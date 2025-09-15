@@ -1,107 +1,220 @@
 import React, { useState } from "react";
-import TeacherModal from "../modals/TeacherModal";
 import TeacherTable from "../components/TeacherTable";
+import TeacherModal from "../modals/TeacherModal";
+import AnimatedButton from "../components/AnimatedButton";
 
-export default function TeachersTab() {
+export default function TeacherTab() {
+  const [teachers, setTeachers] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editIndex, setEditIndex] = useState(null);
-  const [teachers, setTeachers] = useState([]);
   const [view, setView] = useState("active");
-  const [activeSearch, setActiveSearch] = useState("");
-  const [disabledSearch, setDisabledSearch] = useState("");
+  const [searchActive, setSearchActive] = useState("");
+  const [searchDisabled, setSearchDisabled] = useState("");
+  const [toast, setToast] = useState("");
 
-  // -------------------- Save Teacher --------------------
+  // ---------------------------
+  // Save Teacher
+  // ---------------------------
   const handleSaveTeacher = (teacherData) => {
-    if (editIndex !== null) {
-      const updated = [...teachers];
-      updated[editIndex] = {
-        ...teacherData,
-        active: teachers[editIndex].active,
-        salary: teachers[editIndex].salary ?? 0,
-        ratePerClass: teachers[editIndex].ratePerClass ?? teacherData.ratePerClass,
-      };
-      setTeachers(updated);
-      setEditIndex(null);
-    } else {
-      setTeachers([
-        ...teachers,
-        {
-          ...teacherData,
-          active: true,
-          salary: 0,
-        },
-      ]);
-    }
-  };
+  // Check if email already used (only when adding new teacher)
+  if (
+    editIndex === null &&
+    teachers.some(
+      (t) => t.email.toLowerCase() === teacherData.email.toLowerCase()
+    )
+  ) {
+    setToast("Email already in use by another teacher.");
+    setTimeout(() => setToast(""), 3000);
+    return;
+  }
 
-  // -------------------- Edit / Delete / Toggle --------------------
-  const handleEditTeacher = (index) => {
+  const generatedPassword =
+    teacherData.password && teacherData.password.trim() !== ""
+      ? teacherData.password
+      : Math.random().toString(36).slice(-8);
+
+  if (editIndex !== null) {
+    const updated = [...teachers];
+    updated[editIndex] = {
+      ...teacherData,
+      password: generatedPassword,
+      active: teachers[editIndex].active,
+      earned: teachers[editIndex].earned,
+      lessonsCompleted: teachers[editIndex].lessonsCompleted,
+    };
+    setTeachers(updated);
+    setEditIndex(null);
+  } else {
+    setTeachers([
+      ...teachers,
+      {
+        ...teacherData,
+        password: generatedPassword,
+        active: true,
+        lessonsCompleted: 0,
+        earned: 0,
+        showTempPassword: true,
+      },
+    ]);
+  }
+  setIsModalOpen(false);
+};
+
+  // ---------------------------
+  // Edit / Delete / Toggle
+  // ---------------------------
+  const handleEdit = (index) => {
     setEditIndex(index);
     setIsModalOpen(true);
   };
 
-  const handleDeleteTeacher = (index) => {
-    if (window.confirm("Are you sure you want to delete this teacher?")) {
+  const handleDelete = (index) => {
+    if (window.confirm("Delete this teacher?")) {
       const updated = [...teachers];
       updated.splice(index, 1);
       setTeachers(updated);
     }
   };
 
-  const handleToggleAccess = (index) => {
+  const handleToggle = (index) => {
     const updated = [...teachers];
     updated[index].active = !updated[index].active;
     setTeachers(updated);
   };
 
-  // -------------------- Salary --------------------
-  const handleMarkClass = (index) => {
+  // ---------------------------
+  // Lesson & Payment
+  // ---------------------------
+  const handleMarkLesson = (index) => {
     const updated = [...teachers];
     if (!updated[index]) return;
-    const rate = updated[index].ratePerClass || 0;
-    updated[index].salary = (updated[index].salary || 0) + rate;
+    updated[index].lessonsCompleted =
+      (updated[index].lessonsCompleted || 0) + 1;
+
+    const rate = parseFloat(updated[index].ratePerClass || 0);
+    updated[index].earned = (updated[index].earned || 0) + rate;
     setTeachers(updated);
   };
 
-  const handlePaySalary = (index) => {
+
+  const handlePayTeacher = (index) => {
+  const teacher = teachers[index];
+  if (!teacher) return;
+
+  // Ask for confirmation
+  const confirmed = window.confirm(
+    `Are you sure you want to pay ${teacher.firstName} ${teacher.lastName} a salary of $${teacher.earned}?`
+  );
+
+  if (!confirmed) return;
+
+  // Reset salary & lessons
+  const updated = [...teachers];
+  updated[index] = {
+    ...teacher,
+    earned: 0,
+    lessonsCompleted: 0,
+  };
+  setTeachers(updated);
+
+  // Send email
+  sendEmail(
+    teacher.email,
+    `Hi ${teacher.firstName},\n\nYour salary of $${teacher.earned} has been paid.\n\nThank you for your great work!`
+  );
+
+  // Show toast
+  setToast(`Salary of $${teacher.earned} paid to ${teacher.firstName}`);
+  setTimeout(() => setToast(""), 3000);
+};
+
+
+
+  // ---------------------------
+  // Password actions
+  // ---------------------------
+  const handleResetPassword = (index) => {
     const updated = [...teachers];
-    updated[index].salary = 0;
+    const newPass = Math.random().toString(36).slice(-8);
+    updated[index].password = newPass;
+    updated[index].showTempPassword = true;
     setTeachers(updated);
+
+    setToast("Password reset!");
+    setTimeout(() => setToast(""), 2000);
+
+    // hide after 5s
+    setTimeout(() => {
+      const again = [...updated];
+      if (again[index]) again[index].showTempPassword = false;
+      setTeachers(again);
+    }, 5000);
+
+    console.log(
+      `Email sent to ${updated[index].email}: Your new password is ${newPass}`
+    );
   };
 
-  // -------------------- Filters --------------------
+  const handleCopyPassword = (index) => {
+    if (navigator.clipboard && teachers[index]?.password) {
+      navigator.clipboard.writeText(teachers[index].password);
+      setToast("Password copied!");
+      setTimeout(() => setToast(""), 2000);
+
+      const updated = [...teachers];
+      updated[index].showTempPassword = false;
+      setTeachers(updated);
+    }
+  };
+
+  // ---------------------------
+  // Filters
+  // ---------------------------
   const activeTeachers = teachers.filter((t) => t.active);
   const disabledTeachers = teachers.filter((t) => !t.active);
 
-  const filterTeachers = (list, term) =>
-    list.filter(
-      (t) =>
-        t.firstName.toLowerCase().includes(term.toLowerCase()) ||
-        t.lastName.toLowerCase().includes(term.toLowerCase()) ||
-        (t.email && t.email.toLowerCase().includes(term.toLowerCase()))
-    );
+  const filteredActive = activeTeachers.filter((t) =>
+    `${t.firstName} ${t.lastName}`
+      .toLowerCase()
+      .includes(searchActive.toLowerCase())
+  );
 
-  const visibleActive = filterTeachers(activeTeachers, activeSearch);
-  const visibleDisabled = filterTeachers(disabledTeachers, disabledSearch);
+  const filteredDisabled = disabledTeachers.filter((t) =>
+    `${t.firstName} ${t.lastName}`
+      .toLowerCase()
+      .includes(searchDisabled.toLowerCase())
+  );
 
-  // -------------------- Render --------------------
   return (
-    <div>
+    <div className="relative p-4">
+        {toast && (
+  <div className="fixed top-4 right-4 z-50 bg-red-500 text-white px-4 py-2 rounded shadow">
+    {toast}
+  </div>
+)}
+
       <h2 className="text-2xl font-bold mb-4 text-brand-primary">Teachers</h2>
 
-      {/* Create Button */}
-      <button
-        onClick={() => {
-          setEditIndex(null);
-          setIsModalOpen(true);
-        }}
-        className="px-4 py-2 bg-brand-primary text-white rounded-lg hover:bg-brand-secondary"
-      >
-        + Add Teacher
-      </button>
+      {toast && (
+        <div className="fixed top-4 right-4 bg-green-600 text-white px-4 py-2 rounded shadow">
+          {toast}
+        </div>
+      )}
 
-      {/* Toggle Buttons */}
-      <div className="flex justify-center gap-3 mt-6">
+      <div className="flex gap-3">
+        <AnimatedButton
+          color="primary"
+          onClick={() => {
+            setEditIndex(null);
+            setIsModalOpen(true);
+          }}
+        >
+          + Add Teacher
+        </AnimatedButton>
+      </div>
+
+      {/* Toggle view */}
+      <div className="flex justify-center gap-4 mt-6">
         <button
           onClick={() => setView("active")}
           className={`px-6 py-2 rounded-full font-medium transition-all duration-300 ${
@@ -112,10 +225,9 @@ export default function TeachersTab() {
         >
           Active Teachers
         </button>
-
         <button
           onClick={() => setView("disabled")}
-          className={`px-5 py-2 rounded-full font-medium transition-all duration-300 ${
+          className={`px-6 py-2 rounded-full font-medium transition-all duration-300 ${
             view === "disabled"
               ? "bg-red-600 text-white shadow-lg scale-105"
               : "bg-gray-200 text-gray-700 hover:bg-gray-300"
@@ -125,65 +237,58 @@ export default function TeachersTab() {
         </button>
       </div>
 
-      {/* === Active Tab === */}
+      {/* Active teachers */}
       {view === "active" && (
-        <>
-          {/* Search Bar for Active */}
-          <div className="mt-5 mb-5 flex justify-center">
-            <div className="relative w-80">
-              <input
-                type="text"
-                value={activeSearch}
-                onChange={(e) => setActiveSearch(e.target.value)}
-                placeholder="🔍 Search active teachers"
-                className="w-full pl-10 pr-4 py-2 border rounded-full shadow-sm focus:outline-none focus:ring-2 focus:ring-brand-primary"
-              />
-              <span className="absolute left-3 top-2.5 text-gray-500">🔍</span>
-            </div>
+        <div className="mt-6">
+          <div className="mb-4 flex justify-center">
+            <input
+              type="text"
+              placeholder="Search active teachers..."
+              value={searchActive}
+              onChange={(e) => setSearchActive(e.target.value)}
+              className="w-80 px-4 py-2 rounded-full border shadow focus:ring focus:ring-green-300"
+            />
           </div>
 
-          <h3 className="text-lg font-bold mb-2 text-green-600">Active Teachers</h3>
           <TeacherTable
-            teachers={visibleActive}
-            onEdit={handleEditTeacher}
-            onDelete={handleDeleteTeacher}
-            onToggle={handleToggleAccess}
-            onMarkClass={handleMarkClass}
-            onPaySalary={handlePaySalary}
+            teachers={filteredActive}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+            onToggle={handleToggle}
+            onMarkLesson={handleMarkLesson}
+            onPay={handlePayTeacher}
+            onCopyPassword={handleCopyPassword}
+            onResetPassword={handleResetPassword}
           />
-        </>
+        </div>
       )}
 
-      {/* === Disabled Tab === */}
+      {/* Disabled teachers */}
       {view === "disabled" && (
-        <>
-          {/* Search Bar for Disabled */}
-          <div className="mt-5 mb-5 flex justify-center">
-            <div className="relative w-80">
-              <input
-                type="text"
-                value={disabledSearch}
-                onChange={(e) => setDisabledSearch(e.target.value)}
-                placeholder="🔍 Search disabled teachers"
-                className="w-full pl-10 pr-4 py-2 border rounded-full shadow-sm focus:outline-none focus:ring-2 focus:ring-brand-primary"
-              />
-              <span className="absolute left-3 top-2.5 text-gray-500">🔍</span>
-            </div>
+        <div className="mt-6">
+          <div className="mb-4 flex justify-center">
+            <input
+              type="text"
+              placeholder="Search disabled teachers..."
+              value={searchDisabled}
+              onChange={(e) => setSearchDisabled(e.target.value)}
+              className="w-80 px-4 py-2 rounded-full border shadow focus:ring focus:ring-red-300"
+            />
           </div>
 
-          <h3 className="text-lg font-bold mb-2 text-red-600">Disabled Teachers</h3>
           <TeacherTable
-            teachers={visibleDisabled}
-            onEdit={handleEditTeacher}
-            onDelete={handleDeleteTeacher}
-            onToggle={handleToggleAccess}
-            onMarkClass={handleMarkClass}
-            onPaySalary={handlePaySalary}
+            teachers={filteredDisabled}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+            onToggle={handleToggle}
+            onMarkLesson={handleMarkLesson}
+            onPay={handlePayTeacher}
+            onCopyPassword={handleCopyPassword}
+            onResetPassword={handleResetPassword}
           />
-        </>
+        </div>
       )}
 
-      {/* Teacher Modal */}
       <TeacherModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}

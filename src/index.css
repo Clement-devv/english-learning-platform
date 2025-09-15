@@ -2,3 +2,39 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Smart defaults */
+:root{
+  --brand-primary: #6D28D9;
+  --brand-secondary: #7C3AED;
+  --brand-accent: #F59E0B;
+  --glass: rgba(255,255,255,0.6);
+}
+
+body {
+  @apply bg-gradient-to-br from-[#F8FAFF] via-white to-[#EEF2FF] font-sans text-slate-800;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Reusable "glass" card */
+.card-glass {
+  @apply bg-white/80 backdrop-blur-md rounded-xl-2 p-6 shadow-soft-lg border border-white/30 transition-transform duration-200 ease-out;
+}
+.card-glass:hover { transform: translateY(-6px); }
+
+/* Fancy primary button (fallback if you don't use AnimatedButton) */
+.btn-primary {
+  background: linear-gradient(90deg,var(--brand-primary),var(--brand-secondary));
+  @apply text-white font-semibold rounded-lg px-4 py-2 shadow-md transition transform;
+}
+.btn-primary:hover { transform: translateY(-2px) scale(1.01); }
+
+/* Soft small button shape */
+.btn-pill {
+  @apply inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-sm;
+}
+
+/* Respect prefers-reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}

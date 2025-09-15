@@ -1,7 +1,7 @@
-import AdminDashboard from "./pages/admin/AdminDashboard";
+import TeacherDashboard from "./pages/teacher/Teacherdashboard";
 
 function App() {
-  return <AdminDashboard />;
+  return <TeacherDashboard />;
 }
 
 export default App;

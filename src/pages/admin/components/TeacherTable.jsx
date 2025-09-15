@@ -6,111 +6,117 @@ export default function TeacherTable({
   onDelete,
   onToggle,
   onMarkLesson,
-  onMarkPaid,
-  onResetPassword,
+  onPay,
   onCopyPassword,
+  onResetPassword,
 }) {
-  if (!teachers || teachers.length === 0) {
-    return (
-      <div className="mt-4 text-center text-gray-500">
-        No teachers available
-      </div>
-    );
-  }
+  const totalSalary = teachers.reduce((acc, t) => acc + (t.earned || 0), 0);
 
   return (
     <div className="mt-4 overflow-x-auto">
-      <table className="w-full border-collapse border border-gray-300">
-        <thead>
-          <tr className="bg-gray-100">
-            <th className="border p-2 text-left">First Name</th>
-            <th className="border p-2 text-left">Last Name</th>
-            <th className="border p-2 text-left">Email</th>
-            <th className="border p-2 text-center">Rate / Class ($)</th>
-            <th className="border p-2 text-center">Salary Accrued ($)</th>
-            <th className="border p-2 text-center">Actions</th>
+      <table className="w-full border-collapse border border-gray-300 shadow-sm text-sm">
+        <thead className="bg-gray-100">
+          <tr>
+            <th className="border p-2">First</th>
+            <th className="border p-2">Last</th>
+            <th className="border p-2">Email</th>
+            <th className="border p-2">Rate ($)</th>
+            <th className="border p-2">Lessons</th>
+            <th className="border p-2">Earned ($)</th>
+            <th className="border p-2">Password</th>
+            <th className="border p-2 w-70">Actions</th>
           </tr>
         </thead>
-
         <tbody>
-          {teachers.map((t, index) => (
-            <tr key={index} className="hover:bg-gray-50">
-              <td className="border p-2">{t.firstName}</td>
-              <td className="border p-2">{t.lastName}</td>
-              <td className="border p-2">{t.email}</td>
-              <td className="border p-2 text-center">
-                {t.ratePerClass ? `$${t.ratePerClass}` : "-"}
-              </td>
-              <td className="border p-2 text-center">
-                ${t.salaryAccrued?.toFixed(2) || "0.00"}
-              </td>
-
-              <td className="border p-2">
-                <div className="flex flex-wrap justify-center gap-2">
-                  <button
-                    onClick={() => onMarkLesson(index)}
-                    className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
-                  >
-                    Mark Lesson
-                  </button>
-
-                  <button
-                    onClick={() => onMarkPaid(index)}
-                    className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700"
-                  >
-                    Mark Paid
-                  </button>
-
-                  {t.showTempPassword && t.password && (
-                    <div className="flex items-center gap-1">
-                      <span className="text-xs bg-yellow-100 px-2 py-0.5 rounded">
-                        {t.password}
-                      </span>
-                      <button
-                        onClick={() => onCopyPassword(index)}
-                        className="text-xs px-2 py-0.5 bg-gray-300 rounded hover:bg-gray-400"
-                      >
-                        Copy
-                      </button>
-                      <button
-                        onClick={() => onResetPassword(index)}
-                        className="text-xs px-2 py-0.5 bg-red-500 text-white rounded hover:bg-red-600"
-                      >
-                        Reset
-                      </button>
-                    </div>
-                  )}
-
-                  <button
-                    onClick={() => onEdit(index)}
-                    className="px-3 py-1 text-sm bg-yellow-500 text-white rounded hover:bg-yellow-600"
-                  >
-                    Edit
-                  </button>
-
-                  <button
-                    onClick={() => onDelete(index)}
-                    className="px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700"
-                  >
-                    Delete
-                  </button>
-
-                  <button
-                    onClick={() => onToggle(index)}
-                    className={`px-3 py-1 text-sm rounded text-white ${
-                      t.active
-                        ? "bg-gray-500 hover:bg-gray-600"
-                        : "bg-green-600 hover:bg-green-700"
-                    }`}
-                  >
-                    {t.active ? "Disable" : "Enable"}
-                  </button>
-                </div>
+          {teachers.length === 0 ? (
+            <tr>
+              <td colSpan="8" className="text-center p-4 text-gray-500 italic">
+                No teachers found
               </td>
             </tr>
-          ))}
+          ) : (
+            teachers.map((t, i) => (
+              <tr key={i} className="hover:bg-gray-50 transition">
+                <td className="border p-2">{t.firstName}</td>
+                <td className="border p-2">{t.lastName}</td>
+                <td className="border p-2">{t.email}</td>
+                <td className="border p-2 text-center">{t.ratePerClass}</td>
+                <td className="border p-2 text-center">{t.lessonsCompleted || 0}</td>
+                <td className="border p-2 text-center">{(t.earned || 0).toFixed(2)}</td>
+                <td className="border p-2 text-center">
+                  {t.showTempPassword ? (
+                    <span className="font-mono bg-gray-100 px-1 py-0.5 rounded text-xs">
+                      {t.password}
+                    </span>
+                  ) : (
+                    <span className="text-gray-400 italic text-xs">Hidden</span>
+                  )}
+                </td>
+                <td className="border p-1">
+                  <div className="flex flex-wrap gap-1 justify-center text-xs">
+                    <button
+                      onClick={() => onEdit(i)}
+                      className="px-2 py-1 bg-yellow-500 text-white rounded hover:bg-yellow-600"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => onDelete(i)}
+                      className="px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600"
+                    >
+                      Delete
+                    </button>
+                    <button
+                      onClick={() => onToggle(i)}
+                      className={`px-2 py-1 rounded text-white ${
+                        t.active ? "bg-gray-500" : "bg-green-600"
+                      }`}
+                    >
+                      {t.active ? "Disable" : "Enable"}
+                    </button>
+                    <button
+                      onClick={() => onMarkLesson(i)}
+                      className="px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
+                    >
+                      +Lesson
+                    </button>
+                    <button
+                     onClick={() => onPay(i)}
+                      className="px-2 py-1 text-xs bg-yellow-600 text-white rounded hover:bg-yellow-700"
+                    >
+                      Paid
+                    </button>
+
+                    {t.password && (
+                      <>
+                        <button
+                          onClick={() => onCopyPassword(i)}
+                          className="px-2 py-1 bg-indigo-500 text-white rounded hover:bg-indigo-600"
+                        >
+                          Copy
+                        </button>
+                        <button
+                          onClick={() => onResetPassword(i)}
+                          className="px-2 py-1 bg-purple-500 text-white rounded hover:bg-purple-600"
+                        >
+                          Reset
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            ))
+          )}
         </tbody>
       </table>
+
+      {/* Total salary footer */}
+      {teachers.length > 0 && (
+        <div className="mt-3 text-right pr-2 text-gray-700 font-semibold">
+          Total Salaries: ${totalSalary.toFixed(2)}
+        </div>
+      )}
     </div>
   );
 }
