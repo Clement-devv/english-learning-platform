@@ -6,8 +6,10 @@ export default function StudentModal({ isOpen, onClose, onSave, initialData }) {
     surname: "",
     age: "",
     email: "",
-    password: "", // <-- new field
+    password: "",
   });
+
+  const [tempPassword, setTempPassword] = useState(null); // <-- NEW
 
   useEffect(() => {
     if (initialData) {
@@ -16,11 +18,12 @@ export default function StudentModal({ isOpen, onClose, onSave, initialData }) {
         surname: initialData.surname || "",
         age: initialData.age || "",
         email: initialData.email || "",
-        password: initialData.password || "",
+        password: "", // never pre-fill real password
       });
     } else {
       setFormData({ firstName: "", surname: "", age: "", email: "", password: "" });
     }
+    setTempPassword(null); // reset when opening fresh
   }, [initialData]);
 
   const handleChange = (e) => {
@@ -28,11 +31,23 @@ export default function StudentModal({ isOpen, onClose, onSave, initialData }) {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    onSave(formData);
-    onClose();
-  };
+  const handleSubmit = async (e) => {
+  e.preventDefault();
+
+  try {
+    const result = await onSave(formData);
+
+    if (result?.tempPassword) {
+      setTempPassword(result.tempPassword); // Show password, stay open
+      // Modal will close when user clicks "Done"
+    } else {
+      // Only close if no tempPassword (edit mode)
+      onClose();
+    }
+  } catch (err) {
+    console.error("Error creating/updating student:", err);
+  }
+};
 
   if (!isOpen) return null;
 
@@ -43,91 +58,114 @@ export default function StudentModal({ isOpen, onClose, onSave, initialData }) {
           {initialData ? "Edit Student" : "Create Student"}
         </h2>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* First Name */}
-          <div>
-            <label className="block text-sm font-medium mb-1">First Name</label>
-            <input
-              type="text"
-              name="firstName"
-              value={formData.firstName}
-              onChange={handleChange}
-              required
-              className="w-full border rounded px-3 py-2"
-            />
-          </div>
-
-          {/* Surname */}
-          <div>
-            <label className="block text-sm font-medium mb-1">Surname</label>
-            <input
-              type="text"
-              name="surname"
-              value={formData.surname}
-              onChange={handleChange}
-              required
-              className="w-full border rounded px-3 py-2"
-            />
-          </div>
-
-          {/* Age */}
-          <div>
-            <label className="block text-sm font-medium mb-1">Age</label>
-            <input
-              type="number"
-              name="age"
-              value={formData.age}
-              onChange={handleChange}
-              required
-              className="w-full border rounded px-3 py-2"
-            />
-          </div>
-
-          {/* Email */}
-          <div>
-            <label className="block text-sm font-medium mb-1">Email</label>
-            <input
-              type="email"
-              name="email"
-              value={formData.email}
-              onChange={handleChange}
-              required
-              className="w-full border rounded px-3 py-2"
-            />
-          </div>
-
-          {/* Password */}
-          <div>
-            <label className="block text-sm font-medium mb-1">
-              Password <span className="text-gray-500">(leave blank to auto-generate)</span>
-            </label>
-            <input
-              type="text"
-              name="password"
-              value={formData.password}
-              onChange={handleChange}
-              placeholder="Optional"
-              className="w-full border rounded px-3 py-2"
-            />
-          </div>
-
-          {/* Buttons */}
-          <div className="flex justify-end gap-3 pt-4">
+        {tempPassword ? (
+          // ✅ SHOW GENERATED PASSWORD
+          <div className="space-y-4">
+            <p className="text-green-600 font-semibold">
+              Student created successfully!
+            </p>
+            <p className="text-gray-700">
+              Temporary Password:{" "}
+              <span className="font-mono bg-gray-100 px-2 py-1 rounded">
+                {tempPassword}
+              </span>
+            </p>
             <button
-              type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded bg-gray-300 hover:bg-gray-400"
+              className="mt-4 px-4 py-2 rounded bg-brand-primary text-white hover:bg-brand-secondary"
             >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="px-4 py-2 rounded bg-brand-primary text-white hover:bg-brand-secondary"
-            >
-              {initialData ? "Update" : "Create"}
+              Done
             </button>
           </div>
-        </form>
+        ) : (
+          // ✅ NORMAL FORM
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {/* First Name */}
+            <div>
+              <label className="block text-sm font-medium mb-1">First Name</label>
+              <input
+                type="text"
+                name="firstName"
+                value={formData.firstName}
+                onChange={handleChange}
+                required
+                className="w-full border rounded px-3 py-2"
+              />
+            </div>
+
+            {/* Surname */}
+            <div>
+              <label className="block text-sm font-medium mb-1">Surname</label>
+              <input
+                type="text"
+                name="surname"
+                value={formData.surname}
+                onChange={handleChange}
+                required
+                className="w-full border rounded px-3 py-2"
+              />
+            </div>
+
+            {/* Age */}
+            <div>
+              <label className="block text-sm font-medium mb-1">Age</label>
+              <input
+                type="number"
+                name="age"
+                value={formData.age}
+                onChange={handleChange}
+                required
+                className="w-full border rounded px-3 py-2"
+              />
+            </div>
+
+            {/* Email */}
+            <div>
+              <label className="block text-sm font-medium mb-1">Email</label>
+              <input
+                type="email"
+                name="email"
+                value={formData.email}
+                onChange={handleChange}
+                required
+                className="w-full border rounded px-3 py-2"
+              />
+            </div>
+
+            {/* Password */}
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                Password{" "}
+                <span className="text-gray-500">(leave blank to auto-generate)</span>
+              </label>
+              <input
+                type="text"
+                name="password"
+                value={formData.password}
+                onChange={handleChange}
+                placeholder="Optional"
+                className="w-full border rounded px-3 py-2"
+              />
+            </div>
+
+            {/* Buttons */}
+            <div className="flex justify-end gap-3 pt-4">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 rounded bg-gray-300 hover:bg-gray-400"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 rounded bg-brand-primary text-white hover:bg-brand-secondary"
+              >
+                {initialData ? "Update" : "Create"}
+              </button>
+            </div>
+          </form>
+        )}
       </div>
     </div>
   );

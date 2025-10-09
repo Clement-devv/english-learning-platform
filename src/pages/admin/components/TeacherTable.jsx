@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 
 export default function TeacherTable({
   teachers,
@@ -10,10 +10,35 @@ export default function TeacherTable({
   onCopyPassword,
   onResetPassword,
 }) {
-  const totalSalary = teachers.reduce((acc, t) => acc + (t.earned || 0), 0);
+  const [continentFilter, setContinentFilter] = useState("All");
+
+  const filteredTeachers =
+    continentFilter === "All"
+      ? teachers
+      : teachers.filter((t) => t.continent === continentFilter);
+
+  const totalSalary = filteredTeachers.reduce(
+    (acc, t) => acc + (t.earned || 0),
+    0
+  );
 
   return (
     <div className="mt-4 overflow-x-auto">
+      {/* Continent Filter */}
+      <div className="mb-3 flex items-center gap-3">
+        <label className="font-medium">Filter by Continent:</label>
+        <select
+          value={continentFilter}
+          onChange={(e) => setContinentFilter(e.target.value)}
+          className="border px-3 py-1 rounded shadow-sm"
+        >
+          <option value="All">All</option>
+          <option value="Africa">Africa</option>
+          <option value="Asia">Asia</option>
+          <option value="Europe">Europe</option>
+        </select>
+      </div>
+
       <table className="w-full border-collapse border border-gray-300 shadow-sm text-sm">
         <thead className="bg-gray-100">
           <tr>
@@ -23,26 +48,37 @@ export default function TeacherTable({
             <th className="border p-2">Rate ($)</th>
             <th className="border p-2">Lessons</th>
             <th className="border p-2">Earned ($)</th>
+            <th className="border p-2">Continent</th>
             <th className="border p-2">Password</th>
             <th className="border p-2 w-70">Actions</th>
           </tr>
         </thead>
         <tbody>
-          {teachers.length === 0 ? (
+          {filteredTeachers.length === 0 ? (
             <tr>
-              <td colSpan="8" className="text-center p-4 text-gray-500 italic">
+              <td
+                colSpan="9"
+                className="text-center p-4 text-gray-500 italic"
+              >
                 No teachers found
               </td>
             </tr>
           ) : (
-            teachers.map((t, i) => (
+            filteredTeachers.map((t, i) => (
               <tr key={i} className="hover:bg-gray-50 transition">
                 <td className="border p-2">{t.firstName}</td>
                 <td className="border p-2">{t.lastName}</td>
                 <td className="border p-2">{t.email}</td>
                 <td className="border p-2 text-center">{t.ratePerClass}</td>
-                <td className="border p-2 text-center">{t.lessonsCompleted || 0}</td>
-                <td className="border p-2 text-center">{(t.earned || 0).toFixed(2)}</td>
+                <td className="border p-2 text-center">
+                  {t.lessonsCompleted || 0}
+                </td>
+                <td className="border p-2 text-center">
+                  {(t.earned || 0).toFixed(2)}
+                </td>
+                <td className="border p-2 text-center">
+                  {t.continent || "—"}
+                </td>
                 <td className="border p-2 text-center">
                   {t.showTempPassword ? (
                     <span className="font-mono bg-gray-100 px-1 py-0.5 rounded text-xs">
@@ -81,7 +117,7 @@ export default function TeacherTable({
                       +Lesson
                     </button>
                     <button
-                     onClick={() => onPay(i)}
+                      onClick={() => onPay(i)}
                       className="px-2 py-1 text-xs bg-yellow-600 text-white rounded hover:bg-yellow-700"
                     >
                       Paid
@@ -112,7 +148,7 @@ export default function TeacherTable({
       </table>
 
       {/* Total salary footer */}
-      {teachers.length > 0 && (
+      {filteredTeachers.length > 0 && (
         <div className="mt-3 text-right pr-2 text-gray-700 font-semibold">
           Total Salaries: ${totalSalary.toFixed(2)}
         </div>

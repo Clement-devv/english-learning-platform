@@ -2,8 +2,7 @@ import React from "react";
 import { motion } from "framer-motion";
 import { Video } from "lucide-react";
 
-export default function ClassItem({ item }) {
-  // Badge style based on status
+export default function ClassItem({ item, onJoin }) {
   const getBadgeClasses = (status) => {
     switch (status) {
       case "live":
@@ -38,7 +37,6 @@ export default function ClassItem({ item }) {
         <h3 className="font-semibold text-gray-800">{item.title}</h3>
         <p className="text-sm text-gray-600">{item.topic}</p>
 
-        {/* Time */}
         <p className="text-xs text-gray-500">
           Time:{" "}
           {item.time
@@ -49,22 +47,18 @@ export default function ClassItem({ item }) {
             : "No time"}
         </p>
 
-        {/* Duration */}
         {item.duration && (
           <p className="text-xs text-gray-500">
             Duration: {item.duration} mins
           </p>
         )}
 
-        {/* Students */}
         {item.students && item.students.length > 0 ? (
           <p className="mt-1 text-xs text-gray-600">
             <strong>Students:</strong>{" "}
             {item.students
               .map((st) =>
-                typeof st === "string" || typeof st === "number"
-                  ? st
-                  : st.name
+                typeof st === "string" || typeof st === "number" ? st : st.name
               )
               .join(", ")}
           </p>
@@ -75,9 +69,11 @@ export default function ClassItem({ item }) {
         )}
       </div>
 
+      {/* ✅ Start button now triggers onJoin */}
       <motion.button
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
+        onClick={() => onJoin(item)} // 🔥 this connects to TeacherDashboard
         className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center space-x-2"
       >
         <Video className="w-4 h-4" />

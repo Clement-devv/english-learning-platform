@@ -2,12 +2,13 @@ import React, { useState } from "react";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 
-export default function PaymentHistoryModal({ isOpen, onClose, history = [] }) {
+export default function PaymentHistoryModal({ isOpen, onClose, history }) {
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
 
   if (!isOpen) return null;
 
+  // Filter by date range
   const filtered = history.filter((p) => {
     const d = new Date(p.date);
     const from = fromDate ? new Date(fromDate) : null;
@@ -23,8 +24,8 @@ export default function PaymentHistoryModal({ isOpen, onClose, history = [] }) {
     doc.autoTable({
       head: [["Date", "Student", "Method", "Amount", "Classes", "Status"]],
       body: filtered.map((p) => [
-        p.date,
-        p.student,
+        new Date(p.date).toLocaleDateString(),
+        p.student || "Unknown",
         p.method,
         p.amount,
         p.classes || "-",
@@ -33,6 +34,28 @@ export default function PaymentHistoryModal({ isOpen, onClose, history = [] }) {
       startY: 25,
     });
     doc.save("payment-history.pdf");
+  };
+
+  const handleCSV = () => {
+    const rows = [
+      ["Date", "Student", "Method", "Amount", "Classes", "Status"],
+      ...filtered.map((p) => [
+        new Date(p.date).toLocaleDateString(),
+        p.student || "Unknown",
+        p.method,
+        p.amount,
+        p.classes || "-",
+        p.status,
+      ]),
+    ];
+    const csv = rows.map((r) => r.join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "payment-history.csv";
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -57,7 +80,13 @@ export default function PaymentHistoryModal({ isOpen, onClose, history = [] }) {
             onClick={handlePrint}
             className="ml-auto px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
           >
-            Print to PDF
+            PDF
+          </button>
+          <button
+            onClick={handleCSV}
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          >
+            CSV
           </button>
         </div>
 
@@ -77,20 +106,19 @@ export default function PaymentHistoryModal({ isOpen, onClose, history = [] }) {
               {filtered.length > 0 ? (
                 filtered.map((row, i) => (
                   <tr key={i} className="hover:bg-gray-50">
-                    <td className="border p-2">{row.date}</td>
-                    <td className="border p-2">{row.student}</td>
+                    <td className="border p-2">
+                      {new Date(row.date).toLocaleDateString()}
+                    </td>
+                    <td className="border p-2">{row.student || "Unknown"}</td>
                     <td className="border p-2">{row.method}</td>
-                    <td className="border p-2">{row.amount}</td>
+                    <td className="border p-2">₦{row.amount}</td>
                     <td className="border p-2">{row.classes || "-"}</td>
                     <td className="border p-2">{row.status}</td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td
-                    colSpan="6"
-                    className="text-center p-4 text-gray-500"
-                  >
+                  <td colSpan="6" className="text-center p-4 text-gray-500">
                     No payment records found
                   </td>
                 </tr>

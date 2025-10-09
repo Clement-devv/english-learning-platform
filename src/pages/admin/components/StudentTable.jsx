@@ -33,41 +33,42 @@ export default function StudentTable({
               </td>
             </tr>
           ) : (
-            students.map((s, i) => (
-              <tr key={i} className="hover:bg-gray-50">
+            students.map((s) => (
+              <tr key={s._id} className="hover:bg-gray-50">
                 <td className="border p-2">{s.firstName}</td>
                 <td className="border p-2">{s.surname}</td>
                 <td className="border p-2">{s.email}</td>
 
+                
                 {/* Password column */}
-                <td className="border p-2">
-                  {s.showTempPassword ? (
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono bg-gray-100 px-2 py-1 rounded">
-                        {s.password}
+                  <td className="border p-2">
+                    {s.showTempPassword && s.tempPassword ? (
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono bg-gray-100 px-2 py-1 rounded text-sm">
+                          {s.tempPassword}  {/* ✅ Show tempPassword, not password */}
+                        </span>
+                        <button
+                          onClick={() => onCopyPassword(s._id)}
+                          className="px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
+                        >
+                          Copy
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="italic text-gray-400 text-sm">
+                        ••••••••
                       </span>
+                    )}
+
+                    <div className="mt-1">
                       <button
-                        onClick={() => onCopyPassword(i)}
-                        className="px-2 py-1 text-xs bg-gray-200 rounded hover:bg-gray-300"
+                        onClick={() => onResetPassword(s._id)}
+                        className="px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600"
                       >
-                        Copy
+                        Reset Password
                       </button>
                     </div>
-                  ) : (
-                    <span className="italic text-gray-500 text-sm">
-                      (Password hidden)
-                    </span>
-                  )}
-
-                  <div className="mt-1">
-                    <button
-                      onClick={() => onResetPassword(i)}
-                      className="px-2 py-1 text-xs bg-red-200 text-red-700 rounded hover:bg-red-300"
-                    >
-                      Reset Password
-                    </button>
-                  </div>
-                </td>
+                  </td>
 
                 {/* Classes */}
                 <td className="border p-2 text-center">
@@ -78,49 +79,49 @@ export default function StudentTable({
                 <td className="border p-2">
                   <div className="flex flex-wrap gap-2">
                     <button
-                      onClick={() => onMarkLesson(i)}
+                      onClick={() => onMarkLesson(s._id)}
                       className="px-2 py-1 bg-purple-600 text-white rounded hover:bg-purple-700 text-xs"
                     >
                       Mark Lesson
                     </button>
 
                     <button
-                      onClick={() => onManualPayment(i)}
+                      onClick={() => onManualPayment(s._id)}
                       className="px-2 py-1 bg-green-600 text-white rounded hover:bg-green-700 text-xs"
                     >
                       Manual Payment
                     </button>
 
                     <button
-                      onClick={() => onViewPayment(i)}
+                      onClick={() => onViewPayment(s._id)}
                       className="px-2 py-1 bg-yellow-600 text-white rounded hover:bg-yellow-700 text-xs"
                     >
                       View Payment
                     </button>
 
                     <button
-                      onClick={() => onViewLessons(i)}
+                      onClick={() => onViewLessons(s._id)}
                       className="px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-xs"
                     >
                       View Lessons
                     </button>
 
                     <button
-                      onClick={() => onEdit(i)}
+                      onClick={() => onEdit(s._id)}
                       className="px-2 py-1 bg-indigo-500 text-white rounded hover:bg-indigo-600 text-xs"
                     >
                       Edit
                     </button>
 
                     <button
-                      onClick={() => onDelete(i)}
+                      onClick={() => onDelete(s._id)}
                       className="px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600 text-xs"
                     >
                       Delete
                     </button>
 
                     <button
-                      onClick={() => onToggle(i)}
+                      onClick={() => onToggle(s._id, !s.active)}
                       className={`px-2 py-1 text-xs rounded text-white ${
                         s.active
                           ? "bg-gray-500 hover:bg-gray-600"

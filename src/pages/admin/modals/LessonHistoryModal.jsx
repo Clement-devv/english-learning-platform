@@ -21,12 +21,11 @@ export default function LessonHistoryModal({ isOpen, onClose, history = [] }) {
     const doc = new jsPDF();
     doc.text("Lesson History", 14, 15);
     doc.autoTable({
-      head: [["Date", "Student", "Teacher", "Remaining"]],
+      head: [["Date", "Student", "Teacher"]],
       body: filtered.map((l) => [
-        l.date,
-        l.student,
-        l.teacher || "-",
-        l.remaining,
+        new Date(l.date).toLocaleDateString(),
+        l.student || "Unknown",
+        l.teacher || "Unknown",
       ]),
       startY: 25,
     });
@@ -66,25 +65,22 @@ export default function LessonHistoryModal({ isOpen, onClose, history = [] }) {
                 <th className="border p-2">Date</th>
                 <th className="border p-2">Student</th>
                 <th className="border p-2">Teacher</th>
-                <th className="border p-2">Remaining</th>
               </tr>
             </thead>
             <tbody>
               {filtered.length > 0 ? (
                 filtered.map((row, i) => (
                   <tr key={i} className="hover:bg-gray-50">
-                    <td className="border p-2">{row.date}</td>
-                    <td className="border p-2">{row.student}</td>
-                    <td className="border p-2">{row.teacher || "-"}</td>
-                    <td className="border p-2">{row.remaining}</td>
+                    <td className="border p-2">
+                      {new Date(row.date).toLocaleDateString()}
+                    </td>
+                    <td className="border p-2">{row.student || "Unknown"}</td>
+                    <td className="border p-2">{row.teacher || "Unknown"}</td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td
-                    colSpan="4"
-                    className="text-center p-4 text-gray-500"
-                  >
+                  <td colSpan="3" className="text-center p-4 text-gray-500">
                     No lesson records found
                   </td>
                 </tr>

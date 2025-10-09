@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Users, Calendar, Video, MessageSquare, BookOpen, Bell, Settings, Clock, Star, TrendingUp, Play, Eye } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 const TeacherDashboard = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -10,6 +11,14 @@ const TeacherDashboard = () => {
     totalStudents: 87,
     completedClasses: 342
   });
+
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+  localStorage.removeItem('teacherToken');
+  localStorage.removeItem('teacherInfo');
+  navigate('/teacher/login');
+};
 
   const [liveClasses, setLiveClasses] = useState([
     {
