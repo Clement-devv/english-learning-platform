@@ -5,14 +5,15 @@ import Student from "../models/Student.js";
 import Payment from "../models/Payment.js";
 import Lesson from "../models/Lesson.js";
 import { sendWelcomeEmail, sendPasswordResetEmail } from "../utils/emailService.js";
+import { verifyToken, verifyAdmin, verifyAdminOrTeacher, verifyStudent, verifyOwnership } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
 
 // ================== STUDENT CRUD ==================
 
-// 👉 Get all students
-router.get("/", async (req, res) => {
+// 👉 Get all students - ONLY ADMIN AND TEACHERS can view
+router.get("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
   try {
     const students = await Student.find();
     res.json(students);
@@ -22,9 +23,14 @@ router.get("/", async (req, res) => {
   }
 });
 
-// 👉 Get single student by ID
-router.get("/:id", async (req, res) => {
+// 👉 Get single student by ID - Admin, Teachers, or the student themselves
+router.get("/:id", verifyToken, async (req, res) => {
   try {
+    // Students can only view their own data, Admin/Teachers can view any
+    if (req.user.role === "student" && req.user.id !== req.params.id) {
+      return res.status(403).json({ message: "You can only view your own data" });
+    }
+
     const student = await Student.findById(req.params.id);
     if (!student) return res.status(404).json({ message: "Student not found" });
     res.json(student);
@@ -34,8 +40,8 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-// 👉 Create new student
-router.post("/", async (req, res) => {
+// 👉 Create new student - ONLY ADMIN AND TEACHERS
+router.post("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
   try {
     const { firstName, surname, email, password, age, noOfClasses } = req.body;
 
@@ -89,8 +95,8 @@ router.post("/", async (req, res) => {
   }
 });
 
-// 👉 Update student
-router.put("/:id", async (req, res) => {
+// 👉 Update student - ONLY ADMIN AND TEACHERS
+router.put("/:id", verifyToken, verifyAdminOrTeacher, async (req, res) => {
   try {
     const { password, ...updates } = req.body;
 
@@ -128,8 +134,8 @@ router.put("/:id", async (req, res) => {
   }
 });
 
-// 👉 Delete student
-router.delete("/:id", async (req, res) => {
+// 👉 Delete student - ONLY ADMIN
+router.delete("/:id", verifyToken, verifyAdmin, async (req, res) => {
   try {
     const student = await Student.findByIdAndDelete(req.params.id);
     if (!student) return res.status(404).json({ message: "Student not found" });
@@ -143,8 +149,8 @@ router.delete("/:id", async (req, res) => {
 
 // ================== EXTRA FEATURES ==================
 
-// 👉 Reset password
-router.post("/:id/reset-password", async (req, res) => {
+// 👉 Reset password - ONLY ADMIN AND TEACHERS
+router.post("/:id/reset-password", verifyToken, verifyAdminOrTeacher, async (req, res) => {
   try {
     const student = await Student.findById(req.params.id);
     if (!student) return res.status(404).json({ message: "Student not found" });
@@ -175,8 +181,8 @@ router.post("/:id/reset-password", async (req, res) => {
   }
 });
 
-// 👉 Record lesson
-router.post("/:id/lesson", async (req, res) => {
+// 👉 Record lesson - ONLY ADMIN AND TEACHERS
+router.post("/:id/lesson", verifyToken, verifyAdminOrTeacher, async (req, res) => {
   try {
     const student = await Student.findById(req.params.id);
     if (!student) return res.status(404).json({ message: "Student not found" });
@@ -203,9 +209,14 @@ router.post("/:id/lesson", async (req, res) => {
   }
 });
 
-// 👉 Get all lessons for a student
-router.get("/:id/lessons", async (req, res) => {
+// 👉 Get all lessons for a student - Admin, Teachers, or the student themselves
+router.get("/:id/lessons", verifyToken, async (req, res) => {
   try {
+    // Students can only view their own lessons
+    if (req.user.role === "student" && req.user.id !== req.params.id) {
+      return res.status(403).json({ message: "You can only view your own lessons" });
+    }
+
     const lessons = await Lesson.find({ studentId: req.params.id }).sort({ date: -1 });
     res.json(lessons);
   } catch (err) {
@@ -214,8 +225,8 @@ router.get("/:id/lessons", async (req, res) => {
   }
 });
 
-// 👉 Record payment
-router.post("/:id/payment", async (req, res) => {
+// 👉 Record payment - ONLY ADMIN
+router.post("/:id/payment", verifyToken, verifyAdmin, async (req, res) => {
   try {
     const { amount, classes, method = "Manual", status = "completed" } = req.body;
     const student = await Student.findById(req.params.id);
@@ -242,9 +253,14 @@ router.post("/:id/payment", async (req, res) => {
   }
 });
 
-// 👉 Get all payments for a student
-router.get("/:id/payments", async (req, res) => {
+// 👉 Get all payments for a student - Admin, Teachers, or the student themselves
+router.get("/:id/payments", verifyToken, async (req, res) => {
   try {
+    // Students can only view their own payments
+    if (req.user.role === "student" && req.user.id !== req.params.id) {
+      return res.status(403).json({ message: "You can only view your own payments" });
+    }
+
     const payments = await Payment.find({ studentId: req.params.id }).sort({ date: -1 });
     res.json(payments);
   } catch (err) {
@@ -253,8 +269,8 @@ router.get("/:id/payments", async (req, res) => {
   }
 });
 
-// 👉 Toggle student active/inactive
-router.patch("/:id/toggle", async (req, res) => {
+// 👉 Toggle student active/inactive - ONLY ADMIN
+router.patch("/:id/toggle", verifyToken, verifyAdmin, async (req, res) => {
   try {
     const student = await Student.findById(req.params.id);
     if (!student) return res.status(404).json({ message: "Student not found" });

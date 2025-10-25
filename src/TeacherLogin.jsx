@@ -22,12 +22,16 @@ export default function TeacherLogin() {
         password: password
       });
 
-      // Store token and teacher info
-      localStorage.setItem('teacherToken', response.data.token);
-      localStorage.setItem('teacherInfo', JSON.stringify(response.data.teacher));
-
-      // Redirect to dashboard
-      navigate('/teacher/dashboard');
+      
+  if (response.data.success) {
+  // Store token, session token, and teacher info
+  localStorage.setItem('teacherToken', response.data.token);
+  localStorage.setItem('teacherSessionToken', response.data.sessionToken);
+  localStorage.setItem('teacherInfo', JSON.stringify(response.data.teacher));
+  
+  // Navigate to dashboard
+  navigate('/teacher/dashboard');
+}
       
     } catch (err) {
       console.error('Login error:', err);

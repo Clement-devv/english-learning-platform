@@ -233,3 +233,78 @@ export const sendForgotPasswordEmail = async (teacherEmail, teacherName, resetTo
     return { success: false, error: error.message };
   }
 };
+
+
+// Send forgot password email for STUDENTS
+export const sendStudentForgotPasswordEmail = async (studentEmail, studentName, resetToken) => {
+  const resetLink = `${process.env.FRONTEND_URL}/student/reset-password/${resetToken}`;
+  
+  const transporter = nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASSWORD,
+    },
+  });
+  
+  const mailOptions = {
+    from: `School App <${process.env.EMAIL_USER}>`,
+    to: studentEmail,
+    subject: "Reset Your Password - Student Portal",
+    html: `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+            .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
+            .button { display: inline-block; padding: 15px 40px; background: #4facfe; color: white; text-decoration: none; border-radius: 5px; margin: 20px 0; font-weight: bold; }
+            .warning { background: #fff3cd; padding: 15px; border-radius: 5px; border-left: 4px solid #ffc107; margin: 20px 0; }
+            .footer { text-align: center; color: #666; font-size: 12px; margin-top: 20px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>🔐 Password Reset Request</h1>
+            </div>
+            <div class="content">
+              <p>Hello <strong>${studentName}</strong>,</p>
+              <p>We received a request to reset your student account password. Click the button below to create a new password:</p>
+              
+              <a href="${resetLink}" class="button">Reset Password</a>
+
+              <p>Or copy and paste this link in your browser:</p>
+              <p style="word-break: break-all; color: #666; font-size: 12px;">${resetLink}</p>
+
+              <div class="warning">
+                <strong>⚠️ Important:</strong>
+                <ul>
+                  <li>This link will expire in <strong>1 hour</strong></li>
+                  <li>If you didn't request this, please ignore this email</li>
+                  <li>Your password won't change unless you click the link above</li>
+                </ul>
+              </div>
+
+              <div class="footer">
+                <p>If you're having trouble, contact your teacher or administrator for assistance.</p>
+                <p>© 2025 School App. All rights reserved.</p>
+              </div>
+            </div>
+          </div>
+        </body>
+      </html>
+    `,
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    console.log(`✅ Student forgot password email sent to ${studentEmail}`);
+    return { success: true };
+  } catch (error) {
+    console.error("❌ Error sending student forgot password email:", error);
+    return { success: false, error: error.message };
+  }
+};

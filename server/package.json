@@ -8,6 +8,8 @@
     "dev": "nodemon index.js"
   },
   "dependencies": {
+    "@react-three/drei": "^10.7.6",
+    "@react-three/fiber": "^9.3.0",
     "agora-access-token": "^2.0.4",
     "agora-rtc-sdk-ng": "^4.24.0",
     "axios": "^1.12.2",
@@ -17,7 +19,9 @@
     "express": "^5.1.0",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.0.0",
-    "nodemailer": "^7.0.6"
+    "nodemailer": "^7.0.6",
+    "three": "^0.180.0",
+    "ua-parser-js": "^2.0.6"
   },
   "devDependencies": {
     "nodemon": "^3.1.10"

@@ -7,12 +7,13 @@ const api = axios.create({
 // Add token to all requests automatically
 api.interceptors.request.use(
   (config) => {
-    // Check for both teacher and student tokens
+    // Check for admin, teacher, or student tokens
+    const adminToken = localStorage.getItem('adminToken');
     const teacherToken = localStorage.getItem('teacherToken');
     const studentToken = localStorage.getItem('studentToken');
     
-    // Use whichever token exists
-    const token = teacherToken || studentToken;
+    // Use whichever token exists (priority: admin > teacher > student)
+    const token = adminToken || teacherToken || studentToken;
     
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -30,10 +31,15 @@ api.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       // Check which type of user is logged in and redirect accordingly
+      const adminToken = localStorage.getItem('adminToken');
       const teacherToken = localStorage.getItem('teacherToken');
       const studentToken = localStorage.getItem('studentToken');
       
-      if (teacherToken) {
+      if (adminToken) {
+        localStorage.removeItem('adminToken');
+        localStorage.removeItem('adminInfo');
+        window.location.href = '/admin/login';
+      } else if (teacherToken) {
         localStorage.removeItem('teacherToken');
         localStorage.removeItem('teacherInfo');
         window.location.href = '/teacher/login';

@@ -1,9 +1,9 @@
 // src/pages/student/StudentLogin.jsx
-// src/pages/student/StudentLogin.jsx
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BookOpen, Mail, Lock, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import api from '../../api'; // Use your api instance
+
 
 export default function StudentLogin() {
   const [email, setEmail] = useState('');
@@ -25,13 +25,14 @@ export default function StudentLogin() {
       });
 
       if (response.data.success) {
-        // Store token and student info
-        localStorage.setItem('studentToken', response.data.token);
-        localStorage.setItem('studentInfo', JSON.stringify(response.data.student));
-        
-        // Navigate to student dashboard
-        navigate('/student/dashboard');
-      }
+  // Store token, session token, and student info
+  localStorage.setItem('studentToken', response.data.token);
+  localStorage.setItem('studentSessionToken', response.data.sessionToken);
+  localStorage.setItem('studentInfo', JSON.stringify(response.data.student));
+  
+  // Navigate to dashboard
+  navigate('/student/dashboard');
+}
     } catch (err) {
       console.error('Login error:', err);
       setError(
@@ -42,8 +43,6 @@ export default function StudentLogin() {
       setLoading(false);
     }
   };
-
-  // ... rest of your JSX stays the same
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center p-4">
@@ -144,10 +143,14 @@ export default function StudentLogin() {
 
           {/* Footer */}
           <div className="mt-6 text-center">
-            <p className="text-sm text-gray-600">
-              Need help? Contact your administrator
-            </p>
-          </div>
+          <button
+            type="button"
+            onClick={() => navigate('/student/forgot-password')}
+            className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+          >
+            Forgot your password?
+          </button>
+        </div>
         </div>
 
         {/* Additional Info */}

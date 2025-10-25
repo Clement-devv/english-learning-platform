@@ -1,6 +1,20 @@
 // models/Teacher.js
 import mongoose from "mongoose";
 
+const sessionSchema = new mongoose.Schema({
+  token: { type: String, required: true },
+  deviceInfo: {
+    browser: String,
+    os: String,
+    device: String,
+  },
+  ipAddress: String,
+  location: String,
+  loginTime: { type: Date, default: Date.now },
+  lastActivity: { type: Date, default: Date.now },
+  isActive: { type: Boolean, default: true },
+});
+
 const teacherSchema = new mongoose.Schema({
   firstName: String,
   lastName: String,
@@ -19,11 +33,13 @@ const teacherSchema = new mongoose.Schema({
   // Password reset fields
   resetPasswordToken: String,
   resetPasswordExpires: Date,
-  
-  // Track password changes
   lastPasswordChange: Date,
+  
+  // Session management
+  sessions: [sessionSchema],
+  lastLogin: Date,
 }, {
-  timestamps: true, // Adds createdAt and updatedAt automatically
+  timestamps: true,
 });
 
 export default mongoose.model("Teacher", teacherSchema);

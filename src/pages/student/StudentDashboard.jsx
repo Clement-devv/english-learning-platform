@@ -8,9 +8,14 @@ import UpcomingClasses from "./components/UpcomingClasses";
 import ProgressCard from "./components/ProgressCard";
 import QuickActions from "./components/QuickActions";
 import NotificationsCard from "./components/NotificationsCard";
+import ChangePassword from "../../components/student/auth/ChangePassword";
 
 export default function StudentDashboard() {
   const navigate = useNavigate();
+  
+  // Change Password Modal State
+  const [showChangePassword, setShowChangePassword] = useState(false);
+  const [toast, setToast] = useState("");
   
   // Get student info from localStorage
   const [student, setStudent] = useState(() => {
@@ -23,7 +28,7 @@ export default function StudentDashboard() {
         surname: parsed.surname,
         email: parsed.email,
         noOfClasses: parsed.noOfClasses || 0,
-        level: "Intermediate" // You can add this field to your student model later
+        level: "Intermediate"
       };
     }
     return { name: "Student", level: "Intermediate" };
@@ -103,6 +108,11 @@ export default function StudentDashboard() {
     navigate("/student/login");
   };
 
+  const handlePasswordChangeSuccess = (message) => {
+    setToast(message);
+    setTimeout(() => setToast(""), 3000);
+  };
+
   const joinVideoCall = (classId, className) => {
     alert(`Joining "${className}" video call...`);
   };
@@ -115,7 +125,19 @@ export default function StudentDashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-      <Header student={student} notifications={notifications} onLogout={handleLogout} />
+      {/* Toast Notification */}
+      {toast && (
+        <div className="fixed top-4 right-4 z-50 px-4 py-2 rounded shadow text-white bg-green-500">
+          {toast}
+        </div>
+      )}
+
+      <Header 
+        student={student} 
+        notifications={notifications} 
+        onLogout={handleLogout}
+        onChangePassword={() => setShowChangePassword(true)}
+      />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -134,6 +156,14 @@ export default function StudentDashboard() {
           </div>
         </div>
       </div>
+
+      {/* Change Password Modal */}
+      {showChangePassword && (
+        <ChangePassword
+          onClose={() => setShowChangePassword(false)}
+          onSuccess={handlePasswordChangeSuccess}
+        />
+      )}
     </div>
   );
 }

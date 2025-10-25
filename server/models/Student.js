@@ -1,6 +1,19 @@
 // models/Student.js
 import mongoose from "mongoose";
-import bcrypt from "bcrypt";
+
+const sessionSchema = new mongoose.Schema({
+  token: { type: String, required: true },
+  deviceInfo: {
+    browser: String,
+    os: String,
+    device: String,
+  },
+  ipAddress: String,
+  location: String,
+  loginTime: { type: Date, default: Date.now },
+  lastActivity: { type: Date, default: Date.now },
+  isActive: { type: Boolean, default: true },
+});
 
 const studentSchema = new mongoose.Schema({
   firstName: { type: String, required: true },
@@ -11,27 +24,18 @@ const studentSchema = new mongoose.Schema({
   noOfClasses: { type: Number, default: 0 },
   lastPaymentDate: Date,
   showTempPassword: { type: Boolean, default: false },
-  age: { type: Number }, // 👈 optional, added so your modal doesn’t break
-}, { timestamps: true });
-
-// Hash password before save
-studentSchema.pre("save", async function (next) {
-  // Only hash if password was actually modified
-  if (!this.isModified("password")) {
-    return next();
-  }
-
-  // If password is being modified but is empty/null, generate one
-  if (!this.password) {
-    const tempPass = Math.random().toString(36).slice(-8);
-    this.password = await bcrypt.hash(tempPass, 10);
-    this.showTempPassword = true;
-  } else {
-    // Password was provided, just hash it
-    this.password = await bcrypt.hash(this.password, 10);
-  }
+  age: { type: Number },
   
-  next();
+  // Password reset fields
+  resetPasswordToken: String,
+  resetPasswordExpires: Date,
+  lastPasswordChange: Date,
+  
+  // Session management
+  sessions: [sessionSchema],
+  lastLogin: Date,
+}, { 
+  timestamps: true 
 });
 
 export default mongoose.model("Student", studentSchema);

@@ -2,11 +2,12 @@ import express from "express";
 import bcrypt from "bcryptjs";
 import Teacher from "../models/Teacher.js";
 import { sendWelcomeEmail, sendPasswordResetEmail } from "../utils/emailService.js";
+import { verifyToken, verifyAdmin, verifyAdminOrTeacher } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-// 👉 Get all teachers
-router.get("/", async (req, res) => {
+// 👉 Get all teachers - Admin and Teachers can view
+router.get("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
   try {
     const teachers = await Teacher.find();
     res.json(teachers);
@@ -15,8 +16,8 @@ router.get("/", async (req, res) => {
   }
 });
 
-// 👉 Create new teacher
-router.post("/", async (req, res) => {
+// 👉 Create new teacher - ONLY ADMIN
+router.post("/", verifyToken, verifyAdmin, async (req, res) => {
   try {
     const { firstName, lastName, email, ratePerClass, password, continent } = req.body;
 
@@ -53,7 +54,6 @@ router.post("/", async (req, res) => {
       console.log(`✅ Welcome email sent to ${email}`);
     } catch (emailError) {
       console.error(`❌ Failed to send welcome email:`, emailError);
-      // Don't fail the request if email fails
     }
 
     const teacherResponse = teacher.toObject();
@@ -66,8 +66,8 @@ router.post("/", async (req, res) => {
   }
 });
 
-// 👉 Update teacher
-router.put("/:id", async (req, res) => {
+// 👉 Update teacher - ONLY ADMIN
+router.put("/:id", verifyToken, verifyAdmin, async (req, res) => {
   try {
     const { continent, password, ...otherUpdates } = req.body;
 
@@ -121,8 +121,9 @@ router.put("/:id", async (req, res) => {
     res.status(400).json({ message: err.message });
   }
 });
-// 👉 Delete teacher
-router.delete("/:id", async (req, res) => {
+
+// 👉 Delete teacher - ONLY ADMIN
+router.delete("/:id", verifyToken, verifyAdmin, async (req, res) => {
   try {
     const teacher = await Teacher.findByIdAndDelete(req.params.id);
     if (!teacher) return res.status(404).json({ message: "Teacher not found" });
