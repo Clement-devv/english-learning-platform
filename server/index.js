@@ -10,6 +10,14 @@ import cors from "cors";
 
 
 
+console.log("✅ Environment Check:");
+console.log("  MongoDB:", process.env.MONGO_URI ? "✓ Configured" : "✗ Missing");
+console.log("  JWT Secret:", process.env.JWT_SECRET ? "✓ Configured" : "✗ Missing");
+console.log("  Email:", process.env.EMAIL_USER ? "✓ Configured" : "✗ Missing");
+
+
+
+
 // Routes
 import teacherRoutes from "./routes/teacherRoutes.js";
 import studentRoutes from "./routes/studentRoutes.js";
@@ -29,6 +37,9 @@ const app = express();
 // Middleware
 app.use(cors());
 app.use(express.json());
+
+app.use('/api/', apiLimiter);
+
 
 // MongoDB connection (no deprecated options needed)
 mongoose

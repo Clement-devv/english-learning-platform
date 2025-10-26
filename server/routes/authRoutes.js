@@ -6,6 +6,12 @@ import Teacher from "../models/Teacher.js";
 import Student from "../models/Student.js";
 import Admin from "../models/Admin.js"; 
 
+import { config } from "../config/config.js";
+import { loginLimiter, passwordResetLimiter } from "../middleware/rateLimiter.js";
+
+import { createSession, cleanExpiredSessions } from "../utils/sessionManager.js";
+
+
 //import { sendForgotPasswordEmail } from "../utils/emailService.js";
 import { sendForgotPasswordEmail, sendStudentForgotPasswordEmail } from "../utils/emailService.js";
 
@@ -19,7 +25,7 @@ const verifyToken = async (req, res, next) => {
       return res.status(401).json({ message: "No token provided" });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || "your-secret-key-change-this");
+    const decoded = jwt.verify(config.jwtSecret);
     const teacher = await Teacher.findById(decoded.id).select("-password");
     
     if (!teacher || !teacher.active) {
@@ -35,26 +41,36 @@ const verifyToken = async (req, res, next) => {
 
 
 // Teacher Login
-router.post("/teacher/login", async (req, res) => {
+
+router.post("/teacher/login", loginLimiter, async  (req, res) => {
   try {
     const { email, password } = req.body;
 
     const teacher = await Teacher.findOne({ email });
     if (!teacher) {
-      return res.status(401).json({ message: "Invalid email or password" });
+      return res.status(401).json({ 
+        success: false,
+        message: "Invalid email or password" 
+      });
     }
 
     if (!teacher.active) {
-      return res.status(403).json({ message: "Your account has been deactivated. Please contact admin." });
+      return res.status(403).json({ 
+        success: false,
+        message: "Your account has been deactivated. Please contact admin." 
+      });
     }
 
     const isPasswordValid = await bcrypt.compare(password, teacher.password);
     
     if (!isPasswordValid) {
-      return res.status(401).json({ message: "Invalid email or password" });
+      return res.status(401).json({ 
+        success: false,
+        message: "Invalid email or password" 
+      });
     }
 
-    // Generate JWT token
+    // Generate JWT token using config
     const token = jwt.sign(
       { 
         id: teacher._id, 
@@ -63,8 +79,8 @@ router.post("/teacher/login", async (req, res) => {
         lastName: teacher.lastName,
         role: "teacher"
       },
-      process.env.JWT_SECRET || "your-secret-key-change-this",
-      { expiresIn: "7d" }
+      config.jwtSecret,  // Using config instead of hardcoded
+      { expiresIn: config.jwtExpiry }  // Using config for expiry
     );
 
     // Create session
@@ -125,7 +141,7 @@ router.post("/teacher/change-password", verifyToken, async (req, res) => {
     }
 
     // Hash and save new password
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    const hashedPassword = await bcrypt.hash(password, config.bcryptRounds);
     teacher.password = hashedPassword;
     teacher.lastPasswordChange = new Date();
     await teacher.save();
@@ -142,7 +158,7 @@ router.post("/teacher/change-password", verifyToken, async (req, res) => {
 });
 
 // Forgot Password - Request reset
-router.post("/teacher/forgot-password", async (req, res) => {
+router.post("/teacher/forgot-password", passwordResetLimiter, async (req, res) => {
   try {
     const { email } = req.body;
 
@@ -223,7 +239,7 @@ router.post("/teacher/reset-password/:token", async (req, res) => {
     }
 
     // Hash and save new password
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    const hashedPassword = await bcrypt.hash(password, config.bcryptRounds);
     teacher.password = hashedPassword;
     teacher.lastPasswordChange = new Date();
     teacher.resetPasswordToken = undefined;
@@ -248,7 +264,7 @@ router.post("/teacher/reset-password/:token", async (req, res) => {
 
 
 // Student Login
-router.post("/student/login", async (req, res) => {
+router.post("/student/login", loginLimiter, async (req, res) => {
   try {
     const { email, password } = req.body;
 
@@ -282,8 +298,8 @@ router.post("/student/login", async (req, res) => {
         surname: student.surname,
         role: "student"
       },
-      process.env.JWT_SECRET || "your-secret-key-change-this",
-      { expiresIn: "7d" }
+      config.jwtSecret,
+      { expiresIn: config.jwtExpiry }
     );
 
     // Create session
@@ -324,7 +340,7 @@ router.get("/student/verify", async (req, res) => {
       return res.status(401).json({ message: "No token provided" });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || "your-secret-key-change-this");
+    const decoded = jwt.verify(token, config.jwtSecret);
     const student = await Student.findById(decoded.id).select("-password");
     
     if (!student || !student.active) {
@@ -346,7 +362,7 @@ router.post("/student/change-password", async (req, res) => {
       return res.status(401).json({ message: "No token provided" });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || "your-secret-key-change-this");
+    const decoded = jwt.verify(token, config.jwtSecret);
     const { currentPassword, newPassword } = req.body;
 
     if (!currentPassword || !newPassword) {
@@ -370,7 +386,7 @@ router.post("/student/change-password", async (req, res) => {
     }
 
     // Hash and save new password
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    const hashedPassword = await bcrypt.hash(password, config.bcryptRounds);
     student.password = hashedPassword;
     student.lastPasswordChange = new Date();
     await student.save();
@@ -388,7 +404,7 @@ router.post("/student/change-password", async (req, res) => {
 
 
 // Student Forgot Password - Request reset
-router.post("/student/forgot-password", async (req, res) => {
+router.post("/student/forgot-password", passwordResetLimiter, async (req, res) => {
   try {
     const { email } = req.body;
 
@@ -469,7 +485,7 @@ router.post("/student/reset-password/:token", async (req, res) => {
     }
 
     // Hash and save new password
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    const hashedPassword = await bcrypt.hash(password, config.bcryptRounds);
     student.password = hashedPassword;
     student.lastPasswordChange = new Date();
     student.resetPasswordToken = undefined;
@@ -488,8 +504,8 @@ router.post("/student/reset-password/:token", async (req, res) => {
 });
 
 
-// Admin Login
-router.post("/admin/login", async (req, res) => {
+// Admin Login........................................................................
+router.post("/admin/login", loginLimiter, async (req, res) => {
   try {
     const { username, password } = req.body;
 
@@ -517,8 +533,8 @@ router.post("/admin/login", async (req, res) => {
         email: admin.email,
         role: "admin"
       },
-      process.env.JWT_SECRET || "your-secret-key-change-this",
-      { expiresIn: "7d" }
+      config.jwtSecret,
+      { expiresIn: config.jwtExpiry }
     );
 
     // Create session
@@ -559,7 +575,7 @@ router.get("/admin/verify", async (req, res) => {
       return res.status(401).json({ message: "No token provided" });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || "your-secret-key-change-this");
+    const decoded = jwt.verify(token, config.jwtSecret);
     
     if (decoded.role !== "admin") {
       return res.status(403).json({ message: "Admin access required" });
@@ -586,7 +602,7 @@ router.post("/admin/change-password", async (req, res) => {
       return res.status(401).json({ message: "No token provided" });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || "your-secret-key-change-this");
+    const decoded = jwt.verify(token, config.jwtSecret);
     const { currentPassword, newPassword } = req.body;
 
     if (!currentPassword || !newPassword) {
@@ -610,7 +626,7 @@ router.post("/admin/change-password", async (req, res) => {
     }
 
     // Hash and save new password
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    const hashedPassword = await bcrypt.hash(password, config.bcryptRounds);
     admin.password = hashedPassword;
     admin.lastPasswordChange = new Date();
     await admin.save();
@@ -635,7 +651,7 @@ router.get("/sessions", async (req, res) => {
       return res.status(401).json({ message: "No token provided" });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || "your-secret-key-change-this");
+    const decoded = jwt.verify(token, config.jwtSecret);
     
     let user;
     if (decoded.role === "teacher") {
@@ -689,7 +705,7 @@ router.post("/logout-session", async (req, res) => {
       return res.status(400).json({ message: "Session token required" });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || "your-secret-key-change-this");
+    const decoded = jwt.verify(token, config.jwtSecret);
     
     let user;
     if (decoded.role === "teacher") {
@@ -729,7 +745,7 @@ router.post("/logout-all-devices", async (req, res) => {
       return res.status(401).json({ message: "No token provided" });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || "your-secret-key-change-this");
+    const decoded = jwt.verify(token, config.jwtSecret);
     
     let user;
     if (decoded.role === "teacher") {

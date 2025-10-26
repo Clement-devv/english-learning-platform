@@ -32,7 +32,7 @@ router.post("/", verifyToken, verifyAdmin, async (req, res) => {
     const plainPassword = password || Math.random().toString(36).slice(-8);
     
     // Hash the password before saving
-    const hashedPassword = await bcrypt.hash(plainPassword, 10);
+    const hashedPassword = await bcrypt.hash(password, config.bcryptRounds);
 
     const teacher = await Teacher.create({
       firstName,
@@ -81,7 +81,7 @@ router.put("/:id", verifyToken, verifyAdmin, async (req, res) => {
     let updateData = { ...otherUpdates, continent };
     
     if (password) {
-      const hashedPassword = await bcrypt.hash(password, 10);
+      const hashedPassword = await bcrypt.hash(password, config.bcryptRounds);
       updateData.password = hashedPassword;
       updateData.lastPasswordChange = new Date();
     }
@@ -123,7 +123,7 @@ router.put("/:id", verifyToken, verifyAdmin, async (req, res) => {
 });
 
 // 👉 Delete teacher - ONLY ADMIN
-router.delete("/:id", verifyToken, verifyAdmin, async (req, res) => {
+router.delete("/:id", verifyToken, verifyAdmin, strictLimiter, async (req, res) => {
   try {
     const teacher = await Teacher.findByIdAndDelete(req.params.id);
     if (!teacher) return res.status(404).json({ message: "Teacher not found" });

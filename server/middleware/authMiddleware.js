@@ -1,5 +1,6 @@
 // middleware/authMiddleware.js
 import jwt from "jsonwebtoken";
+import { config } from "../config/config.js";
 import Teacher from "../models/Teacher.js";
 import Student from "../models/Student.js";
 import Admin from "../models/Admin.js";
@@ -10,16 +11,35 @@ export const verifyToken = async (req, res, next) => {
     const token = req.headers.authorization?.split(" ")[1];
     
     if (!token) {
-      return res.status(401).json({ message: "No token provided" });
+      return res.status(401).json({ 
+        success: false,
+        message: "No token provided" 
+      });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || "your-secret-key-change-this");
+    // Use config for JWT secret - NO FALLBACK!
+    const decoded = jwt.verify(token, config.jwtSecret);
     
     // Attach decoded token to request
     req.user = decoded;
     next();
   } catch (err) {
-    return res.status(401).json({ message: "Invalid or expired token" });
+    if (err.name === 'TokenExpiredError') {
+      return res.status(401).json({ 
+        success: false,
+        message: "Token expired, please login again" 
+      });
+    }
+    if (err.name === 'JsonWebTokenError') {
+      return res.status(401).json({ 
+        success: false,
+        message: "Invalid token" 
+      });
+    }
+    return res.status(500).json({ 
+      success: false,
+      message: "Token verification failed" 
+    });
   }
 };
 

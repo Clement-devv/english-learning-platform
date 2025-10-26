@@ -6,6 +6,7 @@ import Payment from "../models/Payment.js";
 import Lesson from "../models/Lesson.js";
 import { sendWelcomeEmail, sendPasswordResetEmail } from "../utils/emailService.js";
 import { verifyToken, verifyAdmin, verifyAdminOrTeacher, verifyStudent, verifyOwnership } from "../middleware/authMiddleware.js";
+import { strictLimiter } from "../middleware/rateLimiter.js";
 
 const router = express.Router();
 
@@ -59,8 +60,7 @@ router.post("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
     if (!rawPassword) {
       rawPassword = Math.random().toString(36).slice(-8);
     }
-    const hashedPassword = await bcryptjs.hash(rawPassword, 10);
-
+    const hashedPassword = await bcrypt.hash(password, config.bcryptRounds);
     const student = await Student.create({
       firstName,
       surname,
@@ -101,7 +101,7 @@ router.put("/:id", verifyToken, verifyAdminOrTeacher, async (req, res) => {
     const { password, ...updates } = req.body;
 
     if (password) {
-      updates.password = await bcryptjs.hash(password, 10);
+      updates.password = await bcrypt.hash(password, config.bcryptRounds);
       updates.showTempPassword = false;
       updates.lastPasswordChange = new Date();
     }
@@ -135,7 +135,7 @@ router.put("/:id", verifyToken, verifyAdminOrTeacher, async (req, res) => {
 });
 
 // 👉 Delete student - ONLY ADMIN
-router.delete("/:id", verifyToken, verifyAdmin, async (req, res) => {
+router.delete("/:id", verifyToken, verifyAdmin, strictLimiter, async (req, res) => {
   try {
     const student = await Student.findByIdAndDelete(req.params.id);
     if (!student) return res.status(404).json({ message: "Student not found" });
@@ -150,13 +150,13 @@ router.delete("/:id", verifyToken, verifyAdmin, async (req, res) => {
 // ================== EXTRA FEATURES ==================
 
 // 👉 Reset password - ONLY ADMIN AND TEACHERS
-router.post("/:id/reset-password", verifyToken, verifyAdminOrTeacher, async (req, res) => {
+router.post("/:id/reset-password", verifyToken, verifyAdminOrTeacher, strictLimiter, async (req, res) => {
   try {
     const student = await Student.findById(req.params.id);
     if (!student) return res.status(404).json({ message: "Student not found" });
 
     const newPass = Math.random().toString(36).slice(-8);
-    student.password = await bcryptjs.hash(newPass, 10);
+    student.password = await bcrypt.hash(password, config.bcryptRounds);
     student.showTempPassword = true;
     student.lastPasswordChange = new Date();
     await student.save();

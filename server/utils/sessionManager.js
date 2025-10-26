@@ -1,5 +1,5 @@
 // utils/sessionManager.js
-import UAParser from "ua-parser-js";
+import { UAParser } from "ua-parser-js";  // Changed from default import
 import crypto from "crypto";
 
 /**
@@ -22,8 +22,8 @@ export const getDeviceInfo = (req) => {
 export const getIpAddress = (req) => {
   return req.headers['x-forwarded-for']?.split(',')[0] || 
          req.headers['x-real-ip'] || 
-         req.connection.remoteAddress || 
-         req.socket.remoteAddress || 
+         req.connection?.remoteAddress || 
+         req.socket?.remoteAddress || 
          'Unknown';
 };
 
@@ -42,11 +42,11 @@ export const createSession = (req, jwtToken) => {
     token: generateSessionToken(),
     deviceInfo: getDeviceInfo(req),
     ipAddress: getIpAddress(req),
-    location: 'Unknown', // Can be enhanced with geolocation API
+    location: 'Unknown',
     loginTime: new Date(),
     lastActivity: new Date(),
     isActive: true,
-    jwtToken: jwtToken, // Store JWT for validation
+    jwtToken: jwtToken,
   };
 };
 
@@ -58,17 +58,6 @@ export const cleanExpiredSessions = (sessions) => {
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
   
   return sessions.filter(session => 
-    session.isActive && session.lastActivity > sevenDaysAgo
+    session.isActive && new Date(session.lastActivity) > sevenDaysAgo
   );
-};
-
-/**
- * Update session activity
- */
-export const updateSessionActivity = (sessions, sessionToken) => {
-  const session = sessions.find(s => s.token === sessionToken);
-  if (session) {
-    session.lastActivity = new Date();
-  }
-  return sessions;
 };
