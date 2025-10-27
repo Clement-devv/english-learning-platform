@@ -4,6 +4,10 @@ import Teacher from "../models/Teacher.js";
 import { sendWelcomeEmail, sendPasswordResetEmail } from "../utils/emailService.js";
 import { verifyToken, verifyAdmin, verifyAdminOrTeacher } from "../middleware/authMiddleware.js";
 
+
+import { config } from "../config/config.js";
+import { strictLimiter } from "../middleware/rateLimiter.js";
+
 const router = express.Router();
 
 // 👉 Get all teachers - Admin and Teachers can view
@@ -32,7 +36,7 @@ router.post("/", verifyToken, verifyAdmin, async (req, res) => {
     const plainPassword = password || Math.random().toString(36).slice(-8);
     
     // Hash the password before saving
-    const hashedPassword = await bcrypt.hash(password, config.bcryptRounds);
+    const hashedPassword = await bcrypt.hash(plainPassword, config.bcryptRounds);
 
     const teacher = await Teacher.create({
       firstName,

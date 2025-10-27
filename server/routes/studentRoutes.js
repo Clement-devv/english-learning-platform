@@ -8,6 +8,9 @@ import { sendWelcomeEmail, sendPasswordResetEmail } from "../utils/emailService.
 import { verifyToken, verifyAdmin, verifyAdminOrTeacher, verifyStudent, verifyOwnership } from "../middleware/authMiddleware.js";
 import { strictLimiter } from "../middleware/rateLimiter.js";
 
+import bcrypt from "bcryptjs"; 
+import { config } from "../config/config.js";
+
 const router = express.Router();
 
 
@@ -60,7 +63,7 @@ router.post("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
     if (!rawPassword) {
       rawPassword = Math.random().toString(36).slice(-8);
     }
-    const hashedPassword = await bcrypt.hash(password, config.bcryptRounds);
+    const hashedPassword = await bcrypt.hash(rawPassword, config.bcryptRounds);
     const student = await Student.create({
       firstName,
       surname,
@@ -156,7 +159,7 @@ router.post("/:id/reset-password", verifyToken, verifyAdminOrTeacher, strictLimi
     if (!student) return res.status(404).json({ message: "Student not found" });
 
     const newPass = Math.random().toString(36).slice(-8);
-    student.password = await bcrypt.hash(password, config.bcryptRounds);
+    student.password = await bcrypt.hash(newPass, config.bcryptRounds);
     student.showTempPassword = true;
     student.lastPasswordChange = new Date();
     await student.save();

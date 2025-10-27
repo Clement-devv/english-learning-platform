@@ -7,6 +7,16 @@ import express from "express";
 import mongoose from "mongoose";
 import cors from "cors";
 
+import { apiLimiter } from "./middleware/rateLimiter.js";
+import { config } from "./config/config.js";
+import { 
+  securityHeaders, 
+  noSqlInjectionProtection,
+  xssProtection,
+  parameterPollutionProtection,
+  requestLimits
+} from "./middleware/security.js";
+
 
 
 
@@ -34,9 +44,42 @@ import agoraRoutes from "./routes/agoraRoutes.js";
 
 const app = express();
 
+// Trust proxy if behind reverse proxy
+if (config.trustProxy) {
+  app.set('trust proxy', 1);
+}
+
+// Security Middleware - 
+app.use(securityHeaders);
+app.use(noSqlInjectionProtection);
+app.use(xssProtection);
+app.use(parameterPollutionProtection);
+
+
 // Middleware
-app.use(cors());
-app.use(express.json());
+
+// CORS Configuration
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
+    
+    if (config.corsOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  maxAge: 86400
+}));
+
+
+// Body parser with size limits 
+app.use(express.json(requestLimits.json));
+app.use(express.urlencoded(requestLimits.urlencoded));
+//app.use(express.json());
 
 app.use('/api/', apiLimiter);
 

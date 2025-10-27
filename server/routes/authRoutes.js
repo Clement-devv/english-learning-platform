@@ -25,7 +25,7 @@ const verifyToken = async (req, res, next) => {
       return res.status(401).json({ message: "No token provided" });
     }
 
-    const decoded = jwt.verify(config.jwtSecret);
+    const decoded = jwt.verify(token, config.jwtSecret);
     const teacher = await Teacher.findById(decoded.id).select("-password");
     
     if (!teacher || !teacher.active) {
@@ -141,7 +141,7 @@ router.post("/teacher/change-password", verifyToken, async (req, res) => {
     }
 
     // Hash and save new password
-    const hashedPassword = await bcrypt.hash(password, config.bcryptRounds);
+    const hashedPassword = await bcrypt.hash(newPassword, config.bcryptRounds);
     teacher.password = hashedPassword;
     teacher.lastPasswordChange = new Date();
     await teacher.save();
@@ -239,7 +239,7 @@ router.post("/teacher/reset-password/:token", async (req, res) => {
     }
 
     // Hash and save new password
-    const hashedPassword = await bcrypt.hash(password, config.bcryptRounds);
+    const hashedPassword = await bcrypt.hash(newPassword, config.bcryptRounds);
     teacher.password = hashedPassword;
     teacher.lastPasswordChange = new Date();
     teacher.resetPasswordToken = undefined;
@@ -386,7 +386,7 @@ router.post("/student/change-password", async (req, res) => {
     }
 
     // Hash and save new password
-    const hashedPassword = await bcrypt.hash(password, config.bcryptRounds);
+    const hashedPassword = await bcrypt.hash(newPassword, config.bcryptRounds);
     student.password = hashedPassword;
     student.lastPasswordChange = new Date();
     await student.save();
@@ -485,7 +485,7 @@ router.post("/student/reset-password/:token", async (req, res) => {
     }
 
     // Hash and save new password
-    const hashedPassword = await bcrypt.hash(password, config.bcryptRounds);
+    const hashedPassword = await bcrypt.hash(newPassword, config.bcryptRounds);
     student.password = hashedPassword;
     student.lastPasswordChange = new Date();
     student.resetPasswordToken = undefined;
@@ -626,7 +626,7 @@ router.post("/admin/change-password", async (req, res) => {
     }
 
     // Hash and save new password
-    const hashedPassword = await bcrypt.hash(password, config.bcryptRounds);
+    const hashedPassword = await bcrypt.hash(newPassword, config.bcryptRounds);
     admin.password = hashedPassword;
     admin.lastPasswordChange = new Date();
     await admin.save();
