@@ -26,12 +26,15 @@ import LiveClasses from "./components/dashboard/LiveClasses";
 import UpcomingClasses from "./components/dashboard/UpcomingClasses";
 import Classroom from "../../pages/Classroom"; // ✅ video call component
 
+import SessionManagement from "../../components/SessionManagement";
+
 export default function TeacherDashboard() {
   const navigate = useNavigate();
   const [teacherInfo, setTeacherInfo] = useState(null);
   const [activeTab, setActiveTab] = useState("dashboard");
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [toast, setToast] = useState("");
+  const [showSessionManagement, setShowSessionManagement] = useState(false);
 
   // 🆕 Classroom state
   const [activeClass, setActiveClass] = useState(null);
@@ -73,6 +76,7 @@ export default function TeacherDashboard() {
   // Logout function
   const handleLogout = () => {
     localStorage.removeItem("teacherToken");
+    localStorage.removeItem("teacherSessionToken");
     localStorage.removeItem("teacherInfo");
     navigate("/teacher/login");
   };
@@ -157,7 +161,8 @@ export default function TeacherDashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-r from-purple-500 to-pink-500">
-      <DashboardHeader />
+      <DashboardHeader onManageSessions={() => setShowSessionManagement(true)}
+ />
 
       {/* Toast Notification */}
       {toast && (
@@ -281,6 +286,15 @@ export default function TeacherDashboard() {
         <ChangePassword
           onClose={() => setShowChangePassword(false)}
           onSuccess={handlePasswordChangeSuccess}
+        />
+      )}
+
+      {/* Session Management Modal */}
+      {showSessionManagement && (
+        <SessionManagement
+          isOpen={showSessionManagement}
+          onClose={() => setShowSessionManagement(false)}
+          userType="teacher"
         />
       )}
 

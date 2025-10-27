@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";  // ✅ ADDED
 import OverviewTab from "./tabs/OverviewTab";
 import TeachersTab from "./tabs/TeachersTab";
 import StudentsTab from "./tabs/StudentsTab";
@@ -8,6 +9,7 @@ import NotificationsTab from "./tabs/NotificationsTab";
 import AssignStudentsTab from "./tabs/AssignStudentsTab";
 import BookingsTab from "./tabs/BookingsTab";
 import Header from "./ui/Header";
+import SessionManagement from "../../components/SessionManagement";
 import {
   TrendingUp,
   Video,
@@ -21,6 +23,7 @@ import { getTeachers } from "../../services/teacherService";
 import { getStudents } from "../../services/studentService";
 
 export default function AdminDashboard() {
+  const navigate = useNavigate();  // ✅ ADDED
   const [activeTab, setActiveTab] = useState("overview");
   const [notifications, setNotifications] = useState([]);
   
@@ -28,6 +31,15 @@ export default function AdminDashboard() {
   const [teachers, setTeachers] = useState([]);
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showSessionManagement, setShowSessionManagement] = useState(false);
+
+  // ✅ ADDED LOGOUT FUNCTION
+  const handleLogout = () => {
+    localStorage.removeItem("adminToken");
+    localStorage.removeItem("adminSessionToken");
+    localStorage.removeItem("adminInfo");
+    navigate("/admin/login");
+  };
 
   // Load teachers and students on mount
   useEffect(() => {
@@ -102,7 +114,10 @@ export default function AdminDashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-r from-violet-500 to-fuchsia-500">
-      <Header />
+      <Header 
+        onManageSessions={() => setShowSessionManagement(true)}  // ✅ ADDED
+        onLogout={handleLogout}  // ✅ ADDED
+      />
       <div className="max-w-7xl mx-auto px-4 py-6">
         <div className="flex flex-wrap gap-3 mb-6">
           {tabs.map(({ key, label, icon: Icon }) => (
@@ -123,6 +138,15 @@ export default function AdminDashboard() {
 
         <div className="bg-white shadow-md rounded-lg p-6">{renderTab()}</div>
       </div>
+
+      {/* ✅ ADDED SESSION MANAGEMENT MODAL */}
+      {showSessionManagement && (
+        <SessionManagement
+          isOpen={showSessionManagement}
+          onClose={() => setShowSessionManagement(false)}
+          userType="admin"
+        />
+      )}
     </div>
   );
 }

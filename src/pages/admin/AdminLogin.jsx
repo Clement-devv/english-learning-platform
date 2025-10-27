@@ -25,7 +25,7 @@ export default function AdminLogin() {
       if (response.data.success) {
   // Store token, session token, and admin info
   localStorage.setItem('adminToken', response.data.token);
-  localStorage.setItem('adminSessionToken', response.data.sessionToken); // NEW
+  localStorage.setItem('adminSessionToken', response.data.sessionToken); 
   localStorage.setItem('adminInfo', JSON.stringify(response.data.admin));
   
   // Navigate to admin dashboard

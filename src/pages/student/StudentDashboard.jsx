@@ -9,12 +9,14 @@ import ProgressCard from "./components/ProgressCard";
 import QuickActions from "./components/QuickActions";
 import NotificationsCard from "./components/NotificationsCard";
 import ChangePassword from "../../components/student/auth/ChangePassword";
+import SessionManagement from "../../components/SessionManagement";
 
 export default function StudentDashboard() {
   const navigate = useNavigate();
   
-  // Change Password Modal State
+  // Modal States
   const [showChangePassword, setShowChangePassword] = useState(false);
+  const [showSessionManagement, setShowSessionManagement] = useState(false);
   const [toast, setToast] = useState("");
   
   // Get student info from localStorage
@@ -90,79 +92,80 @@ export default function StudentDashboard() {
     { id: 3, message: "Great job completing yesterday's lesson!", time: "1 day ago", unread: false },
   ]);
 
-  // Update progress when student data changes
-  useEffect(() => {
-    const studentInfo = localStorage.getItem('studentInfo');
-    if (studentInfo) {
-      const parsed = JSON.parse(studentInfo);
-      setProgress(prev => ({
-        ...prev,
-        totalLessons: parsed.noOfClasses || 0
-      }));
-    }
-  }, []);
-
+  // ✅ FIXED LOGOUT
   const handleLogout = () => {
     localStorage.removeItem("studentToken");
+    localStorage.removeItem("studentSessionToken");
     localStorage.removeItem("studentInfo");
     navigate("/student/login");
   };
 
-  const handlePasswordChangeSuccess = (message) => {
-    setToast(message);
+  const handlePasswordChanged = () => {
+    setShowChangePassword(false);
+    setToast("Password changed successfully!");
     setTimeout(() => setToast(""), 3000);
   };
 
-  const joinVideoCall = (classId, className) => {
-    alert(`Joining "${className}" video call...`);
+  const handleJoinClass = (classId) => {
+    console.log("Joining class:", classId);
+    // Add your join class logic here
   };
 
-  const enrollInClass = (classId) => {
-    setUpcomingClasses((prev) =>
-      prev.map((cls) => (cls.id === classId ? { ...cls, enrolled: true } : cls))
-    );
+  const handleEnrollClass = (classId) => {
+    console.log("Enrolling in class:", classId);
+    // Add your enroll logic here
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-      {/* Toast Notification */}
-      {toast && (
-        <div className="fixed top-4 right-4 z-50 px-4 py-2 rounded shadow text-white bg-green-500">
-          {toast}
-        </div>
-      )}
-
-      <Header 
-        student={student} 
-        notifications={notifications} 
+    <div className="min-h-screen bg-gray-50">
+      <Header
+        student={student}
+        notifications={notifications}
         onLogout={handleLogout}
         onChangePassword={() => setShowChangePassword(true)}
+        onManageSessions={() => setShowSessionManagement(true)}
       />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Main Column */}
-          <div className="lg:col-span-2 space-y-8">
-            <WelcomeSection student={student} progress={progress} />
-            <ActiveClasses activeClasses={activeClasses} onJoin={joinVideoCall} />
-            <UpcomingClasses upcomingClasses={upcomingClasses} onEnroll={enrollInClass} />
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <WelcomeSection student={student} />
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+          <div className="lg:col-span-2 space-y-6">
+            {/* ✅ FIXED PROPS */}
+            <ActiveClasses activeClasses={activeClasses} onJoin={handleJoinClass} />
+            <UpcomingClasses upcomingClasses={upcomingClasses} onEnroll={handleEnrollClass} />
           </div>
 
-          {/* Sidebar */}
           <div className="space-y-6">
             <ProgressCard progress={progress} />
             <QuickActions />
             <NotificationsCard notifications={notifications} />
           </div>
         </div>
-      </div>
+      </main>
 
       {/* Change Password Modal */}
       {showChangePassword && (
         <ChangePassword
           onClose={() => setShowChangePassword(false)}
-          onSuccess={handlePasswordChangeSuccess}
+          onPasswordChanged={handlePasswordChanged}
         />
+      )}
+
+      {/* Session Management Modal */}
+      {showSessionManagement && (
+        <SessionManagement
+          isOpen={showSessionManagement}
+          onClose={() => setShowSessionManagement(false)}
+          userType="student"
+        />
+      )}
+
+      {/* Toast Notification */}
+      {toast && (
+        <div className="fixed bottom-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg">
+          {toast}
+        </div>
       )}
     </div>
   );
