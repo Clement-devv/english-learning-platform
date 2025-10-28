@@ -1,6 +1,7 @@
 // src/pages/student/StudentDashboard.jsx
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { Settings } from "lucide-react"; // Import Settings icon
 import Header from "./components/Header";
 import WelcomeSection from "./components/WelcomeSection";
 import ActiveClasses from "./components/ActiveClasses";
@@ -10,6 +11,8 @@ import QuickActions from "./components/QuickActions";
 import NotificationsCard from "./components/NotificationsCard";
 import ChangePassword from "../../components/student/auth/ChangePassword";
 import SessionManagement from "../../components/SessionManagement";
+import SettingsSidebar from "../../components/SettingsSidebar";
+import SettingsModal from "../../components/SettingsModal";
 
 export default function StudentDashboard() {
   const navigate = useNavigate();
@@ -17,6 +20,8 @@ export default function StudentDashboard() {
   // Modal States
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [showSessionManagement, setShowSessionManagement] = useState(false);
+  const [showSettingsSidebar, setShowSettingsSidebar] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [toast, setToast] = useState("");
   
   // Get student info from localStorage
@@ -92,7 +97,6 @@ export default function StudentDashboard() {
     { id: 3, message: "Great job completing yesterday's lesson!", time: "1 day ago", unread: false },
   ]);
 
-  // ✅ FIXED LOGOUT
   const handleLogout = () => {
     localStorage.removeItem("studentToken");
     localStorage.removeItem("studentSessionToken");
@@ -131,7 +135,6 @@ export default function StudentDashboard() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
           <div className="lg:col-span-2 space-y-6">
-            {/* ✅ FIXED PROPS */}
             <ActiveClasses activeClasses={activeClasses} onJoin={handleJoinClass} />
             <UpcomingClasses upcomingClasses={upcomingClasses} onEnroll={handleEnrollClass} />
           </div>
@@ -143,6 +146,34 @@ export default function StudentDashboard() {
           </div>
         </div>
       </main>
+
+      {/* Floating Settings Button */}
+      <button
+        onClick={() => setShowSettingsSidebar(true)}
+        className="fixed bottom-6 right-6 bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-4 rounded-full shadow-2xl hover:shadow-3xl hover:scale-110 transition-all duration-300 z-30 group"
+        aria-label="Open Settings"
+      >
+        <Settings className="w-6 h-6 group-hover:rotate-90 transition-transform duration-300" />
+        <span className="absolute right-full mr-3 top-1/2 -translate-y-1/2 bg-gray-900 text-white text-sm px-3 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+          Settings
+        </span>
+      </button>
+
+      {/* Settings Sidebar */}
+      <SettingsSidebar
+        isOpen={showSettingsSidebar}
+        onClose={() => setShowSettingsSidebar(false)}
+        onChangePassword={() => setShowChangePassword(true)}
+        onManageSessions={() => setShowSessionManagement(true)}
+        onManage2FA={() => setShowSettingsModal(true)}
+      />
+
+      {/* Settings Modal (for 2FA) */}
+      <SettingsModal
+        isOpen={showSettingsModal}
+        onClose={() => setShowSettingsModal(false)}
+        userType="student"
+      />
 
       {/* Change Password Modal */}
       {showChangePassword && (
@@ -163,7 +194,7 @@ export default function StudentDashboard() {
 
       {/* Toast Notification */}
       {toast && (
-        <div className="fixed bottom-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg">
+        <div className="fixed bottom-20 right-6 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 animate-slide-in">
           {toast}
         </div>
       )}

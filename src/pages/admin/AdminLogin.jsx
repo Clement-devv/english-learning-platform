@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Shield, User, Lock, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import api from '../../api';
+import TwoFactorLogin from '../../components/TwoFactorLogin';
 
 export default function AdminLogin() {
   const [username, setUsername] = useState('');
@@ -9,9 +10,11 @@ export default function AdminLogin() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [requires2FA, setRequires2FA] = useState(false);
+  const [tempUserId, setTempUserId] = useState(null);
   const navigate = useNavigate();
 
-  const handleSubmit = async (e) => {
+  const handleInitialLogin = async (e) => {
     e.preventDefault();
     setError('');
     setLoading(true);
@@ -23,14 +26,16 @@ export default function AdminLogin() {
       });
 
       if (response.data.success) {
-  // Store token, session token, and admin info
-  localStorage.setItem('adminToken', response.data.token);
-  localStorage.setItem('adminSessionToken', response.data.sessionToken); 
-  localStorage.setItem('adminInfo', JSON.stringify(response.data.admin));
-  
-  // Navigate to admin dashboard
-  navigate('/admin');
-}   
+        // Login successful without 2FA
+        localStorage.setItem('adminToken', response.data.token);
+        localStorage.setItem('adminSessionToken', response.data.sessionToken); 
+        localStorage.setItem('adminInfo', JSON.stringify(response.data.admin));
+        navigate('/admin');
+      } else if (response.data.requires2FA) {
+        // 2FA required
+        setRequires2FA(true);
+        setTempUserId(response.data.tempUserId);
+      }
     } catch (err) {
       console.error('Admin login error:', err);
       setError(
@@ -42,6 +47,53 @@ export default function AdminLogin() {
     }
   };
 
+  const handle2FAVerification = async (twoFactorToken, backupCode) => {
+    setError('');
+    setLoading(true);
+
+    try {
+      const response = await api.post('/api/auth/verify-2fa-login', {
+        tempUserId,
+        twoFactorToken,
+        backupCode,
+        role: 'admin'
+      });
+
+      if (response.data.success) {
+        localStorage.setItem('adminToken', response.data.token);
+        localStorage.setItem('adminSessionToken', response.data.sessionToken);
+        localStorage.setItem('adminInfo', JSON.stringify(response.data.user));
+        navigate('/admin');
+      }
+    } catch (err) {
+      console.error('2FA verification error:', err);
+      setError(err.response?.data?.message || 'Invalid 2FA code');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCancelViaGoDashboard2FA = () => {
+    setRequires2FA(false);
+    setTempUserId(null);
+    setError('');
+  };
+
+  // Show 2FA verification screen
+  if (requires2FA) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-red-50 flex items-center justify-center p-4">
+        <TwoFactorLogin
+          onVerify={handle2FAVerification}
+          onCancel={handleCancel2FA}
+          loading={loading}
+          error={error}
+        />
+      </div>
+    );
+  }
+
+  // Show standard login screen
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-red-50 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
@@ -60,7 +112,7 @@ export default function AdminLogin() {
 
         {/* Login Card */}
         <div className="bg-white rounded-2xl shadow-xl p-8">
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleInitialLogin} className="space-y-6">
             {/* Error Alert */}
             {error && (
               <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start space-x-3">
@@ -146,13 +198,6 @@ export default function AdminLogin() {
               This area is restricted to authorized administrators only
             </p>
           </div>
-        </div>
-
-        {/* Demo Info (remove in production) */}
-        <div className="mt-6 p-4 bg-purple-50 rounded-lg">
-          <p className="text-xs text-purple-800 text-center">
-            💡 First time? Use the credentials from createAdmin.js script
-          </p>
         </div>
       </div>
     </div>

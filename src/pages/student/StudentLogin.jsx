@@ -2,8 +2,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BookOpen, Mail, Lock, AlertCircle, Eye, EyeOff } from 'lucide-react';
-import api from '../../api'; // Use your api instance
-
+import api from '../../api';
+import TwoFactorLogin from '../../components/TwoFactorLogin';
 
 export default function StudentLogin() {
   const [email, setEmail] = useState('');
@@ -11,9 +11,11 @@ export default function StudentLogin() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [requires2FA, setRequires2FA] = useState(false);
+  const [tempUserId, setTempUserId] = useState(null);
   const navigate = useNavigate();
 
-  const handleSubmit = async (e) => {
+  const handleInitialLogin = async (e) => {
     e.preventDefault();
     setError('');
     setLoading(true);
@@ -25,16 +27,18 @@ export default function StudentLogin() {
       });
 
       if (response.data.success) {
-  // Store token, session token, and student info
-  localStorage.setItem('studentToken', response.data.token);
-  localStorage.setItem('studentSessionToken', response.data.sessionToken);
-  localStorage.setItem('studentInfo', JSON.stringify(response.data.student));
-  
-  // Navigate to dashboard
-  navigate('/student/dashboard');
-}
+        // Login successful without 2FA
+        localStorage.setItem('studentToken', response.data.token);
+        localStorage.setItem('studentSessionToken', response.data.sessionToken);
+        localStorage.setItem('studentInfo', JSON.stringify(response.data.student));
+        navigate('/student/dashboard');
+      } else if (response.data.requires2FA) {
+        // 2FA required
+        setRequires2FA(true);
+        setTempUserId(response.data.tempUserId);
+      }
     } catch (err) {
-      console.error('Login error:', err);
+      console.error('Student login error:', err);
       setError(
         err.response?.data?.message || 
         'Login failed. Please check your credentials and try again.'
@@ -44,6 +48,53 @@ export default function StudentLogin() {
     }
   };
 
+  const handle2FAVerification = async (twoFactorToken, backupCode) => {
+    setError('');
+    setLoading(true);
+
+    try {
+      const response = await api.post('/api/auth/verify-2fa-login', {
+        tempUserId,
+        twoFactorToken,
+        backupCode,
+        role: 'student'
+      });
+
+      if (response.data.success) {
+        localStorage.setItem('studentToken', response.data.token);
+        localStorage.setItem('studentSessionToken', response.data.sessionToken);
+        localStorage.setItem('studentInfo', JSON.stringify(response.data.user));
+        navigate('/student/dashboard');
+      }
+    } catch (err) {
+      console.error('2FA verification error:', err);
+      setError(err.response?.data?.message || 'Invalid 2FA code');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCancel2FA = () => {
+    setRequires2FA(false);
+    setTempUserId(null);
+    setError('');
+  };
+
+  // Show 2FA verification screen
+  if (requires2FA) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center p-4">
+        <TwoFactorLogin
+          onVerify={handle2FAVerification}
+          onCancel={handleCancel2FA}
+          loading={loading}
+          error={error}
+        />
+      </div>
+    );
+  }
+
+  // Show standard login screen
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
@@ -62,7 +113,7 @@ export default function StudentLogin() {
 
         {/* Login Card */}
         <div className="bg-white rounded-2xl shadow-xl p-8">
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleInitialLogin} className="space-y-6">
             {/* Error Alert */}
             {error && (
               <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start space-x-3">
@@ -143,14 +194,14 @@ export default function StudentLogin() {
 
           {/* Footer */}
           <div className="mt-6 text-center">
-          <button
-            type="button"
-            onClick={() => navigate('/student/forgot-password')}
-            className="text-sm text-blue-600 hover:text-blue-700 font-medium"
-          >
-            Forgot your password?
-          </button>
-        </div>
+            <button
+              type="button"
+              onClick={() => navigate('/student/forgot-password')}
+              className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+            >
+              Forgot your password?
+            </button>
+          </div>
         </div>
 
         {/* Additional Info */}

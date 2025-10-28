@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Key } from "lucide-react";
+import { Settings } from "lucide-react";
 
 // layout
 import DashboardHeader from "./components/Layout/DashboardHeader";
@@ -24,9 +24,12 @@ import BookingList from "./components/bookings/BookingList";
 import QuickStats from "./components/dashboard/QuickStats";
 import LiveClasses from "./components/dashboard/LiveClasses";
 import UpcomingClasses from "./components/dashboard/UpcomingClasses";
-import Classroom from "../../pages/Classroom"; // ✅ video call component
+import Classroom from "../../pages/Classroom";
 
+// Session Management & Settings
 import SessionManagement from "../../components/SessionManagement";
+import SettingsSidebar from "../../components/SettingsSidebar";
+import SettingsModal from "../../components/SettingsModal";
 
 export default function TeacherDashboard() {
   const navigate = useNavigate();
@@ -35,8 +38,12 @@ export default function TeacherDashboard() {
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [toast, setToast] = useState("");
   const [showSessionManagement, setShowSessionManagement] = useState(false);
+  
+  // Settings Sidebar States
+  const [showSettingsSidebar, setShowSettingsSidebar] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
 
-  // 🆕 Classroom state
+  // Classroom state
   const [activeClass, setActiveClass] = useState(null);
   const [isClassroomOpen, setIsClassroomOpen] = useState(false);
 
@@ -153,7 +160,7 @@ export default function TeacherDashboard() {
     setClasses((prev) => [...prev, { ...newClass, id: Date.now() }]);
   };
 
-  // 🆕 Handle joining live classroom
+  // Handle joining live classroom
   const handleJoinClass = (cls) => {
     setActiveClass(cls);
     setIsClassroomOpen(true);
@@ -161,8 +168,11 @@ export default function TeacherDashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-r from-purple-500 to-pink-500">
-      <DashboardHeader onManageSessions={() => setShowSessionManagement(true)}
- />
+      {/* Header - Only Logout (no more onManageSessions prop) */}
+      <DashboardHeader 
+        teacherInfo={teacherInfo}
+        onLogout={handleLogout}
+      />
 
       {/* Toast Notification */}
       {toast && (
@@ -171,33 +181,16 @@ export default function TeacherDashboard() {
         </div>
       )}
 
-      {/* Welcome Banner */}
+      {/* Welcome Banner - CLEANED UP (No buttons here anymore) */}
       {teacherInfo && (
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
-          <div className="bg-white rounded-lg shadow-md p-4 flex justify-between items-center">
-            <div>
-              <h2 className="text-2xl font-bold text-gray-800">
-                Welcome, {teacherInfo.firstName} {teacherInfo.lastName}!
-              </h2>
-              <p className="text-gray-600 text-sm">
-                {teacherInfo.email} • {teacherInfo.continent}
-              </p>
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setShowChangePassword(true)}
-                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition flex items-center gap-2"
-              >
-                <Key className="w-4 h-4" />
-                Change Password
-              </button>
-              <button
-                onClick={handleLogout}
-                className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition"
-              >
-                Logout
-              </button>
-            </div>
+          <div className="bg-white rounded-lg shadow-md p-4">
+            <h2 className="text-2xl font-bold text-gray-800">
+              Welcome, {teacherInfo.firstName} {teacherInfo.lastName}!
+            </h2>
+            <p className="text-gray-600 text-sm">
+              {teacherInfo.email} • {teacherInfo.continent}
+            </p>
           </div>
         </div>
       )}
@@ -219,7 +212,7 @@ export default function TeacherDashboard() {
                 totalBookings: bookings.length,
               }}
             />
-            <LiveClasses classes={classes} onJoin={handleJoinClass} /> {/* ✅ add this */}
+            <LiveClasses classes={classes} onJoin={handleJoinClass} />
             <UpcomingClasses
               classes={classes}
               students={students}
@@ -298,7 +291,7 @@ export default function TeacherDashboard() {
         />
       )}
 
-      {/* 🆕 Classroom Modal */}
+      {/* Classroom Modal */}
       {isClassroomOpen && activeClass && (
         <div className="fixed inset-0 z-50 bg-black bg-opacity-80 flex items-center justify-center">
           <div className="w-full max-w-5xl bg-white rounded-xl shadow-lg overflow-hidden">
@@ -315,6 +308,34 @@ export default function TeacherDashboard() {
           </div>
         </div>
       )}
+
+      {/* ✨ NEW: Floating Settings Button */}
+      <button
+        onClick={() => setShowSettingsSidebar(true)}
+        className="fixed bottom-6 right-6 bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-4 rounded-full shadow-2xl hover:shadow-3xl hover:scale-110 transition-all duration-300 z-30 group"
+        aria-label="Open Settings"
+      >
+        <Settings className="w-6 h-6 group-hover:rotate-90 transition-transform duration-300" />
+        <span className="absolute right-full mr-3 top-1/2 -translate-y-1/2 bg-gray-900 text-white text-sm px-3 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+          Settings
+        </span>
+      </button>
+
+      {/* ✨ NEW: Settings Sidebar */}
+      <SettingsSidebar
+        isOpen={showSettingsSidebar}
+        onClose={() => setShowSettingsSidebar(false)}
+        onChangePassword={() => setShowChangePassword(true)}
+        onManageSessions={() => setShowSessionManagement(true)}
+        onManage2FA={() => setShowSettingsModal(true)}
+      />
+
+      {/* ✨ NEW: Settings Modal (for 2FA) */}
+      <SettingsModal
+        isOpen={showSettingsModal}
+        onClose={() => setShowSettingsModal(false)}
+        userType="teacher"
+      />
     </div>
   );
 }

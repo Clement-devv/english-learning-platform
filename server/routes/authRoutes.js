@@ -10,6 +10,7 @@ import { config } from "../config/config.js";
 import { loginLimiter, passwordResetLimiter } from "../middleware/rateLimiter.js";
 
 import { createSession, cleanExpiredSessions } from "../utils/sessionManager.js";
+import twoFactorAuth from "../utils/twoFactorAuth.js";
 
 
 //import { sendForgotPasswordEmail } from "../utils/emailService.js";
@@ -40,53 +41,187 @@ const verifyToken = async (req, res, next) => {
 };
 
 
+// Verify 2FA code during login (used when requires2FA is true)
+router.post("/verify-2fa-login", loginLimiter, async (req, res) => {
+  try {
+    const { tempUserId, twoFactorToken, backupCode, role } = req.body;
+
+    if (!tempUserId || !role) {
+      return res.status(400).json({ message: "Missing required fields" });
+    }
+
+    if (!twoFactorToken && !backupCode) {
+      return res.status(400).json({ message: "2FA code or backup code required" });
+    }
+
+    // Get user model based on role
+    let UserModel;
+    switch (role) {
+      case 'admin': UserModel = Admin; break;
+      case 'teacher': UserModel = Teacher; break;
+      case 'student': UserModel = Student; break;
+      default: return res.status(400).json({ message: "Invalid role" });
+    }
+
+    const user = await UserModel.findById(tempUserId);
+    
+    if (!user || !user.active) {
+      return res.status(403).json({ message: "User not found or inactive" });
+    }
+
+    if (!user.twoFactorEnabled) {
+      return res.status(400).json({ message: "2FA is not enabled for this user" });
+    }
+
+    // Verify the code
+    let isValid = false;
+    
+    if (twoFactorToken) {
+      const { verifyTwoFactorToken } = await import('../utils/twoFactorAuth.js');
+      isValid = verifyTwoFactorToken(twoFactorToken, user.twoFactorSecret);
+    } else if (backupCode) {
+      const { verifyBackupCode } = await import('../utils/twoFactorAuth.js');
+      const result = verifyBackupCode(backupCode, user.twoFactorBackupCodes);
+      
+      if (result.valid) {
+        user.twoFactorBackupCodes = result.remainingCodes;
+        await user.save();
+        isValid = true;
+      }
+    }
+
+    if (!isValid) {
+      return res.status(401).json({ 
+        success: false,
+        message: "Invalid 2FA code or backup code" 
+      });
+    }
+
+    // Generate JWT token
+    const token = jwt.sign(
+      { 
+        id: user._id, 
+        email: user.email,
+        role: role
+      },
+      config.jwtSecret,
+      { expiresIn: config.jwtExpiry }
+    );
+
+    // Create session
+    const session = createSession(req, token);
+    user.sessions = cleanExpiredSessions(user.sessions || []);
+    user.sessions.push(session);
+    user.lastLogin = new Date();
+    await user.save();
+
+    // Return user data based on role
+    const userData = {
+      id: user._id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      role: role,
+      twoFactorEnabled: user.twoFactorEnabled,
+      active: user.active
+    };
+
+    // Add role-specific fields
+    if (role === 'admin') {
+      userData.username = user.username;
+    } else if (role === 'teacher') {
+      userData.country = user.country;
+      userData.continent = user.continent;
+      userData.ratePerClass = user.ratePerClass;
+    }
+
+    res.json({
+      success: true,
+      token,
+      sessionToken: session.token,
+      user: userData
+    });
+
+  } catch (err) {
+    console.error("2FA verification error:", err);
+    res.status(500).json({ message: "Server error during 2FA verification" });
+  }
+});
+
+
 // Teacher Login
 
-router.post("/teacher/login", loginLimiter, async  (req, res) => {
+router.post("/teacher/login", loginLimiter, async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, twoFactorToken, backupCode } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ message: "Email and password are required" });
+    }
 
     const teacher = await Teacher.findOne({ email });
     if (!teacher) {
-      return res.status(401).json({ 
-        success: false,
-        message: "Invalid email or password" 
-      });
+      return res.status(401).json({ message: "Invalid email or password" });
     }
 
     if (!teacher.active) {
       return res.status(403).json({ 
-        success: false,
         message: "Your account has been deactivated. Please contact admin." 
       });
     }
 
     const isPasswordValid = await bcrypt.compare(password, teacher.password);
-    
     if (!isPasswordValid) {
-      return res.status(401).json({ 
-        success: false,
-        message: "Invalid email or password" 
-      });
+      return res.status(401).json({ message: "Invalid email or password" });
     }
 
-    // Generate JWT token using config
+    // ===== NEW: Check if 2FA is enabled =====
+    if (teacher.twoFactorEnabled) {
+      if (!twoFactorToken && !backupCode) {
+        return res.status(200).json({
+          success: false,
+          requires2FA: true,
+          message: "Please enter your 2FA code",
+          tempUserId: teacher._id
+        });
+      }
+
+      let isValid = false;
+      
+      if (twoFactorToken) {
+        const { verifyTwoFactorToken } = await import('../utils/twoFactorAuth.js');
+        isValid = verifyTwoFactorToken(twoFactorToken, teacher.twoFactorSecret);
+      } else if (backupCode) {
+        const { verifyBackupCode } = await import('../utils/twoFactorAuth.js');
+        const result = verifyBackupCode(backupCode, teacher.twoFactorBackupCodes);
+        
+        if (result.valid) {
+          teacher.twoFactorBackupCodes = result.remainingCodes;
+          await teacher.save();
+          isValid = true;
+        }
+      }
+
+      if (!isValid) {
+        return res.status(401).json({ 
+          success: false,
+          message: "Invalid 2FA code or backup code" 
+        });
+      }
+    }
+    // ===== END 2FA CHECK =====
+
     const token = jwt.sign(
       { 
         id: teacher._id, 
         email: teacher.email,
-        firstName: teacher.firstName,
-        lastName: teacher.lastName,
         role: "teacher"
       },
-      config.jwtSecret,  // Using config instead of hardcoded
-      { expiresIn: config.jwtExpiry }  // Using config for expiry
+      config.jwtSecret,
+      { expiresIn: config.jwtExpiry }
     );
 
-    // Create session
     const session = createSession(req, token);
-    
-    // Clean old sessions and add new one
     teacher.sessions = cleanExpiredSessions(teacher.sessions || []);
     teacher.sessions.push(session);
     teacher.lastLogin = new Date();
@@ -95,15 +230,17 @@ router.post("/teacher/login", loginLimiter, async  (req, res) => {
     res.json({
       success: true,
       token,
-      sessionToken: session.token, // Return session token for logout
+      sessionToken: session.token,
       teacher: {
         id: teacher._id,
+        email: teacher.email,
         firstName: teacher.firstName,
         lastName: teacher.lastName,
-        email: teacher.email,
+        country: teacher.country,
         continent: teacher.continent,
         ratePerClass: teacher.ratePerClass,
-        active: teacher.active
+        active: teacher.active,
+        twoFactorEnabled: teacher.twoFactorEnabled
       }
     });
 
@@ -112,7 +249,6 @@ router.post("/teacher/login", loginLimiter, async  (req, res) => {
     res.status(500).json({ message: "Server error during login" });
   }
 });
-
 
 // Verify Token
 router.get("/verify", verifyToken, (req, res) => {
@@ -264,48 +400,78 @@ router.post("/teacher/reset-password/:token", async (req, res) => {
 
 
 // Student Login
+
 router.post("/student/login", loginLimiter, async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, twoFactorToken, backupCode } = req.body;
 
     if (!email || !password) {
       return res.status(400).json({ message: "Email and password are required" });
     }
 
-    const student = await Student.findOne({ email });
+    const student = await Student.findOne({ email });  // ✅ FIXED: Capital 'S'
     if (!student) {
       return res.status(401).json({ message: "Invalid email or password" });
     }
 
     if (!student.active) {
       return res.status(403).json({ 
-        message: "Your account has been deactivated. Please contact your administrator." 
+        message: "Your account has been deactivated. Please contact admin." 
       });
     }
 
     const isPasswordValid = await bcrypt.compare(password, student.password);
-    
     if (!isPasswordValid) {
       return res.status(401).json({ message: "Invalid email or password" });
     }
 
-    // Generate JWT token
+    // ===== NEW: Check if 2FA is enabled =====
+    if (student.twoFactorEnabled) {
+      if (!twoFactorToken && !backupCode) {
+        return res.status(200).json({
+          success: false,
+          requires2FA: true,
+          message: "Please enter your 2FA code",
+          tempUserId: student._id
+        });
+      }
+
+      let isValid = false;
+      
+      if (twoFactorToken) {
+        const { verifyTwoFactorToken } = await import('../utils/twoFactorAuth.js');
+        isValid = verifyTwoFactorToken(twoFactorToken, student.twoFactorSecret);
+      } else if (backupCode) {
+        const { verifyBackupCode } = await import('../utils/twoFactorAuth.js');
+        const result = verifyBackupCode(backupCode, student.twoFactorBackupCodes);
+        
+        if (result.valid) {
+          student.twoFactorBackupCodes = result.remainingCodes;
+          await student.save();
+          isValid = true;
+        }
+      }
+
+      if (!isValid) {
+        return res.status(401).json({ 
+          success: false,
+          message: "Invalid 2FA code or backup code" 
+        });
+      }
+    }
+    // ===== END 2FA CHECK =====
+
     const token = jwt.sign(
       { 
         id: student._id, 
         email: student.email,
-        firstName: student.firstName,
-        surname: student.surname,
         role: "student"
       },
       config.jwtSecret,
       { expiresIn: config.jwtExpiry }
     );
 
-    // Create session
     const session = createSession(req, token);
-    
-    // Clean old sessions and add new one
     student.sessions = cleanExpiredSessions(student.sessions || []);
     student.sessions.push(session);
     student.lastLogin = new Date();
@@ -317,16 +483,19 @@ router.post("/student/login", loginLimiter, async (req, res) => {
       sessionToken: session.token,
       student: {
         id: student._id,
-        firstName: student.firstName,
-        surname: student.surname,
         email: student.email,
-        noOfClasses: student.noOfClasses,
-        active: student.active
+        firstName: student.firstName,
+        lastName: student.lastName,
+        country: student.country,
+        continent: student.continent,
+        ratePerClass: student.ratePerClass,
+        active: student.active,
+        twoFactorEnabled: student.twoFactorEnabled  // ✅ Good!
       }
     });
 
   } catch (err) {
-    console.error("Student login error:", err);
+    console.error("Login error:", err);
     res.status(500).json({ message: "Server error during login" });
   }
 });
@@ -505,9 +674,11 @@ router.post("/student/reset-password/:token", async (req, res) => {
 
 
 // Admin Login........................................................................
+
+// Admin Login with 2FA support
 router.post("/admin/login", loginLimiter, async (req, res) => {
   try {
-    const { username, password } = req.body;
+    const { username, password, twoFactorToken, backupCode } = req.body;
 
     const admin = await Admin.findOne({ $or: [{ username }, { email: username }] });
     
@@ -525,7 +696,48 @@ router.post("/admin/login", loginLimiter, async (req, res) => {
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
-    // Generate JWT token
+    // ===== NEW: Check if 2FA is enabled =====
+    if (admin.twoFactorEnabled) {
+      // If 2FA is enabled but no code provided, prompt for 2FA
+      if (!twoFactorToken && !backupCode) {
+        return res.status(200).json({
+          success: false,
+          requires2FA: true,
+          message: "Please enter your 2FA code",
+          tempUserId: admin._id // Send temp ID for the next request
+        });
+      }
+
+      // Verify 2FA token or backup code
+      let isValid = false;
+      
+      if (twoFactorToken) {
+        // Import the verification function at the top of the file
+        const { verifyTwoFactorToken } = await import('../utils/twoFactorAuth.js');
+        isValid = verifyTwoFactorToken(twoFactorToken, admin.twoFactorSecret);
+      } else if (backupCode) {
+        // Verify and use backup code
+        const { verifyBackupCode } = await import('../utils/twoFactorAuth.js');
+        const result = verifyBackupCode(backupCode, admin.twoFactorBackupCodes);
+        
+        if (result.valid) {
+          // Update backup codes (remove used one)
+          admin.twoFactorBackupCodes = result.remainingCodes;
+          await admin.save();
+          isValid = true;
+        }
+      }
+
+      if (!isValid) {
+        return res.status(401).json({ 
+          success: false,
+          message: "Invalid 2FA code or backup code" 
+        });
+      }
+    }
+    // ===== END 2FA CHECK =====
+
+    // Generate JWT token (existing code)
     const token = jwt.sign(
       { 
         id: admin._id, 
@@ -537,10 +749,10 @@ router.post("/admin/login", loginLimiter, async (req, res) => {
       { expiresIn: config.jwtExpiry }
     );
 
-    // Create session
+    // Create session 
     const session = createSession(req, token);
     
-    // Clean old sessions and add new one
+    
     admin.sessions = cleanExpiredSessions(admin.sessions || []);
     admin.sessions.push(session);
     admin.lastLogin = new Date();
@@ -556,7 +768,8 @@ router.post("/admin/login", loginLimiter, async (req, res) => {
         email: admin.email,
         firstName: admin.firstName,
         lastName: admin.lastName,
-        role: "admin"
+        role: "admin",
+        twoFactorEnabled: admin.twoFactorEnabled // Include this
       }
     });
 

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";  // ✅ ADDED
+import { useNavigate } from "react-router-dom";
+import { Settings } from "lucide-react";
 import OverviewTab from "./tabs/OverviewTab";
 import TeachersTab from "./tabs/TeachersTab";
 import StudentsTab from "./tabs/StudentsTab";
@@ -10,6 +11,9 @@ import AssignStudentsTab from "./tabs/AssignStudentsTab";
 import BookingsTab from "./tabs/BookingsTab";
 import Header from "./ui/Header";
 import SessionManagement from "../../components/SessionManagement";
+import SettingsSidebar from "../../components/SettingsSidebar";
+import SettingsModal from "../../components/SettingsModal";
+//import ChangePassword from "../../components/admin/auth/ChangePassword"; // Add this component
 import {
   TrendingUp,
   Video,
@@ -23,7 +27,7 @@ import { getTeachers } from "../../services/teacherService";
 import { getStudents } from "../../services/studentService";
 
 export default function AdminDashboard() {
-  const navigate = useNavigate();  // ✅ ADDED
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("overview");
   const [notifications, setNotifications] = useState([]);
   
@@ -31,14 +35,26 @@ export default function AdminDashboard() {
   const [teachers, setTeachers] = useState([]);
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
+  
+  // Modal States
   const [showSessionManagement, setShowSessionManagement] = useState(false);
+  const [showChangePassword, setShowChangePassword] = useState(false);
+  const [showSettingsSidebar, setShowSettingsSidebar] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [toast, setToast] = useState("");
 
-  // ✅ ADDED LOGOUT FUNCTION
+  // Logout function
   const handleLogout = () => {
     localStorage.removeItem("adminToken");
     localStorage.removeItem("adminSessionToken");
     localStorage.removeItem("adminInfo");
     navigate("/admin/login");
+  };
+
+  const handlePasswordChanged = () => {
+    setShowChangePassword(false);
+    setToast("Password changed successfully!");
+    setTimeout(() => setToast(""), 3000);
   };
 
   // Load teachers and students on mount
@@ -114,10 +130,16 @@ export default function AdminDashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-r from-violet-500 to-fuchsia-500">
-      <Header 
-        onManageSessions={() => setShowSessionManagement(true)}  // ✅ ADDED
-        onLogout={handleLogout}  // ✅ ADDED
-      />
+      {/* Header - Only Logout */}
+      <Header onLogout={handleLogout} />
+
+      {/* Toast Notification */}
+      {toast && (
+        <div className="fixed top-4 right-4 z-50 px-6 py-3 rounded-lg shadow-lg text-white bg-green-500">
+          {toast}
+        </div>
+      )}
+
       <div className="max-w-7xl mx-auto px-4 py-6">
         <div className="flex flex-wrap gap-3 mb-6">
           {tabs.map(({ key, label, icon: Icon }) => (
@@ -126,8 +148,8 @@ export default function AdminDashboard() {
               onClick={() => setActiveTab(key)}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition ${
                 activeTab === key
-                  ? "bg-purple-600 text-white"
-                  : "bg-gray-200 hover:bg-gray-300"
+                  ? "bg-purple-600 text-white shadow-lg"
+                  : "bg-white hover:bg-gray-100 text-gray-700"
               }`}
             >
               {Icon && <Icon className="w-4 h-4" />}
@@ -139,7 +161,43 @@ export default function AdminDashboard() {
         <div className="bg-white shadow-md rounded-lg p-6">{renderTab()}</div>
       </div>
 
-      {/* ✅ ADDED SESSION MANAGEMENT MODAL */}
+      {/* Floating Settings Button */}
+      <button
+        onClick={() => setShowSettingsSidebar(true)}
+        className="fixed bottom-6 right-6 bg-gradient-to-r from-purple-600 to-pink-600 text-white p-4 rounded-full shadow-2xl hover:shadow-3xl hover:scale-110 transition-all duration-300 z-30 group"
+        aria-label="Open Settings"
+      >
+        <Settings className="w-6 h-6 group-hover:rotate-90 transition-transform duration-300" />
+        <span className="absolute right-full mr-3 top-1/2 -translate-y-1/2 bg-gray-900 text-white text-sm px-3 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+          Settings
+        </span>
+      </button>
+
+      {/* Settings Sidebar */}
+      <SettingsSidebar
+        isOpen={showSettingsSidebar}
+        onClose={() => setShowSettingsSidebar(false)}
+        onChangePassword={() => setShowChangePassword(true)}
+        onManageSessions={() => setShowSessionManagement(true)}
+        onManage2FA={() => setShowSettingsModal(true)}
+      />
+
+      {/* Settings Modal (for 2FA) */}
+      <SettingsModal
+        isOpen={showSettingsModal}
+        onClose={() => setShowSettingsModal(false)}
+        userType="admin"
+      />
+
+      {/* Change Password Modal */}
+      {showChangePassword && (
+        <ChangePassword
+          onClose={() => setShowChangePassword(false)}
+          onPasswordChanged={handlePasswordChanged}
+        />
+      )}
+
+      {/* Session Management Modal */}
       {showSessionManagement && (
         <SessionManagement
           isOpen={showSessionManagement}

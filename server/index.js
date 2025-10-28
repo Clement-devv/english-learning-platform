@@ -16,6 +16,7 @@ import {
   parameterPollutionProtection,
   requestLimits
 } from "./middleware/security.js";
+import twoFactorRoutes from "./routes/twoFactorRoutes.js";
 
 
 
@@ -54,6 +55,7 @@ app.use(securityHeaders);
 app.use(noSqlInjectionProtection);
 app.use(xssProtection);
 app.use(parameterPollutionProtection);
+
 
 
 // Middleware
@@ -124,6 +126,8 @@ app.use("/api/lessons", lessonRoutes);
 app.use("/api/assignments", assignmentRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/agora", agoraRoutes);
+app.use("/api/2fa", twoFactorRoutes);
+
 
 
 // Error handling middleware (better debugging)

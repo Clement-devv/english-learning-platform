@@ -1,26 +1,43 @@
+// src/pages/teacher/components/Layout/DashboardHeader.jsx
 import React from "react";
-import { Shield } from 'lucide-react';
+import { LogOut, GraduationCap } from "lucide-react";
 
-export default function DashboardHeader({ onManageSessions }) {
+export default function DashboardHeader({ teacherInfo, onLogout }) {
   return (
-    <header className="bg-slate-50 shadow-sm border-b border-slate-200 dark:bg-slate-800 dark:border-slate-600">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-        <h1 className="text-xl font-bold text-gray-800">
-          English Learning Platform
-        </h1>
-        <div className="flex items-center space-x-4">
-          <button
-            onClick={onManageSessions}
-            className="flex items-center gap-2 px-3 py-1.5 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-colors text-sm font-medium"
-          >
-            <Shield className="w-4 h-4" />
-            Sessions
-          </button>
-          <span className="text-sm font-medium text-gray-600">
-            Teacher Mannie
-          </span>
-          <div className="w-8 h-8 bg-blue-500 text-white flex items-center justify-center rounded-full">
-            T
+    <header className="bg-white shadow-md">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between h-16">
+          {/* Left: Logo/Brand */}
+          <div className="flex items-center gap-3">
+            <div className="bg-gradient-to-br from-purple-600 to-pink-600 p-2 rounded-lg">
+              <GraduationCap className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-gray-900">Teacher Dashboard</h1>
+              <p className="text-xs text-gray-500">Manage your classes and students</p>
+            </div>
+          </div>
+
+          {/* Right: Teacher Info & Logout */}
+          <div className="flex items-center gap-4">
+            {/* Teacher Info */}
+            {teacherInfo && (
+              <div className="hidden sm:block text-right">
+                <p className="text-sm font-semibold text-gray-900">
+                  {teacherInfo.firstName} {teacherInfo.lastName}
+                </p>
+                <p className="text-xs text-gray-500">{teacherInfo.email}</p>
+              </div>
+            )}
+
+            {/* Logout Button */}
+            <button
+              onClick={onLogout}
+              className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors font-medium"
+            >
+              <LogOut className="w-4 h-4" />
+              <span className="hidden sm:inline">Logout</span>
+            </button>
           </div>
         </div>
       </div>

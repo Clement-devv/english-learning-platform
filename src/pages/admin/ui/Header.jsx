@@ -1,37 +1,49 @@
+// src/pages/admin/ui/Header.jsx
 import React from "react";
-import { Shield } from 'lucide-react';
+import { LogOut, Shield } from "lucide-react";
 
-const Header = ({ onManageSessions, onLogout }) => {
+export default function Header({ onLogout }) {
+  // Get admin info from localStorage
+  const adminInfo = JSON.parse(localStorage.getItem("adminInfo") || "{}");
+
   return (
-    <header className="bg-white shadow-sm p-4 mb-6 flex justify-between items-center">
-      <h1 className="text-xl font-bold text-purple-700">Admin Dashboard</h1>
-      <div className="flex items-center space-x-4">
-        {/* Sessions Button */}
-        <button
-          onClick={onManageSessions}
-          className="flex items-center gap-2 px-3 py-1.5 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-colors text-sm font-medium"
-        >
-          <Shield className="w-4 h-4" />
-          Sessions
-        </button>
+    <header className="bg-white shadow-md">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between h-16">
+          {/* Left: Logo/Brand */}
+          <div className="flex items-center gap-3">
+            <div className="bg-gradient-to-br from-violet-600 to-fuchsia-600 p-2 rounded-lg">
+              <Shield className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-gray-900">Admin Dashboard</h1>
+              <p className="text-xs text-gray-500">Platform Management</p>
+            </div>
+          </div>
 
-        {/* Logout Button - ✅ UPDATED STYLING */}
-        <button 
-          onClick={onLogout}
-          className="px-3 py-1.5 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm font-medium"
-        >
-          Logout
-        </button>
+          {/* Right: Admin Info & Logout */}
+          <div className="flex items-center gap-4">
+            {/* Admin Info */}
+            {adminInfo.email && (
+              <div className="hidden sm:block text-right">
+                <p className="text-sm font-semibold text-gray-900">
+                  {adminInfo.firstName || "Admin"} {adminInfo.lastName || ""}
+                </p>
+                <p className="text-xs text-gray-500">{adminInfo.email}</p>
+              </div>
+            )}
 
-        <span className="text-gray-600">Welcome, Admin</span>
-        <img
-          src="https://via.placeholder.com/40"
-          alt="Logo"
-          className="w-10 h-10 rounded-full border"
-        />
+            {/* Logout Button */}
+            <button
+              onClick={onLogout}
+              className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors font-medium"
+            >
+              <LogOut className="w-4 h-4" />
+              <span className="hidden sm:inline">Logout</span>
+            </button>
+          </div>
+        </div>
       </div>
     </header>
   );
-};
-
-export default Header;
+}
