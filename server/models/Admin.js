@@ -30,6 +30,13 @@ const adminSchema = new mongoose.Schema({
   // Session management
   sessions: [sessionSchema],
   lastLogin: Date,
+
+  // Two-Factor Authentication
+  twoFactorEnabled: { type: Boolean, default: false },
+  twoFactorSecret: String,
+  twoFactorBackupCodes: [String],
+  twoFactorVerified: { type: Boolean, default: false },
+  
 }, { 
   timestamps: true 
 });
