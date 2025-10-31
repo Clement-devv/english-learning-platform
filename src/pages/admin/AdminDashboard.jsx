@@ -111,7 +111,11 @@ export default function AdminDashboard() {
           />
         );
       case "bookings":
-        return <BookingsTab />;
+        return <BookingsTab
+        teachers={teachers} 
+        students={students} 
+        onNotify={handleNotify}
+         />;
       default:
         return <OverviewTab />;
     }
