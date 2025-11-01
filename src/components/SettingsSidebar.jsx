@@ -1,4 +1,4 @@
-// src/components/SettingsSidebar.jsx
+// src/components/SettingsSidebar.jsx - 
 import React, { useState } from 'react';
 import { 
   Settings, 
@@ -7,7 +7,10 @@ import {
   Shield, 
   Monitor, 
   ChevronRight,
-  Lock
+  Lock,
+  User,
+  Mail,
+  Globe
 } from 'lucide-react';
 
 export default function SettingsSidebar({ 
@@ -15,7 +18,8 @@ export default function SettingsSidebar({
   onClose, 
   onChangePassword,
   onManageSessions,
-  onManage2FA 
+  onManage2FA,
+  userInfo = null // NEW: Accept user info to display email and continent
 }) {
   const [activeSection, setActiveSection] = useState(null);
 
@@ -63,7 +67,7 @@ export default function SettingsSidebar({
       ></div>
 
       {/* Sidebar */}
-      <div className="fixed right-0 top-0 h-full w-full sm:w-96 bg-white shadow-2xl z-50 transform transition-transform duration-300 ease-in-out">
+      <div className="fixed right-0 top-0 h-full w-full sm:w-96 bg-white shadow-2xl z-50 transform transition-transform duration-300 ease-in-out overflow-y-auto">
         {/* Header */}
         <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-6 text-white">
           <div className="flex items-center justify-between">
@@ -84,6 +88,37 @@ export default function SettingsSidebar({
             </button>
           </div>
         </div>
+
+        {/* FIX #3: User Profile Section - Display email and continent */}
+        {userInfo && (
+          <div className="p-4 bg-gradient-to-br from-purple-50 to-pink-50 border-b border-gray-200">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="bg-gradient-to-br from-purple-500 to-pink-500 p-3 rounded-full">
+                <User className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h3 className="font-bold text-gray-900">
+                  {userInfo.firstName} {userInfo.lastName}
+                </h3>
+                <p className="text-xs text-gray-500">Account Information</p>
+              </div>
+            </div>
+            
+            <div className="space-y-2 bg-white rounded-lg p-3 shadow-sm">
+              <div className="flex items-center gap-2 text-sm">
+                <Mail className="w-4 h-4 text-gray-500" />
+                <span className="text-gray-700">{userInfo.email}</span>
+              </div>
+              
+              {userInfo.continent && (
+                <div className="flex items-center gap-2 text-sm">
+                  <Globe className="w-4 h-4 text-gray-500" />
+                  <span className="text-gray-700">{userInfo.continent}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Menu Items */}
         <div className="p-4 space-y-2">

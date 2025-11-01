@@ -18,7 +18,7 @@
     "dotenv": "^17.2.2",
     "express": "^4.21.2",
     "framer-motion": "^12.23.12",
-    "jspdf": "^3.0.2",
+    "jspdf": "^3.0.3",
     "jspdf-autotable": "^5.0.2",
     "lucide-react": "^0.541.0",
     "mongoose": "^8.18.1",
