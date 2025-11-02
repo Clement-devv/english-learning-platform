@@ -1,7 +1,7 @@
-// src/pages/teacher/TeacherDashboard.jsx - v3 COMPLETE
+// src/pages/teacher/TeacherDashboard.jsx - UPDATED WITH ALL FIXES
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Settings } from "lucide-react";
+import { Settings, Plus } from "lucide-react";
 
 // Layout
 import DashboardHeader from "./components/Layout/DashboardHeader";
@@ -39,7 +39,9 @@ import {
   getTeacherBookings, 
   acceptBooking, 
   rejectBooking,
-  createBooking 
+  createBooking,
+  deleteBooking,
+  cancelBooking
 } from "../../services/bookingService";
 
 export default function TeacherDashboard() {
@@ -64,56 +66,50 @@ export default function TeacherDashboard() {
   const [classes, setClasses] = useState([]);
   const [completedClasses, setCompletedClasses] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
 
-  // Class modal
+  // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Time-based greeting function
-  const getGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return "Good Morning";
-    if (hour < 18) return "Good Afternoon";
-    return "Good Evening";
-  };
-
   useEffect(() => {
+    const teacherData = JSON.parse(localStorage.getItem("teacherInfo") || "{}");
+    if (!teacherData._id && !teacherData.id) {
+      navigate("/teacher/login");
+      return;
+    }
+    setTeacherInfo(teacherData);
     fetchTeacherData();
-  }, []);
+  }, [navigate]);
 
   const fetchTeacherData = async () => {
     try {
       setLoading(true);
-      const teacherInfoRaw = localStorage.getItem("teacherInfo");
-      if (!teacherInfoRaw) {
-        navigate("/teacher/login");
-        return;
+      const teacherData = JSON.parse(localStorage.getItem("teacherInfo") || "{}");
+      const teacherId = teacherData._id || teacherData.id;
+
+      if (!teacherId) {
+        throw new Error("No teacher ID found");
       }
 
-      const parsed = JSON.parse(teacherInfoRaw);
-      setTeacherInfo(parsed);
-      const teacherId = parsed._id || parsed.id;
+      const [studentsData, pendingBookingsData, acceptedBookingsData, completedBookingsData] = await Promise.all([
+        getAssignedStudents(teacherId),
+        getTeacherBookings(teacherId, "pending"),
+        getTeacherBookings(teacherId, "accepted"),
+        getTeacherBookings(teacherId, "completed")
+      ]);
 
-      // Fetch assigned students
-      const assignedStudentsData = await getAssignedStudents(teacherId);
-      const studentsFormatted = assignedStudentsData.map((item) => ({
+      const studentsFormatted = studentsData.map((item) => ({
         id: item.student._id,
         name: `${item.student.firstName} ${item.student.surname}`,
-        level: item.student.active ? "Active" : "Inactive",
-        progress: item.student.noOfClasses || 0,
         email: item.student.email,
+        status: item.student.active ? "Active" : "Inactive",
+        progress: item.student.noOfClasses || 0,
         active: item.student.active,
         assignmentId: item.assignmentId,
         assignedDate: item.assignedDate
       }));
       setStudents(studentsFormatted);
 
-      // Fetch pending bookings
-      const pendingBookingsData = await getTeacherBookings(teacherId, "pending");
-      
-      // FIXED: Better date handling for bookings
       const bookingsFormatted = pendingBookingsData.map((booking) => {
-        // Parse the date properly
         const scheduledDate = new Date(booking.scheduledTime);
         
         return {
@@ -123,7 +119,6 @@ export default function TeacherDashboard() {
           studentName: `${booking.studentId.firstName} ${booking.studentId.surname}`,
           classTitle: booking.classTitle,
           topic: booking.topic,
-          // FIXED: Proper date formatting
           time: scheduledDate.toLocaleString('en-US', {
             weekday: 'short',
             year: 'numeric',
@@ -137,140 +132,141 @@ export default function TeacherDashboard() {
           notes: booking.notes,
           status: booking.status,
           isAdminBooking: booking.createdBy === "admin",
-          scheduledTime: booking.scheduledTime, // Keep original ISO string
+          scheduledTime: booking.scheduledTime,
           rawDate: scheduledDate
         };
       });
       setBookings(bookingsFormatted);
 
-      // Fetch accepted bookings (scheduled classes)
-      const acceptedBookingsData = await getTeacherBookings(teacherId, "accepted");
-      
-      // Fetch completed bookings
-      const completedBookingsData = await getTeacherBookings(teacherId, "completed");
-      
-      // FIXED: Better class time handling with status detection
-      const activeClasses = [];
-      const finishedClasses = [];
+      // ✅ FIXED: Group bookings by scheduledTime and classTitle to combine multiple students
+      const classesMap = new Map();
       
       acceptedBookingsData.forEach((booking) => {
         const scheduledDate = new Date(booking.scheduledTime);
         const now = new Date();
-        
-        // Calculate time difference in milliseconds
         const timeDiff = scheduledDate - now;
         
-        // Determine status
         let status = "scheduled";
-        if (timeDiff < -3600000) { // More than 1 hour ago
+        if (timeDiff < -3600000) {
           status = "completed";
-        } else if (timeDiff < 0 && timeDiff > -3600000) { // Started, within last hour
+        } else if (timeDiff < 0 && timeDiff > -3600000) {
           status = "live";
-        } else if (timeDiff > 0 && timeDiff < 900000) { // Starting within 15 minutes
-          status = "upcoming-soon"; // Will blink
+        } else if (timeDiff > 0 && timeDiff < 900000) {
+          status = "upcoming-soon";
         }
         
-        const classObj = {
-          id: booking._id,
-          title: booking.classTitle,
-          topic: booking.topic || "Scheduled Lesson",
-          // FIXED: Store both formatted time and raw date
-          time: scheduledDate.toLocaleTimeString('en-US', { 
-            hour: 'numeric', 
-            minute: '2-digit',
-            hour12: true 
-          }),
-          date: scheduledDate.toLocaleDateString('en-US', {
-            month: 'short',
-            day: 'numeric',
-            year: 'numeric'
-          }),
-          fullDateTime: scheduledDate.toLocaleString('en-US', {
-            weekday: 'short',
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-            hour: 'numeric',
-            minute: '2-digit',
-            hour12: true
-          }),
-          scheduledTime: booking.scheduledTime, // ISO string
-          scheduledDate: scheduledDate, // Date object for sorting/filtering
-          status: status,
-          students: [`${booking.studentId.firstName} ${booking.studentId.surname}`],
-          studentId: booking.studentId._id,
-          duration: booking.duration,
-          notes: booking.notes,
-          bookingId: booking._id
-        };
+        // Create a unique key for grouping: time + title
+        const groupKey = `${booking.scheduledTime}_${booking.classTitle}`;
+        
+        if (classesMap.has(groupKey)) {
+          // Add student to existing class
+          const existingClass = classesMap.get(groupKey);
+          existingClass.students.push(`${booking.studentId.firstName} ${booking.studentId.surname}`);
+          existingClass.bookingIds.push(booking._id);
+        } else {
+          // Create new class entry
+          const classObj = {
+            id: booking._id,
+            title: booking.classTitle,
+            topic: booking.topic || "Scheduled Lesson",
+            time: scheduledDate.toLocaleTimeString('en-US', { 
+              hour: 'numeric', 
+              minute: '2-digit',
+              hour12: true 
+            }),
+            date: scheduledDate.toLocaleDateString('en-US', {
+              month: 'short',
+              day: 'numeric',
+              year: 'numeric'
+            }),
+            fullDateTime: scheduledDate.toLocaleString('en-US', {
+              weekday: 'short',
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric',
+              hour: 'numeric',
+              minute: '2-digit',
+              hour12: true
+            }),
+            scheduledTime: booking.scheduledTime,
+            scheduledDate: scheduledDate,
+            status: status,
+            students: [`${booking.studentId.firstName} ${booking.studentId.surname}`],
+            duration: booking.duration,
+            notes: booking.notes,
+            bookingId: booking._id,
+            bookingIds: [booking._id] // Track all booking IDs for this class
+          };
+          
+          classesMap.set(groupKey, classObj);
+        }
+      });
 
-        if (status === "completed") {
+      // Convert map to arrays
+      const activeClasses = [];
+      const finishedClasses = [];
+      
+      classesMap.forEach((classObj) => {
+        if (classObj.status === "completed") {
           finishedClasses.push(classObj);
         } else {
           activeClasses.push(classObj);
         }
       });
 
-      // Add completed bookings
+      setClasses(activeClasses);
+
+      // ✅ FIXED: Group completed bookings too
+      const completedMap = new Map();
+      
       completedBookingsData.forEach((booking) => {
         const scheduledDate = new Date(booking.scheduledTime);
-        finishedClasses.push({
-          id: booking._id,
-          title: booking.classTitle,
-          topic: booking.topic || "Scheduled Lesson",
-          time: scheduledDate.toLocaleTimeString('en-US', { 
-            hour: 'numeric', 
-            minute: '2-digit',
-            hour12: true 
-          }),
-          date: scheduledDate.toLocaleDateString('en-US', {
-            month: 'short',
-            day: 'numeric',
-            year: 'numeric'
-          }),
-          fullDateTime: scheduledDate.toLocaleString('en-US', {
-            weekday: 'short',
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-            hour: 'numeric',
-            minute: '2-digit',
-            hour12: true
-          }),
-          scheduledTime: booking.scheduledTime,
-          scheduledDate: scheduledDate,
-          status: "completed",
-          students: [`${booking.studentId.firstName} ${booking.studentId.surname}`],
-          studentId: booking.studentId._id,
-          duration: booking.duration,
-          notes: booking.notes,
-          bookingId: booking._id,
-          completedAt: booking.completedAt
-        });
+        const groupKey = `${booking.scheduledTime}_${booking.classTitle}`;
+        
+        if (completedMap.has(groupKey)) {
+          const existingClass = completedMap.get(groupKey);
+          existingClass.students.push(`${booking.studentId.firstName} ${booking.studentId.surname}`);
+        } else {
+          completedMap.set(groupKey, {
+            id: booking._id,
+            title: booking.classTitle,
+            topic: booking.topic || "Completed Lesson",
+            fullDateTime: scheduledDate.toLocaleString('en-US', {
+              weekday: 'short',
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric',
+              hour: 'numeric',
+              minute: '2-digit',
+              hour12: true
+            }),
+            scheduledTime: booking.scheduledTime,
+            scheduledDate: scheduledDate,
+            students: [`${booking.studentId.firstName} ${booking.studentId.surname}`],
+            duration: booking.duration,
+            status: "completed"
+          });
+        }
       });
-
-      setClasses(activeClasses);
-      setCompletedClasses(finishedClasses);
-
+      
+      const completedFromBookings = Array.from(completedMap.values());
+      setCompletedClasses([...finishedClasses, ...completedFromBookings]);
+      
     } catch (err) {
-      console.error("Error fetching teacher data:", err);
-      setError(err.response?.data?.message || "Failed to load teacher data");
+      console.error("Failed to load teacher data:", err);
+      console.error("Error details:", err.response?.data?.message || "Failed to load teacher data");
       showToast("Failed to load data from server", "error");
     } finally {
       setLoading(false);
     }
   };
 
-  /**
-   * FIXED: Improved booking acceptance with proper date handling
-   */
   const handleAcceptBooking = async (booking) => {
     try {
       await acceptBooking(booking.id);
       
       setBookings((prev) => prev.filter((b) => b.id !== booking.id));
 
-      // Parse date properly
       const scheduledDate = new Date(booking.scheduledTime);
       const now = new Date();
       const timeDiff = scheduledDate - now;
@@ -317,7 +313,6 @@ export default function TeacherDashboard() {
       setClasses((prev) => [...prev, newClass]);
       showToast(`Accepted booking for ${booking.name}! Class added to your schedule.`);
       
-      // Refresh after a moment
       setTimeout(() => {
         fetchTeacherData();
       }, 1000);
@@ -328,9 +323,6 @@ export default function TeacherDashboard() {
     }
   };
 
-  /**
-   * Handle rejecting a booking
-   */
   const handleRejectBooking = async (booking) => {
     try {
       const reason = prompt("Reason for rejection (optional):");
@@ -344,9 +336,7 @@ export default function TeacherDashboard() {
     }
   };
 
-  /**
-   * FIXED: Handle adding a new class with proper ISO date conversion
-   */
+  // ✅ FIXED: Improved class creation for multiple students under ONE schedule
   const handleAddClass = async (newClass) => {
     try {
       if (!newClass.students || newClass.students.length === 0) {
@@ -356,12 +346,9 @@ export default function TeacherDashboard() {
 
       const teacherId = teacherInfo._id || teacherInfo.id;
       
-      // FIXED: Convert datetime-local string to ISO 8601 format
-      // datetime-local gives us "2024-11-05T14:30"
-      // We need to convert it to proper ISO format for the backend
       const localDateTimeString = newClass.time;
       const scheduledDate = new Date(localDateTimeString);
-      const isoString = scheduledDate.toISOString(); // Proper ISO format
+      const isoString = scheduledDate.toISOString();
       
       console.log("Creating class with date:", {
         original: localDateTimeString,
@@ -369,13 +356,14 @@ export default function TeacherDashboard() {
         iso: isoString
       });
       
+      // Create bookings for each student
       const bookingPromises = newClass.students.map(async (student) => {
         const bookingData = {
           teacherId: teacherId,
           studentId: student.id,
           classTitle: newClass.title,
           topic: newClass.topic,
-          scheduledTime: isoString, // FIXED: Use ISO string
+          scheduledTime: isoString,
           duration: newClass.duration || 60,
           notes: `Teacher-created class`,
           createdBy: "teacher"
@@ -396,15 +384,11 @@ export default function TeacherDashboard() {
     }
   };
 
-  /**
-   * Show toast notification
-   */
   const showToast = (message, type = "success") => {
     setToast({ message, type });
     setTimeout(() => setToast(""), 3000);
   };
 
-  // Logout function
   const handleLogout = () => {
     localStorage.removeItem("teacherToken");
     localStorage.removeItem("teacherSessionToken");
@@ -412,12 +396,11 @@ export default function TeacherDashboard() {
     navigate("/teacher/login");
   };
 
-  // Password change success handler
   const handlePasswordChangeSuccess = (message) => {
     showToast(message);
   };
 
-  // CLASS CANCEL / DELETE
+  // ✅ CLASS CANCEL / DELETE
   const [confirmModal, setConfirmModal] = useState({
     open: false,
     type: null,
@@ -427,95 +410,154 @@ export default function TeacherDashboard() {
   const askCancelClass = (id) =>
     setConfirmModal({ open: true, type: "cancel", classId: id });
 
-  const askDeleteClass = (id) =>
-    setConfirmModal({ open: true, type: "delete", classId: id });
+  const askDeleteClass = (classItem) => {
+    // Accept both ID and class object
+    const classId = typeof classItem === 'object' ? classItem.id : classItem;
+    setConfirmModal({ open: true, type: "delete", classId: classId });
+  };
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     if (confirmModal.type === "cancel") {
-      setClasses((prev) =>
-        prev.map((cls) =>
-          cls.id === confirmModal.classId
-            ? { ...cls, status: "cancelled" }
-            : cls
-        )
-      );
+      try {
+        // ✅ FIXED: Cancel all bookings if class has multiple students
+        const classToCancel = classes.find(cls => cls.id === confirmModal.classId);
+        
+        if (classToCancel && classToCancel.bookingIds && classToCancel.bookingIds.length > 0) {
+          // Cancel all bookings for this class (in case of grouped students)
+          await Promise.all(
+            classToCancel.bookingIds.map(bookingId => cancelBooking(bookingId, "Teacher cancelled class"))
+          );
+        } else {
+          // Single booking - cancel by class ID
+          await cancelBooking(confirmModal.classId, "Teacher cancelled class");
+        }
+        
+        // Update UI
+        setClasses((prev) =>
+          prev.map((cls) =>
+            cls.id === confirmModal.classId
+              ? { ...cls, status: "cancelled" }
+              : cls
+          )
+        );
+        showToast("Class cancelled successfully");
+      } catch (err) {
+        console.error("Error cancelling class:", err);
+        showToast("Failed to cancel class", "error");
+      }
     } else if (confirmModal.type === "delete") {
-      setClasses((prev) => prev.filter((cls) => cls.id !== confirmModal.classId));
+      try {
+        // ✅ FIXED: Delete all bookings if class has multiple students
+        const classToDelete = classes.find(cls => cls.id === confirmModal.classId);
+        
+        if (classToDelete && classToDelete.bookingIds && classToDelete.bookingIds.length > 0) {
+          // Delete all bookings for this class (in case of grouped students)
+          await Promise.all(
+            classToDelete.bookingIds.map(bookingId => deleteBooking(bookingId))
+          );
+        } else {
+          // Single booking - delete by class ID
+          await deleteBooking(confirmModal.classId);
+        }
+        
+        setClasses((prev) => prev.filter((cls) => cls.id !== confirmModal.classId));
+        showToast("Class deleted successfully");
+      } catch (err) {
+        console.error("Error deleting class:", err);
+        showToast("Failed to delete class", "error");
+      }
     }
     setConfirmModal({ open: false, type: null, classId: null });
   };
 
-  // Handle joining live classroom
   const handleJoinClass = (cls) => {
     setActiveClass(cls);
     setIsClassroomOpen(true);
   };
 
-  // Show loading state
+  const handleLeaveClassroom = () => {
+    setIsClassroomOpen(false);
+    setActiveClass(null);
+  };
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center">
-        <div className="bg-white p-8 rounded-lg shadow-xl">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto"></div>
-          <p className="mt-4 text-gray-700 font-semibold">Loading your dashboard...</p>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading dashboard...</p>
         </div>
       </div>
     );
   }
 
+  if (isClassroomOpen && activeClass) {
+    return (
+      <Classroom
+        classData={activeClass}
+        userRole="teacher"
+        onLeave={handleLeaveClassroom}
+      />
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-gradient-to-r from-purple-500 to-pink-500">
-      {/* Header with Settings Button */}
-      <div className="bg-white shadow-md">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-gray-800">Teacher Dashboard</h1>
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => setShowSettingsSidebar(true)}
-              className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
-              title="Settings"
-            >
-              <Settings className="h-6 w-6 text-gray-600" />
-            </button>
-            <button
-              onClick={handleLogout}
-              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-            >
-              Logout
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Toast Notification */}
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-purple-50">
       {toast && (
-        <div className={`fixed top-4 right-4 z-50 px-4 py-2 rounded shadow text-white ${
+        <div className={`fixed top-4 right-4 z-50 px-6 py-3 rounded-lg shadow-lg ${
           toast.type === "error" ? "bg-red-500" : "bg-green-500"
-        }`}>
-          {toast.message || toast}
+        } text-white`}>
+          {toast.message}
         </div>
       )}
 
-      {/* Error Message */}
-      {error && (
-        <div className="max-w-6xl mx-auto px-4 pt-4">
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
-            <strong>Error:</strong> {error}
-          </div>
-        </div>
+      <DashboardHeader
+        teacherName={teacherInfo?.firstName || "Teacher"}
+        onLogout={handleLogout}
+        onChangePassword={() => setShowChangePassword(true)}
+        onOpenSettings={() => setShowSettingsSidebar(true)}
+        onSessionManagement={() => setShowSessionManagement(true)}
+      />
+
+      {showChangePassword && (
+        <ChangePassword
+          onClose={() => setShowChangePassword(false)}
+          onSuccess={handlePasswordChangeSuccess}
+        />
       )}
 
-      {/* Welcome Banner */}
-      {teacherInfo && (
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
-          <div className="bg-white rounded-lg shadow-md p-4">
-            <h2 className="text-2xl font-bold text-gray-800">
-              {getGreeting()}, {teacherInfo.firstName} {teacherInfo.lastName}! 👋
+      {showSessionManagement && (
+        <SessionManagement onClose={() => setShowSessionManagement(false)} />
+      )}
+
+      {showSettingsSidebar && (
+        <SettingsSidebar
+          isOpen={showSettingsSidebar}
+          onClose={() => setShowSettingsSidebar(false)}
+          onOpenModal={() => {
+            setShowSettingsSidebar(false);
+            setShowSettingsModal(true);
+          }}
+        />
+      )}
+
+      {showSettingsModal && (
+        <SettingsModal
+          isOpen={showSettingsModal}
+          onClose={() => setShowSettingsModal(false)}
+        />
+      )}
+
+      {!loading && teacherInfo && (
+        <div className="bg-gradient-to-r from-purple-600 via-blue-600 to-indigo-600 text-white py-6 px-4 shadow-lg">
+          <div className="max-w-6xl mx-auto">
+            <h2 className="text-2xl sm:text-3xl font-bold">
+              Welcome back, {teacherInfo.firstName}! 👋
             </h2>
-            <p className="text-sm text-gray-500 mt-1">
-              You have <span className="font-semibold text-purple-600">{students.length}</span> assigned students,{" "}
-              <span className="font-semibold text-blue-600">{classes.length}</span> scheduled classes, and{" "}
-              <span className="font-semibold text-orange-600">{bookings.length}</span> pending bookings
+            <p className="text-sm text-purple-100 mt-1">
+              You have <span className="font-semibold text-white">{students.length}</span> assigned students,{" "}
+              <span className="font-semibold text-white">{classes.length}</span> scheduled classes, and{" "}
+              <span className="font-semibold text-white">{bookings.length}</span> pending bookings
             </p>
           </div>
         </div>
@@ -528,7 +570,6 @@ export default function TeacherDashboard() {
           tabs={["dashboard", "classes", "completed-classes", "students", "bookings"]}
         />
 
-        {/* Dashboard Tab */}
         {activeTab === "dashboard" && (
           <div className="space-y-6">
             <QuickStats
@@ -548,15 +589,17 @@ export default function TeacherDashboard() {
           </div>
         )}
 
-        {/* Classes Tab */}
         {activeTab === "classes" && (
           <div className="space-y-6">
+            {/* ✅ IMPROVED: Better Add Class button design */}
             <button
               onClick={() => setIsModalOpen(true)}
-              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+              className="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2 font-semibold text-lg"
             >
-              + Add Class
+              <Plus className="w-5 h-5" />
+              Add New Class
             </button>
+            
             {classes.length === 0 ? (
               <div className="bg-white rounded-lg shadow-md p-8 text-center">
                 <p className="text-gray-500 text-lg">No classes scheduled yet</p>
@@ -565,7 +608,11 @@ export default function TeacherDashboard() {
                 </p>
               </div>
             ) : (
-              <ClassList data={classes} />
+              <ClassList 
+                data={classes} 
+                onJoin={handleJoinClass}
+                onDelete={askDeleteClass}
+              />
             )}
           </div>
         )}
@@ -577,7 +624,6 @@ export default function TeacherDashboard() {
           students={students}
         />
 
-        {/* Completed Classes Tab */}
         {activeTab === "completed-classes" && (
           <CompletedClassesTab 
             classes={completedClasses}
@@ -585,26 +631,18 @@ export default function TeacherDashboard() {
           />
         )}
 
-        {/* Students Tab - WITH PAGINATION */}
         {activeTab === "students" && (
           <div>
             {students.length === 0 ? (
               <div className="bg-white rounded-lg shadow-md p-8 text-center">
                 <p className="text-gray-500 text-lg">No students assigned yet</p>
-                <p className="text-gray-400 text-sm mt-2">
-                  Contact your admin to get students assigned to you
-                </p>
               </div>
             ) : (
-              <StudentProgressList
-                students={students}
-                onView={(student) => alert(`Viewing ${student.name}`)}
-              />
+              <StudentProgressList students={students} />
             )}
           </div>
         )}
 
-        {/* Bookings Tab */}
         {activeTab === "bookings" && (
           <BookingList
             bookings={bookings}
@@ -612,79 +650,16 @@ export default function TeacherDashboard() {
             onReject={handleRejectBooking}
           />
         )}
+
+        <ConfirmModal
+          isOpen={confirmModal.open}
+          type={confirmModal.type}
+          onConfirm={handleConfirm}
+          onCancel={() =>
+            setConfirmModal({ open: false, type: null, classId: null })
+          }
+        />
       </div>
-
-      <ConfirmModal
-        isOpen={confirmModal.open}
-        title={confirmModal.type === "cancel" ? "Cancel Class" : "Delete Class"}
-        message={
-          confirmModal.type === "cancel"
-            ? "Are you sure you want to cancel this class?"
-            : "Are you sure you want to delete this class?"
-        }
-        onConfirm={handleConfirm}
-        onCancel={() => setConfirmModal({ open: false, type: null, classId: null })}
-      />
-
-      {/* Change Password Modal */}
-      {showChangePassword && (
-        <ChangePassword
-          isOpen={showChangePassword}
-          onClose={() => setShowChangePassword(false)}
-          onSuccess={handlePasswordChangeSuccess}
-          userType="teacher"
-        />
-      )}
-
-      {/* Session Management */}
-      {showSessionManagement && (
-        <SessionManagement
-          isOpen={showSessionManagement}
-          onClose={() => setShowSessionManagement(false)}
-          userType="teacher"
-        />
-      )}
-
-      {/* Settings Sidebar */}
-      {showSettingsSidebar && (
-        <SettingsSidebar
-          isOpen={showSettingsSidebar}
-          onClose={() => setShowSettingsSidebar(false)}
-          onChangePassword={() => {
-            setShowSettingsSidebar(false);
-            setShowChangePassword(true);
-          }}
-          onManageSessions={() => {
-            setShowSettingsSidebar(false);
-            setShowSessionManagement(true);
-          }}
-          onManage2FA={() => {
-            setShowSettingsSidebar(false);
-            setShowSettingsModal(true);
-          }}
-          userInfo={teacherInfo}
-        />
-      )}
-
-      {/* Settings Modal */}
-      {showSettingsModal && (
-        <SettingsModal
-          isOpen={showSettingsModal}
-          onClose={() => setShowSettingsModal(false)}
-          userType="teacher"
-        />
-      )}
-
-      {/* Classroom */}
-      {isClassroomOpen && activeClass && (
-        <Classroom
-          classInfo={activeClass}
-          onClose={() => {
-            setIsClassroomOpen(false);
-            setActiveClass(null);
-          }}
-        />
-      )}
     </div>
   );
 }

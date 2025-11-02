@@ -1,4 +1,4 @@
-// src/pages/teacher/components/classes/CompletedClassesTab.jsx
+// src/pages/teacher/components/classes/CompletedClasses.jsx -
 import React, { useState, useMemo } from "react";
 import { Search, Download, ChevronLeft, ChevronRight, Calendar, Clock, User } from "lucide-react";
 import jsPDF from "jspdf";
@@ -124,61 +124,53 @@ export default function CompletedClassesTab({ classes, teacherInfo }) {
 
   return (
     <div className="space-y-6">
-      {/* Header with controls */}
+      {/* Header with filters */}
       <div className="bg-white rounded-lg shadow-md p-6">
-        <h2 className="text-2xl font-bold text-gray-800 mb-4">Completed Classes</h2>
-        
-        {/* Search and Date Range */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
+          <h2 className="text-2xl font-bold text-gray-800">Completed Classes</h2>
+          <button
+            onClick={generatePDF}
+            className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+          >
+            <Download className="w-4 h-4" />
+            Export PDF
+          </button>
+        </div>
+
+        {/* Filters */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* Search */}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
             <input
               type="text"
-              placeholder="Search classes, topics, or students..."
+              placeholder="Search classes..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
             />
           </div>
 
-          {/* Start Date */}
-          <div className="relative">
-            <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-            />
-          </div>
-
-          {/* End Date */}
-          <div className="relative">
-            <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-            />
-          </div>
+          {/* Date Range */}
+          <input
+            type="date"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+            className="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+            placeholder="Start date"
+          />
+          <input
+            type="date"
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+            className="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+            placeholder="End date"
+          />
         </div>
 
-        {/* Actions */}
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="text-sm text-gray-600">
-            Showing {startIndex + 1}-{Math.min(endIndex, filteredClasses.length)} of {filteredClasses.length} classes
-          </div>
-          
-          <button
-            onClick={generatePDF}
-            disabled={filteredClasses.length === 0}
-            className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
-          >
-            <Download className="w-4 h-4" />
-            Download PDF Report
-          </button>
+        {/* Results count */}
+        <div className="mt-4 text-sm text-gray-600">
+          Showing {startIndex + 1}-{Math.min(endIndex, filteredClasses.length)} of {filteredClasses.length} classes
         </div>
       </div>
 
@@ -222,23 +214,17 @@ export default function CompletedClassesTab({ classes, teacherInfo }) {
                       <div className="flex flex-wrap items-center gap-4 mt-3 text-sm text-gray-500">
                         <div className="flex items-center gap-1">
                           <Calendar className="w-4 h-4" />
-                          <span>{cls.date}</span>
+                          <span>{cls.fullDateTime}</span>
                         </div>
                         <div className="flex items-center gap-1">
                           <Clock className="w-4 h-4" />
-                          <span>{cls.time} ({cls.duration} mins)</span>
+                          <span>{cls.duration} mins</span>
                         </div>
                         <div className="flex items-center gap-1">
                           <User className="w-4 h-4" />
                           <span>{cls.students.join(", ")}</span>
                         </div>
                       </div>
-                      
-                      {cls.notes && (
-                        <p className="text-sm text-gray-500 mt-2">
-                          <span className="font-medium">Notes:</span> {cls.notes}
-                        </p>
-                      )}
                     </div>
                   </div>
                 </div>
@@ -254,10 +240,11 @@ export default function CompletedClassesTab({ classes, teacherInfo }) {
         </div>
       )}
 
-      {/* Pagination */}
+      {/* ✅ FIXED: Complete Pagination with Page Numbers */}
       {totalPages > 1 && (
         <div className="bg-white rounded-lg shadow-md p-4">
           <div className="flex items-center justify-between">
+            {/* Previous Button */}
             <button
               onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
               disabled={currentPage === 1}
@@ -267,41 +254,48 @@ export default function CompletedClassesTab({ classes, teacherInfo }) {
               Previous
             </button>
 
+            {/* Page Numbers */}
             <div className="flex items-center gap-2">
-              {/* Page numbers */}
               {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
                 // Show first page, last page, current page, and pages around current
-                if (
+                const showPage = 
                   page === 1 ||
                   page === totalPages ||
-                  (page >= currentPage - 1 && page <= currentPage + 1)
-                ) {
-                  return (
-                    <button
-                      key={page}
-                      onClick={() => setCurrentPage(page)}
-                      className={`w-10 h-10 rounded-lg font-medium transition-colors ${
-                        currentPage === page
-                          ? "bg-purple-600 text-white"
-                          : "bg-white border hover:bg-gray-50"
-                      }`}
-                    >
-                      {page}
-                    </button>
-                  );
-                }
+                  (page >= currentPage - 1 && page <= currentPage + 1);
+
                 // Show ellipsis
-                if (page === currentPage - 2 || page === currentPage + 2) {
+                const showEllipsisBefore = page === currentPage - 2 && currentPage > 3;
+                const showEllipsisAfter = page === currentPage + 2 && currentPage < totalPages - 2;
+
+                if (!showPage && !showEllipsisBefore && !showEllipsisAfter) {
+                  return null;
+                }
+
+                if (showEllipsisBefore || showEllipsisAfter) {
                   return (
-                    <span key={page} className="px-2 text-gray-400">
+                    <span key={`ellipsis-${page}`} className="px-2 text-gray-400">
                       ...
                     </span>
                   );
                 }
-                return null;
+
+                return (
+                  <button
+                    key={page}
+                    onClick={() => setCurrentPage(page)}
+                    className={`w-10 h-10 rounded-lg font-medium transition-colors ${
+                      currentPage === page
+                        ? "bg-purple-600 text-white"
+                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    }`}
+                  >
+                    {page}
+                  </button>
+                );
               })}
             </div>
 
+            {/* Next Button */}
             <button
               onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
               disabled={currentPage === totalPages}
@@ -310,6 +304,11 @@ export default function CompletedClassesTab({ classes, teacherInfo }) {
               Next
               <ChevronRight className="w-4 h-4" />
             </button>
+          </div>
+
+          {/* Page Info */}
+          <div className="text-center text-sm text-gray-600 mt-3">
+            Page {currentPage} of {totalPages}
           </div>
         </div>
       )}
