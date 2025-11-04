@@ -1,47 +1,80 @@
-
-import express from "express";
-import pkg from "agora-access-token";
-import dotenv from "dotenv";
-
-dotenv.config();
-
+// server/routes/agoraRoutes.js - STRING UID VERSION (FINAL)
+import express from 'express';
+import pkg from 'agora-access-token';
 const { RtcTokenBuilder, RtcRole } = pkg;
+
 const router = express.Router();
 
-router.get("/token", (req, res) => {
+const APP_ID = process.env.AGORA_APP_ID;
+const APP_CERTIFICATE = process.env.AGORA_APP_CERTIFICATE;
+
+router.get('/token', (req, res) => {
   try {
-    const appID = process.env.AGORA_APP_ID;
-    const appCertificate = process.env.AGORA_APP_CERTIFICATE;
-    const channelName = req.query.channel;
-    const uid = req.query.uid || 0;
-
-    if (!appID || !appCertificate) {
-      return res.status(500).json({ error: "Agora credentials missing" });
+    const { channel, uid } = req.query;
+    
+    console.log('📞 Token request:', { channel, uid });
+    
+    if (!channel || !uid) {
+      return res.status(400).json({
+        success: false,
+        message: 'Channel name and UID are required'
+      });
     }
-    if (!channelName) {
-      return res.status(400).json({ error: "Channel name is required" });
+
+    if (!APP_ID || !APP_CERTIFICATE) {
+      console.error('❌ Agora credentials missing!');
+      return res.status(500).json({
+        success: false,
+        message: 'Video calling not configured'
+      });
     }
 
-    const role = RtcRole.PUBLISHER;
-    const expireTime = 3600; // 1 hour
-    const currentTime = Math.floor(Date.now() / 1000);
-    const privilegeExpireTime = currentTime + expireTime;
+    // Use string UID (MongoDB ObjectId works perfectly)
+    const stringUid = String(uid);
+    console.log(`✅ Using string UID: ${stringUid}`);
 
-    const token = RtcTokenBuilder.buildTokenWithUid(
-      appID,
-      appCertificate,
-      channelName,
-      uid,
-      role,
-      privilegeExpireTime
+    const expirationTimeInSeconds = 3600 * 24;
+    const currentTimestamp = Math.floor(Date.now() / 1000);
+    const privilegeExpiredTs = currentTimestamp + expirationTimeInSeconds;
+
+    // Use buildTokenWithAccount for string UIDs
+    const token = RtcTokenBuilder.buildTokenWithAccount(
+      APP_ID,
+      APP_CERTIFICATE,
+      channel,
+      stringUid,
+      RtcRole.PUBLISHER,
+      privilegeExpiredTs
     );
 
-    return res.json({ token });
+    console.log('✅ Token generated with string UID');
+
+    res.json({
+      success: true,
+      token,
+      appId: APP_ID,
+      channel,
+      uid: stringUid,
+      expiresAt: new Date(privilegeExpiredTs * 1000).toISOString()
+    });
+
   } catch (error) {
-    console.error("Agora token error:", error);
-    return res.status(500).json({ error: error.message });
+    console.error('❌ Token generation error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to generate token',
+      error: error.message
+    });
   }
 });
 
-export default router;
+router.get('/status', (req, res) => {
+  const isConfigured = !!(APP_ID && APP_CERTIFICATE);
+  res.json({
+    success: true,
+    configured: isConfigured,
+    message: isConfigured ? '✅ Configured' : '⚠️ Not configured'
+  });
+});
 
+export default router;

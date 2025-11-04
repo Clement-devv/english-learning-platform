@@ -30,7 +30,7 @@ import Classroom from "../../pages/Classroom";
 
 // Session Management & Settings
 import SessionManagement from "../../components/SessionManagement";
-import SettingsSidebar from "./../../components/SettingsSidebar";
+import SettingsSidebar from "../../components/SettingsSidebar";
 import SettingsModal from "../../components/SettingsModal";
 
 // Services for fetching real data
