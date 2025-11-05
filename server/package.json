@@ -26,6 +26,7 @@
     "mongoose": "^8.0.0",
     "nodemailer": "^7.0.6",
     "qrcode": "^1.5.4",
+    "socket.io": "^4.8.1",
     "speakeasy": "^2.0.0",
     "three": "^0.180.0",
     "ua-parser-js": "^2.0.6",

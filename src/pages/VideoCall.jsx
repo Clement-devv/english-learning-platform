@@ -1,62 +1,7 @@
-// VideoCall.jsx
-/*import React, { useEffect, useRef, useState } from "react";
-import AgoraRTC from "agora-rtc-sdk-ng";
-import axios from "axios";
-
-const APP_ID = "YOUR_AGORA_APP_ID";
-
-export default function VideoCall({ channelName, userId }) {
-  const client = useRef(null);
-  const [joined, setJoined] = useState(false);
-  const localContainer = useRef();
-  const remoteContainer = useRef();
-
-  const joinCall = async () => {
-    client.current = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
-    const { data } = await axios.get(`/api/agora/token?channel=${channelName}&uid=${userId}`);
-    const token = data.token;
-
-    await client.current.join(APP_ID, channelName, token, userId);
-    const localTrack = await AgoraRTC.createMicrophoneAndCameraTracks();
-    localTrack[1].play(localContainer.current);
-    await client.current.publish(localTrack);
-    setJoined(true);
-
-    client.current.on("user-published", async (user, mediaType) => {
-      await client.current.subscribe(user, mediaType);
-      if (mediaType === "video") user.videoTrack.play(remoteContainer.current);
-    });
-  };
-
-  const leaveCall = async () => {
-    await client.current.leave();
-    setJoined(false);
-  };
-
-  return (
-    <div className="flex flex-col items-center">
-      <div className="flex gap-4 my-4">
-        <button onClick={joinCall} disabled={joined} className="px-4 py-2 bg-green-500 text-white rounded">
-          Join Call
-        </button>
-        <button onClick={leaveCall} disabled={!joined} className="px-4 py-2 bg-red-500 text-white rounded">
-          Leave Call
-        </button>
-      </div>
-      <div className="flex gap-4">
-        <div ref={localContainer} className="w-64 h-48 bg-gray-200 rounded" />
-        <div ref={remoteContainer} className="w-64 h-48 bg-gray-200 rounded" />
-      </div>
-    </div>
-  );
-}
-*/
-
-
-// src/pages/VideoCall.jsx - FINAL FIXED VERSION
+// src/pages/VideoCall.jsx - ENHANCED WITH FIXES
 import React, { useEffect, useRef, useState } from "react";
 import AgoraRTC from "agora-rtc-sdk-ng";
-import api from "../api"; // ✅ FIX: Use configured api instead of axios
+import api from "../api";
 import { 
   Mic, 
   MicOff, 
@@ -66,10 +11,19 @@ import {
   Monitor,
   MonitorOff,
   Users,
-  Loader
+  Loader,
+  Maximize2,
+  Minimize2
 } from "lucide-react";
 
-export default function VideoCall({ channelName, userId, userName = "User", onLeave }) {
+export default function VideoCall({ 
+  channelName, 
+  userId, 
+  userName = "User", 
+  onLeave,
+  isMaximized = false,
+  onToggleMaximize 
+}) {
   const client = useRef(null);
   const [joined, setJoined] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -172,71 +126,69 @@ export default function VideoCall({ channelName, userId, userName = "User", onLe
     }
   };
 
- const joinCall = async () => {
-  try {
-    setLoading(true);
-    setError(null);
+  const joinCall = async () => {
+    try {
+      setLoading(true);
+      setError(null);
 
-    console.log(`🚀 Joining channel: ${channelName} with UID: ${userId}`);
+      console.log(`🚀 Joining channel: ${channelName} with UID: ${userId}`);
 
-    const { data } = await api.get(
-      `/api/agora/token?channel=${channelName}&uid=${userId}`
-    );
+      const { data } = await api.get(
+        `/api/agora/token?channel=${channelName}&uid=${userId}`
+      );
 
-    if (!data.success) {
-      throw new Error(data.message || 'Failed to get authentication token');
-    }
+      if (!data.success) {
+        throw new Error(data.message || 'Failed to get authentication token');
+      }
 
-    console.log('✅ Token received');
-    console.log('   Numeric UID from backend:', data.uid);
+      console.log('✅ Token received');
 
-    // ✅ CRITICAL FIX: Use data.uid (not Number(userId))
-    await client.current.join(
-      data.appId, 
-      channelName, 
-      data.token, 
-      data.uid  // This must be the numeric UID from backend response
-    );
+      await client.current.join(
+        data.appId, 
+        channelName, 
+        data.token, 
+        data.uid
+      );
 
-    console.log('✅ Joined channel with UID:', data.uid);
+      console.log('✅ Joined channel with UID:', data.uid);
 
-    const [audioTrack, videoTrack] = await AgoraRTC.createMicrophoneAndCameraTracks({
-      audioConfig: { encoderConfig: "music_standard" },
-      videoConfig: { encoderConfig: "720p_2" },
-    });
+      const [audioTrack, videoTrack] = await AgoraRTC.createMicrophoneAndCameraTracks({
+        audioConfig: { encoderConfig: "music_standard" },
+        videoConfig: { encoderConfig: "720p_2" },
+      });
       
-    setLocalAudioTrack(audioTrack);
-    setLocalVideoTrack(videoTrack);
+      setLocalAudioTrack(audioTrack);
+      setLocalVideoTrack(videoTrack);
 
-    if (localContainer.current) {
-      videoTrack.play(localContainer.current);
-    }
+      if (localContainer.current) {
+        videoTrack.play(localContainer.current);
+      }
 
-    await client.current.publish([audioTrack, videoTrack]);
+      await client.current.publish([audioTrack, videoTrack]);
       
-    console.log('✅ Published local tracks');
-    setJoined(true);
+      console.log('✅ Published local tracks');
+      setJoined(true);
       
-  } catch (err) {
-    console.error('❌ Join call error:', err);
-    
-    let errorMessage = 'Failed to join call';
-    
-    if (err.message.includes('camera') || err.message.includes('microphone')) {
-      errorMessage = 'Unable to access camera/microphone. Please check permissions.';
-    } else if (err.code === 'INVALID_TOKEN') {
-      errorMessage = 'Session expired. Please refresh and try again.';
-    } else if (err.response?.status === 500) {
-      errorMessage = 'Video service temporarily unavailable.';
-    } else {
-      errorMessage = err.message || errorMessage;
+    } catch (err) {
+      console.error('❌ Join call error:', err);
+      
+      let errorMessage = 'Failed to join call';
+      
+      if (err.message.includes('camera') || err.message.includes('microphone')) {
+        errorMessage = 'Unable to access camera/microphone. Please check permissions.';
+      } else if (err.code === 'INVALID_TOKEN') {
+        errorMessage = 'Session expired. Please refresh and try again.';
+      } else if (err.response?.status === 500) {
+        errorMessage = 'Video service temporarily unavailable.';
+      } else {
+        errorMessage = err.message || errorMessage;
+      }
+      
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
     }
-    
-    setError(errorMessage);
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   const leaveCall = async () => {
     if (!joined && !localAudioTrack && !localVideoTrack) {
@@ -310,22 +262,38 @@ export default function VideoCall({ channelName, userId, userName = "User", onLe
     }
   };
 
+  // ✅ FIXED: Screen sharing with proper error handling
   const toggleScreenShare = async () => {
     try {
       if (!isScreenSharing) {
         console.log('🖥️ Starting screen share...');
         
-        const screen = await AgoraRTC.createScreenVideoTrack({ encoderConfig: "1080p_1" });
+        // Create screen track
+        const screen = await AgoraRTC.createScreenVideoTrack({
+          encoderConfig: "1080p_1",
+          optimizationMode: "detail"
+        });
         
-        if (localVideoTrack) {
-          await client.current.unpublish(localVideoTrack);
+        // If camera is on, unpublish it first
+        if (localVideoTrack && camOn) {
+          await client.current.unpublish([localVideoTrack]);
+          localVideoTrack.stop();
         }
-        await client.current.publish(screen);
+        
+        // Publish screen track
+        await client.current.publish([screen]);
+        
+        // Play screen in local container
+        if (localContainer.current) {
+          screen.play(localContainer.current);
+        }
         
         setScreenTrack(screen);
         setIsScreenSharing(true);
         
+        // Handle when user stops sharing via browser UI
         screen.on("track-ended", () => {
+          console.log('🖥️ Screen share ended by user');
           toggleScreenShare();
         });
         
@@ -334,14 +302,20 @@ export default function VideoCall({ channelName, userId, userName = "User", onLe
       } else {
         console.log('🖥️ Stopping screen share...');
         
+        // Unpublish and close screen track
         if (screenTrack) {
-          await client.current.unpublish(screenTrack);
+          await client.current.unpublish([screenTrack]);
+          screenTrack.stop();
           screenTrack.close();
           setScreenTrack(null);
         }
         
-        if (localVideoTrack) {
-          await client.current.publish(localVideoTrack);
+        // Restart camera if it was on before
+        if (localVideoTrack && camOn) {
+          await client.current.publish([localVideoTrack]);
+          if (localContainer.current) {
+            localVideoTrack.play(localContainer.current);
+          }
         }
         
         setIsScreenSharing(false);
@@ -349,7 +323,19 @@ export default function VideoCall({ channelName, userId, userName = "User", onLe
       }
     } catch (error) {
       console.error('❌ Screen share error:', error);
-      setError('Screen sharing failed. Please try again.');
+      
+      // Better error messages
+      let errorMsg = 'Screen sharing failed. ';
+      if (error.message.includes('Permission denied')) {
+        errorMsg += 'Please allow screen sharing permission.';
+      } else if (error.message.includes('NotAllowedError')) {
+        errorMsg += 'Screen sharing was cancelled.';
+      } else {
+        errorMsg += 'Please try again.';
+      }
+      
+      setError(errorMsg);
+      setIsScreenSharing(false);
     }
   };
 
@@ -371,6 +357,15 @@ export default function VideoCall({ channelName, userId, userName = "User", onLe
           <span className="text-sm">
             {remoteUsers.length + (joined ? 1 : 0)} participant{(remoteUsers.length + (joined ? 1 : 0)) !== 1 ? 's' : ''}
           </span>
+          {onToggleMaximize && (
+            <button
+              onClick={onToggleMaximize}
+              className="ml-4 p-2 hover:bg-gray-700 rounded-lg transition"
+              title={isMaximized ? "Minimize" : "Maximize"}
+            >
+              {isMaximized ? <Minimize2 className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
+            </button>
+          )}
         </div>
       </div>
 
@@ -399,7 +394,7 @@ export default function VideoCall({ channelName, userId, userName = "User", onLe
                 <span className="font-medium">{userName} (You)</span>
                 {!micOn && <MicOff className="w-3 h-3" />}
                 {!camOn && <VideoOff className="w-3 h-3" />}
-                {isScreenSharing && <Monitor className="w-3 h-3" />}
+                {isScreenSharing && <Monitor className="w-3 h-3 text-blue-400" />}
               </div>
             </div>
           )}
