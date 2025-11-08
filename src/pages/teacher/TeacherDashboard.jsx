@@ -1,4 +1,4 @@
-// src/pages/teacher/TeacherDashboard.jsx - UPDATED WITH ALL FIXES
+// src/pages/teacher/TeacherDashboard.jsx - WITH DARK MODE
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Settings, Plus } from "lucide-react";
@@ -28,6 +28,10 @@ import LiveClasses from "./components/dashboard/LiveClasses";
 import UpcomingClasses from "./components/dashboard/UpcomingClasses";
 import Classroom from "../../pages/Classroom";
 
+// Dark Mode
+import { useDarkMode } from '../../hooks/useDarkMode';
+import DarkModeToggle from '../../components/DarkModeToggle';
+
 // Session Management & Settings
 import SessionManagement from "../../components/SessionManagement";
 import SettingsSidebar from "../../components/SettingsSidebar";
@@ -55,6 +59,9 @@ export default function TeacherDashboard() {
   // Settings Sidebar States
   const [showSettingsSidebar, setShowSettingsSidebar] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+
+  // Dark Mode
+  const { isDarkMode, toggleDarkMode } = useDarkMode();
 
   // Classroom state
   const [activeClass, setActiveClass] = useState(null);
@@ -138,7 +145,6 @@ export default function TeacherDashboard() {
       });
       setBookings(bookingsFormatted);
 
-      // ✅ FIXED: Group bookings by scheduledTime and classTitle to combine multiple students
       const classesMap = new Map();
       
       acceptedBookingsData.forEach((booking) => {
@@ -155,16 +161,13 @@ export default function TeacherDashboard() {
           status = "upcoming-soon";
         }
         
-        // Create a unique key for grouping: time + title
         const groupKey = `${booking.scheduledTime}_${booking.classTitle}`;
         
         if (classesMap.has(groupKey)) {
-          // Add student to existing class
           const existingClass = classesMap.get(groupKey);
           existingClass.students.push(`${booking.studentId.firstName} ${booking.studentId.surname}`);
           existingClass.bookingIds.push(booking._id);
         } else {
-          // Create new class entry
           const classObj = {
             id: booking._id,
             title: booking.classTitle,
@@ -195,14 +198,13 @@ export default function TeacherDashboard() {
             duration: booking.duration,
             notes: booking.notes,
             bookingId: booking._id,
-            bookingIds: [booking._id] // Track all booking IDs for this class
+            bookingIds: [booking._id]
           };
           
           classesMap.set(groupKey, classObj);
         }
       });
 
-      // Convert map to arrays
       const activeClasses = [];
       const finishedClasses = [];
       
@@ -216,7 +218,6 @@ export default function TeacherDashboard() {
 
       setClasses(activeClasses);
 
-      // ✅ FIXED: Group completed bookings too
       const completedMap = new Map();
       
       completedBookingsData.forEach((booking) => {
@@ -336,7 +337,6 @@ export default function TeacherDashboard() {
     }
   };
 
-  // ✅ FIXED: Improved class creation for multiple students under ONE schedule
   const handleAddClass = async (newClass) => {
     try {
       if (!newClass.students || newClass.students.length === 0) {
@@ -356,7 +356,6 @@ export default function TeacherDashboard() {
         iso: isoString
       });
       
-      // Create bookings for each student
       const bookingPromises = newClass.students.map(async (student) => {
         const bookingData = {
           teacherId: teacherId,
@@ -400,7 +399,6 @@ export default function TeacherDashboard() {
     showToast(message);
   };
 
-  // ✅ CLASS CANCEL / DELETE
   const [confirmModal, setConfirmModal] = useState({
     open: false,
     type: null,
@@ -411,7 +409,6 @@ export default function TeacherDashboard() {
     setConfirmModal({ open: true, type: "cancel", classId: id });
 
   const askDeleteClass = (classItem) => {
-    // Accept both ID and class object
     const classId = typeof classItem === 'object' ? classItem.id : classItem;
     setConfirmModal({ open: true, type: "delete", classId: classId });
   };
@@ -419,20 +416,16 @@ export default function TeacherDashboard() {
   const handleConfirm = async () => {
     if (confirmModal.type === "cancel") {
       try {
-        // ✅ FIXED: Cancel all bookings if class has multiple students
         const classToCancel = classes.find(cls => cls.id === confirmModal.classId);
         
         if (classToCancel && classToCancel.bookingIds && classToCancel.bookingIds.length > 0) {
-          // Cancel all bookings for this class (in case of grouped students)
           await Promise.all(
             classToCancel.bookingIds.map(bookingId => cancelBooking(bookingId, "Teacher cancelled class"))
           );
         } else {
-          // Single booking - cancel by class ID
           await cancelBooking(confirmModal.classId, "Teacher cancelled class");
         }
         
-        // Update UI
         setClasses((prev) =>
           prev.map((cls) =>
             cls.id === confirmModal.classId
@@ -447,16 +440,13 @@ export default function TeacherDashboard() {
       }
     } else if (confirmModal.type === "delete") {
       try {
-        // ✅ FIXED: Delete all bookings if class has multiple students
         const classToDelete = classes.find(cls => cls.id === confirmModal.classId);
         
         if (classToDelete && classToDelete.bookingIds && classToDelete.bookingIds.length > 0) {
-          // Delete all bookings for this class (in case of grouped students)
           await Promise.all(
             classToDelete.bookingIds.map(bookingId => deleteBooking(bookingId))
           );
         } else {
-          // Single booking - delete by class ID
           await deleteBooking(confirmModal.classId);
         }
         
@@ -482,10 +472,10 @@ export default function TeacherDashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className={`min-h-screen flex items-center justify-center ${isDarkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading dashboard...</p>
+          <div className={`animate-spin rounded-full h-12 w-12 border-b-2 ${isDarkMode ? 'border-blue-400' : 'border-blue-600'} mx-auto`}></div>
+          <p className={`mt-4 ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>Loading dashboard...</p>
         </div>
       </div>
     );
@@ -502,7 +492,8 @@ export default function TeacherDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-purple-50">
+    <div className={`min-h-screen ${isDarkMode ? 'bg-gray-900' : 'bg-gradient-to-br from-gray-50 via-blue-50 to-purple-50'}`}>
+      {/* Toast Notification */}
       {toast && (
         <div className={`fixed top-4 right-4 z-50 px-6 py-3 rounded-lg shadow-lg ${
           toast.type === "error" ? "bg-red-500" : "bg-green-500"
@@ -517,6 +508,7 @@ export default function TeacherDashboard() {
         onChangePassword={() => setShowChangePassword(true)}
         onOpenSettings={() => setShowSettingsSidebar(true)}
         onSessionManagement={() => setShowSessionManagement(true)}
+        isDarkMode={isDarkMode}
       />
 
       {showChangePassword && (
@@ -527,16 +519,32 @@ export default function TeacherDashboard() {
       )}
 
       {showSessionManagement && (
-        <SessionManagement onClose={() => setShowSessionManagement(false)} />
+        <SessionManagement 
+          onClose={() => setShowSessionManagement(false)}
+          userType="teacher"
+        />
       )}
 
       {showSettingsSidebar && (
         <SettingsSidebar
           isOpen={showSettingsSidebar}
           onClose={() => setShowSettingsSidebar(false)}
-          onOpenModal={() => {
+          onChangePassword={() => {
+            setShowSettingsSidebar(false);
+            setShowChangePassword(true);
+          }}
+          onManageSessions={() => {
+            setShowSettingsSidebar(false);
+            setShowSessionManagement(true);
+          }}
+          onManage2FA={() => {
             setShowSettingsSidebar(false);
             setShowSettingsModal(true);
+          }}
+          userInfo={{
+            firstName: teacherInfo?.firstName,
+            lastName: teacherInfo?.lastName,
+            email: teacherInfo?.email
           }}
         />
       )}
@@ -545,16 +553,22 @@ export default function TeacherDashboard() {
         <SettingsModal
           isOpen={showSettingsModal}
           onClose={() => setShowSettingsModal(false)}
+          userType="teacher"
         />
       )}
 
+      {/* Welcome Banner */}
       {!loading && teacherInfo && (
-        <div className="bg-gradient-to-r from-purple-600 via-blue-600 to-indigo-600 text-white py-6 px-4 shadow-lg">
+        <div className={`${
+          isDarkMode 
+            ? 'bg-gradient-to-r from-purple-800 via-blue-800 to-indigo-800' 
+            : 'bg-gradient-to-r from-purple-600 via-blue-600 to-indigo-600'
+        } text-white py-6 px-4 shadow-lg`}>
           <div className="max-w-6xl mx-auto">
             <h2 className="text-2xl sm:text-3xl font-bold">
               Welcome back, {teacherInfo.firstName}! 👋
             </h2>
-            <p className="text-sm text-purple-100 mt-1">
+            <p className={`text-sm ${isDarkMode ? 'text-purple-200' : 'text-purple-100'} mt-1`}>
               You have <span className="font-semibold text-white">{students.length}</span> assigned students,{" "}
               <span className="font-semibold text-white">{classes.length}</span> scheduled classes, and{" "}
               <span className="font-semibold text-white">{bookings.length}</span> pending bookings
@@ -563,11 +577,13 @@ export default function TeacherDashboard() {
         </div>
       )}
 
+      {/* Main Content */}
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <TeacherNavTabs
           activeTab={activeTab}
           onChange={setActiveTab}
           tabs={["dashboard", "classes", "completed-classes", "students", "bookings"]}
+          isDarkMode={isDarkMode}
         />
 
         {activeTab === "dashboard" && (
@@ -578,32 +594,41 @@ export default function TeacherDashboard() {
                 totalClasses: classes.length,
                 totalBookings: bookings.length,
               }}
+              isDarkMode={isDarkMode}
             />
-            <LiveClasses classes={classes.filter(c => c.status === "live")} onJoin={handleJoinClass} />
+            <LiveClasses 
+              classes={classes.filter(c => c.status === "live")} 
+              onJoin={handleJoinClass}
+              isDarkMode={isDarkMode}
+            />
             <UpcomingClasses
               classes={classes.filter(c => c.status === "scheduled" || c.status === "upcoming-soon")}
               students={students}
               onCancel={askCancelClass}
               onDelete={askDeleteClass}
+              isDarkMode={isDarkMode}
             />
           </div>
         )}
 
         {activeTab === "classes" && (
           <div className="space-y-6">
-            {/* ✅ IMPROVED: Better Add Class button design */}
             <button
               onClick={() => setIsModalOpen(true)}
-              className="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2 font-semibold text-lg"
+              className={`px-6 py-3 ${
+                isDarkMode 
+                  ? 'bg-gradient-to-r from-blue-700 to-indigo-700 hover:from-blue-600 hover:to-indigo-600' 
+                  : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700'
+              } text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2 font-semibold text-lg`}
             >
               <Plus className="w-5 h-5" />
               Add New Class
             </button>
             
             {classes.length === 0 ? (
-              <div className="bg-white rounded-lg shadow-md p-8 text-center">
-                <p className="text-gray-500 text-lg">No classes scheduled yet</p>
-                <p className="text-gray-400 text-sm mt-2">
+              <div className={`${isDarkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow-md p-8 text-center`}>
+                <p className={`${isDarkMode ? 'text-gray-300' : 'text-gray-500'} text-lg`}>No classes scheduled yet</p>
+                <p className={`${isDarkMode ? 'text-gray-400' : 'text-gray-400'} text-sm mt-2`}>
                   Accept booking requests to add classes to your schedule
                 </p>
               </div>
@@ -612,6 +637,7 @@ export default function TeacherDashboard() {
                 data={classes} 
                 onJoin={handleJoinClass}
                 onDelete={askDeleteClass}
+                isDarkMode={isDarkMode}
               />
             )}
           </div>
@@ -622,23 +648,28 @@ export default function TeacherDashboard() {
           onClose={() => setIsModalOpen(false)}
           onSave={handleAddClass}
           students={students}
+          isDarkMode={isDarkMode}
         />
 
         {activeTab === "completed-classes" && (
           <CompletedClassesTab 
             classes={completedClasses}
             teacherInfo={teacherInfo}
+            isDarkMode={isDarkMode}
           />
         )}
 
         {activeTab === "students" && (
           <div>
             {students.length === 0 ? (
-              <div className="bg-white rounded-lg shadow-md p-8 text-center">
-                <p className="text-gray-500 text-lg">No students assigned yet</p>
+              <div className={`${isDarkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow-md p-8 text-center`}>
+                <p className={`${isDarkMode ? 'text-gray-300' : 'text-gray-500'} text-lg`}>No students assigned yet</p>
               </div>
             ) : (
-              <StudentProgressList students={students} />
+              <StudentProgressList 
+                students={students}
+                isDarkMode={isDarkMode}
+              />
             )}
           </div>
         )}
@@ -648,6 +679,7 @@ export default function TeacherDashboard() {
             bookings={bookings}
             onAccept={handleAcceptBooking}
             onReject={handleRejectBooking}
+            isDarkMode={isDarkMode}
           />
         )}
 
@@ -658,7 +690,32 @@ export default function TeacherDashboard() {
           onCancel={() =>
             setConfirmModal({ open: false, type: null, classId: null })
           }
+          isDarkMode={isDarkMode}
         />
+      </div>
+
+      {/* Floating Action Buttons */}
+      <div className="fixed bottom-6 right-6 flex flex-col gap-3 z-30">
+        {/* Dark Mode Toggle */}
+        <DarkModeToggle isDarkMode={isDarkMode} onToggle={toggleDarkMode} />
+
+        {/* Settings Button */}
+        <button
+          onClick={() => setShowSettingsSidebar(true)}
+          className={`${
+            isDarkMode 
+              ? 'bg-gradient-to-r from-purple-700 to-pink-700' 
+              : 'bg-gradient-to-r from-purple-600 to-pink-600'
+          } text-white p-4 rounded-full shadow-2xl hover:shadow-3xl hover:scale-110 transition-all duration-300 group`}
+          aria-label="Open Settings"
+        >
+          <Settings className="w-6 h-6 group-hover:rotate-90 transition-transform duration-300" />
+          <span className={`absolute right-full mr-3 top-1/2 -translate-y-1/2 ${
+            isDarkMode ? 'bg-gray-700' : 'bg-gray-900'
+          } text-white text-sm px-3 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap`}>
+            Settings
+          </span>
+        </button>
       </div>
     </div>
   );

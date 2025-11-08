@@ -7,6 +7,126 @@ import { verifyToken, verifyAdmin, verifyAdminOrTeacher } from "../middleware/au
 
 const router = express.Router();
 
+
+
+/**
+ * PATCH /api/bookings/:id/complete
+ * Mark booking as completed AND reduce student's noOfClasses
+ * This is the ENHANCED version that properly updates student records
+ */
+router.patch("/:id/complete", verifyToken, async (req, res) => {
+  try {
+    const booking = await Booking.findById(req.params.id)
+      .populate("teacherId", "firstName lastName email")
+      .populate("studentId", "firstName surname email noOfClasses");
+    
+    if (!booking) {
+      return res.status(404).json({ message: "Booking not found" });
+    }
+
+    // Only allow completion if booking is accepted
+    if (booking.status !== "accepted") {
+      return res.status(400).json({ 
+        message: `Cannot complete booking with status: ${booking.status}` 
+      });
+    }
+
+    // Update booking status
+    booking.status = "completed";
+    booking.completedAt = new Date();
+    await booking.save();
+
+    // ✅ CRITICAL: Reduce student's noOfClasses by 1
+    const Student = mongoose.model("Student");
+    const student = await Student.findById(booking.studentId._id);
+    
+    if (student && student.noOfClasses > 0) {
+      student.noOfClasses -= 1;
+      await student.save();
+      
+      console.log(`✅ Reduced student ${student.firstName} ${student.surname}'s classes: ${student.noOfClasses + 1} → ${student.noOfClasses}`);
+    } else if (student && student.noOfClasses === 0) {
+      console.warn(`⚠️ Student ${student.firstName} ${student.surname} has 0 classes remaining`);
+    }
+
+    // Return updated data
+    const updatedBooking = await Booking.findById(booking._id)
+      .populate("teacherId", "firstName lastName email")
+      .populate("studentId", "firstName surname email noOfClasses");
+
+    res.json({
+      message: "Booking completed and student class count updated",
+      booking: updatedBooking,
+      studentClassesRemaining: updatedBooking.studentId.noOfClasses
+    });
+  } catch (err) {
+    console.error("Error completing booking:", err);
+    res.status(500).json({ message: "Error completing booking" });
+  }
+});
+
+/**
+ * POST /api/bookings/auto-complete
+ * Auto-complete bookings that have passed their scheduled time + duration
+ * This can be called by a cron job or manually
+ */
+router.post("/auto-complete", verifyToken, async (req, res) => {
+  try {
+    const now = new Date();
+    
+    // Find all accepted bookings that should be completed
+    // (scheduled time + duration has passed)
+    const bookingsToComplete = await Booking.find({
+      status: "accepted",
+      scheduledTime: { $lt: now }
+    }).populate("studentId", "firstName surname email noOfClasses");
+
+    const completed = [];
+    const Student = mongoose.model("Student");
+
+    for (const booking of bookingsToComplete) {
+      // Check if the booking has ended (scheduledTime + duration)
+      const endTime = new Date(booking.scheduledTime);
+      endTime.setMinutes(endTime.getMinutes() + (booking.duration || 60));
+
+      if (now > endTime) {
+        // Mark as completed
+        booking.status = "completed";
+        booking.completedAt = new Date();
+        await booking.save();
+
+        // Reduce student's class count
+        const student = await Student.findById(booking.studentId._id);
+        if (student && student.noOfClasses > 0) {
+          student.noOfClasses -= 1;
+          await student.save();
+          
+          console.log(`✅ Auto-completed: ${booking.classTitle} for ${student.firstName} ${student.surname}`);
+          console.log(`   Classes remaining: ${student.noOfClasses}`);
+        }
+
+        completed.push({
+          bookingId: booking._id,
+          classTitle: booking.classTitle,
+          studentName: `${booking.studentId.firstName} ${booking.studentId.surname}`,
+          classesRemaining: student?.noOfClasses || 0
+        });
+      }
+    }
+
+    res.json({
+      message: `Auto-completed ${completed.length} bookings`,
+      completed: completed
+    });
+  } catch (err) {
+    console.error("Error auto-completing bookings:", err);
+    res.status(500).json({ message: "Error auto-completing bookings" });
+  }
+});
+
+
+
+
 /**
  * GET /api/bookings
  * Get all bookings (Admin only)

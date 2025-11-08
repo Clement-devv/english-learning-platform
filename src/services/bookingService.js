@@ -1,4 +1,4 @@
-// src/services/bookingService.js
+// src/services/bookingService.js - 
 import api from "../api";
 
 /**
@@ -62,11 +62,15 @@ export const rejectBooking = async (bookingId, reason = "") => {
 };
 
 /**
- * Mark booking as completed
+ * Mark booking as completed (ENHANCED)
+ * This will:
+ * 1. Mark booking as completed
+ * 2. Reduce student's noOfClasses by 1
+ * 3. Return updated booking and student info
  */
 export const completeBooking = async (bookingId) => {
   const res = await api.patch(`/api/bookings/${bookingId}/complete`);
-  return res.data.booking;
+  return res.data;
 };
 
 /**
@@ -82,5 +86,13 @@ export const cancelBooking = async (bookingId, reason = "") => {
  */
 export const deleteBooking = async (bookingId) => {
   const res = await api.delete(`/api/bookings/${bookingId}`);
+  return res.data;
+};
+
+/**
+ * Auto-complete expired bookings (for background/cron jobs)
+ */
+export const autoCompleteExpiredBookings = async () => {
+  const res = await api.post("/api/bookings/auto-complete");
   return res.data;
 };

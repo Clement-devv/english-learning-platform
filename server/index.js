@@ -196,7 +196,8 @@ import agoraRoutes from "./routes/agoraRoutes.js";
 import twoFactorRoutes from "./routes/twoFactorRoutes.js";
 import bookingRoutes from "./routes/bookingRoutes.js";
 import teacherAssignmentRoutes from "./routes/teacherAssignmentRoutes.js";
-import { initializeSocket } from './socketServer.js'; // 👈 ADD THIS
+import { initializeSocket } from './socketServer.js'; 
+import classroomRoutes from "./routes/classroomRoutes.js";
 
 const app = express();
 const httpServer = http.createServer(app); // 👈 CHANGE: Wrap app with http.createServer
@@ -284,6 +285,7 @@ app.use("/api/agora", agoraRoutes);
 app.use("/api/2fa", twoFactorRoutes);
 app.use("/api/bookings", bookingRoutes);
 app.use("/api/teachers", teacherAssignmentRoutes);
+app.use("/api/classroom", classroomRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
