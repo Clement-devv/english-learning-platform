@@ -57,8 +57,8 @@ export default function Classroom({ classData, userRole, onLeave }) {
   
   const userId = userInfo._id || userInfo.id || Date.now();
   const userName = `${userInfo.firstName || 'User'} ${userInfo.lastName || userInfo.surname || ''}`.trim();
-  const channelName = classData?.id || classData?.bookingId || classData?.title?.replace(/\s+/g, '-') || `class-${Date.now()}`;
-
+  const channelName = `class-${classData?.bookingId || classData?.id}`;
+   console.log('🎓 Channel Name:', channelName);
   console.log('🎓 Classroom opened:', { 
     classData, 
     userId, 

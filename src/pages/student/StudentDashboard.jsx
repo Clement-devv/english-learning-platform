@@ -81,8 +81,9 @@ export default function StudentDashboard() {
   const [activeTab, setActiveTab] = useState("dashboard");
   
   // Classroom state
-  const [activeClassroom, setActiveClassroom] = useState(null);
+  //const [activeClassroom, setActiveClassroom] = useState(null);
   const [isClassroomOpen, setIsClassroomOpen] = useState(false);
+  const [activeClass, setActiveClass] = useState(null);
   
   // Get student info with proper full name
   const [student, setStudent] = useState(() => {
@@ -172,7 +173,10 @@ export default function StudentDashboard() {
     }
   }, [notificationsEnabled, notificationPermission, upcomingClasses]);
 
-  const fetchStudentData = async () => {
+// ✅ COMPLETE FIXED fetchStudentData FUNCTION
+// Replace your entire fetchStudentData function (around line 190-330) with this:
+
+const fetchStudentData = async () => {
   try {
     setLoading(true);
     const studentId = student.id;
@@ -186,74 +190,92 @@ export default function StudentDashboard() {
     const acceptedBookings = await getStudentBookings(studentId, "accepted");
     const completedBookings = await getStudentBookings(studentId, "completed");
 
+    const now = new Date();
+    const active = [];
+    const upcoming = [];
 
-      const now = new Date();
-      const active = [];
-      const upcoming = [];
+    acceptedBookings.forEach((booking) => {
+      const scheduledDate = new Date(booking.scheduledTime);
+      const timeDiff = scheduledDate - now;
 
-      acceptedBookings.forEach((booking) => {
-        const scheduledDate = new Date(booking.scheduledTime);
-        const timeDiff = scheduledDate - now;
+      // ✅ FIX: Create complete class data with ALL fields explicitly
+      const completeClassData = {
+        id: booking._id,
+        bookingId: booking._id,  // ✅ EXPLICIT: Make sure bookingId is always set
+        title: booking.classTitle,
+        teacher: `${booking.teacherId.firstName} ${booking.teacherId.lastName}`,
+        teacherId: booking.teacherId._id,
+        topic: booking.topic || "English Lesson",
+        scheduledTime: booking.scheduledTime,
+        scheduledDate: scheduledDate,
+        duration: booking.duration || 60,  // ✅ EXPLICIT: Ensure duration has a value
+        notes: booking.notes || ""
+      };
 
-        const classData = {
-          id: booking._id,
-          title: booking.classTitle,
-          teacher: `${booking.teacherId.firstName} ${booking.teacherId.lastName}`,
-          teacherId: booking.teacherId._id,
-          topic: booking.topic || "English Lesson",
-          scheduledTime: booking.scheduledTime,
-          scheduledDate: scheduledDate,
-          duration: booking.duration,
-          notes: booking.notes,
-          bookingId: booking._id
-        };
-
-        if (timeDiff < 900000 && timeDiff > -(booking.duration * 60 * 1000)) {
-          active.push({
-            ...classData,
-            time: scheduledDate.toLocaleTimeString('en-US', { 
-              hour: 'numeric', 
-              minute: '2-digit',
-              hour12: true 
-            }),
-            status: "live",
-            participants: 1,
-            maxParticipants: 12
-          });
-        } 
-        else if (timeDiff > 0 && timeDiff < 7200000) {
-          active.push({
-            ...classData,
-            time: scheduledDate.toLocaleTimeString('en-US', { 
-              hour: 'numeric', 
-              minute: '2-digit',
-              hour12: true 
-            }),
-            status: "starting-soon",
-            participants: 1,
-            maxParticipants: 12
-          });
-        }
-        else if (timeDiff > 0) {
-          upcoming.push({
-            ...classData,
-            time: scheduledDate.toLocaleDateString('en-US', {
-              weekday: 'short',
-              month: 'short',
-              day: 'numeric',
-              hour: 'numeric',
-              minute: '2-digit',
-              hour12: true
-            }),
-            enrolled: true
-          });
-        }
+      // ✅ Debug log to verify data
+      console.log('📊 Processing booking:', {
+        bookingId: booking._id,
+        duration: booking.duration,
+        title: booking.classTitle
       });
 
-      const completed = completedBookings.map((booking) => {
+      // Active/Live classes (starting within 15 minutes or currently happening)
+      if (timeDiff < 900000 && timeDiff > -(booking.duration * 60 * 1000)) {
+        active.push({
+          ...completeClassData,  // ✅ Spread complete data
+          time: scheduledDate.toLocaleTimeString('en-US', { 
+            hour: 'numeric', 
+            minute: '2-digit',
+            hour12: true 
+          }),
+          status: timeDiff < 0 ? "live" : "starting-soon",
+          participants: 1,
+          maxParticipants: 12
+        });
+        
+        console.log('✅ Added to active classes:', completeClassData.title);
+      } 
+      // Starting soon (within 2 hours)
+      else if (timeDiff > 0 && timeDiff < 7200000) {
+        active.push({
+          ...completeClassData,
+          time: scheduledDate.toLocaleTimeString('en-US', { 
+            hour: 'numeric', 
+            minute: '2-digit',
+            hour12: true 
+          }),
+          status: "starting-soon",
+          participants: 1,
+          maxParticipants: 12
+        });
+        
+        console.log('✅ Added to starting-soon:', completeClassData.title);
+      }
+      // Upcoming (more than 2 hours away)
+      else if (timeDiff > 0) {
+        upcoming.push({
+          ...completeClassData,
+          time: scheduledDate.toLocaleDateString('en-US', {
+            weekday: 'short',
+            month: 'short',
+            day: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true
+          }),
+          enrolled: true
+        });
+        
+        console.log('✅ Added to upcoming:', completeClassData.title);
+      }
+    });
+
+    // Process completed classes
+    const completed = completedBookings.map((booking) => {
       const scheduledDate = new Date(booking.scheduledTime);
       return {
         id: booking._id,
+        bookingId: booking._id,  // ✅ EXPLICIT: Add bookingId here too
         title: booking.classTitle,
         teacher: `${booking.teacherId.firstName} ${booking.teacherId.lastName}`,
         topic: booking.topic || "Completed Lesson",
@@ -268,11 +290,27 @@ export default function StudentDashboard() {
           minute: '2-digit',
           hour12: true
         }),
-        duration: booking.duration,
-        notes: booking.notes,
+        duration: booking.duration || 60,  // ✅ EXPLICIT: Ensure duration
+        notes: booking.notes || "",
         status: "completed"
       };
     });
+
+    // ✅ Debug logs to verify data
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('📊 STUDENT DATA LOADED:');
+    console.log('Active classes:', active.length);
+    console.log('Upcoming classes:', upcoming.length);
+    console.log('Completed classes:', completed.length);
+    
+    if (active.length > 0) {
+      console.log('🔍 First active class details:');
+      console.log('  - ID:', active[0].id);
+      console.log('  - BookingId:', active[0].bookingId);
+      console.log('  - Duration:', active[0].duration);
+      console.log('  - Title:', active[0].title);
+    }
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
     setActiveClasses(active);
     setUpcomingClasses(upcoming);
@@ -281,7 +319,7 @@ export default function StudentDashboard() {
     const weeklyCompleted = calculateWeeklyCompleted(completed);
     const streakDays = calculateStreakDays(completed);
     
-    // ✅ FIX: Get actual student data to show classes remaining
+    // Get actual student data to show classes remaining
     const studentInfo = JSON.parse(localStorage.getItem('studentInfo'));
     const classesRemaining = studentInfo?.noOfClasses || 0;
     const completedCount = completed.length;
@@ -289,27 +327,27 @@ export default function StudentDashboard() {
     
     setProgress({
       completedLessons: completedCount,
-      totalLessons: totalClassesPaid, // ✅ This is the total they paid for
-      classesRemaining: classesRemaining, // ✅ NEW: Classes they have left
+      totalLessons: totalClassesPaid,
+      classesRemaining: classesRemaining,
       streakDays: streakDays,
       weeklyGoal: 5,
       weeklyCompleted: weeklyCompleted,
     });
 
-      const newNotifications = [];
-      active.forEach((cls) => {
-        if (cls.status === "starting-soon") {
-          newNotifications.push({
-            id: cls.id,
-            message: `Class reminder: ${cls.title} starts soon`,
-            time: "Soon",
-            unread: true
-          });
-        }
-      });
-      setNotifications(newNotifications);
+    const newNotifications = [];
+    active.forEach((cls) => {
+      if (cls.status === "starting-soon") {
+        newNotifications.push({
+          id: cls.id,
+          message: `Class reminder: ${cls.title} starts soon`,
+          time: "Soon",
+          unread: true
+        });
+      }
+    });
+    setNotifications(newNotifications);
 
-    } catch (err) {
+  } catch (err) {
     console.error("Failed to load student data:", err);
     showToast("Failed to load data from server", "error");
   } finally {
@@ -710,16 +748,55 @@ export default function StudentDashboard() {
     showToast("Password changed successfully!");
   };
 
-  const handleJoinClass = (classData) => {
-    setActiveClassroom(classData);
-    setIsClassroomOpen(true);
+ 
+
+const handleJoinClass = (classData) => {
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log('🎓 STUDENT JOINING CLASS');
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log('📋 Full classData received:', classData);
+  console.log('📊 Key fields:');
+  console.log('  - id:', classData.id);
+  console.log('  - bookingId:', classData.bookingId);
+  console.log('  - title:', classData.title);
+  console.log('  - duration:', classData.duration);
+  console.log('  - topic:', classData.topic);
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  
+  // ✅ Ensure we always have a valid bookingId
+  const finalBookingId = classData.bookingId || classData.id;
+  const finalDuration = classData.duration || 60;
+  
+  if (!finalBookingId) {
+    console.error('❌ ERROR: No bookingId found!');
+    showToast('Cannot join class: Missing booking ID', 'error');
+    return;
+  }
+  
+  console.log('✅ Using bookingId:', finalBookingId);
+  console.log('✅ Using duration:', finalDuration);
+  
+  const classroomData = {
+    id: finalBookingId,
+    bookingId: finalBookingId,
+    title: classData.title || "Class",
+    topic: classData.topic || "English Lesson",
+    duration: finalDuration
   };
+  
+  console.log('🚀 Setting classroom data:', classroomData);
+  console.log('📺 Expected channel name: class-' + finalBookingId);
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  
+  setActiveClass(classroomData);
+  setIsClassroomOpen(true);
+};
 
   const handleLeaveClassroom = () => {
-    setIsClassroomOpen(false);
-    setActiveClassroom(null);
-    fetchStudentData();
-  };
+  setIsClassroomOpen(false);
+  setActiveClass(null);  
+  fetchStudentData();
+};
 
   const handleEnrollClass = (classId) => {
     showToast("Enrollment feature coming soon!");
@@ -736,15 +813,15 @@ export default function StudentDashboard() {
     );
   }
 
-  if (isClassroomOpen && activeClassroom) {
-    return (
-      <Classroom
-        classData={activeClassroom}
-        userRole="student"
-        onLeave={handleLeaveClassroom}
-      />
-    );
-  }
+  if (isClassroomOpen && activeClass) {  
+  return (
+    <Classroom
+      classData={activeClass} 
+      userRole="student"
+      onLeave={handleLeaveClassroom}
+    />
+  );
+}
 
   const chartData = getChartData();
 

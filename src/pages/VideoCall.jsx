@@ -1,4 +1,4 @@
-// src/pages/VideoCall.jsx - ENHANCED WITH FIXES
+// src/pages/VideoCall.jsx - FULLY CORRECTED VERSION
 import React, { useEffect, useRef, useState } from "react";
 import AgoraRTC from "agora-rtc-sdk-ng";
 import api from "../api";
@@ -22,7 +22,9 @@ export default function VideoCall({
   userName = "User", 
   onLeave,
   isMaximized = false,
-  onToggleMaximize 
+  onToggleMaximize,
+  onUserJoined,    // ✅ NEW PROP
+  onUserLeft       // ✅ NEW PROP
 }) {
   const client = useRef(null);
   const [joined, setJoined] = useState(false);
@@ -77,32 +79,51 @@ export default function VideoCall({
     client.current.on("connection-state-change", handleConnectionChange);
   };
 
+  // ✅ FIXED: Proper callback placement
   const handleUserPublished = async (user, mediaType) => {
+    console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
     console.log(`👤 User ${user.uid} published ${mediaType}`);
+    console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
     
     try {
       await client.current.subscribe(user, mediaType);
+      console.log(`✅ Subscribed to ${mediaType}`);
       
       if (mediaType === "video") {
         setRemoteUsers(prev => {
           const exists = prev.find(u => u.uid === user.uid);
-          if (exists) return prev;
+          if (exists) {
+            console.log('ℹ️ User already in list');
+            return prev;
+          }
+          
+          console.log('➕ Adding new user to list');
+          
+          // ✅ FIXED: Notify parent component INSIDE setRemoteUsers
+          if (onUserJoined) {
+            console.log('📢 Calling onUserJoined callback');
+            onUserJoined(user.uid);
+          }
+          
           return [...prev, user];
         });
         
+        // Play video after state update
         setTimeout(() => {
           const container = remoteContainerRef.current[user.uid];
           if (container && user.videoTrack) {
             user.videoTrack.play(container);
+            console.log('🎥 Playing video');
           }
         }, 100);
       }
       
       if (mediaType === "audio") {
         user.audioTrack?.play();
+        console.log('🔊 Playing audio');
       }
     } catch (error) {
-      console.error("Subscribe error:", error);
+      console.error("❌ Subscribe error:", error);
     }
   };
 
@@ -113,9 +134,19 @@ export default function VideoCall({
     }
   };
 
+  // ✅ FIXED: Proper callback placement
   const handleUserLeft = (user) => {
-    console.log(`👋 User ${user.uid} left`);
+    console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+    console.log(`👋 User ${user.uid} left channel`);
+    console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+    
     setRemoteUsers(prev => prev.filter(u => u.uid !== user.uid));
+    
+    // ✅ FIXED: Notify parent component INSIDE the function
+    if (onUserLeft) {
+      console.log('📢 Calling onUserLeft callback');
+      onUserLeft(user.uid);
+    }
   };
 
   const handleConnectionChange = (currentState, prevState) => {
@@ -131,7 +162,12 @@ export default function VideoCall({
       setLoading(true);
       setError(null);
 
-      console.log(`🚀 Joining channel: ${channelName} with UID: ${userId}`);
+      console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+      console.log(`🚀 JOINING AGORA CHANNEL`);
+      console.log(`Channel: ${channelName}`);
+      console.log(`User ID: ${userId}`);
+      console.log(`User Name: ${userName}`);
+      console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
 
       const { data } = await api.get(
         `/api/agora/token?channel=${channelName}&uid=${userId}`
@@ -141,7 +177,8 @@ export default function VideoCall({
         throw new Error(data.message || 'Failed to get authentication token');
       }
 
-      console.log('✅ Token received');
+      console.log('✅ Token received from server');
+      console.log('App ID:', data.appId.substring(0, 8) + '...');
 
       await client.current.join(
         data.appId, 
@@ -153,24 +190,40 @@ export default function VideoCall({
       console.log('✅ Joined channel with UID:', data.uid);
 
       const [audioTrack, videoTrack] = await AgoraRTC.createMicrophoneAndCameraTracks({
-        audioConfig: { encoderConfig: "music_standard" },
-        videoConfig: { encoderConfig: "720p_2" },
+        audioConfig: { 
+          encoderConfig: "music_standard",
+          ANS: true,
+          AEC: true
+        },
+        videoConfig: { 
+          encoderConfig: "720p_2",
+          optimizationMode: "detail"
+        },
       });
       
+      console.log('✅ Tracks created successfully');
       setLocalAudioTrack(audioTrack);
       setLocalVideoTrack(videoTrack);
 
       if (localContainer.current) {
         videoTrack.play(localContainer.current);
+        console.log('✅ Local video playing');
       }
 
       await client.current.publish([audioTrack, videoTrack]);
       
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       console.log('✅ Published local tracks');
+      console.log('🎉 JOIN COMPLETE - Waiting for others...');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      
       setJoined(true);
       
     } catch (err) {
-      console.error('❌ Join call error:', err);
+      console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.error('❌ JOIN ERROR:', err);
+      console.error('Error message:', err.message);
+      console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       
       let errorMessage = 'Failed to join call';
       
@@ -180,6 +233,8 @@ export default function VideoCall({
         errorMessage = 'Session expired. Please refresh and try again.';
       } else if (err.response?.status === 500) {
         errorMessage = 'Video service temporarily unavailable.';
+      } else if (err.message.includes('token')) {
+        errorMessage = 'Authentication failed. Please refresh the page.';
       } else {
         errorMessage = err.message || errorMessage;
       }
@@ -262,28 +317,23 @@ export default function VideoCall({
     }
   };
 
-  // ✅ FIXED: Screen sharing with proper error handling
   const toggleScreenShare = async () => {
     try {
       if (!isScreenSharing) {
         console.log('🖥️ Starting screen share...');
         
-        // Create screen track
         const screen = await AgoraRTC.createScreenVideoTrack({
           encoderConfig: "1080p_1",
           optimizationMode: "detail"
         });
         
-        // If camera is on, unpublish it first
         if (localVideoTrack && camOn) {
           await client.current.unpublish([localVideoTrack]);
           localVideoTrack.stop();
         }
         
-        // Publish screen track
         await client.current.publish([screen]);
         
-        // Play screen in local container
         if (localContainer.current) {
           screen.play(localContainer.current);
         }
@@ -291,7 +341,6 @@ export default function VideoCall({
         setScreenTrack(screen);
         setIsScreenSharing(true);
         
-        // Handle when user stops sharing via browser UI
         screen.on("track-ended", () => {
           console.log('🖥️ Screen share ended by user');
           toggleScreenShare();
@@ -302,7 +351,6 @@ export default function VideoCall({
       } else {
         console.log('🖥️ Stopping screen share...');
         
-        // Unpublish and close screen track
         if (screenTrack) {
           await client.current.unpublish([screenTrack]);
           screenTrack.stop();
@@ -310,7 +358,6 @@ export default function VideoCall({
           setScreenTrack(null);
         }
         
-        // Restart camera if it was on before
         if (localVideoTrack && camOn) {
           await client.current.publish([localVideoTrack]);
           if (localContainer.current) {
@@ -324,7 +371,6 @@ export default function VideoCall({
     } catch (error) {
       console.error('❌ Screen share error:', error);
       
-      // Better error messages
       let errorMsg = 'Screen sharing failed. ';
       if (error.message.includes('Permission denied')) {
         errorMsg += 'Please allow screen sharing permission.';
@@ -406,8 +452,12 @@ export default function VideoCall({
                 ref={(el) => (remoteContainerRef.current[user.uid] = el)}
                 className="w-full h-full min-h-[300px]"
               />
-              <div className="absolute bottom-3 left-3 bg-gradient-to-r from-gray-900/90 to-gray-800/90 text-white text-sm px-3 py-1.5 rounded-full">
-                <span className="font-medium">User {user.uid}</span>
+              <div className="absolute bottom-3 left-3 bg-gradient-to-r from-green-600/90 to-green-500/90 text-white text-sm px-3 py-1.5 rounded-full flex items-center gap-2">
+                <span className="w-2 h-2 bg-white rounded-full animate-pulse"></span>
+                <span className="font-medium">Connected</span>
+              </div>
+              <div className="absolute top-3 right-3 bg-green-500 text-white text-xs px-2 py-1 rounded-full">
+                🟢 Live
               </div>
             </div>
           ))}
@@ -426,11 +476,15 @@ export default function VideoCall({
           {/* Waiting for others */}
           {joined && remoteUsers.length === 0 && (
             <div className="flex flex-col items-center justify-center bg-gray-800 rounded-lg min-h-[300px]">
-              <Users className="w-16 h-16 text-gray-600 mb-4" />
-              <p className="text-gray-400 text-lg font-medium">Waiting for others...</p>
+              <Users className="w-16 h-16 text-gray-600 mb-4 animate-pulse" />
+              <p className="text-gray-400 text-lg font-medium">Waiting for others to join...</p>
               <p className="text-gray-500 text-sm mt-2">
                 Channel: <span className="font-mono bg-gray-700 px-2 py-1 rounded">{channelName}</span>
               </p>
+              <div className="mt-4 text-gray-500 text-xs text-center max-w-md">
+                <p>💡 Make sure the other participant is using the same class link</p>
+                <p className="mt-1">They should see the same channel name above</p>
+              </div>
             </div>
           )}
         </div>

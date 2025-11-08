@@ -337,51 +337,63 @@ export default function TeacherDashboard() {
     }
   };
 
-  const handleAddClass = async (newClass) => {
-    try {
-      if (!newClass.students || newClass.students.length === 0) {
-        showToast("Please select at least one student for the class", "error");
-        return;
-      }
+ 
 
-      const teacherId = teacherInfo._id || teacherInfo.id;
-      
-      const localDateTimeString = newClass.time;
-      const scheduledDate = new Date(localDateTimeString);
-      const isoString = scheduledDate.toISOString();
-      
-      console.log("Creating class with date:", {
-        original: localDateTimeString,
-        parsed: scheduledDate,
-        iso: isoString
-      });
-      
-      const bookingPromises = newClass.students.map(async (student) => {
-        const bookingData = {
-          teacherId: teacherId,
-          studentId: student.id,
-          classTitle: newClass.title,
-          topic: newClass.topic,
-          scheduledTime: isoString,
-          duration: newClass.duration || 60,
-          notes: `Teacher-created class`,
-          createdBy: "teacher"
-        };
-
-        const booking = await createBooking(bookingData);
-        return await acceptBooking(booking._id);
-      });
-
-      await Promise.all(bookingPromises);
-      showToast(`Class "${newClass.title}" created successfully for ${newClass.students.length} student(s)!`);
-      
-      await fetchTeacherData();
-      
-    } catch (err) {
-      console.error("Error creating class:", err);
-      showToast("Failed to create class. Please try again.", "error");
+const handleAddClass = async (newClass) => {
+  try {
+    if (!newClass.students || newClass.students.length === 0) {
+      showToast("Please select at least one student for the class", "error");
+      return;
     }
-  };
+
+    const teacherId = teacherInfo._id || teacherInfo.id;
+    
+    const localDateTimeString = newClass.time;
+    const scheduledDate = new Date(localDateTimeString);
+    const isoString = scheduledDate.toISOString();
+    
+    // Log the duration to verify it's being captured
+    console.log("Creating class with details:", {
+      original: localDateTimeString,
+      parsed: scheduledDate,
+      iso: isoString,
+      duration: newClass.duration,  // Should show actual value like 30, 45, etc.
+      durationParsed: parseInt(newClass.duration)
+    });
+    
+    const bookingPromises = newClass.students.map(async (student) => {
+      const bookingData = {
+        teacherId: teacherId,
+        studentId: student.id,
+        classTitle: newClass.title,
+        topic: newClass.topic,
+        scheduledTime: isoString,
+        duration: parseInt(newClass.duration), // ✅ FIX: Remove the || 60 fallback, parse as integer
+        notes: `Teacher-created class`,
+        createdBy: "teacher"
+      };
+
+      console.log("📤 Sending booking data:", bookingData); // ✅ DEBUG
+
+      const booking = await createBooking(bookingData);
+      console.log("✅ Booking created:", booking); // ✅ DEBUG
+      
+      return await acceptBooking(booking._id);
+    });
+
+    await Promise.all(bookingPromises);
+    showToast(`Class "${newClass.title}" created successfully for ${newClass.students.length} student(s)!`);
+    
+    await fetchTeacherData();
+    
+  } catch (err) {
+    console.error("Error creating class:", err);
+    console.error("Error details:", err.response?.data); // ✅ More detailed error
+    showToast("Failed to create class. Please try again.", "error");
+  }
+};
+
+
 
   const showToast = (message, type = "success") => {
     setToast({ message, type });
@@ -460,10 +472,18 @@ export default function TeacherDashboard() {
     setConfirmModal({ open: false, type: null, classId: null });
   };
 
-  const handleJoinClass = (cls) => {
-    setActiveClass(cls);
-    setIsClassroomOpen(true);
-  };
+ const handleJoinClass = (classItem) => {
+     console.log('🔍 Joining class:', classItem);
+     
+     setActiveClass({
+       id: classItem.bookingId || classItem.id,
+       bookingId: classItem.bookingId || classItem.id,
+       title: classItem.title,
+       topic: classItem.topic,
+       duration: classItem.duration
+     });
+     setIsClassroomOpen(true);
+   };
 
   const handleLeaveClassroom = () => {
     setIsClassroomOpen(false);
