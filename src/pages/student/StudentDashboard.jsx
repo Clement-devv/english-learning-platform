@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
   Settings, Search, Download, ChevronLeft, ChevronRight, Calendar, Clock, User,
-  Award, Trophy, Star, TrendingUp, Share2, Bell, Sun, Moon, X, Check
+  Award, Trophy, Star, TrendingUp, Share2, Bell, Sun, MessageCircle, Moon, X, Check
 } from "lucide-react";
 import Confetti from 'react-confetti';
 import {
@@ -22,6 +22,7 @@ import SessionManagement from "../../components/SessionManagement";
 import SettingsSidebar from "../../components/SettingsSidebar";
 import SettingsModal from "../../components/SettingsModal";
 import Classroom from "../Classroom";
+import MessagesTab from "../../components/chat/MessagesTab";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 
@@ -173,8 +174,8 @@ export default function StudentDashboard() {
     }
   }, [notificationsEnabled, notificationPermission, upcomingClasses]);
 
-// ✅ COMPLETE FIXED fetchStudentData FUNCTION
-// Replace your entire fetchStudentData function (around line 190-330) with this:
+// ✅ FIXED fetchStudentData FUNCTION FOR StudentDashboard.jsx
+// This ensures bookingId is ALWAYS present when joining a class
 
 const fetchStudentData = async () => {
   try {
@@ -187,6 +188,7 @@ const fetchStudentData = async () => {
       return;
     }
 
+    // Fetch bookings from API
     const acceptedBookings = await getStudentBookings(studentId, "accepted");
     const completedBookings = await getStudentBookings(studentId, "completed");
 
@@ -194,35 +196,43 @@ const fetchStudentData = async () => {
     const active = [];
     const upcoming = [];
 
+    // Process accepted bookings
     acceptedBookings.forEach((booking) => {
       const scheduledDate = new Date(booking.scheduledTime);
       const timeDiff = scheduledDate - now;
 
-      // ✅ FIX: Create complete class data with ALL fields explicitly
       const completeClassData = {
+
         id: booking._id,
-        bookingId: booking._id,  // ✅ EXPLICIT: Make sure bookingId is always set
+        bookingId: booking._id,
         title: booking.classTitle,
         teacher: `${booking.teacherId.firstName} ${booking.teacherId.lastName}`,
         teacherId: booking.teacherId._id,
         topic: booking.topic || "English Lesson",
         scheduledTime: booking.scheduledTime,
         scheduledDate: scheduledDate,
-        duration: booking.duration || 60,  // ✅ EXPLICIT: Ensure duration has a value
+        duration: booking.duration,  // ✅ NO FALLBACK
         notes: booking.notes || ""
       };
 
-      // ✅ Debug log to verify data
+
+// ✅ Add validation AFTER creating the object
+      if (!completeClassData.duration) {
+        console.warn(`⚠️ Booking ${booking._id} has no duration! Using 30 as emergency fallback.`);
+        completeClassData.duration = 30;  // Better fallback than 60
+      }
+
+      // Log for debugging
       console.log('📊 Processing booking:', {
-        bookingId: booking._id,
-        duration: booking.duration,
-        title: booking.classTitle
+        bookingId: completeClassData.bookingId,
+        duration: completeClassData.duration,
+        title: completeClassData.title
       });
 
       // Active/Live classes (starting within 15 minutes or currently happening)
       if (timeDiff < 900000 && timeDiff > -(booking.duration * 60 * 1000)) {
         active.push({
-          ...completeClassData,  // ✅ Spread complete data
+          ...completeClassData,           // ✅ Spread all the complete data
           time: scheduledDate.toLocaleTimeString('en-US', { 
             hour: 'numeric', 
             minute: '2-digit',
@@ -275,7 +285,7 @@ const fetchStudentData = async () => {
       const scheduledDate = new Date(booking.scheduledTime);
       return {
         id: booking._id,
-        bookingId: booking._id,  // ✅ EXPLICIT: Add bookingId here too
+        bookingId: booking._id,           // ✅ EXPLICIT: Add bookingId here too
         title: booking.classTitle,
         teacher: `${booking.teacherId.firstName} ${booking.teacherId.lastName}`,
         topic: booking.topic || "Completed Lesson",
@@ -290,13 +300,13 @@ const fetchStudentData = async () => {
           minute: '2-digit',
           hour12: true
         }),
-        duration: booking.duration || 60,  // ✅ EXPLICIT: Ensure duration
+        duration: booking.duration || 60, // ✅ EXPLICIT: Ensure duration
         notes: booking.notes || "",
         status: "completed"
       };
     });
 
-    // ✅ Debug logs to verify data
+    // ✅ Debug logs to verify data structure
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log('📊 STUDENT DATA LOADED:');
     console.log('Active classes:', active.length);
@@ -304,18 +314,27 @@ const fetchStudentData = async () => {
     console.log('Completed classes:', completed.length);
     
     if (active.length > 0) {
-      console.log('🔍 First active class details:');
+      console.log('🔍 First active class structure:');
       console.log('  - ID:', active[0].id);
       console.log('  - BookingId:', active[0].bookingId);
       console.log('  - Duration:', active[0].duration);
       console.log('  - Title:', active[0].title);
+      
+      // ✅ Verify critical fields exist
+      if (!active[0].bookingId) {
+        console.error('❌ CRITICAL: Active class missing bookingId!');
+      } else {
+        console.log('✅ All critical fields present');
+      }
     }
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
+    // Update state with processed data
     setActiveClasses(active);
     setUpcomingClasses(upcoming);
     setCompletedClasses(completed);
 
+    // Calculate progress metrics
     const weeklyCompleted = calculateWeeklyCompleted(completed);
     const streakDays = calculateStreakDays(completed);
     
@@ -334,26 +353,33 @@ const fetchStudentData = async () => {
       weeklyCompleted: weeklyCompleted,
     });
 
+    // Generate notifications for upcoming classes
     const newNotifications = [];
     active.forEach((cls) => {
       if (cls.status === "starting-soon") {
         newNotifications.push({
-          id: cls.id,
-          message: `Class reminder: ${cls.title} starts soon`,
-          time: "Soon",
-          unread: true
+          id: `class-${cls.id}`,
+          type: "class",
+          message: `${cls.title} starts soon!`,
+          time: cls.time,
+          read: false
         });
       }
     });
-    setNotifications(newNotifications);
+
+    if (newNotifications.length > 0) {
+      setNotifications((prev) => [...newNotifications, ...prev]);
+    }
+
+    setLoading(false);
 
   } catch (err) {
-    console.error("Failed to load student data:", err);
-    showToast("Failed to load data from server", "error");
-  } finally {
+    console.error("Failed to fetch student data:", err);
+    showToast("Failed to load your classes", "error");
     setLoading(false);
   }
 };
+
 
   const calculateStreakDays = (completedBookings) => {
     if (completedBookings.length === 0) return 0;
@@ -759,13 +785,13 @@ const handleJoinClass = (classData) => {
   console.log('  - id:', classData.id);
   console.log('  - bookingId:', classData.bookingId);
   console.log('  - title:', classData.title);
-  console.log('  - duration:', classData.duration);
+  console.log('  - duration:', classData.duration);  // ← SHOULD SHOW 45, NOT 60!
   console.log('  - topic:', classData.topic);
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   
   // ✅ Ensure we always have a valid bookingId
   const finalBookingId = classData.bookingId || classData.id;
-  const finalDuration = classData.duration || 60;
+  const finalDuration = classData.duration;  // ✅ NO FALLBACK!
   
   if (!finalBookingId) {
     console.error('❌ ERROR: No bookingId found!');
@@ -773,15 +799,21 @@ const handleJoinClass = (classData) => {
     return;
   }
   
+  if (!finalDuration) {
+    console.error('❌ ERROR: No duration found!');
+    showToast('Cannot join class: Missing duration', 'error');
+    return;
+  }
+  
   console.log('✅ Using bookingId:', finalBookingId);
-  console.log('✅ Using duration:', finalDuration);
+  console.log('✅ Using duration:', finalDuration, 'minutes');  // ← CONFIRM HERE
   
   const classroomData = {
     id: finalBookingId,
     bookingId: finalBookingId,
     title: classData.title || "Class",
     topic: classData.topic || "English Lesson",
-    duration: finalDuration
+    duration: finalDuration  // ✅ This should be 45, not 60!
   };
   
   console.log('🚀 Setting classroom data:', classroomData);
@@ -924,6 +956,18 @@ const handleJoinClass = (classData) => {
           </button>
         </div>
       </div>
+
+      <button
+          onClick={() => setActiveTab("messages")}
+          className={`px-6 py-3 font-semibold transition-all flex items-center gap-2 whitespace-nowrap ${
+            activeTab === "messages"
+              ? `${isDarkMode ? 'text-blue-400 border-blue-400' : 'text-blue-600 border-blue-600'} border-b-2`
+              : `${isDarkMode ? 'text-gray-300 hover:text-blue-400' : 'text-gray-600 hover:text-blue-600'}`
+          }`}
+        >
+          <MessageCircle className="w-5 h-5" />
+          Messages
+        </button>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8">
         {/* Dashboard Tab */}
@@ -1341,6 +1385,10 @@ const handleJoinClass = (classData) => {
               </div>
             </div>
           </div>
+        )}
+        {/* Messages Tab */}
+        {activeTab === "messages" && (
+          <MessagesTab userRole="student" />
         )}
       </main>
 

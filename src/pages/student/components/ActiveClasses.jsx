@@ -24,7 +24,7 @@ export default function ActiveClasses({ activeClasses, onJoin }) {
               </div>
 
               <button
-                onClick={() => onJoin(cls.id, cls.title)}
+                onClick={() => onJoin(cls)}
                 className={`px-6 py-3 rounded-xl font-semibold transition-all duration-200 transform hover:scale-105 ${
                   cls.status === "live"
                     ? "bg-red-500 hover:bg-red-600 text-white animate-pulse"

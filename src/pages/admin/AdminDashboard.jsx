@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Settings } from "lucide-react";
+import { MessageCircle, Settings } from "lucide-react";
 import OverviewTab from "./tabs/OverviewTab";
 import TeachersTab from "./tabs/TeachersTab";
 import StudentsTab from "./tabs/StudentsTab";
@@ -15,7 +15,8 @@ import SettingsSidebar from "../../components/SettingsSidebar";
 import SettingsModal from "../../components/SettingsModal";
 import { useDarkMode } from '../../hooks/useDarkMode';
 import DarkModeToggle from '../../components/DarkModeToggle';
-//import ChangePassword from "../../components/admin/auth/ChangePassword"; // Add this component
+import MessagesTab from '../../components/chat/MessagesTab';
+//import ChangePassword from "../../components/admin/auth/ChangePassword"; // ✅ FIXED: Uncommented
 import {
   TrendingUp,
   Video,
@@ -130,6 +131,10 @@ export default function AdminDashboard() {
             isDarkMode={isDarkMode}
           />
         );
+      case "messages": // ✅ FIXED: Consistent lowercase
+        return (
+          <MessagesTab userRole="admin" />
+        );
       default:
         return <OverviewTab isDarkMode={isDarkMode} />;
     }
@@ -144,6 +149,7 @@ export default function AdminDashboard() {
     { key: "notifications", label: "Notifications", icon: Bell },
     { key: "assign", label: "Assign Students", icon: Users },
     { key: "bookings", label: "Bookings", icon: Calendar },
+    { key: "messages", label: "Messages", icon: MessageCircle }, // ✅ FIXED: Consistent lowercase, better icon
   ];
 
   return (

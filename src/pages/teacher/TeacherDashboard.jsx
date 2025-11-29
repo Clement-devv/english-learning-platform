@@ -1,7 +1,7 @@
-// src/pages/teacher/TeacherDashboard.jsx - WITH DARK MODE
+// src/pages/teacher/TeacherDashboard.jsx - WITH DARK MODE & MESSAGES
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Settings, Plus } from "lucide-react";
+import { Settings, Plus, MessageCircle } from "lucide-react";
 
 // Layout
 import DashboardHeader from "./components/Layout/DashboardHeader";
@@ -36,6 +36,9 @@ import DarkModeToggle from '../../components/DarkModeToggle';
 import SessionManagement from "../../components/SessionManagement";
 import SettingsSidebar from "../../components/SettingsSidebar";
 import SettingsModal from "../../components/SettingsModal";
+
+// ✅ NEW: Messages/Chat
+import MessagesTab from "../../components/chat/MessagesTab";
 
 // Services for fetching real data
 import { getAssignedStudents } from "../../services/teacherStudentService";
@@ -337,63 +340,58 @@ export default function TeacherDashboard() {
     }
   };
 
- 
+  const handleAddClass = async (newClass) => {
+    try {
+      if (!newClass.students || newClass.students.length === 0) {
+        showToast("Please select at least one student for the class", "error");
+        return;
+      }
 
-const handleAddClass = async (newClass) => {
-  try {
-    if (!newClass.students || newClass.students.length === 0) {
-      showToast("Please select at least one student for the class", "error");
-      return;
-    }
-
-    const teacherId = teacherInfo._id || teacherInfo.id;
-    
-    const localDateTimeString = newClass.time;
-    const scheduledDate = new Date(localDateTimeString);
-    const isoString = scheduledDate.toISOString();
-    
-    // Log the duration to verify it's being captured
-    console.log("Creating class with details:", {
-      original: localDateTimeString,
-      parsed: scheduledDate,
-      iso: isoString,
-      duration: newClass.duration,  // Should show actual value like 30, 45, etc.
-      durationParsed: parseInt(newClass.duration)
-    });
-    
-    const bookingPromises = newClass.students.map(async (student) => {
-      const bookingData = {
-        teacherId: teacherId,
-        studentId: student.id,
-        classTitle: newClass.title,
-        topic: newClass.topic,
-        scheduledTime: isoString,
-        duration: parseInt(newClass.duration), // ✅ FIX: Remove the || 60 fallback, parse as integer
-        notes: `Teacher-created class`,
-        createdBy: "teacher"
-      };
-
-      console.log("📤 Sending booking data:", bookingData); // ✅ DEBUG
-
-      const booking = await createBooking(bookingData);
-      console.log("✅ Booking created:", booking); // ✅ DEBUG
+      const teacherId = teacherInfo._id || teacherInfo.id;
       
-      return await acceptBooking(booking._id);
-    });
+      const localDateTimeString = newClass.time;
+      const scheduledDate = new Date(localDateTimeString);
+      const isoString = scheduledDate.toISOString();
+      
+      console.log("Creating class with details:", {
+        original: localDateTimeString,
+        parsed: scheduledDate,
+        iso: isoString,
+        duration: newClass.duration,
+        durationParsed: parseInt(newClass.duration)
+      });
+      
+      const bookingPromises = newClass.students.map(async (student) => {
+        const bookingData = {
+          teacherId: teacherId,
+          studentId: student.id,
+          classTitle: newClass.title,
+          topic: newClass.topic,
+          scheduledTime: isoString,
+          duration: parseInt(newClass.duration),
+          notes: `Teacher-created class`,
+          createdBy: "teacher"
+        };
 
-    await Promise.all(bookingPromises);
-    showToast(`Class "${newClass.title}" created successfully for ${newClass.students.length} student(s)!`);
-    
-    await fetchTeacherData();
-    
-  } catch (err) {
-    console.error("Error creating class:", err);
-    console.error("Error details:", err.response?.data); // ✅ More detailed error
-    showToast("Failed to create class. Please try again.", "error");
-  }
-};
+        console.log("📤 Sending booking data:", bookingData);
 
+        const booking = await createBooking(bookingData);
+        console.log("✅ Booking created:", booking);
+        
+        return await acceptBooking(booking._id);
+      });
 
+      await Promise.all(bookingPromises);
+      showToast(`Class "${newClass.title}" created successfully for ${newClass.students.length} student(s)!`);
+      
+      await fetchTeacherData();
+      
+    } catch (err) {
+      console.error("Error creating class:", err);
+      console.error("Error details:", err.response?.data);
+      showToast("Failed to create class. Please try again.", "error");
+    }
+  };
 
   const showToast = (message, type = "success") => {
     setToast({ message, type });
@@ -472,18 +470,18 @@ const handleAddClass = async (newClass) => {
     setConfirmModal({ open: false, type: null, classId: null });
   };
 
- const handleJoinClass = (classItem) => {
-     console.log('🔍 Joining class:', classItem);
-     
-     setActiveClass({
-       id: classItem.bookingId || classItem.id,
-       bookingId: classItem.bookingId || classItem.id,
-       title: classItem.title,
-       topic: classItem.topic,
-       duration: classItem.duration
-     });
-     setIsClassroomOpen(true);
-   };
+  const handleJoinClass = (classItem) => {
+    console.log('🔍 Joining class:', classItem);
+    
+    setActiveClass({
+      id: classItem.bookingId || classItem.id,
+      bookingId: classItem.bookingId || classItem.id,
+      title: classItem.title,
+      topic: classItem.topic,
+      duration: classItem.duration
+    });
+    setIsClassroomOpen(true);
+  };
 
   const handleLeaveClassroom = () => {
     setIsClassroomOpen(false);
@@ -599,10 +597,11 @@ const handleAddClass = async (newClass) => {
 
       {/* Main Content */}
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* ✅ Added "messages" tab */}
         <TeacherNavTabs
           activeTab={activeTab}
           onChange={setActiveTab}
-          tabs={["dashboard", "classes", "completed-classes", "students", "bookings"]}
+          tabs={["dashboard", "classes", "completed-classes", "students", "bookings", "messages"]}
           isDarkMode={isDarkMode}
         />
 
@@ -701,6 +700,11 @@ const handleAddClass = async (newClass) => {
             onReject={handleRejectBooking}
             isDarkMode={isDarkMode}
           />
+        )}
+
+        {/* ✅ NEW: Messages Tab */}
+        {activeTab === "messages" && (
+          <MessagesTab userRole="teacher" />
         )}
 
         <ConfirmModal

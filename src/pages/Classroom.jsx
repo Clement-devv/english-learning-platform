@@ -1,617 +1,690 @@
-// src/pages/Classroom.jsx - WITH TIMER + WORKING VIDEO CALL
-import React, { useState, useEffect, useRef } from 'react';
-import { Clock, Users, AlertCircle, XCircle, LogOut, X, MessageCircle, Palette } from 'lucide-react';
-import { motion, AnimatePresence } from "framer-motion";
-import VideoCall from './VideoCall';
-import SharedWhiteboard from '../components/SharedWhiteboard';
-import { completeBooking } from '../services/bookingService';
+// src/pages/Classroom.jsx - 🎨 COMPLETE FIX: Persistent Timer + End Class + Video Fix
+import React, { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
+import VideoCall from "./VideoCall";
+import api from "../api";
 import { 
-  updateClassroomAttendance, 
-  endClassEarly 
-} from '../services/classroomService';
+  Video, 
+  FileText, 
+  PenTool,
+  Clock,
+  Users,
+  CheckCircle2,
+  XCircle,
+  Loader,
+  Power,
+  AlertTriangle
+} from "lucide-react";
 
-export default function Classroom({ classData, userRole, onLeave }) {
-  // UI States
-  const [showChat, setShowChat] = useState(true);
-  const [showWhiteboard, setShowWhiteboard] = useState(true);
-  const [videoMaximized, setVideoMaximized] = useState(false);
-  const [whiteboardMaximized, setWhiteboardMaximized] = useState(false);
-  const [chatMessages, setChatMessages] = useState([]);
-  const [newMessage, setNewMessage] = useState('');
+export default function Classroom({ classData, userRole: propUserRole, onLeave }) {
+  const navigate = useNavigate();
   
-  // Timer states
-  const [timeRemaining, setTimeRemaining] = useState(0);
-  const [totalDuration, setTotalDuration] = useState(0);
+  const userRole = propUserRole || localStorage.getItem("role");
+  const userId = localStorage.getItem("userId");
+  const userName = localStorage.getItem("name") || "User";
+  const bookingId = classData?.bookingId || classData?.id;
+
+  console.log('🎓 Classroom initialized:', { bookingId, userRole, userName, duration: classData?.duration });
+
+  const [error, setError] = useState(null);
+  const [activeTab, setActiveTab] = useState("video");
+
+  // Presence tracking
+  const [isTeacherPresent, setIsTeacherPresent] = useState(userRole === "teacher");
+  const [isStudentPresent, setIsStudentPresent] = useState(userRole === "student");
+
+  // 🔥 PERSISTENT TIMER STATE
+  const [sessionData, setSessionData] = useState(null);
+  const [timeElapsed, setTimeElapsed] = useState(0); // Seconds elapsed
+  const [bothActiveTime, setBothActiveTime] = useState(0); // Time both present
   const [isTimerRunning, setIsTimerRunning] = useState(false);
-  const [classStartTime, setClassStartTime] = useState(null);
+  const [classStarted, setClassStarted] = useState(false);
   
-  // Attendance tracking
-  const [teacherJoinedAt, setTeacherJoinedAt] = useState(null);
-  const [studentJoinedAt, setStudentJoinedAt] = useState(null);
-  const [teacherActiveTime, setTeacherActiveTime] = useState(0);
-  const [studentActiveTime, setStudentActiveTime] = useState(0);
-  const [bothActiveTime, setBothActiveTime] = useState(0);
-  
-  // Status states
-  const [isTeacherPresent, setIsTeacherPresent] = useState(false);
-  const [isStudentPresent, setIsStudentPresent] = useState(false);
-  const [classStatus, setClassStatus] = useState('waiting');
-  
-  // Early end modal
-  const [showEndEarlyModal, setShowEndEarlyModal] = useState(false);
-  const [endReason, setEndReason] = useState('');
-  const [reportedBy, setReportedBy] = useState('');
-  const [endDescription, setEndDescription] = useState('');
-  
-  // Refs
-  const timerIntervalRef = useRef(null);
-  const attendanceIntervalRef = useRef(null);
-  const heartbeatIntervalRef = useRef(null);
-  
-  // User info for video call
-  const userInfo = JSON.parse(
-    localStorage.getItem('teacherInfo') || 
-    localStorage.getItem('studentInfo') || 
-    '{}'
-  );
-  
-  const userId = userInfo._id || userInfo.id || Date.now();
-  const userName = `${userInfo.firstName || 'User'} ${userInfo.lastName || userInfo.surname || ''}`.trim();
-  const channelName = `class-${classData?.bookingId || classData?.id}`;
-   console.log('🎓 Channel Name:', channelName);
-  console.log('🎓 Classroom opened:', { 
-    classData, 
-    userId, 
-    userName, 
-    channelName,
-    userRole 
-  });
+  const timerInterval = useRef(null);
+  const syncInterval = useRef(null);
+  const sessionCheckInterval = useRef(null);
 
-  // Calculate required attendance time (83%)
-  const getRequiredAttendanceTime = (duration) => {
-    return Math.floor(duration * 0.83);
-  };
+  // 🔥 End Class Modal
+  const [showEndModal, setShowEndModal] = useState(false);
+  const [endReason, setEndReason] = useState("");
 
-  // Initialize classroom on mount
+  // Fetch or create session data on mount
   useEffect(() => {
-    initializeClassroom();
+    fetchOrCreateSession();
+    
+    // Check session every 5 seconds for updates
+    sessionCheckInterval.current = setInterval(() => {
+      fetchSessionData();
+    }, 5000);
+
     return () => {
-      clearInterval(timerIntervalRef.current);
-      clearInterval(attendanceIntervalRef.current);
-      clearInterval(heartbeatIntervalRef.current);
+      clearInterval(sessionCheckInterval.current);
       handleUserLeaving();
     };
   }, []);
 
-  const initializeClassroom = async () => {
+  const fetchOrCreateSession = async () => {
     try {
-      const durationMinutes = classData.duration || 60;
-      const durationSeconds = durationMinutes * 60;
-      setTotalDuration(durationSeconds);
-      setTimeRemaining(durationSeconds);
-
-      const now = new Date();
-      if (userRole === 'teacher') {
-        setIsTeacherPresent(true);
-        setTeacherJoinedAt(now);
-        setClassStartTime(now);
-      } else if (userRole === 'student') {
-        setIsStudentPresent(true);
-        setStudentJoinedAt(now);
-        if (!classStartTime) setClassStartTime(now);
+      console.log('📊 Fetching session for booking:', bookingId);
+      
+      // Try to get existing session
+      const { data } = await api.get(`/api/classroom/session/${bookingId}`);
+      
+      if (data.session) {
+        console.log('✅ Found existing session:', data.session);
+        setSessionData(data.session);
+        
+        // Calculate time elapsed since class started
+        if (data.session.classStartedAt) {
+          const startTime = new Date(data.session.classStartedAt);
+          const now = new Date();
+          const elapsed = Math.floor((now - startTime) / 1000);
+          setTimeElapsed(elapsed);
+          setBothActiveTime(data.session.bothActiveTime || 0);
+          
+          console.log('⏱️ Time elapsed:', elapsed, 'seconds');
+          console.log('👥 Both active time:', data.session.bothActiveTime, 'seconds');
+        }
+      } else {
+        // Create new session by sending join event
+        await handleJoinSession();
       }
-
-      await updateClassroomAttendance({
-        bookingId: classData.bookingId || classData.id,
-        userRole: userRole,
-        action: 'join',
-        timestamp: now.toISOString()
-      });
-
-      startHeartbeat();
-
-      console.log('✅ Classroom initialized');
     } catch (err) {
-      console.error('Error initializing classroom:', err);
+      console.error('❌ Error fetching session:', err);
+      // Create new session
+      await handleJoinSession();
     }
   };
 
-  // Start timer when both users are present
+  const fetchSessionData = async () => {
+    try {
+      const { data } = await api.get(`/api/classroom/session/${bookingId}`);
+      if (data.session) {
+        setSessionData(data.session);
+        setBothActiveTime(data.session.bothActiveTime || 0);
+      }
+    } catch (err) {
+      console.error('Error syncing session:', err);
+    }
+  };
+
+  const handleJoinSession = async () => {
+    try {
+      console.log('🚪 Joining session as:', userRole);
+      
+      await api.post('/api/classroom/attendance', {
+        bookingId: bookingId,
+        userRole: userRole,
+        action: 'join',
+        timestamp: new Date().toISOString()
+      });
+
+      // Fetch updated session
+      await fetchSessionData();
+      
+      // Start heartbeat
+      startHeartbeat();
+      
+      console.log('✅ Session joined successfully');
+    } catch (err) {
+      console.error('❌ Error joining session:', err);
+    }
+  };
+
+  const handleUserLeaving = async () => {
+    try {
+      await api.post('/api/classroom/attendance', {
+        bookingId: bookingId,
+        userRole: userRole,
+        action: 'leave',
+        timestamp: new Date().toISOString(),
+        activeTime: timeElapsed
+      });
+      
+      clearInterval(syncInterval.current);
+      console.log('👋 Left session');
+    } catch (err) {
+      console.error('Error leaving session:', err);
+    }
+  };
+
+  const startHeartbeat = () => {
+    // Send heartbeat every 10 seconds
+    syncInterval.current = setInterval(async () => {
+      try {
+        await api.post('/api/classroom/attendance', {
+          bookingId: bookingId,
+          userRole: userRole,
+          action: 'heartbeat',
+          timestamp: new Date().toISOString(),
+          activeTime: timeElapsed
+        });
+      } catch (err) {
+        console.error('Heartbeat error:', err);
+      }
+    }, 10000);
+  };
+
+  // Start timer when both users present
   useEffect(() => {
-    if (isTeacherPresent && isStudentPresent && !isTimerRunning) {
+    console.log('🔍 Presence check:', {
+      isTeacherPresent,
+      isStudentPresent,
+      isTimerRunning,
+      classStarted
+    });
+
+    if (isTeacherPresent && isStudentPresent && !isTimerRunning && !classStarted) {
+      console.log('✅ Both users present - Starting timer!');
+      setIsTimerRunning(true);
+      setClassStarted(true);
       startTimer();
-      startAttendanceTracking();
-      setClassStatus('active');
-      console.log('✅ Both users present - Timer started!');
     }
   }, [isTeacherPresent, isStudentPresent]);
 
   const startTimer = () => {
-    setIsTimerRunning(true);
-    timerIntervalRef.current = setInterval(() => {
-      setTimeRemaining((prev) => {
-        if (prev <= 0) {
-          handleTimerComplete();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-  };
-
-  const startAttendanceTracking = () => {
-    attendanceIntervalRef.current = setInterval(() => {
-      if (isTeacherPresent) setTeacherActiveTime(prev => prev + 1);
-      if (isStudentPresent) setStudentActiveTime(prev => prev + 1);
+    timerInterval.current = setInterval(() => {
+      setTimeElapsed(prev => prev + 1);
+      
+      // Increment bothActiveTime only if both present
       if (isTeacherPresent && isStudentPresent) {
         setBothActiveTime(prev => prev + 1);
       }
     }, 1000);
   };
 
-  const startHeartbeat = () => {
-    heartbeatIntervalRef.current = setInterval(async () => {
-      try {
-        await updateClassroomAttendance({
-          bookingId: classData.bookingId || classData.id,
-          userRole: userRole,
-          action: 'heartbeat',
-          timestamp: new Date().toISOString(),
-          activeTime: userRole === 'teacher' ? teacherActiveTime : studentActiveTime
-        });
-      } catch (err) {
-        console.error('Heartbeat error:', err);
-      }
-    }, 30000);
+  // Stop timer when someone leaves (but keep tracking)
+  useEffect(() => {
+    if ((!isTeacherPresent || !isStudentPresent) && isTimerRunning) {
+      console.log('⏸️ One user left - Timer continues but not counting together time');
+      // Don't stop timer, just stop incrementing bothActiveTime
+    }
+  }, [isTeacherPresent, isStudentPresent]);
+
+  const handleUserJoined = (uid) => {
+    console.log('✅ CALLBACK: Remote user joined!', uid);
+    
+    if (userRole === "teacher") {
+      console.log('👨‍🎓 Student joined!');
+      setIsStudentPresent(true);
+    } else {
+      console.log('👨‍🏫 Teacher joined!');
+      setIsTeacherPresent(true);
+    }
   };
 
-  const handleTimerComplete = async () => {
-    clearInterval(timerIntervalRef.current);
-    clearInterval(attendanceIntervalRef.current);
-    setIsTimerRunning(false);
-    setClassStatus('completed');
-
-    await checkAndCompleteClass();
+  const handleUserLeft = (uid) => {
+    console.log('👋 User left:', uid);
+    
+    if (userRole === "teacher") {
+      setIsStudentPresent(false);
+    } else {
+      setIsTeacherPresent(false);
+    }
   };
 
-  const checkAndCompleteClass = async () => {
+  const handleLeaveCall = () => {
+    if (timerInterval.current) {
+      clearInterval(timerInterval.current);
+    }
+    
+    handleUserLeaving();
+    
+    if (onLeave) {
+      onLeave();
+    } else {
+      navigate(userRole === "teacher" ? "/teacher/dashboard" : "/student/dashboard");
+    }
+  };
+
+  // 🔥 END CLASS FUNCTION (Teacher Only)
+  const handleEndClass = async () => {
+    if (userRole !== "teacher") return;
+    
     try {
-      const requiredSeconds = getRequiredAttendanceTime(totalDuration);
-      const canComplete = bothActiveTime >= requiredSeconds;
+      console.log('🛑 Teacher ending class...');
+      console.log('📊 Final stats:', {
+        timeElapsed,
+        bothActiveTime,
+        requiredTime: getRequiredTime(classData.duration)
+      });
 
-      if (canComplete) {
-        const result = await completeBooking(classData.bookingId || classData.id);
-        
-        if (userRole === 'student') {
-          alert(`🎉 Class completed!\n\nYou have ${result.studentClassesRemaining} classes remaining.`);
-        } else {
-          alert('✅ Class completed successfully!');
-        }
+      const requiredTime = getRequiredTime(classData.duration);
+      const meetsRequirement = bothActiveTime >= requiredTime;
 
-        setTimeout(() => onLeave(), 2000);
-      } else {
-        const shortfall = Math.ceil((requiredSeconds - bothActiveTime) / 60);
+      if (!meetsRequirement) {
         alert(
-          `⚠️ Class time completed, but attendance requirement not met.\n\n` +
-          `Required: ${Math.floor(requiredSeconds / 60)} minutes together.\n` +
-          `Short by: ${shortfall} minutes.\n\n` +
-          `This class requires admin review.`
+          `⚠️ Attendance Requirement Not Met\n\n` +
+          `Time together: ${formatMinutes(bothActiveTime)}\n` +
+          `Required: ${formatMinutes(requiredTime)}\n\n` +
+          `Short by: ${formatMinutes(requiredTime - bothActiveTime)}\n\n` +
+          `This class will need admin review.`
         );
         
-        await endClassEarly({
-          bookingId: classData.bookingId || classData.id,
+        // Create complaint for admin review
+        await api.post('/api/classroom/end-early', {
+          bookingId: bookingId,
           reason: 'insufficient_attendance',
-          reportedBy: 'system',
-          description: `Both participants were only active together for ${Math.floor(bothActiveTime / 60)} minutes out of ${Math.floor(requiredSeconds / 60)} minutes required.`,
-          teacherActiveTime,
-          studentActiveTime,
-          bothActiveTime,
-          requiredTime: requiredSeconds,
+          reportedBy: 'teacher',
+          description: `Teacher ended class. Both active: ${formatMinutes(bothActiveTime)}, Required: ${formatMinutes(requiredTime)}`,
+          teacherActiveTime: timeElapsed,
+          studentActiveTime: timeElapsed,
+          bothActiveTime: bothActiveTime,
+          requiredTime: requiredTime,
           endedAt: new Date().toISOString(),
-          endedBy: 'system'
+          endedBy: userRole
         });
+        
+        handleLeaveCall();
+        return;
+      }
 
-        onLeave();
+      // Complete the booking
+      const { data } = await api.put(`/api/bookings/${bookingId}/complete`);
+      
+      if (data.success) {
+        alert('✅ Class completed successfully!');
+        handleLeaveCall();
       }
     } catch (err) {
-      console.error('Error checking class completion:', err);
-      alert('Error processing class completion. Please contact admin.');
-      onLeave();
+      console.error('❌ Error ending class:', err);
+      alert('Error ending class. Please try again.');
     }
   };
 
-  const handleUserLeaving = async () => {
-    try {
-      await updateClassroomAttendance({
-        bookingId: classData.bookingId || classData.id,
-        userRole: userRole,
-        action: 'leave',
-        timestamp: new Date().toISOString(),
-        totalActiveTime: userRole === 'teacher' ? teacherActiveTime : studentActiveTime
-      });
-    } catch (err) {
-      console.error('Error handling user leaving:', err);
-    }
-  };
-
-  const handleLeaveClass = async () => {
-    try {
-      await handleUserLeaving();
-      onLeave();
-    } catch (err) {
-      console.error('Error leaving class:', err);
-      onLeave();
-    }
-  };
-
-  const handleEndClassEarly = () => {
-    if (userRole !== 'teacher') {
-      alert('Only the teacher can end the class early.');
-      return;
-    }
-    setShowEndEarlyModal(true);
-  };
-
-  const submitEarlyEnd = async () => {
-    if (!endReason || !reportedBy || !endDescription.trim()) {
-      alert('Please fill in all fields.');
-      return;
-    }
-
-    try {
-      await endClassEarly({
-        bookingId: classData.bookingId || classData.id,
-        reason: endReason,
-        reportedBy: reportedBy,
-        description: endDescription,
-        teacherActiveTime,
-        studentActiveTime,
-        bothActiveTime,
-        requiredTime: getRequiredAttendanceTime(totalDuration),
-        endedAt: new Date().toISOString(),
-        endedBy: userRole
-      });
-
-      alert('✅ Complaint submitted. Class marked as PENDING for admin review.');
-
-      clearInterval(timerIntervalRef.current);
-      clearInterval(attendanceIntervalRef.current);
-      clearInterval(heartbeatIntervalRef.current);
-
-      setShowEndEarlyModal(false);
-      setTimeout(() => onLeave(), 1000);
-    } catch (err) {
-      console.error('Error ending class early:', err);
-      alert('Error submitting complaint. Please try again.');
+  // Calculate required time based on duration
+  const getRequiredTime = (duration) => {
+    switch(duration) {
+      case 30: return 25 * 60; // 25 mins out of 30
+      case 45: return 40 * 60; // 40 mins out of 45
+      case 60: return 50 * 60; // 50 mins out of 60
+      default: return Math.floor(duration * 60 * 0.83); // 83% default
     }
   };
 
   const formatTime = (seconds) => {
+    if (!seconds && seconds !== 0) return "--:--";
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const getTimerColor = () => {
-    const percentage = (timeRemaining / totalDuration) * 100;
-    if (percentage > 50) return 'text-green-400';
-    if (percentage > 20) return 'text-orange-400';
-    return 'text-red-400';
+  const formatMinutes = (seconds) => {
+    return `${Math.floor(seconds / 60)} min ${seconds % 60} sec`;
   };
 
-  const toggleVideoMaximize = () => {
-    setVideoMaximized(!videoMaximized);
-    if (!videoMaximized) setWhiteboardMaximized(false);
+  const getTimeRemaining = () => {
+    const totalSeconds = (classData?.duration || 60) * 60;
+    const remaining = totalSeconds - timeElapsed;
+    return Math.max(0, remaining);
   };
 
-  const toggleWhiteboardMaximize = () => {
-    setWhiteboardMaximized(!whiteboardMaximized);
-    if (!whiteboardMaximized) setVideoMaximized(false);
+  const handleTabChange = (tab) => {
+    console.log('🎚️ Switching to tab:', tab);
+    setActiveTab(tab);
   };
 
-  const sendMessage = (e) => {
-    e.preventDefault();
-    if (newMessage.trim()) {
-      const message = {
-        id: Date.now(),
-        text: newMessage,
-        sender: userName,
-        timestamp: new Date().toLocaleTimeString(),
-      };
-      setChatMessages([...chatMessages, message]);
-      setNewMessage('');
-    }
-  };
+  if (!bookingId) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-red-50 to-pink-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-md text-center">
+          <XCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-red-600 mb-2">Oops!</h2>
+          <p className="text-gray-600 mb-6">Cannot load classroom without a valid booking ID.</p>
+          <button
+            onClick={handleLeaveCall}
+            className="px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-full font-bold hover:shadow-lg transition-all"
+          >
+            Go Back
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const channelName = `class-${bookingId}`;
+  const timeRemaining = getTimeRemaining();
+  const requiredTime = getRequiredTime(classData.duration);
+  const completionPercentage = Math.min(100, Math.round((bothActiveTime / requiredTime) * 100));
 
   return (
-    <div className="fixed inset-0 z-50 bg-gray-900 flex flex-col">
-      {/* Header with Timer */}
-      <div className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-6 py-4 shadow-lg">
+    <div className="h-screen flex flex-col bg-gradient-to-br from-purple-50 via-blue-50 to-pink-50">
+      
+      {/* 🎨 COMPACT HEADER */}
+      <div className="bg-white shadow-md border-b-2 border-purple-200 px-6 py-3">
         <div className="flex items-center justify-between">
-          {/* Class Info */}
-          <div>
-            <h2 className="text-xl font-bold">🎓 {classData?.title || "Virtual Classroom"}</h2>
-            {classData?.topic && <p className="text-sm text-purple-100">{classData.topic}</p>}
+          
+          {/* Left: Timer Info */}
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <Clock className="w-4 h-4 text-purple-600" />
+                <span className="text-lg font-bold text-purple-700">
+                  {formatTime(timeRemaining)}
+                </span>
+              </div>
+              <div className="text-xs text-gray-500">
+                Elapsed: {formatTime(timeElapsed)}
+              </div>
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              <div className={`w-2 h-2 rounded-full ${isTimerRunning ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`} />
+              <span className="text-gray-600 font-medium">
+                {isTimerRunning ? 'In Progress' : 'Waiting...'}
+              </span>
+              <span className="text-xs text-gray-500">
+                • Together: {formatTime(bothActiveTime)} / {formatTime(requiredTime)} ({completionPercentage}%)
+              </span>
+            </div>
           </div>
 
-          {/* Timer */}
-          <div className="flex items-center gap-6">
-            <div className="bg-white/20 rounded-lg px-4 py-2">
-              <div className="flex items-center gap-2">
-                <Clock className="w-5 h-5" />
-                <div className={`text-2xl font-bold ${getTimerColor()}`}>
-                  {formatTime(timeRemaining)}
+          {/* Center: Tabs */}
+          <div className="flex items-center gap-2 bg-gradient-to-r from-purple-100 to-pink-100 rounded-full p-1">
+            <button
+              onClick={() => handleTabChange("video")}
+              className={`flex items-center gap-2 px-4 py-2 rounded-full font-bold transition-all ${
+                activeTab === "video"
+                  ? "bg-white text-purple-600 shadow-md scale-105"
+                  : "text-purple-400 hover:text-purple-600"
+              }`}
+            >
+              <Video className="w-4 h-4" />
+              <span className="text-sm">Video</span>
+            </button>
+
+            <button
+              onClick={() => handleTabChange("content")}
+              className={`flex items-center gap-2 px-4 py-2 rounded-full font-bold transition-all ${
+                activeTab === "content"
+                  ? "bg-white text-blue-600 shadow-md scale-105"
+                  : "text-blue-400 hover:text-blue-600"
+              }`}
+            >
+              <FileText className="w-4 h-4" />
+              <span className="text-sm">Content</span>
+            </button>
+
+            <button
+              onClick={() => handleTabChange("whiteboard")}
+              className={`flex items-center gap-2 px-4 py-2 rounded-full font-bold transition-all ${
+                activeTab === "whiteboard"
+                  ? "bg-white text-pink-600 shadow-md scale-105"
+                  : "text-pink-400 hover:text-pink-600"
+              }`}
+            >
+              <PenTool className="w-4 h-4" />
+              <span className="text-sm">Whiteboard</span>
+            </button>
+          </div>
+
+          {/* Right: Participants */}
+          <div className="flex flex-col gap-1 items-end">
+            <div className="flex items-center gap-2">
+              <Users className="w-4 h-4 text-purple-600" />
+              <span className="text-sm font-bold text-purple-700">
+                {(isTeacherPresent ? 1 : 0) + (isStudentPresent ? 1 : 0)}/2
+              </span>
+            </div>
+            <div className="flex items-center gap-3 text-xs">
+              <div className="flex items-center gap-1">
+                {isTeacherPresent ? (
+                  <CheckCircle2 className="w-3 h-3 text-green-500" />
+                ) : (
+                  <XCircle className="w-3 h-3 text-gray-400" />
+                )}
+                <span className="text-gray-600 font-medium">Teacher</span>
+              </div>
+              <div className="flex items-center gap-1">
+                {isStudentPresent ? (
+                  <CheckCircle2 className="w-3 h-3 text-green-500" />
+                ) : (
+                  <XCircle className="w-3 h-3 text-gray-400" />
+                )}
+                <span className="text-gray-600 font-medium">Student</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 📱 MAIN CONTENT */}
+      <div className="flex-1 overflow-hidden relative">
+        
+        {/* Video Tab - Always mounted, just hidden */}
+        <div className={activeTab === "video" ? "h-full" : "hidden"}>
+          <VideoCall
+            key={`video-${bookingId}`}
+            channelName={channelName}
+            userId={userId}
+            userName={userName}
+            onLeave={handleLeaveCall}
+            onUserJoined={handleUserJoined}
+            onUserLeft={handleUserLeft}
+            mode="video"
+          />
+        </div>
+
+        {/* Content Tab */}
+        {activeTab === "content" && (
+          <div className="h-full flex">
+            <div className="flex-1 bg-gradient-to-br from-blue-50 to-purple-50 p-4 flex items-center justify-center">
+              <div className="w-full h-full bg-white rounded-3xl shadow-2xl border-4 border-blue-200 flex items-center justify-center">
+                <div className="text-center">
+                  <FileText className="w-24 h-24 text-blue-400 mx-auto mb-4" />
+                  <p className="text-2xl font-bold text-blue-600">Content Sharing</p>
+                  <p className="text-gray-500 mt-2">PDF viewer or screen share will appear here</p>
                 </div>
               </div>
-              <p className="text-xs text-center">
-                {isTimerRunning ? 'Time Left' : 'Waiting...'}
+            </div>
+            <div className="w-64 bg-gradient-to-b from-purple-100 to-pink-100 p-3 flex flex-col gap-3">
+              <div className="flex-1 bg-gradient-to-br from-purple-200 to-purple-300 rounded-2xl shadow-xl border-4 border-white flex items-center justify-center">
+                <span className="text-white font-bold">Teacher</span>
+              </div>
+              <div className="flex-1 bg-gradient-to-br from-pink-200 to-pink-300 rounded-2xl shadow-xl border-4 border-white flex items-center justify-center">
+                <span className="text-white font-bold">Student</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Whiteboard Tab */}
+        {activeTab === "whiteboard" && (
+          <WhiteboardTab
+            userRole={userRole}
+          />
+        )}
+
+        {/* 🔥 END CLASS BUTTON (Teacher Only, Bottom Left) */}
+        {userRole === "teacher" && (
+          <button
+            onClick={() => setShowEndModal(true)}
+            className="absolute bottom-6 left-6 flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded-full font-bold shadow-lg hover:shadow-xl transform hover:scale-105 transition-all z-50"
+          >
+            <Power className="w-5 h-5" />
+            End Class
+          </button>
+        )}
+      </div>
+
+      {/* 🔥 END CLASS CONFIRMATION MODAL */}
+      {showEndModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4">
+          <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full">
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <AlertTriangle className="w-8 h-8 text-red-600" />
+              </div>
+              <h2 className="text-2xl font-bold text-gray-800 mb-2">End Class?</h2>
+              <p className="text-gray-600">
+                Are you sure you want to end this class?
               </p>
             </div>
 
-            {/* Attendance */}
-            <div className="bg-white/20 rounded-lg px-4 py-2 text-sm">
-              <div className="flex items-center gap-2 mb-1">
-                <Users className="w-4 h-4" />
-                <span className="font-semibold">Status</span>
-              </div>
-              <div className="space-y-0.5">
-                <div>Teacher: <span className={isTeacherPresent ? 'text-green-300' : 'text-red-300'}>
-                  {isTeacherPresent ? '✓' : '✗'}
-                </span></div>
-                <div>Student: <span className={isStudentPresent ? 'text-green-300' : 'text-red-300'}>
-                  {isStudentPresent ? '✓' : '✗'}
-                </span></div>
-              </div>
-            </div>
-
-            {/* Controls */}
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setShowWhiteboard(!showWhiteboard)}
-                className={`p-2 rounded-lg transition ${
-                  showWhiteboard ? 'bg-white/30' : 'bg-white/10 hover:bg-white/20'
-                }`}
-                title="Toggle Whiteboard"
-              >
-                <Palette className="w-5 h-5" />
-              </button>
-
-              <button
-                onClick={() => setShowChat(!showChat)}
-                className={`p-2 rounded-lg transition ${
-                  showChat ? 'bg-white/30' : 'bg-white/10 hover:bg-white/20'
-                }`}
-                title="Toggle Chat"
-              >
-                <MessageCircle className="w-5 h-5" />
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Progress Bar */}
-        <div className="mt-3">
-          <div className="w-full bg-white/20 rounded-full h-2">
-            <div
-              className="bg-white h-2 rounded-full transition-all duration-1000"
-              style={{ width: `${((totalDuration - timeRemaining) / totalDuration) * 100}%` }}
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Main Content */}
-      <div className="flex flex-1 overflow-hidden">
-        <div className={`flex-1 flex ${showWhiteboard ? 'flex-row' : ''}`}>
-          {/* Video Section */}
-          <AnimatePresence>
-            {(!whiteboardMaximized || !showWhiteboard) && (
-              <motion.div 
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className={`${
-                  videoMaximized ? 'w-full' : showWhiteboard ? 'w-1/2' : 'w-full'
-                } transition-all`}
-              >
-                <VideoCall 
-                  channelName={channelName}
-                  userId={userId}
-                  userName={userName}
-                  onLeave={handleLeaveClass}
-                  isMaximized={videoMaximized}
-                  onToggleMaximize={showWhiteboard ? toggleVideoMaximize : null}
-                />
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* Whiteboard Section */}
-          <AnimatePresence>
-            {showWhiteboard && !videoMaximized && (
-              <motion.div 
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className={`${
-                  whiteboardMaximized ? 'w-full' : 'w-1/2'
-                } border-l-2 border-gray-700`}
-              >
-                <SharedWhiteboard 
-                  isMaximized={whiteboardMaximized}
-                  onToggleMaximize={toggleWhiteboardMaximize}
-                  channelName={channelName}
-                  userId={userId}
-                  userName={userName}
-                  userRole={userRole}
-                />
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-
-        {/* Chat Sidebar */}
-        <AnimatePresence>
-          {showChat && (
-            <motion.div 
-              initial={{ x: 300 }}
-              animate={{ x: 0 }}
-              exit={{ x: 300 }}
-              className="w-80 bg-gray-800 border-l-2 border-gray-700 flex flex-col"
-            >
-              <div className="p-4 border-b border-gray-700">
-                <h3 className="text-white font-bold flex items-center gap-2">
-                  <MessageCircle className="w-5 h-5" />
-                  Class Chat
-                </h3>
-              </div>
-              
-              <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                {chatMessages.map((msg) => (
-                  <div key={msg.id} className="bg-gray-700 rounded-lg p-3">
-                    <div className="flex justify-between items-start mb-1">
-                      <span className="text-purple-300 font-semibold text-sm">
-                        {msg.sender}
-                      </span>
-                      <span className="text-gray-400 text-xs">{msg.timestamp}</span>
-                    </div>
-                    <p className="text-white text-sm">{msg.text}</p>
-                  </div>
-                ))}
-              </div>
-              
-              <form onSubmit={sendMessage} className="p-4 border-t border-gray-700">
-                <input
-                  type="text"
-                  value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
-                  placeholder="Type a message..."
-                  className="w-full px-4 py-2 rounded-lg bg-gray-700 text-white border-none focus:ring-2 focus:ring-purple-500"
-                />
-              </form>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-
-      {/* Action Buttons */}
-      <div className="fixed bottom-6 right-6 flex flex-col gap-3 z-50">
-        {userRole === 'teacher' && classStatus === 'active' && (
-          <button
-            onClick={handleEndClassEarly}
-            className="flex items-center gap-2 px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg shadow-lg"
-          >
-            <XCircle className="w-5 h-5" />
-            End Class Early
-          </button>
-        )}
-        
-        <button
-          onClick={handleLeaveClass}
-          className="flex items-center gap-2 px-6 py-3 bg-gray-600 hover:bg-gray-700 text-white rounded-lg shadow-lg"
-        >
-          <LogOut className="w-5 h-5" />
-          Leave Class
-        </button>
-      </div>
-
-      {/* End Early Modal */}
-      {showEndEarlyModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-2xl font-bold text-gray-800">End Class Early</h3>
-              <button onClick={() => setShowEndEarlyModal(false)} className="p-2 hover:bg-gray-100 rounded-lg">
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-
-            <div className="mb-6 p-4 bg-yellow-50 border-l-4 border-yellow-500 rounded">
-              <div className="flex gap-2">
-                <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
-                <div className="text-sm text-yellow-800">
-                  <p className="font-semibold mb-1">Important:</p>
-                  <ul className="list-disc list-inside space-y-1">
-                    <li>This will end the class immediately</li>
-                    <li>Your complaint will be sent to admin</li>
-                    <li>Class marked as PENDING until review</li>
-                  </ul>
+            <div className="bg-blue-50 rounded-2xl p-4 mb-6">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-gray-600">Time Elapsed:</p>
+                  <p className="font-bold text-gray-800">{formatTime(timeElapsed)}</p>
+                </div>
+                <div>
+                  <p className="text-gray-600">Together:</p>
+                  <p className="font-bold text-gray-800">{formatTime(bothActiveTime)}</p>
+                </div>
+                <div>
+                  <p className="text-gray-600">Required:</p>
+                  <p className="font-bold text-gray-800">{formatTime(requiredTime)}</p>
+                </div>
+                <div>
+                  <p className="text-gray-600">Progress:</p>
+                  <p className={`font-bold ${completionPercentage >= 100 ? 'text-green-600' : 'text-orange-600'}`}>
+                    {completionPercentage}%
+                  </p>
                 </div>
               </div>
             </div>
 
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Reason for Ending Early *
-                </label>
-                <select
-                  value={endReason}
-                  onChange={(e) => setEndReason(e.target.value)}
-                  className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">Select a reason</option>
-                  <option value="network_issue">Network/Technical Issue</option>
-                  <option value="student_absent">Student Not Responding</option>
-                  <option value="student_unprepared">Student Unprepared</option>
-                  <option value="emergency">Emergency</option>
-                  <option value="other">Other</option>
-                </select>
+            {completionPercentage < 100 && (
+              <div className="bg-yellow-50 border-2 border-yellow-200 rounded-2xl p-4 mb-6">
+                <p className="text-sm text-yellow-800">
+                  ⚠️ <strong>Note:</strong> This class hasn't met the minimum attendance requirement. 
+                  It will require admin review.
+                </p>
               </div>
+            )}
 
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Issue Related To *
-                </label>
-                <div className="space-y-2">
-                  {['network', 'student', 'other'].map((option) => (
-                    <label key={option} className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="reportedBy"
-                        value={option}
-                        checked={reportedBy === option}
-                        onChange={(e) => setReportedBy(e.target.value)}
-                        className="w-4 h-4"
-                      />
-                      <span className="capitalize">{option === 'network' ? 'Network/Technical' : option}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Detailed Description *
-                </label>
-                <textarea
-                  value={endDescription}
-                  onChange={(e) => setEndDescription(e.target.value)}
-                  placeholder="Explain why you're ending the class early..."
-                  className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 min-h-[120px]"
-                  maxLength={500}
-                />
-                <p className="text-xs text-gray-500 mt-1">{endDescription.length}/500</p>
-              </div>
-            </div>
-
-            <div className="flex gap-3 mt-6">
+            <div className="flex gap-3">
               <button
-                onClick={() => setShowEndEarlyModal(false)}
-                className="flex-1 px-6 py-3 border-2 border-gray-300 rounded-lg hover:bg-gray-50 font-semibold"
+                onClick={() => setShowEndModal(false)}
+                className="flex-1 px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-full font-bold transition-all"
               >
                 Cancel
               </button>
               <button
-                onClick={submitEarlyEnd}
-                className="flex-1 px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold"
+                onClick={handleEndClass}
+                className="flex-1 px-6 py-3 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded-full font-bold shadow-lg transition-all"
               >
-                Submit Complaint
+                End Class
               </button>
             </div>
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// 🎨 WHITEBOARD TAB
+function WhiteboardTab({ userRole }) {
+  const canvasRef = useRef(null);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [currentColor, setCurrentColor] = useState("#000000");
+  const [brushSize, setBrushSize] = useState(3);
+
+  const colors = [
+    "#000000", "#FF0000", "#00FF00", "#0000FF",
+    "#FFFF00", "#FF00FF", "#00FFFF", "#FF8800"
+  ];
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.fillStyle = "#FFFFFF";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }, []);
+
+  const startDrawing = (e) => {
+    if (userRole !== "teacher") return;
+    setIsDrawing(true);
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext("2d");
+    const rect = canvas.getBoundingClientRect();
+    ctx.beginPath();
+    ctx.moveTo(e.clientX - rect.left, e.clientY - rect.top);
+  };
+
+  const draw = (e) => {
+    if (!isDrawing || userRole !== "teacher") return;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext("2d");
+    const rect = canvas.getBoundingClientRect();
+    ctx.strokeStyle = currentColor;
+    ctx.lineWidth = brushSize;
+    ctx.lineTo(e.clientX - rect.left, e.clientY - rect.top);
+    ctx.stroke();
+  };
+
+  const stopDrawing = () => setIsDrawing(false);
+
+  const clearCanvas = () => {
+    if (userRole !== "teacher") return;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#FFFFFF";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  };
+
+  return (
+    <div className="h-full flex gap-4 p-4">
+      <div className="flex-1 flex flex-col gap-3">
+        {userRole === "teacher" && (
+          <div className="bg-white rounded-2xl shadow-lg p-3 flex items-center justify-between border-2 border-purple-200">
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-bold text-purple-600">Colors:</span>
+              {colors.map((color) => (
+                <button
+                  key={color}
+                  onClick={() => setCurrentColor(color)}
+                  className={`w-8 h-8 rounded-full border-4 transition-all ${
+                    currentColor === color ? "border-purple-500 scale-110" : "border-gray-300"
+                  }`}
+                  style={{ backgroundColor: color }}
+                />
+              ))}
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-bold text-purple-600">Size:</span>
+              <input
+                type="range"
+                min="1"
+                max="20"
+                value={brushSize}
+                onChange={(e) => setBrushSize(Number(e.target.value))}
+                className="w-24"
+              />
+              <span className="text-sm font-medium text-gray-600">{brushSize}px</span>
+            </div>
+            <button
+              onClick={clearCanvas}
+              className="px-4 py-2 bg-gradient-to-r from-red-400 to-red-500 hover:from-red-500 hover:to-red-600 text-white rounded-full font-bold text-sm shadow-lg"
+            >
+              Clear
+            </button>
+          </div>
+        )}
+        <div className="flex-1 bg-white rounded-3xl shadow-2xl border-4 border-purple-200 overflow-hidden">
+          <canvas
+            ref={canvasRef}
+            width={1200}
+            height={700}
+            onMouseDown={startDrawing}
+            onMouseMove={draw}
+            onMouseUp={stopDrawing}
+            onMouseLeave={stopDrawing}
+            className="w-full h-full cursor-crosshair"
+          />
+        </div>
+      </div>
+      <div className="w-48 flex flex-col gap-3">
+        <div className="flex-1 bg-gradient-to-br from-purple-200 to-purple-300 rounded-2xl shadow-xl border-4 border-white flex items-center justify-center">
+          <span className="text-sm font-bold text-white">Teacher</span>
+        </div>
+        <div className="flex-1 bg-gradient-to-br from-pink-200 to-pink-300 rounded-2xl shadow-xl border-4 border-white flex items-center justify-center">
+          <span className="text-sm font-bold text-white">Student</span>
+        </div>
+      </div>
     </div>
   );
 }
