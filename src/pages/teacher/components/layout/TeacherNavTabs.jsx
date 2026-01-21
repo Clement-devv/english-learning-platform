@@ -1,6 +1,6 @@
 // src/pages/teacher/components/layout/TeacherNavTabs.jsx
 import React from "react";
-import { Home, Calendar, CheckCircle, Users, BookOpen, MessageCircle } from "lucide-react";
+import { Home, Calendar, CheckCircle, Users, BookOpen, MessageCircle, DollarSign } from "lucide-react";
 
 export default function TeacherNavTabs({ activeTab, onChange, tabs, isDarkMode }) {
   const tabConfig = {
@@ -9,7 +9,8 @@ export default function TeacherNavTabs({ activeTab, onChange, tabs, isDarkMode }
     "completed-classes": { label: "Completed Classes", icon: CheckCircle },
     students: { label: "Students", icon: Users },
     bookings: { label: "Bookings", icon: BookOpen },
-    messages: { label: "Messages", icon: MessageCircle } // ✅ NEW: Messages tab
+    messages: { label: "Messages", icon: MessageCircle },
+    payment: { label: "Payment", icon: DollarSign }
   };
 
   return (

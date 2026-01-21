@@ -16,6 +16,7 @@ import SettingsModal from "../../components/SettingsModal";
 import { useDarkMode } from '../../hooks/useDarkMode';
 import DarkModeToggle from '../../components/DarkModeToggle';
 import MessagesTab from '../../components/chat/MessagesTab';
+import PaymentsTab from "./tabs/PaymentTab";
 //import ChangePassword from "../../components/admin/auth/ChangePassword"; // ✅ FIXED: Uncommented
 import {
   TrendingUp,
@@ -25,6 +26,7 @@ import {
   Home,
   Bell,
   Users,
+  DollarSign
 } from "lucide-react";
 import { getTeachers } from "../../services/teacherService";
 import { getStudents } from "../../services/studentService";
@@ -135,6 +137,9 @@ export default function AdminDashboard() {
         return (
           <MessagesTab userRole="admin" />
         );
+      case "payments":
+      return <PaymentsTab isDarkMode={isDarkMode} />;
+
       default:
         return <OverviewTab isDarkMode={isDarkMode} />;
     }
@@ -149,7 +154,8 @@ export default function AdminDashboard() {
     { key: "notifications", label: "Notifications", icon: Bell },
     { key: "assign", label: "Assign Students", icon: Users },
     { key: "bookings", label: "Bookings", icon: Calendar },
-    { key: "messages", label: "Messages", icon: MessageCircle }, // ✅ FIXED: Consistent lowercase, better icon
+    { key: "messages", label: "Messages", icon: MessageCircle },
+    { key: "payments", label: "Payments", icon: DollarSign }
   ];
 
   return (

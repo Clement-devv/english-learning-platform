@@ -8,13 +8,14 @@ console.log("📧 Email configured:", process.env.EMAIL_USER ? "✓" : "✗");
 import express from "express";
 import mongoose from "mongoose";
 import cors from "cors";
-import http from "http"; // 👈 ADD THIS
+import http from "http"; 
+
 
 //import { apiLimiter } from "./middleware/rateLimiter.js";
 import { 
   apiLimiter,
-  realtimeLimiter,  // ✅ ADD THIS
-  pollingLimiter,   // ✅ ADD THIS
+  realtimeLimiter,  
+  pollingLimiter,   
   loginLimiter
 } from "./middleware/rateLimiter.js";
 import { config } from "./config/config.js";
@@ -45,6 +46,7 @@ import teacherAssignmentRoutes from "./routes/teacherAssignmentRoutes.js";
 import { initializeSocket } from './socketServer.js'; 
 import classroomRoutes from "./routes/classroomRoutes.js";
 import groupChatRoutes from "./routes/groupChatRoutes.js";
+import paymentTransactionRoutes from "./routes/paymentTransactionRoutes.js";
 
 const app = express();
 const httpServer = http.createServer(app); // 👈 CHANGE: Wrap app with http.createServer
@@ -139,6 +141,7 @@ app.use("/api/bookings", bookingRoutes);
 app.use("/api/teachers", teacherAssignmentRoutes);
 app.use("/api/classroom", classroomRoutes);
 app.use("/api/group-chats", groupChatRoutes);
+app.use("/api/payments", paymentTransactionRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

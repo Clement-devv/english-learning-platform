@@ -1,23 +1,22 @@
-// server/routes/bookingRoutes.js
+// server/routes/bookingRoutes.js - ENHANCED BOOKING COMPLETION WITH PAYMENT TRACKING
 import express from "express";
+import mongoose from "mongoose";
 import Booking from "../models/Booking.js";
 import Student from "../models/Student.js";
 import Teacher from "../models/Teacher.js";
+import PaymentTransaction from "../models/PaymentTransaction.js";
 import { verifyToken, verifyAdmin, verifyAdminOrTeacher } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-
-
 /**
  * PATCH /api/bookings/:id/complete
- * Mark booking as completed AND reduce student's noOfClasses
- * This is the ENHANCED version that properly updates student records
+ * ✅ ENHANCED: Mark booking as completed, reduce student classes, AND update teacher earnings
  */
 router.patch("/:id/complete", verifyToken, async (req, res) => {
   try {
     const booking = await Booking.findById(req.params.id)
-      .populate("teacherId", "firstName lastName email")
+      .populate("teacherId", "firstName lastName email ratePerClass lessonsCompleted earned")
       .populate("studentId", "firstName surname email noOfClasses");
     
     if (!booking) {
@@ -31,129 +30,96 @@ router.patch("/:id/complete", verifyToken, async (req, res) => {
       });
     }
 
-    // Update booking status
-    booking.status = "completed";
-    booking.completedAt = new Date();
-    await booking.save();
+    // Start a transaction session for data consistency
+    const session = await mongoose.startSession();
+    session.startTransaction();
 
-    // ✅ CRITICAL: Reduce student's noOfClasses by 1
-    const Student = mongoose.model("Student");
-    const student = await Student.findById(booking.studentId._id);
-    
-    if (student && student.noOfClasses > 0) {
-      student.noOfClasses -= 1;
-      await student.save();
+    try {
+      // 1. Update booking status
+      booking.status = "completed";
+      booking.completedAt = new Date();
+      await booking.save({ session });
+
+      // 2. Reduce student's noOfClasses by 1
+      const student = await Student.findById(booking.studentId._id).session(session);
       
-      console.log(`✅ Reduced student ${student.firstName} ${student.surname}'s classes: ${student.noOfClasses + 1} → ${student.noOfClasses}`);
-    } else if (student && student.noOfClasses === 0) {
-      console.warn(`⚠️ Student ${student.firstName} ${student.surname} has 0 classes remaining`);
-    }
+      if (student && student.noOfClasses > 0) {
+        student.noOfClasses -= 1;
+        await student.save({ session });
+        console.log(`✅ Reduced student ${student.firstName} ${student.surname}'s classes: ${student.noOfClasses + 1} → ${student.noOfClasses}`);
+      } else if (student && student.noOfClasses === 0) {
+        console.warn(`⚠️ Student ${student.firstName} ${student.surname} has 0 classes remaining`);
+      }
 
-    // Return updated data
-    const updatedBooking = await Booking.findById(booking._id)
-      .populate("teacherId", "firstName lastName email")
-      .populate("studentId", "firstName surname email noOfClasses");
+      // 3. 🔥 UPDATE TEACHER EARNINGS
+      const teacher = await Teacher.findById(booking.teacherId._id).session(session);
+      
+      if (teacher) {
+        const ratePerClass = parseFloat(teacher.ratePerClass || 0);
+        
+        // Update teacher's earnings and lessons completed
+        teacher.lessonsCompleted = (teacher.lessonsCompleted || 0) + 1;
+        teacher.earned = (teacher.earned || 0) + ratePerClass;
+        await teacher.save({ session });
 
-    res.json({
-      message: "Booking completed and student class count updated",
-      booking: updatedBooking,
-      studentClassesRemaining: updatedBooking.studentId.noOfClasses
-    });
-  } catch (err) {
-    console.error("Error completing booking:", err);
-    res.status(500).json({ message: "Error completing booking" });
-  }
-});
+        console.log(`💰 Updated teacher ${teacher.firstName} ${teacher.lastName}'s earnings:`);
+        console.log(`   Lessons Completed: ${teacher.lessonsCompleted - 1} → ${teacher.lessonsCompleted}`);
+        console.log(`   Earned: $${(teacher.earned - ratePerClass).toFixed(2)} → $${teacher.earned.toFixed(2)}`);
 
-/**
- * POST /api/bookings/auto-complete
- * Auto-complete bookings that have passed their scheduled time + duration
- * This can be called by a cron job or manually
- */
-router.post("/auto-complete", verifyToken, async (req, res) => {
-  try {
-    const now = new Date();
-    
-    // Find all accepted bookings that should be completed
-    // (scheduled time + duration has passed)
-    const bookingsToComplete = await Booking.find({
-      status: "accepted",
-      scheduledTime: { $lt: now }
-    }).populate("studentId", "firstName surname email noOfClasses");
-
-    const completed = [];
-    const Student = mongoose.model("Student");
-
-    for (const booking of bookingsToComplete) {
-      // Check if the booking has ended (scheduledTime + duration)
-      const endTime = new Date(booking.scheduledTime);
-      endTime.setMinutes(endTime.getMinutes() + (booking.duration || 60));
-
-      if (now > endTime) {
-        // Mark as completed
-        booking.status = "completed";
-        booking.completedAt = new Date();
-        await booking.save();
-
-        // Reduce student's class count
-        const student = await Student.findById(booking.studentId._id);
-        if (student && student.noOfClasses > 0) {
-          student.noOfClasses -= 1;
-          await student.save();
-          
-          console.log(`✅ Auto-completed: ${booking.classTitle} for ${student.firstName} ${student.surname}`);
-          console.log(`   Classes remaining: ${student.noOfClasses}`);
-        }
-
-        completed.push({
+        // 4. 🔥 CREATE PAYMENT TRANSACTION RECORD
+        const paymentTransaction = new PaymentTransaction({
+          teacherId: teacher._id,
           bookingId: booking._id,
+          amount: ratePerClass,
+          type: "class_completion",
+          status: "pending",
+          description: `Payment for completed class: ${booking.classTitle}`,
           classTitle: booking.classTitle,
           studentName: `${booking.studentId.firstName} ${booking.studentId.surname}`,
-          classesRemaining: student?.noOfClasses || 0
+          completedAt: booking.completedAt
         });
+
+        await paymentTransaction.save({ session });
+        console.log(`📝 Created payment transaction: ${paymentTransaction._id}`);
       }
+
+      // Commit the transaction
+      await session.commitTransaction();
+
+      // Return updated data
+      const updatedBooking = await Booking.findById(booking._id)
+        .populate("teacherId", "firstName lastName email ratePerClass lessonsCompleted earned")
+        .populate("studentId", "firstName surname email noOfClasses");
+
+      res.json({
+        success: true,
+        message: "Class completed successfully! Teacher earnings updated.",
+        booking: updatedBooking,
+        studentClassesRemaining: updatedBooking.studentId.noOfClasses,
+        teacherEarned: updatedBooking.teacherId.earned,
+        teacherLessonsCompleted: updatedBooking.teacherId.lessonsCompleted
+      });
+
+    } catch (error) {
+      // Rollback transaction on error
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      session.endSession();
     }
 
-    res.json({
-      message: `Auto-completed ${completed.length} bookings`,
-      completed: completed
+  } catch (err) {
+    console.error("❌ Error completing booking:", err);
+    res.status(500).json({ 
+      message: "Error completing booking",
+      error: err.message 
     });
-  } catch (err) {
-    console.error("Error auto-completing bookings:", err);
-    res.status(500).json({ message: "Error auto-completing bookings" });
-  }
-});
-
-
-
-
-/**
- * GET /api/bookings
- * Get all bookings (Admin only)
- * Using verifyAdminOrTeacher as fallback if verifyAdmin has issues
- */
-router.get("/", verifyToken, async (req, res) => {
-  try {
-    // Check if user is admin
-    if (req.user.role !== "admin") {
-      return res.status(403).json({ message: "Admin access required" });
-    }
-
-    const bookings = await Booking.find()
-      .populate("teacherId", "firstName lastName email")
-      .populate("studentId", "firstName surname email")
-      .sort({ scheduledTime: -1 });
-    
-    res.json(bookings);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Error fetching bookings" });
   }
 });
 
 /**
  * GET /api/bookings/teacher/:teacherId
- * Get all bookings for a specific teacher
+ * Get all bookings for a teacher with optional status filter
  */
 router.get("/teacher/:teacherId", verifyToken, async (req, res) => {
   try {
@@ -171,8 +137,8 @@ router.get("/teacher/:teacherId", verifyToken, async (req, res) => {
     }
 
     const bookings = await Booking.find(filter)
-      .populate("studentId", "firstName surname email noOfClasses")
-      .sort({ scheduledTime: 1 });
+      .populate("studentId", "firstName surname email")
+      .sort({ scheduledTime: -1 });
 
     res.json(bookings);
   } catch (err) {
@@ -183,7 +149,7 @@ router.get("/teacher/:teacherId", verifyToken, async (req, res) => {
 
 /**
  * GET /api/bookings/student/:studentId
- * Get all bookings for a specific student
+ * Get all bookings for a student
  */
 router.get("/student/:studentId", verifyToken, async (req, res) => {
   try {
@@ -208,6 +174,27 @@ router.get("/student/:studentId", verifyToken, async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Error fetching student bookings" });
+  }
+});
+
+/**
+ * GET /api/bookings
+ * Get all bookings (Admin only)
+ */
+router.get("/", verifyToken, verifyAdmin, async (req, res) => {
+  try {
+    const { status } = req.query;
+    const filter = status ? { status } : {};
+
+    const bookings = await Booking.find(filter)
+      .populate("teacherId", "firstName lastName email")
+      .populate("studentId", "firstName surname email")
+      .sort({ scheduledTime: -1 });
+
+    res.json(bookings);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Error fetching bookings" });
   }
 });
 
@@ -261,7 +248,6 @@ router.post("/", verifyToken, async (req, res) => {
       createdByUserModel: createdBy === "admin" ? "Admin" : createdBy === "teacher" ? "Teacher" : "Student"
     });
 
-    // Populate the booking
     const populatedBooking = await Booking.findById(booking._id)
       .populate("teacherId", "firstName lastName email")
       .populate("studentId", "firstName surname email");
@@ -347,36 +333,6 @@ router.patch("/:id/reject", verifyToken, async (req, res) => {
 });
 
 /**
- * PATCH /api/bookings/:id/complete
- * Mark booking as completed
- */
-router.patch("/:id/complete", verifyToken, async (req, res) => {
-  try {
-    const booking = await Booking.findById(req.params.id);
-    
-    if (!booking) {
-      return res.status(404).json({ message: "Booking not found" });
-    }
-
-    booking.status = "completed";
-    booking.completedAt = new Date();
-    await booking.save();
-
-    const populatedBooking = await Booking.findById(booking._id)
-      .populate("teacherId", "firstName lastName email")
-      .populate("studentId", "firstName surname email");
-
-    res.json({
-      message: "Booking completed",
-      booking: populatedBooking
-    });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Error completing booking" });
-  }
-});
-
-/**
  * PATCH /api/bookings/:id/cancel
  * Cancel a booking
  */
@@ -391,7 +347,7 @@ router.patch("/:id/cancel", verifyToken, async (req, res) => {
 
     booking.status = "cancelled";
     booking.cancelledAt = new Date();
-    booking.rejectionReason = reason || "Cancelled";
+    booking.notes = reason || booking.notes;
     await booking.save();
 
     const populatedBooking = await Booking.findById(booking._id)
@@ -412,13 +368,8 @@ router.patch("/:id/cancel", verifyToken, async (req, res) => {
  * DELETE /api/bookings/:id
  * Delete a booking (Admin only)
  */
-router.delete("/:id", verifyToken, async (req, res) => {
+router.delete("/:id", verifyToken, verifyAdmin, async (req, res) => {
   try {
-    // Check if user is admin
-    if (req.user.role !== "admin") {
-      return res.status(403).json({ message: "Admin access required" });
-    }
-
     const booking = await Booking.findByIdAndDelete(req.params.id);
     
     if (!booking) {

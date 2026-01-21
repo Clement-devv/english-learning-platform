@@ -40,6 +40,8 @@ import SettingsModal from "../../components/SettingsModal";
 // ✅ NEW: Messages/Chat
 import MessagesTab from "../../components/chat/MessagesTab";
 
+import PaymentTab from "./tabs/PaymentTab";
+
 // Services for fetching real data
 import { getAssignedStudents } from "../../services/teacherStudentService";
 import { 
@@ -601,7 +603,7 @@ export default function TeacherDashboard() {
         <TeacherNavTabs
           activeTab={activeTab}
           onChange={setActiveTab}
-          tabs={["dashboard", "classes", "completed-classes", "students", "bookings", "messages"]}
+          tabs={["dashboard", "classes", "completed-classes", "students", "bookings", "messages", "payment"]}
           isDarkMode={isDarkMode}
         />
 
@@ -705,6 +707,11 @@ export default function TeacherDashboard() {
         {/* ✅ NEW: Messages Tab */}
         {activeTab === "messages" && (
           <MessagesTab userRole="teacher" />
+        )}
+
+        {/* ✅ NEW: Payment Tab */}
+        {activeTab === "payment" && (
+          <PaymentTab teacher={teacherInfo} isDarkMode={isDarkMode} />
         )}
 
         <ConfirmModal
