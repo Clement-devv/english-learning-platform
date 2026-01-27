@@ -210,11 +210,11 @@ router.get("/session/:bookingId", verifyToken, async (req, res) => {
   try {
     const session = await ClassroomSession.findOne({ 
       bookingId: req.params.bookingId 
-    }).populate("bookingId");
+});
 
     if (!session) {
-      return res.status(404).json({ message: "Session not found" });
-    }
+  return res.json({ session: null });
+}
 
     res.json({ session });
 

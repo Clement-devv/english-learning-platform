@@ -33,6 +33,40 @@ const bookingSchema = new mongoose.Schema({
     enum: ["pending", "accepted", "rejected", "completed", "cancelled"],
     default: "pending"
   },
+  pendingConfirmation: {
+      type: Boolean,
+      default: false,
+    },
+    
+    teacherConfirmedAt: {
+      type: Date,
+    },
+    
+    studentConfirmedAt: {
+      type: Date,
+    },
+    
+    autoConfirmAt: {
+      type: Date, // When to auto-confirm (24 hours after teacher confirms)
+    },
+    
+    disputed: {
+      type: Boolean,
+      default: false,
+    },
+    
+    disputeReason: {
+      type: String,
+    },
+    
+    disputedAt: {
+      type: Date,
+    },
+    
+    disputedBy: {
+      type: String,
+      enum: ["teacher", "student"],
+    },
   notes: {
     type: String,
     default: ""
@@ -54,6 +88,22 @@ const bookingSchema = new mongoose.Schema({
     type: String,
     default: ""
   },
+  // Add these new fields to your Booking schema
+disputeResolution: {
+  type: String,
+  enum: ['approved_teacher', 'approved_student'],
+},
+disputeResolvedBy: {
+  type: mongoose.Schema.Types.ObjectId,
+  ref: 'Admin'
+},
+disputeResolvedAt: {
+  type: Date
+},
+adminNotes: {
+  type: String,
+  default: ''
+},
   completedAt: Date,
   cancelledAt: Date
 }, { 

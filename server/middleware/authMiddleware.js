@@ -164,3 +164,7 @@ export const verifyOwnership = (paramName = 'id') => {
     next();
   };
 };
+export const protect = verifyToken;
+export const adminOnly = verifyAdmin;
+export const teacherOnly = verifyTeacher;
+export const studentOnly = verifyStudent;

@@ -29,6 +29,12 @@ const teacherSchema = new mongoose.Schema({
     enum: ["Africa", "Europe", "Asia"],
     required: true,
   },
+
+   googleMeetLink: {
+    type: String,
+    default: "",
+    trim: true
+  },
   
   // Password reset fields
   resetPasswordToken: String,

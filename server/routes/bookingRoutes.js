@@ -1,4 +1,4 @@
-// server/routes/bookingRoutes.js - ENHANCED BOOKING COMPLETION WITH PAYMENT TRACKING
+// server/routes/bookingRoutes.js 
 import express from "express";
 import mongoose from "mongoose";
 import Booking from "../models/Booking.js";
@@ -11,13 +11,13 @@ const router = express.Router();
 
 /**
  * PATCH /api/bookings/:id/complete
- * ✅ ENHANCED: Mark booking as completed, reduce student classes, AND update teacher earnings
+ * Teacher marks class as complete (pending student confirmation)
  */
 router.patch("/:id/complete", verifyToken, async (req, res) => {
   try {
     const booking = await Booking.findById(req.params.id)
-      .populate("teacherId", "firstName lastName email ratePerClass lessonsCompleted earned")
-      .populate("studentId", "firstName surname email noOfClasses");
+      .populate("teacherId", "firstName lastName email")
+      .populate("studentId", "firstName surname email");
     
     if (!booking) {
       return res.status(404).json({ message: "Booking not found" });
@@ -30,43 +30,92 @@ router.patch("/:id/complete", verifyToken, async (req, res) => {
       });
     }
 
-    // Start a transaction session for data consistency
+    // 🆕 Set to pending_confirmation instead of completed
+    booking.status = "pending_confirmation";
+    booking.pendingConfirmation = true;
+    booking.teacherConfirmedAt = new Date();
+    
+    // 🆕 Set auto-confirm time (5 HOURS from now)
+    const autoConfirmTime = new Date();
+    autoConfirmTime.setHours(autoConfirmTime.getHours() + 5); // ✅ CHANGED FROM 24 TO 5 HOURS
+    booking.autoConfirmAt = autoConfirmTime;
+    
+    await booking.save();
+
+    console.log(`✅ Class marked as pending confirmation. Auto-confirm at: ${autoConfirmTime}`);
+
+    res.json({
+      success: true,
+      message: "Class marked complete. Waiting for student confirmation.",
+      booking: booking,
+      autoConfirmAt: autoConfirmTime
+    });
+
+  } catch (err) {
+    console.error("❌ Error completing booking:", err);
+    res.status(500).json({ 
+      message: "Error completing booking",
+      error: err.message 
+    });
+  }
+});
+
+/**
+ * PATCH /api/bookings/:id/student-confirm
+ * Student confirms class completion
+ */
+router.patch("/:id/student-confirm", verifyToken, async (req, res) => {
+  try {
+    const booking = await Booking.findById(req.params.id)
+      .populate("teacherId", "firstName lastName ratePerClass earned lessonsCompleted")
+      .populate("studentId", "firstName surname noOfClasses");
+    
+    if (!booking) {
+      return res.status(404).json({ message: "Booking not found" });
+    }
+
+    if (booking.status !== "pending_confirmation") {
+      return res.status(400).json({ 
+        message: "This class is not pending confirmation" 
+      });
+    }
+
+    // Verify the student confirming is the correct student
+    if (booking.studentId._id.toString() !== req.user.id && req.user.role !== "admin") {
+      return res.status(403).json({ message: "Unauthorized" });
+    }
+
+    // Start transaction for atomic updates
     const session = await mongoose.startSession();
     session.startTransaction();
 
     try {
-      // 1. Update booking status
+      // ✅ FINALIZE COMPLETION
       booking.status = "completed";
       booking.completedAt = new Date();
+      booking.studentConfirmedAt = new Date();
+      booking.pendingConfirmation = false;
       await booking.save({ session });
 
-      // 2. Reduce student's noOfClasses by 1
+      // ✅ Reduce student's noOfClasses
       const student = await Student.findById(booking.studentId._id).session(session);
-      
       if (student && student.noOfClasses > 0) {
         student.noOfClasses -= 1;
         await student.save({ session });
-        console.log(`✅ Reduced student ${student.firstName} ${student.surname}'s classes: ${student.noOfClasses + 1} → ${student.noOfClasses}`);
-      } else if (student && student.noOfClasses === 0) {
-        console.warn(`⚠️ Student ${student.firstName} ${student.surname} has 0 classes remaining`);
+        console.log(`✅ Reduced student classes: ${student.noOfClasses + 1} → ${student.noOfClasses}`);
       }
 
-      // 3. 🔥 UPDATE TEACHER EARNINGS
+      // ✅ Update teacher earnings
       const teacher = await Teacher.findById(booking.teacherId._id).session(session);
-      
       if (teacher) {
         const ratePerClass = parseFloat(teacher.ratePerClass || 0);
-        
-        // Update teacher's earnings and lessons completed
         teacher.lessonsCompleted = (teacher.lessonsCompleted || 0) + 1;
         teacher.earned = (teacher.earned || 0) + ratePerClass;
         await teacher.save({ session });
+        
+        console.log(`💰 Teacher earnings updated: $${teacher.earned.toFixed(2)}`);
 
-        console.log(`💰 Updated teacher ${teacher.firstName} ${teacher.lastName}'s earnings:`);
-        console.log(`   Lessons Completed: ${teacher.lessonsCompleted - 1} → ${teacher.lessonsCompleted}`);
-        console.log(`   Earned: $${(teacher.earned - ratePerClass).toFixed(2)} → $${teacher.earned.toFixed(2)}`);
-
-        // 4. 🔥 CREATE PAYMENT TRANSACTION RECORD
+        // ✅ Create payment transaction
         const paymentTransaction = new PaymentTransaction({
           teacherId: teacher._id,
           bookingId: booking._id,
@@ -78,30 +127,20 @@ router.patch("/:id/complete", verifyToken, async (req, res) => {
           studentName: `${booking.studentId.firstName} ${booking.studentId.surname}`,
           completedAt: booking.completedAt
         });
-
         await paymentTransaction.save({ session });
-        console.log(`📝 Created payment transaction: ${paymentTransaction._id}`);
       }
 
-      // Commit the transaction
       await session.commitTransaction();
-
-      // Return updated data
-      const updatedBooking = await Booking.findById(booking._id)
-        .populate("teacherId", "firstName lastName email ratePerClass lessonsCompleted earned")
-        .populate("studentId", "firstName surname email noOfClasses");
+      
+      console.log(`✅ Class ${booking._id} confirmed by student and completed`);
 
       res.json({
         success: true,
-        message: "Class completed successfully! Teacher earnings updated.",
-        booking: updatedBooking,
-        studentClassesRemaining: updatedBooking.studentId.noOfClasses,
-        teacherEarned: updatedBooking.teacherId.earned,
-        teacherLessonsCompleted: updatedBooking.teacherId.lessonsCompleted
+        message: "Class confirmed successfully",
+        booking: booking
       });
 
     } catch (error) {
-      // Rollback transaction on error
       await session.abortTransaction();
       throw error;
     } finally {
@@ -109,9 +148,167 @@ router.patch("/:id/complete", verifyToken, async (req, res) => {
     }
 
   } catch (err) {
-    console.error("❌ Error completing booking:", err);
+    console.error("❌ Error confirming booking:", err);
     res.status(500).json({ 
-      message: "Error completing booking",
+      message: "Error confirming booking",
+      error: err.message 
+    });
+  }
+});
+
+/**
+ * PATCH /api/bookings/:id/dispute
+ * Student reports an issue with class completion
+ */
+router.patch("/:id/dispute", verifyToken, async (req, res) => {
+  try {
+    const { reason } = req.body;
+    
+    if (!reason || reason.trim() === "") {
+      return res.status(400).json({ message: "Dispute reason is required" });
+    }
+
+    const booking = await Booking.findById(req.params.id)
+      .populate("teacherId", "firstName lastName email")
+      .populate("studentId", "firstName surname email");
+    
+    if (!booking) {
+      return res.status(404).json({ message: "Booking not found" });
+    }
+
+    if (booking.status !== "pending_confirmation") {
+      return res.status(400).json({ 
+        message: "This class is not pending confirmation" 
+      });
+    }
+
+    // Verify the student disputing is the correct student
+    if (booking.studentId._id.toString() !== req.user.id && req.user.role !== "admin") {
+      return res.status(403).json({ message: "Unauthorized" });
+    }
+
+    // Mark as disputed
+    booking.status = "disputed";
+    booking.disputed = true;
+    booking.disputeReason = reason;
+    booking.disputedAt = new Date();
+    booking.disputedBy = "student";
+    booking.pendingConfirmation = false;
+    
+    await booking.save();
+
+    console.log(`⚠️ Class ${booking._id} disputed by student: ${reason}`);
+
+    res.json({
+      success: true,
+      message: "Dispute reported. Admin will review.",
+      booking: booking
+    });
+
+  } catch (err) {
+    console.error("❌ Error disputing booking:", err);
+    res.status(500).json({ 
+      message: "Error reporting dispute",
+      error: err.message 
+    });
+  }
+});
+
+/**
+ * POST /api/bookings/auto-confirm
+ * Auto-confirm classes after 5 hours (called by cron job)
+ */
+router.post("/auto-confirm", verifyToken, async (req, res) => {
+  try {
+    const now = new Date();
+    
+    // Find all bookings pending confirmation where autoConfirmAt has passed
+    const bookingsToConfirm = await Booking.find({
+      status: "pending_confirmation",
+      autoConfirmAt: { $lte: now }
+    })
+    .populate("teacherId", "firstName lastName ratePerClass earned lessonsCompleted")
+    .populate("studentId", "firstName surname noOfClasses");
+
+    console.log(`🔄 Auto-confirming ${bookingsToConfirm.length} classes...`);
+
+    const results = [];
+
+    for (const booking of bookingsToConfirm) {
+      const session = await mongoose.startSession();
+      session.startTransaction();
+
+      try {
+        // Mark as completed
+        booking.status = "completed";
+        booking.completedAt = new Date();
+        booking.studentConfirmedAt = new Date(); // Auto-confirmed
+        booking.pendingConfirmation = false;
+        await booking.save({ session });
+
+        // Reduce student's classes
+        const student = await Student.findById(booking.studentId._id).session(session);
+        if (student && student.noOfClasses > 0) {
+          student.noOfClasses -= 1;
+          await student.save({ session });
+        }
+
+        // Update teacher earnings
+        const teacher = await Teacher.findById(booking.teacherId._id).session(session);
+        if (teacher) {
+          const ratePerClass = parseFloat(teacher.ratePerClass || 0);
+          teacher.lessonsCompleted = (teacher.lessonsCompleted || 0) + 1;
+          teacher.earned = (teacher.earned || 0) + ratePerClass;
+          await teacher.save({ session });
+
+          // Create payment transaction
+          const paymentTransaction = new PaymentTransaction({
+            teacherId: teacher._id,
+            bookingId: booking._id,
+            amount: ratePerClass,
+            type: "class_completion",
+            status: "pending",
+            description: `Payment for auto-confirmed class: ${booking.classTitle}`,
+            classTitle: booking.classTitle,
+            studentName: `${booking.studentId.firstName} ${booking.studentId.surname}`,
+            completedAt: booking.completedAt
+          });
+          await paymentTransaction.save({ session });
+        }
+
+        await session.commitTransaction();
+        
+        results.push({
+          bookingId: booking._id,
+          status: "auto-confirmed"
+        });
+
+        console.log(`✅ Auto-confirmed class ${booking._id}`);
+
+      } catch (error) {
+        await session.abortTransaction();
+        console.error(`❌ Error auto-confirming ${booking._id}:`, error);
+        
+        results.push({
+          bookingId: booking._id,
+          status: "error",
+          error: error.message
+        });
+      } finally {
+        session.endSession();
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `Auto-confirmed ${results.filter(r => r.status === "auto-confirmed").length} classes`,
+      results: results
+    });
+
+  } catch (err) {
+    console.error("❌ Error in auto-confirm:", err);
+    res.status(500).json({ 
+      message: "Error auto-confirming bookings",
       error: err.message 
     });
   }
@@ -174,6 +371,30 @@ router.get("/student/:studentId", verifyToken, async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Error fetching student bookings" });
+  }
+});
+
+/**
+ * GET /api/bookings/:id
+ * Get single booking by ID
+ */
+router.get("/:id", verifyToken, async (req, res) => {
+  try {
+    const booking = await Booking.findById(req.params.id)
+      .populate("teacherId", "firstName lastName email googleMeetLink") 
+      .populate("studentId", "firstName surname email");
+
+    if (!booking) {
+      return res.status(404).json({ message: "Booking not found" });
+    }
+
+    res.json({
+      success: true,
+      booking
+    });
+  } catch (err) {
+    console.error("Error fetching booking:", err);
+    res.status(500).json({ message: "Error fetching booking" });
   }
 });
 

@@ -47,9 +47,13 @@ import { initializeSocket } from './socketServer.js';
 import classroomRoutes from "./routes/classroomRoutes.js";
 import groupChatRoutes from "./routes/groupChatRoutes.js";
 import paymentTransactionRoutes from "./routes/paymentTransactionRoutes.js";
+import { startAutoConfirmJob } from './jobs/autoConfirmClasses.js';
+import disputeRoutes from './routes/disputeRoutes.js';
 
 const app = express();
 const httpServer = http.createServer(app); // 👈 CHANGE: Wrap app with http.createServer
+
+
 
 // Initialize Socket.IO 👈 ADD THIS
 const io = initializeSocket(httpServer);
@@ -95,6 +99,7 @@ app.use("/api/classroom", realtimeLimiter);
 app.use("/api/agora", realtimeLimiter);
 
 app.use("/api/group-chats", pollingLimiter);
+
 
 // MongoDB connection
 mongoose
@@ -142,6 +147,7 @@ app.use("/api/teachers", teacherAssignmentRoutes);
 app.use("/api/classroom", classroomRoutes);
 app.use("/api/group-chats", groupChatRoutes);
 app.use("/api/payments", paymentTransactionRoutes);
+app.use('/api/disputes', disputeRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
@@ -154,5 +160,6 @@ const PORT = process.env.PORT || 5000;
 // 👇 CHANGE: Use httpServer.listen instead of app.listen
 httpServer.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
-  console.log(`🔌 Socket.IO initialized for whiteboard sharing`); // 👈 ADD THIS
+  console.log(`🔌 Socket.IO initialized for whiteboard sharing`);
+  startAutoConfirmJob();
 });

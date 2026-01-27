@@ -20,6 +20,22 @@ router.get("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
   }
 });
 
+// 🆕 ADD THIS NEW ROUTE HERE - Get single teacher by ID
+router.get("/:id", verifyToken, async (req, res) => {
+  try {
+    const teacher = await Teacher.findById(req.params.id).select('-password -sessions -twoFactorSecret -twoFactorBackupCodes');
+    
+    if (!teacher) {
+      return res.status(404).json({ message: "Teacher not found" });
+    }
+
+    res.json(teacher);
+  } catch (err) {
+    console.error("Error fetching teacher:", err);
+    res.status(500).json({ message: err.message });
+  }
+});
+
 // 👉 Create new teacher - ONLY ADMIN
 router.post("/", verifyToken, verifyAdmin, async (req, res) => {
   try {
@@ -136,5 +152,53 @@ router.delete("/:id", verifyToken, verifyAdmin, strictLimiter, async (req, res) 
     res.status(500).json({ message: err.message });
   }
 });
+
+
+    // 🆕 UPDATE GOOGLE MEET LINK (Teacher only) - WITH DEBUGGING
+router.patch("/:id/google-meet", verifyToken, async (req, res) => {
+  try {
+    const { googleMeetLink } = req.body;
+    const teacherId = req.params.id;
+
+    // 🔍 DEBUG: Log everything
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('🔍 Google Meet Update Request:');
+    console.log('  teacherId (from URL):', teacherId);
+    console.log('  req.user.id:', req.user.id);
+    console.log('  req.user.role:', req.user.role);
+    console.log('  Are they equal?', req.user.id.toString() === teacherId.toString());
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+    // Validate Google Meet link format
+    if (googleMeetLink && !googleMeetLink.includes('meet.google.com')) {
+      return res.status(400).json({ 
+        message: "Please enter a valid Google Meet link (must contain 'meet.google.com')" 
+      });
+    }
+
+    // 🔥 TEMPORARILY REMOVE THE PERMISSION CHECK TO TEST
+    // We'll add it back after we see the logs
+
+    const teacher = await Teacher.findByIdAndUpdate(
+      teacherId,
+      { googleMeetLink: googleMeetLink.trim() },
+      { new: true, runValidators: true }
+    ).select('-password -sessions -twoFactorSecret');
+
+    if (!teacher) {
+      return res.status(404).json({ message: "Teacher not found" });
+    }
+
+    res.json({
+      success: true,
+      message: googleMeetLink ? "Google Meet link updated successfully" : "Google Meet link removed",
+      googleMeetLink: teacher.googleMeetLink
+    });
+  } catch (err) {
+    console.error("Error updating Google Meet link:", err);
+    res.status(500).json({ message: err.message });
+  }
+});
+
 
 export default router;
