@@ -10,6 +10,22 @@ import { strictLimiter } from "../middleware/rateLimiter.js";
 
 const router = express.Router();
 
+// 👉 Get single teacher by ID
+router.get("/:id", verifyToken, async (req, res) => {
+  try {
+    const teacher = await Teacher.findById(req.params.id).select("-password");
+    
+    if (!teacher) {
+      return res.status(404).json({ message: "Teacher not found" });
+    }
+    
+    res.json(teacher);
+  } catch (err) {
+    console.error("Error fetching teacher:", err);
+    res.status(500).json({ message: "Error fetching teacher data" });
+  }
+});
+
 // 👉 Get all teachers - Admin and Teachers can view
 router.get("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
   try {

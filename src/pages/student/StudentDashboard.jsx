@@ -3,13 +3,14 @@ import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
   Settings, Search, Download, ChevronLeft, ChevronRight, Calendar, Clock, User,
-  Award, Trophy, Star, TrendingUp, Share2, Bell, Sun, MessageCircle, Moon, X, Check
+  Award, Trophy, Star, TrendingUp, Share2, Bell, Sun, MessageCircle, Moon, X, Check, AlertTriangle
 } from "lucide-react";
 import Confetti from 'react-confetti';
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, 
   Tooltip as RechartsTooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell
 } from 'recharts';
+import api from "../../api";
 import Header from "./components/Header";
 import WelcomeSection from "./components/WelcomeSection";
 import ActiveClasses from "./components/ActiveClasses";
@@ -23,8 +24,10 @@ import SettingsSidebar from "../../components/SettingsSidebar";
 import SettingsModal from "../../components/SettingsModal";
 import Classroom from "../Classroom";
 import MessagesTab from "../../components/chat/MessagesTab";
+import ClassConfirmation from '../../components/student/ClassConfirmation';
 import jsPDF from "jspdf";
 import "jspdf-autotable";
+
 
 // Import booking service to fetch real data
 import { getStudentBookings } from "../../services/bookingService";
@@ -85,6 +88,11 @@ export default function StudentDashboard() {
   //const [activeClassroom, setActiveClassroom] = useState(null);
   const [isClassroomOpen, setIsClassroomOpen] = useState(false);
   const [activeClass, setActiveClass] = useState(null);
+
+  //Student class confirmation
+const [pendingConfirmations, setPendingConfirmations] = useState([]);
+const [showConfirmationModal, setShowConfirmationModal] = useState(false);
+const [selectedConfirmation, setSelectedConfirmation] = useState(null);
   
   // Get student info with proper full name
   const [student, setStudent] = useState(() => {
@@ -174,7 +182,24 @@ export default function StudentDashboard() {
     }
   }, [notificationsEnabled, notificationPermission, upcomingClasses]);
 
-// ✅ FIXED fetchStudentData FUNCTION FOR StudentDashboard.jsx
+  const getTimeRemaining = (autoConfirmAt) => {
+    if (!autoConfirmAt) return "Unknown";
+    const now = new Date();
+    const confirmTime = new Date(autoConfirmAt);
+    const diff = confirmTime - now;
+    
+    if (diff <= 0) return "Expired";
+    
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    
+    if (hours > 0) {
+      return `${hours}h ${minutes}m`;
+    }
+    return `${minutes}m`;
+  };
+
+
 // This ensures bookingId is ALWAYS present when joining a class
 
 const fetchStudentData = async () => {
@@ -188,13 +213,39 @@ const fetchStudentData = async () => {
       return;
     }
 
-    // Fetch bookings from API
-    const acceptedBookings = await getStudentBookings(studentId, "accepted");
-    const completedBookings = await getStudentBookings(studentId, "completed");
+    // ✅ FETCH ALL BOOKING TYPES (DO THIS ONCE!)
+    const [acceptedBookings, completedBookings, pendingConfirmationBookings] = await Promise.all([
+      getStudentBookings(studentId, "accepted"),
+      getStudentBookings(studentId, "completed"),
+      getStudentBookings(studentId, "pending_confirmation")
+    ]);
+
+    console.log(`📊 Fetched bookings:`, {
+      accepted: acceptedBookings.length,
+      completed: completedBookings.length,
+      pendingConfirmation: pendingConfirmationBookings.length
+    });
 
     const now = new Date();
     const active = [];
     const upcoming = [];
+
+    // ✅ PROCESS PENDING CONFIRMATIONS (use pendingConfirmationBookings from Promise.all)
+    const formattedPendingConfirmations = pendingConfirmationBookings.map(booking => ({
+      id: booking._id,
+      bookingId: booking._id,
+      title: booking.classTitle,
+      teacher: `${booking.teacherId.firstName} ${booking.teacherId.lastName}`,
+      teacherId: booking.teacherId._id,
+      scheduledTime: booking.scheduledTime,
+      duration: booking.duration,
+      teacherConfirmedAt: booking.teacherConfirmedAt,
+      autoConfirmAt: booking.autoConfirmAt,
+      topic: booking.topic || "English Lesson"
+    }));
+
+    setPendingConfirmations(formattedPendingConfirmations);
+    console.log('📋 Pending confirmations set:', formattedPendingConfirmations.length);
 
     // Process accepted bookings
     acceptedBookings.forEach((booking) => {
@@ -202,7 +253,6 @@ const fetchStudentData = async () => {
       const timeDiff = scheduledDate - now;
 
       const completeClassData = {
-
         id: booking._id,
         bookingId: booking._id,
         title: booking.classTitle,
@@ -211,15 +261,14 @@ const fetchStudentData = async () => {
         topic: booking.topic || "English Lesson",
         scheduledTime: booking.scheduledTime,
         scheduledDate: scheduledDate,
-        duration: booking.duration,  // ✅ NO FALLBACK
+        duration: booking.duration,
         notes: booking.notes || ""
       };
 
-
-// ✅ Add validation AFTER creating the object
+      // ✅ Validation
       if (!completeClassData.duration) {
         console.warn(`⚠️ Booking ${booking._id} has no duration! Using 30 as emergency fallback.`);
-        completeClassData.duration = 30;  // Better fallback than 60
+        completeClassData.duration = 30;
       }
 
       // Log for debugging
@@ -232,7 +281,7 @@ const fetchStudentData = async () => {
       // Active/Live classes (starting within 15 minutes or currently happening)
       if (timeDiff < 900000 && timeDiff > -(booking.duration * 60 * 1000)) {
         active.push({
-          ...completeClassData,           // ✅ Spread all the complete data
+          ...completeClassData,
           time: scheduledDate.toLocaleTimeString('en-US', { 
             hour: 'numeric', 
             minute: '2-digit',
@@ -285,7 +334,7 @@ const fetchStudentData = async () => {
       const scheduledDate = new Date(booking.scheduledTime);
       return {
         id: booking._id,
-        bookingId: booking._id,           // ✅ EXPLICIT: Add bookingId here too
+        bookingId: booking._id,
         title: booking.classTitle,
         teacher: `${booking.teacherId.firstName} ${booking.teacherId.lastName}`,
         topic: booking.topic || "Completed Lesson",
@@ -300,11 +349,12 @@ const fetchStudentData = async () => {
           minute: '2-digit',
           hour12: true
         }),
-        duration: booking.duration || 60, // ✅ EXPLICIT: Ensure duration
+        duration: booking.duration || 60,
         notes: booking.notes || "",
         status: "completed"
       };
     });
+
 
     // ✅ Debug logs to verify data structure
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
@@ -774,61 +824,60 @@ const fetchStudentData = async () => {
     showToast("Password changed successfully!");
   };
 
- 
-
-const handleJoinClass = (classData) => {
+  const handleJoinClass = async (classItem) => {
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   console.log('🎓 STUDENT JOINING CLASS');
-  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-  console.log('📋 Full classData received:', classData);
-  console.log('📊 Key fields:');
-  console.log('  - id:', classData.id);
-  console.log('  - bookingId:', classData.bookingId);
-  console.log('  - title:', classData.title);
-  console.log('  - duration:', classData.duration);  // ← SHOULD SHOW 45, NOT 60!
-  console.log('  - topic:', classData.topic);
+  console.log('📋 classItem received:', classItem);
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   
-  // ✅ Ensure we always have a valid bookingId
-  const finalBookingId = classData.bookingId || classData.id;
-  const finalDuration = classData.duration;  // ✅ NO FALLBACK!
-  
-  if (!finalBookingId) {
-    console.error('❌ ERROR: No bookingId found!');
-    showToast('Cannot join class: Missing booking ID', 'error');
-    return;
+  try {
+    const bookingId = classItem.bookingId || classItem.id;
+    
+    if (!bookingId) {
+      console.error('❌ ERROR: No bookingId found!');
+      showToast('Cannot join class: Missing booking ID', 'error');
+      return;
+    }
+    
+    console.log('📥 Fetching booking details for:', bookingId);
+    
+    const { data: bookingData } = await api.get(`/api/bookings/${bookingId}`);
+    const teacherGoogleMeetLink = bookingData.booking?.teacherId?.googleMeetLink || '';
+    
+    console.log('🔗 Teacher Google Meet Link:', teacherGoogleMeetLink);
+    
+    const classroomData = {
+      id: bookingId,
+      bookingId: bookingId,
+      title: classItem.title || "Class",
+      topic: classItem.topic || "English Lesson",
+      duration: classItem.duration,
+      teacherGoogleMeetLink: teacherGoogleMeetLink
+    };
+    
+    console.log('🚀 Navigating to classroom with data:', classroomData);
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    
+    navigate("/classroom", { 
+      state: { 
+        classData: classroomData, 
+        userRole: "student" 
+      } 
+    });
+    
+  } catch (err) {
+    console.error('❌ Error joining class:', err);
+    showToast('Failed to join class. Please try again.', 'error');
   }
-  
-  if (!finalDuration) {
-    console.error('❌ ERROR: No duration found!');
-    showToast('Cannot join class: Missing duration', 'error');
-    return;
-  }
-  
-  console.log('✅ Using bookingId:', finalBookingId);
-  console.log('✅ Using duration:', finalDuration, 'minutes');  // ← CONFIRM HERE
-  
-  const classroomData = {
-    id: finalBookingId,
-    bookingId: finalBookingId,
-    title: classData.title || "Class",
-    topic: classData.topic || "English Lesson",
-    duration: finalDuration  // ✅ This should be 45, not 60!
-  };
-  
-  console.log('🚀 Setting classroom data:', classroomData);
-  console.log('📺 Expected channel name: class-' + finalBookingId);
-  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-  
-  setActiveClass(classroomData);
-  setIsClassroomOpen(true);
 };
 
   const handleLeaveClassroom = () => {
   setIsClassroomOpen(false);
   setActiveClass(null);  
   fetchStudentData();
-};
+  };
+
+
 
   const handleEnrollClass = (classId) => {
     showToast("Enrollment feature coming soon!");
@@ -907,67 +956,108 @@ const handleJoinClass = (classData) => {
         onManageSessions={() => setShowSessionManagement(true)}
       />
 
-      {/* Navigation Tabs */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
-        <div className={`flex gap-4 border-b ${isDarkMode ? 'border-gray-700' : 'border-gray-200'} mb-6 overflow-x-auto`}>
-          <button
-            onClick={() => setActiveTab("dashboard")}
-            className={`px-6 py-3 font-semibold transition-all whitespace-nowrap ${
-              activeTab === "dashboard"
-                ? `${isDarkMode ? 'text-blue-400 border-blue-400' : 'text-blue-600 border-blue-600'} border-b-2`
-                : `${isDarkMode ? 'text-gray-300 hover:text-blue-400' : 'text-gray-600 hover:text-blue-600'}`
-            }`}
-          >
-            Dashboard
-          </button>
-          <button
-            onClick={() => setActiveTab("completed-classes")}
-            className={`px-6 py-3 font-semibold transition-all whitespace-nowrap ${
-              activeTab === "completed-classes"
-                ? `${isDarkMode ? 'text-blue-400 border-blue-400' : 'text-blue-600 border-blue-600'} border-b-2`
-                : `${isDarkMode ? 'text-gray-300 hover:text-blue-400' : 'text-gray-600 hover:text-blue-600'}`
-            }`}
-          >
-            Completed Classes ({completedClasses.length})
-          </button>
-          
-          <button
-            onClick={() => setActiveTab("badges")}
-            className={`px-6 py-3 font-semibold transition-all flex items-center gap-2 whitespace-nowrap ${
-              activeTab === "badges"
-                ? `${isDarkMode ? 'text-blue-400 border-blue-400' : 'text-blue-600 border-blue-600'} border-b-2`
-                : `${isDarkMode ? 'text-gray-300 hover:text-blue-400' : 'text-gray-600 hover:text-blue-600'}`
-            }`}
-          >
-            <Award className="w-5 h-5" />
-            Badges ({badges.length}/{BADGE_DEFINITIONS.length})
-          </button>
-          
-          <button
-            onClick={() => setActiveTab("charts")}
-            className={`px-6 py-3 font-semibold transition-all flex items-center gap-2 whitespace-nowrap ${
-              activeTab === "charts"
-                ? `${isDarkMode ? 'text-blue-400 border-blue-400' : 'text-blue-600 border-blue-600'} border-b-2`
-                : `${isDarkMode ? 'text-gray-300 hover:text-blue-400' : 'text-gray-600 hover:text-blue-600'}`
-            }`}
-          >
-            <TrendingUp className="w-5 h-5" />
-            Progress Charts
-          </button>
-        </div>
-      </div>
 
-      <button
-          onClick={() => setActiveTab("messages")}
-          className={`px-6 py-3 font-semibold transition-all flex items-center gap-2 whitespace-nowrap ${
-            activeTab === "messages"
-              ? `${isDarkMode ? 'text-blue-400 border-blue-400' : 'text-blue-600 border-blue-600'} border-b-2`
-              : `${isDarkMode ? 'text-gray-300 hover:text-blue-400' : 'text-gray-600 hover:text-blue-600'}`
-          }`}
-        >
-          <MessageCircle className="w-5 h-5" />
-          Messages
-        </button>
+      {/* 🆕 PENDING CONFIRMATIONS BANNER */}
+      {pendingConfirmations.length > 0 && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4">
+          {pendingConfirmations.map(confirmation => (
+            <div 
+              key={confirmation.id}
+              className={`${isDarkMode ? 'bg-yellow-900/30 border-yellow-800' : 'bg-yellow-50 border-yellow-200'} border-2 rounded-2xl p-4 mb-4`}
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-2">
+                    <AlertTriangle className={`w-5 h-5 ${isDarkMode ? 'text-yellow-400' : 'text-yellow-600'}`} />
+                    <h3 className={`font-bold ${isDarkMode ? 'text-yellow-400' : 'text-yellow-800'}`}>
+                      Class Completion Confirmation Required
+                    </h3>
+                  </div>
+                  <p className={`text-sm ${isDarkMode ? 'text-yellow-500' : 'text-yellow-700'} mb-2`}>
+                    Your teacher marked <strong>"{confirmation.title}"</strong> as complete. Please confirm attendance.
+                  </p>
+                  <p className={`text-xs ${isDarkMode ? 'text-yellow-600' : 'text-yellow-600'}`}>
+                    Auto-confirms in: <strong>{getTimeRemaining(confirmation.autoConfirmAt)}</strong>
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setSelectedConfirmation(confirmation);
+                    setShowConfirmationModal(true);
+                  }}
+                  className={`px-4 py-2 ${isDarkMode ? 'bg-yellow-700 hover:bg-yellow-600' : 'bg-yellow-500 hover:bg-yellow-600'} text-white rounded-lg font-medium transition-all whitespace-nowrap`}
+                >
+                  Review Class
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Navigation Tabs */}
+<div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
+  <div className={`flex gap-4 border-b ${isDarkMode ? 'border-gray-700' : 'border-gray-200'} mb-6 overflow-x-auto`}>
+    <button
+      onClick={() => setActiveTab("dashboard")}
+      className={`px-6 py-3 font-semibold transition-all whitespace-nowrap ${
+        activeTab === "dashboard"
+          ? `${isDarkMode ? 'text-blue-400 border-blue-400' : 'text-blue-600 border-blue-600'} border-b-2`
+          : `${isDarkMode ? 'text-gray-300 hover:text-blue-400' : 'text-gray-600 hover:text-blue-600'}`
+      }`}
+    >
+      Dashboard
+    </button>
+    
+    <button
+      onClick={() => setActiveTab("completed-classes")}
+      className={`px-6 py-3 font-semibold transition-all whitespace-nowrap ${
+        activeTab === "completed-classes"
+          ? `${isDarkMode ? 'text-blue-400 border-blue-400' : 'text-blue-600 border-blue-600'} border-b-2`
+          : `${isDarkMode ? 'text-gray-300 hover:text-blue-400' : 'text-gray-600 hover:text-blue-600'}`
+      }`}
+    >
+      Completed Classes ({completedClasses.length})
+    </button>
+    
+    <button
+      onClick={() => setActiveTab("badges")}
+      className={`px-6 py-3 font-semibold transition-all flex items-center gap-2 whitespace-nowrap ${
+        activeTab === "badges"
+          ? `${isDarkMode ? 'text-blue-400 border-blue-400' : 'text-blue-600 border-blue-600'} border-b-2`
+          : `${isDarkMode ? 'text-gray-300 hover:text-blue-400' : 'text-gray-600 hover:text-blue-600'}`
+      }`}
+    >
+      <Award className="w-5 h-5" />
+      Badges ({badges.length}/{BADGE_DEFINITIONS.length})
+    </button>
+    
+    <button
+      onClick={() => setActiveTab("charts")}
+      className={`px-6 py-3 font-semibold transition-all flex items-center gap-2 whitespace-nowrap ${
+        activeTab === "charts"
+          ? `${isDarkMode ? 'text-blue-400 border-blue-400' : 'text-blue-600 border-blue-600'} border-b-2`
+          : `${isDarkMode ? 'text-gray-300 hover:text-blue-400' : 'text-gray-600 hover:text-blue-600'}`
+      }`}
+    >
+      <TrendingUp className="w-5 h-5" />
+      Progress Charts
+    </button>
+    
+    {/* 🆕 MOVED INSIDE - Messages Tab */}
+    <button
+      onClick={() => setActiveTab("messages")}
+      className={`px-6 py-3 font-semibold transition-all flex items-center gap-2 whitespace-nowrap ${
+        activeTab === "messages"
+          ? `${isDarkMode ? 'text-blue-400 border-blue-400' : 'text-blue-600 border-blue-600'} border-b-2`
+          : `${isDarkMode ? 'text-gray-300 hover:text-blue-400' : 'text-gray-600 hover:text-blue-600'}`
+      }`}
+    >
+      <MessageCircle className="w-5 h-5" />
+      Messages
+    </button>
+  </div>
+</div>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8">
         {/* Dashboard Tab */}
@@ -1533,6 +1623,32 @@ const handleJoinClass = (classData) => {
           userType="student"
         />
       )}
+
+
+      {/* 🆕 CLASS CONFIRMATION MODAL */}
+      {showConfirmationModal && selectedConfirmation && (
+        <ClassConfirmation
+          booking={selectedConfirmation}
+          onConfirm={() => {
+            setShowConfirmationModal(false);
+            setSelectedConfirmation(null);
+            showToast('Class confirmed successfully!');
+            fetchStudentData(); // Refresh data
+          }}
+          onDispute={() => {
+            setShowConfirmationModal(false);
+            setSelectedConfirmation(null);
+            showToast('Dispute submitted. Admin will review.');
+            fetchStudentData(); // Refresh data
+          }}
+          onClose={() => {
+            setShowConfirmationModal(false);
+            setSelectedConfirmation(null);
+          }}
+          isDarkMode={isDarkMode}
+        />
+      )}
     </div>
   );
 }
+

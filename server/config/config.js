@@ -35,15 +35,17 @@ export const config = {
   passwordRequireLowercase: true,
   passwordRequireNumbers: true,
   passwordRequireSpecialChars: true,
-  
-  // Email
-  email: {
-    user: process.env.EMAIL_USER,
-    password: process.env.EMAIL_PASSWORD,
-  },
-  
-  // Frontend
-  frontendUrl: process.env.FRONTEND_URL || 'http://localhost:5173',
+
+  // Email configuration
+  emailHost: process.env.EMAIL_HOST || "smtp.gmail.com",
+  emailPort: parseInt(process.env.EMAIL_PORT) || 587,
+  emailUser: process.env.EMAIL_USER,
+  emailPassword: process.env.EMAIL_PASSWORD,
+  emailFrom: process.env.EMAIL_FROM || process.env.EMAIL_USER,
+
+  // App configuration
+  appName: process.env.APP_NAME || "English Learning Platform",
+  frontendUrl: process.env.FRONTEND_URL || "http://localhost:3000",
   
   // CORS
   corsOrigins: process.env.CORS_ORIGINS?.split(',') || [

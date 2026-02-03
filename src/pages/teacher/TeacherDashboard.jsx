@@ -1,7 +1,7 @@
 // src/pages/teacher/TeacherDashboard.jsx - WITH DARK MODE & MESSAGES
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Settings, Plus, MessageCircle } from "lucide-react";
+import { Settings, Plus, MessageCircle, Video } from "lucide-react";
 
 // Layout
 import DashboardHeader from "./components/Layout/DashboardHeader";
@@ -41,6 +41,8 @@ import SettingsModal from "../../components/SettingsModal";
 import MessagesTab from "../../components/chat/MessagesTab";
 
 import PaymentTab from "./tabs/PaymentTab";
+import GoogleMeetSettings from '../../components/GoogleMeetSettings';
+import api from "../../api";
 
 // Services for fetching real data
 import { getAssignedStudents } from "../../services/teacherStudentService";
@@ -78,6 +80,9 @@ export default function TeacherDashboard() {
   const [classes, setClasses] = useState([]);
   const [completedClasses, setCompletedClasses] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [googleMeetLink, setGoogleMeetLink] = useState('');
+  const [showGoogleMeetSettings, setShowGoogleMeetSettings] = useState(false);
+  
 
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -97,10 +102,20 @@ export default function TeacherDashboard() {
       setLoading(true);
       const teacherData = JSON.parse(localStorage.getItem("teacherInfo") || "{}");
       const teacherId = teacherData._id || teacherData.id;
+      setGoogleMeetLink(teacherData.googleMeetLink || '');
+      console.log('✅ Teacher Info Loaded:', teacherData._id);
 
       if (!teacherId) {
         throw new Error("No teacher ID found");
       }
+
+       // 🆕 FETCH TEACHER FROM API TO GET LATEST DATA
+      const { data: apiTeacherData } = await api.get(`/api/teachers/${teacherId}`);
+      setTeacherInfo(apiTeacherData);  // Update with API data
+      setGoogleMeetLink(apiTeacherData.googleMeetLink || '');
+      console.log('✅ Teacher Info Loaded:', apiTeacherData._id);
+
+      
 
       const [studentsData, pendingBookingsData, acceptedBookingsData, completedBookingsData] = await Promise.all([
         getAssignedStudents(teacherId),
@@ -343,57 +358,90 @@ export default function TeacherDashboard() {
   };
 
   const handleAddClass = async (newClass) => {
-    try {
-      if (!newClass.students || newClass.students.length === 0) {
-        showToast("Please select at least one student for the class", "error");
-        return;
-      }
-
-      const teacherId = teacherInfo._id || teacherInfo.id;
-      
-      const localDateTimeString = newClass.time;
-      const scheduledDate = new Date(localDateTimeString);
-      const isoString = scheduledDate.toISOString();
-      
-      console.log("Creating class with details:", {
-        original: localDateTimeString,
-        parsed: scheduledDate,
-        iso: isoString,
-        duration: newClass.duration,
-        durationParsed: parseInt(newClass.duration)
-      });
-      
-      const bookingPromises = newClass.students.map(async (student) => {
-        const bookingData = {
-          teacherId: teacherId,
-          studentId: student.id,
-          classTitle: newClass.title,
-          topic: newClass.topic,
-          scheduledTime: isoString,
-          duration: parseInt(newClass.duration),
-          notes: `Teacher-created class`,
-          createdBy: "teacher"
-        };
-
-        console.log("📤 Sending booking data:", bookingData);
-
-        const booking = await createBooking(bookingData);
-        console.log("✅ Booking created:", booking);
-        
-        return await acceptBooking(booking._id);
-      });
-
-      await Promise.all(bookingPromises);
-      showToast(`Class "${newClass.title}" created successfully for ${newClass.students.length} student(s)!`);
-      
-      await fetchTeacherData();
-      
-    } catch (err) {
-      console.error("Error creating class:", err);
-      console.error("Error details:", err.response?.data);
-      showToast("Failed to create class. Please try again.", "error");
+  try {
+    // Validation
+    if (!newClass.students || newClass.students.length === 0) {
+      showToast("Please select at least one student for the class", "error");
+      return;
     }
-  };
+
+    const teacherId = teacherInfo._id || teacherInfo.id;
+    
+    // Parse and format date
+    const scheduledDate = new Date(newClass.time);
+    const isoString = scheduledDate.toISOString();
+    
+    console.log("Creating class with details:", {
+      teacher: teacherId,
+      students: newClass.students.length,
+      scheduledTime: isoString,
+      duration: parseInt(newClass.duration)
+    });
+    
+    // Create bookings for each student
+    const bookingPromises = newClass.students.map(async (student) => {
+      const bookingData = {
+        teacherId: teacherId,
+        studentId: student.id,
+        classTitle: newClass.title,
+        topic: newClass.topic || "",
+        scheduledTime: isoString,
+        duration: parseInt(newClass.duration),
+        notes: newClass.notes || "Teacher-created class",
+        createdBy: "teacher"
+      };
+
+      console.log("📤 Creating booking for student:", student.name);
+
+      // ✅ CORRECT: POST to /api/bookings
+      const response = await api.post("/api/bookings", bookingData);
+      
+      console.log("✅ Booking created:", response.data.booking._id);
+      
+      // Teacher-created bookings are auto-accepted on backend
+      // But we can still call accept to be safe
+      if (response.data.booking.status === "pending") {
+        return await acceptBooking(response.data.booking._id);
+      }
+      
+      return response.data.booking;
+    });
+
+    // Wait for all bookings to be created
+    const createdBookings = await Promise.all(bookingPromises);
+    
+    console.log(`✅ Created ${createdBookings.length} bookings`);
+    
+    showToast(
+      `Class "${newClass.title}" created successfully for ${newClass.students.length} student(s)!`,
+      "success"
+    );
+    
+    // Refresh teacher data to show new classes
+    await fetchTeacherData();
+    
+  } catch (err) {
+    console.error("❌ Error creating class:", err);
+    
+    // Better error logging
+    if (err.response) {
+      console.error("Response error:", err.response.data);
+      console.error("Status code:", err.response.status);
+    } else if (err.request) {
+      console.error("Request error - no response received");
+      console.error("Is backend running on port 5000?");
+    } else {
+      console.error("Error:", err.message);
+    }
+    
+    // User-friendly error message
+    const errorMessage = err.response?.data?.message 
+      || err.message 
+      || "Failed to create class. Please check your connection and try again.";
+    
+    showToast(errorMessage, "error");
+  }
+};
 
   const showToast = (message, type = "success") => {
     setToast({ message, type });
@@ -472,7 +520,32 @@ export default function TeacherDashboard() {
     setConfirmModal({ open: false, type: null, classId: null });
   };
 
+
   const handleJoinClass = (classItem) => {
+  console.log("🚀 Starting class:", classItem);
+
+  const classroomData = {
+    id: classItem.id || classItem.bookingId,
+    bookingId: classItem.bookingId || classItem.id,
+    title: classItem.title,
+    teacher: `${teacherInfo.firstName} ${teacherInfo.lastName}`,
+    students: classItem.students || [],
+    duration: classItem.duration,
+    scheduledTime: classItem.scheduledTime,
+    teacherGoogleMeetLink: googleMeetLink
+  };
+
+  console.log("📊 Classroom data:", classroomData);
+
+  navigate("/classroom", { 
+    state: { 
+      classData: classroomData, 
+      userRole: "teacher" 
+    } 
+  });
+};
+
+  /*const handleJoinClass = (classItem) => {
     console.log('🔍 Joining class:', classItem);
     
     setActiveClass({
@@ -480,10 +553,11 @@ export default function TeacherDashboard() {
       bookingId: classItem.bookingId || classItem.id,
       title: classItem.title,
       topic: classItem.topic,
-      duration: classItem.duration
+      duration: classItem.duration,
+      
     });
     setIsClassroomOpen(true);
-  };
+  };*/
 
   const handleLeaveClassroom = () => {
     setIsClassroomOpen(false);
@@ -606,17 +680,60 @@ export default function TeacherDashboard() {
           tabs={["dashboard", "classes", "completed-classes", "students", "bookings", "messages", "payment"]}
           isDarkMode={isDarkMode}
         />
+    {activeTab === "dashboard" && (
+  <div className="space-y-6">
+    {/* 🆕 Google Meet Settings - Collapsible */}
+    {teacherInfo?._id && (
+      <div className={`${isDarkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg border ${isDarkMode ? 'border-gray-700' : 'border-gray-200'} overflow-hidden`}>
+        {/* Header with Toggle */}
+        <button
+          onClick={() => setShowGoogleMeetSettings(!showGoogleMeetSettings)}
+          className={`w-full px-6 py-4 flex items-center justify-between ${isDarkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-50'} transition-colors`}
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center">
+              <Video className="w-5 h-5 text-white" />
+            </div>
+            <div className="text-left">
+              <h3 className={`font-bold text-lg ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                Google Meet Link
+              </h3>
+              <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                {googleMeetLink ? 'Link configured ✓' : 'Click to set up your meeting link'}
+              </p>
+            </div>
+          </div>
+          <div className={`transform transition-transform ${showGoogleMeetSettings ? 'rotate-180' : ''}`}>
+            <svg className={`w-5 h-5 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </div>
+        </button>
 
-        {activeTab === "dashboard" && (
-          <div className="space-y-6">
-            <QuickStats
-              stats={{
-                totalStudents: students.length,
-                totalClasses: classes.length,
-                totalBookings: bookings.length,
-              }}
+        {/* Collapsible Content */}
+        {showGoogleMeetSettings && (
+          <div className="px-6 pb-6 border-t border-gray-200 pt-4">
+            <GoogleMeetSettings
+              teacherId={teacherInfo._id}
+              initialLink={googleMeetLink || ''}
+              onUpdate={(newLink) => setGoogleMeetLink(newLink)}
               isDarkMode={isDarkMode}
             />
+          </div>
+        )}
+      </div>
+    )}
+
+    <QuickStats
+      stats={{
+        totalStudents: students.length,
+        totalClasses: classes.length,
+        totalBookings: bookings.length,
+      }}
+      isDarkMode={isDarkMode}
+    />
+
+            
             <LiveClasses 
               classes={classes.filter(c => c.status === "live")} 
               onJoin={handleJoinClass}
@@ -630,7 +747,7 @@ export default function TeacherDashboard() {
               isDarkMode={isDarkMode}
             />
           </div>
-        )}
+     )}
 
         {activeTab === "classes" && (
           <div className="space-y-6">

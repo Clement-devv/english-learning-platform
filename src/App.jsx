@@ -10,6 +10,7 @@ import TeacherLogin from "./pages/teacher/TeacherLogin";
 import ForgotPassword from "./pages/teacher/ForgotPassword";
 import ResetPassword from "./pages/teacher/ResetPassword";
 import ProtectedRoute from "./components/ProtectedRoute";
+import ClassroomProtectedRoute from "./components/ClassroomProtectedRoute";
 
 // Student
 import StudentLogin from "./pages/student/StudentLogin";
@@ -17,6 +18,9 @@ import StudentForgotPassword from "./pages/student/ForgotPassword";
 import StudentResetPassword from "./pages/student/ResetPassword";
 import StudentDashboard from "./pages/student/StudentDashboard";
 import StudentProtectedRoute from "./components/StudentProtectedRoute";
+
+// Classroom
+import Classroom from "./pages/Classroom"; 
 
 // Navigation component
 function NavigationButtons() {
@@ -186,6 +190,18 @@ function App() {
             } 
           />
 
+          {/* Classroom Route - Both Teacher & Student */}
+          <Route
+            path="/classroom"
+            element={
+              <ClassroomProtectedRoute>
+                <Classroom />
+              </ClassroomProtectedRoute>
+            }
+          />
+
+          
+          
           {/* Teacher Routes */}
           <Route path="/teacher/login" element={<TeacherLogin />} />
           <Route path="/teacher/forgot-password" element={<ForgotPassword />} />

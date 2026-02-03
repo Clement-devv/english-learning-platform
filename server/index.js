@@ -1,6 +1,3 @@
-
-
-
 import dotenv from "dotenv";
 dotenv.config();
 console.log("📧 Email configured:", process.env.EMAIL_USER ? "✓" : "✗");
@@ -10,8 +7,6 @@ import mongoose from "mongoose";
 import cors from "cors";
 import http from "http"; 
 
-
-//import { apiLimiter } from "./middleware/rateLimiter.js";
 import { 
   apiLimiter,
   realtimeLimiter,  
@@ -47,11 +42,17 @@ import { initializeSocket } from './socketServer.js';
 import classroomRoutes from "./routes/classroomRoutes.js";
 import groupChatRoutes from "./routes/groupChatRoutes.js";
 import paymentTransactionRoutes from "./routes/paymentTransactionRoutes.js";
+import recurringBookingsRoutes from "./routes/recurringBookingsRoutes.js";
+import analyticsRoutes from "./routes/analyticsRoutes.js";
+import { verifyEmailConfig } from "./utils/emailService.js";
+
+// ✅ FIXED: Correct import path for RecurringPattern model
+import RecurringPattern from "./models/RecurringPattern.js";
 
 const app = express();
-const httpServer = http.createServer(app); // 👈 CHANGE: Wrap app with http.createServer
+const httpServer = http.createServer(app);
 
-// Initialize Socket.IO 👈 ADD THIS
+// Initialize Socket.IO
 const io = initializeSocket(httpServer);
 
 // Trust proxy if behind reverse proxy
@@ -142,6 +143,8 @@ app.use("/api/teachers", teacherAssignmentRoutes);
 app.use("/api/classroom", classroomRoutes);
 app.use("/api/group-chats", groupChatRoutes);
 app.use("/api/payments", paymentTransactionRoutes);
+app.use("/api/recurring-bookings", recurringBookingsRoutes);
+app.use("/api/analytics", analyticsRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
@@ -149,10 +152,21 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: err.message });
 });
 
+// Verify email configuration on startup
+verifyEmailConfig().then(isValid => {
+  if (isValid) {
+    console.log("✅ Email service configured");
+  } else {
+    console.warn("⚠️ Email service not configured - notifications disabled");
+  }
+});
+
+// ✅ REMOVED: Incorrect export statement
+// (Models don't need to be exported from server file)
+
 // Start server
 const PORT = process.env.PORT || 5000;
-// 👇 CHANGE: Use httpServer.listen instead of app.listen
 httpServer.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
-  console.log(`🔌 Socket.IO initialized for whiteboard sharing`); // 👈 ADD THIS
+  console.log(`🔌 Socket.IO initialized for whiteboard sharing`);
 });

@@ -1,6 +1,7 @@
 // src/pages/Classroom.jsx - 🎨 COMPLETE FIX: Persistent Timer + End Class + Video Fix
 import React, { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+//import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import VideoCall from "./VideoCall";
 import api from "../api";
 import { 
@@ -16,15 +17,28 @@ import {
   AlertTriangle
 } from "lucide-react";
 
-export default function Classroom({ classData, userRole: propUserRole, onLeave }) {
+export default function Classroom({ classData, userRole: propUserRole, onLeave, teacherGoogleMeetLink }) {
   const navigate = useNavigate();
+  const location = useLocation();
+
+  //  Get data from location.state if not provided as props
+  const stateData = location.state || {};
+  const finalClassData = classData || stateData.classData;
+  const finalUserRole = propUserRole || stateData.userRole || localStorage.getItem("role");
+  const finalGoogleMeetLink = teacherGoogleMeetLink || finalClassData?.teacherGoogleMeetLink;
   
-  const userRole = propUserRole || localStorage.getItem("role");
+  const userRole = finalUserRole;
   const userId = localStorage.getItem("userId");
   const userName = localStorage.getItem("name") || "User";
-  const bookingId = classData?.bookingId || classData?.id;
+  const bookingId = finalClassData?.bookingId || finalClassData?.id;
 
-  console.log('🎓 Classroom initialized:', { bookingId, userRole, userName, duration: classData?.duration });
+ console.log('🎓 Classroom initialized:', { 
+  bookingId, 
+  userRole, 
+  userName, 
+  duration: finalClassData?.duration,
+  googleMeetLink: finalGoogleMeetLink
+});
 
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState("video");
@@ -47,6 +61,7 @@ export default function Classroom({ classData, userRole: propUserRole, onLeave }
   // 🔥 End Class Modal
   const [showEndModal, setShowEndModal] = useState(false);
   const [endReason, setEndReason] = useState("");
+  const [activeVideoProvider, setActiveVideoProvider] = useState(null);
 
   // Fetch or create session data on mount
   useEffect(() => {
@@ -238,59 +253,126 @@ export default function Classroom({ classData, userRole: propUserRole, onLeave }
   };
 
   // 🔥 END CLASS FUNCTION (Teacher Only)
-  const handleEndClass = async () => {
-    if (userRole !== "teacher") return;
-    
-    try {
-      console.log('🛑 Teacher ending class...');
-      console.log('📊 Final stats:', {
-        timeElapsed,
-        bothActiveTime,
-        requiredTime: getRequiredTime(classData.duration)
-      });
+/*const handleEndClass = async () => {
+  if (userRole !== "teacher") return;
+  
+  // ✅ DEFENSIVE CHECK #1: Verify finalClassData exists
+  if (!finalClassData) {
+    console.error('❌ ERROR: finalClassData is undefined!');
+    alert('Error: Class data not found. Please refresh and try again.');
+    return;
+  }
+  
+  // ✅ DEFENSIVE CHECK #2: Verify duration exists
+  if (!finalClassData.duration) {
+    console.warn('⚠️ Duration missing, using 60 minutes default');
+    finalClassData.duration = 60;
+  }
+  
+  try {
+    console.log('🛑 Teacher ending class...');
+    console.log('📊 classData:', finalClassData);
+    console.log('📊 Final stats:', {
+      timeElapsed,
+      bothActiveTime,
+      duration: finalClassData.duration,
+      requiredTime: getRequiredTime(finalClassData.duration)
+    });
 
-      const requiredTime = getRequiredTime(classData.duration);
-      const meetsRequirement = bothActiveTime >= requiredTime;
+    const requiredTime = getRequiredTime(finalClassData.duration);
+    const meetsRequirement = bothActiveTime >= requiredTime;
 
-      if (!meetsRequirement) {
-        alert(
-          `⚠️ Attendance Requirement Not Met\n\n` +
-          `Time together: ${formatMinutes(bothActiveTime)}\n` +
-          `Required: ${formatMinutes(requiredTime)}\n\n` +
-          `Short by: ${formatMinutes(requiredTime - bothActiveTime)}\n\n` +
-          `This class will need admin review.`
-        );
-        
-        // Create complaint for admin review
-        await api.post('/api/classroom/end-early', {
-          bookingId: bookingId,
-          reason: 'insufficient_attendance',
-          reportedBy: 'teacher',
-          description: `Teacher ended class. Both active: ${formatMinutes(bothActiveTime)}, Required: ${formatMinutes(requiredTime)}`,
-          teacherActiveTime: timeElapsed,
-          studentActiveTime: timeElapsed,
-          bothActiveTime: bothActiveTime,
-          requiredTime: requiredTime,
-          endedAt: new Date().toISOString(),
-          endedBy: userRole
-        });
-        
-        handleLeaveCall();
-        return;
-      }
-
-      // Complete the booking
-      const { data } = await api.put(`/api/bookings/${bookingId}/complete`);
+    if (!meetsRequirement) {
+      alert(
+        `⚠️ Attendance Requirement Not Met\n\n` +
+        `Time together: ${formatMinutes(bothActiveTime)}\n` +
+        `Required: ${formatMinutes(requiredTime)}\n\n` +
+        `Short by: ${formatMinutes(requiredTime - bothActiveTime)}\n\n` +
+        `This class will need admin review.`
+      );
       
-      if (data.success) {
-        alert('✅ Class completed successfully!');
-        handleLeaveCall();
-      }
-    } catch (err) {
-      console.error('❌ Error ending class:', err);
-      alert('Error ending class. Please try again.');
+      // Create complaint for admin review
+      await api.post('/api/classroom/end-early', {
+        bookingId: bookingId,
+        reason: 'insufficient_attendance',
+        reportedBy: 'teacher',
+        description: `Teacher ended class. Both active: ${formatMinutes(bothActiveTime)}, Required: ${formatMinutes(requiredTime)}`,
+        teacherActiveTime: timeElapsed,
+        studentActiveTime: timeElapsed,
+        bothActiveTime: bothActiveTime,
+        requiredTime: requiredTime,
+        endedAt: new Date().toISOString(),
+        endedBy: userRole
+      });
+      
+      handleLeaveCall();
+      return;
     }
-  };
+
+    // ✅ Complete the booking with PATCH (not PUT)
+    const { data } = await api.patch(`/api/bookings/${bookingId}/complete`);
+    
+    if (data.success) {
+      alert('✅ Class marked as pending student confirmation!');
+      handleLeaveCall();
+    }
+  } catch (err) {
+    console.error('❌ Error ending class:', err);
+    console.error('Full error:', err.response?.data || err.message);
+    alert(`Error ending class: ${err.response?.data?.message || err.message}`);
+  }
+};*/
+
+// 🔥 END CLASS FUNCTION (Teacher Only)
+const handleEndClass = async () => {
+  if (userRole !== "teacher") return;
+  
+  try {
+    console.log('🛑 Teacher ending class...');
+    console.log('📊 Final stats:', {
+      timeElapsed,
+      bothActiveTime,
+      requiredTime: getRequiredTime(finalClassData.duration) // ✅ FIXED
+    });
+
+    const requiredTime = getRequiredTime(finalClassData.duration); // ✅ FIXED
+    const meetsRequirement = bothActiveTime >= requiredTime;
+
+    // ✅ ALWAYS USE THE SAME ENDPOINT - Just pass different data
+    const completionData = {
+      duration: finalClassData.duration, // ✅ FIXED
+      actualDuration: timeElapsed,
+      bothActiveTime: bothActiveTime,
+      meetsRequirement: meetsRequirement
+    };
+
+    console.log('📤 Sending completion data:', completionData);
+
+    // ✅ CORRECT - Uses PATCH and sets to pending_confirmation
+    const { data } = await api.patch(
+      `/api/bookings/${bookingId}/complete`, 
+      completionData
+    );
+
+    if (!meetsRequirement) {
+      alert(
+        `⚠️ Class Ended Early\n\n` +
+        `Time together: ${formatMinutes(bothActiveTime)}\n` +
+        `Required: ${formatMinutes(requiredTime)}\n\n` +
+        `Student will be asked to confirm attendance.`
+      );
+    } else {
+      alert('✅ Class completed! Waiting for student confirmation.');
+    }
+
+    console.log('✅ Class marked as pending confirmation');
+    handleLeaveCall();
+
+  } catch (err) {
+    console.error('❌ Error ending class:', err);
+    alert('Error ending class. Please try again.');
+  }
+};
 
   // Calculate required time based on duration
   const getRequiredTime = (duration) => {
@@ -314,7 +396,7 @@ export default function Classroom({ classData, userRole: propUserRole, onLeave }
   };
 
   const getTimeRemaining = () => {
-    const totalSeconds = (classData?.duration || 60) * 60;
+    const totalSeconds = (finalClassData?.duration || 60) * 60;
     const remaining = totalSeconds - timeElapsed;
     return Math.max(0, remaining);
   };
@@ -344,7 +426,7 @@ export default function Classroom({ classData, userRole: propUserRole, onLeave }
 
   const channelName = `class-${bookingId}`;
   const timeRemaining = getTimeRemaining();
-  const requiredTime = getRequiredTime(classData.duration);
+  const requiredTime = getRequiredTime(finalClassData.duration);
   const completionPercentage = Math.min(100, Math.round((bothActiveTime / requiredTime) * 100));
 
   return (
@@ -352,6 +434,20 @@ export default function Classroom({ classData, userRole: propUserRole, onLeave }
       
       {/* 🎨 COMPACT HEADER */}
       <div className="bg-white shadow-md border-b-2 border-purple-200 px-6 py-3">
+        
+        {/* 🎥 VIDEO STATUS */}
+          {activeVideoProvider && (
+            <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 rounded-lg border border-blue-200 mb-4">
+              <Video className="w-4 h-4 text-blue-600" />
+              <span className="text-sm font-medium text-blue-700">
+                Using: {activeVideoProvider === 'agora' ? 'Agora Video' : 'Google Meet'}
+              </span>
+            </div>
+          )}
+
+          <div className="flex items-center justify-between">
+           </div>
+
         <div className="flex items-center justify-between">
           
           {/* Left: Timer Info */}
@@ -450,19 +546,141 @@ export default function Classroom({ classData, userRole: propUserRole, onLeave }
       {/* 📱 MAIN CONTENT */}
       <div className="flex-1 overflow-hidden relative">
         
-        {/* Video Tab - Always mounted, just hidden */}
-        <div className={activeTab === "video" ? "h-full" : "hidden"}>
-          <VideoCall
-            key={`video-${bookingId}`}
-            channelName={channelName}
-            userId={userId}
-            userName={userName}
-            onLeave={handleLeaveCall}
-            onUserJoined={handleUserJoined}
-            onUserLeft={handleUserLeft}
-            mode="video"
-          />
-        </div>
+       {/* Video Tab - Conditional rendering based on choice */}
+        {activeTab === "video" && (
+          <div className="h-full">
+            {!activeVideoProvider ? (
+              // 🎯 VIDEO PROVIDER SELECTION SCREEN
+              <div className="h-full flex items-center justify-center bg-gradient-to-br from-purple-50 to-blue-50 p-8">
+                <div className="max-w-2xl w-full">
+                  <h2 className="text-3xl font-bold text-center text-gray-800 mb-3">
+                    Choose Your Video Platform
+                  </h2>
+                  <p className="text-center text-gray-600 mb-8">
+                    Select which platform you'd like to use for this class
+                  </p>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Google Meet Option */}
+                    <button
+                      onClick={() => {
+                        if (finalGoogleMeetLink) {
+                          window.open(finalGoogleMeetLink, '_blank');
+                          setActiveVideoProvider('googlemeet');
+                        } else {
+                          alert('⚠️ Google Meet link not configured. Please ask your teacher to set it up.');
+                        }
+                      }}
+                      disabled={!finalGoogleMeetLink}
+                      className={`p-8 rounded-2xl border-4 transition-all ${
+                        finalGoogleMeetLink
+                          ? 'bg-white border-green-300 hover:border-green-500 hover:shadow-xl cursor-pointer'
+                          : 'bg-gray-100 border-gray-300 cursor-not-allowed opacity-60'
+                      }`}
+                    >
+                      <div className="flex flex-col items-center">
+                        <div className={`w-20 h-20 rounded-full flex items-center justify-center mb-4 ${
+                          finalGoogleMeetLink ? 'bg-green-500' : 'bg-gray-400'
+                        }`}>
+                          <Video className="w-10 h-10 text-white" />
+                        </div>
+                        <h3 className="text-xl font-bold text-gray-800 mb-2">Google Meet</h3>
+                        <p className="text-sm text-gray-600 text-center mb-3">
+                          Opens in a new tab
+                        </p>
+                        {finalGoogleMeetLink ? (
+                          <span className="inline-block px-4 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">
+                            ✓ Available
+                          </span>
+                        ) : (
+                          <span className="inline-block px-4 py-1 bg-gray-200 text-gray-600 rounded-full text-xs font-medium">
+                            Not Configured
+                          </span>
+                        )}
+                      </div>
+                    </button>
+
+                    {/* Agora Option */}
+                    <button
+                      onClick={() => setActiveVideoProvider('agora')}
+                      className="p-8 rounded-2xl border-4 bg-white border-blue-300 hover:border-blue-500 hover:shadow-xl transition-all cursor-pointer"
+                    >
+                      <div className="flex flex-col items-center">
+                        <div className="w-20 h-20 bg-blue-500 rounded-full flex items-center justify-center mb-4">
+                          <Video className="w-10 h-10 text-white" />
+                        </div>
+                        <h3 className="text-xl font-bold text-gray-800 mb-2">Agora Video</h3>
+                        <p className="text-sm text-gray-600 text-center mb-3">
+                          Embedded video call
+                        </p>
+                        <span className="inline-block px-4 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
+                          ✓ Always Available
+                        </span>
+                      </div>
+                    </button>
+                  </div>
+
+                  <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                    <p className="text-sm text-blue-800 text-center">
+                      💡 <strong>Tip:</strong> Google Meet uses your teacher's subscription. 
+                      Agora is available as a backup option.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : activeVideoProvider === 'agora' ? (
+              // 🎥 AGORA VIDEO (only renders when selected)
+              <div className="h-full relative">
+                <VideoCall
+                  key={`video-${bookingId}`}
+                  channelName={channelName}
+                  userId={userId}
+                  userName={userName}
+                  onLeave={handleLeaveCall}
+                  onUserJoined={handleUserJoined}
+                  onUserLeft={handleUserLeft}
+                  mode="video"
+                />
+                {/* Back button */}
+                <button
+                  onClick={() => setActiveVideoProvider(null)}
+                  className="absolute top-4 left-4 px-4 py-2 bg-white/90 backdrop-blur rounded-lg shadow-lg hover:bg-white transition-all flex items-center gap-2 z-50"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                  Change Platform
+                </button>
+              </div>
+            ) : (
+              // 📞 GOOGLE MEET PLACEHOLDER (user opened it in new tab)
+              <div className="h-full flex items-center justify-center bg-gradient-to-br from-green-50 to-emerald-50 p-8">
+                <div className="text-center max-w-md">
+                  <div className="w-24 h-24 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-6 animate-pulse">
+                    <Video className="w-12 h-12 text-white" />
+                  </div>
+                  <h3 className="text-2xl font-bold text-gray-800 mb-3">Google Meet Opened</h3>
+                  <p className="text-gray-600 mb-6">
+                    Your Google Meet session has been opened in a new tab. 
+                    Please check your browser tabs to join the meeting.
+                  </p>
+                  <button
+                    onClick={() => window.open(finalGoogleMeetLink, '_blank')}
+                    className="px-6 py-3 bg-green-500 hover:bg-green-600 text-white rounded-lg font-medium transition-all"
+                  >
+                    Reopen Google Meet
+                  </button>
+                  <button
+                    onClick={() => setActiveVideoProvider(null)}
+                    className="block w-full mt-4 px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-medium transition-all"
+                  >
+                    ← Choose Different Platform
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Content Tab */}
         {activeTab === "content" && (

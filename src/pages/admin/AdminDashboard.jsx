@@ -17,16 +17,25 @@ import { useDarkMode } from '../../hooks/useDarkMode';
 import DarkModeToggle from '../../components/DarkModeToggle';
 import MessagesTab from '../../components/chat/MessagesTab';
 import PaymentsTab from "./tabs/PaymentTab";
+import DisputeReview from '../../components/admin/DisputeReview';
+
+import BookingCalendar from "../../components/calendar/BookingCalendar";
+import RecurringBookingForm from "../../components/bookings/RecurringBookingForm";
+import AnalyticsDashboard from "../../components/analytics/AnalyticsDashboard";
+
 //import ChangePassword from "../../components/admin/auth/ChangePassword"; // ✅ FIXED: Uncommented
 import {
   TrendingUp,
   Video,
   User,
-  Calendar,
   Home,
   Bell,
   Users,
-  DollarSign
+  DollarSign,
+  Calendar,      
+  BarChart3,     
+  Repeat,         
+  AlertTriangle
 } from "lucide-react";
 import { getTeachers } from "../../services/teacherService";
 import { getStudents } from "../../services/studentService";
@@ -46,6 +55,9 @@ export default function AdminDashboard() {
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [showSettingsSidebar, setShowSettingsSidebar] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+
+  const [showRecurringForm, setShowRecurringForm] = useState(false);
+  const [calendarBookings, setCalendarBookings] = useState([]);
 
   // Dark Mode
   const { isDarkMode, toggleDarkMode } = useDarkMode();
@@ -84,6 +96,29 @@ export default function AdminDashboard() {
     })();
   }, []);
 
+  
+useEffect(() => {
+  if (activeTab === "calendar") {
+    fetchBookingsForCalendar();
+  }
+}, [activeTab]);
+
+// Add this function around line 95
+const fetchBookingsForCalendar = async () => {
+  try {
+    const response = await fetch('/api/bookings', {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+      }
+    });
+    const data = await response.json();
+    setCalendarBookings(data);
+    console.log("📅 Bookings loaded for calendar:", data.length);
+  } catch (err) {
+    console.error("Error fetching bookings for calendar:", err);
+  }
+};
+
   const handleNotify = (note) => {
     const fullNote =
       typeof note === "string"
@@ -111,6 +146,8 @@ export default function AdminDashboard() {
         return <StudentsTab onNotify={handleNotify} isDarkMode={isDarkMode} />;
       case "classes":
         return <ClassesTab isDarkMode={isDarkMode} />;
+      case "analytics":
+      return <AnalyticsDashboard isDarkMode={isDarkMode} />;
       case "applications":
         return <ApplicationsTab isDarkMode={isDarkMode} />;
       case "notifications":
@@ -133,12 +170,37 @@ export default function AdminDashboard() {
             isDarkMode={isDarkMode}
           />
         );
-      case "messages": // ✅ FIXED: Consistent lowercase
+        
+        case "calendar":
+      return (
+        <div>
+          <BookingCalendar 
+            bookings={calendarBookings}
+            onBookingClick={(booking) => {
+              console.log("Booking clicked:", booking);
+              alert(
+                `${booking.classTitle}\n` +
+                `Time: ${new Date(booking.scheduledTime).toLocaleString()}\n` +
+                `Status: ${booking.status}`
+              );
+            }}
+            onDateClick={(date) => {
+              console.log("Date clicked:", date);
+              setActiveTab("bookings"); // Switch to bookings tab
+            }}
+            allowCreate={true}
+          />
+        </div>
+      );
+      case "messages": 
         return (
           <MessagesTab userRole="admin" />
         );
       case "payments":
       return <PaymentsTab isDarkMode={isDarkMode} />;
+
+      case "disputes":
+      return <DisputeReview isDarkMode={isDarkMode} />;
 
       default:
         return <OverviewTab isDarkMode={isDarkMode} />;
@@ -155,7 +217,10 @@ export default function AdminDashboard() {
     { key: "assign", label: "Assign Students", icon: Users },
     { key: "bookings", label: "Bookings", icon: Calendar },
     { key: "messages", label: "Messages", icon: MessageCircle },
-    { key: "payments", label: "Payments", icon: DollarSign }
+    { key: "payments", label: "Payments", icon: DollarSign },
+    { key: "disputes", label: "Disputes", icon: AlertTriangle },
+    { key: "calendar", label: "Calendar View", icon: Calendar },
+    { key: "analytics", label: "Analytics", icon: BarChart3 },
   ];
 
   return (
