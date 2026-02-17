@@ -43,6 +43,8 @@ import MessagesTab from "../../components/chat/MessagesTab";
 import PaymentTab from "./tabs/PaymentTab";
 import GoogleMeetSettings from '../../components/GoogleMeetSettings';
 import api from "../../api";
+import RecurringClassForm from "../../components/teacher/RecurringClassForm";
+import { Repeat } from "lucide-react";
 
 // Services for fetching real data
 import { getAssignedStudents } from "../../services/teacherStudentService";
@@ -82,6 +84,7 @@ export default function TeacherDashboard() {
   const [loading, setLoading] = useState(true);
   const [googleMeetLink, setGoogleMeetLink] = useState('');
   const [showGoogleMeetSettings, setShowGoogleMeetSettings] = useState(false);
+  const [showRecurringForm, setShowRecurringForm] = useState(false);
   
 
   // Modal states
@@ -465,13 +468,21 @@ export default function TeacherDashboard() {
     classId: null,
   });
 
-  const askCancelClass = (id) =>
-    setConfirmModal({ open: true, type: "cancel", classId: id });
+  const askCancelClass = (classItem) => {
+  const classId = typeof classItem === 'object' 
+    ? (classItem.id || classItem.bookingId) 
+    : classItem;
+  console.log("✅ Cancel classId:", classId);
+  setConfirmModal({ open: true, type: "cancel", classId: classId });
+};
 
-  const askDeleteClass = (classItem) => {
-    const classId = typeof classItem === 'object' ? classItem.id : classItem;
-    setConfirmModal({ open: true, type: "delete", classId: classId });
-  };
+const askDeleteClass = (classItem) => {
+  const classId = typeof classItem === 'object' 
+    ? (classItem.id || classItem.bookingId) 
+    : classItem;
+  console.log("✅ Delete classId:", classId);
+  setConfirmModal({ open: true, type: "delete", classId: classId });
+};
 
   const handleConfirm = async () => {
     if (confirmModal.type === "cancel") {
@@ -762,6 +773,14 @@ export default function TeacherDashboard() {
               <Plus className="w-5 h-5" />
               Add New Class
             </button>
+
+            <button
+            onClick={() => setShowRecurringForm(true)}
+            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition flex items-center gap-2"
+          >
+            <Repeat className="w-4 h-4" />
+            Create Recurring Classes
+          </button>
             
             {classes.length === 0 ? (
               <div className={`${isDarkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow-md p-8 text-center`}>
@@ -820,6 +839,32 @@ export default function TeacherDashboard() {
             isDarkMode={isDarkMode}
           />
         )}
+
+        {/* Recurring Class Form Modal */}
+          {showRecurringForm && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+                <RecurringClassForm 
+                  students={students}
+                  teacherInfo={teacherInfo}
+                  onSuccess={(pattern) => {
+                    console.log("✅ Recurring classes created:", pattern);
+                    setShowRecurringForm(false);
+                    showToast(
+                      `Successfully created ${pattern.occurrences} recurring classes!`,
+                      "success"
+                    );
+                    // Refresh data to show new classes
+                    setTimeout(() => {
+                      fetchTeacherData();
+                    }, 1000);
+                  }}
+                  onCancel={() => setShowRecurringForm(false)}
+                />
+              </div>
+            </div>
+          )}
+
 
         {/* ✅ NEW: Messages Tab */}
         {activeTab === "messages" && (
