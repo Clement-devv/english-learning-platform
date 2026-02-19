@@ -252,24 +252,28 @@ export default function TeacherDashboard() {
           existingClass.students.push(`${booking.studentId.firstName} ${booking.studentId.surname}`);
         } else {
           completedMap.set(groupKey, {
-            id: booking._id,
-            title: booking.classTitle,
-            topic: booking.topic || "Completed Lesson",
-            fullDateTime: scheduledDate.toLocaleString('en-US', {
-              weekday: 'short',
-              year: 'numeric',
-              month: 'short',
-              day: 'numeric',
-              hour: 'numeric',
-              minute: '2-digit',
-              hour12: true
-            }),
-            scheduledTime: booking.scheduledTime,
-            scheduledDate: scheduledDate,
-            students: [`${booking.studentId.firstName} ${booking.studentId.surname}`],
-            duration: booking.duration,
-            status: "completed"
-          });
+          id: booking._id,
+          title: booking.classTitle,
+          topic: booking.topic || "Completed Lesson",
+          fullDateTime: scheduledDate.toLocaleString('en-US', {
+            weekday: 'short',
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true
+          }),
+          scheduledTime: booking.scheduledTime,
+          scheduledDate: scheduledDate,
+          students: [`${booking.studentId.firstName} ${booking.studentId.surname}`],
+          duration: booking.duration,
+          status: "completed",
+          // ── NEW: admin rejection flags ──────────────────────────────
+          adminRejected: booking.adminRejected || false,
+          adminRejectedReason: booking.adminRejectedReason || "",
+          adminRejectedAt: booking.adminRejectedAt || null,
+        });
         }
       });
       

@@ -387,6 +387,8 @@ router.patch("/:id/complete", verifyToken, async (req, res) => {
     try {
       // Update booking
       booking.status = "completed";
+      booking.markedBy = "classroom";
+      booking.adminRejected = false; 
       booking.completedAt = new Date();
       await booking.save({ session });
 

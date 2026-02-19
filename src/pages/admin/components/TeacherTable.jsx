@@ -1,3 +1,4 @@
+// src/pages/admin/components/TeacherTable.jsx
 import React, { useState } from "react";
 
 export default function TeacherTable({
@@ -6,6 +7,7 @@ export default function TeacherTable({
   onDelete,
   onToggle,
   onMarkLesson,
+  onUnmarkLesson,   // ← NEW
   onPay,
   onCopyPassword,
   onResetPassword,
@@ -50,35 +52,28 @@ export default function TeacherTable({
             <th className="border p-2">Earned ($)</th>
             <th className="border p-2">Continent</th>
             <th className="border p-2">Password</th>
-            <th className="border p-2 w-70">Actions</th>
+            <th className="border p-2">Actions</th>
           </tr>
         </thead>
         <tbody>
           {filteredTeachers.length === 0 ? (
             <tr>
-              <td
-                colSpan="9"
-                className="text-center p-4 text-gray-500 italic"
-              >
+              <td colSpan="9" className="text-center p-4 text-gray-500 italic">
                 No teachers found
               </td>
             </tr>
           ) : (
             filteredTeachers.map((t, i) => (
-              <tr key={i} className="hover:bg-gray-50 transition">
+              <tr key={t._id || i} className="hover:bg-gray-50 transition">
                 <td className="border p-2">{t.firstName}</td>
                 <td className="border p-2">{t.lastName}</td>
                 <td className="border p-2">{t.email}</td>
                 <td className="border p-2 text-center">{t.ratePerClass}</td>
-                <td className="border p-2 text-center">
-                  {t.lessonsCompleted || 0}
-                </td>
-                <td className="border p-2 text-center">
-                  {(t.earned || 0).toFixed(2)}
-                </td>
-                <td className="border p-2 text-center">
-                  {t.continent || "—"}
-                </td>
+                <td className="border p-2 text-center">{t.lessonsCompleted || 0}</td>
+                <td className="border p-2 text-center">{(t.earned || 0).toFixed(2)}</td>
+                <td className="border p-2 text-center">{t.continent || "—"}</td>
+
+                {/* Password column */}
                 <td className="border p-2 text-center">
                   {t.showTempPassword ? (
                     <span className="font-mono bg-gray-100 px-1 py-0.5 rounded text-xs">
@@ -88,37 +83,53 @@ export default function TeacherTable({
                     <span className="text-gray-400 italic text-xs">Hidden</span>
                   )}
                 </td>
+
+                {/* Actions */}
                 <td className="border p-1">
                   <div className="flex flex-wrap gap-1 justify-center text-xs">
+
                     <button
                       onClick={() => onEdit(i)}
                       className="px-2 py-1 bg-yellow-500 text-white rounded hover:bg-yellow-600"
                     >
                       Edit
                     </button>
+
                     <button
                       onClick={() => onDelete(i)}
                       className="px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600"
                     >
                       Delete
                     </button>
+
                     <button
                       onClick={() => onToggle(i)}
                       className={`px-2 py-1 rounded text-white ${
-                        t.active ? "bg-gray-500" : "bg-green-600"
+                        t.active ? "bg-gray-500 hover:bg-gray-600" : "bg-green-600 hover:bg-green-700"
                       }`}
                     >
                       {t.active ? "Disable" : "Enable"}
                     </button>
+
+                    {/* ✅ Mark Lesson */}
                     <button
                       onClick={() => onMarkLesson(i)}
-                      className="px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
+                      className="px-2 py-1 bg-emerald-600 text-white rounded hover:bg-emerald-700"
                     >
-                      +Lesson
+                      ✅ Mark
                     </button>
+
+                    {/* ✅ NEW: Unmark Lesson */}
+                    <button
+                      onClick={() => onUnmarkLesson(i)}
+                      className="px-2 py-1 bg-rose-600 text-white rounded hover:bg-rose-700"
+                    >
+                      ⚠️ Unmark
+                    </button>
+
                     <button
                       onClick={() => onPay(i)}
-                      className="px-2 py-1 text-xs bg-yellow-600 text-white rounded hover:bg-yellow-700"
+                      className="px-2 py-1 bg-yellow-600 text-white rounded hover:bg-yellow-700"
                     >
                       Paid
                     </button>
@@ -139,6 +150,7 @@ export default function TeacherTable({
                         </button>
                       </>
                     )}
+
                   </div>
                 </td>
               </tr>

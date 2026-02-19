@@ -1,3 +1,4 @@
+// src/pages/admin/components/StudentTable.jsx
 import React from "react";
 
 export default function StudentTable({
@@ -9,6 +10,7 @@ export default function StudentTable({
   onViewPayment,
   onViewLessons,
   onMarkLesson,
+  onUnmarkLesson,   // ← NEW
   onCopyPassword,
   onResetPassword,
 }) {
@@ -39,50 +41,54 @@ export default function StudentTable({
                 <td className="border p-2">{s.surname}</td>
                 <td className="border p-2">{s.email}</td>
 
-                
                 {/* Password column */}
-                  <td className="border p-2">
-                    {s.showTempPassword && s.tempPassword ? (
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono bg-gray-100 px-2 py-1 rounded text-sm">
-                          {s.tempPassword}  {/* ✅ Show tempPassword, not password */}
-                        </span>
-                        <button
-                          onClick={() => onCopyPassword(s._id)}
-                          className="px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
-                        >
-                          Copy
-                        </button>
-                      </div>
-                    ) : (
-                      <span className="italic text-gray-400 text-sm">
-                        ••••••••
+                <td className="border p-2">
+                  {s.showTempPassword && s.tempPassword ? (
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono bg-gray-100 px-2 py-1 rounded text-sm">
+                        {s.tempPassword}
                       </span>
-                    )}
-
-                    <div className="mt-1">
                       <button
-                        onClick={() => onResetPassword(s._id)}
-                        className="px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600"
+                        onClick={() => onCopyPassword(s._id)}
+                        className="px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
                       >
-                        Reset Password
+                        Copy
                       </button>
                     </div>
-                  </td>
+                  ) : (
+                    <span className="italic text-gray-400 text-sm">••••••••</span>
+                  )}
+                  <div className="mt-1">
+                    <button
+                      onClick={() => onResetPassword(s._id)}
+                      className="px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600"
+                    >
+                      Reset Password
+                    </button>
+                  </div>
+                </td>
 
                 {/* Classes */}
-                <td className="border p-2 text-center">
-                  {s.noOfClasses ?? 0}
-                </td>
+                <td className="border p-2 text-center">{s.noOfClasses ?? 0}</td>
 
                 {/* Actions */}
                 <td className="border p-2">
                   <div className="flex flex-wrap gap-2">
+
+                    {/* ✅ Mark Lesson */}
                     <button
                       onClick={() => onMarkLesson(s._id)}
-                      className="px-2 py-1 bg-purple-600 text-white rounded hover:bg-purple-700 text-xs"
+                      className="px-2 py-1 bg-emerald-600 text-white rounded hover:bg-emerald-700 text-xs"
                     >
-                      Mark Lesson
+                      ✅ Mark Lesson
+                    </button>
+
+                    {/* ✅ NEW: Unmark Lesson */}
+                    <button
+                      onClick={() => onUnmarkLesson(s._id)}
+                      className="px-2 py-1 bg-rose-600 text-white rounded hover:bg-rose-700 text-xs"
+                    >
+                      ⚠️ Unmark Lesson
                     </button>
 
                     <button
@@ -130,6 +136,7 @@ export default function StudentTable({
                     >
                       {s.active ? "Disable" : "Enable"}
                     </button>
+
                   </div>
                 </td>
               </tr>

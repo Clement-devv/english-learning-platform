@@ -27,6 +27,7 @@ import MessagesTab from "../../components/chat/MessagesTab";
 import ClassConfirmation from '../../components/student/ClassConfirmation';
 import jsPDF from "jspdf";
 import "jspdf-autotable";
+import StudentCompletedTab from "./tabs/StudentCompletedTab";
 
 
 // Import booking service to fetch real data
@@ -1121,147 +1122,11 @@ const fetchStudentData = async () => {
 
         {/* Completed Classes Tab */}
         {activeTab === "completed-classes" && (
-          <div className="space-y-6">
-            <div className={`${isDarkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow-md p-6`}>
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
-                <h2 className={`text-2xl font-bold ${isDarkMode ? 'text-gray-100' : 'text-gray-800'}`}>My Completed Classes</h2>
-                <button
-                  onClick={generatePDF}
-                  className={`flex items-center gap-2 px-4 py-2 ${isDarkMode ? 'bg-gradient-to-r from-blue-700 to-indigo-700' : 'bg-gradient-to-r from-blue-600 to-indigo-600'} text-white rounded-lg hover:opacity-90 transition-colors`}
-                >
-                  <Download className="w-4 h-4" />
-                  Export PDF
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="relative">
-                  <Search className={`absolute left-3 top-1/2 transform -translate-y-1/2 ${isDarkMode ? 'text-gray-400' : 'text-gray-400'} w-5 h-5`} />
-                  <input
-                    type="text"
-                    placeholder="Search classes..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className={`w-full pl-10 pr-4 py-2 ${isDarkMode ? 'bg-gray-700 border-gray-600 text-gray-100' : 'border'} rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500`}
-                  />
-                </div>
-
-                <input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  className={`px-4 py-2 ${isDarkMode ? 'bg-gray-700 border-gray-600 text-gray-100' : 'border'} rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500`}
-                />
-                <input
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  className={`px-4 py-2 ${isDarkMode ? 'bg-gray-700 border-gray-600 text-gray-100' : 'border'} rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500`}
-                />
-              </div>
-
-              <div className={`mt-4 text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-                Showing {startIndex + 1}-{Math.min(endIndex, filteredCompletedClasses.length)} of {filteredCompletedClasses.length} classes
-              </div>
-            </div>
-
-            {currentCompletedClasses.length === 0 ? (
-              <div className={`${isDarkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow-md p-12 text-center`}>
-                <p className={`${isDarkMode ? 'text-gray-300' : 'text-gray-500'} text-lg`}>
-                  {searchQuery || startDate || endDate
-                    ? "No classes found matching your criteria"
-                    : "No completed classes yet"}
-                </p>
-                {(searchQuery || startDate || endDate) && (
-                  <button
-                    onClick={() => {
-                      setSearchQuery("");
-                      setStartDate("");
-                      setEndDate("");
-                    }}
-                    className={`mt-4 px-4 py-2 ${isDarkMode ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-700'} underline`}
-                  >
-                    Clear filters
-                  </button>
-                )}
-              </div>
-            ) : (
-              <div className={`${isDarkMode ? 'bg-gray-800 divide-gray-700' : 'bg-white divide-gray-200'} rounded-lg shadow-md divide-y`}>
-                {currentCompletedClasses.map((cls, index) => (
-                  <div key={cls.id} className={`p-6 ${isDarkMode ? 'hover:bg-gray-750' : 'hover:bg-gray-50'} transition-colors`}>
-                    <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-                      <div className="flex-1">
-                        <div className="flex items-start gap-3">
-                          <div className={`${isDarkMode ? 'bg-blue-900 text-blue-300' : 'bg-blue-100 text-blue-600'} rounded-full w-10 h-10 flex items-center justify-center font-bold flex-shrink-0`}>
-                            {startIndex + index + 1}
-                          </div>
-                          <div className="flex-1">
-                            <h3 className={`text-lg font-semibold ${isDarkMode ? 'text-gray-100' : 'text-gray-800'}`}>{cls.title}</h3>
-                            <p className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-600'} mt-1`}>
-                              <span className="font-medium">Topic:</span> {cls.topic}
-                            </p>
-                            
-                            <div className={`flex flex-wrap items-center gap-4 mt-3 text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-                              <div className="flex items-center gap-1">
-                                <User className="w-4 h-4" />
-                                <span>{cls.teacher}</span>
-                              </div>
-                              <div className="flex items-center gap-1">
-                                <Calendar className="w-4 h-4" />
-                                <span>{cls.fullDateTime}</span>
-                              </div>
-                              <div className="flex items-center gap-1">
-                                <Clock className="w-4 h-4" />
-                                <span>{cls.duration} minutes</span>
-                              </div>
-                            </div>
-
-                            {cls.notes && (
-                              <p className={`mt-2 text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'} italic`}>
-                                Note: {cls.notes}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-medium">
-                          ✓ Completed
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {totalPages > 1 && (
-              <div className="flex items-center justify-center gap-2 mt-6">
-                <button
-                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                  disabled={currentPage === 1}
-                  className={`p-2 rounded-lg ${isDarkMode ? 'border-gray-600 hover:bg-gray-700' : 'border hover:bg-gray-50'} disabled:opacity-50 disabled:cursor-not-allowed`}
-                >
-                  <ChevronLeft className="w-5 h-5" />
-                </button>
-                
-                <span className={`px-4 py-2 text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-                  Page {currentPage} of {totalPages}
-                </span>
-                
-                <button
-                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                  disabled={currentPage === totalPages}
-                  className={`p-2 rounded-lg ${isDarkMode ? 'border-gray-600 hover:bg-gray-700' : 'border hover:bg-gray-50'} disabled:opacity-50 disabled:cursor-not-allowed`}
-                >
-                  <ChevronRight className="w-5 h-5" />
-                </button>
-              </div>
-            )}
-          </div>
+          <StudentCompletedTab
+            studentId={student.id}
+            isDarkMode={isDarkMode}
+          />
         )}
-
         {/* FEATURE #2: Badges Tab */}
         {activeTab === "badges" && (
           <div className="space-y-6">

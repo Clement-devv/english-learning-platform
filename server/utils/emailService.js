@@ -42,7 +42,7 @@ export const verifyEmailConfig = async () => {
 /**
  * Generic email sender with error handling
  */
-const sendEmail = async (mailOptions) => {
+export const sendEmail = async (mailOptions) => {
   try {
     const info = await transporter.sendMail(mailOptions);
     console.log("📧 Email sent:", info.messageId);

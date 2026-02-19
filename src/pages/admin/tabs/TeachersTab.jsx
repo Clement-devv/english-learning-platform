@@ -1,39 +1,104 @@
+// src/pages/admin/tabs/TeachersTab.jsx
 import React, { useState, useEffect } from "react";
-import api from "../../../api"; // make sure api.js exports an axios instance
-import TeacherTable from "../components/TeacherTable";
+import {
+  Search,
+  Users,
+  UserCheck,
+  UserX,
+  TrendingUp,
+  DollarSign,
+  Plus,
+  SlidersHorizontal,
+} from "lucide-react";
+import api from "../../../api";
+import TeacherCard from "../components/TeacherCard";
 import TeacherModal from "../modals/TeacherModal";
-import AnimatedButton from "../components/AnimatedButton";
+import LessonMarkModal from "../modals/LessonMarkModal"; // ← NEW
 
-export default function TeacherTab({ onNotify }) {
+// ─── Small summary stat card ──────────────────────────────────────────────────
+function SummaryCard({ icon: Icon, label, value, sub, color, isDarkMode }) {
+  const colors = {
+    blue: {
+      bg: isDarkMode ? "bg-blue-900/30" : "bg-blue-50",
+      icon: isDarkMode ? "bg-blue-700/60 text-blue-300" : "bg-blue-100 text-blue-600",
+      value: isDarkMode ? "text-blue-300" : "text-blue-700",
+      border: isDarkMode ? "border-blue-800/40" : "border-blue-100",
+    },
+    emerald: {
+      bg: isDarkMode ? "bg-emerald-900/30" : "bg-emerald-50",
+      icon: isDarkMode ? "bg-emerald-700/60 text-emerald-300" : "bg-emerald-100 text-emerald-600",
+      value: isDarkMode ? "text-emerald-300" : "text-emerald-700",
+      border: isDarkMode ? "border-emerald-800/40" : "border-emerald-100",
+    },
+    amber: {
+      bg: isDarkMode ? "bg-amber-900/30" : "bg-amber-50",
+      icon: isDarkMode ? "bg-amber-700/60 text-amber-300" : "bg-amber-100 text-amber-600",
+      value: isDarkMode ? "text-amber-300" : "text-amber-700",
+      border: isDarkMode ? "border-amber-800/40" : "border-amber-100",
+    },
+    purple: {
+      bg: isDarkMode ? "bg-purple-900/30" : "bg-purple-50",
+      icon: isDarkMode ? "bg-purple-700/60 text-purple-300" : "bg-purple-100 text-purple-600",
+      value: isDarkMode ? "text-purple-300" : "text-purple-700",
+      border: isDarkMode ? "border-purple-800/40" : "border-purple-100",
+    },
+  };
+  const c = colors[color] || colors.blue;
+
+  return (
+    <div className={`rounded-xl border p-4 flex items-center gap-4 ${c.bg} ${c.border}`}>
+      <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${c.icon}`}>
+        <Icon className="w-5 h-5" />
+      </div>
+      <div>
+        <p className={`text-xs font-medium ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+          {label}
+        </p>
+        <p className={`text-xl font-bold ${c.value}`}>{value}</p>
+        {sub && (
+          <p className={`text-xs ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>{sub}</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
+export default function TeachersTab({ onNotify, isDarkMode = false }) {
   const [teachers, setTeachers] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editIndex, setEditIndex] = useState(null);
-  const [view, setView] = useState("active");
-  const [searchActive, setSearchActive] = useState("");
-  const [searchDisabled, setSearchDisabled] = useState("");
+  const [view, setView] = useState("active"); // "active" | "disabled" | "all"
+  const [searchQuery, setSearchQuery] = useState("");
+  const [continentFilter, setContinentFilter] = useState("");
   const [toast, setToast] = useState("");
+  const [toastType, setToastType] = useState("success"); // "success" | "error" | "info"
   const [loading, setLoading] = useState(false);
 
-  // ✅ NEW: continent filter state (empty = all)
-  const [continentFilter, setContinentFilter] = useState("");
+  // ── NEW: Lesson modal state ──────────────────────────────────────────────────
+  // Shape: { mode: "mark" | "unmark", teacher: {...} }
+  const [lessonModal, setLessonModal] = useState(null);
 
-  // ---------------------------
-  // Load teachers from backend
-  // ---------------------------
+  // ── Toast helper ────────────────────────────────────────────────────────────
+  const showToast = (message, type = "success") => {
+    setToast(message);
+    setToastType(type);
+    setTimeout(() => setToast(""), 3500);
+  };
+
+  // ── Fetch teachers ──────────────────────────────────────────────────────────
   useEffect(() => {
     const fetchTeachers = async () => {
       setLoading(true);
       try {
-        console.log("Fetching teachers from API..."); // Debug log
-        const res = await api.get("/api/teachers"); // Fixed: Added /api prefix
-        console.log("Teachers fetched successfully:", res.data); // Debug log
+        const res = await api.get("/api/teachers");
         setTeachers(res.data);
       } catch (err) {
         console.error("Error fetching teachers:", err);
-        console.error("Error response:", err.response?.data); // More detailed error
-        console.error("Error status:", err.response?.status); // Status code
-        setToast(`Could not load teachers: ${err.response?.data?.message || err.message}`);
-        setTimeout(() => setToast(""), 5000); // Longer display time
+        showToast(
+          `Could not load teachers: ${err.response?.data?.message || err.message}`,
+          "error"
+        );
       } finally {
         setLoading(false);
       }
@@ -41,408 +106,437 @@ export default function TeacherTab({ onNotify }) {
     fetchTeachers();
   }, []);
 
-  // ---------------------------
-  // Save Teacher (create/update)
-  // ---------------------------
+  // ── Save teacher (create / update) ─────────────────────────────────────────
   const handleSaveTeacher = async (teacherData) => {
     try {
-      console.log("Saving teacher data:", teacherData); // Debug log
-      
       if (editIndex !== null) {
         const id = teachers[editIndex]._id;
-        console.log("Updating teacher with ID:", id); // Debug log
-        const res = await api.put(`/api/teachers/${id}`, teacherData); // Fixed: Added /api prefix
-        setTeachers((prev) =>
-          prev.map((t, i) => (i === editIndex ? res.data : t))
-        );
+        const res = await api.put(`/api/teachers/${id}`, teacherData);
+        setTeachers((prev) => prev.map((t, i) => (i === editIndex ? res.data : t)));
         onNotify?.(`Teacher updated: ${teacherData.firstName} ${teacherData.lastName}`);
-        setToast(`Teacher ${teacherData.firstName} ${teacherData.lastName} updated successfully!`);
+        showToast(`${teacherData.firstName} ${teacherData.lastName} updated successfully!`);
       } else {
-        console.log("Creating new teacher..."); // Debug log
-        const res = await api.post("/api/teachers", teacherData); // Fixed: Added /api prefix
-        console.log("Teacher created:", res.data); // Debug log
+        const res = await api.post("/api/teachers", teacherData);
         setTeachers((prev) => [...prev, res.data]);
-        onNotify?.(`New teacher created: ${teacherData.firstName} ${teacherData.lastName}`);
-        setToast(`Teacher ${teacherData.firstName} ${teacherData.lastName} created successfully!`);
+        onNotify?.(`Teacher created: ${teacherData.firstName} ${teacherData.lastName}`);
+        showToast(`${teacherData.firstName} ${teacherData.lastName} added successfully!`);
       }
-      
-      setIsModalOpen(false);
-      setEditIndex(null);
-      setTimeout(() => setToast(""), 3000);
-      
     } catch (err) {
-      console.error("Save error:", err);
-      console.error("Save error response:", err.response?.data); // More detailed error
-      console.error("Save error status:", err.response?.status); // Status code
-      
-      let errorMessage = "Failed to save teacher";
-      if (err.response?.data?.message) {
-        errorMessage += `: ${err.response.data.message}`;
-      } else if (err.message) {
-        errorMessage += `: ${err.message}`;
-      }
-      
-      setToast(errorMessage);
-      setTimeout(() => setToast(""), 5000); // Longer display time for errors
+      console.error("Save teacher error:", err);
+      showToast("Could not save teacher. Please try again.", "error");
+    } finally {
+      setEditIndex(null);
+      setIsModalOpen(false);
     }
   };
 
-  // ---------------------------
-  // Edit / Delete / Toggle
-  // ---------------------------
+  // ── Delete ──────────────────────────────────────────────────────────────────
+  const handleDelete = async (index) => {
+    const teacher = teachers[index];
+    if (!teacher) return;
+    if (!window.confirm(`Delete ${teacher.firstName} ${teacher.lastName}? This cannot be undone.`))
+      return;
+    try {
+      await api.delete(`/api/teachers/${teacher._id}`);
+      setTeachers((prev) => prev.filter((_, i) => i !== index));
+      showToast(`${teacher.firstName} deleted.`);
+    } catch (err) {
+      console.error("Delete teacher error:", err);
+      showToast("Could not delete teacher.", "error");
+    }
+  };
+
+  // ── Toggle active/disabled ──────────────────────────────────────────────────
+  const handleToggle = async (index) => {
+    const teacher = teachers[index];
+    if (!teacher) return;
+    try {
+      const res = await api.put(`/api/teachers/${teacher._id}`, {
+        active: !teacher.active,
+      });
+      setTeachers((prev) => prev.map((t, i) => (i === index ? res.data : t)));
+      showToast(
+        `${teacher.firstName} ${res.data.active ? "enabled" : "disabled"}.`,
+        "info"
+      );
+    } catch (err) {
+      console.error("Toggle teacher error:", err);
+      showToast("Could not update teacher status.", "error");
+    }
+  };
+
+  // ── Mark lesson → opens multi-step modal ────────────────────────────────────
+  const handleMarkLesson = (index) => {
+    const teacher = teachers[index];
+    if (!teacher) return;
+    setLessonModal({ mode: "mark", teacher });
+  };
+
+  // ── NEW: Unmark lesson → opens multi-step modal ─────────────────────────────
+  const handleUnmarkLesson = (index) => {
+    const teacher = teachers[index];
+    if (!teacher) return;
+    setLessonModal({ mode: "unmark", teacher });
+  };
+
+  // ── Handle lesson modal success ─────────────────────────────────────────────
+  const handleLessonSuccess = (result) => {
+    // Update teacher earnings/lessons in local state
+    if (result?.teacher) {
+      setTeachers((prev) =>
+        prev.map((t) =>
+          t._id === lessonModal?.teacher?._id ? { ...t, ...result.teacher } : t
+        )
+      );
+    }
+    const msg =
+      lessonModal?.mode === "mark"
+        ? "✅ Lesson marked complete! Earnings updated."
+        : "⚠️ Lesson rejected and reversed.";
+    showToast(msg, "info");
+    // Modal stays open showing the "Done" screen — user clicks Done to close it
+  };
+
+  // ── Pay teacher ─────────────────────────────────────────────────────────────
+  const handlePayTeacher = async (index) => {
+    const teacher = teachers[index];
+    if (!teacher) return;
+    if (!teacher.earned || teacher.earned <= 0) {
+      showToast("No payment due for this teacher.", "info");
+      return;
+    }
+    if (!window.confirm(`Pay $${teacher.earned?.toFixed(2)} to ${teacher.firstName} ${teacher.lastName}?`))
+      return;
+    try {
+      const res = await api.put(`/api/teachers/${teacher._id}`, { earned: 0 });
+      setTeachers((prev) => prev.map((t, i) => (i === index ? res.data : t)));
+      showToast(`$${teacher.earned?.toFixed(2)} paid to ${teacher.firstName}!`);
+    } catch (err) {
+      console.error("Pay teacher error:", err);
+      showToast("Could not process payment.", "error");
+    }
+  };
+
+  // ── Reset password ──────────────────────────────────────────────────────────
+  const handleResetPassword = async (index) => {
+    const teacher = teachers[index];
+    if (!teacher) return;
+    try {
+      const newPass = Math.random().toString(36).slice(-8);
+      const res = await api.put(`/api/teachers/${teacher._id}`, {
+        password: newPass,
+      });
+      setTeachers((prev) =>
+        prev.map((t, i) =>
+          i === index
+            ? { ...res.data, password: newPass, showTempPassword: true }
+            : t
+        )
+      );
+      showToast("Password reset. Copy it from the card.", "info");
+
+      // Auto-hide after 15 seconds
+      setTimeout(() => {
+        setTeachers((prev) =>
+          prev.map((t, i) =>
+            i === index ? { ...t, showTempPassword: false, password: undefined } : t
+          )
+        );
+      }, 15000);
+
+      console.log(`📧 Send to ${teacher.email}: new password = ${newPass}`);
+    } catch (err) {
+      console.error("Reset password error:", err);
+      showToast("Could not reset password.", "error");
+    }
+  };
+
+  // ── Copy password ───────────────────────────────────────────────────────────
+  const handleCopyPassword = (index) => {
+    const teacher = teachers[index];
+    if (teacher?.password && navigator.clipboard) {
+      navigator.clipboard.writeText(teacher.password);
+      showToast("Password copied to clipboard!");
+      setTeachers((prev) =>
+        prev.map((t, i) =>
+          i === index ? { ...t, showTempPassword: false, password: undefined } : t
+        )
+      );
+    }
+  };
+
+  // ── Edit ────────────────────────────────────────────────────────────────────
   const handleEdit = (index) => {
     setEditIndex(index);
     setIsModalOpen(true);
   };
 
-  const handleDelete = async (index) => {
-    const teacher = teachers[index];
-    if (!teacher || !window.confirm("Delete this teacher?")) return;
-    
-    try {
-      console.log("Deleting teacher with ID:", teacher._id); // Debug log
-      await api.delete(`/api/teachers/${teacher._id}`); // Fixed: Added /api prefix
-      setTeachers((prev) => prev.filter((_, i) => i !== index));
-      setToast(`Teacher ${teacher.firstName} ${teacher.lastName} deleted successfully!`);
-      setTimeout(() => setToast(""), 3000);
-    } catch (err) {
-      console.error("Delete error:", err);
-      console.error("Delete error response:", err.response?.data); // More detailed error
-      
-      let errorMessage = "Could not delete teacher";
-      if (err.response?.data?.message) {
-        errorMessage += `: ${err.response.data.message}`;
-      }
-      
-      setToast(errorMessage);
-      setTimeout(() => setToast(""), 5000);
-    }
-  };
-
-  const handleToggle = async (index) => {
-    const teacher = teachers[index];
-    if (!teacher) return;
-    
-    try {
-      console.log("Toggling teacher status for ID:", teacher._id); // Debug log
-      const res = await api.put(`/api/teachers/${teacher._id}`, { // Fixed: Added /api prefix
-        active: !teacher.active,
-      });
-      setTeachers((prev) =>
-        prev.map((t, i) => (i === index ? res.data : t))
-      );
-      
-      const status = !teacher.active ? "activated" : "deactivated";
-      setToast(`Teacher ${teacher.firstName} ${teacher.lastName} ${status}!`);
-      setTimeout(() => setToast(""), 3000);
-      
-    } catch (err) {
-      console.error("Toggle error:", err);
-      console.error("Toggle error response:", err.response?.data); // More detailed error
-      
-      setToast("Could not update teacher status");
-      setTimeout(() => setToast(""), 3000);
-    }
-  };
-
-  // ---------------------------
-  // Lesson & Payment (with backend sync)
-  // ---------------------------
-  const handleMarkLesson = async (index) => {
-    const teacher = teachers[index];
-    if (!teacher) return;
-
-    try {
-      const updatedLessons = (teacher.lessonsCompleted || 0) + 1;
-      const rate = parseFloat(teacher.ratePerClass || 0);
-      const updatedEarned = (teacher.earned || 0) + rate;
-
-      // Update backend
-      const res = await api.put(`/api/teachers/${teacher._id}`, {
-        lessonsCompleted: updatedLessons,
-        earned: updatedEarned,
-      });
-
-      // Update frontend
-      setTeachers((prev) =>
-        prev.map((t, i) => (i === index ? res.data : t))
-      );
-
-      setToast(`Lesson marked for ${teacher.firstName}! Earned: $${rate}`);
-      setTimeout(() => setToast(""), 3000);
-      
-    } catch (err) {
-      console.error("Mark lesson error:", err);
-      setToast("Could not mark lesson");
-      setTimeout(() => setToast(""), 3000);
-    }
-  };
-
-  const handlePayTeacher = async (index) => {
-    const teacher = teachers[index];
-    if (!teacher || teacher.earned <= 0) {
-      setToast("No payment due for this teacher");
-      setTimeout(() => setToast(""), 3000);
-      return;
-    }
-
-    if (!window.confirm(`Pay ${teacher.firstName} ${teacher.lastName} $${teacher.earned}?`)) {
-      return;
-    }
-
-    try {
-      // Reset earned and lessons on backend
-      const res = await api.put(`/api/teachers/${teacher._id}`, {
-        earned: 0,
-        lessonsCompleted: 0,
-      });
-
-      // Update frontend
-      setTeachers((prev) =>
-        prev.map((t, i) => (i === index ? res.data : t))
-      );
-
-      setToast(`Salary of $${teacher.earned} paid to ${teacher.firstName}!`);
-      setTimeout(() => setToast(""), 3000);
-      
-    } catch (err) {
-      console.error("Pay teacher error:", err);
-      setToast("Could not process payment");
-      setTimeout(() => setToast(""), 3000);
-    }
-  };
-
-  // ---------------------------
-  // Password actions (with backend sync)
-  // ---------------------------
-  // Replace the handleResetPassword function in your TeacherTab.jsx with this:
-
-const handleResetPassword = async (index) => {
-  const teacher = teachers[index];
-  if (!teacher) return;
-
-  try {
-    // Generate a new random password
-    const newPass = Math.random().toString(36).slice(-8);
-    
-    // Send the plain password to backend - backend will hash it
-    const res = await api.put(`/api/teachers/${teacher._id}`, {
-      password: newPass,
-    });
-
-    // Backend returns the teacher data with temporaryPassword field
-    const updated = [...teachers];
-    updated[index] = { 
-      ...res.data, 
-      password: newPass, // Store plain password temporarily for display
-      showTempPassword: true 
-    };
-    setTeachers(updated);
-    
-    setToast("Password reset successfully!");
-    setTimeout(() => setToast(""), 2000);
-    
-    // Hide temp password after 10 seconds
-    setTimeout(() => {
-      setTeachers(prev => 
-        prev.map((t, i) => 
-          i === index ? { ...t, showTempPassword: false, password: undefined } : t
-        )
-      );
-    }, 10000);
-
-    // Log for admin to email the teacher
-    console.log(`📧 Email this to ${teacher.email}:`);
-    console.log(`Your new password is: ${newPass}`);
-    console.log(`Please login at: http://yourapp.com/teacher/login`);
-    
-  } catch (err) {
-    console.error("Reset password error:", err);
-    setToast("Could not reset password");
-    setTimeout(() => setToast(""), 3000);
-  }
-};
-  const handleCopyPassword = (index) => {
-    if (navigator.clipboard && teachers[index]?.password) {
-      navigator.clipboard.writeText(teachers[index].password);
-      setToast("Password copied to clipboard!");
-      setTimeout(() => setToast(""), 2000);
-      
-      // Hide temp password
-      setTeachers(prev => 
-        prev.map((t, i) => 
-          i === index ? { ...t, showTempPassword: false } : t
-        )
-      );
-    }
-  };
-
-  // ---------------------------
-  // Filters
-  // ---------------------------
+  // ── Computed stats ──────────────────────────────────────────────────────────
   const activeTeachers = teachers.filter((t) => t.active);
   const disabledTeachers = teachers.filter((t) => !t.active);
+  const totalEarned = teachers.reduce((sum, t) => sum + (t.earned || 0), 0);
+  const totalLessons = teachers.reduce((sum, t) => sum + (t.lessonsCompleted || 0), 0);
 
-  // include continent filter together with name search
-  const filteredActive = activeTeachers.filter((t) =>
-    `${t.firstName} ${t.lastName}`.toLowerCase().includes(searchActive.toLowerCase())
-    && (continentFilter === "" || t.continent === continentFilter)
-  );
-  const filteredDisabled = disabledTeachers.filter((t) =>
-    `${t.firstName} ${t.lastName}`.toLowerCase().includes(searchDisabled.toLowerCase())
-    && (continentFilter === "" || t.continent === continentFilter)
-  );
+  // ── Filtered teachers ───────────────────────────────────────────────────────
+  const sourceList =
+    view === "active"
+      ? activeTeachers
+      : view === "disabled"
+      ? disabledTeachers
+      : teachers;
 
+  const filteredTeachers = sourceList.filter((t) => {
+    const matchesSearch = `${t.firstName} ${t.lastName} ${t.email}`
+      .toLowerCase()
+      .includes(searchQuery.toLowerCase());
+    const matchesContinent =
+      continentFilter === "" || t.continent === continentFilter;
+    return matchesSearch && matchesContinent;
+  });
+
+  // ── UI helpers ──────────────────────────────────────────────────────────────
+  const base = isDarkMode ? "bg-gray-900" : "bg-gray-50";
+  const cardBg = isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200";
+  const textPrimary = isDarkMode ? "text-white" : "text-gray-900";
+  const textSecondary = isDarkMode ? "text-gray-400" : "text-gray-500";
+  const inputCls = isDarkMode
+    ? "bg-gray-700 border-gray-600 text-white placeholder-gray-500 focus:ring-blue-500 focus:border-blue-500"
+    : "bg-white border-gray-300 text-gray-900 placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500";
+  const selectCls = isDarkMode
+    ? "bg-gray-700 border-gray-600 text-white focus:ring-blue-500"
+    : "bg-white border-gray-300 text-gray-900 focus:ring-blue-500";
+
+  const tabBtnCls = (key) =>
+    view === key
+      ? "bg-blue-600 text-white shadow-sm"
+      : isDarkMode
+      ? "text-gray-400 hover:text-gray-200 hover:bg-gray-700"
+      : "text-gray-500 hover:text-gray-700 hover:bg-gray-100";
+
+  // ── Render ──────────────────────────────────────────────────────────────────
   return (
-    <div className="relative p-4">
+    <div className={`min-h-[60vh] ${base} rounded-2xl p-6`}>
+
+      {/* ── Toast ── */}
       {toast && (
-        <div className={`fixed top-4 right-4 z-50 px-4 py-2 rounded shadow text-white max-w-sm ${
-          toast.includes('successfully') || toast.includes('paid') || toast.includes('copied') 
-            ? 'bg-green-500' 
-            : toast.includes('Error') || toast.includes('Failed') || toast.includes('Could not')
-            ? 'bg-red-500'
-            : 'bg-blue-500'
-        }`}>
-          {toast}
+        <div
+          className={`fixed top-4 right-4 z-50 flex items-center gap-2 px-4 py-3 rounded-xl shadow-xl text-sm font-medium text-white transition-all ${
+            toastType === "error"
+              ? "bg-red-500"
+              : toastType === "info"
+              ? "bg-blue-500"
+              : "bg-emerald-500"
+          }`}
+        >
+          {toastType === "error" ? "✕" : toastType === "info" ? "ℹ" : "✓"} {toast}
         </div>
       )}
 
-      <h2 className="text-2xl font-bold mb-4 text-brand-primary">Teachers</h2>
+      {/* ── NEW: Lesson Mark / Unmark Modal ── */}
+      {lessonModal && (
+        <LessonMarkModal
+          mode={lessonModal.mode}
+          startWith="teacher"
+          teacher={lessonModal.teacher}
+          onClose={() => setLessonModal(null)}
+          onSuccess={handleLessonSuccess}
+          isDarkMode={isDarkMode}
+        />
+      )}
 
-      <div className="flex gap-3">
-        <AnimatedButton
-          color="primary"
+      {/* ── Page header ── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+        <div>
+          <h2 className={`text-2xl font-bold ${textPrimary}`}>Teachers</h2>
+          <p className={`text-sm mt-0.5 ${textSecondary}`}>
+            Manage all teachers on the platform
+          </p>
+        </div>
+        <button
           onClick={() => {
             setEditIndex(null);
             setIsModalOpen(true);
           }}
+          className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold text-sm shadow-md transition-all duration-150 active:scale-95 flex-shrink-0"
         >
-          + Add Teacher
-        </AnimatedButton>
-      </div>
-
-      {/* Toggle view */}
-      <div className="flex justify-center gap-4 mt-6">
-        <button
-          onClick={() => setView("active")}
-          className={`px-6 py-2 rounded-full font-medium transition-all duration-300 ${
-            view === "active"
-              ? "bg-green-600 text-white shadow-lg scale-105"
-              : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-          }`}
-        >
-          Active Teachers ({filteredActive.length})
-        </button>
-        <button
-          onClick={() => setView("disabled")}
-          className={`px-6 py-2 rounded-full font-medium transition-all duration-300 ${
-            view === "disabled"
-              ? "bg-red-600 text-white shadow-lg scale-105"
-              : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-          }`}
-        >
-          Disabled Teachers ({filteredDisabled.length})
+          <Plus className="w-4 h-4" />
+          Add Teacher
         </button>
       </div>
 
+      {/* ── Summary stats ── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+        <SummaryCard
+          icon={Users}
+          label="Total Teachers"
+          value={teachers.length}
+          color="blue"
+          isDarkMode={isDarkMode}
+        />
+        <SummaryCard
+          icon={UserCheck}
+          label="Active"
+          value={activeTeachers.length}
+          sub={`${disabledTeachers.length} disabled`}
+          color="emerald"
+          isDarkMode={isDarkMode}
+        />
+        <SummaryCard
+          icon={TrendingUp}
+          label="Total Lessons"
+          value={totalLessons}
+          color="amber"
+          isDarkMode={isDarkMode}
+        />
+        <SummaryCard
+          icon={DollarSign}
+          label="Pending Payout"
+          value={`$${totalEarned.toFixed(2)}`}
+          color="purple"
+          isDarkMode={isDarkMode}
+        />
+      </div>
+
+      {/* ── Filter bar ── */}
+      <div
+        className={`rounded-xl border p-4 mb-6 ${cardBg} flex flex-col sm:flex-row gap-3 items-start sm:items-center`}
+      >
+        {/* View tabs */}
+        <div className={`flex gap-1 p-1 rounded-lg ${isDarkMode ? "bg-gray-900" : "bg-gray-100"}`}>
+          {[
+            { key: "all", label: `All (${teachers.length})` },
+            { key: "active", label: `Active (${activeTeachers.length})` },
+            { key: "disabled", label: `Disabled (${disabledTeachers.length})` },
+          ].map(({ key, label }) => (
+            <button
+              key={key}
+              onClick={() => setView(key)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 ${tabBtnCls(key)}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {/* Spacer */}
+        <div className="flex-1" />
+
+        {/* Search */}
+        <div className="relative w-full sm:w-56">
+          <Search
+            className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${textSecondary}`}
+          />
+          <input
+            type="text"
+            placeholder="Search teachers..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className={`w-full pl-9 pr-3 py-2 rounded-lg border text-sm transition-colors ${inputCls}`}
+          />
+        </div>
+
+        {/* Continent filter */}
+        <div className="relative">
+          <SlidersHorizontal
+            className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${textSecondary}`}
+          />
+          <select
+            value={continentFilter}
+            onChange={(e) => setContinentFilter(e.target.value)}
+            className={`pl-9 pr-3 py-2 rounded-lg border text-sm transition-colors appearance-none ${selectCls}`}
+          >
+            <option value="">All Continents</option>
+            <option value="Africa">Africa</option>
+            <option value="Europe">Europe</option>
+            <option value="Asia">Asia</option>
+            <option value="North America">North America</option>
+            <option value="South America">South America</option>
+          </select>
+        </div>
+      </div>
+
+      {/* ── Loading state ── */}
       {loading && (
-        <div className="mt-6 text-center">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-          <p className="mt-2">Loading teachers...</p>
+        <div className="flex flex-col items-center justify-center py-20 gap-3">
+          <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+          <p className={`text-sm ${textSecondary}`}>Loading teachers...</p>
         </div>
       )}
 
-      {/* Active teachers */}
-      {!loading && view === "active" && (
-        <div className="mt-6">
-          <div className="mb-4 flex justify-center gap-4">
-            <input
-              type="text"
-              placeholder="Search active teachers..."
-              value={searchActive}
-              onChange={(e) => setSearchActive(e.target.value)}
-              className="w-80 px-4 py-2 rounded-full border shadow focus:ring focus:ring-green-300"
-            />
-
-            {/* ✅ Continent filter select */}
-            <select
-              value={continentFilter}
-              onChange={(e) => setContinentFilter(e.target.value)}
-              className="px-4 py-2 rounded-full border shadow"
-            >
-              <option value="">All Continents</option>
-              <option value="Africa">Africa</option>
-              <option value="Europe">Europe</option>
-              <option value="Asia">Asia</option>
-            </select>
+      {/* ── Empty state ── */}
+      {!loading && filteredTeachers.length === 0 && (
+        <div className="flex flex-col items-center justify-center py-20 gap-3">
+          <div
+            className={`w-16 h-16 rounded-2xl flex items-center justify-center ${
+              isDarkMode ? "bg-gray-800" : "bg-gray-100"
+            }`}
+          >
+            <Users className={`w-8 h-8 ${textSecondary}`} />
           </div>
-
-          {filteredActive.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
-              {searchActive ? "No active teachers found matching your search." : "No active teachers found."}
-            </div>
-          ) : (
-            <TeacherTable
-              teachers={filteredActive}
-              onEdit={handleEdit}
-              onDelete={handleDelete}
-              onToggle={handleToggle}
-              onMarkLesson={handleMarkLesson}
-              onPay={handlePayTeacher}
-              onCopyPassword={handleCopyPassword}
-              onResetPassword={handleResetPassword}
-            />
+          <p className={`text-base font-semibold ${textPrimary}`}>No teachers found</p>
+          <p className={`text-sm ${textSecondary}`}>
+            {searchQuery || continentFilter
+              ? "Try adjusting your search or filters."
+              : view === "disabled"
+              ? "There are no disabled teachers."
+              : "Add your first teacher to get started."}
+          </p>
+          {!searchQuery && !continentFilter && view === "active" && (
+            <button
+              onClick={() => {
+                setEditIndex(null);
+                setIsModalOpen(true);
+              }}
+              className="mt-2 flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold transition-all"
+            >
+              <Plus className="w-4 h-4" />
+              Add First Teacher
+            </button>
           )}
         </div>
       )}
 
-      {/* Disabled teachers */}
-      {!loading && view === "disabled" && (
-        <div className="mt-6">
-          <div className="mb-4 flex justify-center gap-4">
-            <input
-              type="text"
-              placeholder="Search disabled teachers..."
-              value={searchDisabled}
-              onChange={(e) => setSearchDisabled(e.target.value)}
-              className="w-80 px-4 py-2 rounded-full border shadow focus:ring focus:ring-red-300"
-            />
+      {/* ── Teacher card grid ── */}
+      {!loading && filteredTeachers.length > 0 && (
+        <>
+          {/* Result count */}
+          <p className={`text-xs mb-4 ${textSecondary}`}>
+            Showing {filteredTeachers.length} of {sourceList.length} teacher
+            {sourceList.length !== 1 ? "s" : ""}
+            {searchQuery && ` matching "${searchQuery}"`}
+          </p>
 
-            {/* ✅ Continent filter select (same state, applies to both views) */}
-            <select
-              value={continentFilter}
-              onChange={(e) => setContinentFilter(e.target.value)}
-              className="px-4 py-2 rounded-full border shadow"
-            >
-              <option value="">All Continents</option>
-              <option value="Africa">Africa</option>
-              <option value="Europe">Europe</option>
-              <option value="Asia">Asia</option>
-            </select>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {filteredTeachers.map((teacher) => {
+              // Resolve real index in the full teachers array (handlers use index)
+              const realIndex = teachers.findIndex((t) => t._id === teacher._id);
+              return (
+                <TeacherCard
+                  key={teacher._id || realIndex}
+                  teacher={teacher}
+                  isDarkMode={isDarkMode}
+                  onEdit={() => handleEdit(realIndex)}
+                  onDelete={() => handleDelete(realIndex)}
+                  onToggle={() => handleToggle(realIndex)}
+                  onMarkLesson={() => handleMarkLesson(realIndex)}
+                  onUnmarkLesson={() => handleUnmarkLesson(realIndex)} // ← NEW
+                  onPay={() => handlePayTeacher(realIndex)}
+                  onCopyPassword={() => handleCopyPassword(realIndex)}
+                  onResetPassword={() => handleResetPassword(realIndex)}
+                />
+              );
+            })}
           </div>
-
-          {filteredDisabled.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
-              {searchDisabled ? "No disabled teachers found matching your search." : "No disabled teachers found."}
-            </div>
-          ) : (
-            <TeacherTable
-              teachers={filteredDisabled}
-              onEdit={handleEdit}
-              onDelete={handleDelete}
-              onToggle={handleToggle}
-              onMarkLesson={handleMarkLesson}
-              onPay={handlePayTeacher}
-              onCopyPassword={handleCopyPassword}
-              onResetPassword={handleResetPassword}
-            />
-          )}
-        </div>
+        </>
       )}
 
+      {/* ── Teacher create / edit modal ── */}
       <TeacherModal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={() => {
+          setIsModalOpen(false);
+          setEditIndex(null);
+        }}
         onSave={handleSaveTeacher}
         initialData={editIndex !== null ? teachers[editIndex] : null}
       />

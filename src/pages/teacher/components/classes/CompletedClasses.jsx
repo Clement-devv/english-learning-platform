@@ -1,510 +1,335 @@
-// src/pages/teacher/components/classes/CompletedClasses.jsx
+// src/pages/teacher/components/classes/CompletedClasses.jsx  — UPDATED
+// Changes: Added adminRejected badge display, "rejected" filter tab, 
+// and updated data shape to include adminRejected from booking API
+
 import React, { useState, useMemo } from "react";
-import { Search, Download, ChevronLeft, ChevronRight, Calendar, Clock, User, AlertCircle } from "lucide-react";
+import {
+  Search,
+  Download,
+  ChevronLeft,
+  ChevronRight,
+  Calendar,
+  Clock,
+  User,
+  AlertCircle,
+  CheckCircle,
+  XCircle,
+  Filter,
+} from "lucide-react";
 
 export default function CompletedClassesTab({ classes, teacherInfo, isDarkMode }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all"); // all | completed | rejected
   const [exportError, setExportError] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const itemsPerPage = 10;
 
-  // Filter classes based on search and date range
+  // ── Colours ──────────────────────────────────────────────────────────────
+  const bg = isDarkMode ? "bg-gray-800" : "bg-white";
+  const text = isDarkMode ? "text-gray-100" : "text-gray-800";
+  const subText = isDarkMode ? "text-gray-400" : "text-gray-500";
+  const border = isDarkMode ? "border-gray-700" : "border-gray-200";
+  const hoverRow = isDarkMode ? "hover:bg-gray-700" : "hover:bg-gray-50";
+  const inputCls = isDarkMode
+    ? "bg-gray-700 border-gray-600 text-gray-100 placeholder-gray-400"
+    : "border-gray-300 text-gray-900";
+
+  // ── Filter + search ───────────────────────────────────────────────────────
   const filteredClasses = useMemo(() => {
     let filtered = classes;
 
-    // Search filter
+    // Status filter
+    if (statusFilter === "completed") {
+      filtered = filtered.filter((c) => !c.adminRejected);
+    } else if (statusFilter === "rejected") {
+      filtered = filtered.filter((c) => c.adminRejected);
+    }
+
+    // Text search
     if (searchQuery) {
-      filtered = filtered.filter((cls) =>
-        cls.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        cls.topic.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        cls.students.some(s => s.toLowerCase().includes(searchQuery.toLowerCase()))
+      const q = searchQuery.toLowerCase();
+      filtered = filtered.filter(
+        (cls) =>
+          cls.title?.toLowerCase().includes(q) ||
+          cls.topic?.toLowerCase().includes(q) ||
+          cls.students?.some((s) => s.toLowerCase().includes(q))
       );
     }
 
-    // Date range filter
+    // Date range
     if (startDate && endDate) {
       const start = new Date(startDate);
       const end = new Date(endDate);
       end.setHours(23, 59, 59, 999);
-
       filtered = filtered.filter((cls) => {
-        const classDate = new Date(cls.scheduledTime);
-        return classDate >= start && classDate <= end;
+        const d = new Date(cls.scheduledTime);
+        return d >= start && d <= end;
       });
     }
 
     return filtered.sort((a, b) => new Date(b.scheduledTime) - new Date(a.scheduledTime));
-  }, [classes, searchQuery, startDate, endDate]);
+  }, [classes, searchQuery, startDate, endDate, statusFilter]);
+
+  // Counts for tabs
+  const completedCount = classes.filter((c) => !c.adminRejected).length;
+  const rejectedCount = classes.filter((c) => c.adminRejected).length;
 
   // Pagination
   const totalPages = Math.ceil(filteredClasses.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const currentClasses = filteredClasses.slice(startIndex, endIndex);
+  const currentClasses = filteredClasses.slice(startIndex, startIndex + itemsPerPage);
 
-  React.useEffect(() => {
-    setCurrentPage(1);
-  }, [searchQuery, startDate, endDate]);
+  React.useEffect(() => { setCurrentPage(1); }, [searchQuery, startDate, endDate, statusFilter]);
 
-  // Generate PDF using dynamic import
+  // ── PDF Export ────────────────────────────────────────────────────────────
   const generatePDF = async () => {
     try {
       setIsGenerating(true);
       setExportError("");
+      if (!teacherInfo) { setExportError("Teacher information not available"); return; }
 
-      // Validation
-      if (!teacherInfo) {
-        setExportError("Teacher information not available");
-        setIsGenerating(false);
-        return;
-      }
-
-      if (filteredClasses.length === 0) {
-        setExportError("No classes to export");
-        setIsGenerating(false);
-        return;
-      }
-
-      console.log("📄 Starting PDF generation...");
-
-      // Dynamic import to ensure proper loading
-      const { jsPDF } = await import('jspdf');
-      await import('jspdf-autotable');
-
-      console.log("✅ jsPDF loaded");
+      const { default: jsPDF } = await import("jspdf");
+      const { default: autoTable } = await import("jspdf-autotable");
 
       const doc = new jsPDF();
-
-      // Verify autoTable is available
-      if (typeof doc.autoTable !== 'function') {
-        console.error("❌ autoTable not attached to jsPDF instance");
-        
-        // Try alternative: load autoTable manually
-        try {
-          const autoTable = await import('jspdf-autotable');
-          console.log("📦 Loaded autoTable module:", autoTable);
-          
-          if (autoTable.default) {
-            console.log("🔧 Attempting to use default export");
-          }
-        } catch (err) {
-          console.error("Failed to load autoTable:", err);
-        }
-        
-        setExportError("PDF library loading error. Please try refreshing the page.");
-        setIsGenerating(false);
-        return;
-      }
-
-      console.log("✅ autoTable function available");
-
-      // Add title
       doc.setFontSize(18);
-      doc.setTextColor(147, 51, 234);
       doc.text("Completed Classes Report", 14, 20);
-
-      // Add teacher info
       doc.setFontSize(11);
-      doc.setTextColor(0, 0, 0);
       doc.text(`Teacher: ${teacherInfo.firstName} ${teacherInfo.lastName}`, 14, 30);
-      doc.text(`Email: ${teacherInfo.email}`, 14, 36);
+      doc.text(`Generated: ${new Date().toLocaleDateString()}`, 14, 36);
 
-      if (startDate && endDate) {
-        doc.text(`Period: ${new Date(startDate).toLocaleDateString()} - ${new Date(endDate).toLocaleDateString()}`, 14, 42);
-      } else {
-        doc.text(`Generated: ${new Date().toLocaleDateString()}`, 14, 42);
-      }
-
-      doc.text(`Total Classes: ${filteredClasses.length}`, 14, 48);
-
-      // Prepare table data
-      const tableData = filteredClasses.map((cls, index) => [
-        index + 1,
-        cls.title || 'N/A',
-        cls.topic || 'N/A',
-        cls.students.join(", ") || 'N/A',
-        cls.fullDateTime || new Date(cls.scheduledTime).toLocaleString(),
-        `${cls.duration || 0} min`
-      ]);
-
-      console.log("📊 Table data prepared:", tableData.length, "rows");
-
-      // Add table
-      doc.autoTable({
-        startY: 55,
-        head: [['#', 'Class Title', 'Topic', 'Student(s)', 'Date & Time', 'Duration']],
-        body: tableData,
-        theme: 'striped',
-        headStyles: {
-          fillColor: [147, 51, 234],
-          textColor: [255, 255, 255],
-          fontSize: 10,
-          fontStyle: 'bold'
-        },
-        styles: {
-          fontSize: 9,
-          cellPadding: 3
-        },
-        columnStyles: {
-          0: { cellWidth: 10, halign: 'center' },
-          1: { cellWidth: 40 },
-          2: { cellWidth: 35 },
-          3: { cellWidth: 35 },
-          4: { cellWidth: 40 },
-          5: { cellWidth: 20, halign: 'center' }
-        },
-        alternateRowStyles: {
-          fillColor: [245, 245, 245]
-        }
+      autoTable(doc, {
+        startY: 45,
+        head: [["#", "Class", "Topic", "Students", "Date", "Duration", "Status"]],
+        body: filteredClasses.map((cls, i) => [
+          i + 1,
+          cls.title,
+          cls.topic || "—",
+          cls.students?.join(", ") || "—",
+          new Date(cls.scheduledTime).toLocaleDateString(),
+          `${cls.duration} min`,
+          cls.adminRejected ? "Rejected" : "Completed",
+        ]),
+        theme: "striped",
+        headStyles: { fillColor: [88, 28, 135] },
+        styles: { fontSize: 8 },
       });
 
-      console.log("✅ Table added to PDF");
-
-      // Add footer
-      const pageCount = doc.internal.getNumberOfPages();
-      for (let i = 1; i <= pageCount; i++) {
-        doc.setPage(i);
-        doc.setFontSize(8);
-        doc.setTextColor(128, 128, 128);
-        doc.text(
-          `Page ${i} of ${pageCount}`,
-          doc.internal.pageSize.width / 2,
-          doc.internal.pageSize.height - 10,
-          { align: 'center' }
-        );
-      }
-
-      // Save PDF
-      const filename = startDate && endDate
-        ? `completed-classes-${startDate}-to-${endDate}.pdf`
-        : `completed-classes-${new Date().toISOString().split('T')[0]}.pdf`;
-
-      doc.save(filename);
-
-      console.log(`✅ PDF saved successfully: ${filename}`);
-      setIsGenerating(false);
-
-    } catch (error) {
-      console.error("❌ PDF generation failed:", error);
-      console.error("Error stack:", error.stack);
-      setExportError(`Failed to generate PDF: ${error.message}`);
+      doc.save(`completed-classes-${teacherInfo.firstName}-${new Date().toISOString().split("T")[0]}.pdf`);
+    } catch (err) {
+      console.error("PDF error:", err);
+      setExportError("Could not generate PDF. Please try again.");
+    } finally {
       setIsGenerating(false);
     }
   };
 
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="space-y-6">
-      {/* Header with filters */}
-      <div className={`${
-        isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
-      } rounded-2xl border shadow-lg p-6`}>
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+    <div className="space-y-4">
+      {/* Header card */}
+      <div className={`${bg} rounded-xl shadow-md p-5`}>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
           <div>
-            <h2 className={`text-2xl font-bold mb-2 ${
-              isDarkMode ? 'text-white' : 'text-gray-800'
-            }`}>
-              Completed Classes
-            </h2>
-            <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-              Review your teaching history and export reports
+            <h2 className={`text-xl font-bold ${text}`}>Completed Classes</h2>
+            <p className={`text-sm mt-0.5 ${subText}`}>
+              {completedCount} completed · {rejectedCount} rejected by admin
             </p>
           </div>
-          <button
-            onClick={generatePDF}
-            disabled={filteredClasses.length === 0 || isGenerating}
-            className={`flex items-center gap-2 px-6 py-3 rounded-xl font-semibold transition-all duration-200 shadow-lg hover:shadow-xl ${
-              filteredClasses.length === 0 || isGenerating
-                ? isDarkMode
-                  ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
-                  : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                : isDarkMode
-                  ? 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white'
-                  : 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white'
-            }`}
-          >
-            <Download className={`w-5 h-5 ${isGenerating ? 'animate-bounce' : ''}`} />
-            {isGenerating ? 'Generating...' : 'Export PDF'}
-          </button>
+          <div className="flex gap-2 flex-wrap">
+            <button
+              onClick={generatePDF}
+              disabled={isGenerating || filteredClasses.length === 0}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors ${
+                isGenerating || filteredClasses.length === 0
+                  ? "bg-gray-400 cursor-not-allowed"
+                  : "bg-purple-600 hover:bg-purple-700"
+              }`}
+            >
+              <Download className="w-4 h-4" />
+              {isGenerating ? "Generating…" : "Export PDF"}
+            </button>
+          </div>
         </div>
 
-        {/* Export Error */}
         {exportError && (
-          <div className={`mb-4 p-4 rounded-lg flex items-start gap-3 ${
-            isDarkMode ? 'bg-red-900/20 border-red-800 text-red-400' : 'bg-red-50 border-red-200 text-red-700'
-          } border`}>
-            <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
-            <div className="flex-1">
-              <p className="text-sm font-semibold mb-1">{exportError}</p>
-              <button
-                onClick={() => setExportError("")}
-                className="text-xs underline hover:no-underline"
-              >
-                Dismiss
-              </button>
-            </div>
-          </div>
+          <p className="text-sm text-red-600 mb-3 flex items-center gap-1">
+            <AlertCircle className="w-4 h-4" /> {exportError}
+          </p>
         )}
 
-        {/* Filters */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Status filter tabs */}
+        <div className={`flex gap-1 p-1 rounded-lg mb-4 w-fit ${isDarkMode ? "bg-gray-700" : "bg-gray-100"}`}>
+          {[
+            { key: "all", label: `All (${classes.length})` },
+            { key: "completed", label: `Completed (${completedCount})` },
+            { key: "rejected", label: `Rejected (${rejectedCount})` },
+          ].map(({ key, label }) => (
+            <button
+              key={key}
+              onClick={() => setStatusFilter(key)}
+              className={`px-4 py-1.5 rounded-md text-sm font-semibold transition-all ${
+                statusFilter === key
+                  ? key === "rejected"
+                    ? "bg-rose-600 text-white"
+                    : "bg-purple-600 text-white"
+                  : isDarkMode
+                  ? "text-gray-400 hover:text-gray-200"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {/* Search + date filters */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <div className="relative">
-            <Search className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 ${
-              isDarkMode ? 'text-gray-400' : 'text-gray-400'
-            }`} />
+            <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${subText}`} />
             <input
               type="text"
-              placeholder="Search classes..."
+              placeholder="Search classes, topics, students…"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className={`w-full pl-10 pr-4 py-3 rounded-lg transition-all ${
-                isDarkMode
-                  ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-purple-500'
-                  : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400 focus:border-purple-500'
-              } border-2 focus:ring-2 focus:ring-purple-500/50 outline-none`}
+              className={`w-full pl-9 pr-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-purple-400 focus:outline-none ${inputCls}`}
             />
           </div>
-
           <input
             type="date"
             value={startDate}
             onChange={(e) => setStartDate(e.target.value)}
-            className={`px-4 py-3 rounded-lg transition-all ${
-              isDarkMode
-                ? 'bg-gray-700 border-gray-600 text-white focus:border-purple-500'
-                : 'bg-white border-gray-300 text-gray-900 focus:border-purple-500'
-            } border-2 focus:ring-2 focus:ring-purple-500/50 outline-none`}
+            className={`px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-purple-400 focus:outline-none ${inputCls}`}
           />
-
           <input
             type="date"
             value={endDate}
             onChange={(e) => setEndDate(e.target.value)}
-            className={`px-4 py-3 rounded-lg transition-all ${
-              isDarkMode
-                ? 'bg-gray-700 border-gray-600 text-white focus:border-purple-500'
-                : 'bg-white border-gray-300 text-gray-900 focus:border-purple-500'
-            } border-2 focus:ring-2 focus:ring-purple-500/50 outline-none`}
+            className={`px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-purple-400 focus:outline-none ${inputCls}`}
           />
         </div>
 
-        <div className={`mt-4 text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-          Showing <span className="font-semibold">{startIndex + 1}-{Math.min(endIndex, filteredClasses.length)}</span> of <span className="font-semibold">{filteredClasses.length}</span> classes
-        </div>
+        <p className={`text-xs mt-2 ${subText}`}>
+          Showing {startIndex + 1}–{Math.min(startIndex + itemsPerPage, filteredClasses.length)} of {filteredClasses.length} classes
+        </p>
       </div>
 
-      {/* Classes List */}
+      {/* Class list */}
       {currentClasses.length === 0 ? (
-        <div className={`${
-          isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
-        } rounded-2xl border shadow-lg p-12 text-center`}>
-          <Calendar className={`w-16 h-16 mx-auto mb-4 ${
-            isDarkMode ? 'text-gray-600' : 'text-gray-300'
-          }`} />
-          <p className={`text-lg font-semibold mb-2 ${
-            isDarkMode ? 'text-gray-300' : 'text-gray-600'
-          }`}>
-            {searchQuery || startDate || endDate
-              ? "No classes found matching your criteria"
-              : "No completed classes yet"}
+        <div className={`${bg} rounded-xl shadow-md p-12 text-center`}>
+          <CheckCircle className={`w-12 h-12 mx-auto mb-3 opacity-25 ${subText}`} />
+          <p className={`${subText} text-lg`}>
+            {searchQuery || startDate || endDate || statusFilter !== "all"
+              ? "No classes match your filters."
+              : "No completed classes yet."}
           </p>
-          {(searchQuery || startDate || endDate) && (
+          {(searchQuery || startDate || endDate || statusFilter !== "all") && (
             <button
-              onClick={() => {
-                setSearchQuery("");
-                setStartDate("");
-                setEndDate("");
-              }}
-              className={`mt-4 px-6 py-3 rounded-lg font-semibold transition-all ${
-                isDarkMode
-                  ? 'bg-purple-600 hover:bg-purple-700 text-white'
-                  : 'bg-purple-600 hover:bg-purple-700 text-white'
-              }`}
+              onClick={() => { setSearchQuery(""); setStartDate(""); setEndDate(""); setStatusFilter("all"); }}
+              className="mt-3 text-sm text-purple-600 hover:underline"
             >
-              Clear Filters
+              Clear all filters
             </button>
           )}
         </div>
       ) : (
-        <div className="space-y-4">
-          {currentClasses.map((cls) => (
-            <div
-              key={cls.id}
-              className={`${
-                isDarkMode
-                  ? 'bg-gray-800 border-gray-700 hover:bg-gray-750'
-                  : 'bg-white border-gray-200 hover:shadow-xl'
-              } rounded-2xl border shadow-lg transition-all duration-300 overflow-hidden`}
-            >
-              <div className="h-2 bg-gradient-to-r from-purple-500 to-pink-500"></div>
-
-              <div className="p-6">
-                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                  <div className="flex-1">
-                    <h3 className={`text-xl font-bold mb-2 ${
-                      isDarkMode ? 'text-white' : 'text-gray-900'
+        <div className={`${bg} rounded-xl shadow-md divide-y ${border}`}>
+          {currentClasses.map((cls, idx) => {
+            const isRejected = cls.adminRejected;
+            return (
+              <div key={cls.id || idx} className={`p-5 ${hoverRow} transition-colors`}>
+                <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+                  <div className="flex gap-3 flex-1">
+                    {/* Index badge */}
+                    <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0 ${
+                      isRejected
+                        ? "bg-red-100 text-red-700"
+                        : isDarkMode
+                        ? "bg-purple-900 text-purple-300"
+                        : "bg-purple-100 text-purple-700"
                     }`}>
-                      {cls.title}
-                    </h3>
-                    <p className={`text-sm mb-4 ${
-                      isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                    }`}>
-                      {cls.topic}
-                    </p>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                      <div className="flex items-center gap-3">
-                        <div className={`${
-                          isDarkMode ? 'bg-purple-900/30' : 'bg-purple-100'
-                        } p-2 rounded-lg`}>
-                          <Calendar className={`w-5 h-5 ${
-                            isDarkMode ? 'text-purple-400' : 'text-purple-600'
-                          }`} />
-                        </div>
-                        <div>
-                          <p className={`text-xs ${isDarkMode ? 'text-gray-500' : 'text-gray-500'}`}>
-                            Date
-                          </p>
-                          <p className={`text-sm font-semibold ${
-                            isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                          }`}>
-                            {cls.fullDateTime || new Date(cls.scheduledTime).toLocaleDateString()}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-3">
-                        <div className={`${
-                          isDarkMode ? 'bg-blue-900/30' : 'bg-blue-100'
-                        } p-2 rounded-lg`}>
-                          <Clock className={`w-5 h-5 ${
-                            isDarkMode ? 'text-blue-400' : 'text-blue-600'
-                          }`} />
-                        </div>
-                        <div>
-                          <p className={`text-xs ${isDarkMode ? 'text-gray-500' : 'text-gray-500'}`}>
-                            Duration
-                          </p>
-                          <p className={`text-sm font-semibold ${
-                            isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                          }`}>
-                            {cls.duration} minutes
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-3">
-                        <div className={`${
-                          isDarkMode ? 'bg-green-900/30' : 'bg-green-100'
-                        } p-2 rounded-lg`}>
-                          <User className={`w-5 h-5 ${
-                            isDarkMode ? 'text-green-400' : 'text-green-600'
-                          }`} />
-                        </div>
-                        <div>
-                          <p className={`text-xs ${isDarkMode ? 'text-gray-500' : 'text-gray-500'}`}>
-                            Students
-                          </p>
-                          <p className={`text-sm font-semibold ${
-                            isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                          }`}>
-                            {cls.students.length}
-                          </p>
-                        </div>
-                      </div>
+                      {startIndex + idx + 1}
                     </div>
 
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      {cls.students.map((student, idx) => (
-                        <span
-                          key={idx}
-                          className={`${
-                            isDarkMode
-                              ? 'bg-gray-700 text-gray-300 border-gray-600'
-                              : 'bg-gray-100 text-gray-700 border-gray-300'
-                          } px-3 py-1.5 rounded-lg text-sm font-medium border`}
-                        >
-                          {student}
+                    <div className="flex-1">
+                      {/* Title + rejection badge */}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className={`font-semibold ${text}`}>{cls.title}</h3>
+                        {isRejected ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-700 border border-red-200">
+                            <XCircle className="w-3 h-3" />
+                            Rejected by Admin
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700 border border-emerald-200">
+                            <CheckCircle className="w-3 h-3" />
+                            Completed
+                          </span>
+                        )}
+                      </div>
+
+                      {cls.topic && (
+                        <p className={`text-sm mt-0.5 ${subText}`}>
+                          <span className="font-medium">Topic:</span> {cls.topic}
+                        </p>
+                      )}
+
+                      {/* Meta row */}
+                      <div className={`flex flex-wrap items-center gap-4 mt-2 text-sm ${subText}`}>
+                        <span className="flex items-center gap-1">
+                          <Calendar className="w-4 h-4" />
+                          {cls.fullDateTime || new Date(cls.scheduledTime).toLocaleString()}
                         </span>
-                      ))}
-                    </div>
-                  </div>
+                        <span className="flex items-center gap-1">
+                          <Clock className="w-4 h-4" />
+                          {cls.duration} min
+                        </span>
+                        {cls.students?.length > 0 && (
+                          <span className="flex items-center gap-1">
+                            <User className="w-4 h-4" />
+                            {cls.students.join(", ")}
+                          </span>
+                        )}
+                      </div>
 
-                  <div className={`${
-                    isDarkMode ? 'bg-green-900/30 text-green-400' : 'bg-green-100 text-green-700'
-                  } px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-2 self-start lg:self-center`}>
-                    <div className="w-2 h-2 bg-current rounded-full"></div>
-                    Completed
+                      {/* Rejection reason */}
+                      {isRejected && cls.adminRejectedReason && (
+                        <p className="mt-2 text-xs text-red-600 bg-red-50 border border-red-200 px-3 py-1.5 rounded-lg">
+                          <strong>Reason:</strong> {cls.adminRejectedReason}
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className={`${
-          isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
-        } rounded-2xl border shadow-lg p-4`}>
-          <div className="flex items-center justify-between">
-            <button
-              onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-              disabled={currentPage === 1}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-all ${
-                currentPage === 1
-                  ? isDarkMode
-                    ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
-                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                  : isDarkMode
-                    ? 'bg-purple-600 hover:bg-purple-700 text-white'
-                    : 'bg-purple-600 hover:bg-purple-700 text-white'
-              }`}
-            >
-              <ChevronLeft className="w-5 h-5" />
-              Previous
-            </button>
-
-            <div className="flex items-center gap-2">
-              {[...Array(totalPages)].map((_, index) => (
-                <button
-                  key={index}
-                  onClick={() => setCurrentPage(index + 1)}
-                  className={`w-10 h-10 rounded-lg font-semibold transition-all ${
-                    currentPage === index + 1
-                      ? isDarkMode
-                        ? 'bg-purple-600 text-white'
-                        : 'bg-purple-600 text-white'
-                      : isDarkMode
-                        ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  {index + 1}
-                </button>
-              ))}
-            </div>
-
-            <button
-              onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-              disabled={currentPage === totalPages}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-all ${
-                currentPage === totalPages
-                  ? isDarkMode
-                    ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
-                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                  : isDarkMode
-                    ? 'bg-purple-600 hover:bg-purple-700 text-white'
-                    : 'bg-purple-600 hover:bg-purple-700 text-white'
-              }`}
-            >
-              Next
-              <ChevronRight className="w-5 h-5" />
-            </button>
-          </div>
+        <div className="flex items-center justify-center gap-3">
+          <button
+            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+            disabled={currentPage === 1}
+            className={`p-2 rounded-lg transition-colors disabled:opacity-30 ${isDarkMode ? "hover:bg-gray-700" : "hover:bg-gray-100"}`}
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+          <span className={`text-sm ${subText}`}>
+            Page {currentPage} of {totalPages}
+          </span>
+          <button
+            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+            disabled={currentPage === totalPages}
+            className={`p-2 rounded-lg transition-colors disabled:opacity-30 ${isDarkMode ? "hover:bg-gray-700" : "hover:bg-gray-100"}`}
+          >
+            <ChevronRight className="w-5 h-5" />
+          </button>
         </div>
       )}
     </div>

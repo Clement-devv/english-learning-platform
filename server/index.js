@@ -45,6 +45,7 @@ import paymentTransactionRoutes from "./routes/paymentTransactionRoutes.js";
 import recurringBookingsRoutes from "./routes/recurringBookingsRoutes.js";
 import analyticsRoutes from "./routes/analyticsRoutes.js";
 import { verifyEmailConfig } from "./utils/emailService.js";
+import adminLessonRoutes from "./routes/adminLessonRoutes.js";
 
 // ✅ FIXED: Correct import path for RecurringPattern model
 import RecurringPattern from "./models/RecurringPattern.js";
@@ -145,6 +146,7 @@ app.use("/api/group-chats", groupChatRoutes);
 app.use("/api/payments", paymentTransactionRoutes);
 app.use("/api/recurring-bookings", recurringBookingsRoutes);
 app.use("/api/analytics", analyticsRoutes);
+app.use("/api/admin/lessons", adminLessonRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
