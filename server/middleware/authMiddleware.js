@@ -4,6 +4,7 @@ import { config } from "../config/config.js";
 import Teacher from "../models/Teacher.js";
 import Student from "../models/Student.js";
 import Admin from "../models/Admin.js";
+import SubAdmin from "../models/SubAdmin.js";
 
 // Verify JWT token and attach user to request
 export const verifyToken = async (req, res, next) => {
@@ -42,6 +43,30 @@ export const verifyToken = async (req, res, next) => {
     });
   }
 };
+
+export const verifySubAdmin = async (req, res, next) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ message: "Authentication required" });
+    }
+    if (req.user.role !== "sub-admin") {
+      return res.status(403).json({ message: "Sub-admin access required" });
+    }
+    const subAdmin = await SubAdmin.findById(req.user.id);
+    if (!subAdmin || subAdmin.status !== "active") {
+      return res.status(403).json({ message: "Sub-admin account inactive or not found" });
+    }
+    req.subAdmin = subAdmin;
+    // Attach teacher scope to every request
+    req.teacherScope = subAdmin.assignmentType === "region"
+      ? null // route will need to query by region
+      : subAdmin.assignedTeachers.map(String);
+    next();
+  } catch (err) {
+    return res.status(500).json({ message: "Authorization error" });
+  }
+};
+
 
 // Verify user is Admin
 export const verifyAdmin = async (req, res, next) => {

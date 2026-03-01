@@ -46,6 +46,9 @@ import recurringBookingsRoutes from "./routes/recurringBookingsRoutes.js";
 import analyticsRoutes from "./routes/analyticsRoutes.js";
 import { verifyEmailConfig } from "./utils/emailService.js";
 import adminLessonRoutes from "./routes/adminLessonRoutes.js";
+import subAdminRoutes     from "./routes/subAdminRoutes.js";
+import subAdminAuthRoutes from "./routes/subAdminAuthRoutes.js";
+import subAdminScopeRoutes from "./routes/subAdminScopeRoutes.js";
 
 // ✅ FIXED: Correct import path for RecurringPattern model
 import RecurringPattern from "./models/RecurringPattern.js";
@@ -147,6 +150,11 @@ app.use("/api/payments", paymentTransactionRoutes);
 app.use("/api/recurring-bookings", recurringBookingsRoutes);
 app.use("/api/analytics", analyticsRoutes);
 app.use("/api/admin/lessons", adminLessonRoutes);
+app.use("/api/sub-admins",      subAdminRoutes);
+app.use("/api/sub-admin-auth",  subAdminAuthRoutes);
+app.use("/api/sub-admin-scope", subAdminScopeRoutes);
+
+
 
 // Error handling middleware
 app.use((err, req, res, next) => {

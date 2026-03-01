@@ -703,6 +703,373 @@ export const sendForgotPasswordEmail = async (email, name, resetToken) => {
   return await sendEmail(mailOptions);
 };
 
+// ─────────────────────────────────────────────────────────────────────────────
+// ADD THESE TWO FUNCTIONS TO: server/utils/emailService.js
+// Add them before the `export default` line at the bottom
+// Also add both names to the export default object
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Send invitation email to a new sub-admin
+ * @param {Object} subAdmin  - SubAdmin document (firstName, lastName, email)
+ * @param {String} setupUrl  - The account setup link
+ * @param {Object} createdBy - Admin who created the invite (firstName, lastName)
+ */
+export const sendSubAdminInviteEmail = async (subAdmin, setupUrl, createdBy) => {
+  const adminName = createdBy
+    ? `${createdBy.firstName} ${createdBy.lastName}`
+    : "The main administrator";
+
+  const mailOptions = {
+    from: `"${config.appName}" <${config.emailFrom}>`,
+    to: subAdmin.email,
+    subject: `You've been invited to join ${config.appName} as a Sub-Admin`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <style>
+          * { box-sizing: border-box; margin: 0; padding: 0; }
+          body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: #f0f4ff;
+            padding: 40px 20px;
+          }
+          .wrapper {
+            max-width: 580px;
+            margin: 0 auto;
+          }
+          .card {
+            background: white;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 8px 40px rgba(79,99,210,0.12);
+          }
+          .header {
+            background: linear-gradient(135deg, #1e2540 0%, #2d3a6e 100%);
+            padding: 40px 36px;
+            text-align: center;
+          }
+          .logo-ring {
+            width: 72px; height: 72px;
+            background: linear-gradient(135deg, #4f63d2, #6b82f0);
+            border-radius: 20px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 16px;
+            font-size: 32px;
+          }
+          .header h1 {
+            color: white;
+            font-size: 22px;
+            font-weight: 700;
+            margin-bottom: 6px;
+          }
+          .header p {
+            color: rgba(255,255,255,0.6);
+            font-size: 14px;
+          }
+          .body {
+            padding: 36px;
+          }
+          .greeting {
+            font-size: 17px;
+            font-weight: 600;
+            color: #1e293b;
+            margin-bottom: 14px;
+          }
+          .text {
+            font-size: 14.5px;
+            color: #64748b;
+            line-height: 1.7;
+            margin-bottom: 12px;
+          }
+          .info-box {
+            background: #f0f4ff;
+            border: 1px solid #dde3f8;
+            border-radius: 14px;
+            padding: 18px 20px;
+            margin: 24px 0;
+          }
+          .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 7px 0;
+            border-bottom: 1px solid #e8ecf8;
+            font-size: 13.5px;
+          }
+          .info-row:last-child { border-bottom: none; }
+          .info-label { color: #94a3b8; font-weight: 500; }
+          .info-value { color: #1e293b; font-weight: 700; }
+          .cta-btn {
+            display: block;
+            width: 100%;
+            padding: 16px;
+            background: linear-gradient(135deg, #4f63d2, #6b82f0);
+            color: white !important;
+            text-decoration: none;
+            border-radius: 14px;
+            text-align: center;
+            font-size: 15px;
+            font-weight: 700;
+            margin: 28px 0 16px;
+            letter-spacing: 0.01em;
+          }
+          .expiry {
+            text-align: center;
+            font-size: 12.5px;
+            color: #94a3b8;
+            margin-bottom: 24px;
+          }
+          .warning-box {
+            background: #fef9c3;
+            border: 1px solid #fde68a;
+            border-radius: 12px;
+            padding: 14px 16px;
+            font-size: 13px;
+            color: #92400e;
+            margin-bottom: 24px;
+          }
+          .footer {
+            background: #f8faff;
+            border-top: 1px solid #e8ecf8;
+            padding: 20px 36px;
+            text-align: center;
+            font-size: 12px;
+            color: #94a3b8;
+            line-height: 1.6;
+          }
+          .link-fallback {
+            word-break: break-all;
+            font-size: 12px;
+            color: #4f63d2;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="wrapper">
+          <div class="card">
+
+            <!-- Header -->
+            <div class="header">
+              <div class="logo-ring">🛡️</div>
+              <h1>You're Invited!</h1>
+              <p>${config.appName} Sub-Admin Access</p>
+            </div>
+
+            <!-- Body -->
+            <div class="body">
+              <p class="greeting">Hi ${subAdmin.firstName} ${subAdmin.lastName},</p>
+
+              <p class="text">
+                <strong>${adminName}</strong> has invited you to join 
+                <strong>${config.appName}</strong> as a <strong>Sub-Administrator</strong>.
+                You will be able to manage assigned teachers and their students on the platform.
+              </p>
+
+              <div class="info-box">
+                <div class="info-row">
+                  <span class="info-label">Your Email</span>
+                  <span class="info-value">${subAdmin.email}</span>
+                </div>
+                <div class="info-row">
+                  <span class="info-label">Role</span>
+                  <span class="info-value">Sub-Administrator</span>
+                </div>
+                <div class="info-row">
+                  <span class="info-label">Platform</span>
+                  <span class="info-value">${config.appName}</span>
+                </div>
+                <div class="info-row">
+                  <span class="info-label">Invited By</span>
+                  <span class="info-value">${adminName}</span>
+                </div>
+              </div>
+
+              <p class="text">
+                Click the button below to set up your password and activate your account.
+                This link will expire in <strong>48 hours</strong>.
+              </p>
+
+              <a href="${setupUrl}" class="cta-btn">
+                ✅ Set Up My Account
+              </a>
+
+              <p class="expiry">⏰ This invitation expires in 48 hours</p>
+
+              <div class="warning-box">
+                ⚠️ If you did not expect this invitation, you can safely ignore this email.
+                Your email address will not be used without account activation.
+              </div>
+
+              <p class="text" style="font-size: 12.5px; color: #94a3b8;">
+                If the button above doesn't work, copy and paste this link into your browser:<br />
+                <a href="${setupUrl}" class="link-fallback">${setupUrl}</a>
+              </p>
+            </div>
+
+            <!-- Footer -->
+            <div class="footer">
+              <p>This is an automated message from <strong>${config.appName}</strong></p>
+              <p>Please do not reply to this email · Contact support for assistance</p>
+            </div>
+
+          </div>
+        </div>
+      </body>
+      </html>
+    `,
+  };
+
+  return await sendEmail(mailOptions);
+};
+
+/**
+ * Send welcome email after sub-admin activates their account
+ * @param {Object} subAdmin - SubAdmin document
+ */
+export const sendSubAdminWelcomeEmail = async (subAdmin) => {
+  const loginUrl = `${config.frontendUrl}/sub-admin/login`;
+
+  const mailOptions = {
+    from: `"${config.appName}" <${config.emailFrom}>`,
+    to: subAdmin.email,
+    subject: `Welcome aboard, ${subAdmin.firstName}! Your account is ready 🎉`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8" />
+        <style>
+          * { box-sizing: border-box; margin: 0; padding: 0; }
+          body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: #f0f4ff;
+            padding: 40px 20px;
+          }
+          .wrapper { max-width: 580px; margin: 0 auto; }
+          .card {
+            background: white;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 8px 40px rgba(79,99,210,0.12);
+          }
+          .header {
+            background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+            padding: 40px 36px;
+            text-align: center;
+          }
+          .header h1 { color: white; font-size: 24px; font-weight: 700; margin-top: 12px; }
+          .header p  { color: rgba(255,255,255,0.75); font-size: 14px; margin-top: 6px; }
+          .body { padding: 36px; }
+          .greeting { font-size: 17px; font-weight: 600; color: #1e293b; margin-bottom: 14px; }
+          .text { font-size: 14.5px; color: #64748b; line-height: 1.7; margin-bottom: 14px; }
+          .feature-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin: 24px 0;
+          }
+          .feature {
+            background: #f0f4ff;
+            border: 1px solid #dde3f8;
+            border-radius: 12px;
+            padding: 14px;
+            text-align: center;
+          }
+          .feature .icon { font-size: 24px; margin-bottom: 6px; }
+          .feature p { font-size: 12.5px; font-weight: 600; color: #475569; }
+          .cta-btn {
+            display: block;
+            padding: 16px;
+            background: linear-gradient(135deg, #4f63d2, #6b82f0);
+            color: white !important;
+            text-decoration: none;
+            border-radius: 14px;
+            text-align: center;
+            font-size: 15px;
+            font-weight: 700;
+            margin: 28px 0;
+          }
+          .footer {
+            background: #f8faff;
+            border-top: 1px solid #e8ecf8;
+            padding: 20px 36px;
+            text-align: center;
+            font-size: 12px;
+            color: #94a3b8;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="wrapper">
+          <div class="card">
+
+            <div class="header">
+              <div style="font-size: 48px;">🎉</div>
+              <h1>Welcome, ${subAdmin.firstName}!</h1>
+              <p>Your sub-admin account is now active</p>
+            </div>
+
+            <div class="body">
+              <p class="greeting">Hi ${subAdmin.firstName} ${subAdmin.lastName},</p>
+
+              <p class="text">
+                Your account has been successfully set up! You now have access to 
+                <strong>${config.appName}</strong>'s admin panel where you can manage 
+                your assigned teachers and students.
+              </p>
+
+              <div class="feature-grid">
+                <div class="feature">
+                  <div class="icon">👨‍🏫</div>
+                  <p>Manage Teachers</p>
+                </div>
+                <div class="feature">
+                  <div class="icon">👩‍🎓</div>
+                  <p>View Students</p>
+                </div>
+                <div class="feature">
+                  <div class="icon">💬</div>
+                  <p>Send Messages</p>
+                </div>
+                <div class="feature">
+                  <div class="icon">📅</div>
+                  <p>Track Bookings</p>
+                </div>
+              </div>
+
+              <p class="text">
+                Use your email address <strong>${subAdmin.email}</strong> and the password 
+                you just created to log in.
+              </p>
+
+              <a href="${loginUrl}" class="cta-btn">
+                🚀 Go to My Dashboard
+              </a>
+
+              <p class="text" style="font-size: 13px; color: #94a3b8;">
+                If you have questions or need help, contact the main administrator who set up your account.
+              </p>
+            </div>
+
+            <div class="footer">
+              <p>This is an automated message from <strong>${config.appName}</strong></p>
+            </div>
+
+          </div>
+        </div>
+      </body>
+      </html>
+    `,
+  };
+
+  return await sendEmail(mailOptions);
+};
+
 export default {
   verifyEmailConfig,
   sendBookingRequestToTeacher,
@@ -712,5 +1079,7 @@ export default {
   sendClassCompletedNotification,
   sendWelcomeEmail,
   sendPasswordResetEmail,
-  sendForgotPasswordEmail
+  sendForgotPasswordEmail,
+  sendSubAdminInviteEmail,
+  sendSubAdminWelcomeEmail
 };

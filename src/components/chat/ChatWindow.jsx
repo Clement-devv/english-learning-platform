@@ -1,356 +1,291 @@
-// src/components/chat/ChatWindow.jsx - ✅ BEAUTIFUL UI WITH COLORS & SMOOTH SCROLLING
+// src/components/chat/ChatWindow.jsx
 import React, { useState, useEffect, useRef } from "react";
-import { Send, ArrowLeft, Users, Loader, Paperclip, Smile, MoreVertical, Phone, Video, Search } from "lucide-react";
+import {
+  Send, ArrowLeft, Users, Loader2,
+  Paperclip, Smile, MoreVertical, Search, CheckCheck,
+} from "lucide-react";
 import api from "../../api";
-import { useDarkMode } from "../../hooks/useDarkMode";
 
-export default function ChatWindow({ chat, userRole, onClose }) {
+export default function ChatWindow({ chat, userRole, onClose, isDark }) {
   const [messages, setMessages] = useState([]);
-  const [newMessage, setNewMessage] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [sending, setSending] = useState(false);
-  const messagesEndRef = useRef(null);
-  const messagesContainerRef = useRef(null);
-  const { isDarkMode } = useDarkMode();
+  const [newMsg, setNewMsg]     = useState("");
+  const [loading, setLoading]   = useState(false);
+  const [sending, setSending]   = useState(false);
+  const bottomRef               = useRef(null);
+  const textareaRef             = useRef(null);
+  const inputWrapRef            = useRef(null);
 
-  // 🎨 Color palette for different user types
-  const roleColors = {
-    admin: {
-      bg: 'bg-gradient-to-br from-purple-500 to-purple-600',
-      text: 'text-white',
-      name: 'text-purple-600',
-      badge: 'bg-purple-100 text-purple-700'
-    },
-    teacher: {
-      bg: 'bg-gradient-to-br from-blue-500 to-blue-600',
-      text: 'text-white',
-      name: 'text-blue-600',
-      badge: 'bg-blue-100 text-blue-700'
-    },
-    student: {
-      bg: 'bg-gradient-to-br from-green-500 to-green-600',
-      text: 'text-white',
-      name: 'text-green-600',
-      badge: 'bg-green-100 text-green-700'
-    }
-  };
-
-  // Fetch messages when chat changes
   useEffect(() => {
-    if (chat?._id) {
-      fetchMessages();
-      markAsRead();
-      
-      // Poll for new messages every 5 seconds
-      const interval = setInterval(fetchMessages, 5000);
-      return () => clearInterval(interval);
-    }
+    if (!chat?._id) return;
+    fetchMessages();
+    markAsRead();
+    const id = setInterval(fetchMessages, 5000);
+    return () => clearInterval(id);
   }, [chat?._id]);
 
-  // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
-    scrollToBottom();
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
 
   const fetchMessages = async () => {
     if (!chat?._id) return;
-    
     try {
       setLoading(true);
-      const response = await api.get(`/api/group-chats/${chat._id}/messages`);
-      
-      // Handle different response formats
-      let fetchedMessages = [];
-      if (response.data.messages) {
-        fetchedMessages = response.data.messages;
-      } else if (Array.isArray(response.data)) {
-        fetchedMessages = response.data;
-      }
-      
-      setMessages(fetchedMessages);
-    } catch (error) {
-      console.error("Error fetching messages:", error);
+      const res = await api.get(`/api/group-chats/${chat._id}/messages`);
+      const msgs = res.data?.messages || (Array.isArray(res.data) ? res.data : []);
+      setMessages(msgs);
+    } catch (e) {
+      console.error("Fetch messages error:", e);
     } finally {
       setLoading(false);
     }
   };
 
   const markAsRead = async () => {
-    if (!chat?._id) return;
-    
-    try {
-      await api.patch(`/api/group-chats/${chat._id}/mark-read`);
-    } catch (error) {
-      console.error("Error marking as read:", error);
-    }
+    try { await api.patch(`/api/group-chats/${chat._id}/mark-read`); } catch {}
   };
 
-  const handleSendMessage = async (e) => {
+  const handleSend = async (e) => {
     e.preventDefault();
-    
-    if (!newMessage.trim() || sending) return;
-    
+    if (!newMsg.trim() || sending) return;
     try {
       setSending(true);
-      
-      const response = await api.post(`/api/group-chats/${chat._id}/messages`, {
-        message: newMessage.trim()
-      });
-
-      if (response.data.success) {
-        // Add the new message to the list
-        setMessages(prev => [...prev, response.data.data]);
-        setNewMessage("");
-        scrollToBottom();
+      const res = await api.post(`/api/group-chats/${chat._id}/messages`, { message: newMsg.trim() });
+      if (res.data.success) {
+        setMessages(prev => [...prev, res.data.data]);
+        setNewMsg("");
+        if (textareaRef.current) {
+          textareaRef.current.style.height = "auto";
+          textareaRef.current.focus();
+        }
       }
-    } catch (error) {
-      console.error("Error sending message:", error);
-      alert("Failed to send message. Please try again.");
+    } catch (e) {
+      console.error("Send error:", e);
     } finally {
       setSending(false);
     }
   };
 
-  const formatTime = (date) => {
-    if (!date) return "";
-    const d = new Date(date);
-    return d.toLocaleTimeString('en-US', { 
-      hour: 'numeric', 
-      minute: '2-digit',
-      hour12: true 
+  const handleKeyDown = (e) => {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(e); }
+  };
+
+  // ── Helpers ─────────────────────────────────────
+  const fmtTime = (d) => {
+    if (!d) return "";
+    return new Date(d).toLocaleTimeString("en-US", { hour:"numeric", minute:"2-digit", hour12:true });
+  };
+
+  const fmtDate = (d) => {
+    if (!d) return "";
+    const date = new Date(d), today = new Date();
+    const yest = new Date(today); yest.setDate(yest.getDate() - 1);
+    if (date.toDateString() === today.toDateString()) return "Today";
+    if (date.toDateString() === yest.toDateString())  return "Yesterday";
+    return date.toLocaleDateString("en-US", {
+      month:"short", day:"numeric",
+      year: date.getFullYear() !== today.getFullYear() ? "numeric" : undefined,
     });
   };
 
-  const formatDate = (date) => {
-    if (!date) return "";
-    const d = new Date(date);
-    const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-    
-    if (d.toDateString() === today.toDateString()) {
-      return "Today";
-    } else if (d.toDateString() === yesterday.toDateString()) {
-      return "Yesterday";
-    } else {
-      return d.toLocaleDateString('en-US', { 
-        month: 'short', 
-        day: 'numeric',
-        year: d.getFullYear() !== today.getFullYear() ? 'numeric' : undefined
-      });
-    }
+  const getInitials = (name = "") => {
+    const p = name.trim().split(" ");
+    return p.length >= 2
+      ? (p[0][0] + p[p.length-1][0]).toUpperCase()
+      : name.slice(0,2).toUpperCase();
   };
 
-  // Group messages by date
-  const groupedMessages = messages.reduce((groups, message) => {
-    const date = formatDate(message.createdAt);
-    if (!groups[date]) {
-      groups[date] = [];
-    }
-    groups[date].push(message);
-    return groups;
+  const roleStyle = {
+    admin:   { grad:"linear-gradient(135deg,#7c3aed,#a855f7)", bubble:"linear-gradient(135deg,#7c3aed,#8b5cf6)", badge:"#7c3aed" },
+    teacher: { grad:"linear-gradient(135deg,#1d4ed8,#0891b2)", bubble:"linear-gradient(135deg,#2563eb,#06b6d4)", badge:"#1d4ed8" },
+    student: { grad:"linear-gradient(135deg,#047857,#10b981)", bubble:"linear-gradient(135deg,#059669,#10b981)", badge:"#047857" },
+  };
+
+  const myStyle = roleStyle[userRole] || roleStyle.student;
+
+  const grouped = messages.reduce((acc, m) => {
+    const key = fmtDate(m.createdAt);
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(m);
+    return acc;
   }, {});
 
-  // Get initials for avatar
-  const getInitials = (name) => {
-    if (!name) return "?";
-    const parts = name.split(" ");
-    if (parts.length >= 2) {
-      return (parts[0][0] + parts[1][0]).toUpperCase();
-    }
-    return name.substring(0, 2).toUpperCase();
+  // ── Colour tokens ─────────────────────────────
+  const C = {
+    bg:       isDark ? "#111318" : "#f5f6fb",
+    header:   isDark ? "#16191f" : "#ffffff",
+    border:   isDark ? "rgba(255,255,255,0.06)" : "#eef0f8",
+    text:     isDark ? "#e4e6ef" : "#1a1d2e",
+    sub:      isDark ? "#4a4f6a" : "#9ea3be",
+    inBubble: isDark ? "#1e2130" : "#ffffff",
+    inText:   isDark ? "#d4d7e8" : "#2d3048",
+    dateBg:   isDark ? "#1a1d28" : "#eef0f8",
+    inputBg:  isDark ? "#1e2130" : "#ffffff",
+    inputBdr: isDark ? "rgba(255,255,255,0.09)" : "#e2e4f0",
+    footer:   isDark ? "#16191f" : "#ffffff",
+    accent:   "#6366f1",
   };
 
-  if (!chat) {
-    return null;
-  }
-
   return (
-    <div className={`flex flex-col h-full ${isDarkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
-      {/* 🎨 ENHANCED HEADER */}
-      <div className={`${
-        isDarkMode 
-          ? 'bg-gradient-to-r from-gray-800 via-gray-800 to-gray-800 border-gray-700' 
-          : 'bg-gradient-to-r from-white via-gray-50 to-white border-gray-200'
-      } border-b px-4 py-3 shadow-sm`}>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            {/* Back button (mobile) */}
-            {onClose && (
-              <button
-                onClick={onClose}
-                className={`md:hidden p-2 rounded-lg transition-colors ${
-                  isDarkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'
-                }`}
-              >
-                <ArrowLeft className="w-5 h-5" />
-              </button>
-            )}
-            
-            {/* Avatar */}
-            <div className="relative">
-              <div className={`w-10 h-10 rounded-full ${
-                isDarkMode ? 'bg-gradient-to-br from-blue-500 to-purple-600' : 'bg-gradient-to-br from-blue-400 to-purple-500'
-              } flex items-center justify-center text-white font-semibold shadow-md`}>
-                <Users className="w-5 h-5" />
-              </div>
-              <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
-            </div>
-            
-            {/* Chat Info */}
-            <div className="flex-1 min-w-0">
-              <h2 className={`font-semibold text-base truncate ${
-                isDarkMode ? 'text-white' : 'text-gray-900'
-              }`}>
-                {chat.chatName || "Unnamed Chat"}
-              </h2>
-              <p className={`text-xs flex items-center gap-1 ${
-                isDarkMode ? 'text-gray-400' : 'text-gray-500'
-              }`}>
-                <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                {messages.length} messages
-              </p>
-            </div>
+    <div style={{
+      display:"flex", flexDirection:"column", height:"100%",
+      background: C.bg, fontFamily:"'Plus Jakarta Sans','Segoe UI',sans-serif",
+    }}>
+
+      {/* ── Header ── */}
+      <div style={{
+        display:"flex", alignItems:"center", justifyContent:"space-between",
+        padding:"13px 18px", background: C.header, borderBottom:`1px solid ${C.border}`,
+        flexShrink:0, gap:"12px",
+      }}>
+        <div style={{ display:"flex", alignItems:"center", gap:"11px", minWidth:0 }}>
+          <button onClick={onClose} className="msg-back-btn" style={{
+            background:"none", border:"none", cursor:"pointer", padding:"6px",
+            color: C.sub, display:"flex", alignItems:"center", borderRadius:"9px",
+            flexShrink:0,
+          }}>
+            <ArrowLeft size={19} />
+          </button>
+
+          <div style={{
+            width:"42px", height:"42px", borderRadius:"13px",
+            background: myStyle.grad, flexShrink:0,
+            display:"flex", alignItems:"center", justifyContent:"center",
+            fontSize:"14px", fontWeight:"700", color:"white",
+            boxShadow:"0 4px 12px rgba(0,0,0,0.2)",
+          }}>
+            {getInitials(chat.chatName || "??")}
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex items-center gap-1">
-            <button className={`p-2 rounded-lg transition-colors ${
-              isDarkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'
-            }`}>
-              <Search className="w-5 h-5" />
-            </button>
-            <button className={`p-2 rounded-lg transition-colors ${
-              isDarkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'
-            }`}>
-              <Phone className="w-5 h-5" />
-            </button>
-            <button className={`p-2 rounded-lg transition-colors ${
-              isDarkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'
-            }`}>
-              <Video className="w-5 h-5" />
-            </button>
-            <button className={`p-2 rounded-lg transition-colors ${
-              isDarkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'
-            }`}>
-              <MoreVertical className="w-5 h-5" />
-            </button>
+          <div style={{ minWidth:0 }}>
+            <h3 style={{ margin:0, fontSize:"15px", fontWeight:"700", color: C.text,
+              overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+              {chat.chatName || "Chat"}
+            </h3>
+            <div style={{ display:"flex", alignItems:"center", gap:"5px", marginTop:"2px" }}>
+              <span style={{ width:"7px", height:"7px", borderRadius:"50%", background:"#22c55e", flexShrink:0 }} />
+              <span style={{ fontSize:"11.5px", color: C.sub }}>Active now</span>
+              <span style={{ color: C.sub, opacity:0.4, fontSize:"14px" }}>·</span>
+              <Users size={11} color={C.sub} />
+              <span style={{ fontSize:"11.5px", color: C.sub }}>Group</span>
+            </div>
           </div>
+        </div>
+
+        <div style={{ display:"flex", gap:"2px", flexShrink:0 }}>
+          {[Search, MoreVertical].map((Icon, i) => (
+            <button key={i} style={{
+              background:"none", border:"none", cursor:"pointer",
+              padding:"8px", borderRadius:"10px", color: C.sub,
+              display:"flex", alignItems:"center", transition:"background 0.15s",
+            }}
+              onMouseEnter={e => e.currentTarget.style.background = isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)"}
+              onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+            >
+              <Icon size={18} />
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* 🎨 MESSAGES WITH PROPER SCROLLING */}
-      <div 
-        ref={messagesContainerRef}
-        className="flex-1 overflow-y-auto px-4 py-4 space-y-4"
-        style={{
-          scrollBehavior: 'smooth',
-          overflowX: 'hidden' // Prevent horizontal scroll
-        }}
+      {/* ── Messages ── */}
+      <div
+        style={{ flex:1, overflowY:"auto", padding:"14px 18px", display:"flex", flexDirection:"column" }}
+        className="msg-scrollbar"
       >
         {loading && messages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full gap-3">
-            <Loader className="w-8 h-8 animate-spin text-blue-500" />
-            <p className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>
-              Loading messages...
-            </p>
+          <div style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center", gap:"10px", color: C.sub }}>
+            <Loader2 size={24} color={C.accent} style={{ animation:"msg-spin 1s linear infinite" }} />
+            <span style={{ fontSize:"13px" }}>Loading messages…</span>
           </div>
-        ) : Object.keys(groupedMessages).length === 0 ? (
-          <div className={`flex flex-col items-center justify-center h-full ${
-            isDarkMode ? 'text-gray-400' : 'text-gray-500'
-          }`}>
-            <div className={`w-20 h-20 rounded-full ${
-              isDarkMode ? 'bg-gray-800' : 'bg-gray-100'
-            } flex items-center justify-center mb-4`}>
-              <Smile className="w-10 h-10" />
-            </div>
-            <p className="text-center text-lg font-medium">No messages yet</p>
-            <p className="text-center text-sm mt-1">Start the conversation!</p>
+        ) : Object.keys(grouped).length === 0 ? (
+          <div style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:"10px", color: C.sub }}>
+            <Smile size={30} style={{ opacity:0.25 }} />
+            <p style={{ margin:0, fontSize:"13.5px" }}>No messages yet — say hello! 👋</p>
           </div>
         ) : (
-          Object.entries(groupedMessages).map(([date, dateMessages]) => (
+          Object.entries(grouped).map(([date, dayMsgs]) => (
             <div key={date}>
-              {/* 🎨 DATE SEPARATOR */}
-              <div className="flex items-center gap-3 my-6">
-                <div className={`flex-1 h-px ${isDarkMode ? 'bg-gray-700' : 'bg-gray-200'}`} />
-                <div className={`px-3 py-1 rounded-full text-xs font-medium ${
-                  isDarkMode 
-                    ? 'bg-gray-800 text-gray-400' 
-                    : 'bg-white text-gray-600 shadow-sm'
-                }`}>
+              {/* Date pill */}
+              <div style={{ display:"flex", alignItems:"center", gap:"10px", margin:"12px 0 8px" }}>
+                <div style={{ flex:1, height:"1px", background: C.border }} />
+                <span style={{
+                  fontSize:"11px", fontWeight:"600", color: C.sub,
+                  background: C.dateBg, padding:"3px 12px", borderRadius:"20px",
+                }}>
                   {date}
-                </div>
-                <div className={`flex-1 h-px ${isDarkMode ? 'bg-gray-700' : 'bg-gray-200'}`} />
+                </span>
+                <div style={{ flex:1, height:"1px", background: C.border }} />
               </div>
 
-              {/* 🎨 MESSAGES WITH COLORS */}
-              {dateMessages.map((msg, idx) => {
-                const isOwnMessage = msg.senderRole === userRole;
-                const colors = roleColors[msg.senderRole] || roleColors.student;
-                
+              {dayMsgs.map((msg, idx) => {
+                const isOwn   = msg.senderRole === userRole;
+                const sStyle  = roleStyle[msg.senderRole] || roleStyle.student;
+                const prevMsg = dayMsgs[idx - 1];
+                const showAvt = !isOwn && (!prevMsg || prevMsg.senderRole !== msg.senderRole || prevMsg.senderName !== msg.senderName);
+                const isLast  = !dayMsgs[idx + 1] || dayMsgs[idx + 1]?.senderRole !== msg.senderRole;
+
                 return (
-                  <div
-                    key={msg._id || idx}
-                    className={`flex items-end gap-2 mb-4 ${
-                      isOwnMessage ? 'flex-row-reverse' : 'flex-row'
-                    }`}
-                  >
-                    {/* Avatar (only for others' messages) */}
-                    {!isOwnMessage && (
-                      <div className={`${colors.bg} w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-semibold flex-shrink-0 shadow-md`}>
-                        {getInitials(msg.senderName)}
+                  <div key={msg._id || idx} style={{
+                    display:"flex", alignItems:"flex-end", gap:"8px",
+                    marginBottom: isLast ? "10px" : "2px",
+                    flexDirection: isOwn ? "row-reverse" : "row",
+                  }} className="msg-bubble-wrap">
+                    {/* Avatar */}
+                    {!isOwn && (
+                      <div style={{
+                        width:"32px", height:"32px", borderRadius:"10px", flexShrink:0,
+                        background: showAvt ? sStyle.grad : "transparent",
+                        display:"flex", alignItems:"center", justifyContent:"center",
+                        fontSize:"11px", fontWeight:"700", color:"white",
+                      }}>
+                        {showAvt ? getInitials(msg.senderName) : ""}
                       </div>
                     )}
-                    
-                    {/* Message Content */}
-                    <div className={`flex flex-col max-w-[75%] md:max-w-[60%] ${
-                      isOwnMessage ? 'items-end' : 'items-start'
-                    }`}>
-                      {/* Sender name (only for others' messages) */}
-                      {!isOwnMessage && (
-                        <div className="flex items-center gap-2 mb-1 px-1">
-                          <span className={`text-xs font-semibold ${colors.name}`}>
+
+                    <div style={{
+                      display:"flex", flexDirection:"column", maxWidth:"66%",
+                      alignItems: isOwn ? "flex-end" : "flex-start",
+                    }}>
+                      {!isOwn && showAvt && (
+                        <div style={{ display:"flex", alignItems:"center", gap:"6px", marginBottom:"4px", paddingLeft:"2px" }}>
+                          <span style={{ fontSize:"11.5px", fontWeight:"700", color: C.accent }}>
                             {msg.senderName}
                           </span>
-                          <span className={`text-[10px] px-2 py-0.5 rounded-full ${colors.badge} font-medium uppercase`}>
+                          <span style={{
+                            fontSize:"9.5px", fontWeight:"700", color:"white",
+                            background: sStyle.badge, padding:"1px 7px",
+                            borderRadius:"8px", textTransform:"uppercase", opacity:0.9,
+                          }}>
                             {msg.senderRole}
                           </span>
                         </div>
                       )}
-                      
-                      {/* Message Bubble */}
-                      <div
-                        className={`relative px-4 py-2.5 rounded-2xl shadow-sm ${
-                          isOwnMessage
-                            ? `${colors.bg} ${colors.text} rounded-br-md`
-                            : isDarkMode
-                              ? 'bg-gray-800 text-white rounded-bl-md'
-                              : 'bg-white text-gray-900 rounded-bl-md border border-gray-200'
-                        }`}
-                      >
-                        <p className="text-sm whitespace-pre-wrap break-words leading-relaxed">
+
+                      {/* Bubble */}
+                      <div style={{
+                        padding:"9px 13px",
+                        background: isOwn ? myStyle.bubble : C.inBubble,
+                        color: isOwn ? "white" : C.inText,
+                        borderRadius: isOwn
+                          ? (isLast ? "18px 18px 5px 18px" : "18px")
+                          : (isLast ? "18px 18px 18px 5px" : "18px"),
+                        boxShadow: isOwn
+                          ? "0 4px 14px rgba(99,102,241,0.28)"
+                          : isDark ? "0 2px 8px rgba(0,0,0,0.3)" : "0 2px 8px rgba(0,0,0,0.06)",
+                        border: !isOwn ? `1px solid ${C.border}` : "none",
+                      }} className="msg-bubble">
+                        <p style={{ margin:0, fontSize:"13.5px", whiteSpace:"pre-wrap", wordBreak:"break-word", lineHeight:"1.55" }}>
                           {msg.message}
                         </p>
-                        
-                        {/* Time */}
-                        <div className={`flex items-center gap-1 mt-1 text-[10px] ${
-                          isOwnMessage 
-                            ? 'text-white/80' 
-                            : isDarkMode 
-                              ? 'text-gray-400' 
-                              : 'text-gray-500'
-                        }`}>
-                          <span>{formatTime(msg.createdAt)}</span>
-                          {isOwnMessage && (
-                            <>
-                              <span>•</span>
-                              <span>✓✓</span>
-                            </>
-                          )}
+                        <div style={{
+                          display:"flex", justifyContent:"flex-end", alignItems:"center",
+                          gap:"4px", marginTop:"4px",
+                          fontSize:"10.5px",
+                          color: isOwn ? "rgba(255,255,255,0.75)" : C.sub,
+                        }}>
+                          <span>{fmtTime(msg.createdAt)}</span>
+                          {isOwn && <CheckCheck size={13} />}
                         </div>
                       </div>
                     </div>
@@ -360,91 +295,116 @@ export default function ChatWindow({ chat, userRole, onClose }) {
             </div>
           ))
         )}
-        <div ref={messagesEndRef} />
+        <div ref={bottomRef} />
       </div>
 
-      {/* 🎨 ENHANCED INPUT */}
-      <div className={`${
-        isDarkMode 
-          ? 'bg-gray-800 border-gray-700' 
-          : 'bg-white border-gray-200'
-      } border-t px-4 py-3 shadow-lg`}>
-        <form onSubmit={handleSendMessage} className="flex items-end gap-2">
-          {/* Attachment Button */}
-          <button
-            type="button"
-            className={`p-2.5 rounded-xl transition-all ${
-              isDarkMode 
-                ? 'hover:bg-gray-700 text-gray-400 hover:text-gray-200' 
-                : 'hover:bg-gray-100 text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            <Paperclip className="w-5 h-5" />
+      {/* ── Input footer ── */}
+      <div style={{
+        padding:"12px 16px", background: C.footer,
+        borderTop:`1px solid ${C.border}`, flexShrink:0,
+      }}>
+        <form onSubmit={handleSend} style={{ display:"flex", alignItems:"flex-end", gap:"8px" }}>
+
+          <button type="button" style={{
+            background:"none", border:"none", cursor:"pointer",
+            padding:"10px", borderRadius:"12px", color: C.sub,
+            display:"flex", alignItems:"center",
+          }}>
+            <Paperclip size={18} />
           </button>
 
-          {/* Message Input */}
-          <div className="flex-1 relative">
+          {/* Input wrap */}
+          <div
+            ref={inputWrapRef}
+            style={{
+              flex:1, display:"flex", alignItems:"flex-end",
+              background: C.inputBg, border:`1.5px solid ${C.inputBdr}`,
+              borderRadius:"14px", padding:"8px 12px",
+              transition:"border-color 0.2s, box-shadow 0.2s",
+            }}
+          >
             <textarea
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSendMessage(e);
-                }
-              }}
-              placeholder="Type a message..."
+              ref={textareaRef}
+              value={newMsg}
+              onChange={e => setNewMsg(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Type a message…"
               disabled={sending}
               rows={1}
-              className={`w-full px-4 py-3 rounded-2xl resize-none ${
-                isDarkMode 
-                  ? 'bg-gray-700 text-white placeholder-gray-400 focus:bg-gray-600' 
-                  : 'bg-gray-100 text-gray-900 placeholder-gray-500 focus:bg-gray-50'
-              } border-none focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-all`}
               style={{
-                minHeight: '44px',
-                maxHeight: '120px'
+                flex:1, border:"none", outline:"none", resize:"none",
+                background:"transparent", fontSize:"13.5px", color: C.text,
+                fontFamily:"inherit", lineHeight:"1.55",
+                maxHeight:"120px", overflowY:"auto",
+              }}
+              onFocus={() => {
+                if (inputWrapRef.current) {
+                  inputWrapRef.current.style.borderColor = "#6366f1";
+                  inputWrapRef.current.style.boxShadow   = "0 0 0 3px rgba(99,102,241,0.12)";
+                }
+              }}
+              onBlur={() => {
+                if (inputWrapRef.current) {
+                  inputWrapRef.current.style.borderColor = C.inputBdr;
+                  inputWrapRef.current.style.boxShadow   = "none";
+                }
+              }}
+              onInput={e => {
+                e.target.style.height = "auto";
+                e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px";
               }}
             />
-            
-            {/* Emoji Button */}
-            <button
-              type="button"
-              className={`absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-lg transition-all ${
-                isDarkMode 
-                  ? 'hover:bg-gray-600 text-gray-400 hover:text-gray-200' 
-                  : 'hover:bg-gray-200 text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              <Smile className="w-5 h-5" />
+            <button type="button" style={{
+              background:"none", border:"none", cursor:"pointer",
+              padding:"2px 0 2px 8px", color: C.sub,
+              display:"flex", alignItems:"center",
+            }}>
+              <Smile size={17} />
             </button>
           </div>
 
-          {/* Send Button */}
+          {/* Send button */}
           <button
             type="submit"
-            disabled={!newMessage.trim() || sending}
-            className={`p-3 rounded-xl font-medium transition-all shadow-md ${
-              !newMessage.trim() || sending
-                ? isDarkMode
-                  ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
-                  : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                : 'bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-blue-500/25 hover:shadow-lg hover:scale-105 active:scale-95'
-            }`}
+            disabled={!newMsg.trim() || sending}
+            className="msg-send-btn"
+            style={{
+              width:"44px", height:"44px", borderRadius:"13px", border:"none",
+              background: newMsg.trim() ? myStyle.bubble : (isDark ? "#1e2130" : "#eef0f8"),
+              cursor: newMsg.trim() ? "pointer" : "default",
+              display:"flex", alignItems:"center", justifyContent:"center",
+              flexShrink:0, transition:"all 0.2s",
+              boxShadow: newMsg.trim() ? "0 4px 14px rgba(99,102,241,0.35)" : "none",
+            }}
           >
-            {sending ? (
-              <Loader className="w-5 h-5 animate-spin" />
-            ) : (
-              <Send className="w-5 h-5" />
-            )}
+            {sending
+              ? <Loader2 size={18} color="white" style={{ animation:"msg-spin 1s linear infinite" }} />
+              : <Send size={17} color={newMsg.trim() ? "white" : C.sub} strokeWidth={2} />
+            }
           </button>
         </form>
-        
-        {/* Typing Indicator (Optional) */}
-        <div className={`text-xs mt-2 h-4 ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>
-          {/* You can add "Someone is typing..." here */}
-        </div>
       </div>
+
+      {/* Global chat CSS (injected once) */}
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+        .msg-scrollbar::-webkit-scrollbar { width: 4px; }
+        .msg-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .msg-scrollbar::-webkit-scrollbar-thumb { background: rgba(99,102,241,0.2); border-radius: 4px; }
+        .msg-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(99,102,241,0.4); }
+        .msg-back-btn { display: none !important; }
+        @media(max-width:768px) { .msg-back-btn { display: flex !important; } }
+        .msg-bubble-wrap { animation: msg-bubble-in 0.2s cubic-bezier(0.34,1.56,0.64,1) both; }
+        @keyframes msg-bubble-in {
+          from { opacity:0; transform:scale(0.92) translateY(6px); }
+          to   { opacity:1; transform:scale(1) translateY(0); }
+        }
+        .msg-send-btn:hover:not(:disabled) { transform: scale(1.06); }
+        .msg-send-btn:active:not(:disabled) { transform: scale(0.95); }
+        .msg-pulse { animation: msg-pulse-anim 1.6s ease-in-out infinite; }
+        @keyframes msg-pulse-anim { 0%,100%{opacity:0.5} 50%{opacity:1} }
+        @keyframes msg-spin { to { transform: rotate(360deg); } }
+      `}</style>
     </div>
   );
 }

@@ -442,9 +442,9 @@ const styles = {
     transition: 'border-color 0.2s, box-shadow 0.2s',
   },
   inputWrapFocused: {
-    borderColor: '#1a1a2e',
-    boxShadow: '0 0 0 3px rgba(26,26,46,0.07)',
-  },
+  border: '1.5px solid #1a1a2e',
+  boxShadow: '0 0 0 3px rgba(26,26,46,0.07)',
+},
   input: {
     flex: 1,
     border: 'none',
