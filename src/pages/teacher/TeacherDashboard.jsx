@@ -1,96 +1,107 @@
-// src/pages/teacher/TeacherDashboard.jsx - WITH DARK MODE & MESSAGES
+// src/pages/teacher/TeacherDashboard.jsx - NEW SIDEBAR DESIGN + 100% ORIGINAL LOGIC
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Settings, Plus, MessageCircle, Video } from "lucide-react";
+import {
+  Settings, Plus, MessageCircle, Video, Repeat,
+  Home, Calendar, CheckCircle, Users, BookOpen,
+  DollarSign, LogOut, Menu, ChevronRight,
+  GraduationCap, RefreshCw, AlertCircle
+} from "lucide-react";
 
-// Layout
+// ── Layout (original) ─────────────────────────────────────────────────────────
 import DashboardHeader from "./components/Layout/DashboardHeader";
-import TeacherNavTabs from "./components/layout/TeacherNavTabs";
 
-// Change Password Modal
+// ── Change Password (original) ────────────────────────────────────────────────
 import ChangePassword from "../../components/teacher/auth/ChangePassword";
 
-// Classes
-import ClassList from "./components/classes/ClassList";
-import ClassModal from "./components/classes/ClassModal";
-import ConfirmModal from "./components/classes/ConfirmModal";
+// ── Classes (original) ────────────────────────────────────────────────────────
+import ClassList           from "./components/classes/ClassList";
+import ClassModal          from "./components/classes/ClassModal";
+import ConfirmModal        from "./components/classes/ConfirmModal";
 import CompletedClassesTab from "./components/classes/CompletedClasses";
 
-// Students
+// ── Students (original) ───────────────────────────────────────────────────────
 import StudentProgressList from "./components/students/StudentProgressList";
 
-// Bookings
+// ── Bookings (original) ───────────────────────────────────────────────────────
 import BookingList from "./components/bookings/BookingList";
 
-// Dashboard widgets
-import QuickStats from "./components/dashboard/QuickStats";
-import LiveClasses from "./components/dashboard/LiveClasses";
+// ── Dashboard widgets (original) ──────────────────────────────────────────────
+import QuickStats      from "./components/dashboard/QuickStats";
+import LiveClasses     from "./components/dashboard/LiveClasses";
 import UpcomingClasses from "./components/dashboard/UpcomingClasses";
-import Classroom from "../../pages/Classroom";
+import Classroom       from "../../pages/Classroom";
 
-// Dark Mode
-import { useDarkMode } from '../../hooks/useDarkMode';
-import DarkModeToggle from '../../components/DarkModeToggle';
+// ── Dark Mode (original) ──────────────────────────────────────────────────────
+import { useDarkMode }  from "../../hooks/useDarkMode";
+import DarkModeToggle   from "../../components/DarkModeToggle";
 
-// Session Management & Settings
+// ── Session / Settings (original) ─────────────────────────────────────────────
 import SessionManagement from "../../components/SessionManagement";
-import SettingsSidebar from "../../components/SettingsSidebar";
-import SettingsModal from "../../components/SettingsModal";
+import SettingsSidebar   from "../../components/SettingsSidebar";
+import SettingsModal     from "../../components/SettingsModal";
 
-// ✅ NEW: Messages/Chat
-import MessagesTab from "../../components/chat/MessagesTab";
-
-import PaymentTab from "./tabs/PaymentTab";
-import GoogleMeetSettings from '../../components/GoogleMeetSettings';
-import api from "../../api";
+// ── Messages / Payment / Meet / Recurring (original) ──────────────────────────
+import MessagesTab        from "../../components/chat/MessagesTab";
+import PaymentTab         from "./tabs/PaymentTab";
+import GoogleMeetSettings from "../../components/GoogleMeetSettings";
 import RecurringClassForm from "../../components/teacher/RecurringClassForm";
-import { Repeat } from "lucide-react";
+import api                from "../../api";
 
-// Services for fetching real data
+// ── Services (original) ───────────────────────────────────────────────────────
 import { getAssignedStudents } from "../../services/teacherStudentService";
-import { 
-  getTeacherBookings, 
-  acceptBooking, 
+import {
+  getTeacherBookings,
+  acceptBooking,
   rejectBooking,
   createBooking,
   deleteBooking,
-  cancelBooking
+  cancelBooking,
 } from "../../services/bookingService";
+
+// ── Sidebar nav config ────────────────────────────────────────────────────────
+const NAV = [
+  { key: "dashboard",         label: "Dashboard",         icon: Home          },
+  { key: "classes",           label: "My Classes",        icon: Calendar      },
+  { key: "completed-classes", label: "Completed Classes", icon: CheckCircle   },
+  { key: "students",          label: "Students",          icon: Users         },
+  { key: "bookings",          label: "Bookings",          icon: BookOpen      },
+  { key: "messages",          label: "Messages",          icon: MessageCircle },
+  { key: "payment",           label: "Payment",           icon: DollarSign    },
+];
 
 export default function TeacherDashboard() {
   const navigate = useNavigate();
-  const [teacherInfo, setTeacherInfo] = useState(null);
-  const [activeTab, setActiveTab] = useState("dashboard");
+
+  // ── Original state (100% preserved) ──────────────────────────────────────────
+  const [teacherInfo,    setTeacherInfo]    = useState(null);
+  const [activeTab,      setActiveTab]      = useState("dashboard");
   const [showChangePassword, setShowChangePassword] = useState(false);
-  const [toast, setToast] = useState("");
+  const [toast,          setToast]          = useState("");
   const [showSessionManagement, setShowSessionManagement] = useState(false);
-  
-  // Settings Sidebar States
-  const [showSettingsSidebar, setShowSettingsSidebar] = useState(false);
-  const [showSettingsModal, setShowSettingsModal] = useState(false);
-
-  // Dark Mode
+  const [showSettingsSidebar,   setShowSettingsSidebar]   = useState(false);
+  const [showSettingsModal,     setShowSettingsModal]     = useState(false);
   const { isDarkMode, toggleDarkMode } = useDarkMode();
-
-  // Classroom state
-  const [activeClass, setActiveClass] = useState(null);
-  const [isClassroomOpen, setIsClassroomOpen] = useState(false);
-
-  // Real data from backend
-  const [students, setStudents] = useState([]);
-  const [bookings, setBookings] = useState([]);
-  const [classes, setClasses] = useState([]);
+  const [activeClass,    setActiveClass]    = useState(null);
+  const [isClassroomOpen,setIsClassroomOpen]= useState(false);
+  const [students,       setStudents]       = useState([]);
+  const [bookings,       setBookings]       = useState([]);
+  const [classes,        setClasses]        = useState([]);
   const [completedClasses, setCompletedClasses] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [googleMeetLink, setGoogleMeetLink] = useState('');
+  const [loading,        setLoading]        = useState(true);
+  const [googleMeetLink, setGoogleMeetLink] = useState("");
   const [showGoogleMeetSettings, setShowGoogleMeetSettings] = useState(false);
-  const [showRecurringForm, setShowRecurringForm] = useState(false);
-  
+  const [showRecurringForm,      setShowRecurringForm]      = useState(false);
+  const [isModalOpen,    setIsModalOpen]    = useState(false);
+  const [confirmModal,   setConfirmModal]   = useState({ open: false, type: null, classId: null });
 
-  // Modal states
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  // ── New sidebar state ─────────────────────────────────────────────────────────
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [mounted,     setMounted]     = useState(false);
 
+  // ── Original useEffect ────────────────────────────────────────────────────────
   useEffect(() => {
+    setMounted(true);
     const teacherData = JSON.parse(localStorage.getItem("teacherInfo") || "{}");
     if (!teacherData._id && !teacherData.id) {
       navigate("/teacher/login");
@@ -100,186 +111,136 @@ export default function TeacherDashboard() {
     fetchTeacherData();
   }, [navigate]);
 
+  // ── Original fetchTeacherData (100% preserved) ────────────────────────────────
   const fetchTeacherData = async () => {
     try {
       setLoading(true);
       const teacherData = JSON.parse(localStorage.getItem("teacherInfo") || "{}");
       const teacherId = teacherData._id || teacherData.id;
-      setGoogleMeetLink(teacherData.googleMeetLink || '');
-      console.log('✅ Teacher Info Loaded:', teacherData._id);
+      setGoogleMeetLink(teacherData.googleMeetLink || "");
+      console.log("✅ Teacher Info Loaded:", teacherData._id);
 
-      if (!teacherId) {
-        throw new Error("No teacher ID found");
-      }
+      if (!teacherId) throw new Error("No teacher ID found");
 
-       // 🆕 FETCH TEACHER FROM API TO GET LATEST DATA
       const { data: apiTeacherData } = await api.get(`/api/teachers/${teacherId}`);
-      setTeacherInfo(apiTeacherData);  // Update with API data
-      setGoogleMeetLink(apiTeacherData.googleMeetLink || '');
-      console.log('✅ Teacher Info Loaded:', apiTeacherData._id);
+      setTeacherInfo(apiTeacherData);
+      setGoogleMeetLink(apiTeacherData.googleMeetLink || "");
+      console.log("✅ Teacher Info Loaded:", apiTeacherData._id);
 
-      
+      const [studentsData, pendingBookingsData, acceptedBookingsData, completedBookingsData] =
+        await Promise.all([
+          getAssignedStudents(teacherId),
+          getTeacherBookings(teacherId, "pending"),
+          getTeacherBookings(teacherId, "accepted"),
+          getTeacherBookings(teacherId, "completed"),
+        ]);
 
-      const [studentsData, pendingBookingsData, acceptedBookingsData, completedBookingsData] = await Promise.all([
-        getAssignedStudents(teacherId),
-        getTeacherBookings(teacherId, "pending"),
-        getTeacherBookings(teacherId, "accepted"),
-        getTeacherBookings(teacherId, "completed")
-      ]);
-
+      // Format students
       const studentsFormatted = studentsData.map((item) => ({
-        id: item.student._id,
-        name: `${item.student.firstName} ${item.student.surname}`,
-        email: item.student.email,
-        status: item.student.active ? "Active" : "Inactive",
-        progress: item.student.noOfClasses || 0,
-        active: item.student.active,
+        id:           item.student._id,
+        name:         `${item.student.firstName} ${item.student.surname}`,
+        email:        item.student.email,
+        status:       item.student.active ? "Active" : "Inactive",
+        progress:     item.student.noOfClasses || 0,
+        active:       item.student.active,
         assignmentId: item.assignmentId,
-        assignedDate: item.assignedDate
+        assignedDate: item.assignedDate,
       }));
       setStudents(studentsFormatted);
 
+      // Format pending bookings
       const bookingsFormatted = pendingBookingsData.map((booking) => {
         const scheduledDate = new Date(booking.scheduledTime);
-        
         return {
-          id: booking._id,
-          name: `${booking.studentId.firstName} ${booking.studentId.surname}`,
-          studentId: booking.studentId._id,
-          studentName: `${booking.studentId.firstName} ${booking.studentId.surname}`,
-          classTitle: booking.classTitle,
-          topic: booking.topic,
-          time: scheduledDate.toLocaleString('en-US', {
-            weekday: 'short',
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-            hour: 'numeric',
-            minute: '2-digit',
-            hour12: true
-          }),
-          duration: booking.duration,
-          notes: booking.notes,
-          status: booking.status,
-          isAdminBooking: booking.createdBy === "admin",
+          id:            booking._id,
+          name:          `${booking.studentId.firstName} ${booking.studentId.surname}`,
+          studentId:     booking.studentId._id,
+          studentName:   `${booking.studentId.firstName} ${booking.studentId.surname}`,
+          classTitle:    booking.classTitle,
+          topic:         booking.topic,
+          time:          scheduledDate.toLocaleString("en-US", { weekday: "short", year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", hour12: true }),
+          duration:      booking.duration,
+          notes:         booking.notes,
+          status:        booking.status,
+          isAdminBooking:booking.createdBy === "admin",
           scheduledTime: booking.scheduledTime,
-          rawDate: scheduledDate
+          rawDate:       scheduledDate,
         };
       });
       setBookings(bookingsFormatted);
 
+      // Build classes map from accepted bookings
       const classesMap = new Map();
-      
       acceptedBookingsData.forEach((booking) => {
         const scheduledDate = new Date(booking.scheduledTime);
-        const now = new Date();
-        const timeDiff = scheduledDate - now;
-        
+        const now           = new Date();
+        const timeDiff      = scheduledDate - now;
+
         let status = "scheduled";
-        if (timeDiff < -3600000) {
-          status = "completed";
-        } else if (timeDiff < 0 && timeDiff > -3600000) {
-          status = "live";
-        } else if (timeDiff > 0 && timeDiff < 900000) {
-          status = "upcoming-soon";
-        }
-        
+        if      (timeDiff < -3600000)                status = "completed";
+        else if (timeDiff < 0 && timeDiff > -3600000) status = "live";
+        else if (timeDiff > 0 && timeDiff < 900000)   status = "upcoming-soon";
+
         const groupKey = `${booking.scheduledTime}_${booking.classTitle}`;
-        
+
         if (classesMap.has(groupKey)) {
-          const existingClass = classesMap.get(groupKey);
-          existingClass.students.push(`${booking.studentId.firstName} ${booking.studentId.surname}`);
-          existingClass.bookingIds.push(booking._id);
+          const existing = classesMap.get(groupKey);
+          existing.students.push(`${booking.studentId.firstName} ${booking.studentId.surname}`);
+          existing.bookingIds.push(booking._id);
         } else {
-          const classObj = {
-            id: booking._id,
-            title: booking.classTitle,
-            topic: booking.topic || "Scheduled Lesson",
-            time: scheduledDate.toLocaleTimeString('en-US', { 
-              hour: 'numeric', 
-              minute: '2-digit',
-              hour12: true 
-            }),
-            date: scheduledDate.toLocaleDateString('en-US', {
-              month: 'short',
-              day: 'numeric',
-              year: 'numeric'
-            }),
-            fullDateTime: scheduledDate.toLocaleString('en-US', {
-              weekday: 'short',
-              year: 'numeric',
-              month: 'short',
-              day: 'numeric',
-              hour: 'numeric',
-              minute: '2-digit',
-              hour12: true
-            }),
-            scheduledTime: booking.scheduledTime,
-            scheduledDate: scheduledDate,
-            status: status,
-            students: [`${booking.studentId.firstName} ${booking.studentId.surname}`],
-            duration: booking.duration,
-            notes: booking.notes,
+          classesMap.set(groupKey, {
+            id:           booking._id,
+            title:        booking.classTitle,
+            topic:        booking.topic || "Scheduled Lesson",
+            time:         scheduledDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true }),
+            date:         scheduledDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+            fullDateTime: scheduledDate.toLocaleString("en-US", { weekday: "short", year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", hour12: true }),
+            scheduledTime:booking.scheduledTime,
+            scheduledDate,
+            status,
+            students:  [`${booking.studentId.firstName} ${booking.studentId.surname}`],
+            duration:  booking.duration,
+            notes:     booking.notes,
             bookingId: booking._id,
-            bookingIds: [booking._id]
-          };
-          
-          classesMap.set(groupKey, classObj);
+            bookingIds:[booking._id],
+          });
         }
       });
 
-      const activeClasses = [];
+      const activeClasses   = [];
       const finishedClasses = [];
-      
-      classesMap.forEach((classObj) => {
-        if (classObj.status === "completed") {
-          finishedClasses.push(classObj);
-        } else {
-          activeClasses.push(classObj);
-        }
+      classesMap.forEach((cls) => {
+        if (cls.status === "completed") finishedClasses.push(cls);
+        else                            activeClasses.push(cls);
       });
-
       setClasses(activeClasses);
 
+      // Build completed map
       const completedMap = new Map();
-      
       completedBookingsData.forEach((booking) => {
         const scheduledDate = new Date(booking.scheduledTime);
         const groupKey = `${booking.scheduledTime}_${booking.classTitle}`;
-        
         if (completedMap.has(groupKey)) {
-          const existingClass = completedMap.get(groupKey);
-          existingClass.students.push(`${booking.studentId.firstName} ${booking.studentId.surname}`);
+          completedMap.get(groupKey).students.push(`${booking.studentId.firstName} ${booking.studentId.surname}`);
         } else {
           completedMap.set(groupKey, {
-          id: booking._id,
-          title: booking.classTitle,
-          topic: booking.topic || "Completed Lesson",
-          fullDateTime: scheduledDate.toLocaleString('en-US', {
-            weekday: 'short',
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-            hour: 'numeric',
-            minute: '2-digit',
-            hour12: true
-          }),
-          scheduledTime: booking.scheduledTime,
-          scheduledDate: scheduledDate,
-          students: [`${booking.studentId.firstName} ${booking.studentId.surname}`],
-          duration: booking.duration,
-          status: "completed",
-          // ── NEW: admin rejection flags ──────────────────────────────
-          adminRejected: booking.adminRejected || false,
-          adminRejectedReason: booking.adminRejectedReason || "",
-          adminRejectedAt: booking.adminRejectedAt || null,
-        });
+            id:                  booking._id,
+            title:               booking.classTitle,
+            topic:               booking.topic || "Completed Lesson",
+            fullDateTime:        scheduledDate.toLocaleString("en-US", { weekday: "short", year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", hour12: true }),
+            scheduledTime:       booking.scheduledTime,
+            scheduledDate,
+            students:            [`${booking.studentId.firstName} ${booking.studentId.surname}`],
+            duration:            booking.duration,
+            status:              "completed",
+            adminRejected:       booking.adminRejected || false,
+            adminRejectedReason: booking.adminRejectedReason || "",
+            adminRejectedAt:     booking.adminRejectedAt || null,
+          });
         }
       });
-      
-      const completedFromBookings = Array.from(completedMap.values());
-      setCompletedClasses([...finishedClasses, ...completedFromBookings]);
-      
+
+      setCompletedClasses([...finishedClasses, ...Array.from(completedMap.values())]);
     } catch (err) {
       console.error("Failed to load teacher data:", err);
       console.error("Error details:", err.response?.data?.message || "Failed to load teacher data");
@@ -289,62 +250,37 @@ export default function TeacherDashboard() {
     }
   };
 
+  // ── Original handlers (100% preserved) ───────────────────────────────────────
   const handleAcceptBooking = async (booking) => {
     try {
       await acceptBooking(booking.id);
-      
       setBookings((prev) => prev.filter((b) => b.id !== booking.id));
 
       const scheduledDate = new Date(booking.scheduledTime);
-      const now = new Date();
-      const timeDiff = scheduledDate - now;
-      
+      const timeDiff      = scheduledDate - new Date();
       let status = "scheduled";
-      if (timeDiff < -3600000) {
-        status = "completed";
-      } else if (timeDiff < 900000 && timeDiff > 0) {
-        status = "upcoming-soon";
-      }
+      if      (timeDiff < -3600000)               status = "completed";
+      else if (timeDiff < 900000 && timeDiff > 0)  status = "upcoming-soon";
 
-      const newClass = {
-        id: booking.id,
-        title: booking.classTitle,
-        topic: booking.topic || "Scheduled Lesson",
-        time: scheduledDate.toLocaleTimeString('en-US', { 
-          hour: 'numeric', 
-          minute: '2-digit',
-          hour12: true 
-        }),
-        date: scheduledDate.toLocaleDateString('en-US', {
-          month: 'short',
-          day: 'numeric',
-          year: 'numeric'
-        }),
-        fullDateTime: scheduledDate.toLocaleString('en-US', {
-          weekday: 'short',
-          year: 'numeric',
-          month: 'short',
-          day: 'numeric',
-          hour: 'numeric',
-          minute: '2-digit',
-          hour12: true
-        }),
-        scheduledTime: booking.scheduledTime,
-        scheduledDate: scheduledDate,
-        status: status,
-        students: [booking.studentName],
-        duration: booking.duration,
-        notes: booking.notes,
-        bookingId: booking.id
-      };
+      setClasses((prev) => [...prev, {
+        id:           booking.id,
+        title:        booking.classTitle,
+        topic:        booking.topic || "Scheduled Lesson",
+        time:         scheduledDate.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true }),
+        date:         scheduledDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+        fullDateTime: scheduledDate.toLocaleString("en-US", { weekday: "short", year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", hour12: true }),
+        scheduledTime:booking.scheduledTime,
+        scheduledDate,
+        status,
+        students:  [booking.studentName],
+        duration:  booking.duration,
+        notes:     booking.notes,
+        bookingId: booking.id,
+        bookingIds:[booking.id],
+      }]);
 
-      setClasses((prev) => [...prev, newClass]);
       showToast(`Accepted booking for ${booking.name}! Class added to your schedule.`);
-      
-      setTimeout(() => {
-        fetchTeacherData();
-      }, 1000);
-      
+      setTimeout(fetchTeacherData, 1000);
     } catch (err) {
       console.error("Error accepting booking:", err);
       showToast("Failed to accept booking. Please try again.", "error");
@@ -355,7 +291,6 @@ export default function TeacherDashboard() {
     try {
       const reason = prompt("Reason for rejection (optional):");
       await rejectBooking(booking.id, reason || "");
-      
       setBookings((prev) => prev.filter((b) => b.id !== booking.id));
       showToast(`Rejected booking for ${booking.name}`);
     } catch (err) {
@@ -365,90 +300,49 @@ export default function TeacherDashboard() {
   };
 
   const handleAddClass = async (newClass) => {
-  try {
-    // Validation
-    if (!newClass.students || newClass.students.length === 0) {
-      showToast("Please select at least one student for the class", "error");
-      return;
-    }
-
-    const teacherId = teacherInfo._id || teacherInfo.id;
-    
-    // Parse and format date
-    const scheduledDate = new Date(newClass.time);
-    const isoString = scheduledDate.toISOString();
-    
-    console.log("Creating class with details:", {
-      teacher: teacherId,
-      students: newClass.students.length,
-      scheduledTime: isoString,
-      duration: parseInt(newClass.duration)
-    });
-    
-    // Create bookings for each student
-    const bookingPromises = newClass.students.map(async (student) => {
-      const bookingData = {
-        teacherId: teacherId,
-        studentId: student.id,
-        classTitle: newClass.title,
-        topic: newClass.topic || "",
-        scheduledTime: isoString,
-        duration: parseInt(newClass.duration),
-        notes: newClass.notes || "Teacher-created class",
-        createdBy: "teacher"
-      };
-
-      console.log("📤 Creating booking for student:", student.name);
-
-      // ✅ CORRECT: POST to /api/bookings
-      const response = await api.post("/api/bookings", bookingData);
-      
-      console.log("✅ Booking created:", response.data.booking._id);
-      
-      // Teacher-created bookings are auto-accepted on backend
-      // But we can still call accept to be safe
-      if (response.data.booking.status === "pending") {
-        return await acceptBooking(response.data.booking._id);
+    try {
+      if (!newClass.students || newClass.students.length === 0) {
+        showToast("Please select at least one student for the class", "error");
+        return;
       }
-      
-      return response.data.booking;
-    });
+      const teacherId     = teacherInfo._id || teacherInfo.id;
+      const scheduledDate = new Date(newClass.time);
+      const isoString     = scheduledDate.toISOString();
 
-    // Wait for all bookings to be created
-    const createdBookings = await Promise.all(bookingPromises);
-    
-    console.log(`✅ Created ${createdBookings.length} bookings`);
-    
-    showToast(
-      `Class "${newClass.title}" created successfully for ${newClass.students.length} student(s)!`,
-      "success"
-    );
-    
-    // Refresh teacher data to show new classes
-    await fetchTeacherData();
-    
-  } catch (err) {
-    console.error("❌ Error creating class:", err);
-    
-    // Better error logging
-    if (err.response) {
-      console.error("Response error:", err.response.data);
-      console.error("Status code:", err.response.status);
-    } else if (err.request) {
-      console.error("Request error - no response received");
-      console.error("Is backend running on port 5000?");
-    } else {
-      console.error("Error:", err.message);
+      console.log("Creating class with details:", { teacher: teacherId, students: newClass.students.length, scheduledTime: isoString, duration: parseInt(newClass.duration) });
+
+      const bookingPromises = newClass.students.map(async (student) => {
+        const bookingData = {
+          teacherId,
+          studentId:    student.id,
+          classTitle:   newClass.title,
+          topic:        newClass.topic || "",
+          scheduledTime:isoString,
+          duration:     parseInt(newClass.duration),
+          notes:        newClass.notes || "Teacher-created class",
+          createdBy:    "teacher",
+        };
+        console.log("📤 Creating booking for student:", student.name);
+        const response = await api.post("/api/bookings", bookingData);
+        console.log("✅ Booking created:", response.data.booking._id);
+        if (response.data.booking.status === "pending") {
+          return await acceptBooking(response.data.booking._id);
+        }
+        return response.data.booking;
+      });
+
+      const createdBookings = await Promise.all(bookingPromises);
+      console.log(`✅ Created ${createdBookings.length} bookings`);
+      showToast(`Class "${newClass.title}" created successfully for ${newClass.students.length} student(s)!`, "success");
+      await fetchTeacherData();
+    } catch (err) {
+      console.error("❌ Error creating class:", err);
+      if (err.response) { console.error("Response error:", err.response.data); console.error("Status code:", err.response.status); }
+      else if (err.request) { console.error("Request error - no response received"); console.error("Is backend running on port 5000?"); }
+      else { console.error("Error:", err.message); }
+      showToast(err.response?.data?.message || err.message || "Failed to create class. Please check your connection and try again.", "error");
     }
-    
-    // User-friendly error message
-    const errorMessage = err.response?.data?.message 
-      || err.message 
-      || "Failed to create class. Please check your connection and try again.";
-    
-    showToast(errorMessage, "error");
-  }
-};
+  };
 
   const showToast = (message, type = "success") => {
     setToast({ message, type });
@@ -466,48 +360,28 @@ export default function TeacherDashboard() {
     showToast(message);
   };
 
-  const [confirmModal, setConfirmModal] = useState({
-    open: false,
-    type: null,
-    classId: null,
-  });
-
   const askCancelClass = (classItem) => {
-  const classId = typeof classItem === 'object' 
-    ? (classItem.id || classItem.bookingId) 
-    : classItem;
-  console.log("✅ Cancel classId:", classId);
-  setConfirmModal({ open: true, type: "cancel", classId: classId });
-};
+    const classId = typeof classItem === "object" ? (classItem.id || classItem.bookingId) : classItem;
+    console.log("✅ Cancel classId:", classId);
+    setConfirmModal({ open: true, type: "cancel", classId });
+  };
 
-const askDeleteClass = (classItem) => {
-  const classId = typeof classItem === 'object' 
-    ? (classItem.id || classItem.bookingId) 
-    : classItem;
-  console.log("✅ Delete classId:", classId);
-  setConfirmModal({ open: true, type: "delete", classId: classId });
-};
+  const askDeleteClass = (classItem) => {
+    const classId = typeof classItem === "object" ? (classItem.id || classItem.bookingId) : classItem;
+    console.log("✅ Delete classId:", classId);
+    setConfirmModal({ open: true, type: "delete", classId });
+  };
 
   const handleConfirm = async () => {
     if (confirmModal.type === "cancel") {
       try {
-        const classToCancel = classes.find(cls => cls.id === confirmModal.classId);
-        
-        if (classToCancel && classToCancel.bookingIds && classToCancel.bookingIds.length > 0) {
-          await Promise.all(
-            classToCancel.bookingIds.map(bookingId => cancelBooking(bookingId, "Teacher cancelled class"))
-          );
+        const classToCancel = classes.find((cls) => cls.id === confirmModal.classId);
+        if (classToCancel?.bookingIds?.length > 0) {
+          await Promise.all(classToCancel.bookingIds.map((bid) => cancelBooking(bid, "Teacher cancelled class")));
         } else {
           await cancelBooking(confirmModal.classId, "Teacher cancelled class");
         }
-        
-        setClasses((prev) =>
-          prev.map((cls) =>
-            cls.id === confirmModal.classId
-              ? { ...cls, status: "cancelled" }
-              : cls
-          )
-        );
+        setClasses((prev) => prev.map((cls) => cls.id === confirmModal.classId ? { ...cls, status: "cancelled" } : cls));
         showToast("Class cancelled successfully");
       } catch (err) {
         console.error("Error cancelling class:", err);
@@ -515,16 +389,12 @@ const askDeleteClass = (classItem) => {
       }
     } else if (confirmModal.type === "delete") {
       try {
-        const classToDelete = classes.find(cls => cls.id === confirmModal.classId);
-        
-        if (classToDelete && classToDelete.bookingIds && classToDelete.bookingIds.length > 0) {
-          await Promise.all(
-            classToDelete.bookingIds.map(bookingId => deleteBooking(bookingId))
-          );
+        const classToDelete = classes.find((cls) => cls.id === confirmModal.classId);
+        if (classToDelete?.bookingIds?.length > 0) {
+          await Promise.all(classToDelete.bookingIds.map((bid) => deleteBooking(bid)));
         } else {
           await deleteBooking(confirmModal.classId);
         }
-        
         setClasses((prev) => prev.filter((cls) => cls.id !== confirmModal.classId));
         showToast("Class deleted successfully");
       } catch (err) {
@@ -535,91 +405,423 @@ const askDeleteClass = (classItem) => {
     setConfirmModal({ open: false, type: null, classId: null });
   };
 
-
   const handleJoinClass = (classItem) => {
-  console.log("🚀 Starting class:", classItem);
-
-  const classroomData = {
-    id: classItem.id || classItem.bookingId,
-    bookingId: classItem.bookingId || classItem.id,
-    title: classItem.title,
-    teacher: `${teacherInfo.firstName} ${teacherInfo.lastName}`,
-    students: classItem.students || [],
-    duration: classItem.duration,
-    scheduledTime: classItem.scheduledTime,
-    teacherGoogleMeetLink: googleMeetLink
+    console.log("🚀 Starting class:", classItem);
+    const classroomData = {
+      id:                    classItem.id || classItem.bookingId,
+      bookingId:             classItem.bookingId || classItem.id,
+      title:                 classItem.title,
+      teacher:               `${teacherInfo.firstName} ${teacherInfo.lastName}`,
+      students:              classItem.students || [],
+      duration:              classItem.duration,
+      scheduledTime:         classItem.scheduledTime,
+      teacherGoogleMeetLink: googleMeetLink,
+    };
+    console.log("📊 Classroom data:", classroomData);
+    navigate("/classroom", { state: { classData: classroomData, userRole: "teacher" } });
   };
-
-  console.log("📊 Classroom data:", classroomData);
-
-  navigate("/classroom", { 
-    state: { 
-      classData: classroomData, 
-      userRole: "teacher" 
-    } 
-  });
-};
-
-  /*const handleJoinClass = (classItem) => {
-    console.log('🔍 Joining class:', classItem);
-    
-    setActiveClass({
-      id: classItem.bookingId || classItem.id,
-      bookingId: classItem.bookingId || classItem.id,
-      title: classItem.title,
-      topic: classItem.topic,
-      duration: classItem.duration,
-      
-    });
-    setIsClassroomOpen(true);
-  };*/
 
   const handleLeaveClassroom = () => {
     setIsClassroomOpen(false);
     setActiveClass(null);
   };
 
+  // ── Computed ──────────────────────────────────────────────────────────────────
+  const pendingBookings = bookings.length;
+  const completedCount  = completedClasses.length;
+  const c               = palette(isDarkMode);
+  const activeLabel     = NAV.find((n) => n.key === activeTab)?.label || "Dashboard";
+
+  // ── Original loading screen ───────────────────────────────────────────────────
   if (loading) {
     return (
-      <div className={`min-h-screen flex items-center justify-center ${isDarkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
+      <div className={`min-h-screen flex items-center justify-center ${isDarkMode ? "bg-gray-900" : "bg-gray-50"}`}>
         <div className="text-center">
-          <div className={`animate-spin rounded-full h-12 w-12 border-b-2 ${isDarkMode ? 'border-blue-400' : 'border-blue-600'} mx-auto`}></div>
-          <p className={`mt-4 ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>Loading dashboard...</p>
+          <div className={`animate-spin rounded-full h-12 w-12 border-b-2 ${isDarkMode ? "border-blue-400" : "border-blue-600"} mx-auto`} />
+          <p className={`mt-4 ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>Loading dashboard...</p>
         </div>
       </div>
     );
   }
 
+  // ── Original classroom override ───────────────────────────────────────────────
   if (isClassroomOpen && activeClass) {
-    return (
-      <Classroom
-        classData={activeClass}
-        userRole="teacher"
-        onLeave={handleLeaveClassroom}
-      />
-    );
+    return <Classroom classData={activeClass} userRole="teacher" onLeave={handleLeaveClassroom} />;
   }
 
+  // ── Main render ───────────────────────────────────────────────────────────────
   return (
-    <div className={`min-h-screen ${isDarkMode ? 'bg-gray-900' : 'bg-gradient-to-br from-gray-50 via-blue-50 to-purple-50'}`}>
-      {/* Toast Notification */}
+    <>
+      <style>{globalCSS(isDarkMode)}</style>
+      <div style={{ display: "flex", height: "100vh", background: c.bg, fontFamily: "'Plus Jakarta Sans', sans-serif", overflow: "hidden", opacity: mounted ? 1 : 0, transition: "opacity 0.3s ease" }}>
+
+        {/* ═══════════════════════════════════════════ SIDEBAR ══ */}
+        <aside style={{ width: sidebarOpen ? "230px" : "60px", background: c.card, borderRight: `1px solid ${c.border}`, display: "flex", flexDirection: "column", flexShrink: 0, transition: "width 0.25s cubic-bezier(0.4,0,0.2,1)", overflow: "hidden", zIndex: 40 }}>
+
+          {/* Logo */}
+          <div style={{ height: "64px", display: "flex", alignItems: "center", padding: sidebarOpen ? "0 18px" : "0 14px", borderBottom: `1px solid ${c.border}`, gap: "10px", flexShrink: 0 }}>
+            <div style={{ width: "32px", height: "32px", borderRadius: "10px", flexShrink: 0, background: "linear-gradient(135deg, #7c3aed, #8b5cf6)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <GraduationCap size={15} color="white" />
+            </div>
+            {sidebarOpen && (
+              <div style={{ overflow: "hidden" }}>
+                <p style={{ margin: 0, fontSize: "13px", fontWeight: "800", color: c.heading, whiteSpace: "nowrap" }}>EduLearn</p>
+                <p style={{ margin: 0, fontSize: "9px", color: c.muted, fontWeight: "700", letterSpacing: "0.08em", textTransform: "uppercase" }}>Teacher Portal</p>
+              </div>
+            )}
+          </div>
+
+          {/* Nav items */}
+          <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden", padding: "10px 6px" }} className="td-scroll">
+            {NAV.map(({ key, label, icon: Icon }) => {
+              const active   = activeTab === key;
+              const hasBadge = key === "bookings" && pendingBookings > 0;
+              return (
+                <button key={key} onClick={() => setActiveTab(key)} title={!sidebarOpen ? label : undefined}
+                  style={{ width: "100%", display: "flex", alignItems: "center", gap: "10px", padding: sidebarOpen ? "9px 10px" : "9px 14px", borderRadius: "10px", border: "none", cursor: "pointer", background: active ? (isDarkMode ? "#1e1730" : "#f5f0ff") : "transparent", color: active ? (isDarkMode ? "#a78bfa" : "#7c3aed") : (isDarkMode ? "#4b5563" : "#64748b"), fontFamily: "inherit", fontSize: "13.5px", fontWeight: active ? "700" : "500", textAlign: "left", marginBottom: "2px", whiteSpace: "nowrap", overflow: "hidden", position: "relative", transition: "all 0.15s" }}
+                  className="td-nav-btn"
+                >
+                  {active && <div style={{ position: "absolute", left: 0, top: "20%", bottom: "20%", width: "3px", borderRadius: "0 3px 3px 0", background: "#8b5cf6" }} />}
+                  <Icon size={16} style={{ flexShrink: 0 }} />
+                  {sidebarOpen && <span style={{ flex: 1 }}>{label}</span>}
+                  {sidebarOpen && hasBadge && (
+                    <span style={{ background: "#ef4444", color: "white", borderRadius: "10px", fontSize: "10px", fontWeight: "800", padding: "1px 7px", flexShrink: 0 }}>{pendingBookings}</span>
+                  )}
+                  {!sidebarOpen && hasBadge && (
+                    <span style={{ position: "absolute", top: "6px", right: "6px", width: "8px", height: "8px", background: "#ef4444", borderRadius: "50%" }} />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Bottom controls */}
+          <div style={{ borderTop: `1px solid ${c.border}`, padding: "10px 6px", flexShrink: 0 }}>
+            <button onClick={toggleDarkMode} title={isDarkMode ? "Light Mode" : "Dark Mode"}
+              style={{ width: "100%", display: "flex", alignItems: "center", gap: "10px", padding: sidebarOpen ? "9px 10px" : "9px 14px", borderRadius: "10px", border: "none", cursor: "pointer", background: "transparent", color: isDarkMode ? "#4b5563" : "#64748b", fontFamily: "inherit", fontSize: "13.5px", fontWeight: "500", textAlign: "left", marginBottom: "4px", whiteSpace: "nowrap" }}
+              className="td-nav-btn"
+            >
+              <span style={{ fontSize: "15px", flexShrink: 0 }}>{isDarkMode ? "☀️" : "🌙"}</span>
+              {sidebarOpen && <span>{isDarkMode ? "Light Mode" : "Dark Mode"}</span>}
+            </button>
+
+            <button onClick={() => setShowSettingsSidebar(true)} title="Settings"
+              style={{ width: "100%", display: "flex", alignItems: "center", gap: "10px", padding: sidebarOpen ? "9px 10px" : "9px 14px", borderRadius: "10px", border: "none", cursor: "pointer", background: "transparent", color: isDarkMode ? "#4b5563" : "#64748b", fontFamily: "inherit", fontSize: "13.5px", fontWeight: "500", textAlign: "left", marginBottom: "4px", whiteSpace: "nowrap" }}
+              className="td-nav-btn"
+            >
+              <Settings size={16} style={{ flexShrink: 0 }} />
+              {sidebarOpen && <span>Settings</span>}
+            </button>
+
+            <button onClick={handleLogout} title="Logout"
+              style={{ width: "100%", display: "flex", alignItems: "center", gap: "10px", padding: sidebarOpen ? "9px 10px" : "9px 14px", borderRadius: "10px", border: "none", cursor: "pointer", background: "transparent", color: "#ef4444", fontFamily: "inherit", fontSize: "13.5px", fontWeight: "500", textAlign: "left", whiteSpace: "nowrap" }}
+              className="td-logout-btn"
+            >
+              <LogOut size={16} style={{ flexShrink: 0 }} />
+              {sidebarOpen && <span>Logout</span>}
+            </button>
+          </div>
+        </aside>
+
+        {/* ══════════════════════════════════════════ MAIN AREA ══ */}
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, overflow: "hidden" }}>
+
+          {/* Top bar */}
+          <header style={{ height: "64px", background: c.card, borderBottom: `1px solid ${c.border}`, display: "flex", alignItems: "center", padding: "0 24px", gap: "16px", flexShrink: 0 }}>
+            <button onClick={() => setSidebarOpen(!sidebarOpen)}
+              style={{ background: "none", border: "none", cursor: "pointer", color: c.muted, padding: "6px", borderRadius: "8px", display: "flex", alignItems: "center" }}
+              className="td-nav-btn"
+            >
+              <Menu size={20} />
+            </button>
+
+            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+              <span style={{ fontSize: "12.5px", color: c.muted, fontWeight: "500" }}>Teacher</span>
+              <ChevronRight size={13} color={c.muted} />
+              <span style={{ fontSize: "13px", color: c.heading, fontWeight: "700" }}>{activeLabel}</span>
+            </div>
+
+            <div style={{ flex: 1 }} />
+
+            <div style={{ background: isDarkMode ? "#1e1730" : "#f5f0ff", border: `1px solid ${isDarkMode ? "#2d1f4a" : "#ddd6fe"}`, borderRadius: "20px", padding: "4px 12px", fontSize: "11.5px", fontWeight: "700", color: isDarkMode ? "#a78bfa" : "#7c3aed" }}>
+              👨‍🎓 {students.length} students
+            </div>
+
+            {pendingBookings > 0 && (
+              <div onClick={() => setActiveTab("bookings")}
+                style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: "20px", padding: "4px 12px", fontSize: "11.5px", fontWeight: "700", color: "#ef4444", cursor: "pointer" }}>
+                🔔 {pendingBookings} pending
+              </div>
+            )}
+
+            <button onClick={() => setIsModalOpen(true)}
+              style={{ background: "linear-gradient(135deg, #7c3aed, #8b5cf6)", color: "white", border: "none", borderRadius: "10px", padding: "8px 14px", fontSize: "12.5px", fontWeight: "700", cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: "6px" }}>
+              <Plus size={14} /> New Class
+            </button>
+
+            <div style={{ width: "34px", height: "34px", borderRadius: "10px", background: "linear-gradient(135deg, #7c3aed, #8b5cf6)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", fontWeight: "800", color: "white", flexShrink: 0 }}>
+              {(teacherInfo?.firstName?.[0] || "T").toUpperCase()}
+            </div>
+          </header>
+
+          {/* Scrollable content */}
+          <main
+            style={{ flex: 1, overflowY: "auto", padding: activeTab === "messages" ? "0" : "24px", background: c.bg }}
+            className="td-scroll"
+          >
+            <div style={{ background: c.card, borderRadius: "16px", border: `1px solid ${c.border}`, minHeight: "calc(100vh - 112px)", padding: activeTab === "messages" ? "0" : "24px", overflow: activeTab === "messages" ? "hidden" : "visible" }}>
+
+              {/* ─────────────────────────── DASHBOARD TAB ── */}
+              {activeTab === "dashboard" && (
+                <div style={{ display: "flex", flexDirection: "column", gap: "22px" }}>
+
+                  {/* Header row */}
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "12px" }}>
+                    <div>
+                      <h1 style={{ margin: 0, fontSize: "20px", fontWeight: "800", color: c.heading }}>
+                        Welcome back, {teacherInfo?.firstName}! 👋
+                      </h1>
+                      <p style={{ margin: "4px 0 0", fontSize: "13px", color: c.muted }}>
+                        You have <strong style={{ color: c.heading }}>{students.length}</strong> assigned students,{" "}
+                        <strong style={{ color: c.heading }}>{classes.length}</strong> scheduled classes, and{" "}
+                        <strong style={{ color: c.heading }}>{bookings.length}</strong> pending bookings
+                      </p>
+                    </div>
+                    <button onClick={fetchTeacherData}
+                      style={{ background: isDarkMode ? "#1e1730" : "#f5f0ff", border: `1px solid ${isDarkMode ? "#2d1f4a" : "#ddd6fe"}`, borderRadius: "10px", padding: "8px 14px", fontSize: "13px", fontWeight: "600", color: isDarkMode ? "#a78bfa" : "#7c3aed", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px", fontFamily: "inherit" }}>
+                      <RefreshCw size={13} /> Refresh
+                    </button>
+                  </div>
+
+                  {/* Stat cards */}
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: "14px" }}>
+                    {[
+                      { icon: Users,       label: "Students",         value: students.length, sub: "assigned to you",   accent: "#8b5cf6", bg: isDarkMode ? "rgba(139,92,246,0.1)" : "#f5f3ff" },
+                      { icon: Calendar,    label: "Classes",          value: classes.length,  sub: "scheduled total",   accent: "#3b82f6", bg: isDarkMode ? "rgba(59,130,246,0.1)"  : "#eff6ff" },
+                      { icon: CheckCircle, label: "Completed",        value: completedCount,  sub: "classes finished",  accent: "#10b981", bg: isDarkMode ? "rgba(16,185,129,0.1)"  : "#f0fdf4" },
+                      { icon: BookOpen,    label: "Pending Bookings", value: pendingBookings, sub: "awaiting response", accent: "#f59e0b", bg: isDarkMode ? "rgba(245,158,11,0.1)"  : "#fffbeb" },
+                    ].map(({ icon: Icon, label, value, sub, accent, bg }) => (
+                      <div key={label} style={{ background: c.card, border: `1px solid ${c.border}`, borderRadius: "14px", padding: "18px", display: "flex", gap: "12px", boxShadow: isDarkMode ? "none" : "0 2px 10px rgba(0,0,0,0.04)" }}>
+                        <div style={{ width: "42px", height: "42px", borderRadius: "12px", background: bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                          <Icon size={18} color={accent} />
+                        </div>
+                        <div>
+                          <p style={{ margin: "0 0 3px", fontSize: "11px", fontWeight: "700", color: c.muted, textTransform: "uppercase", letterSpacing: "0.06em" }}>{label}</p>
+                          <p style={{ margin: "0 0 2px", fontSize: "24px", fontWeight: "800", color: c.heading, lineHeight: 1 }}>{value}</p>
+                          <p style={{ margin: 0, fontSize: "12px", color: accent, fontWeight: "600" }}>{sub}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Google Meet — original logic, new shell */}
+                  {teacherInfo?._id && (
+                    <div style={{ background: isDarkMode ? "#1e1730" : "#f5f0ff", border: `1px solid ${isDarkMode ? "#2d1f4a" : "#ddd6fe"}`, borderRadius: "14px", overflow: "hidden" }}>
+                      <button
+                        onClick={() => setShowGoogleMeetSettings(!showGoogleMeetSettings)}
+                        style={{ width: "100%", padding: "16px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", background: "transparent", border: "none", cursor: "pointer", fontFamily: "inherit" }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                          <div style={{ width: "38px", height: "38px", borderRadius: "10px", background: "linear-gradient(135deg, #059669, #10b981)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                            <Video size={16} color="white" />
+                          </div>
+                          <div style={{ textAlign: "left" }}>
+                            <p style={{ margin: 0, fontSize: "13.5px", fontWeight: "700", color: c.heading }}>Google Meet Link</p>
+                            <p style={{ margin: 0, fontSize: "12px", color: c.muted }}>{googleMeetLink ? "Link configured ✓" : "Click to set up your meeting link"}</p>
+                          </div>
+                        </div>
+                        <div style={{ transform: showGoogleMeetSettings ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>
+                          <svg style={{ width: "18px", height: "18px" }} fill="none" stroke={c.muted} viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </div>
+                      </button>
+
+                      {showGoogleMeetSettings && (
+                        <div style={{ padding: "16px 20px 20px", borderTop: `1px solid ${isDarkMode ? "#2d1f4a" : "#ddd6fe"}` }}>
+                          <GoogleMeetSettings
+                            teacherId={teacherInfo._id}
+                            initialLink={googleMeetLink || ""}
+                            onUpdate={(newLink) => setGoogleMeetLink(newLink)}
+                            isDarkMode={isDarkMode}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Original dashboard widgets */}
+                  <QuickStats
+                    stats={{ totalStudents: students.length, totalClasses: classes.length, totalBookings: bookings.length }}
+                    isDarkMode={isDarkMode}
+                  />
+                  <LiveClasses
+                    classes={classes.filter((c) => c.status === "live")}
+                    onJoin={handleJoinClass}
+                    isDarkMode={isDarkMode}
+                  />
+                  <UpcomingClasses
+                    classes={classes.filter((c) => c.status === "scheduled" || c.status === "upcoming-soon")}
+                    students={students}
+                    onCancel={askCancelClass}
+                    onDelete={askDeleteClass}
+                    isDarkMode={isDarkMode}
+                  />
+                </div>
+              )}
+
+              {/* ────────────────────────────── CLASSES TAB ── */}
+              {activeTab === "classes" && (
+                <div style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "10px" }}>
+                    <div>
+                      <h1 style={{ margin: 0, fontSize: "20px", fontWeight: "800", color: c.heading }}>My Classes</h1>
+                      <p style={{ margin: "4px 0 0", fontSize: "13px", color: c.muted }}>{classes.length} classes scheduled</p>
+                    </div>
+                    <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                      <button
+                        onClick={() => setShowRecurringForm(true)}
+                        style={{ background: isDarkMode ? "#1e1730" : "#f5f0ff", border: `1px solid ${isDarkMode ? "#2d1f4a" : "#ddd6fe"}`, borderRadius: "10px", padding: "9px 16px", fontSize: "13px", fontWeight: "600", color: isDarkMode ? "#a78bfa" : "#7c3aed", cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: "6px" }}
+                        className="td-nav-btn"
+                      >
+                        <Repeat size={14} /> Create Recurring Classes
+                      </button>
+                      <button
+                        onClick={() => setIsModalOpen(true)}
+                        style={{ background: "linear-gradient(135deg, #7c3aed, #8b5cf6)", color: "white", border: "none", borderRadius: "10px", padding: "9px 16px", fontSize: "13px", fontWeight: "700", cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: "6px" }}
+                      >
+                        <Plus size={14} /> Add New Class
+                      </button>
+                    </div>
+                  </div>
+
+                  {classes.length === 0 ? (
+                    <div style={{ textAlign: "center", padding: "60px 0", background: isDarkMode ? "#0f1117" : "#f8faff", borderRadius: "14px", border: `1px solid ${c.border}` }}>
+                      <Calendar size={36} color={isDarkMode ? "#1e2235" : "#e2e8f0"} style={{ margin: "0 auto 10px" }} />
+                      <p style={{ fontSize: "14px", color: c.muted, margin: "0 0 4px", fontWeight: "600" }}>No classes scheduled yet</p>
+                      <p style={{ fontSize: "12px", color: c.muted, margin: 0 }}>Accept booking requests to add classes to your schedule</p>
+                    </div>
+                  ) : (
+                    <ClassList
+                      data={classes}
+                      onJoin={handleJoinClass}
+                      onDelete={askDeleteClass}
+                      isDarkMode={isDarkMode}
+                    />
+                  )}
+                </div>
+              )}
+
+              {/* ─────────────────────────── COMPLETED TAB ── */}
+              {activeTab === "completed-classes" && (
+                <div style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
+                  <div>
+                    <h1 style={{ margin: 0, fontSize: "20px", fontWeight: "800", color: c.heading }}>Completed Classes</h1>
+                    <p style={{ margin: "4px 0 0", fontSize: "13px", color: c.muted }}>{completedClasses.length} classes completed</p>
+                  </div>
+                  <CompletedClassesTab
+                    classes={completedClasses}
+                    teacherInfo={teacherInfo}
+                    isDarkMode={isDarkMode}
+                  />
+                </div>
+              )}
+
+              {/* ──────────────────────────── STUDENTS TAB ── */}
+              {activeTab === "students" && (
+                <div style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
+                  <div>
+                    <h1 style={{ margin: 0, fontSize: "20px", fontWeight: "800", color: c.heading }}>My Students</h1>
+                    <p style={{ margin: "4px 0 0", fontSize: "13px", color: c.muted }}>{students.length} students assigned to you</p>
+                  </div>
+                  {students.length === 0 ? (
+                    <div style={{ textAlign: "center", padding: "60px 0", background: isDarkMode ? "#0f1117" : "#f8faff", borderRadius: "14px", border: `1px solid ${c.border}` }}>
+                      <Users size={36} color={isDarkMode ? "#1e2235" : "#e2e8f0"} style={{ margin: "0 auto 10px" }} />
+                      <p style={{ fontSize: "14px", color: c.muted, margin: 0, fontWeight: "600" }}>No students assigned yet</p>
+                    </div>
+                  ) : (
+                    <StudentProgressList students={students} isDarkMode={isDarkMode} />
+                  )}
+                </div>
+              )}
+
+              {/* ──────────────────────────── BOOKINGS TAB ── */}
+              {activeTab === "bookings" && (
+                <div style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
+                  <div>
+                    <h1 style={{ margin: 0, fontSize: "20px", fontWeight: "800", color: c.heading }}>Bookings</h1>
+                    <p style={{ margin: "4px 0 0", fontSize: "13px", color: c.muted }}>{pendingBookings} pending · {bookings.length} total</p>
+                  </div>
+                  <BookingList
+                    bookings={bookings}
+                    onAccept={handleAcceptBooking}
+                    onReject={handleRejectBooking}
+                    isDarkMode={isDarkMode}
+                  />
+                </div>
+              )}
+
+              {/* ──────────────────────────── MESSAGES TAB ── */}
+              {activeTab === "messages" && <MessagesTab userRole="teacher" />}
+
+              {/* ───────────────────────────── PAYMENT TAB ── */}
+              {activeTab === "payment" && (
+                <div style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
+                  <h1 style={{ margin: 0, fontSize: "20px", fontWeight: "800", color: c.heading }}>Payment</h1>
+                  <PaymentTab teacher={teacherInfo} isDarkMode={isDarkMode} />
+                </div>
+              )}
+
+            </div>
+          </main>
+        </div>
+      </div>
+
+      {/* ── Toast (original) ── */}
       {toast && (
-        <div className={`fixed top-4 right-4 z-50 px-6 py-3 rounded-lg shadow-lg ${
-          toast.type === "error" ? "bg-red-500" : "bg-green-500"
-        } text-white`}>
+        <div className={`fixed top-4 right-4 z-50 px-6 py-3 rounded-lg shadow-lg ${toast.type === "error" ? "bg-red-500" : "bg-green-500"} text-white`}>
           {toast.message}
         </div>
       )}
 
-      <DashboardHeader
-        teacherName={teacherInfo?.firstName || "Teacher"}
-        onLogout={handleLogout}
-        onChangePassword={() => setShowChangePassword(true)}
-        onOpenSettings={() => setShowSettingsSidebar(true)}
-        onSessionManagement={() => setShowSessionManagement(true)}
+      {/* ── Class Modal (original) ── */}
+      <ClassModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSave={handleAddClass}
+        students={students}
         isDarkMode={isDarkMode}
       />
 
+      {/* ── Recurring Form Modal (original) ── */}
+      {showRecurringForm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+            <RecurringClassForm
+              students={students}
+              teacherInfo={teacherInfo}
+              onSuccess={(pattern) => {
+                console.log("✅ Recurring classes created:", pattern);
+                setShowRecurringForm(false);
+                showToast(`Successfully created ${pattern.occurrences} recurring classes!`, "success");
+                setTimeout(() => { fetchTeacherData(); }, 1000);
+              }}
+              onCancel={() => setShowRecurringForm(false)}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* ── Confirm Modal (original) ── */}
+      <ConfirmModal
+        isOpen={confirmModal.open}
+        type={confirmModal.type}
+        onConfirm={handleConfirm}
+        onCancel={() => setConfirmModal({ open: false, type: null, classId: null })}
+        isDarkMode={isDarkMode}
+      />
+
+      {/* ── Change Password (original) ── */}
       {showChangePassword && (
         <ChangePassword
           onClose={() => setShowChangePassword(false)}
@@ -627,37 +829,27 @@ const askDeleteClass = (classItem) => {
         />
       )}
 
+      {/* ── Session Management (original) ── */}
       {showSessionManagement && (
-        <SessionManagement 
+        <SessionManagement
           onClose={() => setShowSessionManagement(false)}
           userType="teacher"
         />
       )}
 
+      {/* ── Settings Sidebar (original) ── */}
       {showSettingsSidebar && (
         <SettingsSidebar
           isOpen={showSettingsSidebar}
           onClose={() => setShowSettingsSidebar(false)}
-          onChangePassword={() => {
-            setShowSettingsSidebar(false);
-            setShowChangePassword(true);
-          }}
-          onManageSessions={() => {
-            setShowSettingsSidebar(false);
-            setShowSessionManagement(true);
-          }}
-          onManage2FA={() => {
-            setShowSettingsSidebar(false);
-            setShowSettingsModal(true);
-          }}
-          userInfo={{
-            firstName: teacherInfo?.firstName,
-            lastName: teacherInfo?.lastName,
-            email: teacherInfo?.email
-          }}
+          onChangePassword={() => { setShowSettingsSidebar(false); setShowChangePassword(true); }}
+          onManageSessions={() => { setShowSettingsSidebar(false); setShowSessionManagement(true); }}
+          onManage2FA={() => { setShowSettingsSidebar(false); setShowSettingsModal(true); }}
+          userInfo={{ firstName: teacherInfo?.firstName, lastName: teacherInfo?.lastName, email: teacherInfo?.email }}
         />
       )}
 
+      {/* ── Settings Modal (original) ── */}
       {showSettingsModal && (
         <SettingsModal
           isOpen={showSettingsModal}
@@ -665,255 +857,30 @@ const askDeleteClass = (classItem) => {
           userType="teacher"
         />
       )}
-
-      {/* Welcome Banner */}
-      {!loading && teacherInfo && (
-        <div className={`${
-          isDarkMode 
-            ? 'bg-gradient-to-r from-purple-800 via-blue-800 to-indigo-800' 
-            : 'bg-gradient-to-r from-purple-600 via-blue-600 to-indigo-600'
-        } text-white py-6 px-4 shadow-lg`}>
-          <div className="max-w-6xl mx-auto">
-            <h2 className="text-2xl sm:text-3xl font-bold">
-              Welcome back, {teacherInfo.firstName}! 👋
-            </h2>
-            <p className={`text-sm ${isDarkMode ? 'text-purple-200' : 'text-purple-100'} mt-1`}>
-              You have <span className="font-semibold text-white">{students.length}</span> assigned students,{" "}
-              <span className="font-semibold text-white">{classes.length}</span> scheduled classes, and{" "}
-              <span className="font-semibold text-white">{bookings.length}</span> pending bookings
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Main Content */}
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* ✅ Added "messages" tab */}
-        <TeacherNavTabs
-          activeTab={activeTab}
-          onChange={setActiveTab}
-          tabs={["dashboard", "classes", "completed-classes", "students", "bookings", "messages", "payment"]}
-          isDarkMode={isDarkMode}
-        />
-    {activeTab === "dashboard" && (
-  <div className="space-y-6">
-    {/* 🆕 Google Meet Settings - Collapsible */}
-    {teacherInfo?._id && (
-      <div className={`${isDarkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl shadow-lg border ${isDarkMode ? 'border-gray-700' : 'border-gray-200'} overflow-hidden`}>
-        {/* Header with Toggle */}
-        <button
-          onClick={() => setShowGoogleMeetSettings(!showGoogleMeetSettings)}
-          className={`w-full px-6 py-4 flex items-center justify-between ${isDarkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-50'} transition-colors`}
-        >
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center">
-              <Video className="w-5 h-5 text-white" />
-            </div>
-            <div className="text-left">
-              <h3 className={`font-bold text-lg ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                Google Meet Link
-              </h3>
-              <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                {googleMeetLink ? 'Link configured ✓' : 'Click to set up your meeting link'}
-              </p>
-            </div>
-          </div>
-          <div className={`transform transition-transform ${showGoogleMeetSettings ? 'rotate-180' : ''}`}>
-            <svg className={`w-5 h-5 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
-          </div>
-        </button>
-
-        {/* Collapsible Content */}
-        {showGoogleMeetSettings && (
-          <div className="px-6 pb-6 border-t border-gray-200 pt-4">
-            <GoogleMeetSettings
-              teacherId={teacherInfo._id}
-              initialLink={googleMeetLink || ''}
-              onUpdate={(newLink) => setGoogleMeetLink(newLink)}
-              isDarkMode={isDarkMode}
-            />
-          </div>
-        )}
-      </div>
-    )}
-
-    <QuickStats
-      stats={{
-        totalStudents: students.length,
-        totalClasses: classes.length,
-        totalBookings: bookings.length,
-      }}
-      isDarkMode={isDarkMode}
-    />
-
-            
-            <LiveClasses 
-              classes={classes.filter(c => c.status === "live")} 
-              onJoin={handleJoinClass}
-              isDarkMode={isDarkMode}
-            />
-            <UpcomingClasses
-              classes={classes.filter(c => c.status === "scheduled" || c.status === "upcoming-soon")}
-              students={students}
-              onCancel={askCancelClass}
-              onDelete={askDeleteClass}
-              isDarkMode={isDarkMode}
-            />
-          </div>
-     )}
-
-        {activeTab === "classes" && (
-          <div className="space-y-6">
-            <button
-              onClick={() => setIsModalOpen(true)}
-              className={`px-6 py-3 ${
-                isDarkMode 
-                  ? 'bg-gradient-to-r from-blue-700 to-indigo-700 hover:from-blue-600 hover:to-indigo-600' 
-                  : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700'
-              } text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2 font-semibold text-lg`}
-            >
-              <Plus className="w-5 h-5" />
-              Add New Class
-            </button>
-
-            <button
-            onClick={() => setShowRecurringForm(true)}
-            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition flex items-center gap-2"
-          >
-            <Repeat className="w-4 h-4" />
-            Create Recurring Classes
-          </button>
-            
-            {classes.length === 0 ? (
-              <div className={`${isDarkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow-md p-8 text-center`}>
-                <p className={`${isDarkMode ? 'text-gray-300' : 'text-gray-500'} text-lg`}>No classes scheduled yet</p>
-                <p className={`${isDarkMode ? 'text-gray-400' : 'text-gray-400'} text-sm mt-2`}>
-                  Accept booking requests to add classes to your schedule
-                </p>
-              </div>
-            ) : (
-              <ClassList 
-                data={classes} 
-                onJoin={handleJoinClass}
-                onDelete={askDeleteClass}
-                isDarkMode={isDarkMode}
-              />
-            )}
-          </div>
-        )}
-
-        <ClassModal
-          isOpen={isModalOpen}
-          onClose={() => setIsModalOpen(false)}
-          onSave={handleAddClass}
-          students={students}
-          isDarkMode={isDarkMode}
-        />
-
-        {activeTab === "completed-classes" && (
-          <CompletedClassesTab 
-            classes={completedClasses}
-            teacherInfo={teacherInfo}
-            isDarkMode={isDarkMode}
-          />
-        )}
-
-        {activeTab === "students" && (
-          <div>
-            {students.length === 0 ? (
-              <div className={`${isDarkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow-md p-8 text-center`}>
-                <p className={`${isDarkMode ? 'text-gray-300' : 'text-gray-500'} text-lg`}>No students assigned yet</p>
-              </div>
-            ) : (
-              <StudentProgressList 
-                students={students}
-                isDarkMode={isDarkMode}
-              />
-            )}
-          </div>
-        )}
-
-        {activeTab === "bookings" && (
-          <BookingList
-            bookings={bookings}
-            onAccept={handleAcceptBooking}
-            onReject={handleRejectBooking}
-            isDarkMode={isDarkMode}
-          />
-        )}
-
-        {/* Recurring Class Form Modal */}
-          {showRecurringForm && (
-            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-              <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
-                <RecurringClassForm 
-                  students={students}
-                  teacherInfo={teacherInfo}
-                  onSuccess={(pattern) => {
-                    console.log("✅ Recurring classes created:", pattern);
-                    setShowRecurringForm(false);
-                    showToast(
-                      `Successfully created ${pattern.occurrences} recurring classes!`,
-                      "success"
-                    );
-                    // Refresh data to show new classes
-                    setTimeout(() => {
-                      fetchTeacherData();
-                    }, 1000);
-                  }}
-                  onCancel={() => setShowRecurringForm(false)}
-                />
-              </div>
-            </div>
-          )}
-
-
-        {/* ✅ NEW: Messages Tab */}
-        {activeTab === "messages" && (
-          <MessagesTab userRole="teacher" />
-        )}
-
-        {/* ✅ NEW: Payment Tab */}
-        {activeTab === "payment" && (
-          <PaymentTab teacher={teacherInfo} isDarkMode={isDarkMode} />
-        )}
-
-        <ConfirmModal
-          isOpen={confirmModal.open}
-          type={confirmModal.type}
-          onConfirm={handleConfirm}
-          onCancel={() =>
-            setConfirmModal({ open: false, type: null, classId: null })
-          }
-          isDarkMode={isDarkMode}
-        />
-      </div>
-
-      {/* Floating Action Buttons */}
-      <div className="fixed bottom-6 right-6 flex flex-col gap-3 z-30">
-        {/* Dark Mode Toggle */}
-        <DarkModeToggle isDarkMode={isDarkMode} onToggle={toggleDarkMode} />
-
-        {/* Settings Button */}
-        <button
-          onClick={() => setShowSettingsSidebar(true)}
-          className={`${
-            isDarkMode 
-              ? 'bg-gradient-to-r from-purple-700 to-pink-700' 
-              : 'bg-gradient-to-r from-purple-600 to-pink-600'
-          } text-white p-4 rounded-full shadow-2xl hover:shadow-3xl hover:scale-110 transition-all duration-300 group`}
-          aria-label="Open Settings"
-        >
-          <Settings className="w-6 h-6 group-hover:rotate-90 transition-transform duration-300" />
-          <span className={`absolute right-full mr-3 top-1/2 -translate-y-1/2 ${
-            isDarkMode ? 'bg-gray-700' : 'bg-gray-900'
-          } text-white text-sm px-3 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap`}>
-            Settings
-          </span>
-        </button>
-      </div>
-    </div>
+    </>
   );
+}
+
+// ── Palette helper ────────────────────────────────────────────────────────────
+function palette(dark) {
+  return {
+    bg:      dark ? "#0f1117" : "#f4f6fb",
+    card:    dark ? "#1a1d27" : "#ffffff",
+    border:  dark ? "#1e2235" : "#e8ecf4",
+    heading: dark ? "#e2e8f0" : "#1e293b",
+    text:    dark ? "#94a3b8" : "#475569",
+    muted:   dark ? "#374151" : "#94a3b8",
+  };
+}
+
+// ── Global CSS ────────────────────────────────────────────────────────────────
+function globalCSS(dark) {
+  return `
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+    * { box-sizing: border-box; }
+    .td-scroll::-webkit-scrollbar { width: 4px; }
+    .td-scroll::-webkit-scrollbar-thumb { background: ${dark ? "#1e2235" : "#e0e4f4"}; border-radius: 4px; }
+    .td-nav-btn:hover { background: ${dark ? "#1e1730 !important" : "#f5f0ff !important"}; color: ${dark ? "#a78bfa !important" : "#7c3aed !important"}; }
+    .td-logout-btn:hover { background: rgba(239,68,68,0.08) !important; }
+  `;
 }

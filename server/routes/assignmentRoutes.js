@@ -12,7 +12,8 @@ router.get("/", async (req, res) => {
     const assignments = await Assignment.find()
       .populate("teacherId", "firstName lastName email")
       .populate("studentId", "firstName surname email")
-      .sort({ assignedDate: -1 });
+      .sort({ assignedDate: -1 })
+      .lean();
     res.json(assignments);
   } catch (err) {
     console.error(err);

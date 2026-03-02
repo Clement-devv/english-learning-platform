@@ -30,7 +30,8 @@ const bookingSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ["pending", "accepted", "rejected", "completed", "cancelled"],
+    // "missed" = both parties did not attend long enough — no deductions, no earnings
+    enum: ["pending", "accepted", "rejected", "completed", "cancelled", "missed"],
     default: "pending"
   },
   notes: {
@@ -54,15 +55,49 @@ const bookingSchema = new mongoose.Schema({
     type: String,
     default: ""
   },
-  completedAt: Date,
-  cancelledAt: Date
+  // Who/what marked this as completed or missed
+  markedBy: {
+    type: String,
+    enum: ["admin", "classroom", "system", "teacher"],
+    default: null
+  },
+  // When a class is missed: why
+  missedReason: {
+    type: String,
+    default: ""
+  },
+  // Admin rejection after completion (admin can reject a completed class)
+  adminRejected: {
+    type: Boolean,
+    default: false
+  },
+  adminRejectedAt: Date,
+  adminRejectedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Admin"
+  },
+  adminRejectedReason: {
+    type: String,
+    default: ""
+  },
+
+  recurringPatternId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "RecurringPattern",
+    default: null
+  },
+
+  acceptedAt:   Date,
+  completedAt:  Date,
+  cancelledAt:  Date,
 }, { 
   timestamps: true 
 });
 
-// Index for faster queries
+// Indexes for faster queries
 bookingSchema.index({ teacherId: 1, status: 1 });
 bookingSchema.index({ studentId: 1, status: 1 });
 bookingSchema.index({ scheduledTime: 1 });
+bookingSchema.index({ recurringPatternId: 1 });
 
 export default mongoose.model("Booking", bookingSchema);

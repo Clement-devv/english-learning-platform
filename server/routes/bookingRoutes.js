@@ -45,8 +45,8 @@ const getInitialStatus = (createdBy) => {
 router.get("/:id", verifyToken, async (req, res) => {
   try {
     const booking = await Booking.findById(req.params.id)
-      .populate("teacherId", "firstName lastName email continent")
-      .populate("studentId", "firstName surname email noOfClasses");
+      .populate("teacherId", "firstName lastName email continent googleMeetLink")
+      .populate("studentId", "firstName surname email noOfClasses ");
     
     if (!booking) {
       return res.status(404).json({ 
@@ -364,7 +364,7 @@ router.patch("/:id/reject", verifyToken, async (req, res) => {
 router.patch("/:id/complete", verifyToken, async (req, res) => {
   try {
     const booking = await Booking.findById(req.params.id)
-      .populate("teacherId", "firstName lastName email ratePerClass lessonsCompleted earned")
+      .populate("teacherId", "firstName lastName email ratePerClass lessonsCompleted earned googleMeetLink")
       .populate("studentId", "firstName surname email noOfClasses");
     
     if (!booking) {
@@ -472,7 +472,9 @@ router.get("/", verifyToken, verifyAdmin, async (req, res) => {
     const bookings = await Booking.find(filter)
       .populate("teacherId", "firstName lastName email")
       .populate("studentId", "firstName surname email")
-      .sort({ scheduledTime: -1 });
+      .sort({ scheduledTime: -1 })
+      .limit(500)
+      .lean();
 
     res.json(bookings);
   } catch (err) {
@@ -497,11 +499,18 @@ router.get("/teacher/:teacherId", verifyToken, async (req, res) => {
     }
 
     const filter = { teacherId };
-    if (status) filter.status = status;
+    if (status === "completed") {
+      // ✅ Include both "completed" and "missed" — frontend distinguishes with missedReason
+      filter.status = { $in: ["completed", "missed"] };
+    } else if (status) {
+      filter.status = status;
+    }
 
     const bookings = await Booking.find(filter)
       .populate("studentId", "firstName surname email noOfClasses")
-      .sort({ scheduledTime: -1 });
+      .sort({ scheduledTime: -1 })
+      .limit(200)
+      .lean();
 
     res.json(bookings);
   } catch (err) {
@@ -526,11 +535,18 @@ router.get("/student/:studentId", verifyToken, async (req, res) => {
     }
 
     const filter = { studentId };
-    if (status) filter.status = status;
+    if (status === "completed") {
+      // ✅ Include both "completed" and "missed" — frontend distinguishes with missedReason
+      filter.status = { $in: ["completed", "missed"] };
+    } else if (status) {
+      filter.status = status;
+    }
 
     const bookings = await Booking.find(filter)
-      .populate("teacherId", "firstName lastName email continent")
-      .sort({ scheduledTime: 1 });
+      .populate("teacherId", "firstName lastName email continent googleMeetLink")
+      .sort({ scheduledTime: 1 })
+      .limit(200)
+      .lean();
 
     res.json(bookings);
   } catch (err) {

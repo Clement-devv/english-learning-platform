@@ -252,7 +252,11 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
 
   const handleSaveManualPayment = async (paymentData) => {
     try {
-      const result = await addPayment(paymentData);
+      if (!selectedStudent) {
+        showToast("No student selected", "error");
+        return;
+      }
+      const result = await addPayment(selectedStudent, paymentData);
       setPaymentHistory((prev) => [...prev, result]);
 
       // Refresh student classes count

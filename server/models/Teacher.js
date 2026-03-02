@@ -1,4 +1,4 @@
-// models/Teacher.js
+// server/models/Teacher.js
 import mongoose from "mongoose";
 
 const sessionSchema = new mongoose.Schema({
@@ -21,35 +21,46 @@ const teacherSchema = new mongoose.Schema({
   email: { type: String, unique: true, required: true },
   ratePerClass: Number,
   password: String,
-  active: { type: Boolean, default: true },
-  lessonsCompleted: { type: Number, default: 0 },
-  earned: { type: Number, default: 0 },
   continent: {
     type: String,
-    enum: ["Africa", "Europe", "Asia"],
+    enum: ["Africa", "Europe", "Asia", "Americas", "Oceania"],
     required: true,
   },
-  
-  // Password reset fields
-  resetPasswordToken: String,
+
+  googleMeetLink: {
+  type: String,
+  default: "",
+},
+
+  // ── Invite / account status ──────────────────────────────────────────────
+  status: {
+    type: String,
+    enum: ["pending", "active", "suspended"],
+    default: "pending",    // starts pending until teacher sets password
+  },
+  inviteToken:   String,   // crypto token sent in email
+  inviteExpires: Date,     // 48h expiry
+
+  // ── Existing fields ───────────────────────────────────────────────────────
+  active: { type: Boolean, default: false }, // false until invite accepted
+  lessonsCompleted: { type: Number, default: 0 },
+  earned: { type: Number, default: 0 },
+
+  // Password reset
+  resetPasswordToken:   String,
   resetPasswordExpires: Date,
-  lastPasswordChange: Date,
-  
+  lastPasswordChange:   Date,
+
   // Session management
-  sessions: [sessionSchema],
+  sessions:  [sessionSchema],
   lastLogin: Date,
 
   // Two-Factor Authentication
-  twoFactorEnabled: { type: Boolean, default: false },
-  twoFactorSecret: String,
+  twoFactorEnabled:     { type: Boolean, default: false },
+  twoFactorSecret:      String,
   twoFactorBackupCodes: [String],
-  twoFactorVerified: { type: Boolean, default: false },
-  
-}, {
-  timestamps: true,
-  
-});
+  twoFactorVerified:    { type: Boolean, default: false },
 
-
+}, { timestamps: true });
 
 export default mongoose.model("Teacher", teacherSchema);

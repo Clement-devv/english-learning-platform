@@ -3,7 +3,7 @@ import express from "express";
 import GroupChat from "../models/GroupChat.js";
 import Teacher from "../models/Teacher.js";
 import Student from "../models/Student.js";
-import Admin from "../models/Admin.js"; // ✅ ADDED: Admin model import
+import Admin from "../models/Admin.js"; 
 import { verifyToken } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
@@ -109,7 +109,10 @@ router.get("/:chatId/messages", verifyToken, async (req, res) => {
     const { chatId } = req.params;
     const { id: userId, role } = req.user;
 
-    const chat = await GroupChat.findById(chatId);
+    const chat = await GroupChat.findById(chatId)
+    .select("chatName teacherId studentId assignmentId")
+    .lean();
+    
 
     if (!chat) {
       return res.status(404).json({ 

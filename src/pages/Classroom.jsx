@@ -1,807 +1,20 @@
-// src/pages/Classroom.jsx - 🎨 COMPLETE FIX: Persistent Timer + End Class + Video Fix
-import React, { useState, useEffect, useRef } from "react";
-//import { useNavigate } from "react-router-dom";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import VideoCall from "./VideoCall";
 import api from "../api";
-import { 
-  Video, 
-  FileText, 
-  PenTool,
-  Clock,
-  Users,
-  CheckCircle2,
-  XCircle,
-  Loader,
-  Power,
-  AlertTriangle
+import {
+  Video, FileText, PenTool, Clock, Users,
+  CheckCircle2, XCircle, Loader, Power, AlertTriangle,
+  CheckCircle, X,
 } from "lucide-react";
 
-export default function Classroom({ classData, userRole: propUserRole, onLeave, teacherGoogleMeetLink }) {
-  const navigate = useNavigate();
-  const location = useLocation();
-
-  //  Get data from location.state if not provided as props
-  const stateData = location.state || {};
-  const finalClassData = classData || stateData.classData;
-  const finalUserRole = propUserRole || stateData.userRole || localStorage.getItem("role");
-  const finalGoogleMeetLink = teacherGoogleMeetLink || finalClassData?.teacherGoogleMeetLink;
-  
-  const userRole = finalUserRole;
-  const userId = localStorage.getItem("userId");
-  const userName = localStorage.getItem("name") || "User";
-  const bookingId = finalClassData?.bookingId || finalClassData?.id;
-
- console.log('🎓 Classroom initialized:', { 
-  bookingId, 
-  userRole, 
-  userName, 
-  duration: finalClassData?.duration,
-  googleMeetLink: finalGoogleMeetLink
-});
-
-  const [error, setError] = useState(null);
-  const [activeTab, setActiveTab] = useState("video");
-
-  // Presence tracking
-  const [isTeacherPresent, setIsTeacherPresent] = useState(userRole === "teacher");
-  const [isStudentPresent, setIsStudentPresent] = useState(userRole === "student");
-
-  // 🔥 PERSISTENT TIMER STATE
-  const [sessionData, setSessionData] = useState(null);
-  const [timeElapsed, setTimeElapsed] = useState(0); // Seconds elapsed
-  const [bothActiveTime, setBothActiveTime] = useState(0); // Time both present
-  const [isTimerRunning, setIsTimerRunning] = useState(false);
-  const [classStarted, setClassStarted] = useState(false);
-  
-  const timerInterval = useRef(null);
-  const syncInterval = useRef(null);
-  const sessionCheckInterval = useRef(null);
-
-  // 🔥 End Class Modal
-  const [showEndModal, setShowEndModal] = useState(false);
-  const [endReason, setEndReason] = useState("");
-  const [activeVideoProvider, setActiveVideoProvider] = useState(null);
-
-  // Fetch or create session data on mount
-  useEffect(() => {
-    fetchOrCreateSession();
-    
-    // Check session every 5 seconds for updates
-    sessionCheckInterval.current = setInterval(() => {
-      fetchSessionData();
-    }, 5000);
-
-    return () => {
-      clearInterval(sessionCheckInterval.current);
-      handleUserLeaving();
-    };
-  }, []);
-
-  const fetchOrCreateSession = async () => {
-    try {
-      console.log('📊 Fetching session for booking:', bookingId);
-      
-      // Try to get existing session
-      const { data } = await api.get(`/api/classroom/session/${bookingId}`);
-      
-      if (data.session) {
-        console.log('✅ Found existing session:', data.session);
-        setSessionData(data.session);
-        
-        // Calculate time elapsed since class started
-        if (data.session.classStartedAt) {
-          const startTime = new Date(data.session.classStartedAt);
-          const now = new Date();
-          const elapsed = Math.floor((now - startTime) / 1000);
-          setTimeElapsed(elapsed);
-          setBothActiveTime(data.session.bothActiveTime || 0);
-          
-          console.log('⏱️ Time elapsed:', elapsed, 'seconds');
-          console.log('👥 Both active time:', data.session.bothActiveTime, 'seconds');
-        }
-      } else {
-        // Create new session by sending join event
-        await handleJoinSession();
-      }
-    } catch (err) {
-      console.error('❌ Error fetching session:', err);
-      // Create new session
-      await handleJoinSession();
-    }
-  };
-
-  const fetchSessionData = async () => {
-    try {
-      const { data } = await api.get(`/api/classroom/session/${bookingId}`);
-      if (data.session) {
-        setSessionData(data.session);
-        setBothActiveTime(data.session.bothActiveTime || 0);
-      }
-    } catch (err) {
-      console.error('Error syncing session:', err);
-    }
-  };
-
-  const handleJoinSession = async () => {
-    try {
-      console.log('🚪 Joining session as:', userRole);
-      
-      await api.post('/api/classroom/attendance', {
-        bookingId: bookingId,
-        userRole: userRole,
-        action: 'join',
-        timestamp: new Date().toISOString()
-      });
-
-      // Fetch updated session
-      await fetchSessionData();
-      
-      // Start heartbeat
-      startHeartbeat();
-      
-      console.log('✅ Session joined successfully');
-    } catch (err) {
-      console.error('❌ Error joining session:', err);
-    }
-  };
-
-  const handleUserLeaving = async () => {
-    try {
-      await api.post('/api/classroom/attendance', {
-        bookingId: bookingId,
-        userRole: userRole,
-        action: 'leave',
-        timestamp: new Date().toISOString(),
-        activeTime: timeElapsed
-      });
-      
-      clearInterval(syncInterval.current);
-      console.log('👋 Left session');
-    } catch (err) {
-      console.error('Error leaving session:', err);
-    }
-  };
-
-  const startHeartbeat = () => {
-    // Send heartbeat every 10 seconds
-    syncInterval.current = setInterval(async () => {
-      try {
-        await api.post('/api/classroom/attendance', {
-          bookingId: bookingId,
-          userRole: userRole,
-          action: 'heartbeat',
-          timestamp: new Date().toISOString(),
-          activeTime: timeElapsed
-        });
-      } catch (err) {
-        console.error('Heartbeat error:', err);
-      }
-    }, 10000);
-  };
-
-  // Start timer when both users present
-  useEffect(() => {
-    console.log('🔍 Presence check:', {
-      isTeacherPresent,
-      isStudentPresent,
-      isTimerRunning,
-      classStarted
-    });
-
-    if (isTeacherPresent && isStudentPresent && !isTimerRunning && !classStarted) {
-      console.log('✅ Both users present - Starting timer!');
-      setIsTimerRunning(true);
-      setClassStarted(true);
-      startTimer();
-    }
-  }, [isTeacherPresent, isStudentPresent]);
-
-  const startTimer = () => {
-    timerInterval.current = setInterval(() => {
-      setTimeElapsed(prev => prev + 1);
-      
-      // Increment bothActiveTime only if both present
-      if (isTeacherPresent && isStudentPresent) {
-        setBothActiveTime(prev => prev + 1);
-      }
-    }, 1000);
-  };
-
-  // Stop timer when someone leaves (but keep tracking)
-  useEffect(() => {
-    if ((!isTeacherPresent || !isStudentPresent) && isTimerRunning) {
-      console.log('⏸️ One user left - Timer continues but not counting together time');
-      // Don't stop timer, just stop incrementing bothActiveTime
-    }
-  }, [isTeacherPresent, isStudentPresent]);
-
-  const handleUserJoined = (uid) => {
-    console.log('✅ CALLBACK: Remote user joined!', uid);
-    
-    if (userRole === "teacher") {
-      console.log('👨‍🎓 Student joined!');
-      setIsStudentPresent(true);
-    } else {
-      console.log('👨‍🏫 Teacher joined!');
-      setIsTeacherPresent(true);
-    }
-  };
-
-  const handleUserLeft = (uid) => {
-    console.log('👋 User left:', uid);
-    
-    if (userRole === "teacher") {
-      setIsStudentPresent(false);
-    } else {
-      setIsTeacherPresent(false);
-    }
-  };
-
-  const handleLeaveCall = () => {
-    if (timerInterval.current) {
-      clearInterval(timerInterval.current);
-    }
-    
-    handleUserLeaving();
-    
-    if (onLeave) {
-      onLeave();
-    } else {
-      navigate(userRole === "teacher" ? "/teacher/dashboard" : "/student/dashboard");
-    }
-  };
-
-  // 🔥 END CLASS FUNCTION (Teacher Only)
-/*const handleEndClass = async () => {
-  if (userRole !== "teacher") return;
-  
-  // ✅ DEFENSIVE CHECK #1: Verify finalClassData exists
-  if (!finalClassData) {
-    console.error('❌ ERROR: finalClassData is undefined!');
-    alert('Error: Class data not found. Please refresh and try again.');
-    return;
-  }
-  
-  // ✅ DEFENSIVE CHECK #2: Verify duration exists
-  if (!finalClassData.duration) {
-    console.warn('⚠️ Duration missing, using 60 minutes default');
-    finalClassData.duration = 60;
-  }
-  
-  try {
-    console.log('🛑 Teacher ending class...');
-    console.log('📊 classData:', finalClassData);
-    console.log('📊 Final stats:', {
-      timeElapsed,
-      bothActiveTime,
-      duration: finalClassData.duration,
-      requiredTime: getRequiredTime(finalClassData.duration)
-    });
-
-    const requiredTime = getRequiredTime(finalClassData.duration);
-    const meetsRequirement = bothActiveTime >= requiredTime;
-
-    if (!meetsRequirement) {
-      alert(
-        `⚠️ Attendance Requirement Not Met\n\n` +
-        `Time together: ${formatMinutes(bothActiveTime)}\n` +
-        `Required: ${formatMinutes(requiredTime)}\n\n` +
-        `Short by: ${formatMinutes(requiredTime - bothActiveTime)}\n\n` +
-        `This class will need admin review.`
-      );
-      
-      // Create complaint for admin review
-      await api.post('/api/classroom/end-early', {
-        bookingId: bookingId,
-        reason: 'insufficient_attendance',
-        reportedBy: 'teacher',
-        description: `Teacher ended class. Both active: ${formatMinutes(bothActiveTime)}, Required: ${formatMinutes(requiredTime)}`,
-        teacherActiveTime: timeElapsed,
-        studentActiveTime: timeElapsed,
-        bothActiveTime: bothActiveTime,
-        requiredTime: requiredTime,
-        endedAt: new Date().toISOString(),
-        endedBy: userRole
-      });
-      
-      handleLeaveCall();
-      return;
-    }
-
-    // ✅ Complete the booking with PATCH (not PUT)
-    const { data } = await api.patch(`/api/bookings/${bookingId}/complete`);
-    
-    if (data.success) {
-      alert('✅ Class marked as pending student confirmation!');
-      handleLeaveCall();
-    }
-  } catch (err) {
-    console.error('❌ Error ending class:', err);
-    console.error('Full error:', err.response?.data || err.message);
-    alert(`Error ending class: ${err.response?.data?.message || err.message}`);
-  }
-};*/
-
-// 🔥 END CLASS FUNCTION (Teacher Only)
-const handleEndClass = async () => {
-  if (userRole !== "teacher") return;
-  
-  try {
-    console.log('🛑 Teacher ending class...');
-    console.log('📊 Final stats:', {
-      timeElapsed,
-      bothActiveTime,
-      requiredTime: getRequiredTime(finalClassData.duration) // ✅ FIXED
-    });
-
-    const requiredTime = getRequiredTime(finalClassData.duration); // ✅ FIXED
-    const meetsRequirement = bothActiveTime >= requiredTime;
-
-    // ✅ ALWAYS USE THE SAME ENDPOINT - Just pass different data
-    const completionData = {
-      duration: finalClassData.duration, // ✅ FIXED
-      actualDuration: timeElapsed,
-      bothActiveTime: bothActiveTime,
-      meetsRequirement: meetsRequirement
-    };
-
-    console.log('📤 Sending completion data:', completionData);
-
-    // ✅ CORRECT - Uses PATCH and sets to pending_confirmation
-    const { data } = await api.patch(
-      `/api/bookings/${bookingId}/complete`, 
-      completionData
-    );
-
-    if (!meetsRequirement) {
-      alert(
-        `⚠️ Class Ended Early\n\n` +
-        `Time together: ${formatMinutes(bothActiveTime)}\n` +
-        `Required: ${formatMinutes(requiredTime)}\n\n` +
-        `Student will be asked to confirm attendance.`
-      );
-    } else {
-      alert('✅ Class completed! Waiting for student confirmation.');
-    }
-
-    console.log('✅ Class marked as pending confirmation');
-    handleLeaveCall();
-
-  } catch (err) {
-    console.error('❌ Error ending class:', err);
-    alert('Error ending class. Please try again.');
-  }
-};
-
-  // Calculate required time based on duration
-  const getRequiredTime = (duration) => {
-    switch(duration) {
-      case 30: return 25 * 60; // 25 mins out of 30
-      case 45: return 40 * 60; // 40 mins out of 45
-      case 60: return 50 * 60; // 50 mins out of 60
-      default: return Math.floor(duration * 60 * 0.83); // 83% default
-    }
-  };
-
-  const formatTime = (seconds) => {
-    if (!seconds && seconds !== 0) return "--:--";
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  const formatMinutes = (seconds) => {
-    return `${Math.floor(seconds / 60)} min ${seconds % 60} sec`;
-  };
-
-  const getTimeRemaining = () => {
-    const totalSeconds = (finalClassData?.duration || 60) * 60;
-    const remaining = totalSeconds - timeElapsed;
-    return Math.max(0, remaining);
-  };
-
-  const handleTabChange = (tab) => {
-    console.log('🎚️ Switching to tab:', tab);
-    setActiveTab(tab);
-  };
-
-  if (!bookingId) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-red-50 to-pink-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-md text-center">
-          <XCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-red-600 mb-2">Oops!</h2>
-          <p className="text-gray-600 mb-6">Cannot load classroom without a valid booking ID.</p>
-          <button
-            onClick={handleLeaveCall}
-            className="px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-full font-bold hover:shadow-lg transition-all"
-          >
-            Go Back
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  const channelName = `class-${bookingId}`;
-  const timeRemaining = getTimeRemaining();
-  const requiredTime = getRequiredTime(finalClassData.duration);
-  const completionPercentage = Math.min(100, Math.round((bothActiveTime / requiredTime) * 100));
-
-  return (
-    <div className="h-screen flex flex-col bg-gradient-to-br from-purple-50 via-blue-50 to-pink-50">
-      
-      {/* 🎨 COMPACT HEADER */}
-      <div className="bg-white shadow-md border-b-2 border-purple-200 px-6 py-3">
-        
-        {/* 🎥 VIDEO STATUS */}
-          {activeVideoProvider && (
-            <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 rounded-lg border border-blue-200 mb-4">
-              <Video className="w-4 h-4 text-blue-600" />
-              <span className="text-sm font-medium text-blue-700">
-                Using: {activeVideoProvider === 'agora' ? 'Agora Video' : 'Google Meet'}
-              </span>
-            </div>
-          )}
-
-          <div className="flex items-center justify-between">
-           </div>
-
-        <div className="flex items-center justify-between">
-          
-          {/* Left: Timer Info */}
-          <div className="flex flex-col gap-1">
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2">
-                <Clock className="w-4 h-4 text-purple-600" />
-                <span className="text-lg font-bold text-purple-700">
-                  {formatTime(timeRemaining)}
-                </span>
-              </div>
-              <div className="text-xs text-gray-500">
-                Elapsed: {formatTime(timeElapsed)}
-              </div>
-            </div>
-            <div className="flex items-center gap-2 text-sm">
-              <div className={`w-2 h-2 rounded-full ${isTimerRunning ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`} />
-              <span className="text-gray-600 font-medium">
-                {isTimerRunning ? 'In Progress' : 'Waiting...'}
-              </span>
-              <span className="text-xs text-gray-500">
-                • Together: {formatTime(bothActiveTime)} / {formatTime(requiredTime)} ({completionPercentage}%)
-              </span>
-            </div>
-          </div>
-
-          {/* Center: Tabs */}
-          <div className="flex items-center gap-2 bg-gradient-to-r from-purple-100 to-pink-100 rounded-full p-1">
-            <button
-              onClick={() => handleTabChange("video")}
-              className={`flex items-center gap-2 px-4 py-2 rounded-full font-bold transition-all ${
-                activeTab === "video"
-                  ? "bg-white text-purple-600 shadow-md scale-105"
-                  : "text-purple-400 hover:text-purple-600"
-              }`}
-            >
-              <Video className="w-4 h-4" />
-              <span className="text-sm">Video</span>
-            </button>
-
-            <button
-              onClick={() => handleTabChange("content")}
-              className={`flex items-center gap-2 px-4 py-2 rounded-full font-bold transition-all ${
-                activeTab === "content"
-                  ? "bg-white text-blue-600 shadow-md scale-105"
-                  : "text-blue-400 hover:text-blue-600"
-              }`}
-            >
-              <FileText className="w-4 h-4" />
-              <span className="text-sm">Content</span>
-            </button>
-
-            <button
-              onClick={() => handleTabChange("whiteboard")}
-              className={`flex items-center gap-2 px-4 py-2 rounded-full font-bold transition-all ${
-                activeTab === "whiteboard"
-                  ? "bg-white text-pink-600 shadow-md scale-105"
-                  : "text-pink-400 hover:text-pink-600"
-              }`}
-            >
-              <PenTool className="w-4 h-4" />
-              <span className="text-sm">Whiteboard</span>
-            </button>
-          </div>
-
-          {/* Right: Participants */}
-          <div className="flex flex-col gap-1 items-end">
-            <div className="flex items-center gap-2">
-              <Users className="w-4 h-4 text-purple-600" />
-              <span className="text-sm font-bold text-purple-700">
-                {(isTeacherPresent ? 1 : 0) + (isStudentPresent ? 1 : 0)}/2
-              </span>
-            </div>
-            <div className="flex items-center gap-3 text-xs">
-              <div className="flex items-center gap-1">
-                {isTeacherPresent ? (
-                  <CheckCircle2 className="w-3 h-3 text-green-500" />
-                ) : (
-                  <XCircle className="w-3 h-3 text-gray-400" />
-                )}
-                <span className="text-gray-600 font-medium">Teacher</span>
-              </div>
-              <div className="flex items-center gap-1">
-                {isStudentPresent ? (
-                  <CheckCircle2 className="w-3 h-3 text-green-500" />
-                ) : (
-                  <XCircle className="w-3 h-3 text-gray-400" />
-                )}
-                <span className="text-gray-600 font-medium">Student</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* 📱 MAIN CONTENT */}
-      <div className="flex-1 overflow-hidden relative">
-        
-       {/* Video Tab - Conditional rendering based on choice */}
-        {activeTab === "video" && (
-          <div className="h-full">
-            {!activeVideoProvider ? (
-              // 🎯 VIDEO PROVIDER SELECTION SCREEN
-              <div className="h-full flex items-center justify-center bg-gradient-to-br from-purple-50 to-blue-50 p-8">
-                <div className="max-w-2xl w-full">
-                  <h2 className="text-3xl font-bold text-center text-gray-800 mb-3">
-                    Choose Your Video Platform
-                  </h2>
-                  <p className="text-center text-gray-600 mb-8">
-                    Select which platform you'd like to use for this class
-                  </p>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Google Meet Option */}
-                    <button
-                      onClick={() => {
-                        if (finalGoogleMeetLink) {
-                          window.open(finalGoogleMeetLink, '_blank');
-                          setActiveVideoProvider('googlemeet');
-                        } else {
-                          alert('⚠️ Google Meet link not configured. Please ask your teacher to set it up.');
-                        }
-                      }}
-                      disabled={!finalGoogleMeetLink}
-                      className={`p-8 rounded-2xl border-4 transition-all ${
-                        finalGoogleMeetLink
-                          ? 'bg-white border-green-300 hover:border-green-500 hover:shadow-xl cursor-pointer'
-                          : 'bg-gray-100 border-gray-300 cursor-not-allowed opacity-60'
-                      }`}
-                    >
-                      <div className="flex flex-col items-center">
-                        <div className={`w-20 h-20 rounded-full flex items-center justify-center mb-4 ${
-                          finalGoogleMeetLink ? 'bg-green-500' : 'bg-gray-400'
-                        }`}>
-                          <Video className="w-10 h-10 text-white" />
-                        </div>
-                        <h3 className="text-xl font-bold text-gray-800 mb-2">Google Meet</h3>
-                        <p className="text-sm text-gray-600 text-center mb-3">
-                          Opens in a new tab
-                        </p>
-                        {finalGoogleMeetLink ? (
-                          <span className="inline-block px-4 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">
-                            ✓ Available
-                          </span>
-                        ) : (
-                          <span className="inline-block px-4 py-1 bg-gray-200 text-gray-600 rounded-full text-xs font-medium">
-                            Not Configured
-                          </span>
-                        )}
-                      </div>
-                    </button>
-
-                    {/* Agora Option */}
-                    <button
-                      onClick={() => setActiveVideoProvider('agora')}
-                      className="p-8 rounded-2xl border-4 bg-white border-blue-300 hover:border-blue-500 hover:shadow-xl transition-all cursor-pointer"
-                    >
-                      <div className="flex flex-col items-center">
-                        <div className="w-20 h-20 bg-blue-500 rounded-full flex items-center justify-center mb-4">
-                          <Video className="w-10 h-10 text-white" />
-                        </div>
-                        <h3 className="text-xl font-bold text-gray-800 mb-2">Agora Video</h3>
-                        <p className="text-sm text-gray-600 text-center mb-3">
-                          Embedded video call
-                        </p>
-                        <span className="inline-block px-4 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
-                          ✓ Always Available
-                        </span>
-                      </div>
-                    </button>
-                  </div>
-
-                  <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                    <p className="text-sm text-blue-800 text-center">
-                      💡 <strong>Tip:</strong> Google Meet uses your teacher's subscription. 
-                      Agora is available as a backup option.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            ) : activeVideoProvider === 'agora' ? (
-              // 🎥 AGORA VIDEO (only renders when selected)
-              <div className="h-full relative">
-                <VideoCall
-                  key={`video-${bookingId}`}
-                  channelName={channelName}
-                  userId={userId}
-                  userName={userName}
-                  onLeave={handleLeaveCall}
-                  onUserJoined={handleUserJoined}
-                  onUserLeft={handleUserLeft}
-                  mode="video"
-                />
-                {/* Back button */}
-                <button
-                  onClick={() => setActiveVideoProvider(null)}
-                  className="absolute top-4 left-4 px-4 py-2 bg-white/90 backdrop-blur rounded-lg shadow-lg hover:bg-white transition-all flex items-center gap-2 z-50"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                  </svg>
-                  Change Platform
-                </button>
-              </div>
-            ) : (
-              // 📞 GOOGLE MEET PLACEHOLDER (user opened it in new tab)
-              <div className="h-full flex items-center justify-center bg-gradient-to-br from-green-50 to-emerald-50 p-8">
-                <div className="text-center max-w-md">
-                  <div className="w-24 h-24 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-6 animate-pulse">
-                    <Video className="w-12 h-12 text-white" />
-                  </div>
-                  <h3 className="text-2xl font-bold text-gray-800 mb-3">Google Meet Opened</h3>
-                  <p className="text-gray-600 mb-6">
-                    Your Google Meet session has been opened in a new tab. 
-                    Please check your browser tabs to join the meeting.
-                  </p>
-                  <button
-                    onClick={() => window.open(finalGoogleMeetLink, '_blank')}
-                    className="px-6 py-3 bg-green-500 hover:bg-green-600 text-white rounded-lg font-medium transition-all"
-                  >
-                    Reopen Google Meet
-                  </button>
-                  <button
-                    onClick={() => setActiveVideoProvider(null)}
-                    className="block w-full mt-4 px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-medium transition-all"
-                  >
-                    ← Choose Different Platform
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Content Tab */}
-        {activeTab === "content" && (
-          <div className="h-full flex">
-            <div className="flex-1 bg-gradient-to-br from-blue-50 to-purple-50 p-4 flex items-center justify-center">
-              <div className="w-full h-full bg-white rounded-3xl shadow-2xl border-4 border-blue-200 flex items-center justify-center">
-                <div className="text-center">
-                  <FileText className="w-24 h-24 text-blue-400 mx-auto mb-4" />
-                  <p className="text-2xl font-bold text-blue-600">Content Sharing</p>
-                  <p className="text-gray-500 mt-2">PDF viewer or screen share will appear here</p>
-                </div>
-              </div>
-            </div>
-            <div className="w-64 bg-gradient-to-b from-purple-100 to-pink-100 p-3 flex flex-col gap-3">
-              <div className="flex-1 bg-gradient-to-br from-purple-200 to-purple-300 rounded-2xl shadow-xl border-4 border-white flex items-center justify-center">
-                <span className="text-white font-bold">Teacher</span>
-              </div>
-              <div className="flex-1 bg-gradient-to-br from-pink-200 to-pink-300 rounded-2xl shadow-xl border-4 border-white flex items-center justify-center">
-                <span className="text-white font-bold">Student</span>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Whiteboard Tab */}
-        {activeTab === "whiteboard" && (
-          <WhiteboardTab
-            userRole={userRole}
-          />
-        )}
-
-        {/* 🔥 END CLASS BUTTON (Teacher Only, Bottom Left) */}
-        {userRole === "teacher" && (
-          <button
-            onClick={() => setShowEndModal(true)}
-            className="absolute bottom-6 left-6 flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded-full font-bold shadow-lg hover:shadow-xl transform hover:scale-105 transition-all z-50"
-          >
-            <Power className="w-5 h-5" />
-            End Class
-          </button>
-        )}
-      </div>
-
-      {/* 🔥 END CLASS CONFIRMATION MODAL */}
-      {showEndModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4">
-          <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full">
-            <div className="text-center mb-6">
-              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <AlertTriangle className="w-8 h-8 text-red-600" />
-              </div>
-              <h2 className="text-2xl font-bold text-gray-800 mb-2">End Class?</h2>
-              <p className="text-gray-600">
-                Are you sure you want to end this class?
-              </p>
-            </div>
-
-            <div className="bg-blue-50 rounded-2xl p-4 mb-6">
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <p className="text-gray-600">Time Elapsed:</p>
-                  <p className="font-bold text-gray-800">{formatTime(timeElapsed)}</p>
-                </div>
-                <div>
-                  <p className="text-gray-600">Together:</p>
-                  <p className="font-bold text-gray-800">{formatTime(bothActiveTime)}</p>
-                </div>
-                <div>
-                  <p className="text-gray-600">Required:</p>
-                  <p className="font-bold text-gray-800">{formatTime(requiredTime)}</p>
-                </div>
-                <div>
-                  <p className="text-gray-600">Progress:</p>
-                  <p className={`font-bold ${completionPercentage >= 100 ? 'text-green-600' : 'text-orange-600'}`}>
-                    {completionPercentage}%
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {completionPercentage < 100 && (
-              <div className="bg-yellow-50 border-2 border-yellow-200 rounded-2xl p-4 mb-6">
-                <p className="text-sm text-yellow-800">
-                  ⚠️ <strong>Note:</strong> This class hasn't met the minimum attendance requirement. 
-                  It will require admin review.
-                </p>
-              </div>
-            )}
-
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowEndModal(false)}
-                className="flex-1 px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-full font-bold transition-all"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleEndClass}
-                className="flex-1 px-6 py-3 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded-full font-bold shadow-lg transition-all"
-              >
-                End Class
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// 🎨 WHITEBOARD TAB
+// ─── Whiteboard Tab ───────────────────────────────────────────────────────────
 function WhiteboardTab({ userRole }) {
   const canvasRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [currentColor, setCurrentColor] = useState("#000000");
   const [brushSize, setBrushSize] = useState(3);
-
-  const colors = [
-    "#000000", "#FF0000", "#00FF00", "#0000FF",
-    "#FFFF00", "#FF00FF", "#00FFFF", "#FF8800"
-  ];
+  const colors = ["#000000","#FF0000","#00FF00","#0000FF","#FFFF00","#FF00FF","#00FFFF","#FF8800"];
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -837,7 +50,6 @@ function WhiteboardTab({ userRole }) {
   const stopDrawing = () => setIsDrawing(false);
 
   const clearCanvas = () => {
-    if (userRole !== "teacher") return;
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
     ctx.fillStyle = "#FFFFFF";
@@ -845,64 +57,828 @@ function WhiteboardTab({ userRole }) {
   };
 
   return (
-    <div className="h-full flex gap-4 p-4">
-      <div className="flex-1 flex flex-col gap-3">
-        {userRole === "teacher" && (
-          <div className="bg-white rounded-2xl shadow-lg p-3 flex items-center justify-between border-2 border-purple-200">
-            <div className="flex items-center gap-3">
-              <span className="text-sm font-bold text-purple-600">Colors:</span>
-              {colors.map((color) => (
-                <button
-                  key={color}
-                  onClick={() => setCurrentColor(color)}
-                  className={`w-8 h-8 rounded-full border-4 transition-all ${
-                    currentColor === color ? "border-purple-500 scale-110" : "border-gray-300"
-                  }`}
-                  style={{ backgroundColor: color }}
-                />
-              ))}
-            </div>
-            <div className="flex items-center gap-3">
-              <span className="text-sm font-bold text-purple-600">Size:</span>
-              <input
-                type="range"
-                min="1"
-                max="20"
-                value={brushSize}
-                onChange={(e) => setBrushSize(Number(e.target.value))}
-                className="w-24"
-              />
-              <span className="text-sm font-medium text-gray-600">{brushSize}px</span>
-            </div>
+    <div className="h-full flex flex-col bg-white">
+      {userRole === "teacher" && (
+        <div className="flex items-center gap-3 p-3 bg-gray-100 border-b">
+          {colors.map((c) => (
             <button
-              onClick={clearCanvas}
-              className="px-4 py-2 bg-gradient-to-r from-red-400 to-red-500 hover:from-red-500 hover:to-red-600 text-white rounded-full font-bold text-sm shadow-lg"
-            >
-              Clear
-            </button>
+              key={c}
+              onClick={() => setCurrentColor(c)}
+              className={`w-6 h-6 rounded-full border-2 ${currentColor === c ? "border-black scale-125" : "border-transparent"}`}
+              style={{ backgroundColor: c }}
+            />
+          ))}
+          <input type="range" min="1" max="20" value={brushSize}
+            onChange={(e) => setBrushSize(Number(e.target.value))} className="w-24" />
+          <button onClick={clearCanvas} className="px-3 py-1 bg-red-500 text-white rounded text-sm">Clear</button>
+        </div>
+      )}
+      <canvas
+        ref={canvasRef} width={800} height={500}
+        className="flex-1 cursor-crosshair"
+        onMouseDown={startDrawing} onMouseMove={draw}
+        onMouseUp={stopDrawing} onMouseLeave={stopDrawing}
+      />
+    </div>
+  );
+}
+
+// ─── Main Classroom Component ─────────────────────────────────────────────────
+export default function Classroom({ classData, userRole: propUserRole, onLeave, teacherGoogleMeetLink }) {
+  const navigate    = useNavigate();
+  const location    = useLocation();
+  const stateData   = location.state || {};
+  
+  const finalClassData = classData || stateData.classData;
+  const userRole       = propUserRole || stateData.userRole || localStorage.getItem("role");
+  const bookingId      = finalClassData?.bookingId || finalClassData?.id;
+  const userId         = localStorage.getItem("userId");
+  const userName       = localStorage.getItem("name") || "User";
+
+  console.log("🎓 Classroom init:", { bookingId, userRole, duration: finalClassData?.duration });
+
+  // ── UI state ────────────────────────────────────────────────────────────────
+  const [activeTab, setActiveTab]                     = useState("video");
+  const [activeVideoProvider, setActiveVideoProvider] = useState(null);
+  const [showLeaveModal, setShowLeaveModal]           = useState(false);
+  const [error, setError]                             = useState(null);
+
+  // ── Google Meet link — FIX 1: Single useState, no duplicate const ───────────
+  const [resolvedGoogleMeetLink, setResolvedGoogleMeetLink] = useState(
+    teacherGoogleMeetLink || finalClassData?.teacherGoogleMeetLink || ''
+  );
+
+  // Fallback: fetch from booking API if link wasn't passed in navigation state
+  useEffect(() => {
+    if (!resolvedGoogleMeetLink && bookingId) {
+      api.get(`/api/bookings/${bookingId}`)
+        .then(({ data }) => {
+          const link = data.booking?.teacherId?.googleMeetLink || '';
+          if (link) {
+            console.log('✅ Fetched Google Meet link from booking:', link);
+            setResolvedGoogleMeetLink(link);
+          }
+        })
+        .catch(err => console.error('Failed to fetch Meet link:', err));
+    }
+  }, [bookingId]);
+
+  // ── Presence (refs + state so setInterval can read current values) ──────────
+  const [isTeacherPresent, setIsTeacherPresent] = useState(userRole === "teacher");
+  const [isStudentPresent, setIsStudentPresent] = useState(userRole === "student");
+  const teacherPresentRef = useRef(userRole === "teacher");
+  const studentPresentRef = useRef(userRole === "student");
+
+  // Keep refs in sync with state
+  useEffect(() => { teacherPresentRef.current = isTeacherPresent; }, [isTeacherPresent]);
+  useEffect(() => { studentPresentRef.current = isStudentPresent; }, [isStudentPresent]);
+
+  // ── Timer state ─────────────────────────────────────────────────────────────
+  const [timeElapsed,    setTimeElapsed]    = useState(0);
+  const [bothActiveTime, setBothActiveTime] = useState(0);
+  const [isTimerRunning, setIsTimerRunning] = useState(false);
+  const [classStarted,   setClassStarted]   = useState(false);
+  const classStartedRef = useRef(false); // ✅ FIX: ref to avoid stale closure in polling interval
+  const timerRef   = useRef(null);
+  const syncRef    = useRef(null);
+  const sessionRef = useRef(null);
+
+  // Keep classStartedRef in sync
+  useEffect(() => { classStartedRef.current = classStarted; }, [classStarted]);
+
+  // ── Auto-complete state ─────────────────────────────────────────────────────
+  const [autoCompleting,   setAutoCompleting]   = useState(false);
+  const [completionResult, setCompletionResult] = useState(null);
+  const hasAutoCompletedRef = useRef(false);
+
+  // ── Session state ───────────────────────────────────────────────────────────
+  const [sessionData, setSessionData] = useState(null);
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Helpers
+  // ─────────────────────────────────────────────────────────────────────────────
+  const getRequiredTime = (duration) =>
+    Math.floor((duration || 60) * 60 * 0.83);
+
+  const formatTime = (seconds) => {
+    if (seconds == null || isNaN(seconds)) return "--:--";
+    const s   = Math.max(0, Math.round(seconds));
+    const m   = Math.floor(s / 60);
+    const sec = s % 60;
+    return `${m}:${sec.toString().padStart(2, "0")}`;
+  };
+
+  const formatMinutes = (seconds) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return s > 0 ? `${m}m ${s}s` : `${m}m`;
+  };
+
+  const classDurationSeconds = (finalClassData?.duration || 60) * 60;
+  const requiredTime         = getRequiredTime(finalClassData?.duration);
+  const timeRemaining        = Math.max(0, classDurationSeconds - timeElapsed);
+  const completionPct        = Math.min(100, Math.round((bothActiveTime / requiredTime) * 100));
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Timer — uses refs to avoid stale closure on presence flags
+  // ─────────────────────────────────────────────────────────────────────────────
+  const startTimer = useCallback(() => {
+    if (timerRef.current) return;
+    console.log("⏱️ Timer started");
+    timerRef.current = setInterval(() => {
+      setTimeElapsed((prev) => prev + 1);
+      if (teacherPresentRef.current && studentPresentRef.current) {
+        setBothActiveTime((prev) => prev + 1);
+      }
+    }, 1000);
+  }, []);
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Session: join, heartbeat, leave
+  // ─────────────────────────────────────────────────────────────────────────────
+  const joinSession = useCallback(async () => {
+    try {
+      const res = await api.post("/api/classroom/attendance", {
+        bookingId,
+        userRole,
+        action: "join",
+        timestamp: new Date().toISOString(),
+      });
+      setSessionData(res.data.session);
+
+      if (res.data.session?.classStartedAt) {
+        const elapsed = Math.floor((Date.now() - new Date(res.data.session.classStartedAt)) / 1000);
+        setTimeElapsed(elapsed);
+        setBothActiveTime(res.data.session.bothActiveTime || 0);
+        if (!classStartedRef.current) {
+          classStartedRef.current = true;
+          setClassStarted(true);
+          setIsTimerRunning(true);
+          startTimer();
+        }
+      }
+      console.log(`✅ Joined session as ${userRole}`);
+    } catch (err) {
+      console.error("❌ Join session error:", err);
+      // Retry after 3 seconds if join fails
+      setTimeout(() => {
+        console.log("🔄 Retrying session join...");
+        joinSession();
+      }, 3000);
+    }
+  }, [bookingId, userRole, startTimer]);
+
+  const sendHeartbeat = useCallback(async (currentBothActiveTime) => {
+    try {
+      await api.post("/api/classroom/attendance", {
+        bookingId,
+        userRole,
+        action: "heartbeat",
+        timestamp: new Date().toISOString(),
+        activeTime: currentBothActiveTime,
+      });
+    } catch (err) {
+      console.error("Heartbeat error:", err);
+    }
+  }, [bookingId, userRole]);
+
+  const leaveSession = useCallback(async (finalBothActiveTime) => {
+    try {
+      clearInterval(syncRef.current);
+      clearInterval(sessionRef.current);
+      await api.post("/api/classroom/attendance", {
+        bookingId,
+        userRole,
+        action: "leave",
+        timestamp: new Date().toISOString(),
+        activeTime: finalBothActiveTime,
+      });
+      console.log("👋 Left session");
+    } catch (err) {
+      console.error("Leave session error:", err);
+    }
+  }, [bookingId, userRole]);
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Auto-complete — called when timer hits 0
+  // ─────────────────────────────────────────────────────────────────────────────
+  const handleAutoComplete = useCallback(async (currentBothActiveTime) => {
+    if (hasAutoCompletedRef.current) return;
+    hasAutoCompletedRef.current = true;
+
+    clearInterval(timerRef.current);
+    timerRef.current = null;
+
+    setAutoCompleting(true);
+    console.log("🏁 Class time elapsed — auto-completing...", { currentBothActiveTime, requiredTime });
+
+    try {
+      const { data } = await api.post("/api/classroom/auto-complete", {
+        bookingId,
+        clientBothActiveTime: currentBothActiveTime,
+      });
+      setCompletionResult(data);
+      console.log("✅ Auto-complete result:", data);
+    } catch (err) {
+      console.error("❌ Auto-complete error:", err);
+      setCompletionResult({
+        completed: false,
+        missed: true,
+        message: "Could not determine class outcome. Please contact admin.",
+        error: true,
+      });
+    } finally {
+      setAutoCompleting(false);
+    }
+  }, [bookingId, requiredTime]);
+
+  // Watch timeRemaining → fire auto-complete when it hits 0
+  useEffect(() => {
+    if (timeRemaining === 0 && classStarted && !hasAutoCompletedRef.current) {
+      setBothActiveTime((current) => {
+        handleAutoComplete(current);
+        return current;
+      });
+    }
+  }, [timeRemaining, classStarted, handleAutoComplete]);
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Mount: join session, heartbeat, poll for other user joining
+  // ─────────────────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!bookingId) return;
+
+    joinSession();
+
+    // Poll every 5 seconds — detects when the other user joins
+    sessionRef.current = setInterval(async () => {
+      try {
+        const { data } = await api.get(`/api/classroom/session/${bookingId}`);
+        if (!data.session) return;
+        setSessionData(data.session);
+
+        const s         = data.session;
+        const teacherIn = !!s.teacherJoinedAt;
+        const studentIn = !!s.studentJoinedAt;
+
+        if (teacherIn !== teacherPresentRef.current) setIsTeacherPresent(teacherIn);
+        if (studentIn !== studentPresentRef.current) setIsStudentPresent(studentIn);
+
+        // Both just joined — start timer (use ref to avoid stale closure)
+        if (teacherIn && studentIn && !classStartedRef.current) {
+          classStartedRef.current = true; // ✅ set ref immediately to prevent double-start
+          if (s.classStartedAt) {
+            const elapsed = Math.floor((Date.now() - new Date(s.classStartedAt)) / 1000);
+            setTimeElapsed(elapsed);
+            setBothActiveTime(s.bothActiveTime || 0);
+          }
+          setClassStarted(true);
+          setIsTimerRunning(true);
+          startTimer();
+        }
+
+        // Other side already triggered auto-complete
+        if ((s.status === "completed" || s.status === "incomplete") && !hasAutoCompletedRef.current) {
+          hasAutoCompletedRef.current = true;
+          clearInterval(timerRef.current);
+          setBothActiveTime((cur) => {
+            handleAutoComplete(cur);
+            return cur;
+          });
+        }
+      } catch (_) { /* session not created yet */ }
+    }, 5000);
+
+    // Heartbeat every 15 seconds
+    syncRef.current = setInterval(() => {
+      setBothActiveTime((current) => {
+        sendHeartbeat(current);
+        return current;
+      });
+    }, 15000);
+
+    return () => {
+      clearInterval(timerRef.current);
+      clearInterval(syncRef.current);
+      clearInterval(sessionRef.current);
+      setBothActiveTime((cur) => {
+        leaveSession(cur);
+        return cur;
+      });
+    };
+  }, [bookingId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Video call presence callbacks (Agora only)
+  // ─────────────────────────────────────────────────────────────────────────────
+  const handleUserJoined = (uid) => {
+    console.log("✅ Remote user joined video:", uid);
+    if (userRole === "teacher") setIsStudentPresent(true);
+    else setIsTeacherPresent(true);
+  };
+
+  const handleUserLeft = (uid) => {
+    console.log("👋 Remote user left video:", uid);
+    if (userRole === "teacher") setIsStudentPresent(false);
+    else setIsTeacherPresent(false);
+  };
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Leave early
+  // ─────────────────────────────────────────────────────────────────────────────
+  const handleLeaveEarly = () => {
+    clearInterval(timerRef.current);
+    clearInterval(syncRef.current);
+    clearInterval(sessionRef.current);
+    setBothActiveTime((cur) => {
+      leaveSession(cur);
+      return cur;
+    });
+    if (onLeave) onLeave();
+    else navigate(userRole === "teacher" ? "/teacher/dashboard" : "/student/dashboard");
+  };
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Guard: no bookingId
+  // ─────────────────────────────────────────────────────────────────────────────
+  if (!bookingId) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-red-50 p-4">
+        <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-md text-center">
+          <XCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-red-600 mb-2">Cannot Load Classroom</h2>
+          <p className="text-gray-600 mb-6">No booking ID found. Please join from your dashboard.</p>
+          <button
+            onClick={() => navigate(userRole === "teacher" ? "/teacher/dashboard" : "/student/dashboard")}
+            className="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-full font-bold transition-all"
+          >
+            Go Back
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const channelName = `class-${bookingId}`;
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Completion screen
+  // ─────────────────────────────────────────────────────────────────────────────
+  if (autoCompleting || completionResult) {
+    const isCompleted = completionResult?.completed && !completionResult?.missed;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 to-blue-50 p-4">
+        <div className="bg-white rounded-3xl shadow-2xl p-10 max-w-md w-full text-center">
+          {autoCompleting ? (
+            <>
+              <div className="w-20 h-20 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-6" />
+              <h2 className="text-2xl font-bold text-gray-800 mb-2">Processing Class...</h2>
+              <p className="text-gray-500">Calculating attendance and updating records</p>
+            </>
+          ) : isCompleted ? (
+            <>
+              <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <CheckCircle className="w-12 h-12 text-emerald-600" />
+              </div>
+              <h2 className="text-2xl font-bold text-gray-800 mb-2">Class Completed! 🎉</h2>
+              <p className="text-gray-600 mb-6">{completionResult?.message || "Class successfully recorded."}</p>
+              <div className="bg-emerald-50 rounded-2xl p-4 mb-6 text-sm text-left space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Time Together</span>
+                  <span className="font-bold text-emerald-700">{formatMinutes(completionResult?.bothActiveTime || bothActiveTime)}</span>
+                </div>
+                {userRole === "teacher" && completionResult?.teacherEarned != null && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Earnings Added</span>
+                    <span className="font-bold text-emerald-700">${completionResult.teacherEarned.toFixed(2)}</span>
+                  </div>
+                )}
+                {userRole === "student" && completionResult?.studentClassesRemaining != null && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Classes Remaining</span>
+                    <span className="font-bold text-emerald-700">{completionResult.studentClassesRemaining}</span>
+                  </div>
+                )}
+              </div>
+              <button
+                onClick={() => navigate(userRole === "teacher" ? "/teacher/dashboard" : "/student/dashboard")}
+                className="w-full px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full font-bold transition-all"
+              >
+                Back to Dashboard
+              </button>
+            </>
+          ) : (
+            <>
+              <div className="w-20 h-20 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <XCircle className="w-12 h-12 text-orange-600" />
+              </div>
+              <h2 className="text-2xl font-bold text-gray-800 mb-2">Class Not Completed</h2>
+              <p className="text-gray-600 mb-4 text-sm">
+                {completionResult?.reason || "Attendance requirements were not met."}
+              </p>
+              <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4 mb-6 text-sm text-left space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Teacher Joined</span>
+                  <span className={`font-bold ${completionResult?.teacherJoined ? "text-emerald-600" : "text-red-600"}`}>
+                    {completionResult?.teacherJoined ? "✓ Yes" : "✗ No"}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Student Joined</span>
+                  <span className={`font-bold ${completionResult?.studentJoined ? "text-emerald-600" : "text-red-600"}`}>
+                    {completionResult?.studentJoined ? "✓ Yes" : "✗ No"}
+                  </span>
+                </div>
+                {completionResult?.bothActiveTime != null && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Time Together</span>
+                    <span className="font-bold text-orange-700">{formatMinutes(completionResult.bothActiveTime)}</span>
+                  </div>
+                )}
+                {completionResult?.requiredTime != null && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Required</span>
+                    <span className="font-bold text-gray-700">{formatMinutes(completionResult.requiredTime)}</span>
+                  </div>
+                )}
+              </div>
+              <p className="text-xs text-gray-400 mb-4">No class was deducted and no earnings were added.</p>
+              <button
+                onClick={() => navigate(userRole === "teacher" ? "/teacher/dashboard" : "/student/dashboard")}
+                className="w-full px-6 py-3 bg-gray-700 hover:bg-gray-800 text-white rounded-full font-bold transition-all"
+              >
+                Back to Dashboard
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Main classroom UI
+  // ─────────────────────────────────────────────────────────────────────────────
+  return (
+    <div className="h-screen flex flex-col bg-gradient-to-br from-purple-50 via-blue-50 to-pink-50">
+
+      {/* ── HEADER ── */}
+      <div className="bg-white shadow-md border-b-2 border-purple-200 px-6 py-3 flex-shrink-0">
+
+        {/* Row 1: class info + leave button */}
+        <div className="flex items-center justify-between mb-2">
+          <div>
+            <h1 className="text-lg font-bold text-gray-800">{finalClassData?.title || "Class"}</h1>
+            <p className="text-xs text-gray-500">{finalClassData?.topic || ""}</p>
+          </div>
+          <button
+            onClick={() => setShowLeaveModal(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded-full font-semibold text-sm transition-all"
+          >
+            <Power className="w-4 h-4" />
+            Leave Early
+          </button>
+        </div>
+
+        {/* Row 2: timer + tabs + presence */}
+        <div className="flex items-center justify-between">
+
+          {/* Left: Timer */}
+          <div className="flex flex-col gap-0.5">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1.5">
+                <Clock className="w-4 h-4 text-purple-600" />
+                <span className={`text-xl font-bold ${timeRemaining < 60 ? "text-red-600 animate-pulse" : "text-purple-700"}`}>
+                  {formatTime(timeRemaining)}
+                </span>
+              </div>
+              <span className="text-xs text-gray-400">elapsed: {formatTime(timeElapsed)}</span>
+            </div>
+            <div className="flex items-center gap-2 text-xs">
+              <div className={`w-2 h-2 rounded-full ${isTimerRunning ? "bg-green-500 animate-pulse" : "bg-gray-300"}`} />
+              <span className="text-gray-500 font-medium">
+                {classStarted ? "In Progress" : "Waiting for both to join..."}
+              </span>
+              {classStarted && (
+                <span className="text-gray-400">
+                  · Together: {formatTime(bothActiveTime)} / {formatTime(requiredTime)} ({completionPct}%)
+                </span>
+              )}
+            </div>
+            {/* Progress bar */}
+            <div className="w-48 h-1.5 bg-gray-200 rounded-full mt-1">
+              <div
+                className={`h-full rounded-full transition-all duration-1000 ${completionPct >= 100 ? "bg-emerald-500" : "bg-purple-500"}`}
+                style={{ width: `${completionPct}%` }}
+              />
+            </div>
+          </div>
+
+          {/* Center: Tabs */}
+          <div className="flex items-center gap-2 bg-gradient-to-r from-purple-100 to-pink-100 rounded-full p-1">
+            {["video", "content", "whiteboard"].map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-full font-bold text-sm transition-all ${
+                  activeTab === tab ? "bg-white shadow-md scale-105 text-purple-600" : "text-purple-400 hover:text-purple-600"
+                }`}
+              >
+                {tab === "video"      && <Video    className="w-3.5 h-3.5" />}
+                {tab === "content"    && <FileText  className="w-3.5 h-3.5" />}
+                {tab === "whiteboard" && <PenTool   className="w-3.5 h-3.5" />}
+                {tab.charAt(0).toUpperCase() + tab.slice(1)}
+              </button>
+            ))}
+          </div>
+
+          {/* Right: Presence */}
+          <div className="flex flex-col items-end gap-1">
+            <div className="flex items-center gap-1.5">
+              <Users className="w-4 h-4 text-purple-600" />
+              <span className="text-sm font-bold text-purple-700">
+                {(isTeacherPresent ? 1 : 0) + (isStudentPresent ? 1 : 0)}/2
+              </span>
+            </div>
+            <div className="flex items-center gap-3 text-xs">
+              <div className="flex items-center gap-1">
+                {isTeacherPresent
+                  ? <CheckCircle2 className="w-3 h-3 text-emerald-500" />
+                  : <XCircle      className="w-3 h-3 text-gray-300" />}
+                <span className="text-gray-500">Teacher</span>
+              </div>
+              <div className="flex items-center gap-1">
+                {isStudentPresent
+                  ? <CheckCircle2 className="w-3 h-3 text-emerald-500" />
+                  : <XCircle      className="w-3 h-3 text-gray-300" />}
+                <span className="text-gray-500">Student</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── WAITING BANNER ── */}
+      {!classStarted && (
+        <div className="bg-amber-50 border-b border-amber-200 px-6 py-2 flex items-center justify-center gap-2 text-sm text-amber-700">
+          <Loader className="w-4 h-4 animate-spin" />
+          Waiting for {isTeacherPresent ? "student" : "teacher"} to join before class begins...
+        </div>
+      )}
+
+      {/* ── MAIN CONTENT ── */}
+      <div className="flex-1 overflow-hidden relative">
+
+        {/* VIDEO TAB */}
+        {activeTab === "video" && (
+          <div className="h-full">
+            {!activeVideoProvider ? (
+
+              /* ── Video provider selection ── */
+              <div className="h-full flex items-center justify-center bg-gradient-to-br from-purple-50 to-blue-50 p-8">
+                <div className="max-w-2xl w-full">
+                  <h2 className="text-3xl font-bold text-center text-gray-800 mb-3">Choose Video Platform</h2>
+                  <p className="text-center text-gray-600 mb-8">Select which platform to use for this class</p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                    {/* Google Meet — FIX 2: Corrected inverted onClick logic */}
+                    <button
+                      onClick={() => {
+                        if (resolvedGoogleMeetLink) {
+                          window.open(resolvedGoogleMeetLink, "_blank");
+                          setActiveVideoProvider("googlemeet");
+                        } else {
+                          alert("⚠️ Google Meet link not configured. Ask your teacher to set it up.");
+                        }
+                      }}
+                      disabled={!resolvedGoogleMeetLink}
+                      className={`p-8 rounded-2xl border-4 transition-all ${
+                        resolvedGoogleMeetLink
+                          ? "bg-white border-green-300 hover:border-green-500 hover:shadow-xl cursor-pointer"
+                          : "bg-gray-100 border-gray-300 cursor-not-allowed opacity-60"
+                      }`}
+                    >
+                      <div className="flex flex-col items-center">
+                        <div className={`w-20 h-20 rounded-full flex items-center justify-center mb-4 ${resolvedGoogleMeetLink ? "bg-green-500" : "bg-gray-400"}`}>
+                          <Video className="w-10 h-10 text-white" />
+                        </div>
+                        <h3 className="text-xl font-bold text-gray-800 mb-2">Google Meet</h3>
+                        <p className="text-sm text-gray-600 text-center mb-3">Opens in a new tab</p>
+                        <span className={`px-4 py-1 rounded-full text-xs font-medium ${resolvedGoogleMeetLink ? "bg-green-100 text-green-700" : "bg-gray-200 text-gray-600"}`}>
+                          {resolvedGoogleMeetLink ? "✓ Available" : "Not Configured"}
+                        </span>
+                      </div>
+                    </button>
+
+                    {/* Agora */}
+                    <button
+                      onClick={() => setActiveVideoProvider("agora")}
+                      className="p-8 rounded-2xl border-4 bg-white border-blue-300 hover:border-blue-500 hover:shadow-xl transition-all cursor-pointer"
+                    >
+                      <div className="flex flex-col items-center">
+                        <div className="w-20 h-20 bg-blue-500 rounded-full flex items-center justify-center mb-4">
+                          <Video className="w-10 h-10 text-white" />
+                        </div>
+                        <h3 className="text-xl font-bold text-gray-800 mb-2">Agora Video</h3>
+                        <p className="text-sm text-gray-600 text-center mb-3">Embedded in browser</p>
+                        <span className="px-4 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">✓ Always Available</span>
+                      </div>
+                    </button>
+                  </div>
+                  <p className="text-center text-xs text-gray-400 mt-6">
+                    💡 Google Meet uses the teacher's subscription. Agora is always available as backup.
+                  </p>
+                </div>
+              </div>
+
+            ) : activeVideoProvider === "agora" ? (
+
+              /* ── Agora embedded video ── */
+              <div className="h-full relative">
+                <VideoCall
+                  key={`video-${bookingId}`}
+                  channelName={channelName}
+                  userId={userId}
+                  userName={userName}
+                  onLeave={() => setActiveVideoProvider(null)}
+                  onUserJoined={handleUserJoined}
+                  onUserLeft={handleUserLeft}
+                  mode="video"
+                />
+                <button
+                  onClick={() => setActiveVideoProvider(null)}
+                  className="absolute top-4 left-4 px-4 py-2 bg-white/90 backdrop-blur rounded-lg shadow-lg hover:bg-white transition-all flex items-center gap-2 z-50"
+                >
+                  ← Change Platform
+                </button>
+              </div>
+
+            ) : (
+
+              /* ── Google Meet attendance monitor ── */
+              <div className="h-full flex flex-col items-center justify-center bg-gradient-to-br from-green-50 to-emerald-50 p-8 gap-6">
+
+                {/* Status card */}
+                <div className="bg-white rounded-3xl shadow-xl p-8 max-w-md w-full text-center border-2 border-green-200">
+
+                  {/* Animated icon */}
+                  <div className="relative w-20 h-20 mx-auto mb-5">
+                    <div className="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center">
+                      <Video className="w-10 h-10 text-white" />
+                    </div>
+                    {classStarted && (
+                      <span className="absolute inset-0 rounded-full bg-green-400 animate-ping opacity-30" />
+                    )}
+                  </div>
+
+                  <h3 className="text-xl font-bold text-gray-800 mb-1">Google Meet is Open</h3>
+                  <p className="text-sm text-gray-500 mb-5">
+                    Your class is happening in the other tab.{" "}
+                    <strong className="text-red-600">Do not close this page</strong> — it tracks your attendance.
+                  </p>
+
+                  {/* Attendance progress */}
+                  <div className="bg-gray-50 rounded-2xl p-4 mb-5 text-sm">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-gray-500 font-medium">Attendance</span>
+                      <span className={`font-bold text-base ${completionPct >= 100 ? "text-emerald-600" : "text-purple-600"}`}>
+                        {completionPct}%
+                      </span>
+                    </div>
+                    <div className="w-full h-3 bg-gray-200 rounded-full overflow-hidden mb-3">
+                      <div
+                        className={`h-full rounded-full transition-all duration-1000 ${completionPct >= 100 ? "bg-emerald-500" : "bg-purple-500"}`}
+                        style={{ width: `${completionPct}%` }}
+                      />
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 text-xs text-center">
+                      <div>
+                        <p className="text-gray-400">Time Together</p>
+                        <p className="font-bold text-gray-700">{formatTime(bothActiveTime)}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-400">Required</p>
+                        <p className="font-bold text-gray-700">{formatTime(requiredTime)}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-400">Remaining</p>
+                        <p className={`font-bold ${timeRemaining < 120 ? "text-red-600 animate-pulse" : "text-gray-700"}`}>
+                          {formatTime(timeRemaining)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Presence pills */}
+                  <div className="flex gap-3 justify-center mb-5">
+                    <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border ${
+                      isTeacherPresent ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-gray-100 text-gray-400 border-gray-200"
+                    }`}>
+                      <span className={`w-2 h-2 rounded-full ${isTeacherPresent ? "bg-emerald-500" : "bg-gray-300"}`} />
+                      Teacher {isTeacherPresent ? "Present" : "Waiting"}
+                    </div>
+                    <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border ${
+                      isStudentPresent ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-gray-100 text-gray-400 border-gray-200"
+                    }`}>
+                      <span className={`w-2 h-2 rounded-full ${isStudentPresent ? "bg-emerald-500" : "bg-gray-300"}`} />
+                      Student {isStudentPresent ? "Present" : "Waiting"}
+                    </div>
+                  </div>
+
+                  {/* Status message */}
+                  {!classStarted ? (
+                    <div className="flex items-center justify-center gap-2 text-sm text-amber-700 bg-amber-50 rounded-xl px-4 py-3 mb-4">
+                      <Loader className="w-4 h-4 animate-spin flex-shrink-0" />
+                      Waiting for both parties to open their classroom pages...
+                    </div>
+                  ) : completionPct >= 100 ? (
+                    <div className="flex items-center justify-center gap-2 text-sm text-emerald-700 bg-emerald-50 rounded-xl px-4 py-3 mb-4">
+                      <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+                      Attendance requirement met! Class will complete when the timer ends.
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center gap-2 text-sm text-purple-700 bg-purple-50 rounded-xl px-4 py-3 mb-4">
+                      <Clock className="w-4 h-4 animate-pulse flex-shrink-0" />
+                      Class in progress — stay on Google Meet and keep this tab open.
+                    </div>
+                  )}
+
+                  {/* Buttons */}
+                  <div className="flex flex-col gap-2">
+                    <button
+                      onClick={() => window.open(resolvedGoogleMeetLink, "_blank")}
+                      className="w-full px-5 py-3 bg-green-500 hover:bg-green-600 text-white rounded-full font-bold text-sm transition-all"
+                    >
+                      🔗 Reopen Google Meet
+                    </button>
+                    <button
+                      onClick={() => setActiveVideoProvider(null)}
+                      className="w-full px-5 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-full text-sm transition-all"
+                    >
+                      ← Switch Video Platform
+                    </button>
+                  </div>
+                </div>
+
+                {/* Bottom warning */}
+                <div className="max-w-md w-full bg-red-50 border border-red-200 rounded-2xl px-5 py-3 flex items-start gap-3">
+                  <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-red-700 leading-relaxed">
+                    <strong>Important:</strong> Closing this page will stop your attendance tracking and your class may be marked as incomplete. Keep both this tab and Google Meet open for the full class duration.
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         )}
-        <div className="flex-1 bg-white rounded-3xl shadow-2xl border-4 border-purple-200 overflow-hidden">
-          <canvas
-            ref={canvasRef}
-            width={1200}
-            height={700}
-            onMouseDown={startDrawing}
-            onMouseMove={draw}
-            onMouseUp={stopDrawing}
-            onMouseLeave={stopDrawing}
-            className="w-full h-full cursor-crosshair"
-          />
-        </div>
+
+        {/* CONTENT TAB */}
+        {activeTab === "content" && (
+          <div className="h-full flex items-center justify-center bg-blue-50">
+            <div className="text-center">
+              <FileText className="w-24 h-24 text-blue-300 mx-auto mb-4" />
+              <p className="text-xl font-bold text-blue-600">Content Sharing</p>
+              <p className="text-gray-500 mt-2">PDF viewer coming soon</p>
+            </div>
+          </div>
+        )}
+
+        {/* WHITEBOARD TAB */}
+        {activeTab === "whiteboard" && <WhiteboardTab userRole={userRole} />}
       </div>
-      <div className="w-48 flex flex-col gap-3">
-        <div className="flex-1 bg-gradient-to-br from-purple-200 to-purple-300 rounded-2xl shadow-xl border-4 border-white flex items-center justify-center">
-          <span className="text-sm font-bold text-white">Teacher</span>
+
+      {/* ── LEAVE EARLY MODAL ── */}
+      {showLeaveModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4">
+          <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-sm w-full text-center">
+            <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <AlertTriangle className="w-8 h-8 text-orange-600" />
+            </div>
+            <h2 className="text-xl font-bold text-gray-800 mb-2">Leave Early?</h2>
+            <p className="text-gray-600 text-sm mb-4">
+              The class timer will continue running. Completion will be decided automatically when the full {finalClassData?.duration || 60} minutes elapse.
+            </p>
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mb-6 text-xs text-amber-800">
+              ⚠️ If you leave now, your time together ({formatTime(bothActiveTime)}) is saved.
+              The class will complete or be marked missed at end-time regardless.
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowLeaveModal(false)}
+                className="flex-1 px-4 py-3 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-full font-bold transition-all"
+              >
+                Stay
+              </button>
+              <button
+                onClick={handleLeaveEarly}
+                className="flex-1 px-4 py-3 bg-red-500 hover:bg-red-600 text-white rounded-full font-bold transition-all"
+              >
+                Leave
+              </button>
+            </div>
+          </div>
         </div>
-        <div className="flex-1 bg-gradient-to-br from-pink-200 to-pink-300 rounded-2xl shadow-xl border-4 border-white flex items-center justify-center">
-          <span className="text-sm font-bold text-white">Student</span>
-        </div>
-      </div>
+      )}
     </div>
   );
 }
