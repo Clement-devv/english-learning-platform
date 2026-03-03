@@ -32,7 +32,7 @@ const classroomSessionSchema = new mongoose.Schema({
   classEndedAt: Date,
   status: {
     type: String,
-    enum: ["waiting", "active", "completed", "ended-early", "incomplete"],
+    enum: ["waiting", "active", "completed", "ended-early", "incomplete", "missed"],
     default: "waiting"
   },
   heartbeats: [{

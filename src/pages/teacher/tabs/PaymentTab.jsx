@@ -407,9 +407,26 @@ export default function PaymentTab({ teacher, isDarkMode }) {
     }
   };
 
-  useEffect(() => {
-    load();
-  }, [teacher?._id]);
+ 
+useEffect(() => {
+  load();
+}, [teacher?._id]);
+
+
+useEffect(() => {
+  load();
+
+  // Refresh when user returns to this browser tab (e.g. after Google Meet)
+  const handleVisibility = () => {
+    if (document.visibilityState === "visible") {
+      load(true); // silent refresh
+    }
+  };
+
+  document.addEventListener("visibilitychange", handleVisibility);
+  return () => document.removeEventListener("visibilitychange", handleVisibility);
+}, [teacher?._id]);
+  
 
   // ── Filtered transactions ──
   const filtered = useMemo(() => {

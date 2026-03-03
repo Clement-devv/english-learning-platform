@@ -6,6 +6,7 @@ import express from "express";
 import mongoose from "mongoose";
 import cors from "cors";
 import http from "http"; 
+import compression from "compression";
 
 import { 
   apiLimiter,
@@ -49,6 +50,7 @@ import adminLessonRoutes from "./routes/adminLessonRoutes.js";
 import subAdminRoutes     from "./routes/subAdminRoutes.js";
 import subAdminAuthRoutes from "./routes/subAdminAuthRoutes.js";
 import subAdminScopeRoutes from "./routes/subAdminScopeRoutes.js";
+
 
 // ✅ FIXED: Correct import path for RecurringPattern model
 import RecurringPattern from "./models/RecurringPattern.js";
@@ -94,6 +96,16 @@ app.set('io', io);
 app.use(express.json(requestLimits.json));
 app.use(express.urlencoded(requestLimits.urlencoded));
 
+app.use(compression({
+  level: 6,           // compression level 1-9 (6 = good balance of speed vs size)
+  threshold: 1024,    // only compress responses > 1KB (no point compressing tiny ones)
+  filter: (req, res) => {
+    // Don't compress SSE streams (Socket.IO handles its own compression)
+    if (req.headers["x-no-compression"]) return false;
+    return compression.filter(req, res);
+  },
+}));
+
 app.use('/api/', apiLimiter);
 
 app.use("/api/classroom", realtimeLimiter);
@@ -103,9 +115,36 @@ app.use("/api/group-chats", pollingLimiter);
 
 // MongoDB connection
 mongoose
-  .connect(process.env.MONGO_URI)
-  .then(() => console.log("✅ MongoDB connected"))
+  .connect(process.env.MONGO_URI, {
+    maxPoolSize: 10,
+    minPoolSize: 2,
+    serverSelectionTimeoutMS: 5000,
+    socketTimeoutMS: 45000,
+    connectTimeoutMS: 10000,
+    heartbeatFrequencyMS: 10000,
+  })
+  .then(() => {
+    console.log("✅ MongoDB connected");
+    // ✅ Only start keep-alive AFTER successful connection
+    setInterval(async () => {
+      try {
+        await mongoose.connection.db.admin().ping();
+        console.log('🏓 DB keep-alive ping');
+      } catch (e) {
+        console.error('DB ping failed:', e.message);
+      }
+    }, 5 * 60 * 1000);
+  })
   .catch((err) => console.error("❌ MongoDB connection error:", err));
+  
+  setInterval(async () => {
+    try {
+      await mongoose.connection.db.admin().ping();
+      console.log('🏓 DB keep-alive ping');
+    } catch (e) { console.error('DB ping failed:', e.message); }
+  }, 5 * 60 * 1000);
+
+
 
 // Root endpoint
 app.get("/", (req, res) => {

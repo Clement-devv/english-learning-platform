@@ -1,6 +1,6 @@
 // src/pages/teacher/TeacherDashboard.jsx - NEW SIDEBAR DESIGN + 100% ORIGINAL LOGIC
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import {
   Settings, Plus, MessageCircle, Video, Repeat,
   Home, Calendar, CheckCircle, Users, BookOpen,
@@ -99,6 +99,8 @@ export default function TeacherDashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [mounted,     setMounted]     = useState(false);
 
+  const location = useLocation();
+
   // ── Original useEffect ────────────────────────────────────────────────────────
   useEffect(() => {
     setMounted(true);
@@ -110,6 +112,11 @@ export default function TeacherDashboard() {
     setTeacherInfo(teacherData);
     fetchTeacherData();
   }, [navigate]);
+
+  if (location.state?.classCompleted) {
+    setActiveTab("payment"); // switch to payment tab automatically
+    navigate(location.pathname, { replace: true, state: {} }); // clear state
+  }
 
   // ── Original fetchTeacherData (100% preserved) ────────────────────────────────
   const fetchTeacherData = async () => {
@@ -126,6 +133,11 @@ export default function TeacherDashboard() {
       setTeacherInfo(apiTeacherData);
       setGoogleMeetLink(apiTeacherData.googleMeetLink || "");
       console.log("✅ Teacher Info Loaded:", apiTeacherData._id);
+      
+      localStorage.setItem("teacherInfo", JSON.stringify({
+        ...JSON.parse(localStorage.getItem("teacherInfo") || "{}"),
+        ...apiTeacherData,
+      }));
 
       const [studentsData, pendingBookingsData, acceptedBookingsData, completedBookingsData] =
         await Promise.all([

@@ -197,36 +197,48 @@ export default function Classroom({ classData, userRole: propUserRole, onLeave, 
   // Session: join, heartbeat, leave
   // ─────────────────────────────────────────────────────────────────────────────
   const joinSession = useCallback(async () => {
-    try {
-      const res = await api.post("/api/classroom/attendance", {
-        bookingId,
-        userRole,
-        action: "join",
-        timestamp: new Date().toISOString(),
-      });
-      setSessionData(res.data.session);
+  try {
+    const res = await api.post("/api/classroom/attendance", {
+      bookingId,
+      userRole,
+      action: "join",
+      timestamp: new Date().toISOString(),
+    });
 
-      if (res.data.session?.classStartedAt) {
-        const elapsed = Math.floor((Date.now() - new Date(res.data.session.classStartedAt)) / 1000);
-        setTimeElapsed(elapsed);
-        setBothActiveTime(res.data.session.bothActiveTime || 0);
-        if (!classStartedRef.current) {
-          classStartedRef.current = true;
-          setClassStarted(true);
-          setIsTimerRunning(true);
-          startTimer();
-        }
-      }
-      console.log(`✅ Joined session as ${userRole}`);
-    } catch (err) {
-      console.error("❌ Join session error:", err);
-      // Retry after 3 seconds if join fails
-      setTimeout(() => {
-        console.log("🔄 Retrying session join...");
-        joinSession();
-      }, 3000);
+    const session = res.data.session;       // ← your new code starts here
+    setSessionData(session);
+
+    // Sync presence refs DIRECTLY from session response
+    if (session) {
+      const teacherIn = !!session.teacherJoinedAt;
+      const studentIn = !!session.studentJoinedAt;
+      teacherPresentRef.current = teacherIn;
+      studentPresentRef.current = studentIn;
+      setIsTeacherPresent(teacherIn);
+      setIsStudentPresent(studentIn);
     }
-  }, [bookingId, userRole, startTimer]);
+
+    if (session?.classStartedAt) {
+      const elapsed = Math.floor((Date.now() - new Date(session.classStartedAt)) / 1000);
+      setTimeElapsed(elapsed);
+      setBothActiveTime(session.bothActiveTime || 0);
+      if (!classStartedRef.current) {
+        classStartedRef.current = true;
+        setClassStarted(true);
+        setIsTimerRunning(true);
+        startTimer();
+      }
+    }
+    console.log(`✅ Joined session as ${userRole}`);  // ← your new code ends here
+
+  } catch (err) {
+    console.error("❌ Join session error:", err);
+    setTimeout(() => {
+      console.log("🔄 Retrying session join...");
+      joinSession();
+    }, 3000);
+  }
+}, [bookingId, userRole, startTimer]);
 
   const sendHeartbeat = useCallback(async (currentBothActiveTime) => {
     try {
@@ -292,81 +304,113 @@ export default function Classroom({ classData, userRole: propUserRole, onLeave, 
     }
   }, [bookingId, requiredTime]);
 
-  // Watch timeRemaining → fire auto-complete when it hits 0
-  useEffect(() => {
-    if (timeRemaining === 0 && classStarted && !hasAutoCompletedRef.current) {
-      setBothActiveTime((current) => {
-        handleAutoComplete(current);
-        return current;
-      });
-    }
-  }, [timeRemaining, classStarted, handleAutoComplete]);
 
+const handleAutoCompleteRef = useRef(handleAutoComplete);
+useEffect(() => { 
+  handleAutoCompleteRef.current = handleAutoComplete; 
+}, [handleAutoComplete]);
+
+ useEffect(() => {
+  if (timeRemaining === 0 && classStarted && !hasAutoCompletedRef.current) {
+    setBothActiveTime((current) => {
+      handleAutoCompleteRef.current(current); // ✅ use ref not direct function
+      return current;
+    });
+  }
+}, [timeRemaining, classStarted]); // ✅ no handleAutoComplete dep = no infinite loop
+
+ 
   // ─────────────────────────────────────────────────────────────────────────────
-  // Mount: join session, heartbeat, poll for other user joining
-  // ─────────────────────────────────────────────────────────────────────────────
-  useEffect(() => {
-    if (!bookingId) return;
+// Mount: join session, heartbeat, poll for other user joining
+// ─────────────────────────────────────────────────────────────────────────────
+useEffect(() => {
+  if (!bookingId) return;
 
-    joinSession();
+  joinSession();
 
-    // Poll every 5 seconds — detects when the other user joins
-    sessionRef.current = setInterval(async () => {
-      try {
-        const { data } = await api.get(`/api/classroom/session/${bookingId}`);
-        if (!data.session) return;
-        setSessionData(data.session);
+  let currentPollInterval = 2000;
+  let pollTimeout = null;
 
-        const s         = data.session;
-        const teacherIn = !!s.teacherJoinedAt;
-        const studentIn = !!s.studentJoinedAt;
+  const poll = async () => {
+    try {
+      const { data } = await api.get(`/api/classroom/session/${bookingId}`);
+      if (!data.session) return;
+      setSessionData(data.session);
 
-        if (teacherIn !== teacherPresentRef.current) setIsTeacherPresent(teacherIn);
-        if (studentIn !== studentPresentRef.current) setIsStudentPresent(studentIn);
+      const s         = data.session;
+      const teacherIn = !!s.teacherJoinedAt;
+      const studentIn = !!s.studentJoinedAt;
 
-        // Both just joined — start timer (use ref to avoid stale closure)
-        if (teacherIn && studentIn && !classStartedRef.current) {
-          classStartedRef.current = true; // ✅ set ref immediately to prevent double-start
-          if (s.classStartedAt) {
-            const elapsed = Math.floor((Date.now() - new Date(s.classStartedAt)) / 1000);
-            setTimeElapsed(elapsed);
-            setBothActiveTime(s.bothActiveTime || 0);
-          }
-          setClassStarted(true);
-          setIsTimerRunning(true);
-          startTimer();
+      // Update refs directly so timer sees changes immediately
+      if (teacherIn !== teacherPresentRef.current) {
+        teacherPresentRef.current = teacherIn;
+        setIsTeacherPresent(teacherIn);
+      }
+      if (studentIn !== studentPresentRef.current) {
+        studentPresentRef.current = studentIn;
+        setIsStudentPresent(studentIn);
+      }
+
+      // Both just joined — start timer
+      if (teacherIn && studentIn && !classStartedRef.current) {
+        classStartedRef.current = true;
+
+        // ✅ FIX: Hard-sync elapsed time from server's classStartedAt
+        // So even if this user detects the join 2s late, they start at the
+        // exact same point in time as the other user — no drift
+        if (s.classStartedAt) {
+          const elapsed = Math.floor((Date.now() - new Date(s.classStartedAt)) / 1000);
+          setTimeElapsed(elapsed);
+          // Sync bothActiveTime too — use server value if available, else elapsed
+          setBothActiveTime(s.bothActiveTime > 0 ? s.bothActiveTime : elapsed);
         }
 
-        // Other side already triggered auto-complete
-        if ((s.status === "completed" || s.status === "incomplete") && !hasAutoCompletedRef.current) {
-          hasAutoCompletedRef.current = true;
-          clearInterval(timerRef.current);
-          setBothActiveTime((cur) => {
-            handleAutoComplete(cur);
-            return cur;
-          });
-        }
-      } catch (_) { /* session not created yet */ }
-    }, 5000);
+        setClassStarted(true);
+        setIsTimerRunning(true);
+        startTimer();
 
-    // Heartbeat every 15 seconds
-    syncRef.current = setInterval(() => {
-      setBothActiveTime((current) => {
-        sendHeartbeat(current);
-        return current;
-      });
-    }, 15000);
+        // ✅ Slow down polling now that class is active — saves server load
+        currentPollInterval = 5000;
+      }
 
-    return () => {
-      clearInterval(timerRef.current);
-      clearInterval(syncRef.current);
-      clearInterval(sessionRef.current);
-      setBothActiveTime((cur) => {
-        leaveSession(cur);
-        return cur;
-      });
-    };
-  }, [bookingId]); // eslint-disable-line react-hooks/exhaustive-deps
+      // Other side already triggered auto-complete
+      if ((s.status === "completed" || s.status === "incomplete") && !hasAutoCompletedRef.current) {
+        hasAutoCompletedRef.current = true;
+        clearInterval(timerRef.current);
+        setBothActiveTime((cur) => {
+          handleAutoCompleteRef.current(cur);
+          return cur;
+        });
+        return; // stop polling
+      }
+    } catch (_) { /* session not created yet */ }
+
+    // Schedule next poll with current interval
+    pollTimeout = setTimeout(poll, currentPollInterval);
+  };
+
+  // Start first poll
+  pollTimeout = setTimeout(poll, currentPollInterval);
+
+  // Heartbeat every 15 seconds
+  syncRef.current = setInterval(() => {
+    setBothActiveTime((current) => {
+      sendHeartbeat(current);
+      return current;
+    });
+  }, 15000);
+
+  return () => {
+    clearTimeout(pollTimeout);
+    clearInterval(timerRef.current);
+    clearInterval(syncRef.current);
+    clearInterval(sessionRef.current);
+    setBothActiveTime((cur) => {
+      leaveSession(cur);
+      return cur;
+    });
+  };
+}, [bookingId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ─────────────────────────────────────────────────────────────────────────────
   // Video call presence callbacks (Agora only)
@@ -461,7 +505,9 @@ export default function Classroom({ classData, userRole: propUserRole, onLeave, 
                 )}
               </div>
               <button
-                onClick={() => navigate(userRole === "teacher" ? "/teacher/dashboard" : "/student/dashboard")}
+                onClick={() => navigate(userRole === "teacher" ? "/teacher/dashboard" : "/student/dashboard",
+                  { state: { classCompleted: true, activeTab: "payment" } }
+                )}
                 className="w-full px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full font-bold transition-all"
               >
                 Back to Dashboard
@@ -504,7 +550,9 @@ export default function Classroom({ classData, userRole: propUserRole, onLeave, 
               </div>
               <p className="text-xs text-gray-400 mb-4">No class was deducted and no earnings were added.</p>
               <button
-                onClick={() => navigate(userRole === "teacher" ? "/teacher/dashboard" : "/student/dashboard")}
+                onClick={() => navigate(userRole === "teacher" ? "/teacher/dashboard" : "/student/dashboard",
+                  { state: { classCompleted: true, activeTab: "payment" } }
+                )}
                 className="w-full px-6 py-3 bg-gray-700 hover:bg-gray-800 text-white rounded-full font-bold transition-all"
               >
                 Back to Dashboard
