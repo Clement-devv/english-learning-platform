@@ -8,10 +8,15 @@ const paymentTransactionSchema = new mongoose.Schema({
     required: true,
     index: true
   },
+  studentId: {                           
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Student",
+    index: true,
+  },
   bookingId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Booking",
-    required: true
+    required: true,
   },
   amount: {
     type: Number,
@@ -65,6 +70,7 @@ const paymentTransactionSchema = new mongoose.Schema({
 });
 
 // Indexes for efficient queries
+paymentTransactionSchema.index({ bookingId: 1 }, { unique: true });
 paymentTransactionSchema.index({ teacherId: 1, status: 1 });
 paymentTransactionSchema.index({ completedAt: -1 });
 paymentTransactionSchema.index({ paidAt: -1 });

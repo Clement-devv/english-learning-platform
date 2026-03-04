@@ -10,10 +10,14 @@ import Assignment from "../models/Assignment.js";
 import PaymentTransaction from "../models/PaymentTransaction.js";
 import { verifyToken, verifyAdmin } from "../middleware/authMiddleware.js";
 import { sendEmail } from "../utils/emailService.js";
+import { completeClass } from "../services/classCompletionService.js";
 
 const router = express.Router();
 
-// ─── Email helpers ────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Email helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
 async function sendLessonMarkedEmails(teacher, student, booking) {
   try {
     const teacherHtml = `
@@ -98,7 +102,9 @@ async function sendLessonUnmarkedEmails(teacher, student, booking, reason) {
   }
 }
 
-// ─── GET: Students assigned to a teacher ─────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/admin/lessons/teacher/:teacherId/students
+// ─────────────────────────────────────────────────────────────────────────────
 router.get("/teacher/:teacherId/students", verifyToken, verifyAdmin, async (req, res) => {
   try {
     const { teacherId } = req.params;
@@ -125,7 +131,9 @@ router.get("/teacher/:teacherId/students", verifyToken, verifyAdmin, async (req,
   }
 });
 
-// ─── GET: Teachers assigned to a student ─────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/admin/lessons/student/:studentId/teachers
+// ─────────────────────────────────────────────────────────────────────────────
 router.get("/student/:studentId/teachers", verifyToken, verifyAdmin, async (req, res) => {
   try {
     const { studentId } = req.params;
@@ -154,7 +162,9 @@ router.get("/student/:studentId/teachers", verifyToken, verifyAdmin, async (req,
   }
 });
 
-// ─── GET: Bookings between a teacher-student pair ────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/admin/lessons/bookings?teacherId=&studentId=&type=mark|unmark
+// ─────────────────────────────────────────────────────────────────────────────
 router.get("/bookings", verifyToken, verifyAdmin, async (req, res) => {
   try {
     const { teacherId, studentId, type } = req.query;
@@ -184,7 +194,13 @@ router.get("/bookings", verifyToken, verifyAdmin, async (req, res) => {
   }
 });
 
-// ─── POST: Mark a lesson as completed ────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/admin/lessons/mark
+// Admin manually marks a lesson as completed.
+// Uses the shared classCompletionService — same atomic transaction and
+// duplicate-prevention guarantees as the auto-complete flow.
+// skipAttendanceCheck: true because admin is making a conscious override.
+// ─────────────────────────────────────────────────────────────────────────────
 router.post("/mark", verifyToken, verifyAdmin, async (req, res) => {
   const { bookingId } = req.body;
 
@@ -193,94 +209,50 @@ router.post("/mark", verifyToken, verifyAdmin, async (req, res) => {
   }
 
   try {
-    // 1. Load booking
-    const booking = await Booking.findById(bookingId)
-      .populate("teacherId", "firstName lastName email ratePerClass lessonsCompleted earned")
-      .populate("studentId", "firstName surname email noOfClasses active");
+    const result = await completeClass(bookingId, "admin", { skipAttendanceCheck: true });
 
-    if (!booking) {
-      return res.status(404).json({ success: false, message: "Booking not found" });
-    }
-
-    if (booking.status !== "accepted") {
+    if (result.alreadyProcessed) {
       return res.status(400).json({
         success: false,
-        message: `Can only mark 'accepted' bookings. Current status: ${booking.status}`,
+        message: `Booking is already ${result.completed ? "completed" : "missed"}.`,
       });
     }
 
-    // 2. Mark booking complete
-    booking.status = "completed";
-    booking.completedAt = new Date();
-    booking.adminRejected = false;
-    booking.markedBy = "admin";
-    await booking.save();
-
-    // 3. Deduct student class
-    const student = await Student.findById(booking.studentId._id);
-    if (student) {
-      student.noOfClasses = Math.max(0, (student.noOfClasses || 0) - 1);
-      if (student.noOfClasses === 0) student.active = false;
-      await student.save();
-    }
-
-    // 4. Add teacher earnings
-    const teacher = await Teacher.findById(booking.teacherId._id);
-    let ratePerClass = 0;
-    if (teacher) {
-      ratePerClass = parseFloat(teacher.ratePerClass || 0);
-      teacher.lessonsCompleted = (teacher.lessonsCompleted || 0) + 1;
-      teacher.earned = (teacher.earned || 0) + ratePerClass;
-      await teacher.save();
-    }
-
-    // 5. Create PaymentTransaction
-    await PaymentTransaction.create({
-      bookingId: booking._id,
-      teacherId: booking.teacherId._id,
-      studentId: booking.studentId._id,
-      amount: ratePerClass,
-      status: "pending",
-      type: "class_completion",
-      classTitle: booking.classTitle,
-      studentName: `${booking.studentId.firstName} ${booking.studentId.surname}`,
-      completedAt: new Date(),
-      description: `Admin marked class completed - ${booking.classTitle}`,
+    // Send emails non-blocking — email failure must NOT make admin think marking failed
+    setImmediate(async () => {
+      try {
+        const booking = await Booking.findById(bookingId)
+          .populate("teacherId", "firstName lastName email ratePerClass")
+          .populate("studentId", "firstName surname email noOfClasses");
+        if (booking) {
+          await sendLessonMarkedEmails(booking.teacherId, booking.studentId, booking);
+        }
+      } catch (emailErr) {
+        console.error("📧 Admin mark email failed:", emailErr.message);
+      }
     });
 
-    // 6. Send emails (non-critical — intentionally not awaited)
-    const updatedStudent = await Student.findById(booking.studentId._id);
-    const updatedTeacher = await Teacher.findById(booking.teacherId._id);
-    sendLessonMarkedEmails(updatedTeacher, updatedStudent, booking);
+    console.log(`✅ Admin marked lesson complete | bookingId: ${bookingId}`);
 
-    console.log(`✅ Admin marked lesson: ${booking.classTitle} | Teacher: ${updatedTeacher.firstName} | Student: ${updatedStudent.firstName}`);
-
-    res.json({
+    return res.json({
       success: true,
-      message: "Lesson marked as completed",
-      booking: {
-        _id: booking._id,
-        classTitle: booking.classTitle,
-        status: "completed",
-        completedAt: booking.completedAt,
-      },
-      teacher: {
-        lessonsCompleted: updatedTeacher.lessonsCompleted,
-        earned: updatedTeacher.earned,
-        rateAdded: ratePerClass,
-      },
-      student: {
-        noOfClasses: updatedStudent.noOfClasses,
-        active: updatedStudent.active,
-      },
+      message: "Lesson marked as completed.",
+      ...result,
     });
+
   } catch (err) {
-    console.error("❌ Error marking lesson:", err);
+    console.error("❌ Error marking lesson:", err.message);
     res.status(500).json({ success: false, message: "Error marking lesson: " + err.message });
   }
 });
 
-// ─── POST: Unmark (admin-reject) a completed lesson ──────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/admin/lessons/unmark
+// Admin reverses a completed lesson (admin-reject).
+// Restores student credit and deducts teacher earnings.
+// NOTE: This intentionally does NOT use the completion service —
+// it is a reversal flow, not a completion flow.
+// ─────────────────────────────────────────────────────────────────────────────
 router.post("/unmark", verifyToken, verifyAdmin, async (req, res) => {
   const { bookingId, reason } = req.body;
 
@@ -289,7 +261,6 @@ router.post("/unmark", verifyToken, verifyAdmin, async (req, res) => {
   }
 
   try {
-    // 1. Load booking
     const booking = await Booking.findById(bookingId)
       .populate("teacherId", "firstName lastName email ratePerClass lessonsCompleted earned")
       .populate("studentId", "firstName surname email noOfClasses active");
@@ -308,18 +279,18 @@ router.post("/unmark", verifyToken, verifyAdmin, async (req, res) => {
     if (booking.adminRejected) {
       return res.status(400).json({
         success: false,
-        message: "This lesson has already been admin-rejected",
+        message: "This lesson has already been admin-rejected.",
       });
     }
 
-    // 2. Flag booking as admin-rejected
+    // Flag booking as admin-rejected
     booking.adminRejected = true;
     booking.adminRejectedAt = new Date();
     booking.adminRejectedBy = req.user.id;
     booking.adminRejectedReason = reason || "";
     await booking.save();
 
-    // 3. Restore student class
+    // Restore student class credit
     const student = await Student.findById(booking.studentId._id);
     if (student) {
       student.noOfClasses = (student.noOfClasses || 0) + 1;
@@ -327,32 +298,38 @@ router.post("/unmark", verifyToken, verifyAdmin, async (req, res) => {
       await student.save();
     }
 
-    // 4. Deduct teacher earnings
+    // Deduct teacher earnings (float-safe)
     const teacher = await Teacher.findById(booking.teacherId._id);
     let ratePerClass = 0;
     if (teacher) {
-      ratePerClass = parseFloat(teacher.ratePerClass || 0);
+      ratePerClass = Math.round((parseFloat(teacher.ratePerClass) || 0) * 100) / 100;
       teacher.lessonsCompleted = Math.max(0, (teacher.lessonsCompleted || 0) - 1);
-      teacher.earned = Math.max(0, (teacher.earned || 0) - ratePerClass);
+      teacher.earned = Math.max(0, Math.round(((teacher.earned || 0) - ratePerClass) * 100) / 100);
       await teacher.save();
     }
 
-    // 5. Cancel PaymentTransaction
+    // Cancel the PaymentTransaction for this booking
     await PaymentTransaction.updateMany(
       { bookingId: booking._id, status: "pending" },
       { $set: { status: "cancelled", notes: `Admin rejected: ${reason || "No reason given"}` } }
     );
 
-    // 6. Send emails (non-critical — intentionally not awaited)
-    const updatedStudent = await Student.findById(booking.studentId._id);
-    const updatedTeacher = await Teacher.findById(booking.teacherId._id);
-    sendLessonUnmarkedEmails(updatedTeacher, updatedStudent, booking, reason);
+    // Send emails non-blocking
+    setImmediate(async () => {
+      try {
+        const updatedStudent = await Student.findById(booking.studentId._id);
+        const updatedTeacher = await Teacher.findById(booking.teacherId._id);
+        await sendLessonUnmarkedEmails(updatedTeacher, updatedStudent, booking, reason);
+      } catch (emailErr) {
+        console.error("📧 Unmark email failed:", emailErr.message);
+      }
+    });
 
-    console.log(`⚠️ Admin unmarked lesson: ${booking.classTitle} | Reason: ${reason || "none"}`);
+    console.log(`⚠️ Admin unmarked lesson | bookingId: ${bookingId} | Reason: ${reason || "none"}`);
 
-    res.json({
+    return res.json({
       success: true,
-      message: "Lesson marked as not completed (admin rejected)",
+      message: "Lesson marked as not completed (admin rejected).",
       booking: {
         _id: booking._id,
         classTitle: booking.classTitle,
@@ -361,18 +338,19 @@ router.post("/unmark", verifyToken, verifyAdmin, async (req, res) => {
         adminRejectedReason: reason || "",
       },
       teacher: {
-        lessonsCompleted: updatedTeacher.lessonsCompleted,
-        earned: updatedTeacher.earned,
+        lessonsCompleted: teacher?.lessonsCompleted,
+        earned: teacher?.earned,
         rateDeducted: ratePerClass,
       },
       student: {
-        noOfClasses: updatedStudent.noOfClasses,
-        active: updatedStudent.active,
+        noOfClasses: student?.noOfClasses,
+        active: student?.active,
         classRestored: true,
       },
     });
+
   } catch (err) {
-    console.error("❌ Error unmarking lesson:", err);
+    console.error("❌ Error unmarking lesson:", err.message);
     res.status(500).json({ success: false, message: "Error unmarking lesson: " + err.message });
   }
 });
