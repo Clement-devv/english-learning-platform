@@ -142,6 +142,9 @@ export default function Classroom({ classData, userRole: propUserRole, onLeave, 
   const timerRef   = useRef(null);
   const syncRef    = useRef(null);
   const sessionRef = useRef(null);
+  const classStartedAtRef = useRef(null);   
+  const bothActiveStartRef = useRef(null);
+  const bothActiveAccRef = useRef(0);       
 
   // Keep classStartedRef in sync
   useEffect(() => { classStartedRef.current = classStarted; }, [classStarted]);
@@ -182,16 +185,37 @@ export default function Classroom({ classData, userRole: propUserRole, onLeave, 
   // ─────────────────────────────────────────────────────────────────────────────
   // Timer — uses refs to avoid stale closure on presence flags
   // ─────────────────────────────────────────────────────────────────────────────
-  const startTimer = useCallback(() => {
-    if (timerRef.current) return;
-    console.log("⏱️ Timer started");
-    timerRef.current = setInterval(() => {
-      setTimeElapsed((prev) => prev + 1);
-      if (teacherPresentRef.current && studentPresentRef.current) {
-        setBothActiveTime((prev) => prev + 1);
+  // NEW — timestamp-based, immune to tab throttling
+const startTimer = useCallback(() => {
+  if (timerRef.current) return;
+
+  // Record the real wall-clock start time
+  if (!classStartedAtRef.current) {
+    classStartedAtRef.current = Date.now();
+  }
+
+  timerRef.current = setInterval(() => {
+    // Elapsed = real wall-clock time, not tick count
+    const elapsed = Math.floor((Date.now() - classStartedAtRef.current) / 1000);
+    setTimeElapsed(elapsed);
+
+    // bothActiveTime: accumulate real segments when both are present
+    if (teacherPresentRef.current && studentPresentRef.current) {
+      if (!bothActiveStartRef.current) {
+        bothActiveStartRef.current = Date.now(); // segment started
       }
-    }, 1000);
-  }, []);
+      const segmentSeconds = Math.floor((Date.now() - bothActiveStartRef.current) / 1000);
+      setBothActiveTime(bothActiveAccRef.current + segmentSeconds);
+    } else {
+      // One person left — close the segment, save accumulated time
+      if (bothActiveStartRef.current) {
+        bothActiveAccRef.current += Math.floor((Date.now() - bothActiveStartRef.current) / 1000);
+        bothActiveStartRef.current = null;
+      }
+      setBothActiveTime(bothActiveAccRef.current);
+    }
+  }, 1000);
+}, []);
 
   // ─────────────────────────────────────────────────────────────────────────────
   // Session: join, heartbeat, leave
@@ -219,16 +243,18 @@ export default function Classroom({ classData, userRole: propUserRole, onLeave, 
     }
 
     if (session?.classStartedAt) {
-      const elapsed = Math.floor((Date.now() - new Date(session.classStartedAt)) / 1000);
-      setTimeElapsed(elapsed);
-      setBothActiveTime(session.bothActiveTime || 0);
-      if (!classStartedRef.current) {
-        classStartedRef.current = true;
-        setClassStarted(true);
-        setIsTimerRunning(true);
-        startTimer();
-      }
-    }
+  const elapsed = Math.floor((Date.now() - new Date(session.classStartedAt)) / 1000);
+  setTimeElapsed(elapsed);
+  setBothActiveTime(session.bothActiveTime || 0);
+  if (!classStartedRef.current) {
+    classStartedRef.current = true;
+    setClassStarted(true);
+    setIsTimerRunning(true);
+    classStartedAtRef.current = new Date(session.classStartedAt).getTime(); 
+    bothActiveAccRef.current = session.bothActiveTime || 0;                 
+    startTimer();
+  }
+}
     console.log(`✅ Joined session as ${userRole}`);  // ← your new code ends here
 
   } catch (err) {
@@ -411,6 +437,41 @@ useEffect(() => {
     });
   };
 }, [bookingId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+// ── Resync from server when user switches back to this tab ──────────────────
+useEffect(() => {
+  const handleVisibilityChange = async () => {
+    if (document.visibilityState !== "visible") return;
+    if (!bookingId || !classStarted) return;
+
+    try {
+      const { data } = await api.get(`/api/classroom/session/${bookingId}`);
+      const s = data.session;
+      if (!s) return;
+
+      console.log("👁️ Tab visible — resyncing from server...");
+
+      // Recalculate elapsed from server's classStartedAt
+      if (s.classStartedAt) {
+        classStartedAtRef.current = new Date(s.classStartedAt).getTime();
+        const elapsed = Math.floor((Date.now() - classStartedAtRef.current) / 1000);
+        setTimeElapsed(elapsed);
+      }
+
+      // Restore server's authoritative bothActiveTime
+      if (s.bothActiveTime > 0) {
+        bothActiveAccRef.current = s.bothActiveTime;
+        bothActiveStartRef.current = null; // reset segment
+        setBothActiveTime(s.bothActiveTime);
+      }
+    } catch (err) {
+      console.error("Resync error:", err);
+    }
+  };
+
+  document.addEventListener("visibilitychange", handleVisibilityChange);
+  return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+}, [bookingId, classStarted]);
 
   // ─────────────────────────────────────────────────────────────────────────────
   // Video call presence callbacks (Agora only)
