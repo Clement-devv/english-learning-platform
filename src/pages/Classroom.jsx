@@ -100,6 +100,18 @@ export default function Classroom({ classData, userRole: propUserRole, onLeave, 
   // ── UI state ────────────────────────────────────────────────────────────────
   const [activeTab, setActiveTab]                     = useState("video");
   const [activeVideoProvider, setActiveVideoProvider] = useState(null);
+  const activeVideoProviderRef = useRef(null); // track latest value without re-render
+
+  // Choose a video provider: sets local state AND persists to server so the
+  // other participant's poll picks it up and auto-joins the same platform.
+  const chooseProvider = useCallback(async (provider) => {
+    setActiveVideoProvider(provider);
+    activeVideoProviderRef.current = provider;
+    if (!provider || !bookingId) return;
+    try {
+      await api.patch(`/api/classroom/session/${bookingId}/video-provider`, { videoProvider: provider });
+    } catch (_) { /* non-critical — other user will still see it on next poll */ }
+  }, [bookingId]);
   const [showLeaveModal, setShowLeaveModal]           = useState(false);
   const [error, setError]                             = useState(null);
 
@@ -397,6 +409,12 @@ useEffect(() => {
 
         // ✅ Slow down polling now that class is active — saves server load
         currentPollInterval = 5000;
+      }
+
+      // Auto-apply video provider if the other side already chose one
+      if (s.videoProvider && !activeVideoProviderRef.current) {
+        activeVideoProviderRef.current = s.videoProvider;
+        setActiveVideoProvider(s.videoProvider);
       }
 
       // Other side already triggered auto-complete
@@ -738,9 +756,46 @@ useEffect(() => {
       {/* ── MAIN CONTENT ── */}
       <div className="flex-1 overflow-hidden relative">
 
-        {/* VIDEO TAB */}
-        {activeTab === "video" && (
-          <div className="h-full">
+        {/*
+          ── BUG FIX: Agora VideoCall must NEVER unmount while the session is active.
+          ── Previously it was inside {activeTab === "video" && ...} which unmounted it
+          ── every time the user switched tabs, calling client.leave() and ending the call.
+          ──
+          ── Solution: render VideoCall always (when provider=agora), hide with CSS only.
+          ── visibility:hidden keeps the element in layout with real dimensions so Agora
+          ── can continue rendering video frames. Switching back makes it visible instantly.
+        */}
+        {activeVideoProvider === "agora" && (
+          <div
+            className="absolute inset-0"
+            style={{
+              visibility: activeTab === "video" ? "visible" : "hidden",
+              zIndex: activeTab === "video" ? 10 : 0,
+              pointerEvents: activeTab === "video" ? "auto" : "none",
+            }}
+          >
+            <VideoCall
+              key={`video-${bookingId}`}
+              channelName={channelName}
+              userId={userId}
+              userName={userName}
+              onLeave={() => { activeVideoProviderRef.current = null; setActiveVideoProvider(null); }}
+              onUserJoined={handleUserJoined}
+              onUserLeft={handleUserLeft}
+              mode="video"
+            />
+            <button
+              onClick={() => { activeVideoProviderRef.current = null; setActiveVideoProvider(null); }}
+              className="absolute top-4 left-4 px-4 py-2 bg-white/90 backdrop-blur rounded-lg shadow-lg hover:bg-white transition-all flex items-center gap-2 z-50 text-sm font-medium"
+            >
+              ← Change Platform
+            </button>
+          </div>
+        )}
+
+        {/* VIDEO TAB — provider selection or Google Meet monitor */}
+        {activeTab === "video" && activeVideoProvider !== "agora" && (
+          <div className="h-full" style={{ position: "relative", zIndex: 10 }}>
             {!activeVideoProvider ? (
 
               /* ── Video provider selection ── */
@@ -750,12 +805,12 @@ useEffect(() => {
                   <p className="text-center text-gray-600 mb-8">Select which platform to use for this class</p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
-                    {/* Google Meet — FIX 2: Corrected inverted onClick logic */}
+                    {/* Google Meet */}
                     <button
                       onClick={() => {
                         if (resolvedGoogleMeetLink) {
                           window.open(resolvedGoogleMeetLink, "_blank");
-                          setActiveVideoProvider("googlemeet");
+                          chooseProvider("googlemeet");
                         } else {
                           alert("⚠️ Google Meet link not configured. Ask your teacher to set it up.");
                         }
@@ -781,7 +836,7 @@ useEffect(() => {
 
                     {/* Agora */}
                     <button
-                      onClick={() => setActiveVideoProvider("agora")}
+                      onClick={() => chooseProvider("agora")}
                       className="p-8 rounded-2xl border-4 bg-white border-blue-300 hover:border-blue-500 hover:shadow-xl transition-all cursor-pointer"
                     >
                       <div className="flex flex-col items-center">
@@ -800,44 +855,17 @@ useEffect(() => {
                 </div>
               </div>
 
-            ) : activeVideoProvider === "agora" ? (
-
-              /* ── Agora embedded video ── */
-              <div className="h-full relative">
-                <VideoCall
-                  key={`video-${bookingId}`}
-                  channelName={channelName}
-                  userId={userId}
-                  userName={userName}
-                  onLeave={() => setActiveVideoProvider(null)}
-                  onUserJoined={handleUserJoined}
-                  onUserLeft={handleUserLeft}
-                  mode="video"
-                />
-                <button
-                  onClick={() => setActiveVideoProvider(null)}
-                  className="absolute top-4 left-4 px-4 py-2 bg-white/90 backdrop-blur rounded-lg shadow-lg hover:bg-white transition-all flex items-center gap-2 z-50"
-                >
-                  ← Change Platform
-                </button>
-              </div>
-
             ) : (
 
               /* ── Google Meet attendance monitor ── */
               <div className="h-full flex flex-col items-center justify-center bg-gradient-to-br from-green-50 to-emerald-50 p-8 gap-6">
 
-                {/* Status card */}
                 <div className="bg-white rounded-3xl shadow-xl p-8 max-w-md w-full text-center border-2 border-green-200">
-
-                  {/* Animated icon */}
                   <div className="relative w-20 h-20 mx-auto mb-5">
                     <div className="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center">
                       <Video className="w-10 h-10 text-white" />
                     </div>
-                    {classStarted && (
-                      <span className="absolute inset-0 rounded-full bg-green-400 animate-ping opacity-30" />
-                    )}
+                    {classStarted && <span className="absolute inset-0 rounded-full bg-green-400 animate-ping opacity-30" />}
                   </div>
 
                   <h3 className="text-xl font-bold text-gray-800 mb-1">Google Meet is Open</h3>
@@ -846,55 +874,32 @@ useEffect(() => {
                     <strong className="text-red-600">Do not close this page</strong> — it tracks your attendance.
                   </p>
 
-                  {/* Attendance progress */}
                   <div className="bg-gray-50 rounded-2xl p-4 mb-5 text-sm">
                     <div className="flex justify-between items-center mb-2">
                       <span className="text-gray-500 font-medium">Attendance</span>
-                      <span className={`font-bold text-base ${completionPct >= 100 ? "text-emerald-600" : "text-purple-600"}`}>
-                        {completionPct}%
-                      </span>
+                      <span className={`font-bold text-base ${completionPct >= 100 ? "text-emerald-600" : "text-purple-600"}`}>{completionPct}%</span>
                     </div>
                     <div className="w-full h-3 bg-gray-200 rounded-full overflow-hidden mb-3">
-                      <div
-                        className={`h-full rounded-full transition-all duration-1000 ${completionPct >= 100 ? "bg-emerald-500" : "bg-purple-500"}`}
-                        style={{ width: `${completionPct}%` }}
-                      />
+                      <div className={`h-full rounded-full transition-all duration-1000 ${completionPct >= 100 ? "bg-emerald-500" : "bg-purple-500"}`} style={{ width: `${completionPct}%` }} />
                     </div>
                     <div className="grid grid-cols-3 gap-2 text-xs text-center">
-                      <div>
-                        <p className="text-gray-400">Time Together</p>
-                        <p className="font-bold text-gray-700">{formatTime(bothActiveTime)}</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-400">Required</p>
-                        <p className="font-bold text-gray-700">{formatTime(requiredTime)}</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-400">Remaining</p>
-                        <p className={`font-bold ${timeRemaining < 120 ? "text-red-600 animate-pulse" : "text-gray-700"}`}>
-                          {formatTime(timeRemaining)}
-                        </p>
-                      </div>
+                      <div><p className="text-gray-400">Time Together</p><p className="font-bold text-gray-700">{formatTime(bothActiveTime)}</p></div>
+                      <div><p className="text-gray-400">Required</p><p className="font-bold text-gray-700">{formatTime(requiredTime)}</p></div>
+                      <div><p className="text-gray-400">Remaining</p><p className={`font-bold ${timeRemaining < 120 ? "text-red-600 animate-pulse" : "text-gray-700"}`}>{formatTime(timeRemaining)}</p></div>
                     </div>
                   </div>
 
-                  {/* Presence pills */}
                   <div className="flex gap-3 justify-center mb-5">
-                    <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border ${
-                      isTeacherPresent ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-gray-100 text-gray-400 border-gray-200"
-                    }`}>
+                    <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border ${isTeacherPresent ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-gray-100 text-gray-400 border-gray-200"}`}>
                       <span className={`w-2 h-2 rounded-full ${isTeacherPresent ? "bg-emerald-500" : "bg-gray-300"}`} />
                       Teacher {isTeacherPresent ? "Present" : "Waiting"}
                     </div>
-                    <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border ${
-                      isStudentPresent ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-gray-100 text-gray-400 border-gray-200"
-                    }`}>
+                    <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border ${isStudentPresent ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-gray-100 text-gray-400 border-gray-200"}`}>
                       <span className={`w-2 h-2 rounded-full ${isStudentPresent ? "bg-emerald-500" : "bg-gray-300"}`} />
                       Student {isStudentPresent ? "Present" : "Waiting"}
                     </div>
                   </div>
 
-                  {/* Status message */}
                   {!classStarted ? (
                     <div className="flex items-center justify-center gap-2 text-sm text-amber-700 bg-amber-50 rounded-xl px-4 py-3 mb-4">
                       <Loader className="w-4 h-4 animate-spin flex-shrink-0" />
@@ -912,28 +917,22 @@ useEffect(() => {
                     </div>
                   )}
 
-                  {/* Buttons */}
                   <div className="flex flex-col gap-2">
-                    <button
-                      onClick={() => window.open(resolvedGoogleMeetLink, "_blank")}
-                      className="w-full px-5 py-3 bg-green-500 hover:bg-green-600 text-white rounded-full font-bold text-sm transition-all"
-                    >
+                    <button onClick={() => window.open(resolvedGoogleMeetLink, "_blank")}
+                      className="w-full px-5 py-3 bg-green-500 hover:bg-green-600 text-white rounded-full font-bold text-sm transition-all">
                       🔗 Reopen Google Meet
                     </button>
-                    <button
-                      onClick={() => setActiveVideoProvider(null)}
-                      className="w-full px-5 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-full text-sm transition-all"
-                    >
+                    <button onClick={() => setActiveVideoProvider(null)}
+                      className="w-full px-5 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-full text-sm transition-all">
                       ← Switch Video Platform
                     </button>
                   </div>
                 </div>
 
-                {/* Bottom warning */}
                 <div className="max-w-md w-full bg-red-50 border border-red-200 rounded-2xl px-5 py-3 flex items-start gap-3">
                   <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
                   <p className="text-xs text-red-700 leading-relaxed">
-                    <strong>Important:</strong> Closing this page will stop your attendance tracking and your class may be marked as incomplete. Keep both this tab and Google Meet open for the full class duration.
+                    <strong>Important:</strong> Closing this page will stop your attendance tracking and your class may be marked as incomplete.
                   </p>
                 </div>
               </div>
@@ -943,7 +942,7 @@ useEffect(() => {
 
         {/* CONTENT TAB */}
         {activeTab === "content" && (
-          <div className="h-full flex items-center justify-center bg-blue-50">
+          <div className="absolute inset-0 flex items-center justify-center bg-blue-50" style={{ zIndex: 10 }}>
             <div className="text-center">
               <FileText className="w-24 h-24 text-blue-300 mx-auto mb-4" />
               <p className="text-xl font-bold text-blue-600">Content Sharing</p>
@@ -953,7 +952,11 @@ useEffect(() => {
         )}
 
         {/* WHITEBOARD TAB */}
-        {activeTab === "whiteboard" && <WhiteboardTab userRole={userRole} />}
+        {activeTab === "whiteboard" && (
+          <div className="absolute inset-0" style={{ zIndex: 10 }}>
+            <WhiteboardTab userRole={userRole} />
+          </div>
+        )}
       </div>
 
       {/* ── LEAVE EARLY MODAL ── */}

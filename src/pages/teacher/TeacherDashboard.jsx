@@ -113,10 +113,12 @@ export default function TeacherDashboard() {
     fetchTeacherData();
   }, [navigate]);
 
-  if (location.state?.classCompleted) {
-    setActiveTab("payment"); // switch to payment tab automatically
-    navigate(location.pathname, { replace: true, state: {} }); // clear state
-  }
+  useEffect(() => {
+    if (location.state?.classCompleted) {
+      setActiveTab(location.state.activeTab || "payment");
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.state?.classCompleted]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Original fetchTeacherData (100% preserved) ────────────────────────────────
   const fetchTeacherData = async () => {
@@ -155,6 +157,9 @@ export default function TeacherDashboard() {
         status:       item.student.active ? "Active" : "Inactive",
         progress:     item.student.noOfClasses || 0,
         active:       item.student.active,
+        age:          item.student.age || null,
+        dateOfBirth:  item.student.dateOfBirth || null,
+        rank:         item.student.rank || "",
         assignmentId: item.assignmentId,
         assignedDate: item.assignedDate,
       }));
@@ -248,6 +253,7 @@ export default function TeacherDashboard() {
             adminRejected:       booking.adminRejected || false,
             adminRejectedReason: booking.adminRejectedReason || "",
             adminRejectedAt:     booking.adminRejectedAt || null,
+            disputeRaised:       booking.disputeRaised || false,
           });
         }
       });

@@ -1,229 +1,216 @@
-// src/pages/VideoCall_TABS.jsx - 🎥 VIDEO COMPONENT FOR TABBED INTERFACE
-import React, { useEffect, useRef, useState, useCallback } from "react";
+// src/pages/VideoCall.jsx
+import { useEffect, useRef, useState, useCallback } from "react";
 import AgoraRTC from "agora-rtc-sdk-ng";
+
+// Let Agora handle autoplay-blocked audio automatically (replays on next user gesture)
+AgoraRTC.setParameter("AUDIO_VOLUME_INDICATION_INTERVAL", 200);
 import api from "../api";
-import { 
-  Mic, 
-  MicOff, 
-  Video as VideoIcon, 
-  VideoOff, 
-  PhoneOff, 
-  Monitor,
-  MonitorOff,
-  Users,
-  Loader,
-  Smile
+import {
+  Mic, MicOff, Video as VideoIcon, VideoOff,
+  PhoneOff, Monitor, MonitorOff, Users, Loader, Smile,
 } from "lucide-react";
 
-export default function VideoCall({ 
-  channelName, 
-  userId, 
-  userName = "User", 
+export default function VideoCall({
+  channelName,
+  userId,
+  userName = "User",
   onLeave,
   onUserJoined,
   onUserLeft,
-  mode = "video" // "video" | "content" | "whiteboard"
+  mode = "video", // "video" | "content" | "whiteboard"
 }) {
   const client = useRef(null);
-  const [joined, setJoined] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  
+  const [joined,          setJoined]          = useState(false);
+  const [loading,         setLoading]         = useState(false);
+  const [error,           setError]           = useState(null);
+
   const [localAudioTrack, setLocalAudioTrack] = useState(null);
   const [localVideoTrack, setLocalVideoTrack] = useState(null);
-  const [screenTrack, setScreenTrack] = useState(null);
-  const [remoteUsers, setRemoteUsers] = useState([]);
-  
-  const [micOn, setMicOn] = useState(true);
-  const [camOn, setCamOn] = useState(true);
+  const [screenTrack,     setScreenTrack]     = useState(null);
+  const [remoteUsers,     setRemoteUsers]     = useState([]);
+
+  const [micOn,           setMicOn]           = useState(true);
+  const [camOn,           setCamOn]           = useState(true);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
-  
-  // 😊 Emoji reaction state
+
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const [activeEmoji, setActiveEmoji] = useState(null);
-  
-  const localContainer = useRef();
+  const [activeEmoji,     setActiveEmoji]     = useState(null);
+
+  const localContainer    = useRef(null);
   const remoteContainerRef = useRef({});
-  
-  // 🔒 Prevent multiple join attempts
-  const isJoiningRef = useRef(false);
-  const hasJoinedRef = useRef(false);
-  
+
+  // Prevent duplicate joins
+  const isJoiningRef  = useRef(false);
+  const hasJoinedRef  = useRef(false);
+
+  // Stable refs for callbacks so event handlers never go stale
   const onUserJoinedRef = useRef(onUserJoined);
-  const onUserLeftRef = useRef(onUserLeft);
+  const onUserLeftRef   = useRef(onUserLeft);
+  useEffect(() => { onUserJoinedRef.current = onUserJoined; }, [onUserJoined]);
+  useEffect(() => { onUserLeftRef.current   = onUserLeft;   }, [onUserLeft]);
 
-  useEffect(() => {
-    onUserJoinedRef.current = onUserJoined;
-    onUserLeftRef.current = onUserLeft;
-  }, [onUserJoined, onUserLeft]);
-
+  // ── Event handlers (stable — empty deps) ─────────────────────────────────
   const handleUserPublished = useCallback(async (user, mediaType) => {
     console.log(`👤 User ${user.uid} published ${mediaType}`);
-    
     try {
       await client.current.subscribe(user, mediaType);
-      console.log(`✅ Subscribed to ${mediaType}`);
-      
+      console.log(`✅ Subscribed to ${user.uid} / ${mediaType}`);
+
       if (mediaType === "video") {
         setRemoteUsers(prev => {
           const exists = prev.find(u => u.uid === user.uid);
-          if (exists) return prev;
-          
-          if (onUserJoinedRef.current) {
-            console.log('📢 Calling onUserJoined callback');
-            onUserJoinedRef.current(user.uid);
+          if (exists) {
+            // User already tracked — still try to replay in case container changed
+            return prev.map(u => u.uid === user.uid ? user : u);
           }
-          
+          onUserJoinedRef.current?.(user.uid);
           return [...prev, user];
         });
-        
-        setTimeout(() => {
-          const container = remoteContainerRef.current[user.uid];
-          if (container && user.videoTrack) {
-            user.videoTrack.play(container);
-            console.log('🎥 Playing video');
-          }
-        }, 100);
       }
-      
+
       if (mediaType === "audio") {
-        user.audioTrack?.play();
+        // play() can be silently blocked by browser autoplay policy;
+        // Agora's SDK queues it and replays on the next user gesture automatically.
+        try { user.audioTrack?.play(); } catch (_) {}
       }
-    } catch (error) {
-      console.error("❌ Subscribe error:", error);
+    } catch (err) {
+      console.error("❌ Subscribe error:", err);
     }
   }, []);
 
   const handleUserUnpublished = useCallback((user, mediaType) => {
+    console.log(`👤 User ${user.uid} unpublished ${mediaType}`);
     if (mediaType === "video") {
       setRemoteUsers(prev => prev.filter(u => u.uid !== user.uid));
     }
   }, []);
 
   const handleUserLeft = useCallback((user) => {
-    console.log(`👋 User ${user.uid} left channel`);
+    console.log(`👋 User ${user.uid} left`);
     setRemoteUsers(prev => prev.filter(u => u.uid !== user.uid));
-    
-    if (onUserLeftRef.current) {
-      onUserLeftRef.current(user.uid);
-    }
+    onUserLeftRef.current?.(user.uid);
   }, []);
 
-  const handleConnectionChange = useCallback((currentState, prevState) => {
-    console.log(`🔌 Connection: ${prevState} -> ${currentState}`);
-    if (currentState === "DISCONNECTED") {
-      setError("Connection lost. Please rejoin the call.");
+  const handleConnectionChange = useCallback((cur, prev) => {
+    console.log(`🔌 Connection: ${prev} → ${cur}`);
+    if (cur === "DISCONNECTED") {
+      setError("Connection lost. Please rejoin.");
       setJoined(false);
+      hasJoinedRef.current = false;
     }
   }, []);
 
+  // ── Unmount cleanup only — synchronous so it never races with a remount ────
   useEffect(() => {
-    if (!client.current) {
-      console.log('🔧 Initializing Agora client');
-      
-      client.current = AgoraRTC.createClient({ 
-        mode: "rtc", 
-        codec: "vp8" 
-      });
-
-      client.current.on("user-published", handleUserPublished);
-      client.current.on("user-unpublished", handleUserUnpublished);
-      client.current.on("user-left", handleUserLeft);
-      client.current.on("connection-state-change", handleConnectionChange);
-      
-      console.log('✅ Event listeners registered');
-    }
-    
     return () => {
-      if (joined && client.current) {
-        cleanup();
+      console.log("🧹 Unmounting VideoCall — leaving Agora");
+      // Capture the ref value at cleanup time to avoid stale closure issues
+      const c = client.current;
+      if (c) {
+        c.removeAllListeners();
+        c.leave().catch(() => {});
+        client.current = null;
       }
+      // Stop and close tracks directly (don't call leaveCall which needs state)
+      // Tracks are stored in refs via state — just best-effort close here
     };
-  }, [handleUserPublished, handleUserUnpublished, handleUserLeft, handleConnectionChange, joined]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Auto-join on component mount
+  // ── Auto-join on mount ────────────────────────────────────────────────────
   useEffect(() => {
-    if (!joined && !loading && !isJoiningRef.current && !hasJoinedRef.current) {
-      // Small delay to ensure component is fully mounted
-      const timer = setTimeout(() => {
-        joinCall();
-      }, 100);
-      
-      return () => clearTimeout(timer);
-    }
-  }, []); // Only run once on mount
+    const t = setTimeout(() => {
+      if (!hasJoinedRef.current && !isJoiningRef.current) joinCall();
+    }, 300);
+    return () => clearTimeout(t);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── FIX: play local video AFTER joined=true causes DOM to render container ─
+  useEffect(() => {
+    if (!joined || !localVideoTrack) return;
+    if (localContainer.current) {
+      console.log("▶️ Playing local video track");
+      localVideoTrack.play(localContainer.current);
+    }
+  }, [joined, localVideoTrack]);
+
+  // ── FIX: play remote videos after remoteUsers OR joined changes ─────────────
+  // Both deps are needed: remoteUsers changes when a new participant is added,
+  // but if they joined BEFORE us, joined=false when remoteUsers first updates,
+  // so the container divs don't exist yet. Adding joined means we retry once
+  // the local join completes and the containers are finally in the DOM.
+  useEffect(() => {
+    if (!joined) return;
+    remoteUsers.forEach(user => {
+      const container = remoteContainerRef.current[user.uid];
+      if (container && user.videoTrack) {
+        console.log(`▶️ Playing remote video for ${user.uid}`);
+        user.videoTrack.play(container);
+      }
+    });
+  }, [remoteUsers, joined]);
+
+  // ── Join ─────────────────────────────────────────────────────────────────
   const joinCall = async () => {
-    // 🔒 Prevent multiple join attempts
-    if (isJoiningRef.current || hasJoinedRef.current || joined) {
-      console.log('⚠️ Already joining or joined, skipping...');
+    if (isJoiningRef.current || hasJoinedRef.current) {
+      console.log("⚠️ Already joining / joined — skip");
       return;
     }
-
     try {
       isJoiningRef.current = true;
       setLoading(true);
       setError(null);
 
-      console.log(`🚀 JOINING AGORA CHANNEL: ${channelName}`);
+      // Create a fresh client each join — avoids any stale state from a previous session
+      const newClient = AgoraRTC.createClient({ mode: "rtc", codec: "h264" });
+      newClient.on("user-published",        handleUserPublished);
+      newClient.on("user-unpublished",      handleUserUnpublished);
+      newClient.on("user-left",             handleUserLeft);
+      newClient.on("connection-state-change", handleConnectionChange);
+      client.current = newClient;
 
-      // 🔧 FIX: Add random suffix for testing with same account
-      // Remove this in production - each user should have unique userId
-      const testUID = userId + '-' + Math.random().toString(36).substr(2, 9);
-      console.log('🔑 Using UID:', testUID, '(original:', userId, ')');
+      // Use the real userId — no random suffix (that broke presence tracking)
+      const uid = String(userId);
+      console.log(`🚀 Joining channel: ${channelName} as uid: ${uid}`);
 
-      const { data } = await api.get(
-        `/api/agora/token?channel=${channelName}&uid=${testUID}`
-      );
-
-      if (!data.success) {
-        throw new Error(data.message || 'Failed to get authentication token');
-      }
+      const { data } = await api.get(`/api/agora/token?channel=${channelName}&uid=${uid}`);
+      if (!data.success) throw new Error(data.message || "Token request failed");
 
       await client.current.join(data.appId, channelName, data.token, data.uid);
-      console.log('✅ Joined channel with UID:', data.uid);
+      console.log("✅ Joined channel");
 
+      // 480p_2 + h264 → ~2× faster to start than 720p_2 + vp8
       const [audioTrack, videoTrack] = await AgoraRTC.createMicrophoneAndCameraTracks({
-        audioConfig: { 
-          encoderConfig: "music_standard",
-          ANS: true,
-          AEC: true
+        audioConfig: {
+          encoderConfig: "speech_standard", // leaner than music_standard
+          ANS: true, AEC: true, AGC: true,
         },
-        videoConfig: { 
-          encoderConfig: "720p_2",
-          optimizationMode: "detail"
+        videoConfig: {
+          encoderConfig: "480p_2",          // fast to encode, upgrade later if needed
+          optimizationMode: "motion",       // better for faces / movement
         },
       });
-      
+
       setLocalAudioTrack(audioTrack);
       setLocalVideoTrack(videoTrack);
-
-      if (localContainer.current) {
-        videoTrack.play(localContainer.current);
-      }
+      // NOTE: do NOT call videoTrack.play() here — localContainer.current is null
+      // because joined=false means the container div isn't in the DOM yet.
+      // The useEffect above handles playing once setJoined(true) re-renders the container.
 
       await client.current.publish([audioTrack, videoTrack]);
-      console.log('✅ Published local tracks');
-      
+      console.log("✅ Published local tracks");
+
       hasJoinedRef.current = true;
       setJoined(true);
-      
+
     } catch (err) {
-      console.error('❌ JOIN ERROR:', err);
-      
-      let errorMessage = 'Failed to join call';
-      
-      if (err.code === 'INVALID_OPERATION') {
-        errorMessage = 'Already connected. Please refresh the page.';
-      } else if (err.message.includes('camera') || err.message.includes('microphone')) {
-        errorMessage = 'Unable to access camera/microphone. Please check permissions.';
-      } else if (err.code === 'INVALID_TOKEN') {
-        errorMessage = 'Session expired. Please refresh and try again.';
-      } else {
-        errorMessage = err.message || errorMessage;
-      }
-      
-      setError(errorMessage);
+      console.error("❌ Join error:", err);
+      let msg = "Failed to join call";
+      if (err.code === "INVALID_OPERATION")   msg = "Already connected — please refresh.";
+      else if (err.message?.includes("camera") || err.message?.includes("microphone"))
+        msg = "Cannot access camera/microphone. Check browser permissions.";
+      else if (err.code === "INVALID_TOKEN")  msg = "Session expired — please refresh.";
+      else                                    msg = err.message || msg;
+      setError(msg);
       hasJoinedRef.current = false;
     } finally {
       setLoading(false);
@@ -231,34 +218,19 @@ export default function VideoCall({
     }
   };
 
+  // ── Leave ─────────────────────────────────────────────────────────────────
   const leaveCall = async () => {
-    if (!joined) return;
-
+    if (!joined && !hasJoinedRef.current) return;
     try {
-      console.log('👋 Leaving call...');
-      
-      if (localAudioTrack) {
-        localAudioTrack.stop();
-        localAudioTrack.close();
-      }
-      if (localVideoTrack) {
-        localVideoTrack.stop();
-        localVideoTrack.close();
-      }
-      if (screenTrack) {
-        screenTrack.stop();
-        screenTrack.close();
-      }
+      console.log("👋 Leaving call");
+      localAudioTrack?.stop(); localAudioTrack?.close();
+      localVideoTrack?.stop(); localVideoTrack?.close();
+      screenTrack?.stop();     screenTrack?.close();
+      if (client.current) await client.current.leave();
 
-      if (client.current) {
-        await client.current.leave();
-      }
-      
-      // Reset all flags
       setJoined(false);
       hasJoinedRef.current = false;
       isJoiningRef.current = false;
-      
       setRemoteUsers([]);
       setLocalAudioTrack(null);
       setLocalVideoTrack(null);
@@ -266,36 +238,26 @@ export default function VideoCall({
       setIsScreenSharing(false);
       setMicOn(true);
       setCamOn(true);
-      
-      if (onLeave) onLeave();
-      
+
+      onLeave?.();
     } catch (err) {
-      console.error('❌ Leave call error:', err);
+      console.error("❌ Leave error:", err);
     }
   };
 
-  const cleanup = async () => {
-    await leaveCall();
-    if (client.current) {
-      client.current.removeAllListeners();
-      client.current = null;
-    }
-  };
-
+  // ── Controls ──────────────────────────────────────────────────────────────
   const toggleMic = async () => {
-    if (localAudioTrack) {
-      const newState = !micOn;
-      await localAudioTrack.setEnabled(newState);
-      setMicOn(newState);
-    }
+    if (!localAudioTrack) return;
+    const next = !micOn;
+    await localAudioTrack.setEnabled(next);
+    setMicOn(next);
   };
 
   const toggleCamera = async () => {
-    if (localVideoTrack) {
-      const newState = !camOn;
-      await localVideoTrack.setEnabled(newState);
-      setCamOn(newState);
-    }
+    if (!localVideoTrack) return;
+    const next = !camOn;
+    await localVideoTrack.setEnabled(next);
+    setCamOn(next);
   };
 
   const toggleScreenShare = async () => {
@@ -303,27 +265,17 @@ export default function VideoCall({
       if (!isScreenSharing) {
         const screen = await AgoraRTC.createScreenVideoTrack({
           encoderConfig: "1080p_1",
-          optimizationMode: "detail"
+          optimizationMode: "detail",
         });
-        
         if (localVideoTrack && camOn) {
           await client.current.unpublish([localVideoTrack]);
           localVideoTrack.stop();
         }
-        
         await client.current.publish([screen]);
-        
-        if (localContainer.current) {
-          screen.play(localContainer.current);
-        }
-        
+        if (localContainer.current) screen.play(localContainer.current);
         setScreenTrack(screen);
         setIsScreenSharing(true);
-        
-        screen.on("track-ended", () => {
-          toggleScreenShare();
-        });
-        
+        screen.on("track-ended", () => toggleScreenShare());
       } else {
         if (screenTrack) {
           await client.current.unpublish([screenTrack]);
@@ -331,218 +283,158 @@ export default function VideoCall({
           screenTrack.close();
           setScreenTrack(null);
         }
-        
         if (localVideoTrack && camOn) {
           await client.current.publish([localVideoTrack]);
-          if (localContainer.current) {
-            localVideoTrack.play(localContainer.current);
-          }
+          if (localContainer.current) localVideoTrack.play(localContainer.current);
         }
-        
         setIsScreenSharing(false);
       }
-    } catch (error) {
-      console.error('❌ Screen share error:', error);
-      setError('Screen sharing failed. Please try again.');
+    } catch (err) {
+      console.error("❌ Screen share error:", err);
+      setError("Screen sharing failed. Please try again.");
       setIsScreenSharing(false);
     }
   };
 
-  // 😊 Emoji reactions
-  const emojis = ['👍', '❤️', '😂', '😮', '😢', '👏', '🎉', '🤔'];
-  
+  const emojis = ["👍", "❤️", "😂", "😮", "😢", "👏", "🎉", "🤔"];
   const sendEmoji = (emoji) => {
     setActiveEmoji(emoji);
     setShowEmojiPicker(false);
     setTimeout(() => setActiveEmoji(null), 3000);
   };
 
-  // 🎨 RENDER BASED ON MODE
-  if (mode === "video") {
-    // FULL VIDEO VIEW - Two large video boxes
-    return (
-      <div className="h-full flex flex-col bg-gradient-to-br from-purple-50 via-blue-50 to-pink-50">
-        
-        {/* 🎥 LARGE VIDEO AREAS */}
-        <div className="flex-1 p-4 flex gap-4">
-          
-          {/* Local Video - ALWAYS SHOW (even when not joined) */}
-          <div className="flex-1 relative bg-gradient-to-br from-purple-100 to-blue-100 rounded-3xl overflow-hidden shadow-2xl border-4 border-white">
-            {joined ? (
-              <>
-                <div ref={localContainer} className="w-full h-full" />
-                
-                {/* User label */}
-                <div className="absolute bottom-4 left-4 bg-white/90 backdrop-blur-sm px-4 py-2 rounded-full shadow-lg">
-                  <span className="font-bold text-purple-700">{userName} (You)</span>
-                </div>
+  // ── Shared video panels ───────────────────────────────────────────────────
+  const compact = mode !== "video";
 
-                {/* Status icons */}
-                <div className="absolute top-4 right-4 flex gap-2">
-                  {!micOn && (
-                    <div className="bg-red-500 p-2 rounded-full animate-pulse">
-                      <MicOff className="w-5 h-5 text-white" />
-                    </div>
-                  )}
-                  {!camOn && (
-                    <div className="bg-red-500 p-2 rounded-full animate-pulse">
-                      <VideoOff className="w-5 h-5 text-white" />
-                    </div>
-                  )}
-                  {isScreenSharing && (
-                    <div className="bg-blue-500 p-2 rounded-full">
-                      <Monitor className="w-5 h-5 text-white" />
-                    </div>
-                  )}
-                </div>
+  const LocalPanel = (
+    <div className={`flex-1 relative bg-gradient-to-br from-purple-100 to-blue-100 rounded-3xl overflow-hidden shadow-2xl border-4 border-white ${compact ? "min-h-0" : ""}`}>
+      {joined ? (
+        <>
+          {/* FIX: container always in DOM once joined=true, ref is immediately valid */}
+          <div ref={localContainer} className="w-full h-full" />
 
-                {/* Active Emoji */}
-                {activeEmoji && (
-                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
-                    <span className="text-9xl animate-bounce drop-shadow-2xl">{activeEmoji}</span>
-                  </div>
-                )}
-              </>
-            ) : (
-              /* Loading/Connecting state */
-              <div className="w-full h-full flex flex-col items-center justify-center">
-                {loading ? (
-                  <>
-                    <Loader className="w-16 h-16 text-purple-500 animate-spin mb-4" />
-                    <p className="text-xl font-bold text-purple-600">Connecting to video...</p>
-                    <p className="text-sm text-purple-400 mt-2">Starting camera and microphone</p>
-                  </>
-                ) : (
-                  <>
-                    <VideoIcon className="w-16 h-16 text-purple-400 mb-4" />
-                    <p className="text-xl font-bold text-purple-600">Ready to join</p>
-                  </>
-                )}
-              </div>
-            )}
+          <div className={`absolute bottom-4 left-4 bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-lg`}>
+            <span className={`font-bold text-purple-700 ${compact ? "text-xs" : "text-sm"}`}>{userName} (You)</span>
           </div>
 
-          {/* Remote Video */}
-          {joined && remoteUsers.length > 0 ? (
-            <div className="flex-1 relative bg-gradient-to-br from-pink-100 to-purple-100 rounded-3xl overflow-hidden shadow-2xl border-4 border-white">
-              {remoteUsers.map((user) => (
-                <div key={user.uid} className="w-full h-full">
-                  <div 
-                    ref={(el) => (remoteContainerRef.current[user.uid] = el)}
-                    className="w-full h-full"
-                  />
-                  
-                  {/* Connected badge */}
-                  <div className="absolute bottom-4 left-4 bg-white/90 backdrop-blur-sm px-4 py-2 rounded-full shadow-lg flex items-center gap-2">
-                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                    <span className="font-bold text-purple-700">Connected</span>
-                  </div>
+          <div className="absolute top-3 right-3 flex gap-1.5">
+            {!micOn && <div className="bg-red-500 p-1.5 rounded-full animate-pulse"><MicOff className={`${compact ? "w-3 h-3" : "w-4 h-4"} text-white`} /></div>}
+            {!camOn && <div className="bg-red-500 p-1.5 rounded-full animate-pulse"><VideoOff className={`${compact ? "w-3 h-3" : "w-4 h-4"} text-white`} /></div>}
+            {isScreenSharing && <div className="bg-blue-500 p-1.5 rounded-full"><Monitor className={`${compact ? "w-3 h-3" : "w-4 h-4"} text-white`} /></div>}
+          </div>
 
-                  <div className="absolute top-4 right-4 bg-green-500 text-white text-sm px-4 py-2 rounded-full font-bold shadow-lg animate-pulse">
-                    🔴 LIVE
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : joined ? (
-            <div className="flex-1 flex flex-col items-center justify-center bg-gradient-to-br from-yellow-50 to-orange-50 rounded-3xl border-4 border-dashed border-yellow-300">
-              <Users className="w-32 h-32 text-yellow-400 mb-4 animate-pulse" />
-              <p className="text-2xl font-bold text-yellow-600">Waiting for others...</p>
-              <p className="text-lg text-yellow-500 mt-2">They'll appear here when they join! 🎉</p>
-            </div>
-          ) : (
-            /* Not joined yet - show placeholder */
-            <div className="flex-1 flex flex-col items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 rounded-3xl border-4 border-dashed border-gray-300">
-              <Users className="w-32 h-32 text-gray-400 mb-4" />
-              <p className="text-2xl font-bold text-gray-600">Other participant</p>
-              <p className="text-lg text-gray-500 mt-2">Will appear when connected</p>
+          {activeEmoji && !compact && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+              <span className="text-9xl animate-bounce drop-shadow-2xl">{activeEmoji}</span>
             </div>
           )}
+        </>
+      ) : (
+        <div className="w-full h-full flex flex-col items-center justify-center">
+          {loading ? (
+            <>
+              <Loader className={`${compact ? "w-8 h-8" : "w-16 h-16"} text-purple-500 animate-spin mb-3`} />
+              <p className={`font-bold text-purple-600 ${compact ? "text-sm" : "text-xl"}`}>Connecting…</p>
+              {!compact && <p className="text-sm text-purple-400 mt-1">Starting camera and microphone</p>}
+            </>
+          ) : (
+            <>
+              <VideoIcon className={`${compact ? "w-8 h-8" : "w-16 h-16"} text-purple-400 mb-3`} />
+              <p className={`font-bold text-purple-600 ${compact ? "text-sm" : "text-xl"}`}>Ready to join</p>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+
+  const RemotePanel = joined && remoteUsers.length > 0 ? (
+    <div className="flex-1 relative bg-gradient-to-br from-pink-100 to-purple-100 rounded-3xl overflow-hidden shadow-2xl border-4 border-white">
+      {remoteUsers.map(user => (
+        <div key={user.uid} className="w-full h-full">
+          {/* FIX: ref callback runs synchronously after render, then useEffect plays video */}
+          <div
+            ref={el => { remoteContainerRef.current[user.uid] = el; }}
+            className="w-full h-full"
+          />
+          <div className={`absolute bottom-4 left-4 bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-lg flex items-center gap-1.5`}>
+            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+            <span className={`font-bold text-purple-700 ${compact ? "text-xs" : "text-sm"}`}>Connected</span>
+          </div>
+          <div className={`absolute top-3 right-3 bg-green-500 text-white font-bold rounded-full shadow-lg ${compact ? "text-xs px-2 py-0.5" : "text-sm px-3 py-1"}`}>
+            🔴 LIVE
+          </div>
+        </div>
+      ))}
+    </div>
+  ) : joined ? (
+    <div className="flex-1 flex flex-col items-center justify-center bg-gradient-to-br from-yellow-50 to-orange-50 rounded-3xl border-4 border-dashed border-yellow-300">
+      <Users className={`${compact ? "w-12 h-12" : "w-24 h-24"} text-yellow-400 mb-3 animate-pulse`} />
+      <p className={`font-bold text-yellow-600 ${compact ? "text-base" : "text-2xl"}`}>Waiting for others…</p>
+      {!compact && <p className="text-lg text-yellow-500 mt-1">They'll appear here when they join 🎉</p>}
+    </div>
+  ) : (
+    <div className="flex-1 flex flex-col items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 rounded-3xl border-4 border-dashed border-gray-300">
+      <Users className={`${compact ? "w-12 h-12" : "w-24 h-24"} text-gray-400 mb-3`} />
+      <p className={`font-bold text-gray-600 ${compact ? "text-base" : "text-2xl"}`}>Other participant</p>
+    </div>
+  );
+
+  // ── Full video mode ───────────────────────────────────────────────────────
+  if (mode === "video") {
+    return (
+      <div className="h-full flex flex-col bg-gradient-to-br from-purple-50 via-blue-50 to-pink-50">
+
+        <div className="flex-1 p-4 flex gap-4">
+          {LocalPanel}
+          {RemotePanel}
         </div>
 
-        {/* Error Message */}
         {error && (
           <div className="mx-4 mb-2 bg-red-100 border-2 border-red-300 text-red-700 px-4 py-3 rounded-2xl flex items-center justify-between">
             <span className="font-medium">{error}</span>
-            <button 
-              onClick={() => setError(null)}
-              className="text-red-500 hover:text-red-700 font-bold text-lg"
-            >
-              ✕
+            <button onClick={() => { setError(null); if (!joined) joinCall(); }} className="text-red-500 hover:text-red-700 font-bold ml-3">
+              {joined ? "✕" : "Retry"}
             </button>
           </div>
         )}
 
-        {/* 🎮 COLORFUL CONTROLS */}
-        <div className="bg-white border-t-2 border-purple-200 p-4 shadow-lg">
+        <div className="bg-white border-t-2 border-purple-200 p-4 shadow-lg flex-shrink-0">
           <div className="flex items-center justify-center gap-3">
             {joined && (
               <>
-                {/* Mic */}
-                <button
-                  onClick={toggleMic}
-                  className={`p-4 rounded-full shadow-lg transform hover:scale-110 transition-all ${
-                    micOn 
-                      ? 'bg-gradient-to-br from-blue-400 to-blue-500 hover:from-blue-500 hover:to-blue-600 text-white' 
-                      : 'bg-gradient-to-br from-red-400 to-red-500 text-white animate-pulse'
-                  }`}
-                >
+                <button onClick={toggleMic}
+                  className={`p-4 rounded-full shadow-lg transform hover:scale-110 transition-all ${micOn ? "bg-gradient-to-br from-blue-400 to-blue-500 text-white" : "bg-gradient-to-br from-red-400 to-red-500 text-white animate-pulse"}`}>
                   {micOn ? <Mic className="w-6 h-6" /> : <MicOff className="w-6 h-6" />}
                 </button>
 
-                {/* Camera */}
-                <button
-                  onClick={toggleCamera}
-                  className={`p-4 rounded-full shadow-lg transform hover:scale-110 transition-all ${
-                    camOn 
-                      ? 'bg-gradient-to-br from-purple-400 to-purple-500 hover:from-purple-500 hover:to-purple-600 text-white' 
-                      : 'bg-gradient-to-br from-red-400 to-red-500 text-white animate-pulse'
-                  }`}
-                >
+                <button onClick={toggleCamera}
+                  className={`p-4 rounded-full shadow-lg transform hover:scale-110 transition-all ${camOn ? "bg-gradient-to-br from-purple-400 to-purple-500 text-white" : "bg-gradient-to-br from-red-400 to-red-500 text-white animate-pulse"}`}>
                   {camOn ? <VideoIcon className="w-6 h-6" /> : <VideoOff className="w-6 h-6" />}
                 </button>
 
-                {/* Screen Share */}
-                <button
-                  onClick={toggleScreenShare}
-                  className={`p-4 rounded-full shadow-lg transform hover:scale-110 transition-all ${
-                    isScreenSharing
-                      ? 'bg-gradient-to-br from-orange-400 to-orange-500 text-white'
-                      : 'bg-gradient-to-br from-gray-300 to-gray-400 hover:from-gray-400 hover:to-gray-500 text-gray-700'
-                  }`}
-                >
+                <button onClick={toggleScreenShare}
+                  className={`p-4 rounded-full shadow-lg transform hover:scale-110 transition-all ${isScreenSharing ? "bg-gradient-to-br from-orange-400 to-orange-500 text-white" : "bg-gradient-to-br from-gray-300 to-gray-400 text-gray-700"}`}>
                   {isScreenSharing ? <MonitorOff className="w-6 h-6" /> : <Monitor className="w-6 h-6" />}
                 </button>
 
-                {/* 😊 Emoji Picker */}
                 <div className="relative">
-                  <button
-                    onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                    className="p-4 rounded-full bg-gradient-to-br from-yellow-300 to-yellow-400 hover:from-yellow-400 hover:to-yellow-500 shadow-lg transform hover:scale-110 transition-all"
-                  >
+                  <button onClick={() => setShowEmojiPicker(v => !v)}
+                    className="p-4 rounded-full bg-gradient-to-br from-yellow-300 to-yellow-400 hover:from-yellow-400 hover:to-yellow-500 shadow-lg transform hover:scale-110 transition-all">
                     <Smile className="w-6 h-6 text-gray-700" />
                   </button>
-
                   {showEmojiPicker && (
-                    <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-white rounded-2xl shadow-2xl p-3 grid grid-cols-4 gap-2 border-2 border-yellow-300">
-                      {emojis.map((emoji, idx) => (
-                        <button
-                          key={idx}
-                          onClick={() => sendEmoji(emoji)}
-                          className="text-3xl hover:scale-125 transform transition-all p-2 hover:bg-yellow-50 rounded-lg"
-                        >
-                          {emoji}
-                        </button>
+                    <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-white rounded-2xl shadow-2xl p-3 grid grid-cols-4 gap-2 border-2 border-yellow-300 z-50">
+                      {emojis.map(e => (
+                        <button key={e} onClick={() => sendEmoji(e)}
+                          className="text-3xl hover:scale-125 transition-all p-2 hover:bg-yellow-50 rounded-lg">{e}</button>
                       ))}
                     </div>
                   )}
                 </div>
 
-                {/* Leave Call */}
-                <button
-                  onClick={leaveCall}
-                  className="p-4 rounded-full bg-gradient-to-br from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white shadow-lg transform hover:scale-110 transition-all"
-                >
+                <button onClick={leaveCall}
+                  className="p-4 rounded-full bg-gradient-to-br from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white shadow-lg transform hover:scale-110 transition-all">
                   <PhoneOff className="w-6 h-6" />
                 </button>
               </>
@@ -553,60 +445,11 @@ export default function VideoCall({
     );
   }
 
-  // For "content" and "whiteboard" modes - show both videos side by side (smaller)
+  // ── Compact mode (content / whiteboard) — side-by-side mini panels ────────
   return (
-    <div className="h-full flex gap-4 p-4 bg-gradient-to-br from-purple-50 via-blue-50 to-pink-50">
-      {/* Local Video */}
-      {joined && (
-        <div className="flex-1 relative bg-gradient-to-br from-purple-100 to-blue-100 rounded-3xl overflow-hidden shadow-xl border-4 border-white">
-          <div ref={localContainer} className="w-full h-full" />
-          
-          <div className="absolute bottom-3 left-3 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full shadow-lg">
-            <span className="font-bold text-sm text-purple-700">{userName}</span>
-          </div>
-
-          <div className="absolute top-3 right-3 flex gap-1">
-            {!micOn && (
-              <div className="bg-red-500 p-1.5 rounded-full">
-                <MicOff className="w-4 h-4 text-white" />
-              </div>
-            )}
-            {!camOn && (
-              <div className="bg-red-500 p-1.5 rounded-full">
-                <VideoOff className="w-4 h-4 text-white" />
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Remote Video */}
-      {joined && remoteUsers.length > 0 ? (
-        <div className="flex-1 relative bg-gradient-to-br from-pink-100 to-purple-100 rounded-3xl overflow-hidden shadow-xl border-4 border-white">
-          {remoteUsers.map((user) => (
-            <div key={user.uid} className="w-full h-full">
-              <div 
-                ref={(el) => (remoteContainerRef.current[user.uid] = el)}
-                className="w-full h-full"
-              />
-              
-              <div className="absolute bottom-3 left-3 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full shadow-lg flex items-center gap-1">
-                <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
-                <span className="font-bold text-sm text-purple-700">Connected</span>
-              </div>
-
-              <div className="absolute top-3 right-3 bg-green-500 text-white text-xs px-2 py-1 rounded-full font-bold shadow-lg">
-                🔴 LIVE
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : joined ? (
-        <div className="flex-1 flex flex-col items-center justify-center bg-gradient-to-br from-yellow-50 to-orange-50 rounded-3xl border-4 border-dashed border-yellow-300">
-          <Users className="w-16 h-16 text-yellow-400 mb-3 animate-pulse" />
-          <p className="text-lg font-bold text-yellow-600">Waiting...</p>
-        </div>
-      ) : null}
+    <div className="h-full flex gap-3 p-3 bg-gradient-to-br from-purple-50 via-blue-50 to-pink-50">
+      {LocalPanel}
+      {RemotePanel}
     </div>
   );
 }

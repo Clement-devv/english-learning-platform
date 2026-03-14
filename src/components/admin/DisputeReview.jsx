@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react';
 import { 
-  AlertTriangle, 
-  CheckCircle, 
-  XCircle, 
-  Clock, 
+  AlertTriangle,
+  CheckCircle,
+  Clock,
   User,
   Calendar,
   FileText,
@@ -198,7 +197,7 @@ export default function DisputeReview() {
                         <User className="w-4 h-4 text-gray-400" />
                         <span className="text-gray-600">Student:</span>
                         <span className="font-medium text-gray-800">
-                          {dispute.studentId.firstName} {dispute.studentId.lastName}
+                          {dispute.studentId.firstName} {dispute.studentId.surname || dispute.studentId.lastName}
                         </span>
                       </div>
 
@@ -272,7 +271,7 @@ export default function DisputeReview() {
                 <div>
                   <span className="text-gray-600">Student:</span>
                   <p className="font-medium text-gray-800">
-                    {selectedDispute.studentId.firstName} {selectedDispute.studentId.lastName}
+                    {selectedDispute.studentId.firstName} {selectedDispute.studentId.surname || selectedDispute.studentId.lastName}
                   </p>
                 </div>
               </div>

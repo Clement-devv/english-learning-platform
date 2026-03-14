@@ -3,11 +3,13 @@ import React, { useState, useEffect } from "react";
 
 export default function StudentModal({ isOpen, onClose, onSave, initialData }) {
   const [formData, setFormData] = useState({
-    firstName:  "",
-    surname:    "",
-    age:        "",
-    email:      "",
-    noOfClasses:"",
+    firstName:   "",
+    surname:     "",
+    age:         "",
+    email:       "",
+    noOfClasses: "",
+    dateOfBirth: "",
+    rank:        "",
   });
   const [invited, setInvited]   = useState(false); // show success state
   const [savedStudent, setSavedStudent] = useState(null);
@@ -23,9 +25,11 @@ export default function StudentModal({ isOpen, onClose, onSave, initialData }) {
         age:         initialData.age         || "",
         email:       initialData.email       || "",
         noOfClasses: initialData.noOfClasses || "",
+        dateOfBirth: initialData.dateOfBirth ? initialData.dateOfBirth.slice(0, 10) : "",
+        rank:        initialData.rank        || "",
       });
     } else {
-      setFormData({ firstName:"", surname:"", age:"", email:"", noOfClasses:"" });
+      setFormData({ firstName:"", surname:"", age:"", email:"", noOfClasses:"", dateOfBirth:"", rank:"" });
     }
     setInvited(false);
     setSavedStudent(null);
@@ -130,7 +134,7 @@ export default function StudentModal({ isOpen, onClose, onSave, initialData }) {
                 {isEdit && <p style={{ fontSize:"11px", color:"#94a3b8", marginTop:"4px" }}>Email cannot be changed after creation</p>}
               </div>
 
-              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"12px", marginBottom:"20px" }}>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"12px", marginBottom:"12px" }}>
                 <div>
                   <label style={labelStyle}>Age</label>
                   <input style={inputStyle} type="number" name="age" value={formData.age} onChange={handleChange} placeholder="e.g. 12" min="3" max="99" />
@@ -138,6 +142,17 @@ export default function StudentModal({ isOpen, onClose, onSave, initialData }) {
                 <div>
                   <label style={labelStyle}>No. of Classes</label>
                   <input style={inputStyle} type="number" name="noOfClasses" value={formData.noOfClasses} onChange={handleChange} placeholder="e.g. 10" min="0" />
+                </div>
+              </div>
+
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"12px", marginBottom:"20px" }}>
+                <div>
+                  <label style={labelStyle}>Date of Birth</label>
+                  <input style={inputStyle} type="date" name="dateOfBirth" value={formData.dateOfBirth} onChange={handleChange} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Rank / Level</label>
+                  <input style={inputStyle} type="text" name="rank" value={formData.rank} onChange={handleChange} placeholder="e.g. A2, Beginner" />
                 </div>
               </div>
 
