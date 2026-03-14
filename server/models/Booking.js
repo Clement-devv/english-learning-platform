@@ -87,11 +87,40 @@ const bookingSchema = new mongoose.Schema({
     default: null
   },
 
+  // Teacher dispute fields
+  disputeRaised: {
+    type: Boolean,
+    default: false
+  },
+  disputeReason: {
+    type: String,
+    default: ""
+  },
+  disputeStatus: {
+    type: String,
+    enum: ["pending", "resolved_teacher", "resolved_student"],
+    default: null
+  },
+  disputedAt: Date,
+  disputedBy: {
+    type: String,
+    default: ""
+  },
+  disputeResolution: {
+    type: String,
+    default: ""
+  },
+  disputeAdminNotes: {
+    type: String,
+    default: ""
+  },
+  disputeResolvedAt: Date,
+
   acceptedAt:   Date,
   completedAt:  Date,
   cancelledAt:  Date,
-}, { 
-  timestamps: true 
+}, {
+  timestamps: true
 });
 
 // Indexes for faster queries

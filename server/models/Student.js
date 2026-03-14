@@ -21,6 +21,8 @@ const studentSchema = new mongoose.Schema({
   lastPaymentDate: Date,
   showTempPassword:{ type: Boolean, default: false },
   age:         { type: Number },
+  dateOfBirth: { type: Date },
+  rank:        { type: String, default: "" },
 
   // ── Invite flow (same pattern as Teacher) ──────────────────────────────────
   status: {

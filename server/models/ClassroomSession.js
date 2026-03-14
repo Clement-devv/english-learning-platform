@@ -35,6 +35,11 @@ const classroomSessionSchema = new mongoose.Schema({
     enum: ["waiting", "active", "completed", "ended-early", "incomplete", "missed"],
     default: "waiting"
   },
+  videoProvider: {
+    type: String,
+    enum: ["agora", "googlemeet", null],
+    default: null,
+  },
   heartbeats: [{
     userRole: {
       type: String,

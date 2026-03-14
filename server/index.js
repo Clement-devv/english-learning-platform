@@ -50,6 +50,7 @@ import adminLessonRoutes from "./routes/adminLessonRoutes.js";
 import subAdminRoutes     from "./routes/subAdminRoutes.js";
 import subAdminAuthRoutes from "./routes/subAdminAuthRoutes.js";
 import subAdminScopeRoutes from "./routes/subAdminScopeRoutes.js";
+import disputeRoutes from "./routes/disputeRoutes.js";
 
 
 // ✅ FIXED: Correct import path for RecurringPattern model
@@ -192,6 +193,7 @@ app.use("/api/admin/lessons", adminLessonRoutes);
 app.use("/api/sub-admins",      subAdminRoutes);
 app.use("/api/sub-admin-auth",  subAdminAuthRoutes);
 app.use("/api/sub-admin-scope", subAdminScopeRoutes);
+app.use("/api/disputes",        disputeRoutes);
 
 
 

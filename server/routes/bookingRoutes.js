@@ -470,7 +470,7 @@ router.get("/", verifyToken, verifyAdmin, async (req, res) => {
     const filter = status ? { status } : {};
 
     const bookings = await Booking.find(filter)
-      .populate("teacherId", "firstName lastName email")
+      .populate("teacherId", "firstName lastName email googleMeetLink")
       .populate("studentId", "firstName surname email")
       .sort({ scheduledTime: -1 })
       .limit(500)
