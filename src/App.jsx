@@ -34,6 +34,7 @@ import StudentProtectedRoute from "./components/StudentProtectedRoute";
 // Classroom
 import Classroom from "./pages/Classroom";
 import StudentSetup from "./pages/student/StudentSetup";
+import Join from "./pages/Join";
 
 const HIDE_NAV_ON = [
   "/sub-admin/setup",
@@ -173,6 +174,8 @@ function App() {
           <Route path="/student/reset-password/:token"  element={<StudentResetPassword />} />
           <Route path="/student/dashboard"              element={<StudentProtectedRoute><StudentDashboard /></StudentProtectedRoute>} />
           <Route path="/student/setup"                 element={<StudentSetup />} />
+
+          <Route path="/join"                          element={<Join />} />
 
           <Route path="*" element={<Navigate to="/admin/login" replace />} />
         </Routes>

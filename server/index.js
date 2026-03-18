@@ -41,16 +41,33 @@ import bookingRoutes from "./routes/bookingRoutes.js";
 import teacherAssignmentRoutes from "./routes/teacherAssignmentRoutes.js";
 import { initializeSocket } from './socketServer.js'; 
 import classroomRoutes from "./routes/classroomRoutes.js";
-import groupChatRoutes from "./routes/groupChatRoutes.js";
+import groupChatRoutes     from "./routes/groupChatRoutes.js";
+import directMessageRoutes from "./routes/directMessageRoutes.js";
 import paymentTransactionRoutes from "./routes/paymentTransactionRoutes.js";
 import recurringBookingsRoutes from "./routes/recurringBookingsRoutes.js";
 import analyticsRoutes from "./routes/analyticsRoutes.js";
 import { verifyEmailConfig } from "./utils/emailService.js";
+import { startReminderScheduler } from "./utils/reminderScheduler.js";
 import adminLessonRoutes from "./routes/adminLessonRoutes.js";
 import subAdminRoutes     from "./routes/subAdminRoutes.js";
 import subAdminAuthRoutes from "./routes/subAdminAuthRoutes.js";
 import subAdminScopeRoutes from "./routes/subAdminScopeRoutes.js";
 import disputeRoutes from "./routes/disputeRoutes.js";
+import contentRoutes from "./routes/contentRoutes.js";
+import teacherAvailabilityRoutes from "./routes/teacherAvailabilityRoutes.js";
+import homeworkRoutes from "./routes/homeworkRoutes.js";
+import pronunciationRoutes from "./routes/pronunciationRoutes.js";
+import quizRoutes         from "./routes/quizRoutes.js";
+import grammarRoutes      from "./routes/grammarRoutes.js";
+import chatRoutes         from "./routes/chatRoutes.js";
+import quizTemplateRoutes from "./routes/quizTemplateRoutes.js";
+import vocabRoutes        from "./routes/vocabRoutes.js";
+import recordingRoutes, { startRecordingCleanup } from "./routes/recordingRoutes.js";
+import reportRoutes       from "./routes/reportRoutes.js";
+import { startProgressReportScheduler } from "./utils/progressReportScheduler.js";
+import reviewRoutes       from "./routes/reviewRoutes.js";
+import referralRoutes     from "./routes/referralRoutes.js";
+import pushRoutes         from "./routes/pushRoutes.js";
 
 
 // ✅ FIXED: Correct import path for RecurringPattern model
@@ -126,6 +143,9 @@ mongoose
   })
   .then(() => {
     console.log("✅ MongoDB connected");
+    startReminderScheduler();
+    startRecordingCleanup();
+    startProgressReportScheduler();
     // ✅ Only start keep-alive AFTER successful connection
     setInterval(async () => {
       try {
@@ -185,7 +205,8 @@ app.use("/api/2fa", twoFactorRoutes);
 app.use("/api/bookings", bookingRoutes);
 app.use("/api/teachers", teacherAssignmentRoutes);
 app.use("/api/classroom", classroomRoutes);
-app.use("/api/group-chats", groupChatRoutes);
+app.use("/api/group-chats",     groupChatRoutes);
+app.use("/api/direct-messages", directMessageRoutes);
 app.use("/api/payments", paymentTransactionRoutes);
 app.use("/api/recurring-bookings", recurringBookingsRoutes);
 app.use("/api/analytics", analyticsRoutes);
@@ -194,6 +215,20 @@ app.use("/api/sub-admins",      subAdminRoutes);
 app.use("/api/sub-admin-auth",  subAdminAuthRoutes);
 app.use("/api/sub-admin-scope", subAdminScopeRoutes);
 app.use("/api/disputes",        disputeRoutes);
+app.use("/api/content",              contentRoutes);
+app.use("/api/teacher-availability", teacherAvailabilityRoutes);
+app.use("/api/homework",             homeworkRoutes);
+app.use("/api/pronunciation",        pronunciationRoutes);
+app.use("/api/quiz",                 quizRoutes);
+app.use("/api/quiz-templates",       quizTemplateRoutes);
+app.use("/api/grammar",              grammarRoutes);
+app.use("/api/chat",                 chatRoutes);
+app.use("/api/vocab",                vocabRoutes);
+app.use("/api/recordings",           recordingRoutes);
+app.use("/api/reports",              reportRoutes);
+app.use("/api/reviews",              reviewRoutes);
+app.use("/api/referrals",            referralRoutes);
+app.use("/api/push",                 pushRoutes);
 
 
 

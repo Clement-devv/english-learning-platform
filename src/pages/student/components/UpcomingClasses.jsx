@@ -1,5 +1,9 @@
-// src/pages/student/UpcomingClasses.jsx
+// src/pages/student/components/UpcomingClasses.jsx
+import { getUserTimezone, dualTime, tzCity } from "../../../utils/timezone";
+
 export default function UpcomingClasses({ upcomingClasses, enrollInClass }) {
+  const myTZ = getUserTimezone();
+
   return (
     <div className="bg-white rounded-2xl shadow p-6">
       <h3 className="text-xl font-semibold mb-4 text-gray-800">
@@ -9,31 +13,49 @@ export default function UpcomingClasses({ upcomingClasses, enrollInClass }) {
         <p className="text-gray-500">No upcoming classes at the moment.</p>
       ) : (
         <div className="space-y-4">
-          {upcomingClasses.map((cls) => (
-            <div
-              key={cls.id}
-              className="flex justify-between items-center border-b border-gray-100 pb-3"
-            >
-              <div>
-                <h4 className="font-semibold text-gray-700">{cls.title}</h4>
-                <p className="text-sm text-gray-500">
-                  {cls.teacher} • {cls.time}
-                </p>
-                <p className="text-sm text-gray-500 italic">{cls.topic}</p>
-              </div>
-              <button
-                onClick={() => enrollInClass(cls.id)}
-                disabled={cls.enrolled}
-                className={`px-4 py-2 rounded-lg text-sm font-medium ${
-                  cls.enrolled
-                    ? "bg-green-100 text-green-700 cursor-default"
-                    : "bg-indigo-600 text-white hover:bg-indigo-700"
-                }`}
+          {upcomingClasses.map((cls) => {
+            const dual = cls.scheduledTime
+              ? dualTime(cls.scheduledTime, myTZ, cls.teacherTimezone)
+              : null;
+            const showTeacherTZ = dual && !dual.sameZone && cls.teacherTimezone;
+
+            return (
+              <div
+                key={cls.id}
+                className="flex justify-between items-center border-b border-gray-100 pb-3"
               >
-                {cls.enrolled ? "Enrolled" : "Enroll"}
-              </button>
-            </div>
-          ))}
+                <div>
+                  <h4 className="font-semibold text-gray-700">{cls.title}</h4>
+                  <p className="text-sm text-gray-500">{cls.teacher}</p>
+
+                  {/* Student's local time */}
+                  <p className="text-sm text-gray-600 font-medium">
+                    {dual ? `${dual.myTime} ${dual.myAbbr}` : cls.time}
+                  </p>
+
+                  {/* Teacher's time (only if different timezone) */}
+                  {showTeacherTZ && (
+                    <p className="text-xs text-indigo-500">
+                      Teacher ({tzCity(cls.teacherTimezone)}): {dual.theirTime} {dual.theirAbbr}
+                    </p>
+                  )}
+
+                  <p className="text-sm text-gray-500 italic">{cls.topic}</p>
+                </div>
+                <button
+                  onClick={() => enrollInClass(cls.id)}
+                  disabled={cls.enrolled}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium ${
+                    cls.enrolled
+                      ? "bg-green-100 text-green-700 cursor-default"
+                      : "bg-indigo-600 text-white hover:bg-indigo-700"
+                  }`}
+                >
+                  {cls.enrolled ? "Enrolled" : "Enroll"}
+                </button>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

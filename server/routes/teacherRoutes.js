@@ -42,6 +42,36 @@ router.get("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
 });
 
 // PATCH /api/teachers/:id/google-meet
+// PATCH /api/teachers/:id/schedule-visibility  — teacher toggles student access
+router.patch("/:id/schedule-visibility", verifyToken, async (req, res) => {
+  try {
+    const { showScheduleToStudents } = req.body;
+    if (typeof showScheduleToStudents !== "boolean")
+      return res.status(400).json({ message: "showScheduleToStudents must be boolean" });
+    const teacher = await Teacher.findByIdAndUpdate(
+      req.params.id,
+      { showScheduleToStudents },
+      { new: true, select: "showScheduleToStudents" }
+    );
+    if (!teacher) return res.status(404).json({ message: "Teacher not found" });
+    res.json({ showScheduleToStudents: teacher.showScheduleToStudents });
+  } catch (err) {
+    res.status(500).json({ message: "Error updating schedule visibility" });
+  }
+});
+
+// PATCH /api/teachers/:id/timezone  — silently update teacher's local timezone
+router.patch("/:id/timezone", verifyToken, async (req, res) => {
+  try {
+    const { timezone } = req.body;
+    if (!timezone) return res.status(400).json({ message: "timezone required" });
+    await Teacher.findByIdAndUpdate(req.params.id, { timezone });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ message: "Error updating timezone" });
+  }
+});
+
 router.patch("/:id/google-meet", verifyToken, async (req, res) => {
   try {
     const { googleMeetLink } = req.body;

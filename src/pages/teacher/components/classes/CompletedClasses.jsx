@@ -1,5 +1,6 @@
 // src/pages/teacher/components/classes/CompletedClasses.jsx
 import React, { useState, useMemo } from "react";
+import { getUserTimezone, formatDateInTZ, tzAbbr } from "../../../../utils/timezone";
 import {
   Search,
   Download,
@@ -17,6 +18,10 @@ import {
 import api from "../../../../api";
 
 export default function CompletedClassesTab({ classes, teacherInfo, isDarkMode }) {
+  const myTZ   = getUserTimezone();
+  const myAbbr = tzAbbr(myTZ);
+  const fmtScheduled = (raw) =>
+    raw ? `${formatDateInTZ(raw, myTZ)} ${myAbbr}` : "—";
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [startDate, setStartDate] = useState("");
@@ -328,7 +333,7 @@ export default function CompletedClassesTab({ classes, teacherInfo, isDarkMode }
                       <div className={`flex flex-wrap items-center gap-4 mt-2 text-sm ${subText}`}>
                         <span className="flex items-center gap-1">
                           <Calendar className="w-4 h-4" />
-                          {cls.fullDateTime || new Date(cls.scheduledTime).toLocaleString()}
+                          {fmtScheduled(cls.scheduledTime)}
                         </span>
                         <span className="flex items-center gap-1">
                           <Clock className="w-4 h-4" />

@@ -1537,20 +1537,399 @@ export const sendStudentWelcomeEmail = async (student) => {
 };
 
 
+// ==================== BOOKING CREATED — NOTIFY STUDENT ====================
+
+export const sendBookingCreatedToStudent = async (student, teacher, booking) => {
+  const scheduledDate = new Date(booking.scheduledTime);
+  const formattedDate = scheduledDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  const formattedTime = scheduledDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+
+  return sendEmail({
+    from: `"${config.appName}" <${config.emailFrom}>`,
+    to: student.email,
+    subject: `Class Booked – ${booking.classTitle}`,
+    html: `<!DOCTYPE html><html><head><style>
+      body{font-family:Arial,sans-serif;line-height:1.6;color:#333}
+      .container{max-width:600px;margin:0 auto;padding:20px}
+      .header{background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;padding:30px;text-align:center;border-radius:10px 10px 0 0}
+      .content{background:#f9f9f9;padding:30px;border-radius:0 0 10px 10px}
+      .card{background:#fff;padding:20px;border-radius:8px;margin:20px 0;box-shadow:0 2px 4px rgba(0,0,0,0.1)}
+      .row{margin:10px 0;padding:10px 0;border-bottom:1px solid #eee}
+      .label{font-weight:bold;color:#667eea}
+      .btn{display:inline-block;padding:12px 30px;background:#667eea;color:#fff;text-decoration:none;border-radius:5px;font-weight:bold}
+      .footer{text-align:center;margin-top:30px;color:#999;font-size:12px}
+    </style></head><body><div class="container">
+      <div class="header"><h1>📅 Class Booked!</h1><p>Your class has been scheduled</p></div>
+      <div class="content">
+        <p>Hi ${student.firstName},</p>
+        <p>Your class with <strong>${teacher.firstName} ${teacher.lastName}</strong> has been booked. The teacher will confirm shortly.</p>
+        <div class="card">
+          <div class="row"><span class="label">Class:</span> ${booking.classTitle}</div>
+          ${booking.topic ? `<div class="row"><span class="label">Topic:</span> ${booking.topic}</div>` : ''}
+          <div class="row"><span class="label">Date:</span> ${formattedDate}</div>
+          <div class="row"><span class="label">Time:</span> ${formattedTime}</div>
+          <div class="row"><span class="label">Duration:</span> ${booking.duration} minutes</div>
+          <div class="row"><span class="label">Teacher:</span> ${teacher.firstName} ${teacher.lastName}</div>
+        </div>
+        <div style="text-align:center;margin-top:20px">
+          <a href="${config.frontendUrl}/student/dashboard" class="btn">View Dashboard</a>
+        </div>
+      </div>
+      <div class="footer"><p>This is an automated message from ${config.appName}</p></div>
+    </div></body></html>`
+  });
+};
+
+// ==================== CLASS TIMED REMINDERS (1hr / 30min / 5min) ====================
+
+export const sendClassTimedReminder = async (user, booking, role, minutesLeft) => {
+  const scheduledDate = new Date(booking.scheduledTime);
+  const formattedTime = scheduledDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  const urgency = minutesLeft <= 5 ? '🚨' : minutesLeft <= 30 ? '⚡' : '⏰';
+  const urgencyText = minutesLeft <= 5 ? 'starts in 5 minutes — join NOW!' : minutesLeft <= 30 ? `starts in ${minutesLeft} minutes` : `starts in 1 hour`;
+  const headerColor = minutesLeft <= 5 ? '#e74c3c' : minutesLeft <= 30 ? '#f39c12' : '#667eea';
+
+  return sendEmail({
+    from: `"${config.appName}" <${config.emailFrom}>`,
+    to: user.email,
+    subject: `${urgency} Class Reminder – ${urgencyText} – ${booking.classTitle}`,
+    html: `<!DOCTYPE html><html><head><style>
+      body{font-family:Arial,sans-serif;line-height:1.6;color:#333}
+      .container{max-width:600px;margin:0 auto;padding:20px}
+      .header{background:${headerColor};color:#fff;padding:30px;text-align:center;border-radius:10px 10px 0 0}
+      .content{background:#f9f9f9;padding:30px;border-radius:0 0 10px 10px}
+      .time-box{background:#fff;padding:24px;border-radius:8px;margin:20px 0;text-align:center;box-shadow:0 2px 4px rgba(0,0,0,0.1)}
+      .big-time{font-size:40px;font-weight:bold;color:${headerColor};margin:10px 0}
+      .btn{display:inline-block;padding:14px 40px;background:${headerColor};color:#fff;text-decoration:none;border-radius:5px;font-weight:bold;font-size:16px}
+      .footer{text-align:center;margin-top:30px;color:#999;font-size:12px}
+    </style></head><body><div class="container">
+      <div class="header"><h1>${urgency} Class Reminder</h1><p>Your class ${urgencyText}</p></div>
+      <div class="content">
+        <p>Hi ${user.firstName},</p>
+        <div class="time-box">
+          <h2>${booking.classTitle}</h2>
+          <div class="big-time">${formattedTime}</div>
+          <p style="font-size:18px;color:#666">${minutesLeft} minutes away</p>
+          <p style="color:#999">Duration: ${booking.duration} minutes</p>
+        </div>
+        ${minutesLeft <= 5 ? '<p style="color:#e74c3c;font-weight:bold;text-align:center;font-size:16px">Please join the class immediately!</p>' : ''}
+        <div style="text-align:center;margin-top:20px">
+          <a href="${config.frontendUrl}/${role}/dashboard" class="btn">Join Class Now</a>
+        </div>
+      </div>
+      <div class="footer"><p>Automated reminder from ${config.appName}</p></div>
+    </div></body></html>`
+  });
+};
+
+// ==================== HOMEWORK EMAILS ====================
+
+export const sendHomeworkAssigned = async (student, teacher, homework) => {
+  const dueDate = new Date(homework.dueDate).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+  return sendEmail({
+    from: `"${config.appName}" <${config.emailFrom}>`,
+    to: student.email,
+    subject: `📚 New Homework – ${homework.title}`,
+    html: `<!DOCTYPE html><html><head><style>
+      body{font-family:Arial,sans-serif;line-height:1.6;color:#333}
+      .container{max-width:600px;margin:0 auto;padding:20px}
+      .header{background:linear-gradient(135deg,#7c3aed,#a855f7);color:#fff;padding:30px;text-align:center;border-radius:10px 10px 0 0}
+      .content{background:#f9f9f9;padding:30px;border-radius:0 0 10px 10px}
+      .card{background:#fff;padding:20px;border-radius:8px;margin:20px 0;box-shadow:0 2px 4px rgba(0,0,0,0.1)}
+      .row{margin:10px 0;padding:10px 0;border-bottom:1px solid #eee}
+      .label{font-weight:bold;color:#7c3aed}
+      .due{background:#fef3c7;border-left:4px solid #f59e0b;padding:14px;border-radius:4px;margin:16px 0}
+      .btn{display:inline-block;padding:12px 30px;background:#7c3aed;color:#fff;text-decoration:none;border-radius:5px;font-weight:bold}
+      .footer{text-align:center;margin-top:30px;color:#999;font-size:12px}
+    </style></head><body><div class="container">
+      <div class="header"><h1>📚 New Homework!</h1><p>Your teacher has assigned new work</p></div>
+      <div class="content">
+        <p>Hi ${student.firstName},</p>
+        <p><strong>${teacher.firstName} ${teacher.lastName}</strong> has assigned you new homework.</p>
+        <div class="card">
+          <div class="row"><span class="label">Title:</span> ${homework.title}</div>
+          ${homework.description ? `<div class="row"><span class="label">Instructions:</span> ${homework.description}</div>` : ''}
+          <div class="row"><span class="label">Teacher:</span> ${teacher.firstName} ${teacher.lastName}</div>
+        </div>
+        <div class="due">
+          <strong>⏰ Due Date:</strong> ${dueDate}
+        </div>
+        <div style="text-align:center;margin-top:20px">
+          <a href="${config.frontendUrl}/student/dashboard" class="btn">View Homework</a>
+        </div>
+      </div>
+      <div class="footer"><p>Automated message from ${config.appName}</p></div>
+    </div></body></html>`
+  });
+};
+
+export const sendHomeworkSubmitted = async (teacher, student, homework) => {
+  return sendEmail({
+    from: `"${config.appName}" <${config.emailFrom}>`,
+    to: teacher.email,
+    subject: `📬 Homework Submitted – ${homework.title} – ${student.firstName} ${student.surname || student.lastName}`,
+    html: `<!DOCTYPE html><html><head><style>
+      body{font-family:Arial,sans-serif;line-height:1.6;color:#333}
+      .container{max-width:600px;margin:0 auto;padding:20px}
+      .header{background:linear-gradient(135deg,#10b981,#059669);color:#fff;padding:30px;text-align:center;border-radius:10px 10px 0 0}
+      .content{background:#f9f9f9;padding:30px;border-radius:0 0 10px 10px}
+      .card{background:#fff;padding:20px;border-radius:8px;margin:20px 0;box-shadow:0 2px 4px rgba(0,0,0,0.1)}
+      .row{margin:10px 0;padding:10px 0;border-bottom:1px solid #eee}
+      .label{font-weight:bold;color:#10b981}
+      .btn{display:inline-block;padding:12px 30px;background:#10b981;color:#fff;text-decoration:none;border-radius:5px;font-weight:bold}
+      .footer{text-align:center;margin-top:30px;color:#999;font-size:12px}
+    </style></head><body><div class="container">
+      <div class="header"><h1>📬 Homework Submitted!</h1><p>A student has submitted their work</p></div>
+      <div class="content">
+        <p>Hi ${teacher.firstName},</p>
+        <p><strong>${student.firstName} ${student.surname || student.lastName}</strong> has submitted their homework and it is ready for you to grade.</p>
+        <div class="card">
+          <div class="row"><span class="label">Homework:</span> ${homework.title}</div>
+          <div class="row"><span class="label">Student:</span> ${student.firstName} ${student.surname || student.lastName}</div>
+          <div class="row"><span class="label">Submitted:</span> ${new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}</div>
+        </div>
+        <div style="text-align:center;margin-top:20px">
+          <a href="${config.frontendUrl}/teacher/dashboard" class="btn">Grade Now</a>
+        </div>
+      </div>
+      <div class="footer"><p>Automated message from ${config.appName}</p></div>
+    </div></body></html>`
+  });
+};
+
+export const sendHomeworkDueReminder = async (student, homework, minutesLeft) => {
+  const dueDate = new Date(homework.dueDate).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+
+  return sendEmail({
+    from: `"${config.appName}" <${config.emailFrom}>`,
+    to: student.email,
+    subject: `⚡ Homework Due Soon – ${homework.title} – ${minutesLeft} minutes left!`,
+    html: `<!DOCTYPE html><html><head><style>
+      body{font-family:Arial,sans-serif;line-height:1.6;color:#333}
+      .container{max-width:600px;margin:0 auto;padding:20px}
+      .header{background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;padding:30px;text-align:center;border-radius:10px 10px 0 0}
+      .content{background:#f9f9f9;padding:30px;border-radius:0 0 10px 10px}
+      .urgent{background:#fff3cd;border-left:4px solid #f59e0b;padding:16px;border-radius:4px;margin:16px 0;font-size:16px}
+      .btn{display:inline-block;padding:14px 40px;background:#f59e0b;color:#fff;text-decoration:none;border-radius:5px;font-weight:bold;font-size:16px}
+      .footer{text-align:center;margin-top:30px;color:#999;font-size:12px}
+    </style></head><body><div class="container">
+      <div class="header"><h1>⚡ Homework Due Soon!</h1><p>Only ${minutesLeft} minutes left</p></div>
+      <div class="content">
+        <p>Hi ${student.firstName},</p>
+        <div class="urgent">
+          <strong>📚 ${homework.title}</strong> is due at <strong>${dueDate}</strong> — only <strong>${minutesLeft} minutes</strong> remaining!
+        </div>
+        <p>If you haven't submitted yet, please log in and submit your work before the deadline.</p>
+        <div style="text-align:center;margin-top:20px">
+          <a href="${config.frontendUrl}/student/dashboard" class="btn">Submit Now</a>
+        </div>
+      </div>
+      <div class="footer"><p>Automated reminder from ${config.appName}</p></div>
+    </div></body></html>`
+  });
+};
+
+// ==================== QUIZ EMAILS ====================
+
+export const sendQuizAssigned = async (student, teacher, quiz) => {
+  const dueDate = new Date(quiz.dueDate).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+  return sendEmail({
+    from: `"${config.appName}" <${config.emailFrom}>`,
+    to: student.email,
+    subject: `📝 New Quiz – ${quiz.title}`,
+    html: `<!DOCTYPE html><html><head><style>
+      body{font-family:Arial,sans-serif;line-height:1.6;color:#333}
+      .container{max-width:600px;margin:0 auto;padding:20px}
+      .header{background:linear-gradient(135deg,#7c3aed,#6d28d9);color:#fff;padding:30px;text-align:center;border-radius:10px 10px 0 0}
+      .content{background:#f9f9f9;padding:30px;border-radius:0 0 10px 10px}
+      .card{background:#fff;padding:20px;border-radius:8px;margin:20px 0;box-shadow:0 2px 4px rgba(0,0,0,0.1)}
+      .row{margin:10px 0;padding:10px 0;border-bottom:1px solid #eee}
+      .label{font-weight:bold;color:#7c3aed}
+      .warning{background:#fef3c7;border-left:4px solid #f59e0b;padding:14px;border-radius:4px;margin:16px 0}
+      .due{background:#ede9fe;border-left:4px solid #7c3aed;padding:14px;border-radius:4px;margin:16px 0}
+      .btn{display:inline-block;padding:12px 30px;background:#7c3aed;color:#fff;text-decoration:none;border-radius:5px;font-weight:bold}
+      .footer{text-align:center;margin-top:30px;color:#999;font-size:12px}
+    </style></head><body><div class="container">
+      <div class="header"><h1>📝 New Quiz Assigned!</h1><p>You have a new test to complete</p></div>
+      <div class="content">
+        <p>Hi ${student.firstName},</p>
+        <p><strong>${teacher.firstName} ${teacher.lastName}</strong> has assigned you a quiz.</p>
+        <div class="card">
+          <div class="row"><span class="label">Quiz:</span> ${quiz.title}</div>
+          <div class="row"><span class="label">Questions:</span> ${quiz.questions.length}</div>
+          <div class="row"><span class="label">Time Limit:</span> ${quiz.timeLimit} minutes</div>
+          <div class="row"><span class="label">Teacher:</span> ${teacher.firstName} ${teacher.lastName}</div>
+        </div>
+        <div class="due"><strong>📅 Due Date:</strong> ${dueDate}</div>
+        <div class="warning"><strong>⚠️ Note:</strong> You only have <strong>one attempt</strong>. Once started, the timer cannot be paused.</div>
+        <div style="text-align:center;margin-top:20px">
+          <a href="${config.frontendUrl}/student/dashboard" class="btn">Take Quiz</a>
+        </div>
+      </div>
+      <div class="footer"><p>Automated message from ${config.appName}</p></div>
+    </div></body></html>`
+  });
+};
+
+export const sendQuizCompleted = async (teacher, student, quiz, attempt) => {
+  const scoreColor = attempt.percentage >= 80 ? '#10b981' : attempt.percentage >= 60 ? '#f59e0b' : '#ef4444';
+  const trophy = attempt.percentage >= 90 ? '🏆' : attempt.percentage >= 75 ? '🥇' : attempt.percentage >= 60 ? '🥈' : '🥉';
+
+  return sendEmail({
+    from: `"${config.appName}" <${config.emailFrom}>`,
+    to: teacher.email,
+    subject: `📝 Quiz Completed – ${quiz.title} – ${student.firstName} ${student.surname || student.lastName} scored ${attempt.percentage}%`,
+    html: `<!DOCTYPE html><html><head><style>
+      body{font-family:Arial,sans-serif;line-height:1.6;color:#333}
+      .container{max-width:600px;margin:0 auto;padding:20px}
+      .header{background:linear-gradient(135deg,#10b981,#059669);color:#fff;padding:30px;text-align:center;border-radius:10px 10px 0 0}
+      .content{background:#f9f9f9;padding:30px;border-radius:0 0 10px 10px}
+      .score-box{background:#fff;padding:24px;border-radius:8px;margin:20px 0;text-align:center;box-shadow:0 2px 4px rgba(0,0,0,0.1)}
+      .score{font-size:48px;font-weight:bold;color:${scoreColor}}
+      .card{background:#fff;padding:20px;border-radius:8px;margin:20px 0;box-shadow:0 2px 4px rgba(0,0,0,0.1)}
+      .row{margin:10px 0;padding:10px 0;border-bottom:1px solid #eee}
+      .label{font-weight:bold;color:#10b981}
+      .btn{display:inline-block;padding:12px 30px;background:#10b981;color:#fff;text-decoration:none;border-radius:5px;font-weight:bold}
+      .footer{text-align:center;margin-top:30px;color:#999;font-size:12px}
+    </style></head><body><div class="container">
+      <div class="header"><h1>📝 Quiz Completed!</h1><p>A student has finished their quiz</p></div>
+      <div class="content">
+        <p>Hi ${teacher.firstName},</p>
+        <p><strong>${student.firstName} ${student.surname || student.lastName}</strong> has completed the quiz.</p>
+        <div class="score-box">
+          <div style="font-size:48px">${trophy}</div>
+          <div class="score">${attempt.percentage}%</div>
+          <p style="font-size:18px;color:#666">${attempt.score} out of ${attempt.totalQuestions} correct</p>
+          ${attempt.timeTaken ? `<p style="color:#999">Completed in ${Math.floor(attempt.timeTaken/60)}m ${attempt.timeTaken%60}s</p>` : ''}
+        </div>
+        <div class="card">
+          <div class="row"><span class="label">Quiz:</span> ${quiz.title}</div>
+          <div class="row"><span class="label">Student:</span> ${student.firstName} ${student.surname || student.lastName}</div>
+          <div class="row"><span class="label">Score:</span> ${attempt.score}/${attempt.totalQuestions} (${attempt.percentage}%)</div>
+        </div>
+        <div style="text-align:center;margin-top:20px">
+          <a href="${config.frontendUrl}/teacher/dashboard" class="btn">View Results</a>
+        </div>
+      </div>
+      <div class="footer"><p>Automated message from ${config.appName}</p></div>
+    </div></body></html>`
+  });
+};
+
+export const sendQuizDueReminder = async (student, quiz, minutesLeft) => {
+  const dueTime = new Date(quiz.dueDate).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+
+  return sendEmail({
+    from: `"${config.appName}" <${config.emailFrom}>`,
+    to: student.email,
+    subject: `⚡ Quiz Due Soon – ${quiz.title} – ${minutesLeft} minutes left!`,
+    html: `<!DOCTYPE html><html><head><style>
+      body{font-family:Arial,sans-serif;line-height:1.6;color:#333}
+      .container{max-width:600px;margin:0 auto;padding:20px}
+      .header{background:linear-gradient(135deg,#7c3aed,#6d28d9);color:#fff;padding:30px;text-align:center;border-radius:10px 10px 0 0}
+      .content{background:#f9f9f9;padding:30px;border-radius:0 0 10px 10px}
+      .urgent{background:#ede9fe;border-left:4px solid #7c3aed;padding:16px;border-radius:4px;margin:16px 0;font-size:16px}
+      .warning{background:#fee2e2;border-left:4px solid #ef4444;padding:14px;border-radius:4px;margin:16px 0}
+      .btn{display:inline-block;padding:14px 40px;background:#7c3aed;color:#fff;text-decoration:none;border-radius:5px;font-weight:bold;font-size:16px}
+      .footer{text-align:center;margin-top:30px;color:#999;font-size:12px}
+    </style></head><body><div class="container">
+      <div class="header"><h1>⚡ Quiz Due Soon!</h1><p>Only ${minutesLeft} minutes left</p></div>
+      <div class="content">
+        <p>Hi ${student.firstName},</p>
+        <div class="urgent">
+          <strong>📝 ${quiz.title}</strong> is due at <strong>${dueTime}</strong> — only <strong>${minutesLeft} minutes</strong> remaining!
+        </div>
+        <div class="warning">
+          <strong>⚠️ Remember:</strong> You have <strong>one attempt only</strong>. Once you start, the ${quiz.timeLimit}-minute timer begins immediately.
+        </div>
+        <p>If you haven't started yet, log in now and complete the quiz before the deadline.</p>
+        <div style="text-align:center;margin-top:20px">
+          <a href="${config.frontendUrl}/student/dashboard" class="btn">Take Quiz Now</a>
+        </div>
+      </div>
+      <div class="footer"><p>Automated reminder from ${config.appName}</p></div>
+    </div></body></html>`
+  });
+};
+
 export default {
   verifyEmailConfig,
   sendBookingRequestToTeacher,
   sendBookingAcceptedToStudent,
   sendBookingRejectedToStudent,
+  sendBookingCreatedToStudent,
   sendClassReminder,
+  sendClassTimedReminder,
   sendClassCompletedNotification,
+  sendHomeworkAssigned,
+  sendHomeworkSubmitted,
+  sendHomeworkDueReminder,
+  sendQuizAssigned,
+  sendQuizCompleted,
+  sendQuizDueReminder,
   sendWelcomeEmail,
   sendPasswordResetEmail,
   sendForgotPasswordEmail,
   sendSubAdminInviteEmail,
   sendSubAdminWelcomeEmail,
   sendTeacherInviteEmail,
-  sendTeacherInviteEmail,
   sendStudentInviteEmail,
   sendStudentWelcomeEmail
+};
+// ==================== PROGRESS REPORTS ====================
+
+/**
+ * Send a progress report PDF to a student by email.
+ * @param {Object} student  - { firstName, surname, email }
+ * @param {Buffer} pdfBuffer - PDF bytes from generateProgressReport()
+ * @param {"weekly"|"monthly"} period
+ * @param {Date} from  - start of reporting window
+ * @param {Date} to    - end of reporting window
+ */
+export const sendProgressReport = async (student, pdfBuffer, period, from, to) => {
+  const label   = period === "weekly" ? "Weekly" : "Monthly";
+  const fromStr = from.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  const toStr   = new Date(to - 1).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  const subject = `${label} Progress Report — ${fromStr} to ${toStr}`;
+  const filename = `progress-report-${from.toISOString().slice(0, 10)}.pdf`;
+
+  const html = `
+    <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
+      <div style="background:#16a34a;padding:24px 32px;border-radius:8px 8px 0 0;">
+        <h1 style="color:#fff;margin:0;font-size:20px;">📊 ${label} Progress Report</h1>
+        <p style="color:#dcfce7;margin:8px 0 0;font-size:13px;">${fromStr} – ${toStr}</p>
+      </div>
+      <div style="background:#f0fdf4;padding:24px 32px;border-radius:0 0 8px 8px;">
+        <p style="color:#1e293b;font-size:15px;">
+          Hi <strong>${student.firstName}</strong>,
+        </p>
+        <p style="color:#334155;font-size:14px;line-height:1.6;">
+          Your ${label.toLowerCase()} progress report is attached as a PDF.
+          It includes a summary of your completed classes, homework scores,
+          quiz results, and vocabulary flashcard progress.
+        </p>
+        <p style="color:#334155;font-size:14px;line-height:1.6;">
+          Keep up the great work — every class gets you closer to fluency! 🎯
+        </p>
+        <p style="color:#64748b;font-size:12px;margin-top:24px;">
+          This report was generated automatically by the English Learning Platform.
+          If you have questions, contact your teacher directly.
+        </p>
+      </div>
+    </div>
+  `;
+
+  return sendEmail({
+    from: `"English Learning Platform" <${config.emailFrom}>`,
+    to:   student.email,
+    subject,
+    html,
+    attachments: [{
+      filename,
+      content:     pdfBuffer,
+      contentType: "application/pdf",
+    }],
+  });
 };

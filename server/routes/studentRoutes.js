@@ -18,6 +18,7 @@ import {
   verifyStudent,
   verifyOwnership,
 } from "../middleware/authMiddleware.js";
+import { completeReferral } from "./referralRoutes.js";
 import { strictLimiter } from "../middleware/rateLimiter.js";
 import { config } from "../config/config.js";
 
@@ -174,7 +175,18 @@ router.post("/setup-account", async (req, res) => {
     student.active        = true;
     student.inviteToken   = undefined;
     student.inviteExpires = undefined;
+
+    // Auto-generate unique referral code
+    for (let i = 0; i < 10; i++) {
+      const code = crypto.randomBytes(4).toString("hex").toUpperCase();
+      const taken = await Student.exists({ referralCode: code });
+      if (!taken) { student.referralCode = code; break; }
+    }
+
     await student.save();
+
+    // Credit referrer if this student was referred
+    completeReferral(student._id).catch(() => {});
 
     // Send welcome email
     console.log(`📧 Sending welcome email to ${student.email}...`);
@@ -226,6 +238,18 @@ router.post("/:id/resend-invite", verifyToken, verifyAdmin, strictLimiter, async
 // ================== UPDATE / DELETE ==================
 
 // 👉 Update student - ONLY ADMIN AND TEACHERS
+// PATCH /api/students/:id/timezone  — silently update student's local timezone
+router.patch("/:id/timezone", verifyToken, async (req, res) => {
+  try {
+    const { timezone } = req.body;
+    if (!timezone) return res.status(400).json({ message: "timezone required" });
+    await Student.findByIdAndUpdate(req.params.id, { timezone });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ message: "Error updating timezone" });
+  }
+});
+
 router.put("/:id", verifyToken, verifyAdminOrTeacher, async (req, res) => {
   try {
     const { password, ...updates } = req.body;

@@ -55,6 +55,7 @@ export default function MessagesTab({ userRole }) {
           {selectedChat ? (
             <ChatWindow
               chat={selectedChat}
+              chatType={selectedChat._chatType || "group"}
               userRole={userRole}
               onClose={handleCloseChat}
               isDark={dark}

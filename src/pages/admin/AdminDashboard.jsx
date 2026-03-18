@@ -5,7 +5,7 @@ import {
   TrendingUp, Video, User, Home, Bell, Users, DollarSign,
   Calendar, BarChart3, AlertTriangle, MessageCircle, Settings,
   LogOut, ChevronRight, Menu, X, BookOpen, CheckSquare,
-  Shield
+  Shield, CalendarDays, FileText, Star
 } from "lucide-react";
 
 import OverviewTab from "./tabs/OverviewTab";
@@ -28,6 +28,12 @@ import AnalyticsDashboard from "../../components/analytics/AnalyticsDashboard";
 import { getTeachers } from "../../services/teacherService";
 import { getStudents } from "../../services/studentService";
 import SubAdminsTab from "./tabs/SubAdminsTab";
+import TeacherScheduleTab from "./tabs/TeacherScheduleTab";
+import ChatCreditsTab from "./tabs/ChatCreditsTab";
+import RecordingsTab from "./tabs/RecordingsTab";
+import ReportsTab    from "./tabs/ReportsTab";
+import ReviewsTab    from "./tabs/ReviewsTab";
+import ReferralsTab  from "./tabs/ReferralsTab";
 
 // ── Nav groups ────────────────────────────────────────────────────────────────
 const NAV = [
@@ -44,25 +50,31 @@ const NAV = [
   {
     group: "People",
     items: [
-      { key: "teachers",     label: "Teachers",         icon: Video },
-      { key: "students",     label: "Students",         icon: User },
-      { key: "applications", label: "Applications",     icon: Home },
-      { key: "assign",       label: "Assign Students",  icon: Users },
+      { key: "teachers",          label: "Teachers",          icon: Video },
+      { key: "teacher-schedules", label: "Teacher Schedules",  icon: CalendarDays },
+      { key: "students",          label: "Students",          icon: User },
+      { key: "applications",      label: "Applications",      icon: Home },
+      { key: "assign",            label: "Assign Students",   icon: Users },
     ],
   },
   {
     group: "Classes",
     items: [
-      { key: "classes",   label: "All Classes",    icon: BookOpen },
-      { key: "bookings",  label: "Bookings",       icon: Calendar },
-      { key: "calendar",  label: "Calendar View",  icon: Calendar },
+      { key: "classes",     label: "All Classes",    icon: BookOpen },
+      { key: "bookings",    label: "Bookings",       icon: Calendar },
+      { key: "calendar",    label: "Calendar View",  icon: Calendar },
+      { key: "recordings",  label: "Recordings",     icon: Video     },
+      { key: "reports",     label: "Progress Reports", icon: FileText },
+      { key: "reviews",     label: "Reviews",          icon: Star     },
+      { key: "referrals",   label: "Referrals",        icon: Users    },
     ],
   },
   {
     group: "Finance & Trust",
     items: [
-      { key: "payments",  label: "Payments",  icon: DollarSign },
-      { key: "disputes",  label: "Disputes",  icon: AlertTriangle },
+      { key: "payments",      label: "Payments",      icon: DollarSign },
+      { key: "chat-credits",  label: "Chat Credits",  icon: MessageCircle },
+      { key: "disputes",      label: "Disputes",      icon: AlertTriangle },
     ],
   },
 ];
@@ -136,7 +148,8 @@ export default function AdminDashboard() {
     switch (activeTab) {
       case "overview":      return <OverviewTab isDarkMode={isDarkMode} />;
       case "analytics":     return <AnalyticsDashboard isDarkMode={isDarkMode} />;
-      case "teachers":      return <TeachersTab onNotify={handleNotify} isDarkMode={isDarkMode} />;
+      case "teachers":           return <TeachersTab onNotify={handleNotify} isDarkMode={isDarkMode} />;
+      case "teacher-schedules":  return <TeacherScheduleTab teachers={teachers} isDarkMode={isDarkMode} />;
       case "students":      return <StudentsTab onNotify={handleNotify} isDarkMode={isDarkMode} />;
       case "classes":       return <ClassesTab isDarkMode={isDarkMode} />;
       case "applications":  return <ApplicationsTab isDarkMode={isDarkMode} />;
@@ -145,7 +158,12 @@ export default function AdminDashboard() {
       case "bookings":      return <BookingsTab teachers={teachers} students={students} onNotify={handleNotify} isDarkMode={isDarkMode} />;
       case "messages":      return <MessagesTab userRole="admin" />;
       case "payments":      return <PaymentsTab isDarkMode={isDarkMode} />;
+      case "chat-credits":  return <ChatCreditsTab isDarkMode={isDarkMode} />;
       case "disputes":      return <DisputeReview isDarkMode={isDarkMode} />;
+      case "recordings":    return <RecordingsTab teachers={teachers} isDarkMode={isDarkMode} />;
+      case "reports":       return <ReportsTab students={students} isDarkMode={isDarkMode} />;
+      case "reviews":       return <ReviewsTab isDarkMode={isDarkMode} />;
+      case "referrals":     return <ReferralsTab isDarkMode={isDarkMode} />;
       case "sub-admins":    return <SubAdminsTab isDarkMode={isDarkMode} teachers={teachers} />;
       case "calendar":
         return (

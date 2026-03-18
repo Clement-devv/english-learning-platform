@@ -23,7 +23,7 @@ router.post("/attendance", verifyToken, async (req, res) => {
       return res.status(400).json({ message: "bookingId, userRole, and action are required" });
     }
 
-    // ── Find or create session ──────────────────────────────────────────────
+    // ── Find or create session (upsert to avoid race-condition duplicate-key errors) ──
     let session = await ClassroomSession.findOne({ bookingId });
 
     if (!session) {
@@ -31,24 +31,36 @@ router.post("/attendance", verifyToken, async (req, res) => {
       if (!booking) return res.status(404).json({ message: "Booking not found" });
 
       const durationSeconds = (booking.duration || 60) * 60;
-      const requiredSeconds = Math.floor(durationSeconds * 0.83); // 83% required
+      const requiredSeconds = Math.floor(durationSeconds * 0.83);
 
       session = new ClassroomSession({
         bookingId,
         requiredTime: requiredSeconds,
         status: "waiting",
       });
+      try {
+        await session.save();
+      } catch (dupErr) {
+        if (dupErr.code === 11000) {
+          // Another concurrent request created it first — fetch that one
+          session = await ClassroomSession.findOne({ bookingId });
+        } else {
+          throw dupErr;
+        }
+      }
     }
 
     const ts = timestamp ? new Date(timestamp) : new Date();
 
     // ── Handle actions ──────────────────────────────────────────────────────
     if (action === "join") {
-      if (userRole === "teacher" && !session.teacherJoinedAt) {
-        session.teacherJoinedAt = ts;
+      if (userRole === "teacher") {
+        if (!session.teacherJoinedAt) session.teacherJoinedAt = ts;
+        session.teacherLeftAt = null; // null (not undefined) so Mongoose actually saves the clear
         console.log(`👨‍🏫 Teacher joined booking ${bookingId}`);
-      } else if (userRole === "student" && !session.studentJoinedAt) {
-        session.studentJoinedAt = ts;
+      } else if (userRole === "student") {
+        if (!session.studentJoinedAt) session.studentJoinedAt = ts;
+        session.studentLeftAt = null; // null (not undefined) so Mongoose actually saves the clear
         console.log(`👨‍🎓 Student joined booking ${bookingId}`);
       }
 
@@ -110,7 +122,7 @@ router.post("/attendance", verifyToken, async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 router.post("/auto-complete", verifyToken, async (req, res) => {
   try {
-    const { bookingId, clientBothActiveTime } = req.body;
+    const { bookingId, clientBothActiveTime, callerRole } = req.body;
 
     if (!bookingId) {
       return res.status(400).json({ message: "bookingId is required" });
@@ -125,21 +137,42 @@ router.post("/auto-complete", verifyToken, async (req, res) => {
       return res.status(404).json({ message: "Booking not found" });
     }
 
-    // Already finalized — just return the current result
-    if (booking.status === "completed" || booking.status === "missed") {
+    // Already COMPLETED and paid — truly finalised, cannot re-process
+    if (booking.status === "completed" && !booking.adminRejected) {
+      const existingSession = await ClassroomSession.findOne({ bookingId });
       return res.json({
         alreadyProcessed: true,
-        completed: booking.status === "completed" && !booking.adminRejected,
-        missed: booking.status === "missed" || booking.adminRejected,
-        booking: {
-          status: booking.status,
-          adminRejected: booking.adminRejected,
-          adminRejectedReason: booking.adminRejectedReason,
-        },
+        completed: true,
+        missed: false,
+        teacherJoined: !!(existingSession?.teacherJoinedAt),
+        studentJoined: !!(existingSession?.studentJoinedAt),
+        bothActiveTime: existingSession?.bothActiveTime || 0,
+        requiredTime: existingSession?.requiredTime || Math.floor((booking.duration || 60) * 60 * 0.83),
+        message: "Class already completed",
       });
     }
 
-    if (booking.status !== "accepted") {
+    // Already marked missed — return the stored result without re-processing
+    if (booking.status === "missed") {
+      const existingSession = await ClassroomSession.findOne({ bookingId });
+      return res.json({
+        alreadyProcessed: true,
+        completed: false,
+        missed: true,
+        teacherJoined: !!(existingSession?.teacherJoinedAt) || callerRole === "teacher",
+        studentJoined: !!(existingSession?.studentJoinedAt) || callerRole === "student",
+        bothActiveTime: existingSession?.bothActiveTime || 0,
+        requiredTime: existingSession?.requiredTime || Math.floor((booking.duration || 60) * 60 * 0.83),
+        reason: booking.missedReason || "Attendance requirements were not met.",
+        message: "Class already marked as not completed",
+      });
+    }
+
+    // "missed" bookings can be re-processed (previous run may have had bad data).
+    // "pending" bookings are allowed (booking may never have been formally accepted).
+    // Hard-block only truly terminal statuses.
+    const blockedStatuses = ["rejected", "cancelled"];
+    if (blockedStatuses.includes(booking.status)) {
       return res.status(400).json({
         message: `Cannot auto-complete booking with status: ${booking.status}`,
       });
@@ -151,26 +184,43 @@ router.post("/auto-complete", verifyToken, async (req, res) => {
     const sessionTeacherJoined = !!(session?.teacherJoinedAt);
     const sessionStudentJoined = !!(session?.studentJoinedAt);
 
-    // clientBothActiveTime > 0 is client-side proof that both were present together.
-    // The Classroom timer only accumulates bothActiveTime when BOTH presence refs are
-    // true (either from session polling or from Agora video callbacks). So if the
-    // attendance API had a transient failure and the session lacks joinedAt times,
-    // the client value is the reliable fallback.
+    // classStartedAt is set server-side ONLY when both teacherJoinedAt AND
+    // studentJoinedAt were recorded — so it's definitive proof both joined.
+    const serverConfirmedBothJoined = !!(session?.classStartedAt);
+
+    // clientBothActiveTime > 0 means the client timer accumulated time while
+    // both presence flags were true — also reliable evidence both were present.
     const clientEvidenceBothPresent = (clientBothActiveTime || 0) > 0;
 
-    const teacherJoined = sessionTeacherJoined || clientEvidenceBothPresent;
-    const studentJoined = sessionStudentJoined || clientEvidenceBothPresent;
+    // callerRole = the authenticated user who triggered auto-complete.
+    // They were physically present in the classroom, so this is direct evidence.
+    const callerIsTeacher = callerRole === "teacher";
+    const callerIsStudent = callerRole === "student";
+
+    const teacherJoined = sessionTeacherJoined || serverConfirmedBothJoined || clientEvidenceBothPresent || callerIsTeacher;
+    const studentJoined = sessionStudentJoined || serverConfirmedBothJoined || clientEvidenceBothPresent || callerIsStudent;
     const bothJoined    = teacherJoined && studentJoined;
 
-    // Use whichever bothActiveTime is higher: server-tracked or client-sent
+    // Use the maximum of server and client values — the client already sends
+    // MAX(its local value, server value), so this is MAX of all sources.
+    // This prevents a tracking bug on one side from underreporting bothActiveTime.
     const serverBothActiveTime = session?.bothActiveTime || 0;
     const bothActiveTime = Math.max(serverBothActiveTime, clientBothActiveTime || 0);
-    const requiredTime   = session?.requiredTime || Math.floor((booking.duration || 60) * 60 * 0.83);
-    const meetsRequirement = bothActiveTime >= requiredTime;
+
+    const requiredTime = session?.requiredTime || Math.floor((booking.duration || 60) * 60 * 0.83);
+    const meetsRequirement = bothActiveTime >= requiredTime
+      // Fallback: if the server confirmed both joined (classStartedAt set) AND neither
+      // has a leftAt recorded at completion time, they were present for the full class.
+      // This covers cases where client-side bothActiveTime tracking was unreliable.
+      || (serverConfirmedBothJoined && !session?.teacherLeftAt && !session?.studentLeftAt);
 
     console.log(`🏁 Auto-complete check for booking ${bookingId}:`, {
+      bookingStatus: booking.status,
+      sessionExists: !!session,
       sessionTeacherJoined,
       sessionStudentJoined,
+      serverConfirmedBothJoined,
+      clientBothActiveTime,
       clientEvidenceBothPresent,
       teacherJoined,
       studentJoined,
@@ -409,6 +459,123 @@ router.get("/complaints", verifyToken, async (req, res) => {
     res.json({ complaints });
   } catch (err) {
     res.status(500).json({ message: "Error fetching complaints" });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PATCH /api/classroom/complaints/:id  — admin updates complaint status
+// ─────────────────────────────────────────────────────────────────────────────
+router.patch("/complaints/:id", verifyToken, async (req, res) => {
+  try {
+    if (req.user.role !== "admin") return res.status(403).json({ message: "Admin only" });
+    const { status, adminNotes, resolution } = req.body;
+    const complaint = await ClassComplaint.findByIdAndUpdate(
+      req.params.id,
+      { status, adminNotes, resolution, reviewedAt: new Date(), reviewedBy: req.user.id },
+      { new: true }
+    ).populate("bookingId", "classTitle scheduledTime duration")
+     .populate("teacherId", "firstName lastName email")
+     .populate("studentId", "firstName surname email");
+    if (!complaint) return res.status(404).json({ message: "Complaint not found" });
+    res.json({ complaint });
+  } catch (err) {
+    res.status(500).json({ message: "Error updating complaint" });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PATCH /api/classroom/admin-complete/:bookingId
+// Admin manually marks a missed class as completed (e.g. after dispute resolution)
+// ─────────────────────────────────────────────────────────────────────────────
+router.patch("/admin-complete/:bookingId", verifyToken, async (req, res) => {
+  try {
+    if (req.user.role !== "admin") return res.status(403).json({ message: "Admin only" });
+
+    const { complaintId, adminNotes } = req.body;
+
+    const booking = await Booking.findById(req.params.bookingId)
+      .populate("teacherId", "firstName lastName email ratePerClass lessonsCompleted earned")
+      .populate("studentId", "firstName surname email noOfClasses active");
+
+    if (!booking) return res.status(404).json({ message: "Booking not found" });
+    if (booking.status === "completed") return res.status(400).json({ message: "Already completed" });
+    if (!["missed", "accepted", "pending"].includes(booking.status)) {
+      return res.status(400).json({ message: `Cannot complete booking with status: ${booking.status}` });
+    }
+
+    const session = await ClassroomSession.findOne({ bookingId: req.params.bookingId });
+
+    const dbSession = await mongoose.startSession();
+    dbSession.startTransaction();
+
+    try {
+      booking.status = "completed";
+      booking.completedAt = new Date();
+      booking.markedBy = "admin";
+      booking.adminRejected = false;
+      await booking.save({ session: dbSession });
+
+      const student = await Student.findById(booking.studentId._id).session(dbSession);
+      if (student && student.noOfClasses > 0) {
+        student.noOfClasses -= 1;
+        if (student.noOfClasses === 0) student.active = false;
+        await student.save({ session: dbSession });
+      }
+
+      const teacher = await Teacher.findById(booking.teacherId._id).session(dbSession);
+      let earned = 0;
+      if (teacher) {
+        earned = parseFloat(teacher.ratePerClass || 0);
+        teacher.lessonsCompleted = (teacher.lessonsCompleted || 0) + 1;
+        teacher.earned = (teacher.earned || 0) + earned;
+        await teacher.save({ session: dbSession });
+      }
+
+      await PaymentTransaction.create([{
+        bookingId: booking._id,
+        teacherId: booking.teacherId._id,
+        studentId: booking.studentId._id,
+        amount: earned,
+        status: "pending",
+        type: "class_completion",
+        classTitle: booking.classTitle,
+        completedAt: new Date(),
+        description: `Admin-approved: ${booking.classTitle} (dispute resolved)`,
+      }], { session: dbSession });
+
+      if (session) {
+        session.status = "completed";
+        session.classEndedAt = new Date();
+        await session.save({ session: dbSession });
+      }
+
+      if (complaintId) {
+        await ClassComplaint.findByIdAndUpdate(complaintId, {
+          status: "approved",
+          resolution: "mark_complete",
+          adminNotes: adminNotes || "Marked complete by admin",
+          reviewedAt: new Date(),
+          reviewedBy: req.user.id,
+        }, { session: dbSession });
+      }
+
+      await dbSession.commitTransaction();
+
+      return res.json({
+        success: true,
+        message: `Class marked as completed by admin. Teacher earned $${earned}.`,
+        teacherEarned: earned,
+        studentClassesRemaining: student?.noOfClasses ?? 0,
+      });
+    } catch (err) {
+      await dbSession.abortTransaction();
+      throw err;
+    } finally {
+      dbSession.endSession();
+    }
+  } catch (err) {
+    console.error("Admin-complete error:", err);
+    res.status(500).json({ message: "Error completing class: " + err.message });
   }
 });
 

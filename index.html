@@ -4,10 +4,60 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Vite + React</title>
+    <title>English Learning Platform</title>
+
+    <!-- ── Google Translate ── -->
+    <style>
+      /* Hide the blue "Page translated" banner Google injects */
+      .goog-te-banner-frame { display: none !important; }
+      body { top: 0 !important; }
+
+      /* Clean up the widget container */
+      .goog-te-gadget { font-size: 0 !important; }
+      .goog-te-gadget > span > a { display: none !important; }
+
+      /* Style the select dropdown */
+      .goog-te-gadget select.goog-te-combo {
+        font-size: 13px !important;
+        font-weight: 600 !important;
+        padding: 6px 10px !important;
+        border-radius: 9px !important;
+        border: 1.5px solid rgba(124,58,237,0.25) !important;
+        background: rgba(124,58,237,0.07) !important;
+        color: #7c3aed !important;
+        cursor: pointer !important;
+        outline: none !important;
+        font-family: 'Plus Jakarta Sans', sans-serif !important;
+        transition: border-color 0.2s !important;
+      }
+      .goog-te-gadget select.goog-te-combo:hover {
+        border-color: #7c3aed !important;
+      }
+
+      /* Remove the Google logo */
+      .goog-logo-link { display: none !important; }
+      .goog-te-gadget img { display: none !important; }
+    </style>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
+
+    <!-- ── Google Translate init ── -->
+    <script>
+      function googleTranslateElementInit() {
+        new google.translate.TranslateElement(
+          {
+            pageLanguage: "en",
+            includedLanguages:
+              "en,vi,fr,es,de,ar,zh-CN,zh-TW,ja,ko,pt,ru,hi,id,tr,it,nl,pl,sv,th",
+            layout: google.translate.TranslateElement.InlineLayout.SIMPLE,
+            autoDisplay: false,
+          },
+          "google_translate_element"
+        );
+      }
+    </script>
+    <script src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
   </body>
 </html>

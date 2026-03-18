@@ -119,6 +119,10 @@ const bookingSchema = new mongoose.Schema({
   acceptedAt:   Date,
   completedAt:  Date,
   cancelledAt:  Date,
+
+  // ── Timezone snapshots (stored at booking creation) ──────────────────────
+  teacherTimezone: { type: String, default: "" }, // e.g. "Africa/Lagos"
+  studentTimezone: { type: String, default: "" }, // e.g. "Asia/Ho_Chi_Minh"
 }, {
   timestamps: true
 });

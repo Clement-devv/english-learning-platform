@@ -1,8 +1,12 @@
 // src/pages/teacher/components/classes/ClassList.jsx
 import React, { useState } from "react";
 import { Calendar, Clock, Trash2, Users, ChevronRight, Video, Grid, List, CalendarDays, MoreVertical } from "lucide-react";
+import { getUserTimezone, formatInTZ, tzAbbr } from "../../../../utils/timezone";
 
 export default function ClassList({ data, onJoin, onDelete, isDarkMode }) {
+  const myTZ    = getUserTimezone();
+  const myAbbr  = tzAbbr(myTZ);
+  const fmtTime = (raw) => raw ? `${formatInTZ(raw, myTZ)} ${myAbbr}` : "—";
   const [viewMode, setViewMode] = useState('calendar'); // 'calendar', 'list', 'grid'
   const [selectedWeek, setSelectedWeek] = useState(0); // 0 = current week, 1 = next week, etc.
 
@@ -218,7 +222,7 @@ export default function ClassList({ data, onJoin, onDelete, isDarkMode }) {
                         <div className="flex items-center gap-1 text-xs">
                           <Clock className={`w-3 h-3 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`} />
                           <span className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>
-                            {classItem.time}
+                            {fmtTime(classItem.scheduledTime)}
                           </span>
                         </div>
                         <div className="flex items-center gap-1 text-xs mt-1">
@@ -289,7 +293,7 @@ export default function ClassList({ data, onJoin, onDelete, isDarkMode }) {
                             classItem.status === 'upcoming-soon' ? 'bg-yellow-500' :
                             'bg-blue-500'
                           } flex items-center justify-center text-white font-bold text-lg`}>
-                            {classItem.time.split(':')[0]}
+                            {classItem.scheduledTime ? formatInTZ(classItem.scheduledTime, myTZ).split(':')[0].replace(/\D/g,'') : '—'}
                           </div>
                           <div className="flex-1">
                             <h4 className={`font-bold text-lg mb-1 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
@@ -302,7 +306,7 @@ export default function ClassList({ data, onJoin, onDelete, isDarkMode }) {
                               <div className="flex items-center gap-1">
                                 <Clock className={`w-4 h-4 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`} />
                                 <span className={isDarkMode ? 'text-gray-300' : 'text-gray-700'}>
-                                  {classItem.time} ({classItem.duration} min)
+                                  {fmtTime(classItem.scheduledTime)} ({classItem.duration} min)
                                 </span>
                               </div>
                               <div className="flex items-center gap-1">
@@ -401,7 +405,7 @@ export default function ClassList({ data, onJoin, onDelete, isDarkMode }) {
                 </div>
                 <div className={`flex items-center gap-2 text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                   <Clock className="w-4 h-4" />
-                  <span>{classItem.time} • {classItem.duration} minutes</span>
+                  <span>{fmtTime(classItem.scheduledTime)} • {classItem.duration} min</span>
                 </div>
 
                 {/* Students */}

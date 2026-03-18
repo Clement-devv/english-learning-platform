@@ -14,6 +14,7 @@ import {
   sendBookingRequestToTeacher,
   sendBookingAcceptedToStudent,
   sendBookingRejectedToStudent,
+  sendBookingCreatedToStudent,
   sendClassCompletedNotification
 } from "../utils/emailService.js";
 
@@ -155,7 +156,7 @@ router.post("/", verifyToken, async (req, res) => {
 
     const initialStatus = getInitialStatus(createdBy);
 
-    // Create booking
+    // Create booking (include timezone snapshots from teacher/student profiles)
     const booking = await Booking.create({
       teacherId,
       studentId,
@@ -167,23 +168,25 @@ router.post("/", verifyToken, async (req, res) => {
       status: initialStatus,
       createdBy,
       createdByUserId: req.user.id,
-      createdByUserModel: createdBy === "admin" ? "Admin" : "Teacher"
+      createdByUserModel: createdBy === "admin" ? "Admin" : "Teacher",
+      teacherTimezone: teacher.timezone || "",
+      studentTimezone: student.timezone || "",
     });
 
     const populatedBooking = await Booking.findById(booking._id)
       .populate("teacherId", "firstName lastName email")
       .populate("studentId", "firstName surname email noOfClasses");
 
-    // ✅ SEND EMAIL NOTIFICATION (if admin-created booking)
+    // Send email notifications (non-blocking)
     if (createdBy === "admin") {
-      try {
-        await sendBookingRequestToTeacher(teacher, student, populatedBooking);
-        console.log(`📧 Booking notification sent to ${teacher.email}`);
-      } catch (emailError) {
-        console.error("📧 Email notification failed:", emailError.message);
-        // Don't fail the booking creation if email fails
-      }
+      sendBookingRequestToTeacher(teacher, student, populatedBooking).catch(e =>
+        console.error("📧 Teacher booking email failed:", e.message)
+      );
     }
+    // Always notify student that a class has been booked for them
+    sendBookingCreatedToStudent(student, teacher, populatedBooking).catch(e =>
+      console.error("📧 Student booking email failed:", e.message)
+    );
 
     console.log(`✅ Booking created by ${req.user.role}:`, {
       bookingId: booking._id,
@@ -594,20 +597,28 @@ router.patch("/:id/cancel", verifyToken, async (req, res) => {
   }
 });
 
-router.delete("/:id", verifyToken, verifyAdmin, async (req, res) => {
+router.delete("/:id", verifyToken, async (req, res) => {
   try {
-    const booking = await Booking.findByIdAndDelete(req.params.id);
-    
+    const booking = await Booking.findById(req.params.id);
+
     if (!booking) {
-      return res.status(404).json({ 
-        success: false,
-        message: "Booking not found" 
-      });
+      return res.status(404).json({ success: false, message: "Booking not found" });
     }
 
-    res.json({ 
+    // Admins can delete any booking; teachers can only delete their own
+    const isAdmin   = req.user.role === "admin";
+    const isOwner   = req.user.role === "teacher" &&
+                      String(booking.teacherId) === String(req.user.id);
+
+    if (!isAdmin && !isOwner) {
+      return res.status(403).json({ success: false, message: "Not authorised to delete this booking" });
+    }
+
+    await booking.deleteOne();
+
+    res.json({
       success: true,
-      message: "Booking deleted successfully" 
+      message: "Booking deleted successfully"
     });
 
   } catch (err) {

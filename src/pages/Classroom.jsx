@@ -1,87 +1,14 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import VideoCall from "./VideoCall";
+import ContentViewer from "./ContentViewer";
+import WhiteboardTab from "./WhiteboardTab";
 import api from "../api";
 import {
   Video, FileText, PenTool, Clock, Users,
   CheckCircle2, XCircle, Loader, Power, AlertTriangle,
-  CheckCircle, X,
+  CheckCircle, X, RefreshCw,
 } from "lucide-react";
-
-// ─── Whiteboard Tab ───────────────────────────────────────────────────────────
-function WhiteboardTab({ userRole }) {
-  const canvasRef = useRef(null);
-  const [isDrawing, setIsDrawing] = useState(false);
-  const [currentColor, setCurrentColor] = useState("#000000");
-  const [brushSize, setBrushSize] = useState(3);
-  const colors = ["#000000","#FF0000","#00FF00","#0000FF","#FFFF00","#FF00FF","#00FFFF","#FF8800"];
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-    ctx.fillStyle = "#FFFFFF";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-  }, []);
-
-  const startDrawing = (e) => {
-    if (userRole !== "teacher") return;
-    setIsDrawing(true);
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext("2d");
-    const rect = canvas.getBoundingClientRect();
-    ctx.beginPath();
-    ctx.moveTo(e.clientX - rect.left, e.clientY - rect.top);
-  };
-
-  const draw = (e) => {
-    if (!isDrawing || userRole !== "teacher") return;
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext("2d");
-    const rect = canvas.getBoundingClientRect();
-    ctx.strokeStyle = currentColor;
-    ctx.lineWidth = brushSize;
-    ctx.lineTo(e.clientX - rect.left, e.clientY - rect.top);
-    ctx.stroke();
-  };
-
-  const stopDrawing = () => setIsDrawing(false);
-
-  const clearCanvas = () => {
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext("2d");
-    ctx.fillStyle = "#FFFFFF";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-  };
-
-  return (
-    <div className="h-full flex flex-col bg-white">
-      {userRole === "teacher" && (
-        <div className="flex items-center gap-3 p-3 bg-gray-100 border-b">
-          {colors.map((c) => (
-            <button
-              key={c}
-              onClick={() => setCurrentColor(c)}
-              className={`w-6 h-6 rounded-full border-2 ${currentColor === c ? "border-black scale-125" : "border-transparent"}`}
-              style={{ backgroundColor: c }}
-            />
-          ))}
-          <input type="range" min="1" max="20" value={brushSize}
-            onChange={(e) => setBrushSize(Number(e.target.value))} className="w-24" />
-          <button onClick={clearCanvas} className="px-3 py-1 bg-red-500 text-white rounded text-sm">Clear</button>
-        </div>
-      )}
-      <canvas
-        ref={canvasRef} width={800} height={500}
-        className="flex-1 cursor-crosshair"
-        onMouseDown={startDrawing} onMouseMove={draw}
-        onMouseUp={stopDrawing} onMouseLeave={stopDrawing}
-      />
-    </div>
-  );
-}
 
 // ─── Main Classroom Component ─────────────────────────────────────────────────
 export default function Classroom({ classData, userRole: propUserRole, onLeave, teacherGoogleMeetLink }) {
@@ -153,7 +80,8 @@ export default function Classroom({ classData, userRole: propUserRole, onLeave, 
   const classStartedRef = useRef(false); // ✅ FIX: ref to avoid stale closure in polling interval
   const timerRef   = useRef(null);
   const syncRef    = useRef(null);
-  const sessionRef = useRef(null);
+  const sessionRef           = useRef(null);
+  const joinConfirmedRef     = useRef(false); // true once joinSession succeeds
   const classStartedAtRef = useRef(null);   
   const bothActiveStartRef = useRef(null);
   const bothActiveAccRef = useRef(0);       
@@ -168,6 +96,13 @@ export default function Classroom({ classData, userRole: propUserRole, onLeave, 
 
   // ── Session state ───────────────────────────────────────────────────────────
   const [sessionData, setSessionData] = useState(null);
+
+  // ── Dispute state ────────────────────────────────────────────────────────────
+  const [disputeOpen,       setDisputeOpen]       = useState(false);
+  const [disputeReason,     setDisputeReason]     = useState("network_issue");
+  const [disputeDesc,       setDisputeDesc]       = useState("");
+  const [disputeSubmitting, setDisputeSubmitting] = useState(false);
+  const [disputeSubmitted,  setDisputeSubmitted]  = useState(false);
 
   // ─────────────────────────────────────────────────────────────────────────────
   // Helpers
@@ -244,10 +179,19 @@ const startTimer = useCallback(() => {
     const session = res.data.session;       // ← your new code starts here
     setSessionData(session);
 
-    // Sync presence refs DIRECTLY from session response
+    // Sync presence refs DIRECTLY from session response.
+    // For the caller's own role, treat them as present (they just joined).
+    // For the other role, trust Agora's ref if it already detected them live
+    // (Agora connects faster than the DB — don't let a stale leftAt override it).
     if (session) {
-      const teacherIn = !!session.teacherJoinedAt;
-      const studentIn = !!session.studentJoinedAt;
+      const teacherIn = userRole === "teacher"
+        ? !!session.teacherJoinedAt                                      // I just joined — ignore my own leftAt
+        : teacherPresentRef.current                                      // Agora already detected them live
+          || (!!session.teacherJoinedAt && !session.teacherLeftAt);     // fallback: DB confirms
+      const studentIn = userRole === "student"
+        ? !!session.studentJoinedAt                                      // I just joined — ignore my own leftAt
+        : studentPresentRef.current                                      // Agora already detected them live
+          || (!!session.studentJoinedAt && !session.studentLeftAt);     // fallback: DB confirms
       teacherPresentRef.current = teacherIn;
       studentPresentRef.current = studentIn;
       setIsTeacherPresent(teacherIn);
@@ -262,12 +206,16 @@ const startTimer = useCallback(() => {
     classStartedRef.current = true;
     setClassStarted(true);
     setIsTimerRunning(true);
-    classStartedAtRef.current = new Date(session.classStartedAt).getTime(); 
-    bothActiveAccRef.current = session.bothActiveTime || 0;                 
+    classStartedAtRef.current = new Date(session.classStartedAt).getTime();
+    // Use whichever is larger: server value or what we restored from sessionStorage
+    // (heartbeat may lag a few seconds behind, so our local snapshot can be more accurate)
+    bothActiveAccRef.current = Math.max(session.bothActiveTime || 0, bothActiveAccRef.current);
+    setBothActiveTime(bothActiveAccRef.current);
     startTimer();
   }
 }
-    console.log(`✅ Joined session as ${userRole}`);  // ← your new code ends here
+    joinConfirmedRef.current = true;
+    console.log(`✅ Joined session as ${userRole}`);
 
   } catch (err) {
     console.error("❌ Join session error:", err);
@@ -323,18 +271,33 @@ const startTimer = useCallback(() => {
     console.log("🏁 Class time elapsed — auto-completing...", { currentBothActiveTime, requiredTime });
 
     try {
+      // If the local timer restarted (e.g. after a refresh) our state might be 0.
+      // Pull the server's latest bothActiveTime and use whichever is larger.
+      let bestBothActiveTime = currentBothActiveTime || 0;
+      try {
+        const { data: sessionData } = await api.get(`/api/classroom/session/${bookingId}`);
+        const serverVal = sessionData?.session?.bothActiveTime || 0;
+        bestBothActiveTime = Math.max(bestBothActiveTime, serverVal);
+      } catch (_) { /* non-critical — use local value */ }
+
       const { data } = await api.post("/api/classroom/auto-complete", {
         bookingId,
-        clientBothActiveTime: currentBothActiveTime,
+        clientBothActiveTime: bestBothActiveTime,
+        callerRole: userRole,   // authenticated caller = proof they were present
       });
       setCompletionResult(data);
       console.log("✅ Auto-complete result:", data);
     } catch (err) {
       console.error("❌ Auto-complete error:", err);
+      const serverMsg = err?.response?.data?.message || err?.message || "Unknown error";
+      console.error("❌ Server said:", serverMsg);
       setCompletionResult({
         completed: false,
         missed: true,
+        reason: `Auto-complete failed: ${serverMsg}`,
         message: "Could not determine class outcome. Please contact admin.",
+        teacherJoined: false,
+        studentJoined: false,
         error: true,
       });
     } finally {
@@ -364,6 +327,22 @@ useEffect(() => {
 useEffect(() => {
   if (!bookingId) return;
 
+  // ── Restore from a Refresh-button reload (not a fresh join) ──────────────
+  const REFRESH_KEY = `classroom_refresh_${bookingId}`;
+  try {
+    const raw = sessionStorage.getItem(REFRESH_KEY);
+    if (raw) {
+      const saved = JSON.parse(raw);
+      // Only trust the snapshot if it is less than 60 seconds old
+      if (Date.now() - saved.savedAt < 60_000) {
+        bothActiveAccRef.current  = saved.bothActiveAcc;
+        if (saved.classStartedAt) classStartedAtRef.current = saved.classStartedAt;
+        setBothActiveTime(saved.bothActiveAcc); // show immediately — no flash to 0
+      }
+    }
+  } catch (_) { /* ignore bad data */ }
+  sessionStorage.removeItem(REFRESH_KEY); // always clear after reading
+
   joinSession();
 
   let currentPollInterval = 2000;
@@ -376,8 +355,17 @@ useEffect(() => {
       setSessionData(data.session);
 
       const s         = data.session;
-      const teacherIn = !!s.teacherJoinedAt;
-      const studentIn = !!s.studentJoinedAt;
+      // For the current user's OWN role: if they're running this poll, they're
+      // present — never let stale DB data (old leftAt before join clears it) set
+      // their own presence to false. Only rely on DB for the OTHER user.
+      const teacherIn = userRole === "teacher"
+        ? (teacherPresentRef.current || !!s.teacherJoinedAt)           // self: keep true once set
+        : teacherPresentRef.current                                     // other: trust Agora ref if it detected them live
+          || (!!s.teacherJoinedAt && !s.teacherLeftAt);                // fallback: DB confirms joined and not left
+      const studentIn = userRole === "student"
+        ? (studentPresentRef.current || !!s.studentJoinedAt)           // self: keep true once set
+        : studentPresentRef.current                                     // other: trust Agora ref if it detected them live
+          || (!!s.studentJoinedAt && !s.studentLeftAt);                // fallback: DB confirms joined and not left
 
       // Update refs directly so timer sees changes immediately
       if (teacherIn !== teacherPresentRef.current) {
@@ -476,12 +464,23 @@ useEffect(() => {
         setTimeElapsed(elapsed);
       }
 
-      // Restore server's authoritative bothActiveTime
-      if (s.bothActiveTime > 0) {
-        bothActiveAccRef.current = s.bothActiveTime;
-        bothActiveStartRef.current = null; // reset segment
-        setBothActiveTime(s.bothActiveTime);
+      // Sync bothActiveTime without breaking the active segment.
+      // The server value can lag up to 15 s behind (heartbeat interval), so
+      // compute our own current total (acc + any running segment) and use
+      // whichever is larger — never go backwards.
+      const runningSegment = bothActiveStartRef.current
+        ? Math.floor((Date.now() - bothActiveStartRef.current) / 1000)
+        : 0;
+      const localTotal = bothActiveAccRef.current + runningSegment;
+      const serverTotal = s.bothActiveTime || 0;
+
+      if (serverTotal > localTotal) {
+        // Server is ahead (e.g. other user's client pushed a bigger value)
+        // Absorb the difference into the accumulator so the segment can keep running
+        bothActiveAccRef.current = serverTotal - runningSegment;
+        setBothActiveTime(serverTotal);
       }
+      // If local >= server: do nothing — our timestamp-based timer is already correct
     } catch (err) {
       console.error("Resync error:", err);
     }
@@ -496,29 +495,79 @@ useEffect(() => {
   // ─────────────────────────────────────────────────────────────────────────────
   const handleUserJoined = (uid) => {
     console.log("✅ Remote user joined video:", uid);
-    if (userRole === "teacher") setIsStudentPresent(true);
-    else setIsTeacherPresent(true);
+    if (userRole === "teacher") {
+      studentPresentRef.current = true;
+      setIsStudentPresent(true);
+    } else {
+      teacherPresentRef.current = true;
+      setIsTeacherPresent(true);
+    }
   };
 
   const handleUserLeft = (uid) => {
     console.log("👋 Remote user left video:", uid);
-    if (userRole === "teacher") setIsStudentPresent(false);
-    else setIsTeacherPresent(false);
+    if (userRole === "teacher") {
+      studentPresentRef.current = false;
+      setIsStudentPresent(false);
+    } else {
+      teacherPresentRef.current = false;
+      setIsTeacherPresent(false);
+    }
   };
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Refresh — flush time to server then reload (timer resumes from server state)
+  // ─────────────────────────────────────────────────────────────────────────────
+  const handleRefresh = useCallback(() => {
+    setBothActiveTime((cur) => {
+      // Persist current accumulated time so the page reload can restore it instantly
+      const key = `classroom_refresh_${bookingId}`;
+      sessionStorage.setItem(key, JSON.stringify({
+        bothActiveAcc:  cur,
+        classStartedAt: classStartedAtRef.current,
+        savedAt:        Date.now(),
+      }));
+      sendHeartbeat(cur);
+      return cur;
+    });
+    setTimeout(() => window.location.reload(), 300);
+  }, [bookingId, sendHeartbeat]);
 
   // ─────────────────────────────────────────────────────────────────────────────
   // Leave early
   // ─────────────────────────────────────────────────────────────────────────────
-  const handleLeaveEarly = () => {
+  const handleLeaveEarly = async () => {
+    sessionStorage.removeItem(`classroom_refresh_${bookingId}`);
     clearInterval(timerRef.current);
+    timerRef.current = null;
     clearInterval(syncRef.current);
     clearInterval(sessionRef.current);
-    setBothActiveTime((cur) => {
-      leaveSession(cur);
-      return cur;
-    });
-    if (onLeave) onLeave();
-    else navigate(userRole === "teacher" ? "/teacher/dashboard" : "/student/dashboard");
+    setShowLeaveModal(false);
+
+    // Read current bothActiveTime from refs (don't rely on async setState)
+    const curBothActive = bothActiveAccRef.current + (
+      bothActiveStartRef.current
+        ? Math.floor((Date.now() - bothActiveStartRef.current) / 1000)
+        : 0
+    );
+    setBothActiveTime(curBothActive);
+
+    // If joinSession hasn't completed yet, wait up to 3s for it
+    if (!joinConfirmedRef.current) {
+      await new Promise(resolve => {
+        const t = setTimeout(resolve, 3000);
+        const check = setInterval(() => {
+          if (joinConfirmedRef.current) { clearInterval(check); clearTimeout(t); resolve(); }
+        }, 100);
+      });
+    }
+
+    // Record leave FIRST, then process completion
+    await leaveSession(curBothActive);
+
+    if (!hasAutoCompletedRef.current) {
+      handleAutoCompleteRef.current(curBothActive);
+    }
   };
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -584,9 +633,12 @@ useEffect(() => {
                 )}
               </div>
               <button
-                onClick={() => navigate(userRole === "teacher" ? "/teacher/dashboard" : "/student/dashboard",
-                  { state: { classCompleted: true, activeTab: "payment" } }
-                )}
+                onClick={() => {
+                  if (onLeave) onLeave();
+                  else navigate(userRole === "teacher" ? "/teacher/dashboard" : "/student/dashboard",
+                    { state: { classCompleted: true, activeTab: "payment" } }
+                  );
+                }}
                 className="w-full px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full font-bold transition-all"
               >
                 Back to Dashboard
@@ -628,10 +680,96 @@ useEffect(() => {
                 )}
               </div>
               <p className="text-xs text-gray-400 mb-4">No class was deducted and no earnings were added.</p>
+
+              {/* ── Dispute section ── */}
+              {!disputeSubmitted ? (
+                !disputeOpen ? (
+                  <button
+                    onClick={() => setDisputeOpen(true)}
+                    className="w-full px-6 py-3 mb-3 bg-amber-500 hover:bg-amber-600 text-white rounded-full font-bold transition-all"
+                  >
+                    Request Dispute / Technical Issue
+                  </button>
+                ) : (
+                  <div className="text-left mb-3 border border-amber-300 rounded-2xl p-4 bg-amber-50">
+                    <p className="font-bold text-gray-700 mb-3 text-sm">Report an issue for admin review</p>
+                    <div className="mb-3">
+                      <label className="text-xs font-semibold text-gray-500 uppercase mb-1 block">Reason</label>
+                      <select
+                        value={disputeReason}
+                        onChange={e => setDisputeReason(e.target.value)}
+                        className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-amber-400"
+                      >
+                        <option value="network_issue">Network / Technical Issue</option>
+                        <option value="emergency">Emergency (teacher or student)</option>
+                        <option value="student_absent">Student Was Absent</option>
+                        <option value="student_unprepared">Student Was Unprepared</option>
+                        <option value="insufficient_attendance">Attendance Tracker Error</option>
+                        <option value="other">Other</option>
+                      </select>
+                    </div>
+                    <div className="mb-3">
+                      <label className="text-xs font-semibold text-gray-500 uppercase mb-1 block">Description</label>
+                      <textarea
+                        value={disputeDesc}
+                        onChange={e => setDisputeDesc(e.target.value)}
+                        placeholder="Describe what happened..."
+                        rows={3}
+                        className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-amber-400 resize-none"
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setDisputeOpen(false)}
+                        className="flex-1 px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-full text-sm font-bold"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        disabled={!disputeDesc.trim() || disputeSubmitting}
+                        onClick={async () => {
+                          setDisputeSubmitting(true);
+                          try {
+                            await api.post("/api/classroom/end-early", {
+                              bookingId,
+                              reason: disputeReason,
+                              reportedBy: userRole,
+                              description: disputeDesc,
+                              teacherActiveTime: completionResult?.bothActiveTime || 0,
+                              studentActiveTime: completionResult?.bothActiveTime || 0,
+                              bothActiveTime: completionResult?.bothActiveTime || 0,
+                              requiredTime: completionResult?.requiredTime || 0,
+                              endedAt: new Date().toISOString(),
+                              endedBy: userRole,
+                            });
+                            setDisputeSubmitted(true);
+                          } catch (err) {
+                            console.error("Dispute submit error:", err);
+                          } finally {
+                            setDisputeSubmitting(false);
+                          }
+                        }}
+                        className="flex-1 px-4 py-2 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white rounded-full text-sm font-bold"
+                      >
+                        {disputeSubmitting ? "Submitting…" : "Submit"}
+                      </button>
+                    </div>
+                  </div>
+                )
+              ) : (
+                <div className="mb-3 p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-sm text-emerald-700 font-semibold text-center">
+                  ✓ Dispute submitted. An admin will review and may mark the class as completed.
+                </div>
+              )}
+
               <button
-                onClick={() => navigate(userRole === "teacher" ? "/teacher/dashboard" : "/student/dashboard",
-                  { state: { classCompleted: true, activeTab: "payment" } }
-                )}
+                onClick={() => {
+                  if (onLeave) onLeave();
+                  else navigate(
+                    userRole === "teacher" ? "/teacher/dashboard" : "/student/dashboard",
+                    { state: { classMissed: true, activeTab: userRole === "teacher" ? "bookings" : "dashboard" } }
+                  );
+                }}
                 className="w-full px-6 py-3 bg-gray-700 hover:bg-gray-800 text-white rounded-full font-bold transition-all"
               >
                 Back to Dashboard
@@ -658,13 +796,23 @@ useEffect(() => {
             <h1 className="text-lg font-bold text-gray-800">{finalClassData?.title || "Class"}</h1>
             <p className="text-xs text-gray-500">{finalClassData?.topic || ""}</p>
           </div>
-          <button
-            onClick={() => setShowLeaveModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded-full font-semibold text-sm transition-all"
-          >
-            <Power className="w-4 h-4" />
-            Leave Early
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleRefresh}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-full font-semibold text-sm transition-all"
+              title="Refresh page — timer continues from where it left off"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Refresh
+            </button>
+            <button
+              onClick={() => setShowLeaveModal(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded-full font-semibold text-sm transition-all"
+            >
+              <Power className="w-4 h-4" />
+              Leave Early
+            </button>
+          </div>
         </div>
 
         {/* Row 2: timer + tabs + presence */}
@@ -757,39 +905,52 @@ useEffect(() => {
       <div className="flex-1 overflow-hidden relative">
 
         {/*
-          ── BUG FIX: Agora VideoCall must NEVER unmount while the session is active.
-          ── Previously it was inside {activeTab === "video" && ...} which unmounted it
-          ── every time the user switched tabs, calling client.leave() and ending the call.
-          ──
-          ── Solution: render VideoCall always (when provider=agora), hide with CSS only.
-          ── visibility:hidden keeps the element in layout with real dimensions so Agora
-          ── can continue rendering video frames. Switching back makes it visible instantly.
+          VideoCall must NEVER unmount while the session is active — doing so calls
+          client.leave() and ends the Agora connection.
+
+          On the "video" tab → full-screen, mode="video"
+          On the "content" tab → 200px right sidebar, mode="sidebar" (stacked panels)
+          On the "whiteboard" tab → hidden via visibility:hidden
         */}
         {activeVideoProvider === "agora" && (
           <div
-            className="absolute inset-0"
             style={{
-              visibility: activeTab === "video" ? "visible" : "hidden",
-              zIndex: activeTab === "video" ? 10 : 0,
-              pointerEvents: activeTab === "video" ? "auto" : "none",
+              position: "absolute",
+              zIndex: activeTab === "video" ? 10 : 5,
+              // Video tab: full screen
+              ...(activeTab === "video" ? {
+                inset: 0,
+              // Content tab: narrow right sidebar
+              } : activeTab === "content" ? {
+                right: 0, top: 0, bottom: 0, width: "196px",
+              // Whiteboard: hidden
+              } : {
+                inset: 0,
+                visibility: "hidden",
+                pointerEvents: "none",
+              }),
             }}
           >
             <VideoCall
               key={`video-${bookingId}`}
               channelName={channelName}
-              userId={userId}
               userName={userName}
               onLeave={() => { activeVideoProviderRef.current = null; setActiveVideoProvider(null); }}
               onUserJoined={handleUserJoined}
               onUserLeft={handleUserLeft}
-              mode="video"
+              mode={activeTab === "video" ? "video" : activeTab === "content" ? "sidebar" : "video"}
+              userRole={userRole}
+              bookingId={bookingId}
             />
-            <button
-              onClick={() => { activeVideoProviderRef.current = null; setActiveVideoProvider(null); }}
-              className="absolute top-4 left-4 px-4 py-2 bg-white/90 backdrop-blur rounded-lg shadow-lg hover:bg-white transition-all flex items-center gap-2 z-50 text-sm font-medium"
-            >
-              ← Change Platform
-            </button>
+            {/* "Change Platform" only shown on the video tab */}
+            {activeTab === "video" && (
+              <button
+                onClick={() => { activeVideoProviderRef.current = null; setActiveVideoProvider(null); }}
+                className="absolute top-4 left-4 px-4 py-2 bg-white/90 backdrop-blur rounded-lg shadow-lg hover:bg-white transition-all flex items-center gap-2 z-50 text-sm font-medium"
+              >
+                ← Change Platform
+              </button>
+            )}
           </div>
         )}
 
@@ -940,23 +1101,48 @@ useEffect(() => {
           </div>
         )}
 
-        {/* CONTENT TAB */}
-        {activeTab === "content" && (
-          <div className="absolute inset-0 flex items-center justify-center bg-blue-50" style={{ zIndex: 10 }}>
-            <div className="text-center">
-              <FileText className="w-24 h-24 text-blue-300 mx-auto mb-4" />
-              <p className="text-xl font-bold text-blue-600">Content Sharing</p>
-              <p className="text-gray-500 mt-2">PDF viewer coming soon</p>
+        {/* CONTENT TAB — always mounted so the socket stays alive across tab switches */}
+        <div
+          className="absolute inset-0 flex"
+          style={{
+            zIndex: activeTab === "content" ? 10 : 0,
+            paddingRight: activeVideoProvider === "agora" ? "196px" : 0,
+            visibility: activeTab === "content" ? "visible" : "hidden",
+            pointerEvents: activeTab === "content" ? "auto" : "none",
+          }}
+        >
+          <div className="flex-1 min-w-0 h-full">
+            <ContentViewer bookingId={bookingId} userRole={userRole} channelName={channelName} />
+          </div>
+          {/* Placeholder sidebar shown when Agora is NOT active */}
+          {!activeVideoProvider && (
+            <div className="w-[196px] flex-shrink-0 bg-gray-900 flex flex-col items-center justify-center gap-3 p-4">
+              <div className="w-14 h-14 bg-gray-700 rounded-full flex items-center justify-center">
+                <Video className="w-7 h-7 text-gray-400" />
+              </div>
+              <p className="text-gray-400 text-xs text-center leading-relaxed">
+                Start a video call from the Video tab to see each other here
+              </p>
             </div>
-          </div>
-        )}
+          )}
+        </div>
 
-        {/* WHITEBOARD TAB */}
-        {activeTab === "whiteboard" && (
-          <div className="absolute inset-0" style={{ zIndex: 10 }}>
-            <WhiteboardTab userRole={userRole} />
-          </div>
-        )}
+        {/* WHITEBOARD TAB — always mounted so socket stays alive */}
+        <div
+          className="absolute inset-0"
+          style={{
+            zIndex: activeTab === "whiteboard" ? 10 : 0,
+            visibility: activeTab === "whiteboard" ? "visible" : "hidden",
+            pointerEvents: activeTab === "whiteboard" ? "auto" : "none",
+          }}
+        >
+          <WhiteboardTab
+            userRole={userRole}
+            channelName={channelName}
+            userId={userId}
+            userName={userName}
+          />
+        </div>
       </div>
 
       {/* ── LEAVE EARLY MODAL ── */}
@@ -968,11 +1154,10 @@ useEffect(() => {
             </div>
             <h2 className="text-xl font-bold text-gray-800 mb-2">Leave Early?</h2>
             <p className="text-gray-600 text-sm mb-4">
-              The class timer will continue running. Completion will be decided automatically when the full {finalClassData?.duration || 60} minutes elapse.
+              This will end the class immediately and process attendance right now.
             </p>
             <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mb-6 text-xs text-amber-800">
-              ⚠️ If you leave now, your time together ({formatTime(bothActiveTime)}) is saved.
-              The class will complete or be marked missed at end-time regardless.
+              ⚠️ Time together: {formatTime(bothActiveTime)}. If requirements aren't met, the class will be marked incomplete and you can request a dispute.
             </div>
             <div className="flex gap-3">
               <button

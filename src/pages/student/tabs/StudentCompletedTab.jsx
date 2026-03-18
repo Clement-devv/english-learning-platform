@@ -8,6 +8,7 @@
 //   )}
 
 import { useState, useEffect, useMemo } from "react";
+import { getUserTimezone, dualTime, tzCity } from "../../../utils/timezone";
 import {
   CheckCircle,
   XCircle,
@@ -34,6 +35,23 @@ const fmtDateTime = (d) =>
         minute: "2-digit",
       })
     : "—";
+
+// ─── Dual-time display for completed class row ────────────────────────────────
+function StudentDualTime({ scheduledTime, teacherTimezone }) {
+  if (!scheduledTime) return <span>—</span>;
+  const myTZ = getUserTimezone();
+  const dual = dualTime(scheduledTime, myTZ, teacherTimezone);
+  return (
+    <span>
+      {dual.myTime} {dual.myAbbr}
+      {!dual.sameZone && teacherTimezone && (
+        <span style={{ marginLeft: 6, opacity: 0.65, fontSize: "0.85em" }}>
+          · Teacher ({tzCity(teacherTimezone)}): {dual.theirTime} {dual.theirAbbr}
+        </span>
+      )}
+    </span>
+  );
+}
 
 // ─── Status badge ─────────────────────────────────────────────────────────────
 function StatusBadge({ adminRejected }) {
@@ -97,6 +115,7 @@ export default function StudentCompletedTab({ studentId, isDarkMode }) {
         adminRejected: b.adminRejected || false,
         adminRejectedReason: b.adminRejectedReason || "",
         adminRejectedAt: b.adminRejectedAt,
+        teacherTimezone: b.teacherTimezone || "",
       }));
 
       setClasses(normalised);
@@ -292,7 +311,7 @@ export default function StudentCompletedTab({ studentId, isDarkMode }) {
                     </span>
                     <span className="flex items-center gap-1.5">
                       <Calendar className="w-4 h-4" />
-                      {fmtDateTime(cls.scheduledTime)}
+                      <StudentDualTime scheduledTime={cls.scheduledTime} teacherTimezone={cls.teacherTimezone} />
                     </span>
                     <span className="flex items-center gap-1.5">
                       <Clock className="w-4 h-4" />

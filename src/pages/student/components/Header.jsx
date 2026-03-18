@@ -1,6 +1,7 @@
 // src/pages/student/components/Header.jsx
 import React from "react";
 import { LogOut, BookOpen } from "lucide-react";
+import GoogleTranslate from "../../../components/GoogleTranslate";
 
 export default function Header({ student, notifications, onLogout }) {
   const unreadCount = notifications?.filter(n => n.unread).length || 0;
@@ -33,6 +34,9 @@ export default function Header({ student, notifications, onLogout }) {
                 </p>
               </div>
             )}
+
+            {/* Language selector */}
+            <GoogleTranslate />
 
             {/* Logout Button */}
             <button

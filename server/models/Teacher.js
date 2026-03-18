@@ -28,9 +28,15 @@ const teacherSchema = new mongoose.Schema({
   },
 
   googleMeetLink: {
-  type: String,
-  default: "",
-},
+    type: String,
+    default: "",
+  },
+
+  // ── Timezone (auto-updated on dashboard load) ────────────────────────────
+  timezone: { type: String, default: "" }, // e.g. "Africa/Lagos"
+
+  // ── Schedule visibility ───────────────────────────────────────────────────
+  showScheduleToStudents: { type: Boolean, default: true },
 
   // ── Invite / account status ──────────────────────────────────────────────
   status: {
@@ -60,6 +66,9 @@ const teacherSchema = new mongoose.Schema({
   twoFactorSecret:      String,
   twoFactorBackupCodes: [String],
   twoFactorVerified:    { type: Boolean, default: false },
+
+  // ── Web Push subscription ─────────────────────────────────────────────────
+  pushSubscription: { type: Object, default: null },
 
 }, { timestamps: true });
 

@@ -1,11 +1,11 @@
 // src/pages/teacher/TeacherDashboard.jsx - NEW SIDEBAR DESIGN + 100% ORIGINAL LOGIC
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
   Settings, Plus, MessageCircle, Video, Repeat,
   Home, Calendar, CheckCircle, Users, BookOpen,
   DollarSign, LogOut, Menu, ChevronRight,
-  GraduationCap, RefreshCw, AlertCircle
+  GraduationCap, RefreshCw, AlertCircle, CalendarDays, Film, Star, Bell
 } from "lucide-react";
 
 // ── Layout (original) ─────────────────────────────────────────────────────────
@@ -44,9 +44,17 @@ import SettingsModal     from "../../components/SettingsModal";
 // ── Messages / Payment / Meet / Recurring (original) ──────────────────────────
 import MessagesTab        from "../../components/chat/MessagesTab";
 import PaymentTab         from "./tabs/PaymentTab";
+import HomeworkTab        from "./tabs/HomeworkTab";
+import QuizTab           from "./tabs/QuizTab";
+import VocabTab          from "./tabs/VocabTab";
+import RecordingsTab     from "./tabs/RecordingsTab";
+import ReviewsTab       from "./tabs/ReviewsTab";
+import ScheduleTab        from "./tabs/ScheduleTab";
 import GoogleMeetSettings from "../../components/GoogleMeetSettings";
 import RecurringClassForm from "../../components/teacher/RecurringClassForm";
 import api                from "../../api";
+import { getUserTimezone } from "../../utils/timezone";
+import { pushSupported, enablePush, disablePush, getPushStatus } from "../../utils/pushNotifications";
 
 // ── Services (original) ───────────────────────────────────────────────────────
 import { getAssignedStudents } from "../../services/teacherStudentService";
@@ -62,12 +70,18 @@ import {
 // ── Sidebar nav config ────────────────────────────────────────────────────────
 const NAV = [
   { key: "dashboard",         label: "Dashboard",         icon: Home          },
+  { key: "schedule",          label: "Schedule",          icon: CalendarDays  },
   { key: "classes",           label: "My Classes",        icon: Calendar      },
   { key: "completed-classes", label: "Completed Classes", icon: CheckCircle   },
   { key: "students",          label: "Students",          icon: Users         },
   { key: "bookings",          label: "Bookings",          icon: BookOpen      },
   { key: "messages",          label: "Messages",          icon: MessageCircle },
   { key: "payment",           label: "Payment",           icon: DollarSign    },
+  { key: "homework",          label: "Homework",          icon: BookOpen      },
+  { key: "quiz",              label: "Quizzes",           icon: GraduationCap },
+  { key: "vocab",             label: "Vocabulary",        icon: BookOpen      },
+  { key: "recordings",        label: "Recordings",        icon: Film          },
+  { key: "reviews",           label: "My Reviews",        icon: Star          },
 ];
 
 export default function TeacherDashboard() {
@@ -94,6 +108,35 @@ export default function TeacherDashboard() {
   const [showRecurringForm,      setShowRecurringForm]      = useState(false);
   const [isModalOpen,    setIsModalOpen]    = useState(false);
   const [confirmModal,   setConfirmModal]   = useState({ open: false, type: null, classId: null });
+  const [homeworkToGrade, setHomeworkToGrade] = useState(0);
+  const prevHomeworkToGradeRef = useRef(null);
+  const [quizAttempted, setQuizAttempted] = useState(0);
+  const prevQuizAttemptedRef = useRef(null);
+
+  // ── Push notifications ────────────────────────────────────────────────────────
+  const [pushEnabled, setPushEnabled] = useState(false);
+  useEffect(() => {
+    if (!pushSupported()) return;
+    getPushStatus().then(setPushEnabled);
+  }, []);
+
+  async function togglePush() {
+    if (pushEnabled) {
+      await disablePush();
+      setPushEnabled(false);
+      showToast("Notifications disabled");
+    } else {
+      const { ok, reason } = await enablePush();
+      if (ok) {
+        setPushEnabled(true);
+        showToast("🔔 Notifications enabled! You'll be reminded before class.");
+      } else if (reason === "denied") {
+        showToast("Notifications blocked — allow them in browser settings.", "error");
+      } else {
+        showToast("Could not enable notifications.", "error");
+      }
+    }
+  }
 
   // ── New sidebar state ─────────────────────────────────────────────────────────
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -117,8 +160,64 @@ export default function TeacherDashboard() {
     if (location.state?.classCompleted) {
       setActiveTab(location.state.activeTab || "payment");
       navigate(location.pathname, { replace: true, state: {} });
+    } else if (location.state?.classMissed) {
+      setActiveTab(location.state.activeTab || "bookings");
+      navigate(location.pathname, { replace: true, state: {} });
     }
-  }, [location.state?.classCompleted]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [location.state?.classCompleted, location.state?.classMissed]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Homework submission count polling ─────────────────────────────────────
+  useEffect(() => {
+    const checkHomework = async () => {
+      try {
+        const { data } = await api.get("/api/homework/my");
+        const toGrade = (data.homework || []).filter(h => h.status === "submitted").length;
+        setHomeworkToGrade(toGrade);
+
+        // Notify if a new submission came in since last check
+        if (prevHomeworkToGradeRef.current !== null && toGrade > prevHomeworkToGradeRef.current) {
+          const diff = toGrade - prevHomeworkToGradeRef.current;
+          if ("Notification" in window && Notification.permission === "granted") {
+            new Notification("📬 Homework Submitted!", {
+              body: `${diff} student${diff > 1 ? "s have" : " has"} submitted homework for you to grade.`,
+              icon: "/favicon.ico",
+            });
+          }
+        }
+        prevHomeworkToGradeRef.current = toGrade;
+      } catch { /* silent */ }
+    };
+
+    checkHomework();
+    const interval = setInterval(checkHomework, 90 * 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // ── Quiz attempt count polling ─────────────────────────────────────────────
+  useEffect(() => {
+    const checkQuizzes = async () => {
+      try {
+        const { data } = await api.get("/api/quiz/my");
+        const attempted = (data.quizzes || []).filter(q => q.status === "attempted").length;
+        setQuizAttempted(attempted);
+
+        if (prevQuizAttemptedRef.current !== null && attempted > prevQuizAttemptedRef.current) {
+          const diff = attempted - prevQuizAttemptedRef.current;
+          if ("Notification" in window && Notification.permission === "granted") {
+            new Notification("📝 Quiz Completed!", {
+              body: `${diff} student${diff > 1 ? "s have" : " has"} completed a quiz. View results in the Quizzes tab.`,
+              icon: "/favicon.ico",
+            });
+          }
+        }
+        prevQuizAttemptedRef.current = attempted;
+      } catch { /* silent */ }
+    };
+
+    checkQuizzes();
+    const interval = setInterval(checkQuizzes, 90 * 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   // ── Original fetchTeacherData (100% preserved) ────────────────────────────────
   const fetchTeacherData = async () => {
@@ -130,6 +229,9 @@ export default function TeacherDashboard() {
       console.log("✅ Teacher Info Loaded:", teacherData._id);
 
       if (!teacherId) throw new Error("No teacher ID found");
+
+      // Silently update teacher's timezone so bookings created later carry correct TZ
+      api.patch(`/api/teachers/${teacherId}/timezone`, { timezone: getUserTimezone() }).catch(() => {});
 
       const { data: apiTeacherData } = await api.get(`/api/teachers/${teacherId}`);
       setTeacherInfo(apiTeacherData);
@@ -151,7 +253,11 @@ export default function TeacherDashboard() {
 
       // Format students
       const studentsFormatted = studentsData.map((item) => ({
+        _id:          item.student._id,
         id:           item.student._id,
+        firstName:    item.student.firstName,
+        surname:      item.student.surname || "",
+        noOfClasses:  item.student.noOfClasses || 0,
         name:         `${item.student.firstName} ${item.student.surname}`,
         email:        item.student.email,
         status:       item.student.active ? "Active" : "Inactive",
@@ -179,9 +285,11 @@ export default function TeacherDashboard() {
           duration:      booking.duration,
           notes:         booking.notes,
           status:        booking.status,
-          isAdminBooking:booking.createdBy === "admin",
-          scheduledTime: booking.scheduledTime,
-          rawDate:       scheduledDate,
+          isAdminBooking:   booking.createdBy === "admin",
+          scheduledTime:    booking.scheduledTime,
+          rawDate:          scheduledDate,
+          teacherTimezone:  booking.teacherTimezone || "",
+          studentTimezone:  booking.studentTimezone || "",
         };
       });
       setBookings(bookingsFormatted);
@@ -493,7 +601,8 @@ export default function TeacherDashboard() {
           <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden", padding: "10px 6px" }} className="td-scroll">
             {NAV.map(({ key, label, icon: Icon }) => {
               const active   = activeTab === key;
-              const hasBadge = key === "bookings" && pendingBookings > 0;
+              const hasBadge = (key === "bookings" && pendingBookings > 0) || (key === "homework" && homeworkToGrade > 0) || (key === "quiz" && quizAttempted > 0);
+              const badgeCount = key === "bookings" ? pendingBookings : key === "homework" ? homeworkToGrade : key === "quiz" ? quizAttempted : 0;
               return (
                 <button key={key} onClick={() => setActiveTab(key)} title={!sidebarOpen ? label : undefined}
                   style={{ width: "100%", display: "flex", alignItems: "center", gap: "10px", padding: sidebarOpen ? "9px 10px" : "9px 14px", borderRadius: "10px", border: "none", cursor: "pointer", background: active ? (isDarkMode ? "#1e1730" : "#f5f0ff") : "transparent", color: active ? (isDarkMode ? "#a78bfa" : "#7c3aed") : (isDarkMode ? "#4b5563" : "#64748b"), fontFamily: "inherit", fontSize: "13.5px", fontWeight: active ? "700" : "500", textAlign: "left", marginBottom: "2px", whiteSpace: "nowrap", overflow: "hidden", position: "relative", transition: "all 0.15s" }}
@@ -503,7 +612,7 @@ export default function TeacherDashboard() {
                   <Icon size={16} style={{ flexShrink: 0 }} />
                   {sidebarOpen && <span style={{ flex: 1 }}>{label}</span>}
                   {sidebarOpen && hasBadge && (
-                    <span style={{ background: "#ef4444", color: "white", borderRadius: "10px", fontSize: "10px", fontWeight: "800", padding: "1px 7px", flexShrink: 0 }}>{pendingBookings}</span>
+                    <span style={{ background: "#ef4444", color: "white", borderRadius: "10px", fontSize: "10px", fontWeight: "800", padding: "1px 7px", flexShrink: 0 }}>{badgeCount}</span>
                   )}
                   {!sidebarOpen && hasBadge && (
                     <span style={{ position: "absolute", top: "6px", right: "6px", width: "8px", height: "8px", background: "#ef4444", borderRadius: "50%" }} />
@@ -570,6 +679,21 @@ export default function TeacherDashboard() {
                 style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: "20px", padding: "4px 12px", fontSize: "11.5px", fontWeight: "700", color: "#ef4444", cursor: "pointer" }}>
                 🔔 {pendingBookings} pending
               </div>
+            )}
+
+            {pushSupported() && (
+              <button
+                onClick={togglePush}
+                title={pushEnabled ? "Disable push notifications" : "Enable push notifications"}
+                style={{
+                  background: pushEnabled ? "#16a34a" : (isDarkMode ? "#1e293b" : "#f1f5f9"),
+                  border: `1px solid ${pushEnabled ? "#16a34a" : c.border}`,
+                  borderRadius: "10px", padding: "7px 10px", cursor: "pointer",
+                  color: pushEnabled ? "#fff" : c.muted, display: "flex", alignItems: "center",
+                }}
+              >
+                <Bell size={16} fill={pushEnabled ? "currentColor" : "none"} />
+              </button>
             )}
 
             <button onClick={() => setIsModalOpen(true)}
@@ -779,6 +903,18 @@ export default function TeacherDashboard() {
                 </div>
               )}
 
+              {/* ──────────────────────────── SCHEDULE TAB ── */}
+              {activeTab === "schedule" && (
+                <ScheduleTab
+                  teacherInfo={teacherInfo}
+                  isDarkMode={isDarkMode}
+                  classes={classes}
+                  bookings={bookings}
+                  students={students}
+                  onRefresh={fetchTeacherData}
+                />
+              )}
+
               {/* ──────────────────────────── MESSAGES TAB ── */}
               {activeTab === "messages" && <MessagesTab userRole="teacher" />}
 
@@ -788,6 +924,43 @@ export default function TeacherDashboard() {
                   <h1 style={{ margin: 0, fontSize: "20px", fontWeight: "800", color: c.heading }}>Payment</h1>
                   <PaymentTab teacher={teacherInfo} isDarkMode={isDarkMode} />
                 </div>
+              )}
+
+              {/* ──────────────────────────── HOMEWORK TAB ── */}
+              {activeTab === "homework" && (
+                <HomeworkTab
+                  teacherInfo={teacherInfo}
+                  students={students}
+                  isDarkMode={isDarkMode}
+                />
+              )}
+
+              {/* ─────────────────────────────── QUIZ TAB ── */}
+              {activeTab === "quiz" && (
+                <QuizTab
+                  teacherInfo={teacherInfo}
+                  students={students}
+                  isDarkMode={isDarkMode}
+                />
+              )}
+
+              {/* ─────────────────────────────── VOCAB TAB ── */}
+              {activeTab === "vocab" && (
+                <VocabTab
+                  teacherInfo={teacherInfo}
+                  students={students}
+                  isDarkMode={isDarkMode}
+                />
+              )}
+
+              {/* ─────────────────────────────── RECORDINGS TAB ── */}
+              {activeTab === "recordings" && (
+                <RecordingsTab isDarkMode={isDarkMode} />
+              )}
+
+              {/* ──────────────────────────────── REVIEWS TAB ── */}
+              {activeTab === "reviews" && (
+                <ReviewsTab teacherInfo={teacherInfo} isDarkMode={isDarkMode} />
               )}
 
             </div>

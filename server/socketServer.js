@@ -31,7 +31,8 @@ export function initializeSocket(httpServer) {
           users: new Set(),
           locked: true,
           pdfData: null,
-          pdfVisibleToStudents: false // NEW: Default hidden from students
+          pdfVisibleToStudents: false,
+          currentPage: 1,
         });
       }
 
@@ -44,14 +45,18 @@ export function initializeSocket(httpServer) {
 
       // Send current states to new joiner
       socket.emit('lock-status', session.locked);
-      socket.emit('pdf-visibility-changed', session.pdfVisibleToStudents); // NEW
+      socket.emit('pdf-visibility-changed', session.pdfVisibleToStudents);
 
       // Send current PDF if exists
       if (session.pdfData) {
         socket.emit('pdf-shared', {
           ...session.pdfData,
-          visibleToStudents: session.pdfVisibleToStudents // NEW
+          visibleToStudents: session.pdfVisibleToStudents
         });
+        // Send current page so student jumps to where teacher is
+        if (session.currentPage > 1) {
+          socket.emit('pdf-page-sync', { page: session.currentPage });
+        }
       }
 
       // Notify all users in the room about user count
@@ -184,6 +189,63 @@ export function initializeSocket(httpServer) {
 
         console.log(`👋 User ${userId} left whiteboard: ${channelName} (${userCount} users remaining)`);
       }
+    });
+
+    // ── PDF content sync (teacher → student) ────────────────────────────────
+    // The server simply relays these to everyone else in the room.
+    // Only the teacher should emit them; the client enforces this.
+
+    socket.on('pdf-stroke-start', (data) => {
+      socket.to(data.channelName).emit('pdf-stroke-start', data);
+    });
+
+    socket.on('pdf-stroke-move', (data) => {
+      socket.to(data.channelName).emit('pdf-stroke-move', data);
+    });
+
+    socket.on('pdf-stroke-end', (data) => {
+      socket.to(data.channelName).emit('pdf-stroke-end', data);
+    });
+
+    socket.on('pdf-page-sync', (data) => {
+      const session = whiteboardSessions.get(data.channelName);
+      if (session) session.currentPage = data.page;
+      socket.to(data.channelName).emit('pdf-page-sync', data);
+    });
+
+    socket.on('pdf-uploaded', (data) => {
+      const session = whiteboardSessions.get(data.channelName);
+      if (session) session.currentPage = 1;
+      socket.to(data.channelName).emit('pdf-uploaded', data);
+    });
+
+    socket.on('pdf-clear-sync', (data) => {
+      socket.to(data.channelName).emit('pdf-clear-sync', data);
+    });
+
+    // Whiteboard canvas state sync (used for undo + join catch-up)
+    socket.on('wb-sync', (data) => {
+      socket.to(data.channelName).emit('wb-sync', data);
+    });
+
+    // ── Emoji reactions (video call) ─────────────────────────────────────────
+    socket.on('join-reactions', ({ channelName }) => {
+      socket.join(`reactions-${channelName}`);
+    });
+
+    socket.on('emoji-reaction', (data) => {
+      socket.to(`reactions-${data.channelName}`).emit('emoji-reaction', data);
+    });
+
+    // ── Live chat (video call) ────────────────────────────────────────────────
+    socket.on('join-chat', ({ channelName }) => {
+      socket.join(`chat-${channelName}`);
+      console.log(`💬 Socket joined chat room: chat-${channelName}`);
+    });
+
+    socket.on('chat-message', (data) => {
+      // Relay to everyone else in the chat room
+      socket.to(`chat-${data.channelName}`).emit('chat-message', data);
     });
 
     // Handle disconnect

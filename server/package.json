@@ -10,6 +10,7 @@
     "migrate": "001-add-recurring-fields.js"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.79.0",
     "@react-three/drei": "^10.7.6",
     "@react-three/fiber": "^9.3.0",
     "agora-access-token": "^2.0.4",
@@ -29,7 +30,10 @@
     "jspdf-autotable": "^5.0.2",
     "mongodb": "^7.1.0",
     "mongoose": "^8.0.0",
+    "multer": "^2.1.1",
     "nodemailer": "^7.0.6",
+    "pdf-parse": "^2.4.5",
+    "pdfkit": "^0.18.0",
     "qrcode": "^1.5.4",
     "react-confetti": "^6.4.0",
     "recharts": "^3.3.0",
@@ -37,6 +41,7 @@
     "speakeasy": "^2.0.0",
     "three": "^0.180.0",
     "ua-parser-js": "^2.0.6",
+    "web-push": "^3.6.7",
     "xss-clean": "^0.1.4"
   },
   "devDependencies": {

@@ -110,8 +110,8 @@ router.get("/:chatId/messages", verifyToken, async (req, res) => {
     const { id: userId, role } = req.user;
 
     const chat = await GroupChat.findById(chatId)
-    .select("chatName teacherId studentId assignmentId")
-    .lean();
+      .select("chatName teacherId studentId assignmentId messages")
+      .lean();
     
 
     if (!chat) {
@@ -133,7 +133,7 @@ router.get("/:chatId/messages", verifyToken, async (req, res) => {
 
     res.json({
       success: true,
-      messages: chat.messages
+      messages: chat.messages || []
     });
 
   } catch (error) {

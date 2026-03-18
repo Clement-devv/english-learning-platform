@@ -1,6 +1,7 @@
 // src/pages/teacher/components/Layout/DashboardHeader.jsx
 import React from "react";
 import { LogOut, GraduationCap } from "lucide-react";
+import GoogleTranslate from "../../../../components/GoogleTranslate";
 
 export default function DashboardHeader({ teacherInfo, onLogout }) {
   return (
@@ -18,7 +19,7 @@ export default function DashboardHeader({ teacherInfo, onLogout }) {
             </div>
           </div>
 
-          {/* Right: Teacher Info & Logout */}
+          {/* Right: Teacher Info, Translate & Logout */}
           <div className="flex items-center gap-4">
             {/* Teacher Info */}
             {teacherInfo && (
@@ -29,6 +30,9 @@ export default function DashboardHeader({ teacherInfo, onLogout }) {
                 <p className="text-xs text-gray-500">{teacherInfo.email}</p>
               </div>
             )}
+
+            {/* Language selector */}
+            <GoogleTranslate />
 
             {/* Logout Button */}
             <button

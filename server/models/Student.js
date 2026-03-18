@@ -24,6 +24,9 @@ const studentSchema = new mongoose.Schema({
   dateOfBirth: { type: Date },
   rank:        { type: String, default: "" },
 
+  // ── Timezone (auto-updated on dashboard load) ────────────────────────────
+  timezone: { type: String, default: "" }, // e.g. "Asia/Ho_Chi_Minh"
+
   // ── Invite flow (same pattern as Teacher) ──────────────────────────────────
   status: {
     type:    String,
@@ -47,6 +50,14 @@ const studentSchema = new mongoose.Schema({
   twoFactorSecret:      String,
   twoFactorBackupCodes: [String],
   twoFactorVerified:    { type: Boolean, default: false },
+
+  // ── Web Push subscription ─────────────────────────────────────────────────
+  pushSubscription: { type: Object, default: null },   // { endpoint, keys: {p256dh, auth} }
+
+  // ── Referral system ───────────────────────────────────────────────────────
+  referralCode:          { type: String, unique: true, sparse: true },
+  referredBy:            { type: mongoose.Schema.Types.ObjectId, ref: "Student", default: null },
+  referralCreditsEarned: { type: Number, default: 0 },
 }, { timestamps: true });
 
 export default mongoose.model("Student", studentSchema);
