@@ -284,6 +284,26 @@ router.put("/:id", verifyToken, verifyAdminOrTeacher, async (req, res) => {
   }
 });
 
+// 👉 Toggle student active/inactive - ONLY ADMIN
+router.patch("/:id/toggle", verifyToken, verifyAdmin, async (req, res) => {
+  try {
+    const { active } = req.body;
+    if (typeof active !== "boolean") {
+      return res.status(400).json({ message: "active (boolean) is required" });
+    }
+    const student = await Student.findByIdAndUpdate(
+      req.params.id,
+      { active },
+      { new: true }
+    ).select("firstName surname email active noOfClasses age lastPaymentDate status");
+    if (!student) return res.status(404).json({ message: "Student not found" });
+    res.json({ message: `Student ${active ? "enabled" : "disabled"}`, student });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Error toggling student status" });
+  }
+});
+
 // 👉 Delete student - ONLY ADMIN
 router.delete("/:id", verifyToken, verifyAdmin, strictLimiter, async (req, res) => {
   try {

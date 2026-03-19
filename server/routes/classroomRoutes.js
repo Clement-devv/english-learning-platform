@@ -1,6 +1,5 @@
 
 import express from "express";
-import mongoose from "mongoose";
 import ClassroomSession from "../models/ClassroomSession.js";
 import ClassComplaint from "../models/ClassComplaint.js";
 import Booking from "../models/Booking.js";
@@ -54,22 +53,39 @@ router.post("/attendance", verifyToken, async (req, res) => {
 
     // ── Handle actions ──────────────────────────────────────────────────────
     if (action === "join") {
+      // Use atomic $set so concurrent teacher+student join requests don't
+      // overwrite each other's joinedAt fields (lost-update race condition).
+      const joinFields = {};
       if (userRole === "teacher") {
-        if (!session.teacherJoinedAt) session.teacherJoinedAt = ts;
-        session.teacherLeftAt = null; // null (not undefined) so Mongoose actually saves the clear
+        if (!session.teacherJoinedAt) joinFields.teacherJoinedAt = ts;
+        joinFields.teacherLeftAt = null;
         console.log(`👨‍🏫 Teacher joined booking ${bookingId}`);
       } else if (userRole === "student") {
-        if (!session.studentJoinedAt) session.studentJoinedAt = ts;
-        session.studentLeftAt = null; // null (not undefined) so Mongoose actually saves the clear
+        if (!session.studentJoinedAt) joinFields.studentJoinedAt = ts;
+        joinFields.studentLeftAt = null;
         console.log(`👨‍🎓 Student joined booking ${bookingId}`);
       }
 
-      // Both joined → start the class
-      if (session.teacherJoinedAt && session.studentJoinedAt && !session.classStartedAt) {
-        session.classStartedAt = new Date();
-        session.status = "active";
+      // Apply the join fields atomically, then re-fetch the fresh document
+      // so we can check whether both parties are now present.
+      const freshSession = await ClassroomSession.findOneAndUpdate(
+        { bookingId },
+        { $set: joinFields },
+        { new: true }
+      );
+
+      // If both are now present and the class hasn't started yet, start it.
+      // Use a conditional atomic update to avoid double-setting classStartedAt.
+      if (freshSession.teacherJoinedAt && freshSession.studentJoinedAt && !freshSession.classStartedAt) {
+        await ClassroomSession.findOneAndUpdate(
+          { bookingId, classStartedAt: null },
+          { $set: { classStartedAt: new Date(), status: "active" } }
+        );
         console.log(`🎉 Class started for booking ${bookingId}! Both parties present.`);
       }
+
+      const updatedSession = await ClassroomSession.findOne({ bookingId });
+      return res.json({ message: "Attendance updated", session: updatedSession });
     }
     else if (action === "leave") {
       if (userRole === "teacher") {
@@ -140,33 +156,35 @@ router.post("/auto-complete", verifyToken, async (req, res) => {
     // Already COMPLETED and paid — truly finalised, cannot re-process
     if (booking.status === "completed" && !booking.adminRejected) {
       const existingSession = await ClassroomSession.findOne({ bookingId });
+      let reportedBothActiveTime = existingSession?.bothActiveTime || 0;
+      // If stored bothActiveTime is 0, recover it from timestamps
+      if (reportedBothActiveTime === 0 && existingSession?.classStartedAt) {
+        const endMs = existingSession.classEndedAt
+          ? new Date(existingSession.classEndedAt).getTime()
+          : booking.completedAt
+            ? new Date(booking.completedAt).getTime()
+            : Date.now();
+        const maxDuration = (booking.duration || 60) * 60;
+        reportedBothActiveTime = Math.min(
+          Math.max(0, Math.floor((endMs - new Date(existingSession.classStartedAt).getTime()) / 1000)),
+          maxDuration
+        );
+      }
       return res.json({
         alreadyProcessed: true,
         completed: true,
         missed: false,
         teacherJoined: !!(existingSession?.teacherJoinedAt),
         studentJoined: !!(existingSession?.studentJoinedAt),
-        bothActiveTime: existingSession?.bothActiveTime || 0,
+        bothActiveTime: reportedBothActiveTime,
         requiredTime: existingSession?.requiredTime || Math.floor((booking.duration || 60) * 60 * 0.83),
         message: "Class already completed",
       });
     }
 
-    // Already marked missed — return the stored result without re-processing
-    if (booking.status === "missed") {
-      const existingSession = await ClassroomSession.findOne({ bookingId });
-      return res.json({
-        alreadyProcessed: true,
-        completed: false,
-        missed: true,
-        teacherJoined: !!(existingSession?.teacherJoinedAt) || callerRole === "teacher",
-        studentJoined: !!(existingSession?.studentJoinedAt) || callerRole === "student",
-        bothActiveTime: existingSession?.bothActiveTime || 0,
-        requiredTime: existingSession?.requiredTime || Math.floor((booking.duration || 60) * 60 * 0.83),
-        reason: booking.missedReason || "Attendance requirements were not met.",
-        message: "Class already marked as not completed",
-      });
-    }
+    // NOTE: "missed" bookings are intentionally NOT short-circuited here.
+    // The second caller (teacher or student) may have a valid clientBothActiveTime
+    // that can correct a wrongly-missed class. Fall through to re-evaluate.
 
     // "missed" bookings can be re-processed (previous run may have had bad data).
     // "pending" bookings are allowed (booking may never have been formally accepted).
@@ -205,7 +223,17 @@ router.post("/auto-complete", verifyToken, async (req, res) => {
     // MAX(its local value, server value), so this is MAX of all sources.
     // This prevents a tracking bug on one side from underreporting bothActiveTime.
     const serverBothActiveTime = session?.bothActiveTime || 0;
-    const bothActiveTime = Math.max(serverBothActiveTime, clientBothActiveTime || 0);
+    let bothActiveTime = Math.max(serverBothActiveTime, clientBothActiveTime || 0);
+
+    // If both active time is still 0 but the server confirmed both joined
+    // (classStartedAt is set), calculate the real duration from timestamps.
+    // This covers cases where heartbeats or client tracking failed entirely.
+    if (bothActiveTime === 0 && serverConfirmedBothJoined && session?.classStartedAt) {
+      const maxDuration = (booking.duration || 60) * 60;
+      const elapsed = Math.floor((Date.now() - new Date(session.classStartedAt)) / 1000);
+      bothActiveTime = Math.min(elapsed, maxDuration);
+      console.log(`⏱️ bothActiveTime was 0 — calculated from classStartedAt: ${Math.floor(bothActiveTime/60)}m ${bothActiveTime%60}s`);
+    }
 
     const requiredTime = session?.requiredTime || Math.floor((booking.duration || 60) * 60 * 0.83);
     const meetsRequirement = bothActiveTime >= requiredTime
@@ -232,78 +260,65 @@ router.post("/auto-complete", verifyToken, async (req, res) => {
 
     // ── Case 1: CLASS COMPLETED ✅ ───────────────────────────────────────────
     if (bothJoined && meetsRequirement) {
-      const dbSession = await mongoose.startSession();
-      dbSession.startTransaction();
+      // Mark booking completed
+      booking.status = "completed";
+      booking.completedAt = new Date();
+      booking.markedBy = "system";
+      booking.adminRejected = false;
+      await booking.save();
 
-      try {
-        // Mark booking completed
-        booking.status = "completed";
-        booking.completedAt = new Date();
-        booking.markedBy = "system";
-        booking.adminRejected = false;
-        await booking.save({ session: dbSession });
-
-        // Deduct student class
-        const student = await Student.findById(booking.studentId._id).session(dbSession);
-        if (student && student.noOfClasses > 0) {
-          student.noOfClasses -= 1;
-          if (student.noOfClasses === 0) student.active = false;
-          await student.save({ session: dbSession });
-        }
-
-        // Add teacher earnings
-        const teacher = await Teacher.findById(booking.teacherId._id).session(dbSession);
-        let earned = 0;
-        if (teacher) {
-          earned = parseFloat(teacher.ratePerClass || 0);
-          teacher.lessonsCompleted = (teacher.lessonsCompleted || 0) + 1;
-          teacher.earned = (teacher.earned || 0) + earned;
-          await teacher.save({ session: dbSession });
-        }
-
-        // Create payment transaction
-        await PaymentTransaction.create([{
-          bookingId: booking._id,
-          teacherId: booking.teacherId._id,
-          studentId: booking.studentId._id,
-          amount: earned,
-          status: "pending",
-          type: "class_completion",
-          classTitle: booking.classTitle,
-          completedAt: new Date(),
-          description: `Auto-completed: ${booking.classTitle} (system)`,
-        }], { session: dbSession });
-
-        // Update session status
-        if (session) {
-          session.status = "completed";
-          session.classEndedAt = new Date();
-          session.bothActiveTime = bothActiveTime;
-          await session.save({ session: dbSession });
-        }
-
-        await dbSession.commitTransaction();
-
-        console.log(`✅ Class completed: ${booking.classTitle} | Teacher earned: $${earned} | Student classes left: ${student?.noOfClasses ?? "?"}`);
-
-        return res.json({
-          completed: true,
-          missed: false,
-          message: "Class completed successfully!",
-          teacherJoined: true,
-          studentJoined: true,
-          teacherEarned: earned,
-          studentClassesRemaining: student?.noOfClasses ?? 0,
-          bothActiveTime,
-          requiredTime,
-        });
-
-      } catch (err) {
-        await dbSession.abortTransaction();
-        throw err;
-      } finally {
-        dbSession.endSession();
+      // Deduct student class
+      const student = await Student.findById(booking.studentId._id);
+      if (student && student.noOfClasses > 0) {
+        student.noOfClasses -= 1;
+        if (student.noOfClasses === 0) student.active = false;
+        await student.save();
       }
+
+      // Add teacher earnings
+      const teacher = await Teacher.findById(booking.teacherId._id);
+      let earned = 0;
+      if (teacher) {
+        earned = parseFloat(teacher.ratePerClass || 0);
+        teacher.lessonsCompleted = (teacher.lessonsCompleted || 0) + 1;
+        teacher.earned = (teacher.earned || 0) + earned;
+        await teacher.save();
+      }
+
+      // Create payment transaction
+      await PaymentTransaction.create({
+        bookingId: booking._id,
+        teacherId: booking.teacherId._id,
+        studentId: booking.studentId._id,
+        amount: earned,
+        status: "pending",
+        type: "class_completion",
+        classTitle: booking.classTitle,
+        completedAt: new Date(),
+        description: `Auto-completed: ${booking.classTitle} (system)`,
+      });
+
+      // Update session status
+      if (session) {
+        session.status = "completed";
+        session.classEndedAt = new Date();
+        session.bothActiveTime = bothActiveTime;
+        await session.save();
+      }
+
+      console.log(`✅ Class completed: ${booking.classTitle} | Teacher earned: $${earned} | Student classes left: ${student?.noOfClasses ?? "?"}`);
+
+      return res.json({
+        completed: true,
+        missed: false,
+        message: "Class completed successfully!",
+        teacherJoined: true,
+        studentJoined: true,
+        teacherEarned: earned,
+        studentClassesRemaining: student?.noOfClasses ?? 0,
+        bothActiveTime,
+        requiredTime,
+      });
     }
 
     // ── Case 2: CLASS MISSED / INCOMPLETE ❌ ────────────────────────────────
@@ -331,6 +346,7 @@ router.post("/auto-complete", verifyToken, async (req, res) => {
     if (session) {
       session.status = "incomplete";
       session.classEndedAt = new Date();
+      session.bothActiveTime = bothActiveTime; // persist so re-processing sees correct value
       await session.save();
     }
 
@@ -505,74 +521,62 @@ router.patch("/admin-complete/:bookingId", verifyToken, async (req, res) => {
 
     const session = await ClassroomSession.findOne({ bookingId: req.params.bookingId });
 
-    const dbSession = await mongoose.startSession();
-    dbSession.startTransaction();
+    booking.status = "completed";
+    booking.completedAt = new Date();
+    booking.markedBy = "admin";
+    booking.adminRejected = false;
+    await booking.save();
 
-    try {
-      booking.status = "completed";
-      booking.completedAt = new Date();
-      booking.markedBy = "admin";
-      booking.adminRejected = false;
-      await booking.save({ session: dbSession });
-
-      const student = await Student.findById(booking.studentId._id).session(dbSession);
-      if (student && student.noOfClasses > 0) {
-        student.noOfClasses -= 1;
-        if (student.noOfClasses === 0) student.active = false;
-        await student.save({ session: dbSession });
-      }
-
-      const teacher = await Teacher.findById(booking.teacherId._id).session(dbSession);
-      let earned = 0;
-      if (teacher) {
-        earned = parseFloat(teacher.ratePerClass || 0);
-        teacher.lessonsCompleted = (teacher.lessonsCompleted || 0) + 1;
-        teacher.earned = (teacher.earned || 0) + earned;
-        await teacher.save({ session: dbSession });
-      }
-
-      await PaymentTransaction.create([{
-        bookingId: booking._id,
-        teacherId: booking.teacherId._id,
-        studentId: booking.studentId._id,
-        amount: earned,
-        status: "pending",
-        type: "class_completion",
-        classTitle: booking.classTitle,
-        completedAt: new Date(),
-        description: `Admin-approved: ${booking.classTitle} (dispute resolved)`,
-      }], { session: dbSession });
-
-      if (session) {
-        session.status = "completed";
-        session.classEndedAt = new Date();
-        await session.save({ session: dbSession });
-      }
-
-      if (complaintId) {
-        await ClassComplaint.findByIdAndUpdate(complaintId, {
-          status: "approved",
-          resolution: "mark_complete",
-          adminNotes: adminNotes || "Marked complete by admin",
-          reviewedAt: new Date(),
-          reviewedBy: req.user.id,
-        }, { session: dbSession });
-      }
-
-      await dbSession.commitTransaction();
-
-      return res.json({
-        success: true,
-        message: `Class marked as completed by admin. Teacher earned $${earned}.`,
-        teacherEarned: earned,
-        studentClassesRemaining: student?.noOfClasses ?? 0,
-      });
-    } catch (err) {
-      await dbSession.abortTransaction();
-      throw err;
-    } finally {
-      dbSession.endSession();
+    const student = await Student.findById(booking.studentId._id);
+    if (student && student.noOfClasses > 0) {
+      student.noOfClasses -= 1;
+      if (student.noOfClasses === 0) student.active = false;
+      await student.save();
     }
+
+    const teacher = await Teacher.findById(booking.teacherId._id);
+    let earned = 0;
+    if (teacher) {
+      earned = parseFloat(teacher.ratePerClass || 0);
+      teacher.lessonsCompleted = (teacher.lessonsCompleted || 0) + 1;
+      teacher.earned = (teacher.earned || 0) + earned;
+      await teacher.save();
+    }
+
+    await PaymentTransaction.create({
+      bookingId: booking._id,
+      teacherId: booking.teacherId._id,
+      studentId: booking.studentId._id,
+      amount: earned,
+      status: "pending",
+      type: "class_completion",
+      classTitle: booking.classTitle,
+      completedAt: new Date(),
+      description: `Admin-approved: ${booking.classTitle} (dispute resolved)`,
+    });
+
+    if (session) {
+      session.status = "completed";
+      session.classEndedAt = new Date();
+      await session.save();
+    }
+
+    if (complaintId) {
+      await ClassComplaint.findByIdAndUpdate(complaintId, {
+        status: "approved",
+        resolution: "mark_complete",
+        adminNotes: adminNotes || "Marked complete by admin",
+        reviewedAt: new Date(),
+        reviewedBy: req.user.id,
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: `Class marked as completed by admin. Teacher earned $${earned}.`,
+      teacherEarned: earned,
+      studentClassesRemaining: student?.noOfClasses ?? 0,
+    });
   } catch (err) {
     console.error("Admin-complete error:", err);
     res.status(500).json({ message: "Error completing class: " + err.message });

@@ -565,9 +565,11 @@ useEffect(() => {
     // Record leave FIRST, then process completion
     await leaveSession(curBothActive);
 
-    if (!hasAutoCompletedRef.current) {
-      handleAutoCompleteRef.current(curBothActive);
-    }
+    // Always force completion on explicit leave — reset the flag in case a
+    // previous auto-complete attempt failed (e.g. server error), which would
+    // have left hasAutoCompletedRef = true and prevented the leave from working.
+    hasAutoCompletedRef.current = false;
+    handleAutoCompleteRef.current(curBothActive);
   };
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -767,7 +769,7 @@ useEffect(() => {
                   if (onLeave) onLeave();
                   else navigate(
                     userRole === "teacher" ? "/teacher/dashboard" : "/student/dashboard",
-                    { state: { classMissed: true, activeTab: userRole === "teacher" ? "bookings" : "dashboard" } }
+                    { state: { classMissed: true, activeTab: userRole === "teacher" ? "completed-classes" : "dashboard" } }
                   );
                 }}
                 className="w-full px-6 py-3 bg-gray-700 hover:bg-gray-800 text-white rounded-full font-bold transition-all"

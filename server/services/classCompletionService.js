@@ -2,7 +2,6 @@
 // THE single source of truth for all class completion logic.
 // Routes (classroom, admin, booking) all call completeClass() — nothing else.
 
-import mongoose from "mongoose";
 import Booking            from "../models/Booking.js";
 import Student            from "../models/Student.js";
 import Teacher            from "../models/Teacher.js";
@@ -146,11 +145,10 @@ export async function completeClass(bookingId, markedBy = "system", options = {}
   }
 
   // ══════════════════════════════════════════════════════
-  // STEP 4 — Multi-document transaction (5 atomic writes)
+  // STEP 4 — Sequential writes (no transactions — standalone MongoDB)
+  // The optimistic lock on "processing" status in STEP 1 prevents
+  // any concurrent duplicate from running these writes.
   // ══════════════════════════════════════════════════════
-  const dbSession = await mongoose.startSession();
-  dbSession.startTransaction();
-
   try {
     const now       = new Date();
     const teacherId = claimedBooking.teacherId._id;
@@ -159,58 +157,48 @@ export async function completeClass(bookingId, markedBy = "system", options = {}
     // Write 1: Finalize booking
     await Booking.updateOne(
       { _id: bookingId },
-      { $set: { status: "completed", completedAt: now, markedBy, adminRejected: false } },
-      { session: dbSession }
+      { $set: { status: "completed", completedAt: now, markedBy, adminRejected: false } }
     );
 
-    // Write 2: Deduct 1 credit from student (floor at 0)  [fixes inconsistent Math.max]
-    const student = await Student.findById(studentId).session(dbSession);
+    // Write 2: Deduct 1 credit from student (floor at 0)
+    const student = await Student.findById(studentId);
     if (!student) throw new Error(`Student ${studentId} not found`);
     const newClassCount = Math.max(0, (student.noOfClasses || 0) - 1);
     student.noOfClasses = newClassCount;
     if (newClassCount === 0) student.active = false;
-    await student.save({ session: dbSession });
+    await student.save();
 
-    // Write 3: Add teacher earnings — float-safe  [fixes BUG-4]
-    const teacher = await Teacher.findById(teacherId).session(dbSession);
+    // Write 3: Add teacher earnings — float-safe
+    const teacher = await Teacher.findById(teacherId);
     if (!teacher) throw new Error(`Teacher ${teacherId} not found`);
     const ratePerClass        = toMoney(teacher.ratePerClass);
     const newLessonsCompleted = (teacher.lessonsCompleted || 0) + 1;
     const newEarned           = toMoney((teacher.earned   || 0) + ratePerClass);
     teacher.lessonsCompleted  = newLessonsCompleted;
     teacher.earned            = newEarned;
-    await teacher.save({ session: dbSession });
+    await teacher.save();
 
-    // Write 4: Create PaymentTransaction  [fixes BUG-3 — unique bookingId index is 2nd safety net]
-    await PaymentTransaction.create(
-      [{
-        bookingId:   claimedBooking._id,
-        teacherId,
-        studentId,
-        amount:      ratePerClass,
-        status:      "pending",
-        type:        "class_completion",
-        classTitle:  claimedBooking.classTitle,
-        studentName: `${claimedBooking.studentId.firstName} ${claimedBooking.studentId.surname}`,
-        completedAt: now,
-        description: `Completed by ${markedBy} — ${claimedBooking.classTitle}`,
-      }],
-      { session: dbSession }
-    );
+    // Write 4: Create PaymentTransaction
+    await PaymentTransaction.create({
+      bookingId:   claimedBooking._id,
+      teacherId,
+      studentId,
+      amount:      ratePerClass,
+      status:      "pending",
+      type:        "class_completion",
+      classTitle:  claimedBooking.classTitle,
+      studentName: `${claimedBooking.studentId.firstName} ${claimedBooking.studentId.surname}`,
+      completedAt: now,
+      description: `Completed by ${markedBy} — ${claimedBooking.classTitle}`,
+    });
 
-    // Write 5: Update ClassroomSession INSIDE the transaction  [fixes BUG-5]
-    // Previous code: session.save() ran AFTER commitTransaction — crash between
-    // commit and save left session permanently stale. Now it rolls back with all.
+    // Write 5: Update ClassroomSession
     if (session) {
       await ClassroomSession.updateOne(
         { _id: session._id },
-        { $set: { status: "completed", classEndedAt: now, bothActiveTime: attendance.bothActiveTime } },
-        { session: dbSession }
+        { $set: { status: "completed", classEndedAt: now, bothActiveTime: attendance.bothActiveTime } }
       );
     }
-
-    // ── Commit ─────────────────────────────────────────
-    await dbSession.commitTransaction();
 
     console.log(
       `✅ [ClassCompletion] "${claimedBooking.classTitle}" (${bookingId})\n` +
@@ -232,27 +220,22 @@ export async function completeClass(bookingId, markedBy = "system", options = {}
     };
 
   } catch (err) {
-    await dbSession.abortTransaction();
-
-    // STEP 7 — Release processing lock  [fixes BUG-6]
+    // Release processing lock so the booking can be retried
     try {
       await Booking.updateOne(
         { _id: bookingId, status: "processing" },
         { $set: { status: "accepted" } }
       );
-      console.warn(`⚠️  [ClassCompletion] Rolled back ${bookingId}. Reset to "accepted".`);
+      console.warn(`⚠️  [ClassCompletion] Error on ${bookingId}, reset to "accepted". Error: ${err.message}`);
     } catch (resetErr) {
-      // 🚨 CRITICAL: booking is stuck in "processing" — needs manual fix in Atlas
       console.error(
-        `🚨 CRITICAL: Could not reset booking ${bookingId} after rollback!\n` +
-        `   Transaction error : ${err.message}\n` +
-        `   Reset error       : ${resetErr.message}\n` +
+        `🚨 CRITICAL: Could not reset booking ${bookingId} after error!\n` +
+        `   Error        : ${err.message}\n` +
+        `   Reset error  : ${resetErr.message}\n` +
         `   FIX: db.bookings.updateOne({_id: ObjectId("${bookingId}")}, {$set:{status:"accepted"}})`
       );
     }
 
     throw err;
-  } finally {
-    dbSession.endSession();
   }
 }

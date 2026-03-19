@@ -1,6 +1,5 @@
 // server/routes/bookingRoutes.js - WITH EMAIL NOTIFICATIONS
 import express from "express";
-import mongoose from "mongoose";
 import Booking from "../models/Booking.js";
 import Student from "../models/Student.js";
 import Teacher from "../models/Teacher.js";
@@ -384,76 +383,63 @@ router.patch("/:id/complete", verifyToken, async (req, res) => {
       });
     }
 
-    const session = await mongoose.startSession();
-    session.startTransaction();
+    // Update booking
+    booking.status = "completed";
+    booking.markedBy = "classroom";
+    booking.adminRejected = false;
+    booking.completedAt = new Date();
+    await booking.save();
 
-    try {
-      // Update booking
-      booking.status = "completed";
-      booking.markedBy = "classroom";
-      booking.adminRejected = false; 
-      booking.completedAt = new Date();
-      await booking.save({ session });
-
-      // Update student
-      const student = await Student.findById(booking.studentId._id).session(session);
-      if (student && student.noOfClasses > 0) {
-        student.noOfClasses -= 1;
-        await student.save({ session });
-      }
-
-      // Update teacher
-      const teacher = await Teacher.findById(booking.teacherId._id).session(session);
-      if (teacher) {
-        const ratePerClass = parseFloat(teacher.ratePerClass || 0);
-        teacher.lessonsCompleted = (teacher.lessonsCompleted || 0) + 1;
-        teacher.earned = (teacher.earned || 0) + ratePerClass;
-        await teacher.save({ session });
-
-        // Create payment transaction
-        await PaymentTransaction.create([{
-          bookingId: booking._id,
-          teacherId: teacher._id,
-          studentId: student._id,
-          amount: ratePerClass,
-          status: "pending",
-          completedAt: new Date()
-        }], { session });
-      }
-
-      await session.commitTransaction();
-
-      // ✅ SEND COMPLETION EMAILS
-      try {
-        await sendClassCompletedNotification(
-          booking.teacherId,
-          booking.studentId,
-          booking
-        );
-        console.log(`📧 Completion notifications sent`);
-      } catch (emailError) {
-        console.error("📧 Email notification failed:", emailError.message);
-      }
-
-      const updatedBooking = await Booking.findById(booking._id)
-        .populate("teacherId", "firstName lastName earned lessonsCompleted")
-        .populate("studentId", "firstName surname noOfClasses");
-
-      res.json({
-        success: true,
-        message: "Class completed successfully (notifications sent)",
-        booking: updatedBooking,
-        studentClassesRemaining: updatedBooking.studentId.noOfClasses,
-        teacherEarned: updatedBooking.teacherId.earned,
-        teacherLessonsCompleted: updatedBooking.teacherId.lessonsCompleted
-      });
-
-    } catch (error) {
-      await session.abortTransaction();
-      throw error;
-    } finally {
-      session.endSession();
+    // Update student
+    const student = await Student.findById(booking.studentId._id);
+    if (student && student.noOfClasses > 0) {
+      student.noOfClasses -= 1;
+      await student.save();
     }
+
+    // Update teacher
+    const teacher = await Teacher.findById(booking.teacherId._id);
+    if (teacher) {
+      const ratePerClass = parseFloat(teacher.ratePerClass || 0);
+      teacher.lessonsCompleted = (teacher.lessonsCompleted || 0) + 1;
+      teacher.earned = (teacher.earned || 0) + ratePerClass;
+      await teacher.save();
+
+      // Create payment transaction
+      await PaymentTransaction.create({
+        bookingId: booking._id,
+        teacherId: teacher._id,
+        studentId: student._id,
+        amount: ratePerClass,
+        status: "pending",
+        completedAt: new Date()
+      });
+    }
+
+    // ✅ SEND COMPLETION EMAILS
+    try {
+      await sendClassCompletedNotification(
+        booking.teacherId,
+        booking.studentId,
+        booking
+      );
+      console.log(`📧 Completion notifications sent`);
+    } catch (emailError) {
+      console.error("📧 Email notification failed:", emailError.message);
+    }
+
+    const updatedBooking = await Booking.findById(booking._id)
+      .populate("teacherId", "firstName lastName earned lessonsCompleted")
+      .populate("studentId", "firstName surname noOfClasses");
+
+    res.json({
+      success: true,
+      message: "Class completed successfully (notifications sent)",
+      booking: updatedBooking,
+      studentClassesRemaining: updatedBooking.studentId.noOfClasses,
+      teacherEarned: updatedBooking.teacherId.earned,
+      teacherLessonsCompleted: updatedBooking.teacherId.lessonsCompleted
+    });
 
   } catch (err) {
     console.error("❌ Error completing booking:", err);

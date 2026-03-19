@@ -15,6 +15,7 @@ import {
   TrendingUp,
   Eye,
   EyeOff,
+  MinusCircle,
 } from "lucide-react";
 
 function getInitials(firstName = "", lastName = "") {
@@ -79,6 +80,7 @@ export default function TeacherCard({
   onDelete,
   onToggle,
   onMarkLesson,
+  onUnmarkLesson,
   onPay,
   onCopyPassword,
   onResetPassword,
@@ -189,6 +191,16 @@ export default function TeacherCard({
                   isDarkMode={isDarkMode}
                   onClick={() => {
                     onMarkLesson();
+                    setMenuOpen(false);
+                  }}
+                />
+                <DropdownItem
+                  icon={MinusCircle}
+                  label="Unmark Lesson"
+                  color="rose"
+                  isDarkMode={isDarkMode}
+                  onClick={() => {
+                    onUnmarkLesson();
                     setMenuOpen(false);
                   }}
                 />
@@ -382,6 +394,7 @@ function DropdownItem({ icon: Icon, label, color, isDarkMode, onClick }) {
     purple: isDarkMode ? "text-purple-400 hover:bg-purple-900/40" : "text-purple-600 hover:bg-purple-50",
     indigo: isDarkMode ? "text-indigo-400 hover:bg-indigo-900/40" : "text-indigo-600 hover:bg-indigo-50",
     red: isDarkMode ? "text-red-400 hover:bg-red-900/40" : "text-red-600 hover:bg-red-50",
+    rose: isDarkMode ? "text-rose-400 hover:bg-rose-900/40" : "text-rose-600 hover:bg-rose-50",
   };
 
   return (

@@ -27,8 +27,10 @@ async function makeUniqueCode() {
 // ── GET /api/referrals/my  —  student: their code + stats ────────────────────
 router.get("/my", verifyToken, verifyStudent, async (req, res) => {
   try {
-    let student = await Student.findById(req.user._id)
+    let student = await Student.findById(req.user.id)
       .select("referralCode referralCreditsEarned firstName");
+
+    if (!student) return res.status(404).json({ error: "Student not found" });
 
     // Auto-generate code if missing (for existing students)
     if (!student.referralCode) {
@@ -36,7 +38,7 @@ router.get("/my", verifyToken, verifyStudent, async (req, res) => {
       await student.save();
     }
 
-    const referrals = await Referral.find({ referrerId: req.user._id })
+    const referrals = await Referral.find({ referrerId: req.user.id })
       .sort({ createdAt: -1 })
       .select("referredFirstName referredLastName referredEmail status creditAwarded createdAt");
 

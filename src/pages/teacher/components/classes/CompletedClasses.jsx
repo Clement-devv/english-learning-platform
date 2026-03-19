@@ -57,9 +57,9 @@ export default function CompletedClassesTab({ classes, teacherInfo, isDarkMode }
     let filtered = classes;
 
     if (statusFilter === "completed") {
-      filtered = filtered.filter((c) => !c.adminRejected);
+      filtered = filtered.filter((c) => !c.isMissed && !c.adminRejected);
     } else if (statusFilter === "not_completed") {
-      filtered = filtered.filter((c) => c.adminRejected);
+      filtered = filtered.filter((c) => c.isMissed || c.adminRejected);
     }
 
     if (searchQuery) {
@@ -86,8 +86,8 @@ export default function CompletedClassesTab({ classes, teacherInfo, isDarkMode }
   }, [classes, searchQuery, startDate, endDate, statusFilter]);
 
   // Counts for tabs
-  const completedCount = classes.filter((c) => !c.adminRejected).length;
-  const notCompletedCount = classes.filter((c) => c.adminRejected).length;
+  const completedCount    = classes.filter((c) => !c.isMissed && !c.adminRejected).length;
+  const notCompletedCount = classes.filter((c) => c.isMissed || c.adminRejected).length;
 
   // Pagination
   const totalPages = Math.ceil(filteredClasses.length / itemsPerPage);
@@ -123,7 +123,7 @@ export default function CompletedClassesTab({ classes, teacherInfo, isDarkMode }
           cls.students?.join(", ") || "—",
           new Date(cls.scheduledTime).toLocaleDateString(),
           `${cls.duration} min`,
-          cls.adminRejected ? "Not Completed" : "Completed",
+          (cls.isMissed || cls.adminRejected) ? "Not Completed" : "Completed",
         ]),
         theme: "striped",
         headStyles: { fillColor: [88, 28, 135] },
@@ -181,7 +181,7 @@ export default function CompletedClassesTab({ classes, teacherInfo, isDarkMode }
           <div>
             <h2 className={`text-xl font-bold ${text}`}>Completed Classes</h2>
             <p className={`text-sm mt-0.5 ${subText}`}>
-              {completedCount} completed · {notCompletedCount} not completed (rejected by admin)
+              {completedCount} completed · {notCompletedCount} not completed
             </p>
           </div>
           <div className="flex gap-2 flex-wrap">
@@ -283,7 +283,7 @@ export default function CompletedClassesTab({ classes, teacherInfo, isDarkMode }
       ) : (
         <div className={`${bg} rounded-xl shadow-md divide-y ${border}`}>
           {currentClasses.map((cls, idx) => {
-            const isNotCompleted = cls.adminRejected;
+            const isNotCompleted = cls.isMissed || cls.adminRejected;
             const alreadyDisputed = cls.disputeRaised || localDisputed[cls.id];
             return (
               <div key={cls.id || idx} className={`p-5 ${hoverRow} transition-colors`}>
@@ -347,7 +347,12 @@ export default function CompletedClassesTab({ classes, teacherInfo, isDarkMode }
                         )}
                       </div>
 
-                      {/* Admin rejection reason */}
+                      {/* Missed / rejection reason */}
+                      {isNotCompleted && cls.missedReason && (
+                        <p className="mt-2 text-xs text-red-600 bg-red-50 border border-red-200 px-3 py-1.5 rounded-lg">
+                          <strong>Reason:</strong> {cls.missedReason}
+                        </p>
+                      )}
                       {isNotCompleted && cls.adminRejectedReason && (
                         <p className="mt-2 text-xs text-red-600 bg-red-50 border border-red-200 px-3 py-1.5 rounded-lg">
                           <strong>Admin reason:</strong> {cls.adminRejectedReason}
@@ -427,6 +432,11 @@ export default function CompletedClassesTab({ classes, teacherInfo, isDarkMode }
               <p className={subText}>
                 {disputeBooking.fullDateTime || new Date(disputeBooking.scheduledTime).toLocaleString()}
               </p>
+              {disputeBooking.missedReason && (
+                <p className="mt-1 text-red-500 text-xs">
+                  Reason: {disputeBooking.missedReason}
+                </p>
+              )}
               {disputeBooking.adminRejectedReason && (
                 <p className="mt-1 text-red-500 text-xs">
                   Admin reason: {disputeBooking.adminRejectedReason}

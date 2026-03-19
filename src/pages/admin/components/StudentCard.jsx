@@ -17,6 +17,7 @@ import {
   Receipt,
   AlertTriangle,
   GraduationCap,
+  MinusCircle,
 } from "lucide-react";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -122,6 +123,7 @@ export default function StudentCard({
   onDelete,
   onToggle,
   onMarkLesson,
+  onUnmarkLesson,
   onManualPayment,
   onViewPayment,
   onViewLessons,
@@ -274,6 +276,13 @@ export default function StudentCard({
                   color="purple"
                   isDarkMode={isDarkMode}
                   onClick={() => { onMarkLesson(); setMenuOpen(false); }}
+                />
+                <DropdownItem
+                  icon={MinusCircle}
+                  label="Unmark Lesson"
+                  color="rose"
+                  isDarkMode={isDarkMode}
+                  onClick={() => { onUnmarkLesson(); setMenuOpen(false); }}
                 />
                 <DropdownItem
                   icon={RotateCcw}
@@ -443,6 +452,7 @@ function DropdownItem({ icon: Icon, label, color, isDarkMode, onClick }) {
     amber: isDarkMode ? "text-amber-400 hover:bg-amber-900/40" : "text-amber-600 hover:bg-amber-50",
     indigo: isDarkMode ? "text-indigo-400 hover:bg-indigo-900/40" : "text-indigo-600 hover:bg-indigo-50",
     red: isDarkMode ? "text-red-400 hover:bg-red-900/40" : "text-red-600 hover:bg-red-50",
+    rose: isDarkMode ? "text-rose-400 hover:bg-rose-900/40" : "text-rose-600 hover:bg-rose-50",
   };
 
   return (

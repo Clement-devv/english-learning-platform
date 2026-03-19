@@ -2,6 +2,8 @@
 import express from "express";
 import Booking from "../models/Booking.js";
 import Student from "../models/Student.js";
+import Teacher from "../models/Teacher.js";
+import PaymentTransaction from "../models/PaymentTransaction.js";
 import { verifyToken, verifyAdmin, verifyAdminOrTeacher } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
@@ -31,9 +33,9 @@ router.post("/booking/:bookingId", verifyToken, async (req, res) => {
       return res.status(403).json({ success: false, message: "Not authorized to raise a dispute for this booking" });
     }
 
-    // Can only dispute admin-rejected classes
-    if (!booking.adminRejected) {
-      return res.status(400).json({ success: false, message: "Can only raise a dispute on classes rejected by admin" });
+    // Can only dispute admin-rejected OR missed (attendance not met) classes
+    if (!booking.adminRejected && booking.status !== "missed") {
+      return res.status(400).json({ success: false, message: "Can only raise a dispute on classes that were not completed" });
     }
 
     // Don't allow duplicate disputes
@@ -128,20 +130,58 @@ router.patch("/:bookingId/resolve", verifyAdmin, async (req, res) => {
     }
 
     if (resolution === "approve_teacher") {
-      // Teacher wins: class is valid — remove the admin rejection, restore as completed
+      // Teacher wins — mark as completed and process payment/deduction if not already done
+      const wasMissed = booking.status === "missed";
+
       booking.adminRejected = false;
       booking.adminRejectedReason = "";
       booking.status = "completed";
+      booking.markedBy = "admin";
       booking.disputeStatus = "resolved_teacher";
+
+      if (wasMissed) {
+        // Missed class approved: deduct student class and pay teacher
+        const student = await Student.findById(booking.studentId._id);
+        if (student && student.noOfClasses > 0) {
+          student.noOfClasses -= 1;
+          if (student.noOfClasses === 0) student.active = false;
+          await student.save();
+        }
+
+        const teacher = await Teacher.findById(booking.teacherId._id);
+        if (teacher) {
+          const earned = parseFloat(teacher.ratePerClass || 0);
+          teacher.lessonsCompleted = (teacher.lessonsCompleted || 0) + 1;
+          teacher.earned = (teacher.earned || 0) + earned;
+          await teacher.save();
+
+          await PaymentTransaction.create({
+            bookingId: booking._id,
+            teacherId: booking.teacherId._id,
+            studentId: booking.studentId._id,
+            amount: earned,
+            status: "pending",
+            type: "class_completion",
+            classTitle: booking.classTitle,
+            completedAt: new Date(),
+            description: `Dispute approved: ${booking.classTitle} (missed → completed by admin)`,
+          });
+          console.log(`💰 Teacher paid $${earned} after dispute approval for booking ${booking._id}`);
+        }
+      }
     } else {
-      // Student wins: class stays rejected, refund student 1 class
+      // Student wins: class stays rejected/missed, no change to teacher earnings
       booking.disputeStatus = "resolved_student";
 
-      const student = await Student.findById(booking.studentId._id);
-      if (student) {
-        student.noOfClasses = (student.noOfClasses || 0) + 1;
-        await student.save();
-        console.log(`✅ Refunded 1 class to student ${student.firstName}`);
+      // Only refund student class if it was already deducted (adminRejected = completed then rejected)
+      // Missed classes never deducted student's class, so no refund needed
+      if (booking.adminRejected) {
+        const student = await Student.findById(booking.studentId._id);
+        if (student) {
+          student.noOfClasses = (student.noOfClasses || 0) + 1;
+          await student.save();
+          console.log(`✅ Refunded 1 class to student ${student.firstName}`);
+        }
       }
     }
 

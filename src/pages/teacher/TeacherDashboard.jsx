@@ -161,7 +161,7 @@ export default function TeacherDashboard() {
       setActiveTab(location.state.activeTab || "payment");
       navigate(location.pathname, { replace: true, state: {} });
     } else if (location.state?.classMissed) {
-      setActiveTab(location.state.activeTab || "bookings");
+      setActiveTab(location.state.activeTab || "completed-classes");
       navigate(location.pathname, { replace: true, state: {} });
     }
   }, [location.state?.classCompleted, location.state?.classMissed]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -248,8 +248,11 @@ export default function TeacherDashboard() {
           getAssignedStudents(teacherId),
           getTeacherBookings(teacherId, "pending"),
           getTeacherBookings(teacherId, "accepted"),
-          getTeacherBookings(teacherId, "completed"),
+          getTeacherBookings(teacherId, "completed"), // server returns both completed + missed
         ]);
+      // Split into completed vs missed based on actual status field
+      const missedBookingsData = completedBookingsData.filter((b) => b.status === "missed");
+      const trueCompletedData  = completedBookingsData.filter((b) => b.status === "completed");
 
       // Format students
       const studentsFormatted = studentsData.map((item) => ({
@@ -340,9 +343,9 @@ export default function TeacherDashboard() {
       });
       setClasses(activeClasses);
 
-      // Build completed map
+      // Build completed map (truly completed, no missed)
       const completedMap = new Map();
-      completedBookingsData.forEach((booking) => {
+      trueCompletedData.forEach((booking) => {
         const scheduledDate = new Date(booking.scheduledTime);
         const groupKey = `${booking.scheduledTime}_${booking.classTitle}`;
         if (completedMap.has(groupKey)) {
@@ -366,7 +369,34 @@ export default function TeacherDashboard() {
         }
       });
 
-      setCompletedClasses([...finishedClasses, ...Array.from(completedMap.values())]);
+      // Build missed classes map (status = "missed" — ended early or time not met)
+      const missedMap = new Map();
+      missedBookingsData.forEach((booking) => {
+        const scheduledDate = new Date(booking.scheduledTime);
+        const groupKey = `${booking.scheduledTime}_${booking.classTitle}`;
+        if (missedMap.has(groupKey)) {
+          missedMap.get(groupKey).students.push(`${booking.studentId.firstName} ${booking.studentId.surname}`);
+        } else {
+          missedMap.set(groupKey, {
+            id:            booking._id,
+            title:         booking.classTitle,
+            topic:         booking.topic || "Missed Lesson",
+            fullDateTime:  scheduledDate.toLocaleString("en-US", { weekday: "short", year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", hour12: true }),
+            scheduledTime: booking.scheduledTime,
+            scheduledDate,
+            students:      [`${booking.studentId.firstName} ${booking.studentId.surname}`],
+            duration:      booking.duration,
+            status:        "missed",
+            isMissed:      true,
+            missedReason:  booking.missedReason || "",
+            adminRejected: booking.adminRejected || false,
+            adminRejectedReason: booking.adminRejectedReason || "",
+            disputeRaised: booking.disputeRaised || false,
+          });
+        }
+      });
+
+      setCompletedClasses([...finishedClasses, ...Array.from(completedMap.values()), ...Array.from(missedMap.values())]);
     } catch (err) {
       console.error("Failed to load teacher data:", err);
       console.error("Error details:", err.response?.data?.message || "Failed to load teacher data");
