@@ -1,28 +1,34 @@
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: "http://localhost:5000",
+  baseURL: import.meta.env.VITE_API_URL || "http://localhost:5000",
 });
+
+// Token helpers — prefer sessionStorage (cleared on tab close), fall back to
+// localStorage for users who chose "remember me". Never store in cookies
+// without the HttpOnly flag.
+const getToken = (key) =>
+  sessionStorage.getItem(key) || localStorage.getItem(key);
+
+const removeToken = (key) => {
+  sessionStorage.removeItem(key);
+  localStorage.removeItem(key);
+};
 
 // Add token to all requests automatically
 api.interceptors.request.use(
   (config) => {
-    // Check for admin, teacher, or student tokens
-    const adminToken = localStorage.getItem('adminToken');
-    const teacherToken = localStorage.getItem('teacherToken');
-    const studentToken = localStorage.getItem('studentToken');
-    
-    // Use whichever token exists (priority: admin > teacher > student)
-    const token = adminToken || teacherToken || studentToken;
-    
+    const token =
+      getToken("adminToken") ||
+      getToken("teacherToken") ||
+      getToken("studentToken");
+
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
 // Handle token expiration
@@ -30,23 +36,18 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Check which type of user is logged in and redirect accordingly
-      const adminToken = localStorage.getItem('adminToken');
-      const teacherToken = localStorage.getItem('teacherToken');
-      const studentToken = localStorage.getItem('studentToken');
-      
-      if (adminToken) {
-        localStorage.removeItem('adminToken');
-        localStorage.removeItem('adminInfo');
-        window.location.href = '/admin/login';
-      } else if (teacherToken) {
-        localStorage.removeItem('teacherToken');
-        localStorage.removeItem('teacherInfo');
-        window.location.href = '/teacher/login';
-      } else if (studentToken) {
-        localStorage.removeItem('studentToken');
-        localStorage.removeItem('studentInfo');
-        window.location.href = '/student/login';
+      if (getToken("adminToken")) {
+        removeToken("adminToken");
+        removeToken("adminInfo");
+        window.location.href = "/admin/login";
+      } else if (getToken("teacherToken")) {
+        removeToken("teacherToken");
+        removeToken("teacherInfo");
+        window.location.href = "/teacher/login";
+      } else if (getToken("studentToken")) {
+        removeToken("studentToken");
+        removeToken("studentInfo");
+        window.location.href = "/student/login";
       }
     }
     return Promise.reject(error);

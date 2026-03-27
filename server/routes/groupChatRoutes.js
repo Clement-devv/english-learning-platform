@@ -1,9 +1,10 @@
-// server/routes/groupChatRoutes.js - ✅ FIXED VERSION WITH ADMIN SUPPORT
+// server/routes/groupChatRoutes.js
 import express from "express";
 import GroupChat from "../models/GroupChat.js";
-import Teacher from "../models/Teacher.js";
-import Student from "../models/Student.js";
-import Admin from "../models/Admin.js"; 
+import Teacher  from "../models/Teacher.js";
+import Student  from "../models/Student.js";
+import Admin    from "../models/Admin.js";
+import SubAdmin from "../models/SubAdmin.js";
 import { verifyToken } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
@@ -17,22 +18,19 @@ router.get("/", verifyToken, async (req, res) => {
     const { id: userId, role } = req.user;
 
     let filter = {};
-    
-    // Role-based filtering
+
     if (role === "admin") {
-      // Admin sees ALL chats
       filter = {};
     } else if (role === "teacher") {
-      // Teacher sees only their assigned students
       filter.teacherId = userId;
     } else if (role === "student") {
-      // Student sees only their teacher
       filter.studentId = userId;
+    } else if (role === "sub-admin") {
+      // Sub-admin sees chats for teachers in their scope
+      const scope = req.user.teacherScope || [];
+      filter.teacherId = { $in: scope };
     } else {
-      return res.status(403).json({ 
-        success: false, 
-        message: "Invalid user role" 
-      });
+      return res.status(403).json({ success: false, message: "Invalid user role" });
     }
 
     const chats = await GroupChat.find(filter)
@@ -75,28 +73,23 @@ router.get("/:chatId", verifyToken, async (req, res) => {
       });
     }
 
-    // Access control: Only admin, assigned teacher, or assigned student can view
-    if (role !== "admin" && 
-        chat.teacherId._id.toString() !== userId && 
-        chat.studentId._id.toString() !== userId) {
-      return res.status(403).json({ 
-        success: false, 
-        message: "Access denied" 
-      });
+    // Access control
+    const teacherIdStr = chat.teacherId?._id?.toString() || chat.teacherId?.toString();
+    const studentIdStr = chat.studentId?._id?.toString() || chat.studentId?.toString();
+    const scope = req.user.teacherScope?.map(String) || [];
+
+    if (role !== "admin" &&
+        teacherIdStr !== userId &&
+        studentIdStr !== userId &&
+        !(role === "sub-admin" && scope.includes(teacherIdStr))) {
+      return res.status(403).json({ success: false, message: "Access denied" });
     }
 
-    res.json({
-      success: true,
-      chat
-    });
+    res.json({ success: true, chat });
 
   } catch (error) {
     console.error("❌ Error fetching chat:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to fetch chat",
-      error: error.message
-    });
+    res.status(500).json({ success: false, message: "Failed to fetch chat", error: error.message });
   }
 });
 
@@ -122,27 +115,19 @@ router.get("/:chatId/messages", verifyToken, async (req, res) => {
     }
 
     // Access control
-    if (role !== "admin" && 
-        chat.teacherId.toString() !== userId && 
-        chat.studentId.toString() !== userId) {
-      return res.status(403).json({ 
-        success: false, 
-        message: "Access denied" 
-      });
+    const scope = req.user.teacherScope?.map(String) || [];
+    if (role !== "admin" &&
+        chat.teacherId.toString() !== userId &&
+        chat.studentId.toString() !== userId &&
+        !(role === "sub-admin" && scope.includes(chat.teacherId.toString()))) {
+      return res.status(403).json({ success: false, message: "Access denied" });
     }
 
-    res.json({
-      success: true,
-      messages: chat.messages || []
-    });
+    res.json({ success: true, messages: chat.messages || [] });
 
   } catch (error) {
     console.error("❌ Error fetching messages:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to fetch messages",
-      error: error.message
-    });
+    res.status(500).json({ success: false, message: "Failed to fetch messages", error: error.message });
   }
 });
 
@@ -157,48 +142,30 @@ router.post("/:chatId/messages", verifyToken, async (req, res) => {
     const { message } = req.body;
     const { id: senderId, role } = req.user;
 
-    // ✅ FIXED: Get sender details (including Admin)
     let senderName, senderModel;
-    
+
     if (role === "teacher") {
       const teacher = await Teacher.findById(senderId);
-      if (!teacher) {
-        return res.status(404).json({ 
-          success: false, 
-          message: "Teacher not found" 
-        });
-      }
-      senderName = `${teacher.firstName} ${teacher.lastName}`;
+      if (!teacher) return res.status(404).json({ success: false, message: "Teacher not found" });
+      senderName  = `${teacher.firstName} ${teacher.lastName}`;
       senderModel = "Teacher";
-      
     } else if (role === "student") {
       const student = await Student.findById(senderId);
-      if (!student) {
-        return res.status(404).json({ 
-          success: false, 
-          message: "Student not found" 
-        });
-      }
-      senderName = `${student.firstName} ${student.surname}`;
+      if (!student) return res.status(404).json({ success: false, message: "Student not found" });
+      senderName  = `${student.firstName} ${student.surname}`;
       senderModel = "Student";
-      
     } else if (role === "admin") {
-      // ✅ NEW: Handle admin users
       const admin = await Admin.findById(senderId);
-      if (!admin) {
-        return res.status(404).json({ 
-          success: false, 
-          message: "Admin not found" 
-        });
-      }
-      senderName = `${admin.firstName} ${admin.lastName}`;
+      if (!admin) return res.status(404).json({ success: false, message: "Admin not found" });
+      senderName  = `${admin.firstName} ${admin.lastName}`;
       senderModel = "Admin";
-      
+    } else if (role === "sub-admin") {
+      const subAdmin = await SubAdmin.findById(senderId);
+      if (!subAdmin) return res.status(404).json({ success: false, message: "Sub-admin not found" });
+      senderName  = `${subAdmin.firstName} ${subAdmin.lastName}`;
+      senderModel = "SubAdmin";
     } else {
-      return res.status(403).json({ 
-        success: false, 
-        message: "Invalid user role" 
-      });
+      return res.status(403).json({ success: false, message: "Invalid user role" });
     }
 
     // Validation
@@ -218,14 +185,13 @@ router.post("/:chatId/messages", verifyToken, async (req, res) => {
       });
     }
 
-    // Access control: Admin can send to any chat
-    if (role !== "admin" && 
-        chat.teacherId.toString() !== senderId && 
-        chat.studentId.toString() !== senderId) {
-      return res.status(403).json({ 
-        success: false, 
-        message: "Access denied" 
-      });
+    // Access control
+    const sendScope = req.user.teacherScope?.map(String) || [];
+    if (role !== "admin" &&
+        chat.teacherId.toString() !== senderId &&
+        chat.studentId.toString() !== senderId &&
+        !(role === "sub-admin" && sendScope.includes(chat.teacherId.toString()))) {
+      return res.status(403).json({ success: false, message: "Access denied" });
     }
 
     // Create new message
@@ -252,14 +218,21 @@ router.post("/:chatId/messages", verifyToken, async (req, res) => {
 
     // Update unread counts for other participants
     if (role === "teacher") {
-      chat.unreadCount.student += 1;
-      chat.unreadCount.admin += 1;
+      chat.unreadCount.student  += 1;
+      chat.unreadCount.admin    += 1;
+      chat.unreadCount.subAdmin += 1;
     } else if (role === "student") {
-      chat.unreadCount.teacher += 1;
-      chat.unreadCount.admin += 1;
+      chat.unreadCount.teacher  += 1;
+      chat.unreadCount.admin    += 1;
+      chat.unreadCount.subAdmin += 1;
     } else if (role === "admin") {
+      chat.unreadCount.teacher  += 1;
+      chat.unreadCount.student  += 1;
+      chat.unreadCount.subAdmin += 1;
+    } else if (role === "sub-admin") {
       chat.unreadCount.teacher += 1;
       chat.unreadCount.student += 1;
+      chat.unreadCount.admin   += 1;
     }
 
     await chat.save();
@@ -302,13 +275,12 @@ router.patch("/:chatId/mark-read", verifyToken, async (req, res) => {
     }
 
     // Access control
-    if (role !== "admin" && 
-        chat.teacherId.toString() !== userId && 
-        chat.studentId.toString() !== userId) {
-      return res.status(403).json({ 
-        success: false, 
-        message: "Access denied" 
-      });
+    const mrScope = req.user.teacherScope?.map(String) || [];
+    if (role !== "admin" &&
+        chat.teacherId.toString() !== userId &&
+        chat.studentId.toString() !== userId &&
+        !(role === "sub-admin" && mrScope.includes(chat.teacherId.toString()))) {
+      return res.status(403).json({ success: false, message: "Access denied" });
     }
 
     // Mark all messages as read by this user
@@ -319,13 +291,10 @@ router.patch("/:chatId/mark-read", verifyToken, async (req, res) => {
     });
 
     // Reset unread count for this role
-    if (role === "admin") {
-      chat.unreadCount.admin = 0;
-    } else if (role === "teacher") {
-      chat.unreadCount.teacher = 0;
-    } else if (role === "student") {
-      chat.unreadCount.student = 0;
-    }
+    if (role === "admin")         chat.unreadCount.admin    = 0;
+    else if (role === "teacher")  chat.unreadCount.teacher  = 0;
+    else if (role === "student")  chat.unreadCount.student  = 0;
+    else if (role === "sub-admin") chat.unreadCount.subAdmin = 0;
 
     await chat.save();
 

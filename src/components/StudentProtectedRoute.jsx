@@ -9,7 +9,7 @@ export default function StudentProtectedRoute({ children }) {
 
   useEffect(() => {
     const verifyToken = async () => {
-      const token = localStorage.getItem('studentToken');
+      const token = sessionStorage.getItem('studentToken') || localStorage.getItem('studentToken');
       
       if (!token) {
         setIsAuthenticated(false);
@@ -25,7 +25,9 @@ export default function StudentProtectedRoute({ children }) {
         setIsAuthenticated(true);
       } catch (error) {
         console.error('Student token verification failed:', error);
+        sessionStorage.removeItem('studentToken');
         localStorage.removeItem('studentToken');
+        sessionStorage.removeItem('studentInfo');
         localStorage.removeItem('studentInfo');
         setIsAuthenticated(false);
       } finally {

@@ -3,24 +3,23 @@ import React, { useState, useEffect, useCallback } from "react";
 import { Search, MessageCircle, CheckCheck, Shield, Plus } from "lucide-react";
 import api from "../../api";
 
-export default function GroupChatList({ userRole, onSelectChat, selectedChatId, isDark }) {
+export default function GroupChatList({ userRole, onSelectChat, selectedChatId, isDark, onUnreadCount }) {
   const [groupChats,  setGroupChats]  = useState([]);
   const [dms,         setDms]         = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [loading,     setLoading]     = useState(true);
   const [startingDm,  setStartingDm]  = useState(false);
 
-  // ── Colour tokens — fixed for proper dark mode contrast ──────────────────
   const C = {
-    bg:       isDark ? "#13151c" : "#f8f9ff",
-    text:     isDark ? "#e8eaf6" : "#1a1d2e",
-    sub:      isDark ? "#8b91b8" : "#9ea3be",   // was #4a4f6a — too dark
-    border:   isDark ? "rgba(255,255,255,0.09)" : "#eef0f8",
-    inputBg:  isDark ? "#1e2235" : "#eef0f8",
-    inputTxt: isDark ? "#e8eaf6" : "#1a1d2e",
-    hover:    isDark ? "rgba(255,255,255,0.05)" : "rgba(99,102,241,0.05)",
-    active:   isDark ? "rgba(99,102,241,0.18)"  : "rgba(99,102,241,0.09)",
-    accent:   "#6366f1",
+    bg:         isDark ? "#13151c" : "#f8f9ff",
+    text:       isDark ? "#e8eaf6" : "#1a1d2e",
+    sub:        isDark ? "#8b91b8" : "#9ea3be",
+    border:     isDark ? "rgba(255,255,255,0.09)" : "#eef0f8",
+    inputBg:    isDark ? "#1e2235" : "#eef0f8",
+    inputTxt:   isDark ? "#e8eaf6" : "#1a1d2e",
+    hover:      isDark ? "rgba(255,255,255,0.05)" : "rgba(99,102,241,0.05)",
+    active:     isDark ? "rgba(99,102,241,0.18)"  : "rgba(99,102,241,0.09)",
+    accent:     "#6366f1",
     sectionTxt: isDark ? "#6b72a0" : "#b0b5d0",
   };
 
@@ -50,6 +49,18 @@ export default function GroupChatList({ userRole, onSelectChat, selectedChatId, 
     const id = setInterval(fetchAll, 10000);
     return () => clearInterval(id);
   }, [fetchAll]);
+
+  // Map userRole to the unreadCount key used in DB
+  const unreadKey = userRole === "sub-admin" ? "subAdmin" : userRole;
+
+  // Emit total unread count to parent whenever it changes
+  const totalUnread =
+    groupChats.reduce((s, c) => s + (c?.unreadCount?.[unreadKey] || 0), 0) +
+    dms.reduce((s, d) => s + (d?.unreadCount?.[unreadKey] || 0), 0);
+
+  useEffect(() => {
+    onUnreadCount?.(totalUnread);
+  }, [totalUnread, onUnreadCount]);
 
   const startAdminDm = async () => {
     if (startingDm) return;
@@ -83,22 +94,55 @@ export default function GroupChatList({ userRole, onSelectChat, selectedChatId, 
     return p.length >= 2 ? (p[0][0] + p[p.length - 1][0]).toUpperCase() : name.slice(0, 2).toUpperCase();
   };
 
+  // Derive display info for a DM — proper names + role badges
+  const getDmInfo = (dm) => {
+    // Admin sees who sent the DM
+    if (userRole === "admin") {
+      if (dm.type === "teacher-admin" && dm.teacherId) {
+        const name = `${dm.teacherId.firstName} ${dm.teacherId.lastName}`;
+        return { name, initials: getInitials(name), roleBadge: "Teacher",
+          avatarBg: "linear-gradient(135deg,#1d4ed8,#0891b2)",
+          badgeColor: isDark ? "#bfdbfe" : "#1d4ed8", badgeBg: isDark ? "rgba(29,78,216,0.25)" : "rgba(29,78,216,0.10)" };
+      }
+      if (dm.type === "student-admin" && dm.studentId) {
+        const name = `${dm.studentId.firstName} ${dm.studentId.surname}`;
+        return { name, initials: getInitials(name), roleBadge: "Student",
+          avatarBg: "linear-gradient(135deg,#047857,#10b981)",
+          badgeColor: isDark ? "#a7f3d0" : "#047857", badgeBg: isDark ? "rgba(4,120,87,0.25)" : "rgba(4,120,87,0.10)" };
+      }
+      if (dm.type === "sub-admin-admin" && dm.subAdminId) {
+        const name = `${dm.subAdminId.firstName} ${dm.subAdminId.lastName}`;
+        return { name, initials: getInitials(name), roleBadge: "Sub-Admin",
+          avatarBg: "linear-gradient(135deg,#b45309,#f59e0b)",
+          badgeColor: isDark ? "#fde68a" : "#b45309", badgeBg: isDark ? "rgba(180,83,9,0.25)" : "rgba(180,83,9,0.10)" };
+      }
+    }
+    // Sub-admin sees "Admin" as the other party
+    if (userRole === "sub-admin") {
+      return { name: "Admin", initials: "AD", roleBadge: "Admin",
+        avatarBg: "linear-gradient(135deg,#7c3aed,#a855f7)",
+        badgeColor: isDark ? "#e9d5ff" : "#7c3aed", badgeBg: isDark ? "rgba(124,58,237,0.25)" : "rgba(124,58,237,0.10)" };
+    }
+    const name = dm.chatName || "Admin";
+    return { name, initials: getInitials(name), roleBadge: null,
+      avatarBg: "linear-gradient(135deg,#7c3aed,#a855f7)", badgeColor: null, badgeBg: null };
+  };
+
   const roleGrad = {
     admin:   "linear-gradient(135deg,#7c3aed,#a855f7)",
     teacher: "linear-gradient(135deg,#1d4ed8,#0891b2)",
     student: "linear-gradient(135deg,#047857,#10b981)",
   };
 
-  const totalUnread =
-    groupChats.reduce((s, c) => s + (c?.unreadCount?.[userRole] || 0), 0) +
-    dms.reduce((s, d) => s + (d?.unreadCount?.[userRole] || 0), 0);
-
   const filteredGroups = groupChats.filter(c =>
     c?.chatName?.toLowerCase().includes(searchQuery.toLowerCase())
   );
-  const filteredDms = dms.filter(d =>
-    d?.chatName?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+
+  // For DM search: match against derived name
+  const filteredDms = dms.filter(dm => {
+    const info = getDmInfo(dm);
+    return info.name.toLowerCase().includes(searchQuery.toLowerCase());
+  });
 
   return (
     <>
@@ -126,8 +170,21 @@ export default function GroupChatList({ userRole, onSelectChat, selectedChatId, 
               width: "38px", height: "38px", borderRadius: "12px",
               background: isDark ? "rgba(99,102,241,0.18)" : "rgba(99,102,241,0.10)",
               display: "flex", alignItems: "center", justifyContent: "center",
+              position: "relative",
             }}>
               <MessageCircle size={18} color={C.accent} />
+              {totalUnread > 0 && (
+                <div style={{
+                  position: "absolute", top: "-5px", right: "-5px",
+                  minWidth: "18px", height: "18px", borderRadius: "9px",
+                  background: "#ef4444", color: "white",
+                  fontSize: "10px", fontWeight: "800",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  padding: "0 4px",
+                }}>
+                  {totalUnread > 99 ? "99+" : totalUnread}
+                </div>
+              )}
             </div>
           </div>
 
@@ -163,20 +220,22 @@ export default function GroupChatList({ userRole, onSelectChat, selectedChatId, 
               <SectionLabel label="Direct Messages" color={C.sectionTxt} />
 
               {filteredDms.length > 0 ? (
-                filteredDms.map(dm => (
-                  <ChatRow
-                    key={dm._id}
-                    chat={{ ...dm, _chatType: "dm" }}
-                    isSelected={selectedChatId === dm._id}
-                    unread={dm.unreadCount?.[userRole] || 0}
-                    isDark={isDark}
-                    C={C}
-                    onSelect={onSelectChat}
-                    formatTime={formatTime}
-                    icon={<Shield size={16} color="white" />}
-                    avatarBg="linear-gradient(135deg,#7c3aed,#a855f7)"
-                  />
-                ))
+                filteredDms.map(dm => {
+                  const info = getDmInfo(dm);
+                  return (
+                    <DmRow
+                      key={dm._id}
+                      chat={{ ...dm, _chatType: "dm" }}
+                      isSelected={selectedChatId === dm._id}
+                      unread={dm.unreadCount?.[unreadKey] || 0}
+                      isDark={isDark}
+                      C={C}
+                      onSelect={onSelectChat}
+                      formatTime={formatTime}
+                      info={info}
+                    />
+                  );
+                })
               ) : userRole !== "admin" ? (
                 <div style={{ padding: "8px 16px 4px" }}>
                   <button
@@ -220,7 +279,7 @@ export default function GroupChatList({ userRole, onSelectChat, selectedChatId, 
                     key={chat._id}
                     chat={{ ...chat, _chatType: "group" }}
                     isSelected={selectedChatId === chat._id}
-                    unread={chat.unreadCount?.[userRole] || 0}
+                    unread={chat.unreadCount?.[unreadKey] || 0}
                     isDark={isDark}
                     C={C}
                     onSelect={onSelectChat}
@@ -260,7 +319,94 @@ function SectionLabel({ label, color }) {
   );
 }
 
-function ChatRow({ chat, isSelected, unread, isDark, C, onSelect, formatTime, icon, avatarBg, initials }) {
+// DM row — shows proper name + role badge for admin
+function DmRow({ chat, isSelected, unread, isDark, C, onSelect, formatTime, info }) {
+  const lastMsg = chat.lastMessage;
+
+  return (
+    <button
+      onClick={() => onSelect(chat)}
+      style={{
+        width: "100%", display: "flex", alignItems: "center", gap: "12px",
+        padding: "10px 16px",
+        background: isSelected ? C.active : "transparent",
+        border: "none", cursor: "pointer", textAlign: "left",
+        borderLeft: `3px solid ${isSelected ? C.accent : "transparent"}`,
+        transition: "background 0.15s",
+      }}
+      onMouseEnter={e => !isSelected && (e.currentTarget.style.background = C.hover)}
+      onMouseLeave={e => !isSelected && (e.currentTarget.style.background = "transparent")}
+    >
+      {/* Avatar */}
+      <div style={{
+        width: "46px", height: "46px", borderRadius: "14px",
+        background: info.avatarBg, flexShrink: 0,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        fontSize: "14px", fontWeight: "700", color: "white",
+        boxShadow: "0 3px 10px rgba(0,0,0,0.25)",
+      }}>
+        {info.initials}
+      </div>
+
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "3px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "6px", minWidth: 0 }}>
+            <span style={{
+              fontSize: "13.5px", fontWeight: unread ? "700" : "600",
+              color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+            }}>
+              {info.name}
+            </span>
+            {info.roleBadge && (
+              <span style={{
+                fontSize: "10px", fontWeight: "700", flexShrink: 0,
+                padding: "1px 6px", borderRadius: "6px",
+                color: info.badgeColor, background: info.badgeBg,
+              }}>
+                {info.roleBadge}
+              </span>
+            )}
+          </div>
+          <span style={{ fontSize: "11px", color: unread ? C.accent : C.sub, flexShrink: 0, marginLeft: "8px" }}>
+            {formatTime(lastMsg?.timestamp || chat.lastActivityAt)}
+          </span>
+        </div>
+
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <p style={{
+            margin: 0, fontSize: "12px",
+            color: unread ? (isDark ? "#c8ccec" : "#4a4f6a") : C.sub,
+            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+            fontWeight: unread ? "600" : "400", flex: 1,
+          }}>
+            {lastMsg ? (
+              <span>
+                <CheckCheck size={12} style={{ display: "inline", marginRight: "4px", opacity: 0.55 }} />
+                {lastMsg.senderName?.split(" ")[0]}: {lastMsg.text}
+              </span>
+            ) : (
+              <em style={{ opacity: 0.5 }}>No messages yet</em>
+            )}
+          </p>
+          {unread > 0 && (
+            <span style={{
+              minWidth: "20px", height: "20px", borderRadius: "10px",
+              background: C.accent, color: "white",
+              fontSize: "10.5px", fontWeight: "700",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              padding: "0 6px", marginLeft: "8px", flexShrink: 0,
+            }}>
+              {unread > 99 ? "99+" : unread}
+            </span>
+          )}
+        </div>
+      </div>
+    </button>
+  );
+}
+
+// Group chat row (unchanged behaviour)
+function ChatRow({ chat, isSelected, unread, isDark, C, onSelect, formatTime, avatarBg, initials }) {
   const lastMsg = chat.lastMessage;
   const name    = chat.chatName || "Unnamed";
 
@@ -285,7 +431,7 @@ function ChatRow({ chat, isSelected, unread, isDark, C, onSelect, formatTime, ic
         fontSize: "14px", fontWeight: "700", color: "white",
         boxShadow: "0 3px 10px rgba(0,0,0,0.25)",
       }}>
-        {icon || initials}
+        {initials}
       </div>
 
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -322,7 +468,9 @@ function ChatRow({ chat, isSelected, unread, isDark, C, onSelect, formatTime, ic
               fontSize: "10.5px", fontWeight: "700",
               display: "flex", alignItems: "center", justifyContent: "center",
               padding: "0 6px", marginLeft: "8px", flexShrink: 0,
-            }}>{unread}</span>
+            }}>
+              {unread > 99 ? "99+" : unread}
+            </span>
           )}
         </div>
       </div>

@@ -16,6 +16,7 @@ import {
   Eye,
   EyeOff,
   MinusCircle,
+  History,
 } from "lucide-react";
 
 function getInitials(firstName = "", lastName = "") {
@@ -84,6 +85,7 @@ export default function TeacherCard({
   onPay,
   onCopyPassword,
   onResetPassword,
+  onPayHistory,
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -211,6 +213,16 @@ export default function TeacherCard({
                   isDarkMode={isDarkMode}
                   onClick={() => {
                     onPay();
+                    setMenuOpen(false);
+                  }}
+                />
+                <DropdownItem
+                  icon={History}
+                  label="Payment History"
+                  color="indigo"
+                  isDarkMode={isDarkMode}
+                  onClick={() => {
+                    onPayHistory?.();
                     setMenuOpen(false);
                   }}
                 />

@@ -8,6 +8,7 @@ import Admin from "../models/Admin.js";
 
 import { config } from "../config/config.js";
 import { loginLimiter, passwordResetLimiter } from "../middleware/rateLimiter.js";
+import { validatePasswordStrength } from "../utils/passwordUtils.js";
 
 import { createSession, cleanExpiredSessions } from "../utils/sessionManager.js";
 import twoFactorAuth from "../utils/twoFactorAuth.js";
@@ -264,8 +265,9 @@ router.post("/teacher/change-password", verifyToken, async (req, res) => {
       return res.status(400).json({ message: "Current password and new password are required" });
     }
 
-    if (newPassword.length < 6) {
-      return res.status(400).json({ message: "New password must be at least 6 characters long" });
+    const { isValid, errors } = validatePasswordStrength(newPassword);
+    if (!isValid) {
+      return res.status(400).json({ message: errors[0], errors });
     }
 
     const teacher = await Teacher.findById(req.teacher._id);
@@ -346,7 +348,7 @@ router.post("/teacher/forgot-password", passwordResetLimiter, async (req, res) =
 });
 
 // Reset Password - Using token from email
-router.post("/teacher/reset-password/:token", async (req, res) => {
+router.post("/teacher/reset-password/:token", passwordResetLimiter, async (req, res) => {
   try {
     const { newPassword } = req.body;
     const resetToken = req.params.token;
@@ -355,8 +357,9 @@ router.post("/teacher/reset-password/:token", async (req, res) => {
       return res.status(400).json({ message: "New password is required" });
     }
 
-    if (newPassword.length < 6) {
-      return res.status(400).json({ message: "Password must be at least 6 characters long" });
+    const { isValid, errors } = validatePasswordStrength(newPassword);
+    if (!isValid) {
+      return res.status(400).json({ message: errors[0], errors });
     }
 
     // Hash the token from URL to compare with database
@@ -522,11 +525,11 @@ router.get("/student/verify", async (req, res) => {
   }
 });
 
-// Student Change Password - 
+// Student Change Password -
 router.post("/student/change-password", async (req, res) => {
   try {
     const token = req.headers.authorization?.split(" ")[1];
-    
+
     if (!token) {
       return res.status(401).json({ message: "No token provided" });
     }
@@ -538,8 +541,9 @@ router.post("/student/change-password", async (req, res) => {
       return res.status(400).json({ message: "Current password and new password are required" });
     }
 
-    if (newPassword.length < 6) {
-      return res.status(400).json({ message: "New password must be at least 6 characters long" });
+    const { isValid, errors } = validatePasswordStrength(newPassword);
+    if (!isValid) {
+      return res.status(400).json({ message: errors[0], errors });
     }
 
     const student = await Student.findById(decoded.id);
@@ -625,7 +629,7 @@ router.post("/student/forgot-password", passwordResetLimiter, async (req, res) =
 });
 
 // Student Reset Password - Using token from email
-router.post("/student/reset-password/:token", async (req, res) => {
+router.post("/student/reset-password/:token", passwordResetLimiter, async (req, res) => {
   try {
     const { newPassword } = req.body;
     const resetToken = req.params.token;
@@ -634,8 +638,9 @@ router.post("/student/reset-password/:token", async (req, res) => {
       return res.status(400).json({ message: "New password is required" });
     }
 
-    if (newPassword.length < 6) {
-      return res.status(400).json({ message: "Password must be at least 6 characters long" });
+    const { isValid, errors } = validatePasswordStrength(newPassword);
+    if (!isValid) {
+      return res.status(400).json({ message: errors[0], errors });
     }
 
     // Hash the token from URL to compare with database
@@ -806,11 +811,11 @@ router.get("/admin/verify", async (req, res) => {
   }
 });
 
-// Admin Change Password - ADD THIS TOO (optional but recommended)
+// Admin Change Password
 router.post("/admin/change-password", async (req, res) => {
   try {
     const token = req.headers.authorization?.split(" ")[1];
-    
+
     if (!token) {
       return res.status(401).json({ message: "No token provided" });
     }
@@ -822,8 +827,9 @@ router.post("/admin/change-password", async (req, res) => {
       return res.status(400).json({ message: "Current password and new password are required" });
     }
 
-    if (newPassword.length < 6) {
-      return res.status(400).json({ message: "New password must be at least 6 characters long" });
+    const { isValid, errors } = validatePasswordStrength(newPassword);
+    if (!isValid) {
+      return res.status(400).json({ message: errors[0], errors });
     }
 
     const admin = await Admin.findById(decoded.id);

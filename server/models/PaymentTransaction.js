@@ -16,7 +16,7 @@ const paymentTransactionSchema = new mongoose.Schema({
   bookingId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Booking",
-    required: true,
+    default: null,
   },
   amount: {
     type: Number,
@@ -70,7 +70,7 @@ const paymentTransactionSchema = new mongoose.Schema({
 });
 
 // Indexes for efficient queries
-paymentTransactionSchema.index({ bookingId: 1 }, { unique: true });
+paymentTransactionSchema.index({ bookingId: 1 }, { unique: true, sparse: true }); // sparse allows multiple nulls
 paymentTransactionSchema.index({ teacherId: 1, status: 1 });
 paymentTransactionSchema.index({ completedAt: -1 });
 paymentTransactionSchema.index({ paidAt: -1 });

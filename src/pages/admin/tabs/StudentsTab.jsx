@@ -7,9 +7,11 @@ import {
   AlertTriangle,
   GraduationCap,
   Plus,
-  SlidersHorizontal,
   BookOpen,
   Receipt,
+  Trash2,
+  RotateCcw,
+  Clock,
 } from "lucide-react";
 import StudentCard from "../components/StudentCard";
 import StudentModal from "../modals/StudentModal";
@@ -23,6 +25,7 @@ import {
   createStudent,
   updateStudent,
   deleteStudent,
+  restoreStudent,
   toggleStudent,
   recordLesson,
   apiResetPassword,
@@ -32,6 +35,90 @@ import {
 } from "../../../services/studentService";
 
 const PASSWORD_TTL = 15000;
+
+// ── Days remaining until deletion ────────────────────────────────────────────
+function daysUntilDeletion(dateStr) {
+  if (!dateStr) return null;
+  const diff = new Date(dateStr).getTime() - Date.now();
+  return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+}
+
+// ── Delete confirmation modal ─────────────────────────────────────────────────
+function DeleteConfirmModal({ student, onConfirm, onCancel, isDarkMode }) {
+  if (!student) return null;
+
+  const overlay = "fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm";
+  const box = isDarkMode
+    ? "bg-gray-800 border border-gray-700 text-white"
+    : "bg-white border border-gray-200 text-gray-900";
+
+  return (
+    <div className={overlay}>
+      <div className={`rounded-2xl shadow-2xl p-6 w-full max-w-md mx-4 ${box}`}>
+        {/* Icon */}
+        <div className="flex justify-center mb-4">
+          <div className="w-14 h-14 rounded-full bg-red-100 flex items-center justify-center">
+            <Trash2 className="w-7 h-7 text-red-600" />
+          </div>
+        </div>
+
+        {/* Heading */}
+        <h2 className="text-xl font-bold text-center mb-2">Schedule Account Deletion?</h2>
+        <p className={`text-center text-sm mb-5 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+          You are about to schedule{" "}
+          <span className="font-semibold text-red-500">
+            {student.firstName} {student.surname}
+          </span>{" "}
+          for deletion.
+        </p>
+
+        {/* Info box */}
+        <div className={`rounded-xl p-4 mb-5 text-sm space-y-2 ${isDarkMode ? "bg-red-900/20 border border-red-800/40" : "bg-red-50 border border-red-100"}`}>
+          <div className="flex items-start gap-2">
+            <Clock className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
+            <span className={isDarkMode ? "text-red-300" : "text-red-700"}>
+              The account will be <strong>disabled immediately</strong> and permanently deleted after{" "}
+              <strong>7 days</strong>.
+            </span>
+          </div>
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
+            <span className={isDarkMode ? "text-amber-300" : "text-amber-700"}>
+              A warning email will be sent to <strong>{student.email}</strong> telling them to contact
+              admin if this is a mistake.
+            </span>
+          </div>
+          <div className="flex items-start gap-2">
+            <RotateCcw className="w-4 h-4 text-sky-500 mt-0.5 flex-shrink-0" />
+            <span className={isDarkMode ? "text-sky-300" : "text-sky-700"}>
+              You can <strong>restore</strong> the account any time within those 7 days.
+            </span>
+          </div>
+        </div>
+
+        {/* Buttons */}
+        <div className="flex gap-3">
+          <button
+            onClick={onCancel}
+            className={`flex-1 py-2.5 rounded-xl font-semibold text-sm transition-all ${
+              isDarkMode
+                ? "bg-gray-700 hover:bg-gray-600 text-gray-200"
+                : "bg-gray-100 hover:bg-gray-200 text-gray-700"
+            }`}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            className="flex-1 py-2.5 rounded-xl font-semibold text-sm bg-red-600 hover:bg-red-700 text-white transition-all"
+          >
+            Schedule Deletion
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ── Summary stat card ─────────────────────────────────────────────────────────
 function SummaryCard({ icon: Icon, label, value, sub, color, isDarkMode }) {
@@ -93,16 +180,15 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
   const [isManualModalOpen, setIsManualModalOpen] = useState(false);
   const [isLessonModalOpen, setIsLessonModalOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState(null);
-
+  const [deleteTarget, setDeleteTarget] = useState(null); // student scheduled for deletion confirm
   const [lessonModal, setLessonModal] = useState(null);
- 
 
   // History data
   const [paymentHistory, setPaymentHistory] = useState([]);
   const [lessonHistory, setLessonHistory] = useState([]);
 
   // Filters
-  const [view, setView] = useState("active"); // "active" | "disabled" | "all"
+  const [view, setView] = useState("active"); // "active" | "disabled" | "pending_deletion" | "all"
   const [searchQuery, setSearchQuery] = useState("");
 
   // Toast
@@ -113,10 +199,6 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
     setToast(message);
     setToastType(type);
     setTimeout(() => setToast(""), 3500);
-  };
-
-  const sendEmail = (to, message) => {
-    if (to) console.log(`📧 Email to ${to}: ${message}`);
   };
 
   // ── Load data ───────────────────────────────────────────────────────────────
@@ -132,7 +214,6 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
 
         setStudents(studentsData);
 
-        // Format payment history (filter nulls)
         const formattedPayments = paymentsData
           .filter((p) => p.studentId !== null)
           .map((p) => ({
@@ -143,7 +224,6 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
           }));
         setPaymentHistory(formattedPayments);
 
-        // Format lesson history (filter nulls)
         const formattedLessons = lessonsData
           .filter((l) => l.studentId !== null)
           .map((l) => ({
@@ -175,9 +255,7 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
         const result = await createStudent(data);
         setStudents((prev) => [...prev, result.student]);
         onNotify?.(`New student created: ${result.student.firstName} ${result.student.surname}`);
-        sendEmail(data.email, `Welcome ${data.firstName}!`);
         showToast(`${result.student.firstName} created successfully!`);
-        // Return result so modal can show temp password
         return result;
       }
     } catch (e) {
@@ -186,18 +264,54 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
     }
   };
 
-  // ── Delete ──────────────────────────────────────────────────────────────────
-  const handleDeleteStudent = async (id) => {
+  // ── Delete (open confirmation modal) ────────────────────────────────────────
+  const handleDeleteStudent = (id) => {
     const stu = students.find((s) => s._id === id);
-    if (!window.confirm(`Delete ${stu?.firstName} ${stu?.surname}? This cannot be undone.`))
-      return;
+    setDeleteTarget(stu);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
     try {
-      await deleteStudent(id);
-      setStudents((prev) => prev.filter((s) => s._id !== id));
-      showToast(`${stu?.firstName} deleted.`);
+      const result = await deleteStudent(deleteTarget._id);
+      // Update student in list to reflect scheduled deletion state
+      setStudents((prev) =>
+        prev.map((s) =>
+          s._id === deleteTarget._id
+            ? { ...s, active: false, scheduledDeletionAt: result.scheduledDeletionAt }
+            : s
+        )
+      );
+      showToast(
+        `${deleteTarget.firstName} scheduled for deletion in 7 days. Warning email sent.`,
+        "info"
+      );
+      onNotify?.(`${deleteTarget.firstName} scheduled for deletion.`);
     } catch (e) {
       console.error("❌ Delete error:", e);
-      showToast("Could not delete student.", "error");
+      showToast(e.response?.data?.message || "Could not schedule deletion.", "error");
+    } finally {
+      setDeleteTarget(null);
+    }
+  };
+
+  // ── Restore student ──────────────────────────────────────────────────────────
+  const handleRestoreStudent = async (id) => {
+    const stu = students.find((s) => s._id === id);
+    try {
+      const result = await restoreStudent(id);
+      setStudents((prev) =>
+        prev.map((s) =>
+          s._id === id
+            ? { ...s, active: true, scheduledDeletionAt: null, deletionWarningEmailSent: false }
+            : s
+        )
+      );
+      showToast(`${stu?.firstName}'s account has been restored!`, "success");
+      onNotify?.(`${stu?.firstName} restored.`);
+    } catch (e) {
+      console.error("❌ Restore error:", e);
+      showToast("Could not restore student.", "error");
     }
   };
 
@@ -227,7 +341,6 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
   };
 
   const handleLessonSuccess = (result) => {
-    // Update student in list to reflect new class count
     if (result?.student) {
       setStudents((prev) =>
         prev.map((s) =>
@@ -258,11 +371,8 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
       }
       const result = await addPayment(selectedStudent, paymentData);
       setPaymentHistory((prev) => [...prev, result]);
-
-      // Refresh student classes count
       const studentsData = await getStudents();
       setStudents(studentsData);
-
       showToast("Payment recorded successfully!");
     } catch (e) {
       console.error("❌ Manual payment error:", e);
@@ -297,8 +407,6 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
       );
       showToast("Password reset. Copy it from the card.", "info");
 
-      if (stu) sendEmail(stu.email, `Password reset: ${plainPassword}`);
-
       setTimeout(() => {
         setStudents((prev) =>
           prev.map((s) =>
@@ -327,11 +435,10 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
   };
 
   // ── Computed values ─────────────────────────────────────────────────────────
-  const activeStudents = students.filter((s) => s.active);
-  const disabledStudents = students.filter((s) => !s.active);
-  const zeroClassStudents = students.filter(
-    (s) => s.active && (s.noOfClasses ?? 0) <= 0
-  );
+  const pendingDeletion = students.filter((s) => !!s.scheduledDeletionAt);
+  const activeStudents = students.filter((s) => s.active && !s.scheduledDeletionAt);
+  const disabledStudents = students.filter((s) => !s.active && !s.scheduledDeletionAt);
+  const zeroClassStudents = students.filter((s) => s.active && (s.noOfClasses ?? 0) <= 0);
   const totalClasses = students.reduce((sum, s) => sum + (s.noOfClasses || 0), 0);
 
   const sourceList =
@@ -339,6 +446,8 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
       ? activeStudents
       : view === "disabled"
       ? disabledStudents
+      : view === "pending_deletion"
+      ? pendingDeletion
       : students;
 
   const filteredStudents = sourceList.filter((s) =>
@@ -360,7 +469,9 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
 
   const tabBtnCls = (key) =>
     view === key
-      ? "bg-sky-600 text-white shadow-sm"
+      ? key === "pending_deletion"
+        ? "bg-red-600 text-white shadow-sm"
+        : "bg-sky-600 text-white shadow-sm"
       : isDarkMode
       ? "text-gray-400 hover:text-gray-200 hover:bg-gray-700"
       : "text-gray-500 hover:text-gray-700 hover:bg-gray-100";
@@ -382,6 +493,14 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
         </div>
       )}
 
+      {/* ── Delete confirmation modal ── */}
+      <DeleteConfirmModal
+        student={deleteTarget}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setDeleteTarget(null)}
+        isDarkMode={isDarkMode}
+      />
+
       {/* ── Page header ── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
@@ -392,7 +511,6 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          {/* Global history shortcuts */}
           <button
             onClick={() => { setSelectedStudent(null); setIsPaymentModalOpen(true); }}
             className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-all ${
@@ -466,11 +584,12 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
         className={`rounded-xl border p-4 mb-6 ${cardBg} flex flex-col sm:flex-row gap-3 items-start sm:items-center`}
       >
         {/* View tabs */}
-        <div className={`flex gap-1 p-1 rounded-lg ${isDarkMode ? "bg-gray-900" : "bg-gray-100"}`}>
+        <div className={`flex gap-1 p-1 rounded-lg flex-wrap ${isDarkMode ? "bg-gray-900" : "bg-gray-100"}`}>
           {[
-            { key: "all", label: `All (${students.length})` },
-            { key: "active", label: `Active (${activeStudents.length})` },
-            { key: "disabled", label: `Disabled (${disabledStudents.length})` },
+            { key: "all",             label: `All (${students.length})` },
+            { key: "active",          label: `Active (${activeStudents.length})` },
+            { key: "disabled",        label: `Disabled (${disabledStudents.length})` },
+            { key: "pending_deletion", label: `🗑 Pending Deletion (${pendingDeletion.length})` },
           ].map(({ key, label }) => (
             <button
               key={key}
@@ -523,6 +642,8 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
               ? `No results for "${searchQuery}"`
               : view === "disabled"
               ? "There are no disabled students."
+              : view === "pending_deletion"
+              ? "No students scheduled for deletion."
               : "Add your first student to get started."}
           </p>
           {!searchQuery && view === "active" && (
@@ -547,42 +668,67 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
           </p>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {filteredStudents.map((student) => (
-              <StudentCard
-                key={student._id}
-                student={student}
-                isDarkMode={isDarkMode}
-                onEdit={() => {
-                  setEditId(student._id);
-                  setIsModalOpen(true);
-                }}
-                onDelete={() => handleDeleteStudent(student._id)}
-                onToggle={() => handleToggleAccess(student._id, !student.active)}
-                onMarkLesson={() => handleMarkLesson(student._id)}        
-                onUnmarkLesson={() => handleUnmarkLesson(student._id)}
-                onManualPayment={() => handleOpenManualPayment(student._id)}
-                onViewPayment={() => handleViewPayment(student._id)}
-                onViewLessons={() => handleViewLessons(student._id)}
-                onResetPassword={() => handleResetPassword(student._id)}
-                onCopyPassword={() => handleCopyPassword(student._id)}
-              />
-            ))}
+            {filteredStudents.map((student) => {
+              const days = daysUntilDeletion(student.scheduledDeletionAt);
+              const isPendingDeletion = days !== null;
+
+              return (
+                <div key={student._id} className="relative">
+                  {/* ── Deletion countdown banner ── */}
+                  {isPendingDeletion && (
+                    <div className="absolute -top-2 left-2 right-2 z-10 flex items-center justify-between gap-2 bg-red-600 text-white text-xs font-semibold px-3 py-1.5 rounded-lg shadow-lg">
+                      <span className="flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        Deletes in {days} day{days !== 1 ? "s" : ""}
+                      </span>
+                      <button
+                        onClick={() => handleRestoreStudent(student._id)}
+                        className="flex items-center gap-1 bg-white text-red-600 px-2 py-0.5 rounded-md text-xs font-bold hover:bg-red-50 transition-colors"
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                        Restore
+                      </button>
+                    </div>
+                  )}
+
+                  <div className={isPendingDeletion ? "mt-5 opacity-75 ring-2 ring-red-400 rounded-xl" : ""}>
+                    <StudentCard
+                      student={student}
+                      isDarkMode={isDarkMode}
+                      onEdit={() => {
+                        setEditId(student._id);
+                        setIsModalOpen(true);
+                      }}
+                      onDelete={() => handleDeleteStudent(student._id)}
+                      onToggle={() => handleToggleAccess(student._id, !student.active)}
+                      onMarkLesson={() => handleMarkLesson(student._id)}
+                      onUnmarkLesson={() => handleUnmarkLesson(student._id)}
+                      onManualPayment={() => handleOpenManualPayment(student._id)}
+                      onViewPayment={() => handleViewPayment(student._id)}
+                      onViewLessons={() => handleViewLessons(student._id)}
+                      onResetPassword={() => handleResetPassword(student._id)}
+                      onCopyPassword={() => handleCopyPassword(student._id)}
+                    />
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </>
       )}
 
       {/* ── Modals ── */}
+      {lessonModal && (
+        <LessonMarkModal
+          mode={lessonModal.mode}
+          startWith="student"
+          student={lessonModal.student}
+          onClose={() => setLessonModal(null)}
+          onSuccess={handleLessonSuccess}
+          isDarkMode={false}
+        />
+      )}
 
-        {lessonModal && (
-      <LessonMarkModal
-        mode={lessonModal.mode}
-        startWith="student"
-        student={lessonModal.student}
-        onClose={() => setLessonModal(null)}
-        onSuccess={handleLessonSuccess}
-        isDarkMode={false}
-      />
-    )}
       <StudentModal
         isOpen={isModalOpen}
         onClose={() => {

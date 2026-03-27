@@ -7,6 +7,7 @@ import {
   sendPasswordResetEmail,
   sendTeacherInviteEmail,
   sendTeacherWelcomeEmail,
+  sendTeacherAccountDeletionWarningEmail,
 } from "../utils/emailService.js";
 import { verifyToken, verifyAdmin, verifyAdminOrTeacher } from "../middleware/authMiddleware.js";
 import { config } from "../config/config.js";
@@ -64,7 +65,13 @@ router.patch("/:id/schedule-visibility", verifyToken, async (req, res) => {
 router.patch("/:id/timezone", verifyToken, async (req, res) => {
   try {
     const { timezone } = req.body;
-    if (!timezone) return res.status(400).json({ message: "timezone required" });
+    if (!timezone || typeof timezone !== "string") {
+      return res.status(400).json({ message: "timezone required" });
+    }
+    // Validate against the IANA timezone database
+    try { Intl.DateTimeFormat(undefined, { timeZone: timezone }); }
+    catch { return res.status(400).json({ message: "Invalid timezone identifier" }); }
+
     await Teacher.findByIdAndUpdate(req.params.id, { timezone });
     res.json({ ok: true });
   } catch (err) {
@@ -301,13 +308,56 @@ router.put("/:id", verifyToken, verifyAdmin, async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// DELETE /api/teachers/:id
+// DELETE /api/teachers/:id  — soft-delete: disable + schedule permanent deletion in 7 days
 // ─────────────────────────────────────────────────────────────────────────────
 router.delete("/:id", verifyToken, verifyAdmin, strictLimiter, async (req, res) => {
   try {
-    const teacher = await Teacher.findByIdAndDelete(req.params.id);
+    const teacher = await Teacher.findById(req.params.id);
     if (!teacher) return res.status(404).json({ message: "Teacher not found" });
-    res.json({ message: "Teacher deleted" });
+
+    if (teacher.scheduledDeletionAt) {
+      return res.status(400).json({ message: "Teacher is already scheduled for deletion" });
+    }
+
+    const deletionDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+
+    teacher.active = false;
+    teacher.scheduledDeletionAt = deletionDate;
+    teacher.deletionWarningEmailSent = false;
+    await teacher.save();
+
+    sendTeacherAccountDeletionWarningEmail(teacher, deletionDate).catch((err) =>
+      console.error("Teacher deletion warning email failed:", err.message)
+    );
+
+    res.json({
+      message: "Teacher scheduled for deletion",
+      scheduledDeletionAt: deletionDate,
+      teacher,
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/teachers/:id/restore  — cancel scheduled deletion
+// ─────────────────────────────────────────────────────────────────────────────
+router.post("/:id/restore", verifyToken, verifyAdmin, async (req, res) => {
+  try {
+    const teacher = await Teacher.findById(req.params.id);
+    if (!teacher) return res.status(404).json({ message: "Teacher not found" });
+
+    if (!teacher.scheduledDeletionAt) {
+      return res.status(400).json({ message: "Teacher is not scheduled for deletion" });
+    }
+
+    teacher.scheduledDeletionAt = null;
+    teacher.deletionWarningEmailSent = false;
+    teacher.active = true;
+    await teacher.save();
+
+    res.json({ message: "Teacher account restored successfully", teacher });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

@@ -20,9 +20,15 @@ export const updateStudent = async (id, student) => {
   return res.data.student;
 };
 
-// 👉 Delete student
+// 👉 Schedule student for deletion (soft-delete — permanent after 7 days)
 export const deleteStudent = async (id) => {
   const res = await api.delete(`${API_URL}/${id}`);
+  return res.data;
+};
+
+// 👉 Restore a student that was scheduled for deletion
+export const restoreStudent = async (id) => {
+  const res = await api.post(`${API_URL}/${id}/restore`);
   return res.data;
 };
 

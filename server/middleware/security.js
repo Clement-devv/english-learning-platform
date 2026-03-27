@@ -12,14 +12,17 @@ export const securityHeaders = helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
+      // Removed 'unsafe-inline' — use external stylesheets instead
+      styleSrc: ["'self'"],
       scriptSrc: ["'self'"],
-      imgSrc: ["'self'", "data:", "https:"],
+      // Removed data: URI — prevents data-URI-based XSS payloads
+      imgSrc: ["'self'", "https:"],
       connectSrc: ["'self'"],
       fontSrc: ["'self'"],
       objectSrc: ["'none'"],
       mediaSrc: ["'self'"],
       frameSrc: ["'none'"],
+      upgradeInsecureRequests: [],
     },
   },
   hsts: {
@@ -28,7 +31,7 @@ export const securityHeaders = helmet({
     preload: true,
   },
   noSniff: true,
-  referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+  referrerPolicy: { policy: "strict-origin-when-cross-origin" },
 });
 
 /**

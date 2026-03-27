@@ -47,8 +47,8 @@ export const verifyTwoFactorToken = (token, secret) => {
 export const generateBackupCodes = () => {
   const codes = [];
   for (let i = 0; i < 10; i++) {
-    // Generate 8-character alphanumeric codes
-    const code = crypto.randomBytes(4).toString('hex').toUpperCase();
+    // 10 random bytes = 20 hex chars = 80 bits of entropy (industry standard)
+    const code = crypto.randomBytes(10).toString('hex').toUpperCase();
     codes.push(code);
   }
   return codes;

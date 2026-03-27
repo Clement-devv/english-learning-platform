@@ -10,6 +10,7 @@ import {
   sendPasswordResetEmail,
   sendStudentInviteEmail,
   sendStudentWelcomeEmail,
+  sendAccountDeletionWarningEmail,
 } from "../utils/emailService.js";
 import {
   verifyToken,
@@ -113,7 +114,7 @@ router.post("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // 👉 Verify invite token — PUBLIC (no auth needed)
 // ─────────────────────────────────────────────────────────────────────────────
-router.get("/verify-invite/:token", async (req, res) => {
+router.get("/verify-invite/:token", strictLimiter, async (req, res) => {
   try {
     const student = await Student.findOne({
       inviteToken:   req.params.token,
@@ -146,7 +147,7 @@ router.get("/verify-invite/:token", async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // 👉 Setup account — student sets password after clicking invite link
 // ─────────────────────────────────────────────────────────────────────────────
-router.post("/setup-account", async (req, res) => {
+router.post("/setup-account", strictLimiter, async (req, res) => {
   try {
     const { token, password } = req.body;
 
@@ -242,7 +243,13 @@ router.post("/:id/resend-invite", verifyToken, verifyAdmin, strictLimiter, async
 router.patch("/:id/timezone", verifyToken, async (req, res) => {
   try {
     const { timezone } = req.body;
-    if (!timezone) return res.status(400).json({ message: "timezone required" });
+    if (!timezone || typeof timezone !== "string") {
+      return res.status(400).json({ message: "timezone required" });
+    }
+    // Validate against the IANA timezone database
+    try { Intl.DateTimeFormat(undefined, { timeZone: timezone }); }
+    catch { return res.status(400).json({ message: "Invalid timezone identifier" }); }
+
     await Student.findByIdAndUpdate(req.params.id, { timezone });
     res.json({ ok: true });
   } catch (err) {
@@ -304,15 +311,59 @@ router.patch("/:id/toggle", verifyToken, verifyAdmin, async (req, res) => {
   }
 });
 
-// 👉 Delete student - ONLY ADMIN
+// 👉 Schedule student for deletion — disables account and sends warning email.
+//    Permanent deletion happens 7 days later via the scheduler. ONLY ADMIN.
 router.delete("/:id", verifyToken, verifyAdmin, strictLimiter, async (req, res) => {
   try {
-    const student = await Student.findByIdAndDelete(req.params.id);
+    const student = await Student.findById(req.params.id);
     if (!student) return res.status(404).json({ message: "Student not found" });
-    res.json({ message: "Student deleted" });
+
+    if (student.scheduledDeletionAt) {
+      return res.status(400).json({ message: "Student is already scheduled for deletion" });
+    }
+
+    const deletionDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+
+    student.active = false;
+    student.scheduledDeletionAt = deletionDate;
+    student.deletionWarningEmailSent = false;
+    await student.save();
+
+    // Send warning email (non-blocking — don't fail the request if email fails)
+    sendAccountDeletionWarningEmail(student, deletionDate).catch((err) =>
+      console.error("Deletion warning email failed:", err.message)
+    );
+
+    res.json({
+      message: "Student scheduled for deletion",
+      scheduledDeletionAt: deletionDate,
+      student,
+    });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: "Error deleting student" });
+    res.status(500).json({ message: "Error scheduling student deletion" });
+  }
+});
+
+// 👉 Restore a student that was scheduled for deletion — ONLY ADMIN
+router.post("/:id/restore", verifyToken, verifyAdmin, async (req, res) => {
+  try {
+    const student = await Student.findById(req.params.id);
+    if (!student) return res.status(404).json({ message: "Student not found" });
+
+    if (!student.scheduledDeletionAt) {
+      return res.status(400).json({ message: "Student is not scheduled for deletion" });
+    }
+
+    student.scheduledDeletionAt = null;
+    student.deletionWarningEmailSent = false;
+    student.active = true;
+    await student.save();
+
+    res.json({ message: "Student account restored successfully", student });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Error restoring student" });
   }
 });
 

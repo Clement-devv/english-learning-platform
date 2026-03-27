@@ -68,6 +68,7 @@ import { startProgressReportScheduler } from "./utils/progressReportScheduler.js
 import reviewRoutes       from "./routes/reviewRoutes.js";
 import referralRoutes     from "./routes/referralRoutes.js";
 import pushRoutes         from "./routes/pushRoutes.js";
+import notificationRoutes from "./routes/notificationRoutes.js";
 
 
 // ✅ FIXED: Correct import path for RecurringPattern model
@@ -229,13 +230,18 @@ app.use("/api/reports",              reportRoutes);
 app.use("/api/reviews",              reviewRoutes);
 app.use("/api/referrals",            referralRoutes);
 app.use("/api/push",                 pushRoutes);
+app.use("/api/notifications",        notificationRoutes);
 
 
 
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error("🔥 Error:", err.message);
-  res.status(500).json({ error: err.message });
+  const status = err.status || err.statusCode || 500;
+  const isDev = config.nodeEnv === "development";
+  res.status(status).json({
+    error: isDev ? err.message : "An internal server error occurred",
+  });
 });
 
 // Verify email configuration on startup

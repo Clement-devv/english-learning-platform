@@ -5,7 +5,7 @@ import crypto from "crypto";
 import SubAdmin from "../models/SubAdmin.js";
 import Teacher from "../models/Teacher.js";
 import { config } from "../config/config.js";
-import { loginLimiter } from "../middleware/rateLimiter.js";
+import { loginLimiter, passwordResetLimiter } from "../middleware/rateLimiter.js";
 import { sendSubAdminInviteEmail, sendSubAdminWelcomeEmail } from "../utils/emailService.js";
 
 const router = express.Router();
@@ -95,7 +95,7 @@ router.post("/login", loginLimiter, async (req, res) => {
 // GET /api/sub-admin-auth/verify-invite/:token
 // Called when sub-admin clicks the email link — validates the token
 // ─────────────────────────────────────────────────────────────────────────────
-router.get("/verify-invite/:token", async (req, res) => {
+router.get("/verify-invite/:token", passwordResetLimiter, async (req, res) => {
   try {
     const { token } = req.params;
 
@@ -130,7 +130,7 @@ router.get("/verify-invite/:token", async (req, res) => {
 // POST /api/sub-admin-auth/setup-account
 // Sub-admin sets their password after clicking email link
 // ─────────────────────────────────────────────────────────────────────────────
-router.post("/setup-account", async (req, res) => {
+router.post("/setup-account", passwordResetLimiter, async (req, res) => {
   try {
     const { token, password, confirmPassword } = req.body;
 

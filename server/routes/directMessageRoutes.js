@@ -4,6 +4,7 @@ import DirectMessage from "../models/DirectMessage.js";
 import Teacher       from "../models/Teacher.js";
 import Student       from "../models/Student.js";
 import Admin         from "../models/Admin.js";
+import SubAdmin      from "../models/SubAdmin.js";
 import { verifyToken } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
@@ -25,13 +26,19 @@ async function getSenderInfo(id, role) {
     if (!a) return null;
     return { name: a.firstName ? `${a.firstName} ${a.lastName || ""}`.trim() : "Admin", model: "Admin" };
   }
+  if (role === "sub-admin") {
+    const sa = await SubAdmin.findById(id);
+    if (!sa) return null;
+    return { name: `${sa.firstName} ${sa.lastName}`, model: "SubAdmin" };
+  }
   return null;
 }
 
 function canAccess(dm, userId, role) {
-  if (role === "admin") return true;
-  if (role === "teacher") return dm.teacherId?.toString() === userId;
-  if (role === "student") return dm.studentId?.toString() === userId;
+  if (role === "admin")     return true;
+  if (role === "teacher")   return dm.teacherId?.toString()  === userId;
+  if (role === "student")   return dm.studentId?.toString()  === userId;
+  if (role === "sub-admin") return dm.subAdminId?.toString() === userId;
   return false;
 }
 
@@ -41,14 +48,16 @@ router.get("/", verifyToken, async (req, res) => {
     const { id: userId, role } = req.user;
     let filter = {};
 
-    if (role === "teacher")      filter.teacherId = userId;
-    else if (role === "student") filter.studentId = userId;
+    if (role === "teacher")        filter.teacherId  = userId;
+    else if (role === "student")   filter.studentId  = userId;
+    else if (role === "sub-admin") filter.subAdminId = userId;
     // admin sees all
 
     const dms = await DirectMessage.find(filter)
       .select("-messages")
-      .populate("teacherId", "firstName lastName email")
-      .populate("studentId", "firstName surname email")
+      .populate("teacherId",  "firstName lastName email")
+      .populate("studentId",  "firstName surname email")
+      .populate("subAdminId", "firstName lastName email")
       .sort({ lastActivityAt: -1 });
 
     res.json({ success: true, dms });
@@ -63,23 +72,25 @@ router.post("/start", verifyToken, async (req, res) => {
   try {
     const { id: userId, role } = req.user;
 
-    if (role !== "teacher" && role !== "student") {
-      return res.status(403).json({ message: "Only teachers and students can start an admin DM" });
+    if (!["teacher", "student", "sub-admin"].includes(role)) {
+      return res.status(403).json({ message: "Only teachers, students and sub-admins can start an admin DM" });
     }
 
     const sender = await getSenderInfo(userId, role);
     if (!sender) return res.status(404).json({ message: "User not found" });
 
-    const type   = role === "teacher" ? "teacher-admin" : "student-admin";
-    const filter = role === "teacher" ? { teacherId: userId } : { studentId: userId };
+    let type, filter, create;
+    if (role === "teacher") {
+      type = "teacher-admin"; filter = { teacherId: userId }; create = { teacherId: userId };
+    } else if (role === "student") {
+      type = "student-admin"; filter = { studentId: userId }; create = { studentId: userId };
+    } else {
+      type = "sub-admin-admin"; filter = { subAdminId: userId }; create = { subAdminId: userId };
+    }
 
     let dm = await DirectMessage.findOne(filter);
     if (!dm) {
-      dm = await DirectMessage.create({
-        type,
-        ...(role === "teacher" ? { teacherId: userId } : { studentId: userId }),
-        chatName: `${sender.name} ↔ Admin`,
-      });
+      dm = await DirectMessage.create({ type, ...create, chatName: `${sender.name} ↔ Admin` });
     }
 
     res.json({ success: true, dm });
@@ -110,6 +121,7 @@ router.post("/:id/messages", verifyToken, async (req, res) => {
     const { message } = req.body;
 
     if (!message?.trim()) return res.status(400).json({ message: "Message cannot be empty" });
+    if (message.trim().length > 5000) return res.status(400).json({ message: "Message too long (max 5000 characters)" });
 
     const dm = await DirectMessage.findById(req.params.id);
     if (!dm) return res.status(404).json({ message: "DM not found" });
@@ -132,8 +144,9 @@ router.post("/:id/messages", verifyToken, async (req, res) => {
 
     // Increment unread for the other party
     if (role === "admin") {
-      if (dm.type === "teacher-admin") dm.unreadCount.teacher += 1;
-      else dm.unreadCount.student += 1;
+      if (dm.type === "teacher-admin")    dm.unreadCount.teacher  += 1;
+      else if (dm.type === "student-admin") dm.unreadCount.student += 1;
+      else                                dm.unreadCount.subAdmin += 1;
     } else {
       dm.unreadCount.admin += 1;
     }
@@ -155,9 +168,10 @@ router.patch("/:id/mark-read", verifyToken, async (req, res) => {
     if (!dm) return res.status(404).json({ message: "DM not found" });
     if (!canAccess(dm, userId, role)) return res.status(403).json({ message: "Access denied" });
 
-    if (role === "admin")        dm.unreadCount.admin   = 0;
-    else if (role === "teacher") dm.unreadCount.teacher = 0;
-    else if (role === "student") dm.unreadCount.student = 0;
+    if (role === "admin")           dm.unreadCount.admin    = 0;
+    else if (role === "teacher")    dm.unreadCount.teacher  = 0;
+    else if (role === "student")    dm.unreadCount.student  = 0;
+    else if (role === "sub-admin")  dm.unreadCount.subAdmin = 0;
 
     await dm.save();
     res.json({ success: true });

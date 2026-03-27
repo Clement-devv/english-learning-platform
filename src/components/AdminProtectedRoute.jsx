@@ -8,9 +8,9 @@ export default function AdminProtectedRoute({ children }) {
 
   useEffect(() => {
     const verifyToken = async () => {
-      const token = localStorage.getItem('adminToken');
-      
-      console.log("Admin token from localStorage:", token ? "EXISTS" : "MISSING");
+      const token = sessionStorage.getItem('adminToken') || localStorage.getItem('adminToken');
+
+      console.log("Admin token from sessionStorage:", token ? "EXISTS" : "MISSING");
       
       if (!token) {
         setIsAuthenticated(false);
@@ -35,6 +35,8 @@ export default function AdminProtectedRoute({ children }) {
         console.error('Error message:', error.response?.data?.message);
         console.error('Full error:', error);
         
+        sessionStorage.removeItem('adminToken');
+        sessionStorage.removeItem('adminInfo');
         localStorage.removeItem('adminToken');
         localStorage.removeItem('adminInfo');
         setIsAuthenticated(false);

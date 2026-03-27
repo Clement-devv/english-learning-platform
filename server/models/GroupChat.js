@@ -80,9 +80,10 @@ const groupChatSchema = new mongoose.Schema({
   
   // Unread counts per user
   unreadCount: {
-    admin: { type: Number, default: 0 },
-    teacher: { type: Number, default: 0 },
-    student: { type: Number, default: 0 }
+    admin:    { type: Number, default: 0 },
+    teacher:  { type: Number, default: 0 },
+    student:  { type: Number, default: 0 },
+    subAdmin: { type: Number, default: 0 },
   },
   
   // Activity tracking

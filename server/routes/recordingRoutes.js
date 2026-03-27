@@ -16,10 +16,19 @@ if (!fs.existsSync(RECORDINGS_DIR)) fs.mkdirSync(RECORDINGS_DIR, { recursive: tr
 // Auto-delete after this many days
 const AUTO_DELETE_DAYS = 30;
 
+// Whitelist of MIME types and their safe extensions
+const ALLOWED_VIDEO_TYPES = {
+  "video/webm":  ".webm",
+  "video/mp4":   ".mp4",
+  "video/ogg":   ".ogv",
+  "video/quicktime": ".mov",
+};
+
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, RECORDINGS_DIR),
   filename:    (_req, file,  cb) => {
-    const ext  = path.extname(file.originalname) || ".webm";
+    // Use the extension derived from the MIME type — never trust the original filename
+    const ext  = ALLOWED_VIDEO_TYPES[file.mimetype] || ".webm";
     const name = `rec_${Date.now()}_${Math.random().toString(36).slice(2)}${ext}`;
     cb(null, name);
   },
@@ -29,7 +38,7 @@ const upload = multer({
   storage,
   limits: { fileSize: 2 * 1024 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
-    if (file.mimetype.startsWith("video/")) return cb(null, true);
+    if (ALLOWED_VIDEO_TYPES[file.mimetype]) return cb(null, true);
     cb(new Error("Only video files are allowed"));
   },
 });

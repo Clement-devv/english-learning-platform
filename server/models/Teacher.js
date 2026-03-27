@@ -70,6 +70,10 @@ const teacherSchema = new mongoose.Schema({
   // ── Web Push subscription ─────────────────────────────────────────────────
   pushSubscription: { type: Object, default: null },
 
+  // ── Soft-delete (7-day grace period) ─────────────────────────────────────
+  scheduledDeletionAt:      { type: Date,    default: null },
+  deletionWarningEmailSent: { type: Boolean, default: false },
+
 }, { timestamps: true });
 
 export default mongoose.model("Teacher", teacherSchema);

@@ -1,80 +1,70 @@
-// middleware/rateLimiter.js - ✅ PRODUCTION-READY (Enhanced from your existing code)
+// middleware/rateLimiter.js
 import rateLimit from "express-rate-limit";
 import { logger } from "../utils/logger.js";
+import LoginAttempt from "../models/LoginAttempt.js";
 
-// In-memory store for failed login attempts (use Redis in production)
-const failedLoginAttempts = new Map();
+const MAX_ATTEMPTS  = 10;
+const LOCK_DURATION = 60 * 60 * 1000; // 1 hour in ms
 
 /**
- * Track failed login attempts per email
+ * Track failed login attempts per identifier (email/username).
+ * Persisted in MongoDB so server restarts don't reset locks.
  */
-export const trackFailedLogin = (email) => {
-  const attempts = failedLoginAttempts.get(email) || { 
-    count: 0, 
-    timestamp: Date.now(),
-    lockUntil: null 
-  };
-  
-  // Reset if 1 hour has passed since first attempt
-  if (Date.now() - attempts.timestamp > 3600000) {
-    attempts.count = 0;
-    attempts.timestamp = Date.now();
-    attempts.lockUntil = null;
+export const trackFailedLogin = async (identifier) => {
+  const now = new Date();
+  const record = await LoginAttempt.findOneAndUpdate(
+    { identifier },
+    {
+      $inc: { count: 1 },
+      $setOnInsert: { firstAttemptAt: now },
+    },
+    { upsert: true, new: true }
+  );
+
+  if (record.count >= MAX_ATTEMPTS && !record.lockUntil) {
+    record.lockUntil = new Date(Date.now() + LOCK_DURATION);
+    await record.save();
+    logger.security("ACCOUNT_LOCKED", { identifier, reason: "Too many failed login attempts" });
   }
-  
-  attempts.count++;
-  
-  // Lock account for 1 hour after 10 failed attempts
-  if (attempts.count >= 10) {
-    attempts.lockUntil = Date.now() + 3600000; // 1 hour from now
-    logger.security('ACCOUNT_LOCKED', { email, reason: 'Too many failed login attempts' });
-  }
-  
-  failedLoginAttempts.set(email, attempts);
-  
-  return attempts;
+
+  return record;
 };
 
 /**
- * Check if account is locked
+ * Check if account is locked.
  */
-export const isAccountLocked = (email) => {
-  const attempts = failedLoginAttempts.get(email);
-  if (!attempts) return false;
-  
-  // Check if lock is still active
-  if (attempts.lockUntil && Date.now() < attempts.lockUntil) {
+export const isAccountLocked = async (identifier) => {
+  const record = await LoginAttempt.findOne({ identifier });
+  if (!record || !record.lockUntil) return { isLocked: false };
+
+  if (Date.now() < record.lockUntil.getTime()) {
     return {
       isLocked: true,
-      lockUntil: attempts.lockUntil,
-      remainingTime: Math.ceil((attempts.lockUntil - Date.now()) / 60000) // minutes
+      lockUntil: record.lockUntil,
+      remainingTime: Math.ceil((record.lockUntil.getTime() - Date.now()) / 60000),
     };
   }
-  
-  // Lock expired, reset
-  if (attempts.lockUntil && Date.now() >= attempts.lockUntil) {
-    failedLoginAttempts.delete(email);
-  }
-  
+
+  // Lock expired — clean up
+  await LoginAttempt.deleteOne({ identifier });
   return { isLocked: false };
 };
 
 /**
- * Clear failed login attempts (on successful login)
+ * Clear failed login attempts on successful login.
  */
-export const clearFailedAttempts = (email) => {
-  failedLoginAttempts.delete(email);
-  logger.info('FAILED_ATTEMPTS_CLEARED', { email });
+export const clearFailedAttempts = async (identifier) => {
+  await LoginAttempt.deleteOne({ identifier });
+  logger.info("FAILED_ATTEMPTS_CLEARED", { identifier });
 };
 
 /**
- * Get remaining login attempts
+ * Get remaining attempts before lockout.
  */
-export const getRemainingAttempts = (email) => {
-  const attempts = failedLoginAttempts.get(email);
-  if (!attempts) return 10;
-  
-  return Math.max(0, 10 - attempts.count);
+export const getRemainingAttempts = async (identifier) => {
+  const record = await LoginAttempt.findOne({ identifier });
+  if (!record) return MAX_ATTEMPTS;
+  return Math.max(0, MAX_ATTEMPTS - record.count);
 };
 
 // =========================================
@@ -311,24 +301,8 @@ export const emailLimiter = rateLimit({
   }
 });
 
-/**
- * Clean up old entries periodically (every 24 hours)
- */
-setInterval(() => {
-  const now = Date.now();
-  const dayAgo = now - 24 * 60 * 60 * 1000;
-  
-  for (const [email, data] of failedLoginAttempts.entries()) {
-    if (data.timestamp < dayAgo) {
-      failedLoginAttempts.delete(email);
-    }
-  }
-  
-  logger.info('CLEANUP', { 
-    message: 'Cleaned up old failed login attempts',
-    remaining: failedLoginAttempts.size 
-  });
-}, 24 * 60 * 60 * 1000);
+// No manual cleanup needed — MongoDB TTL index on LoginAttempt.firstAttemptAt
+// automatically removes records after 2 hours (see models/LoginAttempt.js).
 
 // =========================================
 // EXPORTS

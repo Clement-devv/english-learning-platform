@@ -1,9 +1,11 @@
 import express from "express";
 import Payment from "../models/Payment.js";
+import { verifyToken, verifyAdmin } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-router.get("/", async (req, res) => {
+// Get all payments — admin only
+router.get("/", verifyToken, verifyAdmin, async (req, res) => {
   try {
     const payments = await Payment.find()
       .populate("studentId", "firstName surname email")

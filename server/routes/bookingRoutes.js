@@ -119,10 +119,20 @@ router.post("/", verifyToken, async (req, res) => {
 
     // Validation
     if (!teacherId || !studentId || !classTitle || !scheduledTime) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: "Teacher, student, class title, and scheduled time are required" 
+        message: "Teacher, student, class title, and scheduled time are required",
       });
+    }
+
+    if (typeof classTitle === "string" && classTitle.length > 200) {
+      return res.status(400).json({ success: false, message: "Class title must be 200 characters or fewer" });
+    }
+    if (topic && typeof topic === "string" && topic.length > 500) {
+      return res.status(400).json({ success: false, message: "Topic must be 500 characters or fewer" });
+    }
+    if (notes && typeof notes === "string" && notes.length > 2000) {
+      return res.status(400).json({ success: false, message: "Notes must be 2000 characters or fewer" });
     }
 
     // Verify teacher and student exist

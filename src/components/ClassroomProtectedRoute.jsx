@@ -9,11 +9,12 @@ export default function ClassroomProtectedRoute({ children }) {
 
   useEffect(() => {
     const verifyToken = async () => {
-      // Check for ANY valid token (teacher or student)
-      const teacherToken = localStorage.getItem('teacherToken');
-      const studentToken = localStorage.getItem('studentToken');
-      
-      const token = teacherToken || studentToken;
+      // Check for ANY valid token (teacher, student, or sub-admin spectator)
+      const teacherToken  = localStorage.getItem('teacherToken');
+      const studentToken  = localStorage.getItem('studentToken');
+      const subAdminToken = localStorage.getItem('subAdminToken');
+
+      const token = teacherToken || studentToken || subAdminToken;
       
       if (!token) {
         setIsAuthenticated(false);

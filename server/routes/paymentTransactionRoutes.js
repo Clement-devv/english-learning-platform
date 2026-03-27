@@ -1,6 +1,5 @@
 // server/routes/paymentTransactionRoutes.js - PAYMENT MANAGEMENT ROUTES
 import express from "express";
-import mongoose from "mongoose";
 import PaymentTransaction from "../models/PaymentTransaction.js";
 import Teacher from "../models/Teacher.js";
 import { verifyToken, verifyAdmin } from "../middleware/authMiddleware.js";
@@ -171,71 +170,49 @@ router.patch("/teacher/:teacherId/pay-all", verifyToken, verifyAdmin, async (req
     const { teacherId } = req.params;
     const { paymentMethod, notes } = req.body;
 
-    const session = await mongoose.startSession();
-    session.startTransaction();
+    // Get all pending transactions for this teacher
+    const pendingTransactions = await PaymentTransaction.find({
+      teacherId,
+      status: "pending",
+    });
 
-    try {
-      // Get all pending transactions for this teacher
-      const pendingTransactions = await PaymentTransaction.find({
-        teacherId,
-        status: "pending"
-      }).session(session);
-
-      if (pendingTransactions.length === 0) {
-        await session.abortTransaction();
-        return res.status(400).json({ message: "No pending payments for this teacher" });
-      }
-
-      // Calculate total amount
-      const totalAmount = pendingTransactions.reduce((sum, tx) => sum + tx.amount, 0);
-
-      // Update all pending transactions to paid
-      await PaymentTransaction.updateMany(
-        { teacherId, status: "pending" },
-        {
-          $set: {
-            status: "paid",
-            paidAt: new Date(),
-            paidBy: req.user.id,
-            paymentMethod: paymentMethod || "bank_transfer",
-            notes: notes || ""
-          }
-        },
-        { session }
-      );
-
-      // Reset teacher's earned and lessonsCompleted
-      const teacher = await Teacher.findById(teacherId).session(session);
-      if (teacher) {
-        teacher.earned = 0;
-        teacher.lessonsCompleted = 0;
-        await teacher.save({ session });
-      }
-
-      await session.commitTransaction();
-
-      console.log(`💰 Bulk payment processed: $${totalAmount} paid to teacher ${teacherId}`);
-      console.log(`   Transactions paid: ${pendingTransactions.length}`);
-      console.log(`   Teacher earnings reset to $0`);
-
-      res.json({
-        message: "All pending payments processed successfully",
-        totalAmount,
-        transactionCount: pendingTransactions.length,
-        teacher: {
-          id: teacher._id,
-          name: `${teacher.firstName} ${teacher.lastName}`,
-          earned: 0,
-          lessonsCompleted: 0
-        }
-      });
-
-    } catch (error) {
-      await session.abortTransaction();
-      throw error;
-    } finally {
-      session.endSession();
+    if (pendingTransactions.length === 0) {
+      return res.status(400).json({ message: "No pending payments for this teacher" });
     }
+
+    const totalAmount = pendingTransactions.reduce((sum, tx) => sum + tx.amount, 0);
+
+    // Mark all pending transactions as paid
+    await PaymentTransaction.updateMany(
+      { teacherId, status: "pending" },
+      {
+        $set: {
+          status: "paid",
+          paidAt: new Date(),
+          paidBy: req.user.id,
+          paymentMethod: paymentMethod || "bank_transfer",
+          notes: notes || "",
+        },
+      }
+    );
+
+    // Reset teacher's earned amount
+    const teacher = await Teacher.findById(teacherId);
+    if (teacher) {
+      teacher.earned = 0;
+      await teacher.save();
+    }
+
+    console.log(`💰 Bulk payment: $${totalAmount} paid to teacher ${teacherId} (${pendingTransactions.length} transactions)`);
+
+    res.json({
+      message: "All pending payments processed successfully",
+      totalAmount,
+      transactionCount: pendingTransactions.length,
+      teacher: teacher
+        ? { id: teacher._id, name: `${teacher.firstName} ${teacher.lastName}`, earned: 0 }
+        : null,
+    });
 
   } catch (err) {
     console.error("Error processing bulk payment:", err);

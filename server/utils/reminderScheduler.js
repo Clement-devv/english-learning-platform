@@ -19,6 +19,8 @@ import {
   sendClassTimedReminder,
   sendHomeworkDueReminder,
   sendQuizDueReminder,
+  sendAccountDeletionFinalReminderEmail,
+  sendTeacherAccountDeletionFinalReminderEmail,
 } from "./emailService.js";
 import { sendPush } from "./webPushService.js";
 
@@ -155,6 +157,67 @@ async function checkQuizReminders() {
   }
 }
 
+// ── Scheduled deletion: 24-hour final warning + permanent purge ──────────────
+async function checkScheduledDeletions() {
+  const now = new Date();
+  const in24h = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+
+  // 1. Send 24-hour final reminder to students whose deletion is within the next 24 hours
+  //    and who haven't yet received this final reminder.
+  const pendingReminder = await Student.find({
+    scheduledDeletionAt: { $gt: now, $lte: in24h },
+    deletionWarningEmailSent: false,
+  });
+
+  for (const student of pendingReminder) {
+    sendAccountDeletionFinalReminderEmail(student, student.scheduledDeletionAt).catch((err) =>
+      console.error(`Final deletion reminder failed for ${student.email}:`, err.message)
+    );
+    student.deletionWarningEmailSent = true;
+    await student.save();
+    console.log(`📧 Final deletion reminder → ${student.email} (deletes ${student.scheduledDeletionAt})`);
+  }
+
+  // 2. Permanently delete students whose deletion date has passed.
+  const toDelete = await Student.find({ scheduledDeletionAt: { $lte: now } });
+
+  for (const student of toDelete) {
+    await student.deleteOne();
+    console.log(`🗑️  Student permanently deleted: ${student.email}`);
+  }
+
+  if (toDelete.length > 0) {
+    console.log(`✅ Permanently deleted ${toDelete.length} scheduled student(s)`);
+  }
+
+  // 3. Send 24-hour final reminder to teachers whose deletion is within the next 24 hours.
+  const pendingTeacherReminder = await Teacher.find({
+    scheduledDeletionAt: { $gt: now, $lte: in24h },
+    deletionWarningEmailSent: false,
+  });
+
+  for (const teacher of pendingTeacherReminder) {
+    sendTeacherAccountDeletionFinalReminderEmail(teacher, teacher.scheduledDeletionAt).catch((err) =>
+      console.error(`Final teacher deletion reminder failed for ${teacher.email}:`, err.message)
+    );
+    teacher.deletionWarningEmailSent = true;
+    await teacher.save();
+    console.log(`📧 Final teacher deletion reminder → ${teacher.email} (deletes ${teacher.scheduledDeletionAt})`);
+  }
+
+  // 4. Permanently delete teachers whose deletion date has passed.
+  const teachersToDelete = await Teacher.find({ scheduledDeletionAt: { $lte: now } });
+
+  for (const teacher of teachersToDelete) {
+    await teacher.deleteOne();
+    console.log(`🗑️  Teacher permanently deleted: ${teacher.email}`);
+  }
+
+  if (teachersToDelete.length > 0) {
+    console.log(`✅ Permanently deleted ${teachersToDelete.length} scheduled teacher(s)`);
+  }
+}
+
 // ── Main tick (runs every 60 s) ──────────────────────────────────────────────
 async function runTick() {
   try {
@@ -162,6 +225,7 @@ async function runTick() {
       checkClassReminders(),
       checkHomeworkReminders(),
       checkQuizReminders(),
+      checkScheduledDeletions(),
     ]);
   } catch (err) {
     console.error("Reminder scheduler error:", err.message);

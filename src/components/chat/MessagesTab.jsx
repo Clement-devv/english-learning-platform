@@ -5,7 +5,7 @@ import ChatWindow from "./ChatWindow";
 import { useDarkMode } from "../../hooks/useDarkMode";
 import { MessageSquare } from "lucide-react";
 
-export default function MessagesTab({ userRole }) {
+export default function MessagesTab({ userRole, onUnreadCount }) {
   const [selectedChat, setSelectedChat] = useState(null);
   const { isDarkMode } = useDarkMode();
 
@@ -47,6 +47,7 @@ export default function MessagesTab({ userRole }) {
             onSelectChat={handleSelectChat}
             selectedChatId={selectedChat?._id}
             isDark={dark}
+            onUnreadCount={onUnreadCount}
           />
         </div>
 

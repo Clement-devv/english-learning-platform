@@ -174,9 +174,10 @@ export default function ChatWindow({ chat, chatType = "group", userRole, onClose
   };
 
   const roleStyle = {
-    admin:   { grad: "linear-gradient(135deg,#7c3aed,#a855f7)", bubble: "linear-gradient(135deg,#7c3aed,#8b5cf6)", badge: "#7c3aed" },
-    teacher: { grad: "linear-gradient(135deg,#1d4ed8,#0891b2)", bubble: "linear-gradient(135deg,#2563eb,#06b6d4)", badge: "#1d4ed8" },
-    student: { grad: "linear-gradient(135deg,#047857,#10b981)", bubble: "linear-gradient(135deg,#059669,#10b981)", badge: "#047857" },
+    admin:      { grad: "linear-gradient(135deg,#7c3aed,#a855f7)", bubble: "linear-gradient(135deg,#7c3aed,#8b5cf6)", badge: "#7c3aed" },
+    teacher:    { grad: "linear-gradient(135deg,#1d4ed8,#0891b2)", bubble: "linear-gradient(135deg,#2563eb,#06b6d4)", badge: "#1d4ed8" },
+    student:    { grad: "linear-gradient(135deg,#047857,#10b981)", bubble: "linear-gradient(135deg,#059669,#10b981)", badge: "#047857" },
+    "sub-admin":{ grad: "linear-gradient(135deg,#b45309,#f59e0b)", bubble: "linear-gradient(135deg,#d97706,#f59e0b)", badge: "#b45309" },
   };
 
   const myStyle = roleStyle[userRole] || roleStyle.student;

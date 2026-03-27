@@ -1,24 +1,17 @@
 // src/pages/sub-admin/SubAdminDashboard.jsx
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Shield, TrendingUp, Users, Video, BookOpen,
   MessageCircle, Calendar, LogOut, Menu,
-  ChevronRight, Bell, Settings, Sun, Moon,
+  ChevronRight, ChevronLeft, Sun, Moon,
   CheckCircle, Clock, XCircle, AlertCircle,
-  RefreshCw, Loader2, User
+  RefreshCw, Loader2, User,
+  CheckSquare, DollarSign, Film, BarChart2, Star, RotateCcw
 } from "lucide-react";
 import { useDarkMode } from "../../hooks/useDarkMode";
 import MessagesTab from "../../components/chat/MessagesTab";
 
-// ── Navigation items for sub-admin (limited set) ─────────────────────────────
-const NAV = [
-  { key: "overview",  label: "Overview",  icon: TrendingUp  },
-  { key: "teachers",  label: "Teachers",  icon: Video       },
-  { key: "students",  label: "Students",  icon: Users       },
-  { key: "bookings",  label: "Bookings",  icon: Calendar    },
-  { key: "messages",  label: "Messages",  icon: MessageCircle },
-];
 
 export default function SubAdminDashboard() {
   const navigate   = useNavigate();
@@ -31,9 +24,23 @@ export default function SubAdminDashboard() {
 
   useEffect(() => {
     setMounted(true);
-    const info = localStorage.getItem("subAdminInfo");
+    const info = sessionStorage.getItem("subAdminInfo") || localStorage.getItem("subAdminInfo");
     if (info) setSubAdminInfo(JSON.parse(info));
   }, []);
+
+  const perms = subAdminInfo.permissions || {};
+  const NAV = [
+    { key: "overview",    label: "Overview",    icon: TrendingUp    },
+    ...(perms.canViewClasses  !== false ? [{ key: "classes",    label: "Classes",    icon: CheckSquare   }] : []),
+    { key: "teachers",    label: "Teachers",    icon: Video         },
+    { key: "students",    label: "Students",    icon: Users         },
+    ...(perms.canViewBookings !== false ? [{ key: "live-classes", label: "Live Classes", icon: Calendar }] : []),
+    { key: "recordings",  label: "Recordings",  icon: Film          },
+    { key: "reports",     label: "Reports",     icon: BarChart2     },
+    { key: "reviews",     label: "Reviews",     icon: Star          },
+    ...(perms.canViewPayments           ? [{ key: "payments",   label: "Payments",   icon: DollarSign    }] : []),
+    ...(perms.canSendMessages !== false ? [{ key: "messages",   label: "Messages",   icon: MessageCircle }] : []),
+  ];
 
   const handleLogout = () => {
     localStorage.removeItem("subAdminToken");
@@ -46,11 +53,16 @@ export default function SubAdminDashboard() {
 
   const renderTab = () => {
     switch (activeTab) {
-      case "overview": return <OverviewPanel isDarkMode={isDarkMode} />;
-      case "teachers": return <TeachersPanel isDarkMode={isDarkMode} />;
-      case "students": return <StudentsPanel isDarkMode={isDarkMode} />;
-      case "bookings": return <BookingsPanel isDarkMode={isDarkMode} />;
-      case "messages": return <MessagesTab userRole="sub-admin" />;
+      case "overview":    return <OverviewPanel    isDarkMode={isDarkMode} />;
+      case "classes":     return <ClassesPanel     isDarkMode={isDarkMode} canMark={perms.canMarkLessons} />;
+      case "teachers":    return <TeachersPanel    isDarkMode={isDarkMode} />;
+      case "students":    return <StudentsPanel    isDarkMode={isDarkMode} />;
+      case "live-classes": return <LiveClassesPanel isDarkMode={isDarkMode} />;
+      case "recordings":  return <RecordingsPanel  isDarkMode={isDarkMode} />;
+      case "reports":     return <ReportsPanel     isDarkMode={isDarkMode} />;
+      case "reviews":     return <ReviewsPanel     isDarkMode={isDarkMode} />;
+      case "payments":    return <PaymentsPanel    isDarkMode={isDarkMode} />;
+      case "messages":    return <MessagesTab userRole="sub-admin" />;
       default: return <OverviewPanel isDarkMode={isDarkMode} />;
     }
   };
@@ -434,33 +446,50 @@ function TeachersPanel({ isDarkMode }) {
           <p style={{ fontSize: "14px", color: c.muted, margin: 0 }}>{search ? "No teachers match your search" : "No teachers assigned yet"}</p>
         </div>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "12px" }}>
-          {filtered.map((t) => (
-            <div key={t._id} style={{ background: c.card, border: `1px solid ${c.border}`, borderRadius: "14px", padding: "18px", display: "flex", flexDirection: "column", gap: "12px" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                <div style={{ width: "44px", height: "44px", borderRadius: "13px", background: "linear-gradient(135deg, #3b82f6, #6b82f0)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "15px", fontWeight: "800", color: "white", flexShrink: 0 }}>
-                  {t.firstName[0]}{t.lastName[0]}
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ margin: 0, fontSize: "14px", fontWeight: "700", color: c.heading }}>{t.firstName} {t.lastName}</p>
-                  <p style={{ margin: "2px 0 0", fontSize: "12px", color: c.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.email}</p>
-                </div>
-                <span style={{ fontSize: "11px", fontWeight: "700", padding: "3px 9px", borderRadius: "20px", background: t.active ? (isDarkMode ? "rgba(16,185,129,0.12)" : "#d1fae5") : (isDarkMode ? "rgba(107,114,128,0.12)" : "#f3f4f6"), color: t.active ? "#10b981" : "#6b7280" }}>
-                  {t.active ? "Active" : "Inactive"}
-                </span>
-              </div>
-              <div style={{ display: "flex", gap: "8px" }}>
-                {t.continent && (
-                  <span style={{ fontSize: "11.5px", padding: "4px 10px", borderRadius: "20px", background: isDarkMode ? "#1e2235" : "#f0f4ff", color: c.muted, fontWeight: "600", textTransform: "capitalize" }}>
-                    🌍 {t.continent}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "14px" }}>
+          {filtered.map((t) => {
+            const classesDone = t.lessonsCompleted ?? t.bookingStats?.completed ?? 0;
+            const earned      = Number(t.earned || 0).toFixed(2);
+            const rate        = t.ratePerClass ? `$${t.ratePerClass}` : "—";
+            return (
+              <div key={t._id} style={{ background: c.card, border: `1px solid ${c.border}`, borderRadius: "16px", padding: "18px", display: "flex", flexDirection: "column", gap: "14px" }}>
+                {/* Header row */}
+                <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                  <div style={{ width: "46px", height: "46px", borderRadius: "14px", background: "linear-gradient(135deg, #3b82f6, #6b82f0)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "15px", fontWeight: "800", color: "white", flexShrink: 0 }}>
+                    {(t.firstName?.[0] || "")}{(t.lastName?.[0] || "")}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ margin: 0, fontSize: "14px", fontWeight: "700", color: c.heading }}>{t.firstName} {t.lastName}</p>
+                    <p style={{ margin: "2px 0 0", fontSize: "12px", color: c.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.email}</p>
+                  </div>
+                  <span style={{ fontSize: "11px", fontWeight: "700", padding: "3px 9px", borderRadius: "20px", flexShrink: 0, background: t.active ? (isDarkMode ? "rgba(16,185,129,0.12)" : "#d1fae5") : (isDarkMode ? "rgba(107,114,128,0.12)" : "#f3f4f6"), color: t.active ? "#10b981" : "#6b7280" }}>
+                    {t.active ? "Active" : "Inactive"}
                   </span>
+                </div>
+
+                {/* Stats row */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px" }}>
+                  {[
+                    { label: "Classes Done", value: classesDone, color: "#6b82f0" },
+                    { label: "Rate / Class", value: rate,        color: "#10b981" },
+                    { label: "Pending Pay",  value: `$${earned}`, color: "#f59e0b" },
+                  ].map(({ label, value, color }) => (
+                    <div key={label} style={{ background: isDarkMode ? "#0f1117" : "#f8faff", borderRadius: "10px", padding: "10px 8px", textAlign: "center" }}>
+                      <p style={{ margin: 0, fontSize: "15px", fontWeight: "800", color }}>{value}</p>
+                      <p style={{ margin: "3px 0 0", fontSize: "10px", fontWeight: "600", color: c.muted, textTransform: "uppercase", letterSpacing: "0.05em" }}>{label}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Footer tags */}
+                {t.continent && (
+                  <p style={{ margin: 0, fontSize: "12px", color: c.muted, fontWeight: "600", textTransform: "capitalize" }}>
+                    🌍 {t.continent}
+                  </p>
                 )}
-                <span style={{ fontSize: "11.5px", padding: "4px 10px", borderRadius: "20px", background: isDarkMode ? "#1e2235" : "#f0f4ff", color: c.muted, fontWeight: "600" }}>
-                  {t.bookingStats?.completed || 0} classes done
-                </span>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
@@ -524,25 +553,68 @@ function StudentsPanel({ isDarkMode }) {
           <p style={{ fontSize: "14px", color: c.muted, margin: 0 }}>{search ? "No students match your search" : "No students yet"}</p>
         </div>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "14px" }}>
           {filtered.map((s) => {
             const sc = statusConfig[s.latestBookingStatus] || statusConfig.pending;
+
+            // Age: prefer computed age field, fall back to dateOfBirth calculation
+            let ageDisplay = "—";
+            if (s.age) {
+              ageDisplay = `${s.age} yrs`;
+            } else if (s.dateOfBirth) {
+              const yrs = Math.floor((Date.now() - new Date(s.dateOfBirth)) / (365.25 * 24 * 3600 * 1000));
+              ageDisplay = `${yrs} yrs`;
+            }
+
+            const dobDisplay = s.dateOfBirth
+              ? new Date(s.dateOfBirth).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" })
+              : null;
+
+            const level = s.rank || "—";
+
             return (
-              <div key={s._id} style={{ display: "flex", alignItems: "center", gap: "14px", padding: "14px 16px", background: c.card, border: `1px solid ${c.border}`, borderRadius: "14px" }}>
-                <div style={{ width: "40px", height: "40px", borderRadius: "12px", background: "linear-gradient(135deg, #10b981, #34d399)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "14px", fontWeight: "800", color: "white", flexShrink: 0 }}>
-                  {s.firstName[0]}{s.surname[0]}
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ margin: 0, fontSize: "14px", fontWeight: "700", color: c.heading }}>{s.firstName} {s.surname}</p>
-                  <p style={{ margin: "2px 0 0", fontSize: "12px", color: c.muted }}>{s.email} · Teacher: {s.assignedTeacher?.firstName} {s.assignedTeacher?.lastName}</p>
-                </div>
-                <div style={{ display: "flex", gap: "8px", alignItems: "center", flexShrink: 0 }}>
-                  <span style={{ fontSize: "11.5px", padding: "3px 9px", borderRadius: "20px", background: isDarkMode ? "#1e2235" : "#f0f4ff", color: c.muted, fontWeight: "600" }}>
-                    {s.noOfClasses || 0} classes left
+              <div key={s._id} style={{ background: c.card, border: `1px solid ${c.border}`, borderRadius: "16px", padding: "18px", display: "flex", flexDirection: "column", gap: "14px" }}>
+                {/* Header */}
+                <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                  <div style={{ width: "46px", height: "46px", borderRadius: "14px", background: "linear-gradient(135deg, #10b981, #34d399)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "15px", fontWeight: "800", color: "white", flexShrink: 0 }}>
+                    {(s.firstName?.[0] || "")}{(s.surname?.[0] || "")}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ margin: 0, fontSize: "14px", fontWeight: "700", color: c.heading }}>{s.firstName} {s.surname}</p>
+                    <p style={{ margin: "2px 0 0", fontSize: "12px", color: c.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.email}</p>
+                  </div>
+                  <span style={{ fontSize: "11px", fontWeight: "700", padding: "3px 9px", borderRadius: "20px", flexShrink: 0, background: s.active ? (isDarkMode ? "rgba(16,185,129,0.12)" : "#d1fae5") : (isDarkMode ? "rgba(107,114,128,0.12)" : "#f3f4f6"), color: s.active ? "#10b981" : "#6b7280" }}>
+                    {s.active ? "Active" : "Inactive"}
                   </span>
+                </div>
+
+                {/* Stats row */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px" }}>
+                  {[
+                    { label: "Classes Left", value: s.noOfClasses ?? 0, color: "#6b82f0" },
+                    { label: "Age",          value: ageDisplay,          color: "#3b82f6" },
+                    { label: "Level",        value: level,               color: "#10b981" },
+                  ].map(({ label, value, color }) => (
+                    <div key={label} style={{ background: isDarkMode ? "#0f1117" : "#f8faff", borderRadius: "10px", padding: "10px 8px", textAlign: "center" }}>
+                      <p style={{ margin: 0, fontSize: "15px", fontWeight: "800", color }}>{value}</p>
+                      <p style={{ margin: "3px 0 0", fontSize: "10px", fontWeight: "600", color: c.muted, textTransform: "uppercase", letterSpacing: "0.05em" }}>{label}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Footer */}
+                <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
+                  {dobDisplay && (
+                    <span style={{ fontSize: "12px", color: c.muted, fontWeight: "600" }}>🎂 {dobDisplay}</span>
+                  )}
                   <span style={{ fontSize: "11px", fontWeight: "700", padding: "3px 9px", borderRadius: "20px", background: isDarkMode ? `${sc.color}20` : `${sc.color}15`, color: sc.color }}>
                     {sc.label}
                   </span>
+                  {s.assignedTeacher && (
+                    <span style={{ fontSize: "12px", color: c.muted, fontWeight: "600" }}>
+                      👨‍🏫 {s.assignedTeacher.firstName} {s.assignedTeacher.lastName}
+                    </span>
+                  )}
                 </div>
               </div>
             );
@@ -554,92 +626,1206 @@ function StudentsPanel({ isDarkMode }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// BOOKINGS PANEL
+// LIVE CLASSES PANEL
+// Shows accepted bookings classified as Live Now / Upcoming / Ended
+// Sub-admin can join as spectator via Google Meet or Agora
 // ─────────────────────────────────────────────────────────────────────────────
-function BookingsPanel({ isDarkMode }) {
-  const [bookings, setBookings] = useState([]);
-  const [loading, setLoading]   = useState(true);
-  const [error, setError]       = useState("");
-  const [filter, setFilter]     = useState("all");
+function LiveClassesPanel({ isDarkMode }) {
+  const navigate = useNavigate();
+  const [bookings,   setBookings]   = useState([]);
+  const [loading,    setLoading]    = useState(true);
+  const [error,      setError]      = useState("");
+  const [now,        setNow]        = useState(Date.now());
+  const [spectating, setSpectating] = useState(null); // booking being watched on Agora
   const c = palette(isDarkMode);
+
+  // Tick every 30 s to keep Live / Upcoming labels accurate
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 30000);
+    return () => clearInterval(t);
+  }, []);
 
   const load = useCallback(async () => {
     try { setLoading(true); setError("");
-      const url = filter === "all" ? "/api/sub-admin-scope/bookings" : `/api/sub-admin-scope/bookings?status=${filter}`;
-      const res = await apiFetch(url);
+      const res = await apiFetch("/api/sub-admin-scope/bookings?status=accepted");
       if (res.success) setBookings(res.bookings);
       else setError(res.message);
     } catch { setError("Network error"); }
     finally { setLoading(false); }
-  }, [filter]);
+  }, []);
 
   useEffect(() => { load(); }, [load]);
 
-  const statusConfig = {
-    pending:   { color: "#f59e0b", bg: isDarkMode ? "rgba(245,158,11,0.12)" : "#fef9c3",  label: "Pending"   },
+  // Classify each booking relative to current time
+  const classify = (b) => {
+    const start = new Date(b.scheduledTime).getTime();
+    const end   = start + (b.duration || 60) * 60 * 1000;
+    if (now >= start && now < end) return "live";
+    if (now < start)               return "upcoming";
+    return "ended"; // accepted but past end time — not yet marked
+  };
+
+  const live     = bookings.filter((b) => classify(b) === "live");
+  const upcoming = bookings.filter((b) => classify(b) === "upcoming")
+    .sort((a, b) => new Date(a.scheduledTime) - new Date(b.scheduledTime));
+  const ended    = bookings.filter((b) => classify(b) === "ended")
+    .sort((a, b) => new Date(b.scheduledTime) - new Date(a.scheduledTime));
+
+  // Human-readable countdown / time
+  const timeLabel = (b) => {
+    const diff = new Date(b.scheduledTime).getTime() - now;
+    if (diff > 0) {
+      const mins = Math.round(diff / 60000);
+      if (mins < 60) return `in ${mins}m`;
+      const h = Math.floor(mins / 60), m = mins % 60;
+      return `in ${h}h${m > 0 ? ` ${m}m` : ""}`;
+    }
+    return new Date(b.scheduledTime).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+  };
+
+  const handleJoinMeet = (b) => {
+    const link = b.teacherId?.googleMeetLink;
+    if (link) window.open(link, "_blank", "noopener,noreferrer");
+  };
+
+  const handleWatchAgora = (b) => setSpectating(b);
+
+  const handleJoinClassroom = (b) => {
+    navigate("/classroom", {
+      state: {
+        classData: {
+          id:                   b._id,
+          bookingId:            b._id,
+          title:                b.classTitle || "Class",
+          topic:                b.topic      || "",
+          duration:             b.duration   || 60,
+          scheduledTime:        b.scheduledTime,
+          teacherGoogleMeetLink: b.teacherId?.googleMeetLink || "",
+        },
+        userRole: "spectator",
+      },
+    });
+  };
+
+  if (loading) return <Spinner />;
+  if (error)   return <ErrorState msg={error} onRetry={load} />;
+
+  const ClassCard = ({ b, phase }) => {
+    const meetLink = b.teacherId?.googleMeetLink;
+    const isLive   = phase === "live";
+    return (
+      <div style={{
+        background: c.card,
+        border: `1px solid ${isLive ? "rgba(239,68,68,0.35)" : c.border}`,
+        borderRadius: "16px", padding: "16px 18px",
+        boxShadow: isLive ? "0 0 0 2px rgba(239,68,68,0.08)" : "none",
+      }}>
+        {/* Top row */}
+        <div style={{ display: "flex", alignItems: "flex-start", gap: "12px", marginBottom: "12px" }}>
+          {/* Live pulse / clock icon */}
+          <div style={{ paddingTop: "2px", flexShrink: 0 }}>
+            {isLive ? (
+              <div style={{ position: "relative", width: "10px", height: "10px" }}>
+                <div style={{ width: "10px", height: "10px", borderRadius: "50%", background: "#ef4444" }} />
+                <div style={{ position: "absolute", inset: 0, borderRadius: "50%", background: "rgba(239,68,68,0.4)", animation: "sa-ping 1.4s ease-in-out infinite" }} />
+              </div>
+            ) : (
+              <Clock size={11} color={c.muted} />
+            )}
+          </div>
+
+          {/* Class info */}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ margin: 0, fontSize: "14px", fontWeight: "700", color: c.heading, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {b.classTitle || "Class"}
+            </p>
+            <p style={{ margin: "3px 0 0", fontSize: "12px", color: c.muted }}>
+              👨‍🏫 {b.teacherId?.firstName} {b.teacherId?.lastName}
+              &nbsp;→&nbsp;
+              👩‍🎓 {b.studentId?.firstName} {b.studentId?.surname}
+            </p>
+            <p style={{ margin: "3px 0 0", fontSize: "11px", color: c.muted }}>
+              {b.scheduledTime
+                ? new Date(b.scheduledTime).toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })
+                : ""}
+              {" · "}{b.duration || 60} min
+            </p>
+          </div>
+
+          {/* Status label */}
+          <div style={{ flexShrink: 0, textAlign: "right" }}>
+            {isLive ? (
+              <span style={{ fontSize: "10px", fontWeight: "800", padding: "3px 8px", borderRadius: "6px", background: "#ef4444", color: "white", letterSpacing: "0.05em" }}>
+                LIVE
+              </span>
+            ) : (
+              <span style={{ fontSize: "11px", fontWeight: "600", color: c.muted }}>{timeLabel(b)}</span>
+            )}
+          </div>
+        </div>
+
+        {/* Action buttons */}
+        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+          {meetLink && (
+            <button
+              onClick={() => handleJoinMeet(b)}
+              style={{ display: "flex", alignItems: "center", gap: "6px", padding: "7px 13px", borderRadius: "9px", border: "none", cursor: "pointer", background: isDarkMode ? "rgba(59,130,246,0.15)" : "#dbeafe", color: "#3b82f6", fontSize: "12px", fontWeight: "700", fontFamily: "inherit" }}
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M15 10l4.553-2.069A1 1 0 0121 8.87v6.26a1 1 0 01-1.447.9L15 14"/><rect x="3" y="8" width="12" height="8" rx="2"/></svg>
+              Join Google Meet
+            </button>
+          )}
+          <button
+            onClick={() => handleWatchAgora(b)}
+            style={{ display: "flex", alignItems: "center", gap: "6px", padding: "7px 13px", borderRadius: "9px", border: "none", cursor: "pointer", background: isDarkMode ? "rgba(99,102,241,0.15)" : "#e0e7ff", color: "#6366f1", fontSize: "12px", fontWeight: "700", fontFamily: "inherit" }}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            Watch on Agora
+          </button>
+          {isLive && (
+            <button
+              onClick={() => handleJoinClassroom(b)}
+              style={{ display: "flex", alignItems: "center", gap: "6px", padding: "7px 13px", borderRadius: "9px", border: "none", cursor: "pointer", background: "linear-gradient(135deg,#4f63d2,#6b82f0)", color: "white", fontSize: "12px", fontWeight: "700", fontFamily: "inherit", boxShadow: "0 3px 10px rgba(79,99,210,0.3)" }}
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              Join Classroom
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  const Section = ({ title, items, phase, emptyText }) => (
+    <div>
+      <p style={{ margin: "0 0 10px", fontSize: "12px", fontWeight: "700", color: c.muted, textTransform: "uppercase", letterSpacing: "0.08em" }}>
+        {title} <span style={{ fontWeight: "400", textTransform: "none" }}>({items.length})</span>
+      </p>
+      {items.length === 0 ? (
+        <div style={{ padding: "18px", textAlign: "center", background: c.card, borderRadius: "12px", border: `1px solid ${c.border}` }}>
+          <p style={{ margin: 0, fontSize: "13px", color: c.muted }}>{emptyText}</p>
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+          {items.map((b) => <ClassCard key={b._id} b={b} phase={phase} />)}
+        </div>
+      )}
+    </div>
+  );
+
+  return (
+    <>
+      {/* Agora spectator modal */}
+      {spectating && (
+        <AgoraSpectatorModal
+          booking={spectating}
+          isDarkMode={isDarkMode}
+          onClose={() => setSpectating(null)}
+        />
+      )}
+
+      <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+        {/* Header */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div>
+            <h1 style={{ margin: 0, fontSize: "20px", fontWeight: "800", color: c.heading }}>Live Classes</h1>
+            <p style={{ margin: "4px 0 0", fontSize: "13px", color: c.muted }}>
+              {live.length > 0 ? `${live.length} class${live.length > 1 ? "es" : ""} happening now` : "No classes live right now"}
+            </p>
+          </div>
+          <button onClick={load} style={{ background: isDarkMode ? "#1e2235" : "#eef1ff", border: `1px solid ${isDarkMode ? "#252840" : "#dde3f8"}`, borderRadius: "10px", padding: "8px 14px", fontSize: "13px", fontWeight: "600", color: isDarkMode ? "#6b82f0" : "#4f63d2", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px" }}>
+            <RefreshCw size={13} /> Refresh
+          </button>
+        </div>
+
+        <Section title="🔴 Live Now"  items={live}     phase="live"     emptyText="No classes live at the moment" />
+        <Section title="⏰ Upcoming"  items={upcoming}  phase="upcoming"  emptyText="No upcoming classes scheduled" />
+        <Section title="⌛ Ended"     items={ended}     phase="ended"     emptyText="No recently ended classes" />
+      </div>
+    </>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// REMOTE VIDEO PLAYER — must live outside AgoraSpectatorModal so React never
+// unmounts it on parent re-renders (which would kill the video playback).
+// ─────────────────────────────────────────────────────────────────────────────
+function RemoteVideo({ uid, videoTrack }) {
+  const divRef = useRef(null);
+
+  useEffect(() => {
+    if (divRef.current && videoTrack) {
+      videoTrack.play(divRef.current);
+    }
+    // Stop rendering into this div on unmount; does NOT stop the remote track
+    return () => { try { videoTrack?.stop(); } catch (_) {} };
+  }, [videoTrack]);
+
+  return (
+    <div style={{ flex: 1, minWidth: "280px", background: "#000", borderRadius: "10px", overflow: "hidden", position: "relative", minHeight: "220px" }}>
+      <div ref={divRef} style={{ width: "100%", height: "100%" }} />
+      <span style={{ position: "absolute", bottom: "8px", left: "10px", fontSize: "11px", fontWeight: "600", color: "white", background: "rgba(0,0,0,0.55)", padding: "2px 8px", borderRadius: "6px" }}>
+        Participant {uid}
+      </span>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AGORA SPECTATOR MODAL
+// Joins the class channel as audience (no video/audio publish)
+// Uses dynamic import to keep the sub-admin bundle lean
+// ─────────────────────────────────────────────────────────────────────────────
+function AgoraSpectatorModal({ booking, isDarkMode, onClose }) {
+  const [phase,       setPhase]       = useState("connecting"); // connecting | connected | error | empty
+  const [errorMsg,    setErrorMsg]    = useState("");
+  const [remoteUsers, setRemoteUsers] = useState([]);
+  const clientRef = useRef(null);
+  const c = palette(isDarkMode);
+
+  useEffect(() => {
+    let mounted = true;
+
+    (async () => {
+      try {
+        // Dynamic import — Agora SDK only loads when modal opens
+        const AgoraRTC = (await import("agora-rtc-sdk-ng")).default;
+        if (!mounted) return;
+
+        // Fetch token using sub-admin credentials
+        const token = sessionStorage.getItem("subAdminToken") || localStorage.getItem("subAdminToken");
+        const res   = await fetch(`/api/agora/token?channel=${booking._id}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await res.json();
+        if (!data.success || !data.appId) throw new Error(data.message || "Could not get Agora token");
+        if (!mounted) return;
+
+        // Create client — audience mode, no publishing
+        const client = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
+        clientRef.current = client;
+
+        client.on("user-published", async (user, mediaType) => {
+          await client.subscribe(user, mediaType);
+          if (mediaType === "audio") {
+            // Play audio immediately — sub-admin hears the class through speakers
+            user.audioTrack?.play();
+          }
+          if (mediaType === "video") {
+            // Store uid + videoTrack reference so RemoteVideo can play it
+            setRemoteUsers((prev) => {
+              const exists = prev.find((u) => u.uid === user.uid);
+              const entry  = { uid: user.uid, videoTrack: user.videoTrack };
+              return exists
+                ? prev.map((u) => u.uid === user.uid ? entry : u)
+                : [...prev, entry];
+            });
+          }
+        });
+
+        client.on("user-unpublished", (user, mediaType) => {
+          if (mediaType === "audio") {
+            user.audioTrack?.stop();
+          }
+          if (mediaType === "video") {
+            setRemoteUsers((prev) => prev.filter((u) => u.uid !== user.uid));
+          }
+        });
+
+        client.on("user-left", (user) => {
+          setRemoteUsers((prev) => prev.filter((u) => u.uid !== user.uid));
+        });
+
+        await client.join(data.appId, data.channel, data.token, null);
+        if (!mounted) return;
+        setPhase("connected");
+      } catch (e) {
+        if (mounted) { setPhase("error"); setErrorMsg(e.message); }
+      }
+    })();
+
+    return () => {
+      mounted = false;
+      clientRef.current?.leave().catch(() => {});
+    };
+  }, [booking._id]);
+
+  const overlay = {
+    position: "fixed", inset: 0, zIndex: 9000,
+    background: "rgba(0,0,0,0.75)",
+    display: "flex", alignItems: "center", justifyContent: "center",
+    padding: "16px",
+  };
+  const modal = {
+    width: "100%", maxWidth: "820px",
+    background: isDarkMode ? "#13161f" : "#ffffff",
+    borderRadius: "20px",
+    overflow: "hidden",
+    boxShadow: "0 24px 80px rgba(0,0,0,0.5)",
+    display: "flex", flexDirection: "column",
+    maxHeight: "90vh",
+  };
+
+  return (
+    <div style={overlay} onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div style={modal}>
+        {/* Header */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", borderBottom: `1px solid ${isDarkMode ? "#1e2235" : "#e8ecf4"}` }}>
+          <div>
+            <p style={{ margin: 0, fontSize: "15px", fontWeight: "800", color: isDarkMode ? "#e2e8f0" : "#1e293b" }}>
+              {booking.classTitle || "Class"} — Spectator View
+            </p>
+            <p style={{ margin: "2px 0 0", fontSize: "12px", color: isDarkMode ? "#6b7280" : "#94a3b8" }}>
+              Agora channel · {booking._id}
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            style={{ width: "32px", height: "32px", borderRadius: "8px", border: "none", cursor: "pointer", background: isDarkMode ? "#1e2235" : "#f0f4ff", color: isDarkMode ? "#6b7280" : "#94a3b8", fontSize: "18px", display: "flex", alignItems: "center", justifyContent: "center" }}
+          >×</button>
+        </div>
+
+        {/* Body */}
+        <div style={{ flex: 1, padding: "20px", overflowY: "auto", minHeight: "300px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: phase === "connected" && remoteUsers.length > 0 ? "flex-start" : "center", gap: "16px" }}>
+          {phase === "connecting" && (
+            <>
+              <Loader2 size={36} color="#6366f1" style={{ animation: "sa-spin 0.8s linear infinite" }} />
+              <p style={{ margin: 0, color: isDarkMode ? "#6b7280" : "#94a3b8", fontSize: "14px" }}>Joining class as spectator…</p>
+            </>
+          )}
+
+          {phase === "error" && (
+            <>
+              <XCircle size={36} color="#ef4444" />
+              <p style={{ margin: 0, color: "#ef4444", fontSize: "14px", fontWeight: "600" }}>Failed to connect</p>
+              <p style={{ margin: 0, color: isDarkMode ? "#6b7280" : "#94a3b8", fontSize: "12px" }}>{errorMsg}</p>
+            </>
+          )}
+
+          {phase === "connected" && remoteUsers.length === 0 && (
+            <>
+              <AlertCircle size={36} color={isDarkMode ? "#374151" : "#d1d5db"} />
+              <p style={{ margin: 0, color: isDarkMode ? "#6b7280" : "#94a3b8", fontSize: "14px" }}>
+                Connected — waiting for teacher or student to share video
+              </p>
+            </>
+          )}
+
+          {remoteUsers.length > 0 && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "12px", width: "100%" }}>
+              {remoteUsers.map((u) => (
+                <RemoteVideo key={u.uid} uid={u.uid} videoTrack={u.videoTrack} />
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div style={{ padding: "12px 20px", borderTop: `1px solid ${isDarkMode ? "#1e2235" : "#e8ecf4"}`, display: "flex", justifyContent: "flex-end" }}>
+          <button
+            onClick={onClose}
+            style={{ padding: "8px 20px", borderRadius: "10px", border: "none", cursor: "pointer", background: "#ef4444", color: "white", fontSize: "13px", fontWeight: "700", fontFamily: "inherit" }}
+          >
+            Leave
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CLASSES PANEL — accepted/completed bookings, with optional mark action
+// ─────────────────────────────────────────────────────────────────────────────
+function ClassesPanel({ isDarkMode, canMark }) {
+  const [teachers,  setTeachers]  = useState([]);
+  const [loading,   setLoading]   = useState(true);
+  const [error,     setError]     = useState("");
+  // selectedTeacher = null → show teacher list; = teacher obj → show that teacher's classes
+  const [selectedTeacher, setSelectedTeacher] = useState(null);
+  const c = palette(isDarkMode);
+
+  const loadTeachers = useCallback(async () => {
+    try { setLoading(true); setError("");
+      const res = await apiFetch("/api/sub-admin-scope/teachers");
+      if (res.success) setTeachers(res.teachers);
+      else setError(res.message);
+    } catch { setError("Network error"); }
+    finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { loadTeachers(); }, [loadTeachers]);
+
+  if (loading) return <Spinner />;
+  if (error)   return <ErrorState msg={error} onRetry={loadTeachers} />;
+
+  // ── Drill-down: classes for selected teacher ──────────────────────────────
+  if (selectedTeacher) {
+    return (
+      <TeacherClassesView
+        teacher={selectedTeacher}
+        isDarkMode={isDarkMode}
+        canMark={canMark}
+        onBack={() => setSelectedTeacher(null)}
+      />
+    );
+  }
+
+  // ── Teacher list ──────────────────────────────────────────────────────────
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div>
+          <h1 style={{ margin: 0, fontSize: "20px", fontWeight: "800", color: c.heading }}>Classes</h1>
+          <p style={{ margin: "4px 0 0", fontSize: "13px", color: c.muted }}>
+            Select a teacher to view their classes
+          </p>
+        </div>
+        <button onClick={loadTeachers} style={{ background: isDarkMode ? "#1e2235" : "#eef1ff", border: `1px solid ${isDarkMode ? "#252840" : "#dde3f8"}`, borderRadius: "10px", padding: "8px 14px", fontSize: "13px", fontWeight: "600", color: isDarkMode ? "#6b82f0" : "#4f63d2", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px" }}>
+          <RefreshCw size={13} /> Refresh
+        </button>
+      </div>
+
+      {teachers.length === 0 ? (
+        <div style={{ textAlign: "center", padding: "48px 0" }}>
+          <Video size={36} color={isDarkMode ? "#1e2235" : "#e2e8f0"} style={{ margin: "0 auto 10px" }} />
+          <p style={{ fontSize: "14px", color: c.muted, margin: 0 }}>No teachers in your scope</p>
+        </div>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: "12px" }}>
+          {teachers.map((t) => (
+            <button
+              key={t._id}
+              onClick={() => setSelectedTeacher(t)}
+              style={{
+                background: c.card, border: `1px solid ${c.border}`, borderRadius: "16px",
+                padding: "18px", cursor: "pointer", textAlign: "left",
+                display: "flex", flexDirection: "column", gap: "12px",
+                transition: "border-color 0.15s, box-shadow 0.15s",
+                fontFamily: "inherit",
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#6b82f0"; e.currentTarget.style.boxShadow = "0 4px 20px rgba(107,130,240,0.15)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.borderColor = c.border; e.currentTarget.style.boxShadow = "none"; }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                <div style={{ width: "46px", height: "46px", borderRadius: "14px", background: "linear-gradient(135deg, #4f63d2, #6b82f0)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", fontWeight: "800", color: "white", flexShrink: 0 }}>
+                  {(t.firstName?.[0] || "")}{(t.lastName?.[0] || "")}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ margin: 0, fontSize: "14px", fontWeight: "700", color: c.heading }}>{t.firstName} {t.lastName}</p>
+                  <p style={{ margin: "2px 0 0", fontSize: "12px", color: c.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.email}</p>
+                </div>
+                <ChevronRight size={16} color={c.muted} style={{ flexShrink: 0 }} />
+              </div>
+              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                <span style={{ fontSize: "11.5px", padding: "4px 10px", borderRadius: "20px", background: isDarkMode ? "#1e2235" : "#f0f4ff", color: c.muted, fontWeight: "600" }}>
+                  {t.bookingStats?.completed || 0} completed
+                </span>
+                <span style={{ fontSize: "11.5px", padding: "4px 10px", borderRadius: "20px", background: t.active ? (isDarkMode ? "rgba(16,185,129,0.12)" : "#d1fae5") : (isDarkMode ? "#1e2235" : "#f3f4f6"), color: t.active ? "#10b981" : "#6b7280", fontWeight: "600" }}>
+                  {t.active ? "Active" : "Inactive"}
+                </span>
+                {t.continent && (
+                  <span style={{ fontSize: "11.5px", padding: "4px 10px", borderRadius: "20px", background: isDarkMode ? "#1e2235" : "#f0f4ff", color: c.muted, fontWeight: "600", textTransform: "capitalize" }}>
+                    🌍 {t.continent}
+                  </span>
+                )}
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TEACHER CLASSES VIEW  (drill-down from ClassesPanel)
+// Shows all accepted + completed classes for one teacher, with mark/unmark
+// ─────────────────────────────────────────────────────────────────────────────
+function TeacherClassesView({ teacher, isDarkMode, canMark, onBack }) {
+  const [bookings, setBookings] = useState([]);
+  const [loading,  setLoading]  = useState(true);
+  const [error,    setError]    = useState("");
+  const [busy,     setBusy]     = useState({}); // bookingId → true while API call in flight
+  const [toast,    setToast]    = useState({ msg: "", ok: true });
+  const c = palette(isDarkMode);
+
+  const showToast = (msg, ok = true) => {
+    setToast({ msg, ok });
+    setTimeout(() => setToast({ msg: "", ok: true }), 3500);
+  };
+
+  const load = useCallback(async () => {
+    try { setLoading(true); setError("");
+      // fetch all (no status filter) → returns accepted + completed
+      const res = await apiFetch(`/api/sub-admin-scope/classes?teacherId=${teacher._id}`);
+      if (res.success) setBookings(res.bookings);
+      else setError(res.message);
+    } catch { setError("Network error"); }
+    finally { setLoading(false); }
+  }, [teacher._id]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const apiAction = async (endpoint, bookingId, successMsg) => {
+    setBusy((p) => ({ ...p, [bookingId]: true }));
+    try {
+      const token = sessionStorage.getItem("subAdminToken") || localStorage.getItem("subAdminToken");
+      const res = await fetch(`/api/sub-admin-scope/classes/${endpoint}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ bookingId }),
+      });
+      const data = await res.json();
+      if (data.success) { showToast(successMsg, true); load(); }
+      else showToast(data.message || "Action failed", false);
+    } catch { showToast("Network error", false); }
+    finally { setBusy((p) => ({ ...p, [bookingId]: false })); }
+  };
+
+  const accepted  = bookings.filter((b) => b.status === "accepted");
+  const completed = bookings.filter((b) => b.status === "completed");
+
+  const statusCfg = {
     accepted:  { color: "#3b82f6", bg: isDarkMode ? "rgba(59,130,246,0.12)" : "#dbeafe",  label: "Accepted"  },
     completed: { color: "#10b981", bg: isDarkMode ? "rgba(16,185,129,0.12)" : "#d1fae5",  label: "Completed" },
-    rejected:  { color: "#ef4444", bg: isDarkMode ? "rgba(239,68,68,0.12)" : "#fee2e2",   label: "Rejected"  },
-    cancelled: { color: "#6b7280", bg: isDarkMode ? "rgba(107,114,128,0.12)" : "#f3f4f6", label: "Cancelled" },
   };
+
+  const ClassRow = ({ b }) => {
+    const sc   = statusCfg[b.status] || statusCfg.accepted;
+    const isBusy = busy[b._id];
+    return (
+      <div style={{ display: "flex", alignItems: "center", gap: "12px", padding: "14px 16px", background: c.card, border: `1px solid ${c.border}`, borderRadius: "14px" }}>
+        <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: sc.color, flexShrink: 0 }} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p style={{ margin: 0, fontSize: "14px", fontWeight: "700", color: c.heading, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {b.classTitle || "Class"}
+          </p>
+          <p style={{ margin: "2px 0 0", fontSize: "12px", color: c.muted }}>
+            👩‍🎓 {b.studentId?.firstName} {b.studentId?.surname}
+          </p>
+          <p style={{ margin: "2px 0 0", fontSize: "11px", color: c.muted }}>
+            {b.scheduledTime ? new Date(b.scheduledTime).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" }) : ""}
+            {teacher.ratePerClass ? ` · $${teacher.ratePerClass}/class` : ""}
+          </p>
+        </div>
+        <span style={{ fontSize: "11px", fontWeight: "700", padding: "3px 10px", borderRadius: "20px", background: sc.bg, color: sc.color, flexShrink: 0 }}>
+          {sc.label}
+        </span>
+        {canMark && b.status === "accepted" && (
+          <button
+            onClick={() => apiAction("mark", b._id, "Class marked as completed ✅")}
+            disabled={isBusy}
+            style={{ padding: "7px 14px", borderRadius: "10px", border: "none", cursor: isBusy ? "not-allowed" : "pointer", background: "linear-gradient(135deg, #10b981, #34d399)", color: "white", fontSize: "12px", fontWeight: "700", fontFamily: "inherit", display: "flex", alignItems: "center", gap: "6px", flexShrink: 0, opacity: isBusy ? 0.6 : 1 }}
+          >
+            {isBusy ? <Loader2 size={12} style={{ animation: "sa-spin 0.8s linear infinite" }} /> : <CheckCircle size={12} />}
+            Mark Done
+          </button>
+        )}
+        {canMark && b.status === "completed" && (
+          <button
+            onClick={() => apiAction("unmark", b._id, "Class reverted to accepted ↩")}
+            disabled={isBusy}
+            style={{ padding: "7px 14px", borderRadius: "10px", border: `1px solid ${isDarkMode ? "rgba(245,158,11,0.3)" : "#fde68a"}`, cursor: isBusy ? "not-allowed" : "pointer", background: isDarkMode ? "rgba(245,158,11,0.15)" : "#fef3c7", color: "#f59e0b", fontSize: "12px", fontWeight: "700", fontFamily: "inherit", display: "flex", alignItems: "center", gap: "6px", flexShrink: 0, opacity: isBusy ? 0.6 : 1 }}
+          >
+            {isBusy ? <Loader2 size={12} style={{ animation: "sa-spin 0.8s linear infinite" }} /> : <RotateCcw size={12} />}
+            Unmark
+          </button>
+        )}
+      </div>
+    );
+  };
+
+  const Section = ({ title, items, emptyText }) => (
+    <div>
+      <p style={{ margin: "0 0 10px", fontSize: "12px", fontWeight: "700", color: c.muted, textTransform: "uppercase", letterSpacing: "0.08em" }}>
+        {title} <span style={{ fontWeight: "400", textTransform: "none" }}>({items.length})</span>
+      </p>
+      {items.length === 0 ? (
+        <div style={{ padding: "20px", textAlign: "center", background: c.card, borderRadius: "12px", border: `1px solid ${c.border}` }}>
+          <p style={{ margin: 0, fontSize: "13px", color: c.muted }}>{emptyText}</p>
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+          {items.map((b) => <ClassRow key={b._id} b={b} />)}
+        </div>
+      )}
+    </div>
+  );
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+      {/* Toast */}
+      {toast.msg && (
+        <div style={{ position: "fixed", top: "20px", right: "20px", zIndex: 200, background: toast.ok ? "#10b981" : "#ef4444", color: "white", padding: "12px 20px", borderRadius: "12px", fontSize: "14px", fontWeight: "600", boxShadow: "0 4px 20px rgba(0,0,0,0.2)" }}>
+          {toast.msg}
+        </div>
+      )}
+
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+        <button
+          onClick={onBack}
+          style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 14px", borderRadius: "10px", border: `1px solid ${c.border}`, background: c.card, color: c.muted, fontSize: "13px", fontWeight: "600", cursor: "pointer", fontFamily: "inherit" }}
+        >
+          <ChevronLeft size={15} /> Back
+        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <div style={{ width: "42px", height: "42px", borderRadius: "13px", background: "linear-gradient(135deg, #4f63d2, #6b82f0)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "15px", fontWeight: "800", color: "white", flexShrink: 0 }}>
+            {(teacher.firstName?.[0] || "")}{(teacher.lastName?.[0] || "")}
+          </div>
+          <div>
+            <p style={{ margin: 0, fontSize: "17px", fontWeight: "800", color: c.heading }}>{teacher.firstName} {teacher.lastName}</p>
+            <p style={{ margin: "2px 0 0", fontSize: "12px", color: c.muted }}>
+              {loading ? "Loading…" : `${bookings.length} class${bookings.length !== 1 ? "es" : ""}`}
+              {canMark ? " · Mark / Unmark enabled" : " · View only"}
+            </p>
+          </div>
+        </div>
+        <div style={{ marginLeft: "auto" }}>
+          <button onClick={load} style={{ background: isDarkMode ? "#1e2235" : "#eef1ff", border: `1px solid ${isDarkMode ? "#252840" : "#dde3f8"}`, borderRadius: "10px", padding: "8px 14px", fontSize: "13px", fontWeight: "600", color: isDarkMode ? "#6b82f0" : "#4f63d2", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px" }}>
+            <RefreshCw size={13} /> Refresh
+          </button>
+        </div>
+      </div>
+
+      {/* Content */}
+      {loading ? <Spinner /> : error ? <ErrorState msg={error} onRetry={load} /> : (
+        <>
+          <Section title="Accepted Classes" items={accepted} emptyText="No accepted classes" />
+          <Section title="Completed Classes" items={completed} emptyText="No completed classes" />
+        </>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PAYMENTS PANEL
+// ─────────────────────────────────────────────────────────────────────────────
+function PaymentsPanel({ isDarkMode }) {
+  const [payments, setPayments]   = useState([]);
+  const [summary, setSummary]     = useState([]);
+  const [loading, setLoading]     = useState(true);
+  const [error, setError]         = useState("");
+  const [view, setView]           = useState("summary"); // "summary" | "detail"
+  const c = palette(isDarkMode);
+
+  const load = useCallback(async () => {
+    try { setLoading(true); setError("");
+      const res = await apiFetch("/api/sub-admin-scope/payments");
+      if (res.success) { setPayments(res.payments); setSummary(res.summary); }
+      else setError(res.message);
+    } catch { setError("Network error"); }
+    finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
 
   if (loading) return <Spinner />;
   if (error)   return <ErrorState msg={error} onRetry={load} />;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
-      <div>
-        <h1 style={{ margin: 0, fontSize: "20px", fontWeight: "800", color: c.heading }}>Bookings</h1>
-        <p style={{ margin: "4px 0 0", fontSize: "13px", color: c.muted }}>{bookings.length} booking{bookings.length !== 1 ? "s" : ""} found</p>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div>
+          <h1 style={{ margin: 0, fontSize: "20px", fontWeight: "800", color: c.heading }}>Payments</h1>
+          <p style={{ margin: "4px 0 0", fontSize: "13px", color: c.muted }}>{payments.length} payment record{payments.length !== 1 ? "s" : ""}</p>
+        </div>
+        <button onClick={load} style={{ background: isDarkMode ? "#1e2235" : "#eef1ff", border: `1px solid ${isDarkMode ? "#252840" : "#dde3f8"}`, borderRadius: "10px", padding: "8px 14px", fontSize: "13px", fontWeight: "600", color: isDarkMode ? "#6b82f0" : "#4f63d2", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px" }}>
+          <RefreshCw size={13} /> Refresh
+        </button>
       </div>
 
-      {/* Status filter tabs */}
-      <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
-        {["all", "pending", "accepted", "completed", "rejected", "cancelled"].map((s) => (
-          <button
-            key={s}
-            onClick={() => setFilter(s)}
-            style={{
-              padding: "6px 14px", borderRadius: "20px", border: "none", cursor: "pointer",
-              background: filter === s ? "linear-gradient(135deg, #4f63d2, #6b82f0)" : (isDarkMode ? "#1e2235" : "#f0f4ff"),
-              color: filter === s ? "white" : c.muted,
-              fontFamily: "inherit", fontSize: "12.5px", fontWeight: "700",
-              textTransform: "capitalize",
-            }}
-          >
-            {s === "all" ? "All" : s}
+      <div style={{ display: "flex", gap: "8px" }}>
+        {["summary", "detail"].map((v) => (
+          <button key={v} onClick={() => setView(v)} style={{ padding: "6px 16px", borderRadius: "20px", border: "none", cursor: "pointer", background: view === v ? "linear-gradient(135deg, #4f63d2, #6b82f0)" : (isDarkMode ? "#1e2235" : "#f0f4ff"), color: view === v ? "white" : c.muted, fontFamily: "inherit", fontSize: "12.5px", fontWeight: "700", textTransform: "capitalize" }}>
+            {v === "summary" ? "By Teacher" : "All Records"}
           </button>
         ))}
       </div>
 
-      {bookings.length === 0 ? (
+      {view === "summary" ? (
+        summary.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "48px 0" }}>
+            <DollarSign size={36} color={isDarkMode ? "#1e2235" : "#e2e8f0"} style={{ margin: "0 auto 10px" }} />
+            <p style={{ fontSize: "14px", color: c.muted, margin: 0 }}>No payment data yet</p>
+          </div>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: "12px" }}>
+            {summary.map((s) => (
+              <div key={s.teacher?._id} style={{ background: c.card, border: `1px solid ${c.border}`, borderRadius: "14px", padding: "18px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "14px" }}>
+                  <div style={{ width: "40px", height: "40px", borderRadius: "12px", background: "linear-gradient(135deg, #4f63d2, #6b82f0)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "14px", fontWeight: "800", color: "white", flexShrink: 0 }}>
+                    {s.teacher?.firstName?.[0]}{s.teacher?.lastName?.[0]}
+                  </div>
+                  <div>
+                    <p style={{ margin: 0, fontSize: "14px", fontWeight: "700", color: c.heading }}>{s.teacher?.firstName} {s.teacher?.lastName}</p>
+                    <p style={{ margin: "2px 0 0", fontSize: "11.5px", color: c.muted }}>{s.count} payment{s.count !== 1 ? "s" : ""}</p>
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: "8px" }}>
+                  <div style={{ flex: 1, background: isDarkMode ? "#0f1117" : "#f8faff", borderRadius: "10px", padding: "10px", textAlign: "center" }}>
+                    <p style={{ margin: 0, fontSize: "11px", color: c.muted, fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.05em" }}>Total</p>
+                    <p style={{ margin: "4px 0 0", fontSize: "18px", fontWeight: "800", color: "#6b82f0" }}>${s.totalEarned}</p>
+                  </div>
+                  <div style={{ flex: 1, background: isDarkMode ? "#0f1117" : "#f8faff", borderRadius: "10px", padding: "10px", textAlign: "center" }}>
+                    <p style={{ margin: 0, fontSize: "11px", color: c.muted, fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.05em" }}>Paid</p>
+                    <p style={{ margin: "4px 0 0", fontSize: "18px", fontWeight: "800", color: "#10b981" }}>${s.totalPaid}</p>
+                  </div>
+                  <div style={{ flex: 1, background: isDarkMode ? "#0f1117" : "#f8faff", borderRadius: "10px", padding: "10px", textAlign: "center" }}>
+                    <p style={{ margin: 0, fontSize: "11px", color: c.muted, fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.05em" }}>Pending</p>
+                    <p style={{ margin: "4px 0 0", fontSize: "18px", fontWeight: "800", color: "#f59e0b" }}>${s.totalPending}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )
+      ) : (
+        payments.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "48px 0" }}>
+            <DollarSign size={36} color={isDarkMode ? "#1e2235" : "#e2e8f0"} style={{ margin: "0 auto 10px" }} />
+            <p style={{ fontSize: "14px", color: c.muted, margin: 0 }}>No payments yet</p>
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+            {payments.map((p) => (
+              <div key={p._id} style={{ display: "flex", alignItems: "center", gap: "14px", padding: "14px 16px", background: c.card, border: `1px solid ${c.border}`, borderRadius: "14px" }}>
+                <div style={{ width: "38px", height: "38px", borderRadius: "10px", background: p.status === "paid" ? (isDarkMode ? "rgba(16,185,129,0.12)" : "#d1fae5") : (isDarkMode ? "rgba(245,158,11,0.12)" : "#fef9c3"), display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  <DollarSign size={16} color={p.status === "paid" ? "#10b981" : "#f59e0b"} />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ margin: 0, fontSize: "13.5px", fontWeight: "700", color: c.heading }}>{p.teacherId?.firstName} {p.teacherId?.lastName}</p>
+                  <p style={{ margin: "2px 0 0", fontSize: "12px", color: c.muted }}>Student: {p.studentId?.firstName} {p.studentId?.surname} · {p.createdAt ? new Date(p.createdAt).toLocaleDateString() : ""}</p>
+                </div>
+                <p style={{ margin: 0, fontSize: "16px", fontWeight: "800", color: p.status === "paid" ? "#10b981" : "#f59e0b", flexShrink: 0 }}>${p.amount}</p>
+                <span style={{ fontSize: "11px", fontWeight: "700", padding: "3px 9px", borderRadius: "20px", background: p.status === "paid" ? (isDarkMode ? "rgba(16,185,129,0.12)" : "#d1fae5") : (isDarkMode ? "rgba(245,158,11,0.12)" : "#fef9c3"), color: p.status === "paid" ? "#10b981" : "#f59e0b", textTransform: "capitalize", flexShrink: 0 }}>
+                  {p.status || "pending"}
+                </span>
+              </div>
+            ))}
+          </div>
+        )
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RECORDINGS PANEL — teacher list → drill-down
+// ─────────────────────────────────────────────────────────────────────────────
+function RecordingsPanel({ isDarkMode }) {
+  const [teachers,         setTeachers]         = useState([]);
+  const [loading,          setLoading]          = useState(true);
+  const [error,            setError]            = useState("");
+  const [selectedTeacher,  setSelectedTeacher]  = useState(null);
+  const c = palette(isDarkMode);
+
+  const loadTeachers = useCallback(async () => {
+    try { setLoading(true); setError("");
+      const res = await apiFetch("/api/sub-admin-scope/teachers");
+      if (res.success) setTeachers(res.teachers);
+      else setError(res.message);
+    } catch { setError("Network error"); }
+    finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { loadTeachers(); }, [loadTeachers]);
+
+  if (loading) return <Spinner />;
+  if (error)   return <ErrorState msg={error} onRetry={loadTeachers} />;
+
+  // ── Drill-down: recordings for selected teacher ───────────────────────────
+  if (selectedTeacher) {
+    return (
+      <TeacherRecordingsView
+        teacher={selectedTeacher}
+        isDarkMode={isDarkMode}
+        onBack={() => setSelectedTeacher(null)}
+      />
+    );
+  }
+
+  // ── Teacher list ──────────────────────────────────────────────────────────
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div>
+          <h1 style={{ margin: 0, fontSize: "20px", fontWeight: "800", color: c.heading }}>Recordings</h1>
+          <p style={{ margin: "4px 0 0", fontSize: "13px", color: c.muted }}>Select a teacher to view their recordings</p>
+        </div>
+        <button onClick={loadTeachers} style={{ background: isDarkMode ? "#1e2235" : "#eef1ff", border: `1px solid ${isDarkMode ? "#252840" : "#dde3f8"}`, borderRadius: "10px", padding: "8px 14px", fontSize: "13px", fontWeight: "600", color: isDarkMode ? "#6b82f0" : "#4f63d2", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px" }}>
+          <RefreshCw size={13} /> Refresh
+        </button>
+      </div>
+
+      {teachers.length === 0 ? (
         <div style={{ textAlign: "center", padding: "48px 0" }}>
-          <Calendar size={36} color={isDarkMode ? "#1e2235" : "#e2e8f0"} style={{ margin: "0 auto 10px" }} />
-          <p style={{ fontSize: "14px", color: c.muted, margin: 0 }}>No {filter === "all" ? "" : filter} bookings</p>
+          <Film size={36} color={isDarkMode ? "#1e2235" : "#e2e8f0"} style={{ margin: "0 auto 10px" }} />
+          <p style={{ fontSize: "14px", color: c.muted, margin: 0 }}>No teachers in your scope</p>
+        </div>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: "12px" }}>
+          {teachers.map((t) => (
+            <button
+              key={t._id}
+              onClick={() => setSelectedTeacher(t)}
+              style={{ background: c.card, border: `1px solid ${c.border}`, borderRadius: "16px", padding: "18px", cursor: "pointer", textAlign: "left", display: "flex", flexDirection: "column", gap: "12px", transition: "border-color 0.15s, box-shadow 0.15s", fontFamily: "inherit" }}
+              onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#8b5cf6"; e.currentTarget.style.boxShadow = "0 4px 20px rgba(139,92,246,0.15)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.borderColor = c.border; e.currentTarget.style.boxShadow = "none"; }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                <div style={{ width: "46px", height: "46px", borderRadius: "14px", background: "linear-gradient(135deg, #7c3aed, #8b5cf6)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", fontWeight: "800", color: "white", flexShrink: 0 }}>
+                  {(t.firstName?.[0] || "")}{(t.lastName?.[0] || "")}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ margin: 0, fontSize: "14px", fontWeight: "700", color: c.heading }}>{t.firstName} {t.lastName}</p>
+                  <p style={{ margin: "2px 0 0", fontSize: "12px", color: c.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.email}</p>
+                </div>
+                <ChevronRight size={16} color={c.muted} style={{ flexShrink: 0 }} />
+              </div>
+              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                <span style={{ fontSize: "11.5px", padding: "4px 10px", borderRadius: "20px", background: isDarkMode ? "rgba(139,92,246,0.12)" : "#ede9fe", color: "#8b5cf6", fontWeight: "600" }}>
+                  View recordings
+                </span>
+                {t.active && (
+                  <span style={{ fontSize: "11.5px", padding: "4px 10px", borderRadius: "20px", background: isDarkMode ? "rgba(16,185,129,0.12)" : "#d1fae5", color: "#10b981", fontWeight: "600" }}>
+                    Active
+                  </span>
+                )}
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TEACHER RECORDINGS VIEW  (drill-down from RecordingsPanel)
+// ─────────────────────────────────────────────────────────────────────────────
+function TeacherRecordingsView({ teacher, isDarkMode, onBack }) {
+  const [recordings, setRecordings] = useState([]);
+  const [loading,    setLoading]    = useState(true);
+  const [error,      setError]      = useState("");
+  const [search,     setSearch]     = useState("");
+  const c = palette(isDarkMode);
+
+  const load = useCallback(async () => {
+    try { setLoading(true); setError("");
+      const res = await apiFetch(`/api/sub-admin-scope/recordings?teacherId=${teacher._id}`);
+      if (res.success) setRecordings(res.recordings);
+      else setError(res.message);
+    } catch { setError("Network error"); }
+    finally { setLoading(false); }
+  }, [teacher._id]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const filtered = useMemo(() =>
+    recordings.filter((r) =>
+      `${r.title || ""} ${r.studentId?.firstName || ""} ${r.studentId?.surname || ""}`.toLowerCase().includes(search.toLowerCase())
+    ), [recordings, search]);
+
+  const totalMins = recordings.reduce((s, r) => s + (r.duration ? Math.round(r.duration / 60) : 0), 0);
+
+  if (loading) return <Spinner />;
+  if (error)   return <ErrorState msg={error} onRetry={load} />;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+        <button
+          onClick={onBack}
+          style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 14px", borderRadius: "10px", border: `1px solid ${c.border}`, background: c.card, color: c.muted, fontSize: "13px", fontWeight: "600", cursor: "pointer", fontFamily: "inherit" }}
+        >
+          <ChevronLeft size={15} /> Back
+        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <div style={{ width: "42px", height: "42px", borderRadius: "13px", background: "linear-gradient(135deg, #7c3aed, #8b5cf6)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "15px", fontWeight: "800", color: "white", flexShrink: 0 }}>
+            {(teacher.firstName?.[0] || "")}{(teacher.lastName?.[0] || "")}
+          </div>
+          <div>
+            <p style={{ margin: 0, fontSize: "17px", fontWeight: "800", color: c.heading }}>{teacher.firstName} {teacher.lastName}</p>
+            <p style={{ margin: "2px 0 0", fontSize: "12px", color: c.muted }}>
+              {recordings.length} recording{recordings.length !== 1 ? "s" : ""}
+              {totalMins > 0 ? ` · ${totalMins}m total` : ""}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Search */}
+      <input
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder="Search by title or student…"
+        style={{ width: "100%", padding: "11px 14px", background: isDarkMode ? "#0f1117" : "#f8faff", border: `1.5px solid ${c.border}`, borderRadius: "12px", fontSize: "13.5px", color: c.heading, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }}
+      />
+
+      {/* Recordings list */}
+      {filtered.length === 0 ? (
+        <div style={{ textAlign: "center", padding: "48px 0" }}>
+          <Film size={36} color={isDarkMode ? "#1e2235" : "#e2e8f0"} style={{ margin: "0 auto 10px" }} />
+          <p style={{ fontSize: "14px", color: c.muted, margin: 0 }}>{search ? "No recordings match your search" : "No recordings yet"}</p>
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-          {bookings.map((b) => {
-            const sc = statusConfig[b.status] || statusConfig.pending;
-            return (
-              <div key={b._id} style={{ display: "flex", alignItems: "center", gap: "14px", padding: "14px 16px", background: c.card, border: `1px solid ${c.border}`, borderRadius: "14px" }}>
-                <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: sc.color, flexShrink: 0 }} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ margin: 0, fontSize: "14px", fontWeight: "700", color: c.heading, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{b.classTitle || "Class"}</p>
-                  <p style={{ margin: "2px 0 0", fontSize: "12px", color: c.muted }}>
-                    👨‍🏫 {b.teacherId?.firstName} {b.teacherId?.lastName} &nbsp;→&nbsp; 👩‍🎓 {b.studentId?.firstName} {b.studentId?.surname}
-                  </p>
-                </div>
-                <span style={{ fontSize: "11px", fontWeight: "700", padding: "3px 10px", borderRadius: "20px", background: sc.bg, color: sc.color, textTransform: "capitalize", flexShrink: 0 }}>
-                  {sc.label}
-                </span>
-                <span style={{ fontSize: "11px", color: c.muted, flexShrink: 0 }}>
-                  {b.scheduledTime ? new Date(b.scheduledTime).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : ""}
-                </span>
+          {filtered.map((r) => (
+            <div key={r._id} style={{ display: "flex", alignItems: "center", gap: "14px", padding: "14px 16px", background: c.card, border: `1px solid ${c.border}`, borderRadius: "14px" }}>
+              <div style={{ width: "40px", height: "40px", borderRadius: "12px", background: isDarkMode ? "rgba(139,92,246,0.12)" : "#ede9fe", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <Film size={18} color="#8b5cf6" />
               </div>
-            );
-          })}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ margin: 0, fontSize: "14px", fontWeight: "700", color: c.heading, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {r.title || "Class Recording"}
+                </p>
+                <p style={{ margin: "2px 0 0", fontSize: "12px", color: c.muted }}>
+                  Student: {r.studentId?.firstName} {r.studentId?.surname || r.studentId?.lastName}
+                </p>
+              </div>
+              <p style={{ margin: 0, fontSize: "11.5px", color: c.muted, flexShrink: 0 }}>
+                {r.createdAt ? new Date(r.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : ""}
+              </p>
+              {r.duration && (
+                <span style={{ fontSize: "11.5px", padding: "3px 9px", borderRadius: "20px", background: isDarkMode ? "#1e2235" : "#f0f4ff", color: c.muted, fontWeight: "600", flexShrink: 0 }}>
+                  {Math.round(r.duration / 60)}m
+                </span>
+              )}
+            </div>
+          ))}
         </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// REPORTS PANEL — progress per student
+// ─────────────────────────────────────────────────────────────────────────────
+function ReportsPanel({ isDarkMode }) {
+  const [data, setData]       = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError]     = useState("");
+  const [view, setView]       = useState("students"); // "students" | "history"
+  const [search, setSearch]   = useState("");
+  const c = palette(isDarkMode);
+
+  const load = useCallback(async () => {
+    try { setLoading(true); setError("");
+      const res = await apiFetch("/api/sub-admin-scope/reports");
+      if (res.success) setData(res);
+      else setError(res.message);
+    } catch { setError("Network error"); }
+    finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (loading) return <Spinner />;
+  if (error)   return <ErrorState msg={error} onRetry={load} />;
+
+  const filteredStudents = (data.studentProgress || []).filter((s) =>
+    `${s.student?.firstName} ${s.student?.surname} ${s.teacher?.firstName} ${s.teacher?.lastName}`.toLowerCase().includes(search.toLowerCase())
+  );
+  const filteredHistory = (data.completedBookings || []).filter((b) =>
+    `${b.studentId?.firstName} ${b.studentId?.surname} ${b.teacherId?.firstName} ${b.teacherId?.lastName} ${b.classTitle || ""}`.toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div>
+          <h1 style={{ margin: 0, fontSize: "20px", fontWeight: "800", color: c.heading }}>Progress Reports</h1>
+          <p style={{ margin: "4px 0 0", fontSize: "13px", color: c.muted }}>{data.total} completed class{data.total !== 1 ? "es" : ""} · {data.studentProgress?.length || 0} students</p>
+        </div>
+        <button onClick={load} style={{ background: isDarkMode ? "#1e2235" : "#eef1ff", border: `1px solid ${isDarkMode ? "#252840" : "#dde3f8"}`, borderRadius: "10px", padding: "8px 14px", fontSize: "13px", fontWeight: "600", color: isDarkMode ? "#6b82f0" : "#4f63d2", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px" }}>
+          <RefreshCw size={13} /> Refresh
+        </button>
+      </div>
+
+      <div style={{ display: "flex", gap: "8px" }}>
+        {["students", "history"].map((v) => (
+          <button key={v} onClick={() => setView(v)} style={{ padding: "6px 16px", borderRadius: "20px", border: "none", cursor: "pointer", background: view === v ? "linear-gradient(135deg, #4f63d2, #6b82f0)" : (isDarkMode ? "#1e2235" : "#f0f4ff"), color: view === v ? "white" : c.muted, fontFamily: "inherit", fontSize: "12.5px", fontWeight: "700" }}>
+            {v === "students" ? "By Student" : "Class History"}
+          </button>
+        ))}
+      </div>
+
+      <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search…" style={{ width: "100%", padding: "11px 14px", background: isDarkMode ? "#0f1117" : "#f8faff", border: `1.5px solid ${c.border}`, borderRadius: "12px", fontSize: "13.5px", color: c.heading, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
+
+      {view === "students" ? (
+        filteredStudents.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "48px 0" }}>
+            <BarChart2 size={36} color={isDarkMode ? "#1e2235" : "#e2e8f0"} style={{ margin: "0 auto 10px" }} />
+            <p style={{ fontSize: "14px", color: c.muted, margin: 0 }}>No completed classes yet</p>
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+            {filteredStudents.map((s, i) => {
+              const pct = s.completedClasses > 0
+                ? Math.min(100, Math.round((s.completedClasses / (s.completedClasses + (s.remainingClasses || 0))) * 100))
+                : 0;
+              return (
+                <div key={s.student?._id || i} style={{ padding: "16px", background: c.card, border: `1px solid ${c.border}`, borderRadius: "14px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "12px" }}>
+                    <div style={{ width: "40px", height: "40px", borderRadius: "12px", background: "linear-gradient(135deg, #10b981, #34d399)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "14px", fontWeight: "800", color: "white", flexShrink: 0 }}>
+                      {s.student?.firstName?.[0]}{s.student?.surname?.[0]}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <p style={{ margin: 0, fontSize: "14px", fontWeight: "700", color: c.heading }}>{s.student?.firstName} {s.student?.surname}</p>
+                      <p style={{ margin: "2px 0 0", fontSize: "12px", color: c.muted }}>Teacher: {s.teacher?.firstName} {s.teacher?.lastName} · Last class: {s.lastClass ? new Date(s.lastClass).toLocaleDateString() : "N/A"}</p>
+                    </div>
+                    <div style={{ textAlign: "right", flexShrink: 0 }}>
+                      <p style={{ margin: 0, fontSize: "18px", fontWeight: "800", color: "#10b981" }}>{s.completedClasses}</p>
+                      <p style={{ margin: "2px 0 0", fontSize: "11px", color: c.muted }}>completed</p>
+                    </div>
+                  </div>
+                  <div style={{ height: "6px", background: isDarkMode ? "#1e2235" : "#f0f2fc", borderRadius: "6px", overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${pct}%`, background: "linear-gradient(90deg, #10b981, #34d399)", borderRadius: "6px", transition: "width 0.6s ease" }} />
+                  </div>
+                  <p style={{ margin: "6px 0 0", fontSize: "11.5px", color: c.muted }}>{pct}% of purchased classes completed · {s.remainingClasses || 0} remaining</p>
+                </div>
+              );
+            })}
+          </div>
+        )
+      ) : (
+        filteredHistory.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "48px 0" }}>
+            <BarChart2 size={36} color={isDarkMode ? "#1e2235" : "#e2e8f0"} style={{ margin: "0 auto 10px" }} />
+            <p style={{ fontSize: "14px", color: c.muted, margin: 0 }}>No completed classes yet</p>
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+            {filteredHistory.map((b) => (
+              <div key={b._id} style={{ display: "flex", alignItems: "center", gap: "14px", padding: "12px 16px", background: c.card, border: `1px solid ${c.border}`, borderRadius: "12px" }}>
+                <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#10b981", flexShrink: 0 }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ margin: 0, fontSize: "13.5px", fontWeight: "700", color: c.heading, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{b.classTitle || "Class"}</p>
+                  <p style={{ margin: "2px 0 0", fontSize: "12px", color: c.muted }}>👨‍🏫 {b.teacherId?.firstName} {b.teacherId?.lastName} → 👩‍🎓 {b.studentId?.firstName} {b.studentId?.surname}</p>
+                </div>
+                <span style={{ fontSize: "11px", color: c.muted, flexShrink: 0 }}>{b.scheduledTime ? new Date(b.scheduledTime).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : ""}</span>
+              </div>
+            ))}
+          </div>
+        )
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// REVIEWS PANEL
+// ─────────────────────────────────────────────────────────────────────────────
+function ReviewsPanel({ isDarkMode }) {
+  const [reviews, setReviews]           = useState([]);
+  const [teacherRatings, setTeacherRatings] = useState([]);
+  const [loading, setLoading]           = useState(true);
+  const [error, setError]               = useState("");
+  const [view, setView]                 = useState("ratings");
+  const c = palette(isDarkMode);
+
+  const load = useCallback(async () => {
+    try { setLoading(true); setError("");
+      const res = await apiFetch("/api/sub-admin-scope/reviews");
+      if (res.success) { setReviews(res.reviews); setTeacherRatings(res.teacherRatings); }
+      else setError(res.message);
+    } catch { setError("Network error"); }
+    finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (loading) return <Spinner />;
+  if (error)   return <ErrorState msg={error} onRetry={load} />;
+
+  const StarRow = ({ rating }) => (
+    <div style={{ display: "flex", gap: "2px" }}>
+      {[1,2,3,4,5].map((i) => (
+        <Star key={i} size={13} color={i <= rating ? "#f59e0b" : (isDarkMode ? "#1e2235" : "#e2e8f0")} fill={i <= rating ? "#f59e0b" : "none"} />
+      ))}
+    </div>
+  );
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div>
+          <h1 style={{ margin: 0, fontSize: "20px", fontWeight: "800", color: c.heading }}>Reviews</h1>
+          <p style={{ margin: "4px 0 0", fontSize: "13px", color: c.muted }}>{reviews.length} review{reviews.length !== 1 ? "s" : ""}</p>
+        </div>
+        <button onClick={load} style={{ background: isDarkMode ? "#1e2235" : "#eef1ff", border: `1px solid ${isDarkMode ? "#252840" : "#dde3f8"}`, borderRadius: "10px", padding: "8px 14px", fontSize: "13px", fontWeight: "600", color: isDarkMode ? "#6b82f0" : "#4f63d2", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px" }}>
+          <RefreshCw size={13} /> Refresh
+        </button>
+      </div>
+
+      <div style={{ display: "flex", gap: "8px" }}>
+        {["ratings", "all"].map((v) => (
+          <button key={v} onClick={() => setView(v)} style={{ padding: "6px 16px", borderRadius: "20px", border: "none", cursor: "pointer", background: view === v ? "linear-gradient(135deg, #4f63d2, #6b82f0)" : (isDarkMode ? "#1e2235" : "#f0f4ff"), color: view === v ? "white" : c.muted, fontFamily: "inherit", fontSize: "12.5px", fontWeight: "700" }}>
+            {v === "ratings" ? "Teacher Ratings" : "All Reviews"}
+          </button>
+        ))}
+      </div>
+
+      {view === "ratings" ? (
+        teacherRatings.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "48px 0" }}>
+            <Star size={36} color={isDarkMode ? "#1e2235" : "#e2e8f0"} style={{ margin: "0 auto 10px" }} />
+            <p style={{ fontSize: "14px", color: c.muted, margin: 0 }}>No reviews yet</p>
+          </div>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: "12px" }}>
+            {teacherRatings.sort((a, b) => b.average - a.average).map((t) => (
+              <div key={t.teacher?._id} style={{ background: c.card, border: `1px solid ${c.border}`, borderRadius: "14px", padding: "18px", display: "flex", flexDirection: "column", gap: "12px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                  <div style={{ width: "42px", height: "42px", borderRadius: "13px", background: "linear-gradient(135deg, #f59e0b, #fbbf24)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "15px", fontWeight: "800", color: "white", flexShrink: 0 }}>
+                    {t.teacher?.firstName?.[0]}{t.teacher?.lastName?.[0]}
+                  </div>
+                  <div>
+                    <p style={{ margin: 0, fontSize: "14px", fontWeight: "700", color: c.heading }}>{t.teacher?.firstName} {t.teacher?.lastName}</p>
+                    <p style={{ margin: "2px 0 0", fontSize: "12px", color: c.muted }}>{t.count} review{t.count !== 1 ? "s" : ""}</p>
+                  </div>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                  <p style={{ margin: 0, fontSize: "28px", fontWeight: "800", color: "#f59e0b" }}>{t.average}</p>
+                  <StarRow rating={Math.round(parseFloat(t.average))} />
+                </div>
+              </div>
+            ))}
+          </div>
+        )
+      ) : (
+        reviews.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "48px 0" }}>
+            <Star size={36} color={isDarkMode ? "#1e2235" : "#e2e8f0"} style={{ margin: "0 auto 10px" }} />
+            <p style={{ fontSize: "14px", color: c.muted, margin: 0 }}>No reviews yet</p>
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+            {reviews.map((r) => (
+              <div key={r._id} style={{ padding: "16px", background: c.card, border: `1px solid ${c.border}`, borderRadius: "14px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "8px" }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ margin: 0, fontSize: "13.5px", fontWeight: "700", color: c.heading }}>
+                      {r.studentId?.firstName} {r.studentId?.surname} → {r.teacherId?.firstName} {r.teacherId?.lastName}
+                    </p>
+                    <p style={{ margin: "2px 0 0", fontSize: "11.5px", color: c.muted }}>{r.createdAt ? new Date(r.createdAt).toLocaleDateString() : ""}</p>
+                  </div>
+                  <StarRow rating={r.rating || 0} />
+                </div>
+                {r.comment && (
+                  <p style={{ margin: 0, fontSize: "13px", color: c.text, fontStyle: "italic", padding: "8px 12px", background: isDarkMode ? "#0f1117" : "#f8faff", borderRadius: "8px", borderLeft: `3px solid #f59e0b` }}>
+                    "{r.comment}"
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        )
       )}
     </div>
   );
@@ -649,7 +1835,7 @@ function BookingsPanel({ isDarkMode }) {
 // SHARED HELPERS
 // ─────────────────────────────────────────────────────────────────────────────
 async function apiFetch(url) {
-  const token = localStorage.getItem("subAdminToken");
+  const token = sessionStorage.getItem("subAdminToken") || localStorage.getItem("subAdminToken");
   const res   = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
   return res.json();
 }
@@ -693,4 +1879,5 @@ const css = (dark) => `
   .sa-nav-btn:hover { background: ${dark ? "#1e2235 !important" : "#f0f4ff !important"}; color: ${dark ? "#a5b4fc !important" : "#4f63d2 !important"}; }
   .sa-logout-btn:hover { background: rgba(239,68,68,0.08) !important; }
   @keyframes sa-spin { to { transform: rotate(360deg); } }
+  @keyframes sa-ping { 0%,100% { transform: scale(1); opacity: 0.8; } 50% { transform: scale(2.2); opacity: 0; } }
 `;

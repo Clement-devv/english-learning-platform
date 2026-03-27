@@ -1,19 +1,79 @@
 // src/pages/admin/tabs/PaymentsTab.jsx - ADMIN PAYMENT MANAGEMENT
 import { useState, useEffect } from "react";
-import { 
-  DollarSign, 
-  Users, 
-  CheckCircle, 
-  Clock, 
-  Search,
-  Filter,
-  Calendar,
+import {
+  DollarSign,
+  Users,
+  CheckCircle,
+  Clock,
   TrendingUp,
-  Download,
   CreditCard,
-  AlertCircle
 } from "lucide-react";
 import api from "../../../api";
+
+// ─── Pay-all confirmation modal ───────────────────────────────────────────────
+function PayAllModal({ target, onConfirm, onCancel, isDarkMode }) {
+  if (!target) return null;
+  const { teacherName, pendingAmount, pendingCount, paymentMethod, notes } = target;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+      <div className={`w-full max-w-md rounded-2xl shadow-2xl p-6 ${isDarkMode ? "bg-gray-800 border border-gray-700" : "bg-white"}`}>
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-11 h-11 rounded-xl bg-emerald-100 flex items-center justify-center flex-shrink-0">
+            <DollarSign className="w-5 h-5 text-emerald-600" />
+          </div>
+          <div>
+            <h3 className={`text-lg font-bold ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+              Confirm Salary Payment
+            </h3>
+            <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+              This will mark all pending lessons as paid
+            </p>
+          </div>
+        </div>
+
+        <div className={`rounded-xl p-4 mb-5 space-y-2 ${isDarkMode ? "bg-emerald-900/20 border border-emerald-800/40" : "bg-emerald-50 border border-emerald-100"}`}>
+          <div className="flex justify-between">
+            <span className={`text-sm ${isDarkMode ? "text-emerald-300" : "text-emerald-700"}`}>Teacher</span>
+            <span className={`text-sm font-bold ${isDarkMode ? "text-white" : "text-gray-900"}`}>{teacherName}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className={`text-sm ${isDarkMode ? "text-emerald-300" : "text-emerald-700"}`}>Pending lessons</span>
+            <span className={`text-sm font-semibold ${isDarkMode ? "text-white" : "text-gray-900"}`}>{pendingCount}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className={`text-sm ${isDarkMode ? "text-emerald-300" : "text-emerald-700"}`}>Payment method</span>
+            <span className={`text-sm font-semibold ${isDarkMode ? "text-white" : "text-gray-900"}`}>{paymentMethod.replace("_", " ")}</span>
+          </div>
+          {notes && (
+            <div className="flex justify-between">
+              <span className={`text-sm ${isDarkMode ? "text-emerald-300" : "text-emerald-700"}`}>Notes</span>
+              <span className={`text-sm ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>{notes}</span>
+            </div>
+          )}
+          <div className={`flex justify-between pt-2 border-t ${isDarkMode ? "border-emerald-800/40" : "border-emerald-200"}`}>
+            <span className={`text-sm font-semibold ${isDarkMode ? "text-emerald-300" : "text-emerald-700"}`}>Total payout</span>
+            <span className={`text-xl font-bold ${isDarkMode ? "text-emerald-300" : "text-emerald-600"}`}>${pendingAmount.toFixed(2)}</span>
+          </div>
+        </div>
+
+        <div className="flex gap-3">
+          <button
+            onClick={onCancel}
+            className={`flex-1 py-2.5 rounded-xl text-sm font-semibold border transition-all ${isDarkMode ? "border-gray-600 text-gray-300 hover:bg-gray-700" : "border-gray-300 text-gray-700 hover:bg-gray-50"}`}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-emerald-600 hover:bg-emerald-700 text-white transition-all"
+          >
+            Pay ${pendingAmount.toFixed(2)}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function PaymentsTab({ isDarkMode }) {
   const [teachers, setTeachers] = useState([]);
@@ -31,6 +91,7 @@ export default function PaymentsTab({ isDarkMode }) {
   const [paymentMethod, setPaymentMethod] = useState("bank_transfer");
   const [paymentNotes, setPaymentNotes] = useState("");
   const [toast, setToast] = useState("");
+  const [payAllTarget, setPayAllTarget] = useState(null); // { teacherId, teacherName, pendingAmount, pendingCount, paymentMethod, notes }
 
   useEffect(() => {
     loadPaymentData();
@@ -76,33 +137,34 @@ export default function PaymentsTab({ isDarkMode }) {
     }
   };
 
-  const handlePayAllForTeacher = async (teacherId, teacherName) => {
+  const handlePayAllForTeacher = (teacherId, teacherName) => {
     const teacher = teacherSummary.find(t => t.teacherId === teacherId);
-    
     if (!teacher || teacher.pendingAmount <= 0) {
       showToast("No pending payments for this teacher");
       return;
     }
+    setPayAllTarget({
+      teacherId,
+      teacherName,
+      pendingAmount: teacher.pendingAmount,
+      pendingCount: teacher.pendingCount,
+      paymentMethod,
+      notes: paymentNotes,
+    });
+  };
 
-    if (!window.confirm(
-      `Pay all pending payments for ${teacherName}?\n\n` +
-      `Total Amount: $${teacher.pendingAmount.toFixed(2)}\n` +
-      `Classes: ${teacher.pendingCount}\n\n` +
-      `This will reset their earnings to $0.`
-    )) {
-      return;
-    }
-
+  const handleConfirmPayAll = async () => {
+    if (!payAllTarget) return;
+    const { teacherId, teacherName, pendingAmount } = payAllTarget;
+    setPayAllTarget(null);
     try {
       const res = await api.patch(`/api/payments/teacher/${teacherId}/pay-all`, {
         paymentMethod,
-        notes: paymentNotes
+        notes: paymentNotes,
       });
-
       showToast(`Successfully paid $${res.data.totalAmount.toFixed(2)} to ${teacherName}!`);
       loadPaymentData();
       setPaymentNotes("");
-
     } catch (err) {
       console.error("Error processing bulk payment:", err);
       showToast("Error processing bulk payment");
@@ -149,6 +211,14 @@ export default function PaymentsTab({ isDarkMode }) {
 
   return (
     <div className="space-y-6">
+      {/* Pay-all confirmation modal */}
+      <PayAllModal
+        target={payAllTarget}
+        onConfirm={handleConfirmPayAll}
+        onCancel={() => setPayAllTarget(null)}
+        isDarkMode={isDarkMode}
+      />
+
       {/* Toast */}
       {toast && (
         <div className="fixed top-4 right-4 bg-green-600 text-white px-6 py-3 rounded-lg shadow-lg z-50 animate-fade-in">

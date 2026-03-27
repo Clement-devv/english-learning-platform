@@ -1,10 +1,11 @@
 import express from "express";
 import Lesson from "../models/Lesson.js";
+import { verifyToken, verifyAdminOrTeacher } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-// Get ALL lessons across all students
-router.get("/", async (req, res) => {
+// Get ALL lessons — admin and teachers only
+router.get("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
   try {
     const lessons = await Lesson.find()
       .populate("studentId", "firstName surname email")

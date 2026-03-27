@@ -1,0 +1,44 @@
+{
+  "name": "English Learning Platform",
+  "short_name": "EduLearn",
+  "description": "Learn English with live 1-on-1 teachers",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#ffffff",
+  "theme_color": "#7c3aed",
+  "categories": ["education"],
+  "lang": "en",
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "My Classes",
+      "short_name": "Classes",
+      "description": "View your upcoming classes",
+      "url": "/?tab=dashboard",
+      "icons": [{ "src": "/icons/icon.svg", "sizes": "any" }]
+    },
+    {
+      "name": "Messages",
+      "short_name": "Messages",
+      "description": "Open your messages",
+      "url": "/?tab=messages",
+      "icons": [{ "src": "/icons/icon.svg", "sizes": "any" }]
+    }
+  ]
+}

@@ -19,3 +19,8 @@ export const deleteTeacher = async (id) => {
   const res = await api.delete(`/api/teachers/${id}`);
   return res.data;
 };
+
+export const restoreTeacher = async (id) => {
+  const res = await api.post(`/api/teachers/${id}/restore`);
+  return res.data;
+};

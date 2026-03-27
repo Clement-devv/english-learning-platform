@@ -58,6 +58,12 @@ const studentSchema = new mongoose.Schema({
   referralCode:          { type: String, unique: true, sparse: true },
   referredBy:            { type: mongoose.Schema.Types.ObjectId, ref: "Student", default: null },
   referralCreditsEarned: { type: Number, default: 0 },
+
+  // ── Soft-delete / scheduled deletion ─────────────────────────────────────
+  // When set, the account is disabled and will be permanently deleted after this date.
+  // Cleared when the account is restored by admin.
+  scheduledDeletionAt:        { type: Date,    default: null },
+  deletionWarningEmailSent:   { type: Boolean, default: false },
 }, { timestamps: true });
 
 export default mongoose.model("Student", studentSchema);

@@ -1,5 +1,5 @@
 // src/pages/admin/AdminDashboard.jsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, lazy, Suspense, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   TrendingUp, Video, User, Home, Bell, Users, DollarSign,
@@ -8,32 +8,51 @@ import {
   Shield, CalendarDays, FileText, Star
 } from "lucide-react";
 
-import OverviewTab from "./tabs/OverviewTab";
-import TeachersTab from "./tabs/TeachersTab";
-import StudentsTab from "./tabs/StudentsTab";
-import ClassesTab from "./tabs/ClassesTab";
-import ApplicationsTab from "./tabs/ApplicationsTab";
-import NotificationsTab from "./tabs/NotificationsTab";
-import AssignStudentsTab from "./tabs/AssignStudentsTab";
-import BookingsTab from "./tabs/BookingsTab";
+// Always-needed (small utilities)
+import { useDarkMode } from "../../hooks/useDarkMode";
+import { getTeachers } from "../../services/teacherService";
+import { getStudents } from "../../services/studentService";
+
+// Small overlay components — keep static (used across tabs)
 import SessionManagement from "../../components/SessionManagement";
 import SettingsSidebar from "../../components/SettingsSidebar";
 import SettingsModal from "../../components/SettingsModal";
-import { useDarkMode } from "../../hooks/useDarkMode";
-import MessagesTab from "../../components/chat/MessagesTab";
-import PaymentsTab from "./tabs/PaymentTab";
-import DisputeReview from "../../components/admin/DisputeReview";
-import BookingCalendar from "../../components/calendar/BookingCalendar";
-import AnalyticsDashboard from "../../components/analytics/AnalyticsDashboard";
-import { getTeachers } from "../../services/teacherService";
-import { getStudents } from "../../services/studentService";
-import SubAdminsTab from "./tabs/SubAdminsTab";
-import TeacherScheduleTab from "./tabs/TeacherScheduleTab";
-import ChatCreditsTab from "./tabs/ChatCreditsTab";
-import RecordingsTab from "./tabs/RecordingsTab";
-import ReportsTab    from "./tabs/ReportsTab";
-import ReviewsTab    from "./tabs/ReviewsTab";
-import ReferralsTab  from "./tabs/ReferralsTab";
+
+// Tab components — each becomes its own JS chunk, loaded only when first visited
+const OverviewTab        = lazy(() => import("./tabs/OverviewTab"));
+const TeachersTab        = lazy(() => import("./tabs/TeachersTab"));
+const StudentsTab        = lazy(() => import("./tabs/StudentsTab"));
+const ClassesTab         = lazy(() => import("./tabs/ClassesTab"));
+const ApplicationsTab    = lazy(() => import("./tabs/ApplicationsTab"));
+const NotificationsTab   = lazy(() => import("./tabs/NotificationsTab"));
+const AssignStudentsTab  = lazy(() => import("./tabs/AssignStudentsTab"));
+const BookingsTab        = lazy(() => import("./tabs/BookingsTab"));
+const MessagesTab        = lazy(() => import("../../components/chat/MessagesTab"));
+const PaymentsTab        = lazy(() => import("./tabs/PaymentTab"));
+const DisputeReview      = lazy(() => import("../../components/admin/DisputeReview"));
+const BookingCalendar    = lazy(() => import("../../components/calendar/BookingCalendar"));
+const AnalyticsDashboard = lazy(() => import("../../components/analytics/AnalyticsDashboard"));
+const SubAdminsTab       = lazy(() => import("./tabs/SubAdminsTab"));
+const TeacherScheduleTab = lazy(() => import("./tabs/TeacherScheduleTab"));
+const ChatCreditsTab     = lazy(() => import("./tabs/ChatCreditsTab"));
+const RecordingsTab      = lazy(() => import("./tabs/RecordingsTab"));
+const ReportsTab         = lazy(() => import("./tabs/ReportsTab"));
+const ReviewsTab         = lazy(() => import("./tabs/ReviewsTab"));
+const ReferralsTab       = lazy(() => import("./tabs/ReferralsTab"));
+
+// Inline spinner for tab switches (lightweight, no layout shift)
+function TabLoader() {
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "300px" }}>
+      <div style={{
+        width: "32px", height: "32px", borderRadius: "50%",
+        border: "3px solid #e5e7eb", borderTopColor: "#6366f1",
+        animation: "spin 0.75s linear infinite",
+      }} />
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+    </div>
+  );
+}
 
 // ── Nav groups ────────────────────────────────────────────────────────────────
 const NAV = [
@@ -93,6 +112,8 @@ export default function AdminDashboard() {
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [calendarBookings, setCalendarBookings] = useState([]);
   const [toast, setToast] = useState("");
+  const [unreadMessages, setUnreadMessages]           = useState(0);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
   const { isDarkMode, toggleDarkMode } = useDarkMode();
 
   const adminInfo = JSON.parse(localStorage.getItem("adminInfo") || "{}");
@@ -122,6 +143,22 @@ export default function AdminDashboard() {
     if (activeTab === "calendar") fetchCalendar();
   }, [activeTab]);
 
+  // Poll unread notification count every 60 s
+  useEffect(() => {
+    const fetchUnreadNotifications = async () => {
+      try {
+        const res  = await fetch("/api/notifications/unread-count", {
+          headers: { Authorization: `Bearer ${localStorage.getItem("adminToken")}` },
+        });
+        const data = await res.json();
+        if (data.success) setUnreadNotifications(data.count);
+      } catch (_) {}
+    };
+    fetchUnreadNotifications();
+    const timer = setInterval(fetchUnreadNotifications, 60000);
+    return () => clearInterval(timer);
+  }, []);
+
   const fetchCalendar = async () => {
     try {
       const res = await fetch("/api/bookings", {
@@ -143,28 +180,30 @@ export default function AdminDashboard() {
 
   const activeLabel = NAV.flatMap((g) => g.items).find((i) => i.key === activeTab)?.label || "Overview";
 
-  const renderTab = () => {
+  // Memoized so the tab component only re-renders when its own dependencies change,
+  // not on every unrelated state update (e.g. sidebarOpen, toast, unreadMessages).
+  const tabContent = useMemo(() => {
     if (loading && activeTab === "assign") return <Loader isDarkMode={isDarkMode} />;
     switch (activeTab) {
-      case "overview":      return <OverviewTab isDarkMode={isDarkMode} />;
-      case "analytics":     return <AnalyticsDashboard isDarkMode={isDarkMode} />;
-      case "teachers":           return <TeachersTab onNotify={handleNotify} isDarkMode={isDarkMode} />;
-      case "teacher-schedules":  return <TeacherScheduleTab teachers={teachers} isDarkMode={isDarkMode} />;
-      case "students":      return <StudentsTab onNotify={handleNotify} isDarkMode={isDarkMode} />;
-      case "classes":       return <ClassesTab isDarkMode={isDarkMode} />;
-      case "applications":  return <ApplicationsTab isDarkMode={isDarkMode} />;
-      case "notifications": return <NotificationsTab notifications={notifications} isDarkMode={isDarkMode} />;
-      case "assign":        return <AssignStudentsTab teachers={teachers} students={students} onNotify={handleNotify} isDarkMode={isDarkMode} />;
-      case "bookings":      return <BookingsTab teachers={teachers} students={students} onNotify={handleNotify} isDarkMode={isDarkMode} />;
-      case "messages":      return <MessagesTab userRole="admin" />;
-      case "payments":      return <PaymentsTab isDarkMode={isDarkMode} />;
-      case "chat-credits":  return <ChatCreditsTab isDarkMode={isDarkMode} />;
-      case "disputes":      return <DisputeReview isDarkMode={isDarkMode} />;
-      case "recordings":    return <RecordingsTab teachers={teachers} isDarkMode={isDarkMode} />;
-      case "reports":       return <ReportsTab students={students} isDarkMode={isDarkMode} />;
-      case "reviews":       return <ReviewsTab isDarkMode={isDarkMode} />;
-      case "referrals":     return <ReferralsTab isDarkMode={isDarkMode} />;
-      case "sub-admins":    return <SubAdminsTab isDarkMode={isDarkMode} teachers={teachers} />;
+      case "overview":          return <OverviewTab isDarkMode={isDarkMode} />;
+      case "analytics":         return <AnalyticsDashboard isDarkMode={isDarkMode} />;
+      case "teachers":          return <TeachersTab onNotify={handleNotify} isDarkMode={isDarkMode} />;
+      case "teacher-schedules": return <TeacherScheduleTab teachers={teachers} isDarkMode={isDarkMode} />;
+      case "students":          return <StudentsTab onNotify={handleNotify} isDarkMode={isDarkMode} />;
+      case "classes":           return <ClassesTab isDarkMode={isDarkMode} />;
+      case "applications":      return <ApplicationsTab isDarkMode={isDarkMode} />;
+      case "notifications":     return <NotificationsTab isDarkMode={isDarkMode} onUnreadCount={setUnreadNotifications} />;
+      case "assign":            return <AssignStudentsTab teachers={teachers} students={students} onNotify={handleNotify} isDarkMode={isDarkMode} />;
+      case "bookings":          return <BookingsTab teachers={teachers} students={students} onNotify={handleNotify} isDarkMode={isDarkMode} />;
+      case "messages":          return <MessagesTab userRole="admin" onUnreadCount={setUnreadMessages} />;
+      case "payments":          return <PaymentsTab isDarkMode={isDarkMode} />;
+      case "chat-credits":      return <ChatCreditsTab isDarkMode={isDarkMode} />;
+      case "disputes":          return <DisputeReview isDarkMode={isDarkMode} />;
+      case "recordings":        return <RecordingsTab teachers={teachers} isDarkMode={isDarkMode} />;
+      case "reports":           return <ReportsTab students={students} isDarkMode={isDarkMode} />;
+      case "reviews":           return <ReviewsTab isDarkMode={isDarkMode} />;
+      case "referrals":         return <ReferralsTab isDarkMode={isDarkMode} />;
+      case "sub-admins":        return <SubAdminsTab isDarkMode={isDarkMode} teachers={teachers} />;
       case "calendar":
         return (
           <BookingCalendar
@@ -176,7 +215,8 @@ export default function AdminDashboard() {
         );
       default: return <OverviewTab isDarkMode={isDarkMode} />;
     }
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, isDarkMode, loading, teachers, students, calendarBookings]);
 
   // ── colours ──────────────────────────────────────────────────────────────
   const bg        = isDarkMode ? "#0f1117" : "#f4f6fb";
@@ -245,6 +285,9 @@ export default function AdminDashboard() {
                 )}
                 {group.items.map(({ key, label, icon: Icon }) => {
                   const isActive = activeTab === key;
+                  const badge =
+                    key === "messages"      && unreadMessages      > 0 ? unreadMessages :
+                    key === "notifications" && unreadNotifications > 0 ? unreadNotifications : 0;
                   return (
                     <button
                       key={key}
@@ -270,8 +313,37 @@ export default function AdminDashboard() {
                           background: "#6b82f0",
                         }} />
                       )}
-                      <Icon size={16} style={{ flexShrink: 0 }} />
-                      {sidebarOpen && <span>{label}</span>}
+                      <div style={{ position: "relative", flexShrink: 0 }}>
+                        <Icon size={16} />
+                        {badge > 0 && !sidebarOpen && (
+                          <div style={{
+                            position: "absolute", top: "-5px", right: "-5px",
+                            minWidth: "15px", height: "15px", borderRadius: "8px",
+                            background: "#ef4444", color: "white",
+                            fontSize: "9px", fontWeight: "800",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            padding: "0 3px",
+                          }}>
+                            {badge > 99 ? "99+" : badge}
+                          </div>
+                        )}
+                      </div>
+                      {sidebarOpen && (
+                        <>
+                          <span style={{ flex: 1 }}>{label}</span>
+                          {badge > 0 && (
+                            <span style={{
+                              minWidth: "20px", height: "20px", borderRadius: "10px",
+                              background: "#ef4444", color: "white",
+                              fontSize: "10px", fontWeight: "800",
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                              padding: "0 5px", flexShrink: 0,
+                            }}>
+                              {badge > 99 ? "99+" : badge}
+                            </span>
+                          )}
+                        </>
+                      )}
                     </button>
                   );
                 })}
@@ -378,7 +450,7 @@ export default function AdminDashboard() {
               className="adm-nav-btn"
             >
               <Bell size={19} />
-              {notifications.length > 0 && (
+              {unreadNotifications > 0 && (
                 <span style={{
                   position: "absolute", top: "2px", right: "2px",
                   width: "8px", height: "8px", borderRadius: "50%",
@@ -426,7 +498,9 @@ export default function AdminDashboard() {
               padding: activeTab === "messages" ? "0" : "24px",
               overflow: activeTab === "messages" ? "hidden" : "visible",
             }}>
-              {renderTab()}
+              <Suspense fallback={<TabLoader />}>
+                {tabContent}
+              </Suspense>
             </div>
           </main>
         </div>
