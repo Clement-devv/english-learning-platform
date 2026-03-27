@@ -7,7 +7,7 @@ import Student from "../models/Student.js";
 import Admin from "../models/Admin.js"; 
 
 import { config } from "../config/config.js";
-import { loginLimiter, passwordResetLimiter } from "../middleware/rateLimiter.js";
+import { loginLimiter, passwordResetLimiter, trackFailedLogin, isAccountLocked, clearFailedAttempts } from "../middleware/rateLimiter.js";
 import { validatePasswordStrength } from "../utils/passwordUtils.js";
 
 import { createSession, cleanExpiredSessions } from "../utils/sessionManager.js";
@@ -81,20 +81,20 @@ router.post("/verify-2fa-login", loginLimiter, async (req, res) => {
       const { verifyTwoFactorToken } = await import('../utils/twoFactorAuth.js');
       isValid = verifyTwoFactorToken(twoFactorToken, user.twoFactorSecret);
     } else if (backupCode) {
-      const { verifyBackupCode } = await import('../utils/twoFactorAuth.js');
-      const result = verifyBackupCode(backupCode, user.twoFactorBackupCodes);
-      
-      if (result.valid) {
-        user.twoFactorBackupCodes = result.remainingCodes;
-        await user.save();
-        isValid = true;
-      }
+      // Atomic: find-and-remove the backup code in one DB operation to prevent TOCTOU race
+      const normalizedCode = backupCode.toUpperCase().trim();
+      const updated = await UserModel.findOneAndUpdate(
+        { _id: user._id, twoFactorBackupCodes: normalizedCode },
+        { $pull: { twoFactorBackupCodes: normalizedCode } },
+        { new: false }
+      );
+      isValid = !!updated;
     }
 
     if (!isValid) {
-      return res.status(401).json({ 
+      return res.status(401).json({
         success: false,
-        message: "Invalid 2FA code or backup code" 
+        message: "Invalid 2FA code or backup code"
       });
     }
 
@@ -160,26 +160,45 @@ router.post("/teacher/login", loginLimiter, async (req, res) => {
       return res.status(400).json({ message: "Email and password are required" });
     }
 
+    // Check account lockout before any DB lookup
+    const lockStatus = await isAccountLocked(email);
+    if (lockStatus.isLocked) {
+      return res.status(423).json({
+        message: `Account locked due to too many failed attempts. Try again in ${lockStatus.remainingTime} minute(s).`
+      });
+    }
+
     const teacher = await Teacher.findOne({ email });
     if (!teacher) {
+      await trackFailedLogin(email);
       return res.status(401).json({ message: "Invalid email or password" });
     }
 
     if (!teacher.active) {
-      return res.status(403).json({ 
-        message: "Your account has been deactivated. Please contact admin." 
+      return res.status(403).json({
+        message: "Your account has been deactivated. Please contact admin."
+      });
+    }
+
+    if (teacher.status === 'pending') {
+      return res.status(403).json({
+        message: "Your account setup is incomplete. Please check your invite email."
       });
     }
 
     const isPasswordValid = await bcrypt.compare(password, teacher.password);
     if (!isPasswordValid) {
+      await trackFailedLogin(email);
       return res.status(401).json({ message: "Invalid email or password" });
     }
 
-    // ===== NEW: Check if 2FA is enabled =====
+    // Clear failed attempts on successful password match
+    await clearFailedAttempts(email);
+
+    // ===== 2FA CHECK =====
     if (teacher.twoFactorEnabled) {
       if (!twoFactorToken && !backupCode) {
-        return res.status(200).json({
+        return res.status(202).json({
           success: false,
           requires2FA: true,
           message: "Please enter your 2FA code",
@@ -188,25 +207,24 @@ router.post("/teacher/login", loginLimiter, async (req, res) => {
       }
 
       let isValid = false;
-      
+
       if (twoFactorToken) {
         const { verifyTwoFactorToken } = await import('../utils/twoFactorAuth.js');
         isValid = verifyTwoFactorToken(twoFactorToken, teacher.twoFactorSecret);
       } else if (backupCode) {
-        const { verifyBackupCode } = await import('../utils/twoFactorAuth.js');
-        const result = verifyBackupCode(backupCode, teacher.twoFactorBackupCodes);
-        
-        if (result.valid) {
-          teacher.twoFactorBackupCodes = result.remainingCodes;
-          await teacher.save();
-          isValid = true;
-        }
+        const normalizedCode = backupCode.toUpperCase().trim();
+        const updated = await Teacher.findOneAndUpdate(
+          { _id: teacher._id, twoFactorBackupCodes: normalizedCode },
+          { $pull: { twoFactorBackupCodes: normalizedCode } },
+          { new: false }
+        );
+        isValid = !!updated;
       }
 
       if (!isValid) {
-        return res.status(401).json({ 
+        return res.status(401).json({
           success: false,
-          message: "Invalid 2FA code or backup code" 
+          message: "Invalid 2FA code or backup code"
         });
       }
     }
@@ -412,26 +430,39 @@ router.post("/student/login", loginLimiter, async (req, res) => {
       return res.status(400).json({ message: "Email and password are required" });
     }
 
-    const student = await Student.findOne({ email });  // ✅ FIXED: Capital 'S'
+    // Check account lockout before any DB lookup
+    const lockStatus = await isAccountLocked(email);
+    if (lockStatus.isLocked) {
+      return res.status(423).json({
+        message: `Account locked due to too many failed attempts. Try again in ${lockStatus.remainingTime} minute(s).`
+      });
+    }
+
+    const student = await Student.findOne({ email });
     if (!student) {
+      await trackFailedLogin(email);
       return res.status(401).json({ message: "Invalid email or password" });
     }
 
     if (!student.active) {
-      return res.status(403).json({ 
-        message: "Your account has been deactivated. Please contact admin." 
+      return res.status(403).json({
+        message: "Your account has been deactivated. Please contact admin."
       });
     }
 
     const isPasswordValid = await bcrypt.compare(password, student.password);
     if (!isPasswordValid) {
+      await trackFailedLogin(email);
       return res.status(401).json({ message: "Invalid email or password" });
     }
 
-    // ===== NEW: Check if 2FA is enabled =====
+    // Clear failed attempts on successful password match
+    await clearFailedAttempts(email);
+
+    // ===== 2FA CHECK =====
     if (student.twoFactorEnabled) {
       if (!twoFactorToken && !backupCode) {
-        return res.status(200).json({
+        return res.status(202).json({
           success: false,
           requires2FA: true,
           message: "Please enter your 2FA code",
@@ -440,25 +471,24 @@ router.post("/student/login", loginLimiter, async (req, res) => {
       }
 
       let isValid = false;
-      
+
       if (twoFactorToken) {
         const { verifyTwoFactorToken } = await import('../utils/twoFactorAuth.js');
         isValid = verifyTwoFactorToken(twoFactorToken, student.twoFactorSecret);
       } else if (backupCode) {
-        const { verifyBackupCode } = await import('../utils/twoFactorAuth.js');
-        const result = verifyBackupCode(backupCode, student.twoFactorBackupCodes);
-        
-        if (result.valid) {
-          student.twoFactorBackupCodes = result.remainingCodes;
-          await student.save();
-          isValid = true;
-        }
+        const normalizedCode = backupCode.toUpperCase().trim();
+        const updated = await Student.findOneAndUpdate(
+          { _id: student._id, twoFactorBackupCodes: normalizedCode },
+          { $pull: { twoFactorBackupCodes: normalizedCode } },
+          { new: false }
+        );
+        isValid = !!updated;
       }
 
       if (!isValid) {
-        return res.status(401).json({ 
+        return res.status(401).json({
           success: false,
-          message: "Invalid 2FA code or backup code" 
+          message: "Invalid 2FA code or backup code"
         });
       }
     }
@@ -685,9 +715,22 @@ router.post("/admin/login", loginLimiter, async (req, res) => {
   try {
     const { username, password, twoFactorToken, backupCode } = req.body;
 
+    if (!username || !password) {
+      return res.status(400).json({ message: "Username/email and password are required" });
+    }
+
+    // Check account lockout before any DB lookup
+    const lockStatus = await isAccountLocked(username);
+    if (lockStatus.isLocked) {
+      return res.status(423).json({
+        message: `Account locked due to too many failed attempts. Try again in ${lockStatus.remainingTime} minute(s).`
+      });
+    }
+
     const admin = await Admin.findOne({ $or: [{ username }, { email: username }] });
-    
+
     if (!admin) {
+      await trackFailedLogin(username);
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
@@ -696,47 +739,45 @@ router.post("/admin/login", loginLimiter, async (req, res) => {
     }
 
     const isPasswordValid = await bcrypt.compare(password, admin.password);
-    
+
     if (!isPasswordValid) {
+      await trackFailedLogin(username);
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
-    // ===== NEW: Check if 2FA is enabled =====
+    // Clear failed attempts on successful password match
+    await clearFailedAttempts(username);
+
+    // ===== 2FA CHECK =====
     if (admin.twoFactorEnabled) {
-      // If 2FA is enabled but no code provided, prompt for 2FA
       if (!twoFactorToken && !backupCode) {
-        return res.status(200).json({
+        return res.status(202).json({
           success: false,
           requires2FA: true,
           message: "Please enter your 2FA code",
-          tempUserId: admin._id // Send temp ID for the next request
+          tempUserId: admin._id
         });
       }
 
-      // Verify 2FA token or backup code
       let isValid = false;
-      
+
       if (twoFactorToken) {
-        // Import the verification function at the top of the file
         const { verifyTwoFactorToken } = await import('../utils/twoFactorAuth.js');
         isValid = verifyTwoFactorToken(twoFactorToken, admin.twoFactorSecret);
       } else if (backupCode) {
-        // Verify and use backup code
-        const { verifyBackupCode } = await import('../utils/twoFactorAuth.js');
-        const result = verifyBackupCode(backupCode, admin.twoFactorBackupCodes);
-        
-        if (result.valid) {
-          // Update backup codes (remove used one)
-          admin.twoFactorBackupCodes = result.remainingCodes;
-          await admin.save();
-          isValid = true;
-        }
+        const normalizedCode = backupCode.toUpperCase().trim();
+        const updated = await Admin.findOneAndUpdate(
+          { _id: admin._id, twoFactorBackupCodes: normalizedCode },
+          { $pull: { twoFactorBackupCodes: normalizedCode } },
+          { new: false }
+        );
+        isValid = !!updated;
       }
 
       if (!isValid) {
-        return res.status(401).json({ 
+        return res.status(401).json({
           success: false,
-          message: "Invalid 2FA code or backup code" 
+          message: "Invalid 2FA code or backup code"
         });
       }
     }

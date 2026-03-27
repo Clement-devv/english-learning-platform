@@ -1,7 +1,13 @@
 import axios from "axios";
 
+const _apiUrl = import.meta.env.VITE_API_URL;
+if (!_apiUrl && import.meta.env.PROD) {
+  // Fail loudly in production rather than silently pointing at localhost
+  console.error("❌ VITE_API_URL is not set. All API calls will fail in production. Set this environment variable in your build pipeline.");
+}
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "http://localhost:5000",
+  baseURL: _apiUrl || "http://localhost:5000",
 });
 
 // Token helpers — prefer sessionStorage (cleared on tab close), fall back to

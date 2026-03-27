@@ -157,14 +157,10 @@ mongoose
       }
     }, 5 * 60 * 1000);
   })
-  .catch((err) => console.error("❌ MongoDB connection error:", err));
-  
-  setInterval(async () => {
-    try {
-      await mongoose.connection.db.admin().ping();
-      console.log('🏓 DB keep-alive ping');
-    } catch (e) { console.error('DB ping failed:', e.message); }
-  }, 5 * 60 * 1000);
+  .catch((err) => {
+    console.error("❌ MongoDB connection error:", err);
+    process.exit(1);
+  });
 
 
 
@@ -245,16 +241,17 @@ app.use((err, req, res, next) => {
 });
 
 // Verify email configuration on startup
-verifyEmailConfig().then(isValid => {
-  if (isValid) {
-    console.log("✅ Email service configured");
-  } else {
-    console.warn("⚠️ Email service not configured - notifications disabled");
-  }
-});
-
-// ✅ REMOVED: Incorrect export statement
-// (Models don't need to be exported from server file)
+verifyEmailConfig()
+  .then(isValid => {
+    if (isValid) {
+      console.log("✅ Email service configured");
+    } else {
+      console.warn("⚠️ Email service not configured - notifications disabled");
+    }
+  })
+  .catch(err => {
+    console.error("❌ verifyEmailConfig threw:", err.message);
+  });
 
 // Start server
 const PORT = process.env.PORT || 5000;
@@ -262,3 +259,22 @@ httpServer.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
   console.log(`🔌 Socket.IO initialized for whiteboard sharing`);
 });
+
+// Graceful shutdown handlers
+const shutdown = async (signal) => {
+  console.log(`\n${signal} received — shutting down gracefully`);
+  httpServer.close(() => {
+    console.log("HTTP server closed");
+    mongoose.connection.close(false).then(() => {
+      console.log("MongoDB connection closed");
+      process.exit(0);
+    }).catch(() => process.exit(0));
+  });
+  // Force exit after 10 seconds if still hanging
+  setTimeout(() => {
+    console.error("Forced exit after timeout");
+    process.exit(1);
+  }, 10_000).unref();
+};
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT",  () => shutdown("SIGINT"));

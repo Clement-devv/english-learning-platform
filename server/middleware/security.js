@@ -12,16 +12,22 @@ export const securityHeaders = helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      // Removed 'unsafe-inline' — use external stylesheets instead
-      styleSrc: ["'self'"],
+      styleSrc: ["'self'", "https://fonts.googleapis.com"],
       scriptSrc: ["'self'"],
-      // Removed data: URI — prevents data-URI-based XSS payloads
-      imgSrc: ["'self'", "https:"],
-      connectSrc: ["'self'"],
-      fontSrc: ["'self'"],
+      imgSrc: ["'self'", "https:", "data:"],
+      connectSrc: [
+        "'self'",
+        // Agora RTC / RTM servers
+        "https://*.agora.io",
+        "wss://*.agora.io",
+        "https://*.sd-rtn.com",
+        "wss://*.sd-rtn.com",
+      ],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
       objectSrc: ["'none'"],
-      mediaSrc: ["'self'"],
+      mediaSrc: ["'self'", "blob:"],
       frameSrc: ["'none'"],
+      workerSrc: ["'self'", "blob:"],
       upgradeInsecureRequests: [],
     },
   },

@@ -9,6 +9,7 @@
  * Uses a ReminderLog collection so each reminder is sent exactly once.
  */
 
+import mongoose   from "mongoose";
 import Booking     from "../models/Booking.js";
 import Homework    from "../models/Homework.js";
 import Quiz        from "../models/Quiz.js";
@@ -85,9 +86,9 @@ async function checkClassReminders() {
         Teacher.findById(teacher._id).select("pushSubscription").then(t => {
           if (t?.pushSubscription) {
             sendPush(t.pushSubscription, { ...pushPayload, data: { url: "/teacher/dashboard" } })
-              .catch(() => {});
+              .catch(e => console.error(`Push failed (teacher ${teacher.email}):`, e.message));
           }
-        }).catch(() => {});
+        }).catch(e => console.error(`Push subscription fetch failed:`, e.message));
         console.log(`📧 Class reminder sent → teacher ${teacher.email} (${mins} min)`);
       }
 
@@ -100,9 +101,10 @@ async function checkClassReminders() {
         // Web push
         Student.findById(student._id).select("pushSubscription").then(s => {
           if (s?.pushSubscription) {
-            sendPush(s.pushSubscription, pushPayload).catch(() => {});
+            sendPush(s.pushSubscription, pushPayload)
+              .catch(e => console.error(`Push failed (student ${student.email}):`, e.message));
           }
-        }).catch(() => {});
+        }).catch(e => console.error(`Push subscription fetch failed:`, e.message));
         console.log(`📧 Class reminder sent → student ${student.email} (${mins} min)`);
       }
     }
@@ -220,6 +222,11 @@ async function checkScheduledDeletions() {
 
 // ── Main tick (runs every 60 s) ──────────────────────────────────────────────
 async function runTick() {
+  // Skip if DB is not connected (e.g. during reconnect after outage)
+  if (mongoose.connection.readyState !== 1) {
+    console.warn("⏰ Reminder scheduler skipped — DB not connected (readyState:", mongoose.connection.readyState, ")");
+    return;
+  }
   try {
     await Promise.all([
       checkClassReminders(),

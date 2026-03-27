@@ -23,14 +23,21 @@ export default function ClassroomProtectedRoute({ children }) {
       }
 
       try {
-        // Set token in api headers
         api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-        
-        // Just verify token exists (api.js already handles adding it to requests)
+
+        // Verify the token against the correct backend endpoint based on role
+        if (teacherToken) {
+          await api.get('/api/auth/verify');
+        } else if (studentToken) {
+          await api.get('/api/auth/student/verify');
+        } else if (subAdminToken) {
+          await api.get('/api/sub-admin-auth/verify');
+        }
+
         setIsAuthenticated(true);
       } catch (error) {
         console.error('Token verification failed:', error);
-        
+
         // Clean up based on which token failed
         if (teacherToken) {
           localStorage.removeItem('teacherToken');
@@ -40,7 +47,11 @@ export default function ClassroomProtectedRoute({ children }) {
           localStorage.removeItem('studentToken');
           localStorage.removeItem('studentInfo');
         }
-        
+        if (subAdminToken) {
+          localStorage.removeItem('subAdminToken');
+          localStorage.removeItem('subAdminInfo');
+        }
+
         setIsAuthenticated(false);
       } finally {
         setLoading(false);

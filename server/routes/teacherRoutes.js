@@ -42,9 +42,15 @@ router.get("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
   }
 });
 
-// PATCH /api/teachers/:id/google-meet
+// Ownership guard: admins may update any teacher; teachers may only update themselves
+const requireOwnerOrAdmin = (req, res, next) => {
+  if (req.user?.role === 'admin') return next();
+  if (req.user?.role === 'teacher' && String(req.user.id) === String(req.params.id)) return next();
+  return res.status(403).json({ message: "You can only update your own profile" });
+};
+
 // PATCH /api/teachers/:id/schedule-visibility  — teacher toggles student access
-router.patch("/:id/schedule-visibility", verifyToken, async (req, res) => {
+router.patch("/:id/schedule-visibility", verifyToken, requireOwnerOrAdmin, async (req, res) => {
   try {
     const { showScheduleToStudents } = req.body;
     if (typeof showScheduleToStudents !== "boolean")
@@ -62,7 +68,7 @@ router.patch("/:id/schedule-visibility", verifyToken, async (req, res) => {
 });
 
 // PATCH /api/teachers/:id/timezone  — silently update teacher's local timezone
-router.patch("/:id/timezone", verifyToken, async (req, res) => {
+router.patch("/:id/timezone", verifyToken, requireOwnerOrAdmin, async (req, res) => {
   try {
     const { timezone } = req.body;
     if (!timezone || typeof timezone !== "string") {
@@ -79,7 +85,8 @@ router.patch("/:id/timezone", verifyToken, async (req, res) => {
   }
 });
 
-router.patch("/:id/google-meet", verifyToken, async (req, res) => {
+// PATCH /api/teachers/:id/google-meet
+router.patch("/:id/google-meet", verifyToken, requireOwnerOrAdmin, async (req, res) => {
   try {
     const { googleMeetLink } = req.body;
     const teacher = await Teacher.findByIdAndUpdate(

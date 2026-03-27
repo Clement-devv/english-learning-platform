@@ -18,10 +18,9 @@ export default function StudentProtectedRoute({ children }) {
       }
 
       try {
-        // Set token in api headers
         api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-        
-        // For now, just check if token exists (we'll add proper verification later)
+        // Verify the token against the backend — checks expiry, revocation, and active status
+        await api.get('/api/auth/student/verify');
         setIsAuthenticated(true);
       } catch (error) {
         console.error('Student token verification failed:', error);
