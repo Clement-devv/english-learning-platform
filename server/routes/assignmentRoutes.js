@@ -1,15 +1,24 @@
+// server/routes/assignmentRoutes.js
 import express from "express";
-import Assignment from "../models/Assignment.js";
-import GroupChat from "../models/GroupChat.js"; // ✅ ADD THIS
-import Teacher from "../models/Teacher.js"; // ✅ ADD THIS
-import Student from "../models/Student.js"; // ✅ ADD THIS
+import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
+import { assignmentSchema } from "../schemas/assignmentSchema.js";
+import { groupChatSchema }  from "../schemas/groupChatSchema.js";
+import { teacherSchema }    from "../schemas/teacherSchema.js";
+import { studentSchema }    from "../schemas/studentSchema.js";
 
 const router = express.Router();
+router.use(tenantMiddleware);
+
+const getAssignment = (db) => db.models.Assignment || db.model("Assignment", assignmentSchema);
+const getGroupChat  = (db) => db.models.GroupChat  || db.model("GroupChat",  groupChatSchema);
+const getTeacher    = (db) => db.models.Teacher    || db.model("Teacher",    teacherSchema);
+const getStudent    = (db) => db.models.Student    || db.model("Student",    studentSchema);
 
 // Get all assignments
 router.get("/", async (req, res) => {
   try {
-    const assignments = await Assignment.find()
+    const assignments = await getAssignment(req.db)
+      .find()
       .populate("teacherId", "firstName lastName email")
       .populate("studentId", "firstName surname email")
       .sort({ assignedDate: -1 })
@@ -26,17 +35,15 @@ router.post("/", async (req, res) => {
   try {
     const { teacherId, studentId } = req.body;
 
-    if (!teacherId || !studentId) {
+    if (!teacherId || !studentId)
       return res.status(400).json({ message: "Teacher and Student required" });
-    }
 
-    // Check if already assigned
+    const Assignment = getAssignment(req.db);
+    const GroupChat  = getGroupChat(req.db);
+
     const exists = await Assignment.findOne({ teacherId, studentId });
-    if (exists) {
-      return res.status(400).json({ message: "Assignment already exists" });
-    }
+    if (exists) return res.status(400).json({ message: "Assignment already exists" });
 
-    // Create assignment
     const assignment = await Assignment.create({
       teacherId,
       studentId,
@@ -47,62 +54,48 @@ router.post("/", async (req, res) => {
       .populate("teacherId", "firstName lastName email")
       .populate("studentId", "firstName surname email");
 
-    // ✅ AUTO-CREATE GROUP CHAT
+    // Auto-create group chat
     try {
-      console.log('📱 Creating group chat for assignment:', assignment._id);
-      
-      // Get full teacher and student data for chat name
-      const teacher = await Teacher.findById(teacherId);
-      const student = await Student.findById(studentId);
-      
+      const teacher = await getTeacher(req.db).findById(teacherId);
+      const student = await getStudent(req.db).findById(studentId);
+
       if (!teacher || !student) {
-        console.error('❌ Teacher or Student not found for chat creation');
-        return res.status(201).json({ 
-          message: "Assignment created but chat creation failed", 
-          assignment: populated 
+        console.error("Teacher or Student not found for chat creation");
+        return res.status(201).json({
+          message: "Assignment created but chat creation failed",
+          assignment: populated,
         });
       }
 
       const chatName = `${teacher.firstName} ${teacher.lastName} - ${student.firstName} ${student.surname}`;
-      
-      // Check if chat already exists for this assignment
       const existingChat = await GroupChat.findOne({ assignmentId: assignment._id });
-      
-      if (existingChat) {
-        console.log('ℹ️ Chat already exists for this assignment');
-      } else {
-        const groupChat = await GroupChat.create({
+
+      if (!existingChat) {
+        await GroupChat.create({
           assignmentId: assignment._id,
-          teacherId: teacherId,
-          studentId: studentId,
-          chatName: chatName,
+          teacherId,
+          studentId,
+          chatName,
           messages: [{
-            senderId: req.user?.id || teacherId, // Use admin ID if available, else teacher
-            senderModel: req.user?.role === 'admin' ? 'Admin' : 'Teacher',
-            senderName: 'System',
-            senderRole: 'admin',
-            message: `Chat created for ${chatName}. Welcome to your learning journey! 🎓`,
-            messageType: 'system',
-            createdAt: new Date()
+            senderId:    req.user?.id || teacherId,
+            senderModel: req.user?.role === "admin" ? "Admin" : "Teacher",
+            senderName:  "System",
+            senderRole:  "admin",
+            message:     `Chat created for ${chatName}. Welcome to your learning journey!`,
+            messageType: "system",
+            createdAt:   new Date(),
           }],
-          isActive: true,
-          lastActivityAt: new Date()
+          isActive:       true,
+          lastActivityAt: new Date(),
         });
-        
-        console.log('✅ Group chat created successfully:', groupChat._id);
       }
     } catch (chatErr) {
-      console.error('❌ Error creating group chat:', chatErr);
-      // Don't fail assignment creation if chat creation fails
-      // Just log the error and continue
+      console.error("Error creating group chat:", chatErr);
     }
 
-    res.status(201).json({ 
-      message: "Assignment created successfully", 
-      assignment: populated 
-    });
+    res.status(201).json({ message: "Assignment created successfully", assignment: populated });
   } catch (err) {
-    console.error('❌ Error creating assignment:', err);
+    console.error("Error creating assignment:", err);
     res.status(500).json({ message: "Error creating assignment" });
   }
 });
@@ -110,20 +103,17 @@ router.post("/", async (req, res) => {
 // Delete assignment
 router.delete("/:id", async (req, res) => {
   try {
+    const Assignment = getAssignment(req.db);
     const assignment = await Assignment.findByIdAndDelete(req.params.id);
-    if (!assignment) {
-      return res.status(404).json({ message: "Assignment not found" });
-    }
+    if (!assignment) return res.status(404).json({ message: "Assignment not found" });
 
-    // ✅ OPTIONAL: Delete associated group chat
     try {
-      await GroupChat.findOneAndUpdate(
+      await getGroupChat(req.db).findOneAndUpdate(
         { assignmentId: req.params.id },
         { isActive: false }
       );
-      console.log('✅ Deactivated group chat for deleted assignment');
     } catch (chatErr) {
-      console.error('⚠️ Error deactivating group chat:', chatErr);
+      console.error("Error deactivating group chat:", chatErr);
     }
 
     res.json({ message: "Assignment deleted" });

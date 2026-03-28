@@ -1,6 +1,8 @@
 // src/utils/pushNotifications.js
 // Handles browser permission request, SW registration, and push subscription lifecycle.
 
+import { getCachedCenter } from "./branding";
+
 const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 function authHeader() {
@@ -8,7 +10,11 @@ function authHeader() {
     localStorage.getItem("studentToken") ||
     localStorage.getItem("teacherToken") ||
     localStorage.getItem("token");
-  return t ? { Authorization: `Bearer ${t}` } : {};
+  const slug = import.meta.env.VITE_CENTER_SLUG || getCachedCenter()?.slug;
+  return {
+    ...(t    ? { Authorization: `Bearer ${t}` } : {}),
+    ...(slug ? { "x-center-slug": slug }         : {}),
+  };
 }
 
 function urlBase64ToUint8Array(base64String) {
@@ -49,7 +55,7 @@ export async function enablePush() {
     await navigator.serviceWorker.ready;
 
     // 3. Fetch VAPID public key from server
-    const keyRes = await fetch(`${API}/api/push/vapid-key`);
+    const keyRes = await fetch(`${API}/api/push/vapid-key`, { headers: authHeader() });
     if (!keyRes.ok) return { ok: false, reason: "no_vapid" };
     const { key } = await keyRes.json();
 

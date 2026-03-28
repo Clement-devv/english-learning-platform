@@ -890,6 +890,65 @@ export const sendStudentForgotPasswordEmail = async (email, name, resetToken) =>
 /**
  * Send forgot password email with reset link
  */
+export const sendCenterDeletionWarningEmail = async (center, deletionDate, contactEmail) => {
+  const formattedDate = new Date(deletionDate).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  return await sendEmail({
+    from: `"${config.appName}" <${config.emailFrom}>`,
+    to: center.adminEmail,
+    subject: `Important: Your ${config.appName} center is scheduled for deletion`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background: #dc2626; padding: 20px 28px; border-radius: 10px 10px 0 0;">
+          <h2 style="color: white; margin: 0;">⚠️ Center Deletion Notice</h2>
+        </div>
+        <div style="background: #fff8f8; border: 1px solid #fecaca; border-top: none; padding: 28px; border-radius: 0 0 10px 10px;">
+          <p style="font-size: 15px; color: #111;">Hi there,</p>
+          <p style="font-size: 15px; color: #111;">
+            Your center <strong>${center.centerName}</strong> has been scheduled for <strong>permanent deletion</strong> on:
+          </p>
+          <div style="background: #fee2e2; border: 2px solid #dc2626; border-radius: 8px; padding: 16px 20px; margin: 20px 0; text-align: center;">
+            <p style="margin: 0; font-size: 18px; font-weight: bold; color: #dc2626;">${formattedDate}</p>
+          </div>
+          <p style="font-size: 15px; color: #111;">
+            After this date, your center data, student records, and all associated content will be <strong>permanently removed</strong> and cannot be recovered.
+          </p>
+          <p style="font-size: 15px; color: #111;">
+            <strong>If you believe this is a mistake or wish to reactivate your center</strong>, please contact us immediately before the deletion date:
+          </p>
+          <div style="text-align: center; margin: 24px 0;">
+            <a href="mailto:${contactEmail || config.emailFrom}"
+               style="background: #4F46E5; color: white; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 15px;">
+              Contact Support to Reactivate
+            </a>
+          </div>
+          <p style="font-size: 13px; color: #6b7280; margin-top: 24px;">
+            If you no longer need this account, no action is required. The center will be automatically removed on the scheduled date.
+          </p>
+          <p style="font-size: 13px; color: #6b7280;">— The ${config.appName} Team</p>
+        </div>
+      </div>
+    `,
+  });
+};
+
+export const sendAdminForgotPasswordEmail = async (email, name, resetToken) => {
+  const resetUrl = `${config.frontendUrl}/admin/reset-password/${resetToken}`;
+  return await sendEmail({
+    from: `"${config.appName}" <${config.emailFrom}>`,
+    to: email,
+    subject: 'Admin Password Reset Request',
+    html: `
+      <h2>Admin Password Reset</h2>
+      <p>Hi ${name || 'Admin'},</p>
+      <p>You requested to reset your admin account password. Click the link below:</p>
+      <p><a href="${resetUrl}" style="background:#4F46E5;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;display:inline-block;font-weight:700;">Reset Password</a></p>
+      <p>This link expires in <strong>1 hour</strong>.</p>
+      <p>If you did not request this, please ignore this email — your password will not change.</p>
+      <p>— The ${config.appName} Team</p>
+    `,
+  });
+};
+
 export const sendForgotPasswordEmail = async (email, name, resetToken) => {
   const resetUrl = `${config.frontendUrl}/reset-password/${resetToken}`;
 
@@ -2079,6 +2138,8 @@ export default {
   sendWelcomeEmail,
   sendPasswordResetEmail,
   sendForgotPasswordEmail,
+  sendAdminForgotPasswordEmail,
+  sendCenterDeletionWarningEmail,
   sendSubAdminInviteEmail,
   sendSubAdminWelcomeEmail,
   sendTeacherInviteEmail,
@@ -2095,6 +2156,53 @@ export default {
  * @param {Date} from  - start of reporting window
  * @param {Date} to    - end of reporting window
  */
+// ==================== DOMAIN INSTRUCTIONS ====================
+
+/**
+ * Send DNS setup instructions to a center admin after domain submission
+ */
+export const sendDomainInstructionsEmail = async (center, domain, serverIp) => {
+  return sendEmail({
+    from: `"${config.appName}" <${config.emailFrom}>`,
+    to: center.email,
+    subject: `Custom Domain Setup Instructions — ${domain}`,
+    html: `
+      <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
+        <div style="background:#4f46e5;padding:24px 32px;border-radius:8px 8px 0 0;">
+          <h1 style="color:#fff;margin:0;font-size:20px;">🌐 Custom Domain Setup</h1>
+        </div>
+        <div style="background:#f8f7ff;padding:24px 32px;border-radius:0 0 8px 8px;">
+          <p>Hi <strong>${center.centerName}</strong>,</p>
+          <p>To activate your custom domain <strong>${domain}</strong>, add these DNS records at your domain provider:</p>
+          <table style="border-collapse:collapse;width:100%;margin:16px 0;">
+            <tr style="background:#e0e7ff;">
+              <th style="padding:10px;border:1px solid #c7d2fe;text-align:left;">Type</th>
+              <th style="padding:10px;border:1px solid #c7d2fe;text-align:left;">Name</th>
+              <th style="padding:10px;border:1px solid #c7d2fe;text-align:left;">Value</th>
+            </tr>
+            <tr>
+              <td style="padding:10px;border:1px solid #c7d2fe;">A</td>
+              <td style="padding:10px;border:1px solid #c7d2fe;">@</td>
+              <td style="padding:10px;border:1px solid #c7d2fe;font-weight:bold;">${serverIp}</td>
+            </tr>
+            <tr>
+              <td style="padding:10px;border:1px solid #c7d2fe;">CNAME</td>
+              <td style="padding:10px;border:1px solid #c7d2fe;">www</td>
+              <td style="padding:10px;border:1px solid #c7d2fe;font-weight:bold;">${domain}</td>
+            </tr>
+          </table>
+          <p>⏱️ DNS changes can take up to <strong>48 hours</strong> to propagate.</p>
+          <p>Once done, contact support — we will verify and activate your domain within 24 hours.</p>
+          <p>After activation your portal will be live at: <strong>https://${domain}</strong></p>
+          <p style="color:#64748b;font-size:12px;margin-top:24px;">— The ${config.appName} Team</p>
+        </div>
+      </div>
+    `,
+  });
+};
+
+// ==================== PROGRESS REPORTS ====================
+
 export const sendProgressReport = async (student, pdfBuffer, period, from, to) => {
   const label   = period === "weekly" ? "Weekly" : "Monthly";
   const fromStr = from.toLocaleDateString("en-US", { month: "short", day: "numeric" });

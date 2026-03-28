@@ -3,16 +3,24 @@
 // Register with: app.use("/api/admin/lessons", adminLessonRoutes)
 
 import express from "express";
-import Booking from "../models/Booking.js";
-import Teacher from "../models/Teacher.js";
-import Student from "../models/Student.js";
-import Assignment from "../models/Assignment.js";
-import PaymentTransaction from "../models/PaymentTransaction.js";
 import { verifyToken, verifyAdmin } from "../middleware/authMiddleware.js";
+import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
 import { sendEmail } from "../utils/emailService.js";
 import { completeClass } from "../services/classCompletionService.js";
+import { bookingSchema }            from "../schemas/bookingSchema.js";
+import { teacherSchema }            from "../schemas/teacherSchema.js";
+import { studentSchema }            from "../schemas/studentSchema.js";
+import { assignmentSchema }         from "../schemas/assignmentSchema.js";
+import { paymentTransactionSchema } from "../schemas/paymentTransactionSchema.js";
 
 const router = express.Router();
+router.use(tenantMiddleware);
+
+const getBooking            = (db) => db.models.Booking            || db.model("Booking",            bookingSchema);
+const getTeacher            = (db) => db.models.Teacher            || db.model("Teacher",            teacherSchema);
+const getStudent            = (db) => db.models.Student            || db.model("Student",            studentSchema);
+const getAssignment         = (db) => db.models.Assignment         || db.model("Assignment",         assignmentSchema);
+const getPaymentTransaction = (db) => db.models.PaymentTransaction || db.model("PaymentTransaction", paymentTransactionSchema);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Email helpers
@@ -109,7 +117,7 @@ router.get("/teacher/:teacherId/students", verifyToken, verifyAdmin, async (req,
   try {
     const { teacherId } = req.params;
 
-    const assignments = await Assignment.find({ teacherId })
+    const assignments = await getAssignment(req.db).find({ teacherId })
       .populate("studentId", "firstName surname email noOfClasses active")
       .sort({ assignedDate: -1 });
 
@@ -138,7 +146,7 @@ router.get("/student/:studentId/teachers", verifyToken, verifyAdmin, async (req,
   try {
     const { studentId } = req.params;
 
-    const assignments = await Assignment.find({ studentId })
+    const assignments = await getAssignment(req.db).find({ studentId })
       .populate("teacherId", "firstName lastName email ratePerClass lessonsCompleted earned active")
       .sort({ assignedDate: -1 });
 
@@ -182,7 +190,7 @@ router.get("/bookings", verifyToken, verifyAdmin, async (req, res) => {
       return res.status(400).json({ success: false, message: "type must be 'mark' or 'unmark'" });
     }
 
-    const bookings = await Booking.find({ teacherId, studentId, ...statusFilter })
+    const bookings = await getBooking(req.db).find({ teacherId, studentId, ...statusFilter })
       .populate("teacherId", "firstName lastName ratePerClass")
       .populate("studentId", "firstName surname")
       .sort({ scheduledTime: -1 });
@@ -209,7 +217,7 @@ router.post("/mark", verifyToken, verifyAdmin, async (req, res) => {
   }
 
   try {
-    const result = await completeClass(bookingId, "admin", { skipAttendanceCheck: true });
+    const result = await completeClass(req.db, bookingId, "admin", { skipAttendanceCheck: true });
 
     if (result.alreadyProcessed) {
       return res.status(400).json({
@@ -219,9 +227,10 @@ router.post("/mark", verifyToken, verifyAdmin, async (req, res) => {
     }
 
     // Send emails non-blocking — email failure must NOT make admin think marking failed
+    const db = req.db;
     setImmediate(async () => {
       try {
-        const booking = await Booking.findById(bookingId)
+        const booking = await getBooking(db).findById(bookingId)
           .populate("teacherId", "firstName lastName email ratePerClass")
           .populate("studentId", "firstName surname email noOfClasses");
         if (booking) {
@@ -261,7 +270,7 @@ router.post("/unmark", verifyToken, verifyAdmin, async (req, res) => {
   }
 
   try {
-    const booking = await Booking.findById(bookingId)
+    const booking = await getBooking(req.db).findById(bookingId)
       .populate("teacherId", "firstName lastName email ratePerClass lessonsCompleted earned")
       .populate("studentId", "firstName surname email noOfClasses active");
 
@@ -291,7 +300,7 @@ router.post("/unmark", verifyToken, verifyAdmin, async (req, res) => {
     await booking.save();
 
     // Restore student class credit
-    const student = await Student.findById(booking.studentId._id);
+    const student = await getStudent(req.db).findById(booking.studentId._id);
     if (student) {
       student.noOfClasses = (student.noOfClasses || 0) + 1;
       student.active = true;
@@ -299,7 +308,7 @@ router.post("/unmark", verifyToken, verifyAdmin, async (req, res) => {
     }
 
     // Deduct teacher earnings (float-safe)
-    const teacher = await Teacher.findById(booking.teacherId._id);
+    const teacher = await getTeacher(req.db).findById(booking.teacherId._id);
     let ratePerClass = 0;
     if (teacher) {
       ratePerClass = Math.round((parseFloat(teacher.ratePerClass) || 0) * 100) / 100;
@@ -309,16 +318,19 @@ router.post("/unmark", verifyToken, verifyAdmin, async (req, res) => {
     }
 
     // Cancel the PaymentTransaction for this booking
-    await PaymentTransaction.updateMany(
+    await getPaymentTransaction(req.db).updateMany(
       { bookingId: booking._id, status: "pending" },
       { $set: { status: "cancelled", notes: `Admin rejected: ${reason || "No reason given"}` } }
     );
 
     // Send emails non-blocking
+    const db = req.db;
+    const studentId = booking.studentId._id;
+    const teacherId = booking.teacherId._id;
     setImmediate(async () => {
       try {
-        const updatedStudent = await Student.findById(booking.studentId._id);
-        const updatedTeacher = await Teacher.findById(booking.teacherId._id);
+        const updatedStudent = await getStudent(db).findById(studentId);
+        const updatedTeacher = await getTeacher(db).findById(teacherId);
         await sendLessonUnmarkedEmails(updatedTeacher, updatedStudent, booking, reason);
       } catch (emailErr) {
         console.error("📧 Unmark email failed:", emailErr.message);

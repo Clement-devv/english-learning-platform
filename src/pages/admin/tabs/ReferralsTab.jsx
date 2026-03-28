@@ -3,12 +3,7 @@
 
 import { useState, useEffect } from "react";
 import { CheckCircle, XCircle, RefreshCw, Users } from "lucide-react";
-
-const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
-function authHeader() {
-  const t = localStorage.getItem("adminToken") || localStorage.getItem("token");
-  return t ? { Authorization: `Bearer ${t}` } : {};
-}
+import api from "../../../api";
 
 const fmt = (d) =>
   d ? new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—";
@@ -41,9 +36,9 @@ export default function ReferralsTab({ isDarkMode }) {
   async function load() {
     setLoading(true);
     try {
-      const url = filter ? `${API}/api/referrals?status=${filter}` : `${API}/api/referrals`;
-      const res  = await fetch(url, { headers: authHeader() });
-      const json = await res.json();
+      const url = filter ? `/api/referrals?status=${filter}` : `/api/referrals`;
+      const res  = await api.get(url);
+      const json = res.data;
       setReferrals(Array.isArray(json) ? json : []);
     } catch (e) {
       console.error(e);
@@ -57,16 +52,11 @@ export default function ReferralsTab({ isDarkMode }) {
   async function approve(id) {
     setBusy(b => ({ ...b, [id]: true }));
     try {
-      const res = await fetch(`${API}/api/referrals/${id}/approve`, {
-        method: "POST", headers: authHeader(),
-      });
-      const json = await res.json();
-      if (res.ok) {
-        showToast("Student invited! Referrer credited +1 class.");
-        load();
-      } else {
-        showToast(json.error || "Approval failed", false);
-      }
+      await api.post(`/api/referrals/${id}/approve`);
+      showToast("Student invited! Referrer credited +1 class.");
+      load();
+    } catch (e) {
+      showToast(e.response?.data?.error || "Approval failed", false);
     } finally {
       setBusy(b => ({ ...b, [id]: false }));
     }
@@ -76,11 +66,11 @@ export default function ReferralsTab({ isDarkMode }) {
     if (!window.confirm("Reject this referral application?")) return;
     setBusy(b => ({ ...b, [id]: true }));
     try {
-      const res = await fetch(`${API}/api/referrals/${id}/reject`, {
-        method: "POST", headers: authHeader(),
-      });
-      if (res.ok) { showToast("Application rejected."); load(); }
-      else { const e = await res.json(); showToast(e.error, false); }
+      await api.post(`/api/referrals/${id}/reject`);
+      showToast("Application rejected.");
+      load();
+    } catch (e) {
+      showToast(e.response?.data?.error || "Rejection failed", false);
     } finally {
       setBusy(b => ({ ...b, [id]: false }));
     }

@@ -3,10 +3,15 @@
 // Returns a Buffer containing the PDF bytes.
 
 import PDFDocument from "pdfkit";
-import Booking     from "../models/Booking.js";
-import Homework    from "../models/Homework.js";
-import QuizAttempt from "../models/QuizAttempt.js";
-import VocabProgress from "../models/VocabProgress.js";
+import { bookingSchema }      from "../schemas/bookingSchema.js";
+import { homeworkSchema }     from "../schemas/homeworkSchema.js";
+import { quizAttemptSchema }  from "../schemas/quizAttemptSchema.js";
+import { vocabProgressSchema } from "../schemas/vocabProgressSchema.js";
+
+const getBooking      = (db) => db.models.Booking      || db.model("Booking",      bookingSchema);
+const getHomework     = (db) => db.models.Homework     || db.model("Homework",     homeworkSchema);
+const getQuizAttempt  = (db) => db.models.QuizAttempt  || db.model("QuizAttempt",  quizAttemptSchema);
+const getVocabProgress = (db) => db.models.VocabProgress || db.model("VocabProgress", vocabProgressSchema);
 
 // ── Brand colours ─────────────────────────────────────────────────────────────
 const GREEN  = "#16a34a";
@@ -40,6 +45,7 @@ function badge(score) {
 
 // ── Main export ───────────────────────────────────────────────────────────────
 /**
+ * @param {Object} db       - Per-center Mongoose connection (req.db)
  * @param {Object} student  - Student doc (firstName, surname, email)
  * @param {Object} teacher  - Teacher doc (firstName, lastName) or null
  * @param {Date}   from     - Start of reporting window
@@ -47,27 +53,27 @@ function badge(score) {
  * @param {"weekly"|"monthly"} period
  * @returns {Promise<Buffer>}
  */
-export async function generateProgressReport(student, teacher, from, to, period = "monthly") {
+export async function generateProgressReport(db, student, teacher, from, to, period = "monthly") {
   // ── Gather data ─────────────────────────────────────────────────────────────
   const [completedBookings, gradedHW, quizAttempts, vocabStats] = await Promise.all([
-    Booking.find({
+    getBooking(db).find({
       studentId: student._id,
       status: "completed",
       scheduledTime: { $gte: from, $lt: to },
     }).populate("teacherId", "firstName lastName"),
 
-    Homework.find({
+    getHomework(db).find({
       studentId: student._id,
       status: "graded",
       "grade.gradedAt": { $gte: from, $lt: to },
     }),
 
-    QuizAttempt.find({
+    getQuizAttempt(db).find({
       studentId: student._id,
       submittedAt: { $gte: from, $lt: to },
     }).populate("quizId", "title"),
 
-    VocabProgress.find({
+    getVocabProgress(db).find({
       studentId: student._id,
       lastReviewedAt: { $gte: from, $lt: to },
     }),

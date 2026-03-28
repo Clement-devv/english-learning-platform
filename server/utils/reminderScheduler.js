@@ -7,15 +7,15 @@
  *   - Quizzes:   30 min before due date (student, if not yet attempted)
  *
  * Uses a ReminderLog collection so each reminder is sent exactly once.
+ * Call startReminderScheduler(db) once per active center connection.
  */
 
-import mongoose   from "mongoose";
-import Booking     from "../models/Booking.js";
-import Homework    from "../models/Homework.js";
-import Quiz        from "../models/Quiz.js";
-import ReminderLog from "../models/ReminderLog.js";
-import Teacher     from "../models/Teacher.js";
-import Student     from "../models/Student.js";
+import { bookingSchema }     from "../schemas/bookingSchema.js";
+import { homeworkSchema }    from "../schemas/homeworkSchema.js";
+import { quizSchema }        from "../schemas/quizSchema.js";
+import { reminderLogSchema } from "../schemas/reminderLogSchema.js";
+import { teacherSchema }     from "../schemas/teacherSchema.js";
+import { studentSchema }     from "../schemas/studentSchema.js";
 import {
   sendClassTimedReminder,
   sendHomeworkDueReminder,
@@ -25,10 +25,17 @@ import {
 } from "./emailService.js";
 import { sendPush } from "./webPushService.js";
 
+const getBooking     = (db) => db.models.Booking     || db.model("Booking",     bookingSchema);
+const getHomework    = (db) => db.models.Homework    || db.model("Homework",    homeworkSchema);
+const getQuiz        = (db) => db.models.Quiz        || db.model("Quiz",        quizSchema);
+const getReminderLog = (db) => db.models.ReminderLog || db.model("ReminderLog", reminderLogSchema);
+const getTeacher     = (db) => db.models.Teacher     || db.model("Teacher",     teacherSchema);
+const getStudent     = (db) => db.models.Student     || db.model("Student",     studentSchema);
+
 // ── Helper: mark a reminder as sent (returns false if already sent) ──────────
-async function markSent(type, refId) {
+async function markSent(db, type, refId) {
   try {
-    await ReminderLog.create({ type, refId });
+    await getReminderLog(db).create({ type, refId });
     return true; // newly inserted → not yet sent
   } catch (err) {
     if (err.code === 11000) return false; // duplicate key → already sent
@@ -38,19 +45,18 @@ async function markSent(type, refId) {
 
 // ── Helper: check if a time is within [target-margin, target+margin] minutes --
 function inWindow(scheduledTime, targetMins, marginMins = 4) {
-  const now        = Date.now();
-  const diffMins   = (new Date(scheduledTime).getTime() - now) / 60000;
+  const now      = Date.now();
+  const diffMins = (new Date(scheduledTime).getTime() - now) / 60000;
   return diffMins >= (targetMins - marginMins) && diffMins <= (targetMins + marginMins);
 }
 
 // ── Class reminders ──────────────────────────────────────────────────────────
-async function checkClassReminders() {
-  // Only check accepted bookings that haven't started yet
-  const bookings = await Booking.find({
+async function checkClassReminders(db) {
+  const bookings = await getBooking(db).find({
     status: "accepted",
     scheduledTime: {
-      $gt:  new Date(Date.now() + 3 * 60 * 1000),   // at least 3 min in the future
-      $lt:  new Date(Date.now() + 70 * 60 * 1000),  // at most 70 min away
+      $gt: new Date(Date.now() + 3  * 60 * 1000),
+      $lt: new Date(Date.now() + 70 * 60 * 1000),
     },
   })
     .populate("teacherId", "firstName lastName email")
@@ -78,12 +84,11 @@ async function checkClassReminders() {
 
       // Teacher reminder
       const teacherKey = `${label}_t_${booking._id}`;
-      if (await markSent(teacherKey, booking._id)) {
+      if (await markSent(db, teacherKey, booking._id)) {
         sendClassTimedReminder(teacher, booking, "teacher", mins).catch(e =>
           console.error(`Reminder email failed (${teacherKey}):`, e.message)
         );
-        // Web push — fetch fresh subscription from DB
-        Teacher.findById(teacher._id).select("pushSubscription").then(t => {
+        getTeacher(db).findById(teacher._id).select("pushSubscription").then(t => {
           if (t?.pushSubscription) {
             sendPush(t.pushSubscription, { ...pushPayload, data: { url: "/teacher/dashboard" } })
               .catch(e => console.error(`Push failed (teacher ${teacher.email}):`, e.message));
@@ -94,12 +99,11 @@ async function checkClassReminders() {
 
       // Student reminder
       const studentKey = `${label}_s_${booking._id}`;
-      if (await markSent(studentKey, booking._id)) {
+      if (await markSent(db, studentKey, booking._id)) {
         sendClassTimedReminder(student, booking, "student", mins).catch(e =>
           console.error(`Reminder email failed (${studentKey}):`, e.message)
         );
-        // Web push
-        Student.findById(student._id).select("pushSubscription").then(s => {
+        getStudent(db).findById(student._id).select("pushSubscription").then(s => {
           if (s?.pushSubscription) {
             sendPush(s.pushSubscription, pushPayload)
               .catch(e => console.error(`Push failed (student ${student.email}):`, e.message));
@@ -112,12 +116,12 @@ async function checkClassReminders() {
 }
 
 // ── Homework due reminders ───────────────────────────────────────────────────
-async function checkHomeworkReminders() {
-  const homeworks = await Homework.find({
-    status:  "assigned",   // not yet submitted
+async function checkHomeworkReminders(db) {
+  const homeworks = await getHomework(db).find({
+    status:  "assigned",
     dueDate: {
-      $gt: new Date(Date.now() + 24 * 60 * 1000),  // at least 24 min away
-      $lt: new Date(Date.now() + 36 * 60 * 1000),  // within 36 min
+      $gt: new Date(Date.now() + 24 * 60 * 1000),
+      $lt: new Date(Date.now() + 36 * 60 * 1000),
     },
   }).populate("studentId", "firstName email");
 
@@ -126,7 +130,7 @@ async function checkHomeworkReminders() {
     if (!student?.email) continue;
 
     const key = `homework_30min_${hw._id}`;
-    if (await markSent(key, hw._id)) {
+    if (await markSent(db, key, hw._id)) {
       sendHomeworkDueReminder(student, hw, 30).catch(e =>
         console.error(`Homework reminder failed:`, e.message)
       );
@@ -136,9 +140,9 @@ async function checkHomeworkReminders() {
 }
 
 // ── Quiz due reminders ───────────────────────────────────────────────────────
-async function checkQuizReminders() {
-  const quizzes = await Quiz.find({
-    status:  "assigned",   // not yet attempted
+async function checkQuizReminders(db) {
+  const quizzes = await getQuiz(db).find({
+    status:  "assigned",
     dueDate: {
       $gt: new Date(Date.now() + 24 * 60 * 1000),
       $lt: new Date(Date.now() + 36 * 60 * 1000),
@@ -150,7 +154,7 @@ async function checkQuizReminders() {
     if (!student?.email) continue;
 
     const key = `quiz_30min_${quiz._id}`;
-    if (await markSent(key, quiz._id)) {
+    if (await markSent(db, key, quiz._id)) {
       sendQuizDueReminder(student, quiz, 30).catch(e =>
         console.error(`Quiz reminder failed:`, e.message)
       );
@@ -160,12 +164,13 @@ async function checkQuizReminders() {
 }
 
 // ── Scheduled deletion: 24-hour final warning + permanent purge ──────────────
-async function checkScheduledDeletions() {
-  const now = new Date();
+async function checkScheduledDeletions(db) {
+  const now   = new Date();
   const in24h = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+  const Student = getStudent(db);
+  const Teacher = getTeacher(db);
 
-  // 1. Send 24-hour final reminder to students whose deletion is within the next 24 hours
-  //    and who haven't yet received this final reminder.
+  // 1. Send 24-hour final reminder to students whose deletion is within the next 24 hours.
   const pendingReminder = await Student.find({
     scheduledDeletionAt: { $gt: now, $lte: in24h },
     deletionWarningEmailSent: false,
@@ -220,28 +225,30 @@ async function checkScheduledDeletions() {
   }
 }
 
-// ── Main tick (runs every 60 s) ──────────────────────────────────────────────
-async function runTick() {
-  // Skip if DB is not connected (e.g. during reconnect after outage)
-  if (mongoose.connection.readyState !== 1) {
-    console.warn("⏰ Reminder scheduler skipped — DB not connected (readyState:", mongoose.connection.readyState, ")");
-    return;
-  }
-  try {
-    await Promise.all([
-      checkClassReminders(),
-      checkHomeworkReminders(),
-      checkQuizReminders(),
-      checkScheduledDeletions(),
-    ]);
-  } catch (err) {
-    console.error("Reminder scheduler error:", err.message);
-  }
+// ── Main tick (runs every 60 s per center) ───────────────────────────────────
+function makeTick(db) {
+  return async function runTick() {
+    if (db.readyState !== 1) {
+      console.warn("⏰ Reminder scheduler skipped — DB not connected (readyState:", db.readyState, ")");
+      return;
+    }
+    try {
+      await Promise.all([
+        checkClassReminders(db),
+        checkHomeworkReminders(db),
+        checkQuizReminders(db),
+        checkScheduledDeletions(db),
+      ]);
+    } catch (err) {
+      console.error("Reminder scheduler error:", err.message);
+    }
+  };
 }
 
-export function startReminderScheduler() {
-  console.log("⏰ Reminder scheduler started (60s interval)");
-  // Run once immediately on startup, then every 60 seconds
+export function startReminderScheduler(db) {
+  const centerSlug = db.name || "unknown";
+  console.log(`⏰ Reminder scheduler started for center: ${centerSlug} (60s interval)`);
+  const runTick = makeTick(db);
   runTick();
   setInterval(runTick, 60 * 1000);
 }

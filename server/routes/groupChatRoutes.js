@@ -1,22 +1,26 @@
 // server/routes/groupChatRoutes.js
 import express from "express";
-import GroupChat from "../models/GroupChat.js";
-import Teacher  from "../models/Teacher.js";
-import Student  from "../models/Student.js";
-import Admin    from "../models/Admin.js";
-import SubAdmin from "../models/SubAdmin.js";
 import { verifyToken } from "../middleware/authMiddleware.js";
+import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
+import { groupChatSchema }  from "../schemas/groupChatSchema.js";
+import { teacherSchema }    from "../schemas/teacherSchema.js";
+import { studentSchema }    from "../schemas/studentSchema.js";
+import { adminSchema }      from "../schemas/adminSchema.js";
+import { subAdminSchema }   from "../schemas/subAdminSchema.js";
 
 const router = express.Router();
+router.use(tenantMiddleware);
 
-/**
- * GET /api/group-chats
- * Get all group chats for the logged-in user (filtered by role)
- */
+const getGroupChat = (db) => db.models.GroupChat || db.model("GroupChat", groupChatSchema);
+const getTeacher   = (db) => db.models.Teacher   || db.model("Teacher",   teacherSchema);
+const getStudent   = (db) => db.models.Student   || db.model("Student",   studentSchema);
+const getAdmin     = (db) => db.models.Admin     || db.model("Admin",     adminSchema);
+const getSubAdmin  = (db) => db.models.SubAdmin  || db.model("SubAdmin",  subAdminSchema);
+
+// GET /api/group-chats — list chats for logged-in user
 router.get("/", verifyToken, async (req, res) => {
   try {
     const { id: userId, role } = req.user;
-
     let filter = {};
 
     if (role === "admin") {
@@ -26,54 +30,36 @@ router.get("/", verifyToken, async (req, res) => {
     } else if (role === "student") {
       filter.studentId = userId;
     } else if (role === "sub-admin") {
-      // Sub-admin sees chats for teachers in their scope
       const scope = req.user.teacherScope || [];
       filter.teacherId = { $in: scope };
     } else {
       return res.status(403).json({ success: false, message: "Invalid user role" });
     }
 
-    const chats = await GroupChat.find(filter)
+    const chats = await getGroupChat(req.db).find(filter)
       .populate("teacherId", "firstName lastName email")
       .populate("studentId", "firstName surname email")
       .sort({ lastActivityAt: -1 });
 
-    res.json({
-      success: true,
-      chats
-    });
-
+    res.json({ success: true, chats });
   } catch (error) {
-    console.error("❌ Error fetching chats:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to fetch chats",
-      error: error.message
-    });
+    console.error("Error fetching chats:", error);
+    res.status(500).json({ success: false, message: "Failed to fetch chats", error: error.message });
   }
 });
 
-/**
- * GET /api/group-chats/:chatId
- * Get a specific chat by ID
- */
+// GET /api/group-chats/:chatId — get a specific chat
 router.get("/:chatId", verifyToken, async (req, res) => {
   try {
     const { chatId } = req.params;
     const { id: userId, role } = req.user;
 
-    const chat = await GroupChat.findById(chatId)
+    const chat = await getGroupChat(req.db).findById(chatId)
       .populate("teacherId", "firstName lastName email")
       .populate("studentId", "firstName surname email");
 
-    if (!chat) {
-      return res.status(404).json({ 
-        success: false, 
-        message: "Chat not found" 
-      });
-    }
+    if (!chat) return res.status(404).json({ success: false, message: "Chat not found" });
 
-    // Access control
     const teacherIdStr = chat.teacherId?._id?.toString() || chat.teacherId?.toString();
     const studentIdStr = chat.studentId?._id?.toString() || chat.studentId?.toString();
     const scope = req.user.teacherScope?.map(String) || [];
@@ -86,35 +72,24 @@ router.get("/:chatId", verifyToken, async (req, res) => {
     }
 
     res.json({ success: true, chat });
-
   } catch (error) {
-    console.error("❌ Error fetching chat:", error);
+    console.error("Error fetching chat:", error);
     res.status(500).json({ success: false, message: "Failed to fetch chat", error: error.message });
   }
 });
 
-/**
- * GET /api/group-chats/:chatId/messages
- * Get all messages for a specific chat
- */
+// GET /api/group-chats/:chatId/messages
 router.get("/:chatId/messages", verifyToken, async (req, res) => {
   try {
     const { chatId } = req.params;
     const { id: userId, role } = req.user;
 
-    const chat = await GroupChat.findById(chatId)
+    const chat = await getGroupChat(req.db).findById(chatId)
       .select("chatName teacherId studentId assignmentId messages")
       .lean();
-    
 
-    if (!chat) {
-      return res.status(404).json({ 
-        success: false, 
-        message: "Chat not found" 
-      });
-    }
+    if (!chat) return res.status(404).json({ success: false, message: "Chat not found" });
 
-    // Access control
     const scope = req.user.teacherScope?.map(String) || [];
     if (role !== "admin" &&
         chat.teacherId.toString() !== userId &&
@@ -124,18 +99,13 @@ router.get("/:chatId/messages", verifyToken, async (req, res) => {
     }
 
     res.json({ success: true, messages: chat.messages || [] });
-
   } catch (error) {
-    console.error("❌ Error fetching messages:", error);
+    console.error("Error fetching messages:", error);
     res.status(500).json({ success: false, message: "Failed to fetch messages", error: error.message });
   }
 });
 
-/**
- * POST /api/group-chats/:chatId/messages
- * Send a message in a chat
- * ✅ FIXED: Now supports Admin users
- */
+// POST /api/group-chats/:chatId/messages — send a message
 router.post("/:chatId/messages", verifyToken, async (req, res) => {
   try {
     const { chatId } = req.params;
@@ -145,22 +115,22 @@ router.post("/:chatId/messages", verifyToken, async (req, res) => {
     let senderName, senderModel;
 
     if (role === "teacher") {
-      const teacher = await Teacher.findById(senderId);
+      const teacher = await getTeacher(req.db).findById(senderId);
       if (!teacher) return res.status(404).json({ success: false, message: "Teacher not found" });
       senderName  = `${teacher.firstName} ${teacher.lastName}`;
       senderModel = "Teacher";
     } else if (role === "student") {
-      const student = await Student.findById(senderId);
+      const student = await getStudent(req.db).findById(senderId);
       if (!student) return res.status(404).json({ success: false, message: "Student not found" });
       senderName  = `${student.firstName} ${student.surname}`;
       senderModel = "Student";
     } else if (role === "admin") {
-      const admin = await Admin.findById(senderId);
+      const admin = await getAdmin(req.db).findById(senderId);
       if (!admin) return res.status(404).json({ success: false, message: "Admin not found" });
       senderName  = `${admin.firstName} ${admin.lastName}`;
       senderModel = "Admin";
     } else if (role === "sub-admin") {
-      const subAdmin = await SubAdmin.findById(senderId);
+      const subAdmin = await getSubAdmin(req.db).findById(senderId);
       if (!subAdmin) return res.status(404).json({ success: false, message: "Sub-admin not found" });
       senderName  = `${subAdmin.firstName} ${subAdmin.lastName}`;
       senderModel = "SubAdmin";
@@ -168,24 +138,12 @@ router.post("/:chatId/messages", verifyToken, async (req, res) => {
       return res.status(403).json({ success: false, message: "Invalid user role" });
     }
 
-    // Validation
-    if (!message || !message.trim()) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "Message cannot be empty" 
-      });
-    }
+    if (!message || !message.trim())
+      return res.status(400).json({ success: false, message: "Message cannot be empty" });
 
-    // Find chat
-    const chat = await GroupChat.findById(chatId);
-    if (!chat) {
-      return res.status(404).json({ 
-        success: false, 
-        message: "Chat not found" 
-      });
-    }
+    const chat = await getGroupChat(req.db).findById(chatId);
+    if (!chat) return res.status(404).json({ success: false, message: "Chat not found" });
 
-    // Access control
     const sendScope = req.user.teacherScope?.map(String) || [];
     if (role !== "admin" &&
         chat.teacherId.toString() !== senderId &&
@@ -194,29 +152,13 @@ router.post("/:chatId/messages", verifyToken, async (req, res) => {
       return res.status(403).json({ success: false, message: "Access denied" });
     }
 
-    // Create new message
-    const newMessage = {
-      senderId,
-      senderModel,
-      senderName,
-      senderRole: role,
-      message: message.trim(),
-      messageType: "text",
-      isRead: false,
-      readBy: []
-    };
-
-    // Add message to chat
-    chat.messages.push(newMessage);
-    chat.lastMessage = {
-      text: message.trim(),
-      senderId,
-      senderName,
-      timestamp: new Date()
-    };
+    chat.messages.push({
+      senderId, senderModel, senderName, senderRole: role,
+      message: message.trim(), messageType: "text", isRead: false, readBy: [],
+    });
+    chat.lastMessage    = { text: message.trim(), senderId, senderName, timestamp: new Date() };
     chat.lastActivityAt = new Date();
 
-    // Update unread counts for other participants
     if (role === "teacher") {
       chat.unreadCount.student  += 1;
       chat.unreadCount.admin    += 1;
@@ -236,45 +178,24 @@ router.post("/:chatId/messages", verifyToken, async (req, res) => {
     }
 
     await chat.save();
-
-    // Return the newly created message
     const savedMessage = chat.messages[chat.messages.length - 1];
 
-    res.json({
-      success: true,
-      message: "Message sent successfully",
-      data: savedMessage
-    });
-
+    res.json({ success: true, message: "Message sent successfully", data: savedMessage });
   } catch (error) {
-    console.error("❌ Error sending message:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to send message",
-      error: error.message
-    });
+    console.error("Error sending message:", error);
+    res.status(500).json({ success: false, message: "Failed to send message", error: error.message });
   }
 });
 
-/**
- * PATCH /api/group-chats/:chatId/mark-read
- * Mark all messages as read for the current user
- */
+// PATCH /api/group-chats/:chatId/mark-read
 router.patch("/:chatId/mark-read", verifyToken, async (req, res) => {
   try {
     const { chatId } = req.params;
     const { id: userId, role } = req.user;
 
-    const chat = await GroupChat.findById(chatId);
+    const chat = await getGroupChat(req.db).findById(chatId);
+    if (!chat) return res.status(404).json({ success: false, message: "Chat not found" });
 
-    if (!chat) {
-      return res.status(404).json({ 
-        success: false, 
-        message: "Chat not found" 
-      });
-    }
-
-    // Access control
     const mrScope = req.user.teacherScope?.map(String) || [];
     if (role !== "admin" &&
         chat.teacherId.toString() !== userId &&
@@ -283,73 +204,38 @@ router.patch("/:chatId/mark-read", verifyToken, async (req, res) => {
       return res.status(403).json({ success: false, message: "Access denied" });
     }
 
-    // Mark all messages as read by this user
     chat.messages.forEach((msg) => {
       if (!msg.readBy.some(r => r.userId.toString() === userId)) {
         msg.readBy.push({ userId, readAt: new Date() });
       }
     });
 
-    // Reset unread count for this role
-    if (role === "admin")         chat.unreadCount.admin    = 0;
-    else if (role === "teacher")  chat.unreadCount.teacher  = 0;
-    else if (role === "student")  chat.unreadCount.student  = 0;
+    if (role === "admin")          chat.unreadCount.admin    = 0;
+    else if (role === "teacher")   chat.unreadCount.teacher  = 0;
+    else if (role === "student")   chat.unreadCount.student  = 0;
     else if (role === "sub-admin") chat.unreadCount.subAdmin = 0;
 
     await chat.save();
-
-    res.json({
-      success: true,
-      message: "Messages marked as read"
-    });
-
+    res.json({ success: true, message: "Messages marked as read" });
   } catch (error) {
-    console.error("❌ Error marking messages as read:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to mark messages as read",
-      error: error.message
-    });
+    console.error("Error marking messages as read:", error);
+    res.status(500).json({ success: false, message: "Failed to mark messages as read", error: error.message });
   }
 });
 
-/**
- * DELETE /api/group-chats/:chatId
- * Delete a chat (Admin only)
- */
+// DELETE /api/group-chats/:chatId — admin only
 router.delete("/:chatId", verifyToken, async (req, res) => {
   try {
-    const { role } = req.user;
+    if (req.user.role !== "admin")
+      return res.status(403).json({ success: false, message: "Only admins can delete chats" });
 
-    if (role !== "admin") {
-      return res.status(403).json({ 
-        success: false, 
-        message: "Only admins can delete chats" 
-      });
-    }
+    const chat = await getGroupChat(req.db).findByIdAndDelete(req.params.chatId);
+    if (!chat) return res.status(404).json({ success: false, message: "Chat not found" });
 
-    const { chatId } = req.params;
-    const chat = await GroupChat.findByIdAndDelete(chatId);
-
-    if (!chat) {
-      return res.status(404).json({ 
-        success: false, 
-        message: "Chat not found" 
-      });
-    }
-
-    res.json({
-      success: true,
-      message: "Chat deleted successfully"
-    });
-
+    res.json({ success: true, message: "Chat deleted successfully" });
   } catch (error) {
-    console.error("❌ Error deleting chat:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to delete chat",
-      error: error.message
-    });
+    console.error("Error deleting chat:", error);
+    res.status(500).json({ success: false, message: "Failed to delete chat", error: error.message });
   }
 });
 

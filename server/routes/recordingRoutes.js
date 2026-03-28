@@ -4,30 +4,28 @@ import multer     from "multer";
 import path       from "path";
 import fs         from "fs";
 import { fileURLToPath } from "url";
-import Recording  from "../models/Recording.js";
-import Booking    from "../models/Booking.js";
 import { verifyToken } from "../middleware/authMiddleware.js";
+import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
+import { recordingSchema }  from "../schemas/recordingSchema.js";
+import { bookingSchema }    from "../schemas/bookingSchema.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const RECORDINGS_DIR = path.join(__dirname, "../uploads/recordings");
 
 if (!fs.existsSync(RECORDINGS_DIR)) fs.mkdirSync(RECORDINGS_DIR, { recursive: true });
 
-// Auto-delete after this many days
 const AUTO_DELETE_DAYS = 30;
 
-// Whitelist of MIME types and their safe extensions
 const ALLOWED_VIDEO_TYPES = {
-  "video/webm":  ".webm",
-  "video/mp4":   ".mp4",
-  "video/ogg":   ".ogv",
+  "video/webm":      ".webm",
+  "video/mp4":       ".mp4",
+  "video/ogg":       ".ogv",
   "video/quicktime": ".mov",
 };
 
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, RECORDINGS_DIR),
   filename:    (_req, file,  cb) => {
-    // Use the extension derived from the MIME type — never trust the original filename
     const ext  = ALLOWED_VIDEO_TYPES[file.mimetype] || ".webm";
     const name = `rec_${Date.now()}_${Math.random().toString(36).slice(2)}${ext}`;
     cb(null, name);
@@ -44,8 +42,11 @@ const upload = multer({
 });
 
 const router = express.Router();
+router.use(tenantMiddleware);
 
-// ── Helper: delete file from disk + DB ───────────────────────────────────────
+const getRecording = (db) => db.models.Recording || db.model("Recording", recordingSchema);
+const getBooking   = (db) => db.models.Booking   || db.model("Booking",   bookingSchema);
+
 async function purgeRecording(rec) {
   const filePath = path.join(RECORDINGS_DIR, rec.filename);
   if (fs.existsSync(filePath)) {
@@ -54,7 +55,7 @@ async function purgeRecording(rec) {
   await rec.deleteOne();
 }
 
-// ── POST /api/recordings/upload ───────────────────────────────────────────────
+// POST /api/recordings/upload
 router.post("/upload", verifyToken, upload.single("recording"), async (req, res) => {
   try {
     const { role, id: teacherId } = req.user;
@@ -64,17 +65,14 @@ router.post("/upload", verifyToken, upload.single("recording"), async (req, res)
     const { bookingId, duration, title } = req.body;
     if (!bookingId) return res.status(400).json({ success: false, message: "bookingId is required" });
 
-    const booking   = await Booking.findById(bookingId).select("studentId");
+    const booking   = await getBooking(req.db).findById(bookingId).select("studentId");
     const studentId = booking?.studentId || null;
 
-    // Set auto-delete date
     const autoDeleteAt = new Date();
     autoDeleteAt.setDate(autoDeleteAt.getDate() + AUTO_DELETE_DAYS);
 
-    const rec = await Recording.create({
-      bookingId,
-      teacherId,
-      studentId,
+    const rec = await getRecording(req.db).create({
+      bookingId, teacherId, studentId,
       title:    title?.trim() || "",
       filename: req.file.filename,
       duration: parseFloat(duration) || 0,
@@ -91,18 +89,17 @@ router.post("/upload", verifyToken, upload.single("recording"), async (req, res)
   }
 });
 
-// ── GET /api/recordings  —  list for current user ────────────────────────────
+// GET /api/recordings — list for current user
 router.get("/", verifyToken, async (req, res) => {
   try {
     const { role, id: userId } = req.user;
-
     let filter = {};
     if      (role === "teacher") filter.teacherId = userId;
     else if (role === "student") { filter.studentId = userId; filter.visibleToStudent = true; }
     else if (role === "admin")   filter = {};
     else return res.status(403).json({ success: false, message: "Access denied" });
 
-    const recordings = await Recording.find(filter)
+    const recordings = await getRecording(req.db).find(filter)
       .populate("bookingId", "classTitle scheduledTime")
       .populate("teacherId", "firstName lastName")
       .populate("studentId", "firstName surname")
@@ -114,13 +111,12 @@ router.get("/", verifyToken, async (req, res) => {
   }
 });
 
-// ── GET /api/recordings/teacher/:teacherId  —  admin views one teacher's recordings
+// GET /api/recordings/teacher/:teacherId — admin views one teacher's recordings
 router.get("/teacher/:teacherId", verifyToken, async (req, res) => {
   try {
-    const { role } = req.user;
-    if (role !== "admin") return res.status(403).json({ success: false, message: "Admins only" });
+    if (req.user.role !== "admin") return res.status(403).json({ success: false, message: "Admins only" });
 
-    const recordings = await Recording.find({ teacherId: req.params.teacherId })
+    const recordings = await getRecording(req.db).find({ teacherId: req.params.teacherId })
       .populate("bookingId", "classTitle scheduledTime")
       .populate("teacherId", "firstName lastName")
       .populate("studentId", "firstName surname")
@@ -132,13 +128,13 @@ router.get("/teacher/:teacherId", verifyToken, async (req, res) => {
   }
 });
 
-// ── PATCH /api/recordings/:id/visibility  —  teacher toggles student visibility
+// PATCH /api/recordings/:id/visibility
 router.patch("/:id/visibility", verifyToken, async (req, res) => {
   try {
     const { role, id: teacherId } = req.user;
     if (role !== "teacher") return res.status(403).json({ success: false, message: "Teachers only" });
 
-    const rec = await Recording.findOne({ _id: req.params.id, teacherId });
+    const rec = await getRecording(req.db).findOne({ _id: req.params.id, teacherId });
     if (!rec) return res.status(404).json({ success: false, message: "Recording not found" });
 
     rec.visibleToStudent = !rec.visibleToStudent;
@@ -150,14 +146,13 @@ router.patch("/:id/visibility", verifyToken, async (req, res) => {
   }
 });
 
-// ── GET /api/recordings/:id/stream  —  stream with range support ──────────────
+// GET /api/recordings/:id/stream — stream with range support
 router.get("/:id/stream", verifyToken, async (req, res) => {
   try {
     const { role, id: userId } = req.user;
-    const rec = await Recording.findById(req.params.id);
+    const rec = await getRecording(req.db).findById(req.params.id);
     if (!rec) return res.status(404).json({ success: false, message: "Recording not found" });
 
-    // Access control
     if (role === "teacher" && rec.teacherId.toString() !== userId)
       return res.status(403).json({ success: false, message: "Access denied" });
     if (role === "student") {
@@ -199,11 +194,11 @@ router.get("/:id/stream", verifyToken, async (req, res) => {
   }
 });
 
-// ── DELETE /api/recordings/:id ────────────────────────────────────────────────
+// DELETE /api/recordings/:id
 router.delete("/:id", verifyToken, async (req, res) => {
   try {
     const { role, id: userId } = req.user;
-    const rec = await Recording.findById(req.params.id);
+    const rec = await getRecording(req.db).findById(req.params.id);
     if (!rec) return res.status(404).json({ success: false, message: "Not found" });
 
     if (role === "student")
@@ -218,22 +213,23 @@ router.delete("/:id", verifyToken, async (req, res) => {
   }
 });
 
-// ── Auto-delete scheduler — runs daily, purges expired recordings ─────────────
-export function startRecordingCleanup() {
+// Auto-delete scheduler — runs daily, purges expired recordings for a given center db
+export function startRecordingCleanup(db) {
+  const Recording = getRecording(db);
   const run = async () => {
     try {
       const expired = await Recording.find({ autoDeleteAt: { $lte: new Date() } });
       if (expired.length === 0) return;
-      console.log(`🗑️  Auto-deleting ${expired.length} expired recording(s)…`);
+      console.log(`Auto-deleting ${expired.length} expired recording(s)...`);
       for (const rec of expired) await purgeRecording(rec);
-      console.log(`✅ Deleted ${expired.length} recording(s)`);
+      console.log(`Deleted ${expired.length} recording(s)`);
     } catch (err) {
       console.error("Recording cleanup error:", err);
     }
   };
 
-  run(); // run once on startup to catch any missed deletions
-  setInterval(run, 24 * 60 * 60 * 1000); // then every 24 hours
+  run();
+  setInterval(run, 24 * 60 * 60 * 1000);
 }
 
 export default router;

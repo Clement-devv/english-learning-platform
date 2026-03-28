@@ -1,24 +1,26 @@
 // server/routes/subAdminRoutes.js
 import express from "express";
 import crypto from "crypto";
-import SubAdmin from "../models/SubAdmin.js";
-import Teacher from "../models/Teacher.js";
 import { verifyToken, verifyAdmin } from "../middleware/authMiddleware.js";
 import { config } from "../config/config.js";
 import { sendSubAdminInviteEmail } from "../utils/emailService.js";
+import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
+import { subAdminSchema }   from "../schemas/subAdminSchema.js";
+import { teacherSchema }    from "../schemas/teacherSchema.js";
 
 const router = express.Router();
+router.use(tenantMiddleware);
+
+const getSubAdmin = (db) => db.models.SubAdmin || db.model("SubAdmin", subAdminSchema);
+const getTeacher  = (db) => db.models.Teacher  || db.model("Teacher",  teacherSchema);
 
 // All routes require main admin auth
 router.use(verifyToken, verifyAdmin);
 
-// ─────────────────────────────────────────────────────────────────────────────
-// GET /api/sub-admins
-// List all sub-admins (with populated teachers)
-// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/sub-admins — list all sub-admins
 router.get("/", async (req, res) => {
   try {
-    const subAdmins = await SubAdmin.find()
+    const subAdmins = await getSubAdmin(req.db).find()
       .populate("assignedTeachers", "firstName lastName email continent")
       .populate("createdBy", "firstName lastName email")
       .sort({ createdAt: -1 });
@@ -30,49 +32,28 @@ router.get("/", async (req, res) => {
   }
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// POST /api/sub-admins/invite
-// Create and invite a new sub-admin
-// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/sub-admins/invite — create and invite a new sub-admin
 router.post("/invite", async (req, res) => {
   try {
-    const {
-      firstName,
-      lastName,
-      email,
-      assignmentType,
-      region,
-      assignedTeachers,
-      permissions,
-      notes,
-    } = req.body;
+    const { firstName, lastName, email, assignmentType, region, assignedTeachers, permissions, notes } = req.body;
 
-    if (!firstName || !lastName || !email) {
-      return res.status(400).json({
-        success: false,
-        message: "First name, last name and email are required",
-      });
-    }
+    if (!firstName || !lastName || !email)
+      return res.status(400).json({ success: false, message: "First name, last name and email are required" });
 
-    // Check duplicate email
+    const SubAdmin = getSubAdmin(req.db);
     const existing = await SubAdmin.findOne({ email: email.toLowerCase().trim() });
-    if (existing) {
-      return res.status(409).json({
-        success: false,
-        message: "A sub-admin with this email already exists",
-      });
-    }
+    if (existing)
+      return res.status(409).json({ success: false, message: "A sub-admin with this email already exists" });
 
-    // Generate secure invite token (valid for 48 hours)
-    const inviteToken = crypto.randomBytes(32).toString("hex");
+    const inviteToken   = crypto.randomBytes(32).toString("hex");
     const inviteExpires = new Date(Date.now() + 48 * 60 * 60 * 1000);
 
     const subAdmin = await SubAdmin.create({
       firstName: firstName.trim(),
-      lastName: lastName.trim(),
-      email: email.toLowerCase().trim(),
-      assignmentType: assignmentType || "manual",
-      region: assignmentType === "region" ? region : null,
+      lastName:  lastName.trim(),
+      email:     email.toLowerCase().trim(),
+      assignmentType:   assignmentType || "manual",
+      region:           assignmentType === "region" ? region : null,
       assignedTeachers: assignmentType === "manual" ? (assignedTeachers || []) : [],
       permissions: {
         canMarkLessons:  permissions?.canMarkLessons  ?? false,
@@ -87,21 +68,15 @@ router.post("/invite", async (req, res) => {
       createdBy: req.user.id,
     });
 
-    // Send invitation email
     const setupUrl = `${config.frontendUrl}/sub-admin/setup?token=${inviteToken}`;
     await sendSubAdminInviteEmail(subAdmin, setupUrl, req.admin);
-
-    console.log(`✅ Sub-admin invited: ${email}`);
 
     res.status(201).json({
       success: true,
       message: `Invitation sent to ${email}`,
       subAdmin: {
-        id: subAdmin._id,
-        firstName: subAdmin.firstName,
-        lastName: subAdmin.lastName,
-        email: subAdmin.email,
-        status: subAdmin.status,
+        id: subAdmin._id, firstName: subAdmin.firstName,
+        lastName: subAdmin.lastName, email: subAdmin.email, status: subAdmin.status,
       },
     });
   } catch (err) {
@@ -110,28 +85,18 @@ router.post("/invite", async (req, res) => {
   }
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
 // POST /api/sub-admins/:id/resend-invite
-// Resend invite email with a fresh token
-// ─────────────────────────────────────────────────────────────────────────────
 router.post("/:id/resend-invite", async (req, res) => {
   try {
+    const SubAdmin = getSubAdmin(req.db);
     const subAdmin = await SubAdmin.findById(req.params.id);
-    if (!subAdmin) {
-      return res.status(404).json({ success: false, message: "Sub-admin not found" });
-    }
+    if (!subAdmin) return res.status(404).json({ success: false, message: "Sub-admin not found" });
+    if (subAdmin.status === "active")
+      return res.status(400).json({ success: false, message: "This sub-admin has already set up their account" });
 
-    if (subAdmin.status === "active") {
-      return res.status(400).json({
-        success: false,
-        message: "This sub-admin has already set up their account",
-      });
-    }
-
-    // Refresh token
-    subAdmin.inviteToken = crypto.randomBytes(32).toString("hex");
+    subAdmin.inviteToken   = crypto.randomBytes(32).toString("hex");
     subAdmin.inviteExpires = new Date(Date.now() + 48 * 60 * 60 * 1000);
-    subAdmin.status = "pending";
+    subAdmin.status        = "pending";
     await subAdmin.save();
 
     const setupUrl = `${config.frontendUrl}/sub-admin/setup?token=${subAdmin.inviteToken}`;
@@ -144,25 +109,14 @@ router.post("/:id/resend-invite", async (req, res) => {
   }
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// PUT /api/sub-admins/:id
-// Update sub-admin (permissions, assignment, notes)
-// ─────────────────────────────────────────────────────────────────────────────
+// PUT /api/sub-admins/:id — update sub-admin
 router.put("/:id", async (req, res) => {
   try {
-    const {
-      assignmentType,
-      region,
-      assignedTeachers,
-      permissions,
-      notes,
-      status,
-    } = req.body;
+    const { assignmentType, region, assignedTeachers, permissions, notes, status } = req.body;
 
+    const SubAdmin = getSubAdmin(req.db);
     const subAdmin = await SubAdmin.findById(req.params.id);
-    if (!subAdmin) {
-      return res.status(404).json({ success: false, message: "Sub-admin not found" });
-    }
+    if (!subAdmin) return res.status(404).json({ success: false, message: "Sub-admin not found" });
 
     if (assignmentType) subAdmin.assignmentType = assignmentType;
     if (region !== undefined) subAdmin.region = region;
@@ -183,23 +137,14 @@ router.put("/:id", async (req, res) => {
   }
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
 // PATCH /api/sub-admins/:id/toggle-status
-// Suspend or reactivate a sub-admin
-// ─────────────────────────────────────────────────────────────────────────────
 router.patch("/:id/toggle-status", async (req, res) => {
   try {
+    const SubAdmin = getSubAdmin(req.db);
     const subAdmin = await SubAdmin.findById(req.params.id);
-    if (!subAdmin) {
-      return res.status(404).json({ success: false, message: "Sub-admin not found" });
-    }
-
-    if (subAdmin.status === "pending") {
-      return res.status(400).json({
-        success: false,
-        message: "Cannot toggle status of a pending sub-admin",
-      });
-    }
+    if (!subAdmin) return res.status(404).json({ success: false, message: "Sub-admin not found" });
+    if (subAdmin.status === "pending")
+      return res.status(400).json({ success: false, message: "Cannot toggle status of a pending sub-admin" });
 
     subAdmin.status = subAdmin.status === "active" ? "suspended" : "active";
     await subAdmin.save();
@@ -215,53 +160,37 @@ router.patch("/:id/toggle-status", async (req, res) => {
   }
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
 // PATCH /api/sub-admins/:id/assign-teachers
-// Assign or remove specific teachers from a sub-admin
-// ─────────────────────────────────────────────────────────────────────────────
 router.patch("/:id/assign-teachers", async (req, res) => {
   try {
     const { teacherIds } = req.body;
-
-    if (!Array.isArray(teacherIds)) {
+    if (!Array.isArray(teacherIds))
       return res.status(400).json({ success: false, message: "teacherIds must be an array" });
-    }
 
+    const SubAdmin = getSubAdmin(req.db);
     const subAdmin = await SubAdmin.findById(req.params.id);
-    if (!subAdmin) {
-      return res.status(404).json({ success: false, message: "Sub-admin not found" });
-    }
+    if (!subAdmin) return res.status(404).json({ success: false, message: "Sub-admin not found" });
 
     subAdmin.assignedTeachers = teacherIds;
-    subAdmin.assignmentType = "manual";
-    subAdmin.region = null;
+    subAdmin.assignmentType   = "manual";
+    subAdmin.region           = null;
     await subAdmin.save();
 
     const updated = await SubAdmin.findById(subAdmin._id)
       .populate("assignedTeachers", "firstName lastName email continent");
 
-    res.json({
-      success: true,
-      message: "Teachers assigned successfully",
-      assignedTeachers: updated.assignedTeachers,
-    });
+    res.json({ success: true, message: "Teachers assigned successfully", assignedTeachers: updated.assignedTeachers });
   } catch (err) {
     console.error("Assign teachers error:", err);
     res.status(500).json({ success: false, message: "Failed to assign teachers" });
   }
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
 // DELETE /api/sub-admins/:id
-// Permanently delete a sub-admin
-// ─────────────────────────────────────────────────────────────────────────────
 router.delete("/:id", async (req, res) => {
   try {
-    const subAdmin = await SubAdmin.findByIdAndDelete(req.params.id);
-    if (!subAdmin) {
-      return res.status(404).json({ success: false, message: "Sub-admin not found" });
-    }
-
+    const subAdmin = await getSubAdmin(req.db).findByIdAndDelete(req.params.id);
+    if (!subAdmin) return res.status(404).json({ success: false, message: "Sub-admin not found" });
     res.json({ success: true, message: "Sub-admin deleted" });
   } catch (err) {
     console.error("Delete sub-admin error:", err);

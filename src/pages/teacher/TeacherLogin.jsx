@@ -468,7 +468,7 @@ const styles = {
   submitBtn: {
     width: '100%',
     height: '52px',
-    background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
+    background: 'linear-gradient(135deg, var(--brand-primary), var(--brand-secondary))',
     color: 'white',
     border: 'none',
     borderRadius: '12px',

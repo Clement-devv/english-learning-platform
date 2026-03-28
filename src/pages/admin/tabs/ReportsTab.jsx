@@ -3,13 +3,7 @@
 
 import { useState } from "react";
 import { FileText, Send, Eye, ChevronDown } from "lucide-react";
-
-const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
-
-function authHeader() {
-  const token = localStorage.getItem("adminToken") || localStorage.getItem("token");
-  return token ? { Authorization: `Bearer ${token}` } : {};
-}
+import api from "../../../api";
 
 // Build query string for period + reference date
 function buildQuery(period, refDate) {
@@ -53,15 +47,13 @@ export default function ReportsTab({ students = [], isDarkMode }) {
   async function handlePreview() {
     if (!selectedStudent) return showToast("Please select a student", false);
     const q    = buildQuery(period, refDate);
-    const url  = `${API}/api/reports/preview/${selectedStudent}${q}`;
-    const resp = await fetch(url, { headers: authHeader() });
-    if (!resp.ok) {
-      const err = await resp.json().catch(() => ({ error: "Unknown error" }));
-      return showToast(err.error || "Failed to generate report", false);
+    try {
+      const resp = await api.get(`/api/reports/preview/${selectedStudent}${q}`, { responseType: 'blob' });
+      const objUrl = URL.createObjectURL(new Blob([resp.data]));
+      window.open(objUrl, "_blank");
+    } catch (e) {
+      showToast(e.response?.data?.error || "Failed to generate report", false);
     }
-    const blob  = await resp.blob();
-    const objUrl = URL.createObjectURL(blob);
-    window.open(objUrl, "_blank");
   }
 
   async function handleSend() {
@@ -69,13 +61,9 @@ export default function ReportsTab({ students = [], isDarkMode }) {
     setBusy(true);
     try {
       const q    = buildQuery(period, refDate);
-      const resp = await fetch(`${API}/api/reports/send/${selectedStudent}${q}`, {
-        method:  "POST",
-        headers: authHeader(),
-      });
-      const data = await resp.json();
-      if (resp.ok) showToast(data.message || "Report sent!");
-      else         showToast(data.error || "Failed to send report", false);
+      const resp = await api.post(`/api/reports/send/${selectedStudent}${q}`);
+      const data = resp.data;
+      showToast(data.message || "Report sent!");
     } catch (e) {
       showToast(e.message, false);
     } finally {

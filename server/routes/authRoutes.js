@@ -2,24 +2,27 @@ import express from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
-import Teacher from "../models/Teacher.js";
-import Student from "../models/Student.js";
-import Admin from "../models/Admin.js"; 
 
 import { config } from "../config/config.js";
 import { loginLimiter, passwordResetLimiter, trackFailedLogin, isAccountLocked, clearFailedAttempts } from "../middleware/rateLimiter.js";
 import { validatePasswordStrength } from "../utils/passwordUtils.js";
-
 import { createSession, cleanExpiredSessions } from "../utils/sessionManager.js";
-import twoFactorAuth from "../utils/twoFactorAuth.js";
-
-
-//import { sendForgotPasswordEmail } from "../utils/emailService.js";
-import { sendForgotPasswordEmail, sendStudentForgotPasswordEmail } from "../utils/emailService.js";
+import { sendForgotPasswordEmail, sendStudentForgotPasswordEmail, sendAdminForgotPasswordEmail } from "../utils/emailService.js";
+import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
+import { adminSchema } from "../schemas/adminSchema.js";
+import { teacherSchema } from "../schemas/teacherSchema.js";
+import { studentSchema } from "../schemas/studentSchema.js";
 
 const router = express.Router();
 
-// Middleware to verify JWT token
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+const getAdminModel   = (db) => db.models.Admin   || db.model("Admin",   adminSchema);
+const getTeacherModel = (db) => db.models.Teacher || db.model("Teacher", teacherSchema);
+const getStudentModel = (db) => db.models.Student || db.model("Student", studentSchema);
+
+// Local verifyToken used only for teacher-specific routes in this file.
+// Requires tenantMiddleware to run first (sets req.db).
 const verifyToken = async (req, res, next) => {
   try {
     const token = req.headers.authorization?.split(" ")[1];
@@ -28,8 +31,9 @@ const verifyToken = async (req, res, next) => {
     }
 
     const decoded = jwt.verify(token, config.jwtSecret);
+    const Teacher = getTeacherModel(req.db);
     const teacher = await Teacher.findById(decoded.id).select("-password");
-    
+
     if (!teacher || !teacher.active) {
       return res.status(401).json({ message: "Invalid token or inactive account" });
     }
@@ -42,8 +46,9 @@ const verifyToken = async (req, res, next) => {
 };
 
 
-// Verify 2FA code during login (used when requires2FA is true)
-router.post("/verify-2fa-login", loginLimiter, async (req, res) => {
+// ─── 2FA verify (called after initial login when 2FA is required) ─────────────
+
+router.post("/verify-2fa-login", tenantMiddleware, loginLimiter, async (req, res) => {
   try {
     const { tempUserId, twoFactorToken, backupCode, role } = req.body;
 
@@ -55,17 +60,16 @@ router.post("/verify-2fa-login", loginLimiter, async (req, res) => {
       return res.status(400).json({ message: "2FA code or backup code required" });
     }
 
-    // Get user model based on role
     let UserModel;
     switch (role) {
-      case 'admin': UserModel = Admin; break;
-      case 'teacher': UserModel = Teacher; break;
-      case 'student': UserModel = Student; break;
+      case "admin":   UserModel = getAdminModel(req.db);   break;
+      case "teacher": UserModel = getTeacherModel(req.db); break;
+      case "student": UserModel = getStudentModel(req.db); break;
       default: return res.status(400).json({ message: "Invalid role" });
     }
 
     const user = await UserModel.findById(tempUserId);
-    
+
     if (!user || !user.active) {
       return res.status(403).json({ message: "User not found or inactive" });
     }
@@ -74,14 +78,12 @@ router.post("/verify-2fa-login", loginLimiter, async (req, res) => {
       return res.status(400).json({ message: "2FA is not enabled for this user" });
     }
 
-    // Verify the code
     let isValid = false;
-    
+
     if (twoFactorToken) {
-      const { verifyTwoFactorToken } = await import('../utils/twoFactorAuth.js');
+      const { verifyTwoFactorToken } = await import("../utils/twoFactorAuth.js");
       isValid = verifyTwoFactorToken(twoFactorToken, user.twoFactorSecret);
     } else if (backupCode) {
-      // Atomic: find-and-remove the backup code in one DB operation to prevent TOCTOU race
       const normalizedCode = backupCode.toUpperCase().trim();
       const updated = await UserModel.findOneAndUpdate(
         { _id: user._id, twoFactorBackupCodes: normalizedCode },
@@ -92,56 +94,39 @@ router.post("/verify-2fa-login", loginLimiter, async (req, res) => {
     }
 
     if (!isValid) {
-      return res.status(401).json({
-        success: false,
-        message: "Invalid 2FA code or backup code"
-      });
+      return res.status(401).json({ success: false, message: "Invalid 2FA code or backup code" });
     }
 
-    // Generate JWT token
     const token = jwt.sign(
-      { 
-        id: user._id, 
-        email: user.email,
-        role: role
-      },
+      { id: user._id, email: user.email, role, centerId: req.center.slug },
       config.jwtSecret,
       { expiresIn: config.jwtExpiry }
     );
 
-    // Create session
     const session = createSession(req, token);
     user.sessions = cleanExpiredSessions(user.sessions || []);
     user.sessions.push(session);
     user.lastLogin = new Date();
     await user.save();
 
-    // Return user data based on role
     const userData = {
       id: user._id,
       email: user.email,
       firstName: user.firstName,
       lastName: user.lastName,
-      role: role,
+      role,
       twoFactorEnabled: user.twoFactorEnabled,
-      active: user.active
+      active: user.active,
     };
 
-    // Add role-specific fields
-    if (role === 'admin') {
+    if (role === "admin") {
       userData.username = user.username;
-    } else if (role === 'teacher') {
-      userData.country = user.country;
+    } else if (role === "teacher") {
       userData.continent = user.continent;
       userData.ratePerClass = user.ratePerClass;
     }
 
-    res.json({
-      success: true,
-      token,
-      sessionToken: session.token,
-      user: userData
-    });
+    res.json({ success: true, token, sessionToken: session.token, user: userData });
 
   } catch (err) {
     console.error("2FA verification error:", err);
@@ -150,9 +135,9 @@ router.post("/verify-2fa-login", loginLimiter, async (req, res) => {
 });
 
 
-// Teacher Login
+// ─── Teacher Login ────────────────────────────────────────────────────────────
 
-router.post("/teacher/login", loginLimiter, async (req, res) => {
+router.post("/teacher/login", tenantMiddleware, loginLimiter, async (req, res) => {
   try {
     const { email, password, twoFactorToken, backupCode } = req.body;
 
@@ -160,7 +145,6 @@ router.post("/teacher/login", loginLimiter, async (req, res) => {
       return res.status(400).json({ message: "Email and password are required" });
     }
 
-    // Check account lockout before any DB lookup
     const lockStatus = await isAccountLocked(email);
     if (lockStatus.isLocked) {
       return res.status(423).json({
@@ -168,22 +152,20 @@ router.post("/teacher/login", loginLimiter, async (req, res) => {
       });
     }
 
+    const Teacher = getTeacherModel(req.db);
     const teacher = await Teacher.findOne({ email });
+
     if (!teacher) {
       await trackFailedLogin(email);
       return res.status(401).json({ message: "Invalid email or password" });
     }
 
     if (!teacher.active) {
-      return res.status(403).json({
-        message: "Your account has been deactivated. Please contact admin."
-      });
+      return res.status(403).json({ message: "Your account has been deactivated. Please contact admin." });
     }
 
-    if (teacher.status === 'pending') {
-      return res.status(403).json({
-        message: "Your account setup is incomplete. Please check your invite email."
-      });
+    if (teacher.status === "pending") {
+      return res.status(403).json({ message: "Your account setup is incomplete. Please check your invite email." });
     }
 
     const isPasswordValid = await bcrypt.compare(password, teacher.password);
@@ -192,24 +174,22 @@ router.post("/teacher/login", loginLimiter, async (req, res) => {
       return res.status(401).json({ message: "Invalid email or password" });
     }
 
-    // Clear failed attempts on successful password match
     await clearFailedAttempts(email);
 
-    // ===== 2FA CHECK =====
     if (teacher.twoFactorEnabled) {
       if (!twoFactorToken && !backupCode) {
         return res.status(202).json({
           success: false,
           requires2FA: true,
           message: "Please enter your 2FA code",
-          tempUserId: teacher._id
+          tempUserId: teacher._id,
         });
       }
 
       let isValid = false;
 
       if (twoFactorToken) {
-        const { verifyTwoFactorToken } = await import('../utils/twoFactorAuth.js');
+        const { verifyTwoFactorToken } = await import("../utils/twoFactorAuth.js");
         isValid = verifyTwoFactorToken(twoFactorToken, teacher.twoFactorSecret);
       } else if (backupCode) {
         const normalizedCode = backupCode.toUpperCase().trim();
@@ -222,20 +202,12 @@ router.post("/teacher/login", loginLimiter, async (req, res) => {
       }
 
       if (!isValid) {
-        return res.status(401).json({
-          success: false,
-          message: "Invalid 2FA code or backup code"
-        });
+        return res.status(401).json({ success: false, message: "Invalid 2FA code or backup code" });
       }
     }
-    // ===== END 2FA CHECK =====
 
     const token = jwt.sign(
-      { 
-        id: teacher._id, 
-        email: teacher.email,
-        role: "teacher"
-      },
+      { id: teacher._id, email: teacher.email, role: "teacher", centerId: req.center.slug },
       config.jwtSecret,
       { expiresIn: config.jwtExpiry }
     );
@@ -255,12 +227,11 @@ router.post("/teacher/login", loginLimiter, async (req, res) => {
         email: teacher.email,
         firstName: teacher.firstName,
         lastName: teacher.lastName,
-        country: teacher.country,
         continent: teacher.continent,
         ratePerClass: teacher.ratePerClass,
         active: teacher.active,
-        twoFactorEnabled: teacher.twoFactorEnabled
-      }
+        twoFactorEnabled: teacher.twoFactorEnabled,
+      },
     });
 
   } catch (err) {
@@ -269,13 +240,13 @@ router.post("/teacher/login", loginLimiter, async (req, res) => {
   }
 });
 
-// Verify Token
-router.get("/verify", verifyToken, (req, res) => {
+// Verify teacher token
+router.get("/verify", tenantMiddleware, verifyToken, (req, res) => {
   res.json({ success: true, teacher: req.teacher });
 });
 
-// Change Password (Teacher changes their own password)
-router.post("/teacher/change-password", verifyToken, async (req, res) => {
+// Teacher change password
+router.post("/teacher/change-password", tenantMiddleware, verifyToken, async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
 
@@ -288,24 +259,19 @@ router.post("/teacher/change-password", verifyToken, async (req, res) => {
       return res.status(400).json({ message: errors[0], errors });
     }
 
+    const Teacher = getTeacherModel(req.db);
     const teacher = await Teacher.findById(req.teacher._id);
-    
-    // Verify current password
+
     const isCurrentPasswordValid = await bcrypt.compare(currentPassword, teacher.password);
     if (!isCurrentPasswordValid) {
       return res.status(401).json({ message: "Current password is incorrect" });
     }
 
-    // Hash and save new password
-    const hashedPassword = await bcrypt.hash(newPassword, config.bcryptRounds);
-    teacher.password = hashedPassword;
+    teacher.password = await bcrypt.hash(newPassword, config.bcryptRounds);
     teacher.lastPasswordChange = new Date();
     await teacher.save();
 
-    res.json({ 
-      success: true, 
-      message: "Password changed successfully" 
-    });
+    res.json({ success: true, message: "Password changed successfully" });
 
   } catch (err) {
     console.error("Change password error:", err);
@@ -313,8 +279,8 @@ router.post("/teacher/change-password", verifyToken, async (req, res) => {
   }
 });
 
-// Forgot Password - Request reset
-router.post("/teacher/forgot-password", passwordResetLimiter, async (req, res) => {
+// Teacher forgot password
+router.post("/teacher/forgot-password", tenantMiddleware, passwordResetLimiter, async (req, res) => {
   try {
     const { email } = req.body;
 
@@ -322,42 +288,31 @@ router.post("/teacher/forgot-password", passwordResetLimiter, async (req, res) =
       return res.status(400).json({ message: "Email is required" });
     }
 
+    const Teacher = getTeacherModel(req.db);
     const teacher = await Teacher.findOne({ email });
-    
-    // Don't reveal if email exists or not for security
+
     if (!teacher) {
-      return res.json({ 
-        success: true, 
-        message: "If that email exists, a reset link has been sent" 
-      });
+      return res.json({ success: true, message: "If that email exists, a reset link has been sent" });
     }
 
     if (!teacher.active) {
-      return res.status(403).json({ 
-        message: "Your account is deactivated. Please contact admin." 
-      });
+      return res.status(403).json({ message: "Your account is deactivated. Please contact admin." });
     }
 
-    // Generate reset token
     const resetToken = crypto.randomBytes(32).toString("hex");
     const hashedToken = crypto.createHash("sha256").update(resetToken).digest("hex");
 
-    // Save token to database (expires in 1 hour)
     teacher.resetPasswordToken = hashedToken;
-    teacher.resetPasswordExpires = Date.now() + 3600000; // 1 hour
+    teacher.resetPasswordExpires = Date.now() + 3600000;
     await teacher.save();
 
-    // Send email with reset link
     await sendForgotPasswordEmail(
       teacher.email,
       `${teacher.firstName} ${teacher.lastName}`,
-      resetToken // Send unhashed token in email
+      resetToken
     );
 
-    res.json({ 
-      success: true, 
-      message: "If that email exists, a reset link has been sent" 
-    });
+    res.json({ success: true, message: "If that email exists, a reset link has been sent" });
 
   } catch (err) {
     console.error("Forgot password error:", err);
@@ -365,8 +320,8 @@ router.post("/teacher/forgot-password", passwordResetLimiter, async (req, res) =
   }
 });
 
-// Reset Password - Using token from email
-router.post("/teacher/reset-password/:token", passwordResetLimiter, async (req, res) => {
+// Teacher reset password
+router.post("/teacher/reset-password/:token", tenantMiddleware, passwordResetLimiter, async (req, res) => {
   try {
     const { newPassword } = req.body;
     const resetToken = req.params.token;
@@ -380,33 +335,25 @@ router.post("/teacher/reset-password/:token", passwordResetLimiter, async (req, 
       return res.status(400).json({ message: errors[0], errors });
     }
 
-    // Hash the token from URL to compare with database
     const hashedToken = crypto.createHash("sha256").update(resetToken).digest("hex");
 
-    // Find teacher with valid token
+    const Teacher = getTeacherModel(req.db);
     const teacher = await Teacher.findOne({
       resetPasswordToken: hashedToken,
-      resetPasswordExpires: { $gt: Date.now() }
+      resetPasswordExpires: { $gt: Date.now() },
     });
 
     if (!teacher) {
-      return res.status(400).json({ 
-        message: "Invalid or expired reset token. Please request a new one." 
-      });
+      return res.status(400).json({ message: "Invalid or expired reset token. Please request a new one." });
     }
 
-    // Hash and save new password
-    const hashedPassword = await bcrypt.hash(newPassword, config.bcryptRounds);
-    teacher.password = hashedPassword;
+    teacher.password = await bcrypt.hash(newPassword, config.bcryptRounds);
     teacher.lastPasswordChange = new Date();
     teacher.resetPasswordToken = undefined;
     teacher.resetPasswordExpires = undefined;
     await teacher.save();
 
-    res.json({ 
-      success: true, 
-      message: "Password reset successfully. You can now login with your new password." 
-    });
+    res.json({ success: true, message: "Password reset successfully. You can now login with your new password." });
 
   } catch (err) {
     console.error("Reset password error:", err);
@@ -415,14 +362,9 @@ router.post("/teacher/reset-password/:token", passwordResetLimiter, async (req, 
 });
 
 
+// ─── Student Login ────────────────────────────────────────────────────────────
 
-
-//student......................................................
-
-
-// Student Login
-
-router.post("/student/login", loginLimiter, async (req, res) => {
+router.post("/student/login", tenantMiddleware, loginLimiter, async (req, res) => {
   try {
     const { email, password, twoFactorToken, backupCode } = req.body;
 
@@ -430,7 +372,6 @@ router.post("/student/login", loginLimiter, async (req, res) => {
       return res.status(400).json({ message: "Email and password are required" });
     }
 
-    // Check account lockout before any DB lookup
     const lockStatus = await isAccountLocked(email);
     if (lockStatus.isLocked) {
       return res.status(423).json({
@@ -438,16 +379,16 @@ router.post("/student/login", loginLimiter, async (req, res) => {
       });
     }
 
+    const Student = getStudentModel(req.db);
     const student = await Student.findOne({ email });
+
     if (!student) {
       await trackFailedLogin(email);
       return res.status(401).json({ message: "Invalid email or password" });
     }
 
     if (!student.active) {
-      return res.status(403).json({
-        message: "Your account has been deactivated. Please contact admin."
-      });
+      return res.status(403).json({ message: "Your account has been deactivated. Please contact admin." });
     }
 
     const isPasswordValid = await bcrypt.compare(password, student.password);
@@ -456,24 +397,22 @@ router.post("/student/login", loginLimiter, async (req, res) => {
       return res.status(401).json({ message: "Invalid email or password" });
     }
 
-    // Clear failed attempts on successful password match
     await clearFailedAttempts(email);
 
-    // ===== 2FA CHECK =====
     if (student.twoFactorEnabled) {
       if (!twoFactorToken && !backupCode) {
         return res.status(202).json({
           success: false,
           requires2FA: true,
           message: "Please enter your 2FA code",
-          tempUserId: student._id
+          tempUserId: student._id,
         });
       }
 
       let isValid = false;
 
       if (twoFactorToken) {
-        const { verifyTwoFactorToken } = await import('../utils/twoFactorAuth.js');
+        const { verifyTwoFactorToken } = await import("../utils/twoFactorAuth.js");
         isValid = verifyTwoFactorToken(twoFactorToken, student.twoFactorSecret);
       } else if (backupCode) {
         const normalizedCode = backupCode.toUpperCase().trim();
@@ -486,20 +425,12 @@ router.post("/student/login", loginLimiter, async (req, res) => {
       }
 
       if (!isValid) {
-        return res.status(401).json({
-          success: false,
-          message: "Invalid 2FA code or backup code"
-        });
+        return res.status(401).json({ success: false, message: "Invalid 2FA code or backup code" });
       }
     }
-    // ===== END 2FA CHECK =====
 
     const token = jwt.sign(
-      { 
-        id: student._id, 
-        email: student.email,
-        role: "student"
-      },
+      { id: student._id, email: student.email, role: "student", centerId: req.center.slug },
       config.jwtSecret,
       { expiresIn: config.jwtExpiry }
     );
@@ -519,12 +450,9 @@ router.post("/student/login", loginLimiter, async (req, res) => {
         email: student.email,
         firstName: student.firstName,
         lastName: student.lastName,
-        country: student.country,
-        continent: student.continent,
-        ratePerClass: student.ratePerClass,
         active: student.active,
-        twoFactorEnabled: student.twoFactorEnabled  // ✅ Good!
-      }
+        twoFactorEnabled: student.twoFactorEnabled,
+      },
     });
 
   } catch (err) {
@@ -533,18 +461,19 @@ router.post("/student/login", loginLimiter, async (req, res) => {
   }
 });
 
-// Student verify token endpoint - 
-router.get("/student/verify", async (req, res) => {
+// Student verify token
+router.get("/student/verify", tenantMiddleware, async (req, res) => {
   try {
     const token = req.headers.authorization?.split(" ")[1];
-    
+
     if (!token) {
       return res.status(401).json({ message: "No token provided" });
     }
 
     const decoded = jwt.verify(token, config.jwtSecret);
+    const Student = getStudentModel(req.db);
     const student = await Student.findById(decoded.id).select("-password");
-    
+
     if (!student || !student.active) {
       return res.status(401).json({ message: "Invalid token or inactive account" });
     }
@@ -555,8 +484,8 @@ router.get("/student/verify", async (req, res) => {
   }
 });
 
-// Student Change Password -
-router.post("/student/change-password", async (req, res) => {
+// Student change password
+router.post("/student/change-password", tenantMiddleware, async (req, res) => {
   try {
     const token = req.headers.authorization?.split(" ")[1];
 
@@ -576,28 +505,23 @@ router.post("/student/change-password", async (req, res) => {
       return res.status(400).json({ message: errors[0], errors });
     }
 
+    const Student = getStudentModel(req.db);
     const student = await Student.findById(decoded.id);
-    
+
     if (!student || !student.active) {
       return res.status(401).json({ message: "Invalid account or inactive" });
     }
-    
-    // Verify current password
+
     const isCurrentPasswordValid = await bcrypt.compare(currentPassword, student.password);
     if (!isCurrentPasswordValid) {
       return res.status(401).json({ message: "Current password is incorrect" });
     }
 
-    // Hash and save new password
-    const hashedPassword = await bcrypt.hash(newPassword, config.bcryptRounds);
-    student.password = hashedPassword;
+    student.password = await bcrypt.hash(newPassword, config.bcryptRounds);
     student.lastPasswordChange = new Date();
     await student.save();
 
-    res.json({ 
-      success: true, 
-      message: "Password changed successfully" 
-    });
+    res.json({ success: true, message: "Password changed successfully" });
 
   } catch (err) {
     console.error("Student change password error:", err);
@@ -605,9 +529,8 @@ router.post("/student/change-password", async (req, res) => {
   }
 });
 
-
-// Student Forgot Password - Request reset
-router.post("/student/forgot-password", passwordResetLimiter, async (req, res) => {
+// Student forgot password
+router.post("/student/forgot-password", tenantMiddleware, passwordResetLimiter, async (req, res) => {
   try {
     const { email } = req.body;
 
@@ -615,42 +538,31 @@ router.post("/student/forgot-password", passwordResetLimiter, async (req, res) =
       return res.status(400).json({ message: "Email is required" });
     }
 
+    const Student = getStudentModel(req.db);
     const student = await Student.findOne({ email });
-    
-    // Don't reveal if email exists or not for security
+
     if (!student) {
-      return res.json({ 
-        success: true, 
-        message: "If that email exists, a reset link has been sent" 
-      });
+      return res.json({ success: true, message: "If that email exists, a reset link has been sent" });
     }
 
     if (!student.active) {
-      return res.status(403).json({ 
-        message: "Your account is deactivated. Please contact your administrator." 
-      });
+      return res.status(403).json({ message: "Your account is deactivated. Please contact your administrator." });
     }
 
-    // Generate reset token
     const resetToken = crypto.randomBytes(32).toString("hex");
     const hashedToken = crypto.createHash("sha256").update(resetToken).digest("hex");
 
-    // Save token to database (expires in 1 hour)
     student.resetPasswordToken = hashedToken;
-    student.resetPasswordExpires = Date.now() + 3600000; // 1 hour
+    student.resetPasswordExpires = Date.now() + 3600000;
     await student.save();
 
-    // Send email with reset link
     await sendStudentForgotPasswordEmail(
       student.email,
       `${student.firstName} ${student.surname}`,
-      resetToken // Send unhashed token in email
+      resetToken
     );
 
-    res.json({ 
-      success: true, 
-      message: "If that email exists, a reset link has been sent" 
-    });
+    res.json({ success: true, message: "If that email exists, a reset link has been sent" });
 
   } catch (err) {
     console.error("Student forgot password error:", err);
@@ -658,8 +570,8 @@ router.post("/student/forgot-password", passwordResetLimiter, async (req, res) =
   }
 });
 
-// Student Reset Password - Using token from email
-router.post("/student/reset-password/:token", passwordResetLimiter, async (req, res) => {
+// Student reset password
+router.post("/student/reset-password/:token", tenantMiddleware, passwordResetLimiter, async (req, res) => {
   try {
     const { newPassword } = req.body;
     const resetToken = req.params.token;
@@ -673,33 +585,25 @@ router.post("/student/reset-password/:token", passwordResetLimiter, async (req, 
       return res.status(400).json({ message: errors[0], errors });
     }
 
-    // Hash the token from URL to compare with database
     const hashedToken = crypto.createHash("sha256").update(resetToken).digest("hex");
 
-    // Find student with valid token
+    const Student = getStudentModel(req.db);
     const student = await Student.findOne({
       resetPasswordToken: hashedToken,
-      resetPasswordExpires: { $gt: Date.now() }
+      resetPasswordExpires: { $gt: Date.now() },
     });
 
     if (!student) {
-      return res.status(400).json({ 
-        message: "Invalid or expired reset token. Please request a new one." 
-      });
+      return res.status(400).json({ message: "Invalid or expired reset token. Please request a new one." });
     }
 
-    // Hash and save new password
-    const hashedPassword = await bcrypt.hash(newPassword, config.bcryptRounds);
-    student.password = hashedPassword;
+    student.password = await bcrypt.hash(newPassword, config.bcryptRounds);
     student.lastPasswordChange = new Date();
     student.resetPasswordToken = undefined;
     student.resetPasswordExpires = undefined;
     await student.save();
 
-    res.json({ 
-      success: true, 
-      message: "Password reset successfully. You can now login with your new password." 
-    });
+    res.json({ success: true, message: "Password reset successfully. You can now login with your new password." });
 
   } catch (err) {
     console.error("Student reset password error:", err);
@@ -708,10 +612,9 @@ router.post("/student/reset-password/:token", passwordResetLimiter, async (req, 
 });
 
 
-// Admin Login........................................................................
+// ─── Admin Login ──────────────────────────────────────────────────────────────
 
-// Admin Login with 2FA support
-router.post("/admin/login", loginLimiter, async (req, res) => {
+router.post("/admin/login", tenantMiddleware, loginLimiter, async (req, res) => {
   try {
     const { username, password, twoFactorToken, backupCode } = req.body;
 
@@ -719,7 +622,6 @@ router.post("/admin/login", loginLimiter, async (req, res) => {
       return res.status(400).json({ message: "Username/email and password are required" });
     }
 
-    // Check account lockout before any DB lookup
     const lockStatus = await isAccountLocked(username);
     if (lockStatus.isLocked) {
       return res.status(423).json({
@@ -727,6 +629,7 @@ router.post("/admin/login", loginLimiter, async (req, res) => {
       });
     }
 
+    const Admin = getAdminModel(req.db);
     const admin = await Admin.findOne({ $or: [{ username }, { email: username }] });
 
     if (!admin) {
@@ -739,30 +642,27 @@ router.post("/admin/login", loginLimiter, async (req, res) => {
     }
 
     const isPasswordValid = await bcrypt.compare(password, admin.password);
-
     if (!isPasswordValid) {
       await trackFailedLogin(username);
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
-    // Clear failed attempts on successful password match
     await clearFailedAttempts(username);
 
-    // ===== 2FA CHECK =====
     if (admin.twoFactorEnabled) {
       if (!twoFactorToken && !backupCode) {
         return res.status(202).json({
           success: false,
           requires2FA: true,
           message: "Please enter your 2FA code",
-          tempUserId: admin._id
+          tempUserId: admin._id,
         });
       }
 
       let isValid = false;
 
       if (twoFactorToken) {
-        const { verifyTwoFactorToken } = await import('../utils/twoFactorAuth.js');
+        const { verifyTwoFactorToken } = await import("../utils/twoFactorAuth.js");
         isValid = verifyTwoFactorToken(twoFactorToken, admin.twoFactorSecret);
       } else if (backupCode) {
         const normalizedCode = backupCode.toUpperCase().trim();
@@ -775,30 +675,17 @@ router.post("/admin/login", loginLimiter, async (req, res) => {
       }
 
       if (!isValid) {
-        return res.status(401).json({
-          success: false,
-          message: "Invalid 2FA code or backup code"
-        });
+        return res.status(401).json({ success: false, message: "Invalid 2FA code or backup code" });
       }
     }
-    // ===== END 2FA CHECK =====
 
-    // Generate JWT token (existing code)
     const token = jwt.sign(
-      { 
-        id: admin._id, 
-        username: admin.username,
-        email: admin.email,
-        role: "admin"
-      },
+      { id: admin._id, username: admin.username, email: admin.email, role: "admin", centerId: req.center.slug },
       config.jwtSecret,
       { expiresIn: config.jwtExpiry }
     );
 
-    // Create session 
     const session = createSession(req, token);
-    
-    
     admin.sessions = cleanExpiredSessions(admin.sessions || []);
     admin.sessions.push(session);
     admin.lastLogin = new Date();
@@ -815,8 +702,8 @@ router.post("/admin/login", loginLimiter, async (req, res) => {
         firstName: admin.firstName,
         lastName: admin.lastName,
         role: "admin",
-        twoFactorEnabled: admin.twoFactorEnabled // Include this
-      }
+        twoFactorEnabled: admin.twoFactorEnabled,
+      },
     });
 
   } catch (err) {
@@ -825,23 +712,24 @@ router.post("/admin/login", loginLimiter, async (req, res) => {
   }
 });
 
-// Admin Verify Token - ADD THIS
-router.get("/admin/verify", async (req, res) => {
+// Admin verify token
+router.get("/admin/verify", tenantMiddleware, async (req, res) => {
   try {
     const token = req.headers.authorization?.split(" ")[1];
-    
+
     if (!token) {
       return res.status(401).json({ message: "No token provided" });
     }
 
     const decoded = jwt.verify(token, config.jwtSecret);
-    
+
     if (decoded.role !== "admin") {
       return res.status(403).json({ message: "Admin access required" });
     }
 
+    const Admin = getAdminModel(req.db);
     const admin = await Admin.findById(decoded.id).select("-password");
-    
+
     if (!admin || !admin.active) {
       return res.status(401).json({ message: "Invalid token or inactive account" });
     }
@@ -852,8 +740,8 @@ router.get("/admin/verify", async (req, res) => {
   }
 });
 
-// Admin Change Password
-router.post("/admin/change-password", async (req, res) => {
+// Admin change password
+router.post("/admin/change-password", tenantMiddleware, async (req, res) => {
   try {
     const token = req.headers.authorization?.split(" ")[1];
 
@@ -873,28 +761,23 @@ router.post("/admin/change-password", async (req, res) => {
       return res.status(400).json({ message: errors[0], errors });
     }
 
+    const Admin = getAdminModel(req.db);
     const admin = await Admin.findById(decoded.id);
-    
+
     if (!admin || !admin.active) {
       return res.status(401).json({ message: "Invalid account or inactive" });
     }
-    
-    // Verify current password
+
     const isCurrentPasswordValid = await bcrypt.compare(currentPassword, admin.password);
     if (!isCurrentPasswordValid) {
       return res.status(401).json({ message: "Current password is incorrect" });
     }
 
-    // Hash and save new password
-    const hashedPassword = await bcrypt.hash(newPassword, config.bcryptRounds);
-    admin.password = hashedPassword;
+    admin.password = await bcrypt.hash(newPassword, config.bcryptRounds);
     admin.lastPasswordChange = new Date();
     await admin.save();
 
-    res.json({ 
-      success: true, 
-      message: "Password changed successfully" 
-    });
+    res.json({ success: true, message: "Password changed successfully" });
 
   } catch (err) {
     console.error("Admin change password error:", err);
@@ -902,31 +785,98 @@ router.post("/admin/change-password", async (req, res) => {
   }
 });
 
-// Get all active sessions for current user
-router.get("/sessions", async (req, res) => {
+
+// Admin forgot password
+router.post("/admin/forgot-password", tenantMiddleware, passwordResetLimiter, async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ message: "Email is required" });
+
+    const Admin = getAdminModel(req.db);
+    const admin = await Admin.findOne({ email: email.toLowerCase() });
+
+    // Always respond with success to avoid email enumeration
+    if (!admin || !admin.active) {
+      return res.json({ success: true, message: "If that email exists, a reset link has been sent" });
+    }
+
+    const resetToken  = crypto.randomBytes(32).toString("hex");
+    const hashedToken = crypto.createHash("sha256").update(resetToken).digest("hex");
+
+    admin.resetPasswordToken   = hashedToken;
+    admin.resetPasswordExpires = Date.now() + 3600000; // 1 hour
+    await admin.save();
+
+    await sendAdminForgotPasswordEmail(admin.email, admin.firstName || admin.username, resetToken);
+
+    res.json({ success: true, message: "If that email exists, a reset link has been sent" });
+  } catch (err) {
+    console.error("Admin forgot password error:", err);
+    res.status(500).json({ message: "Server error while processing request" });
+  }
+});
+
+// Admin reset password
+router.post("/admin/reset-password/:token", tenantMiddleware, passwordResetLimiter, async (req, res) => {
+  try {
+    const { newPassword } = req.body;
+    const resetToken = req.params.token;
+
+    if (!newPassword) return res.status(400).json({ message: "New password is required" });
+
+    const { isValid, errors } = validatePasswordStrength(newPassword);
+    if (!isValid) return res.status(400).json({ message: errors[0], errors });
+
+    const hashedToken = crypto.createHash("sha256").update(resetToken).digest("hex");
+
+    const Admin = getAdminModel(req.db);
+    const admin = await Admin.findOne({
+      resetPasswordToken:   hashedToken,
+      resetPasswordExpires: { $gt: Date.now() },
+    });
+
+    if (!admin) {
+      return res.status(400).json({ message: "Invalid or expired reset link. Please request a new one." });
+    }
+
+    admin.password             = await bcrypt.hash(newPassword, config.bcryptRounds);
+    admin.lastPasswordChange   = new Date();
+    admin.resetPasswordToken   = undefined;
+    admin.resetPasswordExpires = undefined;
+    await admin.save();
+
+    res.json({ success: true, message: "Password reset successfully. You can now log in with your new password." });
+  } catch (err) {
+    console.error("Admin reset password error:", err);
+    res.status(500).json({ message: "Server error while resetting password" });
+  }
+});
+
+// ─── Session management ───────────────────────────────────────────────────────
+
+router.get("/sessions", tenantMiddleware, async (req, res) => {
   try {
     const token = req.headers.authorization?.split(" ")[1];
-    
+
     if (!token) {
       return res.status(401).json({ message: "No token provided" });
     }
 
     const decoded = jwt.verify(token, config.jwtSecret);
-    
+
     let user;
     if (decoded.role === "teacher") {
-      user = await Teacher.findById(decoded.id).select("sessions lastLogin");
+      user = await getTeacherModel(req.db).findById(decoded.id).select("sessions lastLogin");
     } else if (decoded.role === "student") {
-      user = await Student.findById(decoded.id).select("sessions lastLogin");
+      user = await getStudentModel(req.db).findById(decoded.id).select("sessions lastLogin");
     } else if (decoded.role === "admin") {
-      user = await Admin.findById(decoded.id).select("sessions lastLogin");
+      user = await getAdminModel(req.db).findById(decoded.id).select("sessions lastLogin");
     }
 
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
 
-    // Filter only active sessions
     const activeSessions = user.sessions
       .filter(s => s.isActive)
       .map(s => ({
@@ -936,14 +886,10 @@ router.get("/sessions", async (req, res) => {
         location: s.location,
         loginTime: s.loginTime,
         lastActivity: s.lastActivity,
-        isCurrent: s.jwtToken === token, // Mark current session
+        isCurrent: s.jwtToken === token,
       }));
 
-    res.json({
-      success: true,
-      sessions: activeSessions,
-      lastLogin: user.lastLogin,
-    });
+    res.json({ success: true, sessions: activeSessions, lastLogin: user.lastLogin });
 
   } catch (err) {
     console.error("Get sessions error:", err);
@@ -951,12 +897,11 @@ router.get("/sessions", async (req, res) => {
   }
 });
 
-// Logout from specific session
-router.post("/logout-session", async (req, res) => {
+router.post("/logout-session", tenantMiddleware, async (req, res) => {
   try {
     const token = req.headers.authorization?.split(" ")[1];
     const { sessionToken } = req.body;
-    
+
     if (!token) {
       return res.status(401).json({ message: "No token provided" });
     }
@@ -966,21 +911,20 @@ router.post("/logout-session", async (req, res) => {
     }
 
     const decoded = jwt.verify(token, config.jwtSecret);
-    
+
     let user;
     if (decoded.role === "teacher") {
-      user = await Teacher.findById(decoded.id);
+      user = await getTeacherModel(req.db).findById(decoded.id);
     } else if (decoded.role === "student") {
-      user = await Student.findById(decoded.id);
+      user = await getStudentModel(req.db).findById(decoded.id);
     } else if (decoded.role === "admin") {
-      user = await Admin.findById(decoded.id);
+      user = await getAdminModel(req.db).findById(decoded.id);
     }
 
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
 
-    // Deactivate the specific session
     const session = user.sessions.find(s => s.token === sessionToken);
     if (session) {
       session.isActive = false;
@@ -996,31 +940,29 @@ router.post("/logout-session", async (req, res) => {
   }
 });
 
-// Logout from all devices except current
-router.post("/logout-all-devices", async (req, res) => {
+router.post("/logout-all-devices", tenantMiddleware, async (req, res) => {
   try {
     const token = req.headers.authorization?.split(" ")[1];
-    
+
     if (!token) {
       return res.status(401).json({ message: "No token provided" });
     }
 
     const decoded = jwt.verify(token, config.jwtSecret);
-    
+
     let user;
     if (decoded.role === "teacher") {
-      user = await Teacher.findById(decoded.id);
+      user = await getTeacherModel(req.db).findById(decoded.id);
     } else if (decoded.role === "student") {
-      user = await Student.findById(decoded.id);
+      user = await getStudentModel(req.db).findById(decoded.id);
     } else if (decoded.role === "admin") {
-      user = await Admin.findById(decoded.id);
+      user = await getAdminModel(req.db).findById(decoded.id);
     }
 
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
 
-    // Deactivate all sessions except current
     user.sessions = user.sessions.map(session => {
       if (session.jwtToken !== token) {
         session.isActive = false;
@@ -1030,10 +972,7 @@ router.post("/logout-all-devices", async (req, res) => {
 
     await user.save();
 
-    res.json({ 
-      success: true, 
-      message: "Logged out from all other devices" 
-    });
+    res.json({ success: true, message: "Logged out from all other devices" });
 
   } catch (err) {
     console.error("Logout all devices error:", err);

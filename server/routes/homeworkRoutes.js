@@ -5,9 +5,10 @@ import fs             from "fs";
 import crypto         from "crypto";
 import { fileURLToPath } from "url";
 import { verifyToken } from "../middleware/authMiddleware.js";
-import Homework        from "../models/Homework.js";
-import Student         from "../models/Student.js";
-import Teacher         from "../models/Teacher.js";
+import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
+import { homeworkSchema } from "../schemas/homeworkSchema.js";
+import { studentSchema }  from "../schemas/studentSchema.js";
+import { teacherSchema }  from "../schemas/teacherSchema.js";
 import {
   sendHomeworkAssigned,
   sendHomeworkSubmitted,
@@ -17,6 +18,11 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
 
 const router = express.Router();
+router.use(tenantMiddleware);
+
+const getHomework = (db) => db.models.Homework || db.model("Homework", homeworkSchema);
+const getStudent  = (db) => db.models.Student  || db.model("Student",  studentSchema);
+const getTeacher  = (db) => db.models.Teacher  || db.model("Teacher",  teacherSchema);
 
 // ── Upload directories ────────────────────────────────────────────────────────
 const HW_DIR   = path.join(__dirname, "..", "uploads", "homework", "assignments");
@@ -132,7 +138,7 @@ router.post("/", verifyToken, uploadAssignment.array("files", MAX_FILES), async 
     }
 
     // Verify student belongs to this teacher
-    const student = await Student.findById(studentId);
+    const student = await getStudent(req.db).findById(studentId);
     if (!student) return res.status(404).json({ message: "Student not found" });
 
     const titleClean = title.trim().slice(0, 200);
@@ -140,7 +146,7 @@ router.post("/", verifyToken, uploadAssignment.array("files", MAX_FILES), async 
 
     const attachments = processUploadedFiles(req.files || [], HW_DIR);
 
-    const hw = await Homework.create({
+    const hw = await getHomework(req.db).create({
       teacherId:   req.user.id,
       studentId,
       title:       titleClean,
@@ -150,9 +156,9 @@ router.post("/", verifyToken, uploadAssignment.array("files", MAX_FILES), async 
     });
 
     // Email student about new homework (non-blocking)
-    Student.findById(studentId).then(studentDoc => {
+    getStudent(req.db).findById(studentId).then(studentDoc => {
       if (studentDoc) {
-        Teacher.findById(req.user.id).then(teacherDoc => {
+        getTeacher(req.db).findById(req.user.id).then(teacherDoc => {
           if (teacherDoc) sendHomeworkAssigned(studentDoc, teacherDoc, hw).catch(() => {});
         }).catch(() => {});
       }
@@ -176,7 +182,7 @@ router.get("/my", verifyToken, async (req, res) => {
   try {
     if (req.user.role !== "teacher") return res.status(403).json({ message: "Teachers only" });
 
-    const list = await Homework.find({ teacherId: req.user.id })
+    const list = await getHomework(req.db).find({ teacherId: req.user.id })
       .populate("studentId", "firstName surname email")
       .sort({ createdAt: -1 });
 
@@ -193,7 +199,7 @@ router.get("/assigned", verifyToken, async (req, res) => {
   try {
     if (req.user.role !== "student") return res.status(403).json({ message: "Students only" });
 
-    const list = await Homework.find({ studentId: req.user.id })
+    const list = await getHomework(req.db).find({ studentId: req.user.id })
       .populate("teacherId", "firstName lastName email")
       .sort({ dueDate: 1 });
 
@@ -208,7 +214,7 @@ router.get("/assigned", verifyToken, async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 router.get("/:id", verifyToken, async (req, res) => {
   try {
-    const hw = await Homework.findById(req.params.id)
+    const hw = await getHomework(req.db).findById(req.params.id)
       .populate("teacherId", "firstName lastName email")
       .populate("studentId", "firstName surname email");
 
@@ -236,7 +242,7 @@ router.post("/:id/submit", verifyToken, uploadSubmission.array("files", MAX_FILE
       return res.status(403).json({ message: "Students only" });
     }
 
-    const hw = await Homework.findById(req.params.id);
+    const hw = await getHomework(req.db).findById(req.params.id);
     if (!hw) return res.status(404).json({ message: "Homework not found" });
     if (hw.studentId.toString() !== req.user.id) return res.status(403).json({ message: "Access denied" });
     if (hw.status === "graded") return res.status(400).json({ message: "Already graded" });
@@ -254,8 +260,8 @@ router.post("/:id/submit", verifyToken, uploadSubmission.array("files", MAX_FILE
 
     // Email teacher about submission (non-blocking)
     Promise.all([
-      Teacher.findById(hw.teacherId),
-      Student.findById(req.user.id),
+      getTeacher(req.db).findById(hw.teacherId),
+      getStudent(req.db).findById(req.user.id),
     ]).then(([teacherDoc, studentDoc]) => {
       if (teacherDoc && studentDoc) sendHomeworkSubmitted(teacherDoc, studentDoc, hw).catch(() => {});
     }).catch(() => {});
@@ -276,7 +282,7 @@ router.post("/:id/grade", verifyToken, async (req, res) => {
   try {
     if (req.user.role !== "teacher") return res.status(403).json({ message: "Teachers only" });
 
-    const hw = await Homework.findById(req.params.id);
+    const hw = await getHomework(req.db).findById(req.params.id);
     if (!hw) return res.status(404).json({ message: "Homework not found" });
     if (hw.teacherId.toString() !== req.user.id) return res.status(403).json({ message: "Access denied" });
     if (hw.status !== "submitted") return res.status(400).json({ message: "No submission to grade" });
@@ -305,7 +311,7 @@ router.delete("/:id", verifyToken, async (req, res) => {
   try {
     if (req.user.role !== "teacher") return res.status(403).json({ message: "Teachers only" });
 
-    const hw = await Homework.findById(req.params.id);
+    const hw = await getHomework(req.db).findById(req.params.id);
     if (!hw) return res.status(404).json({ message: "Homework not found" });
     if (hw.teacherId.toString() !== req.user.id) return res.status(403).json({ message: "Access denied" });
 
@@ -335,7 +341,7 @@ router.post("/:id/audio-feedback", verifyToken, audioUpload.single("audio"), asy
     if (req.user.role !== "teacher") return res.status(403).json({ message: "Teachers only" });
     if (!req.file) return res.status(400).json({ message: "No audio file uploaded" });
 
-    const hw = await Homework.findById(req.params.id);
+    const hw = await getHomework(req.db).findById(req.params.id);
     if (!hw) return res.status(404).json({ message: "Homework not found" });
     if (hw.teacherId.toString() !== req.user.id) return res.status(403).json({ message: "Access denied" });
 
@@ -380,7 +386,7 @@ router.get("/file/:type/:fileId", verifyToken, async (req, res) => {
       const filePath = path.join(AUD_DIR, fileId);
       if (!fs.existsSync(filePath)) return res.status(404).json({ message: "File not found" });
 
-      const hw = await Homework.findOne({ "grade.audioFeedback.fileId": fileId });
+      const hw = await getHomework(req.db).findOne({ "grade.audioFeedback.fileId": fileId });
       if (!hw) return res.status(404).json({ message: "File not found" });
 
       const isTeacher = req.user.role === "teacher" && hw.teacherId.toString() === req.user.id;
@@ -402,7 +408,7 @@ router.get("/file/:type/:fileId", verifyToken, async (req, res) => {
       ? { "submission.attachments.fileId": fileId }
       : { "attachments.fileId": fileId };
 
-    const hw = await Homework.findOne(query);
+    const hw = await getHomework(req.db).findOne(query);
     if (!hw) return res.status(404).json({ message: "File not found" });
 
     const isTeacher = req.user.role === "teacher" && hw.teacherId.toString() === req.user.id;

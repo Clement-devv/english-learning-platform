@@ -1,8 +1,12 @@
 import express        from "express";
 import { verifyToken } from "../middleware/authMiddleware.js";
-import QuizTemplate    from "../models/QuizTemplate.js";
+import { tenantMiddleware }    from "../middleware/tenantMiddleware.js";
+import { quizTemplateSchema }  from "../schemas/quizTemplateSchema.js";
 
 const router = express.Router();
+router.use(tenantMiddleware);
+
+const getQuizTemplate = (db) => db.models.QuizTemplate || db.model("QuizTemplate", quizTemplateSchema);
 
 function validateQuestions(questions) {
   if (!Array.isArray(questions) || questions.length < 1 || questions.length > 50)
@@ -30,7 +34,7 @@ router.post("/", verifyToken, async (req, res) => {
     const err = validateQuestions(questions);
     if (err) return res.status(400).json({ message: err });
 
-    const tmpl = await QuizTemplate.create({
+    const tmpl = await getQuizTemplate(req.db).create({
       teacherId:    req.user.id,
       name:         name.trim().slice(0, 200),
       instructions: (instructions || "").trim().slice(0, 2000),
@@ -53,7 +57,7 @@ router.post("/", verifyToken, async (req, res) => {
 router.get("/", verifyToken, async (req, res) => {
   try {
     if (req.user.role !== "teacher") return res.status(403).json({ message: "Teachers only" });
-    const templates = await QuizTemplate.find({ teacherId: req.user.id }).sort({ createdAt: -1 });
+    const templates = await getQuizTemplate(req.db).find({ teacherId: req.user.id }).sort({ createdAt: -1 });
     res.json({ success: true, templates });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -64,7 +68,7 @@ router.get("/", verifyToken, async (req, res) => {
 router.patch("/:id/use", verifyToken, async (req, res) => {
   try {
     if (req.user.role !== "teacher") return res.status(403).json({ message: "Teachers only" });
-    const tmpl = await QuizTemplate.findOneAndUpdate(
+    const tmpl = await getQuizTemplate(req.db).findOneAndUpdate(
       { _id: req.params.id, teacherId: req.user.id },
       { $inc: { usageCount: 1 } },
       { new: true }
@@ -80,7 +84,7 @@ router.patch("/:id/use", verifyToken, async (req, res) => {
 router.delete("/:id", verifyToken, async (req, res) => {
   try {
     if (req.user.role !== "teacher") return res.status(403).json({ message: "Teachers only" });
-    const tmpl = await QuizTemplate.findOne({ _id: req.params.id, teacherId: req.user.id });
+    const tmpl = await getQuizTemplate(req.db).findOne({ _id: req.params.id, teacherId: req.user.id });
     if (!tmpl) return res.status(404).json({ message: "Template not found" });
     await tmpl.deleteOne();
     res.json({ success: true });

@@ -404,7 +404,7 @@ const styles = {
   submitBtn: {
     width: '100%',
     height: '56px',
-    background: 'linear-gradient(135deg, #3b82f6 0%, #6366f1 100%)',
+    background: 'linear-gradient(135deg, var(--brand-primary), var(--brand-secondary))',
     color: 'white',
     border: 'none',
     borderRadius: '18px',
@@ -413,7 +413,7 @@ const styles = {
     cursor: 'pointer',
     fontFamily: 'inherit',
     marginTop: '4px',
-    boxShadow: '0 6px 20px rgba(99,102,241,0.35)',
+    boxShadow: '0 6px 20px rgba(var(--brand-primary-rgb), 0.35)',
     transition: 'transform 0.15s, box-shadow 0.15s',
     letterSpacing: '0.01em',
   },

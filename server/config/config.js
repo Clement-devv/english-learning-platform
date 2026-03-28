@@ -2,7 +2,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 // Validate required environment variables
-const requiredEnvVars = ['JWT_SECRET', 'MONGO_URI', 'EMAIL_USER', 'EMAIL_PASSWORD'];
+const requiredEnvVars = ['JWT_SECRET', 'MONGO_URI', 'EMAIL_USER', 'EMAIL_PASSWORD', 'MASTER_DB_URI', 'DB_BASE_URI'];
 const missingEnvVars = requiredEnvVars.filter(varName => !process.env[varName]);
 
 if (missingEnvVars.length > 0) {
@@ -34,6 +34,8 @@ export const config = {
   
   // Database
   mongoUri: process.env.MONGO_URI,
+  masterDbUri: process.env.MASTER_DB_URI,
+  dbBaseUri:   process.env.DB_BASE_URI,
   
   // Security
   jwtSecret: process.env.JWT_SECRET,
@@ -81,6 +83,11 @@ export const config = {
   
   // Security
   trustProxy: process.env.TRUST_PROXY === 'true',
+
+  // Multi-tenancy
+  superAdminEmail: process.env.SUPER_ADMIN_EMAIL,
+  cdnBaseUrl:      process.env.CDN_BASE_URL || '',
+  serverIp:        process.env.SERVER_IP || null,
 };
 
 export default config;

@@ -1,0 +1,1681 @@
+// src/pages/super-admin/SuperAdminDashboard.jsx
+import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  Crown, LogOut, Building2, CheckCircle, Clock,
+  XCircle, PauseCircle, Plus, X, Eye, EyeOff,
+  Globe, RefreshCw, Trash2, Mail, KeyRound, Palette,
+  BarChart2, ChevronDown, ChevronUp, ToggleLeft, ToggleRight, Video, Mic, Film,
+  AlertTriangle, RotateCcw,
+} from 'lucide-react';
+import api from '../../api';
+import { THEMES } from '../../data/themes';
+
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+
+const TIMEZONES = [
+  'UTC','Africa/Lagos','Africa/Nairobi','Africa/Accra','Africa/Cairo',
+  'America/New_York','America/Chicago','America/Denver','America/Los_Angeles',
+  'America/Sao_Paulo','Asia/Dubai','Asia/Kolkata','Asia/Singapore',
+  'Asia/Tokyo','Australia/Sydney','Europe/London','Europe/Paris','Europe/Berlin',
+];
+
+const EMPTY_FORM = {
+  centerName: '', slug: '', adminEmail: '', password: '',
+  phone: '', country: '', plan: 'basic',
+  website: '', description: '', timezone: 'UTC',
+  address: '', maxTeachers: '', maxStudents: '',
+};
+
+// OTP step: 'email' → 'otp' → 'form' → 'done'
+export default function SuperAdminDashboard() {
+  const navigate = useNavigate();
+  const token    = localStorage.getItem('superAdminToken');
+  const info     = JSON.parse(localStorage.getItem('superAdminInfo') || '{}');
+  const authHeaders = { Authorization: `Bearer ${token}` };
+
+  const [stats,    setStats]    = useState(null);
+  const [centers,  setCenters]  = useState([]);
+  const [domains,  setDomains]  = useState([]);
+  const [loading,  setLoading]  = useState(true);
+  const [tab,      setTab]      = useState('centers'); // 'centers' | 'domains'
+  const [error,    setError]    = useState('');
+
+  // ── Create center modal ──────────────────────────────────────────────────
+  const [showModal, setShowModal]       = useState(false);
+  const [step,      setStep]            = useState('email'); // 'email'|'otp'|'form'|'done'
+  const [form,      setForm]            = useState(EMPTY_FORM);
+  const [otpInput,  setOtpInput]        = useState('');
+  const [sendingOtp,setSendingOtp]      = useState(false);
+  const [otpError,  setOtpError]        = useState('');
+  const [verifying, setVerifying]       = useState(false);
+  const [verifyErr, setVerifyErr]       = useState('');
+  const [creating,  setCreating]        = useState(false);
+  const [createErr, setCreateErr]       = useState('');
+  const [successMsg,setSuccessMsg]      = useState('');
+  const [showPwd,   setShowPwd]         = useState(false);
+
+  // ── Domain actions ───────────────────────────────────────────────────────
+  const [domainAction, setDomainAction] = useState({}); // { [id]: 'verifying'|'removing' }
+
+  // ── Usage ────────────────────────────────────────────────────────────────
+  const [usage,         setUsage]         = useState([]);
+  const [usageMonth,    setUsageMonth]    = useState('');
+  const [expandedCenter,setExpandedCenter]= useState(null); // centerId with sessions open
+  const [sessionDetail, setSessionDetail] = useState({});   // { [centerId]: { sessions, totalMinutes } }
+  const [loadingDetail, setLoadingDetail] = useState({});   // { [centerId]: true }
+
+  // ── Theme picker ─────────────────────────────────────────────────────────
+  const [themeCenter,   setThemeCenter]   = useState(null);   // center object being themed
+  const [applyingTheme, setApplyingTheme] = useState(null);   // theme id currently being applied
+
+  // ── Feature toggles ──────────────────────────────────────────────────────
+  const [featuresCenter, setFeaturesCenter] = useState(null); // center being edited
+  const [savingFeature,  setSavingFeature]  = useState(null); // key currently saving
+
+  // ── Soft delete ──────────────────────────────────────────────────────────
+  const [deleteTarget, setDeleteTarget] = useState(null); // center pending confirmation
+  const [deleting,     setDeleting]     = useState(false);
+  const [deleted,      setDeleted]      = useState([]);   // soft-deleted centers
+  const [restoring,    setRestoring]    = useState(null); // center id being restored
+
+  const loadData = useCallback(() => {
+    setLoading(true);
+    Promise.all([
+      fetch(`${API_BASE}/super-admin/stats`,          { headers: authHeaders }).then(r => r.json()),
+      fetch(`${API_BASE}/super-admin/centers`,         { headers: authHeaders }).then(r => r.json()),
+      fetch(`${API_BASE}/super-admin/centers/domains`, { headers: authHeaders }).then(r => r.json()),
+      fetch(`${API_BASE}/super-admin/usage`,           { headers: authHeaders }).then(r => r.json()),
+      fetch(`${API_BASE}/super-admin/centers/deleted`, { headers: authHeaders }).then(r => r.json()),
+    ])
+      .then(([s, c, d, u, del]) => {
+        if (s.success)   setStats(s.stats);
+        if (c.success)   setCenters(c.centers);
+        if (d.success)   setDomains(d.centers);
+        if (u.success)   { setUsage(u.summary); setUsageMonth(u.thisMonth); }
+        if (del.success) setDeleted(del.centers);
+      })
+      .catch(() => setError('Failed to load data'))
+      .finally(() => setLoading(false));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => { loadData(); }, [loadData]);
+
+  const handleLogout = () => {
+    localStorage.removeItem('superAdminToken');
+    localStorage.removeItem('superAdminInfo');
+    navigate('/super-admin/login');
+  };
+
+  // ── Centers actions ──────────────────────────────────────────────────────
+  const handleApprove = async (id) => {
+    try {
+      const res = await fetch(`${API_BASE}/super-admin/centers/${id}/approve`, {
+        method: 'PATCH', headers: { ...authHeaders, 'Content-Type': 'application/json' },
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message);
+      setCenters(cs => cs.map(c => c._id === id ? { ...c, status: 'active' } : c));
+      setStats(st => st ? { ...st, active: st.active + 1, pending: Math.max(0, st.pending - 1) } : st);
+    } catch (err) {
+      alert(err.message || 'Failed to approve');
+    }
+  };
+
+  const handleReject = async (id) => {
+    const reason = prompt('Rejection reason (optional):');
+    if (reason === null) return; // cancelled
+    try {
+      const res = await fetch(`${API_BASE}/super-admin/centers/${id}/reject`, {
+        method: 'PATCH',
+        headers: { ...authHeaders, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rejectReason: reason }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message);
+      setCenters(cs => cs.map(c => c._id === id ? { ...c, status: 'rejected' } : c));
+    } catch (err) {
+      alert(err.message || 'Failed to reject');
+    }
+  };
+
+  const handleSuspend = async (id) => {
+    if (!window.confirm('Suspend this center?')) return;
+    try {
+      const res = await fetch(`${API_BASE}/super-admin/centers/${id}/suspend`, {
+        method: 'PATCH', headers: authHeaders,
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message);
+      setCenters(cs => cs.map(c => c._id === id ? { ...c, status: 'suspended' } : c));
+    } catch (err) {
+      alert(err.message || 'Failed to suspend');
+    }
+  };
+
+  // ── Domain actions ───────────────────────────────────────────────────────
+  const handleVerifyDomain = async (id) => {
+    setDomainAction(a => ({ ...a, [id]: 'verifying' }));
+    try {
+      const res = await fetch(`${API_BASE}/super-admin/centers/${id}/verify-domain`, {
+        method: 'PATCH', headers: authHeaders,
+      });
+      const data = await res.json();
+      if (!data.success) { alert(data.message); return; }
+      setDomains(ds => ds.map(d => d._id === id ? { ...d, domainVerified: true } : d));
+      alert('Domain verified!');
+    } catch {
+      alert('Verification failed. Please try again.');
+    } finally {
+      setDomainAction(a => { const n = { ...a }; delete n[id]; return n; });
+    }
+  };
+
+  const handleRemoveDomain = async (id, domain) => {
+    if (!window.confirm(`Remove domain "${domain}" from this center?`)) return;
+    setDomainAction(a => ({ ...a, [id]: 'removing' }));
+    try {
+      const res = await fetch(`${API_BASE}/super-admin/centers/${id}/remove-domain`, {
+        method: 'PATCH', headers: authHeaders,
+      });
+      const data = await res.json();
+      if (!data.success) { alert(data.message); return; }
+      setDomains(ds => ds.filter(d => d._id !== id));
+    } catch {
+      alert('Failed to remove domain. Please try again.');
+    } finally {
+      setDomainAction(a => { const n = { ...a }; delete n[id]; return n; });
+    }
+  };
+
+  // ── Feature toggle actions ────────────────────────────────────────────────
+  const handleToggleFeature = async (centerId, key, currentValue) => {
+    setSavingFeature(key);
+    try {
+      const res = await fetch(`${API_BASE}/super-admin/centers/${centerId}/features`, {
+        method: 'PATCH',
+        headers: { ...authHeaders, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [key]: !currentValue }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message);
+      // Update local state immediately
+      setFeaturesCenter(fc => fc ? { ...fc, features: { ...fc.features, [key]: !currentValue } } : fc);
+      setCenters(cs => cs.map(c => c._id === centerId
+        ? { ...c, features: { ...c.features, [key]: !currentValue } }
+        : c
+      ));
+    } catch (err) {
+      alert(err.message || 'Failed to update feature');
+    } finally {
+      setSavingFeature(null);
+    }
+  };
+
+  // ── Soft delete / restore ─────────────────────────────────────────────────
+  const handleSoftDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      const res  = await fetch(`${API_BASE}/super-admin/centers/${deleteTarget._id}/soft-delete`, {
+        method: 'PATCH', headers: authHeaders,
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message);
+      setCenters(cs => cs.filter(c => c._id !== deleteTarget._id));
+      setDeleted(ds => [{ ...deleteTarget, status: 'deleted', scheduledDeletionAt: data.scheduledDeletionAt }, ...ds]);
+      setStats(st => st ? { ...st, active: Math.max(0, st.active - 1) } : st);
+      setDeleteTarget(null);
+    } catch (err) {
+      alert(err.message || 'Failed to schedule deletion');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleRestore = async (center) => {
+    setRestoring(center._id);
+    try {
+      const res  = await fetch(`${API_BASE}/super-admin/centers/${center._id}/restore`, {
+        method: 'PATCH', headers: authHeaders,
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message);
+      setDeleted(ds => ds.filter(d => d._id !== center._id));
+      setCenters(cs => [{ ...center, status: 'active', deletedAt: undefined, scheduledDeletionAt: undefined }, ...cs]);
+      setStats(st => st ? { ...st, active: st.active + 1 } : st);
+    } catch (err) {
+      alert(err.message || 'Failed to restore center');
+    } finally {
+      setRestoring(null);
+    }
+  };
+
+  const daysRemaining = (scheduledDeletionAt) => {
+    const ms   = new Date(scheduledDeletionAt) - Date.now();
+    const days = Math.ceil(ms / (1000 * 60 * 60 * 24));
+    return Math.max(0, days);
+  };
+
+  // ── Usage actions ────────────────────────────────────────────────────────
+  const toggleSessionDetail = async (centerId) => {
+    if (expandedCenter === centerId) { setExpandedCenter(null); return; }
+    setExpandedCenter(centerId);
+    if (sessionDetail[centerId]) return; // already loaded
+    setLoadingDetail(d => ({ ...d, [centerId]: true }));
+    try {
+      const res  = await fetch(`${API_BASE}/super-admin/usage/${centerId}?month=${usageMonth}`, { headers: authHeaders });
+      const data = await res.json();
+      if (data.success) setSessionDetail(d => ({ ...d, [centerId]: { sessions: data.sessions, totalMinutes: data.totalMinutes } }));
+    } catch { /* silent */ } finally {
+      setLoadingDetail(d => { const n = { ...d }; delete n[centerId]; return n; });
+    }
+  };
+
+  const fmtMins = (m) => {
+    if (!m) return '0 min';
+    if (m < 60) return `${m} min`;
+    const h = Math.floor(m / 60);
+    const r = m % 60;
+    return r ? `${h}h ${r}m` : `${h}h`;
+  };
+
+  // ── Theme actions ─────────────────────────────────────────────────────────
+  const handleApplyTheme = async (centerId, theme) => {
+    setApplyingTheme(theme.id);
+    try {
+      const res = await fetch(`${API_BASE}/super-admin/centers/${centerId}/theme`, {
+        method: 'PATCH',
+        headers: { ...authHeaders, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          primaryColor:   theme.primaryColor,
+          secondaryColor: theme.secondaryColor,
+          fontFamily:     theme.fontFamily,
+          borderRadius:   theme.borderRadius,
+          shadowStyle:    theme.shadowStyle,
+          spacing:        theme.spacing,
+          theme:          theme.id,
+        }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message);
+      // Reflect new active theme in both the picker and the centers list
+      setThemeCenter(tc => tc ? { ...tc, branding: { ...tc.branding, theme: theme.id } } : tc);
+      setCenters(cs => cs.map(c => c._id === centerId ? { ...c, branding: { ...c.branding, theme: theme.id } } : c));
+    } catch (err) {
+      alert(err.message || 'Failed to apply theme');
+    } finally {
+      setApplyingTheme(null);
+    }
+  };
+
+  // ── Modal steps ──────────────────────────────────────────────────────────
+  const closeModal = () => {
+    setShowModal(false);
+    setTimeout(() => {
+      setStep('email');
+      setForm(EMPTY_FORM);
+      setOtpInput('');
+      setOtpError('');
+      setVerifyErr('');
+      setCreateErr('');
+      setSuccessMsg('');
+      setShowPwd(false);
+    }, 200);
+  };
+
+  const handleCenterNameChange = (val) => {
+    const slug = val.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    setForm(f => ({ ...f, centerName: val, slug }));
+  };
+
+  const handleSendOtp = async (e) => {
+    e.preventDefault();
+    if (!form.adminEmail.trim()) return;
+    setSendingOtp(true);
+    setOtpError('');
+    try {
+      const res = await fetch(`${API_BASE}/super-admin/send-otp`, {
+        method: 'POST',
+        headers: { ...authHeaders, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adminEmail: form.adminEmail }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message);
+      setStep('otp');
+    } catch (err) {
+      setOtpError(err.message || 'Failed to send OTP');
+    } finally {
+      setSendingOtp(false);
+    }
+  };
+
+  const handleVerifyOtp = async (e) => {
+    e.preventDefault();
+    setVerifying(true);
+    setVerifyErr('');
+    try {
+      const res = await fetch(`${API_BASE}/super-admin/verify-otp`, {
+        method: 'POST',
+        headers: { ...authHeaders, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adminEmail: form.adminEmail, code: otpInput }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message);
+      setStep('form');
+    } catch (err) {
+      setVerifyErr(err.message || 'Incorrect code');
+    } finally {
+      setVerifying(false);
+    }
+  };
+
+  const handleCreateCenter = async (e) => {
+    e.preventDefault();
+    setCreating(true);
+    setCreateErr('');
+    try {
+      // Register (creates center as 'pending')
+      const regRes = await fetch(`${API_BASE}/register-center`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          centerName: form.centerName,
+          slug:       form.slug,
+          adminEmail: form.adminEmail,
+          password:   form.password,
+          phone:      form.phone,
+          country:    form.country,
+          website:    form.website,
+          description:form.description,
+          timezone:   form.timezone,
+          address:    form.address,
+          maxTeachers:form.maxTeachers ? Number(form.maxTeachers) : undefined,
+          maxStudents:form.maxStudents ? Number(form.maxStudents) : undefined,
+          plan:       form.plan,
+        }),
+      });
+      const regData = await regRes.json();
+      if (!regRes.ok) throw new Error(regData.message || 'Registration failed');
+
+      // Find the center by slug and immediately approve
+      const centersRes = await fetch(`${API_BASE}/super-admin/centers`, { headers: authHeaders });
+      const centersData = await centersRes.json();
+      const newCenter = centersData.centers?.find(c => c.slug === form.slug);
+      if (!newCenter) throw new Error('Center registered but not found for approval');
+
+      const approveRes = await fetch(`${API_BASE}/super-admin/centers/${newCenter._id}/approve`, {
+        method: 'PATCH', headers: authHeaders,
+      });
+      const approveData = await approveRes.json();
+      if (!approveData.success) throw new Error(approveData.message || 'Approval failed');
+
+      setSuccessMsg(`"${form.centerName}" is live! The admin can log in at once using their email and password.`);
+      setStep('done');
+      loadData();
+    } catch (err) {
+      setCreateErr(err.message || 'Failed to create center');
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const statusColor = (s) => ({ active: '#10b981', pending: '#f59e0b', suspended: '#ef4444', rejected: '#6b7280' }[s] || '#6b7280');
+  const statusIcon  = (s) => {
+    if (s === 'active')    return <CheckCircle size={13} />;
+    if (s === 'pending')   return <Clock size={13} />;
+    if (s === 'suspended') return <PauseCircle size={13} />;
+    return <XCircle size={13} />;
+  };
+
+  return (
+    <div style={s.root}>
+      {/* Header */}
+      <div style={s.header}>
+        <div style={s.headerLeft}>
+          <Crown size={22} color="#f59e0b" />
+          <span style={s.headerTitle}>Super Admin</span>
+          {info.firstName && <span style={s.headerSub}>{info.firstName} {info.lastName}</span>}
+        </div>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button onClick={() => setShowModal(true)} style={s.createBtn}>
+            <Plus size={15} /> Create Center
+          </button>
+          <button onClick={handleLogout} style={s.logoutBtn}>
+            <LogOut size={15} /> Logout
+          </button>
+        </div>
+      </div>
+
+      <div style={s.body}>
+        {error && <p style={{ color: '#ef4444', marginBottom: '16px' }}>{error}</p>}
+
+        {/* Stats */}
+        {stats && (
+          <div style={s.statsRow}>
+            {[
+              { label: 'Total',     value: stats.total,     color: '#6366f1', icon: Building2   },
+              { label: 'Active',    value: stats.active,    color: '#10b981', icon: CheckCircle },
+              { label: 'Pending',   value: stats.pending,   color: '#f59e0b', icon: Clock       },
+              { label: 'Suspended', value: stats.suspended, color: '#ef4444', icon: PauseCircle },
+            ].map(({ label, value, color, icon: Icon }) => (
+              <div key={label} style={s.statCard}>
+                <div style={{ ...s.statIcon, background: `${color}18` }}>
+                  <Icon size={18} color={color} />
+                </div>
+                <div>
+                  <p style={s.statValue}>{value ?? '—'}</p>
+                  <p style={s.statLabel}>{label}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Tab switcher */}
+        <div style={s.tabRow}>
+          {[
+            { key: 'centers', label: 'Centers',        icon: Building2    },
+            { key: 'domains', label: 'Custom Domains', icon: Globe        },
+            { key: 'usage',   label: 'Agora Usage',    icon: BarChart2    },
+            { key: 'deleted', label: 'Deleted',         icon: Trash2      },
+          ].map(({ key, label, icon: Icon }) => (
+            <button
+              key={key}
+              onClick={() => setTab(key)}
+              style={{ ...s.tabBtn, ...(tab === key ? s.tabBtnActive : {}) }}
+            >
+              <Icon size={14} /> {label}
+              {key === 'domains' && domains.length > 0 && (
+                <span style={s.tabBadge}>{domains.length}</span>
+              )}
+              {key === 'deleted' && deleted.length > 0 && (
+                <span style={{ ...s.tabBadge, background: '#ef4444' }}>{deleted.length}</span>
+              )}
+            </button>
+          ))}
+        </div>
+
+        {/* ── Centers Table ── */}
+        {tab === 'centers' && (
+          <div style={s.card}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+              <h2 style={s.sectionTitle}><Building2 size={16} color="#f59e0b" /> All Centers</h2>
+              <button onClick={loadData} style={s.refreshBtn} title="Refresh"><RefreshCw size={14} /></button>
+            </div>
+
+            {loading ? (
+              <div style={{ padding: '40px', textAlign: 'center', color: '#6b7280' }}>Loading…</div>
+            ) : centers.length === 0 ? (
+              <div style={{ padding: '40px', textAlign: 'center', color: '#6b7280' }}>
+                No centers yet.{' '}
+                <button onClick={() => setShowModal(true)} style={{ background: 'none', border: 'none', color: '#f59e0b', cursor: 'pointer', fontWeight: '600' }}>
+                  Create one →
+                </button>
+              </div>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={s.table}>
+                  <thead>
+                    <tr>
+                      {['Center', 'Slug', 'Plan', 'Status', 'Actions'].map(h => (
+                        <th key={h} style={s.th}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {centers.map(c => (
+                      <tr key={c._id} style={s.tr}>
+                        <td style={s.td}>
+                          <p style={{ margin: 0, fontWeight: '600', color: '#f1f5f9' }}>{c.centerName}</p>
+                          <p style={{ margin: 0, fontSize: '12px', color: '#6b7280' }}>{c.adminEmail}</p>
+                        </td>
+                        <td style={s.td}><code style={s.slug}>{c.slug}</code></td>
+                        <td style={s.td}><span style={s.planBadge}>{c.plan || 'basic'}</span></td>
+                        <td style={s.td}>
+                          <span style={{ ...s.statusBadge, color: statusColor(c.status), borderColor: `${statusColor(c.status)}40`, background: `${statusColor(c.status)}12` }}>
+                            {statusIcon(c.status)} {c.status}
+                          </span>
+                        </td>
+                        <td style={s.td}>
+                          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                            {c.status === 'pending' && (
+                              <>
+                                <button onClick={() => handleApprove(c._id)} style={s.approveBtn}>Approve</button>
+                                <button onClick={() => handleReject(c._id)}  style={s.rejectBtn}>Reject</button>
+                              </>
+                            )}
+                            {c.status === 'active' && (
+                              <button onClick={() => handleSuspend(c._id)} style={s.suspendBtn}>Suspend</button>
+                            )}
+                            {(c.status === 'rejected' || c.status === 'suspended') && (
+                              <button onClick={() => handleApprove(c._id)} style={s.approveBtn}>Reactivate</button>
+                            )}
+                            <button onClick={() => setThemeCenter(c)} style={s.themeBtn} title="Set theme">
+                              <Palette size={12} /> Theme
+                            </button>
+                            <button onClick={() => setFeaturesCenter(c)} style={s.featuresBtn} title="Toggle features">
+                              <ToggleRight size={12} /> Features
+                            </button>
+                            <button onClick={() => setDeleteTarget(c)} style={s.deleteBtn} title="Schedule deletion">
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Domains Table ── */}
+        {tab === 'domains' && (
+          <div style={s.card}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+              <h2 style={s.sectionTitle}><Globe size={16} color="#f59e0b" /> Custom Domains</h2>
+              <button onClick={loadData} style={s.refreshBtn} title="Refresh"><RefreshCw size={14} /></button>
+            </div>
+
+            {loading ? (
+              <div style={{ padding: '40px', textAlign: 'center', color: '#6b7280' }}>Loading…</div>
+            ) : domains.length === 0 ? (
+              <div style={{ padding: '40px', textAlign: 'center', color: '#6b7280' }}>
+                No custom domains submitted yet.
+              </div>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={s.table}>
+                  <thead>
+                    <tr>
+                      {['Center', 'Domain', 'Plan', 'DNS Status', 'Requested', 'Actions'].map(h => (
+                        <th key={h} style={s.th}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {domains.map(d => (
+                      <tr key={d._id} style={s.tr}>
+                        <td style={s.td}>
+                          <p style={{ margin: 0, fontWeight: '600', color: '#f1f5f9' }}>{d.centerName}</p>
+                          <code style={{ ...s.slug, fontSize: '11px' }}>{d.slug}</code>
+                        </td>
+                        <td style={s.td}>
+                          <span style={{ color: '#e2e8f0', fontFamily: 'monospace', fontSize: '13px' }}>{d.customDomain}</span>
+                        </td>
+                        <td style={s.td}><span style={s.planBadge}>{d.plan || 'basic'}</span></td>
+                        <td style={s.td}>
+                          {d.domainVerified ? (
+                            <span style={{ ...s.statusBadge, color: '#10b981', borderColor: '#10b98140', background: '#10b98112' }}>
+                              <CheckCircle size={12} /> Verified
+                            </span>
+                          ) : (
+                            <span style={{ ...s.statusBadge, color: '#f59e0b', borderColor: '#f59e0b40', background: '#f59e0b12' }}>
+                              <Clock size={12} /> Pending
+                            </span>
+                          )}
+                        </td>
+                        <td style={{ ...s.td, fontSize: '12px', color: '#6b7280' }}>
+                          {d.domainRequestedAt ? new Date(d.domainRequestedAt).toLocaleDateString() : '—'}
+                        </td>
+                        <td style={s.td}>
+                          <div style={{ display: 'flex', gap: '6px' }}>
+                            {!d.domainVerified && (
+                              <button
+                                onClick={() => handleVerifyDomain(d._id)}
+                                disabled={!!domainAction[d._id]}
+                                style={s.approveBtn}
+                              >
+                                {domainAction[d._id] === 'verifying' ? '…' : 'Verify DNS'}
+                              </button>
+                            )}
+                            <button
+                              onClick={() => handleRemoveDomain(d._id, d.customDomain)}
+                              disabled={!!domainAction[d._id]}
+                              style={s.rejectBtn}
+                            >
+                              {domainAction[d._id] === 'removing' ? '…' : <Trash2 size={13} />}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+        {/* ── Usage Tab ── */}
+        {tab === 'usage' && (
+          <div style={s.card}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+              <h2 style={s.sectionTitle}><BarChart2 size={16} color="#f59e0b" /> Agora Usage — {usageMonth || 'All Time'}</h2>
+              <button onClick={loadData} style={s.refreshBtn} title="Refresh"><RefreshCw size={14} /></button>
+            </div>
+
+            <p style={{ margin: '0 0 16px', fontSize: '12px', color: '#6b7280' }}>
+              Each row shows how many Agora minutes a center has used. Click a row to see the session-by-session breakdown for this month.
+            </p>
+
+            {loading ? (
+              <div style={{ padding: '40px', textAlign: 'center', color: '#6b7280' }}>Loading…</div>
+            ) : usage.length === 0 ? (
+              <div style={{ padding: '40px', textAlign: 'center', color: '#6b7280' }}>
+                No Agora usage recorded yet. Minutes will appear here after centers complete calls.
+              </div>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={s.table}>
+                  <thead>
+                    <tr>
+                      {['Center', 'This Month', 'Last Month', 'All Time', 'Sessions', ''].map(h => (
+                        <th key={h} style={s.th}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {usage.map(u => (
+                      <React.Fragment key={u.centerId}>
+                        <tr
+                          style={{ ...s.tr, cursor: 'pointer' }}
+                          onClick={() => toggleSessionDetail(u.centerId)}
+                        >
+                          <td style={s.td}>
+                            <p style={{ margin: 0, fontWeight: '600', color: '#f1f5f9' }}>{u.centerName}</p>
+                            <code style={{ ...s.slug, fontSize: '11px' }}>{u.centerId}</code>
+                          </td>
+                          <td style={s.td}>
+                            <span style={{ color: '#34d399', fontWeight: '700', fontSize: '15px' }}>{fmtMins(u.thisMonthMinutes)}</span>
+                          </td>
+                          <td style={s.td}>
+                            <span style={{ color: '#9ca3af', fontWeight: '600' }}>{fmtMins(u.lastMonthMinutes)}</span>
+                          </td>
+                          <td style={s.td}>
+                            <span style={{ color: '#f1f5f9', fontWeight: '600' }}>{fmtMins(u.totalMinutes)}</span>
+                          </td>
+                          <td style={s.td}>
+                            <span style={{ color: '#6b7280', fontSize: '13px' }}>{u.sessions} sessions</span>
+                          </td>
+                          <td style={s.td}>
+                            {loadingDetail[u.centerId]
+                              ? <span style={{ color: '#6b7280', fontSize: '12px' }}>Loading…</span>
+                              : expandedCenter === u.centerId
+                                ? <ChevronUp size={15} color="#f59e0b" />
+                                : <ChevronDown size={15} color="#6b7280" />
+                            }
+                          </td>
+                        </tr>
+
+                        {/* Session detail rows */}
+                        {expandedCenter === u.centerId && sessionDetail[u.centerId] && (
+                          <tr style={{ background: 'rgba(245,158,11,0.03)' }}>
+                            <td colSpan={6} style={{ padding: '0 14px 14px' }}>
+                              <div style={{
+                                borderTop: '1px solid rgba(245,158,11,0.15)',
+                                marginTop: '4px',
+                                paddingTop: '12px',
+                              }}>
+                                <p style={{ margin: '0 0 10px', fontSize: '12px', color: '#f59e0b', fontWeight: '700' }}>
+                                  Sessions in {usageMonth} — Total: {fmtMins(sessionDetail[u.centerId].totalMinutes)}
+                                </p>
+                                {sessionDetail[u.centerId].sessions.length === 0 ? (
+                                  <p style={{ color: '#6b7280', fontSize: '12px' }}>No sessions this month.</p>
+                                ) : (
+                                  <table style={{ ...s.table, fontSize: '12px' }}>
+                                    <thead>
+                                      <tr>
+                                        {['Date', 'Channel', 'Duration', 'Participants'].map(h => (
+                                          <th key={h} style={{ ...s.th, fontSize: '10px' }}>{h}</th>
+                                        ))}
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {sessionDetail[u.centerId].sessions.map(sess => (
+                                        <tr key={sess._id} style={s.tr}>
+                                          <td style={{ ...s.td, color: '#9ca3af' }}>
+                                            {new Date(sess.sessionDate).toLocaleDateString()} {new Date(sess.sessionDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                          </td>
+                                          <td style={{ ...s.td }}>
+                                            <code style={{ ...s.slug, fontSize: '10px' }}>{sess.channelName || '—'}</code>
+                                          </td>
+                                          <td style={{ ...s.td, color: '#34d399', fontWeight: '600' }}>
+                                            {fmtMins(sess.durationMinutes)}
+                                          </td>
+                                          <td style={{ ...s.td, color: '#9ca3af' }}>
+                                            {sess.participantCount} {sess.participantCount === 1 ? 'person' : 'people'}
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Deleted Tab ── */}
+        {tab === 'deleted' && (
+          <div style={s.card}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+              <h2 style={s.sectionTitle}><Trash2 size={16} color="#ef4444" /> Scheduled for Deletion</h2>
+              <button onClick={loadData} style={s.refreshBtn} title="Refresh"><RefreshCw size={14} /></button>
+            </div>
+            <p style={{ margin: '0 0 16px', fontSize: '12px', color: '#6b7280' }}>
+              Centers below will be permanently deleted after their countdown expires. Restore them before the deadline to reactivate.
+            </p>
+
+            {deleted.length === 0 ? (
+              <div style={{ padding: '40px', textAlign: 'center', color: '#6b7280' }}>
+                No centers are currently scheduled for deletion.
+              </div>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={s.table}>
+                  <thead>
+                    <tr>
+                      {['Center', 'Slug', 'Deleted On', 'Permanent Deletion', 'Days Left', ''].map(h => (
+                        <th key={h} style={s.th}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {deleted.map(c => {
+                      const days = daysRemaining(c.scheduledDeletionAt);
+                      const urgent = days <= 2;
+                      return (
+                        <tr key={c._id} style={s.tr}>
+                          <td style={s.td}>
+                            <p style={{ margin: 0, fontWeight: '600', color: '#f1f5f9' }}>{c.centerName}</p>
+                            <p style={{ margin: 0, fontSize: '12px', color: '#6b7280' }}>{c.adminEmail}</p>
+                          </td>
+                          <td style={s.td}><code style={s.slug}>{c.slug}</code></td>
+                          <td style={{ ...s.td, fontSize: '12px', color: '#6b7280' }}>
+                            {c.deletedAt ? new Date(c.deletedAt).toLocaleDateString() : '—'}
+                          </td>
+                          <td style={{ ...s.td, fontSize: '12px', color: urgent ? '#f87171' : '#9ca3af', fontWeight: urgent ? '700' : '400' }}>
+                            {c.scheduledDeletionAt ? new Date(c.scheduledDeletionAt).toLocaleDateString() : '—'}
+                          </td>
+                          <td style={s.td}>
+                            <span style={{
+                              display: 'inline-flex', alignItems: 'center', gap: '5px',
+                              fontSize: '13px', fontWeight: '700',
+                              color: days === 0 ? '#ef4444' : urgent ? '#f59e0b' : '#34d399',
+                            }}>
+                              {days === 0 ? '⚠️ Expired' : `${days} day${days === 1 ? '' : 's'}`}
+                            </span>
+                          </td>
+                          <td style={s.td}>
+                            <button
+                              onClick={() => handleRestore(c)}
+                              disabled={restoring === c._id}
+                              style={s.approveBtn}
+                            >
+                              <RotateCcw size={12} />
+                              {restoring === c._id ? 'Restoring…' : 'Restore'}
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+      </div>
+
+      {/* ── Delete Confirm Modal ── */}
+      {deleteTarget && (
+        <div style={s.overlay} onClick={(e) => e.target === e.currentTarget && !deleting && setDeleteTarget(null)}>
+          <div style={{ ...s.modal, maxWidth: '460px' }}>
+            <div style={s.modalHeader}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <AlertTriangle size={18} color="#ef4444" />
+                <span style={{ ...s.modalTitle, color: '#f87171' }}>Schedule Center Deletion</span>
+              </div>
+              {!deleting && <button onClick={() => setDeleteTarget(null)} style={s.closeBtn}><X size={18} /></button>}
+            </div>
+
+            <div style={{ padding: '24px' }}>
+              {/* Center info */}
+              <div style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)', borderRadius: '10px', padding: '14px 16px', marginBottom: '18px' }}>
+                <p style={{ margin: '0 0 4px', fontWeight: '700', color: '#f1f5f9', fontSize: '15px' }}>{deleteTarget.centerName}</p>
+                <p style={{ margin: 0, fontSize: '12px', color: '#6b7280' }}>{deleteTarget.adminEmail}</p>
+              </div>
+
+              <p style={{ margin: '0 0 12px', fontSize: '14px', color: '#9ca3af', lineHeight: '1.6' }}>
+                This center will <strong style={{ color: '#f1f5f9' }}>not be deleted immediately</strong>. Here's what will happen:
+              </p>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '20px' }}>
+                {[
+                  { icon: '📧', text: 'A warning email is sent to the center admin immediately.' },
+                  { icon: '⏳', text: 'The center is moved to an inactive "Deleted" tab for 7 days.' },
+                  { icon: '🔄', text: 'You can restore it at any time before the deadline.' },
+                  { icon: '🗑️', text: 'After 7 days, the center becomes permanently removed.' },
+                ].map(({ icon, text }) => (
+                  <div key={text} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', fontSize: '13px', color: '#9ca3af' }}>
+                    <span style={{ fontSize: '15px', flexShrink: 0 }}>{icon}</span>
+                    <span style={{ lineHeight: '1.5' }}>{text}</span>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                <button
+                  onClick={() => setDeleteTarget(null)}
+                  disabled={deleting}
+                  style={s.cancelBtn}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSoftDelete}
+                  disabled={deleting}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '7px',
+                    padding: '10px 22px', borderRadius: '10px', border: 'none',
+                    background: deleting ? 'rgba(239,68,68,0.4)' : 'linear-gradient(135deg, #dc2626, #ef4444)',
+                    color: 'white', fontSize: '14px', fontWeight: '700',
+                    cursor: deleting ? 'wait' : 'pointer', fontFamily: 'inherit',
+                  }}
+                >
+                  <Trash2 size={14} />
+                  {deleting ? 'Scheduling…' : 'Yes, Schedule Deletion'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Features Modal ── */}
+      {featuresCenter && (() => {
+        const f = featuresCenter.features || {};
+        const FEATURE_LIST = [
+          {
+            key:         'agora',
+            label:       'Agora Video Calling',
+            description: 'In-platform video calls using Agora RTC. Disable if the center uses only Google Meet.',
+            icon:        Video,
+            color:       '#6366f1',
+          },
+          {
+            key:         'googleMeet',
+            label:       'Google Meet',
+            description: 'Allow teachers to set a Google Meet link for external video calls.',
+            icon:        Globe,
+            color:       '#10b981',
+          },
+          {
+            key:         'recording',
+            label:       'Session Recording',
+            description: 'Let teachers record and save class sessions.',
+            icon:        Film,
+            color:       '#f59e0b',
+          },
+          {
+            key:         'pronunciation',
+            label:       'AI Pronunciation',
+            description: 'AI-powered pronunciation feedback for students.',
+            icon:        Mic,
+            color:       '#e11d48',
+          },
+        ];
+
+        return (
+          <div style={s.overlay} onClick={(e) => e.target === e.currentTarget && setFeaturesCenter(null)}>
+            <div style={{ ...s.modal, maxWidth: '500px' }}>
+              <div style={s.modalHeader}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <ToggleRight size={18} color="#f59e0b" />
+                  <span style={s.modalTitle}>Feature Access</span>
+                  <span style={{ fontSize: '13px', color: '#6b7280' }}>for {featuresCenter.centerName}</span>
+                </div>
+                <button onClick={() => setFeaturesCenter(null)} style={s.closeBtn}><X size={18} /></button>
+              </div>
+
+              <div style={{ padding: '20px 24px 28px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <p style={s.stepDesc}>
+                  Toggle features on or off for this center. Changes take effect immediately — the center will see the update on their next page load.
+                </p>
+
+                {FEATURE_LIST.map(({ key, label, description, icon: Icon, color }) => {
+                  const enabled  = f[key] !== false; // default true if undefined
+                  const saving   = savingFeature === key;
+                  return (
+                    <div key={key} style={{
+                      display: 'flex', alignItems: 'center', gap: '14px',
+                      padding: '14px 16px', borderRadius: '12px',
+                      background: enabled ? `${color}0c` : 'rgba(255,255,255,0.02)',
+                      border: `1px solid ${enabled ? `${color}30` : 'rgba(255,255,255,0.07)'}`,
+                      transition: 'all 0.2s',
+                    }}>
+                      {/* Icon */}
+                      <div style={{
+                        width: '38px', height: '38px', borderRadius: '10px', flexShrink: 0,
+                        background: enabled ? `${color}18` : 'rgba(255,255,255,0.05)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}>
+                        <Icon size={17} color={enabled ? color : '#4b5563'} />
+                      </div>
+
+                      {/* Label + description */}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p style={{ margin: '0 0 2px', fontSize: '14px', fontWeight: '700', color: enabled ? '#f1f5f9' : '#6b7280' }}>
+                          {label}
+                        </p>
+                        <p style={{ margin: 0, fontSize: '11.5px', color: '#6b7280', lineHeight: '1.4' }}>
+                          {description}
+                        </p>
+                      </div>
+
+                      {/* Toggle */}
+                      <button
+                        onClick={() => !saving && handleToggleFeature(featuresCenter._id, key, enabled)}
+                        disabled={saving}
+                        style={{
+                          background: 'none', border: 'none', cursor: saving ? 'wait' : 'pointer',
+                          padding: 0, flexShrink: 0, opacity: saving ? 0.5 : 1,
+                          display: 'flex', alignItems: 'center',
+                        }}
+                        title={enabled ? 'Click to disable' : 'Click to enable'}
+                      >
+                        {enabled
+                          ? <ToggleRight size={32} color={color} />
+                          : <ToggleLeft  size={32} color="#4b5563" />
+                        }
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ── Theme Picker Modal ── */}
+      {themeCenter && (
+        <div style={s.overlay} onClick={(e) => e.target === e.currentTarget && setThemeCenter(null)}>
+          <div style={{ ...s.modal, maxWidth: '880px' }}>
+            <div style={s.modalHeader}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Palette size={18} color="#f59e0b" />
+                <span style={s.modalTitle}>Choose Theme</span>
+                <span style={{ fontSize: '13px', color: '#6b7280' }}>for {themeCenter.centerName}</span>
+              </div>
+              <button onClick={() => setThemeCenter(null)} style={s.closeBtn}><X size={18} /></button>
+            </div>
+
+            <div style={{ padding: '20px 24px 28px' }}>
+              <p style={s.stepDesc}>
+                Themes control colors, font, button shape, shadows and spacing — the full look of the platform for this center.
+                The change takes effect the next time their page loads.
+              </p>
+
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+                gap: '14px',
+                marginTop: '18px',
+              }}>
+                {THEMES.map(theme => {
+                  const isActive   = themeCenter.branding?.theme === theme.id;
+                  const isApplying = applyingTheme === theme.id;
+                  const radiusPx   = parseInt(theme.borderRadius, 10);
+                  const shapeLabel = radiusPx <= 4 ? 'Sharp' : radiusPx >= 14 ? 'Rounded' : 'Soft';
+
+                  return (
+                    <div key={theme.id} style={{
+                      borderRadius: '14px',
+                      border: isActive
+                        ? `2px solid ${theme.primaryColor}`
+                        : '2px solid rgba(255,255,255,0.08)',
+                      background: isActive
+                        ? `${theme.primaryColor}14`
+                        : 'rgba(255,255,255,0.03)',
+                      overflow: 'hidden',
+                      transition: 'border-color 0.15s, background 0.15s',
+                    }}>
+
+                      {/* Mini visual preview */}
+                      <div style={{
+                        height: '76px',
+                        background: theme.primaryColor,
+                        padding: '10px 12px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between',
+                      }}>
+                        {/* Mock nav bar */}
+                        <div style={{ display: 'flex', gap: '5px', alignItems: 'center' }}>
+                          <div style={{ width: '20px', height: '5px', borderRadius: '3px', background: 'rgba(255,255,255,0.9)' }} />
+                          <div style={{ width: '30px', height: '5px', borderRadius: '3px', background: 'rgba(255,255,255,0.4)' }} />
+                          <div style={{ width: '22px', height: '5px', borderRadius: '3px', background: 'rgba(255,255,255,0.4)' }} />
+                        </div>
+                        {/* Font sample + button */}
+                        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
+                          <span style={{
+                            fontSize: '22px', fontWeight: '700', color: 'white',
+                            fontFamily: `'${theme.fontFamily}', sans-serif`,
+                            lineHeight: 1,
+                          }}>Aa</span>
+                          <div style={{
+                            fontSize: '9px', fontWeight: '700',
+                            padding: '4px 9px',
+                            borderRadius: theme.borderRadius,
+                            background: 'rgba(255,255,255,0.22)',
+                            color: 'white',
+                            fontFamily: `'${theme.fontFamily}', sans-serif`,
+                          }}>Button</div>
+                        </div>
+                      </div>
+
+                      {/* Secondary color strip */}
+                      <div style={{
+                        height: '10px',
+                        background: theme.secondaryColor,
+                      }} />
+
+                      {/* Info section */}
+                      <div style={{ padding: '12px 12px 6px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                          <span style={{ fontSize: '13px', fontWeight: '700', color: '#f1f5f9' }}>{theme.name}</span>
+                          {isActive && <CheckCircle size={14} color={theme.primaryColor} />}
+                        </div>
+                        <p style={{ margin: '0 0 8px', fontSize: '11px', color: '#6b7280', lineHeight: '1.4' }}>
+                          {theme.description}
+                        </p>
+                        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                          {[shapeLabel, theme.spacing, theme.shadowStyle === 'none' ? 'flat' : `${theme.shadowStyle} shadow`].map(tag => (
+                            <span key={tag} style={{
+                              fontSize: '9px', padding: '2px 6px', borderRadius: '20px',
+                              background: 'rgba(255,255,255,0.06)', color: '#6b7280', fontWeight: '600',
+                            }}>{tag}</span>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Apply button */}
+                      <div style={{ padding: '8px 12px 12px' }}>
+                        <button
+                          onClick={() => !isApplying && !isActive && handleApplyTheme(themeCenter._id, theme)}
+                          disabled={isApplying || isActive}
+                          style={{
+                            width: '100%', padding: '7px 0', borderRadius: '8px', border: 'none',
+                            background: isActive
+                              ? `${theme.primaryColor}20`
+                              : isApplying
+                                ? 'rgba(255,255,255,0.05)'
+                                : theme.primaryColor,
+                            color: isActive ? theme.primaryColor : 'white',
+                            fontSize: '12px', fontWeight: '700',
+                            cursor: isApplying || isActive ? 'default' : 'pointer',
+                            fontFamily: 'inherit',
+                            opacity: isApplying ? 0.6 : 1,
+                          }}
+                        >
+                          {isApplying ? 'Applying…' : isActive ? '✓ Active' : 'Apply Theme'}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Create Center Modal ── */}
+      {showModal && (
+        <div style={s.overlay} onClick={(e) => e.target === e.currentTarget && closeModal()}>
+          <div style={s.modal}>
+            {/* Modal header */}
+            <div style={s.modalHeader}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Plus size={18} color="#f59e0b" />
+                <span style={s.modalTitle}>Create New Center</span>
+                {step !== 'done' && (
+                  <span style={s.stepTag}>
+                    Step {step === 'email' ? 1 : step === 'otp' ? 2 : 3} / 3
+                  </span>
+                )}
+              </div>
+              <button onClick={closeModal} style={s.closeBtn}><X size={18} /></button>
+            </div>
+
+            {/* ── Step 1: Email ── */}
+            {step === 'email' && (
+              <form onSubmit={handleSendOtp} style={s.modalForm}>
+                <p style={s.stepDesc}>
+                  Enter the admin&apos;s email address. We&apos;ll send a verification code to confirm it&apos;s valid.
+                </p>
+
+                <div style={s.field}>
+                  <label style={s.label}>Admin Email *</label>
+                  <input
+                    style={s.input}
+                    type="email"
+                    placeholder="admin@thecenter.com"
+                    value={form.adminEmail}
+                    onChange={e => setForm(f => ({ ...f, adminEmail: e.target.value }))}
+                    required
+                    autoFocus
+                  />
+                </div>
+
+                {otpError && <ErrorBox msg={otpError} />}
+
+                <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                  <button type="button" onClick={closeModal} style={s.cancelBtn}>Cancel</button>
+                  <button type="submit" style={s.submitBtn} disabled={sendingOtp}>
+                    <Mail size={14} />
+                    {sendingOtp ? 'Sending…' : 'Send Verification Code'}
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* ── Step 2: OTP ── */}
+            {step === 'otp' && (
+              <form onSubmit={handleVerifyOtp} style={s.modalForm}>
+                <p style={s.stepDesc}>
+                  A 6-digit code was sent to <strong style={{ color: '#f59e0b' }}>{form.adminEmail}</strong>.
+                  Enter it below. The code expires in 10 minutes.
+                </p>
+
+                <div style={s.field}>
+                  <label style={s.label}>Verification Code *</label>
+                  <input
+                    style={{ ...s.input, letterSpacing: '0.3em', fontSize: '22px', textAlign: 'center' }}
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]{6}"
+                    maxLength={6}
+                    placeholder="000000"
+                    value={otpInput}
+                    onChange={e => setOtpInput(e.target.value.replace(/\D/g, ''))}
+                    required
+                    autoFocus
+                  />
+                </div>
+
+                {verifyErr && <ErrorBox msg={verifyErr} />}
+
+                <div style={{ display: 'flex', gap: '10px', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <button
+                    type="button"
+                    onClick={() => { setStep('email'); setOtpInput(''); setVerifyErr(''); }}
+                    style={{ background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', fontSize: '13px', fontFamily: 'inherit' }}
+                  >
+                    ← Change email
+                  </button>
+                  <div style={{ display: 'flex', gap: '10px' }}>
+                    <button type="button" onClick={closeModal} style={s.cancelBtn}>Cancel</button>
+                    <button type="submit" style={s.submitBtn} disabled={verifying || otpInput.length < 6}>
+                      <KeyRound size={14} />
+                      {verifying ? 'Verifying…' : 'Verify Code'}
+                    </button>
+                  </div>
+                </div>
+              </form>
+            )}
+
+            {/* ── Step 3: Center Details Form ── */}
+            {step === 'form' && (
+              <form onSubmit={handleCreateCenter} style={s.modalForm}>
+                <p style={s.stepDesc}>
+                  Email <strong style={{ color: '#34d399' }}>✓ verified</strong>. Fill in the center details below.
+                </p>
+
+                {createErr && <ErrorBox msg={createErr} />}
+
+                {/* Row: Center Name */}
+                <div style={s.field}>
+                  <label style={s.label}>Center Name *</label>
+                  <input
+                    style={s.input}
+                    type="text"
+                    placeholder="e.g. Greenfield Academy"
+                    value={form.centerName}
+                    onChange={e => handleCenterNameChange(e.target.value)}
+                    required
+                    disabled={creating}
+                  />
+                </div>
+
+                {/* Row: Slug */}
+                <div style={s.field}>
+                  <label style={s.label}>Slug * <span style={{ color: '#6b7280', fontWeight: '400', textTransform: 'none' }}>(auto-generated, editable)</span></label>
+                  <input
+                    style={s.input}
+                    type="text"
+                    placeholder="greenfield-academy"
+                    value={form.slug}
+                    onChange={e => setForm(f => ({ ...f, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') }))}
+                    required
+                    disabled={creating}
+                  />
+                </div>
+
+                {/* Row: Password + Phone */}
+                <div style={s.twoCol}>
+                  <div style={s.field}>
+                    <label style={s.label}>Admin Password *</label>
+                    <div style={s.passwordWrap}>
+                      <input
+                        style={{ ...s.input, border: 'none', padding: '0', flex: 1, background: 'transparent' }}
+                        type={showPwd ? 'text' : 'password'}
+                        placeholder="Min 8 characters"
+                        value={form.password}
+                        onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
+                        required
+                        disabled={creating}
+                        minLength={8}
+                      />
+                      <button type="button" onClick={() => setShowPwd(v => !v)} style={s.eyeBtn}>
+                        {showPwd ? <EyeOff size={15} /> : <Eye size={15} />}
+                      </button>
+                    </div>
+                  </div>
+                  <div style={s.field}>
+                    <label style={s.label}>Phone</label>
+                    <input
+                      style={s.input}
+                      type="text"
+                      placeholder="+1234567890"
+                      value={form.phone}
+                      onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
+                      disabled={creating}
+                    />
+                  </div>
+                </div>
+
+                {/* Row: Plan + Timezone */}
+                <div style={s.twoCol}>
+                  <div style={s.field}>
+                    <label style={s.label}>Plan *</label>
+                    <select
+                      style={s.input}
+                      value={form.plan}
+                      onChange={e => setForm(f => ({ ...f, plan: e.target.value }))}
+                      disabled={creating}
+                    >
+                      {['free', 'basic', 'pro', 'enterprise'].map(p => (
+                        <option key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div style={s.field}>
+                    <label style={s.label}>Timezone</label>
+                    <select
+                      style={s.input}
+                      value={form.timezone}
+                      onChange={e => setForm(f => ({ ...f, timezone: e.target.value }))}
+                      disabled={creating}
+                    >
+                      {TIMEZONES.map(tz => <option key={tz} value={tz}>{tz}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Row: Country + Address */}
+                <div style={s.twoCol}>
+                  <div style={s.field}>
+                    <label style={s.label}>Country</label>
+                    <input
+                      style={s.input}
+                      type="text"
+                      placeholder="e.g. Nigeria"
+                      value={form.country}
+                      onChange={e => setForm(f => ({ ...f, country: e.target.value }))}
+                      disabled={creating}
+                    />
+                  </div>
+                  <div style={s.field}>
+                    <label style={s.label}>City / Address</label>
+                    <input
+                      style={s.input}
+                      type="text"
+                      placeholder="e.g. Lagos"
+                      value={form.address}
+                      onChange={e => setForm(f => ({ ...f, address: e.target.value }))}
+                      disabled={creating}
+                    />
+                  </div>
+                </div>
+
+                {/* Row: Website + Limits */}
+                <div style={s.twoCol}>
+                  <div style={s.field}>
+                    <label style={s.label}>Website</label>
+                    <input
+                      style={s.input}
+                      type="url"
+                      placeholder="https://thecenter.com"
+                      value={form.website}
+                      onChange={e => setForm(f => ({ ...f, website: e.target.value }))}
+                      disabled={creating}
+                    />
+                  </div>
+                  <div style={s.twoCol}>
+                    <div style={s.field}>
+                      <label style={s.label}>Max Teachers</label>
+                      <input
+                        style={s.input}
+                        type="number"
+                        min="1"
+                        placeholder="∞"
+                        value={form.maxTeachers}
+                        onChange={e => setForm(f => ({ ...f, maxTeachers: e.target.value }))}
+                        disabled={creating}
+                      />
+                    </div>
+                    <div style={s.field}>
+                      <label style={s.label}>Max Students</label>
+                      <input
+                        style={s.input}
+                        type="number"
+                        min="1"
+                        placeholder="∞"
+                        value={form.maxStudents}
+                        onChange={e => setForm(f => ({ ...f, maxStudents: e.target.value }))}
+                        disabled={creating}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Description */}
+                <div style={s.field}>
+                  <label style={s.label}>Description <span style={{ color: '#6b7280', fontWeight: '400', textTransform: 'none' }}>(optional)</span></label>
+                  <textarea
+                    style={{ ...s.input, height: '72px', resize: 'vertical' }}
+                    placeholder="A brief description of what this center offers…"
+                    value={form.description}
+                    onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+                    disabled={creating}
+                  />
+                </div>
+
+                <div style={s.modalNote}>
+                  The center will be registered and activated immediately. The admin can log in right away using the email and password above.
+                </div>
+
+                <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                  <button type="button" onClick={closeModal} style={s.cancelBtn} disabled={creating}>Cancel</button>
+                  <button type="submit" style={s.submitBtn} disabled={creating}>
+                    {creating ? 'Creating…' : 'Create & Activate Center'}
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* ── Done ── */}
+            {step === 'done' && (
+              <div style={{ padding: '28px', display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'center', textAlign: 'center' }}>
+                <CheckCircle size={40} color="#34d399" />
+                <p style={{ margin: 0, fontSize: '17px', fontWeight: '700', color: '#f1f5f9' }}>Center Created!</p>
+                <p style={{ margin: 0, fontSize: '14px', color: '#9ca3af', maxWidth: '360px', lineHeight: '1.6' }}>{successMsg}</p>
+                <button onClick={closeModal} style={{ ...s.submitBtn, marginTop: '8px' }}>Done</button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ErrorBox({ msg }) {
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: '8px',
+      background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)',
+      borderRadius: '8px', padding: '10px 14px',
+    }}>
+      <XCircle size={15} color="#f87171" />
+      <span style={{ color: '#f87171', fontSize: '13px' }}>{msg}</span>
+    </div>
+  );
+}
+
+const s = {
+  root: {
+    minHeight: '100vh',
+    background: '#09080e',
+    color: '#f1f5f9',
+    fontFamily: "'Sora', 'Segoe UI', sans-serif",
+  },
+  header: {
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    padding: '16px 28px',
+    background: 'rgba(245,158,11,0.06)',
+    borderBottom: '1px solid rgba(245,158,11,0.12)',
+  },
+  headerLeft: { display: 'flex', alignItems: 'center', gap: '10px' },
+  headerTitle: { fontSize: '18px', fontWeight: '700', color: '#f1f5f9' },
+  headerSub:   { fontSize: '13px', color: '#6b7280' },
+  createBtn: {
+    display: 'flex', alignItems: 'center', gap: '6px',
+    padding: '8px 16px', borderRadius: '8px',
+    background: 'linear-gradient(135deg, #b45309, #f59e0b)',
+    border: 'none', color: '#0c0a00',
+    fontSize: '13px', fontWeight: '700',
+    cursor: 'pointer', fontFamily: 'inherit',
+  },
+  logoutBtn: {
+    display: 'flex', alignItems: 'center', gap: '6px',
+    padding: '8px 14px', borderRadius: '8px',
+    background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)',
+    color: '#f87171', fontSize: '13px', fontWeight: '600',
+    cursor: 'pointer', fontFamily: 'inherit',
+  },
+  body: { padding: '28px', maxWidth: '1100px', margin: '0 auto' },
+  statsRow: {
+    display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+    gap: '16px', marginBottom: '24px',
+  },
+  statCard: {
+    display: 'flex', alignItems: 'center', gap: '14px',
+    padding: '18px 20px', borderRadius: '14px',
+    background: 'rgba(255,255,255,0.04)',
+    border: '1px solid rgba(255,255,255,0.07)',
+  },
+  statIcon: {
+    width: '40px', height: '40px', borderRadius: '10px',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+  },
+  statValue: { margin: '0 0 2px', fontSize: '24px', fontWeight: '700', color: '#f1f5f9' },
+  statLabel: { margin: 0, fontSize: '12px', color: '#6b7280' },
+  tabRow: { display: 'flex', gap: '8px', marginBottom: '16px' },
+  tabBtn: {
+    display: 'flex', alignItems: 'center', gap: '6px',
+    padding: '7px 16px', borderRadius: '8px', fontSize: '13px', fontWeight: '600',
+    background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
+    color: '#6b7280', cursor: 'pointer', fontFamily: 'inherit',
+  },
+  tabBtnActive: {
+    background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.25)',
+    color: '#f59e0b',
+  },
+  tabBadge: {
+    minWidth: '18px', height: '18px', borderRadius: '9px',
+    background: '#f59e0b', color: '#0c0a00',
+    fontSize: '10px', fontWeight: '800',
+    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+    padding: '0 4px',
+  },
+  card: {
+    background: 'rgba(255,255,255,0.03)',
+    border: '1px solid rgba(255,255,255,0.07)',
+    borderRadius: '16px', padding: '20px',
+  },
+  sectionTitle: {
+    display: 'flex', alignItems: 'center', gap: '8px',
+    fontSize: '15px', fontWeight: '700', color: '#f1f5f9',
+    margin: 0,
+  },
+  refreshBtn: {
+    background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
+    borderRadius: '7px', color: '#6b7280', cursor: 'pointer',
+    padding: '6px', display: 'flex', alignItems: 'center',
+  },
+  table: { width: '100%', borderCollapse: 'collapse' },
+  th: {
+    textAlign: 'left', padding: '10px 14px',
+    fontSize: '11px', fontWeight: '700', letterSpacing: '0.08em',
+    color: '#6b7280', textTransform: 'uppercase',
+    borderBottom: '1px solid rgba(255,255,255,0.06)',
+  },
+  tr: { borderBottom: '1px solid rgba(255,255,255,0.04)' },
+  td: { padding: '12px 14px', verticalAlign: 'middle' },
+  slug: {
+    fontSize: '12px', padding: '2px 8px', borderRadius: '6px',
+    background: 'rgba(245,158,11,0.1)', color: '#f59e0b',
+    fontFamily: 'monospace',
+  },
+  planBadge: {
+    fontSize: '11px', padding: '2px 8px', borderRadius: '20px',
+    background: 'rgba(99,102,241,0.12)', color: '#818cf8',
+    fontWeight: '600', textTransform: 'capitalize',
+  },
+  statusBadge: {
+    display: 'inline-flex', alignItems: 'center', gap: '5px',
+    fontSize: '12px', fontWeight: '600',
+    padding: '3px 10px', borderRadius: '20px',
+    border: '1px solid', textTransform: 'capitalize',
+  },
+  approveBtn: {
+    display: 'inline-flex', alignItems: 'center', gap: '4px',
+    padding: '5px 12px', borderRadius: '7px', fontSize: '12px', fontWeight: '600',
+    background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.25)',
+    color: '#34d399', cursor: 'pointer', fontFamily: 'inherit',
+  },
+  rejectBtn: {
+    display: 'inline-flex', alignItems: 'center', gap: '4px',
+    padding: '5px 12px', borderRadius: '7px', fontSize: '12px', fontWeight: '600',
+    background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)',
+    color: '#f87171', cursor: 'pointer', fontFamily: 'inherit',
+  },
+  suspendBtn: {
+    display: 'inline-flex', alignItems: 'center', gap: '4px',
+    padding: '5px 12px', borderRadius: '7px', fontSize: '12px', fontWeight: '600',
+    background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)',
+    color: '#f59e0b', cursor: 'pointer', fontFamily: 'inherit',
+  },
+  themeBtn: {
+    display: 'inline-flex', alignItems: 'center', gap: '4px',
+    padding: '5px 12px', borderRadius: '7px', fontSize: '12px', fontWeight: '600',
+    background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)',
+    color: '#818cf8', cursor: 'pointer', fontFamily: 'inherit',
+  },
+  featuresBtn: {
+    display: 'inline-flex', alignItems: 'center', gap: '4px',
+    padding: '5px 12px', borderRadius: '7px', fontSize: '12px', fontWeight: '600',
+    background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)',
+    color: '#34d399', cursor: 'pointer', fontFamily: 'inherit',
+  },
+  deleteBtn: {
+    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+    padding: '5px 8px', borderRadius: '7px', fontSize: '12px',
+    background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)',
+    color: '#f87171', cursor: 'pointer', fontFamily: 'inherit',
+  },
+
+  // Modal
+  overlay: {
+    position: 'fixed', inset: 0, zIndex: 1000,
+    background: 'rgba(0,0,0,0.8)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    padding: '20px',
+  },
+  modal: {
+    background: '#110f1a',
+    border: '1px solid rgba(245,158,11,0.2)',
+    borderRadius: '18px',
+    width: '100%', maxWidth: '620px',
+    maxHeight: '92vh', overflowY: 'auto',
+    boxShadow: '0 24px 80px rgba(0,0,0,0.7)',
+  },
+  modalHeader: {
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    padding: '20px 24px',
+    borderBottom: '1px solid rgba(255,255,255,0.07)',
+    position: 'sticky', top: 0, background: '#110f1a', zIndex: 1,
+  },
+  modalTitle: { fontSize: '16px', fontWeight: '700', color: '#f1f5f9' },
+  stepTag: {
+    fontSize: '11px', fontWeight: '700',
+    background: 'rgba(245,158,11,0.12)', color: '#f59e0b',
+    padding: '2px 8px', borderRadius: '20px',
+  },
+  closeBtn: {
+    background: 'none', border: 'none', color: '#6b7280',
+    cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center',
+  },
+  modalForm: { padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' },
+  stepDesc: { margin: 0, fontSize: '13.5px', color: '#9ca3af', lineHeight: '1.6' },
+  twoCol: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' },
+  field: { display: 'flex', flexDirection: 'column', gap: '6px' },
+  label: {
+    fontSize: '11.5px', fontWeight: '700', color: '#9ca3af',
+    textTransform: 'uppercase', letterSpacing: '0.07em',
+  },
+  input: {
+    width: '100%', padding: '10px 14px',
+    background: 'rgba(255,255,255,0.04)',
+    border: '1px solid rgba(255,255,255,0.1)',
+    borderRadius: '10px', color: '#f1f5f9',
+    fontSize: '14px', fontFamily: 'inherit',
+    outline: 'none', boxSizing: 'border-box',
+  },
+  passwordWrap: {
+    display: 'flex', alignItems: 'center',
+    padding: '0 14px',
+    background: 'rgba(255,255,255,0.04)',
+    border: '1px solid rgba(255,255,255,0.1)',
+    borderRadius: '10px', height: '42px', gap: '8px',
+  },
+  eyeBtn: {
+    background: 'none', border: 'none', color: '#6b7280',
+    cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center',
+  },
+  modalNote: {
+    fontSize: '12px', color: '#6b7280',
+    background: 'rgba(245,158,11,0.06)',
+    border: '1px solid rgba(245,158,11,0.12)',
+    borderRadius: '8px', padding: '10px 14px',
+    lineHeight: '1.5',
+  },
+  cancelBtn: {
+    padding: '10px 20px', borderRadius: '10px',
+    background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
+    color: '#9ca3af', fontSize: '14px', fontWeight: '600',
+    cursor: 'pointer', fontFamily: 'inherit',
+  },
+  submitBtn: {
+    display: 'inline-flex', alignItems: 'center', gap: '7px',
+    padding: '10px 22px', borderRadius: '10px',
+    background: 'linear-gradient(135deg, #b45309, #f59e0b)',
+    border: 'none', color: '#0c0a00',
+    fontSize: '14px', fontWeight: '700',
+    cursor: 'pointer', fontFamily: 'inherit',
+  },
+};

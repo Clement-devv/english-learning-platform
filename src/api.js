@@ -1,4 +1,5 @@
 import axios from "axios";
+import { getCachedCenter } from "./utils/branding";
 
 const _apiUrl = import.meta.env.VITE_API_URL;
 if (!_apiUrl && import.meta.env.PROD) {
@@ -21,7 +22,7 @@ const removeToken = (key) => {
   localStorage.removeItem(key);
 };
 
-// Add token to all requests automatically
+// Add token + center slug to all requests automatically
 api.interceptors.request.use(
   (config) => {
     const token =
@@ -32,6 +33,15 @@ api.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+
+    // Always send the center slug so tenantMiddleware can identify the center.
+    // In production this is also derived from the subdomain, but sending the
+    // header is the reliable fallback for dev, mobile apps, and API clients.
+    const slug = import.meta.env.VITE_CENTER_SLUG || getCachedCenter()?.slug;
+    if (slug) {
+      config.headers["x-center-slug"] = slug;
+    }
+
     return config;
   },
   (error) => Promise.reject(error)

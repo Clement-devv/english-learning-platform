@@ -7,43 +7,41 @@
 // POST /api/reports/send/:studentId?period=monthly&month=2026-02
 //      → generates PDF and emails it to the student immediately
 
-import express  from "express";
-import Student  from "../models/Student.js";
-import Teacher  from "../models/Teacher.js";
-import Booking  from "../models/Booking.js";
+import express from "express";
 import { verifyToken, verifyAdminOrTeacher } from "../middleware/authMiddleware.js";
-import { generateProgressReport }  from "../utils/progressReportGenerator.js";
-import { sendProgressReport }      from "../utils/emailService.js";
+import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
+import { generateProgressReport } from "../utils/progressReportGenerator.js";
+import { sendProgressReport }     from "../utils/emailService.js";
+import { studentSchema } from "../schemas/studentSchema.js";
+import { bookingSchema } from "../schemas/bookingSchema.js";
 
 const router = express.Router();
+router.use(tenantMiddleware);
+
+const getStudent = (db) => db.models.Student || db.model("Student", studentSchema);
+const getBooking = (db) => db.models.Booking || db.model("Booking", bookingSchema);
 
 // ── Parse date window from query params ───────────────────────────────────────
-// period = "weekly"  → needs ?week=2026-W10  (ISO week) or defaults to last 7 days
-// period = "monthly" → needs ?month=2026-02  or defaults to last month
 function parseDateRange(period, query) {
   const now = new Date();
 
   if (period === "weekly") {
     if (query.week) {
-      // parse "2026-W10" → Monday of that week
       const [yr, wStr] = query.week.split("-W");
       const week  = parseInt(wStr, 10);
       const year  = parseInt(yr, 10);
-      // Jan 4 is always in week 1 (ISO 8601)
       const jan4  = new Date(year, 0, 4);
       const monday = new Date(jan4.getTime() + (week - 1) * 7 * 24 * 60 * 60 * 1000);
-      monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7)); // back to Monday
+      monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
       monday.setHours(0, 0, 0, 0);
       const sunday = new Date(monday.getTime() + 7 * 24 * 60 * 60 * 1000);
       return { from: monday, to: sunday };
     }
-    // default: last 7 days
     const to   = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const from = new Date(to.getTime() - 7 * 24 * 60 * 60 * 1000);
     return { from, to };
   }
 
-  // monthly
   if (query.month) {
     const [yr, mo] = query.month.split("-").map(Number);
     return {
@@ -51,7 +49,6 @@ function parseDateRange(period, query) {
       to:   new Date(yr, mo,     1),
     };
   }
-  // default: last month
   return {
     from: new Date(now.getFullYear(), now.getMonth() - 1, 1),
     to:   new Date(now.getFullYear(), now.getMonth(),     1),
@@ -59,8 +56,8 @@ function parseDateRange(period, query) {
 }
 
 // ── Primary teacher helper ────────────────────────────────────────────────────
-async function primaryTeacher(studentId) {
-  const last = await Booking.findOne({ studentId, status: "completed" })
+async function primaryTeacher(studentId, db) {
+  const last = await getBooking(db).findOne({ studentId, status: "completed" })
     .sort({ scheduledTime: -1 })
     .populate("teacherId", "firstName lastName");
   return last?.teacherId ?? null;
@@ -73,13 +70,13 @@ router.get(
   verifyAdminOrTeacher,
   async (req, res) => {
     try {
-      const student = await Student.findById(req.params.studentId);
+      const student = await getStudent(req.db).findById(req.params.studentId);
       if (!student) return res.status(404).json({ error: "Student not found" });
 
       const period  = req.query.period === "weekly" ? "weekly" : "monthly";
       const { from, to } = parseDateRange(period, req.query);
-      const teacher = await primaryTeacher(student._id);
-      const pdf     = await generateProgressReport(student, teacher, from, to, period);
+      const teacher = await primaryTeacher(student._id, req.db);
+      const pdf     = await generateProgressReport(req.db, student, teacher, from, to, period);
 
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader(
@@ -101,14 +98,14 @@ router.post(
   verifyAdminOrTeacher,
   async (req, res) => {
     try {
-      const student = await Student.findById(req.params.studentId);
+      const student = await getStudent(req.db).findById(req.params.studentId);
       if (!student) return res.status(404).json({ error: "Student not found" });
       if (!student.email) return res.status(400).json({ error: "Student has no email address" });
 
       const period  = req.query.period === "weekly" ? "weekly" : "monthly";
       const { from, to } = parseDateRange(period, req.query);
-      const teacher = await primaryTeacher(student._id);
-      const pdf     = await generateProgressReport(student, teacher, from, to, period);
+      const teacher = await primaryTeacher(student._id, req.db);
+      const pdf     = await generateProgressReport(req.db, student, teacher, from, to, period);
       const result  = await sendProgressReport(student, pdf, period, from, to);
 
       if (result.success) {

@@ -1,8 +1,9 @@
 import express from "express";
-import TeacherAvailability from "../models/TeacherAvailability.js";
-import Booking from "../models/Booking.js";
-import Teacher from "../models/Teacher.js";
 import { verifyToken } from "../middleware/authMiddleware.js";
+import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
+import { teacherAvailabilitySchema } from "../schemas/teacherAvailabilitySchema.js";
+import { bookingSchema }             from "../schemas/bookingSchema.js";
+import { teacherSchema }             from "../schemas/teacherSchema.js";
 
 // Returns true if [s1,e1) overlaps with [s2,e2)  (string "HH:MM" comparison)
 function timesOverlap(s1, e1, s2, e2) {
@@ -10,6 +11,12 @@ function timesOverlap(s1, e1, s2, e2) {
 }
 
 const router = express.Router();
+router.use(tenantMiddleware);
+
+const getTeacherAvailability = (db) =>
+  db.models.TeacherAvailability || db.model("TeacherAvailability", teacherAvailabilitySchema);
+const getBooking = (db) => db.models.Booking || db.model("Booking", bookingSchema);
+const getTeacher = (db) => db.models.Teacher || db.model("Teacher", teacherSchema);
 
 // GET /api/teacher-availability/:teacherId
 // Query: ?startDate=ISO&endDate=ISO
@@ -17,7 +24,7 @@ router.get("/:teacherId", verifyToken, async (req, res) => {
   try {
     // Students are blocked when teacher has hidden their schedule
     if (req.user.role === "student") {
-      const teacher = await Teacher.findById(req.params.teacherId).select("showScheduleToStudents");
+      const teacher = await getTeacher(req.db).findById(req.params.teacherId).select("showScheduleToStudents");
       if (teacher && teacher.showScheduleToStudents === false) {
         return res.json({ availability: [], hidden: true });
       }
@@ -28,7 +35,6 @@ router.get("/:teacherId", verifyToken, async (req, res) => {
 
     let query;
     if (startDate && endDate) {
-      // Return recurring slots always + specific slots within the date range
       query = {
         ...base,
         $or: [
@@ -40,7 +46,7 @@ router.get("/:teacherId", verifyToken, async (req, res) => {
       query = base;
     }
 
-    const availability = await TeacherAvailability.find(query).sort({ date: 1, startTime: 1 });
+    const availability = await getTeacherAvailability(req.db).find(query).sort({ date: 1, startTime: 1 });
     res.json({ availability });
   } catch (err) {
     console.error("Error fetching availability:", err);
@@ -75,7 +81,7 @@ router.post("/", verifyToken, async (req, res) => {
         ...(isRecurring ? [] : [{ isRecurring: false, date: { $gte: dayStart, $lte: dayEnd } }]),
       ],
     };
-    const existingSlots = await TeacherAvailability.find(slotConflictQuery);
+    const existingSlots = await getTeacherAvailability(req.db).find(slotConflictQuery);
     for (const slot of existingSlots) {
       if (timesOverlap(startTime, endTime, slot.startTime, slot.endTime)) {
         return res.status(409).json({
@@ -86,7 +92,7 @@ router.post("/", verifyToken, async (req, res) => {
 
     // ── Conflict check against accepted/pending bookings (specific day only) ──
     if (!isRecurring && dayStart && dayEnd) {
-      const existingBookings = await Booking.find({
+      const existingBookings = await getBooking(req.db).find({
         teacherId,
         scheduledTime: { $gte: dayStart, $lte: dayEnd },
         status: { $in: ["pending", "accepted"] },
@@ -104,6 +110,7 @@ router.post("/", verifyToken, async (req, res) => {
       }
     }
 
+    const TeacherAvailability = getTeacherAvailability(req.db);
     const avail = new TeacherAvailability({
       teacherId,
       studentId:   req.body.studentId || null,
@@ -127,7 +134,7 @@ router.post("/", verifyToken, async (req, res) => {
 // DELETE /api/teacher-availability/:id
 router.delete("/:id", verifyToken, async (req, res) => {
   try {
-    const avail = await TeacherAvailability.findByIdAndDelete(req.params.id);
+    const avail = await getTeacherAvailability(req.db).findByIdAndDelete(req.params.id);
     if (!avail) return res.status(404).json({ message: "Not found" });
     res.json({ message: "Availability removed" });
   } catch (err) {

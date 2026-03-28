@@ -1,11 +1,17 @@
-import express                from "express";
-import Anthropic              from "@anthropic-ai/sdk";
-import { verifyToken }        from "../middleware/authMiddleware.js";
-import ChatCredit             from "../models/ChatCredit.js";
-import ConversationMessage    from "../models/ConversationMessage.js";
-import Student                from "../models/Student.js";
+import express             from "express";
+import Anthropic           from "@anthropic-ai/sdk";
+import { verifyToken }     from "../middleware/authMiddleware.js";
+import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
+import { chatCreditSchema }         from "../schemas/chatCreditSchema.js";
+import { conversationMessageSchema } from "../schemas/conversationMessageSchema.js";
+import { studentSchema }            from "../schemas/studentSchema.js";
 
 const router = express.Router();
+router.use(tenantMiddleware);
+
+const getChatCredit          = (db) => db.models.ChatCredit          || db.model("ChatCredit",          chatCreditSchema);
+const getConversationMessage = (db) => db.models.ConversationMessage || db.model("ConversationMessage", conversationMessageSchema);
+const getStudent             = (db) => db.models.Student             || db.model("Student",             studentSchema);
 
 // Only send last 20 messages as context — controls cost while keeping conversation coherent
 const CONTEXT_WINDOW = 20;
@@ -28,7 +34,7 @@ router.get("/credits", verifyToken, async (req, res) => {
   try {
     if (req.user.role !== "student") return res.status(403).json({ message: "Students only" });
 
-    const record = await ChatCredit.findOne({ studentId: req.user.id });
+    const record = await getChatCredit(req.db).findOne({ studentId: req.user.id });
     res.json({
       success: true,
       credits:   record?.credits   ?? 0,
@@ -44,7 +50,7 @@ router.get("/history", verifyToken, async (req, res) => {
   try {
     if (req.user.role !== "student") return res.status(403).json({ message: "Students only" });
 
-    const messages = await ConversationMessage
+    const messages = await getConversationMessage(req.db)
       .find({ studentId: req.user.id })
       .sort({ createdAt: -1 })
       .limit(50)
@@ -60,7 +66,7 @@ router.get("/history", verifyToken, async (req, res) => {
 router.delete("/history", verifyToken, async (req, res) => {
   try {
     if (req.user.role !== "student") return res.status(403).json({ message: "Students only" });
-    await ConversationMessage.deleteMany({ studentId: req.user.id });
+    await getConversationMessage(req.db).deleteMany({ studentId: req.user.id });
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -82,7 +88,8 @@ router.post("/message", verifyToken, async (req, res) => {
     }
 
     // ── 1. Check credits ────────────────────────────────────────────────────
-    const creditRecord = await ChatCredit.findOne({ studentId: req.user.id });
+    const ChatCredit    = getChatCredit(req.db);
+    const creditRecord  = await ChatCredit.findOne({ studentId: req.user.id });
     const currentCredits = creditRecord?.credits ?? 0;
 
     if (currentCredits < 1) {
@@ -93,6 +100,7 @@ router.post("/message", verifyToken, async (req, res) => {
     }
 
     // ── 2. Load recent history for context ─────────────────────────────────
+    const ConversationMessage = getConversationMessage(req.db);
     const history = await ConversationMessage
       .find({ studentId: req.user.id })
       .sort({ createdAt: -1 })
@@ -105,7 +113,7 @@ router.post("/message", verifyToken, async (req, res) => {
     }));
 
     // ── 3. Call Claude ──────────────────────────────────────────────────────
-    const student = await Student.findById(req.user.id).select("firstName").lean();
+    const student = await getStudent(req.db).findById(req.user.id).select("firstName").lean();
     const client  = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
     const response = await client.messages.create({
@@ -136,7 +144,7 @@ router.post("/message", verifyToken, async (req, res) => {
     // ── 6. Return response ──────────────────────────────────────────────────
     const updated = await ChatCredit.findOne({ studentId: req.user.id });
     res.json({
-      success:         true,
+      success:          true,
       reply,
       creditsRemaining: updated?.credits ?? 0,
     });
@@ -158,10 +166,10 @@ router.post("/credits/grant", verifyToken, async (req, res) => {
       return res.status(400).json({ message: "studentId and amount (1–10000) are required" });
     }
 
-    const student = await Student.findById(studentId);
+    const student = await getStudent(req.db).findById(studentId);
     if (!student) return res.status(404).json({ message: "Student not found" });
 
-    const record = await ChatCredit.findOneAndUpdate(
+    const record = await getChatCredit(req.db).findOneAndUpdate(
       { studentId },
       {
         $inc:  { credits: amount },
@@ -171,9 +179,9 @@ router.post("/credits/grant", verifyToken, async (req, res) => {
     );
 
     res.json({
-      success:  true,
-      credits:  record.credits,
-      message:  `${amount} credits granted to ${student.firstName}`,
+      success: true,
+      credits: record.credits,
+      message: `${amount} credits granted to ${student.firstName}`,
     });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -186,7 +194,7 @@ router.get("/credits/student/:id", verifyToken, async (req, res) => {
     if (!["teacher", "admin"].includes(req.user.role)) {
       return res.status(403).json({ message: "Teachers and admins only" });
     }
-    const record = await ChatCredit.findOne({ studentId: req.params.id });
+    const record = await getChatCredit(req.db).findOne({ studentId: req.params.id });
     res.json({ success: true, credits: record?.credits ?? 0, totalUsed: record?.totalUsed ?? 0 });
   } catch (err) {
     res.status(500).json({ message: err.message });

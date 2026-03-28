@@ -1,12 +1,19 @@
 // server/routes/disputeRoutes.js
 import express from "express";
-import Booking from "../models/Booking.js";
-import Student from "../models/Student.js";
-import Teacher from "../models/Teacher.js";
-import PaymentTransaction from "../models/PaymentTransaction.js";
-import { verifyToken, verifyAdmin, verifyAdminOrTeacher } from "../middleware/authMiddleware.js";
+import { verifyToken, verifyAdmin } from "../middleware/authMiddleware.js";
+import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
+import { bookingSchema }            from "../schemas/bookingSchema.js";
+import { studentSchema }            from "../schemas/studentSchema.js";
+import { teacherSchema }            from "../schemas/teacherSchema.js";
+import { paymentTransactionSchema } from "../schemas/paymentTransactionSchema.js";
 
 const router = express.Router();
+router.use(tenantMiddleware);
+
+const getBooking            = (db) => db.models.Booking            || db.model("Booking",            bookingSchema);
+const getStudent            = (db) => db.models.Student            || db.model("Student",            studentSchema);
+const getTeacher            = (db) => db.models.Teacher            || db.model("Teacher",            teacherSchema);
+const getPaymentTransaction = (db) => db.models.PaymentTransaction || db.model("PaymentTransaction", paymentTransactionSchema);
 
 /**
  * POST /api/disputes/booking/:bookingId
@@ -20,7 +27,7 @@ router.post("/booking/:bookingId", verifyToken, async (req, res) => {
       return res.status(400).json({ success: false, message: "Dispute reason is required" });
     }
 
-    const booking = await Booking.findById(req.params.bookingId)
+    const booking = await getBooking(req.db).findById(req.params.bookingId)
       .populate("teacherId", "firstName lastName email")
       .populate("studentId", "firstName surname email");
 
@@ -63,9 +70,9 @@ router.post("/booking/:bookingId", verifyToken, async (req, res) => {
  * GET /api/disputes
  * Admin views all pending disputes
  */
-router.get("/", verifyAdmin, async (req, res) => {
+router.get("/", verifyToken, verifyAdmin, async (req, res) => {
   try {
-    const disputes = await Booking.find({ disputeRaised: true, disputeStatus: "pending" })
+    const disputes = await getBooking(req.db).find({ disputeRaised: true, disputeStatus: "pending" })
       .populate("teacherId", "firstName lastName email")
       .populate("studentId", "firstName surname email lastName")
       .sort({ disputedAt: -1 });
@@ -81,8 +88,9 @@ router.get("/", verifyAdmin, async (req, res) => {
  * GET /api/disputes/stats
  * Admin views dispute statistics
  */
-router.get("/stats", verifyAdmin, async (req, res) => {
+router.get("/stats", verifyToken, verifyAdmin, async (req, res) => {
   try {
+    const Booking = getBooking(req.db);
     const [pending, teacherWins, studentWins] = await Promise.all([
       Booking.countDocuments({ disputeRaised: true, disputeStatus: "pending" }),
       Booking.countDocuments({ disputeRaised: true, disputeStatus: "resolved_teacher" }),
@@ -109,7 +117,7 @@ router.get("/stats", verifyAdmin, async (req, res) => {
  * Admin resolves a dispute
  * resolution: "approve_teacher" | "approve_student"
  */
-router.patch("/:bookingId/resolve", verifyAdmin, async (req, res) => {
+router.patch("/:bookingId/resolve", verifyToken, verifyAdmin, async (req, res) => {
   try {
     const { resolution, adminNotes } = req.body;
 
@@ -117,7 +125,7 @@ router.patch("/:bookingId/resolve", verifyAdmin, async (req, res) => {
       return res.status(400).json({ success: false, message: "Invalid resolution value" });
     }
 
-    const booking = await Booking.findById(req.params.bookingId)
+    const booking = await getBooking(req.db).findById(req.params.bookingId)
       .populate("teacherId", "firstName lastName")
       .populate("studentId", "firstName surname noOfClasses");
 
@@ -141,21 +149,21 @@ router.patch("/:bookingId/resolve", verifyAdmin, async (req, res) => {
 
       if (wasMissed) {
         // Missed class approved: deduct student class and pay teacher
-        const student = await Student.findById(booking.studentId._id);
+        const student = await getStudent(req.db).findById(booking.studentId._id);
         if (student && student.noOfClasses > 0) {
           student.noOfClasses -= 1;
           if (student.noOfClasses === 0) student.active = false;
           await student.save();
         }
 
-        const teacher = await Teacher.findById(booking.teacherId._id);
+        const teacher = await getTeacher(req.db).findById(booking.teacherId._id);
         if (teacher) {
           const earned = parseFloat(teacher.ratePerClass || 0);
           teacher.lessonsCompleted = (teacher.lessonsCompleted || 0) + 1;
           teacher.earned = (teacher.earned || 0) + earned;
           await teacher.save();
 
-          await PaymentTransaction.create({
+          await getPaymentTransaction(req.db).create({
             bookingId: booking._id,
             teacherId: booking.teacherId._id,
             studentId: booking.studentId._id,
@@ -176,7 +184,7 @@ router.patch("/:bookingId/resolve", verifyAdmin, async (req, res) => {
       // Only refund student class if it was already deducted (adminRejected = completed then rejected)
       // Missed classes never deducted student's class, so no refund needed
       if (booking.adminRejected) {
-        const student = await Student.findById(booking.studentId._id);
+        const student = await getStudent(req.db).findById(booking.studentId._id);
         if (student) {
           student.noOfClasses = (student.noOfClasses || 0) + 1;
           await student.save();

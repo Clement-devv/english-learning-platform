@@ -5,18 +5,22 @@
 //   - Monthly reports → 1st of every month at 08:00
 //
 // Uses ReminderLog to ensure each report is sent exactly once.
+// Call startProgressReportScheduler(db) once per active center connection.
 
-import Student        from "../models/Student.js";
-import Teacher        from "../models/Teacher.js";
-import Booking        from "../models/Booking.js";
-import ReminderLog    from "../models/ReminderLog.js";
+import { studentSchema }     from "../schemas/studentSchema.js";
+import { bookingSchema }     from "../schemas/bookingSchema.js";
+import { reminderLogSchema } from "../schemas/reminderLogSchema.js";
 import { generateProgressReport } from "./progressReportGenerator.js";
 import { sendProgressReport }     from "./emailService.js";
 
+const getStudent     = (db) => db.models.Student     || db.model("Student",     studentSchema);
+const getBooking     = (db) => db.models.Booking     || db.model("Booking",     bookingSchema);
+const getReminderLog = (db) => db.models.ReminderLog || db.model("ReminderLog", reminderLogSchema);
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
-async function markSent(key) {
+async function markSent(db, key) {
   try {
-    await ReminderLog.create({ type: key, refId: key });
+    await getReminderLog(db).create({ type: key, refId: key });
     return true;    // first time → proceed
   } catch (err) {
     if (err.code === 11000) return false;  // already sent
@@ -33,20 +37,20 @@ function isoWeek(date) {
 }
 
 // ── Find the teacher most associated with a student ───────────────────────────
-async function primaryTeacher(studentId) {
-  const last = await Booking.findOne({ studentId, status: "completed" })
+async function primaryTeacher(db, studentId) {
+  const last = await getBooking(db).findOne({ studentId, status: "completed" })
     .sort({ scheduledTime: -1 })
     .populate("teacherId", "firstName lastName");
   return last?.teacherId ?? null;
 }
 
 // ── Send one report ───────────────────────────────────────────────────────────
-async function sendReport(student, period, from, to, logKey) {
-  if (!(await markSent(logKey))) return;  // already sent this cycle
+async function sendReport(db, student, period, from, to, logKey) {
+  if (!(await markSent(db, logKey))) return;  // already sent this cycle
 
   try {
-    const teacher   = await primaryTeacher(student._id);
-    const pdfBuffer = await generateProgressReport(student, teacher, from, to, period);
+    const teacher   = await primaryTeacher(db, student._id);
+    const pdfBuffer = await generateProgressReport(db, student, teacher, from, to, period);
     const result    = await sendProgressReport(student, pdfBuffer, period, from, to);
     if (result.success) {
       console.log(`📊 ${period} report sent → ${student.email} (${from.toISOString().slice(0,10)})`);
@@ -59,55 +63,58 @@ async function sendReport(student, period, from, to, logKey) {
 }
 
 // ── Weekly check (runs Mon 08:00) ─────────────────────────────────────────────
-async function checkWeeklyReports() {
+async function checkWeeklyReports(db) {
   const now = new Date();
-  if (now.getDay() !== 1)    return;  // not Monday
-  if (now.getHours() !== 8)  return;  // not 8am hour
+  if (now.getDay()   !== 1) return;  // not Monday
+  if (now.getHours() !== 8) return;  // not 8am hour
 
-  // Window = last 7 days (Mon 00:00 to Sun 23:59)
   const to   = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
   const from = new Date(to.getTime() - 7 * 24 * 60 * 60 * 1000);
   const weekKey = `w${now.getFullYear()}-${isoWeek(now)}`;
 
-  const students = await Student.find({ status: "active" });
+  const students = await getStudent(db).find({ status: "active" });
   for (const student of students) {
     if (!student.email) continue;
-    await sendReport(student, "weekly", from, to, `weekly_${weekKey}_${student._id}`);
+    await sendReport(db, student, "weekly", from, to, `weekly_${weekKey}_${student._id}`);
   }
 }
 
 // ── Monthly check (runs 1st of month 08:00) ───────────────────────────────────
-async function checkMonthlyReports() {
+async function checkMonthlyReports(db) {
   const now = new Date();
-  if (now.getDate()   !== 1) return;  // not 1st of month
-  if (now.getHours()  !== 8) return;  // not 8am hour
+  if (now.getDate()  !== 1) return;  // not 1st of month
+  if (now.getHours() !== 8) return;  // not 8am hour
 
-  // Window = entire previous month
   const from = new Date(now.getFullYear(), now.getMonth() - 1, 1);
   const to   = new Date(now.getFullYear(), now.getMonth(),     1);
   const monthKey = `${from.getFullYear()}-${String(from.getMonth() + 1).padStart(2, "0")}`;
 
-  const students = await Student.find({ status: "active" });
+  const students = await getStudent(db).find({ status: "active" });
   for (const student of students) {
     if (!student.email) continue;
-    await sendReport(student, "monthly", from, to, `monthly_${monthKey}_${student._id}`);
+    await sendReport(db, student, "monthly", from, to, `monthly_${monthKey}_${student._id}`);
   }
 }
 
-// ── Main tick (runs every hour) ───────────────────────────────────────────────
-async function runTick() {
-  try {
-    await Promise.all([
-      checkWeeklyReports(),
-      checkMonthlyReports(),
-    ]);
-  } catch (err) {
-    console.error("Progress report scheduler error:", err.message);
-  }
+// ── Main tick (runs every hour per center) ────────────────────────────────────
+function makeTick(db) {
+  return async function runTick() {
+    if (db.readyState !== 1) return;
+    try {
+      await Promise.all([
+        checkWeeklyReports(db),
+        checkMonthlyReports(db),
+      ]);
+    } catch (err) {
+      console.error("Progress report scheduler error:", err.message);
+    }
+  };
 }
 
-export function startProgressReportScheduler() {
-  console.log("📊 Progress report scheduler started (hourly check)");
+export function startProgressReportScheduler(db) {
+  const centerSlug = db.name || "unknown";
+  console.log(`📊 Progress report scheduler started for center: ${centerSlug} (hourly check)`);
+  const runTick = makeTick(db);
   runTick();
-  setInterval(runTick, 60 * 60 * 1000);  // every 1 hour
+  setInterval(runTick, 60 * 60 * 1000);
 }

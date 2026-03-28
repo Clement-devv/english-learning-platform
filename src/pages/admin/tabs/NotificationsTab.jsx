@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Bell, CheckCheck, Filter, RefreshCw, BookOpen, RotateCcw, Shield } from "lucide-react";
+import api from "../../../api";
 
 const TYPE_META = {
   class_marked: {
@@ -54,10 +55,8 @@ export default function NotificationsTab({ isDarkMode, onUnreadCount }) {
   const fetchNotifications = useCallback(async () => {
     try {
       setLoading(true);
-      const res  = await fetch("/api/notifications?limit=200", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
+      const res  = await api.get("/api/notifications?limit=200");
+      const data = res.data;
       if (data.success) {
         setNotifications(data.notifications);
         setUnreadCount(data.unreadCount);
@@ -68,17 +67,14 @@ export default function NotificationsTab({ isDarkMode, onUnreadCount }) {
     } finally {
       setLoading(false);
     }
-  }, [token, onUnreadCount]);
+  }, [onUnreadCount]);
 
   useEffect(() => { fetchNotifications(); }, [fetchNotifications]);
 
   const markAllRead = async () => {
     setMarkingAll(true);
     try {
-      await fetch("/api/notifications/read-all", {
-        method:  "PATCH",
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await api.patch("/api/notifications/read-all");
       setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
       setUnreadCount(0);
       onUnreadCount?.(0);
@@ -91,10 +87,7 @@ export default function NotificationsTab({ isDarkMode, onUnreadCount }) {
 
   const markOneRead = async (id) => {
     try {
-      await fetch(`/api/notifications/${id}/read`, {
-        method:  "PATCH",
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await api.patch(`/api/notifications/${id}/read`);
       setNotifications((prev) =>
         prev.map((n) => (n._id === id ? { ...n, read: true } : n))
       );

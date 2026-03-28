@@ -3,10 +3,11 @@ import multer         from "multer";
 import { PDFParse }   from "pdf-parse";
 import Anthropic      from "@anthropic-ai/sdk";
 import { verifyToken } from "../middleware/authMiddleware.js";
-import Quiz            from "../models/Quiz.js";
-import QuizAttempt     from "../models/QuizAttempt.js";
-import Student         from "../models/Student.js";
-import Teacher         from "../models/Teacher.js";
+import { tenantMiddleware }  from "../middleware/tenantMiddleware.js";
+import { quizSchema }        from "../schemas/quizSchema.js";
+import { quizAttemptSchema } from "../schemas/quizAttemptSchema.js";
+import { studentSchema }     from "../schemas/studentSchema.js";
+import { teacherSchema }     from "../schemas/teacherSchema.js";
 import {
   sendQuizAssigned,
   sendQuizCompleted,
@@ -24,6 +25,12 @@ const upload = multer({
 });
 
 const router = express.Router();
+router.use(tenantMiddleware);
+
+const getQuiz        = (db) => db.models.Quiz        || db.model("Quiz",        quizSchema);
+const getQuizAttempt = (db) => db.models.QuizAttempt || db.model("QuizAttempt", quizAttemptSchema);
+const getStudent     = (db) => db.models.Student     || db.model("Student",     studentSchema);
+const getTeacher     = (db) => db.models.Teacher     || db.model("Teacher",     teacherSchema);
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 // Strip correctIndex from questions before sending to student
@@ -69,7 +76,7 @@ router.post("/", verifyToken, async (req, res) => {
     const qError = validateQuestions(questions);
     if (qError) return res.status(400).json({ message: qError });
 
-    const student = await Student.findById(studentId);
+    const student = await getStudent(req.db).findById(studentId);
     if (!student) return res.status(404).json({ message: "Student not found" });
 
     const timeLimitNum = parseInt(timeLimit, 10);
@@ -77,7 +84,7 @@ router.post("/", verifyToken, async (req, res) => {
       return res.status(400).json({ message: "Time limit must be 1–300 minutes" });
     }
 
-    const quiz = await Quiz.create({
+    const quiz = await getQuiz(req.db).create({
       teacherId:    req.user.id,
       studentId,
       title:        title.trim().slice(0, 200),
@@ -93,9 +100,9 @@ router.post("/", verifyToken, async (req, res) => {
     });
 
     // Email student about new quiz (non-blocking)
-    Student.findById(studentId).then(studentDoc => {
+    getStudent(req.db).findById(studentId).then(studentDoc => {
       if (studentDoc) {
-        Teacher.findById(req.user.id).then(teacherDoc => {
+        getTeacher(req.db).findById(req.user.id).then(teacherDoc => {
           if (teacherDoc) sendQuizAssigned(studentDoc, teacherDoc, quiz).catch(() => {});
         }).catch(() => {});
       }
@@ -115,13 +122,13 @@ router.get("/my", verifyToken, async (req, res) => {
   try {
     if (req.user.role !== "teacher") return res.status(403).json({ message: "Teachers only" });
 
-    const quizzes = await Quiz.find({ teacherId: req.user.id })
+    const quizzes = await getQuiz(req.db).find({ teacherId: req.user.id })
       .populate("studentId", "firstName surname email")
       .sort({ createdAt: -1 });
 
     // Attach attempt data to each quiz
     const quizIds    = quizzes.map(q => q._id);
-    const attempts   = await QuizAttempt.find({ quizId: { $in: quizIds } });
+    const attempts   = await getQuizAttempt(req.db).find({ quizId: { $in: quizIds } });
     const attemptMap = {};
     attempts.forEach(a => { attemptMap[a.quizId.toString()] = a; });
 
@@ -143,13 +150,13 @@ router.get("/assigned", verifyToken, async (req, res) => {
   try {
     if (req.user.role !== "student") return res.status(403).json({ message: "Students only" });
 
-    const quizzes = await Quiz.find({ studentId: req.user.id })
+    const quizzes = await getQuiz(req.db).find({ studentId: req.user.id })
       .populate("teacherId", "firstName lastName")
       .sort({ dueDate: 1 });
 
     // Attach attempt if it exists (so student can see their score)
     const quizIds  = quizzes.map(q => q._id);
-    const attempts = await QuizAttempt.find({ studentId: req.user.id, quizId: { $in: quizIds } });
+    const attempts = await getQuizAttempt(req.db).find({ studentId: req.user.id, quizId: { $in: quizIds } });
     const attemptMap = {};
     attempts.forEach(a => { attemptMap[a.quizId.toString()] = a; });
 
@@ -181,7 +188,7 @@ router.post("/:id/attempt", verifyToken, async (req, res) => {
   try {
     if (req.user.role !== "student") return res.status(403).json({ message: "Students only" });
 
-    const quiz = await Quiz.findById(req.params.id);
+    const quiz = await getQuiz(req.db).findById(req.params.id);
     if (!quiz) return res.status(404).json({ message: "Quiz not found" });
     if (quiz.studentId.toString() !== req.user.id) return res.status(403).json({ message: "Access denied" });
     if (quiz.status === "attempted") return res.status(400).json({ message: "You have already attempted this quiz" });
@@ -201,7 +208,7 @@ router.post("/:id/attempt", verifyToken, async (req, res) => {
     const totalQuestions = quiz.questions.length;
     const percentage     = Math.round((score / totalQuestions) * 100);
 
-    const attempt = await QuizAttempt.create({
+    const attempt = await getQuizAttempt(req.db).create({
       quizId:         quiz._id,
       studentId:      req.user.id,
       teacherId:      quiz.teacherId,
@@ -220,8 +227,8 @@ router.post("/:id/attempt", verifyToken, async (req, res) => {
 
     // Email teacher about completion (non-blocking)
     Promise.all([
-      Teacher.findById(quiz.teacherId),
-      Student.findById(req.user.id),
+      getTeacher(req.db).findById(quiz.teacherId),
+      getStudent(req.db).findById(req.user.id),
     ]).then(([teacherDoc, studentDoc]) => {
       if (teacherDoc && studentDoc) sendQuizCompleted(teacherDoc, studentDoc, quiz, attempt).catch(() => {});
     }).catch(() => {});
@@ -242,7 +249,7 @@ router.delete("/:id", verifyToken, async (req, res) => {
   try {
     if (req.user.role !== "teacher") return res.status(403).json({ message: "Teachers only" });
 
-    const quiz = await Quiz.findById(req.params.id);
+    const quiz = await getQuiz(req.db).findById(req.params.id);
     if (!quiz) return res.status(404).json({ message: "Quiz not found" });
     if (quiz.teacherId.toString() !== req.user.id) return res.status(403).json({ message: "Access denied" });
     if (quiz.status === "attempted") return res.status(400).json({ message: "Cannot delete a quiz that has been attempted" });

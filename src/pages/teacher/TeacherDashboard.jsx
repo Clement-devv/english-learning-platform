@@ -616,7 +616,7 @@ export default function TeacherDashboard() {
 
           {/* Logo */}
           <div style={{ height: "64px", display: "flex", alignItems: "center", padding: sidebarOpen ? "0 18px" : "0 14px", borderBottom: `1px solid ${c.border}`, gap: "10px", flexShrink: 0 }}>
-            <div style={{ width: "32px", height: "32px", borderRadius: "10px", flexShrink: 0, background: "linear-gradient(135deg, #7c3aed, #8b5cf6)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <div style={{ width: "32px", height: "32px", borderRadius: "10px", flexShrink: 0, background: "linear-gradient(135deg, var(--brand-primary), var(--brand-secondary))", display: "flex", alignItems: "center", justifyContent: "center" }}>
               <GraduationCap size={15} color="white" />
             </div>
             {sidebarOpen && (
@@ -635,10 +635,10 @@ export default function TeacherDashboard() {
               const badgeCount = key === "bookings" ? pendingBookings : key === "homework" ? homeworkToGrade : key === "quiz" ? quizAttempted : 0;
               return (
                 <button key={key} onClick={() => setActiveTab(key)} title={!sidebarOpen ? label : undefined}
-                  style={{ width: "100%", display: "flex", alignItems: "center", gap: "10px", padding: sidebarOpen ? "9px 10px" : "9px 14px", borderRadius: "10px", border: "none", cursor: "pointer", background: active ? (isDarkMode ? "#1e1730" : "#f5f0ff") : "transparent", color: active ? (isDarkMode ? "#a78bfa" : "#7c3aed") : (isDarkMode ? "#4b5563" : "#64748b"), fontFamily: "inherit", fontSize: "13.5px", fontWeight: active ? "700" : "500", textAlign: "left", marginBottom: "2px", whiteSpace: "nowrap", overflow: "hidden", position: "relative", transition: "all 0.15s" }}
+                  style={{ width: "100%", display: "flex", alignItems: "center", gap: "10px", padding: sidebarOpen ? "9px 10px" : "9px 14px", borderRadius: "10px", border: "none", cursor: "pointer", background: active ? (isDarkMode ? "rgba(var(--brand-primary-rgb), 0.12)" : "rgba(var(--brand-primary-rgb), 0.08)") : "transparent", color: active ? "var(--brand-primary)" : (isDarkMode ? "#4b5563" : "#64748b"), fontFamily: "inherit", fontSize: "13.5px", fontWeight: active ? "700" : "500", textAlign: "left", marginBottom: "2px", whiteSpace: "nowrap", overflow: "hidden", position: "relative", transition: "all 0.15s" }}
                   className="td-nav-btn"
                 >
-                  {active && <div style={{ position: "absolute", left: 0, top: "20%", bottom: "20%", width: "3px", borderRadius: "0 3px 3px 0", background: "#8b5cf6" }} />}
+                  {active && <div style={{ position: "absolute", left: 0, top: "20%", bottom: "20%", width: "3px", borderRadius: "0 3px 3px 0", background: "var(--brand-secondary)" }} />}
                   <Icon size={16} style={{ flexShrink: 0 }} />
                   {sidebarOpen && <span style={{ flex: 1 }}>{label}</span>}
                   {sidebarOpen && hasBadge && (
@@ -700,7 +700,7 @@ export default function TeacherDashboard() {
 
             <div style={{ flex: 1 }} />
 
-            <div style={{ background: isDarkMode ? "#1e1730" : "#f5f0ff", border: `1px solid ${isDarkMode ? "#2d1f4a" : "#ddd6fe"}`, borderRadius: "20px", padding: "4px 12px", fontSize: "11.5px", fontWeight: "700", color: isDarkMode ? "#a78bfa" : "#7c3aed" }}>
+            <div style={{ background: "rgba(var(--brand-primary-rgb), 0.08)", border: `1px solid rgba(var(--brand-primary-rgb), 0.2)`, borderRadius: "20px", padding: "4px 12px", fontSize: "11.5px", fontWeight: "700", color: "var(--brand-primary)" }}>
               👨‍🎓 {students.length} students
             </div>
 
@@ -727,11 +727,11 @@ export default function TeacherDashboard() {
             )}
 
             <button onClick={() => setIsModalOpen(true)}
-              style={{ background: "linear-gradient(135deg, #7c3aed, #8b5cf6)", color: "white", border: "none", borderRadius: "10px", padding: "8px 14px", fontSize: "12.5px", fontWeight: "700", cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: "6px" }}>
+              style={{ background: "linear-gradient(135deg, var(--brand-primary), var(--brand-secondary))", color: "white", border: "none", borderRadius: "10px", padding: "8px 14px", fontSize: "12.5px", fontWeight: "700", cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: "6px" }}>
               <Plus size={14} /> New Class
             </button>
 
-            <div style={{ width: "34px", height: "34px", borderRadius: "10px", background: "linear-gradient(135deg, #7c3aed, #8b5cf6)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", fontWeight: "800", color: "white", flexShrink: 0 }}>
+            <div style={{ width: "34px", height: "34px", borderRadius: "10px", background: "linear-gradient(135deg, var(--brand-primary), var(--brand-secondary))", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", fontWeight: "800", color: "white", flexShrink: 0 }}>
               {(teacherInfo?.firstName?.[0] || "T").toUpperCase()}
             </div>
           </header>
@@ -760,7 +760,7 @@ export default function TeacherDashboard() {
                       </p>
                     </div>
                     <button onClick={fetchTeacherData}
-                      style={{ background: isDarkMode ? "#1e1730" : "#f5f0ff", border: `1px solid ${isDarkMode ? "#2d1f4a" : "#ddd6fe"}`, borderRadius: "10px", padding: "8px 14px", fontSize: "13px", fontWeight: "600", color: isDarkMode ? "#a78bfa" : "#7c3aed", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px", fontFamily: "inherit" }}>
+                      style={{ background: "rgba(var(--brand-primary-rgb), 0.08)", border: `1px solid rgba(var(--brand-primary-rgb), 0.2)`, borderRadius: "10px", padding: "8px 14px", fontSize: "13px", fontWeight: "600", color: "var(--brand-primary)", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px", fontFamily: "inherit" }}>
                       <RefreshCw size={13} /> Refresh
                     </button>
                   </div>
@@ -788,7 +788,7 @@ export default function TeacherDashboard() {
 
                   {/* Google Meet — original logic, new shell */}
                   {teacherInfo?._id && (
-                    <div style={{ background: isDarkMode ? "#1e1730" : "#f5f0ff", border: `1px solid ${isDarkMode ? "#2d1f4a" : "#ddd6fe"}`, borderRadius: "14px", overflow: "hidden" }}>
+                    <div style={{ background: "rgba(var(--brand-primary-rgb), 0.06)", border: `1px solid rgba(var(--brand-primary-rgb), 0.15)`, borderRadius: "14px", overflow: "hidden" }}>
                       <button
                         onClick={() => setShowGoogleMeetSettings(!showGoogleMeetSettings)}
                         style={{ width: "100%", padding: "16px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", background: "transparent", border: "none", cursor: "pointer", fontFamily: "inherit" }}
@@ -810,7 +810,7 @@ export default function TeacherDashboard() {
                       </button>
 
                       {showGoogleMeetSettings && (
-                        <div style={{ padding: "16px 20px 20px", borderTop: `1px solid ${isDarkMode ? "#2d1f4a" : "#ddd6fe"}` }}>
+                        <div style={{ padding: "16px 20px 20px", borderTop: `1px solid rgba(var(--brand-primary-rgb), 0.15)` }}>
                           <GoogleMeetSettings
                             teacherId={teacherInfo._id}
                             initialLink={googleMeetLink || ""}
@@ -853,14 +853,14 @@ export default function TeacherDashboard() {
                     <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                       <button
                         onClick={() => setShowRecurringForm(true)}
-                        style={{ background: isDarkMode ? "#1e1730" : "#f5f0ff", border: `1px solid ${isDarkMode ? "#2d1f4a" : "#ddd6fe"}`, borderRadius: "10px", padding: "9px 16px", fontSize: "13px", fontWeight: "600", color: isDarkMode ? "#a78bfa" : "#7c3aed", cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: "6px" }}
+                        style={{ background: "rgba(var(--brand-primary-rgb), 0.08)", border: `1px solid rgba(var(--brand-primary-rgb), 0.2)`, borderRadius: "10px", padding: "9px 16px", fontSize: "13px", fontWeight: "600", color: "var(--brand-primary)", cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: "6px" }}
                         className="td-nav-btn"
                       >
                         <Repeat size={14} /> Create Recurring Classes
                       </button>
                       <button
                         onClick={() => setIsModalOpen(true)}
-                        style={{ background: "linear-gradient(135deg, #7c3aed, #8b5cf6)", color: "white", border: "none", borderRadius: "10px", padding: "9px 16px", fontSize: "13px", fontWeight: "700", cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: "6px" }}
+                        style={{ background: "linear-gradient(135deg, var(--brand-primary), var(--brand-secondary))", color: "white", border: "none", borderRadius: "10px", padding: "9px 16px", fontSize: "13px", fontWeight: "700", cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: "6px" }}
                       >
                         <Plus size={14} /> Add New Class
                       </button>
@@ -1101,7 +1101,7 @@ function globalCSS(dark) {
     * { box-sizing: border-box; }
     .td-scroll::-webkit-scrollbar { width: 4px; }
     .td-scroll::-webkit-scrollbar-thumb { background: ${dark ? "#1e2235" : "#e0e4f4"}; border-radius: 4px; }
-    .td-nav-btn:hover { background: ${dark ? "#1e1730 !important" : "#f5f0ff !important"}; color: ${dark ? "#a78bfa !important" : "#7c3aed !important"}; }
+    .td-nav-btn:hover { background: ${dark ? "rgba(var(--brand-primary-rgb), 0.12) !important" : "rgba(var(--brand-primary-rgb), 0.08) !important"}; color: var(--brand-primary) !important; }
     .td-logout-btn:hover { background: rgba(239,68,68,0.08) !important; }
   `;
 }

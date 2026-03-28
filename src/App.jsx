@@ -1,10 +1,12 @@
 import React, { useState, useEffect, lazy, Suspense } from "react";
+import { BrandingProvider } from './context/BrandingContext.jsx';
 import {
   BrowserRouter as Router, Routes, Route,
   Navigate, useNavigate, useLocation
 } from "react-router-dom";
 
 // Auth guards — small, always needed immediately
+import SuperAdminProtectedRoute from "./components/SuperAdminProtectedRoute";
 import AdminProtectedRoute    from "./components/AdminProtectedRoute";
 import SubAdminProtectedRoute from "./components/SubAdminProtectedRoute";
 import ProtectedRoute         from "./components/ProtectedRoute";
@@ -12,12 +14,15 @@ import ClassroomProtectedRoute from "./components/ClassroomProtectedRoute";
 import StudentProtectedRoute  from "./components/StudentProtectedRoute";
 
 // Login pages — small, load fast, keep static
+import SuperAdminLogin     from "./pages/super-admin/SuperAdminLogin";
 import AdminLogin          from "./pages/admin/AdminLogin";
+import AdminResetPassword  from "./pages/admin/AdminResetPassword";
 import SubAdminLogin       from "./pages/sub-admin/SubAdminLogin";
 import TeacherLogin        from "./pages/teacher/TeacherLogin";
 import StudentLogin        from "./pages/student/StudentLogin";
 
 // Heavy pages — lazy loaded (each becomes its own JS chunk)
+const SuperAdminDashboard = lazy(() => import("./pages/super-admin/SuperAdminDashboard"));
 const AdminDashboard      = lazy(() => import("./pages/admin/AdminDashboard"));
 const SubAdminSetup       = lazy(() => import("./pages/sub-admin/SubAdminSetup"));
 const SubAdminDashboard   = lazy(() => import("./pages/sub-admin/SubAdminDashboard"));
@@ -50,13 +55,15 @@ function PageLoader() {
   );
 }
 
+// Paths where the nav is hidden entirely (dashboards, full-screen flows)
+// Use startsWith only for paths that can't conflict with login pages
 const HIDE_NAV_ON = [
   "/sub-admin/setup",
+  "/sub-admin/dashboard",
   "/classroom",
-  "/admin",
   "/teacher/dashboard",
   "/student/dashboard",
-  "/sub-admin/dashboard",
+  "/super-admin/dashboard",
 ];
 
 function NavigationButtons() {
@@ -64,6 +71,7 @@ function NavigationButtons() {
   const location = useLocation();
   const path     = location.pathname;
 
+  const [isSuperAdminLoggedIn, setIsSuperAdminLoggedIn] = useState(false);
   const [isAdminLoggedIn,    setIsAdminLoggedIn]    = useState(false);
   const [isTeacherLoggedIn,  setIsTeacherLoggedIn]  = useState(false);
   const [isStudentLoggedIn,  setIsStudentLoggedIn]  = useState(false);
@@ -72,6 +80,7 @@ function NavigationButtons() {
   const [installed,          setInstalled]          = useState(false);
 
   useEffect(() => {
+    setIsSuperAdminLoggedIn(!!localStorage.getItem("superAdminToken"));
     setIsAdminLoggedIn(!!localStorage.getItem("adminToken"));
     setIsTeacherLoggedIn(!!localStorage.getItem("teacherToken"));
     setIsStudentLoggedIn(!!localStorage.getItem("studentToken") || !!sessionStorage.getItem("studentToken"));
@@ -94,6 +103,7 @@ function NavigationButtons() {
   };
 
   const shouldHide =
+    path === "/admin" ||   // exact match — /admin/login must NOT be hidden
     HIDE_NAV_ON.some((p) => path.startsWith(p)) ||
     path.startsWith("/teacher/reset-password") ||
     path.startsWith("/student/reset-password");
@@ -169,6 +179,15 @@ function NavigationButtons() {
 
         {/* ── Role nav buttons ── */}
         <div className="nav-role-row" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+
+          {isSuperAdminLoggedIn ? (
+            <>
+              <NavBtn onClick={() => navigate("/super-admin/dashboard")} active={path === "/super-admin/dashboard"} color="#d97706" bg="#fffbeb">Super Admin ↗</NavBtn>
+              <NavBtn onClick={() => logout(["superAdminToken","superAdminInfo"], setIsSuperAdminLoggedIn, "/super-admin/login")} color="#ef4444" bg="#fef2f2">Logout</NavBtn>
+            </>
+          ) : (
+            <NavBtn onClick={() => navigate("/super-admin/login")} active={path === "/super-admin/login"} color="#d97706" bg="#fffbeb">Super Admin</NavBtn>
+          )}
 
           {isAdminLoggedIn ? (
             <>
@@ -267,14 +286,19 @@ function NavBtn({ onClick, active, color, bg, children }) {
 
 function App() {
   return (
-    <Router>
+    <BrandingProvider>
+      <Router>
       <div className="min-h-screen">
         <NavigationButtons />
         <Suspense fallback={<PageLoader />}>
           <Routes>
             <Route path="/" element={<Navigate to="/admin/login" replace />} />
 
-            <Route path="/admin/login" element={<AdminLogin />} />
+            <Route path="/super-admin/login"     element={<SuperAdminLogin />} />
+            <Route path="/super-admin/dashboard" element={<SuperAdminProtectedRoute><SuperAdminDashboard /></SuperAdminProtectedRoute>} />
+
+            <Route path="/admin/login"                      element={<AdminLogin />} />
+            <Route path="/admin/reset-password/:token"     element={<AdminResetPassword />} />
             <Route path="/admin" element={<AdminProtectedRoute><AdminDashboard /></AdminProtectedRoute>} />
 
             <Route path="/sub-admin/login"     element={<SubAdminLogin />} />
@@ -302,6 +326,7 @@ function App() {
         </Suspense>
       </div>
     </Router>
+    </BrandingProvider>
   );
 }
 

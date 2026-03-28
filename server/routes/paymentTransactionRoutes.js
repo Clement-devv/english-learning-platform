@@ -1,10 +1,16 @@
 // server/routes/paymentTransactionRoutes.js - PAYMENT MANAGEMENT ROUTES
 import express from "express";
-import PaymentTransaction from "../models/PaymentTransaction.js";
-import Teacher from "../models/Teacher.js";
 import { verifyToken, verifyAdmin } from "../middleware/authMiddleware.js";
+import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
+import { paymentTransactionSchema } from "../schemas/paymentTransactionSchema.js";
+import { teacherSchema }            from "../schemas/teacherSchema.js";
 
 const router = express.Router();
+router.use(tenantMiddleware);
+
+const getPaymentTransaction = (db) =>
+  db.models.PaymentTransaction || db.model("PaymentTransaction", paymentTransactionSchema);
+const getTeacher = (db) => db.models.Teacher || db.model("Teacher", teacherSchema);
 
 /**
  * GET /api/payments/teacher/:teacherId
@@ -15,46 +21,30 @@ router.get("/teacher/:teacherId", verifyToken, async (req, res) => {
     const { teacherId } = req.params;
     const { status } = req.query;
 
-    // Teachers can only view their own payments unless admin
     if (req.user.role === "teacher" && req.user.id !== teacherId) {
       return res.status(403).json({ message: "You can only view your own payments" });
     }
 
     const filter = { teacherId };
-    if (status) {
-      filter.status = status;
-    }
+    if (status) filter.status = status;
 
-    const transactions = await PaymentTransaction.find(filter)
+    const transactions = await getPaymentTransaction(req.db).find(filter)
       .populate("bookingId", "classTitle scheduledTime duration")
       .populate("paidBy", "firstName lastName")
       .sort({ completedAt: -1 });
 
-    // Calculate summary
     const summary = {
-      totalPending: 0,
-      totalPaid: 0,
-      totalEarned: 0,
-      pendingCount: 0,
-      paidCount: 0
+      totalPending: 0, totalPaid: 0, totalEarned: 0,
+      pendingCount: 0, paidCount: 0
     };
 
     transactions.forEach(tx => {
-      if (tx.status === "pending") {
-        summary.totalPending += tx.amount;
-        summary.pendingCount++;
-      } else if (tx.status === "paid") {
-        summary.totalPaid += tx.amount;
-        summary.paidCount++;
-      }
+      if (tx.status === "pending") { summary.totalPending += tx.amount; summary.pendingCount++; }
+      else if (tx.status === "paid") { summary.totalPaid += tx.amount; summary.paidCount++; }
       summary.totalEarned += tx.amount;
     });
 
-    res.json({
-      transactions,
-      summary
-    });
-
+    res.json({ transactions, summary });
   } catch (err) {
     console.error("Error fetching teacher payments:", err);
     res.status(500).json({ message: "Error fetching payment transactions" });
@@ -73,43 +63,28 @@ router.get("/all", verifyToken, verifyAdmin, async (req, res) => {
     if (status) filter.status = status;
     if (teacherId) filter.teacherId = teacherId;
 
-    const transactions = await PaymentTransaction.find(filter)
+    const transactions = await getPaymentTransaction(req.db).find(filter)
       .populate("teacherId", "firstName lastName email ratePerClass")
       .populate("bookingId", "classTitle scheduledTime duration")
       .populate("paidBy", "firstName lastName")
       .sort({ completedAt: -1 });
 
-    // Calculate summary by teacher
     const teacherSummary = {};
 
     transactions.forEach(tx => {
       const tid = tx.teacherId._id.toString();
-      
       if (!teacherSummary[tid]) {
         teacherSummary[tid] = {
           teacherId: tx.teacherId._id,
           teacherName: `${tx.teacherId.firstName} ${tx.teacherId.lastName}`,
-          totalPending: 0,
-          totalPaid: 0,
-          pendingCount: 0,
-          paidCount: 0
+          totalPending: 0, totalPaid: 0, pendingCount: 0, paidCount: 0
         };
       }
-
-      if (tx.status === "pending") {
-        teacherSummary[tid].totalPending += tx.amount;
-        teacherSummary[tid].pendingCount++;
-      } else if (tx.status === "paid") {
-        teacherSummary[tid].totalPaid += tx.amount;
-        teacherSummary[tid].paidCount++;
-      }
+      if (tx.status === "pending") { teacherSummary[tid].totalPending += tx.amount; teacherSummary[tid].pendingCount++; }
+      else if (tx.status === "paid") { teacherSummary[tid].totalPaid += tx.amount; teacherSummary[tid].paidCount++; }
     });
 
-    res.json({
-      transactions,
-      teacherSummary: Object.values(teacherSummary)
-    });
-
+    res.json({ transactions, teacherSummary: Object.values(teacherSummary) });
   } catch (err) {
     console.error("Error fetching all payments:", err);
     res.status(500).json({ message: "Error fetching payment transactions" });
@@ -124,7 +99,7 @@ router.patch("/:id/pay", verifyToken, verifyAdmin, async (req, res) => {
   try {
     const { paymentMethod, notes } = req.body;
 
-    const transaction = await PaymentTransaction.findById(req.params.id)
+    const transaction = await getPaymentTransaction(req.db).findById(req.params.id)
       .populate("teacherId", "firstName lastName email earned lessonsCompleted");
 
     if (!transaction) {
@@ -135,7 +110,6 @@ router.patch("/:id/pay", verifyToken, verifyAdmin, async (req, res) => {
       return res.status(400).json({ message: "This payment has already been processed" });
     }
 
-    // Update transaction
     transaction.status = "paid";
     transaction.paidAt = new Date();
     transaction.paidBy = req.user.id;
@@ -145,16 +119,12 @@ router.patch("/:id/pay", verifyToken, verifyAdmin, async (req, res) => {
 
     console.log(`💳 Payment processed: $${transaction.amount} paid to ${transaction.teacherId.firstName} ${transaction.teacherId.lastName}`);
 
-    const updatedTransaction = await PaymentTransaction.findById(transaction._id)
+    const updatedTransaction = await getPaymentTransaction(req.db).findById(transaction._id)
       .populate("teacherId", "firstName lastName email")
       .populate("bookingId", "classTitle scheduledTime")
       .populate("paidBy", "firstName lastName");
 
-    res.json({
-      message: "Payment processed successfully",
-      transaction: updatedTransaction
-    });
-
+    res.json({ message: "Payment processed successfully", transaction: updatedTransaction });
   } catch (err) {
     console.error("Error processing payment:", err);
     res.status(500).json({ message: "Error processing payment" });
@@ -170,10 +140,8 @@ router.patch("/teacher/:teacherId/pay-all", verifyToken, verifyAdmin, async (req
     const { teacherId } = req.params;
     const { paymentMethod, notes } = req.body;
 
-    // Get all pending transactions for this teacher
-    const pendingTransactions = await PaymentTransaction.find({
-      teacherId,
-      status: "pending",
+    const pendingTransactions = await getPaymentTransaction(req.db).find({
+      teacherId, status: "pending",
     });
 
     if (pendingTransactions.length === 0) {
@@ -182,22 +150,13 @@ router.patch("/teacher/:teacherId/pay-all", verifyToken, verifyAdmin, async (req
 
     const totalAmount = pendingTransactions.reduce((sum, tx) => sum + tx.amount, 0);
 
-    // Mark all pending transactions as paid
-    await PaymentTransaction.updateMany(
+    await getPaymentTransaction(req.db).updateMany(
       { teacherId, status: "pending" },
-      {
-        $set: {
-          status: "paid",
-          paidAt: new Date(),
-          paidBy: req.user.id,
-          paymentMethod: paymentMethod || "bank_transfer",
-          notes: notes || "",
-        },
-      }
+      { $set: { status: "paid", paidAt: new Date(), paidBy: req.user.id,
+                paymentMethod: paymentMethod || "bank_transfer", notes: notes || "" } }
     );
 
-    // Reset teacher's earned amount
-    const teacher = await Teacher.findById(teacherId);
+    const teacher = await getTeacher(req.db).findById(teacherId);
     if (teacher) {
       teacher.earned = 0;
       await teacher.save();
@@ -213,7 +172,6 @@ router.patch("/teacher/:teacherId/pay-all", verifyToken, verifyAdmin, async (req
         ? { id: teacher._id, name: `${teacher.firstName} ${teacher.lastName}`, earned: 0 }
         : null,
     });
-
   } catch (err) {
     console.error("Error processing bulk payment:", err);
     res.status(500).json({ message: "Error processing bulk payment" });
@@ -226,22 +184,18 @@ router.patch("/teacher/:teacherId/pay-all", verifyToken, verifyAdmin, async (req
  */
 router.get("/summary", verifyToken, verifyAdmin, async (req, res) => {
   try {
-    const teachers = await Teacher.find({ active: true })
+    const teachers = await getTeacher(req.db).find({ active: true })
       .select("firstName lastName email ratePerClass earned lessonsCompleted");
 
     const summaryPromises = teachers.map(async (teacher) => {
-      const pendingTransactions = await PaymentTransaction.find({
-        teacherId: teacher._id,
-        status: "pending"
-      });
-
-      const paidTransactions = await PaymentTransaction.find({
-        teacherId: teacher._id,
-        status: "paid"
-      });
+      const PaymentTransaction = getPaymentTransaction(req.db);
+      const [pendingTransactions, paidTransactions] = await Promise.all([
+        PaymentTransaction.find({ teacherId: teacher._id, status: "pending" }),
+        PaymentTransaction.find({ teacherId: teacher._id, status: "paid" }),
+      ]);
 
       const totalPending = pendingTransactions.reduce((sum, tx) => sum + tx.amount, 0);
-      const totalPaid = paidTransactions.reduce((sum, tx) => sum + tx.amount, 0);
+      const totalPaid    = paidTransactions.reduce((sum, tx) => sum + tx.amount, 0);
 
       return {
         teacherId: teacher._id,
@@ -260,19 +214,14 @@ router.get("/summary", verifyToken, verifyAdmin, async (req, res) => {
 
     const summary = await Promise.all(summaryPromises);
 
-    // Calculate overall totals
     const overallTotals = {
       totalPending: summary.reduce((sum, t) => sum + t.pendingAmount, 0),
-      totalPaid: summary.reduce((sum, t) => sum + t.paidAmount, 0),
+      totalPaid:    summary.reduce((sum, t) => sum + t.paidAmount, 0),
       totalTeachers: summary.length,
-      totalLessons: summary.reduce((sum, t) => sum + t.lessonsCompleted, 0)
+      totalLessons:  summary.reduce((sum, t) => sum + t.lessonsCompleted, 0)
     };
 
-    res.json({
-      teachers: summary,
-      totals: overallTotals
-    });
-
+    res.json({ teachers: summary, totals: overallTotals });
   } catch (err) {
     console.error("Error fetching payment summary:", err);
     res.status(500).json({ message: "Error fetching payment summary" });
@@ -292,16 +241,17 @@ router.post("/manual", verifyToken, verifyAdmin, async (req, res) => {
       return res.status(400).json({ message: "Teacher, amount, and type are required" });
     }
 
-    const teacher = await Teacher.findById(teacherId);
+    const teacher = await getTeacher(req.db).findById(teacherId);
     if (!teacher) {
       return res.status(404).json({ message: "Teacher not found" });
     }
 
+    const PaymentTransaction = getPaymentTransaction(req.db);
     const transaction = new PaymentTransaction({
       teacherId,
-      bookingId: null, // Manual transactions don't have bookings
+      bookingId: null,
       amount,
-      type, // manual_adjustment, bonus, deduction
+      type,
       status: "pending",
       description: description || `Manual ${type}`,
       completedAt: new Date()
@@ -309,7 +259,6 @@ router.post("/manual", verifyToken, verifyAdmin, async (req, res) => {
 
     await transaction.save();
 
-    // Update teacher's earned amount
     if (type === "deduction") {
       teacher.earned = Math.max(0, (teacher.earned || 0) - amount);
     } else {
@@ -317,11 +266,7 @@ router.post("/manual", verifyToken, verifyAdmin, async (req, res) => {
     }
     await teacher.save();
 
-    res.status(201).json({
-      message: "Manual payment transaction created",
-      transaction
-    });
-
+    res.status(201).json({ message: "Manual payment transaction created", transaction });
   } catch (err) {
     console.error("Error creating manual payment:", err);
     res.status(500).json({ message: "Error creating manual payment" });

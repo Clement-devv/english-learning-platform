@@ -97,6 +97,7 @@ export default function VideoCall({
   const remoteContainerRef   = useRef({});
   const isJoiningRef         = useRef(false);
   const hasJoinedRef         = useRef(false);
+  const joinedAtRef          = useRef(null);   // timestamp when Agora join succeeded
   const onUserJoinedRef      = useRef(onUserJoined);
   const onUserLeftRef        = useRef(onUserLeft);
   const localAudioTrackRef   = useRef(null);
@@ -348,6 +349,7 @@ export default function VideoCall({
       await client.current.join(data.appId, channelName, data.token, null);
       channelJoined = true;
       hasJoinedRef.current = true;
+      joinedAtRef.current  = Date.now();
       setJoined(true);
 
       const [audioTrack, videoTrack] = await AgoraRTC.createMicrophoneAndCameraTracks({
@@ -395,6 +397,19 @@ export default function VideoCall({
   // ── Leave ─────────────────────────────────────────────────────────────────
   const leaveCall = async () => {
     if (!joined && !hasJoinedRef.current) return;
+
+    // Log Agora usage before cleanup (fire-and-forget — never block the leave flow)
+    if (joinedAtRef.current) {
+      const durationMinutes = Math.ceil((Date.now() - joinedAtRef.current) / 60000);
+      joinedAtRef.current   = null;
+      api.post('/api/agora-usage/log', {
+        channelName,
+        bookingId,
+        durationMinutes,
+        participantCount: remoteUsers.length + 1,
+      }).catch(() => {}); // non-critical — ignore if it fails
+    }
+
     try {
       localAudioTrack?.stop(); localAudioTrack?.close();
       localVideoTrack?.stop(); localVideoTrack?.close();

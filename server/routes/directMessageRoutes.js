@@ -1,33 +1,41 @@
 // server/routes/directMessageRoutes.js
 import express from "express";
-import DirectMessage from "../models/DirectMessage.js";
-import Teacher       from "../models/Teacher.js";
-import Student       from "../models/Student.js";
-import Admin         from "../models/Admin.js";
-import SubAdmin      from "../models/SubAdmin.js";
 import { verifyToken } from "../middleware/authMiddleware.js";
+import { tenantMiddleware }       from "../middleware/tenantMiddleware.js";
+import { directMessageSchema }    from "../schemas/directMessageSchema.js";
+import { teacherSchema }          from "../schemas/teacherSchema.js";
+import { studentSchema }          from "../schemas/studentSchema.js";
+import { adminSchema }            from "../schemas/adminSchema.js";
+import { subAdminSchema }         from "../schemas/subAdminSchema.js";
 
 const router = express.Router();
+router.use(tenantMiddleware);
+
+const getDirectMessage = (db) => db.models.DirectMessage || db.model("DirectMessage", directMessageSchema);
+const getTeacher       = (db) => db.models.Teacher       || db.model("Teacher",       teacherSchema);
+const getStudent       = (db) => db.models.Student       || db.model("Student",       studentSchema);
+const getAdmin         = (db) => db.models.Admin         || db.model("Admin",         adminSchema);
+const getSubAdmin      = (db) => db.models.SubAdmin      || db.model("SubAdmin",      subAdminSchema);
 
 // ── Helpers ────────────────────────────────────────────────────────────────
-async function getSenderInfo(id, role) {
+async function getSenderInfo(id, role, db) {
   if (role === "teacher") {
-    const t = await Teacher.findById(id);
+    const t = await getTeacher(db).findById(id);
     if (!t) return null;
     return { name: `${t.firstName} ${t.lastName}`, model: "Teacher" };
   }
   if (role === "student") {
-    const s = await Student.findById(id);
+    const s = await getStudent(db).findById(id);
     if (!s) return null;
     return { name: `${s.firstName} ${s.surname}`, model: "Student" };
   }
   if (role === "admin") {
-    const a = await Admin.findById(id);
+    const a = await getAdmin(db).findById(id);
     if (!a) return null;
     return { name: a.firstName ? `${a.firstName} ${a.lastName || ""}`.trim() : "Admin", model: "Admin" };
   }
   if (role === "sub-admin") {
-    const sa = await SubAdmin.findById(id);
+    const sa = await getSubAdmin(db).findById(id);
     if (!sa) return null;
     return { name: `${sa.firstName} ${sa.lastName}`, model: "SubAdmin" };
   }
@@ -42,7 +50,7 @@ function canAccess(dm, userId, role) {
   return false;
 }
 
-// ── GET /api/direct-messages  —  list DMs for current user ─────────────────
+// ── GET /api/direct-messages — list DMs for current user ─────────────────
 router.get("/", verifyToken, async (req, res) => {
   try {
     const { id: userId, role } = req.user;
@@ -53,7 +61,7 @@ router.get("/", verifyToken, async (req, res) => {
     else if (role === "sub-admin") filter.subAdminId = userId;
     // admin sees all
 
-    const dms = await DirectMessage.find(filter)
+    const dms = await getDirectMessage(req.db).find(filter)
       .select("-messages")
       .populate("teacherId",  "firstName lastName email")
       .populate("studentId",  "firstName surname email")
@@ -66,17 +74,15 @@ router.get("/", verifyToken, async (req, res) => {
   }
 });
 
-// ── POST /api/direct-messages/start  —  create or retrieve DM with admin ──
-// Called by teacher or student to open their admin DM
+// ── POST /api/direct-messages/start — create or retrieve DM with admin ──
 router.post("/start", verifyToken, async (req, res) => {
   try {
     const { id: userId, role } = req.user;
 
-    if (!["teacher", "student", "sub-admin"].includes(role)) {
+    if (!["teacher", "student", "sub-admin"].includes(role))
       return res.status(403).json({ message: "Only teachers, students and sub-admins can start an admin DM" });
-    }
 
-    const sender = await getSenderInfo(userId, role);
+    const sender = await getSenderInfo(userId, role, req.db);
     if (!sender) return res.status(404).json({ message: "User not found" });
 
     let type, filter, create;
@@ -88,6 +94,7 @@ router.post("/start", verifyToken, async (req, res) => {
       type = "sub-admin-admin"; filter = { subAdminId: userId }; create = { subAdminId: userId };
     }
 
+    const DirectMessage = getDirectMessage(req.db);
     let dm = await DirectMessage.findOne(filter);
     if (!dm) {
       dm = await DirectMessage.create({ type, ...create, chatName: `${sender.name} ↔ Admin` });
@@ -103,7 +110,7 @@ router.post("/start", verifyToken, async (req, res) => {
 router.get("/:id/messages", verifyToken, async (req, res) => {
   try {
     const { id: userId, role } = req.user;
-    const dm = await DirectMessage.findById(req.params.id).lean();
+    const dm = await getDirectMessage(req.db).findById(req.params.id).lean();
 
     if (!dm) return res.status(404).json({ message: "DM not found" });
     if (!canAccess(dm, userId, role)) return res.status(403).json({ message: "Access denied" });
@@ -123,30 +130,27 @@ router.post("/:id/messages", verifyToken, async (req, res) => {
     if (!message?.trim()) return res.status(400).json({ message: "Message cannot be empty" });
     if (message.trim().length > 5000) return res.status(400).json({ message: "Message too long (max 5000 characters)" });
 
-    const dm = await DirectMessage.findById(req.params.id);
+    const dm = await getDirectMessage(req.db).findById(req.params.id);
     if (!dm) return res.status(404).json({ message: "DM not found" });
     if (!canAccess(dm, userId, role)) return res.status(403).json({ message: "Access denied" });
 
-    const sender = await getSenderInfo(userId, role);
+    const sender = await getSenderInfo(userId, role, req.db);
     if (!sender) return res.status(404).json({ message: "Sender not found" });
 
-    const newMsg = {
+    dm.messages.push({
       senderId:    userId,
       senderModel: sender.model,
       senderName:  sender.name,
       senderRole:  role,
       message:     message.trim(),
-    };
-
-    dm.messages.push(newMsg);
-    dm.lastMessage   = { text: message.trim(), senderId: userId, senderName: sender.name, timestamp: new Date() };
+    });
+    dm.lastMessage    = { text: message.trim(), senderId: userId, senderName: sender.name, timestamp: new Date() };
     dm.lastActivityAt = new Date();
 
-    // Increment unread for the other party
     if (role === "admin") {
-      if (dm.type === "teacher-admin")    dm.unreadCount.teacher  += 1;
-      else if (dm.type === "student-admin") dm.unreadCount.student += 1;
-      else                                dm.unreadCount.subAdmin += 1;
+      if (dm.type === "teacher-admin")      dm.unreadCount.teacher  += 1;
+      else if (dm.type === "student-admin") dm.unreadCount.student  += 1;
+      else                                  dm.unreadCount.subAdmin += 1;
     } else {
       dm.unreadCount.admin += 1;
     }
@@ -163,7 +167,7 @@ router.post("/:id/messages", verifyToken, async (req, res) => {
 router.patch("/:id/mark-read", verifyToken, async (req, res) => {
   try {
     const { id: userId, role } = req.user;
-    const dm = await DirectMessage.findById(req.params.id);
+    const dm = await getDirectMessage(req.db).findById(req.params.id);
 
     if (!dm) return res.status(404).json({ message: "DM not found" });
     if (!canAccess(dm, userId, role)) return res.status(403).json({ message: "Access denied" });

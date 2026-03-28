@@ -1,10 +1,13 @@
 // server/routes/teacherAssignmentRoutes.js
 import express from "express";
-import Assignment from "../models/Assignment.js";
-import Student from "../models/Student.js";
 import { verifyToken } from "../middleware/authMiddleware.js";
+import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
+import { assignmentSchema } from "../schemas/assignmentSchema.js";
 
 const router = express.Router();
+router.use(tenantMiddleware);
+
+const getAssignment = (db) => db.models.Assignment || db.model("Assignment", assignmentSchema);
 
 /**
  * GET /api/teachers/:teacherId/students
@@ -14,15 +17,13 @@ router.get("/:teacherId/students", verifyToken, async (req, res) => {
   try {
     const { teacherId } = req.params;
 
-    // Find all assignments for this teacher
-    const assignments = await Assignment.find({ teacherId })
+    const assignments = await getAssignment(req.db).find({ teacherId })
       .populate({
         path: "studentId",
         select: "firstName surname email noOfClasses active age dateOfBirth rank lastPaymentDate"
       })
       .sort({ assignedDate: -1 });
 
-    // Extract student data with assignment info
     const students = assignments.map(assignment => ({
       assignmentId: assignment._id,
       assignedDate: assignment.assignedDate,
@@ -36,9 +37,9 @@ router.get("/:teacherId/students", verifyToken, async (req, res) => {
     });
   } catch (err) {
     console.error("Error fetching assigned students:", err);
-    res.status(500).json({ 
-      success: false, 
-      message: "Error fetching assigned students" 
+    res.status(500).json({
+      success: false,
+      message: "Error fetching assigned students"
     });
   }
 });
@@ -51,7 +52,7 @@ router.get("/:teacherId/assignments", verifyToken, async (req, res) => {
   try {
     const { teacherId } = req.params;
 
-    const assignments = await Assignment.find({ teacherId })
+    const assignments = await getAssignment(req.db).find({ teacherId })
       .populate("studentId", "firstName surname email noOfClasses active")
       .populate("teacherId", "firstName lastName email continent")
       .sort({ assignedDate: -1 });
@@ -63,9 +64,9 @@ router.get("/:teacherId/assignments", verifyToken, async (req, res) => {
     });
   } catch (err) {
     console.error("Error fetching assignments:", err);
-    res.status(500).json({ 
-      success: false, 
-      message: "Error fetching assignments" 
+    res.status(500).json({
+      success: false,
+      message: "Error fetching assignments"
     });
   }
 });

@@ -1,13 +1,19 @@
+// server/routes/lessonRoutes.js
 import express from "express";
-import Lesson from "../models/Lesson.js";
 import { verifyToken, verifyAdminOrTeacher } from "../middleware/authMiddleware.js";
+import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
+import { lessonSchema } from "../schemas/lessonSchema.js";
 
 const router = express.Router();
+router.use(tenantMiddleware);
+
+const getLesson = (db) => db.models.Lesson || db.model("Lesson", lessonSchema);
 
 // Get ALL lessons — admin and teachers only
 router.get("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
   try {
-    const lessons = await Lesson.find()
+    const lessons = await getLesson(req.db)
+      .find()
       .populate("studentId", "firstName surname email")
       .sort({ date: -1 });
     res.json(lessons);

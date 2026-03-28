@@ -1,0 +1,635 @@
+import express from 'express';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import mongoose from 'mongoose';
+import SuperAdmin from '../models/master/SuperAdmin.js';
+import Center from '../models/master/Center.js';
+import AgoraUsage from '../models/master/AgoraUsage.js';
+import { verifySuperAdmin } from '../middleware/superAdminMiddleware.js';
+import { getDb } from '../config/dbManager.js';
+import { config } from '../config/config.js';
+import { sendEmail, sendCenterDeletionWarningEmail } from '../utils/emailService.js';
+import { verifyDomainDns, isValidDomain, normalizeDomain } from '../utils/domainVerifier.js';
+
+// In-memory OTP store: key = adminEmail, value = { code, expiresAt }
+const emailOtpStore = new Map();
+
+const router = express.Router();
+
+// POST /api/super-admin/login
+router.post('/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ success: false, message: 'Email and password are required' });
+    }
+
+    const superAdmin = await SuperAdmin.findOne({ email });
+    if (!superAdmin || !superAdmin.active) {
+      return res.status(401).json({ success: false, message: 'Invalid credentials' });
+    }
+
+    const isPasswordValid = await bcrypt.compare(password, superAdmin.password);
+    if (!isPasswordValid) {
+      return res.status(401).json({ success: false, message: 'Invalid credentials' });
+    }
+
+    const token = jwt.sign(
+      { id: superAdmin._id, role: 'superadmin', email: superAdmin.email },
+      config.jwtSecret,
+      { expiresIn: config.jwtExpiry }
+    );
+
+    superAdmin.sessions.push({ token, isActive: true });
+    superAdmin.lastLogin = new Date();
+    await superAdmin.save();
+
+    res.json({
+      success: true,
+      token,
+      superAdmin: {
+        id: superAdmin._id,
+        firstName: superAdmin.firstName,
+        lastName: superAdmin.lastName,
+        email: superAdmin.email,
+        role: 'superadmin',
+      },
+    });
+  } catch (err) {
+    console.error('❌ Super admin login error:', err);
+    res.status(500).json({ success: false, message: 'Server error', error: err.message });
+  }
+});
+
+// GET /api/super-admin/centers — all centers with optional status filter
+router.get('/centers', verifySuperAdmin, async (req, res) => {
+  try {
+    const { status } = req.query;
+    const filter = status ? { status } : {};
+    const centers = await Center.find(filter).sort({ createdAt: -1 });
+    res.json({ success: true, centers });
+  } catch (err) {
+    console.error('❌ Get centers error:', err);
+    res.status(500).json({ success: false, message: 'Server error', error: err.message });
+  }
+});
+
+// GET /api/super-admin/centers/pending — pending registrations only
+router.get('/centers/pending', verifySuperAdmin, async (req, res) => {
+  try {
+    const centers = await Center.find({ status: 'pending' }).sort({ createdAt: -1 });
+    res.json({ success: true, centers });
+  } catch (err) {
+    console.error('❌ Get pending centers error:', err);
+    res.status(500).json({ success: false, message: 'Server error', error: err.message });
+  }
+});
+
+// PATCH /api/super-admin/centers/:id/approve
+router.patch('/centers/:id/approve', verifySuperAdmin, async (req, res) => {
+  try {
+    const center = await Center.findById(req.params.id).select('+pendingPasswordHash');
+    if (!center) {
+      return res.status(404).json({ success: false, message: 'Center not found' });
+    }
+    if (center.status !== 'pending') {
+      return res.status(400).json({ success: false, message: `Center is already ${center.status}` });
+    }
+    if (!center.pendingPasswordHash) {
+      return res.status(400).json({ success: false, message: 'No pending password hash found for this center' });
+    }
+
+    // Create the center's database and admin account
+    const db = await getDb(center.slug);
+
+    // Import admin schema to register on center DB
+    const { default: adminSchemaModule } = await import('../models/Admin.js');
+    const adminSchema = adminSchemaModule.schema;
+    const Admin = db.models.Admin || db.model('Admin', adminSchema);
+
+    await Admin.create({
+      username: center.adminEmail.split('@')[0],
+      email:    center.adminEmail,
+      password: center.pendingPasswordHash,
+      role:     'admin',
+      active:   true,
+    });
+
+    // Clear the pending password hash and mark active
+    center.pendingPasswordHash = null;
+    center.status     = 'active';
+    center.approvedAt = new Date();
+    center.approvedBy = req.superAdmin._id.toString();
+    await center.save();
+
+    // Welcome email to center admin
+    try {
+      await sendEmail({
+        to: center.adminEmail,
+        subject: `Your ${config.appName} center is approved!`,
+        html: `
+          <p>Congratulations! Your center <strong>${center.centerName}</strong> has been approved.</p>
+          <p>You can now log in to your admin dashboard at: <strong>${config.frontendUrl}</strong></p>
+          <p>Use your registered email address and the password you set during registration.</p>
+          <p>— The ${config.appName} Team</p>
+        `,
+      });
+    } catch (e) {
+      console.error('Approval welcome email failed:', e.message);
+    }
+
+    res.json({ success: true, message: 'Center approved and admin account created', center });
+  } catch (err) {
+    console.error('❌ Approve center error:', err);
+    res.status(500).json({ success: false, message: 'Server error', error: err.message });
+  }
+});
+
+// PATCH /api/super-admin/centers/:id/reject
+router.patch('/centers/:id/reject', verifySuperAdmin, async (req, res) => {
+  try {
+    const { rejectReason } = req.body;
+    const center = await Center.findById(req.params.id).select('+pendingPasswordHash');
+    if (!center) {
+      return res.status(404).json({ success: false, message: 'Center not found' });
+    }
+
+    center.status       = 'rejected';
+    center.rejectedAt   = new Date();
+    center.rejectReason = rejectReason || '';
+    center.pendingPasswordHash = null;
+    await center.save();
+
+    try {
+      await sendEmail({
+        to: center.adminEmail,
+        subject: `Update on your ${config.appName} registration`,
+        html: `
+          <p>Hi,</p>
+          <p>Unfortunately, we were unable to approve the registration for <strong>${center.centerName}</strong>.</p>
+          ${rejectReason ? `<p><strong>Reason:</strong> ${rejectReason}</p>` : ''}
+          <p>If you believe this is a mistake, please contact us.</p>
+          <p>— The ${config.appName} Team</p>
+        `,
+      });
+    } catch (e) {
+      console.error('Rejection email failed:', e.message);
+    }
+
+    res.json({ success: true, message: 'Center rejected', center });
+  } catch (err) {
+    console.error('❌ Reject center error:', err);
+    res.status(500).json({ success: false, message: 'Server error', error: err.message });
+  }
+});
+
+// PATCH /api/super-admin/centers/:id/suspend
+router.patch('/centers/:id/suspend', verifySuperAdmin, async (req, res) => {
+  try {
+    const center = await Center.findByIdAndUpdate(
+      req.params.id,
+      { status: 'suspended' },
+      { new: true }
+    );
+    if (!center) return res.status(404).json({ success: false, message: 'Center not found' });
+    res.json({ success: true, message: 'Center suspended', center });
+  } catch (err) {
+    console.error('❌ Suspend center error:', err);
+    res.status(500).json({ success: false, message: 'Server error', error: err.message });
+  }
+});
+
+// PATCH /api/super-admin/centers/:id/activate
+router.patch('/centers/:id/activate', verifySuperAdmin, async (req, res) => {
+  try {
+    const center = await Center.findByIdAndUpdate(
+      req.params.id,
+      { status: 'active' },
+      { new: true }
+    );
+    if (!center) return res.status(404).json({ success: false, message: 'Center not found' });
+    res.json({ success: true, message: 'Center activated', center });
+  } catch (err) {
+    console.error('❌ Activate center error:', err);
+    res.status(500).json({ success: false, message: 'Server error', error: err.message });
+  }
+});
+
+// GET /api/super-admin/stats — platform-wide counts
+router.get('/stats', verifySuperAdmin, async (req, res) => {
+  try {
+    const [total, active, pending, suspended, rejected] = await Promise.all([
+      Center.countDocuments(),
+      Center.countDocuments({ status: 'active' }),
+      Center.countDocuments({ status: 'pending' }),
+      Center.countDocuments({ status: 'suspended' }),
+      Center.countDocuments({ status: 'rejected' }),
+    ]);
+
+    res.json({
+      success: true,
+      stats: { total, active, pending, suspended, rejected },
+    });
+  } catch (err) {
+    console.error('❌ Stats error:', err);
+    res.status(500).json({ success: false, message: 'Server error', error: err.message });
+  }
+});
+
+// POST /api/super-admin/impersonate/:slug — returns temp 1hr admin token
+router.post('/impersonate/:slug', verifySuperAdmin, async (req, res) => {
+  try {
+    const center = await Center.findOne({ slug: req.params.slug, status: 'active' });
+    if (!center) {
+      return res.status(404).json({ success: false, message: 'Center not found or inactive' });
+    }
+
+    const token = jwt.sign(
+      {
+        id: 'superadmin-impersonation',
+        role: 'admin',
+        centerId: center.slug,
+        isImpersonation: true,
+        impersonatedBy: req.superAdmin._id.toString(),
+      },
+      config.jwtSecret,
+      { expiresIn: '1h' }
+    );
+
+    res.json({ success: true, token, center: { centerName: center.centerName, slug: center.slug } });
+  } catch (err) {
+    console.error('❌ Impersonate error:', err);
+    res.status(500).json({ success: false, message: 'Server error', error: err.message });
+  }
+});
+
+// PATCH /api/super-admin/centers/:id/plan
+router.patch('/centers/:id/plan', verifySuperAdmin, async (req, res) => {
+  try {
+    const { plan } = req.body;
+    if (!['free', 'basic', 'pro', 'enterprise'].includes(plan)) {
+      return res.status(400).json({ success: false, message: 'Invalid plan value' });
+    }
+    const center = await Center.findByIdAndUpdate(req.params.id, { plan }, { new: true });
+    if (!center) return res.status(404).json({ success: false, message: 'Center not found' });
+    res.json({ success: true, message: 'Plan updated', center });
+  } catch (err) {
+    console.error('❌ Update plan error:', err);
+    res.status(500).json({ success: false, message: 'Server error', error: err.message });
+  }
+});
+
+// PATCH /api/super-admin/centers/:id/features — toggle features on/off for a center
+router.patch('/centers/:id/features', verifySuperAdmin, async (req, res) => {
+  try {
+    const { agora, googleMeet, recording, pronunciation } = req.body;
+    const center = await Center.findById(req.params.id);
+    if (!center) return res.status(404).json({ success: false, message: 'Center not found' });
+
+    const update = {};
+    if (agora         !== undefined) update['features.agora']         = !!agora;
+    if (googleMeet    !== undefined) update['features.googleMeet']    = !!googleMeet;
+    if (recording     !== undefined) update['features.recording']     = !!recording;
+    if (pronunciation !== undefined) update['features.pronunciation'] = !!pronunciation;
+
+    const updated = await Center.findByIdAndUpdate(req.params.id, update, { new: true });
+    res.json({ success: true, message: 'Features updated', features: updated.features });
+  } catch (err) {
+    console.error('❌ Update features error:', err);
+    res.status(500).json({ success: false, message: 'Server error', error: err.message });
+  }
+});
+
+// PATCH /api/super-admin/centers/:id/theme — apply a full theme preset to a center
+router.patch('/centers/:id/theme', verifySuperAdmin, async (req, res) => {
+  try {
+    const { primaryColor, secondaryColor, fontFamily, borderRadius, shadowStyle, spacing, theme } = req.body;
+    const center = await Center.findById(req.params.id);
+    if (!center) return res.status(404).json({ success: false, message: 'Center not found' });
+
+    await Center.findByIdAndUpdate(req.params.id, {
+      'branding.primaryColor':   primaryColor,
+      'branding.secondaryColor': secondaryColor,
+      'branding.fontFamily':     fontFamily,
+      'branding.borderRadius':   borderRadius,
+      'branding.shadowStyle':    shadowStyle,
+      'branding.spacing':        spacing,
+      'branding.theme':          theme,
+    });
+
+    res.json({ success: true, message: `Theme "${theme}" applied to ${center.centerName}` });
+  } catch (err) {
+    console.error('❌ Apply theme error:', err);
+    res.status(500).json({ success: false, message: 'Server error', error: err.message });
+  }
+});
+
+// PATCH /api/super-admin/centers/:id/branding
+router.patch('/centers/:id/branding', verifySuperAdmin, async (req, res) => {
+  try {
+    const { primaryColor, secondaryColor, fontFamily, logo, favicon } = req.body;
+    const center = await Center.findById(req.params.id);
+    if (!center) return res.status(404).json({ success: false, message: 'Center not found' });
+
+    await Center.findByIdAndUpdate(req.params.id, {
+      'branding.primaryColor':   primaryColor   !== undefined ? primaryColor   : center.branding.primaryColor,
+      'branding.secondaryColor': secondaryColor !== undefined ? secondaryColor : center.branding.secondaryColor,
+      'branding.fontFamily':     fontFamily     !== undefined ? fontFamily     : center.branding.fontFamily,
+      'branding.logo':           logo           !== undefined ? logo           : center.branding.logo,
+      'branding.favicon':        favicon        !== undefined ? favicon        : center.branding.favicon,
+    });
+
+    res.json({ success: true, message: 'Branding updated' });
+  } catch (err) {
+    console.error('❌ Update branding error:', err);
+    res.status(500).json({ success: false, message: 'Server error', error: err.message });
+  }
+});
+
+// POST /api/super-admin/send-otp — email OTP to verify admin email before center creation
+router.post('/send-otp', verifySuperAdmin, async (req, res) => {
+  try {
+    const { adminEmail } = req.body;
+    if (!adminEmail?.trim()) {
+      return res.status(400).json({ success: false, message: 'adminEmail is required' });
+    }
+
+    const code = String(Math.floor(100000 + Math.random() * 900000));
+    emailOtpStore.set(adminEmail.toLowerCase(), { code, expiresAt: Date.now() + 10 * 60 * 1000 });
+
+    await sendEmail({
+      to: adminEmail,
+      subject: `${config.appName} — Email Verification Code`,
+      html: `
+        <p>Hello,</p>
+        <p>Your verification code for center registration is:</p>
+        <h2 style="letter-spacing:4px;color:#d97706;">${code}</h2>
+        <p>This code expires in <strong>10 minutes</strong>.</p>
+        <p>If you did not request this, please ignore this email.</p>
+        <p>— The ${config.appName} Team</p>
+      `,
+    });
+
+    res.json({ success: true, message: 'OTP sent to ' + adminEmail });
+  } catch (err) {
+    console.error('❌ Send OTP error:', err);
+    res.status(500).json({ success: false, message: 'Failed to send OTP', error: err.message });
+  }
+});
+
+// POST /api/super-admin/verify-otp — confirm OTP code
+router.post('/verify-otp', verifySuperAdmin, async (req, res) => {
+  try {
+    const { adminEmail, code } = req.body;
+    if (!adminEmail || !code) {
+      return res.status(400).json({ success: false, message: 'adminEmail and code are required' });
+    }
+
+    const entry = emailOtpStore.get(adminEmail.toLowerCase());
+    if (!entry) {
+      return res.status(400).json({ success: false, message: 'No OTP found for this email. Please request a new code.' });
+    }
+    if (Date.now() > entry.expiresAt) {
+      emailOtpStore.delete(adminEmail.toLowerCase());
+      return res.status(400).json({ success: false, message: 'OTP has expired. Please request a new code.' });
+    }
+    if (entry.code !== String(code).trim()) {
+      return res.status(400).json({ success: false, message: 'Incorrect code. Please try again.' });
+    }
+
+    emailOtpStore.delete(adminEmail.toLowerCase());
+    res.json({ success: true, message: 'Email verified' });
+  } catch (err) {
+    console.error('❌ Verify OTP error:', err);
+    res.status(500).json({ success: false, message: 'Server error', error: err.message });
+  }
+});
+
+// GET /api/super-admin/centers/domains — all centers with custom domain info
+router.get('/centers/domains', verifySuperAdmin, async (req, res) => {
+  try {
+    const centers = await Center.find(
+      { customDomain: { $exists: true, $ne: null } },
+      'centerName slug customDomain domainVerified domainRequestedAt domainVerifiedAt plan status'
+    ).sort({ domainRequestedAt: -1 });
+    res.json({ success: true, centers });
+  } catch (err) {
+    console.error('❌ Get domains error:', err);
+    res.status(500).json({ success: false, message: 'Server error', error: err.message });
+  }
+});
+
+// PATCH /api/super-admin/centers/:id/verify-domain — run DNS check and mark verified
+router.patch('/centers/:id/verify-domain', verifySuperAdmin, async (req, res) => {
+  try {
+    const center = await Center.findById(req.params.id);
+    if (!center) return res.status(404).json({ success: false, message: 'Center not found' });
+    if (!center.customDomain) {
+      return res.status(400).json({ success: false, message: 'No custom domain set for this center' });
+    }
+    if (!config.serverIp) {
+      return res.status(500).json({ success: false, message: 'SERVER_IP not configured on this server' });
+    }
+
+    const dnsOk = await verifyDomainDns(center.customDomain, config.serverIp);
+    if (!dnsOk) {
+      return res.status(422).json({
+        success: false,
+        message: `DNS A record for ${center.customDomain} does not point to ${config.serverIp}. DNS may still be propagating.`,
+      });
+    }
+
+    await Center.findByIdAndUpdate(req.params.id, {
+      domainVerified:  true,
+      domainVerifiedAt: new Date(),
+      domainVerifiedBy: req.superAdmin._id.toString(),
+    });
+
+    res.json({ success: true, message: `Domain ${center.customDomain} verified successfully` });
+  } catch (err) {
+    console.error('❌ Verify domain error:', err);
+    res.status(500).json({ success: false, message: 'Server error', error: err.message });
+  }
+});
+
+// PATCH /api/super-admin/centers/:id/remove-domain — remove custom domain
+router.patch('/centers/:id/remove-domain', verifySuperAdmin, async (req, res) => {
+  try {
+    const center = await Center.findById(req.params.id);
+    if (!center) return res.status(404).json({ success: false, message: 'Center not found' });
+
+    await Center.findByIdAndUpdate(req.params.id, {
+      $unset: {
+        customDomain:       '',
+        domainVerified:     '',
+        domainRequestedAt:  '',
+        domainVerifiedAt:   '',
+        domainVerifiedBy:   '',
+        domainInstructions: '',
+      },
+    });
+
+    res.json({ success: true, message: 'Custom domain removed' });
+  } catch (err) {
+    console.error('❌ Remove domain error:', err);
+    res.status(500).json({ success: false, message: 'Server error', error: err.message });
+  }
+});
+
+// GET /api/super-admin/centers/deleted — centers in soft-delete waiting period
+router.get('/centers/deleted', verifySuperAdmin, async (req, res) => {
+  try {
+    const centers = await Center.find({ status: 'deleted' }).sort({ deletedAt: -1 });
+    res.json({ success: true, centers });
+  } catch (err) {
+    console.error('❌ Get deleted centers error:', err);
+    res.status(500).json({ success: false, message: 'Server error', error: err.message });
+  }
+});
+
+// PATCH /api/super-admin/centers/:id/soft-delete — mark for deletion in 7 days + email admin
+router.patch('/centers/:id/soft-delete', verifySuperAdmin, async (req, res) => {
+  try {
+    const center = await Center.findById(req.params.id);
+    if (!center) return res.status(404).json({ success: false, message: 'Center not found' });
+    if (center.status === 'deleted') {
+      return res.status(400).json({ success: false, message: 'Center is already scheduled for deletion' });
+    }
+
+    const deletedAt           = new Date();
+    const scheduledDeletionAt = new Date(deletedAt.getTime() + 7 * 24 * 60 * 60 * 1000); // +7 days
+
+    await Center.findByIdAndUpdate(req.params.id, {
+      status:              'deleted',
+      deletedAt,
+      scheduledDeletionAt,
+      deletedBy:           req.superAdmin._id.toString(),
+    });
+
+    // Send warning email to center admin — non-blocking
+    try {
+      await sendCenterDeletionWarningEmail(center, scheduledDeletionAt, config.emailFrom);
+    } catch (e) {
+      console.error('Deletion warning email failed:', e.message);
+    }
+
+    res.json({ success: true, message: 'Center scheduled for deletion in 7 days. Warning email sent.', scheduledDeletionAt });
+  } catch (err) {
+    console.error('❌ Soft delete error:', err);
+    res.status(500).json({ success: false, message: 'Server error', error: err.message });
+  }
+});
+
+// PATCH /api/super-admin/centers/:id/restore — bring a soft-deleted center back to active
+router.patch('/centers/:id/restore', verifySuperAdmin, async (req, res) => {
+  try {
+    const center = await Center.findById(req.params.id);
+    if (!center) return res.status(404).json({ success: false, message: 'Center not found' });
+    if (center.status !== 'deleted') {
+      return res.status(400).json({ success: false, message: 'Center is not in deleted state' });
+    }
+
+    await Center.findByIdAndUpdate(req.params.id, {
+      status:              'active',
+      $unset: { deletedAt: '', scheduledDeletionAt: '', deletedBy: '' },
+    });
+
+    // Notify center admin that their account has been restored
+    try {
+      await sendEmail({
+        to:      center.adminEmail,
+        subject: `✅ Your ${config.appName} center has been restored`,
+        html: `
+          <p>Hi,</p>
+          <p>Great news! Your center <strong>${center.centerName}</strong> has been restored and is now active again.</p>
+          <p>You can log in to your admin dashboard immediately.</p>
+          <p>— The ${config.appName} Team</p>
+        `,
+      });
+    } catch (e) {
+      console.error('Restore email failed:', e.message);
+    }
+
+    res.json({ success: true, message: 'Center restored to active' });
+  } catch (err) {
+    console.error('❌ Restore center error:', err);
+    res.status(500).json({ success: false, message: 'Server error', error: err.message });
+  }
+});
+
+// GET /api/super-admin/usage — per-center Agora minutes summary
+// Returns thisMonth, lastMonth, and allTime totals for each center that has usage.
+router.get('/usage', verifySuperAdmin, async (req, res) => {
+  try {
+    const now       = new Date();
+    const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const lastDate  = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const lastMonth = `${lastDate.getFullYear()}-${String(lastDate.getMonth() + 1).padStart(2, '0')}`;
+
+    // All-time totals grouped by center
+    const allTime = await AgoraUsage.aggregate([
+      { $group: {
+        _id:          '$centerId',
+        centerName:   { $last: '$centerName' },
+        totalMinutes: { $sum: '$durationMinutes' },
+        sessions:     { $sum: 1 },
+      }},
+      { $sort: { totalMinutes: -1 } },
+    ]);
+
+    // This month totals
+    const thisMonthData = await AgoraUsage.aggregate([
+      { $match: { month: thisMonth } },
+      { $group: { _id: '$centerId', minutes: { $sum: '$durationMinutes' } } },
+    ]);
+
+    // Last month totals
+    const lastMonthData = await AgoraUsage.aggregate([
+      { $match: { month: lastMonth } },
+      { $group: { _id: '$centerId', minutes: { $sum: '$durationMinutes' } } },
+    ]);
+
+    // Build lookup maps
+    const thisMonthMap = Object.fromEntries(thisMonthData.map(r => [r._id, r.minutes]));
+    const lastMonthMap = Object.fromEntries(lastMonthData.map(r => [r._id, r.minutes]));
+
+    const summary = allTime.map(c => ({
+      centerId:         c._id,
+      centerName:       c.centerName,
+      totalMinutes:     c.totalMinutes,
+      sessions:         c.sessions,
+      thisMonthMinutes: thisMonthMap[c._id] || 0,
+      lastMonthMinutes: lastMonthMap[c._id] || 0,
+    }));
+
+    res.json({ success: true, summary, thisMonth, lastMonth });
+  } catch (err) {
+    console.error('❌ Usage summary error:', err);
+    res.status(500).json({ success: false, message: 'Server error', error: err.message });
+  }
+});
+
+// GET /api/super-admin/usage/:centerId — session-level detail for one center
+// Query params: ?month=2026-03 (optional, defaults to current month)
+router.get('/usage/:centerId', verifySuperAdmin, async (req, res) => {
+  try {
+    const { centerId } = req.params;
+    const now          = new Date();
+    const defaultMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const month        = req.query.month || defaultMonth;
+
+    const sessions = await AgoraUsage.find({ centerId, month })
+      .sort({ sessionDate: -1 })
+      .limit(200);
+
+    const totalMinutes = sessions.reduce((sum, s) => sum + s.durationMinutes, 0);
+
+    res.json({ success: true, sessions, totalMinutes, month, centerId });
+  } catch (err) {
+    console.error('❌ Center usage detail error:', err);
+    res.status(500).json({ success: false, message: 'Server error', error: err.message });
+  }
+});
+
+export default router;

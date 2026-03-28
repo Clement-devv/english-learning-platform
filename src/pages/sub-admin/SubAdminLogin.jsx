@@ -78,9 +78,9 @@ export default function SubAdminLogin() {
           <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "60px" }}>
             <div style={{
               width: "44px", height: "44px", borderRadius: "14px",
-              background: "linear-gradient(135deg, #4f63d2, #6b82f0)",
+              background: "linear-gradient(135deg, var(--brand-primary), var(--brand-secondary))",
               display: "flex", alignItems: "center", justifyContent: "center",
-              boxShadow: "0 0 24px rgba(107,130,240,0.35)",
+              boxShadow: "0 0 24px rgba(var(--brand-primary-rgb), 0.35)",
             }}>
               <Shield size={20} color="white" />
             </div>
@@ -204,13 +204,13 @@ export default function SubAdminLogin() {
                 disabled={loading}
                 style={{
                   padding: "14px",
-                  background: loading ? "rgba(107,130,240,0.4)" : "linear-gradient(135deg, #4f63d2, #6b82f0)",
+                  background: loading ? "rgba(var(--brand-primary-rgb), 0.4)" : "linear-gradient(135deg, var(--brand-primary), var(--brand-secondary))",
                   color: "white", border: "none", borderRadius: "14px",
                   fontSize: "15px", fontWeight: "700", cursor: loading ? "not-allowed" : "pointer",
                   fontFamily: "inherit",
                   display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
                   marginTop: "8px",
-                  boxShadow: loading ? "none" : "0 4px 20px rgba(107,130,240,0.35)",
+                  boxShadow: loading ? "none" : "0 4px 20px rgba(var(--brand-primary-rgb), 0.35)",
                   transition: "all 0.2s",
                 }}
               >

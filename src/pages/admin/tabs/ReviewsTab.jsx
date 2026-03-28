@@ -5,12 +5,6 @@ import { useState, useEffect, useMemo } from "react";
 import { Flag, Trash2, RefreshCw, AlertTriangle, ChevronDown, ChevronUp } from "lucide-react";
 import api from "../../../api";
 
-const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
-function authHeader() {
-  const t = localStorage.getItem("adminToken") || localStorage.getItem("token");
-  return t ? { Authorization: `Bearer ${t}` } : {};
-}
-
 const fmt = (d) =>
   d ? new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—";
 
@@ -59,8 +53,8 @@ export default function ReviewsTab({ isDarkMode }) {
       if (filterTeacher) params.set("teacherId", filterTeacher);
       if (filterFlag)    params.set("flagged", "true");
       if (filterRating)  params.set("rating", filterRating);
-      const res = await fetch(`${API}/api/reviews?${params}`, { headers: authHeader() });
-      const json = await res.json();
+      const res = await api.get(`/api/reviews?${params}`);
+      const json = res.data;
       setData(json);
     } catch (e) {
       console.error(e);
@@ -74,13 +68,11 @@ export default function ReviewsTab({ isDarkMode }) {
   async function handleFlag(reviewId, currentFlag) {
     setBusy(b => ({ ...b, [reviewId]: true }));
     try {
-      const res = await fetch(`${API}/api/reviews/${reviewId}/flag`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json", ...authHeader() },
-        body: JSON.stringify({ flagged: !currentFlag }),
-      });
-      if (res.ok) { showToast(currentFlag ? "Flag removed" : "Review flagged"); load(); }
-      else        { const e = await res.json(); showToast(e.error, false); }
+      await api.patch(`/api/reviews/${reviewId}/flag`, { flagged: !currentFlag });
+      showToast(currentFlag ? "Flag removed" : "Review flagged");
+      load();
+    } catch (e) {
+      showToast(e.response?.data?.error || "Action failed", false);
     } finally {
       setBusy(b => ({ ...b, [reviewId]: false }));
     }
@@ -90,11 +82,11 @@ export default function ReviewsTab({ isDarkMode }) {
     if (!window.confirm("Delete this review permanently?")) return;
     setBusy(b => ({ ...b, [reviewId]: true }));
     try {
-      const res = await fetch(`${API}/api/reviews/${reviewId}`, {
-        method: "DELETE", headers: authHeader(),
-      });
-      if (res.ok) { showToast("Review deleted"); load(); }
-      else        { const e = await res.json(); showToast(e.error, false); }
+      await api.delete(`/api/reviews/${reviewId}`);
+      showToast("Review deleted");
+      load();
+    } catch (e) {
+      showToast(e.response?.data?.error || "Delete failed", false);
     } finally {
       setBusy(b => ({ ...b, [reviewId]: false }));
     }

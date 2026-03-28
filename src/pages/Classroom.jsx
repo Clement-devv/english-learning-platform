@@ -4,6 +4,7 @@ import VideoCall from "./VideoCall";
 import ContentViewer from "./ContentViewer";
 import WhiteboardTab from "./WhiteboardTab";
 import api from "../api";
+import { getCachedCenter } from "../utils/branding";
 import {
   Video, FileText, PenTool, Clock, Users,
   CheckCircle2, XCircle, Loader, Power, AlertTriangle,
@@ -21,6 +22,11 @@ export default function Classroom({ classData, userRole: propUserRole, onLeave, 
   const bookingId      = finalClassData?.bookingId || finalClassData?.id;
   const userId         = localStorage.getItem("userId");
   const userName       = localStorage.getItem("name") || "User";
+
+  // Feature flags — set by super admin per center
+  const centerFeatures  = getCachedCenter()?.features || {};
+  const agoraEnabled    = centerFeatures.agora    !== false; // default true
+  const googleMeetEnabled = centerFeatures.googleMeet !== false;
 
   console.log("🎓 Classroom init:", { bookingId, userRole, duration: finalClassData?.duration });
 
@@ -914,7 +920,7 @@ useEffect(() => {
           On the "content" tab → 200px right sidebar, mode="sidebar" (stacked panels)
           On the "whiteboard" tab → hidden via visibility:hidden
         */}
-        {activeVideoProvider === "agora" && (
+        {activeVideoProvider === "agora" && agoraEnabled && (
           <div
             style={{
               position: "absolute",
@@ -968,8 +974,8 @@ useEffect(() => {
                   <p className="text-center text-gray-600 mb-8">Select which platform to use for this class</p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
-                    {/* Google Meet */}
-                    <button
+                    {/* Google Meet — only shown if enabled by super admin */}
+                    {googleMeetEnabled && <button
                       onClick={() => {
                         if (resolvedGoogleMeetLink) {
                           window.open(resolvedGoogleMeetLink, "_blank");
@@ -995,22 +1001,24 @@ useEffect(() => {
                           {resolvedGoogleMeetLink ? "✓ Available" : "Not Configured"}
                         </span>
                       </div>
-                    </button>
+                    </button>}
 
-                    {/* Agora */}
-                    <button
-                      onClick={() => chooseProvider("agora")}
-                      className="p-8 rounded-2xl border-4 bg-white border-blue-300 hover:border-blue-500 hover:shadow-xl transition-all cursor-pointer"
-                    >
-                      <div className="flex flex-col items-center">
-                        <div className="w-20 h-20 bg-blue-500 rounded-full flex items-center justify-center mb-4">
-                          <Video className="w-10 h-10 text-white" />
+                    {/* Agora — only shown if enabled by super admin */}
+                    {agoraEnabled && (
+                      <button
+                        onClick={() => chooseProvider("agora")}
+                        className="p-8 rounded-2xl border-4 bg-white border-blue-300 hover:border-blue-500 hover:shadow-xl transition-all cursor-pointer"
+                      >
+                        <div className="flex flex-col items-center">
+                          <div className="w-20 h-20 bg-blue-500 rounded-full flex items-center justify-center mb-4">
+                            <Video className="w-10 h-10 text-white" />
+                          </div>
+                          <h3 className="text-xl font-bold text-gray-800 mb-2">Agora Video</h3>
+                          <p className="text-sm text-gray-600 text-center mb-3">Embedded in browser</p>
+                          <span className="px-4 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">✓ Available</span>
                         </div>
-                        <h3 className="text-xl font-bold text-gray-800 mb-2">Agora Video</h3>
-                        <p className="text-sm text-gray-600 text-center mb-3">Embedded in browser</p>
-                        <span className="px-4 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">✓ Always Available</span>
-                      </div>
-                    </button>
+                      </button>
+                    )}
                   </div>
                   <p className="text-center text-xs text-gray-400 mt-6">
                     💡 Google Meet uses the teacher's subscription. Agora is always available as backup.

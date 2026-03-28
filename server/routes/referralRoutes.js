@@ -2,8 +2,6 @@
 
 import express          from "express";
 import crypto           from "crypto";
-import Referral         from "../models/Referral.js";
-import Student          from "../models/Student.js";
 import {
   verifyToken,
   verifyStudent,
@@ -11,13 +9,21 @@ import {
 } from "../middleware/authMiddleware.js";
 import { sendStudentInviteEmail } from "../utils/emailService.js";
 import { config }       from "../config/config.js";
+import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
+import { referralSchema } from "../schemas/referralSchema.js";
+import { studentSchema }  from "../schemas/studentSchema.js";
 
 const router = express.Router();
+router.use(tenantMiddleware);
+
+const getReferral = (db) => db.models.Referral || db.model("Referral", referralSchema);
+const getStudent  = (db) => db.models.Student  || db.model("Student",  studentSchema);
 
 // ── helpers ───────────────────────────────────────────────────────────────────
-async function makeUniqueCode() {
+async function makeUniqueCode(db) {
+  const Student = getStudent(db);
   for (let i = 0; i < 10; i++) {
-    const code = crypto.randomBytes(4).toString("hex").toUpperCase(); // e.g. "A3F72B1C"
+    const code = crypto.randomBytes(4).toString("hex").toUpperCase();
     const exists = await Student.exists({ referralCode: code });
     if (!exists) return code;
   }
@@ -27,14 +33,15 @@ async function makeUniqueCode() {
 // ── GET /api/referrals/my  —  student: their code + stats ────────────────────
 router.get("/my", verifyToken, verifyStudent, async (req, res) => {
   try {
+    const Student  = getStudent(req.db);
+    const Referral = getReferral(req.db);
+
     let student = await Student.findById(req.user.id)
       .select("referralCode referralCreditsEarned firstName");
-
     if (!student) return res.status(404).json({ error: "Student not found" });
 
-    // Auto-generate code if missing (for existing students)
     if (!student.referralCode) {
-      student.referralCode = await makeUniqueCode();
+      student.referralCode = await makeUniqueCode(req.db);
       await student.save();
     }
 
@@ -43,11 +50,11 @@ router.get("/my", verifyToken, verifyStudent, async (req, res) => {
       .select("referredFirstName referredLastName referredEmail status creditAwarded createdAt");
 
     const stats = {
-      total:    referrals.length,
-      active:   referrals.filter(r => r.status === "active").length,
-      pending:  referrals.filter(r => r.status === "pending").length,
-      invited:  referrals.filter(r => r.status === "invited").length,
-      credits:  student.referralCreditsEarned,
+      total:   referrals.length,
+      active:  referrals.filter(r => r.status === "active").length,
+      pending: referrals.filter(r => r.status === "pending").length,
+      invited: referrals.filter(r => r.status === "invited").length,
+      credits: student.referralCreditsEarned,
     };
 
     res.json({
@@ -65,25 +72,22 @@ router.get("/my", verifyToken, verifyStudent, async (req, res) => {
 router.post("/apply", async (req, res) => {
   try {
     const { firstName, lastName, email, referralCode } = req.body;
-    if (!firstName || !lastName || !email || !referralCode) {
+    if (!firstName || !lastName || !email || !referralCode)
       return res.status(400).json({ error: "All fields are required" });
-    }
 
-    // Find the referrer
+    const Student  = getStudent(req.db);
+    const Referral = getReferral(req.db);
+
     const referrer = await Student.findOne({ referralCode: referralCode.trim().toUpperCase() });
-    if (!referrer) {
-      return res.status(404).json({ error: "Invalid referral code" });
-    }
+    if (!referrer) return res.status(404).json({ error: "Invalid referral code" });
 
-    // Prevent duplicate applications from same email
     const existingStudent = await Student.findOne({ email: email.toLowerCase().trim() });
-    if (existingStudent) {
+    if (existingStudent)
       return res.status(409).json({ error: "An account with this email already exists" });
-    }
+
     const existingRef = await Referral.findOne({ referredEmail: email.toLowerCase().trim() });
-    if (existingRef) {
+    if (existingRef)
       return res.status(409).json({ error: "An application for this email already exists" });
-    }
 
     const referral = await Referral.create({
       referrerId:        referrer._id,
@@ -102,6 +106,7 @@ router.post("/apply", async (req, res) => {
 // ── GET /api/referrals  —  admin: all referral applications ──────────────────
 router.get("/", verifyToken, verifyAdmin, async (req, res) => {
   try {
+    const Referral = getReferral(req.db);
     const filter = {};
     if (req.query.status) filter.status = req.query.status;
 
@@ -119,19 +124,17 @@ router.get("/", verifyToken, verifyAdmin, async (req, res) => {
 // ── POST /api/referrals/:id/approve  —  admin approves → creates student + credits referrer ──
 router.post("/:id/approve", verifyToken, verifyAdmin, async (req, res) => {
   try {
+    const Student  = getStudent(req.db);
+    const Referral = getReferral(req.db);
+
     const referral = await Referral.findById(req.params.id).populate("referrerId");
     if (!referral) return res.status(404).json({ error: "Referral not found" });
-    if (referral.status !== "pending") {
+    if (referral.status !== "pending")
       return res.status(400).json({ error: `Referral is already ${referral.status}` });
-    }
 
-    // Check email not taken
     const emailTaken = await Student.findOne({ email: referral.referredEmail });
-    if (emailTaken) {
-      return res.status(409).json({ error: "Email already registered" });
-    }
+    if (emailTaken) return res.status(409).json({ error: "Email already registered" });
 
-    // Create student account (pending, no password yet)
     const inviteToken   = crypto.randomBytes(32).toString("hex");
     const inviteExpires = new Date(Date.now() + 48 * 60 * 60 * 1000);
 
@@ -146,15 +149,10 @@ router.post("/:id/approve", verifyToken, verifyAdmin, async (req, res) => {
       referredBy: referral.referrerId._id,
     });
 
-    // Send invite email
     const setupUrl = `${config.frontendUrl}/student/setup?token=${inviteToken}`;
-    try {
-      await sendStudentInviteEmail(newStudent, setupUrl);
-    } catch (emailErr) {
-      console.error("Referral invite email failed:", emailErr.message);
-    }
+    try { await sendStudentInviteEmail(newStudent, setupUrl); }
+    catch (emailErr) { console.error("Referral invite email failed:", emailErr.message); }
 
-    // Update referral record
     referral.status            = "invited";
     referral.referredStudentId = newStudent._id;
     await referral.save();
@@ -168,6 +166,7 @@ router.post("/:id/approve", verifyToken, verifyAdmin, async (req, res) => {
 // ── POST /api/referrals/:id/reject  —  admin rejects ─────────────────────────
 router.post("/:id/reject", verifyToken, verifyAdmin, async (req, res) => {
   try {
+    const Referral = getReferral(req.db);
     const referral = await Referral.findByIdAndUpdate(
       req.params.id,
       { status: "rejected" },
@@ -180,10 +179,13 @@ router.post("/:id/reject", verifyToken, verifyAdmin, async (req, res) => {
   }
 });
 
-// ── POST /api/referrals/complete/:studentId  —  called internally when student activates ──
-// This is called from studentRoutes setup-account, not a user-facing endpoint
-export async function completeReferral(studentId) {
+// ── called internally when student activates account ─────────────────────────
+// Accepts db so it can query the correct per-center connection.
+export async function completeReferral(studentId, db) {
   try {
+    const Student  = getStudent(db);
+    const Referral = getReferral(db);
+
     const student = await Student.findById(studentId);
     if (!student?.referredBy) return;
 
@@ -194,7 +196,6 @@ export async function completeReferral(studentId) {
     });
     if (!referral) return;
 
-    // Credit the referrer +1 class
     await Student.findByIdAndUpdate(referral.referrerId, {
       $inc: { noOfClasses: 1, referralCreditsEarned: 1 },
     });
@@ -204,7 +205,7 @@ export async function completeReferral(studentId) {
     referral.creditedAt    = new Date();
     await referral.save();
 
-    console.log(`🎁 Referral credit: +1 class awarded to student ${referral.referrerId}`);
+    console.log(`Referral credit: +1 class awarded to student ${referral.referrerId}`);
   } catch (err) {
     console.error("completeReferral error:", err.message);
   }

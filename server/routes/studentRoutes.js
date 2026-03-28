@@ -1,38 +1,36 @@
-// server/routes/studentRoutes.js - UPDATED WITH INVITE FLOW
+// server/routes/studentRoutes.js
 import express from "express";
 import bcrypt  from "bcryptjs";
 import crypto  from "crypto";
-import Student from "../models/Student.js";
-import Payment from "../models/Payment.js";
-import Lesson  from "../models/Lesson.js";
 import {
-  sendWelcomeEmail,
   sendPasswordResetEmail,
   sendStudentInviteEmail,
   sendStudentWelcomeEmail,
   sendAccountDeletionWarningEmail,
 } from "../utils/emailService.js";
 import {
-  verifyToken,
-  verifyAdmin,
-  verifyAdminOrTeacher,
-  verifyStudent,
-  verifyOwnership,
+  verifyToken, verifyAdmin, verifyAdminOrTeacher, verifyOwnership,
 } from "../middleware/authMiddleware.js";
 import { completeReferral } from "./referralRoutes.js";
 import { strictLimiter } from "../middleware/rateLimiter.js";
 import { config } from "../config/config.js";
+import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
+import { studentSchema } from "../schemas/studentSchema.js";
+import { paymentSchema } from "../schemas/paymentSchema.js";
 
 const router = express.Router();
+router.use(tenantMiddleware);
 
-// ================== STUDENT CRUD ==================
+const getStudent = (db) => db.models.Student || db.model("Student", studentSchema);
+const getPayment = (db) => db.models.Payment || db.model("Payment", paymentSchema);
 
-// 👉 Get all students - ONLY ADMIN AND TEACHERS can view
+// ─── GET all students ─────────────────────────────────────────────────────────
 router.get("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
   try {
-    const students = await Student.find()
-    .select("firstName surname email active noOfClasses age lastPaymentDate showTempPassword status createdAt")
-    .lean();
+    const students = await getStudent(req.db)
+      .find()
+      .select("firstName surname email active noOfClasses age lastPaymentDate showTempPassword status createdAt")
+      .lean();
     res.json(students);
   } catch (err) {
     console.error(err);
@@ -40,15 +38,15 @@ router.get("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
   }
 });
 
-// 👉 Get single student by ID - Admin, Teachers, or the student themselves
+// ─── GET single student ───────────────────────────────────────────────────────
 router.get("/:id", verifyToken, async (req, res) => {
   try {
-    if (req.user.role === "student" && req.user.id !== req.params.id) {
+    if (req.user.role === "student" && req.user.id !== req.params.id)
       return res.status(403).json({ message: "You can only view your own data" });
-    }
-    const student = await Student.findById(req.params.id)
-    .select("firstName surname email active noOfClasses age lastPaymentDate showTempPassword status twoFactorEnabled googleMeetLink createdAt")
-    .lean();
+    const student = await getStudent(req.db)
+      .findById(req.params.id)
+      .select("firstName surname email active noOfClasses age lastPaymentDate showTempPassword status twoFactorEnabled createdAt")
+      .lean();
     if (!student) return res.status(404).json({ message: "Student not found" });
     res.json(student);
   } catch (err) {
@@ -57,48 +55,32 @@ router.get("/:id", verifyToken, async (req, res) => {
   }
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 👉 Create new student — sends invite email instead of password
-// ─────────────────────────────────────────────────────────────────────────────
+// ─── POST create student (invite flow) ───────────────────────────────────────
 router.post("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
   try {
     const { firstName, surname, email, age, noOfClasses } = req.body;
-
-    if (!firstName || !surname || !email) {
+    if (!firstName || !surname || !email)
       return res.status(400).json({ message: "Missing required fields" });
-    }
 
+    const Student = getStudent(req.db);
     const exists = await Student.findOne({ email });
-    if (exists) {
-      return res.status(400).json({ message: "Email already exists" });
-    }
+    if (exists) return res.status(400).json({ message: "Email already exists" });
 
-    // Generate invite token (48-hour expiry)
     const inviteToken   = crypto.randomBytes(32).toString("hex");
     const inviteExpires = new Date(Date.now() + 48 * 60 * 60 * 1000);
 
-    // Create student — no password yet, status pending
     const student = await Student.create({
-      firstName,
-      surname,
-      email,
-      age,
+      firstName, surname, email, age,
       noOfClasses: noOfClasses || 0,
-      status:       "pending",
-      active:       false,
-      inviteToken,
-      inviteExpires,
+      status: "pending", active: false,
+      inviteToken, inviteExpires,
     });
 
-    // Send invite email
     const setupUrl = `${config.frontendUrl}/student/setup?token=${inviteToken}`;
-    console.log(`📧 Sending student invite to ${email}...`);
     try {
       await sendStudentInviteEmail(student, setupUrl);
-      console.log(`✅ Invite sent to ${email}`);
     } catch (emailError) {
-      console.error(`❌ Failed to send invite email:`, emailError);
-      // Don't fail — admin can resend
+      console.error("Failed to send invite email:", emailError);
     }
 
     res.status(201).json({
@@ -111,66 +93,37 @@ router.post("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
   }
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 👉 Verify invite token — PUBLIC (no auth needed)
-// ─────────────────────────────────────────────────────────────────────────────
+// ─── GET verify-invite token ──────────────────────────────────────────────────
 router.get("/verify-invite/:token", strictLimiter, async (req, res) => {
   try {
-    const student = await Student.findOne({
-      inviteToken:   req.params.token,
-      inviteExpires: { $gt: new Date() },
-      status:        "pending",
+    const student = await getStudent(req.db).findOne({
+      inviteToken: req.params.token, inviteExpires: { $gt: new Date() }, status: "pending",
     });
-
     if (!student) {
-      return res.status(400).json({
-        message: "This invite link is invalid or has expired. Please ask your admin to resend the invitation.",
-      });
+      return res.status(400).json({ message: "This invite link is invalid or has expired. Please ask your admin to resend the invitation." });
     }
-
-    res.json({
-      valid: true,
-      student: {
-        firstName:   student.firstName,
-        surname:     student.surname,
-        email:       student.email,
-        noOfClasses: student.noOfClasses,
-        age:         student.age,
-      },
-    });
+    res.json({ valid: true, student: { firstName: student.firstName, surname: student.surname, email: student.email, noOfClasses: student.noOfClasses, age: student.age } });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Error verifying invite" });
   }
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 👉 Setup account — student sets password after clicking invite link
-// ─────────────────────────────────────────────────────────────────────────────
+// ─── POST setup-account ───────────────────────────────────────────────────────
 router.post("/setup-account", strictLimiter, async (req, res) => {
   try {
     const { token, password } = req.body;
+    if (!token || !password) return res.status(400).json({ message: "Token and password are required" });
+    if (password.length < 8) return res.status(400).json({ message: "Password must be at least 8 characters" });
 
-    if (!token || !password) {
-      return res.status(400).json({ message: "Token and password are required" });
-    }
-    if (password.length < 8) {
-      return res.status(400).json({ message: "Password must be at least 8 characters" });
-    }
-
+    const Student = getStudent(req.db);
     const student = await Student.findOne({
-      inviteToken:   token,
-      inviteExpires: { $gt: new Date() },
-      status:        "pending",
+      inviteToken: token, inviteExpires: { $gt: new Date() }, status: "pending",
     });
-
     if (!student) {
-      return res.status(400).json({
-        message: "This invite link is invalid or has expired. Please ask your admin to resend the invitation.",
-      });
+      return res.status(400).json({ message: "This invite link is invalid or has expired. Please ask your admin to resend the invitation." });
     }
 
-    // Activate account
     student.password      = await bcrypt.hash(password, config.bcryptRounds);
     student.status        = "active";
     student.active        = true;
@@ -186,40 +139,26 @@ router.post("/setup-account", strictLimiter, async (req, res) => {
 
     await student.save();
 
-    // Credit referrer if this student was referred
-    completeReferral(student._id).catch(() => {});
+    completeReferral(student._id, req.db).catch(() => {});
 
-    // Send welcome email
-    console.log(`📧 Sending welcome email to ${student.email}...`);
-    try {
-      await sendStudentWelcomeEmail(student);
-      console.log(`✅ Welcome email sent to ${student.email}`);
-    } catch (emailError) {
-      console.error(`❌ Failed to send welcome email:`, emailError);
-    }
+    try { await sendStudentWelcomeEmail(student); }
+    catch (e) { console.error("Failed to send welcome email:", e); }
 
-    res.json({
-      message: "Account activated successfully! You can now login.",
-      student: { firstName: student.firstName, surname: student.surname, email: student.email },
-    });
+    res.json({ message: "Account activated successfully! You can now login.", student: { firstName: student.firstName, surname: student.surname, email: student.email } });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Error setting up account" });
   }
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 👉 Resend invite — admin only
-// ─────────────────────────────────────────────────────────────────────────────
+// ─── POST resend-invite ───────────────────────────────────────────────────────
 router.post("/:id/resend-invite", verifyToken, verifyAdmin, strictLimiter, async (req, res) => {
   try {
+    const Student = getStudent(req.db);
     const student = await Student.findById(req.params.id);
     if (!student) return res.status(404).json({ message: "Student not found" });
-    if (student.status !== "pending") {
-      return res.status(400).json({ message: "Student has already set up their account" });
-    }
+    if (student.status !== "pending") return res.status(400).json({ message: "Student has already set up their account" });
 
-    // Refresh token
     const inviteToken   = crypto.randomBytes(32).toString("hex");
     const inviteExpires = new Date(Date.now() + 48 * 60 * 60 * 1000);
     student.inviteToken   = inviteToken;
@@ -236,52 +175,37 @@ router.post("/:id/resend-invite", verifyToken, verifyAdmin, strictLimiter, async
   }
 });
 
-// ================== UPDATE / DELETE ==================
-
-// 👉 Update student - ONLY ADMIN AND TEACHERS
-// PATCH /api/students/:id/timezone  — silently update student's local timezone
+// ─── PATCH timezone ───────────────────────────────────────────────────────────
 router.patch("/:id/timezone", verifyToken, async (req, res) => {
   try {
     const { timezone } = req.body;
-    if (!timezone || typeof timezone !== "string") {
+    if (!timezone || typeof timezone !== "string")
       return res.status(400).json({ message: "timezone required" });
-    }
-    // Validate against the IANA timezone database
     try { Intl.DateTimeFormat(undefined, { timeZone: timezone }); }
     catch { return res.status(400).json({ message: "Invalid timezone identifier" }); }
-
-    await Student.findByIdAndUpdate(req.params.id, { timezone });
+    await getStudent(req.db).findByIdAndUpdate(req.params.id, { timezone });
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ message: "Error updating timezone" });
   }
 });
 
+// ─── PUT update student ───────────────────────────────────────────────────────
 router.put("/:id", verifyToken, verifyAdminOrTeacher, async (req, res) => {
   try {
     const { password, ...updates } = req.body;
-
     if (password) {
-      updates.password = await bcrypt.hash(password, config.bcryptRounds);
+      updates.password           = await bcrypt.hash(password, config.bcryptRounds);
       updates.showTempPassword   = false;
       updates.lastPasswordChange = new Date();
     }
 
-    const student = await Student.findByIdAndUpdate(req.params.id, updates, { new: true });
+    const student = await getStudent(req.db).findByIdAndUpdate(req.params.id, updates, { new: true });
     if (!student) return res.status(404).json({ message: "Student not found" });
 
     if (password) {
-      console.log(`📧 Sending password reset email to ${student.email}...`);
-      try {
-        await sendPasswordResetEmail(
-          student.email,
-          `${student.firstName} ${student.surname}`,
-          password
-        );
-        console.log(`✅ Password reset email sent to ${student.email}`);
-      } catch (emailError) {
-        console.error(`❌ Failed to send password reset email:`, emailError);
-      }
+      try { await sendPasswordResetEmail(student.email, `${student.firstName} ${student.surname}`, password); }
+      catch (e) { console.error("Failed to send password reset email:", e); }
     }
 
     res.json({ message: "Student updated", student });
@@ -291,18 +215,14 @@ router.put("/:id", verifyToken, verifyAdminOrTeacher, async (req, res) => {
   }
 });
 
-// 👉 Toggle student active/inactive - ONLY ADMIN
+// ─── PATCH toggle active ──────────────────────────────────────────────────────
 router.patch("/:id/toggle", verifyToken, verifyAdmin, async (req, res) => {
   try {
     const { active } = req.body;
-    if (typeof active !== "boolean") {
-      return res.status(400).json({ message: "active (boolean) is required" });
-    }
-    const student = await Student.findByIdAndUpdate(
-      req.params.id,
-      { active },
-      { new: true }
-    ).select("firstName surname email active noOfClasses age lastPaymentDate status");
+    if (typeof active !== "boolean") return res.status(400).json({ message: "active (boolean) is required" });
+    const student = await getStudent(req.db)
+      .findByIdAndUpdate(req.params.id, { active }, { new: true })
+      .select("firstName surname email active noOfClasses age lastPaymentDate status");
     if (!student) return res.status(404).json({ message: "Student not found" });
     res.json({ message: `Student ${active ? "enabled" : "disabled"}`, student });
   } catch (err) {
@@ -311,53 +231,40 @@ router.patch("/:id/toggle", verifyToken, verifyAdmin, async (req, res) => {
   }
 });
 
-// 👉 Schedule student for deletion — disables account and sends warning email.
-//    Permanent deletion happens 7 days later via the scheduler. ONLY ADMIN.
+// ─── DELETE (soft-delete) ─────────────────────────────────────────────────────
 router.delete("/:id", verifyToken, verifyAdmin, strictLimiter, async (req, res) => {
   try {
+    const Student = getStudent(req.db);
     const student = await Student.findById(req.params.id);
     if (!student) return res.status(404).json({ message: "Student not found" });
+    if (student.scheduledDeletionAt) return res.status(400).json({ message: "Student is already scheduled for deletion" });
 
-    if (student.scheduledDeletionAt) {
-      return res.status(400).json({ message: "Student is already scheduled for deletion" });
-    }
-
-    const deletionDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
-
-    student.active = false;
-    student.scheduledDeletionAt = deletionDate;
+    const deletionDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    student.active                   = false;
+    student.scheduledDeletionAt      = deletionDate;
     student.deletionWarningEmailSent = false;
     await student.save();
 
-    // Send warning email (non-blocking — don't fail the request if email fails)
-    sendAccountDeletionWarningEmail(student, deletionDate).catch((err) =>
-      console.error("Deletion warning email failed:", err.message)
-    );
+    sendAccountDeletionWarningEmail(student, deletionDate).catch(e => console.error("Deletion warning email failed:", e.message));
 
-    res.json({
-      message: "Student scheduled for deletion",
-      scheduledDeletionAt: deletionDate,
-      student,
-    });
+    res.json({ message: "Student scheduled for deletion", scheduledDeletionAt: deletionDate, student });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Error scheduling student deletion" });
   }
 });
 
-// 👉 Restore a student that was scheduled for deletion — ONLY ADMIN
+// ─── POST restore ─────────────────────────────────────────────────────────────
 router.post("/:id/restore", verifyToken, verifyAdmin, async (req, res) => {
   try {
+    const Student = getStudent(req.db);
     const student = await Student.findById(req.params.id);
     if (!student) return res.status(404).json({ message: "Student not found" });
+    if (!student.scheduledDeletionAt) return res.status(400).json({ message: "Student is not scheduled for deletion" });
 
-    if (!student.scheduledDeletionAt) {
-      return res.status(400).json({ message: "Student is not scheduled for deletion" });
-    }
-
-    student.scheduledDeletionAt = null;
+    student.scheduledDeletionAt      = null;
     student.deletionWarningEmailSent = false;
-    student.active = true;
+    student.active                   = true;
     await student.save();
 
     res.json({ message: "Student account restored successfully", student });
@@ -367,31 +274,21 @@ router.post("/:id/restore", verifyToken, verifyAdmin, async (req, res) => {
   }
 });
 
-// ================== EXTRA FEATURES ==================
-
-// 👉 Reset password - ONLY ADMIN AND TEACHERS
+// ─── POST reset-password ──────────────────────────────────────────────────────
 router.post("/:id/reset-password", verifyToken, verifyAdminOrTeacher, strictLimiter, async (req, res) => {
   try {
+    const Student = getStudent(req.db);
     const student = await Student.findById(req.params.id);
     if (!student) return res.status(404).json({ message: "Student not found" });
 
-    const newPass = Math.random().toString(36).slice(-8);
-    student.password           = await bcrypt.hash(newPass, config.bcryptRounds);
+    const newPass          = Math.random().toString(36).slice(-8);
+    student.password       = await bcrypt.hash(newPass, config.bcryptRounds);
     student.showTempPassword   = true;
     student.lastPasswordChange = new Date();
     await student.save();
 
-    console.log(`📧 Sending password reset email to ${student.email}...`);
-    try {
-      await sendPasswordResetEmail(
-        student.email,
-        `${student.firstName} ${student.surname}`,
-        newPass
-      );
-      console.log(`✅ Password reset email sent to ${student.email}`);
-    } catch (emailError) {
-      console.error(`❌ Failed to send password reset email:`, emailError);
-    }
+    try { await sendPasswordResetEmail(student.email, `${student.firstName} ${student.surname}`, newPass); }
+    catch (e) { console.error("Failed to send password reset email:", e); }
 
     res.json({ message: "Password reset successfully", tempPassword: newPass });
   } catch (err) {
@@ -400,50 +297,38 @@ router.post("/:id/reset-password", verifyToken, verifyAdminOrTeacher, strictLimi
   }
 });
 
-
-// 👉 Record payment - ONLY ADMIN
+// ─── POST record payment ──────────────────────────────────────────────────────
 router.post("/:id/payment", verifyToken, verifyAdmin, async (req, res) => {
   try {
     const { amount, classes, method = "Manual", status = "completed" } = req.body;
+    if (!amount || !classes) return res.status(400).json({ message: "Amount and number of classes are required" });
 
-    if (!amount || !classes) {
-      return res.status(400).json({ message: "Amount and number of classes are required" });
-    }
-
+    const Student = getStudent(req.db);
     const student = await Student.findById(req.params.id);
     if (!student) return res.status(404).json({ message: "Student not found" });
 
-    // Add classes and activate student
     student.lastPaymentDate = new Date();
     student.active          = true;
     student.noOfClasses     = (student.noOfClasses || 0) + (parseInt(classes, 10) || 0);
     await student.save();
 
-    const payment = await Payment.create({
-      studentId: student._id,
-      amount,
-      classes,
-      method,
-      status,
-      date: new Date(),
+    const payment = await getPayment(req.db).create({
+      studentId: student._id, amount, classes, method, status, date: new Date(),
     });
-
-    console.log(`✅ Payment recorded: ₦${amount} for ${classes} classes → ${student.email}`);
 
     res.json({ message: "Payment recorded", student, payment });
   } catch (err) {
-    console.error("❌ Payment error:", err);
+    console.error("Payment error:", err);
     res.status(500).json({ message: "Error recording payment" });
   }
 });
 
-// 👉 Get all payments for a student
+// ─── GET payments for a student ───────────────────────────────────────────────
 router.get("/:id/payments", verifyToken, async (req, res) => {
   try {
-    if (req.user.role === "student" && req.user.id !== req.params.id) {
+    if (req.user.role === "student" && req.user.id !== req.params.id)
       return res.status(403).json({ message: "You can only view your own payments" });
-    }
-    const payments = await Payment.find({ studentId: req.params.id }).sort({ date: -1 });
+    const payments = await getPayment(req.db).find({ studentId: req.params.id }).sort({ date: -1 });
     res.json(payments);
   } catch (err) {
     console.error(err);

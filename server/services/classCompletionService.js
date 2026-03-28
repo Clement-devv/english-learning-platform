@@ -2,11 +2,17 @@
 // THE single source of truth for all class completion logic.
 // Routes (classroom, admin, booking) all call completeClass() — nothing else.
 
-import Booking            from "../models/Booking.js";
-import Student            from "../models/Student.js";
-import Teacher            from "../models/Teacher.js";
-import PaymentTransaction from "../models/PaymentTransaction.js";
-import ClassroomSession   from "../models/ClassroomSession.js";
+import { bookingSchema }            from "../schemas/bookingSchema.js";
+import { studentSchema }            from "../schemas/studentSchema.js";
+import { teacherSchema }            from "../schemas/teacherSchema.js";
+import { paymentTransactionSchema } from "../schemas/paymentTransactionSchema.js";
+import { classroomSessionSchema }   from "../schemas/classroomSessionSchema.js";
+
+const getBooking            = (db) => db.models.Booking            || db.model("Booking",            bookingSchema);
+const getStudent            = (db) => db.models.Student            || db.model("Student",            studentSchema);
+const getTeacher            = (db) => db.models.Teacher            || db.model("Teacher",            teacherSchema);
+const getPaymentTransaction = (db) => db.models.PaymentTransaction || db.model("PaymentTransaction", paymentTransactionSchema);
+const getClassroomSession   = (db) => db.models.ClassroomSession   || db.model("ClassroomSession",   classroomSessionSchema);
 
 /** Round to exactly 2dp — prevents 0.1+0.2 = 0.30000000000004 salary drift */
 function toMoney(n) {
@@ -47,10 +53,11 @@ function buildMissedReason({ teacherJoined, studentJoined, bothActiveTime, requi
 }
 
 /**
- * completeClass(bookingId, markedBy, options)
+ * completeClass(db, bookingId, markedBy, options)
  *
+ * @param db         - per-center Mongoose connection (req.db)
  * @param bookingId  - MongoDB booking _id
- * @param markedBy   - "system" | "admin" | "classroom"
+ * @param markedBy   - "system" | "admin" | "classroom" | "sub-admin"
  * @param options.skipAttendanceCheck - true ONLY for admin manual override
  *
  * Returns: { success, alreadyProcessed?, completed, missed, reason?,
@@ -58,23 +65,22 @@ function buildMissedReason({ teacherJoined, studentJoined, bothActiveTime, requi
  *            teacherLessonsCompleted, attendance, markedBy }
  * Throws on unexpected DB errors — let route handler return 500.
  */
-export async function completeClass(bookingId, markedBy = "system", options = {}) {
+export async function completeClass(db, bookingId, markedBy = "system", options = {}) {
   const { skipAttendanceCheck = false } = options;
 
+  const Booking            = getBooking(db);
+  const Student            = getStudent(db);
+  const Teacher            = getTeacher(db);
+  const PaymentTransaction = getPaymentTransaction(db);
+  const ClassroomSession   = getClassroomSession(db);
+
   // ══════════════════════════════════════════════════════
-  // STEP 1 — Atomic optimistic lock  [fixes BUG-1]
+  // STEP 1 — Atomic optimistic lock
   // ══════════════════════════════════════════════════════
-  // findOneAndUpdate is a single atomic MongoDB operation.
-  // The filter { status:"accepted" } means ONLY ONE concurrent caller
-  // can ever match. All others get null → alreadyProcessed.
-  // This completely eliminates the read → check → write race condition.
-  //
-  // "processing" is a transient lock state. The catch block resets it
-  // back to "accepted" on failure so booking can be retried.
   const claimedBooking = await Booking.findOneAndUpdate(
-    { _id: bookingId, status: "accepted" }, // atomic — matches ONCE ever
-    { $set: { status: "processing" } },      // transient lock
-    { new: false }                           // return OLD doc
+    { _id: bookingId, status: "accepted" },
+    { $set: { status: "processing" } },
+    { new: false }
   )
     .populate("teacherId", "firstName lastName email ratePerClass lessonsCompleted earned")
     .populate("studentId", "firstName surname email noOfClasses active");
@@ -104,13 +110,12 @@ export async function completeClass(bookingId, markedBy = "system", options = {}
   }
 
   // ══════════════════════════════════════════════════════
-  // STEP 3 — Attendance gate  [fixes BUG-2]
+  // STEP 3 — Attendance gate
   // ══════════════════════════════════════════════════════
   const session    = await ClassroomSession.findOne({ bookingId });
   const attendance = evaluateAttendance(session, claimedBooking.duration);
 
   if (!skipAttendanceCheck && !attendance.meetsRequirement) {
-    // Release processing lock → mark as missed
     const missedBooking = await Booking.findByIdAndUpdate(
       bookingId,
       {
@@ -130,7 +135,7 @@ export async function completeClass(bookingId, markedBy = "system", options = {}
       await session.save();
     }
 
-    console.log(`⚠️  [ClassCompletion] Booking ${bookingId} MISSED. ${missedBooking.missedReason}`);
+    console.log(`[ClassCompletion] Booking ${bookingId} MISSED. ${missedBooking.missedReason}`);
 
     return {
       success:   true,
@@ -145,9 +150,7 @@ export async function completeClass(bookingId, markedBy = "system", options = {}
   }
 
   // ══════════════════════════════════════════════════════
-  // STEP 4 — Sequential writes (no transactions — standalone MongoDB)
-  // The optimistic lock on "processing" status in STEP 1 prevents
-  // any concurrent duplicate from running these writes.
+  // STEP 4 — Sequential writes
   // ══════════════════════════════════════════════════════
   try {
     const now       = new Date();
@@ -201,7 +204,7 @@ export async function completeClass(bookingId, markedBy = "system", options = {}
     }
 
     console.log(
-      `✅ [ClassCompletion] "${claimedBooking.classTitle}" (${bookingId})\n` +
+      `[ClassCompletion] "${claimedBooking.classTitle}" (${bookingId})\n` +
       `   Teacher : ${teacher.firstName} ${teacher.lastName} → +$${ratePerClass} (total $${newEarned})\n` +
       `   Student : ${student.firstName} ${student.surname} → credits left: ${newClassCount}`
     );
@@ -226,10 +229,10 @@ export async function completeClass(bookingId, markedBy = "system", options = {}
         { _id: bookingId, status: "processing" },
         { $set: { status: "accepted" } }
       );
-      console.warn(`⚠️  [ClassCompletion] Error on ${bookingId}, reset to "accepted". Error: ${err.message}`);
+      console.warn(`[ClassCompletion] Error on ${bookingId}, reset to "accepted". Error: ${err.message}`);
     } catch (resetErr) {
       console.error(
-        `🚨 CRITICAL: Could not reset booking ${bookingId} after error!\n` +
+        `CRITICAL: Could not reset booking ${bookingId} after error!\n` +
         `   Error        : ${err.message}\n` +
         `   Reset error  : ${resetErr.message}\n` +
         `   FIX: db.bookings.updateOne({_id: ObjectId("${bookingId}")}, {$set:{status:"accepted"}})`

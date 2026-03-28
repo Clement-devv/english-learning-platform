@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { useDarkMode } from "../../hooks/useDarkMode";
 import MessagesTab from "../../components/chat/MessagesTab";
+import { getCachedCenter } from "../../utils/branding";
 
 
 export default function SubAdminDashboard() {
@@ -894,8 +895,11 @@ function AgoraSpectatorModal({ booking, isDarkMode, onClose }) {
 
         // Fetch token using sub-admin credentials
         const token = sessionStorage.getItem("subAdminToken") || localStorage.getItem("subAdminToken");
+        const slug  = import.meta.env.VITE_CENTER_SLUG || getCachedCenter()?.slug;
+        const agoraHeaders = { Authorization: `Bearer ${token}` };
+        if (slug) agoraHeaders["x-center-slug"] = slug;
         const res   = await fetch(`/api/agora/token?channel=${booking._id}`, {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: agoraHeaders,
         });
         const data = await res.json();
         if (!data.success || !data.appId) throw new Error(data.message || "Could not get Agora token");
@@ -1171,9 +1175,12 @@ function TeacherClassesView({ teacher, isDarkMode, canMark, onBack }) {
     setBusy((p) => ({ ...p, [bookingId]: true }));
     try {
       const token = sessionStorage.getItem("subAdminToken") || localStorage.getItem("subAdminToken");
+      const slug  = import.meta.env.VITE_CENTER_SLUG || getCachedCenter()?.slug;
+      const actionHeaders = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+      if (slug) actionHeaders["x-center-slug"] = slug;
       const res = await fetch(`/api/sub-admin-scope/classes/${endpoint}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: actionHeaders,
         body: JSON.stringify({ bookingId }),
       });
       const data = await res.json();
@@ -1836,7 +1843,10 @@ function ReviewsPanel({ isDarkMode }) {
 // ─────────────────────────────────────────────────────────────────────────────
 async function apiFetch(url) {
   const token = sessionStorage.getItem("subAdminToken") || localStorage.getItem("subAdminToken");
-  const res   = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+  const slug  = import.meta.env.VITE_CENTER_SLUG || getCachedCenter()?.slug;
+  const headers = { Authorization: `Bearer ${token}` };
+  if (slug) headers["x-center-slug"] = slug;
+  const res = await fetch(url, { headers });
   return res.json();
 }
 

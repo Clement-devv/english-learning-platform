@@ -5,8 +5,13 @@ console.log("📧 Email configured:", process.env.EMAIL_USER ? "✓" : "✗");
 import express from "express";
 import mongoose from "mongoose";
 import cors from "cors";
-import http from "http"; 
+import http from "http";
 import compression from "compression";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname  = path.dirname(__filename);
 
 import { 
   apiLimiter,
@@ -35,7 +40,8 @@ import paymentRoutes from "./routes/paymentRoutes.js";
 import lessonRoutes from "./routes/lessonRoutes.js"
 import assignmentRoutes from "./routes/assignmentRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
-import agoraRoutes from "./routes/agoraRoutes.js";
+import agoraRoutes      from "./routes/agoraRoutes.js";
+import agoraUsageRoutes from "./routes/agoraUsageRoutes.js";
 import twoFactorRoutes from "./routes/twoFactorRoutes.js";
 import bookingRoutes from "./routes/bookingRoutes.js";
 import teacherAssignmentRoutes from "./routes/teacherAssignmentRoutes.js";
@@ -47,7 +53,7 @@ import paymentTransactionRoutes from "./routes/paymentTransactionRoutes.js";
 import recurringBookingsRoutes from "./routes/recurringBookingsRoutes.js";
 import analyticsRoutes from "./routes/analyticsRoutes.js";
 import { verifyEmailConfig } from "./utils/emailService.js";
-import { startReminderScheduler } from "./utils/reminderScheduler.js";
+import { startReminderScheduler }       from "./utils/reminderScheduler.js";
 import adminLessonRoutes from "./routes/adminLessonRoutes.js";
 import subAdminRoutes     from "./routes/subAdminRoutes.js";
 import subAdminAuthRoutes from "./routes/subAdminAuthRoutes.js";
@@ -69,10 +75,12 @@ import reviewRoutes       from "./routes/reviewRoutes.js";
 import referralRoutes     from "./routes/referralRoutes.js";
 import pushRoutes         from "./routes/pushRoutes.js";
 import notificationRoutes from "./routes/notificationRoutes.js";
-
-
-// ✅ FIXED: Correct import path for RecurringPattern model
-import RecurringPattern from "./models/RecurringPattern.js";
+import centerRegistrationRoutes from "./routes/centerRegistrationRoutes.js";
+import centerConfigRoutes from "./routes/centerConfigRoutes.js";
+import superAdminRoutes from "./routes/superAdminRoutes.js";
+import Center from "./models/master/Center.js";
+import SuperAdmin from "./models/master/SuperAdmin.js";
+import { getDb } from "./config/dbManager.js";
 
 const app = express();
 const httpServer = http.createServer(app);
@@ -91,27 +99,34 @@ app.use(noSqlInjectionProtection);
 app.use(xssProtection);
 app.use(parameterPollutionProtection);
 
-// CORS Configuration
+// CORS Configuration — allows static origins + verified custom domains
 app.use(cors({
-  origin: (origin, callback) => {
+  origin: async (origin, callback) => {
     if (!origin) return callback(null, true);
-    
-    if (config.corsOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
+    if (config.corsOrigins.includes(origin)) return callback(null, true);
+
+    // Check if origin matches a verified custom domain
+    try {
+      const hostname = new URL(origin).hostname;
+      const match = await Center.findOne({ customDomain: hostname, domainVerified: true });
+      if (match) return callback(null, true);
+    } catch (_) { /* invalid URL — fall through */ }
+
+    callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-center-slug'],
   maxAge: 86400
 }));
 
 // Make io available to routes if needed
 app.set('io', io);
 
-// Body parser with size limits 
+// Serve uploaded files (logos, favicons, recordings, etc.)
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// Body parser with size limits
 app.use(express.json(requestLimits.json));
 app.use(express.urlencoded(requestLimits.urlencoded));
 
@@ -142,18 +157,30 @@ mongoose
     connectTimeoutMS: 10000,
     heartbeatFrequencyMS: 10000,
   })
-  .then(() => {
-    console.log("✅ MongoDB connected");
-    startReminderScheduler();
-    startRecordingCleanup();
-    startProgressReportScheduler();
-    // ✅ Only start keep-alive AFTER successful connection
+  .then(async () => {
+    console.log("✅ Master MongoDB connected");
+
+    // Start per-center schedulers for all currently active centers
+    try {
+      const activeCenters = await Center.find({ status: "active" }).select("slug");
+      console.log(`🏢 Found ${activeCenters.length} active center(s) — starting per-center schedulers`);
+      for (const center of activeCenters) {
+        const db = await getDb(center.slug);
+        startReminderScheduler(db);
+        startRecordingCleanup(db);
+        startProgressReportScheduler(db);
+      }
+    } catch (err) {
+      console.error("❌ Failed to start per-center schedulers:", err.message);
+    }
+
+    // Master DB keep-alive ping
     setInterval(async () => {
       try {
         await mongoose.connection.db.admin().ping();
-        console.log('🏓 DB keep-alive ping');
+        console.log('🏓 Master DB keep-alive ping');
       } catch (e) {
-        console.error('DB ping failed:', e.message);
+        console.error('Master DB ping failed:', e.message);
       }
     }, 5 * 60 * 1000);
   })
@@ -197,7 +224,8 @@ app.use("/api/payments", paymentRoutes);
 app.use("/api/lessons", lessonRoutes);
 app.use("/api/assignments", assignmentRoutes);
 app.use("/api/auth", authRoutes);
-app.use("/api/agora", agoraRoutes);
+app.use("/api/agora",       agoraRoutes);
+app.use("/api/agora-usage", agoraUsageRoutes);
 app.use("/api/2fa", twoFactorRoutes);
 app.use("/api/bookings", bookingRoutes);
 app.use("/api/teachers", teacherAssignmentRoutes);
@@ -227,6 +255,9 @@ app.use("/api/reviews",              reviewRoutes);
 app.use("/api/referrals",            referralRoutes);
 app.use("/api/push",                 pushRoutes);
 app.use("/api/notifications",        notificationRoutes);
+app.use("/api/register-center",      centerRegistrationRoutes);
+app.use("/api/center",               centerConfigRoutes);
+app.use("/api/super-admin",          superAdminRoutes);
 
 
 

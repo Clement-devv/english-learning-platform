@@ -3,7 +3,6 @@ import { useState, useEffect } from "react";
 import { Play, X, Clock, Calendar, Video, ChevronRight, ArrowLeft } from "lucide-react";
 import api from "../../../api";
 
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 export default function RecordingsTab({ teachers = [], isDarkMode }) {
   const [selectedTeacher, setSelectedTeacher] = useState(null);
@@ -52,11 +51,8 @@ export default function RecordingsTab({ teachers = [], isDarkMode }) {
   const loadVideo = async (rec) => {
     if (blobUrls[rec._id]) { setPlaying(rec); return; }
     try {
-      const token = localStorage.getItem("adminToken") || localStorage.getItem("token");
-      const resp  = await fetch(`${API_BASE}/api/recordings/${rec._id}/stream`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const blob = await resp.blob();
+      const resp = await api.get(`/api/recordings/${rec._id}/stream`, { responseType: 'blob' });
+      const blob = new Blob([resp.data]);
       setBlobUrls(prev => ({ ...prev, [rec._id]: URL.createObjectURL(blob) }));
       setPlaying(rec);
     } catch (e) { console.error("Failed to load video:", e); }

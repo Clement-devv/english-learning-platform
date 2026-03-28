@@ -1,9 +1,14 @@
 import express from "express";
 import { verifyToken } from "../middleware/authMiddleware.js";
-import PronunciationCache from "../models/PronunciationCache.js";
+import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
+import { pronunciationCacheSchema } from "../schemas/pronunciationCacheSchema.js";
 import { callGemini, extractJSONArray } from "../utils/geminiHelper.js";
 
 const router = express.Router();
+router.use(tenantMiddleware);
+
+const getPronunciationCache = (db) =>
+  db.models.PronunciationCache || db.model("PronunciationCache", pronunciationCacheSchema);
 
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // refresh cache once per day
 
@@ -34,7 +39,6 @@ const FOCUS_AREAS = {
 
 // ── Call Gemini 1.5 Flash to generate sentences ───────────────────────────────
 async function generateWithGemini(difficulty) {
-  // Pick 3 focus areas randomly for variety
   const focuses = [...FOCUS_AREAS[difficulty]]
     .sort(() => Math.random() - 0.5)
     .slice(0, 3);
@@ -52,8 +56,8 @@ Rules:
 
 Format: [{"text": "The sentence here.", "focus": "Focus area label"}]`;
 
-  const raw    = await callGemini(prompt, { temperature: 0.85, maxOutputTokens: 900 });
-  let   parsed;
+  const raw = await callGemini(prompt, { temperature: 0.85, maxOutputTokens: 900 });
+  let parsed;
   try {
     parsed = extractJSONArray(raw);
   } catch {
@@ -62,11 +66,10 @@ Format: [{"text": "The sentence here.", "focus": "Focus area label"}]`;
 
   if (!Array.isArray(parsed)) throw new Error("Gemini response was not an array");
 
-  // Validate + sanitise each sentence
   return parsed
     .filter(s => typeof s.text === "string" && typeof s.focus === "string")
     .map(s => ({ text: s.text.trim(), focus: s.focus.trim() }))
-    .slice(0, 10); // never exceed 10
+    .slice(0, 10);
 }
 
 // ── GET /api/pronunciation/sentences?difficulty=beginner ──────────────────────
@@ -81,7 +84,7 @@ router.get("/sentences", verifyToken, async (req, res) => {
 
   // ── 1. Try cache ────────────────────────────────────────────────────────────
   try {
-    const cached = await PronunciationCache.findOne({ difficulty });
+    const cached = await getPronunciationCache(req.db).findOne({ difficulty });
     const age    = cached ? Date.now() - new Date(cached.generatedAt).getTime() : Infinity;
 
     if (cached && age < CACHE_TTL_MS && cached.sentences.length > 0) {
@@ -97,8 +100,7 @@ router.get("/sentences", verifyToken, async (req, res) => {
 
     if (sentences.length === 0) throw new Error("Gemini returned 0 valid sentences");
 
-    // Save / replace cache entry
-    await PronunciationCache.findOneAndUpdate(
+    await getPronunciationCache(req.db).findOneAndUpdate(
       { difficulty },
       { sentences, generatedAt: new Date() },
       { upsert: true, new: true }

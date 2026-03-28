@@ -5,10 +5,11 @@ import {
   TrendingUp, Video, User, Home, Bell, Users, DollarSign,
   Calendar, BarChart3, AlertTriangle, MessageCircle, Settings,
   LogOut, ChevronRight, Menu, X, BookOpen, CheckSquare,
-  Shield, CalendarDays, FileText, Star
+  Shield, CalendarDays, FileText, Star, Palette, Globe
 } from "lucide-react";
 
 // Always-needed (small utilities)
+import api from "../../api";
 import { useDarkMode } from "../../hooks/useDarkMode";
 import { getTeachers } from "../../services/teacherService";
 import { getStudents } from "../../services/studentService";
@@ -39,6 +40,8 @@ const RecordingsTab      = lazy(() => import("./tabs/RecordingsTab"));
 const ReportsTab         = lazy(() => import("./tabs/ReportsTab"));
 const ReviewsTab         = lazy(() => import("./tabs/ReviewsTab"));
 const ReferralsTab       = lazy(() => import("./tabs/ReferralsTab"));
+const BrandingTab        = lazy(() => import("./tabs/BrandingTab"));
+const DomainTab          = lazy(() => import("./tabs/DomainTab"));
 
 // Inline spinner for tab switches (lightweight, no layout shift)
 function TabLoader() {
@@ -96,6 +99,13 @@ const NAV = [
       { key: "disputes",      label: "Disputes",      icon: AlertTriangle },
     ],
   },
+  {
+    group: "Settings",
+    items: [
+      { key: "branding", label: "Branding",       icon: Palette },
+      { key: "domain",   label: "Custom Domain",  icon: Globe   },
+    ],
+  },
 ];
 
 export default function AdminDashboard() {
@@ -147,10 +157,8 @@ export default function AdminDashboard() {
   useEffect(() => {
     const fetchUnreadNotifications = async () => {
       try {
-        const res  = await fetch("/api/notifications/unread-count", {
-          headers: { Authorization: `Bearer ${localStorage.getItem("adminToken")}` },
-        });
-        const data = await res.json();
+        const res  = await api.get("/api/notifications/unread-count");
+        const data = res.data;
         if (data.success) setUnreadNotifications(data.count);
       } catch (_) {}
     };
@@ -161,10 +169,8 @@ export default function AdminDashboard() {
 
   const fetchCalendar = async () => {
     try {
-      const res = await fetch("/api/bookings", {
-        headers: { Authorization: `Bearer ${localStorage.getItem("adminToken")}` },
-      });
-      const data = await res.json();
+      const res = await api.get("/api/bookings");
+      const data = res.data;
       setCalendarBookings(data);
     } catch (e) {
       console.error(e);
@@ -204,6 +210,8 @@ export default function AdminDashboard() {
       case "reviews":           return <ReviewsTab isDarkMode={isDarkMode} />;
       case "referrals":         return <ReferralsTab isDarkMode={isDarkMode} />;
       case "sub-admins":        return <SubAdminsTab isDarkMode={isDarkMode} teachers={teachers} />;
+      case "branding":          return <BrandingTab isDarkMode={isDarkMode} />;
+      case "domain":            return <DomainTab isDarkMode={isDarkMode} />;
       case "calendar":
         return (
           <BookingCalendar
@@ -225,9 +233,9 @@ export default function AdminDashboard() {
   const heading   = isDarkMode ? "#e2e8f0" : "#1e293b";
   const muted     = isDarkMode ? "#374151" : "#94a3b8";
   const cardBg    = isDarkMode ? "#1a1d27" : "#ffffff";
-  const hoverBg   = isDarkMode ? "#1e2235" : "#f0f4ff";
-  const activeBg  = isDarkMode ? "#252d4a" : "#eef1ff";
-  const activeClr = isDarkMode ? "#a5b4fc" : "#4f63d2";
+  const hoverBg   = isDarkMode ? "#1e2235" : "rgba(var(--brand-primary-rgb), 0.06)";
+  const activeBg  = isDarkMode ? "#252d4a" : "rgba(var(--brand-primary-rgb), 0.08)";
+  const activeClr = isDarkMode ? "#a5b4fc" : "var(--brand-primary)";
 
   return (
     <>
@@ -257,7 +265,7 @@ export default function AdminDashboard() {
           }}>
             <div style={{
               width: "32px", height: "32px", borderRadius: "10px", flexShrink: 0,
-              background: "linear-gradient(135deg, #4f63d2, #6b82f0)",
+              background: "linear-gradient(135deg, var(--brand-primary), var(--brand-secondary))",
               display: "flex", alignItems: "center", justifyContent: "center",
             }}>
               <Shield size={16} color="white" />
@@ -310,7 +318,7 @@ export default function AdminDashboard() {
                         <div style={{
                           position: "absolute", left: 0, top: "20%", bottom: "20%",
                           width: "3px", borderRadius: "0 3px 3px 0",
-                          background: "#6b82f0",
+                          background: "var(--brand-secondary)",
                         }} />
                       )}
                       <div style={{ position: "relative", flexShrink: 0 }}>
@@ -462,7 +470,7 @@ export default function AdminDashboard() {
             {/* Avatar */}
             <div style={{
               width: "36px", height: "36px", borderRadius: "10px",
-              background: "linear-gradient(135deg, #4f63d2, #6b82f0)",
+              background: "linear-gradient(135deg, var(--brand-primary), var(--brand-secondary))",
               display: "flex", alignItems: "center", justifyContent: "center",
               fontSize: "13px", fontWeight: "700", color: "white", cursor: "pointer",
             }}
@@ -533,7 +541,7 @@ function Loader({ isDarkMode }) {
       <div style={{
         width: "32px", height: "32px", borderRadius: "50%",
         border: `3px solid ${isDarkMode ? "#1e2235" : "#e8ecf4"}`,
-        borderTopColor: "#6b82f0", animation: "adm-spin 0.8s linear infinite",
+        borderTopColor: "var(--brand-secondary)", animation: "adm-spin 0.8s linear infinite",
       }} />
     </div>
   );
@@ -548,8 +556,8 @@ const css = (dark) => `
   .adm-scroll::-webkit-scrollbar-thumb { background: ${dark ? "#1e2235" : "#e0e4f4"}; border-radius: 4px; }
 
   .adm-nav-btn:hover {
-    background: ${dark ? "#1e2235 !important" : "#f0f4ff !important"};
-    color: ${dark ? "#a5b4fc !important" : "#4f63d2 !important"};
+    background: ${dark ? "#1e2235 !important" : "rgba(var(--brand-primary-rgb), 0.06) !important"};
+    color: ${dark ? "#a5b4fc !important" : "var(--brand-primary) !important"};
   }
   .adm-logout-btn:hover {
     background: rgba(239,68,68,0.08) !important;

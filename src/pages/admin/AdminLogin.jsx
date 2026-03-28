@@ -1,7 +1,7 @@
 // src/pages/admin/AdminLogin.jsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, Lock, Eye, EyeOff, AlertCircle, ShieldCheck, ArrowRight } from 'lucide-react';
+import { User, Lock, Eye, EyeOff, AlertCircle, ShieldCheck, ArrowRight, Mail, CheckCircle } from 'lucide-react';
 import api from '../../api';
 import TwoFactorLogin from '../../components/TwoFactorLogin';
 
@@ -13,8 +13,12 @@ export default function AdminLogin() {
   const [loading, setLoading] = useState(false);
   const [requires2FA, setRequires2FA] = useState(false);
   const [tempUserId, setTempUserId] = useState(null);
-  const [focused, setFocused] = useState(null);
-  const [mounted, setMounted] = useState(false);
+  const [focused,       setFocused]      = useState(null);
+  const [mounted,       setMounted]      = useState(false);
+  const [view,          setView]         = useState('login'); // 'login' | 'forgot' | 'forgot-sent'
+  const [forgotEmail,   setForgotEmail]  = useState('');
+  const [forgotLoading, setForgotLoading]= useState(false);
+  const [forgotError,   setForgotError]  = useState('');
   const navigate = useNavigate();
 
   useEffect(() => { setMounted(true); }, []);
@@ -69,6 +73,104 @@ export default function AdminLogin() {
     setTempUserId(null);
     setError('');
   };
+
+  const handleForgotPassword = async (e) => {
+    e.preventDefault();
+    setForgotLoading(true);
+    setForgotError('');
+    try {
+      const res = await api.post('/api/auth/admin/forgot-password', { email: forgotEmail.trim() });
+      if (res.data.success) setView('forgot-sent');
+      else setForgotError(res.data.message || 'Something went wrong.');
+    } catch (err) {
+      setForgotError(err.response?.data?.message || 'Failed to send reset email.');
+    } finally {
+      setForgotLoading(false);
+    }
+  };
+
+  // ── Forgot password — email entry ──
+  if (view === 'forgot') return (
+    <>
+      <style>{css}</style>
+      <div style={s.root}>
+        <div style={s.grid} /><div style={s.scanlines} />
+        <div style={{ ...s.card, opacity: 1, transform: 'none' }} className="al-card">
+          <div style={s.accentBar} />
+          <div style={{ padding: '28px 28px 0', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+              <div style={{ ...s.shieldWrap, width: '48px', height: '48px' }}>
+                <Mail size={22} color="#22d3ee" strokeWidth={1.5} />
+              </div>
+              <div>
+                <h1 style={{ ...s.title, fontSize: '22px' }}>Reset Password</h1>
+                <p style={s.subtitle}>Enter your admin email address</p>
+              </div>
+            </div>
+          </div>
+          <div style={s.divider} />
+          {forgotError && (
+            <div style={s.errorBox} className="al-error">
+              <AlertCircle size={15} color="#f87171" />
+              <span style={s.errorText}>{forgotError}</span>
+            </div>
+          )}
+          <form onSubmit={handleForgotPassword} style={{ ...s.form, paddingBottom: '28px' }}>
+            <div style={s.fieldGroup}>
+              <label style={s.label}>Admin Email</label>
+              <div style={{ ...s.inputWrap, ...(focused === 'forgot' ? s.inputFocused : {}) }}>
+                <Mail size={16} color={focused === 'forgot' ? '#22d3ee' : '#374151'} />
+                <input
+                  type="email"
+                  value={forgotEmail}
+                  onChange={e => setForgotEmail(e.target.value)}
+                  onFocus={() => setFocused('forgot')}
+                  onBlur={() => setFocused(null)}
+                  placeholder="admin@example.com"
+                  required
+                  disabled={forgotLoading}
+                  style={s.input}
+                  autoFocus
+                />
+              </div>
+            </div>
+            <button type="submit" disabled={forgotLoading} style={s.submitBtn} className="al-submit">
+              {forgotLoading ? <span style={{ display: 'flex', alignItems: 'center', gap: '10px', justifyContent: 'center' }}><span className="al-spinner" /> Sending…</span>
+                : <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}><Mail size={16} /> Send Reset Link</span>}
+            </button>
+            <button type="button" onClick={() => { setView('login'); setForgotError(''); }} style={{ background: 'none', border: 'none', color: '#374151', cursor: 'pointer', fontSize: '13px', fontFamily: 'inherit', textAlign: 'center' }}>
+              ← Back to login
+            </button>
+          </form>
+        </div>
+      </div>
+    </>
+  );
+
+  // ── Forgot password — confirmation ──
+  if (view === 'forgot-sent') return (
+    <>
+      <style>{css}</style>
+      <div style={s.root}>
+        <div style={s.grid} /><div style={s.scanlines} />
+        <div style={{ ...s.card, opacity: 1, transform: 'none' }} className="al-card">
+          <div style={s.accentBar} />
+          <div style={{ padding: '40px 28px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', textAlign: 'center' }}>
+            <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <CheckCircle size={30} color="#34d399" />
+            </div>
+            <h2 style={{ margin: 0, fontSize: '20px', fontWeight: '700', color: '#f1f5f9' }}>Check your email</h2>
+            <p style={{ margin: 0, fontSize: '13.5px', color: '#6b7280', lineHeight: '1.6', maxWidth: '300px' }}>
+              If <strong style={{ color: '#e2e8f0' }}>{forgotEmail}</strong> is registered, a reset link has been sent. Check your inbox — it expires in 1 hour.
+            </p>
+            <button onClick={() => { setView('login'); setForgotEmail(''); }} style={{ ...s.submitBtn, marginTop: '8px', width: 'auto', padding: '12px 28px' }} className="al-submit">
+              Back to Login
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
 
   if (requires2FA) {
     return (
@@ -202,6 +304,15 @@ export default function AdminLogin() {
                   <ArrowRight size={17} />
                 </span>
               )}
+            </button>
+
+            {/* Forgot password */}
+            <button
+              type="button"
+              onClick={() => { setView('forgot'); setError(''); setForgotEmail(''); }}
+              style={{ background: 'none', border: 'none', color: '#374151', cursor: 'pointer', fontSize: '13px', fontFamily: 'inherit', textAlign: 'center', marginTop: '4px' }}
+            >
+              Forgot password?
             </button>
           </form>
 
@@ -418,8 +529,8 @@ const s = {
   submitBtn: {
     width: '100%',
     height: '52px',
-    background: 'linear-gradient(135deg, #0e7490, #22d3ee)',
-    color: '#020617',
+    background: 'linear-gradient(135deg, var(--brand-primary), var(--brand-secondary))',
+    color: 'white',
     border: 'none',
     borderRadius: '12px',
     fontSize: '15px',
@@ -428,7 +539,7 @@ const s = {
     fontFamily: 'inherit',
     marginTop: '4px',
     letterSpacing: '0.01em',
-    boxShadow: '0 6px 24px rgba(34,211,238,0.25)',
+    boxShadow: '0 6px 24px rgba(var(--brand-primary-rgb), 0.3)',
     transition: 'opacity 0.2s, transform 0.15s, box-shadow 0.2s',
   },
 

@@ -3,28 +3,30 @@ import express from 'express';
 import { body } from 'express-validator';
 import { validate } from '../middleware/validation.js';
 import { verifyToken } from '../middleware/authMiddleware.js';
+import { tenantMiddleware } from '../middleware/tenantMiddleware.js';
 import {
   generateTwoFactorSecret,
   verifyTwoFactorToken,
   generateBackupCodes,
-  verifyBackupCode
 } from '../utils/twoFactorAuth.js';
 import { logger } from '../utils/logger.js';
-import Teacher from '../models/Teacher.js';
-import Student from '../models/Student.js';
-import Admin from '../models/Admin.js';
+import { teacherSchema } from '../schemas/teacherSchema.js';
+import { studentSchema } from '../schemas/studentSchema.js';
+import { adminSchema }   from '../schemas/adminSchema.js';
 
 const router = express.Router();
+router.use(tenantMiddleware);
 
-/**
- * Helper function to get user model based on role
- */
-const getUserModel = (role) => {
+const getTeacher = (db) => db.models.Teacher || db.model('Teacher', teacherSchema);
+const getStudent = (db) => db.models.Student || db.model('Student', studentSchema);
+const getAdmin   = (db) => db.models.Admin   || db.model('Admin',   adminSchema);
+
+const getUserModel = (role, db) => {
   switch (role) {
-    case 'teacher': return Teacher;
-    case 'student': return Student;
-    case 'admin': return Admin;
-    default: return null;
+    case 'teacher': return getTeacher(db);
+    case 'student': return getStudent(db);
+    case 'admin':   return getAdmin(db);
+    default:        return null;
   }
 };
 
@@ -35,8 +37,8 @@ const getUserModel = (role) => {
 router.post('/setup', verifyToken, async (req, res) => {
   try {
     const { role, id, email } = req.user;
-    const UserModel = getUserModel(role);
-    
+    const UserModel = getUserModel(role, req.db);
+
     if (!UserModel) {
       return res.status(400).json({
         success: false,
@@ -45,7 +47,7 @@ router.post('/setup', verifyToken, async (req, res) => {
     }
 
     const user = await UserModel.findById(id);
-    
+
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -63,23 +65,19 @@ router.post('/setup', verifyToken, async (req, res) => {
 
     // Generate new secret and QR code
     const { secret, qrCode } = await generateTwoFactorSecret(email);
-    
+
     // Store secret temporarily (not enabled yet)
     user.twoFactorSecret = secret;
     user.twoFactorVerified = false;
     await user.save();
 
-    logger.info('2FA_SETUP_INITIATED', { 
-      userId: id, 
-      role, 
-      email 
-    });
+    logger.info('2FA_SETUP_INITIATED', { userId: id, role, email });
 
     res.json({
       success: true,
       message: 'Scan this QR code with your authenticator app',
       qrCode,
-      secret // Also send secret for manual entry
+      secret
     });
 
   } catch (error) {
@@ -107,10 +105,10 @@ router.post('/verify', [
   try {
     const { token } = req.body;
     const { role, id } = req.user;
-    const UserModel = getUserModel(role);
-    
+    const UserModel = getUserModel(role, req.db);
+
     const user = await UserModel.findById(id);
-    
+
     if (!user || !user.twoFactorSecret) {
       return res.status(400).json({
         success: false,
@@ -118,34 +116,24 @@ router.post('/verify', [
       });
     }
 
-    // Verify the token
     const isValid = verifyTwoFactorToken(token, user.twoFactorSecret);
-    
+
     if (!isValid) {
-      logger.warn('2FA_VERIFICATION_FAILED', { 
-        userId: id, 
-        role 
-      });
-      
+      logger.warn('2FA_VERIFICATION_FAILED', { userId: id, role });
       return res.status(400).json({
         success: false,
         message: 'Invalid verification code. Please try again.'
       });
     }
 
-    // Generate backup codes
     const backupCodes = generateBackupCodes();
-    
-    // Enable 2FA
+
     user.twoFactorEnabled = true;
     user.twoFactorVerified = true;
     user.twoFactorBackupCodes = backupCodes;
     await user.save();
 
-    logger.info('2FA_ENABLED', { 
-      userId: id, 
-      role 
-    });
+    logger.info('2FA_ENABLED', { userId: id, role });
 
     res.json({
       success: true,
@@ -176,10 +164,10 @@ router.post('/disable', [
   try {
     const { password } = req.body;
     const { role, id } = req.user;
-    const UserModel = getUserModel(role);
-    
+    const UserModel = getUserModel(role, req.db);
+
     const user = await UserModel.findById(id);
-    
+
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -187,10 +175,9 @@ router.post('/disable', [
       });
     }
 
-    // Verify password
     const bcryptjs = await import('bcryptjs');
     const isValidPassword = await bcryptjs.default.compare(password, user.password);
-    
+
     if (!isValidPassword) {
       return res.status(401).json({
         success: false,
@@ -198,20 +185,16 @@ router.post('/disable', [
       });
     }
 
-    // Disable 2FA
     user.twoFactorEnabled = false;
     user.twoFactorSecret = undefined;
     user.twoFactorBackupCodes = undefined;
     user.twoFactorVerified = false;
     await user.save();
 
-    logger.info('2FA_DISABLED', { 
-      userId: id, 
-      role 
-    });
+    logger.info('2FA_DISABLED', { userId: id, role });
 
     res.json({
-      success: false,
+      success: true,
       message: '2FA has been disabled successfully'
     });
 
@@ -231,10 +214,10 @@ router.post('/disable', [
 router.get('/status', verifyToken, async (req, res) => {
   try {
     const { role, id } = req.user;
-    const UserModel = getUserModel(role);
-    
+    const UserModel = getUserModel(role, req.db);
+
     const user = await UserModel.findById(id).select('twoFactorEnabled twoFactorVerified');
-    
+
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -271,10 +254,10 @@ router.post('/regenerate-backup-codes', [
   try {
     const { password } = req.body;
     const { role, id } = req.user;
-    const UserModel = getUserModel(role);
-    
+    const UserModel = getUserModel(role, req.db);
+
     const user = await UserModel.findById(id);
-    
+
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -289,10 +272,9 @@ router.post('/regenerate-backup-codes', [
       });
     }
 
-    // Verify password
     const bcryptjs = await import('bcryptjs');
     const isValidPassword = await bcryptjs.default.compare(password, user.password);
-    
+
     if (!isValidPassword) {
       return res.status(401).json({
         success: false,
@@ -300,15 +282,11 @@ router.post('/regenerate-backup-codes', [
       });
     }
 
-    // Generate new backup codes
     const backupCodes = generateBackupCodes();
     user.twoFactorBackupCodes = backupCodes;
     await user.save();
 
-    logger.info('2FA_BACKUP_CODES_REGENERATED', { 
-      userId: id, 
-      role 
-    });
+    logger.info('2FA_BACKUP_CODES_REGENERATED', { userId: id, role });
 
     res.json({
       success: true,
