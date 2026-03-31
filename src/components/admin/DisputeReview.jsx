@@ -80,7 +80,7 @@ export default function DisputeReview({ isDarkMode }) {
   };
 
   return (
-    <div style={{ fontFamily: "Plus Jakarta Sans, sans-serif", color: col.text }}>
+    <div style={{ fontFamily: "var(--font-body)", color: col.text }}>
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "20px", flexWrap: "wrap", gap: "12px" }}>
         <div>

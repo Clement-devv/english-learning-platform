@@ -5,6 +5,7 @@ import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
 import { chatCreditSchema }         from "../schemas/chatCreditSchema.js";
 import { conversationMessageSchema } from "../schemas/conversationMessageSchema.js";
 import { studentSchema }            from "../schemas/studentSchema.js";
+import Center                       from "../models/master/Center.js";
 
 const router = express.Router();
 router.use(tenantMiddleware);
@@ -154,6 +155,24 @@ router.post("/message", verifyToken, async (req, res) => {
   }
 });
 
+// ── GET /api/chat/center-credits  (admin sees their center's budget) ──────────
+router.get("/center-credits", verifyToken, async (req, res) => {
+  try {
+    if (req.user.role !== "admin") return res.status(403).json({ message: "Admins only" });
+    const center = await Center.findOne({ slug: req.center.slug })
+      .select("chatCredits centerName").lean();
+    res.json({
+      success:        true,
+      balance:        center?.chatCredits?.balance        ?? 0,
+      totalAllocated: center?.chatCredits?.totalAllocated ?? 0,
+      used:           (center?.chatCredits?.totalAllocated ?? 0) - (center?.chatCredits?.balance ?? 0),
+      log:            (center?.chatCredits?.log || []).slice(-10).reverse(),
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 // ── POST /api/chat/credits/grant  (teacher or admin grants credits) ───────────
 router.post("/credits/grant", verifyToken, async (req, res) => {
   try {
@@ -169,6 +188,22 @@ router.post("/credits/grant", verifyToken, async (req, res) => {
     const student = await getStudent(req.db).findById(studentId);
     if (!student) return res.status(404).json({ message: "Student not found" });
 
+    // ── Check & deduct from center's budget ──────────────────────────────────
+    const deducted = await Center.findOneAndUpdate(
+      { slug: req.center.slug, "chatCredits.balance": { $gte: amount } },
+      { $inc: { "chatCredits.balance": -amount } },
+      { new: true }
+    );
+    if (!deducted) {
+      const center = await Center.findOne({ slug: req.center.slug }).select("chatCredits").lean();
+      const available = center?.chatCredits?.balance ?? 0;
+      return res.status(402).json({
+        message: `Insufficient center credit budget. Available: ${available}, requested: ${amount}. Ask your super admin to top up.`,
+        available,
+      });
+    }
+
+    // ── Grant to student ─────────────────────────────────────────────────────
     const record = await getChatCredit(req.db).findOneAndUpdate(
       { studentId },
       {
@@ -179,9 +214,10 @@ router.post("/credits/grant", verifyToken, async (req, res) => {
     );
 
     res.json({
-      success: true,
-      credits: record.credits,
-      message: `${amount} credits granted to ${student.firstName}`,
+      success:          true,
+      credits:          record.credits,
+      centerBalance:    deducted.chatCredits.balance,
+      message:          `${amount} credits granted to ${student.firstName}`,
     });
   } catch (err) {
     res.status(500).json({ message: err.message });

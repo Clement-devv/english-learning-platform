@@ -59,7 +59,7 @@ export default function RecordingsTab({ teachers = [], isDarkMode }) {
   };
 
   const filteredTeachers = teachers.filter(t =>
-    `${t.firstName} ${t.lastName}`.toLowerCase().includes(search.toLowerCase())
+    `${t.displayName || ""} ${t.firstName} ${t.lastName}`.toLowerCase().includes(search.toLowerCase())
   );
 
   // ── Video player ───────────────────────────────────────────────────────────
@@ -196,7 +196,7 @@ export default function RecordingsTab({ teachers = [], isDarkMode }) {
               </div>
               <div style={{ flex: 1 }}>
                 <p style={{ margin: 0, fontSize: "15px", fontWeight: 800, color: col.text }}>
-                  {t.firstName} {t.lastName}
+                  {t.displayName?.trim() || `${t.firstName} ${t.lastName}`}
                 </p>
                 <p style={{ margin: "2px 0 0", fontSize: "12px", color: col.muted }}>{t.email}</p>
               </div>

@@ -185,7 +185,7 @@ router.patch("/teacher/:teacherId/pay-all", verifyToken, verifyAdmin, async (req
 router.get("/summary", verifyToken, verifyAdmin, async (req, res) => {
   try {
     const teachers = await getTeacher(req.db).find({ active: true })
-      .select("firstName lastName email ratePerClass earned lessonsCompleted");
+      .select("firstName lastName email ratePerClass earned lessonsCompleted bankName accountNumber accountName");
 
     const summaryPromises = teachers.map(async (teacher) => {
       const PaymentTransaction = getPaymentTransaction(req.db);
@@ -208,7 +208,10 @@ router.get("/summary", verifyToken, verifyAdmin, async (req, res) => {
         paidAmount: totalPaid,
         pendingCount: pendingTransactions.length,
         paidCount: paidTransactions.length,
-        totalEarnings: totalPending + totalPaid
+        totalEarnings: totalPending + totalPaid,
+        bankName:      teacher.bankName      || "",
+        accountNumber: teacher.accountNumber || "",
+        accountName:   teacher.accountName   || "",
       };
     });
 

@@ -10,6 +10,8 @@ export const DEFAULT_BRANDING = {
   secondaryColor: '#7C3AED',
   fontFamily:     'Inter',
   favicon:        null,
+  loginBackground: null,
+  loginBgOverlay:  0.45,
   centerName:     'English Learning Platform',
   borderRadius:   '8px',
   shadowStyle:    'soft',
@@ -25,7 +27,8 @@ export const DEFAULT_BRANDING = {
 export const fetchBranding = async () => {
   try {
     // In development: pass slug via env var or hardcode for testing
-    const slug = import.meta.env.VITE_CENTER_SLUG || null;
+    // Also check sessionStorage for impersonation mode
+    const slug = import.meta.env.VITE_CENTER_SLUG || sessionStorage.getItem('impersonationCenterSlug') || null;
 
     const headers = {};
     if (slug) headers['x-center-slug'] = slug;
@@ -96,6 +99,9 @@ export const applyBranding = (branding, center) => {
     SPACINGS[branding.spacing] || '1'
   );
 
+  // 6. Login background overlay opacity
+  document.documentElement.style.setProperty('--brand-login-overlay', branding.loginBgOverlay ?? 0.45);
+
   // If font is not system font, load it from Google Fonts
   const systemFonts = ['Inter', 'Arial', 'Helvetica', 'Georgia', 'Times New Roman'];
   if (!systemFonts.includes(branding.fontFamily)) {
@@ -107,12 +113,12 @@ export const applyBranding = (branding, center) => {
     document.head.appendChild(link);
   }
 
-  // 6. Page title
+  // 7. Page title
   if (center?.centerName) {
     document.title = center.centerName;
   }
 
-  // 7. Favicon
+  // 8. Favicon
   if (branding.favicon) {
     let favicon = document.querySelector("link[rel='icon']");
     if (!favicon) {

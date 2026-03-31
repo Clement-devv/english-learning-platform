@@ -7,7 +7,9 @@ import {
   sendStudentInviteEmail,
   sendStudentWelcomeEmail,
   sendAccountDeletionWarningEmail,
+  sendNewStudentRecordEmail,
 } from "../utils/emailService.js";
+import { generateStudentRecordPdf } from "../utils/recordPdfGenerator.js";
 import {
   verifyToken, verifyAdmin, verifyAdminOrTeacher, verifyOwnership,
 } from "../middleware/authMiddleware.js";
@@ -15,21 +17,25 @@ import { completeReferral } from "./referralRoutes.js";
 import { strictLimiter } from "../middleware/rateLimiter.js";
 import { config } from "../config/config.js";
 import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
-import { studentSchema } from "../schemas/studentSchema.js";
-import { paymentSchema } from "../schemas/paymentSchema.js";
+import { studentSchema }  from "../schemas/studentSchema.js";
+import { teacherSchema }  from "../schemas/teacherSchema.js";
+import { subAdminSchema } from "../schemas/subAdminSchema.js";
+import { paymentSchema }  from "../schemas/paymentSchema.js";
 
 const router = express.Router();
 router.use(tenantMiddleware);
 
-const getStudent = (db) => db.models.Student || db.model("Student", studentSchema);
-const getPayment = (db) => db.models.Payment || db.model("Payment", paymentSchema);
+const getStudent  = (db) => db.models.Student  || db.model("Student",  studentSchema);
+const getTeacher  = (db) => db.models.Teacher  || db.model("Teacher",  teacherSchema);
+const getSubAdmin = (db) => db.models.SubAdmin || db.model("SubAdmin", subAdminSchema);
+const getPayment  = (db) => db.models.Payment  || db.model("Payment",  paymentSchema);
 
 // ─── GET all students ─────────────────────────────────────────────────────────
 router.get("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
   try {
     const students = await getStudent(req.db)
       .find()
-      .select("firstName surname email active noOfClasses age lastPaymentDate showTempPassword status createdAt")
+      .select("firstName surname email active noOfClasses age lastPaymentDate showTempPassword status createdAt phone country rank dateOfBirth")
       .lean();
     res.json(students);
   } catch (err) {
@@ -58,27 +64,50 @@ router.get("/:id", verifyToken, async (req, res) => {
 // ─── POST create student (invite flow) ───────────────────────────────────────
 router.post("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
   try {
-    const { firstName, surname, email, age, noOfClasses } = req.body;
+    const { firstName, surname, email, age, dateOfBirth, rank, phone, country } = req.body;
     if (!firstName || !surname || !email)
       return res.status(400).json({ message: "Missing required fields" });
 
-    const Student = getStudent(req.db);
-    const exists = await Student.findOne({ email });
-    if (exists) return res.status(400).json({ message: "Email already exists" });
+    const Student  = getStudent(req.db);
+    const Teacher  = getTeacher(req.db);
+    const SubAdmin = getSubAdmin(req.db);
+    const normalizedEmail = email.trim().toLowerCase();
+
+    const [asStudent, asTeacher, asSubAdmin] = await Promise.all([
+      Student.findOne({ email: normalizedEmail }).lean(),
+      Teacher.findOne({ email: normalizedEmail }).lean(),
+      SubAdmin.findOne({ email: normalizedEmail }).lean(),
+    ]);
+    if (asStudent)  return res.status(400).json({ message: "Email is already registered as a student" });
+    if (asTeacher)  return res.status(400).json({ message: "Email is already registered as a teacher" });
+    if (asSubAdmin) return res.status(400).json({ message: "Email is already registered as a sub-admin" });
+
+    // ── Check student seat limit (-1 = unlimited) ─────────────────────────
+    const maxStudents = req.center?.maxStudents;
+    if (maxStudents && maxStudents !== -1) {
+      const currentCount = await Student.countDocuments({ status: { $ne: 'disabled' } });
+      if (currentCount >= maxStudents)
+        return res.status(403).json({ message: `Student limit reached (${currentCount}/${maxStudents}). Contact your super admin to increase the limit.` });
+    }
 
     const inviteToken   = crypto.randomBytes(32).toString("hex");
     const inviteExpires = new Date(Date.now() + 48 * 60 * 60 * 1000);
 
     const student = await Student.create({
-      firstName, surname, email, age,
-      noOfClasses: noOfClasses || 0,
+      firstName, surname, email: normalizedEmail, age,
+      noOfClasses: 0,
+      phone: phone || "", country: country || "",
+      dateOfBirth: dateOfBirth || null,
+      rank: rank || "",
       status: "pending", active: false,
       inviteToken, inviteExpires,
     });
 
-    const setupUrl = `${config.frontendUrl}/student/setup?token=${inviteToken}`;
+    const setupUrl = `${config.frontendUrl}/student/setup?token=${inviteToken}&center=${req.center.slug}`;
+    const centerName = req.center?.centerName || "";
+
     try {
-      await sendStudentInviteEmail(student, setupUrl);
+      await sendStudentInviteEmail(student, setupUrl, centerName);
     } catch (emailError) {
       console.error("Failed to send invite email:", emailError);
     }
@@ -141,8 +170,18 @@ router.post("/setup-account", strictLimiter, async (req, res) => {
 
     completeReferral(student._id, req.db).catch(() => {});
 
-    try { await sendStudentWelcomeEmail(student); }
+    const centerName = req.center?.centerName || "";
+
+    try { await sendStudentWelcomeEmail(student, centerName); }
     catch (e) { console.error("Failed to send welcome email:", e); }
+
+    // Fire-and-forget: send admin the student record PDF now that account is fully activated
+    const adminEmail = req.center?.adminEmail;
+    if (adminEmail) {
+      generateStudentRecordPdf(student.toObject(), centerName)
+        .then(pdf => sendNewStudentRecordEmail(adminEmail, student.toObject(), pdf, centerName))
+        .catch(err => console.error("Admin student record email failed:", err.message));
+    }
 
     res.json({ message: "Account activated successfully! You can now login.", student: { firstName: student.firstName, surname: student.surname, email: student.email } });
   } catch (err) {
@@ -165,8 +204,8 @@ router.post("/:id/resend-invite", verifyToken, verifyAdmin, strictLimiter, async
     student.inviteExpires = inviteExpires;
     await student.save();
 
-    const setupUrl = `${config.frontendUrl}/student/setup?token=${inviteToken}`;
-    await sendStudentInviteEmail(student, setupUrl);
+    const setupUrl = `${config.frontendUrl}/student/setup?token=${inviteToken}&center=${req.center.slug}`;
+    await sendStudentInviteEmail(student, setupUrl, req.center?.centerName || "");
 
     res.json({ message: "Invite resent successfully" });
   } catch (err) {
@@ -204,7 +243,7 @@ router.put("/:id", verifyToken, verifyAdminOrTeacher, async (req, res) => {
     if (!student) return res.status(404).json({ message: "Student not found" });
 
     if (password) {
-      try { await sendPasswordResetEmail(student.email, `${student.firstName} ${student.surname}`, password); }
+      try { await sendPasswordResetEmail(student.email, `${student.firstName} ${student.surname}`, password, "student", req.center?.centerName || ""); }
       catch (e) { console.error("Failed to send password reset email:", e); }
     }
 
@@ -245,7 +284,7 @@ router.delete("/:id", verifyToken, verifyAdmin, strictLimiter, async (req, res) 
     student.deletionWarningEmailSent = false;
     await student.save();
 
-    sendAccountDeletionWarningEmail(student, deletionDate).catch(e => console.error("Deletion warning email failed:", e.message));
+    sendAccountDeletionWarningEmail(student, deletionDate, req.center?.centerName || "").catch(e => console.error("Deletion warning email failed:", e.message));
 
     res.json({ message: "Student scheduled for deletion", scheduledDeletionAt: deletionDate, student });
   } catch (err) {
@@ -287,7 +326,7 @@ router.post("/:id/reset-password", verifyToken, verifyAdminOrTeacher, strictLimi
     student.lastPasswordChange = new Date();
     await student.save();
 
-    try { await sendPasswordResetEmail(student.email, `${student.firstName} ${student.surname}`, newPass); }
+    try { await sendPasswordResetEmail(student.email, `${student.firstName} ${student.surname}`, newPass, "student", req.center?.centerName || ""); }
     catch (e) { console.error("Failed to send password reset email:", e); }
 
     res.json({ message: "Password reset successfully", tempPassword: newPass });
@@ -333,6 +372,22 @@ router.get("/:id/payments", verifyToken, async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Error fetching payments" });
+  }
+});
+
+// ─── GET /streak  —  student fetches their own streak data ───────────────────
+router.get("/streak", verifyToken, async (req, res) => {
+  try {
+    if (req.user.role !== "student") return res.status(403).json({ message: "Students only" });
+    const student = await getStudent(req.db)
+      .findById(req.user.id)
+      .select("currentStreak longestStreak lastActivityDate streakFreezes weeklyClassStreak longestWeeklyClassStreak lastClassWeek activityDates")
+      .lean();
+    if (!student) return res.status(404).json({ message: "Student not found" });
+    res.json(student);
+  } catch (err) {
+    console.error("GET /streak error:", err);
+    res.status(500).json({ message: "Server error" });
   }
 });
 

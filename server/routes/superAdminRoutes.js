@@ -10,6 +10,9 @@ import { getDb } from '../config/dbManager.js';
 import { config } from '../config/config.js';
 import { sendEmail, sendCenterDeletionWarningEmail } from '../utils/emailService.js';
 import { verifyDomainDns, isValidDomain, normalizeDomain } from '../utils/domainVerifier.js';
+import { teacherSchema } from '../schemas/teacherSchema.js';
+import { studentSchema }  from '../schemas/studentSchema.js';
+import { bookingSchema }  from '../schemas/bookingSchema.js';
 
 // In-memory OTP store: key = adminEmail, value = { code, expiresAt }
 const emailOtpStore = new Map();
@@ -237,6 +240,52 @@ router.get('/stats', verifySuperAdmin, async (req, res) => {
   }
 });
 
+// GET /api/super-admin/centers/health — per-center teacher/student/booking counts
+router.get('/centers/health', verifySuperAdmin, async (req, res) => {
+  try {
+    const centers = await Center.find({ status: 'active' })
+      .select('_id centerName slug maxTeachers maxStudents')
+      .lean();
+
+    const health = await Promise.all(centers.map(async (center) => {
+      try {
+        const db      = await getDb(center.slug);
+        const Teacher = db.models.Teacher || db.model('Teacher', teacherSchema);
+        const Student = db.models.Student || db.model('Student', studentSchema);
+        const Booking = db.models.Booking || db.model('Booking', bookingSchema);
+
+        const now          = new Date();
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+        const [teachers, students, bookingsThisMonth, lastBooking] = await Promise.all([
+          Teacher.countDocuments(),
+          Student.countDocuments({ status: { $ne: 'disabled' } }),
+          Booking.countDocuments({ createdAt: { $gte: startOfMonth } }),
+          Booking.findOne().sort({ createdAt: -1 }).select('createdAt').lean(),
+        ]);
+
+        return {
+          _id:              center._id,
+          slug:             center.slug,
+          teachers,
+          students,
+          maxTeachers:      center.maxTeachers,
+          maxStudents:      center.maxStudents,
+          bookingsThisMonth,
+          lastActivity:     lastBooking?.createdAt || null,
+        };
+      } catch {
+        return { _id: center._id, slug: center.slug, error: true, teachers: 0, students: 0, bookingsThisMonth: 0, lastActivity: null };
+      }
+    }));
+
+    res.json({ success: true, health });
+  } catch (err) {
+    console.error('❌ Health error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // POST /api/super-admin/impersonate/:slug — returns temp 1hr admin token
 router.post('/impersonate/:slug', verifySuperAdmin, async (req, res) => {
   try {
@@ -254,7 +303,7 @@ router.post('/impersonate/:slug', verifySuperAdmin, async (req, res) => {
         impersonatedBy: req.superAdmin._id.toString(),
       },
       config.jwtSecret,
-      { expiresIn: '1h' }
+      { expiresIn: '30m' }
     );
 
     res.json({ success: true, token, center: { centerName: center.centerName, slug: center.slug } });
@@ -629,6 +678,148 @@ router.get('/usage/:centerId', verifySuperAdmin, async (req, res) => {
   } catch (err) {
     console.error('❌ Center usage detail error:', err);
     res.status(500).json({ success: false, message: 'Server error', error: err.message });
+  }
+});
+
+// PATCH /api/super-admin/centers/:id/limits — update seat limits (-1 = unlimited)
+router.patch('/centers/:id/limits', verifySuperAdmin, async (req, res) => {
+  try {
+    const { maxTeachers, maxStudents } = req.body;
+    const update = {};
+
+    if (maxTeachers !== undefined) {
+      const v = Number(maxTeachers);
+      if (isNaN(v) || (v !== -1 && v < 1))
+        return res.status(400).json({ success: false, message: 'maxTeachers must be -1 (unlimited) or ≥ 1' });
+      update.maxTeachers = v;
+    }
+    if (maxStudents !== undefined) {
+      const v = Number(maxStudents);
+      if (isNaN(v) || (v !== -1 && v < 1))
+        return res.status(400).json({ success: false, message: 'maxStudents must be -1 (unlimited) or ≥ 1' });
+      update.maxStudents = v;
+    }
+
+    const center = await Center.findByIdAndUpdate(req.params.id, update, { new: true });
+    if (!center) return res.status(404).json({ success: false, message: 'Center not found' });
+    res.json({ success: true, maxTeachers: center.maxTeachers, maxStudents: center.maxStudents });
+  } catch (err) {
+    console.error('❌ Update limits error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// POST /api/super-admin/broadcast — email all active center admins
+router.post('/broadcast', verifySuperAdmin, async (req, res) => {
+  try {
+    const { subject, message } = req.body;
+    if (!subject?.trim() || !message?.trim())
+      return res.status(400).json({ success: false, message: 'Subject and message are required' });
+
+    const centers = await Center.find({ status: 'active' }).select('centerName adminEmail').lean();
+    let sent = 0, failed = 0;
+
+    await Promise.all(centers.map(async (center) => {
+      try {
+        await sendEmail({
+          to:      center.adminEmail,
+          subject: subject.trim(),
+          html: `
+            <p>Dear <strong>${center.centerName}</strong> Admin,</p>
+            <div style="white-space:pre-line">${message.trim()}</div>
+            <br/>
+            <p>— The ${config.appName} Team</p>
+          `,
+        });
+        sent++;
+      } catch { failed++; }
+    }));
+
+    res.json({ success: true, sent, failed, total: centers.length });
+  } catch (err) {
+    console.error('❌ Broadcast error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ── GET /api/super-admin/chat-credits  — all centers' credit balances ─────────
+router.get('/chat-credits', verifySuperAdmin, async (req, res) => {
+  try {
+    const centers = await Center.find({ status: 'active' })
+      .select('centerName slug adminEmail plan chatCredits')
+      .lean();
+
+    const data = centers.map(c => ({
+      _id:            c._id,
+      centerName:     c.centerName,
+      slug:           c.slug,
+      adminEmail:     c.adminEmail,
+      plan:           c.plan,
+      balance:        c.chatCredits?.balance        ?? 0,
+      totalAllocated: c.chatCredits?.totalAllocated ?? 0,
+      used:           (c.chatCredits?.totalAllocated ?? 0) - (c.chatCredits?.balance ?? 0),
+      log:            (c.chatCredits?.log || []).slice(-10).reverse(), // last 10, newest first
+    }));
+
+    // Summary totals
+    const totalBalance   = data.reduce((n, c) => n + c.balance, 0);
+    const totalAllocated = data.reduce((n, c) => n + c.totalAllocated, 0);
+    const totalUsed      = data.reduce((n, c) => n + c.used, 0);
+
+    res.json({ success: true, centers: data, totals: { totalBalance, totalAllocated, totalUsed } });
+  } catch (err) {
+    console.error('Chat credits list error:', err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// ── POST /api/super-admin/chat-credits/:centerId  — allocate credits ──────────
+router.post('/chat-credits/:centerId', verifySuperAdmin, async (req, res) => {
+  try {
+    const { amount, note } = req.body;
+    if (!amount || typeof amount !== 'number' || amount < 1 || amount > 100000) {
+      return res.status(400).json({ message: 'amount must be a number between 1 and 100,000' });
+    }
+
+    const center = await Center.findById(req.params.centerId);
+    if (!center || center.status !== 'active') {
+      return res.status(404).json({ message: 'Center not found or inactive' });
+    }
+
+    const logEntry = {
+      amount,
+      note:      note || 'Allocated by super admin',
+      by:        req.user?.username || 'superadmin',
+      createdAt: new Date(),
+    };
+
+    // Cap log at 50 entries
+    const currentLog = center.chatCredits?.log || [];
+    const trimmedLog = currentLog.length >= 50
+      ? currentLog.slice(-49)
+      : currentLog;
+
+    await Center.findByIdAndUpdate(center._id, {
+      $inc: {
+        'chatCredits.balance':        amount,
+        'chatCredits.totalAllocated': amount,
+      },
+      $set: {
+        'chatCredits.log': [...trimmedLog, logEntry],
+      },
+    });
+
+    const updated = await Center.findById(center._id).select('chatCredits centerName').lean();
+
+    res.json({
+      success:  true,
+      message:  `${amount} credits allocated to ${center.centerName}`,
+      balance:  updated.chatCredits.balance,
+      totalAllocated: updated.chatCredits.totalAllocated,
+    });
+  } catch (err) {
+    console.error('Allocate chat credits error:', err);
+    res.status(500).json({ success: false, message: 'Server error' });
   }
 });
 

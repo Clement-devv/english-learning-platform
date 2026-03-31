@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Lock, Eye, EyeOff, CheckCircle } from 'lucide-react';
 import api from '../../api';
 
@@ -12,6 +12,8 @@ export default function ResetPassword() {
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
   const { token } = useParams();
+  const [searchParams] = useSearchParams();
+  const centerSlug = searchParams.get('center') || import.meta.env.VITE_CENTER_SLUG || '';
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
@@ -36,8 +38,8 @@ export default function ResetPassword() {
     setLoading(true);
 
     try {
-      await api.post(`/api/auth/teacher/reset-password/${token}`, {
-        newPassword
+      await api.post(`/api/auth/teacher/reset-password/${token}`, { newPassword }, {
+        headers: centerSlug ? { 'x-center-slug': centerSlug } : {},
       });
 
       setSuccess(true);

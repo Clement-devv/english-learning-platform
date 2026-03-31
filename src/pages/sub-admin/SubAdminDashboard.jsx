@@ -74,7 +74,7 @@ export default function SubAdminDashboard() {
       <div style={{
         display: "flex", height: "100vh",
         background: c.bg,
-        fontFamily: "'Plus Jakarta Sans', sans-serif",
+        fontFamily: "var(--font-body)",
         overflow: "hidden",
         opacity: mounted ? 1 : 0,
         transition: "opacity 0.3s ease",
@@ -1882,7 +1882,6 @@ function palette(dark) {
 }
 
 const css = (dark) => `
-  @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
   * { box-sizing: border-box; }
   .sa-scroll::-webkit-scrollbar { width: 4px; }
   .sa-scroll::-webkit-scrollbar-thumb { background: ${dark ? "#1e2235" : "#e0e4f4"}; border-radius: 4px; }

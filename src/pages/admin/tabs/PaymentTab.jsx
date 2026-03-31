@@ -7,6 +7,8 @@ import {
   Clock,
   TrendingUp,
   CreditCard,
+  Banknote,
+  AlertCircle,
 } from "lucide-react";
 import api from "../../../api";
 
@@ -296,7 +298,7 @@ export default function PaymentsTab({ isDarkMode }) {
 
       {/* Tabs */}
       <div className="flex gap-2 border-b border-gray-200 dark:border-gray-700">
-        {['overview', 'transactions', 'teachers'].map(tab => (
+        {['overview', 'transactions', 'bank details'].map(tab => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -438,6 +440,81 @@ export default function PaymentsTab({ isDarkMode }) {
                       </td>
                     </tr>
                   ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === "bank details" && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className={`text-xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
+                Teacher Bank Details
+              </h3>
+              <p className={`text-sm mt-0.5 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                Bank information saved by each teacher for salary payments
+              </p>
+            </div>
+            <div className={`flex items-center gap-2 text-sm px-3 py-1.5 rounded-lg ${isDarkMode ? 'bg-blue-900/30 text-blue-300' : 'bg-blue-50 text-blue-700'}`}>
+              <Banknote className="w-4 h-4" />
+              {teacherSummary.filter(t => t.bankName || t.accountNumber).length} of {teacherSummary.length} saved
+            </div>
+          </div>
+
+          <div className={`rounded-xl shadow-md overflow-hidden ${isDarkMode ? 'bg-gray-800' : 'bg-white'}`}>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead className={isDarkMode ? 'bg-gray-700' : 'bg-gray-50'}>
+                  <tr>
+                    {['Teacher', 'Account Holder Name', 'Bank Name', 'Account Number', 'Status'].map(h => (
+                      <th key={h} className={`px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider ${isDarkMode ? 'text-gray-300' : 'text-gray-500'}`}>
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className={`divide-y ${isDarkMode ? 'divide-gray-700' : 'divide-gray-100'}`}>
+                  {teacherSummary.map(teacher => {
+                    const hasBankDetails = teacher.bankName || teacher.accountNumber;
+                    return (
+                      <tr key={teacher.teacherId} className={isDarkMode ? 'hover:bg-gray-700/50' : 'hover:bg-gray-50'}>
+                        <td className={`px-6 py-4 ${isDarkMode ? 'text-gray-200' : 'text-gray-900'}`}>
+                          <p className="font-semibold text-sm">{teacher.teacherName}</p>
+                          <p className={`text-xs mt-0.5 ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>{teacher.email}</p>
+                        </td>
+                        <td className={`px-6 py-4 text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                          {teacher.accountName || <span className={isDarkMode ? 'text-gray-600' : 'text-gray-300'}>—</span>}
+                        </td>
+                        <td className={`px-6 py-4 text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                          {teacher.bankName || <span className={isDarkMode ? 'text-gray-600' : 'text-gray-300'}>—</span>}
+                        </td>
+                        <td className={`px-6 py-4 text-sm font-mono ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                          {teacher.accountNumber || <span className={`font-sans ${isDarkMode ? 'text-gray-600' : 'text-gray-300'}`}>—</span>}
+                        </td>
+                        <td className="px-6 py-4">
+                          {hasBankDetails ? (
+                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${isDarkMode ? 'bg-emerald-900/40 text-emerald-300' : 'bg-emerald-50 text-emerald-700'}`}>
+                              <CheckCircle className="w-3 h-3" /> Saved
+                            </span>
+                          ) : (
+                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${isDarkMode ? 'bg-gray-700 text-gray-400' : 'bg-gray-100 text-gray-500'}`}>
+                              <AlertCircle className="w-3 h-3" /> Not set
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {teacherSummary.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className={`px-6 py-12 text-center text-sm ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+                        No teachers found
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>

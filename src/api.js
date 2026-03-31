@@ -37,7 +37,7 @@ api.interceptors.request.use(
     // Always send the center slug so tenantMiddleware can identify the center.
     // In production this is also derived from the subdomain, but sending the
     // header is the reliable fallback for dev, mobile apps, and API clients.
-    const slug = import.meta.env.VITE_CENTER_SLUG || getCachedCenter()?.slug;
+    const slug = import.meta.env.VITE_CENTER_SLUG || sessionStorage.getItem('impersonationCenterSlug') || getCachedCenter()?.slug;
     if (slug) {
       config.headers["x-center-slug"] = slug;
     }
@@ -47,11 +47,17 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Handle token expiration
+// Handle token expiration — but never auto-logout on auth endpoints themselves
+// (login returning 401 for wrong password must not redirect to login page)
+const AUTH_PATHS = ["/login", "/forgot-password", "/reset-password", "/verify-invite", "/setup-account", "/verify-2fa"];
+
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    const url = error.config?.url || "";
+    const isAuthEndpoint = AUTH_PATHS.some((p) => url.includes(p));
+
+    if (error.response?.status === 401 && !isAuthEndpoint) {
       if (getToken("adminToken")) {
         removeToken("adminToken");
         removeToken("adminInfo");

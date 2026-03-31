@@ -8,6 +8,7 @@ export default function SubAdminSetup() {
   const [searchParams]   = useSearchParams();
   const navigate         = useNavigate();
   const token            = searchParams.get("token");
+  const centerSlug       = searchParams.get("center") || import.meta.env.VITE_CENTER_SLUG || "";
 
   const [step, setStep]         = useState("verifying"); // verifying | form | success | error
   const [subAdminInfo, setSubAdminInfo] = useState(null);
@@ -31,7 +32,9 @@ export default function SubAdminSetup() {
 
   const verifyToken = async () => {
     try {
-      const res = await fetch(`/api/sub-admin-auth/verify-invite/${token}`);
+      const res = await fetch(`/api/sub-admin-auth/verify-invite/${token}`, {
+        headers: { "x-center-slug": centerSlug },
+      });
       const data = await res.json();
       if (data.success) {
         setSubAdminInfo(data.subAdmin);
@@ -61,7 +64,7 @@ export default function SubAdminSetup() {
     try {
       const res = await fetch("/api/sub-admin-auth/setup-account", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-center-slug": centerSlug },
         body: JSON.stringify({ token, password: form.password, confirmPassword: form.confirmPassword }),
       });
       const data = await res.json();
@@ -110,7 +113,7 @@ export default function SubAdminSetup() {
         minHeight: "100vh",
         background: "linear-gradient(135deg, #080b14 0%, #0d1220 50%, #080b14 100%)",
         display: "flex", alignItems: "center", justifyContent: "center",
-        padding: "24px", fontFamily: "'Plus Jakarta Sans', sans-serif",
+        padding: "24px", fontFamily: "var(--font-body)",
         position: "relative", overflow: "hidden",
       }}>
         {/* Background orbs */}
@@ -398,7 +401,6 @@ const eyeBtn = {
 };
 
 const globalCSS = `
-  @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
   * { box-sizing: border-box; }
   @keyframes sa-spin { to { transform: rotate(360deg); } }
   @keyframes sa-pop  { 0% { transform: scale(0.5); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }

@@ -330,7 +330,7 @@ export default function ScheduleTab({
 
   // ─────────────────────────────────────────────────────────────────────────
   return (
-    <div style={{ display:"flex", flexDirection:"column", gap:"20px", fontFamily:"Plus Jakarta Sans, sans-serif" }}>
+    <div style={{ display:"flex", flexDirection:"column", gap:"20px", fontFamily:"var(--font-body)" }}>
 
       {/* ── Global styles ── */}
       <style>{`

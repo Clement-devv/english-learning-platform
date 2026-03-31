@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import { Users, UserCheck, Search, Trash2, Plus, ChevronDown, X } from "lucide-react";
+import { Users, UserCheck, Search, Trash2, Plus, ChevronDown, ChevronRight, X, LayoutList, Grid3X3 } from "lucide-react";
 import { getAssignments, createAssignment, deleteAssignment } from "../../../services/assignmentService";
 
 // ── Searchable dropdown combobox ─────────────────────────────────────────────
@@ -156,6 +156,8 @@ export default function AssignStudentsTab({ teachers = [], students = [], onNoti
   const [assigning, setAssigning]   = useState(false);
   const [search, setSearch]         = useState("");
   const [filterTeacher, setFilterTeacher] = useState("");
+  const [viewMode, setViewMode]     = useState("grouped"); // "grouped" | "table"
+  const [collapsed, setCollapsed]   = useState({});        // teacherId → bool
 
   // ── theme helpers ────────────────────────────────────────────────────────────
   const t = {
@@ -230,7 +232,7 @@ export default function AssignStudentsTab({ teachers = [], students = [], onNoti
   const filtered = useMemo(() => {
     return assignments.filter((a) => {
       const studentName = `${a.studentId?.firstName ?? ""} ${a.studentId?.surname ?? ""}`.toLowerCase();
-      const teacherName = `${a.teacherId?.firstName ?? ""} ${a.teacherId?.lastName ?? ""}`.toLowerCase();
+      const teacherName = `${a.teacherId?.displayName ?? ""} ${a.teacherId?.firstName ?? ""} ${a.teacherId?.lastName ?? ""}`.toLowerCase();
       const q = search.toLowerCase();
       const matchesSearch = !q || studentName.includes(q) || teacherName.includes(q);
       const matchesTeacher = !filterTeacher || a.teacherId?._id === filterTeacher;
@@ -244,6 +246,21 @@ export default function AssignStudentsTab({ teachers = [], students = [], onNoti
       .map((a) => a.teacherId)
       .filter((t) => t && !seen.has(t._id) && seen.add(t._id));
   }, [assignments]);
+
+  // Grouped view: map teacherId → { teacher, rows[] } for filtered set
+  const groupedByTeacher = useMemo(() => {
+    const map = new Map();
+    filtered.forEach((a) => {
+      const tid = a.teacherId?._id ?? "unknown";
+      if (!map.has(tid)) map.set(tid, { teacher: a.teacherId, rows: [] });
+      map.get(tid).rows.push(a);
+    });
+    return [...map.values()].sort((a, b) => {
+      const na = a.teacher?.displayName?.trim() || `${a.teacher?.firstName ?? ""} ${a.teacher?.lastName ?? ""}`;
+      const nb = b.teacher?.displayName?.trim() || `${b.teacher?.firstName ?? ""} ${b.teacher?.lastName ?? ""}`;
+      return na.localeCompare(nb);
+    });
+  }, [filtered]);
 
   // ── stat helpers ─────────────────────────────────────────────────────────────
   const totalAssignments = assignments.length;
@@ -326,7 +343,7 @@ export default function AssignStudentsTab({ teachers = [], students = [], onNoti
                 placeholder="Select a teacher…"
                 isDarkMode={isDarkMode}
                 getId={(o) => o._id}
-                getLabel={(o) => `${o.firstName} ${o.lastName}`}
+                getLabel={(o) => o.displayName?.trim() || `${o.firstName} ${o.lastName}`}
               />
             </div>
 
@@ -357,7 +374,7 @@ export default function AssignStudentsTab({ teachers = [], students = [], onNoti
                 {selectedTeacher && (
                   <div className={t.muted}>
                     Teacher: <span className={`font-medium ${isDarkMode ? "text-violet-300" : "text-violet-700"}`}>
-                      {selectedTeacher.firstName} {selectedTeacher.lastName}
+                      {selectedTeacher.displayName?.trim() || `${selectedTeacher.firstName} ${selectedTeacher.lastName}`}
                     </span>
                   </div>
                 )}
@@ -421,15 +438,35 @@ export default function AssignStudentsTab({ teachers = [], students = [], onNoti
                 <option value="">All teachers</option>
                 {uniqueTeachersInAssignments.map((teacher) => (
                   <option key={teacher._id} value={teacher._id}>
-                    {teacher.firstName} {teacher.lastName}
+                    {teacher.displayName?.trim() || `${teacher.firstName} ${teacher.lastName}`}
                   </option>
                 ))}
               </select>
               <ChevronDown size={13} className={`absolute right-2 top-2.5 pointer-events-none ${t.muted}`} />
             </div>
+
+            {/* View toggle */}
+            <div className={`flex rounded-lg border overflow-hidden ${isDarkMode ? "border-[#2a2f45]" : "border-slate-200"}`}>
+              {[
+                { mode: "grouped", Icon: Grid3X3,   title: "Grouped by teacher" },
+                { mode: "table",   Icon: LayoutList, title: "Flat table" },
+              ].map(({ mode, Icon, title }) => (
+                <button
+                  key={mode}
+                  title={title}
+                  onClick={() => setViewMode(mode)}
+                  className={`p-2 transition ${viewMode === mode
+                    ? "bg-violet-600 text-white"
+                    : isDarkMode ? "bg-[#13161f] text-slate-400 hover:text-slate-200" : "bg-white text-slate-400 hover:text-slate-600"
+                  }`}
+                >
+                  <Icon size={14} />
+                </button>
+              ))}
+            </div>
           </div>
 
-          {/* Table */}
+          {/* Content */}
           {filtered.length === 0 ? (
             <div className={`flex flex-col items-center justify-center py-16 gap-3 ${t.muted}`}>
               <Users size={36} className="opacity-30" />
@@ -437,7 +474,64 @@ export default function AssignStudentsTab({ teachers = [], students = [], onNoti
                 {assignments.length === 0 ? "No assignments yet." : "No results match your filters."}
               </p>
             </div>
+          ) : viewMode === "grouped" ? (
+            /* ── Grouped view ── */
+            <div className="overflow-y-auto max-h-[520px] divide-y divide-transparent p-3 space-y-2">
+              {groupedByTeacher.map(({ teacher, rows }) => {
+                const tid = teacher?._id ?? "unknown";
+                const isOpen = collapsed[tid] !== false; // default open
+                const teacherDisplayName = teacher?.displayName?.trim() || `${teacher?.firstName ?? ""} ${teacher?.lastName ?? ""}`.trim() || "Unknown Teacher";
+                const initial = teacherDisplayName[0]?.toUpperCase() ?? "?";
+                return (
+                  <div key={tid} className={`rounded-xl border overflow-hidden ${isDarkMode ? "border-[#2a2f45] bg-[#13161f]" : "border-slate-200 bg-slate-50"}`}>
+                    {/* Teacher header row */}
+                    <button
+                      type="button"
+                      onClick={() => setCollapsed((prev) => ({ ...prev, [tid]: !isOpen }))}
+                      className={`w-full flex items-center gap-3 px-4 py-3 text-left transition ${isDarkMode ? "hover:bg-[#1a1d27]" : "hover:bg-slate-100"}`}
+                    >
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${isDarkMode ? "bg-violet-900/50 text-violet-300" : "bg-violet-100 text-violet-600"}`}>
+                        {initial}
+                      </div>
+                      <span className="font-semibold text-sm flex-1">{teacherDisplayName}</span>
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${t.badge}`}>{rows.length} student{rows.length !== 1 ? "s" : ""}</span>
+                      {isOpen ? <ChevronDown size={14} className={t.muted} /> : <ChevronRight size={14} className={t.muted} />}
+                    </button>
+
+                    {/* Students list */}
+                    {isOpen && (
+                      <div className={`border-t ${isDarkMode ? "border-[#2a2f45]" : "border-slate-200"}`}>
+                        {rows.map((a, idx) => (
+                          <div
+                            key={a._id}
+                            className={`flex items-center gap-3 px-4 py-2.5 text-sm transition
+                              ${idx < rows.length - 1 ? (isDarkMode ? "border-b border-[#1e2235]" : "border-b border-slate-100") : ""}
+                              ${isDarkMode ? "hover:bg-[#1e2235]" : "hover:bg-white"}`}
+                          >
+                            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${isDarkMode ? "bg-emerald-900/50 text-emerald-300" : "bg-emerald-100 text-emerald-600"}`}>
+                              {(a.studentId?.firstName?.[0] ?? "?").toUpperCase()}
+                            </div>
+                            <span className="flex-1 font-medium">{a.studentId?.firstName} {a.studentId?.surname}</span>
+                            <span className={`text-xs ${t.muted}`}>
+                              {a.assignedDate ? new Date(a.assignedDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "—"}
+                            </span>
+                            <button
+                              onClick={() => handleDelete(a._id)}
+                              title="Remove"
+                              className={`p-1.5 rounded-lg transition ${isDarkMode ? "text-red-400 hover:bg-red-900/30" : "text-red-500 hover:bg-red-50"}`}
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           ) : (
+            /* ── Flat table view ── */
             <div className="overflow-auto max-h-[520px]">
               <table className="w-full min-w-[520px] text-sm">
                 <thead className={`sticky top-0 z-10 ${t.tableHead}`}>
@@ -469,7 +563,7 @@ export default function AssignStudentsTab({ teachers = [], students = [], onNoti
                             {(a.teacherId?.firstName?.[0] ?? "?").toUpperCase()}
                           </div>
                           <span className="font-medium truncate">
-                            {a.teacherId?.firstName} {a.teacherId?.lastName}
+                            {a.teacherId?.displayName?.trim() || `${a.teacherId?.firstName} ${a.teacherId?.lastName}`}
                           </span>
                         </div>
                       </td>

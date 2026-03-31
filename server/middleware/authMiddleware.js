@@ -72,6 +72,11 @@ export const verifyAdmin = async (req, res, next) => {
     if (req.user.role !== "admin") {
       return res.status(403).json({ message: "Admin access required" });
     }
+    // Impersonation tokens skip the DB lookup
+    if (req.user.isImpersonation) {
+      req.admin = { _id: null, role: "admin", active: true, isImpersonation: true };
+      return next();
+    }
     const Admin = getAdminModel(req.db);
     const admin = await Admin.findById(req.user.id).select("-password");
     if (!admin || !admin.active) {
@@ -133,6 +138,11 @@ export const verifyAdminOrTeacher = async (req, res, next) => {
       return res.status(401).json({ message: "Authentication required" });
     }
     if (req.user.role === "admin") {
+      // Impersonation tokens skip the DB lookup
+      if (req.user.isImpersonation) {
+        req.admin = { _id: null, role: "admin", active: true, isImpersonation: true };
+        return next();
+      }
       const Admin = getAdminModel(req.db);
       const admin = await Admin.findById(req.user.id).select("-password");
       if (!admin || !admin.active) {

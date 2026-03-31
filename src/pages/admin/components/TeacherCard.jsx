@@ -1,23 +1,12 @@
 // src/pages/admin/components/TeacherCard.jsx
 import React, { useState, useRef, useEffect } from "react";
 import {
-  MoreVertical,
-  Edit3,
-  Trash2,
-  UserX,
-  UserCheck,
-  BookOpen,
-  DollarSign,
-  Copy,
-  RotateCcw,
-  Globe,
-  Mail,
-  TrendingUp,
-  Eye,
-  EyeOff,
-  MinusCircle,
-  History,
+  MoreVertical, Edit3, Trash2, UserX, UserCheck,
+  BookOpen, DollarSign, Copy, RotateCcw, Globe,
+  Mail, TrendingUp, Eye, EyeOff, MinusCircle,
+  History, Send, Clock, Video, Award, ChevronDown, FileDown, Star,
 } from "lucide-react";
+import { downloadTeacherCard } from "../../../utils/teacherPdf";
 
 function getInitials(firstName = "", lastName = "") {
   return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
@@ -60,6 +49,32 @@ function ContinentBadge({ continent, isDarkMode }) {
   );
 }
 
+// Renders 5 stars with partial fill via CSS clip trick
+function StarRating({ rating, totalRatings, isDarkMode }) {
+  const pct = Math.round((rating / 5) * 100);
+  return (
+    <div className="flex items-center gap-1.5">
+      <div className="relative inline-flex" style={{ fontSize: 13, lineHeight: 1 }}>
+        {/* Empty stars */}
+        <span style={{ color: isDarkMode ? "#4b5563" : "#d1d5db", letterSpacing: 1 }}>★★★★★</span>
+        {/* Filled stars overlay */}
+        <span
+          className="absolute inset-0 overflow-hidden"
+          style={{ width: `${pct}%`, color: "#f59e0b", letterSpacing: 1 }}
+        >
+          ★★★★★
+        </span>
+      </div>
+      <span className={`text-xs font-bold ${isDarkMode ? "text-amber-400" : "text-amber-500"}`}>
+        {rating.toFixed(1)}
+      </span>
+      <span className={`text-xs ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
+        ({totalRatings} review{totalRatings !== 1 ? "s" : ""})
+      </span>
+    </div>
+  );
+}
+
 function StatPill({ label, value, color, isDarkMode }) {
   const colorMap = {
     blue: isDarkMode ? "bg-blue-900/40 text-blue-300" : "bg-blue-50 text-blue-700",
@@ -86,13 +101,16 @@ export default function TeacherCard({
   onCopyPassword,
   onResetPassword,
   onPayHistory,
+  onResendInvite,
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [profileExpanded, setProfileExpanded] = useState(false);
   const menuRef = useRef(null);
 
-  const fullName = `${teacher.firstName || ""} ${teacher.lastName || ""}`.trim();
-  const initials = getInitials(teacher.firstName, teacher.lastName);
+  const fullName    = `${teacher.firstName || ""} ${teacher.lastName || ""}`.trim();
+  const displayName = teacher.displayName?.trim() || "";
+  const initials    = getInitials(teacher.firstName, teacher.lastName);
   const avatarGradient = getAvatarColor(fullName);
   const isActive = teacher.active;
   const earned = (teacher.earned || 0).toFixed(2);
@@ -125,7 +143,9 @@ export default function TeacherCard({
       {/* Status stripe */}
       <div
         className={`absolute top-0 left-0 right-0 h-1 rounded-t-2xl ${
-          isActive
+          teacher.status === "pending"
+            ? "bg-gradient-to-r from-amber-400 to-orange-400"
+            : isActive
             ? "bg-gradient-to-r from-emerald-400 to-teal-500"
             : "bg-gradient-to-r from-gray-300 to-gray-400"
         }`}
@@ -137,10 +157,29 @@ export default function TeacherCard({
           <div className="flex items-center gap-3">
             {/* Avatar */}
             <div
-              className={`relative w-12 h-12 rounded-xl bg-gradient-to-br ${avatarGradient} flex items-center justify-center flex-shrink-0 shadow-md`}
+              className={`relative w-12 h-12 rounded-xl flex-shrink-0 shadow-md overflow-hidden ${
+                teacher.photo ? "" : `bg-gradient-to-br ${avatarGradient} flex items-center justify-center`
+              }`}
             >
-              <span className="text-white font-bold text-sm">{initials}</span>
-              {/* Online dot */}
+              {teacher.photo ? (
+                <img
+                  src={teacher.photo}
+                  alt={fullName}
+                  className="w-full h-full object-cover"
+                  onError={e => {
+                    e.currentTarget.style.display = "none";
+                    e.currentTarget.nextSibling.style.display = "flex";
+                  }}
+                />
+              ) : null}
+              {/* Fallback initials — shown when no photo or photo fails to load */}
+              <span
+                className="text-white font-bold text-sm w-full h-full items-center justify-center"
+                style={{ display: teacher.photo ? "none" : "flex" }}
+              >
+                {initials}
+              </span>
+              {/* Status dot */}
               <span
                 className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 ${
                   isDarkMode ? "border-gray-800" : "border-white"
@@ -148,15 +187,20 @@ export default function TeacherCard({
               />
             </div>
 
-            {/* Name + email */}
+            {/* Name + display name + email */}
             <div className="min-w-0">
               <h3
                 className={`font-semibold text-sm leading-tight truncate ${
                   isDarkMode ? "text-white" : "text-gray-900"
                 }`}
               >
-                {fullName || "Unnamed Teacher"}
+                {displayName || fullName || "Unnamed Teacher"}
               </h3>
+              {displayName && (
+                <p className={`text-xs truncate mt-0.5 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
+                  {fullName}
+                </p>
+              )}
               <p
                 className={`text-xs truncate flex items-center gap-1 mt-0.5 ${
                   isDarkMode ? "text-gray-400" : "text-gray-500"
@@ -186,6 +230,21 @@ export default function TeacherCard({
               <div
                 className={`absolute right-0 top-full mt-1 z-50 min-w-[170px] rounded-xl border ${menuBg} py-1.5 overflow-hidden`}
               >
+                {teacher.status === "pending" && (
+                  <>
+                    <DropdownItem
+                      icon={Send}
+                      label="Resend Invite"
+                      color="amber"
+                      isDarkMode={isDarkMode}
+                      onClick={() => {
+                        onResendInvite?.();
+                        setMenuOpen(false);
+                      }}
+                    />
+                    <div className={`my-1 h-px ${isDarkMode ? "bg-gray-700" : "bg-gray-100"}`} />
+                  </>
+                )}
                 <DropdownItem
                   icon={BookOpen}
                   label="Mark Lesson"
@@ -249,6 +308,14 @@ export default function TeacherCard({
                   />
                 )}
 
+                <DropdownItem
+                  icon={FileDown}
+                  label="Download PDF"
+                  color="indigo"
+                  isDarkMode={isDarkMode}
+                  onClick={() => { downloadTeacherCard(teacher); setMenuOpen(false); }}
+                />
+
                 {/* Divider */}
                 <div
                   className={`my-1 h-px ${
@@ -271,9 +338,28 @@ export default function TeacherCard({
           </div>
         </div>
 
-        {/* Continent badge */}
-        <div className="mb-4">
+        {/* Continent badge + pending setup badge */}
+        <div className="mb-4 flex flex-wrap items-center gap-2">
           <ContinentBadge continent={teacher.continent} isDarkMode={isDarkMode} />
+          {teacher.status === "pending" && (
+            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${
+              isDarkMode ? "bg-amber-900/50 text-amber-300" : "bg-amber-100 text-amber-700"
+            }`}>
+              <Clock className="w-3 h-3" />
+              Pending Setup
+            </span>
+          )}
+        </div>
+
+        {/* Rating row */}
+        <div className="mb-3">
+          {teacher.avgRating != null && teacher.totalRatings > 0 ? (
+            <StarRating rating={teacher.avgRating} totalRatings={teacher.totalRatings} isDarkMode={isDarkMode} />
+          ) : (
+            <span className={`text-xs italic ${isDarkMode ? "text-gray-600" : "text-gray-400"}`}>
+              No reviews yet
+            </span>
+          )}
         </div>
 
         {/* Stats row */}
@@ -297,6 +383,104 @@ export default function TeacherCard({
             isDarkMode={isDarkMode}
           />
         </div>
+
+        {/* Professional profile extras */}
+        {(teacher.bio || teacher.specializations?.length > 0 || teacher.certifications?.length > 0 || teacher.timezone || teacher.yearsOfExperience > 0) && (
+          <div className={`mb-4 rounded-xl overflow-hidden ${isDarkMode ? "bg-gray-700/40" : "bg-gray-50"}`}>
+
+            {/* Toggle header */}
+            <button
+              type="button"
+              onClick={() => setProfileExpanded(v => !v)}
+              className={`w-full flex items-center justify-between px-3 py-2 text-xs font-semibold transition-colors ${
+                isDarkMode ? "text-gray-400 hover:text-gray-200" : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              <span>Profile Details</span>
+              <ChevronDown
+                className={`w-3.5 h-3.5 transition-transform duration-200 ${profileExpanded ? "rotate-180" : ""}`}
+              />
+            </button>
+
+            {/* Collapsible content */}
+            {profileExpanded && (
+          <div className="px-3 pb-3 space-y-2.5">
+
+            {/* Bio */}
+            {teacher.bio && (
+              <p className={`text-xs leading-relaxed line-clamp-2 ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>
+                {teacher.bio}
+              </p>
+            )}
+
+            {/* Timezone + Experience row */}
+            {(teacher.timezone || teacher.yearsOfExperience > 0) && (
+              <div className="flex flex-wrap gap-1.5">
+                {teacher.timezone && (
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${isDarkMode ? "bg-blue-900/40 text-blue-300" : "bg-blue-50 text-blue-700"}`}>
+                    <Clock className="w-3 h-3" />{teacher.timezone}
+                  </span>
+                )}
+                {teacher.yearsOfExperience > 0 && (
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${isDarkMode ? "bg-purple-900/40 text-purple-300" : "bg-purple-50 text-purple-700"}`}>
+                    <TrendingUp className="w-3 h-3" />{teacher.yearsOfExperience} yrs exp
+                  </span>
+                )}
+              </div>
+            )}
+
+            {/* Specializations */}
+            {teacher.specializations?.length > 0 && (
+              <div>
+                <p className={`text-xs font-semibold mb-1.5 flex items-center gap-1 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+                  <BookOpen className="w-3 h-3" /> Specializations
+                </p>
+                <div className="flex flex-wrap gap-1">
+                  {teacher.specializations.slice(0, 4).map((s) => (
+                    <span key={s} className={`px-2 py-0.5 rounded-full text-xs font-medium ${isDarkMode ? "bg-brand-primary/20 text-brand-primary" : "bg-violet-50 text-violet-700"}`}>
+                      {s}
+                    </span>
+                  ))}
+                  {teacher.specializations.length > 4 && (
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${isDarkMode ? "bg-gray-600 text-gray-300" : "bg-gray-100 text-gray-500"}`}>
+                      +{teacher.specializations.length - 4} more
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Certifications */}
+            {teacher.certifications?.length > 0 && (
+              <div>
+                <p className={`text-xs font-semibold mb-1.5 flex items-center gap-1 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+                  <Award className="w-3 h-3" /> Certifications
+                </p>
+                <div className="flex flex-wrap gap-1">
+                  {teacher.certifications.map((c) => (
+                    <span key={c} className={`px-2 py-0.5 rounded-full text-xs font-medium ${isDarkMode ? "bg-emerald-900/40 text-emerald-300" : "bg-emerald-50 text-emerald-700"}`}>
+                      {c}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Google Meet link */}
+            {teacher.googleMeetLink && (
+              <a
+                href={teacher.googleMeetLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`inline-flex items-center gap-1.5 text-xs font-medium hover:underline ${isDarkMode ? "text-cyan-400" : "text-cyan-600"}`}
+              >
+                <Video className="w-3 h-3" /> Meet / Zoom Link
+              </a>
+            )}
+          </div>
+            )}
+          </div>
+        )}
 
         {/* Temp password display */}
         {teacher.showTempPassword && teacher.password && (
@@ -407,6 +591,7 @@ function DropdownItem({ icon: Icon, label, color, isDarkMode, onClick }) {
     indigo: isDarkMode ? "text-indigo-400 hover:bg-indigo-900/40" : "text-indigo-600 hover:bg-indigo-50",
     red: isDarkMode ? "text-red-400 hover:bg-red-900/40" : "text-red-600 hover:bg-red-50",
     rose: isDarkMode ? "text-rose-400 hover:bg-rose-900/40" : "text-rose-600 hover:bg-rose-50",
+    amber: isDarkMode ? "text-amber-400 hover:bg-amber-900/40" : "text-amber-600 hover:bg-amber-50",
   };
 
   return (

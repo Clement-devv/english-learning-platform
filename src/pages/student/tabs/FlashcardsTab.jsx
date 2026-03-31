@@ -1,15 +1,17 @@
 // src/pages/student/tabs/FlashcardsTab.jsx
 import { useState, useEffect, useCallback } from "react";
 import api from "../../../api";
+import StreakToast from "../components/StreakToast";
 
 export default function FlashcardsTab({ isDarkMode }) {
-  const [stats,    setStats]    = useState([]);
-  const [cards,    setCards]    = useState([]);
-  const [mode,     setMode]     = useState("home");    // "home" | "review" | "done"
-  const [idx,      setIdx]      = useState(0);
-  const [flipped,  setFlipped]  = useState(false);
-  const [loading,  setLoading]  = useState(true);
-  const [reviewed, setReviewed] = useState(0);
+  const [stats,       setStats]       = useState([]);
+  const [cards,       setCards]       = useState([]);
+  const [mode,        setMode]        = useState("home");    // "home" | "review" | "done"
+  const [idx,         setIdx]         = useState(0);
+  const [flipped,     setFlipped]     = useState(false);
+  const [loading,     setLoading]     = useState(true);
+  const [reviewed,    setReviewed]    = useState(0);
+  const [streakToast, setStreakToast] = useState(null);
 
   const col = {
     bg:      isDarkMode ? "#0f1117" : "#fff8f0",
@@ -49,7 +51,8 @@ export default function FlashcardsTab({ isDarkMode }) {
   const submitRating = async (quality) => {
     const card = cards[idx];
     try {
-      await api.post("/api/vocab/review", { listId: card.listId, wordId: card.wordId, quality });
+      const { data } = await api.post("/api/vocab/review", { listId: card.listId, wordId: card.wordId, quality });
+      if (data?.streak?.incremented) setStreakToast(data.streak);
     } catch { /* silent */ }
 
     const next = idx + 1;
@@ -146,6 +149,7 @@ export default function FlashcardsTab({ isDarkMode }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "20px", maxWidth: "560px", margin: "0 auto" }}>
+      <StreakToast data={streakToast} onDone={() => setStreakToast(null)} />
       {/* Progress bar */}
       <div>
         <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", fontWeight: 700, color: col.muted, marginBottom: "6px" }}>

@@ -1,5 +1,11 @@
 import dotenv from "dotenv";
-dotenv.config();
+import { fileURLToPath } from "url";
+import { dirname, resolve } from "path";
+
+// Always load .env from the server/ directory, regardless of where Node is started from
+const __filename = fileURLToPath(import.meta.url);
+const __dirname  = dirname(__filename);
+dotenv.config({ path: resolve(__dirname, "../.env") });
 
 // Validate required environment variables
 const requiredEnvVars = ['JWT_SECRET', 'MONGO_URI', 'EMAIL_USER', 'EMAIL_PASSWORD', 'MASTER_DB_URI', 'DB_BASE_URI'];

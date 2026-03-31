@@ -67,13 +67,36 @@ export default function OverviewTab({ isDarkMode }) {
     cancelled: { color: "#6b7280", bg: isDarkMode ? "rgba(107,114,128,0.12)" : "#f3f4f6", label: "Cancelled" },
   };
 
-  // ── loading ───────────────────────────────────────────────────────────────
+  // ── loading skeleton ─────────────────────────────────────────────────────
   if (loading) {
     return (
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "80px 0", gap: "16px" }}>
-        <Loader2 size={36} color="#6b82f0" style={{ animation: "ov-spin 0.8s linear infinite" }} />
-        <p style={{ fontSize: "14px", color: c.muted, margin: 0 }}>Loading dashboard…</p>
-        <style>{`@keyframes ov-spin { to { transform: rotate(360deg); } }`}</style>
+      <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+        {/* KPI row skeleton */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "16px" }}>
+          {[1,2,3,4].map(i => (
+            <div key={i} style={{ background: c.card, border: `1px solid ${c.border}`, borderRadius: "16px", padding: "20px", display: "flex", gap: "14px" }}>
+              <div style={{ width: "44px", height: "44px", borderRadius: "12px", background: isDarkMode ? "#1e2235" : "#f1f5f9", flexShrink: 0, animation: "ov-pulse 1.5s ease-in-out infinite" }} />
+              <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "8px" }}>
+                <div style={{ height: "10px", borderRadius: "6px", background: isDarkMode ? "#1e2235" : "#f1f5f9", width: "60%", animation: "ov-pulse 1.5s ease-in-out infinite" }} />
+                <div style={{ height: "26px", borderRadius: "6px", background: isDarkMode ? "#1e2235" : "#f1f5f9", width: "80%", animation: "ov-pulse 1.5s ease-in-out infinite" }} />
+                <div style={{ height: "10px", borderRadius: "6px", background: isDarkMode ? "#1e2235" : "#f1f5f9", width: "50%", animation: "ov-pulse 1.5s ease-in-out infinite" }} />
+              </div>
+            </div>
+          ))}
+        </div>
+        {/* Middle row skeleton */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+          {[1,2].map(i => (
+            <div key={i} style={{ background: c.card, border: `1px solid ${c.border}`, borderRadius: "16px", padding: "20px", height: "200px", animation: "ov-pulse 1.5s ease-in-out infinite" }} />
+          ))}
+        </div>
+        {/* Bookings skeleton */}
+        <div style={{ background: c.card, border: `1px solid ${c.border}`, borderRadius: "16px", padding: "20px" }}>
+          {[1,2,3].map(i => (
+            <div key={i} style={{ height: "52px", borderRadius: "12px", background: isDarkMode ? "#1e2235" : "#f1f5f9", marginBottom: "8px", animation: "ov-pulse 1.5s ease-in-out infinite" }} />
+          ))}
+        </div>
+        <style>{`@keyframes ov-pulse { 0%,100%{opacity:1} 50%{opacity:0.4} } @keyframes ov-spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     );
   }
@@ -142,12 +165,12 @@ export default function OverviewTab({ isDarkMode }) {
     : [];
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "24px", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: "24px", fontFamily: "var(--font-body)" }}>
 
       {/* ── Header ── */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div>
-          <h1 style={{ margin: 0, fontSize: "22px", fontWeight: "800", color: c.heading, letterSpacing: "-0.3px" }}>
+          <h1 style={{ margin: 0, fontSize: "22px", fontWeight: "800", color: c.heading, letterSpacing: "-0.3px", fontFamily: "var(--font-display)" }}>
             Dashboard Overview
           </h1>
           <p style={{ margin: "4px 0 0", fontSize: "13.5px", color: c.muted }}>
@@ -317,9 +340,21 @@ export default function OverviewTab({ isDarkMode }) {
         </div>
 
         {recentBookings.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "32px 0" }}>
-            <Calendar size={32} color={isDarkMode ? "#1e2235" : "#e2e8f0"} style={{ margin: "0 auto 8px" }} />
-            <p style={{ fontSize: "13px", color: c.muted, margin: 0 }}>No bookings yet</p>
+          <div style={{ textAlign: "center", padding: "48px 24px" }}>
+            <div style={{
+              width: "64px", height: "64px", borderRadius: "20px",
+              background: isDarkMode ? "#1e1730" : "#f5f0ff",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              margin: "0 auto 16px",
+            }}>
+              <Calendar size={28} color="var(--brand-primary)" />
+            </div>
+            <p style={{ fontSize: "16px", fontWeight: "700", color: c.heading, margin: "0 0 8px" }}>
+              No bookings yet
+            </p>
+            <p style={{ fontSize: "13.5px", color: c.muted, margin: 0 }}>
+              Bookings will appear here once teachers and students start scheduling classes
+            </p>
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
@@ -400,8 +435,8 @@ export default function OverviewTab({ isDarkMode }) {
       </div>
 
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
         @keyframes ov-spin { to { transform: rotate(360deg); } }
+        @keyframes ov-pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
         .ov-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.08) !important; }
       `}</style>
     </div>

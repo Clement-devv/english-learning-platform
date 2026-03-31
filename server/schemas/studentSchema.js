@@ -22,6 +22,8 @@ export const studentSchema = new mongoose.Schema({
   age: { type: Number },
   dateOfBirth: { type: Date },
   rank: { type: String, default: '' },
+  phone: { type: String, default: '' },
+  country: { type: String, default: '' },
   timezone: { type: String, default: '' },
   status: {
     type: String,
@@ -45,4 +47,14 @@ export const studentSchema = new mongoose.Schema({
   referralCreditsEarned: { type: Number, default: 0 },
   scheduledDeletionAt: { type: Date, default: null },
   deletionWarningEmailSent: { type: Boolean, default: false },
+
+  // ── Streak tracking ──────────────────────────────────────────────────────
+  currentStreak:            { type: Number, default: 0 },   // consecutive active days
+  longestStreak:            { type: Number, default: 0 },
+  lastActivityDate:         { type: Date,   default: null }, // midnight UTC of last active day
+  streakFreezes:            { type: Number, default: 1 },    // 1 free freeze to start
+  weeklyClassStreak:        { type: Number, default: 0 },   // consecutive weeks with ≥1 completed class
+  longestWeeklyClassStreak: { type: Number, default: 0 },
+  lastClassWeek:            { type: String, default: null }, // e.g. "2026-W13"
+  activityDates:            { type: [Date], default: [] },   // last 30 active days (for 7-day dots)
 }, { timestamps: true });

@@ -4,6 +4,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { Mail, Lock, Eye, EyeOff, AlertCircle, ArrowRight } from 'lucide-react';
 import api from '../../api';
 import TwoFactorLogin from '../../components/TwoFactorLogin';
+import { useBranding } from '../../context/BrandingContext';
 
 export default function TeacherLogin() {
   const [email, setEmail] = useState('');
@@ -15,6 +16,8 @@ export default function TeacherLogin() {
   const [tempUserId, setTempUserId] = useState(null);
   const [focusedField, setFocusedField] = useState(null);
   const navigate = useNavigate();
+  const { branding, center } = useBranding();
+  const centerName = center?.centerName || 'English Learning Platform';
 
   const handleInitialLogin = async (e) => {
     e.preventDefault();
@@ -85,21 +88,39 @@ export default function TeacherLogin() {
   return (
     <>
       <style>{css}</style>
-      <div style={styles.root}>
+      <div style={{ ...styles.root, fontFamily: branding.fontFamily ? `'${branding.fontFamily}', 'DM Sans', sans-serif` : styles.root.fontFamily }}>
         {/* ── LEFT PANEL ── */}
-        <div style={styles.left}>
-          {/* Decorative grid */}
+        <div style={{
+          ...styles.left,
+          background: branding.loginBackground
+            ? `url(${branding.loginBackground}) center/cover no-repeat`
+            : styles.left.background,
+        }}>
+          {branding.loginBackground && (
+            <div style={{
+              position: 'absolute', inset: 0,
+              background: `rgba(0,0,0,${branding.loginBgOverlay ?? 0.55})`,
+              pointerEvents: 'none',
+            }} />
+          )}
+          {/* ── Decorative grid ── */}
           <div style={styles.gridOverlay} />
           <div style={styles.glowCircle} />
 
           <div style={styles.leftContent}>
-            {/* Logo mark */}
+            {/* Logo / center name */}
             <div style={styles.logoMark}>
-              <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
-                <path d="M14 2L26 8V20L14 26L2 20V8L14 2Z" stroke="white" strokeWidth="1.5" fill="none"/>
-                <path d="M14 8L20 11V17L14 20L8 17V11L14 8Z" fill="white" fillOpacity="0.9"/>
-              </svg>
-              <span style={styles.logoText}>EduLearn</span>
+              {branding.logo ? (
+                <img src={branding.logo} alt={centerName} style={{ height: 36, maxWidth: 160, objectFit: 'contain' }} />
+              ) : (
+                <>
+                  <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+                    <path d="M14 2L26 8V20L14 26L2 20V8L14 2Z" stroke="white" strokeWidth="1.5" fill="none"/>
+                    <path d="M14 8L20 11V17L14 20L8 17V11L14 8Z" fill="white" fillOpacity="0.9"/>
+                  </svg>
+                  <span style={styles.logoText}>{centerName}</span>
+                </>
+              )}
             </div>
 
             {/* Main headline */}
@@ -132,7 +153,7 @@ export default function TeacherLogin() {
           <div style={styles.formWrap} className="login-form-wrap">
 
             {/* Top label */}
-            <p style={styles.tag}>TEACHER PORTAL</p>
+            <p style={styles.tag}>{centerName} — TEACHER PORTAL</p>
 
             <h2 style={styles.formTitle}>Welcome back</h2>
             <p style={styles.formSub}>Enter your credentials to continue</p>

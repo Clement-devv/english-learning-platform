@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { Mail, Lock, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import api from '../../api';
 import TwoFactorLogin from '../../components/TwoFactorLogin';
+import { useBranding } from '../../context/BrandingContext';
 
 export default function StudentLogin() {
   const [email, setEmail] = useState('');
@@ -15,6 +16,8 @@ export default function StudentLogin() {
   const [tempUserId, setTempUserId] = useState(null);
   const [focusedField, setFocusedField] = useState(null);
   const navigate = useNavigate();
+  const { branding, center } = useBranding();
+  const centerName = center?.centerName || 'English Learning Platform';
 
   const handleInitialLogin = async (e) => {
     e.preventDefault();
@@ -83,7 +86,20 @@ export default function StudentLogin() {
   return (
     <>
       <style>{css}</style>
-      <div style={styles.root}>
+      <div style={{
+          ...styles.root,
+          background: branding.loginBackground
+            ? `url(${branding.loginBackground}) center/cover no-repeat`
+            : styles.root.background,
+          fontFamily: branding.fontFamily ? `'${branding.fontFamily}', 'Nunito', sans-serif` : styles.root.fontFamily,
+        }}>
+        {branding.loginBackground && (
+          <div style={{
+            position: 'absolute', inset: 0, zIndex: 0,
+            background: `rgba(0,0,0,${branding.loginBgOverlay ?? 0.45})`,
+            pointerEvents: 'none',
+          }} />
+        )}
 
         {/* ── Floating background shapes ── */}
         <div className="sl-blob sl-blob-1" />
@@ -99,20 +115,33 @@ export default function StudentLogin() {
         <span className="sl-float sl-f6">🎯</span>
 
         {/* ── Card ── */}
-        <div style={styles.card} className="sl-card">
+        <div style={{
+          ...styles.card,
+          background: branding.loginBackground ? 'rgba(255,255,255,0.96)' : styles.card.background,
+        }} className="sl-card">
 
-          {/* mascot */}
+          {/* mascot / logo */}
           <div style={styles.mascotWrap} className="sl-mascot">
-            <div style={styles.mascotFace}>
-              <span style={styles.mascotEmoji}>🦉</span>
-            </div>
+            {branding.logo ? (
+              <img
+                src={branding.logo}
+                alt={centerName}
+                style={{ height: 56, maxWidth: 160, objectFit: 'contain' }}
+              />
+            ) : (
+              <div style={styles.mascotFace}>
+                <span style={styles.mascotEmoji}>🦉</span>
+              </div>
+            )}
             <div style={styles.speechBubble}>
-              <p style={styles.speechText}>Hi there! Ready to learn? 🎉</p>
+              <p style={styles.speechText}>
+                {branding.logo ? `Welcome to ${centerName}! 🎉` : 'Hi there! Ready to learn? 🎉'}
+              </p>
             </div>
           </div>
 
           {/* Title */}
-          <h1 style={styles.title}>Student Login</h1>
+          <h1 style={styles.title}>{centerName}</h1>
           <p style={styles.subtitle}>Sign in to start your English adventure!</p>
 
           {/* Error */}

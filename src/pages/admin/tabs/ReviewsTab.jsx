@@ -196,9 +196,17 @@ export default function ReviewsTab({ isDarkMode }) {
       {loading ? (
         <p style={{ color: muted, fontSize: 13 }}>Loading…</p>
       ) : displayed.length === 0 ? (
-        <div style={{ textAlign: "center", padding: 48, color: muted }}>
-          <p style={{ margin: 0, fontSize: 22 }}>⭐</p>
-          <p style={{ margin: "8px 0 0", fontWeight: 600, color: text }}>No reviews found</p>
+        <div style={{ textAlign: "center", padding: "48px 24px" }}>
+          <div style={{
+            width: "64px", height: "64px", borderRadius: "20px",
+            background: isDarkMode ? "#1e1730" : "#f5f0ff",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            margin: "0 auto 16px",
+          }}>
+            <Flag size={28} color="var(--brand-primary)" />
+          </div>
+          <p style={{ fontSize: "16px", fontWeight: "700", color: text, margin: "0 0 8px" }}>No reviews found</p>
+          <p style={{ fontSize: "13.5px", color: muted, margin: 0 }}>Reviews will appear here once students rate their classes</p>
         </div>
       ) : (
         displayed.map(r => (

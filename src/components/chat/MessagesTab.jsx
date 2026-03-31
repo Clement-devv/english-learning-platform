@@ -27,7 +27,7 @@ export default function MessagesTab({ userRole, onUnreadCount }) {
           boxShadow: dark ? "0 24px 64px rgba(0,0,0,0.5)" : "0 8px 40px rgba(0,0,0,0.10)",
           background: dark ? "#111318" : "#ffffff",
           border: dark ? "1px solid rgba(255,255,255,0.06)" : "1px solid #e8eaf0",
-          fontFamily: "'Plus Jakarta Sans','Segoe UI',sans-serif",
+          fontFamily: "var(--font-body)",
         }}
       >
         {/* Sidebar */}
@@ -102,7 +102,6 @@ function EmptyState({ dark }) {
 }
 
 const css = `
-  @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
   .msg-shell * { box-sizing: border-box; }
   .msg-empty-orb { animation: msg-bob 4s ease-in-out infinite; }
   @keyframes msg-bob { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-9px)} }

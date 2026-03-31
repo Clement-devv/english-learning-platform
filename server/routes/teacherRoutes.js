@@ -2,22 +2,57 @@
 import express from "express";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
+import { fileURLToPath } from "url";
 import {
   sendPasswordResetEmail,
   sendTeacherInviteEmail,
   sendTeacherWelcomeEmail,
   sendTeacherAccountDeletionWarningEmail,
+  sendNewTeacherRecordEmail,
 } from "../utils/emailService.js";
+import { generateTeacherRecordPdf } from "../utils/recordPdfGenerator.js";
 import { verifyToken, verifyAdmin, verifyAdminOrTeacher } from "../middleware/authMiddleware.js";
 import { config } from "../config/config.js";
 import { strictLimiter } from "../middleware/rateLimiter.js";
 import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
-import { teacherSchema } from "../schemas/teacherSchema.js";
+import { teacherSchema }  from "../schemas/teacherSchema.js";
+import { studentSchema }  from "../schemas/studentSchema.js";
+import { subAdminSchema } from "../schemas/subAdminSchema.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname  = path.dirname(__filename);
+
+// ── Multer config for teacher photos ─────────────────────────────────────────
+const photoStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const dir = path.join(__dirname, "../uploads/teachers");
+    fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    cb(null, `photo-${req.params.id}-${Date.now()}${ext}`);
+  },
+});
+const photoUpload = multer({
+  storage: photoStorage,
+  limits: { fileSize: 3 * 1024 * 1024 }, // 3 MB max
+  fileFilter: (req, file, cb) => {
+    const allowed = [".jpg", ".jpeg", ".png", ".webp"];
+    if (allowed.includes(path.extname(file.originalname).toLowerCase())) cb(null, true);
+    else cb(new Error("Only JPG, PNG, or WebP images are allowed"));
+  },
+});
 
 const router = express.Router();
 router.use(tenantMiddleware);
 
-const getTeacher = (db) => db.models.Teacher || db.model("Teacher", teacherSchema);
+const getTeacher  = (db) => db.models.Teacher  || db.model("Teacher",  teacherSchema);
+const getStudent  = (db) => db.models.Student  || db.model("Student",  studentSchema);
+const getSubAdmin = (db) => db.models.SubAdmin || db.model("SubAdmin", subAdminSchema);
 
 // ─── GET single teacher ───────────────────────────────────────────────────────
 router.get("/:id", verifyToken, async (req, res) => {
@@ -52,6 +87,53 @@ const requireOwnerOrAdmin = (req, res, next) => {
   if (req.user?.role === "teacher" && String(req.user.id) === String(req.params.id)) return next();
   return res.status(403).json({ message: "You can only update your own profile" });
 };
+
+// ─── POST upload photo ────────────────────────────────────────────────────────
+router.post("/:id/photo", verifyToken, requireOwnerOrAdmin, (req, res, next) => {
+  photoUpload.single("photo")(req, res, (err) => {
+    if (err) return res.status(400).json({ message: err.message });
+    next();
+  });
+}, async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ message: "No file uploaded" });
+    const Teacher = getTeacher(req.db);
+    const teacher = await Teacher.findById(req.params.id);
+    if (!teacher) return res.status(404).json({ message: "Teacher not found" });
+
+    // Delete old photo file if it exists
+    if (teacher.photo) {
+      const old = path.join(__dirname, "..", teacher.photo.replace(/^\//, ""));
+      fs.unlink(old, () => {});
+    }
+
+    const photoUrl = `/uploads/teachers/${req.file.filename}`;
+    teacher.photo = photoUrl;
+    await teacher.save();
+    res.json({ message: "Photo uploaded", photo: photoUrl });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Error uploading photo" });
+  }
+});
+
+// ─── DELETE photo ─────────────────────────────────────────────────────────────
+router.delete("/:id/photo", verifyToken, requireOwnerOrAdmin, async (req, res) => {
+  try {
+    const Teacher = getTeacher(req.db);
+    const teacher = await Teacher.findById(req.params.id);
+    if (!teacher) return res.status(404).json({ message: "Teacher not found" });
+    if (teacher.photo) {
+      const filePath = path.join(__dirname, "..", teacher.photo.replace(/^\//, ""));
+      fs.unlink(filePath, () => {});
+      teacher.photo = "";
+      await teacher.save();
+    }
+    res.json({ message: "Photo removed" });
+  } catch (err) {
+    res.status(500).json({ message: "Error removing photo" });
+  }
+});
 
 // ─── PATCH schedule-visibility ────────────────────────────────────────────────
 router.patch("/:id/schedule-visibility", verifyToken, requireOwnerOrAdmin, async (req, res) => {
@@ -106,32 +188,68 @@ router.patch("/:id/google-meet", verifyToken, requireOwnerOrAdmin, async (req, r
 // ─── POST create teacher (invite flow) ───────────────────────────────────────
 router.post("/", verifyToken, verifyAdmin, async (req, res) => {
   try {
-    const { firstName, lastName, email, ratePerClass, continent } = req.body;
+    const {
+      firstName, lastName, email, ratePerClass, continent,
+      phone, country, timezone, googleMeetLink, bio,
+      yearsOfExperience, specializations, certifications,
+    } = req.body;
 
     if (!firstName || !lastName || !email || !continent)
       return res.status(400).json({ message: "First name, last name, email and continent are required" });
     if (!["Africa", "Europe", "Asia", "Americas", "Oceania"].includes(continent))
       return res.status(400).json({ message: "Invalid continent" });
 
-    const Teacher = getTeacher(req.db);
-    const exists = await Teacher.findOne({ email });
-    if (exists) return res.status(400).json({ message: "A teacher with this email already exists" });
+    const Teacher  = getTeacher(req.db);
+    const Student  = getStudent(req.db);
+    const SubAdmin = getSubAdmin(req.db);
+    const normalizedEmail = email.trim().toLowerCase();
+
+    const [asTeacher, asStudent, asSubAdmin] = await Promise.all([
+      Teacher.findOne({ email: normalizedEmail }).lean(),
+      Student.findOne({ email: normalizedEmail }).lean(),
+      SubAdmin.findOne({ email: normalizedEmail }).lean(),
+    ]);
+    if (asTeacher)  return res.status(400).json({ message: "Email is already registered as a teacher" });
+    if (asStudent)  return res.status(400).json({ message: "Email is already registered as a student" });
+    if (asSubAdmin) return res.status(400).json({ message: "Email is already registered as a sub-admin" });
+
+    // ── Check teacher seat limit (-1 = unlimited) ─────────────────────────
+    const maxTeachers = req.center?.maxTeachers;
+    if (maxTeachers && maxTeachers !== -1) {
+      const currentCount = await Teacher.countDocuments();
+      if (currentCount >= maxTeachers)
+        return res.status(403).json({ message: `Teacher limit reached (${currentCount}/${maxTeachers}). Contact your super admin to increase the limit.` });
+    }
 
     const inviteToken   = crypto.randomBytes(32).toString("hex");
     const inviteExpires = new Date(Date.now() + 48 * 60 * 60 * 1000);
 
     const teacher = await Teacher.create({
-      firstName, lastName, email,
+      firstName, lastName, email: normalizedEmail,
       ratePerClass: ratePerClass || 0,
       continent, status: "pending", active: false,
       inviteToken, inviteExpires,
+      phone: phone || "", country: country || "",
+      timezone: timezone || "", googleMeetLink: googleMeetLink || "",
+      bio: bio || "", yearsOfExperience: yearsOfExperience || 0,
+      specializations: specializations || [], certifications: certifications || [],
     });
 
-    const setupUrl = `${config.frontendUrl}/teacher/setup?token=${inviteToken}`;
+    const setupUrl   = `${config.frontendUrl}/teacher/setup?token=${inviteToken}&center=${req.center.slug}`;
+    const centerName = req.center?.centerName || "";
+
     try {
-      await sendTeacherInviteEmail(teacher, setupUrl);
+      await sendTeacherInviteEmail(teacher, setupUrl, centerName);
     } catch (e) {
       console.error("Failed to send teacher invite email:", e.message);
+    }
+
+    // Fire-and-forget: send admin a record PDF
+    const adminEmail = req.center?.adminEmail;
+    if (adminEmail) {
+      generateTeacherRecordPdf(teacher.toObject(), centerName)
+        .then(pdf => sendNewTeacherRecordEmail(adminEmail, teacher.toObject(), pdf, centerName))
+        .catch(err => console.error("Admin teacher record email failed:", err.message));
     }
 
     const response = teacher.toObject();
@@ -193,7 +311,15 @@ router.post("/setup-account", async (req, res) => {
     teacher.lastPasswordChange = new Date();
     await teacher.save();
 
-    try { await sendTeacherWelcomeEmail(teacher); } catch (e) { console.error("Welcome email failed:", e.message); }
+    try { await sendTeacherWelcomeEmail(teacher, req.center?.centerName || ""); } catch (e) { console.error("Welcome email failed:", e.message); }
+
+    const adminEmail = req.center?.adminEmail;
+    if (adminEmail) {
+      const centerName = req.center?.centerName || "";
+      generateTeacherRecordPdf(teacher.toObject(), centerName)
+        .then((pdf) => sendNewTeacherRecordEmail(adminEmail, teacher.toObject(), pdf, centerName))
+        .catch((err) => console.error("Admin teacher record email failed:", err.message));
+    }
 
     res.json({ success: true, message: "Account activated successfully! You can now log in." });
   } catch (err) {
@@ -215,8 +341,8 @@ router.post("/:id/resend-invite", verifyToken, verifyAdmin, async (req, res) => 
     teacher.inviteExpires = new Date(Date.now() + 48 * 60 * 60 * 1000);
     await teacher.save();
 
-    const setupUrl = `${config.frontendUrl}/teacher/setup?token=${teacher.inviteToken}`;
-    await sendTeacherInviteEmail(teacher, setupUrl);
+    const setupUrl = `${config.frontendUrl}/teacher/setup?token=${teacher.inviteToken}&center=${req.center.slug}`;
+    await sendTeacherInviteEmail(teacher, setupUrl, req.center?.centerName || "");
 
     res.json({ success: true, message: "Invite resent successfully" });
   } catch (err) {
@@ -224,7 +350,28 @@ router.post("/:id/resend-invite", verifyToken, verifyAdmin, async (req, res) => 
   }
 });
 
-// ─── PUT update teacher ───────────────────────────────────────────────────────
+// ─── PATCH self-update (teacher or admin) ─────────────────────────────────────
+// Only safe fields — firstName/lastName/country/continent are admin-only (PUT below)
+router.patch("/:id/profile", verifyToken, requireOwnerOrAdmin, async (req, res) => {
+  try {
+    const ALLOWED = ["displayName", "phone", "bio", "timezone", "googleMeetLink",
+                     "yearsOfExperience", "specializations", "certifications",
+                     "bankName", "accountNumber", "accountName"];
+    const updates = {};
+    for (const key of ALLOWED) {
+      if (req.body[key] !== undefined) updates[key] = req.body[key];
+    }
+    const teacher = await getTeacher(req.db)
+      .findByIdAndUpdate(req.params.id, updates, { new: true })
+      .select("-password -inviteToken -twoFactorSecret -twoFactorBackupCodes");
+    if (!teacher) return res.status(404).json({ message: "Teacher not found" });
+    res.json(teacher);
+  } catch (err) {
+    res.status(500).json({ message: "Error updating profile" });
+  }
+});
+
+// ─── PUT update teacher (admin only) ──────────────────────────────────────────
 router.put("/:id", verifyToken, verifyAdmin, async (req, res) => {
   try {
     const { continent, password, ...otherUpdates } = req.body;
@@ -235,6 +382,9 @@ router.put("/:id", verifyToken, verifyAdmin, async (req, res) => {
     if (password) {
       updateData.password           = await bcrypt.hash(password, config.bcryptRounds);
       updateData.lastPasswordChange = new Date();
+      // Activate pending teachers so they can log in with the new password immediately
+      updateData.status = "active";
+      updateData.active = true;
     }
 
     const teacher = await getTeacher(req.db)
@@ -243,7 +393,7 @@ router.put("/:id", verifyToken, verifyAdmin, async (req, res) => {
     if (!teacher) return res.status(404).json({ message: "Teacher not found" });
 
     if (password) {
-      try { await sendPasswordResetEmail(teacher.email, `${teacher.firstName} ${teacher.lastName}`, password); }
+      try { await sendPasswordResetEmail(teacher.email, `${teacher.firstName} ${teacher.lastName}`, password, "teacher", req.center?.centerName || ""); }
       catch (e) { console.error("Password reset email failed:", e.message); }
       const resp = teacher.toObject();
       resp.temporaryPassword = password;
@@ -270,7 +420,7 @@ router.delete("/:id", verifyToken, verifyAdmin, strictLimiter, async (req, res) 
     teacher.deletionWarningEmailSent = false;
     await teacher.save();
 
-    sendTeacherAccountDeletionWarningEmail(teacher, deletionDate).catch(e =>
+    sendTeacherAccountDeletionWarningEmail(teacher, deletionDate, req.center?.centerName || "").catch(e =>
       console.error("Teacher deletion warning email failed:", e.message)
     );
 

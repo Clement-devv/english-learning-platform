@@ -12,12 +12,16 @@ import { config }       from "../config/config.js";
 import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
 import { referralSchema } from "../schemas/referralSchema.js";
 import { studentSchema }  from "../schemas/studentSchema.js";
+import { teacherSchema }  from "../schemas/teacherSchema.js";
+import { subAdminSchema } from "../schemas/subAdminSchema.js";
 
 const router = express.Router();
 router.use(tenantMiddleware);
 
 const getReferral = (db) => db.models.Referral || db.model("Referral", referralSchema);
 const getStudent  = (db) => db.models.Student  || db.model("Student",  studentSchema);
+const getTeacher  = (db) => db.models.Teacher  || db.model("Teacher",  teacherSchema);
+const getSubAdmin = (db) => db.models.SubAdmin || db.model("SubAdmin", subAdminSchema);
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 async function makeUniqueCode(db) {
@@ -81,9 +85,15 @@ router.post("/apply", async (req, res) => {
     const referrer = await Student.findOne({ referralCode: referralCode.trim().toUpperCase() });
     if (!referrer) return res.status(404).json({ error: "Invalid referral code" });
 
-    const existingStudent = await Student.findOne({ email: email.toLowerCase().trim() });
-    if (existingStudent)
-      return res.status(409).json({ error: "An account with this email already exists" });
+    const normalizedRefEmail = email.toLowerCase().trim();
+    const [existingStudent, existingTeacher, existingSubAdmin] = await Promise.all([
+      Student.findOne({ email: normalizedRefEmail }).lean(),
+      getTeacher(req.db).findOne({ email: normalizedRefEmail }).lean(),
+      getSubAdmin(req.db).findOne({ email: normalizedRefEmail }).lean(),
+    ]);
+    if (existingStudent)  return res.status(409).json({ error: "An account with this email already exists as a student" });
+    if (existingTeacher)  return res.status(409).json({ error: "An account with this email already exists as a teacher" });
+    if (existingSubAdmin) return res.status(409).json({ error: "An account with this email already exists as a sub-admin" });
 
     const existingRef = await Referral.findOne({ referredEmail: email.toLowerCase().trim() });
     if (existingRef)
@@ -132,8 +142,14 @@ router.post("/:id/approve", verifyToken, verifyAdmin, async (req, res) => {
     if (referral.status !== "pending")
       return res.status(400).json({ error: `Referral is already ${referral.status}` });
 
-    const emailTaken = await Student.findOne({ email: referral.referredEmail });
-    if (emailTaken) return res.status(409).json({ error: "Email already registered" });
+    const [emailAsStudent, emailAsTeacher, emailAsSubAdmin] = await Promise.all([
+      Student.findOne({ email: referral.referredEmail }).lean(),
+      getTeacher(req.db).findOne({ email: referral.referredEmail }).lean(),
+      getSubAdmin(req.db).findOne({ email: referral.referredEmail }).lean(),
+    ]);
+    if (emailAsStudent)  return res.status(409).json({ error: "Email already registered as a student" });
+    if (emailAsTeacher)  return res.status(409).json({ error: "Email already registered as a teacher" });
+    if (emailAsSubAdmin) return res.status(409).json({ error: "Email already registered as a sub-admin" });
 
     const inviteToken   = crypto.randomBytes(32).toString("hex");
     const inviteExpires = new Date(Date.now() + 48 * 60 * 60 * 1000);
@@ -149,8 +165,8 @@ router.post("/:id/approve", verifyToken, verifyAdmin, async (req, res) => {
       referredBy: referral.referrerId._id,
     });
 
-    const setupUrl = `${config.frontendUrl}/student/setup?token=${inviteToken}`;
-    try { await sendStudentInviteEmail(newStudent, setupUrl); }
+    const setupUrl = `${config.frontendUrl}/student/setup?token=${inviteToken}&center=${req.center.slug}`;
+    try { await sendStudentInviteEmail(newStudent, setupUrl, req.center?.centerName || ""); }
     catch (emailErr) { console.error("Referral invite email failed:", emailErr.message); }
 
     referral.status            = "invited";

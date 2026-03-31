@@ -12,7 +12,9 @@ import {
   Trash2,
   RotateCcw,
   Clock,
+  Download,
 } from "lucide-react";
+import { downloadStudentRoster } from "../../../utils/studentPdf";
 import StudentCard from "../components/StudentCard";
 import StudentModal from "../modals/StudentModal";
 import PaymentHistoryModal from "../modals/PaymentHistoryModal";
@@ -370,7 +372,16 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
         return;
       }
       const result = await addPayment(selectedStudent, paymentData);
-      setPaymentHistory((prev) => [...prev, result]);
+      // Format the new payment the same way as the initial load so filters work
+      const stu = selectedStudentObj;
+      const newEntry = {
+        ...result.payment,
+        studentId: selectedStudent,
+        student: stu ? `${stu.firstName} ${stu.surname}` : "Unknown",
+        amountDisplay: `₦${result.payment?.amount ?? paymentData.amount}`,
+      };
+      setPaymentHistory((prev) => [...prev, newEntry]);
+      setIsManualModalOpen(false);
       const studentsData = await getStudents();
       setStudents(studentsData);
       showToast("Payment recorded successfully!");
@@ -532,6 +543,19 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
           >
             <BookOpen className="w-3.5 h-3.5" />
             All Lessons
+          </button>
+
+          <button
+            onClick={() => downloadStudentRoster(filteredStudents)}
+            title="Download visible students as PDF"
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-all ${
+              isDarkMode
+                ? "border-gray-600 text-gray-300 hover:bg-gray-700"
+                : "border-gray-200 text-gray-600 hover:bg-gray-50"
+            }`}
+          >
+            <Download className="w-3.5 h-3.5" />
+            Download PDF
           </button>
 
           <button
@@ -725,7 +749,7 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
           student={lessonModal.student}
           onClose={() => setLessonModal(null)}
           onSuccess={handleLessonSuccess}
-          isDarkMode={false}
+          isDarkMode={isDarkMode}
         />
       )}
 
@@ -737,6 +761,7 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
         }}
         onSave={handleSaveStudent}
         initialData={editId ? students.find((s) => s._id === editId) : null}
+        isDarkMode={isDarkMode}
       />
 
       <PaymentHistoryModal
@@ -764,6 +789,7 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
         onClose={() => setIsManualModalOpen(false)}
         onSave={handleSaveManualPayment}
         student={selectedStudentObj}
+        isDarkMode={isDarkMode}
       />
     </div>
   );

@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff, Shield, ArrowRight, Loader2 } from "lucide-react";
+import { useBranding } from '../../context/BrandingContext';
 
 export default function SubAdminLogin() {
   const navigate    = useNavigate();
@@ -11,6 +12,8 @@ export default function SubAdminLogin() {
   const [error, setError]     = useState("");
   const [mounted, setMounted] = useState(false);
   const [focused, setFocused] = useState("");
+  const { branding, center } = useBranding();
+  const centerName = center?.centerName || 'English Learning Platform';
 
   useEffect(() => {
     setMounted(true);
@@ -50,10 +53,20 @@ export default function SubAdminLogin() {
       <style>{css}</style>
       <div style={{
         minHeight: "100vh",
-        background: "linear-gradient(135deg, #080b14 0%, #0d1220 60%, #080b14 100%)",
-        display: "flex", fontFamily: "'Plus Jakarta Sans', sans-serif",
+        background: branding.loginBackground
+          ? `url(${branding.loginBackground}) center/cover no-repeat`
+          : "linear-gradient(135deg, #080b14 0%, #0d1220 60%, #080b14 100%)",
+        display: "flex",
+        fontFamily: branding.fontFamily ? `'${branding.fontFamily}', sans-serif` : "var(--font-body)",
         position: "relative", overflow: "hidden",
       }}>
+        {branding.loginBackground && (
+          <div style={{
+            position: "absolute", inset: 0, zIndex: 0,
+            background: `rgba(0,0,0,${Math.max(branding.loginBgOverlay ?? 0.45, 0.55)})`,
+            pointerEvents: "none",
+          }} />
+        )}
         {/* BG orbs */}
         <div style={{ position: "absolute", width: "600px", height: "600px", borderRadius: "50%", background: "radial-gradient(circle, rgba(79,99,210,0.07) 0%, transparent 65%)", top: "-150px", left: "-150px", pointerEvents: "none" }} />
         <div style={{ position: "absolute", width: "400px", height: "400px", borderRadius: "50%", background: "radial-gradient(circle, rgba(139,92,246,0.05) 0%, transparent 65%)", bottom: "-100px", right: "-100px", pointerEvents: "none" }} />
@@ -76,16 +89,20 @@ export default function SubAdminLogin() {
         }}>
           {/* Logo */}
           <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "60px" }}>
-            <div style={{
-              width: "44px", height: "44px", borderRadius: "14px",
-              background: "linear-gradient(135deg, var(--brand-primary), var(--brand-secondary))",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              boxShadow: "0 0 24px rgba(var(--brand-primary-rgb), 0.35)",
-            }}>
-              <Shield size={20} color="white" />
-            </div>
+            {branding.logo ? (
+              <img src={branding.logo} alt={centerName} style={{ height: 44, maxWidth: 160, objectFit: 'contain' }} />
+            ) : (
+              <div style={{
+                width: "44px", height: "44px", borderRadius: "14px",
+                background: "linear-gradient(135deg, var(--brand-primary), var(--brand-secondary))",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                boxShadow: "0 0 24px rgba(var(--brand-primary-rgb), 0.35)",
+              }}>
+                <Shield size={20} color="white" />
+              </div>
+            )}
             <div>
-              <p style={{ margin: 0, fontSize: "15px", fontWeight: "800", color: "#e2e8f0" }}>EduLearn</p>
+              <p style={{ margin: 0, fontSize: "15px", fontWeight: "800", color: "#e2e8f0" }}>{centerName}</p>
               <p style={{ margin: 0, fontSize: "10px", color: "#374151", fontWeight: "700", letterSpacing: "0.1em", textTransform: "uppercase" }}>Sub-Admin Portal</p>
             </div>
           </div>
@@ -275,7 +292,6 @@ const inputSt = {
 };
 
 const css = `
-  @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
   * { box-sizing: border-box; }
   @keyframes sa-spin { to { transform: rotate(360deg); } }
   .sa-portal-btn:hover { background: rgba(255,255,255,0.04) !important; color: #9ca3af !important; }

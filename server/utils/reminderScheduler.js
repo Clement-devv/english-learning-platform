@@ -249,6 +249,7 @@ export function startReminderScheduler(db) {
   const centerSlug = db.name || "unknown";
   console.log(`⏰ Reminder scheduler started for center: ${centerSlug} (60s interval)`);
   const runTick = makeTick(db);
-  runTick();
+  // Don't run immediately — DB connection may still be opening (readyState 2).
+  // The interval will fire once fully connected.
   setInterval(runTick, 60 * 1000);
 }

@@ -194,7 +194,7 @@ export default function ChatWindow({ chat, chatType = "group", userRole, onClose
   return (
     <div style={{
       display: "flex", flexDirection: "column", height: "100%",
-      background: C.bg, fontFamily: "'Plus Jakarta Sans','Segoe UI',sans-serif",
+      background: C.bg, fontFamily: "var(--font-body)",
     }}>
 
       {/* ── Header ── */}
@@ -513,7 +513,6 @@ export default function ChatWindow({ chat, chatType = "group", userRole, onClose
       </div>
 
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
         .msg-scrollbar::-webkit-scrollbar { width: 4px; }
         .msg-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .msg-scrollbar::-webkit-scrollbar-thumb { background: rgba(99,102,241,0.25); border-radius: 4px; }

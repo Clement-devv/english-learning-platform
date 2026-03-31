@@ -93,6 +93,38 @@ router.get("/teacher/:teacherId", verifyToken, async (req, res) => {
   }
 });
 
+// ── GET /api/reviews/stats  —  lightweight per-teacher rating summary ────────
+// Returns Bayesian-corrected scores alongside simple averages.
+// Strategy: Bayesian average (used by IMDb/Amazon) prevents a teacher with
+// 1 five-star from ranking above one with 50 four-stars.
+// Formula: bayes = (v*R + m*C) / (v+m)
+//   v = teacher's review count, R = teacher's mean, m = min threshold, C = global mean
+router.get("/stats", verifyToken, verifyAdmin, async (req, res) => {
+  try {
+    const raw = await getReview(req.db).aggregate([
+      { $match: { flagged: false } },
+      { $group: { _id: "$teacherId", totalRatings: { $sum: 1 }, sumRating: { $sum: "$rating" } } },
+    ]);
+    if (!raw.length) return res.json([]);
+
+    // Global mean across all reviews
+    const totalSum   = raw.reduce((s, r) => s + r.sumRating, 0);
+    const totalCount = raw.reduce((s, r) => s + r.totalRatings, 0);
+    const C = totalCount ? totalSum / totalCount : 0;
+    const m = 5; // minimum-votes prior weight
+
+    const stats = raw.map((r) => {
+      const avg   = Math.round((r.sumRating / r.totalRatings) * 10) / 10;
+      const bayes = Math.round(((r.totalRatings * avg + m * C) / (r.totalRatings + m)) * 10) / 10;
+      return { teacherId: r._id, totalRatings: r.totalRatings, avgRating: avg, bayesianScore: bayes };
+    });
+
+    res.json(stats);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── GET /api/reviews  —  admin: all reviews with optional filters ─────────────
 router.get("/", verifyToken, verifyAdmin, async (req, res) => {
   try {

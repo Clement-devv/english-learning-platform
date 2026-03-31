@@ -11,6 +11,7 @@ import {
 // Always-needed (small utilities)
 import api from "../../api";
 import { useDarkMode } from "../../hooks/useDarkMode";
+import { useBranding } from "../../context/BrandingContext";
 import { getTeachers } from "../../services/teacherService";
 import { getStudents } from "../../services/studentService";
 
@@ -31,7 +32,6 @@ const BookingsTab        = lazy(() => import("./tabs/BookingsTab"));
 const MessagesTab        = lazy(() => import("../../components/chat/MessagesTab"));
 const PaymentsTab        = lazy(() => import("./tabs/PaymentTab"));
 const DisputeReview      = lazy(() => import("../../components/admin/DisputeReview"));
-const BookingCalendar    = lazy(() => import("../../components/calendar/BookingCalendar"));
 const AnalyticsDashboard = lazy(() => import("../../components/analytics/AnalyticsDashboard"));
 const SubAdminsTab       = lazy(() => import("./tabs/SubAdminsTab"));
 const TeacherScheduleTab = lazy(() => import("./tabs/TeacherScheduleTab"));
@@ -42,6 +42,7 @@ const ReviewsTab         = lazy(() => import("./tabs/ReviewsTab"));
 const ReferralsTab       = lazy(() => import("./tabs/ReferralsTab"));
 const BrandingTab        = lazy(() => import("./tabs/BrandingTab"));
 const DomainTab          = lazy(() => import("./tabs/DomainTab"));
+const ClassPricingTab    = lazy(() => import("./tabs/ClassPricingTab"));
 
 // Inline spinner for tab switches (lightweight, no layout shift)
 function TabLoader() {
@@ -84,7 +85,6 @@ const NAV = [
     items: [
       { key: "classes",     label: "All Classes",    icon: BookOpen },
       { key: "bookings",    label: "Bookings",       icon: Calendar },
-      { key: "calendar",    label: "Calendar View",  icon: Calendar },
       { key: "recordings",  label: "Recordings",     icon: Video     },
       { key: "reports",     label: "Progress Reports", icon: FileText },
       { key: "reviews",     label: "Reviews",          icon: Star     },
@@ -95,6 +95,7 @@ const NAV = [
     group: "Finance & Trust",
     items: [
       { key: "payments",      label: "Payments",      icon: DollarSign },
+      { key: "class-pricing", label: "Class Pricing", icon: DollarSign },
       { key: "chat-credits",  label: "Chat Credits",  icon: MessageCircle },
       { key: "disputes",      label: "Disputes",      icon: AlertTriangle },
     ],
@@ -114,17 +115,21 @@ export default function AdminDashboard() {
   const [notifications, setNotifications] = useState([]);
   const [teachers, setTeachers] = useState([]);
   const [students, setStudents] = useState([]);
+  const activeTeachers = teachers.filter(
+    (t) => t.active === true && t.status === "active" && !t.scheduledDeletionAt
+  );
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [showSessionManagement, setShowSessionManagement] = useState(false);
   const [showSettingsSidebar, setShowSettingsSidebar] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showChangePassword, setShowChangePassword] = useState(false);
-  const [calendarBookings, setCalendarBookings] = useState([]);
   const [toast, setToast] = useState("");
   const [unreadMessages, setUnreadMessages]           = useState(0);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const { isDarkMode, toggleDarkMode } = useDarkMode();
+  const { branding, center } = useBranding();
+  const centerName = center?.centerName || "Admin Panel";
 
   const adminInfo = JSON.parse(localStorage.getItem("adminInfo") || "{}");
 
@@ -149,9 +154,6 @@ export default function AdminDashboard() {
     })();
   }, []);
 
-  useEffect(() => {
-    if (activeTab === "calendar") fetchCalendar();
-  }, [activeTab]);
 
   // Poll unread notification count every 60 s
   useEffect(() => {
@@ -166,16 +168,6 @@ export default function AdminDashboard() {
     const timer = setInterval(fetchUnreadNotifications, 60000);
     return () => clearInterval(timer);
   }, []);
-
-  const fetchCalendar = async () => {
-    try {
-      const res = await api.get("/api/bookings");
-      const data = res.data;
-      setCalendarBookings(data);
-    } catch (e) {
-      console.error(e);
-    }
-  };
 
   const handleNotify = (note) => {
     const full = typeof note === "string"
@@ -194,15 +186,16 @@ export default function AdminDashboard() {
       case "overview":          return <OverviewTab isDarkMode={isDarkMode} />;
       case "analytics":         return <AnalyticsDashboard isDarkMode={isDarkMode} />;
       case "teachers":          return <TeachersTab onNotify={handleNotify} isDarkMode={isDarkMode} />;
-      case "teacher-schedules": return <TeacherScheduleTab teachers={teachers} isDarkMode={isDarkMode} />;
+      case "teacher-schedules": return <TeacherScheduleTab teachers={activeTeachers} isDarkMode={isDarkMode} />;
       case "students":          return <StudentsTab onNotify={handleNotify} isDarkMode={isDarkMode} />;
       case "classes":           return <ClassesTab isDarkMode={isDarkMode} />;
       case "applications":      return <ApplicationsTab isDarkMode={isDarkMode} />;
       case "notifications":     return <NotificationsTab isDarkMode={isDarkMode} onUnreadCount={setUnreadNotifications} />;
-      case "assign":            return <AssignStudentsTab teachers={teachers} students={students} onNotify={handleNotify} isDarkMode={isDarkMode} />;
-      case "bookings":          return <BookingsTab teachers={teachers} students={students} onNotify={handleNotify} isDarkMode={isDarkMode} />;
+      case "assign":            return <AssignStudentsTab teachers={activeTeachers} students={students} onNotify={handleNotify} isDarkMode={isDarkMode} />;
+      case "bookings":          return <BookingsTab teachers={activeTeachers} students={students} onNotify={handleNotify} isDarkMode={isDarkMode} />;
       case "messages":          return <MessagesTab userRole="admin" onUnreadCount={setUnreadMessages} />;
       case "payments":          return <PaymentsTab isDarkMode={isDarkMode} />;
+      case "class-pricing":     return <ClassPricingTab isDarkMode={isDarkMode} />;
       case "chat-credits":      return <ChatCreditsTab isDarkMode={isDarkMode} />;
       case "disputes":          return <DisputeReview isDarkMode={isDarkMode} />;
       case "recordings":        return <RecordingsTab teachers={teachers} isDarkMode={isDarkMode} />;
@@ -212,22 +205,13 @@ export default function AdminDashboard() {
       case "sub-admins":        return <SubAdminsTab isDarkMode={isDarkMode} teachers={teachers} />;
       case "branding":          return <BrandingTab isDarkMode={isDarkMode} />;
       case "domain":            return <DomainTab isDarkMode={isDarkMode} />;
-      case "calendar":
-        return (
-          <BookingCalendar
-            bookings={calendarBookings}
-            onBookingClick={(b) => alert(`${b.classTitle}\n${new Date(b.scheduledTime).toLocaleString()}\nStatus: ${b.status}`)}
-            onDateClick={() => setActiveTab("bookings")}
-            allowCreate={true}
-          />
-        );
       default: return <OverviewTab isDarkMode={isDarkMode} />;
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, isDarkMode, loading, teachers, students, calendarBookings]);
+  }, [activeTab, isDarkMode, loading, teachers, students]);
 
   // ── colours ──────────────────────────────────────────────────────────────
-  const bg        = isDarkMode ? "#0f1117" : "#f4f6fb";
+  const bg        = isDarkMode ? "linear-gradient(135deg, #0f0f1a 0%, #1a1030 40%, #0a1628 100%)" : "linear-gradient(135deg, #e8eeff 0%, #f0e8ff 40%, #e8f4ff 100%)";
   const sidebar   = isDarkMode ? "#13161f" : "#ffffff";
   const border    = isDarkMode ? "#1e2235" : "#e8ecf4";
   const heading   = isDarkMode ? "#e2e8f0" : "#1e293b";
@@ -240,7 +224,7 @@ export default function AdminDashboard() {
   return (
     <>
       <style>{css(isDarkMode)}</style>
-      <div style={{ display: "flex", height: "100vh", background: bg, fontFamily: "'Plus Jakarta Sans', sans-serif", overflow: "hidden" }}>
+      <div style={{ display: "flex", height: "100vh", background: bg, fontFamily: "var(--font-body)", overflow: "hidden" }}>
 
         {/* ── SIDEBAR ── */}
         <aside
@@ -263,16 +247,20 @@ export default function AdminDashboard() {
             padding: sidebarOpen ? "0 20px" : "0 16px",
             borderBottom: `1px solid ${border}`, flexShrink: 0, gap: "10px",
           }}>
-            <div style={{
-              width: "32px", height: "32px", borderRadius: "10px", flexShrink: 0,
-              background: "linear-gradient(135deg, var(--brand-primary), var(--brand-secondary))",
-              display: "flex", alignItems: "center", justifyContent: "center",
-            }}>
-              <Shield size={16} color="white" />
-            </div>
+            {branding.logo ? (
+              <img src={branding.logo} alt={centerName} style={{ height: 32, maxWidth: 32, objectFit: "contain", borderRadius: 6, flexShrink: 0 }} />
+            ) : (
+              <div style={{
+                width: "32px", height: "32px", borderRadius: "10px", flexShrink: 0,
+                background: "linear-gradient(135deg, var(--brand-primary), var(--brand-secondary))",
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}>
+                <Shield size={16} color="white" />
+              </div>
+            )}
             {sidebarOpen && (
               <div style={{ overflow: "hidden" }}>
-                <p style={{ margin: 0, fontSize: "14px", fontWeight: "800", color: heading, whiteSpace: "nowrap" }}>EduLearn</p>
+                <p style={{ margin: 0, fontSize: "14px", fontWeight: "800", color: heading, whiteSpace: "nowrap", fontFamily: "var(--font-display)" }}>{centerName}</p>
                 <p style={{ margin: 0, fontSize: "10px", color: muted, whiteSpace: "nowrap", fontWeight: "600", letterSpacing: "0.05em", textTransform: "uppercase" }}>Admin Panel</p>
               </div>
             )}
@@ -499,13 +487,17 @@ export default function AdminDashboard() {
             )}
 
             {/* Tab content */}
-            <div style={{
-              background: cardBg, borderRadius: "16px",
-              border: `1px solid ${border}`,
-              minHeight: "calc(100vh - 140px)",
-              padding: activeTab === "messages" ? "0" : "24px",
-              overflow: activeTab === "messages" ? "hidden" : "visible",
-            }}>
+            <div
+              key={activeTab}
+              className="adm-content"
+              style={{
+                background: cardBg, borderRadius: "20px",
+                border: `1px solid ${border}`,
+                boxShadow: isDarkMode ? "none" : "0 4px 24px rgba(108,99,255,0.07), 0 1px 4px rgba(0,0,0,0.04)",
+                minHeight: "calc(100vh - 140px)",
+                padding: activeTab === "messages" ? "0" : "24px",
+                overflow: activeTab === "messages" ? "hidden" : "visible",
+              }}>
               <Suspense fallback={<TabLoader />}>
                 {tabContent}
               </Suspense>
@@ -548,7 +540,6 @@ function Loader({ isDarkMode }) {
 }
 
 const css = (dark) => `
-  @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
   * { box-sizing: border-box; }
 
   .adm-scroll::-webkit-scrollbar { width: 4px; }
@@ -563,7 +554,12 @@ const css = (dark) => `
     background: rgba(239,68,68,0.08) !important;
   }
 
-  @keyframes adm-spin { to { transform: rotate(360deg); } }
+  @keyframes adm-spin  { to { transform: rotate(360deg); } }
+  @keyframes adm-slide-up {
+    from { opacity: 0; transform: translateY(14px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .adm-content { animation: adm-slide-up 0.35s ease both; }
 
   @media (max-width: 768px) {
     .adm-sidebar { position: fixed !important; height: 100vh; }

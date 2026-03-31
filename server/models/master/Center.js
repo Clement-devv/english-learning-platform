@@ -29,6 +29,8 @@ const centerSchema = new mongoose.Schema({
     secondaryColor: { type: String, default: '#E0E7FF' },
     fontFamily:     { type: String, default: 'Inter' },
     favicon:        { type: String, default: null },
+    loginBackground: { type: String, default: null },
+    loginBgOverlay:  { type: Number, default: 0.45 },
     borderRadius:   { type: String, default: '8px' },
     shadowStyle:    { type: String, default: 'soft' },
     spacing:        { type: String, default: 'comfortable' },
@@ -71,6 +73,18 @@ const centerSchema = new mongoose.Schema({
     type:  { type: String, default: 'A' },
     name:  { type: String, default: '@' },
     value: String,
+  },
+
+  // ── AI Chat Credit Budget (allocated by super admin) ──────────────────────
+  chatCredits: {
+    balance:        { type: Number, default: 0, min: 0 },
+    totalAllocated: { type: Number, default: 0 },
+    log: [{
+      amount:    Number,
+      note:      String,
+      by:        String,   // super admin username
+      createdAt: { type: Date, default: Date.now },
+    }],
   },
 
 }, { timestamps: true });

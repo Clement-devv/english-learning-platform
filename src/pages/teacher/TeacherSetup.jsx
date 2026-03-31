@@ -7,6 +7,7 @@ export default function TeacherSetup() {
   const [searchParams] = useSearchParams();
   const navigate       = useNavigate();
   const token          = searchParams.get("token");
+  const centerSlug     = searchParams.get("center") || import.meta.env.VITE_CENTER_SLUG || "";
 
   const [step,        setStep]        = useState("verifying"); // verifying | form | success | error
   const [teacherInfo, setTeacherInfo] = useState(null);
@@ -29,7 +30,9 @@ export default function TeacherSetup() {
 
   const verifyToken = async () => {
     try {
-      const res  = await fetch(`/api/teachers/verify-invite/${token}`);
+      const res  = await fetch(`/api/teachers/verify-invite/${token}`, {
+        headers: { "x-center-slug": centerSlug },
+      });
       const data = await res.json();
       if (data.success) {
         setTeacherInfo(data.teacher);
@@ -52,7 +55,7 @@ export default function TeacherSetup() {
     try {
       const res  = await fetch("/api/teachers/setup-account", {
         method:  "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-center-slug": centerSlug },
         body:    JSON.stringify({ token, password: form.password, confirmPassword: form.confirmPassword }),
       });
       const data = await res.json();
@@ -96,7 +99,7 @@ export default function TeacherSetup() {
         minHeight: "100vh",
         background: "linear-gradient(135deg, #0a0f1e 0%, #0f1729 50%, #0a0f1e 100%)",
         display: "flex", alignItems: "center", justifyContent: "center",
-        padding: "24px", fontFamily: "'Plus Jakarta Sans', sans-serif",
+        padding: "24px", fontFamily: "var(--font-body)",
         position: "relative", overflow: "hidden",
       }}>
         {/* BG orbs */}
@@ -291,7 +294,6 @@ const inputStyle = { width: "100%", padding: "13px 44px 13px 16px", background: 
 const eyeBtn     = { position: "absolute", right: "14px", top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", padding: "2px", display: "flex", alignItems: "center" };
 
 const globalCSS = `
-  @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
   * { box-sizing: border-box; }
   @keyframes ts-spin { to { transform: rotate(360deg); } }
   @keyframes ts-pop  { 0% { transform: scale(0.5); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }

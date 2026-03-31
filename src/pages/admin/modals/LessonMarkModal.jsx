@@ -355,7 +355,7 @@ export default function LessonMarkModal({
                           }`}
                         >
                           <p className={`font-semibold text-sm ${textPrimary}`}>
-                            {t.firstName} {t.lastName}
+                            {t.displayName?.trim() || `${t.firstName} ${t.lastName}`}
                           </p>
                           <p className={`text-xs mt-0.5 ${textSecondary}`}>
                             {t.email} · Rate: {fmtMoney(t.ratePerClass)}/class

@@ -18,7 +18,15 @@ import {
   AlertTriangle,
   GraduationCap,
   MinusCircle,
+  ChevronDown,
+  ChevronUp,
+  Phone,
+  Globe,
+  Award,
+  Calendar,
+  FileDown,
 } from "lucide-react";
+import { downloadStudentCard } from "../../../utils/studentPdf";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function getInitials(firstName = "", surname = "") {
@@ -132,6 +140,7 @@ export default function StudentCard({
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [profileExpanded, setProfileExpanded] = useState(false);
   const menuRef = useRef(null);
 
   const fullName = `${student.firstName || ""} ${student.surname || ""}`.trim();
@@ -301,6 +310,14 @@ export default function StudentCard({
                   />
                 )}
 
+                <DropdownItem
+                  icon={FileDown}
+                  label="Download PDF"
+                  color="indigo"
+                  isDarkMode={isDarkMode}
+                  onClick={() => { downloadStudentCard(student); setMenuOpen(false); }}
+                />
+
                 <div className={`my-1 h-px ${isDarkMode ? "bg-gray-700" : "bg-gray-100"}`} />
 
                 {/* Danger zone */}
@@ -401,6 +418,62 @@ export default function StudentCard({
                 <Copy className="w-3.5 h-3.5" />
               </button>
             </div>
+          </div>
+        )}
+
+        {/* ── Profile details (collapsible) ── */}
+        {(student.phone || student.country || student.rank || student.dateOfBirth) && (
+          <div className={`mb-4 rounded-xl border overflow-hidden ${isDarkMode ? "border-gray-700" : "border-gray-100"}`}>
+            {/* Toggle header */}
+            <button
+              type="button"
+              onClick={() => setProfileExpanded(v => !v)}
+              className={`w-full flex items-center justify-between px-3 py-2 text-xs font-semibold transition-colors ${
+                isDarkMode
+                  ? "bg-gray-700/60 hover:bg-gray-700 text-gray-300"
+                  : "bg-gray-50 hover:bg-gray-100 text-gray-500"
+              }`}
+            >
+              <span className="flex items-center gap-1.5">
+                <GraduationCap className="w-3.5 h-3.5" />
+                Profile Details
+              </span>
+              {profileExpanded
+                ? <ChevronUp className="w-3.5 h-3.5" />
+                : <ChevronDown className="w-3.5 h-3.5" />}
+            </button>
+
+            {/* Collapsible body */}
+            {profileExpanded && (
+              <div className={`px-3 py-3 space-y-2 ${isDarkMode ? "bg-gray-800/40" : "bg-white"}`}>
+                {student.phone && (
+                  <div className="flex items-center gap-2">
+                    <Phone className={`w-3 h-3 flex-shrink-0 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`} />
+                    <span className={`text-xs ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>{student.phone}</span>
+                  </div>
+                )}
+                {student.country && (
+                  <div className="flex items-center gap-2">
+                    <Globe className={`w-3 h-3 flex-shrink-0 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`} />
+                    <span className={`text-xs ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>{student.country}</span>
+                  </div>
+                )}
+                {student.rank && (
+                  <div className="flex items-center gap-2">
+                    <Award className={`w-3 h-3 flex-shrink-0 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`} />
+                    <span className={`text-xs ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>{student.rank}</span>
+                  </div>
+                )}
+                {student.dateOfBirth && (
+                  <div className="flex items-center gap-2">
+                    <Calendar className={`w-3 h-3 flex-shrink-0 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`} />
+                    <span className={`text-xs ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>
+                      {new Date(student.dateOfBirth).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 

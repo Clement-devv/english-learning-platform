@@ -299,7 +299,7 @@ export default function LessonActionModal({
                 teacherList.map((t) => (
                   <SelectRow
                     key={t._id}
-                    label={`${t.firstName} ${t.lastName}`}
+                    label={t.displayName?.trim() || `${t.firstName} ${t.lastName}`}
                     sub={`${t.email} · $${t.ratePerClass}/class · ${t.continent}`}
                     isDarkMode={isDarkMode}
                     onClick={() => { setTeacher(t); setStep("class"); }}

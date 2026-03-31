@@ -439,10 +439,20 @@ export default function HomeworkTab({ teacherInfo, students, isDarkMode }) {
           <p style={{ marginTop: 12 }}>Loading homework…</p>
         </div>
       ) : filtered.length === 0 ? (
-        <div style={{ textAlign: "center", padding: 60, background: c.card, borderRadius: 16, border: `2px dashed ${c.border}` }}>
-          <BookOpen size={48} color={c.body} style={{ opacity: 0.4 }} />
-          <p style={{ marginTop: 12, color: c.body, fontWeight: 600 }}>
-            {filter === "all" ? "No homework assigned yet. Click 'Assign Homework' to get started!" : `No ${filter} homework.`}
+        <div style={{ textAlign: "center", padding: "48px 24px", background: c.card, borderRadius: "16px", border: `1px solid ${c.border}` }}>
+          <div style={{
+            width: "64px", height: "64px", borderRadius: "20px",
+            background: isDarkMode ? "#1e1730" : "#f5f0ff",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            margin: "0 auto 16px",
+          }}>
+            <BookOpen size={28} color="var(--brand-primary)" />
+          </div>
+          <p style={{ fontSize: "16px", fontWeight: "700", color: c.heading, margin: "0 0 8px" }}>
+            {filter === "all" ? "No homework yet" : `No ${filter} homework`}
+          </p>
+          <p style={{ fontSize: "13.5px", color: c.body, margin: 0 }}>
+            {filter === "all" ? "Assign homework to your students to track their progress" : `No homework with status "${filter}" found`}
           </p>
         </div>
       ) : (
@@ -645,7 +655,7 @@ function AudioFeedbackPlayer({ fileId, duration }) {
   const togglePlay = () => {
     if (!audioRef.current) return;
     if (playing) { audioRef.current.pause(); setPlaying(false); }
-    else         { audioRef.current.play();  setPlaying(true);  }
+    else         { audioRef.current.play().catch(() => {});  setPlaying(true);  }
   };
 
   return (

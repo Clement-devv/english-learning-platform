@@ -13,6 +13,7 @@ import {
   sendQuizCompleted,
 } from "../utils/emailService.js";
 import { callGemini, extractJSONArray } from "../utils/geminiHelper.js";
+import { recordActivity } from "../utils/streakService.js";
 
 // Multer — memory storage (no disk writes, PDF buffer passed straight to pdf-parse)
 const upload = multer({
@@ -225,6 +226,10 @@ router.post("/:id/attempt", verifyToken, async (req, res) => {
     quiz.status = "attempted";
     await quiz.save();
 
+    // Streak — await so we can include result in response
+    let streakResult = null;
+    try { streakResult = await recordActivity(req.db, req.user.id); } catch (_) {}
+
     // Email teacher about completion (non-blocking)
     Promise.all([
       getTeacher(req.db).findById(quiz.teacherId),
@@ -233,9 +238,9 @@ router.post("/:id/attempt", verifyToken, async (req, res) => {
       if (teacherDoc && studentDoc) sendQuizCompleted(teacherDoc, studentDoc, quiz, attempt).catch(() => {});
     }).catch(() => {});
 
-    // Return full quiz (with correct answers revealed) + attempt
+    // Return full quiz (with correct answers revealed) + attempt + streak
     const fullQuiz = quiz.toObject();
-    res.json({ success: true, attempt, quiz: fullQuiz });
+    res.json({ success: true, attempt, quiz: fullQuiz, streak: streakResult });
   } catch (err) {
     console.error("Submit attempt error:", err);
     res.status(500).json({ message: err.message });

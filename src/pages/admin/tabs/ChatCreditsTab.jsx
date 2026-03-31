@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Search, Zap, Plus, RefreshCw } from "lucide-react";
+import { Search, Zap, Plus, RefreshCw, ShieldCheck, AlertTriangle } from "lucide-react";
 import api from "../../../api";
 import { getStudents } from "../../../services/studentService";
 
@@ -20,20 +20,28 @@ export default function ChatCreditsTab({ isDarkMode }) {
     ? { bg: "#0f1117", card: "#1a1d2e", border: "#2a2d40", heading: "#f0f4ff", body: "#c8cce0", muted: "#6b7090", input: "#1a1d2e" }
     : { bg: "#f8fafc", card: "#ffffff", border: "#e2e8f0", heading: "#1e293b", body: "#475569", muted: "#94a3b8", input: "#fff" };
 
-  const [students,   setStudents]   = useState([]);    // [{ _id, firstName, surname, email, credits, totalUsed }]
+  const [students,   setStudents]   = useState([]);
   const [loading,    setLoading]    = useState(true);
   const [search,     setSearch]     = useState("");
-  const [granting,   setGranting]   = useState(null);  // studentId currently being granted
-  const [modal,      setModal]      = useState(null);  // { student } or null
+  const [granting,   setGranting]   = useState(null);
+  const [modal,      setModal]      = useState(null);
   const [amount,     setAmount]     = useState(50);
   const [customAmt,  setCustomAmt]  = useState("");
   const [note,       setNote]       = useState("");
   const [toast,      setToast]      = useState(null);
+  const [budget,     setBudget]     = useState(null); // { balance, totalAllocated, used }
 
   const showToast = (msg, type = "success") => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3500);
   };
+
+  const fetchBudget = useCallback(async () => {
+    try {
+      const { data } = await api.get("/api/chat/center-credits");
+      setBudget(data);
+    } catch { /* non-fatal */ }
+  }, []);
 
   const fetchStudents = useCallback(async () => {
     setLoading(true);
@@ -60,7 +68,7 @@ export default function ChatCreditsTab({ isDarkMode }) {
     }
   }, []);
 
-  useEffect(() => { fetchStudents(); }, [fetchStudents]);
+  useEffect(() => { fetchStudents(); fetchBudget(); }, [fetchStudents, fetchBudget]);
 
   const openModal = (student) => {
     setModal({ student });
@@ -91,6 +99,7 @@ export default function ChatCreditsTab({ isDarkMode }) {
           : s
       ));
 
+      fetchBudget(); // refresh center budget display
       showToast(`✅ ${finalAmount} credits granted to ${modal.student.firstName}!`);
       setModal(null);
     } catch (err) {
@@ -115,7 +124,7 @@ export default function ChatCreditsTab({ isDarkMode }) {
   const lowCreditStudents   = students.filter(s => s.credits > 0 && s.credits <= 10).length;
 
   return (
-    <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", padding: "24px", display: "flex", flexDirection: "column", gap: 24 }}>
+    <div style={{ fontFamily: "var(--font-body)", padding: "24px", display: "flex", flexDirection: "column", gap: 24 }}>
 
       {/* Toast */}
       {toast && (
@@ -127,6 +136,46 @@ export default function ChatCreditsTab({ isDarkMode }) {
           boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
         }}>{toast.msg}</div>
       )}
+
+      {/* ── Center Budget Banner ── */}
+      {budget !== null && (() => {
+        const bal = budget.balance ?? 0;
+        const low = bal > 0 && bal <= 50;
+        const empty = bal === 0;
+        const bg    = empty ? (isDarkMode ? "#450a0a" : "#fef2f2")
+                    : low   ? (isDarkMode ? "#451a03" : "#fffbeb")
+                    :         (isDarkMode ? "#052e16" : "#f0fdf4");
+        const border = empty ? "#fca5a5" : low ? "#fcd34d" : "#86efac";
+        const textC  = empty ? "#dc2626"  : low ? "#d97706" : "#16a34a";
+        const Icon   = empty || low ? AlertTriangle : ShieldCheck;
+        return (
+          <div style={{
+            background: bg, border: `1.5px solid ${border}`, borderRadius: 14,
+            padding: "14px 18px", display: "flex", alignItems: "center",
+            justifyContent: "space-between", gap: 12, flexWrap: "wrap",
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <Icon size={18} color={textC} />
+              <div>
+                <p style={{ margin: 0, fontWeight: 800, fontSize: 13, color: textC }}>
+                  {empty ? "Center credit budget is empty — cannot grant credits to students"
+                   : low  ? `Low center budget — only ${bal} credits remaining`
+                   :        "Center credit budget is healthy"}
+                </p>
+                <p style={{ margin: "2px 0 0", fontSize: 11, color: textC, opacity: 0.8 }}>
+                  {bal.toLocaleString()} available  •  {(budget.totalAllocated ?? 0).toLocaleString()} total allocated  •  {(budget.used ?? 0).toLocaleString()} used
+                </p>
+              </div>
+            </div>
+            <div style={{
+              background: textC, color: "#fff", fontWeight: 800, fontSize: 22,
+              borderRadius: 10, padding: "6px 18px", letterSpacing: "-0.5px",
+            }}>
+              {bal.toLocaleString()}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>

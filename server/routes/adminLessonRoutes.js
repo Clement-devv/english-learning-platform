@@ -26,7 +26,7 @@ const getPaymentTransaction = (db) => db.models.PaymentTransaction || db.model("
 // Email helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-async function sendLessonMarkedEmails(teacher, student, booking) {
+async function sendLessonMarkedEmails(teacher, student, booking, centerName = "") {
   try {
     const teacherHtml = `
       <!DOCTYPE html><html><body style="font-family:Arial,sans-serif;background:#f9fafb;padding:24px">
@@ -59,15 +59,15 @@ async function sendLessonMarkedEmails(teacher, student, booking) {
       </div></body></html>`;
 
     await Promise.all([
-      sendEmail({ to: teacher.email, subject: "Lesson Marked Completed ✅", html: teacherHtml }),
-      sendEmail({ to: student.email, subject: "Lesson Marked Completed 📚", html: studentHtml }),
+      sendEmail({ centerName, to: teacher.email, subject: "Lesson Marked Completed ✅", html: teacherHtml }),
+      sendEmail({ centerName, to: student.email, subject: "Lesson Marked Completed 📚", html: studentHtml }),
     ]);
   } catch (err) {
     console.error("📧 Mark notification email failed:", err.message);
   }
 }
 
-async function sendLessonUnmarkedEmails(teacher, student, booking, reason) {
+async function sendLessonUnmarkedEmails(teacher, student, booking, reason, centerName = "") {
   try {
     const teacherHtml = `
       <!DOCTYPE html><html><body style="font-family:Arial,sans-serif;background:#f9fafb;padding:24px">
@@ -102,8 +102,8 @@ async function sendLessonUnmarkedEmails(teacher, student, booking, reason) {
       </div></body></html>`;
 
     await Promise.all([
-      sendEmail({ to: teacher.email, subject: "Lesson Completion Reversed ⚠️", html: teacherHtml }),
-      sendEmail({ to: student.email, subject: "Lesson Status Updated ⚠️", html: studentHtml }),
+      sendEmail({ centerName, to: teacher.email, subject: "Lesson Completion Reversed ⚠️", html: teacherHtml }),
+      sendEmail({ centerName, to: student.email, subject: "Lesson Status Updated ⚠️", html: studentHtml }),
     ]);
   } catch (err) {
     console.error("📧 Unmark notification email failed:", err.message);
@@ -228,13 +228,14 @@ router.post("/mark", verifyToken, verifyAdmin, async (req, res) => {
 
     // Send emails non-blocking — email failure must NOT make admin think marking failed
     const db = req.db;
+    const centerName = req.center?.centerName || "";
     setImmediate(async () => {
       try {
         const booking = await getBooking(db).findById(bookingId)
           .populate("teacherId", "firstName lastName email ratePerClass")
           .populate("studentId", "firstName surname email noOfClasses");
         if (booking) {
-          await sendLessonMarkedEmails(booking.teacherId, booking.studentId, booking);
+          await sendLessonMarkedEmails(booking.teacherId, booking.studentId, booking, centerName);
         }
       } catch (emailErr) {
         console.error("📧 Admin mark email failed:", emailErr.message);
@@ -325,13 +326,14 @@ router.post("/unmark", verifyToken, verifyAdmin, async (req, res) => {
 
     // Send emails non-blocking
     const db = req.db;
+    const centerName = req.center?.centerName || "";
     const studentId = booking.studentId._id;
     const teacherId = booking.teacherId._id;
     setImmediate(async () => {
       try {
         const updatedStudent = await getStudent(db).findById(studentId);
         const updatedTeacher = await getTeacher(db).findById(teacherId);
-        await sendLessonUnmarkedEmails(updatedTeacher, updatedStudent, booking, reason);
+        await sendLessonUnmarkedEmails(updatedTeacher, updatedStudent, booking, reason, centerName);
       } catch (emailErr) {
         console.error("📧 Unmark email failed:", emailErr.message);
       }

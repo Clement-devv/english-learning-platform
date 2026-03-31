@@ -180,7 +180,7 @@ export default function StudentScheduleTab({ studentId, isDarkMode }) {
   // ── Teacher picker (if multiple teachers) ─────────────────────────────
   if (!teacher) {
     return (
-      <div style={{ display:"flex", flexDirection:"column", gap:"20px", fontFamily:"Plus Jakarta Sans, sans-serif" }}>
+      <div style={{ display:"flex", flexDirection:"column", gap:"20px", fontFamily:"var(--font-body)" }}>
         <style>{`@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}`}</style>
         <div>
           <h2 style={{ margin:0, fontSize:"20px", fontWeight:"800", color:col.heading }}>📅 Teacher Schedule</h2>
@@ -205,7 +205,7 @@ export default function StudentScheduleTab({ studentId, isDarkMode }) {
                   <span style={{ color:"#fff", fontWeight:"800", fontSize:"16px" }}>{t.firstName[0]}</span>
                 </div>
                 <div>
-                  <p style={{ margin:0, fontWeight:"800", fontSize:"15px", color:col.heading }}>{t.firstName} {t.lastName}</p>
+                  <p style={{ margin:0, fontWeight:"800", fontSize:"15px", color:col.heading }}>{t.displayName?.trim() || `${t.firstName} ${t.lastName}`}</p>
                   <p style={{ margin:"3px 0 0", fontSize:"12px", color:col.muted }}>Tap to view schedule</p>
                 </div>
                 <ChevronRight size={18} color={col.muted} style={{ marginLeft:"auto" }} />
@@ -219,7 +219,7 @@ export default function StudentScheduleTab({ studentId, isDarkMode }) {
 
   // ── Calendar view ──────────────────────────────────────────────────────
   return (
-    <div style={{ display:"flex", flexDirection:"column", gap:"18px", fontFamily:"Plus Jakarta Sans, sans-serif" }}>
+    <div style={{ display:"flex", flexDirection:"column", gap:"18px", fontFamily:"var(--font-body)" }}>
       <style>{`
         @keyframes spin   { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
         @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
@@ -240,11 +240,11 @@ export default function StudentScheduleTab({ studentId, isDarkMode }) {
 
         <div style={{ display:"flex", alignItems:"center", gap:"12px" }}>
           <div style={{ width:"40px", height:"40px", borderRadius:"50%", background:"linear-gradient(135deg,#7c3aed,#ec4899)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-            <span style={{ color:"#fff", fontWeight:"800", fontSize:"14px" }}>{teacher.firstName[0]}</span>
+            <span style={{ color:"#fff", fontWeight:"800", fontSize:"14px" }}>{(teacher.displayName?.trim() || teacher.firstName)?.[0]}</span>
           </div>
           <div>
             <p style={{ margin:0, fontWeight:"800", fontSize:"16px", color:col.heading }}>
-              {teacher.firstName} {teacher.lastName}
+              {teacher.displayName?.trim() || `${teacher.firstName} ${teacher.lastName}`}
             </p>
             <p style={{ margin:0, fontSize:"12px", color:col.muted }}>Your teacher's availability</p>
           </div>

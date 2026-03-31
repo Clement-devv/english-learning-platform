@@ -320,7 +320,7 @@ router.post("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
           await sendBookingRequestToTeacher(teacher, student, {
             ...firstBooking.toObject(),
             notes: `Recurring class: ${frequency} for ${finalOccurrences} sessions. ${notes || ''}`
-          });
+          }, req.center?.centerName || "");
           console.log(`📧 Email notification sent to ${teacher.email}`);
         } catch (emailError) {
           console.error("📧 Email notification failed:", emailError.message);

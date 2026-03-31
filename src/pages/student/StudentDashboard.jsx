@@ -46,6 +46,7 @@ import FlashcardsTab      from "./tabs/FlashcardsTab";
 import RecordingsTab      from "./tabs/RecordingsTab";
 import ReviewsTab        from "./tabs/ReviewsTab";
 import ReferralTab      from "./tabs/ReferralTab";
+import StreakWidget      from "./components/StreakWidget";
 import { getStudentBookings } from "../../services/bookingService";
 
 // ── Badge definitions (unchanged) ────────────────────────────────────────────
@@ -385,6 +386,9 @@ export default function StudentDashboard() {
     weeklyGoal: 5, weeklyCompleted: 0, classesRemaining: 0,
   });
   const [notifications,  setNotifications]  = useState([]);
+  const [seenStreakMilestones, setSeenStreakMilestones] = useState(
+    () => new Set(JSON.parse(localStorage.getItem("seenStreakMilestones") || "[]"))
+  );
   const [searchQuery,    setSearchQuery]    = useState("");
   const [startDate,      setStartDate]      = useState("");
   const [endDate,        setEndDate]        = useState("");
@@ -557,14 +561,16 @@ export default function StudentDashboard() {
         }
       });
 
-      const completedList = completed.map((b) => ({
-        id: b._id, bookingId: b._id, title: b.classTitle,
-        teacher: `${b.teacherId.firstName} ${b.teacherId.lastName}`,
-        topic: b.topic || "Completed Lesson",
-        scheduledTime: b.scheduledTime, scheduledDate: new Date(b.scheduledTime),
-        fullDateTime: new Date(b.scheduledTime).toLocaleString("en-US",{weekday:"short",year:"numeric",month:"short",day:"numeric",hour:"numeric",minute:"2-digit",hour12:true}),
-        duration: b.duration || 60, notes: b.notes || "", status: "completed",
-      }));
+      const completedList = completed
+        .filter((b) => b.status === "completed")
+        .map((b) => ({
+          id: b._id, bookingId: b._id, title: b.classTitle,
+          teacher: `${b.teacherId.firstName} ${b.teacherId.lastName}`,
+          topic: b.topic || "Completed Lesson",
+          scheduledTime: b.scheduledTime, scheduledDate: new Date(b.scheduledTime),
+          fullDateTime: new Date(b.scheduledTime).toLocaleString("en-US",{weekday:"short",year:"numeric",month:"short",day:"numeric",hour:"numeric",minute:"2-digit",hour12:true}),
+          duration: b.duration || 60, notes: b.notes || "", status: "completed",
+        }));
 
       setActiveClasses(active);
       setUpcomingClasses(upcoming);
@@ -636,6 +642,21 @@ export default function StudentDashboard() {
     else if (progress.streakDays === 10) triggerCelebration("⚡ 10-Day Streak Master!", "⚡");
     else if (n === 25) triggerCelebration("🎓 25 Classes Done!", "🎓");
     else if (n === 50) triggerCelebration("🏆 50 Classes!", "🏆");
+  };
+
+  const STREAK_MILESTONES = [3, 7, 14, 30, 50, 100];
+  const handleStreakLoaded = (currentStreak) => {
+    const hit = STREAK_MILESTONES.find((m) => currentStreak === m && !seenStreakMilestones.has(m));
+    if (!hit) return;
+    const msgs = {
+      3: ["🌱 3-Day Streak!", "🌱"], 7: ["🔥 One Full Week!", "🔥"],
+      14: ["⚡ Two Weeks Strong!", "⚡"], 30: ["🌟 30-Day Legend!", "🌟"],
+      50: ["💎 50 Days! Incredible!", "💎"], 100: ["🏆 100-Day Master!", "🏆"],
+    };
+    triggerCelebration(msgs[hit][0], msgs[hit][1]);
+    const next = new Set(seenStreakMilestones).add(hit);
+    setSeenStreakMilestones(next);
+    localStorage.setItem("seenStreakMilestones", JSON.stringify([...next]));
   };
 
   const triggerCelebration = (msg, emoji) => {
@@ -903,6 +924,9 @@ export default function StudentDashboard() {
                   <h2 style={{ margin:"0 0 14px",fontSize:"17px",fontWeight:900,color:col.heading }}>📈 My Progress</h2>
                   <ProgressCard progress={progress} />
                 </div>
+
+                {/* Streak */}
+                <StreakWidget isDarkMode={isDarkMode} onLoad={handleStreakLoaded} />
 
                 {/* Recent badges */}
                 <div style={{ background:col.card,border:`2px solid ${col.border}`,borderRadius:"24px",padding:"20px",boxShadow:"0 4px 12px rgba(0,0,0,0.06)" }}>

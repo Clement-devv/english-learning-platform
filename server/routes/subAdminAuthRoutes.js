@@ -132,7 +132,7 @@ router.post("/setup-account", passwordResetLimiter, async (req, res) => {
     subAdmin.inviteExpires = null;
     await subAdmin.save();
 
-    sendSubAdminWelcomeEmail(subAdmin).catch(console.error);
+    sendSubAdminWelcomeEmail(subAdmin, req.center?.centerName || "").catch(console.error);
 
     res.json({ success: true, message: "Account activated successfully! You can now log in." });
   } catch (err) {

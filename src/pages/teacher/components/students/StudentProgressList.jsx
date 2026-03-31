@@ -36,7 +36,7 @@ function StudentDetailModal({ student, isDarkMode, onClose }) {
 
   const rows = [
     { icon: Award,    label: "Rank / Level",       value: student.rank || "—" },
-    { icon: Calendar, label: "Date of Birth",       value: dob ? `${dob}${age ? ` (age ${age})` : ""}` : "—" },
+    { icon: Calendar, label: "Date of Birth",       value: dob ? `${dob}${age ? ` (age ${age})` : ""}` : age ? `Age ${age}` : "—" },
     { icon: BookOpen, label: "Classes remaining",   value: student.progress ?? 0 },
     { icon: TrendingUp, label: "Status",            value: student.active ? "Active" : "Inactive",
       badge: student.active

@@ -114,7 +114,7 @@ export default function NotificationsTab({ isDarkMode, onUnreadCount }) {
   const inputBg = dark ? "#13161f" : "#f8fafc";
 
   return (
-    <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", color: text }}>
+    <div style={{ fontFamily: "var(--font-body)", color: text }}>
 
       {/* ── Header ── */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "20px", flexWrap: "wrap", gap: "12px" }}>

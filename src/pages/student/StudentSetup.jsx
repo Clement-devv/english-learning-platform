@@ -7,6 +7,7 @@ export default function StudentSetup() {
   const [searchParams]   = useSearchParams();
   const navigate         = useNavigate();
   const token            = searchParams.get("token");
+  const centerSlug       = searchParams.get("center") || import.meta.env.VITE_CENTER_SLUG || "";
 
   const [step,      setStep]      = useState("loading"); // loading | form | success | error
   const [student,   setStudent]   = useState(null);
@@ -34,7 +35,7 @@ export default function StudentSetup() {
     if (!token) { setStep("error"); setErrorMsg("No invite token found in the URL."); return; }
     (async () => {
       try {
-        const res = await api.get(`/api/students/verify-invite/${token}`);
+        const res = await api.get(`/api/students/verify-invite/${token}`, { headers: { "x-center-slug": centerSlug } });
         setStudent(res.data.student);
         setStep("form");
       } catch (err) {
@@ -52,7 +53,7 @@ export default function StudentSetup() {
 
     setSubmitting(true);
     try {
-      await api.post("/api/students/setup-account", { token, password });
+      await api.post("/api/students/setup-account", { token, password }, { headers: { "x-center-slug": centerSlug } });
       setStep("success");
     } catch (err) {
       setErrorMsg(err.response?.data?.message || "Something went wrong. Please try again.");
@@ -74,9 +75,8 @@ export default function StudentSetup() {
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { background: ${c.bg}; font-family: 'Plus Jakarta Sans', sans-serif; }
+        body { background: ${c.bg}; font-family: var(--font-body, sans-serif); }
         .ss-input { width:100%; padding:11px 14px; border-radius:10px; border:1.5px solid ${c.border}; font-family:inherit; font-size:14px; color:${c.head}; outline:none; transition:border 0.15s; }
         .ss-input:focus { border-color:${c.accent}; box-shadow:0 0 0 3px rgba(59,130,246,0.12); }
         .ss-btn { width:100%; padding:13px; border-radius:12px; border:none; background:linear-gradient(135deg,#3b82f6,#6366f1); color:#fff; font-family:inherit; font-size:15px; font-weight:800; cursor:pointer; transition:opacity 0.15s; }

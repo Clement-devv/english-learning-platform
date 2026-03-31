@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { User, Lock, Eye, EyeOff, AlertCircle, ShieldCheck, ArrowRight, Mail, CheckCircle } from 'lucide-react';
 import api from '../../api';
 import TwoFactorLogin from '../../components/TwoFactorLogin';
+import { useBranding } from '../../context/BrandingContext';
 
 export default function AdminLogin() {
   const [username, setUsername] = useState('');
@@ -20,6 +21,8 @@ export default function AdminLogin() {
   const [forgotLoading, setForgotLoading]= useState(false);
   const [forgotError,   setForgotError]  = useState('');
   const navigate = useNavigate();
+  const { branding, center } = useBranding();
+  const centerName = center?.centerName || 'English Learning Platform';
 
   useEffect(() => { setMounted(true); }, []);
 
@@ -93,7 +96,8 @@ export default function AdminLogin() {
   if (view === 'forgot') return (
     <>
       <style>{css}</style>
-      <div style={s.root}>
+      <div style={{ ...s.root, background: branding.loginBackground ? `url(${branding.loginBackground}) center/cover no-repeat` : s.root.background }}>
+        {branding.loginBackground && <div style={{ position:'absolute',inset:0,zIndex:0,background:`rgba(0,0,0,${Math.max(branding.loginBgOverlay??0.45,0.6)})`,pointerEvents:'none'}} />}
         <div style={s.grid} /><div style={s.scanlines} />
         <div style={{ ...s.card, opacity: 1, transform: 'none' }} className="al-card">
           <div style={s.accentBar} />
@@ -151,7 +155,8 @@ export default function AdminLogin() {
   if (view === 'forgot-sent') return (
     <>
       <style>{css}</style>
-      <div style={s.root}>
+      <div style={{ ...s.root, background: branding.loginBackground ? `url(${branding.loginBackground}) center/cover no-repeat` : s.root.background }}>
+        {branding.loginBackground && <div style={{ position:'absolute',inset:0,zIndex:0,background:`rgba(0,0,0,${Math.max(branding.loginBgOverlay??0.45,0.6)})`,pointerEvents:'none'}} />}
         <div style={s.grid} /><div style={s.scanlines} />
         <div style={{ ...s.card, opacity: 1, transform: 'none' }} className="al-card">
           <div style={s.accentBar} />
@@ -174,7 +179,8 @@ export default function AdminLogin() {
 
   if (requires2FA) {
     return (
-      <div style={s.root}>
+      <div style={{ ...s.root, background: branding.loginBackground ? `url(${branding.loginBackground}) center/cover no-repeat` : s.root.background }}>
+        {branding.loginBackground && <div style={{ position:'absolute',inset:0,zIndex:0,background:`rgba(0,0,0,${Math.max(branding.loginBgOverlay??0.45,0.6)})`,pointerEvents:'none'}} />}
         <TwoFactorLogin onVerify={handle2FAVerification} onCancel={handleCancel2FA} loading={loading} error={error} />
       </div>
     );
@@ -183,7 +189,19 @@ export default function AdminLogin() {
   return (
     <>
       <style>{css}</style>
-      <div style={s.root}>
+      <div style={{
+        ...s.root,
+        background: branding.loginBackground
+          ? `url(${branding.loginBackground}) center/cover no-repeat`
+          : s.root.background,
+      }}>
+        {branding.loginBackground && (
+          <div style={{
+            position: 'absolute', inset: 0, zIndex: 0,
+            background: `rgba(0,0,0,${Math.max(branding.loginBgOverlay ?? 0.45, 0.6)})`,
+            pointerEvents: 'none',
+          }} />
+        )}
 
         {/* ── Animated background grid ── */}
         <div style={s.grid} />
@@ -209,12 +227,15 @@ export default function AdminLogin() {
 
           {/* Shield icon + title */}
           <div style={s.topSection}>
+            {branding.logo && (
+              <img src={branding.logo} alt={centerName} style={{ height: 40, maxWidth: 120, objectFit: 'contain', marginRight: 4 }} />
+            )}
             <div style={s.shieldWrap} className="al-shield">
               <ShieldCheck size={32} color="#22d3ee" strokeWidth={1.5} />
             </div>
 
             <div>
-              <p style={s.systemLabel}>CONTROL SYSTEM</p>
+              <p style={s.systemLabel}>{centerName}</p>
               <h1 style={s.title}>Admin Portal</h1>
               <p style={s.subtitle}>Authorized personnel only</p>
             </div>
@@ -332,7 +353,7 @@ export default function AdminLogin() {
         </div>
 
         {/* Version tag */}
-        <p style={s.version}>EduLearn Admin v2.0 · {new Date().getFullYear()}</p>
+        <p style={s.version}>{centerName} Admin · {new Date().getFullYear()}</p>
       </div>
     </>
   );

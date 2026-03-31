@@ -4,6 +4,7 @@ import { verifyToken } from "../middleware/authMiddleware.js";
 import { tenantMiddleware }    from "../middleware/tenantMiddleware.js";
 import { vocabListSchema }     from "../schemas/vocabListSchema.js";
 import { vocabProgressSchema } from "../schemas/vocabProgressSchema.js";
+import { recordActivity } from "../utils/streakService.js";
 
 const router = express.Router();
 router.use(tenantMiddleware);
@@ -241,7 +242,12 @@ router.post("/review", verifyToken, async (req, res) => {
     prog.nextReviewDate = new Date(Date.now() + result.interval * 24 * 60 * 60 * 1000);
 
     await prog.save();
-    res.json({ success: true, nextReviewDate: prog.nextReviewDate, interval: prog.interval });
+
+    // Streak — await so we can include result in response
+    let streakResult = null;
+    try { streakResult = await recordActivity(req.db, studentId); } catch (_) {}
+
+    res.json({ success: true, nextReviewDate: prog.nextReviewDate, interval: prog.interval, streak: streakResult });
   } catch (err) {
     console.error("POST /vocab/review:", err);
     res.status(500).json({ success: false, message: err.message });

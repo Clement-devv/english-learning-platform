@@ -30,7 +30,7 @@ const brandingStorage = multer.diskStorage({
 
 const brandingUpload = multer({
   storage: brandingStorage,
-  limits: { fileSize: 2 * 1024 * 1024 }, // 2 MB
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB (backgrounds can be larger)
   fileFilter: (_req, file, cb) => {
     if (/^image\//.test(file.mimetype)) cb(null, true);
     else cb(new Error('Only image files are allowed'));
@@ -57,7 +57,7 @@ router.get('/config', tenantMiddleware, async (req, res) => {
 // PATCH /api/center/branding — center admin updates their own branding
 router.patch('/branding', tenantMiddleware, verifyToken, verifyAdmin, async (req, res) => {
   try {
-    const { primaryColor, secondaryColor, fontFamily, logo, favicon } = req.body;
+    const { primaryColor, secondaryColor, fontFamily, logo, favicon, borderRadius, shadowStyle, spacing, theme, loginBgOverlay } = req.body;
 
     await Center.findByIdAndUpdate(req.center._id, {
       'branding.primaryColor':   primaryColor   !== undefined ? primaryColor   : req.center.branding.primaryColor,
@@ -65,6 +65,11 @@ router.patch('/branding', tenantMiddleware, verifyToken, verifyAdmin, async (req
       'branding.fontFamily':     fontFamily     !== undefined ? fontFamily     : req.center.branding.fontFamily,
       'branding.logo':           logo           !== undefined ? logo           : req.center.branding.logo,
       'branding.favicon':        favicon        !== undefined ? favicon        : req.center.branding.favicon,
+      'branding.borderRadius':    borderRadius    !== undefined ? borderRadius    : req.center.branding.borderRadius,
+      'branding.shadowStyle':     shadowStyle     !== undefined ? shadowStyle     : req.center.branding.shadowStyle,
+      'branding.spacing':         spacing         !== undefined ? spacing         : req.center.branding.spacing,
+      'branding.theme':           theme           !== undefined ? theme           : req.center.branding.theme,
+      'branding.loginBgOverlay':  loginBgOverlay  !== undefined ? loginBgOverlay  : req.center.branding.loginBgOverlay,
     });
 
     res.json({ success: true, message: 'Branding updated' });
@@ -140,7 +145,7 @@ router.post(
   verifyToken,
   verifyAdmin,
   (req, res, next) => {
-    brandingUpload.single(req.query.type === 'favicon' ? 'favicon' : 'logo')(req, res, (err) => {
+    brandingUpload.single(req.query.type === 'favicon' ? 'favicon' : req.query.type === 'loginBackground' ? 'loginBackground' : 'logo')(req, res, (err) => {
       if (err) return res.status(400).json({ success: false, message: err.message });
       next();
     });
@@ -149,7 +154,7 @@ router.post(
     try {
       if (!req.file) return res.status(400).json({ success: false, message: 'No file uploaded' });
 
-      const field    = req.query.type === 'favicon' ? 'favicon' : 'logo';
+      const field = req.query.type === 'favicon' ? 'favicon' : req.query.type === 'loginBackground' ? 'loginBackground' : 'logo';
       const fileUrl  = `/uploads/branding/${req.center.slug}/${req.file.filename}`;
 
       // Delete old file if it exists and is a local upload

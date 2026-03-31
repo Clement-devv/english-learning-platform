@@ -12,9 +12,11 @@ import {
   RotateCcw,
   Clock,
   CheckCircle,
+  Download,
 } from "lucide-react";
 import api from "../../../api";
 import { restoreTeacher } from "../../../services/teacherService";
+import { downloadTeacherRoster } from "../../../utils/teacherPdf";
 import TeacherCard from "../components/TeacherCard";
 import TeacherModal from "../modals/TeacherModal";
 import LessonMarkModal from "../modals/LessonMarkModal";
@@ -115,7 +117,7 @@ function PayConfirmModal({ teacher, onConfirm, onCancel, isDarkMode }) {
               Teacher
             </span>
             <span className={`text-sm font-bold ${isDarkMode ? "text-white" : "text-gray-900"}`}>
-              {teacher.firstName} {teacher.lastName}
+              {teacher.displayName?.trim() || `${teacher.firstName} ${teacher.lastName}`}
             </span>
           </div>
           <div className="flex justify-between items-center mt-2">
@@ -180,7 +182,7 @@ function PayAllConfirmModal({ teachers, onConfirm, onCancel, isDarkMode }) {
           {teachers.map((t) => (
             <div key={t._id} className="flex justify-between items-center py-1.5 border-b last:border-0 border-gray-200/30">
               <span className={`text-sm ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
-                {t.firstName} {t.lastName}
+                {t.displayName?.trim() || `${t.firstName} ${t.lastName}`}
               </span>
               <span className={`text-sm font-bold ${isDarkMode ? "text-emerald-300" : "text-emerald-600"}`}>
                 ${(t.earned || 0).toFixed(2)}
@@ -312,8 +314,17 @@ export default function TeachersTab({ onNotify, isDarkMode = false }) {
     const fetchTeachers = async () => {
       setLoading(true);
       try {
-        const res = await api.get("/api/teachers");
-        setTeachers(res.data);
+        const [teachersRes, statsRes] = await Promise.all([
+          api.get("/api/teachers"),
+          api.get("/api/reviews/stats").catch(() => ({ data: [] })),
+        ]);
+        const ratingMap = {};
+        (statsRes.data || []).forEach((s) => { ratingMap[String(s.teacherId)] = s; });
+        const merged = teachersRes.data.map((t) => {
+          const rs = ratingMap[String(t._id)];
+          return rs ? { ...t, avgRating: rs.avgRating, totalRatings: rs.totalRatings, bayesianScore: rs.bayesianScore } : t;
+        });
+        setTeachers(merged);
       } catch (err) {
         console.error("Error fetching teachers:", err);
         showToast(
@@ -534,6 +545,18 @@ export default function TeachersTab({ onNotify, isDarkMode = false }) {
     setIsModalOpen(true);
   };
 
+  // ── Resend invite ────────────────────────────────────────────────────────────
+  const handleResendInvite = async (index) => {
+    const teacher = teachers[index];
+    if (!teacher) return;
+    try {
+      await api.post(`/api/teachers/${teacher._id}/resend-invite`);
+      showToast(`Invite resent to ${teacher.email}!`);
+    } catch (err) {
+      showToast(err.response?.data?.message || "Failed to resend invite", "error");
+    }
+  };
+
   // ── Computed stats ──────────────────────────────────────────────────────────
   const activeTeachers = teachers.filter((t) => t.active && !t.scheduledDeletionAt);
   const disabledTeachers = teachers.filter((t) => !t.active && !t.scheduledDeletionAt);
@@ -552,7 +575,7 @@ export default function TeachersTab({ onNotify, isDarkMode = false }) {
       : teachers;
 
   const filteredTeachers = sourceList.filter((t) => {
-    const matchesSearch = `${t.firstName} ${t.lastName} ${t.email}`
+    const matchesSearch = `${t.displayName || ""} ${t.firstName} ${t.lastName} ${t.email}`
       .toLowerCase()
       .includes(searchQuery.toLowerCase());
     const matchesContinent =
@@ -655,16 +678,31 @@ export default function TeachersTab({ onNotify, isDarkMode = false }) {
             Manage all teachers on the platform
           </p>
         </div>
-        <button
-          onClick={() => {
-            setEditIndex(null);
-            setIsModalOpen(true);
-          }}
-          className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold text-sm shadow-md transition-all duration-150 active:scale-95 flex-shrink-0"
-        >
-          <Plus className="w-4 h-4" />
-          Add Teacher
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => downloadTeacherRoster(filteredTeachers)}
+            title="Download visible teachers as PDF"
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-all ${
+              isDarkMode
+                ? "border-gray-600 text-gray-300 hover:bg-gray-700"
+                : "border-gray-200 text-gray-600 hover:bg-gray-50"
+            }`}
+          >
+            <Download className="w-3.5 h-3.5" />
+            Download PDF
+          </button>
+
+          <button
+            onClick={() => {
+              setEditIndex(null);
+              setIsModalOpen(true);
+            }}
+            className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold text-sm shadow-md transition-all duration-150 active:scale-95 flex-shrink-0"
+          >
+            <Plus className="w-4 h-4" />
+            Add Teacher
+          </button>
+        </div>
       </div>
 
       {/* ── Summary stats ── */}
@@ -867,6 +905,7 @@ export default function TeachersTab({ onNotify, isDarkMode = false }) {
                       onCopyPassword={() => handleCopyPassword(realIndex)}
                       onResetPassword={() => handleResetPassword(realIndex)}
                       onPayHistory={() => setPayHistoryTeacher(teacher)}
+                      onResendInvite={() => handleResendInvite(realIndex)}
                     />
                   </div>
                 </div>
@@ -885,6 +924,11 @@ export default function TeachersTab({ onNotify, isDarkMode = false }) {
         }}
         onSave={handleSaveTeacher}
         initialData={editIndex !== null ? teachers[editIndex] : null}
+        onPhotoChange={(teacherId, photoUrl) => {
+          setTeachers(prev =>
+            prev.map(t => t._id === teacherId ? { ...t, photo: photoUrl } : t)
+          );
+        }}
       />
     </div>
   );

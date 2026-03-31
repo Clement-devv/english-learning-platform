@@ -15,19 +15,27 @@ import { config } from "../config/config.js";
 
 // Create reusable transporter
 const transporter = nodemailer.createTransport({
-  host: config.emailHost,
-  port: config.emailPort,
-  secure: false, // true for 465, false for other ports
+  host:       config.emailHost,
+  port:       config.emailPort,
+  secure:     config.emailPort === 465,      // true only for port 465 (SSL)
+  requireTLS: config.emailPort === 587,      // enforce STARTTLS on port 587
   auth: {
     user: config.emailUser,
     pass: config.emailPassword,
   },
+  tls: {
+    rejectUnauthorized: false,               // allow self-signed certs in dev
+  },
+  debug: false,
+  logger: false,
 });
 
 /**
  * Verify email configuration on startup
  */
 export const verifyEmailConfig = async () => {
+  // Log what config was loaded so it's easy to debug missing env vars
+  console.log(`📧 Email config — host: ${config.emailHost}, port: ${config.emailPort}, user: ${config.emailUser || "(not set)"}`);
   try {
     await transporter.verify();
     console.log("✅ Email service is ready");
@@ -44,7 +52,11 @@ export const verifyEmailConfig = async () => {
  */
 export const sendEmail = async (mailOptions) => {
   try {
-    const info = await transporter.sendMail(mailOptions);
+    const { centerName, ...opts } = mailOptions;
+    const info = await transporter.sendMail({
+      ...opts,
+      from: `"${centerName || config.appName}" <${config.emailFrom}>`,
+    });
     console.log("📧 Email sent:", info.messageId);
     return { success: true, messageId: info.messageId };
   } catch (error) {
@@ -59,7 +71,7 @@ export const sendEmail = async (mailOptions) => {
  * Sent immediately when admin schedules a student for deletion.
  * Gives the student 7 days to contact admin and request restoration.
  */
-export const sendAccountDeletionWarningEmail = async (student, deletionDate) => {
+export const sendAccountDeletionWarningEmail = async (student, deletionDate, centerName = "") => {
   const formattedDate = new Date(deletionDate).toLocaleDateString("en-US", {
     weekday: "long",
     year: "numeric",
@@ -68,7 +80,7 @@ export const sendAccountDeletionWarningEmail = async (student, deletionDate) => 
   });
 
   return sendEmail({
-    from: `"${config.appName}" <${config.emailFrom}>`,
+    centerName,
     to: student.email,
     subject: `⚠️ Your account is scheduled for deletion on ${formattedDate}`,
     html: `
@@ -116,7 +128,7 @@ export const sendAccountDeletionWarningEmail = async (student, deletionDate) => 
 /**
  * Sent 24 hours before permanent deletion as a final reminder.
  */
-export const sendAccountDeletionFinalReminderEmail = async (student, deletionDate) => {
+export const sendAccountDeletionFinalReminderEmail = async (student, deletionDate, centerName = "") => {
   const formattedDate = new Date(deletionDate).toLocaleDateString("en-US", {
     weekday: "long",
     year: "numeric",
@@ -125,7 +137,7 @@ export const sendAccountDeletionFinalReminderEmail = async (student, deletionDat
   });
 
   return sendEmail({
-    from: `"${config.appName}" <${config.emailFrom}>`,
+    centerName,
     to: student.email,
     subject: `🚨 Final warning — your account will be deleted tomorrow (${formattedDate})`,
     html: `
@@ -161,7 +173,7 @@ export const sendAccountDeletionFinalReminderEmail = async (student, deletionDat
   });
 };
 
-export const sendTeacherAccountDeletionWarningEmail = async (teacher, deletionDate) => {
+export const sendTeacherAccountDeletionWarningEmail = async (teacher, deletionDate, centerName = "") => {
   const formattedDate = new Date(deletionDate).toLocaleDateString("en-US", {
     weekday: "long",
     year: "numeric",
@@ -170,7 +182,7 @@ export const sendTeacherAccountDeletionWarningEmail = async (teacher, deletionDa
   });
 
   return sendEmail({
-    from: `"${config.appName}" <${config.emailFrom}>`,
+    centerName,
     to: teacher.email,
     subject: `⚠️ Your teacher account is scheduled for deletion on ${formattedDate}`,
     html: `
@@ -215,7 +227,7 @@ export const sendTeacherAccountDeletionWarningEmail = async (teacher, deletionDa
   });
 };
 
-export const sendTeacherAccountDeletionFinalReminderEmail = async (teacher, deletionDate) => {
+export const sendTeacherAccountDeletionFinalReminderEmail = async (teacher, deletionDate, centerName = "") => {
   const formattedDate = new Date(deletionDate).toLocaleDateString("en-US", {
     weekday: "long",
     year: "numeric",
@@ -224,7 +236,7 @@ export const sendTeacherAccountDeletionFinalReminderEmail = async (teacher, dele
   });
 
   return sendEmail({
-    from: `"${config.appName}" <${config.emailFrom}>`,
+    centerName,
     to: teacher.email,
     subject: `🚨 Final warning — your teacher account will be deleted tomorrow (${formattedDate})`,
     html: `
@@ -268,7 +280,7 @@ export const sendTeacherAccountDeletionFinalReminderEmail = async (teacher, dele
  * @param {Object} student - Student object
  * @param {Object} booking - Booking object
  */
-export const sendBookingRequestToTeacher = async (teacher, student, booking) => {
+export const sendBookingRequestToTeacher = async (teacher, student, booking, centerName = "") => {
   const scheduledDate = new Date(booking.scheduledTime);
   const formattedDate = scheduledDate.toLocaleDateString('en-US', {
     weekday: 'long',
@@ -282,7 +294,7 @@ export const sendBookingRequestToTeacher = async (teacher, student, booking) => 
   });
 
   const mailOptions = {
-    from: `"${config.appName}" <${config.emailFrom}>`,
+    centerName,
     to: teacher.email,
     subject: `New Class Request - ${student.firstName} ${student.surname}`,
     html: `
@@ -394,7 +406,7 @@ export const sendBookingRequestToTeacher = async (teacher, student, booking) => 
  * @param {Object} teacher - Teacher object
  * @param {Object} booking - Booking object
  */
-export const sendBookingAcceptedToStudent = async (student, teacher, booking) => {
+export const sendBookingAcceptedToStudent = async (student, teacher, booking, centerName = "") => {
   const scheduledDate = new Date(booking.scheduledTime);
   const formattedDate = scheduledDate.toLocaleDateString('en-US', {
     weekday: 'long',
@@ -408,7 +420,7 @@ export const sendBookingAcceptedToStudent = async (student, teacher, booking) =>
   });
 
   const mailOptions = {
-    from: `"${config.appName}" <${config.emailFrom}>`,
+    centerName,
     to: student.email,
     subject: `Class Confirmed - ${booking.classTitle}`,
     html: `
@@ -518,7 +530,7 @@ export const sendBookingAcceptedToStudent = async (student, teacher, booking) =>
  * @param {Object} teacher - Teacher object
  * @param {Object} booking - Booking object
  */
-export const sendBookingRejectedToStudent = async (student, teacher, booking) => {
+export const sendBookingRejectedToStudent = async (student, teacher, booking, centerName = "") => {
   const scheduledDate = new Date(booking.scheduledTime);
   const formattedDate = scheduledDate.toLocaleDateString('en-US', {
     weekday: 'long',
@@ -532,7 +544,7 @@ export const sendBookingRejectedToStudent = async (student, teacher, booking) =>
   });
 
   const mailOptions = {
-    from: `"${config.appName}" <${config.emailFrom}>`,
+    centerName,
     to: student.email,
     subject: `Class Request Update - ${booking.classTitle}`,
     html: `
@@ -627,7 +639,7 @@ export const sendBookingRejectedToStudent = async (student, teacher, booking) =>
  * @param {Object} booking - Booking object
  * @param {string} role - 'student' or 'teacher'
  */
-export const sendClassReminder = async (user, booking, role) => {
+export const sendClassReminder = async (user, booking, role, centerName = "") => {
   const scheduledDate = new Date(booking.scheduledTime);
   const formattedDate = scheduledDate.toLocaleDateString('en-US', {
     weekday: 'long',
@@ -641,7 +653,7 @@ export const sendClassReminder = async (user, booking, role) => {
   });
 
   const mailOptions = {
-    from: `"${config.appName}" <${config.emailFrom}>`,
+    centerName,
     to: user.email,
     subject: `⏰ Class Reminder - Tomorrow at ${formattedTime}`,
     html: `
@@ -719,10 +731,10 @@ export const sendClassReminder = async (user, booking, role) => {
  * @param {Object} student - Student object
  * @param {Object} booking - Booking object
  */
-export const sendClassCompletedNotification = async (teacher, student, booking) => {
+export const sendClassCompletedNotification = async (teacher, student, booking, centerName = "") => {
   // Send to teacher
   const teacherMail = {
-    from: `"${config.appName}" <${config.emailFrom}>`,
+    centerName,
     to: teacher.email,
     subject: `Class Completed - Payment Pending`,
     html: `
@@ -741,7 +753,7 @@ export const sendClassCompletedNotification = async (teacher, student, booking) 
 
   // Send to student
   const studentMail = {
-    from: `"${config.appName}" <${config.emailFrom}>`,
+    centerName,
     to: student.email,
     subject: `Class Completed - Great Job!`,
     html: `
@@ -770,9 +782,9 @@ export const sendClassCompletedNotification = async (teacher, student, booking) 
 /**
  * Send welcome email to new users
  */
-export const sendWelcomeEmail = async (email, name, password) => {
+export const sendWelcomeEmail = async (email, name, password, centerName = "") => {
   const mailOptions = {
-    from: `"${config.appName}" <${config.emailFrom}>`,
+    centerName,
     to: email,
     subject: `Welcome to ${config.appName}!`,
     html: `
@@ -792,9 +804,10 @@ export const sendWelcomeEmail = async (email, name, password) => {
 /**
  * Send password reset email
  */
-export const sendPasswordResetEmail = async (email, name, newPassword) => {
+export const sendPasswordResetEmail = async (email, name, newPassword, role = "teacher", centerName = "") => {
+  const loginPath = role === "student" ? "/student/login" : role === "admin" ? "/admin/login" : "/teacher/login";
   const mailOptions = {
-    from: `"${config.appName}" <${config.emailFrom}>`,
+    centerName,
     to: email,
     subject: "Your Password Has Been Reset",
     html: `
@@ -803,7 +816,7 @@ export const sendPasswordResetEmail = async (email, name, newPassword) => {
       <p>Your password has been reset by an administrator.</p>
       <p><strong>New Password:</strong> ${newPassword}</p>
       <p>Please change this password after logging in.</p>
-      <p>Login here: <a href="${config.frontendUrl}/login">${config.frontendUrl}/login</a></p>
+      <p>Login here: <a href="${config.frontendUrl}${loginPath}">${config.frontendUrl}${loginPath}</a></p>
     `
   };
 
@@ -815,11 +828,12 @@ export const sendPasswordResetEmail = async (email, name, newPassword) => {
 /**
  * Send forgot password email to student with reset link
  */
-export const sendStudentForgotPasswordEmail = async (email, name, resetToken) => {
-  const resetUrl = `${config.frontendUrl}/student/reset-password/${resetToken}`;
+export const sendStudentForgotPasswordEmail = async (email, name, resetToken, centerSlug = "", centerName = "") => {
+  const centerParam = centerSlug ? `?center=${centerSlug}` : "";
+  const resetUrl = `${config.frontendUrl}/student/reset-password/${resetToken}${centerParam}`;
 
   const mailOptions = {
-    from: `"${config.appName}" <${config.emailFrom}>`,
+    centerName,
     to: email,
     subject: "Password Reset Request",
     html: `
@@ -829,7 +843,7 @@ export const sendStudentForgotPasswordEmail = async (email, name, resetToken) =>
         <style>
           body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
           .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+          .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
                     color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
           .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
           .button { display: inline-block; padding: 15px 30px; margin: 20px 0;
@@ -893,7 +907,6 @@ export const sendStudentForgotPasswordEmail = async (email, name, resetToken) =>
 export const sendCenterDeletionWarningEmail = async (center, deletionDate, contactEmail) => {
   const formattedDate = new Date(deletionDate).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
   return await sendEmail({
-    from: `"${config.appName}" <${config.emailFrom}>`,
     to: center.adminEmail,
     subject: `Important: Your ${config.appName} center is scheduled for deletion`,
     html: `
@@ -931,10 +944,11 @@ export const sendCenterDeletionWarningEmail = async (center, deletionDate, conta
   });
 };
 
-export const sendAdminForgotPasswordEmail = async (email, name, resetToken) => {
-  const resetUrl = `${config.frontendUrl}/admin/reset-password/${resetToken}`;
+export const sendAdminForgotPasswordEmail = async (email, name, resetToken, centerSlug = "", centerName = "") => {
+  const centerParam = centerSlug ? `?center=${centerSlug}` : "";
+  const resetUrl = `${config.frontendUrl}/admin/reset-password/${resetToken}${centerParam}`;
   return await sendEmail({
-    from: `"${config.appName}" <${config.emailFrom}>`,
+    centerName,
     to: email,
     subject: 'Admin Password Reset Request',
     html: `
@@ -949,11 +963,12 @@ export const sendAdminForgotPasswordEmail = async (email, name, resetToken) => {
   });
 };
 
-export const sendForgotPasswordEmail = async (email, name, resetToken) => {
-  const resetUrl = `${config.frontendUrl}/reset-password/${resetToken}`;
+export const sendForgotPasswordEmail = async (email, name, resetToken, centerSlug = "", centerName = "") => {
+  const centerParam = centerSlug ? `?center=${centerSlug}` : "";
+  const resetUrl = `${config.frontendUrl}/teacher/reset-password/${resetToken}${centerParam}`;
 
   const mailOptions = {
-    from: `"${config.appName}" <${config.emailFrom}>`,
+    centerName,
     to: email,
     subject: "Password Reset Request",
     html: `
@@ -977,13 +992,13 @@ export const sendForgotPasswordEmail = async (email, name, resetToken) => {
  * @param {String} setupUrl  - The account setup link
  * @param {Object} createdBy - Admin who created the invite (firstName, lastName)
  */
-export const sendSubAdminInviteEmail = async (subAdmin, setupUrl, createdBy) => {
+export const sendSubAdminInviteEmail = async (subAdmin, setupUrl, createdBy, centerName = "") => {
   const adminName = createdBy
     ? `${createdBy.firstName} ${createdBy.lastName}`
     : "The main administrator";
 
   const mailOptions = {
-    from: `"${config.appName}" <${config.emailFrom}>`,
+    centerName,
     to: subAdmin.email,
     subject: `You've been invited to join ${config.appName} as a Sub-Admin`,
     html: `
@@ -1193,11 +1208,11 @@ export const sendSubAdminInviteEmail = async (subAdmin, setupUrl, createdBy) => 
  * Send welcome email after sub-admin activates their account
  * @param {Object} subAdmin - SubAdmin document
  */
-export const sendSubAdminWelcomeEmail = async (subAdmin) => {
+export const sendSubAdminWelcomeEmail = async (subAdmin, centerName = "") => {
   const loginUrl = `${config.frontendUrl}/sub-admin/login`;
 
   const mailOptions = {
-    from: `"${config.appName}" <${config.emailFrom}>`,
+    centerName,
     to: subAdmin.email,
     subject: `Welcome aboard, ${subAdmin.firstName}! Your account is ready 🎉`,
     html: `
@@ -1339,9 +1354,9 @@ export const sendSubAdminWelcomeEmail = async (subAdmin) => {
  * @param {Object} teacher  - Teacher document (firstName, lastName, email, continent)
  * @param {String} setupUrl - The account setup link
  */
-export const sendTeacherInviteEmail = async (teacher, setupUrl) => {
+export const sendTeacherInviteEmail = async (teacher, setupUrl, centerName = "") => {
   const mailOptions = {
-    from: `"${config.appName}" <${config.emailFrom}>`,
+    centerName,
     to: teacher.email,
     subject: `You've been invited to join ${config.appName} as a Teacher 🎓`,
     html: `
@@ -1551,11 +1566,11 @@ export const sendTeacherInviteEmail = async (teacher, setupUrl) => {
  * Send welcome email after teacher activates their account
  * @param {Object} teacher - Teacher document
  */
-export const sendTeacherWelcomeEmail = async (teacher) => {
+export const sendTeacherWelcomeEmail = async (teacher, centerName = "") => {
   const loginUrl = `${config.frontendUrl}/teacher/login`;
 
   const mailOptions = {
-    from: `"${config.appName}" <${config.emailFrom}>`,
+    centerName,
     to: teacher.email,
     subject: `Your teacher account is ready, ${teacher.firstName}! 🎉`,
     html: `
@@ -1629,9 +1644,9 @@ export const sendTeacherWelcomeEmail = async (teacher) => {
  * @param {Object} student - Student object { firstName, surname, email, noOfClasses, age }
  * @param {String} setupUrl - Full URL to the setup page with token
  */
-export const sendStudentInviteEmail = async (student, setupUrl) => {
+export const sendStudentInviteEmail = async (student, setupUrl, centerName = "") => {
   const mailOptions = {
-    from: `"${config.appName}" <${config.emailFrom}>`,
+    centerName,
     to:   student.email,
     subject: `You've been invited to ${config.appName} — Set up your account`,
     html: `
@@ -1731,11 +1746,11 @@ export const sendStudentInviteEmail = async (student, setupUrl) => {
  * Send welcome email after student completes account setup
  * @param {Object} student - Student object { firstName, surname, email }
  */
-export const sendStudentWelcomeEmail = async (student) => {
+export const sendStudentWelcomeEmail = async (student, centerName = "") => {
   const loginUrl = `${config.frontendUrl}/student/login`;
 
   const mailOptions = {
-    from: `"${config.appName}" <${config.emailFrom}>`,
+    centerName,
     to:   student.email,
     subject: `Welcome to ${config.appName} — Your account is ready! 🎉`,
     html: `
@@ -1805,13 +1820,13 @@ export const sendStudentWelcomeEmail = async (student) => {
 
 // ==================== BOOKING CREATED — NOTIFY STUDENT ====================
 
-export const sendBookingCreatedToStudent = async (student, teacher, booking) => {
+export const sendBookingCreatedToStudent = async (student, teacher, booking, centerName = "") => {
   const scheduledDate = new Date(booking.scheduledTime);
   const formattedDate = scheduledDate.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
   const formattedTime = scheduledDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 
   return sendEmail({
-    from: `"${config.appName}" <${config.emailFrom}>`,
+    centerName,
     to: student.email,
     subject: `Class Booked – ${booking.classTitle}`,
     html: `<!DOCTYPE html><html><head><style>
@@ -1848,7 +1863,7 @@ export const sendBookingCreatedToStudent = async (student, teacher, booking) => 
 
 // ==================== CLASS TIMED REMINDERS (1hr / 30min / 5min) ====================
 
-export const sendClassTimedReminder = async (user, booking, role, minutesLeft) => {
+export const sendClassTimedReminder = async (user, booking, role, minutesLeft, centerName = "") => {
   const scheduledDate = new Date(booking.scheduledTime);
   const formattedTime = scheduledDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
   const urgency = minutesLeft <= 5 ? '🚨' : minutesLeft <= 30 ? '⚡' : '⏰';
@@ -1856,7 +1871,7 @@ export const sendClassTimedReminder = async (user, booking, role, minutesLeft) =
   const headerColor = minutesLeft <= 5 ? '#e74c3c' : minutesLeft <= 30 ? '#f39c12' : '#667eea';
 
   return sendEmail({
-    from: `"${config.appName}" <${config.emailFrom}>`,
+    centerName,
     to: user.email,
     subject: `${urgency} Class Reminder – ${urgencyText} – ${booking.classTitle}`,
     html: `<!DOCTYPE html><html><head><style>
@@ -1890,11 +1905,11 @@ export const sendClassTimedReminder = async (user, booking, role, minutesLeft) =
 
 // ==================== HOMEWORK EMAILS ====================
 
-export const sendHomeworkAssigned = async (student, teacher, homework) => {
+export const sendHomeworkAssigned = async (student, teacher, homework, centerName = "") => {
   const dueDate = new Date(homework.dueDate).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
   return sendEmail({
-    from: `"${config.appName}" <${config.emailFrom}>`,
+    centerName,
     to: student.email,
     subject: `📚 New Homework – ${homework.title}`,
     html: `<!DOCTYPE html><html><head><style>
@@ -1930,9 +1945,9 @@ export const sendHomeworkAssigned = async (student, teacher, homework) => {
   });
 };
 
-export const sendHomeworkSubmitted = async (teacher, student, homework) => {
+export const sendHomeworkSubmitted = async (teacher, student, homework, centerName = "") => {
   return sendEmail({
-    from: `"${config.appName}" <${config.emailFrom}>`,
+    centerName,
     to: teacher.email,
     subject: `📬 Homework Submitted – ${homework.title} – ${student.firstName} ${student.surname || student.lastName}`,
     html: `<!DOCTYPE html><html><head><style>
@@ -1964,11 +1979,11 @@ export const sendHomeworkSubmitted = async (teacher, student, homework) => {
   });
 };
 
-export const sendHomeworkDueReminder = async (student, homework, minutesLeft) => {
+export const sendHomeworkDueReminder = async (student, homework, minutesLeft, centerName = "") => {
   const dueDate = new Date(homework.dueDate).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 
   return sendEmail({
-    from: `"${config.appName}" <${config.emailFrom}>`,
+    centerName,
     to: student.email,
     subject: `⚡ Homework Due Soon – ${homework.title} – ${minutesLeft} minutes left!`,
     html: `<!DOCTYPE html><html><head><style>
@@ -1998,11 +2013,11 @@ export const sendHomeworkDueReminder = async (student, homework, minutesLeft) =>
 
 // ==================== QUIZ EMAILS ====================
 
-export const sendQuizAssigned = async (student, teacher, quiz) => {
+export const sendQuizAssigned = async (student, teacher, quiz, centerName = "") => {
   const dueDate = new Date(quiz.dueDate).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
   return sendEmail({
-    from: `"${config.appName}" <${config.emailFrom}>`,
+    centerName,
     to: student.email,
     subject: `📝 New Quiz – ${quiz.title}`,
     html: `<!DOCTYPE html><html><head><style>
@@ -2039,12 +2054,12 @@ export const sendQuizAssigned = async (student, teacher, quiz) => {
   });
 };
 
-export const sendQuizCompleted = async (teacher, student, quiz, attempt) => {
+export const sendQuizCompleted = async (teacher, student, quiz, attempt, centerName = "") => {
   const scoreColor = attempt.percentage >= 80 ? '#10b981' : attempt.percentage >= 60 ? '#f59e0b' : '#ef4444';
   const trophy = attempt.percentage >= 90 ? '🏆' : attempt.percentage >= 75 ? '🥇' : attempt.percentage >= 60 ? '🥈' : '🥉';
 
   return sendEmail({
-    from: `"${config.appName}" <${config.emailFrom}>`,
+    centerName,
     to: teacher.email,
     subject: `📝 Quiz Completed – ${quiz.title} – ${student.firstName} ${student.surname || student.lastName} scored ${attempt.percentage}%`,
     html: `<!DOCTYPE html><html><head><style>
@@ -2084,11 +2099,11 @@ export const sendQuizCompleted = async (teacher, student, quiz, attempt) => {
   });
 };
 
-export const sendQuizDueReminder = async (student, quiz, minutesLeft) => {
+export const sendQuizDueReminder = async (student, quiz, minutesLeft, centerName = "") => {
   const dueTime = new Date(quiz.dueDate).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 
   return sendEmail({
-    from: `"${config.appName}" <${config.emailFrom}>`,
+    centerName,
     to: student.email,
     subject: `⚡ Quiz Due Soon – ${quiz.title} – ${minutesLeft} minutes left!`,
     html: `<!DOCTYPE html><html><head><style>
@@ -2163,7 +2178,6 @@ export default {
  */
 export const sendDomainInstructionsEmail = async (center, domain, serverIp) => {
   return sendEmail({
-    from: `"${config.appName}" <${config.emailFrom}>`,
     to: center.email,
     subject: `Custom Domain Setup Instructions — ${domain}`,
     html: `
@@ -2203,7 +2217,7 @@ export const sendDomainInstructionsEmail = async (center, domain, serverIp) => {
 
 // ==================== PROGRESS REPORTS ====================
 
-export const sendProgressReport = async (student, pdfBuffer, period, from, to) => {
+export const sendProgressReport = async (student, pdfBuffer, period, from, to, centerName = "") => {
   const label   = period === "weekly" ? "Weekly" : "Monthly";
   const fromStr = from.toLocaleDateString("en-US", { month: "short", day: "numeric" });
   const toStr   = new Date(to - 1).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
@@ -2237,12 +2251,89 @@ export const sendProgressReport = async (student, pdfBuffer, period, from, to) =
   `;
 
   return sendEmail({
-    from: `"English Learning Platform" <${config.emailFrom}>`,
+    centerName,
     to:   student.email,
     subject,
     html,
     attachments: [{
       filename,
+      content:     pdfBuffer,
+      contentType: "application/pdf",
+    }],
+  });
+};
+
+// ==================== NEW RECORD NOTIFICATIONS TO ADMIN ====================
+
+/**
+ * Sent to admin when a new student is created.
+ * Attaches a PDF copy of the student's record.
+ */
+export const sendNewStudentRecordEmail = async (adminEmail, student, pdfBuffer, centerName = "") => {
+  const fullName = `${student.firstName || ""} ${student.surname || ""}`.trim();
+  return sendEmail({
+    centerName,
+    to: adminEmail,
+    subject: `New Student Added: ${fullName}`,
+    html: `
+      <div style="font-family:Inter,sans-serif;max-width:520px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;border:1px solid #e2e8f0;">
+        <div style="background:linear-gradient(135deg,#2563eb,#4f46e5);padding:28px 32px;">
+          <h1 style="color:#fff;font-size:18px;font-weight:800;margin:0 0 4px;">New Student Added</h1>
+          <p style="color:rgba(255,255,255,0.8);font-size:13px;margin:0;">A new student record has been created</p>
+        </div>
+        <div style="padding:28px 32px;">
+          <table style="width:100%;border-collapse:collapse;font-size:13px;">
+            <tr style="background:#eff6ff;"><td style="padding:9px 12px;font-weight:700;color:#1d4ed8;width:140px;">Name</td><td style="padding:9px 12px;color:#1e293b;">${fullName}</td></tr>
+            <tr><td style="padding:9px 12px;font-weight:700;color:#1d4ed8;">Email</td><td style="padding:9px 12px;color:#1e293b;">${student.email || "—"}</td></tr>
+            <tr style="background:#eff6ff;"><td style="padding:9px 12px;font-weight:700;color:#1d4ed8;">Phone</td><td style="padding:9px 12px;color:#1e293b;">${student.phone || "—"}</td></tr>
+            <tr><td style="padding:9px 12px;font-weight:700;color:#1d4ed8;">Country</td><td style="padding:9px 12px;color:#1e293b;">${student.country || "—"}</td></tr>
+            <tr style="background:#eff6ff;"><td style="padding:9px 12px;font-weight:700;color:#1d4ed8;">Level / Rank</td><td style="padding:9px 12px;color:#1e293b;">${student.rank || "—"}</td></tr>
+            <tr><td style="padding:9px 12px;font-weight:700;color:#1d4ed8;">Classes</td><td style="padding:9px 12px;color:#1e293b;">${student.noOfClasses ?? 0}</td></tr>
+          </table>
+          <p style="font-size:12px;color:#94a3b8;margin-top:20px;">A PDF copy of this record is attached for offline safe keeping.</p>
+        </div>
+      </div>
+    `,
+    attachments: [{
+      filename:    `${fullName.replace(/\s+/g, "_")}_Student_Record.pdf`,
+      content:     pdfBuffer,
+      contentType: "application/pdf",
+    }],
+  });
+};
+
+/**
+ * Sent to admin when a new teacher is created.
+ * Attaches a PDF copy of the teacher's record.
+ */
+export const sendNewTeacherRecordEmail = async (adminEmail, teacher, pdfBuffer, centerName = "") => {
+  const fullName = `${teacher.firstName || ""} ${teacher.lastName || ""}`.trim();
+  return sendEmail({
+    centerName,
+    to: adminEmail,
+    subject: `New Teacher Added: ${fullName}`,
+    html: `
+      <div style="font-family:Inter,sans-serif;max-width:520px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;border:1px solid #e2e8f0;">
+        <div style="background:linear-gradient(135deg,#7c3aed,#4f46e5);padding:28px 32px;">
+          <h1 style="color:#fff;font-size:18px;font-weight:800;margin:0 0 4px;">New Teacher Added</h1>
+          <p style="color:rgba(255,255,255,0.8);font-size:13px;margin:0;">A new teacher record has been created</p>
+        </div>
+        <div style="padding:28px 32px;">
+          <table style="width:100%;border-collapse:collapse;font-size:13px;">
+            <tr style="background:#f5f3ff;"><td style="padding:9px 12px;font-weight:700;color:#6d28d9;width:160px;">Name</td><td style="padding:9px 12px;color:#1e293b;">${fullName}</td></tr>
+            <tr><td style="padding:9px 12px;font-weight:700;color:#6d28d9;">Email</td><td style="padding:9px 12px;color:#1e293b;">${teacher.email || "—"}</td></tr>
+            <tr style="background:#f5f3ff;"><td style="padding:9px 12px;font-weight:700;color:#6d28d9;">Phone</td><td style="padding:9px 12px;color:#1e293b;">${teacher.phone || "—"}</td></tr>
+            <tr><td style="padding:9px 12px;font-weight:700;color:#6d28d9;">Country</td><td style="padding:9px 12px;color:#1e293b;">${teacher.country || "—"}</td></tr>
+            <tr style="background:#f5f3ff;"><td style="padding:9px 12px;font-weight:700;color:#6d28d9;">Continent</td><td style="padding:9px 12px;color:#1e293b;">${teacher.continent || "—"}</td></tr>
+            <tr><td style="padding:9px 12px;font-weight:700;color:#6d28d9;">Rate/Class</td><td style="padding:9px 12px;color:#1e293b;">${teacher.ratePerClass ? "$" + teacher.ratePerClass : "—"}</td></tr>
+            <tr style="background:#f5f3ff;"><td style="padding:9px 12px;font-weight:700;color:#6d28d9;">Specializations</td><td style="padding:9px 12px;color:#1e293b;">${(teacher.specializations || []).join(", ") || "—"}</td></tr>
+          </table>
+          <p style="font-size:12px;color:#94a3b8;margin-top:20px;">A PDF copy of this record is attached for offline safe keeping.</p>
+        </div>
+      </div>
+    `,
+    attachments: [{
+      filename:    `${fullName.replace(/\s+/g, "_")}_Teacher_Record.pdf`,
       content:     pdfBuffer,
       contentType: "application/pdf",
     }],

@@ -78,6 +78,7 @@ import notificationRoutes from "./routes/notificationRoutes.js";
 import centerRegistrationRoutes from "./routes/centerRegistrationRoutes.js";
 import centerConfigRoutes from "./routes/centerConfigRoutes.js";
 import superAdminRoutes from "./routes/superAdminRoutes.js";
+import classPricingRoutes from "./routes/classPricingRoutes.js";
 import Center from "./models/master/Center.js";
 import SuperAdmin from "./models/master/SuperAdmin.js";
 import { getDb } from "./config/dbManager.js";
@@ -258,6 +259,7 @@ app.use("/api/notifications",        notificationRoutes);
 app.use("/api/register-center",      centerRegistrationRoutes);
 app.use("/api/center",               centerConfigRoutes);
 app.use("/api/super-admin",          superAdminRoutes);
+app.use("/api/class-pricing",        classPricingRoutes);
 
 
 

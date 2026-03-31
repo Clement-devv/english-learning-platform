@@ -1,12 +1,14 @@
 // src/pages/admin/AdminResetPassword.jsx
 import React, { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Lock, Eye, EyeOff, AlertCircle, CheckCircle, ArrowRight, ShieldCheck } from 'lucide-react';
 import api from '../../api';
 
 export default function AdminResetPassword() {
   const { token }    = useParams();
   const navigate     = useNavigate();
+  const [searchParams] = useSearchParams();
+  const centerSlug = searchParams.get('center') || import.meta.env.VITE_CENTER_SLUG || '';
 
   const [password,    setPassword]    = useState('');
   const [confirm,     setConfirm]     = useState('');
@@ -23,7 +25,9 @@ export default function AdminResetPassword() {
     setLoading(true);
     setError('');
     try {
-      const res = await api.post(`/api/auth/admin/reset-password/${token}`, { newPassword: password });
+      const res = await api.post(`/api/auth/admin/reset-password/${token}`, { newPassword: password }, {
+        headers: centerSlug ? { 'x-center-slug': centerSlug } : {},
+      });
       if (res.data.success) setDone(true);
       else setError(res.data.message || 'Reset failed.');
     } catch (err) {

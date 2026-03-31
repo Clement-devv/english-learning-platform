@@ -115,6 +115,5 @@ export function startProgressReportScheduler(db) {
   const centerSlug = db.name || "unknown";
   console.log(`📊 Progress report scheduler started for center: ${centerSlug} (hourly check)`);
   const runTick = makeTick(db);
-  runTick();
   setInterval(runTick, 60 * 60 * 1000);
 }

@@ -13,6 +13,7 @@ import {
   sendHomeworkAssigned,
   sendHomeworkSubmitted,
 } from "../utils/emailService.js";
+import { recordActivity } from "../utils/streakService.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
@@ -258,6 +259,10 @@ router.post("/:id/submit", verifyToken, uploadSubmission.array("files", MAX_FILE
     hw.status     = "submitted";
     await hw.save();
 
+    // Streak — await so we can include result in response
+    let streakResult = null;
+    try { streakResult = await recordActivity(req.db, req.user.id); } catch (_) {}
+
     // Email teacher about submission (non-blocking)
     Promise.all([
       getTeacher(req.db).findById(hw.teacherId),
@@ -266,7 +271,7 @@ router.post("/:id/submit", verifyToken, uploadSubmission.array("files", MAX_FILE
       if (teacherDoc && studentDoc) sendHomeworkSubmitted(teacherDoc, studentDoc, hw).catch(() => {});
     }).catch(() => {});
 
-    res.json({ success: true, homework: hw });
+    res.json({ success: true, homework: hw, streak: streakResult });
   } catch (err) {
     (req.files || []).forEach(f => {
       try { fs.unlinkSync(path.join(SUB_DIR, f.filename)); } catch (_) {}

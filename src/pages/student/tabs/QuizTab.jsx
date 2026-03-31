@@ -5,6 +5,7 @@ import {
   AlertTriangle, ChevronDown, ChevronUp, ArrowRight, ArrowLeft, Send,
 } from "lucide-react";
 import ListenButton from "../../../components/ListenButton";
+import StreakToast from "../components/StreakToast";
 
 const LS_KEY = (quizId) => `quiz_start_${quizId}`;
 
@@ -98,7 +99,7 @@ function QuizScreen({ quiz, onComplete, isDarkMode }) {
         timeTaken,
       });
       localStorage.removeItem(LS_KEY(quiz._id));
-      onComplete(data.quiz, data.attempt);
+      onComplete(data.quiz, data.attempt, data.streak);
     } catch (err) {
       alert(err?.response?.data?.message || "Submission failed. Please try again.");
       submittingRef.current = false;
@@ -410,6 +411,7 @@ export default function StudentQuizTab({ studentInfo, isDarkMode }) {
   const [activeQuiz,   setActiveQuiz]   = useState(null);   // quiz being taken right now
   const [resultData,   setResultData]   = useState(null);   // { quiz, attempt } after submission
   const [toast,        setToast]        = useState(null);
+  const [streakToast,  setStreakToast]  = useState(null);
 
   const showToast = (msg, type = "success") => {
     setToast({ msg, type });
@@ -444,10 +446,11 @@ export default function StudentQuizTab({ studentInfo, isDarkMode }) {
     setActiveQuiz(quiz);
   };
 
-  const handleQuizComplete = (fullQuiz, attempt) => {
+  const handleQuizComplete = (fullQuiz, attempt, streak) => {
     setActiveQuiz(null);
     setResultData({ quiz: fullQuiz, attempt });
     fetchQuizzes();
+    if (streak?.incremented) setStreakToast(streak);
   };
 
   // ── Active quiz full-screen mode ───────────────────────────────────────────
@@ -459,6 +462,7 @@ export default function StudentQuizTab({ studentInfo, isDarkMode }) {
   if (resultData) {
     return (
       <div style={{ fontFamily: "'Nunito', sans-serif" }}>
+        <StreakToast data={streakToast} onDone={() => setStreakToast(null)} />
         <ResultScreen
           quiz={resultData.quiz}
           attempt={resultData.attempt}
@@ -472,6 +476,8 @@ export default function StudentQuizTab({ studentInfo, isDarkMode }) {
   // ── Quiz list ──────────────────────────────────────────────────────────────
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20, fontFamily: "'Nunito', sans-serif" }}>
+
+      <StreakToast data={streakToast} onDone={() => setStreakToast(null)} />
 
       {toast && (
         <div style={{

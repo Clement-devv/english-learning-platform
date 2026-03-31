@@ -7,6 +7,7 @@ import { studentSchema }            from "../schemas/studentSchema.js";
 import { teacherSchema }            from "../schemas/teacherSchema.js";
 import { paymentTransactionSchema } from "../schemas/paymentTransactionSchema.js";
 import { classroomSessionSchema }   from "../schemas/classroomSessionSchema.js";
+import { recordActivity, recordClassCompletion } from "../utils/streakService.js";
 
 const getBooking            = (db) => db.models.Booking            || db.model("Booking",            bookingSchema);
 const getStudent            = (db) => db.models.Student            || db.model("Student",            studentSchema);
@@ -208,6 +209,11 @@ export async function completeClass(db, bookingId, markedBy = "system", options 
       `   Teacher : ${teacher.firstName} ${teacher.lastName} → +$${ratePerClass} (total $${newEarned})\n` +
       `   Student : ${student.firstName} ${student.surname} → credits left: ${newClassCount}`
     );
+
+    // Fire-and-forget streak updates — never block completion
+    const sid = String(studentId);
+    recordActivity(db, sid).catch((e) => console.error("[Streak] recordActivity error:", e.message));
+    recordClassCompletion(db, sid).catch((e) => console.error("[Streak] recordClassCompletion error:", e.message));
 
     return {
       success:                 true,

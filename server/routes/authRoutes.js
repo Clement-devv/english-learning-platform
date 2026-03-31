@@ -139,7 +139,8 @@ router.post("/verify-2fa-login", tenantMiddleware, loginLimiter, async (req, res
 
 router.post("/teacher/login", tenantMiddleware, loginLimiter, async (req, res) => {
   try {
-    const { email, password, twoFactorToken, backupCode } = req.body;
+    const { password, twoFactorToken, backupCode } = req.body;
+    const email = req.body.email?.trim().toLowerCase();
 
     if (!email || !password) {
       return res.status(400).json({ message: "Email and password are required" });
@@ -155,6 +156,8 @@ router.post("/teacher/login", tenantMiddleware, loginLimiter, async (req, res) =
     const Teacher = getTeacherModel(req.db);
     const teacher = await Teacher.findOne({ email });
 
+    console.log(`[teacher-login] center=${req.center?.slug} email=${email} found=${!!teacher} active=${teacher?.active} status=${teacher?.status} hasPassword=${!!teacher?.password}`);
+
     if (!teacher) {
       await trackFailedLogin(email);
       return res.status(401).json({ message: "Invalid email or password" });
@@ -169,6 +172,7 @@ router.post("/teacher/login", tenantMiddleware, loginLimiter, async (req, res) =
     }
 
     const isPasswordValid = await bcrypt.compare(password, teacher.password);
+    console.log(`[teacher-login] passwordValid=${isPasswordValid}`);
     if (!isPasswordValid) {
       await trackFailedLogin(email);
       return res.status(401).json({ message: "Invalid email or password" });
@@ -306,11 +310,18 @@ router.post("/teacher/forgot-password", tenantMiddleware, passwordResetLimiter, 
     teacher.resetPasswordExpires = Date.now() + 3600000;
     await teacher.save();
 
-    await sendForgotPasswordEmail(
+    const emailResult = await sendForgotPasswordEmail(
       teacher.email,
       `${teacher.firstName} ${teacher.lastName}`,
-      resetToken
+      resetToken,
+      req.center.slug,
+      req.center?.centerName || ""
     );
+
+    if (!emailResult.success) {
+      console.error("Teacher forgot-password email failed:", emailResult.error);
+      return res.status(500).json({ message: "Could not send reset email. Please try again later." });
+    }
 
     res.json({ success: true, message: "If that email exists, a reset link has been sent" });
 
@@ -366,7 +377,8 @@ router.post("/teacher/reset-password/:token", tenantMiddleware, passwordResetLim
 
 router.post("/student/login", tenantMiddleware, loginLimiter, async (req, res) => {
   try {
-    const { email, password, twoFactorToken, backupCode } = req.body;
+    const { password, twoFactorToken, backupCode } = req.body;
+    const email = req.body.email?.trim().toLowerCase();
 
     if (!email || !password) {
       return res.status(400).json({ message: "Email and password are required" });
@@ -556,11 +568,18 @@ router.post("/student/forgot-password", tenantMiddleware, passwordResetLimiter, 
     student.resetPasswordExpires = Date.now() + 3600000;
     await student.save();
 
-    await sendStudentForgotPasswordEmail(
+    const emailResult = await sendStudentForgotPasswordEmail(
       student.email,
       `${student.firstName} ${student.surname}`,
-      resetToken
+      resetToken,
+      req.center.slug,
+      req.center?.centerName || ""
     );
+
+    if (!emailResult.success) {
+      console.error("Student forgot-password email failed:", emailResult.error);
+      return res.status(500).json({ message: "Could not send reset email. Please try again later." });
+    }
 
     res.json({ success: true, message: "If that email exists, a reset link has been sent" });
 
@@ -616,7 +635,8 @@ router.post("/student/reset-password/:token", tenantMiddleware, passwordResetLim
 
 router.post("/admin/login", tenantMiddleware, loginLimiter, async (req, res) => {
   try {
-    const { username, password, twoFactorToken, backupCode } = req.body;
+    const { password, twoFactorToken, backupCode } = req.body;
+    const username = req.body.username?.trim().toLowerCase();
 
     if (!username || !password) {
       return res.status(400).json({ message: "Username/email and password are required" });
@@ -727,6 +747,18 @@ router.get("/admin/verify", tenantMiddleware, async (req, res) => {
       return res.status(403).json({ message: "Admin access required" });
     }
 
+    // Impersonation tokens skip the DB lookup — short-lived JWTs issued by super admin
+    if (decoded.isImpersonation) {
+      return res.json({
+        success: true,
+        admin: {
+          id: 'superadmin-impersonation', username: 'impersonation',
+          email: '', firstName: 'Super Admin', lastName: '(Viewing)',
+          role: 'admin', active: true,
+        },
+      });
+    }
+
     const Admin = getAdminModel(req.db);
     const admin = await Admin.findById(decoded.id).select("-password");
 
@@ -807,7 +839,12 @@ router.post("/admin/forgot-password", tenantMiddleware, passwordResetLimiter, as
     admin.resetPasswordExpires = Date.now() + 3600000; // 1 hour
     await admin.save();
 
-    await sendAdminForgotPasswordEmail(admin.email, admin.firstName || admin.username, resetToken);
+    const emailResult = await sendAdminForgotPasswordEmail(admin.email, admin.firstName || admin.username, resetToken, req.center.slug, req.center?.centerName || "");
+
+    if (!emailResult.success) {
+      console.error("Admin forgot-password email failed:", emailResult.error);
+      return res.status(500).json({ message: "Could not send reset email. Please try again later." });
+    }
 
     res.json({ success: true, message: "If that email exists, a reset link has been sent" });
   } catch (err) {

@@ -80,6 +80,7 @@ function pal(dark) {
 // ── Teacher picker card ────────────────────────────────────────────────────
 function TeacherCard({ teacher, onClick, isDarkMode }) {
   const c = pal(isDarkMode);
+  const displayName = teacher.displayName?.trim() || `${teacher.firstName || ""} ${teacher.lastName || ""}`.trim();
   const initials = `${teacher.firstName?.[0] || ""}${teacher.lastName?.[0] || ""}`.toUpperCase();
   return (
     <div
@@ -104,7 +105,7 @@ function TeacherCard({ teacher, onClick, isDarkMode }) {
         </div>
         <div style={{ minWidth: 0 }}>
           <p style={{ margin: 0, fontWeight: "800", fontSize: "14px", color: c.heading, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-            {teacher.firstName} {teacher.lastName}
+            {displayName}
           </p>
           <p style={{ margin: "2px 0 0", fontSize: "11px", color: c.muted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
             {teacher.email}
@@ -213,13 +214,13 @@ export default function TeacherScheduleTab({ teachers = [], isDarkMode }) {
 
   // ── Filtered teacher list ──
   const filtered = teachers.filter(t =>
-    `${t.firstName} ${t.lastName} ${t.email}`.toLowerCase().includes(search.toLowerCase())
+    `${t.displayName || ""} ${t.firstName} ${t.lastName} ${t.email}`.toLowerCase().includes(search.toLowerCase())
   );
 
   // ═══════════════════════ TEACHER PICKER VIEW ═══════════════════════
   if (!selected) {
     return (
-      <div style={{ display: "flex", flexDirection: "column", gap: "20px", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: "20px", fontFamily: "var(--font-body)" }}>
         <style>{`
           @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
         `}</style>
@@ -268,9 +269,10 @@ export default function TeacherScheduleTab({ teachers = [], isDarkMode }) {
 
   // ═══════════════════════ CALENDAR VIEW ═══════════════════════
   const initials = `${selected.firstName?.[0] || ""}${selected.lastName?.[0] || ""}`.toUpperCase();
+  const selectedDisplayName = selected.displayName?.trim() || `${selected.firstName || ""} ${selected.lastName || ""}`.trim();
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "20px", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: "20px", fontFamily: "var(--font-body)" }}>
       <style>{`
         @keyframes spin    { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
         @keyframes fadeIn  { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
@@ -295,7 +297,7 @@ export default function TeacherScheduleTab({ teachers = [], isDarkMode }) {
           </div>
           <div style={{ minWidth: 0 }}>
             <p style={{ margin: 0, fontWeight: "800", fontSize: "16px", color: c.heading }}>
-              {selected.firstName} {selected.lastName}
+              {selectedDisplayName}
             </p>
             <p style={{ margin: 0, fontSize: "12px", color: c.muted, display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
               {selected.email}

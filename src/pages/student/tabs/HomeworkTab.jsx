@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { useGrammarCheck } from "../../../hooks/useGrammarCheck";
 import ListenButton from "../../../components/ListenButton";
+import StreakToast from "../components/StreakToast";
 
 const ALLOWED_TYPES = [
   "application/pdf",
@@ -171,6 +172,7 @@ export default function StudentHomeworkTab({ studentInfo, isDarkMode }) {
   const [expandedId,   setExpandedId]   = useState(null);
   const [submitting,   setSubmitting]   = useState(false);
   const [toast,        setToast]        = useState(null);
+  const [streakToast,  setStreakToast]  = useState(null);
 
   // Per-homework submission form state
   const [subForms, setSubForms] = useState({});   // { [hwId]: { text, files } }
@@ -230,8 +232,9 @@ export default function StudentHomeworkTab({ studentInfo, isDarkMode }) {
       const fd = new FormData();
       fd.append("text", sf.text.trim());
       sf.files.forEach(f => fd.append("files", f));
-      await api.post(`/api/homework/${hwId}/submit`, fd, { headers: { "Content-Type": "multipart/form-data" } });
+      const { data: submitData } = await api.post(`/api/homework/${hwId}/submit`, fd, { headers: { "Content-Type": "multipart/form-data" } });
       showToast("Homework submitted! Great job! 🎉");
+      if (submitData?.streak?.incremented) setStreakToast(submitData.streak);
       setSubForms(prev => {
         const next = { ...prev };
         delete next[hwId];
@@ -266,6 +269,8 @@ export default function StudentHomeworkTab({ studentInfo, isDarkMode }) {
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20, fontFamily: "'Nunito', sans-serif" }}>
+
+      <StreakToast data={streakToast} onDone={() => setStreakToast(null)} />
 
       {/* Toast */}
       {toast && (
@@ -683,7 +688,7 @@ function StudentAudioPlayer({ fileId, duration }) {
   const togglePlay = () => {
     if (!audioRef.current) return;
     if (playing) { audioRef.current.pause(); setPlaying(false); }
-    else         { audioRef.current.play();  setPlaying(true);  }
+    else         { audioRef.current.play().catch(() => {});  setPlaying(true);  }
   };
 
   return (

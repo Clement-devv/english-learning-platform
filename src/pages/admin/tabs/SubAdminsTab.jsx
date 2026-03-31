@@ -200,7 +200,7 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
   ];
 
   return (
-    <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", display: "flex", flexDirection: "column", gap: "20px" }}>
+    <div style={{ fontFamily: "var(--font-body)", display: "flex", flexDirection: "column", gap: "20px" }}>
 
       {/* ── Toast ── */}
       {toast.msg && (
@@ -690,7 +690,6 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
       )}
 
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
         .sa-spin { animation: sa-rotate 0.8s linear infinite; }
         @keyframes sa-rotate { to { transform: rotate(360deg); } }
         .sa-scroll::-webkit-scrollbar { width: 4px; }

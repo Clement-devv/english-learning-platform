@@ -5,14 +5,16 @@ import { verifyToken, verifyAdmin } from "../middleware/authMiddleware.js";
 import { config } from "../config/config.js";
 import { sendSubAdminInviteEmail } from "../utils/emailService.js";
 import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
-import { subAdminSchema }   from "../schemas/subAdminSchema.js";
-import { teacherSchema }    from "../schemas/teacherSchema.js";
+import { subAdminSchema } from "../schemas/subAdminSchema.js";
+import { teacherSchema }  from "../schemas/teacherSchema.js";
+import { studentSchema }  from "../schemas/studentSchema.js";
 
 const router = express.Router();
 router.use(tenantMiddleware);
 
 const getSubAdmin = (db) => db.models.SubAdmin || db.model("SubAdmin", subAdminSchema);
 const getTeacher  = (db) => db.models.Teacher  || db.model("Teacher",  teacherSchema);
+const getStudent  = (db) => db.models.Student  || db.model("Student",  studentSchema);
 
 // All routes require main admin auth
 router.use(verifyToken, verifyAdmin);
@@ -41,9 +43,18 @@ router.post("/invite", async (req, res) => {
       return res.status(400).json({ success: false, message: "First name, last name and email are required" });
 
     const SubAdmin = getSubAdmin(req.db);
-    const existing = await SubAdmin.findOne({ email: email.toLowerCase().trim() });
-    if (existing)
-      return res.status(409).json({ success: false, message: "A sub-admin with this email already exists" });
+    const Teacher  = getTeacher(req.db);
+    const Student  = getStudent(req.db);
+    const normalizedEmail = email.toLowerCase().trim();
+
+    const [asSubAdmin, asTeacher, asStudent] = await Promise.all([
+      SubAdmin.findOne({ email: normalizedEmail }).lean(),
+      Teacher.findOne({ email: normalizedEmail }).lean(),
+      Student.findOne({ email: normalizedEmail }).lean(),
+    ]);
+    if (asSubAdmin) return res.status(409).json({ success: false, message: "Email is already registered as a sub-admin" });
+    if (asTeacher)  return res.status(409).json({ success: false, message: "Email is already registered as a teacher" });
+    if (asStudent)  return res.status(409).json({ success: false, message: "Email is already registered as a student" });
 
     const inviteToken   = crypto.randomBytes(32).toString("hex");
     const inviteExpires = new Date(Date.now() + 48 * 60 * 60 * 1000);
@@ -68,8 +79,8 @@ router.post("/invite", async (req, res) => {
       createdBy: req.user.id,
     });
 
-    const setupUrl = `${config.frontendUrl}/sub-admin/setup?token=${inviteToken}`;
-    await sendSubAdminInviteEmail(subAdmin, setupUrl, req.admin);
+    const setupUrl = `${config.frontendUrl}/sub-admin/setup?token=${inviteToken}&center=${req.center.slug}`;
+    await sendSubAdminInviteEmail(subAdmin, setupUrl, req.admin, req.center?.centerName || "");
 
     res.status(201).json({
       success: true,
@@ -99,8 +110,8 @@ router.post("/:id/resend-invite", async (req, res) => {
     subAdmin.status        = "pending";
     await subAdmin.save();
 
-    const setupUrl = `${config.frontendUrl}/sub-admin/setup?token=${subAdmin.inviteToken}`;
-    await sendSubAdminInviteEmail(subAdmin, setupUrl, req.admin);
+    const setupUrl = `${config.frontendUrl}/sub-admin/setup?token=${subAdmin.inviteToken}&center=${req.center.slug}`;
+    await sendSubAdminInviteEmail(subAdmin, setupUrl, req.admin, req.center?.centerName || "");
 
     res.json({ success: true, message: "Invitation resent successfully" });
   } catch (err) {

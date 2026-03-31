@@ -119,8 +119,7 @@ function NavigationButtons() {
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@600;700;800&display=swap');
-        .app-nav { font-family: 'Plus Jakarta Sans', sans-serif; }
+        .app-nav { font-family: var(--font-display, sans-serif); }
         .nav-role-btn { transition: background 0.15s, color 0.15s, transform 0.1s; }
         .nav-role-btn:hover { opacity: 0.88; transform: translateY(-1px); }
         .nav-install-btn:hover { opacity: 0.9; transform: translateY(-1px); }
@@ -284,11 +283,70 @@ function NavBtn({ onClick, active, color, bg, children }) {
   );
 }
 
+function ImpersonationBanner() {
+  const location = useLocation();
+  const [info, setInfo]       = useState(null);
+  const [timeLeft, setTimeLeft] = useState('');
+
+  useEffect(() => {
+    const slug    = sessionStorage.getItem('impersonationCenterSlug');
+    const expStr  = sessionStorage.getItem('impersonationExpiresAt');
+    const rawInfo = sessionStorage.getItem('adminInfo');
+    if (!slug) { setInfo(null); return; }
+    try {
+      const parsed = JSON.parse(rawInfo || '{}');
+      if (parsed.impersonation) setInfo(parsed);
+    } catch { setInfo(null); }
+
+    if (!expStr) return;
+    const tick = () => {
+      const ms = Number(expStr) - Date.now();
+      if (ms <= 0) { setTimeLeft('Expired'); return; }
+      const m = Math.floor(ms / 60000);
+      const s = Math.floor((ms % 60000) / 1000);
+      setTimeLeft(`${m}m ${s < 10 ? '0' : ''}${s}s`);
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [location]);
+
+  if (!info) return null;
+
+  const handleExit = () => {
+    ['adminToken','adminInfo','impersonationCenterSlug','impersonationExpiresAt']
+      .forEach(k => sessionStorage.removeItem(k));
+    window.close();
+  };
+
+  return (
+    <div style={{
+      position: 'fixed', top: 0, left: 0, right: 0, zIndex: 9999,
+      background: 'linear-gradient(90deg,#7c3aed,#4f46e5)',
+      color: '#fff', display: 'flex', alignItems: 'center',
+      justifyContent: 'space-between', padding: '8px 20px',
+      fontSize: '13px', fontWeight: '600', boxShadow: '0 2px 12px rgba(124,58,237,0.4)',
+    }}>
+      <span>
+        👁️ Viewing <strong>{info.centerName}</strong> as Admin
+        {timeLeft && <span style={{ marginLeft: 10, opacity: 0.8, fontWeight: 400 }}>— Session expires in {timeLeft}</span>}
+      </span>
+      <button
+        onClick={handleExit}
+        style={{ background: 'rgba(255,255,255,0.18)', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 6, color: '#fff', cursor: 'pointer', padding: '4px 12px', fontWeight: 700, fontSize: 12 }}
+      >
+        Exit Session ×
+      </button>
+    </div>
+  );
+}
+
 function App() {
   return (
     <BrandingProvider>
       <Router>
       <div className="min-h-screen">
+        <ImpersonationBanner />
         <NavigationButtons />
         <Suspense fallback={<PageLoader />}>
           <Routes>

@@ -6,7 +6,7 @@ import {
   XCircle, PauseCircle, Plus, X, Eye, EyeOff,
   Globe, RefreshCw, Trash2, Mail, KeyRound, Palette,
   BarChart2, ChevronDown, ChevronUp, ToggleLeft, ToggleRight, Video, Mic, Film,
-  AlertTriangle, RotateCcw,
+  AlertTriangle, RotateCcw, Zap, Send, Activity, Users, UserCheck, LogIn, Megaphone, SlidersHorizontal,
 } from 'lucide-react';
 import api from '../../api';
 import { THEMES } from '../../data/themes';
@@ -74,10 +74,51 @@ export default function SuperAdminDashboard() {
   const [savingFeature,  setSavingFeature]  = useState(null); // key currently saving
 
   // ── Soft delete ──────────────────────────────────────────────────────────
-  const [deleteTarget, setDeleteTarget] = useState(null); // center pending confirmation
+  const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting,     setDeleting]     = useState(false);
-  const [deleted,      setDeleted]      = useState([]);   // soft-deleted centers
-  const [restoring,    setRestoring]    = useState(null); // center id being restored
+  const [deleted,      setDeleted]      = useState([]);
+  const [restoring,    setRestoring]    = useState(null);
+
+  // ── Plan editor ──────────────────────────────────────────────────────────
+  const [planModal,    setPlanModal]    = useState(null);  // center object
+  const [planSelected, setPlanSelected] = useState('');
+  const [planSaving,   setPlanSaving]   = useState(false);
+  const [planMsg,      setPlanMsg]      = useState('');
+
+  // ── Health tab ───────────────────────────────────────────────────────────
+  const [health,        setHealth]        = useState([]);
+  const [healthLoading, setHealthLoading] = useState(false);
+
+  // ── Seat limits modal ─────────────────────────────────────────────────────
+  const [limitsModal,   setLimitsModal]   = useState(null);  // center object
+  const [limitsTeachers,setLimitsTeachers]= useState('');
+  const [limitsStudents,setLimitsStudents]= useState('');
+  const [limitsUnlimT,  setLimitsUnlimT]  = useState(false);
+  const [limitsUnlimS,  setLimitsUnlimS]  = useState(false);
+  const [limitsSaving,  setLimitsSaving]  = useState(false);
+  const [limitsMsg,     setLimitsMsg]     = useState('');
+
+  // ── Impersonation ─────────────────────────────────────────────────────────
+  const [impersonating, setImpersonating] = useState(null); // centerId being entered
+
+  // ── Broadcast email ───────────────────────────────────────────────────────
+  const [broadcastModal,   setBroadcastModal]   = useState(false);
+  const [broadcastSubject, setBroadcastSubject] = useState('');
+  const [broadcastMessage, setBroadcastMessage] = useState('');
+  const [broadcasting,     setBroadcasting]     = useState(false);
+  const [broadcastResult,  setBroadcastResult]  = useState(null);
+
+  // ── AI Chat Credits ───────────────────────────────────────────────────────
+  const [creditCenters,    setCreditCenters]    = useState([]);
+  const [creditTotals,     setCreditTotals]     = useState(null);
+  const [creditLoading,    setCreditLoading]    = useState(false);
+  const [allocModal,       setAllocModal]       = useState(null);  // center object
+  const [allocAmount,      setAllocAmount]      = useState('');
+  const [allocNote,        setAllocNote]        = useState('');
+  const [allocating,       setAllocating]       = useState(false);
+  const [allocMsg,         setAllocMsg]         = useState('');
+  const [creditSearch,     setCreditSearch]     = useState('');
+  const [expandedLog,      setExpandedLog]      = useState(null);  // centerId
 
   const loadData = useCallback(() => {
     setLoading(true);
@@ -99,7 +140,27 @@ export default function SuperAdminDashboard() {
       .finally(() => setLoading(false));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const loadHealth = useCallback(() => {
+    setHealthLoading(true);
+    fetch(`${API_BASE}/super-admin/centers/health`, { headers: authHeaders })
+      .then(r => r.json())
+      .then(d => { if (d.success) setHealth(d.health); })
+      .catch(() => {})
+      .finally(() => setHealthLoading(false));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const loadCredits = useCallback(() => {
+    setCreditLoading(true);
+    fetch(`${API_BASE}/super-admin/chat-credits`, { headers: authHeaders })
+      .then(r => r.json())
+      .then(d => { if (d.success) { setCreditCenters(d.centers); setCreditTotals(d.totals); } })
+      .catch(() => {})
+      .finally(() => setCreditLoading(false));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => { loadData(); }, [loadData]);
+  useEffect(() => { if (tab === 'credits') loadCredits(); }, [tab, loadCredits]);
+  useEffect(() => { if (tab === 'health')  loadHealth();  }, [tab, loadHealth]);
 
   const handleLogout = () => {
     localStorage.removeItem('superAdminToken');
@@ -420,6 +481,46 @@ export default function SuperAdminDashboard() {
     }
   };
 
+  // ── Impersonation ─────────────────────────────────────────────────────────
+  const handleEnterAsAdmin = async (center) => {
+    setImpersonating(center._id);
+    try {
+      const res  = await fetch(`${API_BASE}/super-admin/impersonate/${center.slug}`, {
+        method: 'POST', headers: authHeaders,
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message);
+      const exp = Date.now() + 30 * 60 * 1000;
+      const url = `${window.location.origin}?imp_token=${encodeURIComponent(data.token)}&imp_center=${encodeURIComponent(center.slug)}&imp_name=${encodeURIComponent(center.centerName)}&imp_exp=${exp}`;
+      window.open(url, '_blank');
+    } catch (err) {
+      alert(err.message || 'Failed to start impersonation');
+    } finally {
+      setImpersonating(null);
+    }
+  };
+
+  // ── Broadcast ─────────────────────────────────────────────────────────────
+  const handleBroadcast = async () => {
+    if (!broadcastSubject.trim() || !broadcastMessage.trim()) return;
+    setBroadcasting(true);
+    setBroadcastResult(null);
+    try {
+      const res  = await fetch(`${API_BASE}/super-admin/broadcast`, {
+        method: 'POST',
+        headers: { ...authHeaders, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subject: broadcastSubject, message: broadcastMessage }),
+      });
+      const data = await res.json();
+      if (data.success) setBroadcastResult(data);
+      else throw new Error(data.message);
+    } catch (err) {
+      alert(err.message || 'Broadcast failed');
+    } finally {
+      setBroadcasting(false);
+    }
+  };
+
   const statusColor = (s) => ({ active: '#10b981', pending: '#f59e0b', suspended: '#ef4444', rejected: '#6b7280' }[s] || '#6b7280');
   const statusIcon  = (s) => {
     if (s === 'active')    return <CheckCircle size={13} />;
@@ -473,12 +574,15 @@ export default function SuperAdminDashboard() {
         )}
 
         {/* Tab switcher */}
-        <div style={s.tabRow}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: 8 }}>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           {[
-            { key: 'centers', label: 'Centers',        icon: Building2    },
-            { key: 'domains', label: 'Custom Domains', icon: Globe        },
-            { key: 'usage',   label: 'Agora Usage',    icon: BarChart2    },
-            { key: 'deleted', label: 'Deleted',         icon: Trash2      },
+            { key: 'centers', label: 'Centers',        icon: Building2  },
+            { key: 'health',  label: 'Health',         icon: Activity   },
+            { key: 'domains', label: 'Custom Domains', icon: Globe      },
+            { key: 'usage',   label: 'Agora Usage',    icon: BarChart2  },
+            { key: 'credits', label: 'AI Credits',     icon: Zap        },
+            { key: 'deleted', label: 'Deleted',        icon: Trash2     },
           ].map(({ key, label, icon: Icon }) => (
             <button
               key={key}
@@ -494,6 +598,14 @@ export default function SuperAdminDashboard() {
               )}
             </button>
           ))}
+          </div>
+          {/* Broadcast button */}
+          <button
+            onClick={() => { setBroadcastModal(true); setBroadcastSubject(''); setBroadcastMessage(''); setBroadcastResult(null); }}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#f59e0b,#d97706)', color: '#0c0a00', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}
+          >
+            <Megaphone size={14} /> Broadcast
+          </button>
         </div>
 
         {/* ── Centers Table ── */}
@@ -531,7 +643,16 @@ export default function SuperAdminDashboard() {
                           <p style={{ margin: 0, fontSize: '12px', color: '#6b7280' }}>{c.adminEmail}</p>
                         </td>
                         <td style={s.td}><code style={s.slug}>{c.slug}</code></td>
-                        <td style={s.td}><span style={s.planBadge}>{c.plan || 'basic'}</span></td>
+                        <td style={s.td}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span style={s.planBadge}>{c.plan || 'basic'}</span>
+                            <button
+                              onClick={() => { setPlanModal(c); setPlanSelected(c.plan || 'basic'); setPlanMsg(''); }}
+                              title="Change plan"
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', padding: '2px 4px', borderRadius: 4, lineHeight: 1 }}
+                            >✏️</button>
+                          </div>
+                        </td>
                         <td style={s.td}>
                           <span style={{ ...s.statusBadge, color: statusColor(c.status), borderColor: `${statusColor(c.status)}40`, background: `${statusColor(c.status)}12` }}>
                             {statusIcon(c.status)} {c.status}
@@ -557,6 +678,30 @@ export default function SuperAdminDashboard() {
                             <button onClick={() => setFeaturesCenter(c)} style={s.featuresBtn} title="Toggle features">
                               <ToggleRight size={12} /> Features
                             </button>
+                            <button
+                              onClick={() => {
+                                setLimitsModal(c);
+                                setLimitsUnlimT(c.maxTeachers === -1);
+                                setLimitsUnlimS(c.maxStudents === -1);
+                                setLimitsTeachers(c.maxTeachers === -1 ? '' : String(c.maxTeachers || ''));
+                                setLimitsStudents(c.maxStudents === -1 ? '' : String(c.maxStudents || ''));
+                                setLimitsMsg('');
+                              }}
+                              style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '5px 12px', borderRadius: 7, fontSize: 12, fontWeight: 600, background: 'rgba(251,146,60,0.1)', border: '1px solid rgba(251,146,60,0.2)', color: '#fb923c', cursor: 'pointer', fontFamily: 'inherit' }}
+                              title="Edit seat limits"
+                            >
+                              <SlidersHorizontal size={12} /> Limits
+                            </button>
+                            {c.status === 'active' && (
+                              <button
+                                onClick={() => handleEnterAsAdmin(c)}
+                                disabled={impersonating === c._id}
+                                style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '5px 12px', borderRadius: 7, fontSize: 12, fontWeight: 600, background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.3)', color: '#818cf8', cursor: 'pointer', fontFamily: 'inherit' }}
+                                title="Open admin panel for this center (30 min session)"
+                              >
+                                <LogIn size={12} /> {impersonating === c._id ? '…' : 'Enter'}
+                              </button>
+                            )}
                             <button onClick={() => setDeleteTarget(c)} style={s.deleteBtn} title="Schedule deletion">
                               <Trash2 size={12} />
                             </button>
@@ -648,6 +793,83 @@ export default function SuperAdminDashboard() {
             )}
           </div>
         )}
+        {/* ── Health Tab ── */}
+        {tab === 'health' && (
+          <div style={s.card}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+              <h2 style={s.sectionTitle}><Activity size={16} color="#34d399" /> Center Health</h2>
+              <button onClick={loadHealth} style={s.refreshBtn} title="Refresh"><RefreshCw size={14} /></button>
+            </div>
+            <p style={{ margin: '0 0 16px', fontSize: '12px', color: '#6b7280' }}>
+              Live counts from each center's database. Last Activity shows the most recent booking.
+            </p>
+            {healthLoading ? (
+              <div style={{ padding: '40px', textAlign: 'center', color: '#6b7280' }}>Loading health data…</div>
+            ) : health.length === 0 ? (
+              <div style={{ padding: '40px', textAlign: 'center', color: '#6b7280' }}>No active centers.</div>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={s.table}>
+                  <thead>
+                    <tr>
+                      {['Center', 'Teachers', 'Students', 'Bookings (month)', 'Last Activity'].map(h => (
+                        <th key={h} style={s.th}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {health.map(h => {
+                      const daysSince = h.lastActivity
+                        ? Math.floor((Date.now() - new Date(h.lastActivity)) / 86400000)
+                        : null;
+                      const actColor = daysSince === null ? '#6b7280'
+                        : daysSince <= 7  ? '#34d399'
+                        : daysSince <= 30 ? '#f59e0b'
+                        : '#f87171';
+                      return (
+                        <tr key={h._id} style={s.tr}>
+                          <td style={s.td}>
+                            <p style={{ margin: 0, fontWeight: 600, color: '#f1f5f9' }}>{centers.find(c => c._id === String(h._id))?.centerName || h.slug}</p>
+                            <code style={{ ...s.slug, fontSize: 11 }}>{h.slug}</code>
+                          </td>
+                          <td style={s.td}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <UserCheck size={13} color="#818cf8" />
+                              <span style={{ fontWeight: 700, color: '#f1f5f9' }}>{h.teachers}</span>
+                              {h.maxTeachers && h.maxTeachers !== -1 && (
+                                <span style={{ color: '#6b7280', fontSize: 11 }}>/ {h.maxTeachers}</span>
+                              )}
+                            </div>
+                          </td>
+                          <td style={s.td}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <Users size={13} color="#34d399" />
+                              <span style={{ fontWeight: 700, color: '#f1f5f9' }}>{h.students}</span>
+                              {h.maxStudents && h.maxStudents !== -1 && (
+                                <span style={{ color: '#6b7280', fontSize: 11 }}>/ {h.maxStudents}</span>
+                              )}
+                            </div>
+                          </td>
+                          <td style={{ ...s.td, fontWeight: 700, color: h.bookingsThisMonth > 0 ? '#34d399' : '#6b7280' }}>
+                            {h.bookingsThisMonth}
+                          </td>
+                          <td style={{ ...s.td, color: actColor, fontSize: 12, fontWeight: 600 }}>
+                            {h.lastActivity
+                              ? daysSince === 0 ? 'Today'
+                              : daysSince === 1 ? 'Yesterday'
+                              : `${daysSince}d ago`
+                              : 'No bookings yet'}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* ── Usage Tab ── */}
         {tab === 'usage' && (
           <div style={s.card}>
@@ -836,7 +1058,467 @@ export default function SuperAdminDashboard() {
           </div>
         )}
 
+        {/* ── AI Chat Credits Tab ── */}
+        {tab === 'credits' && (
+          <div style={s.card}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: 10 }}>
+              <h2 style={s.sectionTitle}><Zap size={16} color="#a78bfa" /> AI Chat Credits</h2>
+              <button onClick={loadCredits} style={s.refreshBtn} title="Refresh"><RefreshCw size={14} /></button>
+            </div>
+
+            {/* Summary totals */}
+            {creditTotals && (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, marginBottom: 20 }}>
+                {[
+                  { label: 'Total Allocated', value: creditTotals.totalAllocated.toLocaleString(), color: '#a78bfa' },
+                  { label: 'Currently Available', value: creditTotals.totalBalance.toLocaleString(), color: '#34d399' },
+                  { label: 'Total Used by Students', value: creditTotals.totalUsed.toLocaleString(), color: '#fb923c' },
+                ].map(t => (
+                  <div key={t.label} style={{ background: 'rgba(167,139,250,0.08)', border: '1px solid rgba(167,139,250,0.2)', borderRadius: 10, padding: '14px 16px' }}>
+                    <p style={{ margin: '0 0 4px', fontSize: 11, color: '#9ca3af', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t.label}</p>
+                    <p style={{ margin: 0, fontSize: 24, fontWeight: 900, color: t.color }}>{t.value}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Search */}
+            <div style={{ position: 'relative', marginBottom: 14 }}>
+              <input
+                value={creditSearch}
+                onChange={e => setCreditSearch(e.target.value)}
+                placeholder="Search centers..."
+                style={{ ...s.input, paddingLeft: 32, width: '100%', boxSizing: 'border-box' }}
+              />
+              <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#6b7280', fontSize: 14 }}>🔍</span>
+            </div>
+
+            {creditLoading ? (
+              <div style={{ textAlign: 'center', padding: 40, color: '#6b7280' }}>Loading credits...</div>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={s.table}>
+                  <thead>
+                    <tr>
+                      {['Center', 'Plan', 'Balance', 'Total Allocated', 'Used', 'Log', ''].map(h => (
+                        <th key={h} style={s.th}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {creditCenters
+                      .filter(c => !creditSearch || c.centerName.toLowerCase().includes(creditSearch.toLowerCase()) || c.slug.includes(creditSearch.toLowerCase()))
+                      .map(c => (
+                        <React.Fragment key={c._id}>
+                          <tr style={s.tr}>
+                            <td style={s.td}>
+                              <p style={{ margin: 0, fontWeight: 600, color: '#f1f5f9', fontSize: 13 }}>{c.centerName}</p>
+                              <p style={{ margin: 0, fontSize: 11, color: '#6b7280' }}>{c.adminEmail}</p>
+                            </td>
+                            <td style={s.td}>
+                              <span style={{ background: 'rgba(167,139,250,0.15)', color: '#a78bfa', borderRadius: 6, padding: '2px 8px', fontSize: 11, fontWeight: 700, textTransform: 'uppercase' }}>{c.plan}</span>
+                            </td>
+                            <td style={s.td}>
+                              <span style={{
+                                fontWeight: 800, fontSize: 16,
+                                color: c.balance === 0 ? '#ef4444' : c.balance <= 50 ? '#f59e0b' : '#34d399',
+                              }}>{c.balance.toLocaleString()}</span>
+                            </td>
+                            <td style={{ ...s.td, color: '#9ca3af', fontSize: 13 }}>{c.totalAllocated.toLocaleString()}</td>
+                            <td style={{ ...s.td, color: '#fb923c', fontSize: 13 }}>{c.used.toLocaleString()}</td>
+                            <td style={s.td}>
+                              {c.log.length > 0 ? (
+                                <button
+                                  onClick={() => setExpandedLog(expandedLog === c._id ? null : c._id)}
+                                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', fontSize: 11, display: 'flex', alignItems: 'center', gap: 3 }}
+                                >
+                                  {expandedLog === c._id ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                                  {c.log.length} entr{c.log.length === 1 ? 'y' : 'ies'}
+                                </button>
+                              ) : <span style={{ color: '#4b5563', fontSize: 11 }}>No log</span>}
+                            </td>
+                            <td style={s.td}>
+                              <button
+                                onClick={() => { setAllocModal(c); setAllocAmount(''); setAllocNote(''); setAllocMsg(''); }}
+                                style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#7c3aed,#4f46e5)', color: '#fff', fontWeight: 700, fontSize: 11, cursor: 'pointer' }}
+                              >
+                                <Zap size={12} /> Allocate
+                              </button>
+                            </td>
+                          </tr>
+                          {expandedLog === c._id && (
+                            <tr>
+                              <td colSpan={7} style={{ ...s.td, background: 'rgba(167,139,250,0.04)', padding: '10px 16px' }}>
+                                <p style={{ margin: '0 0 8px', fontSize: 11, fontWeight: 700, color: '#a78bfa', textTransform: 'uppercase' }}>Allocation Log (last 10)</p>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                  {c.log.map((entry, i) => (
+                                    <div key={i} style={{ display: 'flex', gap: 12, fontSize: 11, color: '#9ca3af' }}>
+                                      <span style={{ color: '#34d399', fontWeight: 700, minWidth: 60 }}>+{entry.amount}</span>
+                                      <span>{entry.note || '—'}</span>
+                                      <span style={{ color: '#6b7280' }}>by {entry.by || '—'}</span>
+                                      <span style={{ marginLeft: 'auto' }}>{entry.createdAt ? new Date(entry.createdAt).toLocaleDateString('en-GB') : ''}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </React.Fragment>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
       </div>
+
+      {/* ── Plan Editor Modal ── */}
+      {planModal && (
+        <div style={s.overlay} onClick={e => e.target === e.currentTarget && !planSaving && setPlanModal(null)}>
+          <div style={{ ...s.modal, maxWidth: 380 }}>
+            <div style={s.modalHeader}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <KeyRound size={16} color="#818cf8" />
+                <span style={s.modalTitle}>Change Plan</span>
+              </div>
+              {!planSaving && <button onClick={() => setPlanModal(null)} style={s.closeBtn}><X size={18} /></button>}
+            </div>
+
+            <div style={{ padding: 24 }}>
+              {/* Center info */}
+              <div style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 10, padding: '12px 14px', marginBottom: 20 }}>
+                <p style={{ margin: '0 0 2px', fontWeight: 700, color: '#f1f5f9', fontSize: 14 }}>{planModal.centerName}</p>
+                <p style={{ margin: 0, fontSize: 12, color: '#9ca3af' }}>{planModal.adminEmail}</p>
+                <p style={{ margin: '6px 0 0', fontSize: 12, color: '#818cf8' }}>
+                  Current plan: <strong style={{ textTransform: 'capitalize' }}>{planModal.plan || 'basic'}</strong>
+                </p>
+              </div>
+
+              {/* Plan options */}
+              <p style={{ margin: '0 0 10px', fontSize: 12, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Select plan</p>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 20 }}>
+                {[
+                  { key: 'free',       label: 'Free',       desc: 'Basic access',          color: '#6b7280' },
+                  { key: 'basic',      label: 'Basic',      desc: 'Standard features',     color: '#818cf8' },
+                  { key: 'pro',        label: 'Pro',        desc: 'Advanced features',     color: '#34d399' },
+                  { key: 'enterprise', label: 'Enterprise', desc: 'Unlimited everything',  color: '#f59e0b' },
+                ].map(p => (
+                  <button
+                    key={p.key}
+                    onClick={() => setPlanSelected(p.key)}
+                    style={{
+                      padding: '10px 12px', borderRadius: 10, cursor: 'pointer', textAlign: 'left',
+                      border: planSelected === p.key ? `2px solid ${p.color}` : '1px solid #374151',
+                      background: planSelected === p.key ? `${p.color}18` : 'rgba(255,255,255,0.03)',
+                      transition: 'all 0.15s',
+                    }}
+                  >
+                    <p style={{ margin: '0 0 2px', fontWeight: 700, fontSize: 13, color: planSelected === p.key ? p.color : '#d1d5db' }}>{p.label}</p>
+                    <p style={{ margin: 0, fontSize: 11, color: '#6b7280' }}>{p.desc}</p>
+                  </button>
+                ))}
+              </div>
+
+              {planMsg && (
+                <p style={{ margin: '0 0 14px', fontSize: 13, fontWeight: 700, color: planMsg.startsWith('✅') ? '#34d399' : '#f87171' }}>{planMsg}</p>
+              )}
+
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button
+                  onClick={() => setPlanModal(null)}
+                  disabled={planSaving}
+                  style={{ flex: 1, padding: '10px', borderRadius: 10, border: '1px solid #374151', background: 'transparent', color: '#9ca3af', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
+                >Cancel</button>
+                <button
+                  disabled={planSaving || planSelected === planModal.plan}
+                  onClick={async () => {
+                    setPlanSaving(true); setPlanMsg('');
+                    try {
+                      const res = await fetch(`${API_BASE}/super-admin/centers/${planModal._id}/plan`, {
+                        method: 'PATCH', headers: { ...authHeaders, 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ plan: planSelected }),
+                      });
+                      const d = await res.json();
+                      if (d.success) {
+                        setCenters(prev => prev.map(c => c._id === planModal._id ? { ...c, plan: planSelected } : c));
+                        setPlanModal(null);
+                      } else {
+                        setPlanMsg('❌ ' + (d.message || 'Failed to update plan'));
+                      }
+                    } catch { setPlanMsg('❌ Network error'); }
+                    finally { setPlanSaving(false); }
+                  }}
+                  style={{
+                    flex: 2, padding: '10px', borderRadius: 10, border: 'none', fontFamily: 'inherit',
+                    background: planSaving || planSelected === planModal.plan ? '#374151' : 'linear-gradient(135deg,#6366f1,#818cf8)',
+                    color: '#fff', fontWeight: 700, cursor: planSaving || planSelected === planModal.plan ? 'not-allowed' : 'pointer',
+                  }}
+                >{planSaving ? 'Saving…' : 'Save Plan'}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Allocate Credits Modal ── */}
+      {allocModal && (
+        <div style={s.overlay} onClick={e => e.target === e.currentTarget && !allocating && setAllocModal(null)}>
+          <div style={{ ...s.modal, maxWidth: 420 }}>
+            <div style={s.modalHeader}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <Zap size={16} color="#a78bfa" />
+                <span style={s.modalTitle}>Allocate AI Credits</span>
+              </div>
+              {!allocating && <button onClick={() => setAllocModal(null)} style={s.closeBtn}><X size={18} /></button>}
+            </div>
+
+            <div style={{ padding: 24 }}>
+              {/* Center info */}
+              <div style={{ background: 'rgba(167,139,250,0.08)', border: '1px solid rgba(167,139,250,0.2)', borderRadius: 10, padding: '12px 14px', marginBottom: 18 }}>
+                <p style={{ margin: '0 0 2px', fontWeight: 700, color: '#f1f5f9', fontSize: 14 }}>{allocModal.centerName}</p>
+                <p style={{ margin: 0, fontSize: 12, color: '#9ca3af' }}>{allocModal.adminEmail}</p>
+                <p style={{ margin: '6px 0 0', fontSize: 12, color: '#a78bfa', fontWeight: 600 }}>
+                  Current balance: <strong>{allocModal.balance.toLocaleString()}</strong> credits
+                </p>
+              </div>
+
+              {/* Preset amounts */}
+              <p style={{ margin: '0 0 8px', fontSize: 12, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Quick amounts</p>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
+                {[100, 250, 500, 1000, 2000, 5000].map(n => (
+                  <button
+                    key={n}
+                    onClick={() => setAllocAmount(String(n))}
+                    style={{
+                      padding: '6px 14px', borderRadius: 8, fontWeight: 700, fontSize: 12, cursor: 'pointer',
+                      border: allocAmount === String(n) ? '2px solid #7c3aed' : '1px solid #374151',
+                      background: allocAmount === String(n) ? 'rgba(124,58,237,0.2)' : 'rgba(255,255,255,0.04)',
+                      color: allocAmount === String(n) ? '#a78bfa' : '#9ca3af',
+                    }}
+                  >{n.toLocaleString()}</button>
+                ))}
+              </div>
+
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#9ca3af', marginBottom: 4, textTransform: 'uppercase' }}>Amount *</label>
+              <input
+                type="number" min="1" max="100000"
+                value={allocAmount}
+                onChange={e => setAllocAmount(e.target.value)}
+                placeholder="e.g. 500"
+                style={{ ...s.input, width: '100%', boxSizing: 'border-box', marginBottom: 12 }}
+              />
+
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#9ca3af', marginBottom: 4, textTransform: 'uppercase' }}>Note (optional)</label>
+              <input
+                value={allocNote}
+                onChange={e => setAllocNote(e.target.value)}
+                placeholder="e.g. Monthly plan allocation"
+                style={{ ...s.input, width: '100%', boxSizing: 'border-box', marginBottom: 18 }}
+              />
+
+              {allocMsg && (
+                <p style={{ margin: '0 0 14px', fontSize: 13, fontWeight: 700, color: allocMsg.startsWith('✅') ? '#34d399' : '#f87171' }}>{allocMsg}</p>
+              )}
+
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button
+                  onClick={() => setAllocModal(null)}
+                  disabled={allocating}
+                  style={{ flex: 1, padding: '10px', borderRadius: 10, border: '1px solid #374151', background: 'transparent', color: '#9ca3af', fontWeight: 600, cursor: 'pointer' }}
+                >Cancel</button>
+                <button
+                  disabled={allocating || !allocAmount}
+                  onClick={async () => {
+                    const amt = parseInt(allocAmount, 10);
+                    if (!amt || amt < 1 || amt > 100000) { setAllocMsg('Enter a valid amount (1–100,000)'); return; }
+                    setAllocating(true); setAllocMsg('');
+                    try {
+                      const res = await fetch(`${API_BASE}/super-admin/chat-credits/${allocModal._id}`, {
+                        method: 'POST', headers: { ...authHeaders, 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ amount: amt, note: allocNote.trim() || undefined }),
+                      });
+                      const d = await res.json();
+                      if (d.success) {
+                        setAllocMsg(`✅ ${amt.toLocaleString()} credits allocated! New balance: ${d.balance.toLocaleString()}`);
+                        // update local list
+                        setCreditCenters(prev => prev.map(c =>
+                          c._id === allocModal._id
+                            ? { ...c, balance: d.balance, totalAllocated: d.totalAllocated, used: d.totalAllocated - d.balance }
+                            : c
+                        ));
+                        setCreditTotals(prev => prev ? {
+                          ...prev,
+                          totalBalance:    prev.totalBalance    + amt,
+                          totalAllocated:  prev.totalAllocated  + amt,
+                        } : prev);
+                        setAllocModal(null);
+                      } else {
+                        setAllocMsg('❌ ' + (d.message || 'Failed'));
+                      }
+                    } catch { setAllocMsg('❌ Network error'); }
+                    finally { setAllocating(false); }
+                  }}
+                  style={{ flex: 2, padding: '10px', borderRadius: 10, border: 'none', background: allocating || !allocAmount ? '#374151' : 'linear-gradient(135deg,#7c3aed,#4f46e5)', color: '#fff', fontWeight: 700, cursor: allocating || !allocAmount ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+                >
+                  <Send size={13} /> {allocating ? 'Allocating…' : 'Allocate Credits'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Seat Limits Modal ── */}
+      {limitsModal && (
+        <div style={s.overlay} onClick={e => e.target === e.currentTarget && !limitsSaving && setLimitsModal(null)}>
+          <div style={{ ...s.modal, maxWidth: 400 }}>
+            <div style={s.modalHeader}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <SlidersHorizontal size={16} color="#fb923c" />
+                <span style={s.modalTitle}>Seat Limits</span>
+              </div>
+              {!limitsSaving && <button onClick={() => setLimitsModal(null)} style={s.closeBtn}><X size={18} /></button>}
+            </div>
+            <div style={{ padding: 24 }}>
+              <div style={{ background: 'rgba(251,146,60,0.08)', border: '1px solid rgba(251,146,60,0.2)', borderRadius: 10, padding: '12px 14px', marginBottom: 20 }}>
+                <p style={{ margin: '0 0 2px', fontWeight: 700, color: '#f1f5f9', fontSize: 14 }}>{limitsModal.centerName}</p>
+                <p style={{ margin: 0, fontSize: 12, color: '#9ca3af' }}>Current: {limitsModal.maxTeachers === -1 ? '∞' : limitsModal.maxTeachers} teachers / {limitsModal.maxStudents === -1 ? '∞' : limitsModal.maxStudents} students</p>
+              </div>
+
+              {/* Max Teachers */}
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <label style={{ fontSize: 12, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase' }}>Max Teachers</label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12, color: limitsUnlimT ? '#fb923c' : '#6b7280' }}>
+                    <input type="checkbox" checked={limitsUnlimT} onChange={e => setLimitsUnlimT(e.target.checked)} />
+                    Unlimited
+                  </label>
+                </div>
+                <input
+                  type="number" min="1" placeholder="e.g. 10"
+                  disabled={limitsUnlimT}
+                  value={limitsTeachers}
+                  onChange={e => setLimitsTeachers(e.target.value)}
+                  style={{ ...s.input, width: '100%', boxSizing: 'border-box', opacity: limitsUnlimT ? 0.4 : 1 }}
+                />
+              </div>
+
+              {/* Max Students */}
+              <div style={{ marginBottom: 20 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <label style={{ fontSize: 12, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase' }}>Max Students</label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12, color: limitsUnlimS ? '#fb923c' : '#6b7280' }}>
+                    <input type="checkbox" checked={limitsUnlimS} onChange={e => setLimitsUnlimS(e.target.checked)} />
+                    Unlimited
+                  </label>
+                </div>
+                <input
+                  type="number" min="1" placeholder="e.g. 100"
+                  disabled={limitsUnlimS}
+                  value={limitsStudents}
+                  onChange={e => setLimitsStudents(e.target.value)}
+                  style={{ ...s.input, width: '100%', boxSizing: 'border-box', opacity: limitsUnlimS ? 0.4 : 1 }}
+                />
+              </div>
+
+              {limitsMsg && (
+                <p style={{ margin: '0 0 14px', fontSize: 13, fontWeight: 700, color: limitsMsg.startsWith('✅') ? '#34d399' : '#f87171' }}>{limitsMsg}</p>
+              )}
+
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button onClick={() => setLimitsModal(null)} disabled={limitsSaving} style={{ flex: 1, padding: '10px', borderRadius: 10, border: '1px solid #374151', background: 'transparent', color: '#9ca3af', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Cancel</button>
+                <button
+                  disabled={limitsSaving}
+                  onClick={async () => {
+                    setLimitsSaving(true); setLimitsMsg('');
+                    const body = {
+                      maxTeachers: limitsUnlimT ? -1 : Number(limitsTeachers),
+                      maxStudents: limitsUnlimS ? -1 : Number(limitsStudents),
+                    };
+                    try {
+                      const res = await fetch(`${API_BASE}/super-admin/centers/${limitsModal._id}/limits`, {
+                        method: 'PATCH', headers: { ...authHeaders, 'Content-Type': 'application/json' },
+                        body: JSON.stringify(body),
+                      });
+                      const d = await res.json();
+                      if (d.success) {
+                        setCenters(prev => prev.map(c => c._id === limitsModal._id
+                          ? { ...c, maxTeachers: d.maxTeachers, maxStudents: d.maxStudents } : c));
+                        setLimitsModal(null);
+                      } else { setLimitsMsg('❌ ' + (d.message || 'Failed')); }
+                    } catch { setLimitsMsg('❌ Network error'); }
+                    finally { setLimitsSaving(false); }
+                  }}
+                  style={{ flex: 2, padding: '10px', borderRadius: 10, border: 'none', background: limitsSaving ? '#374151' : 'linear-gradient(135deg,#fb923c,#ea580c)', color: '#fff', fontWeight: 700, cursor: limitsSaving ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}
+                >{limitsSaving ? 'Saving…' : 'Save Limits'}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Broadcast Email Modal ── */}
+      {broadcastModal && (
+        <div style={s.overlay} onClick={e => e.target === e.currentTarget && !broadcasting && setBroadcastModal(false)}>
+          <div style={{ ...s.modal, maxWidth: 500 }}>
+            <div style={s.modalHeader}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <Megaphone size={16} color="#f59e0b" />
+                <span style={s.modalTitle}>Broadcast to All Centers</span>
+              </div>
+              {!broadcasting && <button onClick={() => setBroadcastModal(false)} style={s.closeBtn}><X size={18} /></button>}
+            </div>
+            <div style={{ padding: 24 }}>
+              {broadcastResult ? (
+                <div style={{ textAlign: 'center', padding: '20px 0' }}>
+                  <CheckCircle size={40} color="#34d399" style={{ marginBottom: 12 }} />
+                  <p style={{ margin: '0 0 6px', fontSize: 16, fontWeight: 700, color: '#f1f5f9' }}>Broadcast Sent!</p>
+                  <p style={{ margin: 0, fontSize: 13, color: '#9ca3af' }}>{broadcastResult.sent} emails sent, {broadcastResult.failed} failed (of {broadcastResult.total} centers)</p>
+                  <button onClick={() => setBroadcastModal(false)} style={{ ...s.approveBtn, marginTop: 20, padding: '8px 24px' }}>Done</button>
+                </div>
+              ) : (
+                <>
+                  <div style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 10, padding: '10px 14px', marginBottom: 18, fontSize: 12, color: '#9ca3af' }}>
+                    This will email <strong style={{ color: '#f59e0b' }}>all {centers.filter(c => c.status === 'active').length} active centers</strong> simultaneously.
+                  </div>
+
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#9ca3af', marginBottom: 4, textTransform: 'uppercase' }}>Subject *</label>
+                  <input
+                    value={broadcastSubject}
+                    onChange={e => setBroadcastSubject(e.target.value)}
+                    placeholder="e.g. Scheduled maintenance on Sunday"
+                    style={{ ...s.input, width: '100%', boxSizing: 'border-box', marginBottom: 14 }}
+                    disabled={broadcasting}
+                  />
+
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#9ca3af', marginBottom: 4, textTransform: 'uppercase' }}>Message *</label>
+                  <textarea
+                    value={broadcastMessage}
+                    onChange={e => setBroadcastMessage(e.target.value)}
+                    placeholder="Write your message here…"
+                    rows={6}
+                    style={{ ...s.input, width: '100%', boxSizing: 'border-box', marginBottom: 18, resize: 'vertical', height: 120 }}
+                    disabled={broadcasting}
+                  />
+
+                  <div style={{ display: 'flex', gap: 10 }}>
+                    <button onClick={() => setBroadcastModal(false)} disabled={broadcasting} style={{ flex: 1, padding: '10px', borderRadius: 10, border: '1px solid #374151', background: 'transparent', color: '#9ca3af', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Cancel</button>
+                    <button
+                      disabled={broadcasting || !broadcastSubject.trim() || !broadcastMessage.trim()}
+                      onClick={handleBroadcast}
+                      style={{ flex: 2, padding: '10px', borderRadius: 10, border: 'none', background: broadcasting || !broadcastSubject.trim() || !broadcastMessage.trim() ? '#374151' : 'linear-gradient(135deg,#f59e0b,#d97706)', color: broadcasting || !broadcastSubject.trim() || !broadcastMessage.trim() ? '#6b7280' : '#0c0a00', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+                    >
+                      <Send size={13} /> {broadcasting ? 'Sending…' : 'Send to All Centers'}
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Delete Confirm Modal ── */}
       {deleteTarget && (

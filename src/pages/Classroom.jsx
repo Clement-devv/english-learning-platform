@@ -213,9 +213,14 @@ const startTimer = useCallback(() => {
     setClassStarted(true);
     setIsTimerRunning(true);
     classStartedAtRef.current = new Date(session.classStartedAt).getTime();
-    // Use whichever is larger: server value or what we restored from sessionStorage
-    // (heartbeat may lag a few seconds behind, so our local snapshot can be more accurate)
-    bothActiveAccRef.current = Math.max(session.bothActiveTime || 0, bothActiveAccRef.current);
+    // Anchor segment to class start when acc is 0 (fresh session) for background-tab
+    // resilience (Google Meet). Skip when acc > 0 to avoid double-counting.
+    if (!bothActiveStartRef.current && bothActiveAccRef.current === 0) {
+      bothActiveStartRef.current = classStartedAtRef.current;
+    } else {
+      // Use whichever is larger: server value or what we restored from sessionStorage
+      bothActiveAccRef.current = Math.max(session.bothActiveTime || 0, bothActiveAccRef.current);
+    }
     setBothActiveTime(bothActiveAccRef.current);
     startTimer();
   }
@@ -392,9 +397,18 @@ useEffect(() => {
         // exact same point in time as the other user — no drift
         if (s.classStartedAt) {
           const elapsed = Math.floor((Date.now() - new Date(s.classStartedAt)) / 1000);
+          classStartedAtRef.current = new Date(s.classStartedAt).getTime();
           setTimeElapsed(elapsed);
-          // Sync bothActiveTime too — use server value if available, else elapsed
-          setBothActiveTime(s.bothActiveTime > 0 ? s.bothActiveTime : elapsed);
+          // Sync bothActiveTime — use server value if available, else elapsed.
+          // Only anchor segment to class start when acc is 0 (fresh session) to
+          // avoid double-counting (acc + elapsed would exceed elapsed if acc > 0).
+          if (!bothActiveStartRef.current && bothActiveAccRef.current === 0) {
+            bothActiveStartRef.current = classStartedAtRef.current;
+            setBothActiveTime(elapsed);
+          } else {
+            bothActiveAccRef.current = Math.max(s.bothActiveTime || 0, bothActiveAccRef.current);
+            setBothActiveTime(bothActiveAccRef.current);
+          }
         }
 
         setClassStarted(true);
@@ -431,11 +445,15 @@ useEffect(() => {
   pollTimeout = setTimeout(poll, currentPollInterval);
 
   // Heartbeat every 15 seconds
+  // Compute from refs directly so the value is accurate even when the tab is
+  // in the background (setInterval throttled — React state may be stale).
   syncRef.current = setInterval(() => {
-    setBothActiveTime((current) => {
-      sendHeartbeat(current);
-      return current;
-    });
+    const runningSegment = bothActiveStartRef.current
+      ? Math.floor((Date.now() - bothActiveStartRef.current) / 1000)
+      : 0;
+    const currentBothActiveTime = bothActiveAccRef.current + runningSegment;
+    setBothActiveTime(currentBothActiveTime);
+    sendHeartbeat(currentBothActiveTime);
   }, 15000);
 
   return () => {
@@ -470,23 +488,36 @@ useEffect(() => {
         setTimeElapsed(elapsed);
       }
 
+      // Re-check presence in case polls were throttled while the tab was in background
+      // (Chrome throttles background intervals to ~1 min after 5 min inactive).
+      if (s.teacherJoinedAt && !s.teacherLeftAt) {
+        teacherPresentRef.current = true;
+        setIsTeacherPresent(true);
+      }
+      if (s.studentJoinedAt && !s.studentLeftAt) {
+        studentPresentRef.current = true;
+        setIsStudentPresent(true);
+      }
+
       // Sync bothActiveTime without breaking the active segment.
-      // The server value can lag up to 15 s behind (heartbeat interval), so
-      // compute our own current total (acc + any running segment) and use
-      // whichever is larger — never go backwards.
-      const runningSegment = bothActiveStartRef.current
-        ? Math.floor((Date.now() - bothActiveStartRef.current) / 1000)
+      // Use classStartedAtRef as fallback segment anchor — covers the case where
+      // the tab was throttled and the timer never fired (bothActiveStartRef = null).
+      const segmentStart = bothActiveStartRef.current || classStartedAtRef.current;
+      const runningSegment = segmentStart
+        ? Math.floor((Date.now() - segmentStart) / 1000)
         : 0;
       const localTotal = bothActiveAccRef.current + runningSegment;
       const serverTotal = s.bothActiveTime || 0;
 
       if (serverTotal > localTotal) {
-        // Server is ahead (e.g. other user's client pushed a bigger value)
-        // Absorb the difference into the accumulator so the segment can keep running
+        // Server is ahead — absorb into accumulator so the segment keeps running
         bothActiveAccRef.current = serverTotal - runningSegment;
         setBothActiveTime(serverTotal);
+      } else {
+        // Local is ahead (timer ran or we computed from classStartedAt).
+        // Update state so the display refreshes when the user returns to this tab.
+        setBothActiveTime(localTotal);
       }
-      // If local >= server: do nothing — our timestamp-based timer is already correct
     } catch (err) {
       console.error("Resync error:", err);
     }
@@ -950,8 +981,8 @@ useEffect(() => {
               userRole={userRole}
               bookingId={bookingId}
             />
-            {/* "Change Platform" only shown on the video tab */}
-            {activeTab === "video" && (
+            {/* "Change Platform" only shown on the video tab — teacher only */}
+            {activeTab === "video" && userRole === "teacher" && (
               <button
                 onClick={() => { activeVideoProviderRef.current = null; setActiveVideoProvider(null); }}
                 className="absolute top-4 left-4 px-4 py-2 bg-white/90 backdrop-blur rounded-lg shadow-lg hover:bg-white transition-all flex items-center gap-2 z-50 text-sm font-medium"
@@ -968,6 +999,7 @@ useEffect(() => {
             {!activeVideoProvider ? (
 
               /* ── Video provider selection ── */
+              userRole === "teacher" ? (
               <div className="h-full flex items-center justify-center bg-gradient-to-br from-purple-50 to-blue-50 p-8">
                 <div className="max-w-2xl w-full">
                   <h2 className="text-3xl font-bold text-center text-gray-800 mb-3">Choose Video Platform</h2>
@@ -981,7 +1013,7 @@ useEffect(() => {
                           window.open(resolvedGoogleMeetLink, "_blank");
                           chooseProvider("googlemeet");
                         } else {
-                          alert("⚠️ Google Meet link not configured. Ask your teacher to set it up.");
+                          alert("⚠️ Google Meet link not configured. Please set your Google Meet link in your profile.");
                         }
                       }}
                       disabled={!resolvedGoogleMeetLink}
@@ -1025,6 +1057,18 @@ useEffect(() => {
                   </p>
                 </div>
               </div>
+              ) : (
+              /* ── Student waiting for teacher to choose platform ── */
+              <div className="h-full flex items-center justify-center bg-gradient-to-br from-purple-50 to-blue-50 p-8">
+                <div className="max-w-sm w-full text-center">
+                  <div className="w-20 h-20 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <Loader className="w-10 h-10 text-purple-500 animate-spin" />
+                  </div>
+                  <h2 className="text-2xl font-bold text-gray-800 mb-3">Waiting for Teacher</h2>
+                  <p className="text-gray-600">Your teacher is selecting the video platform. This page will update automatically.</p>
+                </div>
+              </div>
+              )
 
             ) : (
 
@@ -1093,10 +1137,12 @@ useEffect(() => {
                       className="w-full px-5 py-3 bg-green-500 hover:bg-green-600 text-white rounded-full font-bold text-sm transition-all">
                       🔗 Reopen Google Meet
                     </button>
-                    <button onClick={() => setActiveVideoProvider(null)}
+                    {userRole === "teacher" && (
+                    <button onClick={() => { activeVideoProviderRef.current = null; setActiveVideoProvider(null); }}
                       className="w-full px-5 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-full text-sm transition-all">
                       ← Switch Video Platform
                     </button>
+                    )}
                   </div>
                 </div>
 

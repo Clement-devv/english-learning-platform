@@ -90,9 +90,9 @@ router.post("/", verifyToken, async (req, res) => {
       .populate("studentId", "firstName surname email noOfClasses");
 
     if (createdBy === "admin") {
-      sendBookingRequestToTeacher(teacher, student, populatedBooking).catch(e => console.error("Teacher booking email failed:", e.message));
+      sendBookingRequestToTeacher(teacher, student, populatedBooking, req.center?.centerName || "").catch(e => console.error("Teacher booking email failed:", e.message));
     }
-    sendBookingCreatedToStudent(student, teacher, populatedBooking).catch(e => console.error("Student booking email failed:", e.message));
+    sendBookingCreatedToStudent(student, teacher, populatedBooking, req.center?.centerName || "").catch(e => console.error("Student booking email failed:", e.message));
 
     res.status(201).json({
       success: true,
@@ -124,7 +124,7 @@ router.patch("/:id/accept", verifyToken, async (req, res) => {
     booking.acceptedAt = new Date();
     await booking.save();
 
-    try { await sendBookingAcceptedToStudent(booking.studentId, booking.teacherId, booking); }
+    try { await sendBookingAcceptedToStudent(booking.studentId, booking.teacherId, booking, req.center?.centerName || ""); }
     catch (e) { console.error("Email notification failed:", e.message); }
 
     res.json({ success: true, message: "Booking accepted successfully", booking });
@@ -153,7 +153,7 @@ router.patch("/:id/reject", verifyToken, async (req, res) => {
     booking.rejectedAt      = new Date();
     await booking.save();
 
-    try { await sendBookingRejectedToStudent(booking.studentId, booking.teacherId, booking); }
+    try { await sendBookingRejectedToStudent(booking.studentId, booking.teacherId, booking, req.center?.centerName || ""); }
     catch (e) { console.error("Email notification failed:", e.message); }
 
     res.json({ success: true, message: "Booking rejected", booking });

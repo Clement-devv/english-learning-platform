@@ -3,13 +3,14 @@ import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
   Settings, Plus, MessageCircle, Video, Repeat,
-  Home, Calendar, CheckCircle, Users, BookOpen,
+  Home, Calendar, CheckCircle, Users, BookOpen, User,
   DollarSign, LogOut, Menu, ChevronRight,
   GraduationCap, RefreshCw, AlertCircle, CalendarDays, Film, Star, Bell
 } from "lucide-react";
 
 // ── Layout (original) ─────────────────────────────────────────────────────────
 import DashboardHeader from "./components/Layout/DashboardHeader";
+import { useBranding } from "../../context/BrandingContext";
 
 // ── Change Password (original) ────────────────────────────────────────────────
 import ChangePassword from "../../components/teacher/auth/ChangePassword";
@@ -49,6 +50,7 @@ import QuizTab           from "./tabs/QuizTab";
 import VocabTab          from "./tabs/VocabTab";
 import RecordingsTab     from "./tabs/RecordingsTab";
 import ReviewsTab       from "./tabs/ReviewsTab";
+import ProfileTab       from "./tabs/ProfileTab";
 import ScheduleTab        from "./tabs/ScheduleTab";
 import GoogleMeetSettings from "../../components/GoogleMeetSettings";
 import RecurringClassForm from "../../components/teacher/RecurringClassForm";
@@ -82,10 +84,13 @@ const NAV = [
   { key: "vocab",             label: "Vocabulary",        icon: BookOpen      },
   { key: "recordings",        label: "Recordings",        icon: Film          },
   { key: "reviews",           label: "My Reviews",        icon: Star          },
+  { key: "profile",           label: "My Profile",        icon: User          },
 ];
 
 export default function TeacherDashboard() {
   const navigate = useNavigate();
+  const { branding, center } = useBranding();
+  const centerName = center?.centerName || "Teacher Portal";
 
   // ── Original state (100% preserved) ──────────────────────────────────────────
   const [teacherInfo,    setTeacherInfo]    = useState(null);
@@ -396,7 +401,7 @@ export default function TeacherDashboard() {
         }
       });
 
-      setCompletedClasses([...finishedClasses, ...Array.from(completedMap.values()), ...Array.from(missedMap.values())]);
+      setCompletedClasses([...finishedClasses, ...Array.from(completedMap.values())]);
     } catch (err) {
       console.error("Failed to load teacher data:", err);
       console.error("Error details:", err.response?.data?.message || "Failed to load teacher data");
@@ -609,19 +614,23 @@ export default function TeacherDashboard() {
   return (
     <>
       <style>{globalCSS(isDarkMode)}</style>
-      <div style={{ display: "flex", height: "100vh", background: c.bg, fontFamily: "'Plus Jakarta Sans', sans-serif", overflow: "hidden", opacity: mounted ? 1 : 0, transition: "opacity 0.3s ease" }}>
+      <div style={{ display: "flex", height: "100vh", background: c.bg, fontFamily: "var(--font-body)", overflow: "hidden", opacity: mounted ? 1 : 0, transition: "opacity 0.3s ease" }}>
 
         {/* ═══════════════════════════════════════════ SIDEBAR ══ */}
         <aside style={{ width: sidebarOpen ? "230px" : "60px", background: c.card, borderRight: `1px solid ${c.border}`, display: "flex", flexDirection: "column", flexShrink: 0, transition: "width 0.25s cubic-bezier(0.4,0,0.2,1)", overflow: "hidden", zIndex: 40 }}>
 
           {/* Logo */}
           <div style={{ height: "64px", display: "flex", alignItems: "center", padding: sidebarOpen ? "0 18px" : "0 14px", borderBottom: `1px solid ${c.border}`, gap: "10px", flexShrink: 0 }}>
-            <div style={{ width: "32px", height: "32px", borderRadius: "10px", flexShrink: 0, background: "linear-gradient(135deg, var(--brand-primary), var(--brand-secondary))", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <GraduationCap size={15} color="white" />
-            </div>
+            {branding.logo ? (
+              <img src={branding.logo} alt={centerName} style={{ height: 32, maxWidth: 32, objectFit: "contain", borderRadius: 6, flexShrink: 0 }} />
+            ) : (
+              <div style={{ width: "32px", height: "32px", borderRadius: "10px", flexShrink: 0, background: "linear-gradient(135deg, var(--brand-primary), var(--brand-secondary))", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <GraduationCap size={15} color="white" />
+              </div>
+            )}
             {sidebarOpen && (
               <div style={{ overflow: "hidden" }}>
-                <p style={{ margin: 0, fontSize: "13px", fontWeight: "800", color: c.heading, whiteSpace: "nowrap" }}>EduLearn</p>
+                <p style={{ margin: 0, fontSize: "13px", fontWeight: "800", color: c.heading, whiteSpace: "nowrap", fontFamily: "var(--font-display)" }}>{centerName}</p>
                 <p style={{ margin: 0, fontSize: "9px", color: c.muted, fontWeight: "700", letterSpacing: "0.08em", textTransform: "uppercase" }}>Teacher Portal</p>
               </div>
             )}
@@ -741,7 +750,7 @@ export default function TeacherDashboard() {
             style={{ flex: 1, overflowY: "auto", padding: activeTab === "messages" ? "0" : "24px", background: c.bg }}
             className="td-scroll"
           >
-            <div style={{ background: c.card, borderRadius: "16px", border: `1px solid ${c.border}`, minHeight: "calc(100vh - 112px)", padding: activeTab === "messages" ? "0" : "24px", overflow: activeTab === "messages" ? "hidden" : "visible" }}>
+            <div key={activeTab} className="td-content" style={{ background: c.card, borderRadius: "20px", border: `1px solid ${c.border}`, boxShadow: isDarkMode ? "none" : "0 4px 24px rgba(108,99,255,0.07), 0 1px 4px rgba(0,0,0,0.04)", minHeight: "calc(100vh - 112px)", padding: activeTab === "messages" ? "0" : "24px", overflow: activeTab === "messages" ? "hidden" : "visible" }}>
 
               {/* ─────────────────────────── DASHBOARD TAB ── */}
               {activeTab === "dashboard" && (
@@ -750,7 +759,7 @@ export default function TeacherDashboard() {
                   {/* Header row */}
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "12px" }}>
                     <div>
-                      <h1 style={{ margin: 0, fontSize: "20px", fontWeight: "800", color: c.heading }}>
+                      <h1 style={{ margin: 0, fontSize: "20px", fontWeight: "800", color: c.heading, fontFamily: "var(--font-display)" }}>
                         Welcome back, {teacherInfo?.firstName}! 👋
                       </h1>
                       <p style={{ margin: "4px 0 0", fontSize: "13px", color: c.muted }}>
@@ -993,6 +1002,19 @@ export default function TeacherDashboard() {
                 <ReviewsTab teacherInfo={teacherInfo} isDarkMode={isDarkMode} />
               )}
 
+              {/* ─────────────────────────────── PROFILE TAB ── */}
+              {activeTab === "profile" && (
+                <ProfileTab
+                  teacherInfo={teacherInfo}
+                  isDarkMode={isDarkMode}
+                  onUpdate={(updated) => {
+                    const merged = { ...teacherInfo, ...updated };
+                    setTeacherInfo(merged);
+                    localStorage.setItem("teacherInfo", JSON.stringify(merged));
+                  }}
+                />
+              )}
+
             </div>
           </main>
         </div>
@@ -1085,7 +1107,7 @@ export default function TeacherDashboard() {
 // ── Palette helper ────────────────────────────────────────────────────────────
 function palette(dark) {
   return {
-    bg:      dark ? "#0f1117" : "#f4f6fb",
+    bg:      dark ? "linear-gradient(135deg, #0f0f1a 0%, #1a1030 40%, #0a1628 100%)" : "linear-gradient(135deg, #e8eeff 0%, #f0e8ff 40%, #e8f4ff 100%)",
     card:    dark ? "#1a1d27" : "#ffffff",
     border:  dark ? "#1e2235" : "#e8ecf4",
     heading: dark ? "#e2e8f0" : "#1e293b",
@@ -1097,11 +1119,15 @@ function palette(dark) {
 // ── Global CSS ────────────────────────────────────────────────────────────────
 function globalCSS(dark) {
   return `
-    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
     * { box-sizing: border-box; }
     .td-scroll::-webkit-scrollbar { width: 4px; }
     .td-scroll::-webkit-scrollbar-thumb { background: ${dark ? "#1e2235" : "#e0e4f4"}; border-radius: 4px; }
     .td-nav-btn:hover { background: ${dark ? "rgba(var(--brand-primary-rgb), 0.12) !important" : "rgba(var(--brand-primary-rgb), 0.08) !important"}; color: var(--brand-primary) !important; }
+    @keyframes td-slide-up {
+      from { opacity: 0; transform: translateY(14px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .td-content { animation: td-slide-up 0.35s ease both; }
     .td-logout-btn:hover { background: rgba(239,68,68,0.08) !important; }
   `;
 }
