@@ -10,6 +10,7 @@ import { getDb } from '../config/dbManager.js';
 import { config } from '../config/config.js';
 import { sendEmail, sendCenterDeletionWarningEmail } from '../utils/emailService.js';
 import { verifyDomainDns, isValidDomain, normalizeDomain } from '../utils/domainVerifier.js';
+import { pruneSessionsToLimit } from '../utils/sessionManager.js';
 import { teacherSchema } from '../schemas/teacherSchema.js';
 import { studentSchema }  from '../schemas/studentSchema.js';
 import { bookingSchema }  from '../schemas/bookingSchema.js';
@@ -44,7 +45,8 @@ router.post('/login', async (req, res) => {
       { expiresIn: config.jwtExpiry }
     );
 
-    superAdmin.sessions.push({ token, isActive: true });
+    superAdmin.sessions.push({ token, isActive: true, loginTime: new Date() });
+    superAdmin.sessions = pruneSessionsToLimit(superAdmin.sessions);
     superAdmin.lastLogin = new Date();
     await superAdmin.save();
 

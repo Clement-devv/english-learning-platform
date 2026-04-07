@@ -16,9 +16,9 @@ export default function TwoFactorSetup({ isOpen, onClose, userType = 'student' }
 
   // Get the correct token based on user type
   const getToken = () => {
-    if (userType === 'teacher') return localStorage.getItem('teacherToken');
-    if (userType === 'admin') return localStorage.getItem('adminToken');
-    return localStorage.getItem('studentToken');
+    if (userType === 'teacher') return sessionStorage.getItem('teacherToken') || localStorage.getItem('teacherToken');
+    if (userType === 'admin')   return sessionStorage.getItem('adminToken')   || localStorage.getItem('adminToken');
+    return sessionStorage.getItem('studentToken') || localStorage.getItem('studentToken');
   };
 
   // Step 1: Setup 2FA and get QR code
@@ -28,7 +28,7 @@ export default function TwoFactorSetup({ isOpen, onClose, userType = 'student' }
     
     try {
       const token = getToken();
-      const response = await api.post('/api/2fa/setup', {}, {
+      const response = await api.post('/2fa/setup', {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
@@ -56,7 +56,7 @@ export default function TwoFactorSetup({ isOpen, onClose, userType = 'student' }
     
     try {
       const token = getToken();
-      const response = await api.post('/api/2fa/verify', 
+      const response = await api.post('/2fa/verify', 
         { token: verificationCode },
         { headers: { Authorization: `Bearer ${token}` } }
       );

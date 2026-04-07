@@ -77,7 +77,7 @@ export default function StreakWidget({ isDarkMode, onLoad }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.get("/api/students/streak")
+    api.get("/students/streak")
       .then(res => {
         setData(res.data);
         if (res.data?.currentStreak) onLoad?.(res.data.currentStreak);

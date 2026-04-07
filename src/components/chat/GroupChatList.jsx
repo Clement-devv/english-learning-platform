@@ -26,8 +26,8 @@ export default function GroupChatList({ userRole, onSelectChat, selectedChatId, 
   const fetchAll = useCallback(async () => {
     try {
       const [gcRes, dmRes] = await Promise.allSettled([
-        api.get("/api/group-chats"),
-        api.get("/api/direct-messages"),
+        api.get("/group-chats"),
+        api.get("/direct-messages"),
       ]);
       if (gcRes.status === "fulfilled") {
         const data = gcRes.value.data?.chats || [];
@@ -66,7 +66,7 @@ export default function GroupChatList({ userRole, onSelectChat, selectedChatId, 
     if (startingDm) return;
     try {
       setStartingDm(true);
-      const res = await api.post("/api/direct-messages/start");
+      const res = await api.post("/direct-messages/start");
       if (res.data.success) {
         await fetchAll();
         onSelectChat({ ...res.data.dm, _chatType: "dm" });

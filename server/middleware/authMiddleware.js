@@ -1,3 +1,4 @@
+// @ts-check
 // middleware/authMiddleware.js
 import jwt from "jsonwebtoken";
 import { config } from "../config/config.js";
@@ -48,6 +49,10 @@ export const verifySubAdmin = async (req, res, next) => {
     if (req.user.role !== "sub-admin") {
       return res.status(403).json({ message: "Sub-admin access required" });
     }
+    // Tenant guard: token must have been issued for this center
+    if (req.user.centerId !== req.center.slug) {
+      return res.status(403).json({ message: "Token not valid for this center" });
+    }
     const SubAdmin = getSubAdminModel(req.db);
     const subAdmin = await SubAdmin.findById(req.user.id);
     if (!subAdmin || subAdmin.status !== "active") {
@@ -71,6 +76,10 @@ export const verifyAdmin = async (req, res, next) => {
     }
     if (req.user.role !== "admin") {
       return res.status(403).json({ message: "Admin access required" });
+    }
+    // Tenant guard: token must have been issued for this center
+    if (req.user.centerId !== req.center.slug) {
+      return res.status(403).json({ message: "Token not valid for this center" });
     }
     // Impersonation tokens skip the DB lookup
     if (req.user.isImpersonation) {
@@ -98,6 +107,10 @@ export const verifyTeacher = async (req, res, next) => {
     if (req.user.role !== "teacher") {
       return res.status(403).json({ message: "Teacher access required" });
     }
+    // Tenant guard: token must have been issued for this center
+    if (req.user.centerId !== req.center.slug) {
+      return res.status(403).json({ message: "Token not valid for this center" });
+    }
     const Teacher = getTeacherModel(req.db);
     const teacher = await Teacher.findById(req.user.id).select("-password");
     if (!teacher || !teacher.active) {
@@ -119,6 +132,10 @@ export const verifyStudent = async (req, res, next) => {
     if (req.user.role !== "student") {
       return res.status(403).json({ message: "Student access required" });
     }
+    // Tenant guard: token must have been issued for this center
+    if (req.user.centerId !== req.center.slug) {
+      return res.status(403).json({ message: "Token not valid for this center" });
+    }
     const Student = getStudentModel(req.db);
     const student = await Student.findById(req.user.id).select("-password");
     if (!student || !student.active) {
@@ -136,6 +153,10 @@ export const verifyAdminOrTeacher = async (req, res, next) => {
   try {
     if (!req.user) {
       return res.status(401).json({ message: "Authentication required" });
+    }
+    // Tenant guard: token must have been issued for this center
+    if (req.user.centerId !== req.center.slug) {
+      return res.status(403).json({ message: "Token not valid for this center" });
     }
     if (req.user.role === "admin") {
       // Impersonation tokens skip the DB lookup

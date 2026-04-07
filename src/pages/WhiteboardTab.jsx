@@ -6,7 +6,16 @@ import {
   Pencil, Highlighter, Eraser, Trash2, Undo2, Lock, Unlock,
 } from "lucide-react";
 
-const SERVER_URL = import.meta.env.VITE_SOCKET_URL || "http://localhost:5000";
+// In production with custom domains the socket server is on the same origin.
+const SERVER_URL = import.meta.env.VITE_SOCKET_URL || "";
+
+const getSocketToken = () =>
+  sessionStorage.getItem("teacherToken") ||
+  sessionStorage.getItem("studentToken") ||
+  sessionStorage.getItem("adminToken") ||
+  localStorage.getItem("teacherToken") ||
+  localStorage.getItem("studentToken") ||
+  localStorage.getItem("adminToken");
 const MAX_UNDO = 20;
 
 // ── helpers ─────────────────────────────────────────────────────────────────
@@ -163,16 +172,18 @@ export default function WhiteboardTab({ userRole, channelName, userId, userName 
 
   useEffect(() => {
     if (!channelName) return;
-    const socket = io(SERVER_URL, { transports: ["websocket"] });
+    const socket = io(SERVER_URL, {
+      transports: ["websocket"],
+      auth: { token: getSocketToken() },
+    });
     socketRef.current = socket;
 
     socket.on("connect", () => {
       setConnected(true);
       socket.emit("join-whiteboard", {
         channelName,
-        userId:   userId   || "wb-user",
         userName: userName || "User",
-        userRole,
+        // userId and userRole are now derived from the JWT on the server
       });
     });
 

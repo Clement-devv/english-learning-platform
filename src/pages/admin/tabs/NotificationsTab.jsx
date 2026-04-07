@@ -50,12 +50,12 @@ export default function NotificationsTab({ isDarkMode, onUnreadCount }) {
   const [markingAll, setMarkingAll]       = useState(false);
 
   const dark = isDarkMode;
-  const token = localStorage.getItem("adminToken");
+  const token = sessionStorage.getItem("adminToken") || localStorage.getItem("adminToken");
 
   const fetchNotifications = useCallback(async () => {
     try {
       setLoading(true);
-      const res  = await api.get("/api/notifications?limit=200");
+      const res  = await api.get("/notifications?limit=200");
       const data = res.data;
       if (data.success) {
         setNotifications(data.notifications);
@@ -74,7 +74,7 @@ export default function NotificationsTab({ isDarkMode, onUnreadCount }) {
   const markAllRead = async () => {
     setMarkingAll(true);
     try {
-      await api.patch("/api/notifications/read-all");
+      await api.patch("/notifications/read-all");
       setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
       setUnreadCount(0);
       onUnreadCount?.(0);
@@ -87,7 +87,7 @@ export default function NotificationsTab({ isDarkMode, onUnreadCount }) {
 
   const markOneRead = async (id) => {
     try {
-      await api.patch(`/api/notifications/${id}/read`);
+      await api.patch(`/notifications/${id}/read`);
       setNotifications((prev) =>
         prev.map((n) => (n._id === id ? { ...n, read: true } : n))
       );

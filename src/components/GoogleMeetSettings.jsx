@@ -22,7 +22,7 @@ export default function GoogleMeetSettings({ teacherId, initialLink, onUpdate, i
     setMessage({ type: '', text: '' });
 
     try {
-      const { data } = await api.patch(`/api/teachers/${teacherId}/google-meet`, {
+      const { data } = await api.patch(`/teachers/${teacherId}/google-meet`, {
         googleMeetLink: googleMeetLink.trim()
       });
 

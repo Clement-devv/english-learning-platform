@@ -37,7 +37,7 @@ function ImageUploader({ label, hint, currentUrl, type, onUploaded, isDarkMode, 
     try {
       const form = new FormData();
       form.append(type, file);
-      const res = await api.post(`/api/center/branding/upload?type=${type}`, form, {
+      const res = await api.post(`/center/branding/upload?type=${type}`, form, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       setPreview(res.data.url);
@@ -232,7 +232,7 @@ export default function BrandingTab({ isDarkMode }) {
       setLoading(true);
       setError('');
       setSuccess('');
-      await api.patch('/api/center/branding', {
+      await api.patch('/center/branding', {
         primaryColor:   form.primaryColor,
         secondaryColor: form.secondaryColor,
         fontFamily:     form.fontFamily,

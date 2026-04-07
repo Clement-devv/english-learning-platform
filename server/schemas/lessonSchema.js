@@ -5,3 +5,6 @@ export const lessonSchema = new mongoose.Schema({
   teacher:   { type: String, required: true },
   date:      { type: Date, default: Date.now },
 }, { timestamps: true });
+
+// Student lesson history
+lessonSchema.index({ studentId: 1, date: -1 });

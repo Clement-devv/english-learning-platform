@@ -62,3 +62,16 @@ export const teacherSchema = new mongoose.Schema({
   accountNumber: { type: String, default: "" },
   accountName:   { type: String, default: "" },
 }, { timestamps: true });
+
+// Lookup by status (admin lists active/pending/suspended teachers)
+teacherSchema.index({ status: 1 });
+// Analytics overview: countDocuments({ active: true })
+teacherSchema.index({ active: 1 });
+// Analytics overview: $match { earned: { $gt: 0 } } for pending payments
+teacherSchema.index({ earned: 1 });
+// Forgot-password token lookup
+teacherSchema.index({ resetPasswordToken: 1 }, { sparse: true });
+// Scheduled soft-delete sweep
+teacherSchema.index({ scheduledDeletionAt: 1 }, { sparse: true });
+// Invite setup link lookup
+teacherSchema.index({ inviteToken: 1 }, { sparse: true });

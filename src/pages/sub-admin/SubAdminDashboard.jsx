@@ -3,8 +3,7 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Shield, TrendingUp, Users, Video, BookOpen,
-  MessageCircle, Calendar, LogOut, Menu,
-  ChevronRight, ChevronLeft, Sun, Moon,
+  MessageCircle, Calendar,
   CheckCircle, Clock, XCircle, AlertCircle,
   RefreshCw, Loader2, User,
   CheckSquare, DollarSign, Film, BarChart2, Star, RotateCcw
@@ -12,6 +11,10 @@ import {
 import { useDarkMode } from "../../hooks/useDarkMode";
 import MessagesTab from "../../components/chat/MessagesTab";
 import { getCachedCenter } from "../../utils/branding";
+import DashboardLayout  from "../../components/dashboard/DashboardLayout";
+import DashboardSidebar from "../../components/dashboard/DashboardSidebar";
+import DashboardTopBar  from "../../components/dashboard/DashboardTopBar";
+import { dashboardColors } from "../../utils/dashboardColors";
 
 
 export default function SubAdminDashboard() {
@@ -50,7 +53,8 @@ export default function SubAdminDashboard() {
   };
 
   const activeLabel = NAV.find((n) => n.key === activeTab)?.label || "Overview";
-  const c = palette(isDarkMode);
+  const c = dashboardColors(isDarkMode);
+  const centerName = getCachedCenter()?.centerName || "Sub-Admin";
 
   const renderTab = () => {
     switch (activeTab) {
@@ -69,158 +73,38 @@ export default function SubAdminDashboard() {
   };
 
   return (
-    <>
-      <style>{css(isDarkMode)}</style>
-      <div style={{
-        display: "flex", height: "100vh",
-        background: c.bg,
-        fontFamily: "var(--font-body)",
-        overflow: "hidden",
-        opacity: mounted ? 1 : 0,
-        transition: "opacity 0.3s ease",
-      }}>
-
-        {/* ── SIDEBAR ── */}
-        <aside style={{
-          width: sidebarOpen ? "230px" : "60px",
-          background: c.card,
-          borderRight: `1px solid ${c.border}`,
-          display: "flex", flexDirection: "column",
-          flexShrink: 0,
-          transition: "width 0.25s cubic-bezier(0.4,0,0.2,1)",
-          overflow: "hidden", zIndex: 40,
-        }}>
-
-          {/* Logo */}
-          <div style={{
-            height: "64px", display: "flex", alignItems: "center",
-            padding: sidebarOpen ? "0 18px" : "0 14px",
-            borderBottom: `1px solid ${c.border}`,
-            gap: "10px", flexShrink: 0,
-          }}>
-            <div style={{
-              width: "32px", height: "32px", borderRadius: "10px", flexShrink: 0,
-              background: "linear-gradient(135deg, #4f63d2, #6b82f0)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-            }}>
-              <Shield size={15} color="white" />
-            </div>
-            {sidebarOpen && (
-              <div style={{ overflow: "hidden" }}>
-                <p style={{ margin: 0, fontSize: "13px", fontWeight: "800", color: c.heading, whiteSpace: "nowrap" }}>
-                  EduLearn
-                </p>
-                <p style={{ margin: 0, fontSize: "9px", color: c.muted, fontWeight: "700", letterSpacing: "0.08em", textTransform: "uppercase", whiteSpace: "nowrap" }}>
-                  Sub-Admin
-                </p>
-              </div>
-            )}
-          </div>
-
-          {/* Nav items */}
-          <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden", padding: "10px 6px" }} className="sa-scroll">
-            {NAV.map(({ key, label, icon: Icon }) => {
-              const active = activeTab === key;
-              return (
-                <button
-                  key={key}
-                  onClick={() => setActiveTab(key)}
-                  title={!sidebarOpen ? label : undefined}
-                  style={{
-                    width: "100%", display: "flex", alignItems: "center",
-                    gap: "10px", padding: sidebarOpen ? "9px 10px" : "9px 14px",
-                    borderRadius: "10px", border: "none", cursor: "pointer",
-                    background: active ? (isDarkMode ? "#252d4a" : "#eef1ff") : "transparent",
-                    color: active ? (isDarkMode ? "#a5b4fc" : "#4f63d2") : (isDarkMode ? "#4b5563" : "#64748b"),
-                    fontFamily: "inherit", fontSize: "13.5px",
-                    fontWeight: active ? "700" : "500",
-                    textAlign: "left", marginBottom: "2px",
-                    whiteSpace: "nowrap", overflow: "hidden",
-                    position: "relative", transition: "all 0.15s",
-                  }}
-                  className="sa-nav-btn"
-                >
-                  {active && (
-                    <div style={{
-                      position: "absolute", left: 0, top: "20%", bottom: "20%",
-                      width: "3px", borderRadius: "0 3px 3px 0",
-                      background: "#6b82f0",
-                    }} />
-                  )}
-                  <Icon size={16} style={{ flexShrink: 0 }} />
-                  {sidebarOpen && <span>{label}</span>}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Bottom: dark mode + logout */}
-          <div style={{ borderTop: `1px solid ${c.border}`, padding: "10px 6px", flexShrink: 0 }}>
-            <button
-              onClick={toggleDarkMode}
-              title={isDarkMode ? "Light Mode" : "Dark Mode"}
-              style={{
-                width: "100%", display: "flex", alignItems: "center", gap: "10px",
-                padding: sidebarOpen ? "9px 10px" : "9px 14px",
-                borderRadius: "10px", border: "none", cursor: "pointer",
-                background: "transparent",
-                color: isDarkMode ? "#4b5563" : "#64748b",
-                fontFamily: "inherit", fontSize: "13.5px", fontWeight: "500",
-                textAlign: "left", marginBottom: "4px", whiteSpace: "nowrap",
-              }}
-              className="sa-nav-btn"
-            >
-              <span style={{ fontSize: "15px", flexShrink: 0 }}>{isDarkMode ? "☀️" : "🌙"}</span>
-              {sidebarOpen && <span>{isDarkMode ? "Light Mode" : "Dark Mode"}</span>}
-            </button>
-            <button
-              onClick={handleLogout}
-              title="Logout"
-              style={{
-                width: "100%", display: "flex", alignItems: "center", gap: "10px",
-                padding: sidebarOpen ? "9px 10px" : "9px 14px",
-                borderRadius: "10px", border: "none", cursor: "pointer",
-                background: "transparent", color: "#ef4444",
-                fontFamily: "inherit", fontSize: "13.5px", fontWeight: "500",
-                textAlign: "left", whiteSpace: "nowrap",
-              }}
-              className="sa-logout-btn"
-            >
-              <LogOut size={16} style={{ flexShrink: 0 }} />
-              {sidebarOpen && <span>Logout</span>}
-            </button>
-          </div>
-        </aside>
-
-        {/* ── MAIN ── */}
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, overflow: "hidden" }}>
-
-          {/* Top bar */}
-          <header style={{
-            height: "64px", background: c.card,
-            borderBottom: `1px solid ${c.border}`,
-            display: "flex", alignItems: "center",
-            padding: "0 24px", gap: "16px", flexShrink: 0,
-          }}>
-            <button
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              style={{ background: "none", border: "none", cursor: "pointer", color: c.muted, padding: "6px", borderRadius: "8px", display: "flex", alignItems: "center" }}
-              className="sa-nav-btn"
-            >
-              <Menu size={20} />
-            </button>
-
-            {/* Breadcrumb */}
-            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-              <span style={{ fontSize: "12.5px", color: c.muted, fontWeight: "500" }}>Sub-Admin</span>
-              <ChevronRight size={13} color={c.muted} />
-              <span style={{ fontSize: "13px", color: c.heading, fontWeight: "700" }}>{activeLabel}</span>
-            </div>
-
-            <div style={{ flex: 1 }} />
-
-            {/* Scope badge */}
-            {subAdminInfo.assignmentType && (
+    <DashboardLayout
+      isDarkMode={isDarkMode}
+      colors={c}
+      mounted={mounted}
+      activeTab={activeTab}
+      noPaddingTabs={["messages"]}
+      sidebar={
+        <DashboardSidebar
+          nav={NAV}
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          sidebarOpen={sidebarOpen}
+          colors={c}
+          isDarkMode={isDarkMode}
+          centerName={centerName}
+          portalLabel="Sub-Admin"
+          portalIcon={Shield}
+          widths={{ open: "230px", closed: "60px" }}
+          onDarkModeToggle={toggleDarkMode}
+          onLogout={handleLogout}
+        />
+      }
+      topBar={
+        <DashboardTopBar
+          sidebarOpen={sidebarOpen}
+          onToggle={() => setSidebarOpen(!sidebarOpen)}
+          roleName="Sub-Admin"
+          activeLabel={activeLabel}
+          colors={c}
+          userInitial={(subAdminInfo?.firstName?.[0] || "S").toUpperCase()}
+          actions={
+            subAdminInfo.assignmentType ? (
               <div style={{
                 background: isDarkMode ? "#1e2235" : "#eef1ff",
                 border: `1px solid ${isDarkMode ? "#252840" : "#dde3f8"}`,
@@ -232,35 +116,13 @@ export default function SubAdminDashboard() {
                   ? `🌍 ${subAdminInfo.region?.charAt(0).toUpperCase() + subAdminInfo.region?.slice(1)} Region`
                   : `👥 ${subAdminInfo.teacherScope?.length || 0} Teachers Assigned`}
               </div>
-            )}
-
-            {/* Avatar */}
-            <div style={{
-              width: "34px", height: "34px", borderRadius: "10px",
-              background: "linear-gradient(135deg, #4f63d2, #6b82f0)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: "12px", fontWeight: "800", color: "white",
-            }}>
-              {(subAdminInfo?.firstName?.[0] || "S").toUpperCase()}
-            </div>
-          </header>
-
-          {/* Content */}
-          <main style={{ flex: 1, overflowY: "auto", padding: activeTab === "messages" ? "0" : "24px", background: c.bg }} className="sa-scroll">
-            <div style={{
-              background: c.card,
-              borderRadius: "16px",
-              border: `1px solid ${c.border}`,
-              minHeight: "calc(100vh - 112px)",
-              padding: activeTab === "messages" ? "0" : "24px",
-              overflow: activeTab === "messages" ? "hidden" : "visible",
-            }}>
-              {renderTab()}
-            </div>
-          </main>
-        </div>
-      </div>
-    </>
+            ) : null
+          }
+        />
+      }
+    >
+      {renderTab()}
+    </DashboardLayout>
   );
 }
 
@@ -271,12 +133,12 @@ function OverviewPanel({ isDarkMode }) {
   const [data, setData]       = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState("");
-  const c = palette(isDarkMode);
+  const c = dashboardColors(isDarkMode);
 
   const fetch = useCallback(async () => {
     try {
       setLoading(true); setError("");
-      const res = await apiFetch("/api/sub-admin-scope/overview");
+      const res = await apiFetch("/api/v1/sub-admin-scope/overview");
       if (res.success) setData(res.data);
       else setError(res.message || "Failed to load");
     } catch { setError("Network error"); }
@@ -405,11 +267,11 @@ function TeachersPanel({ isDarkMode }) {
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState("");
   const [search, setSearch]     = useState("");
-  const c = palette(isDarkMode);
+  const c = dashboardColors(isDarkMode);
 
   const load = useCallback(async () => {
     try { setLoading(true); setError("");
-      const res = await apiFetch("/api/sub-admin-scope/teachers");
+      const res = await apiFetch("/api/v1/sub-admin-scope/teachers");
       if (res.success) setTeachers(res.teachers);
       else setError(res.message);
     } catch { setError("Network error"); }
@@ -505,11 +367,11 @@ function StudentsPanel({ isDarkMode }) {
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState("");
   const [search, setSearch]     = useState("");
-  const c = palette(isDarkMode);
+  const c = dashboardColors(isDarkMode);
 
   const load = useCallback(async () => {
     try { setLoading(true); setError("");
-      const res = await apiFetch("/api/sub-admin-scope/students");
+      const res = await apiFetch("/api/v1/sub-admin-scope/students");
       if (res.success) setStudents(res.students);
       else setError(res.message);
     } catch { setError("Network error"); }
@@ -638,7 +500,7 @@ function LiveClassesPanel({ isDarkMode }) {
   const [error,      setError]      = useState("");
   const [now,        setNow]        = useState(Date.now());
   const [spectating, setSpectating] = useState(null); // booking being watched on Agora
-  const c = palette(isDarkMode);
+  const c = dashboardColors(isDarkMode);
 
   // Tick every 30 s to keep Live / Upcoming labels accurate
   useEffect(() => {
@@ -648,7 +510,7 @@ function LiveClassesPanel({ isDarkMode }) {
 
   const load = useCallback(async () => {
     try { setLoading(true); setError("");
-      const res = await apiFetch("/api/sub-admin-scope/bookings?status=accepted");
+      const res = await apiFetch("/api/v1/sub-admin-scope/bookings?status=accepted");
       if (res.success) setBookings(res.bookings);
       else setError(res.message);
     } catch { setError("Network error"); }
@@ -728,7 +590,7 @@ function LiveClassesPanel({ isDarkMode }) {
             {isLive ? (
               <div style={{ position: "relative", width: "10px", height: "10px" }}>
                 <div style={{ width: "10px", height: "10px", borderRadius: "50%", background: "#ef4444" }} />
-                <div style={{ position: "absolute", inset: 0, borderRadius: "50%", background: "rgba(239,68,68,0.4)", animation: "sa-ping 1.4s ease-in-out infinite" }} />
+                <div style={{ position: "absolute", inset: 0, borderRadius: "50%", background: "rgba(239,68,68,0.4)", animation: "db-ping 1.4s ease-in-out infinite" }} />
               </div>
             ) : (
               <Clock size={11} color={c.muted} />
@@ -882,7 +744,7 @@ function AgoraSpectatorModal({ booking, isDarkMode, onClose }) {
   const [errorMsg,    setErrorMsg]    = useState("");
   const [remoteUsers, setRemoteUsers] = useState([]);
   const clientRef = useRef(null);
-  const c = palette(isDarkMode);
+  const c = dashboardColors(isDarkMode);
 
   useEffect(() => {
     let mounted = true;
@@ -898,7 +760,7 @@ function AgoraSpectatorModal({ booking, isDarkMode, onClose }) {
         const slug  = import.meta.env.VITE_CENTER_SLUG || getCachedCenter()?.slug;
         const agoraHeaders = { Authorization: `Bearer ${token}` };
         if (slug) agoraHeaders["x-center-slug"] = slug;
-        const res   = await fetch(`/api/agora/token?channel=${booking._id}`, {
+        const res   = await fetch(`/api/v1/agora/token?channel=${booking._id}`, {
           headers: agoraHeaders,
         });
         const data = await res.json();
@@ -993,7 +855,7 @@ function AgoraSpectatorModal({ booking, isDarkMode, onClose }) {
         <div style={{ flex: 1, padding: "20px", overflowY: "auto", minHeight: "300px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: phase === "connected" && remoteUsers.length > 0 ? "flex-start" : "center", gap: "16px" }}>
           {phase === "connecting" && (
             <>
-              <Loader2 size={36} color="#6366f1" style={{ animation: "sa-spin 0.8s linear infinite" }} />
+              <Loader2 size={36} color="#6366f1" style={{ animation: "db-spin 0.8s linear infinite" }} />
               <p style={{ margin: 0, color: isDarkMode ? "#6b7280" : "#94a3b8", fontSize: "14px" }}>Joining class as spectator…</p>
             </>
           )}
@@ -1047,11 +909,11 @@ function ClassesPanel({ isDarkMode, canMark }) {
   const [error,     setError]     = useState("");
   // selectedTeacher = null → show teacher list; = teacher obj → show that teacher's classes
   const [selectedTeacher, setSelectedTeacher] = useState(null);
-  const c = palette(isDarkMode);
+  const c = dashboardColors(isDarkMode);
 
   const loadTeachers = useCallback(async () => {
     try { setLoading(true); setError("");
-      const res = await apiFetch("/api/sub-admin-scope/teachers");
+      const res = await apiFetch("/api/v1/sub-admin-scope/teachers");
       if (res.success) setTeachers(res.teachers);
       else setError(res.message);
     } catch { setError("Network error"); }
@@ -1152,7 +1014,7 @@ function TeacherClassesView({ teacher, isDarkMode, canMark, onBack }) {
   const [error,    setError]    = useState("");
   const [busy,     setBusy]     = useState({}); // bookingId → true while API call in flight
   const [toast,    setToast]    = useState({ msg: "", ok: true });
-  const c = palette(isDarkMode);
+  const c = dashboardColors(isDarkMode);
 
   const showToast = (msg, ok = true) => {
     setToast({ msg, ok });
@@ -1162,7 +1024,7 @@ function TeacherClassesView({ teacher, isDarkMode, canMark, onBack }) {
   const load = useCallback(async () => {
     try { setLoading(true); setError("");
       // fetch all (no status filter) → returns accepted + completed
-      const res = await apiFetch(`/api/sub-admin-scope/classes?teacherId=${teacher._id}`);
+      const res = await apiFetch(`/api/v1/sub-admin-scope/classes?teacherId=${teacher._id}`);
       if (res.success) setBookings(res.bookings);
       else setError(res.message);
     } catch { setError("Network error"); }
@@ -1178,7 +1040,7 @@ function TeacherClassesView({ teacher, isDarkMode, canMark, onBack }) {
       const slug  = import.meta.env.VITE_CENTER_SLUG || getCachedCenter()?.slug;
       const actionHeaders = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
       if (slug) actionHeaders["x-center-slug"] = slug;
-      const res = await fetch(`/api/sub-admin-scope/classes/${endpoint}`, {
+      const res = await fetch(`/api/v1/sub-admin-scope/classes/${endpoint}`, {
         method: "POST",
         headers: actionHeaders,
         body: JSON.stringify({ bookingId }),
@@ -1225,7 +1087,7 @@ function TeacherClassesView({ teacher, isDarkMode, canMark, onBack }) {
             disabled={isBusy}
             style={{ padding: "7px 14px", borderRadius: "10px", border: "none", cursor: isBusy ? "not-allowed" : "pointer", background: "linear-gradient(135deg, #10b981, #34d399)", color: "white", fontSize: "12px", fontWeight: "700", fontFamily: "inherit", display: "flex", alignItems: "center", gap: "6px", flexShrink: 0, opacity: isBusy ? 0.6 : 1 }}
           >
-            {isBusy ? <Loader2 size={12} style={{ animation: "sa-spin 0.8s linear infinite" }} /> : <CheckCircle size={12} />}
+            {isBusy ? <Loader2 size={12} style={{ animation: "db-spin 0.8s linear infinite" }} /> : <CheckCircle size={12} />}
             Mark Done
           </button>
         )}
@@ -1235,7 +1097,7 @@ function TeacherClassesView({ teacher, isDarkMode, canMark, onBack }) {
             disabled={isBusy}
             style={{ padding: "7px 14px", borderRadius: "10px", border: `1px solid ${isDarkMode ? "rgba(245,158,11,0.3)" : "#fde68a"}`, cursor: isBusy ? "not-allowed" : "pointer", background: isDarkMode ? "rgba(245,158,11,0.15)" : "#fef3c7", color: "#f59e0b", fontSize: "12px", fontWeight: "700", fontFamily: "inherit", display: "flex", alignItems: "center", gap: "6px", flexShrink: 0, opacity: isBusy ? 0.6 : 1 }}
           >
-            {isBusy ? <Loader2 size={12} style={{ animation: "sa-spin 0.8s linear infinite" }} /> : <RotateCcw size={12} />}
+            {isBusy ? <Loader2 size={12} style={{ animation: "db-spin 0.8s linear infinite" }} /> : <RotateCcw size={12} />}
             Unmark
           </button>
         )}
@@ -1316,11 +1178,11 @@ function PaymentsPanel({ isDarkMode }) {
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState("");
   const [view, setView]           = useState("summary"); // "summary" | "detail"
-  const c = palette(isDarkMode);
+  const c = dashboardColors(isDarkMode);
 
   const load = useCallback(async () => {
     try { setLoading(true); setError("");
-      const res = await apiFetch("/api/sub-admin-scope/payments");
+      const res = await apiFetch("/api/v1/sub-admin-scope/payments");
       if (res.success) { setPayments(res.payments); setSummary(res.summary); }
       else setError(res.message);
     } catch { setError("Network error"); }
@@ -1427,11 +1289,11 @@ function RecordingsPanel({ isDarkMode }) {
   const [loading,          setLoading]          = useState(true);
   const [error,            setError]            = useState("");
   const [selectedTeacher,  setSelectedTeacher]  = useState(null);
-  const c = palette(isDarkMode);
+  const c = dashboardColors(isDarkMode);
 
   const loadTeachers = useCallback(async () => {
     try { setLoading(true); setError("");
-      const res = await apiFetch("/api/sub-admin-scope/teachers");
+      const res = await apiFetch("/api/v1/sub-admin-scope/teachers");
       if (res.success) setTeachers(res.teachers);
       else setError(res.message);
     } catch { setError("Network error"); }
@@ -1518,11 +1380,11 @@ function TeacherRecordingsView({ teacher, isDarkMode, onBack }) {
   const [loading,    setLoading]    = useState(true);
   const [error,      setError]      = useState("");
   const [search,     setSearch]     = useState("");
-  const c = palette(isDarkMode);
+  const c = dashboardColors(isDarkMode);
 
   const load = useCallback(async () => {
     try { setLoading(true); setError("");
-      const res = await apiFetch(`/api/sub-admin-scope/recordings?teacherId=${teacher._id}`);
+      const res = await apiFetch(`/api/v1/sub-admin-scope/recordings?teacherId=${teacher._id}`);
       if (res.success) setRecordings(res.recordings);
       else setError(res.message);
     } catch { setError("Network error"); }
@@ -1619,11 +1481,11 @@ function ReportsPanel({ isDarkMode }) {
   const [error, setError]     = useState("");
   const [view, setView]       = useState("students"); // "students" | "history"
   const [search, setSearch]   = useState("");
-  const c = palette(isDarkMode);
+  const c = dashboardColors(isDarkMode);
 
   const load = useCallback(async () => {
     try { setLoading(true); setError("");
-      const res = await apiFetch("/api/sub-admin-scope/reports");
+      const res = await apiFetch("/api/v1/sub-admin-scope/reports");
       if (res.success) setData(res);
       else setError(res.message);
     } catch { setError("Network error"); }
@@ -1734,11 +1596,11 @@ function ReviewsPanel({ isDarkMode }) {
   const [loading, setLoading]           = useState(true);
   const [error, setError]               = useState("");
   const [view, setView]                 = useState("ratings");
-  const c = palette(isDarkMode);
+  const c = dashboardColors(isDarkMode);
 
   const load = useCallback(async () => {
     try { setLoading(true); setError("");
-      const res = await apiFetch("/api/sub-admin-scope/reviews");
+      const res = await apiFetch("/api/v1/sub-admin-scope/reviews");
       if (res.success) { setReviews(res.reviews); setTeacherRatings(res.teacherRatings); }
       else setError(res.message);
     } catch { setError("Network error"); }
@@ -1853,7 +1715,7 @@ async function apiFetch(url) {
 function Spinner() {
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "80px 0", gap: "12px" }}>
-      <Loader2 size={28} color="#6b82f0" style={{ animation: "sa-spin 0.8s linear infinite" }} />
+      <Loader2 size={28} color="#6b82f0" style={{ animation: "db-spin 0.8s linear infinite" }} />
     </div>
   );
 }
@@ -1870,23 +1732,3 @@ function ErrorState({ msg, onRetry }) {
   );
 }
 
-function palette(dark) {
-  return {
-    bg:      dark ? "#0f1117" : "#f4f6fb",
-    card:    dark ? "#1a1d27" : "#ffffff",
-    border:  dark ? "#1e2235" : "#e8ecf4",
-    heading: dark ? "#e2e8f0" : "#1e293b",
-    text:    dark ? "#94a3b8" : "#475569",
-    muted:   dark ? "#374151" : "#94a3b8",
-  };
-}
-
-const css = (dark) => `
-  * { box-sizing: border-box; }
-  .sa-scroll::-webkit-scrollbar { width: 4px; }
-  .sa-scroll::-webkit-scrollbar-thumb { background: ${dark ? "#1e2235" : "#e0e4f4"}; border-radius: 4px; }
-  .sa-nav-btn:hover { background: ${dark ? "#1e2235 !important" : "#f0f4ff !important"}; color: ${dark ? "#a5b4fc !important" : "#4f63d2 !important"}; }
-  .sa-logout-btn:hover { background: rgba(239,68,68,0.08) !important; }
-  @keyframes sa-spin { to { transform: rotate(360deg); } }
-  @keyframes sa-ping { 0%,100% { transform: scale(1); opacity: 0.8; } 50% { transform: scale(2.2); opacity: 0; } }
-`;

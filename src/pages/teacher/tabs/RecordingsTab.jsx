@@ -22,7 +22,7 @@ export default function RecordingsTab({ isDarkMode }) {
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(""), 3000); };
 
   useEffect(() => {
-    api.get("/api/recordings")
+    api.get("/recordings")
       .then(r => setRecordings(r.data.recordings || []))
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -52,7 +52,7 @@ export default function RecordingsTab({ isDarkMode }) {
   // ── Toggle visibility ──────────────────────────────────────────────────────
   const toggleVisibility = async (rec) => {
     try {
-      const { data } = await api.patch(`/api/recordings/${rec._id}/visibility`);
+      const { data } = await api.patch(`/recordings/${rec._id}/visibility`);
       setRecordings(prev => prev.map(r =>
         r._id === rec._id ? { ...r, visibleToStudent: data.visibleToStudent } : r
       ));
@@ -64,7 +64,7 @@ export default function RecordingsTab({ isDarkMode }) {
   const handleDelete = async (rec) => {
     if (!confirm(`Delete "${rec.title || "this recording"}"? This cannot be undone.`)) return;
     try {
-      await api.delete(`/api/recordings/${rec._id}`);
+      await api.delete(`/recordings/${rec._id}`);
       setRecordings(prev => prev.filter(r => r._id !== rec._id));
       if (playing?._id === rec._id) setPlaying(null);
       showToast("Recording deleted");
@@ -75,7 +75,7 @@ export default function RecordingsTab({ isDarkMode }) {
   const loadVideo = async (rec) => {
     if (blobUrls[rec._id]) { setPlaying(rec); return; }
     try {
-      const resp = await api.get(`/api/recordings/${rec._id}/stream`, { responseType: 'blob' });
+      const resp = await api.get(`/recordings/${rec._id}/stream`, { responseType: 'blob' });
       const blob = new Blob([resp.data]);
       const url  = URL.createObjectURL(blob);
       setBlobUrls(prev => ({ ...prev, [rec._id]: url }));

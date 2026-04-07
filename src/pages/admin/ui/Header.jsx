@@ -3,8 +3,7 @@ import React from "react";
 import { LogOut, Shield } from "lucide-react";
 
 export default function Header({ onLogout }) {
-  // Get admin info from localStorage
-  const adminInfo = JSON.parse(localStorage.getItem("adminInfo") || "{}");
+  const adminInfo = JSON.parse(sessionStorage.getItem("adminInfo") || localStorage.getItem("adminInfo") || "{}");
 
   return (
     <header className="bg-white shadow-md">

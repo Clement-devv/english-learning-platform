@@ -10,9 +10,9 @@ export default function ClassroomProtectedRoute({ children }) {
   useEffect(() => {
     const verifyToken = async () => {
       // Check for ANY valid token (teacher, student, or sub-admin spectator)
-      const teacherToken  = localStorage.getItem('teacherToken');
-      const studentToken  = localStorage.getItem('studentToken');
-      const subAdminToken = localStorage.getItem('subAdminToken');
+      const teacherToken  = sessionStorage.getItem('teacherToken')  || localStorage.getItem('teacherToken');
+      const studentToken  = sessionStorage.getItem('studentToken')  || localStorage.getItem('studentToken');
+      const subAdminToken = sessionStorage.getItem('subAdminToken') || localStorage.getItem('subAdminToken');
 
       const token = teacherToken || studentToken || subAdminToken;
       
@@ -27,11 +27,11 @@ export default function ClassroomProtectedRoute({ children }) {
 
         // Verify the token against the correct backend endpoint based on role
         if (teacherToken) {
-          await api.get('/api/auth/verify');
+          await api.get('/auth/verify');
         } else if (studentToken) {
-          await api.get('/api/auth/student/verify');
+          await api.get('/auth/student/verify');
         } else if (subAdminToken) {
-          await api.get('/api/sub-admin-auth/verify');
+          await api.get('/sub-admin-auth/verify');
         }
 
         setIsAuthenticated(true);
@@ -40,16 +40,16 @@ export default function ClassroomProtectedRoute({ children }) {
 
         // Clean up based on which token failed
         if (teacherToken) {
-          localStorage.removeItem('teacherToken');
-          localStorage.removeItem('teacherInfo');
+          sessionStorage.removeItem('teacherToken'); localStorage.removeItem('teacherToken');
+          sessionStorage.removeItem('teacherInfo');  localStorage.removeItem('teacherInfo');
         }
         if (studentToken) {
-          localStorage.removeItem('studentToken');
-          localStorage.removeItem('studentInfo');
+          sessionStorage.removeItem('studentToken'); localStorage.removeItem('studentToken');
+          sessionStorage.removeItem('studentInfo');  localStorage.removeItem('studentInfo');
         }
         if (subAdminToken) {
-          localStorage.removeItem('subAdminToken');
-          localStorage.removeItem('subAdminInfo');
+          sessionStorage.removeItem('subAdminToken'); localStorage.removeItem('subAdminToken');
+          sessionStorage.removeItem('subAdminInfo');  localStorage.removeItem('subAdminInfo');
         }
 
         setIsAuthenticated(false);
@@ -74,7 +74,7 @@ export default function ClassroomProtectedRoute({ children }) {
 
   // Redirect based on which login page they came from
   if (!isAuthenticated) {
-    const role = localStorage.getItem('role');
+    const role = sessionStorage.getItem('role') || localStorage.getItem('role');
     const redirectPath = role === 'student' ? '/student/login' : '/teacher/login';
     return <Navigate to={redirectPath} replace />;
   }

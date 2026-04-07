@@ -22,3 +22,16 @@ export const getDb = async (centerSlug) => {
 export const getMasterDb = () => {
   return mongoose.connection;
 };
+
+// Close all per-center connections — call during graceful shutdown
+export const closeAllConnections = async () => {
+  const slugs = Object.keys(connections);
+  await Promise.all(
+    slugs.map(slug =>
+      connections[slug].close().then(() => {
+        console.log(`🔌 DB closed: db_${slug}`);
+        delete connections[slug];
+      }).catch(() => {})
+    )
+  );
+};

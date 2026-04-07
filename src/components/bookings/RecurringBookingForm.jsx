@@ -191,7 +191,7 @@ export default function RecurringBookingForm({
         daysOfWeek: formData.frequency === 'weekly' ? formData.daysOfWeek : []
       };
 
-      const response = await api.post("/api/recurring-bookings", payload);
+      const response = await api.post("/recurring-bookings", payload);
 
       if (response.data.success) {
         if (onSuccess) {

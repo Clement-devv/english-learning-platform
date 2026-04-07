@@ -163,7 +163,7 @@ export default function LessonActionModal({
   useEffect(() => {
     if (step === "teacher" && student?._id) {
       setLoading(true);
-      api.get(`/api/admin/lessons/assignments/${student._id}/teachers`)
+      api.get(`/admin/lessons/assignments/${student._id}/teachers`)
         .then((r) => setTeacherList(r.data.teachers || []))
         .catch(() => setError("Failed to load teachers"))
         .finally(() => setLoading(false));
@@ -174,7 +174,7 @@ export default function LessonActionModal({
   useEffect(() => {
     if (step === "student" && teacher?._id) {
       setLoading(true);
-      api.get(`/api/admin/lessons/assignments/${teacher._id}/students`)
+      api.get(`/admin/lessons/assignments/${teacher._id}/students`)
         .then((r) => setStudentList(r.data.students || []))
         .catch(() => setError("Failed to load students"))
         .finally(() => setLoading(false));
@@ -186,7 +186,7 @@ export default function LessonActionModal({
     if (step === "class" && teacher?._id && student?._id) {
       setLoading(true);
       const statusFilter = isMarking ? "accepted,pending" : "completed";
-      api.get(`/api/admin/lessons/pair-bookings?teacherId=${teacher._id}&studentId=${student._id}&status=${statusFilter}`)
+      api.get(`/admin/lessons/pair-bookings?teacherId=${teacher._id}&studentId=${student._id}&status=${statusFilter}`)
         .then((r) => setBookings(r.data.bookings || []))
         .catch(() => setError("Failed to load classes"))
         .finally(() => setLoading(false));
@@ -199,7 +199,7 @@ export default function LessonActionModal({
     setSubmitting(true);
     setError("");
     try {
-      const endpoint = isMarking ? "/api/admin/lessons/mark" : "/api/admin/lessons/unmark";
+      const endpoint = isMarking ? "/admin/lessons/mark" : "/admin/lessons/unmark";
       const res = await api.post(endpoint, { bookingId: selectedBooking._id });
       onSuccess?.(res.data);
       setStep("done");

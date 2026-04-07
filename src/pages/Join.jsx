@@ -5,7 +5,7 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 
-const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const API = (import.meta.env.VITE_API_URL || "http://localhost:5000") + "/api/v1";
 
 export default function Join() {
   const [params]      = useSearchParams();
@@ -26,7 +26,7 @@ export default function Join() {
     e.preventDefault();
     setError(""); setBusy(true);
     try {
-      const res = await fetch(`${API}/api/referrals/apply`, {
+      const res = await fetch(`${API}/referrals/apply`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),

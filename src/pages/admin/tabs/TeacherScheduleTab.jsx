@@ -175,9 +175,9 @@ export default function TeacherScheduleTab({ teachers = [], isDarkMode }) {
     try {
       const end = new Date(weekStart); end.setDate(weekStart.getDate() + 7);
       const [availRes, acceptedRes, pendingRes] = await Promise.all([
-        api.get(`/api/teacher-availability/${selected._id}?startDate=${weekStart.toISOString()}&endDate=${end.toISOString()}`),
-        api.get(`/api/bookings/teacher/${selected._id}?status=accepted`),
-        api.get(`/api/bookings/teacher/${selected._id}?status=pending`),
+        api.get(`/teacher-availability/${selected._id}?startDate=${weekStart.toISOString()}&endDate=${end.toISOString()}`),
+        api.get(`/bookings/teacher/${selected._id}?status=accepted`),
+        api.get(`/bookings/teacher/${selected._id}?status=pending`),
       ]);
       setAvailability(availRes.data.availability || []);
       setBookings([...(acceptedRes.data || []), ...(pendingRes.data || [])]);

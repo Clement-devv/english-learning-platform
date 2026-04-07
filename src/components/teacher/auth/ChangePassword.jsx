@@ -40,7 +40,7 @@ export default function ChangePassword({ onClose, onSuccess }) {
     setLoading(true);
 
     try {
-      await api.post('/api/auth/teacher/change-password', {
+      await api.post('/auth/teacher/change-password', {
         currentPassword,
         newPassword
       });

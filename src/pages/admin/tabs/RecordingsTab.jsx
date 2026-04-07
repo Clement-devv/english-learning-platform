@@ -27,7 +27,7 @@ export default function RecordingsTab({ teachers = [], isDarkMode }) {
     if (!selectedTeacher) return;
     setLoadingRecs(true);
     setRecordings([]);
-    api.get(`/api/recordings/teacher/${selectedTeacher._id || selectedTeacher.id}`)
+    api.get(`/recordings/teacher/${selectedTeacher._id || selectedTeacher.id}`)
       .then(r => setRecordings(r.data.recordings || []))
       .catch(() => {})
       .finally(() => setLoadingRecs(false));
@@ -51,7 +51,7 @@ export default function RecordingsTab({ teachers = [], isDarkMode }) {
   const loadVideo = async (rec) => {
     if (blobUrls[rec._id]) { setPlaying(rec); return; }
     try {
-      const resp = await api.get(`/api/recordings/${rec._id}/stream`, { responseType: 'blob' });
+      const resp = await api.get(`/recordings/${rec._id}/stream`, { responseType: 'blob' });
       const blob = new Blob([resp.data]);
       setBlobUrls(prev => ({ ...prev, [rec._id]: URL.createObjectURL(blob) }));
       setPlaying(rec);

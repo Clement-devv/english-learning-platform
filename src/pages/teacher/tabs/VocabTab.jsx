@@ -30,7 +30,7 @@ export default function VocabTab({ teacherInfo, students, isDarkMode }) {
   const fetchLists = async () => {
     try {
       setLoading(true);
-      const { data } = await api.get("/api/vocab/lists");
+      const { data } = await api.get("/vocab/lists");
       setLists(data.lists || []);
     } catch { /* silent */ }
     finally { setLoading(false); }
@@ -50,7 +50,7 @@ export default function VocabTab({ teacherInfo, students, isDarkMode }) {
     const validWords = form.words.filter(w => w.word.trim() && w.definition.trim());
     if (validWords.length === 0) return showToast("Add at least one complete word");
     try {
-      await api.post("/api/vocab/lists", { title: form.title, description: form.description, words: validWords });
+      await api.post("/vocab/lists", { title: form.title, description: form.description, words: validWords });
       showToast("List created!");
       setForm({ title: "", description: "", words: [{ word: "", definition: "", example: "" }] });
       setView("lists");
@@ -62,7 +62,7 @@ export default function VocabTab({ teacherInfo, students, isDarkMode }) {
   const handleDelete = async (id) => {
     if (!confirm("Delete this word list?")) return;
     try {
-      await api.delete(`/api/vocab/lists/${id}`);
+      await api.delete(`/vocab/lists/${id}`);
       setLists(l => l.filter(x => x._id !== id));
       showToast("List deleted");
     } catch { showToast("Failed to delete"); }
@@ -78,7 +78,7 @@ export default function VocabTab({ teacherInfo, students, isDarkMode }) {
 
   const handleAssign = async () => {
     try {
-      await api.post(`/api/vocab/lists/${assignTarget._id}/assign`, { studentIds: selectedStu });
+      await api.post(`/vocab/lists/${assignTarget._id}/assign`, { studentIds: selectedStu });
       showToast("Students assigned!");
       setView("lists");
       fetchLists();

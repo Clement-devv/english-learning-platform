@@ -217,7 +217,7 @@ export default function PronunciationTab({ isDarkMode }) {
     setIsFetching(true);
     setFetchStatus(null);
     try {
-      const { data } = await api.get(`/api/pronunciation/sentences?difficulty=${diff}`);
+      const { data } = await api.get(`/pronunciation/sentences?difficulty=${diff}`);
       if (data.success && data.sentences?.length > 0) {
         if (mountedRef.current) setFetchStatus("ok");
         return data.sentences;

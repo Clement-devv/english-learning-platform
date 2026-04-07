@@ -5,7 +5,7 @@ import api from "../api";
  * Update classroom attendance (join, leave, heartbeat)
  */
 export const updateClassroomAttendance = async (attendanceData) => {
-  const res = await api.post("/api/classroom/attendance", attendanceData);
+  const res = await api.post("/classroom/attendance", attendanceData);
   return res.data;
 };
 
@@ -14,7 +14,7 @@ export const updateClassroomAttendance = async (attendanceData) => {
  * Creates a complaint record for admin review
  */
 export const endClassEarly = async (complaintData) => {
-  const res = await api.post("/api/classroom/end-early", complaintData);
+  const res = await api.post("/classroom/end-early", complaintData);
   return res.data;
 };
 
@@ -22,7 +22,7 @@ export const endClassEarly = async (complaintData) => {
  * Check if class meets completion requirements
  */
 export const checkClassCompletion = async (bookingId) => {
-  const res = await api.get(`/api/classroom/check-completion/${bookingId}`);
+  const res = await api.get(`/classroom/check-completion/${bookingId}`);
   return res.data;
 };
 
@@ -30,6 +30,6 @@ export const checkClassCompletion = async (bookingId) => {
  * Get classroom session data (for debugging/admin)
  */
 export const getClassroomSession = async (bookingId) => {
-  const res = await api.get(`/api/classroom/session/${bookingId}`);
+  const res = await api.get(`/classroom/session/${bookingId}`);
   return res.data;
 };

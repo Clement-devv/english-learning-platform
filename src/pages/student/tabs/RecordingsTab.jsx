@@ -19,7 +19,7 @@ export default function RecordingsTab({ isDarkMode }) {
   };
 
   useEffect(() => {
-    api.get("/api/recordings")
+    api.get("/recordings")
       .then(r => setRecordings(r.data.recordings || []))
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -48,7 +48,7 @@ export default function RecordingsTab({ isDarkMode }) {
   const loadVideo = async (rec) => {
     if (blobUrls[rec._id]) { setPlaying(rec); return; }
     try {
-      const resp = await api.get(`/api/recordings/${rec._id}/stream`, { responseType: 'blob' });
+      const resp = await api.get(`/recordings/${rec._id}/stream`, { responseType: 'blob' });
       const blob = new Blob([resp.data]);
       const url  = URL.createObjectURL(blob);
       setBlobUrls(prev => ({ ...prev, [rec._id]: url }));

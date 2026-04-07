@@ -22,7 +22,7 @@ export default function StudentForgotPassword() {
     }
 
     try {
-      await api.post('/api/auth/student/forgot-password', {
+      await api.post('/auth/student/forgot-password', {
         email: email.trim()
       });
 

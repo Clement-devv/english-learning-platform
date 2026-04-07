@@ -33,6 +33,7 @@ import ReactDOM from 'react-dom/client';
 import App from './App.jsx';
 import './index.css';
 import { fetchBranding, applyBranding, setCachedBranding } from './utils/branding.js';
+import ErrorBoundary from './components/ErrorBoundary.jsx';
 
 // ── Handle impersonation URL params ──────────────────────────────────────────
 // Super admin "Enter as Admin" opens a new tab with ?imp_token=xxx&imp_center=slug
@@ -66,7 +67,9 @@ fetchBranding().then(({ branding, center }) => {
   // Always render — branding failure must never block the app
   ReactDOM.createRoot(document.getElementById('root')).render(
     <React.StrictMode>
-      <App />
+      <ErrorBoundary>
+        <App />
+      </ErrorBoundary>
     </React.StrictMode>
   );
 });

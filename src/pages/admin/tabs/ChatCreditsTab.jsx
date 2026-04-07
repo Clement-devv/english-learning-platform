@@ -38,7 +38,7 @@ export default function ChatCreditsTab({ isDarkMode }) {
 
   const fetchBudget = useCallback(async () => {
     try {
-      const { data } = await api.get("/api/chat/center-credits");
+      const { data } = await api.get("/chat/center-credits");
       setBudget(data);
     } catch { /* non-fatal */ }
   }, []);
@@ -53,7 +53,7 @@ export default function ChatCreditsTab({ isDarkMode }) {
       const withCredits = await Promise.all(
         allStudents.map(async (s) => {
           try {
-            const { data } = await api.get(`/api/chat/credits/student/${s._id}`);
+            const { data } = await api.get(`/chat/credits/student/${s._id}`);
             return { ...s, credits: data.credits ?? 0, totalUsed: data.totalUsed ?? 0 };
           } catch {
             return { ...s, credits: 0, totalUsed: 0 };
@@ -86,7 +86,7 @@ export default function ChatCreditsTab({ isDarkMode }) {
 
     setGranting(modal.student._id);
     try {
-      await api.post("/api/chat/credits/grant", {
+      await api.post("/chat/credits/grant", {
         studentId: modal.student._id,
         amount:    finalAmount,
         note:      note.trim() || `Granted by admin`,

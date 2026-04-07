@@ -75,7 +75,8 @@ router.get("/", verifyToken, verifyAdmin, async (req, res) => {
     const disputes = await getBooking(req.db).find({ disputeRaised: true, disputeStatus: "pending" })
       .populate("teacherId", "firstName lastName email")
       .populate("studentId", "firstName surname email lastName")
-      .sort({ disputedAt: -1 });
+      .sort({ disputedAt: -1 })
+      .lean();
 
     res.json({ success: true, disputes });
   } catch (err) {

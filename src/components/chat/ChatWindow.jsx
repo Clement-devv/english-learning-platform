@@ -24,7 +24,7 @@ export default function ChatWindow({ chat, chatType = "group", userRole, onClose
   const prevMsgLen      = useRef(0);
   const mountedRef      = useRef(true);
 
-  const apiBase = chatType === "dm" ? "/api/direct-messages" : "/api/group-chats";
+  const apiBase = chatType === "dm" ? "/api/v1/direct-messages" : "/api/v1/group-chats";
 
   // Reset state when chat changes
   useEffect(() => {

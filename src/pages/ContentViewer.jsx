@@ -167,7 +167,7 @@ export default function ContentViewer({ bookingId, userRole, channelName }) {
   // ── Check for existing PDF on mount ───────────────────────────────────────
   useEffect(() => {
     if (!bookingId) return;
-    api.get(`/api/content/info/${bookingId}`)
+    api.get(`/content/info/${bookingId}`)
       .then(({ data }) => {
         if (data.hasPdf) loadPdf();
         else setLoading(false);
@@ -180,7 +180,7 @@ export default function ContentViewer({ bookingId, userRole, channelName }) {
       setLoading(true);
       setUploadError(null);
       const { data: arrayBuffer } = await api.get(
-        `/api/content/file/${bookingId}`,
+        `/content/file/${bookingId}`,
         { responseType: "arraybuffer" }
       );
       const doc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
@@ -304,7 +304,7 @@ export default function ContentViewer({ bookingId, userRole, channelName }) {
       setUploadError(null);
       const form = new FormData();
       form.append("pdf", file);
-      await api.post(`/api/content/upload?bookingId=${bookingId}`, form);
+      await api.post(`/content/upload?bookingId=${bookingId}`, form);
       await loadPdf();
       // Notify students that a new PDF is available so they load it too
       if (socketRef.current && channelName) {

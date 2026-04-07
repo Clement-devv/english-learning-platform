@@ -25,7 +25,7 @@ export default function AdminResetPassword() {
     setLoading(true);
     setError('');
     try {
-      const res = await api.post(`/api/auth/admin/reset-password/${token}`, { newPassword: password }, {
+      const res = await api.post(`/auth/admin/reset-password/${token}`, { newPassword: password }, {
         headers: centerSlug ? { 'x-center-slug': centerSlug } : {},
       });
       if (res.data.success) setDone(true);

@@ -24,14 +24,14 @@ export default function StudentLogin() {
     setError('');
     setLoading(true);
     try {
-      const response = await api.post('/api/auth/student/login', {
+      const response = await api.post('/auth/student/login', {
         email: email.trim(),
         password,
       });
       if (response.data.success) {
-        localStorage.setItem('studentToken', response.data.token);
-        localStorage.setItem('studentSessionToken', response.data.sessionToken);
-        localStorage.setItem('studentInfo', JSON.stringify(response.data.student));
+        sessionStorage.setItem('studentToken', response.data.token);
+        sessionStorage.setItem('studentSessionToken', response.data.sessionToken);
+        sessionStorage.setItem('studentInfo', JSON.stringify(response.data.student));
         navigate('/student/dashboard');
       } else if (response.data.requires2FA) {
         setRequires2FA(true);
@@ -48,13 +48,13 @@ export default function StudentLogin() {
     setError('');
     setLoading(true);
     try {
-      const response = await api.post('/api/auth/verify-2fa-login', {
+      const response = await api.post('/auth/verify-2fa-login', {
         tempUserId, twoFactorToken, backupCode, role: 'student'
       });
       if (response.data.success) {
-        localStorage.setItem('studentToken', response.data.token);
-        localStorage.setItem('studentSessionToken', response.data.sessionToken);
-        localStorage.setItem('studentInfo', JSON.stringify(response.data.user));
+        sessionStorage.setItem('studentToken', response.data.token);
+        sessionStorage.setItem('studentSessionToken', response.data.sessionToken);
+        sessionStorage.setItem('studentInfo', JSON.stringify(response.data.user));
         navigate('/student/dashboard');
       }
     } catch (err) {

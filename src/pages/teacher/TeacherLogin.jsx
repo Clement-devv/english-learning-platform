@@ -25,15 +25,15 @@ export default function TeacherLogin() {
     setLoading(true);
 
     try {
-      const response = await api.post('/api/auth/teacher/login', {
+      const response = await api.post('/auth/teacher/login', {
         email: email.trim(),
         password
       });
 
       if (response.data.success) {
-        localStorage.setItem('teacherToken', response.data.token);
-        localStorage.setItem('teacherSessionToken', response.data.sessionToken);
-        localStorage.setItem('teacherInfo', JSON.stringify(response.data.teacher));
+        sessionStorage.setItem('teacherToken', response.data.token);
+        sessionStorage.setItem('teacherSessionToken', response.data.sessionToken);
+        sessionStorage.setItem('teacherInfo', JSON.stringify(response.data.teacher));
         navigate('/teacher/dashboard');
       } else if (response.data.requires2FA) {
         setRequires2FA(true);
@@ -50,13 +50,13 @@ export default function TeacherLogin() {
     setError('');
     setLoading(true);
     try {
-      const response = await api.post('/api/auth/verify-2fa-login', {
+      const response = await api.post('/auth/verify-2fa-login', {
         tempUserId, twoFactorToken, backupCode, role: 'teacher'
       });
       if (response.data.success) {
-        localStorage.setItem('teacherToken', response.data.token);
-        localStorage.setItem('teacherSessionToken', response.data.sessionToken);
-        localStorage.setItem('teacherInfo', JSON.stringify(response.data.user));
+        sessionStorage.setItem('teacherToken', response.data.token);
+        sessionStorage.setItem('teacherSessionToken', response.data.sessionToken);
+        sessionStorage.setItem('teacherInfo', JSON.stringify(response.data.user));
         navigate('/teacher/dashboard');
       }
     } catch (err) {

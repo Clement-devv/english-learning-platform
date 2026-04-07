@@ -163,7 +163,7 @@ export default function TeacherModal({ isOpen, onClose, onSave, initialData }) {
         </div>
 
         {/* Scrollable body */}
-        <div className="overflow-y-auto flex-1 px-6 py-5 space-y-6">
+        <div className="overflow-y-auto flex-1 min-h-0 px-6 py-5 space-y-6">
 
           {/* Personal Info */}
           <Section icon={User} title="Personal Information">

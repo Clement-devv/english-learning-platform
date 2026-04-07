@@ -20,7 +20,17 @@ try {
   if (vbCompatible) AgoraRTC.registerExtensions([vbExtension]);
 } catch (_) {}
 
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || "http://localhost:5000";
+// In production with custom domains the socket server is on the same origin.
+// Empty string tells socket.io-client to connect to window.location.origin.
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || "";
+
+const getSocketToken = () =>
+  sessionStorage.getItem("teacherToken") ||
+  sessionStorage.getItem("studentToken") ||
+  sessionStorage.getItem("adminToken") ||
+  localStorage.getItem("teacherToken") ||
+  localStorage.getItem("studentToken") ||
+  localStorage.getItem("adminToken");
 
 const BLUR_OPTIONS = [
   { id: "blur-1", label: "Light",  degree: 1 },
@@ -116,7 +126,10 @@ export default function VideoCall({
 
   // ── Socket: reactions + chat ──────────────────────────────────────────────
   useEffect(() => {
-    const sock = io(SOCKET_URL, { transports: ["websocket"] });
+    const sock = io(SOCKET_URL, {
+      transports: ["websocket"],
+      auth: { token: getSocketToken() },
+    });
     socketRef.current = sock;
 
     sock.on("connect", () => {
@@ -230,7 +243,7 @@ export default function VideoCall({
       form.append("bookingId", bookingId);
       form.append("duration",  String(recSeconds));
       const { default: api } = await import("../api");
-      await api.post("/api/recordings/upload", form, {
+      await api.post("/recordings/upload", form, {
         headers: { "Content-Type": "multipart/form-data" },
       });
     } catch (err) {
@@ -343,7 +356,7 @@ export default function VideoCall({
       newClient.on("connection-state-change", handleConnectionChange);
       client.current = newClient;
 
-      const { data } = await api.get(`/api/agora/token?channel=${channelName}`);
+      const { data } = await api.get(`/agora/token?channel=${channelName}`);
       if (!data.success) throw new Error(data.message || "Token request failed");
 
       await client.current.join(data.appId, channelName, data.token, null);
@@ -402,7 +415,7 @@ export default function VideoCall({
     if (joinedAtRef.current) {
       const durationMinutes = Math.ceil((Date.now() - joinedAtRef.current) / 60000);
       joinedAtRef.current   = null;
-      api.post('/api/agora-usage/log', {
+      api.post('/agora-usage/log', {
         channelName,
         bookingId,
         durationMinutes,

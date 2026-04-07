@@ -35,7 +35,7 @@ export default function StudentSetup() {
     if (!token) { setStep("error"); setErrorMsg("No invite token found in the URL."); return; }
     (async () => {
       try {
-        const res = await api.get(`/api/students/verify-invite/${token}`, { headers: { "x-center-slug": centerSlug } });
+        const res = await api.get(`/students/verify-invite/${token}`, { headers: { "x-center-slug": centerSlug } });
         setStudent(res.data.student);
         setStep("form");
       } catch (err) {
@@ -53,7 +53,7 @@ export default function StudentSetup() {
 
     setSubmitting(true);
     try {
-      await api.post("/api/students/setup-account", { token, password }, { headers: { "x-center-slug": centerSlug } });
+      await api.post("/students/setup-account", { token, password }, { headers: { "x-center-slug": centerSlug } });
       setStep("success");
     } catch (err) {
       setErrorMsg(err.response?.data?.message || "Something went wrong. Please try again.");

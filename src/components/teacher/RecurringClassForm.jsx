@@ -199,7 +199,7 @@ export default function RecurringClassForm({
 
       console.log("📤 Creating recurring classes:", payload);
 
-      const response = await api.post("/api/recurring-bookings", payload);
+      const response = await api.post("/recurring-bookings", payload);
 
       if (response.data.success) {
         console.log("✅ Recurring classes created:", response.data.recurringPattern);

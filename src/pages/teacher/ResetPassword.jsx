@@ -38,7 +38,7 @@ export default function ResetPassword() {
     setLoading(true);
 
     try {
-      await api.post(`/api/auth/teacher/reset-password/${token}`, { newPassword }, {
+      await api.post(`/auth/teacher/reset-password/${token}`, { newPassword }, {
         headers: centerSlug ? { 'x-center-slug': centerSlug } : {},
       });
 

@@ -158,7 +158,7 @@ export default function ScheduleTab({
     try {
       const end = new Date(weekStart); end.setDate(weekStart.getDate() + 7);
       const { data } = await api.get(
-        `/api/teacher-availability/${teacherInfo._id}?startDate=${weekStart.toISOString()}&endDate=${end.toISOString()}`
+        `/teacher-availability/${teacherInfo._id}?startDate=${weekStart.toISOString()}&endDate=${end.toISOString()}`
       );
       setAvailability(data.availability || []);
     } catch { /* silent */ } finally { setLoading(false); }
@@ -265,7 +265,7 @@ export default function ScheduleTab({
     if (conflict) { showToast(conflict, "error"); return; }
     setSaving(true);
     try {
-      await api.post("/api/teacher-availability", {
+      await api.post("/teacher-availability", {
         teacherId:   teacherInfo._id,
         studentId:   addForm.studentId || null,
         date:        addModal.date.toISOString(),
@@ -289,7 +289,7 @@ export default function ScheduleTab({
   // ── Delete availability ───────────────────────────────────────────────────
   const handleDelete = async (id) => {
     try {
-      await api.delete(`/api/teacher-availability/${id}`);
+      await api.delete(`/teacher-availability/${id}`);
       showToast("Slot removed");
       fetchAvailability();
       setDetail(null);
@@ -302,7 +302,7 @@ export default function ScheduleTab({
     setTogglingVis(true);
     const next = !scheduleVisible;
     try {
-      await api.patch(`/api/teachers/${teacherInfo._id}/schedule-visibility`, {
+      await api.patch(`/teachers/${teacherInfo._id}/schedule-visibility`, {
         showScheduleToStudents: next,
       });
       setScheduleVisible(next);

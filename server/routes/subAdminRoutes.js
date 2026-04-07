@@ -3,7 +3,7 @@ import express from "express";
 import crypto from "crypto";
 import { verifyToken, verifyAdmin } from "../middleware/authMiddleware.js";
 import { config } from "../config/config.js";
-import { sendSubAdminInviteEmail } from "../utils/emailService.js";
+import { sendSubAdminInviteEmail, getCenterBaseUrl } from "../utils/emailService.js";
 import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
 import { subAdminSchema } from "../schemas/subAdminSchema.js";
 import { teacherSchema }  from "../schemas/teacherSchema.js";
@@ -79,7 +79,8 @@ router.post("/invite", async (req, res) => {
       createdBy: req.user.id,
     });
 
-    const setupUrl = `${config.frontendUrl}/sub-admin/setup?token=${inviteToken}&center=${req.center.slug}`;
+    const { baseUrl: _sb1, needsSlug: _sn1 } = getCenterBaseUrl(req.center);
+    const setupUrl = `${_sb1}/sub-admin/setup?token=${inviteToken}${_sn1 ? `&center=${req.center.slug}` : ""}`;
     await sendSubAdminInviteEmail(subAdmin, setupUrl, req.admin, req.center?.centerName || "");
 
     res.status(201).json({
@@ -110,7 +111,8 @@ router.post("/:id/resend-invite", async (req, res) => {
     subAdmin.status        = "pending";
     await subAdmin.save();
 
-    const setupUrl = `${config.frontendUrl}/sub-admin/setup?token=${subAdmin.inviteToken}&center=${req.center.slug}`;
+    const { baseUrl: _sb2, needsSlug: _sn2 } = getCenterBaseUrl(req.center);
+    const setupUrl = `${_sb2}/sub-admin/setup?token=${subAdmin.inviteToken}${_sn2 ? `&center=${req.center.slug}` : ""}`;
     await sendSubAdminInviteEmail(subAdmin, setupUrl, req.admin, req.center?.centerName || "");
 
     res.json({ success: true, message: "Invitation resent successfully" });

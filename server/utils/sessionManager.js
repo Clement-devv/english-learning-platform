@@ -56,8 +56,22 @@ export const createSession = (req, jwtToken) => {
 export const cleanExpiredSessions = (sessions) => {
   const sevenDaysAgo = new Date();
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-  
-  return sessions.filter(session => 
+
+  return sessions.filter(session =>
     session.isActive && new Date(session.lastActivity) > sevenDaysAgo
   );
+};
+
+/**
+ * Keep only the N most recent sessions.
+ * Call this after pushing the new session to prevent unbounded growth.
+ */
+const SESSION_LIMIT = 5;
+
+export const pruneSessionsToLimit = (sessions, limit = SESSION_LIMIT) => {
+  if (sessions.length <= limit) return sessions;
+  return sessions
+    .slice()
+    .sort((a, b) => new Date(b.loginTime) - new Date(a.loginTime))
+    .slice(0, limit);
 };

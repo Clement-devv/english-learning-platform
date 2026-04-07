@@ -80,11 +80,12 @@ function NavigationButtons() {
   const [installed,          setInstalled]          = useState(false);
 
   useEffect(() => {
-    setIsSuperAdminLoggedIn(!!localStorage.getItem("superAdminToken"));
-    setIsAdminLoggedIn(!!localStorage.getItem("adminToken"));
-    setIsTeacherLoggedIn(!!localStorage.getItem("teacherToken"));
-    setIsStudentLoggedIn(!!localStorage.getItem("studentToken") || !!sessionStorage.getItem("studentToken"));
-    setIsSubAdminLoggedIn(!!localStorage.getItem("subAdminToken"));
+    const get = (k) => !!(sessionStorage.getItem(k) || localStorage.getItem(k));
+    setIsSuperAdminLoggedIn(get("superAdminToken"));
+    setIsAdminLoggedIn(get("adminToken"));
+    setIsTeacherLoggedIn(get("teacherToken"));
+    setIsStudentLoggedIn(get("studentToken"));
+    setIsSubAdminLoggedIn(get("subAdminToken"));
   }, [location]);
 
   // Capture the PWA install prompt

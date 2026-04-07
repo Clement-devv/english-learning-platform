@@ -45,7 +45,7 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
   const fetchSubAdmins = async () => {
     try {
       setLoading(true);
-      const res = await api.get("/api/sub-admins");
+      const res = await api.get("/sub-admins");
       setSubAdmins(res.data.subAdmins || []);
     } catch (e) {
       showToast("Failed to load sub-admins", "error");
@@ -56,7 +56,7 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
 
   const fetchTeachers = async () => {
     try {
-      const res = await api.get("/api/teachers");
+      const res = await api.get("/teachers");
       setAllTeachers(Array.isArray(res.data) ? res.data : []);
     } catch (e) {
       console.error("Failed to fetch teachers:", e);
@@ -76,10 +76,10 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
     try {
       setAction("form", true);
       if (editTarget) {
-        await api.put(`/api/sub-admins/${editTarget._id}`, form);
+        await api.put(`/sub-admins/${editTarget._id}`, form);
         showToast("Sub-admin updated successfully");
       } else {
-        await api.post("/api/sub-admins/invite", form);
+        await api.post("/sub-admins/invite", form);
         showToast(`Invitation sent to ${form.email} ✉️`);
       }
       setShowForm(false);
@@ -112,7 +112,7 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
   const handleResendInvite = async (sa) => {
     setAction(sa._id + "_resend", true);
     try {
-      await api.post(`/api/sub-admins/${sa._id}/resend-invite`);
+      await api.post(`/sub-admins/${sa._id}/resend-invite`);
       showToast("Invitation resent ✉️");
     } catch (e) {
       showToast("Failed to resend", "error");
@@ -124,7 +124,7 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
   const handleToggleStatus = async (sa) => {
     setAction(sa._id + "_toggle", true);
     try {
-      const res = await api.patch(`/api/sub-admins/${sa._id}/toggle-status`);
+      const res = await api.patch(`/sub-admins/${sa._id}/toggle-status`);
       showToast(`Sub-admin ${res.data.status === "active" ? "reactivated" : "suspended"}`);
       fetchSubAdmins();
     } catch (e) {
@@ -138,7 +138,7 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
     if (!confirm(`Delete ${sa.firstName} ${sa.lastName}? This cannot be undone.`)) return;
     setAction(sa._id + "_delete", true);
     try {
-      await api.delete(`/api/sub-admins/${sa._id}`);
+      await api.delete(`/sub-admins/${sa._id}`);
       showToast("Sub-admin deleted");
       fetchSubAdmins();
     } catch (e) {

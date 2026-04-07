@@ -3,6 +3,22 @@ import nodemailer from "nodemailer";
 import { config } from "../config/config.js";
 
 /**
+ * Resolve the correct base URL for email links sent to a center's users.
+ *
+ * - If the center has a verified custom domain → use https://www.sunshine.com
+ *   (no ?center= slug needed — the domain itself identifies the center)
+ * - Otherwise → use FRONTEND_URL + ?center=slug as fallback
+ *
+ * Returns { baseUrl, needsSlug }
+ */
+export const getCenterBaseUrl = (center) => {
+  if (center?.customDomain && center?.domainVerified) {
+    return { baseUrl: `https://${center.customDomain}`, needsSlug: false };
+  }
+  return { baseUrl: config.frontendUrl, needsSlug: true };
+};
+
+/**
  * Email Configuration
  * Make sure these are set in your .env file:
  * - EMAIL_HOST (e.g., smtp.gmail.com)
@@ -828,9 +844,11 @@ export const sendPasswordResetEmail = async (email, name, newPassword, role = "t
 /**
  * Send forgot password email to student with reset link
  */
-export const sendStudentForgotPasswordEmail = async (email, name, resetToken, centerSlug = "", centerName = "") => {
-  const centerParam = centerSlug ? `?center=${centerSlug}` : "";
-  const resetUrl = `${config.frontendUrl}/student/reset-password/${resetToken}${centerParam}`;
+export const sendStudentForgotPasswordEmail = async (email, name, resetToken, center = null, centerName = "") => {
+  const { baseUrl, needsSlug } = getCenterBaseUrl(center);
+  const centerSlug = typeof center === "string" ? center : center?.slug;
+  const centerParam = needsSlug && centerSlug ? `?center=${centerSlug}` : "";
+  const resetUrl = `${baseUrl}/student/reset-password/${resetToken}${centerParam}`;
 
   const mailOptions = {
     centerName,
@@ -944,9 +962,11 @@ export const sendCenterDeletionWarningEmail = async (center, deletionDate, conta
   });
 };
 
-export const sendAdminForgotPasswordEmail = async (email, name, resetToken, centerSlug = "", centerName = "") => {
-  const centerParam = centerSlug ? `?center=${centerSlug}` : "";
-  const resetUrl = `${config.frontendUrl}/admin/reset-password/${resetToken}${centerParam}`;
+export const sendAdminForgotPasswordEmail = async (email, name, resetToken, center = null, centerName = "") => {
+  const { baseUrl, needsSlug } = getCenterBaseUrl(center);
+  const centerSlug = typeof center === "string" ? center : center?.slug;
+  const centerParam = needsSlug && centerSlug ? `?center=${centerSlug}` : "";
+  const resetUrl = `${baseUrl}/admin/reset-password/${resetToken}${centerParam}`;
   return await sendEmail({
     centerName,
     to: email,
@@ -963,9 +983,11 @@ export const sendAdminForgotPasswordEmail = async (email, name, resetToken, cent
   });
 };
 
-export const sendForgotPasswordEmail = async (email, name, resetToken, centerSlug = "", centerName = "") => {
-  const centerParam = centerSlug ? `?center=${centerSlug}` : "";
-  const resetUrl = `${config.frontendUrl}/teacher/reset-password/${resetToken}${centerParam}`;
+export const sendForgotPasswordEmail = async (email, name, resetToken, center = null, centerName = "") => {
+  const { baseUrl, needsSlug } = getCenterBaseUrl(center);
+  const centerSlug = typeof center === "string" ? center : center?.slug;
+  const centerParam = needsSlug && centerSlug ? `?center=${centerSlug}` : "";
+  const resetUrl = `${baseUrl}/teacher/reset-password/${resetToken}${centerParam}`;
 
   const mailOptions = {
     centerName,

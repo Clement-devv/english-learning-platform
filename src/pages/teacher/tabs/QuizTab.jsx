@@ -349,7 +349,7 @@ export default function QuizTab({ teacherInfo, students, isDarkMode }) {
   const fetchQuizzes = async () => {
     try {
       setLoading(true);
-      const { data } = await api.get("/api/quiz/my");
+      const { data } = await api.get("/quiz/my");
       setQuizzes(data.quizzes || []);
     } catch { showToast("Failed to load quizzes", "error"); }
     finally { setLoading(false); }
@@ -357,7 +357,7 @@ export default function QuizTab({ teacherInfo, students, isDarkMode }) {
 
   const fetchTemplates = async () => {
     try {
-      const { data } = await api.get("/api/quiz-templates");
+      const { data } = await api.get("/quiz-templates");
       setTemplates(data.templates || []);
     } catch { /* silent */ }
   };
@@ -384,7 +384,7 @@ export default function QuizTab({ teacherInfo, students, isDarkMode }) {
     setShowPicker(false);
     setShowForm(true);
     // Increment usage count silently
-    api.patch(`/api/quiz-templates/${tmpl._id}/use`).then(() => fetchTemplates()).catch(() => {});
+    api.patch(`/quiz-templates/${tmpl._id}/use`).then(() => fetchTemplates()).catch(() => {});
     showToast(`Loaded "${tmpl.name}"${doShuffle ? " (shuffled)" : ""}`);
   };
 
@@ -394,7 +394,7 @@ export default function QuizTab({ teacherInfo, students, isDarkMode }) {
     if (invalid) { showToast("All questions and options must have text before saving", "error"); return; }
     try {
       setSavingTemplate(true);
-      await api.post("/api/quiz-templates", {
+      await api.post("/quiz-templates", {
         name,
         instructions: form.instructions,
         timeLimit:    parseInt(form.timeLimit, 10) || 15,
@@ -421,7 +421,7 @@ export default function QuizTab({ teacherInfo, students, isDarkMode }) {
     if (!aiTopic.trim()) { showToast("Please enter a topic first", "error"); return; }
     try {
       setAiLoading(true);
-      const { data } = await api.post("/api/quiz/generate", {
+      const { data } = await api.post("/quiz/generate", {
         topic:      aiTopic.trim(),
         count:      parseInt(aiCount, 10),
         difficulty: aiDifficulty,
@@ -453,7 +453,7 @@ export default function QuizTab({ teacherInfo, students, isDarkMode }) {
       if (aiPdfFile)       fd.append("file",  aiPdfFile);
       fd.append("count", aiCount);
 
-      const { data } = await api.post("/api/quiz/generate-from-notes", fd, {
+      const { data } = await api.post("/quiz/generate-from-notes", fd, {
         headers: { "Content-Type": "multipart/form-data" },
       });
       if (!data.success) throw new Error(data.message);
@@ -481,7 +481,7 @@ export default function QuizTab({ teacherInfo, students, isDarkMode }) {
   const handleDeleteTemplate = async (id) => {
     if (!window.confirm("Delete this template?")) return;
     try {
-      await api.delete(`/api/quiz-templates/${id}`);
+      await api.delete(`/quiz-templates/${id}`);
       setTemplates(prev => prev.filter(t => t._id !== id));
       showToast("Template deleted");
     } catch { showToast("Failed to delete", "error"); }
@@ -498,7 +498,7 @@ export default function QuizTab({ teacherInfo, students, isDarkMode }) {
     if (invalid) { showToast("All questions and options must have text", "error"); return; }
     try {
       setSubmitting(true);
-      await api.post("/api/quiz", {
+      await api.post("/quiz", {
         studentId:    form.studentId,
         title:        form.title.trim(),
         instructions: form.instructions.trim(),
@@ -519,7 +519,7 @@ export default function QuizTab({ teacherInfo, students, isDarkMode }) {
   const handleDelete = async (id) => {
     if (!window.confirm("Delete this quiz?")) return;
     try {
-      await api.delete(`/api/quiz/${id}`);
+      await api.delete(`/quiz/${id}`);
       showToast("Quiz deleted");
       setQuizzes(prev => prev.filter(q => q._id !== id));
     } catch (err) { showToast(err?.response?.data?.message || "Failed to delete", "error"); }

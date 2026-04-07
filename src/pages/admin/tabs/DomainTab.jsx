@@ -10,7 +10,7 @@ export default function DomainTab() {
 
   const fetchStatus = async () => {
     try {
-      const res = await api.get('/api/center/domain/status');
+      const res = await api.get('/center/domain/status');
       setStatus(res.data);
     } catch {
       // no domain yet — that's fine
@@ -26,7 +26,7 @@ export default function DomainTab() {
     setSaving(true);
     setMessage(null);
     try {
-      const res = await api.post('/api/center/domain', { domain });
+      const res = await api.post('/center/domain', { domain });
       setMessage({ type: 'success', text: res.data.message });
       fetchStatus();
     } catch (err) {

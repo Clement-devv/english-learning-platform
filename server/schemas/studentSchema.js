@@ -58,3 +58,14 @@ export const studentSchema = new mongoose.Schema({
   lastClassWeek:            { type: String, default: null }, // e.g. "2026-W13"
   activityDates:            { type: [Date], default: [] },   // last 30 active days (for 7-day dots)
 }, { timestamps: true });
+
+// Lookup by status (admin lists active/pending/suspended students)
+studentSchema.index({ status: 1 });
+// Analytics overview: countDocuments({ active: true, noOfClasses: { $gt: 0 } })
+studentSchema.index({ active: 1, noOfClasses: 1 });
+// Forgot-password token lookup (sparse — most docs have no token)
+studentSchema.index({ resetPasswordToken: 1 }, { sparse: true });
+// Scheduled soft-delete sweep
+studentSchema.index({ scheduledDeletionAt: 1 }, { sparse: true });
+// Invite setup link lookup
+studentSchema.index({ inviteToken: 1 }, { sparse: true });

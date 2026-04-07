@@ -50,7 +50,9 @@ function StatusBadge({ status }) {
 
 function formatDate(d) {
   if (!d) return "—";
-  return new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+  // Use UTC so a dueDate stored as midnight UTC ("2026-04-05T00:00:00Z")
+  // always displays as "5 Apr 2026", never shifts to the previous day.
+  return new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
 }
 
 function isOverdue(dueDate, status) {
@@ -145,7 +147,8 @@ export default function HomeworkTab({ teacherInfo, students, isDarkMode }) {
   const [form, setForm] = useState({
     studentId: "", title: "", description: "", dueDate: "",
   });
-  const [formFiles, setFormFiles] = useState([]);
+  const [formFiles,         setFormFiles]         = useState([]);
+  const [formInstructionAudio, setFormInstructionAudio] = useState(null); // { blob, duration }
 
   // Grade form state per homework ID
   const [gradeForms,   setGradeForms]   = useState({});
@@ -160,7 +163,7 @@ export default function HomeworkTab({ teacherInfo, students, isDarkMode }) {
   const fetchHomework = async () => {
     try {
       setLoading(true);
-      const { data } = await api.get("/api/homework/my");
+      const { data } = await api.get("/homework/my");
       setHomeworkList(data.homework || []);
     } catch {
       showToast("Failed to load homework", "error");
@@ -198,11 +201,23 @@ export default function HomeworkTab({ teacherInfo, students, isDarkMode }) {
       fd.append("dueDate",     form.dueDate);
       formFiles.forEach(f => fd.append("files", f));
 
-      await api.post("/api/homework", fd, { headers: { "Content-Type": "multipart/form-data" } });
+      const { data: created } = await api.post("/homework", fd, { headers: { "Content-Type": "multipart/form-data" } });
+
+      // Upload instruction voice note if recorded
+      if (formInstructionAudio?.blob) {
+        const afd = new FormData();
+        afd.append("audio", formInstructionAudio.blob, "instruction.webm");
+        afd.append("duration", String(formInstructionAudio.duration));
+        await api.post(`/homework/${created.homework._id}/instruction-audio`, afd, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+      }
+
       showToast("Homework assigned!");
       setShowForm(false);
       setForm({ studentId: "", title: "", description: "", dueDate: "" });
       setFormFiles([]);
+      setFormInstructionAudio(null);
       fetchHomework();
     } catch (err) {
       showToast(err?.response?.data?.message || "Failed to assign homework", "error");
@@ -227,12 +242,12 @@ export default function HomeworkTab({ teacherInfo, students, isDarkMode }) {
         const form = new FormData();
         form.append("audio", ab.blob, "feedback.webm");
         form.append("duration", String(ab.duration));
-        await api.post(`/api/homework/${hwId}/audio-feedback`, form, {
+        await api.post(`/homework/${hwId}/audio-feedback`, form, {
           headers: { "Content-Type": "multipart/form-data" },
         });
       }
 
-      await api.post(`/api/homework/${hwId}/grade`, {
+      await api.post(`/homework/${hwId}/grade`, {
         score:    gf.score,
         feedback: gf.feedback || "",
       });
@@ -251,7 +266,7 @@ export default function HomeworkTab({ teacherInfo, students, isDarkMode }) {
   const handleDelete = async (hwId) => {
     if (!window.confirm("Delete this homework and all files?")) return;
     try {
-      await api.delete(`/api/homework/${hwId}`);
+      await api.delete(`/homework/${hwId}`);
       showToast("Deleted");
       setHomeworkList(prev => prev.filter(h => h._id !== hwId));
     } catch {
@@ -267,7 +282,7 @@ export default function HomeworkTab({ teacherInfo, students, isDarkMode }) {
   const openFile = (type, fileId) => {
     // Open through the authenticated download endpoint using a token in the URL
     // (since we can't set headers on <a> tags, we fetch as blob)
-    api.get(`/api/homework/file/${type}/${fileId}`, { responseType: "blob" })
+    api.get(`/homework/file/${type}/${fileId}`, { responseType: "blob" })
       .then(({ data, headers }) => {
         const url = URL.createObjectURL(data);
         window.open(url, "_blank");
@@ -398,6 +413,24 @@ export default function HomeworkTab({ teacherInfo, students, isDarkMode }) {
                 maxLength={2000}
                 rows={3}
                 style={{ width: "100%", padding: "9px 12px", borderRadius: 10, border: `1.5px solid ${c.inputBorder}`, background: c.input, color: c.heading, fontSize: 13, resize: "vertical", boxSizing: "border-box" }} />
+            </div>
+
+            {/* Instruction voice note */}
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 700, color: c.body, display: "block", marginBottom: 6 }}>
+                Voice Instructions (optional)
+              </label>
+              <AudioRecorder
+                isDarkMode={isDarkMode}
+                onRecorded={(blob, duration) =>
+                  setFormInstructionAudio(blob ? { blob, duration } : null)
+                }
+              />
+              {formInstructionAudio?.blob && (
+                <p style={{ margin: "6px 0 0", fontSize: 12, color: "#6366f1", fontWeight: 600 }}>
+                  ✓ Voice note recorded — will be attached to instructions
+                </p>
+              )}
             </div>
 
             <FilePicker files={formFiles} setFiles={setFormFiles} label="Attach reference files" />
@@ -644,7 +677,7 @@ function AudioFeedbackPlayer({ fileId, duration }) {
     setLoading(true);
     try {
       const { default: api } = await import("../../../api");
-      const { data } = await api.get(`/api/homework/file/audio-feedback/${fileId}`, { responseType: "blob" });
+      const { data } = await api.get(`/homework/file/audio-feedback/${fileId}`, { responseType: "blob" });
       const url = URL.createObjectURL(data);
       setBlobUrl(url);
       setTimeout(() => { audioRef.current?.play(); setPlaying(true); }, 50);

@@ -43,3 +43,12 @@ bookingSchema.index({ teacherId: 1, status: 1 });
 bookingSchema.index({ studentId: 1, status: 1 });
 bookingSchema.index({ scheduledTime: 1 });
 bookingSchema.index({ recurringPatternId: 1 });
+// Compound for upcoming-class queries (teacher dashboard: upcoming accepted classes)
+bookingSchema.index({ teacherId: 1, scheduledTime: 1, status: 1 });
+bookingSchema.index({ studentId: 1, scheduledTime: 1, status: 1 });
+// Dispute panel: open disputes
+bookingSchema.index({ disputeRaised: 1, disputeStatus: 1 }, { sparse: true });
+// Admin-rejected sweep
+bookingSchema.index({ adminRejected: 1 }, { sparse: true });
+// Reminder scheduler queries upcoming bookings by time
+bookingSchema.index({ status: 1, scheduledTime: 1 });

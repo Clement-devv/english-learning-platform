@@ -5,7 +5,7 @@ dotenv.config();
 import SuperAdmin from '../models/master/SuperAdmin.js';
 
 async function createSuperAdmin() {
-  await mongoose.connect(process.env.MASTER_DB_URI);
+  await mongoose.connect(process.env.MONGO_URI);
   const existing = await SuperAdmin.findOne({ email: process.env.SUPER_ADMIN_EMAIL });
   if (existing) {
     console.log('Super admin already exists');

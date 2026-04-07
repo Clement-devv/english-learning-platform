@@ -1,7 +1,28 @@
 // middleware/rateLimiter.js
 import rateLimit from "express-rate-limit";
+import { RedisStore } from "rate-limit-redis";
 import { logger } from "../utils/logger.js";
 import LoginAttempt from "../models/LoginAttempt.js";
+import redisClient from "../config/redis.js";
+
+// Build a RedisStore for the given prefix when Redis is available,
+// otherwise return undefined so express-rate-limit uses its memory store.
+const makeStore = (prefix) => {
+  if (!redisClient) return undefined;
+  return new RedisStore({
+    // ioredis exposes a generic .call() method that rate-limit-redis uses
+    // to send arbitrary Redis commands (INCR, EXPIRE, etc.)
+    sendCommand: (...args) => redisClient.call(...args),
+    prefix: `rl:${prefix}:`,
+  });
+};
+
+// Spread helper — only adds { store } when Redis is available so we don't
+// override the default memory store with an explicit undefined.
+const withStore = (prefix) => {
+  const store = makeStore(prefix);
+  return store ? { store } : {};
+};
 
 const MAX_ATTEMPTS  = 10;
 const LOCK_DURATION = 60 * 60 * 1000; // 1 hour in ms
@@ -76,7 +97,7 @@ const createKeyGenerator = (useUser = true) => (req) => {
   if (useUser && req.user?.id) {
     return req.user.id;
   }
-  return req.body.email || req.body.username || req.ip;
+  return req.body?.email || req.body?.username || req.ip;
 };
 
 const shouldSkip = (req) => {
@@ -94,21 +115,23 @@ const shouldSkip = (req) => {
 // 1. LOGIN LIMITER (Keep your existing strict security)
 // =========================================
 export const loginLimiter = rateLimit({
+  ...withStore("login"),
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 20, // ✅ Increased from 5 to 20 (more realistic for legitimate users)
-  skipSuccessfulRequests: true, // Don't count successful logins
+  max: 20,
+  skipSuccessfulRequests: true,
   standardHeaders: true,
   legacyHeaders: false,
-  skip: shouldSkip, // ✅ NEW: Skip localhost in development
-  
+  skip: shouldSkip,
+  validate: { keyGeneratorIpFallback: false },
+
   // Use email if provided, otherwise IP
   keyGenerator: (req) => {
-    return req.body.email || req.body.username || req.ip;
+    return req.body?.email || req.body?.username || req.ip;
   },
-  
+
   // Custom handler with detailed message
   handler: (req, res) => {
-    const identifier = req.body.email || req.body.username || req.ip;
+    const identifier = req.body?.email || req.body?.username || req.ip;
     
     logger.security('RATE_LIMIT_EXCEEDED', {
       type: 'login',
@@ -130,19 +153,21 @@ export const loginLimiter = rateLimit({
 // 2. PASSWORD RESET LIMITER (Keep your strict security)
 // =========================================
 export const passwordResetLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000, // 1 hour
-  max: 5, // ✅ Increased from 3 to 5 (slightly more lenient)
+  ...withStore("pwd-reset"),
+  windowMs: 60 * 60 * 1000,
+  max: 5,
   skipFailedRequests: false,
-  skip: shouldSkip, // ✅ NEW: Skip localhost in development
-  
+  skip: shouldSkip,
+  validate: { keyGeneratorIpFallback: false },
+
   keyGenerator: (req) => {
-    return req.body.email || req.ip;
+    return req.body?.email || req.ip;
   },
-  
+
   handler: (req, res) => {
     logger.security('RATE_LIMIT_EXCEEDED', {
       type: 'password_reset',
-      email: req.body.email,
+      email: req.body?.email,
       ip: req.ip
     });
     
@@ -158,10 +183,12 @@ export const passwordResetLimiter = rateLimit({
 // 3. GENERAL API LIMITER (✅ MASSIVELY INCREASED for 500+ users)
 // =========================================
 export const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5000, // ✅ INCREASED from 100 to 5000 (handles 500+ users)
-  skip: shouldSkip, // ✅ NEW: Skip localhost in development
-  keyGenerator: createKeyGenerator(true), // ✅ NEW: Track by user, not just IP
+  ...withStore("api"),
+  windowMs: 15 * 60 * 1000,
+  max: 5000,
+  skip: shouldSkip,
+  validate: { keyGeneratorIpFallback: false },
+  keyGenerator: createKeyGenerator(true),
   
   handler: (req, res) => {
     logger.security('RATE_LIMIT_EXCEEDED', {
@@ -184,9 +211,11 @@ export const apiLimiter = rateLimit({
 // 4. REAL-TIME LIMITER (✅ NEW - For video calls & heartbeats)
 // =========================================
 export const realtimeLimiter = rateLimit({
-  windowMs: 1 * 60 * 1000, // 1 minute window
-  max: 200, // ✅ 200 requests per minute (video heartbeats every 5 seconds)
+  ...withStore("realtime"),
+  windowMs: 1 * 60 * 1000,
+  max: 200,
   skip: shouldSkip,
+  validate: { keyGeneratorIpFallback: false },
   keyGenerator: createKeyGenerator(true),
   
   handler: (req, res) => {
@@ -209,9 +238,11 @@ export const realtimeLimiter = rateLimit({
 // 5. POLLING LIMITER (✅ NEW - For chat & dashboard polling)
 // =========================================
 export const pollingLimiter = rateLimit({
-  windowMs: 1 * 60 * 1000, // 1 minute
-  max: 100, // ✅ 100 requests per minute (polling every 5-10 seconds)
+  ...withStore("polling"),
+  windowMs: 1 * 60 * 1000,
+  max: 100,
   skip: shouldSkip,
+  validate: { keyGeneratorIpFallback: false },
   keyGenerator: createKeyGenerator(true),
   
   handler: (req, res) => {
@@ -234,9 +265,10 @@ export const pollingLimiter = rateLimit({
 // 6. STRICT LIMITER (Keep for sensitive operations)
 // =========================================
 export const strictLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000, // 1 hour
-  max: 50, // ✅ Increased from 5 to 50 (more realistic)
-  skip: shouldSkip, // ✅ NEW: Skip localhost in development
+  ...withStore("strict"),
+  windowMs: 60 * 60 * 1000,
+  max: 50,
+  skip: shouldSkip,
   
   handler: (req, res) => {
     logger.security('RATE_LIMIT_EXCEEDED', {
@@ -258,9 +290,10 @@ export const strictLimiter = rateLimit({
 // 7. FILE UPLOAD LIMITER (Keep your existing)
 // =========================================
 export const uploadLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000, // 1 hour
-  max: 50, // ✅ Increased from 10 to 50 (more uploads allowed)
-  skip: shouldSkip, // ✅ NEW: Skip localhost in development
+  ...withStore("upload"),
+  windowMs: 60 * 60 * 1000,
+  max: 50,
+  skip: shouldSkip,
   
   handler: (req, res) => {
     logger.security('RATE_LIMIT_EXCEEDED', {
@@ -279,18 +312,20 @@ export const uploadLimiter = rateLimit({
 // 8. EMAIL SENDING LIMITER (Keep your existing)
 // =========================================
 export const emailLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000, // 1 hour
-  max: 10, // ✅ Increased from 5 to 10
-  skip: shouldSkip, // ✅ NEW: Skip localhost in development
-  
+  ...withStore("email"),
+  windowMs: 60 * 60 * 1000,
+  max: 10,
+  skip: shouldSkip,
+  validate: { keyGeneratorIpFallback: false },
+
   keyGenerator: (req) => {
-    return req.body.email || req.ip;
+    return req.body?.email || req.ip;
   },
-  
+
   handler: (req, res) => {
     logger.security('RATE_LIMIT_EXCEEDED', {
       type: 'email',
-      recipient: req.body.email,
+      recipient: req.body?.email,
       ip: req.ip
     });
     

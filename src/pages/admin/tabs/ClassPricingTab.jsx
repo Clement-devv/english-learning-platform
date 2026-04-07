@@ -46,7 +46,7 @@ export default function ClassPricingTab({ isDarkMode }) {
   const inp     = { width: "100%", padding: "10px 13px", borderRadius: "10px", border: `1.5px solid ${border}`, background: inputBg, color: textPri, fontSize: "14px", outline: "none", boxSizing: "border-box", fontFamily: "inherit" };
 
   useEffect(() => {
-    api.get("/api/class-pricing")
+    api.get("/class-pricing")
       .then(r => {
         if (r.data) {
           setPrice(String(r.data.pricePerClass));
@@ -74,7 +74,7 @@ export default function ClassPricingTab({ isDarkMode }) {
     setSaving(true);
     setMsg(null);
     try {
-      await api.put("/api/class-pricing", {
+      await api.put("/class-pricing", {
         pricePerClass: Number(price),
         currency,
         currencySymbol: symbol,

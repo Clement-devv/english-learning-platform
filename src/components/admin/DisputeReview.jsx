@@ -42,7 +42,7 @@ export default function DisputeReview({ isDarkMode }) {
   const load = async () => {
     setLoading(true);
     try {
-      const { data } = await api.get(`/api/classroom/complaints${filter !== "all" ? `?status=${filter}` : ""}`);
+      const { data } = await api.get(`/classroom/complaints${filter !== "all" ? `?status=${filter}` : ""}`);
       setComplaints(data.complaints || []);
     } catch { /* silent */ }
     finally { setLoading(false); }
@@ -52,7 +52,7 @@ export default function DisputeReview({ isDarkMode }) {
 
   const updateComplaint = async (id, status, resolution, notes) => {
     try {
-      await api.patch(`/api/classroom/complaints/${id}`, { status, resolution, adminNotes: notes });
+      await api.patch(`/classroom/complaints/${id}`, { status, resolution, adminNotes: notes });
       await load();
       setReviewing(null);
       setAdminNotes("");
@@ -64,7 +64,7 @@ export default function DisputeReview({ isDarkMode }) {
   const markCompleted = async (complaint) => {
     setCompleting(true);
     try {
-      await api.patch(`/api/classroom/admin-complete/${complaint.bookingId?._id || complaint.bookingId}`, {
+      await api.patch(`/classroom/admin-complete/${complaint.bookingId?._id || complaint.bookingId}`, {
         complaintId: complaint._id,
         adminNotes: adminNotes || "Marked complete by admin after dispute review",
       });

@@ -1,8 +1,7 @@
 // middleware/security.js
 import helmet from "helmet";
-import mongoSanitize from "express-mongo-sanitize";
-import xss from "xss-clean";
-import hpp from "hpp";
+import { sanitize as mongoSanitizeValue } from "express-mongo-sanitize";
+import { clean as xssClean } from "xss-clean/lib/xss.js";
 
 /**
  * Security headers middleware
@@ -41,29 +40,89 @@ export const securityHeaders = helmet({
 });
 
 /**
- * Prevent NoSQL injection attacks
- * Sanitizes user input to prevent MongoDB operator injection
+ * Prevent NoSQL injection attacks.
+ *
+ * express-mongo-sanitize does `req[key] = sanitized` directly which throws on
+ * Express 5 + Node 24 because req.query is a prototype getter. We call its
+ * sanitize() function directly and apply the result safely via
+ * Object.defineProperty for req.query.
  */
-export const noSqlInjectionProtection = mongoSanitize({
-  replaceWith: '_',
-  onSanitize: ({ req, key }) => {
-    console.warn(`🚨 NoSQL injection attempt detected: ${key} in ${req.path}`);
-  },
-});
+const MONGO_SANITIZE_OPTS = { replaceWith: '_' };
+
+export const noSqlInjectionProtection = (req, res, next) => {
+  if (req.body)    req.body    = mongoSanitizeValue(req.body,    MONGO_SANITIZE_OPTS);
+  if (req.params)  req.params  = mongoSanitizeValue(req.params,  MONGO_SANITIZE_OPTS);
+  if (req.headers) req.headers = mongoSanitizeValue(req.headers, MONGO_SANITIZE_OPTS);
+  if (req.query) {
+    const sanitized = mongoSanitizeValue(req.query, MONGO_SANITIZE_OPTS);
+    Object.defineProperty(req, 'query', {
+      value: sanitized,
+      writable: true,
+      configurable: true,
+      enumerable: true,
+    });
+  }
+  next();
+};
 
 /**
- * Prevent XSS attacks
- * Cleans user input from malicious scripts
+ * Prevent XSS attacks.
+ *
+ * xss-clean does `req.query = cleaned` directly, which throws on Express 5 +
+ * Node 24 because req.query is a prototype getter. We use the underlying
+ * xss cleaner directly and apply it safely via Object.defineProperty.
  */
-export const xssProtection = xss();
+export const xssProtection = (req, res, next) => {
+  if (req.body)   req.body   = xssClean(req.body);
+  if (req.params) req.params = xssClean(req.params);
+  if (req.query) {
+    Object.defineProperty(req, 'query', {
+      value: xssClean(req.query),
+      writable: true,
+      configurable: true,
+      enumerable: true,
+    });
+  }
+  next();
+};
 
 /**
- * Prevent HTTP parameter pollution
- * Protects against duplicate parameters
+ * Prevent HTTP parameter pollution (HPP).
+ *
+ * The `hpp` npm package does `req.query = cleaned` which throws on Express 5 +
+ * Node 24 because req.query is a prototype getter and cannot be directly
+ * assigned. This custom version uses Object.defineProperty to safely shadow
+ * the getter with an own-property on the request instance instead.
+ *
+ * For whitelisted params (e.g. ?sort=name&sort=email) arrays are kept as-is.
+ * For all other duplicated params, only the last value is kept.
  */
-export const parameterPollutionProtection = hpp({
-  whitelist: ['sort', 'fields', 'page', 'limit', 'search']
-});
+const HPP_WHITELIST = new Set(['sort', 'fields', 'page', 'limit', 'skip', 'search']);
+
+export const parameterPollutionProtection = (req, res, next) => {
+  const raw = req.query; // read via getter — fine
+  if (!raw || typeof raw !== 'object') return next();
+
+  const cleaned = {};
+  for (const [key, val] of Object.entries(raw)) {
+    if (!Array.isArray(val) || HPP_WHITELIST.has(key)) {
+      cleaned[key] = val;
+    } else {
+      // Duplicate non-whitelisted param: keep last value
+      cleaned[key] = val[val.length - 1];
+    }
+  }
+
+  // Shadow the prototype getter with a plain writable own-property
+  Object.defineProperty(req, 'query', {
+    value: cleaned,
+    writable: true,
+    configurable: true,
+    enumerable: true,
+  });
+
+  next();
+};
 
 /**
  * Request size limits

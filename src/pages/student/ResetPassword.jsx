@@ -38,7 +38,7 @@ export default function StudentResetPassword() {
     setLoading(true);
 
     try {
-      await api.post(`/api/auth/student/reset-password/${token}`, { newPassword }, {
+      await api.post(`/auth/student/reset-password/${token}`, { newPassword }, {
         headers: centerSlug ? { 'x-center-slug': centerSlug } : {},
       });
 

@@ -22,8 +22,8 @@ export default function OverviewTab({ isDarkMode }) {
       setError(null);
 
       const [overviewRes, bookingsRes] = await Promise.all([
-        api.get("/api/analytics/overview"),
-        api.get("/api/bookings?limit=6&sort=desc"),
+        api.get("/analytics/overview"),
+        api.get("/bookings?limit=6&sort=desc"),
       ]);
 
       setOverview(overviewRes.data.data);

@@ -93,7 +93,7 @@ function QuizScreen({ quiz, onComplete, isDarkMode }) {
     const finalAnswers = forcedAnswers ?? answersRef.current;
     const timeTaken    = totalSeconds - secondsLeft;
     try {
-      const { data } = await api.post(`/api/quiz/${quiz._id}/attempt`, {
+      const { data } = await api.post(`/quiz/${quiz._id}/attempt`, {
         answers:   finalAnswers,
         startedAt: startedAt.toISOString(),
         timeTaken,
@@ -421,7 +421,7 @@ export default function StudentQuizTab({ studentInfo, isDarkMode }) {
   const fetchQuizzes = async () => {
     try {
       setLoading(true);
-      const { data } = await api.get("/api/quiz/assigned");
+      const { data } = await api.get("/quiz/assigned");
       setQuizzes(data.quizzes || []);
     } catch {
       showToast("Failed to load quizzes", "error");

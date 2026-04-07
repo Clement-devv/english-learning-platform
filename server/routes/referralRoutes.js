@@ -7,7 +7,7 @@ import {
   verifyStudent,
   verifyAdmin,
 } from "../middleware/authMiddleware.js";
-import { sendStudentInviteEmail } from "../utils/emailService.js";
+import { sendStudentInviteEmail, getCenterBaseUrl } from "../utils/emailService.js";
 import { config }       from "../config/config.js";
 import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
 import { referralSchema } from "../schemas/referralSchema.js";
@@ -165,7 +165,8 @@ router.post("/:id/approve", verifyToken, verifyAdmin, async (req, res) => {
       referredBy: referral.referrerId._id,
     });
 
-    const setupUrl = `${config.frontendUrl}/student/setup?token=${inviteToken}&center=${req.center.slug}`;
+    const { baseUrl: _rb, needsSlug: _rn } = getCenterBaseUrl(req.center);
+    const setupUrl = `${_rb}/student/setup?token=${inviteToken}${_rn ? `&center=${req.center.slug}` : ""}`;
     try { await sendStudentInviteEmail(newStudent, setupUrl, req.center?.centerName || ""); }
     catch (emailErr) { console.error("Referral invite email failed:", emailErr.message); }
 

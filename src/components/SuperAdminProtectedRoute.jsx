@@ -18,7 +18,7 @@ export default function SuperAdminProtectedRoute({ children }) {
 
       try {
         api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-        await api.get('/api/super-admin/stats');
+        await api.get('/super-admin/stats');
         setIsAuthenticated(true);
       } catch {
         localStorage.removeItem('superAdminToken');

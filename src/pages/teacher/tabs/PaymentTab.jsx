@@ -396,7 +396,7 @@ function BankDetailsCard({ teacher, isDarkMode }) {
     if (!teacher?._id) return;
     setSaving(true);
     try {
-      await api.patch(`/api/teachers/${teacher._id}/profile`, {
+      await api.patch(`/teachers/${teacher._id}/profile`, {
         accountName:   form.accountName.trim(),
         bankName:      form.bankName.trim(),
         accountNumber: form.accountNumber.trim(),
@@ -548,7 +548,7 @@ export default function PaymentTab({ teacher, isDarkMode }) {
     if (silent) setRefreshing(true);
     else setLoading(true);
     try {
-      const { data } = await api.get(`/api/payments/teacher/${teacher._id}`);
+      const { data } = await api.get(`/payments/teacher/${teacher._id}`);
       setTransactions(data.transactions || []);
       setSummary(
         data.summary || {

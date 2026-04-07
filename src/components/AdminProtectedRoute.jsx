@@ -25,7 +25,7 @@ export default function AdminProtectedRoute({ children }) {
         api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
         
         // Verify token with backend
-        const response = await api.get('/api/auth/admin/verify');
+        const response = await api.get('/auth/admin/verify');
         console.log("Admin verification response:", response.data);
         
         setIsAuthenticated(true);

@@ -36,7 +36,7 @@ export default function ReferralsTab({ isDarkMode }) {
   async function load() {
     setLoading(true);
     try {
-      const url = filter ? `/api/referrals?status=${filter}` : `/api/referrals`;
+      const url = filter ? `/referrals?status=${filter}` : `/referrals`;
       const res  = await api.get(url);
       const json = res.data;
       setReferrals(Array.isArray(json) ? json : []);
@@ -52,7 +52,7 @@ export default function ReferralsTab({ isDarkMode }) {
   async function approve(id) {
     setBusy(b => ({ ...b, [id]: true }));
     try {
-      await api.post(`/api/referrals/${id}/approve`);
+      await api.post(`/referrals/${id}/approve`);
       showToast("Student invited! Referrer credited +1 class.");
       load();
     } catch (e) {
@@ -66,7 +66,7 @@ export default function ReferralsTab({ isDarkMode }) {
     if (!window.confirm("Reject this referral application?")) return;
     setBusy(b => ({ ...b, [id]: true }));
     try {
-      await api.post(`/api/referrals/${id}/reject`);
+      await api.post(`/referrals/${id}/reject`);
       showToast("Application rejected.");
       load();
     } catch (e) {

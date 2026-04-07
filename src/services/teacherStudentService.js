@@ -6,7 +6,7 @@ import api from "../api";
  * @param {string} teacherId - The teacher's ID
  */
 export const getAssignedStudents = async (teacherId) => {
-  const res = await api.get(`/api/teachers/${teacherId}/students`);
+  const res = await api.get(`/teachers/${teacherId}/students`);
   return res.data.data; // Returns array of { assignmentId, assignedDate, student }
 };
 
@@ -15,6 +15,6 @@ export const getAssignedStudents = async (teacherId) => {
  * @param {string} teacherId - The teacher's ID
  */
 export const getTeacherAssignments = async (teacherId) => {
-  const res = await api.get(`/api/teachers/${teacherId}/assignments`);
+  const res = await api.get(`/teachers/${teacherId}/assignments`);
   return res.data.data;
 };

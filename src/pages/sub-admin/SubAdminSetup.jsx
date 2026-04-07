@@ -32,7 +32,7 @@ export default function SubAdminSetup() {
 
   const verifyToken = async () => {
     try {
-      const res = await fetch(`/api/sub-admin-auth/verify-invite/${token}`, {
+      const res = await fetch(`/api/v1/sub-admin-auth/verify-invite/${token}`, {
         headers: { "x-center-slug": centerSlug },
       });
       const data = await res.json();
@@ -62,7 +62,7 @@ export default function SubAdminSetup() {
     setErrorMsg("");
     setSubmitting(true);
     try {
-      const res = await fetch("/api/sub-admin-auth/setup-account", {
+      const res = await fetch("/api/v1/sub-admin-auth/setup-account", {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-center-slug": centerSlug },
         body: JSON.stringify({ token, password: form.password, confirmPassword: form.confirmPassword }),

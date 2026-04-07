@@ -3,15 +3,18 @@ import React, { useState, useEffect, lazy, Suspense, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   TrendingUp, Video, User, Home, Bell, Users, DollarSign,
-  Calendar, BarChart3, AlertTriangle, MessageCircle, Settings,
-  LogOut, ChevronRight, Menu, X, BookOpen, CheckSquare,
-  Shield, CalendarDays, FileText, Star, Palette, Globe
+  Calendar, BarChart3, AlertTriangle, MessageCircle,
+  X, BookOpen, Shield, CalendarDays, FileText, Star, Palette, Globe
 } from "lucide-react";
 
 // Always-needed (small utilities)
 import api from "../../api";
 import { useDarkMode } from "../../hooks/useDarkMode";
 import { useBranding } from "../../context/BrandingContext";
+import DashboardLayout  from "../../components/dashboard/DashboardLayout";
+import DashboardSidebar from "../../components/dashboard/DashboardSidebar";
+import DashboardTopBar  from "../../components/dashboard/DashboardTopBar";
+import { dashboardColors } from "../../utils/dashboardColors";
 import { getTeachers } from "../../services/teacherService";
 import { getStudents } from "../../services/studentService";
 
@@ -131,7 +134,7 @@ export default function AdminDashboard() {
   const { branding, center } = useBranding();
   const centerName = center?.centerName || "Admin Panel";
 
-  const adminInfo = JSON.parse(localStorage.getItem("adminInfo") || "{}");
+  const adminInfo = JSON.parse(sessionStorage.getItem("adminInfo") || localStorage.getItem("adminInfo") || "{}");
 
   const handleLogout = () => {
     localStorage.removeItem("adminToken");
@@ -159,7 +162,7 @@ export default function AdminDashboard() {
   useEffect(() => {
     const fetchUnreadNotifications = async () => {
       try {
-        const res  = await api.get("/api/notifications/unread-count");
+        const res  = await api.get("/notifications/unread-count");
         const data = res.data;
         if (data.success) setUnreadNotifications(data.count);
       } catch (_) {}
@@ -211,318 +214,83 @@ export default function AdminDashboard() {
   }, [activeTab, isDarkMode, loading, teachers, students]);
 
   // ── colours ──────────────────────────────────────────────────────────────
-  const bg        = isDarkMode ? "linear-gradient(135deg, #0f0f1a 0%, #1a1030 40%, #0a1628 100%)" : "linear-gradient(135deg, #e8eeff 0%, #f0e8ff 40%, #e8f4ff 100%)";
-  const sidebar   = isDarkMode ? "#13161f" : "#ffffff";
-  const border    = isDarkMode ? "#1e2235" : "#e8ecf4";
-  const heading   = isDarkMode ? "#e2e8f0" : "#1e293b";
-  const muted     = isDarkMode ? "#374151" : "#94a3b8";
-  const cardBg    = isDarkMode ? "#1a1d27" : "#ffffff";
-  const hoverBg   = isDarkMode ? "#1e2235" : "rgba(var(--brand-primary-rgb), 0.06)";
-  const activeBg  = isDarkMode ? "#252d4a" : "rgba(var(--brand-primary-rgb), 0.08)";
-  const activeClr = isDarkMode ? "#a5b4fc" : "var(--brand-primary)";
+  const c = dashboardColors(isDarkMode);
 
   return (
     <>
-      <style>{css(isDarkMode)}</style>
-      <div style={{ display: "flex", height: "100vh", background: bg, fontFamily: "var(--font-body)", overflow: "hidden" }}>
-
-        {/* ── SIDEBAR ── */}
-        <aside
-          className="adm-sidebar"
-          style={{
-            width: sidebarOpen ? "240px" : "64px",
-            background: sidebar,
-            borderRight: `1px solid ${border}`,
-            display: "flex",
-            flexDirection: "column",
-            flexShrink: 0,
-            transition: "width 0.25s cubic-bezier(0.4,0,0.2,1)",
-            overflow: "hidden",
-            zIndex: 40,
-          }}
-        >
-          {/* Logo */}
-          <div style={{
-            height: "64px", display: "flex", alignItems: "center",
-            padding: sidebarOpen ? "0 20px" : "0 16px",
-            borderBottom: `1px solid ${border}`, flexShrink: 0, gap: "10px",
-          }}>
-            {branding.logo ? (
-              <img src={branding.logo} alt={centerName} style={{ height: 32, maxWidth: 32, objectFit: "contain", borderRadius: 6, flexShrink: 0 }} />
-            ) : (
-              <div style={{
-                width: "32px", height: "32px", borderRadius: "10px", flexShrink: 0,
-                background: "linear-gradient(135deg, var(--brand-primary), var(--brand-secondary))",
-                display: "flex", alignItems: "center", justifyContent: "center",
-              }}>
-                <Shield size={16} color="white" />
-              </div>
-            )}
-            {sidebarOpen && (
-              <div style={{ overflow: "hidden" }}>
-                <p style={{ margin: 0, fontSize: "14px", fontWeight: "800", color: heading, whiteSpace: "nowrap", fontFamily: "var(--font-display)" }}>{centerName}</p>
-                <p style={{ margin: 0, fontSize: "10px", color: muted, whiteSpace: "nowrap", fontWeight: "600", letterSpacing: "0.05em", textTransform: "uppercase" }}>Admin Panel</p>
-              </div>
-            )}
-          </div>
-
-          {/* Nav */}
-          <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden", padding: "12px 8px" }} className="adm-scroll">
-            {NAV.map((group) => (
-              <div key={group.group} style={{ marginBottom: "8px" }}>
-                {sidebarOpen && (
-                  <p style={{
-                    margin: "0 0 4px 8px", fontSize: "10px", fontWeight: "700",
-                    color: muted, textTransform: "uppercase", letterSpacing: "0.1em",
-                    whiteSpace: "nowrap",
-                  }}>
-                    {group.group}
-                  </p>
-                )}
-                {group.items.map(({ key, label, icon: Icon }) => {
-                  const isActive = activeTab === key;
-                  const badge =
-                    key === "messages"      && unreadMessages      > 0 ? unreadMessages :
-                    key === "notifications" && unreadNotifications > 0 ? unreadNotifications : 0;
-                  return (
-                    <button
-                      key={key}
-                      onClick={() => setActiveTab(key)}
-                      title={!sidebarOpen ? label : undefined}
-                      style={{
-                        width: "100%", display: "flex", alignItems: "center",
-                        gap: "10px", padding: sidebarOpen ? "9px 10px" : "9px 16px",
-                        borderRadius: "10px", border: "none", cursor: "pointer",
-                        background: isActive ? activeBg : "transparent",
-                        color: isActive ? activeClr : isDarkMode ? "#6b7280" : "#64748b",
-                        fontFamily: "inherit", fontSize: "13.5px", fontWeight: isActive ? "700" : "500",
-                        textAlign: "left", transition: "all 0.15s", marginBottom: "2px",
-                        whiteSpace: "nowrap", overflow: "hidden",
-                        position: "relative",
-                      }}
-                      className="adm-nav-btn"
-                    >
-                      {isActive && (
-                        <div style={{
-                          position: "absolute", left: 0, top: "20%", bottom: "20%",
-                          width: "3px", borderRadius: "0 3px 3px 0",
-                          background: "var(--brand-secondary)",
-                        }} />
-                      )}
-                      <div style={{ position: "relative", flexShrink: 0 }}>
-                        <Icon size={16} />
-                        {badge > 0 && !sidebarOpen && (
-                          <div style={{
-                            position: "absolute", top: "-5px", right: "-5px",
-                            minWidth: "15px", height: "15px", borderRadius: "8px",
-                            background: "#ef4444", color: "white",
-                            fontSize: "9px", fontWeight: "800",
-                            display: "flex", alignItems: "center", justifyContent: "center",
-                            padding: "0 3px",
-                          }}>
-                            {badge > 99 ? "99+" : badge}
-                          </div>
-                        )}
-                      </div>
-                      {sidebarOpen && (
-                        <>
-                          <span style={{ flex: 1 }}>{label}</span>
-                          {badge > 0 && (
-                            <span style={{
-                              minWidth: "20px", height: "20px", borderRadius: "10px",
-                              background: "#ef4444", color: "white",
-                              fontSize: "10px", fontWeight: "800",
-                              display: "flex", alignItems: "center", justifyContent: "center",
-                              padding: "0 5px", flexShrink: 0,
-                            }}>
-                              {badge > 99 ? "99+" : badge}
-                            </span>
-                          )}
-                        </>
-                      )}
-                    </button>
-                  );
-                })}
-                {sidebarOpen && <div style={{ height: "1px", background: border, margin: "8px 4px" }} />}
-              </div>
-            ))}
-          </div>
-
-          {/* User info + actions */}
-          <div style={{ borderTop: `1px solid ${border}`, padding: "12px 8px", flexShrink: 0 }}>
-            {/* Dark mode toggle */}
-            <button
-              onClick={toggleDarkMode}
-              style={{
-                width: "100%", display: "flex", alignItems: "center", gap: "10px",
-                padding: sidebarOpen ? "9px 10px" : "9px 16px",
-                borderRadius: "10px", border: "none", cursor: "pointer",
-                background: "transparent", color: isDarkMode ? "#6b7280" : "#64748b",
-                fontFamily: "inherit", fontSize: "13.5px", fontWeight: "500",
-                textAlign: "left", marginBottom: "4px", whiteSpace: "nowrap",
-              }}
-              className="adm-nav-btn"
-            >
-              <span style={{ fontSize: "16px", flexShrink: 0 }}>{isDarkMode ? "☀️" : "🌙"}</span>
-              {sidebarOpen && <span>{isDarkMode ? "Light Mode" : "Dark Mode"}</span>}
-            </button>
-
-            {/* Settings */}
-            <button
-              onClick={() => setShowSettingsSidebar(true)}
-              style={{
-                width: "100%", display: "flex", alignItems: "center", gap: "10px",
-                padding: sidebarOpen ? "9px 10px" : "9px 16px",
-                borderRadius: "10px", border: "none", cursor: "pointer",
-                background: "transparent", color: isDarkMode ? "#6b7280" : "#64748b",
-                fontFamily: "inherit", fontSize: "13.5px", fontWeight: "500",
-                textAlign: "left", marginBottom: "4px", whiteSpace: "nowrap",
-              }}
-              className="adm-nav-btn"
-            >
-              <Settings size={16} style={{ flexShrink: 0 }} />
-              {sidebarOpen && <span>Settings</span>}
-            </button>
-
-            {/* Logout */}
-            <button
-              onClick={handleLogout}
-              style={{
-                width: "100%", display: "flex", alignItems: "center", gap: "10px",
-                padding: sidebarOpen ? "9px 10px" : "9px 16px",
-                borderRadius: "10px", border: "none", cursor: "pointer",
-                background: "transparent", color: "#ef4444",
-                fontFamily: "inherit", fontSize: "13.5px", fontWeight: "500",
-                textAlign: "left", whiteSpace: "nowrap",
-              }}
-              className="adm-logout-btn"
-            >
-              <LogOut size={16} style={{ flexShrink: 0 }} />
-              {sidebarOpen && <span>Logout</span>}
-            </button>
-          </div>
-        </aside>
-
-        {/* ── MAIN ── */}
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, overflow: "hidden" }}>
-
-          {/* Top bar */}
-          <header style={{
-            height: "64px", background: cardBg,
-            borderBottom: `1px solid ${border}`,
-            display: "flex", alignItems: "center",
-            padding: "0 24px", gap: "16px", flexShrink: 0,
-          }}>
-            {/* Collapse toggle */}
-            <button
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              style={{
-                background: "none", border: "none", cursor: "pointer",
-                color: muted, padding: "6px", borderRadius: "8px",
-                display: "flex", alignItems: "center",
-              }}
-              className="adm-nav-btn"
-            >
-              <Menu size={20} />
-            </button>
-
-            {/* Breadcrumb */}
-            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-              <span style={{ fontSize: "13px", color: muted, fontWeight: "500" }}>Admin</span>
-              <ChevronRight size={14} color={muted} />
-              <span style={{ fontSize: "13px", color: heading, fontWeight: "700" }}>{activeLabel}</span>
-            </div>
-
-            <div style={{ flex: 1 }} />
-
-            {/* Notification bell */}
+    <DashboardLayout
+      isDarkMode={isDarkMode}
+      colors={c}
+      activeTab={activeTab}
+      noPaddingTabs={["messages"]}
+      sidebar={
+        <DashboardSidebar
+          nav={NAV}
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          sidebarOpen={sidebarOpen}
+          colors={c}
+          isDarkMode={isDarkMode}
+          branding={branding}
+          centerName={centerName}
+          portalLabel="Admin Panel"
+          portalIcon={Shield}
+          badges={{ messages: unreadMessages, notifications: unreadNotifications }}
+          onDarkModeToggle={toggleDarkMode}
+          onSettings={() => setShowSettingsSidebar(true)}
+          onLogout={handleLogout}
+        />
+      }
+      topBar={
+        <DashboardTopBar
+          sidebarOpen={sidebarOpen}
+          onToggle={() => setSidebarOpen(!sidebarOpen)}
+          roleName="Admin"
+          activeLabel={activeLabel}
+          colors={c}
+          userInitial={(adminInfo?.firstName?.[0] || "A").toUpperCase()}
+          onAvatarClick={() => setShowSettingsSidebar(true)}
+          actions={
             <button
               onClick={() => setActiveTab("notifications")}
-              style={{
-                position: "relative", background: "none", border: "none",
-                cursor: "pointer", color: muted, padding: "6px",
-                borderRadius: "8px", display: "flex", alignItems: "center",
-              }}
-              className="adm-nav-btn"
+              style={{ position: "relative", background: "none", border: "none", cursor: "pointer", color: c.muted, padding: "6px", borderRadius: "8px", display: "flex", alignItems: "center" }}
+              className="db-nav-btn"
             >
               <Bell size={19} />
               {unreadNotifications > 0 && (
-                <span style={{
-                  position: "absolute", top: "2px", right: "2px",
-                  width: "8px", height: "8px", borderRadius: "50%",
-                  background: "#ef4444",
-                }} />
+                <span style={{ position: "absolute", top: "2px", right: "2px", width: "8px", height: "8px", borderRadius: "50%", background: "#ef4444" }} />
               )}
             </button>
-
-            {/* Avatar */}
-            <div style={{
-              width: "36px", height: "36px", borderRadius: "10px",
-              background: "linear-gradient(135deg, var(--brand-primary), var(--brand-secondary))",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: "13px", fontWeight: "700", color: "white", cursor: "pointer",
-            }}
-              onClick={() => setShowSettingsSidebar(true)}
-            >
-              {(adminInfo?.firstName?.[0] || "A").toUpperCase()}
-            </div>
-          </header>
-
-          {/* Content */}
-          <main style={{
-            flex: 1, overflowY: "auto", padding: "24px",
-            background: bg,
-          }} className="adm-scroll">
-
-            {/* Toast */}
-            {toast && (
-              <div style={{
-                position: "fixed", top: "16px", right: "16px", zIndex: 100,
-                background: "#10b981", color: "white", padding: "12px 20px",
-                borderRadius: "12px", fontSize: "14px", fontWeight: "600",
-                boxShadow: "0 4px 20px rgba(16,185,129,0.4)",
-              }}>
-                {toast}
-              </div>
-            )}
-
-            {/* Tab content */}
-            <div
-              key={activeTab}
-              className="adm-content"
-              style={{
-                background: cardBg, borderRadius: "20px",
-                border: `1px solid ${border}`,
-                boxShadow: isDarkMode ? "none" : "0 4px 24px rgba(108,99,255,0.07), 0 1px 4px rgba(0,0,0,0.04)",
-                minHeight: "calc(100vh - 140px)",
-                padding: activeTab === "messages" ? "0" : "24px",
-                overflow: activeTab === "messages" ? "hidden" : "visible",
-              }}>
-              <Suspense fallback={<TabLoader />}>
-                {tabContent}
-              </Suspense>
-            </div>
-          </main>
-        </div>
-
-        {/* ── MODALS ── */}
-        <SettingsSidebar
-          isOpen={showSettingsSidebar}
-          onClose={() => setShowSettingsSidebar(false)}
-          onChangePassword={() => { setShowSettingsSidebar(false); setShowChangePassword(true); }}
-          onManageSessions={() => { setShowSettingsSidebar(false); setShowSessionManagement(true); }}
-          onManage2FA={() => { setShowSettingsSidebar(false); setShowSettingsModal(true); }}
-          userInfo={{
-            firstName: adminInfo?.firstName || "Admin",
-            lastName: adminInfo?.lastName || "User",
-            email: adminInfo?.email || localStorage.getItem("adminEmail") || "admin@example.com",
-          }}
+          }
         />
-        <SettingsModal isOpen={showSettingsModal} onClose={() => setShowSettingsModal(false)} userType="admin" />
-        {showSessionManagement && (
-          <SessionManagement isOpen={showSessionManagement} onClose={() => setShowSessionManagement(false)} userType="admin" />
-        )}
-      </div>
+      }
+    >
+      {/* Toast */}
+      {toast && (
+        <div style={{ position: "fixed", top: "16px", right: "16px", zIndex: 100, background: "#10b981", color: "white", padding: "12px 20px", borderRadius: "12px", fontSize: "14px", fontWeight: "600", boxShadow: "0 4px 20px rgba(16,185,129,0.4)" }}>
+          {toast}
+        </div>
+      )}
+      <Suspense fallback={<TabLoader />}>
+        {tabContent}
+      </Suspense>
+    </DashboardLayout>
+    <SettingsSidebar
+      isOpen={showSettingsSidebar}
+      onClose={() => setShowSettingsSidebar(false)}
+      onChangePassword={() => { setShowSettingsSidebar(false); setShowChangePassword(true); }}
+      onManageSessions={() => { setShowSettingsSidebar(false); setShowSessionManagement(true); }}
+      onManage2FA={() => { setShowSettingsSidebar(false); setShowSettingsModal(true); }}
+      userInfo={{
+        firstName: adminInfo?.firstName || "Admin",
+        lastName: adminInfo?.lastName || "User",
+        email: adminInfo?.email || localStorage.getItem("adminEmail") || "admin@example.com",
+      }}
+    />
+    <SettingsModal isOpen={showSettingsModal} onClose={() => setShowSettingsModal(false)} userType="admin" />
+    {showSessionManagement && (
+      <SessionManagement isOpen={showSessionManagement} onClose={() => setShowSessionManagement(false)} userType="admin" />
+    )}
     </>
   );
 }
@@ -533,35 +301,9 @@ function Loader({ isDarkMode }) {
       <div style={{
         width: "32px", height: "32px", borderRadius: "50%",
         border: `3px solid ${isDarkMode ? "#1e2235" : "#e8ecf4"}`,
-        borderTopColor: "var(--brand-secondary)", animation: "adm-spin 0.8s linear infinite",
+        borderTopColor: "var(--brand-secondary)", animation: "db-spin 0.8s linear infinite",
       }} />
     </div>
   );
 }
 
-const css = (dark) => `
-  * { box-sizing: border-box; }
-
-  .adm-scroll::-webkit-scrollbar { width: 4px; }
-  .adm-scroll::-webkit-scrollbar-track { background: transparent; }
-  .adm-scroll::-webkit-scrollbar-thumb { background: ${dark ? "#1e2235" : "#e0e4f4"}; border-radius: 4px; }
-
-  .adm-nav-btn:hover {
-    background: ${dark ? "#1e2235 !important" : "rgba(var(--brand-primary-rgb), 0.06) !important"};
-    color: ${dark ? "#a5b4fc !important" : "var(--brand-primary) !important"};
-  }
-  .adm-logout-btn:hover {
-    background: rgba(239,68,68,0.08) !important;
-  }
-
-  @keyframes adm-spin  { to { transform: rotate(360deg); } }
-  @keyframes adm-slide-up {
-    from { opacity: 0; transform: translateY(14px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
-  .adm-content { animation: adm-slide-up 0.35s ease both; }
-
-  @media (max-width: 768px) {
-    .adm-sidebar { position: fixed !important; height: 100vh; }
-  }
-`;

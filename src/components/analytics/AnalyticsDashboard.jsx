@@ -43,13 +43,13 @@ export default function AnalyticsDashboard({ isDarkMode }) {
         overviewRes, timelineRes, teachersRes,
         studentsRes, revenueRes, timesRes, acceptanceRes
       ] = await Promise.all([
-        api.get("/api/analytics/overview"),
-        api.get(`/api/analytics/bookings-timeline?period=${period}`),
-        api.get("/api/analytics/teacher-performance?limit=5"),
-        api.get("/api/analytics/student-engagement?limit=5"),
-        api.get("/api/analytics/revenue-breakdown"),
-        api.get("/api/analytics/popular-times"),
-        api.get("/api/analytics/booking-acceptance-rate")
+        api.get("/analytics/overview"),
+        api.get(`/analytics/bookings-timeline?period=${period}`),
+        api.get("/analytics/teacher-performance?limit=5"),
+        api.get("/analytics/student-engagement?limit=5"),
+        api.get("/analytics/revenue-breakdown"),
+        api.get("/analytics/popular-times"),
+        api.get("/analytics/booking-acceptance-rate")
       ]);
       setOverview(overviewRes.data.data);
       setTimeline(timelineRes.data.data);

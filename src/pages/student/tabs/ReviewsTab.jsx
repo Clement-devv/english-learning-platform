@@ -58,7 +58,7 @@ function ReviewForm({ booking, isDarkMode, onSubmitted }) {
     if (!rating) { setErr("Please pick a star rating."); return; }
     setBusy(true); setErr("");
     try {
-      await api.post("/api/reviews", { bookingId: booking._id, rating, comment });
+      await api.post("/reviews", { bookingId: booking._id, rating, comment });
       onSubmitted(booking._id);
     } catch (e) {
       setErr(e.response?.data?.error || e.message);
@@ -138,8 +138,8 @@ export default function ReviewsTab({ isDarkMode }) {
     setLoading(true);
     try {
       const [bookingsRes, reviewsRes] = await Promise.all([
-        api.get("/api/bookings/student"),
-        api.get("/api/reviews/my"),
+        api.get("/bookings/student"),
+        api.get("/reviews/my"),
       ]);
 
       const reviewedIds = new Set(

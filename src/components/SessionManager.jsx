@@ -15,7 +15,7 @@ export default function SessionManager({ userRole, onClose }) {
   const fetchSessions = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/api/auth/sessions');
+      const response = await api.get('/auth/sessions');
       setSessions(response.data.sessions || []);
     } catch (err) {
       console.error('Error fetching sessions:', err);
@@ -30,7 +30,7 @@ export default function SessionManager({ userRole, onClose }) {
 
     try {
       setActionLoading(sessionToken);
-      await api.post('/api/auth/logout-session', { sessionToken });
+      await api.post('/auth/logout-session', { sessionToken });
       
       // Remove from UI
       setSessions(prev => prev.filter(s => s.sessionToken !== sessionToken));
@@ -48,7 +48,7 @@ export default function SessionManager({ userRole, onClose }) {
 
     try {
       setActionLoading('all');
-      await api.post('/api/auth/logout-all-devices');
+      await api.post('/auth/logout-all-devices');
       
       // Keep only current session
       setSessions(prev => prev.filter(s => s.isCurrent));

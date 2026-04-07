@@ -12,10 +12,15 @@ const getLesson = (db) => db.models.Lesson || db.model("Lesson", lessonSchema);
 // Get ALL lessons — admin and teachers only
 router.get("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
   try {
+    const limit = Math.min(parseInt(req.query.limit) || 500, 1000);
+    const skip  = Math.max(parseInt(req.query.skip)  || 0,   0);
     const lessons = await getLesson(req.db)
       .find()
       .populate("studentId", "firstName surname email")
-      .sort({ date: -1 });
+      .sort({ date: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean();
     res.json(lessons);
   } catch (err) {
     console.error(err);

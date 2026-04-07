@@ -126,8 +126,16 @@ router.get("/teacher-performance", verifyToken, verifyAdmin, async (req, res) =>
 
     const teacherStats = await getTeacher(req.db).aggregate([
       {
+        // Pipeline $lookup: only fetch {status} per booking — uses the
+        // {teacherId,status} index and avoids loading full booking documents.
         $lookup: {
-          from: "bookings", localField: "_id", foreignField: "teacherId", as: "bookings",
+          from: "bookings",
+          let: { tid: "$_id" },
+          pipeline: [
+            { $match: { $expr: { $eq: ["$teacherId", "$$tid"] } } },
+            { $project: { _id: 0, status: 1 } },
+          ],
+          as: "bookings",
         },
       },
       {
@@ -170,8 +178,16 @@ router.get("/student-engagement", verifyToken, verifyAdmin, async (req, res) => 
 
     const studentStats = await getStudent(req.db).aggregate([
       {
+        // Pipeline $lookup: only fetch {status, scheduledTime} — uses the
+        // {studentId,status} index and avoids loading full booking documents.
         $lookup: {
-          from: "bookings", localField: "_id", foreignField: "studentId", as: "bookings",
+          from: "bookings",
+          let: { sid: "$_id" },
+          pipeline: [
+            { $match: { $expr: { $eq: ["$studentId", "$$sid"] } } },
+            { $project: { _id: 0, status: 1, scheduledTime: 1 } },
+          ],
+          as: "bookings",
         },
       },
       {

@@ -17,7 +17,7 @@ export default function TeacherLogin() {
     setLoading(true);
 
     try {
-      const response = await api.post('/api/auth/teacher/login', {
+      const response = await api.post('/auth/teacher/login', {
         email: email.trim(),
         password: password
       });
@@ -25,9 +25,9 @@ export default function TeacherLogin() {
       
   if (response.data.success) {
   // Store token, session token, and teacher info
-  localStorage.setItem('teacherToken', response.data.token);
-  localStorage.setItem('teacherSessionToken', response.data.sessionToken);
-  localStorage.setItem('teacherInfo', JSON.stringify(response.data.teacher));
+  sessionStorage.setItem('teacherToken', response.data.token);
+  sessionStorage.setItem('teacherSessionToken', response.data.sessionToken);
+  sessionStorage.setItem('teacherInfo', JSON.stringify(response.data.teacher));
   
   // Navigate to dashboard
   navigate('/teacher/dashboard');

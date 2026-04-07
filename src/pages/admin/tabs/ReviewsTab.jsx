@@ -53,7 +53,7 @@ export default function ReviewsTab({ isDarkMode }) {
       if (filterTeacher) params.set("teacherId", filterTeacher);
       if (filterFlag)    params.set("flagged", "true");
       if (filterRating)  params.set("rating", filterRating);
-      const res = await api.get(`/api/reviews?${params}`);
+      const res = await api.get(`/reviews?${params}`);
       const json = res.data;
       setData(json);
     } catch (e) {
@@ -68,7 +68,7 @@ export default function ReviewsTab({ isDarkMode }) {
   async function handleFlag(reviewId, currentFlag) {
     setBusy(b => ({ ...b, [reviewId]: true }));
     try {
-      await api.patch(`/api/reviews/${reviewId}/flag`, { flagged: !currentFlag });
+      await api.patch(`/reviews/${reviewId}/flag`, { flagged: !currentFlag });
       showToast(currentFlag ? "Flag removed" : "Review flagged");
       load();
     } catch (e) {
@@ -82,7 +82,7 @@ export default function ReviewsTab({ isDarkMode }) {
     if (!window.confirm("Delete this review permanently?")) return;
     setBusy(b => ({ ...b, [reviewId]: true }));
     try {
-      await api.delete(`/api/reviews/${reviewId}`);
+      await api.delete(`/reviews/${reviewId}`);
       showToast("Review deleted");
       load();
     } catch (e) {

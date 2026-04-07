@@ -31,14 +31,14 @@ export default function AdminLogin() {
     setError('');
     setLoading(true);
     try {
-      const response = await api.post('/api/auth/admin/login', {
+      const response = await api.post('/auth/admin/login', {
         username: username.trim(),
         password,
       });
       if (response.data.success) {
-        localStorage.setItem('adminToken', response.data.token);
-        localStorage.setItem('adminSessionToken', response.data.sessionToken);
-        localStorage.setItem('adminInfo', JSON.stringify(response.data.admin));
+        sessionStorage.setItem('adminToken', response.data.token);
+        sessionStorage.setItem('adminSessionToken', response.data.sessionToken);
+        sessionStorage.setItem('adminInfo', JSON.stringify(response.data.admin));
         navigate('/admin');
       } else if (response.data.requires2FA) {
         setRequires2FA(true);
@@ -55,13 +55,13 @@ export default function AdminLogin() {
     setError('');
     setLoading(true);
     try {
-      const response = await api.post('/api/auth/verify-2fa-login', {
+      const response = await api.post('/auth/verify-2fa-login', {
         tempUserId, twoFactorToken, backupCode, role: 'admin',
       });
       if (response.data.success) {
-        localStorage.setItem('adminToken', response.data.token);
-        localStorage.setItem('adminSessionToken', response.data.sessionToken);
-        localStorage.setItem('adminInfo', JSON.stringify(response.data.user));
+        sessionStorage.setItem('adminToken', response.data.token);
+        sessionStorage.setItem('adminSessionToken', response.data.sessionToken);
+        sessionStorage.setItem('adminInfo', JSON.stringify(response.data.user));
         navigate('/admin');
       }
     } catch (err) {
@@ -82,7 +82,7 @@ export default function AdminLogin() {
     setForgotLoading(true);
     setForgotError('');
     try {
-      const res = await api.post('/api/auth/admin/forgot-password', { email: forgotEmail.trim() });
+      const res = await api.post('/auth/admin/forgot-password', { email: forgotEmail.trim() });
       if (res.data.success) setView('forgot-sent');
       else setForgotError(res.data.message || 'Something went wrong.');
     } catch (err) {

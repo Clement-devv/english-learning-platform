@@ -18,7 +18,7 @@ export default function SubAdminLogin() {
   useEffect(() => {
     setMounted(true);
     // If already logged in, redirect
-    if (localStorage.getItem("subAdminToken")) {
+    if (sessionStorage.getItem("subAdminToken") || localStorage.getItem("subAdminToken")) {
       navigate("/sub-admin/dashboard");
     }
   }, []);
@@ -28,7 +28,7 @@ export default function SubAdminLogin() {
     setError("");
     setLoading(true);
     try {
-      const res = await fetch("/api/sub-admin-auth/login", {
+      const res = await fetch("/api/v1/sub-admin-auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),

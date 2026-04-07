@@ -8,12 +8,13 @@ if (!_apiUrl && import.meta.env.PROD) {
 }
 
 const api = axios.create({
-  baseURL: _apiUrl || "http://localhost:5000",
+  baseURL: (_apiUrl || "http://localhost:5000") + "/api/v1",
 });
 
-// Token helpers — prefer sessionStorage (cleared on tab close), fall back to
-// localStorage for users who chose "remember me". Never store in cookies
-// without the HttpOnly flag.
+// Token helpers — tokens are written to sessionStorage on login so they are
+// cleared when the tab closes (reducing XSS exposure vs. localStorage).
+// The localStorage fallback handles tokens that were stored by an older
+// version of the app; new logins always use sessionStorage.
 const getToken = (key) =>
   sessionStorage.getItem(key) || localStorage.getItem(key);
 
@@ -34,10 +35,16 @@ api.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`;
     }
 
-    // Always send the center slug so tenantMiddleware can identify the center.
-    // In production this is also derived from the subdomain, but sending the
-    // header is the reliable fallback for dev, mobile apps, and API clients.
-    const slug = import.meta.env.VITE_CENTER_SLUG || sessionStorage.getItem('impersonationCenterSlug') || getCachedCenter()?.slug;
+    // Send x-center-slug header so tenantMiddleware can identify the center.
+    // Priority:
+    //   1. Super admin impersonation session (overrides everything)
+    //   2. Dev-only env var (only active during `vite dev`, never in prod builds)
+    //   3. Cached center slug (populated after first branding fetch)
+    // In production with custom domains the server reads the Host header instead,
+    // so we must NOT hardcode a slug that would override that routing.
+    const impersonationSlug = sessionStorage.getItem('impersonationCenterSlug');
+    const devSlug = import.meta.env.DEV ? (import.meta.env.VITE_CENTER_SLUG || null) : null;
+    const slug = impersonationSlug || devSlug || getCachedCenter()?.slug;
     if (slug) {
       config.headers["x-center-slug"] = slug;
     }
@@ -56,22 +63,53 @@ api.interceptors.response.use(
   (error) => {
     const url = error.config?.url || "";
     const isAuthEndpoint = AUTH_PATHS.some((p) => url.includes(p));
+    const status = error.response?.status;
 
-    if (error.response?.status === 401 && !isAuthEndpoint) {
+    // 401 — session expired or token revoked: clear storage and redirect to login
+    if (status === 401 && !isAuthEndpoint) {
       if (getToken("adminToken")) {
         removeToken("adminToken");
+        removeToken("adminSessionToken");
         removeToken("adminInfo");
         window.location.href = "/admin/login";
       } else if (getToken("teacherToken")) {
         removeToken("teacherToken");
+        removeToken("teacherSessionToken");
         removeToken("teacherInfo");
         window.location.href = "/teacher/login";
       } else if (getToken("studentToken")) {
         removeToken("studentToken");
+        removeToken("studentSessionToken");
         removeToken("studentInfo");
         window.location.href = "/student/login";
       }
+      return Promise.reject(error);
     }
+
+    // 403 — authenticated but not authorised for this resource
+    if (status === 403) {
+      error.userMessage = "You don't have permission to perform this action.";
+      return Promise.reject(error);
+    }
+
+    // 429 — rate limited
+    if (status === 429) {
+      error.userMessage = "Too many requests. Please wait a moment and try again.";
+      return Promise.reject(error);
+    }
+
+    // 500 / 502 / 503 — server-side failure; don't expose raw message
+    if (status >= 500) {
+      error.userMessage = "A server error occurred. Please try again later.";
+      return Promise.reject(error);
+    }
+
+    // Network error (no response at all — offline, DNS failure, CORS block)
+    if (!error.response) {
+      error.userMessage = "Unable to reach the server. Check your internet connection.";
+      return Promise.reject(error);
+    }
+
     return Promise.reject(error);
   }
 );

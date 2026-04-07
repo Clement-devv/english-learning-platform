@@ -2,14 +2,16 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
-  Settings, Plus, MessageCircle, Video, Repeat,
+  Plus, MessageCircle, Video, Repeat,
   Home, Calendar, CheckCircle, Users, BookOpen, User,
-  DollarSign, LogOut, Menu, ChevronRight,
-  GraduationCap, RefreshCw, AlertCircle, CalendarDays, Film, Star, Bell
+  DollarSign, GraduationCap, RefreshCw, AlertCircle, CalendarDays, Film, Star, Bell
 } from "lucide-react";
 
-// ── Layout (original) ─────────────────────────────────────────────────────────
-import DashboardHeader from "./components/Layout/DashboardHeader";
+// ── Shared dashboard shell ────────────────────────────────────────────────────
+import DashboardLayout  from "../../components/dashboard/DashboardLayout";
+import DashboardSidebar from "../../components/dashboard/DashboardSidebar";
+import DashboardTopBar  from "../../components/dashboard/DashboardTopBar";
+import { dashboardColors } from "../../utils/dashboardColors";
 import { useBranding } from "../../context/BrandingContext";
 
 // ── Change Password (original) ────────────────────────────────────────────────
@@ -152,7 +154,7 @@ export default function TeacherDashboard() {
   // ── Original useEffect ────────────────────────────────────────────────────────
   useEffect(() => {
     setMounted(true);
-    const teacherData = JSON.parse(localStorage.getItem("teacherInfo") || "{}");
+    const teacherData = JSON.parse(sessionStorage.getItem("teacherInfo") || localStorage.getItem("teacherInfo") || "{}");
     if (!teacherData._id && !teacherData.id) {
       navigate("/teacher/login");
       return;
@@ -175,7 +177,7 @@ export default function TeacherDashboard() {
   useEffect(() => {
     const checkHomework = async () => {
       try {
-        const { data } = await api.get("/api/homework/my");
+        const { data } = await api.get("/homework/my");
         const toGrade = (data.homework || []).filter(h => h.status === "submitted").length;
         setHomeworkToGrade(toGrade);
 
@@ -202,7 +204,7 @@ export default function TeacherDashboard() {
   useEffect(() => {
     const checkQuizzes = async () => {
       try {
-        const { data } = await api.get("/api/quiz/my");
+        const { data } = await api.get("/quiz/my");
         const attempted = (data.quizzes || []).filter(q => q.status === "attempted").length;
         setQuizAttempted(attempted);
 
@@ -228,7 +230,7 @@ export default function TeacherDashboard() {
   const fetchTeacherData = async () => {
     try {
       setLoading(true);
-      const teacherData = JSON.parse(localStorage.getItem("teacherInfo") || "{}");
+      const teacherData = JSON.parse(sessionStorage.getItem("teacherInfo") || localStorage.getItem("teacherInfo") || "{}");
       const teacherId = teacherData._id || teacherData.id;
       setGoogleMeetLink(teacherData.googleMeetLink || "");
       console.log("✅ Teacher Info Loaded:", teacherData._id);
@@ -236,15 +238,15 @@ export default function TeacherDashboard() {
       if (!teacherId) throw new Error("No teacher ID found");
 
       // Silently update teacher's timezone so bookings created later carry correct TZ
-      api.patch(`/api/teachers/${teacherId}/timezone`, { timezone: getUserTimezone() }).catch(() => {});
+      api.patch(`/teachers/${teacherId}/timezone`, { timezone: getUserTimezone() }).catch(() => {});
 
-      const { data: apiTeacherData } = await api.get(`/api/teachers/${teacherId}`);
+      const { data: apiTeacherData } = await api.get(`/teachers/${teacherId}`);
       setTeacherInfo(apiTeacherData);
       setGoogleMeetLink(apiTeacherData.googleMeetLink || "");
       console.log("✅ Teacher Info Loaded:", apiTeacherData._id);
       
-      localStorage.setItem("teacherInfo", JSON.stringify({
-        ...JSON.parse(localStorage.getItem("teacherInfo") || "{}"),
+      sessionStorage.setItem("teacherInfo", JSON.stringify({
+        ...JSON.parse(sessionStorage.getItem("teacherInfo") || localStorage.getItem("teacherInfo") || "{}"),
         ...apiTeacherData,
       }));
 
@@ -401,7 +403,7 @@ export default function TeacherDashboard() {
         }
       });
 
-      setCompletedClasses([...finishedClasses, ...Array.from(completedMap.values())]);
+      setCompletedClasses([...finishedClasses, ...Array.from(completedMap.values()), ...Array.from(missedMap.values())]);
     } catch (err) {
       console.error("Failed to load teacher data:", err);
       console.error("Error details:", err.response?.data?.message || "Failed to load teacher data");
@@ -484,7 +486,7 @@ export default function TeacherDashboard() {
           createdBy:    "teacher",
         };
         console.log("📤 Creating booking for student:", student.name);
-        const response = await api.post("/api/bookings", bookingData);
+        const response = await api.post("/bookings", bookingData);
         console.log("✅ Booking created:", response.data.booking._id);
         if (response.data.booking.status === "pending") {
           return await acceptBooking(response.data.booking._id);
@@ -590,7 +592,7 @@ export default function TeacherDashboard() {
   // ── Computed ──────────────────────────────────────────────────────────────────
   const pendingBookings = bookings.length;
   const completedCount  = completedClasses.length;
-  const c               = palette(isDarkMode);
+  const c               = dashboardColors(isDarkMode);
   const activeLabel     = NAV.find((n) => n.key === activeTab)?.label || "Dashboard";
 
   // ── Original loading screen ───────────────────────────────────────────────────
@@ -613,144 +615,63 @@ export default function TeacherDashboard() {
   // ── Main render ───────────────────────────────────────────────────────────────
   return (
     <>
-      <style>{globalCSS(isDarkMode)}</style>
-      <div style={{ display: "flex", height: "100vh", background: c.bg, fontFamily: "var(--font-body)", overflow: "hidden", opacity: mounted ? 1 : 0, transition: "opacity 0.3s ease" }}>
-
-        {/* ═══════════════════════════════════════════ SIDEBAR ══ */}
-        <aside style={{ width: sidebarOpen ? "230px" : "60px", background: c.card, borderRight: `1px solid ${c.border}`, display: "flex", flexDirection: "column", flexShrink: 0, transition: "width 0.25s cubic-bezier(0.4,0,0.2,1)", overflow: "hidden", zIndex: 40 }}>
-
-          {/* Logo */}
-          <div style={{ height: "64px", display: "flex", alignItems: "center", padding: sidebarOpen ? "0 18px" : "0 14px", borderBottom: `1px solid ${c.border}`, gap: "10px", flexShrink: 0 }}>
-            {branding.logo ? (
-              <img src={branding.logo} alt={centerName} style={{ height: 32, maxWidth: 32, objectFit: "contain", borderRadius: 6, flexShrink: 0 }} />
-            ) : (
-              <div style={{ width: "32px", height: "32px", borderRadius: "10px", flexShrink: 0, background: "linear-gradient(135deg, var(--brand-primary), var(--brand-secondary))", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <GraduationCap size={15} color="white" />
-              </div>
-            )}
-            {sidebarOpen && (
-              <div style={{ overflow: "hidden" }}>
-                <p style={{ margin: 0, fontSize: "13px", fontWeight: "800", color: c.heading, whiteSpace: "nowrap", fontFamily: "var(--font-display)" }}>{centerName}</p>
-                <p style={{ margin: 0, fontSize: "9px", color: c.muted, fontWeight: "700", letterSpacing: "0.08em", textTransform: "uppercase" }}>Teacher Portal</p>
-              </div>
-            )}
-          </div>
-
-          {/* Nav items */}
-          <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden", padding: "10px 6px" }} className="td-scroll">
-            {NAV.map(({ key, label, icon: Icon }) => {
-              const active   = activeTab === key;
-              const hasBadge = (key === "bookings" && pendingBookings > 0) || (key === "homework" && homeworkToGrade > 0) || (key === "quiz" && quizAttempted > 0);
-              const badgeCount = key === "bookings" ? pendingBookings : key === "homework" ? homeworkToGrade : key === "quiz" ? quizAttempted : 0;
-              return (
-                <button key={key} onClick={() => setActiveTab(key)} title={!sidebarOpen ? label : undefined}
-                  style={{ width: "100%", display: "flex", alignItems: "center", gap: "10px", padding: sidebarOpen ? "9px 10px" : "9px 14px", borderRadius: "10px", border: "none", cursor: "pointer", background: active ? (isDarkMode ? "rgba(var(--brand-primary-rgb), 0.12)" : "rgba(var(--brand-primary-rgb), 0.08)") : "transparent", color: active ? "var(--brand-primary)" : (isDarkMode ? "#4b5563" : "#64748b"), fontFamily: "inherit", fontSize: "13.5px", fontWeight: active ? "700" : "500", textAlign: "left", marginBottom: "2px", whiteSpace: "nowrap", overflow: "hidden", position: "relative", transition: "all 0.15s" }}
-                  className="td-nav-btn"
-                >
-                  {active && <div style={{ position: "absolute", left: 0, top: "20%", bottom: "20%", width: "3px", borderRadius: "0 3px 3px 0", background: "var(--brand-secondary)" }} />}
-                  <Icon size={16} style={{ flexShrink: 0 }} />
-                  {sidebarOpen && <span style={{ flex: 1 }}>{label}</span>}
-                  {sidebarOpen && hasBadge && (
-                    <span style={{ background: "#ef4444", color: "white", borderRadius: "10px", fontSize: "10px", fontWeight: "800", padding: "1px 7px", flexShrink: 0 }}>{badgeCount}</span>
-                  )}
-                  {!sidebarOpen && hasBadge && (
-                    <span style={{ position: "absolute", top: "6px", right: "6px", width: "8px", height: "8px", background: "#ef4444", borderRadius: "50%" }} />
-                  )}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Bottom controls */}
-          <div style={{ borderTop: `1px solid ${c.border}`, padding: "10px 6px", flexShrink: 0 }}>
-            <button onClick={toggleDarkMode} title={isDarkMode ? "Light Mode" : "Dark Mode"}
-              style={{ width: "100%", display: "flex", alignItems: "center", gap: "10px", padding: sidebarOpen ? "9px 10px" : "9px 14px", borderRadius: "10px", border: "none", cursor: "pointer", background: "transparent", color: isDarkMode ? "#4b5563" : "#64748b", fontFamily: "inherit", fontSize: "13.5px", fontWeight: "500", textAlign: "left", marginBottom: "4px", whiteSpace: "nowrap" }}
-              className="td-nav-btn"
-            >
-              <span style={{ fontSize: "15px", flexShrink: 0 }}>{isDarkMode ? "☀️" : "🌙"}</span>
-              {sidebarOpen && <span>{isDarkMode ? "Light Mode" : "Dark Mode"}</span>}
-            </button>
-
-            <button onClick={() => setShowSettingsSidebar(true)} title="Settings"
-              style={{ width: "100%", display: "flex", alignItems: "center", gap: "10px", padding: sidebarOpen ? "9px 10px" : "9px 14px", borderRadius: "10px", border: "none", cursor: "pointer", background: "transparent", color: isDarkMode ? "#4b5563" : "#64748b", fontFamily: "inherit", fontSize: "13.5px", fontWeight: "500", textAlign: "left", marginBottom: "4px", whiteSpace: "nowrap" }}
-              className="td-nav-btn"
-            >
-              <Settings size={16} style={{ flexShrink: 0 }} />
-              {sidebarOpen && <span>Settings</span>}
-            </button>
-
-            <button onClick={handleLogout} title="Logout"
-              style={{ width: "100%", display: "flex", alignItems: "center", gap: "10px", padding: sidebarOpen ? "9px 10px" : "9px 14px", borderRadius: "10px", border: "none", cursor: "pointer", background: "transparent", color: "#ef4444", fontFamily: "inherit", fontSize: "13.5px", fontWeight: "500", textAlign: "left", whiteSpace: "nowrap" }}
-              className="td-logout-btn"
-            >
-              <LogOut size={16} style={{ flexShrink: 0 }} />
-              {sidebarOpen && <span>Logout</span>}
-            </button>
-          </div>
-        </aside>
-
-        {/* ══════════════════════════════════════════ MAIN AREA ══ */}
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, overflow: "hidden" }}>
-
-          {/* Top bar */}
-          <header style={{ height: "64px", background: c.card, borderBottom: `1px solid ${c.border}`, display: "flex", alignItems: "center", padding: "0 24px", gap: "16px", flexShrink: 0 }}>
-            <button onClick={() => setSidebarOpen(!sidebarOpen)}
-              style={{ background: "none", border: "none", cursor: "pointer", color: c.muted, padding: "6px", borderRadius: "8px", display: "flex", alignItems: "center" }}
-              className="td-nav-btn"
-            >
-              <Menu size={20} />
-            </button>
-
-            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-              <span style={{ fontSize: "12.5px", color: c.muted, fontWeight: "500" }}>Teacher</span>
-              <ChevronRight size={13} color={c.muted} />
-              <span style={{ fontSize: "13px", color: c.heading, fontWeight: "700" }}>{activeLabel}</span>
-            </div>
-
-            <div style={{ flex: 1 }} />
-
-            <div style={{ background: "rgba(var(--brand-primary-rgb), 0.08)", border: `1px solid rgba(var(--brand-primary-rgb), 0.2)`, borderRadius: "20px", padding: "4px 12px", fontSize: "11.5px", fontWeight: "700", color: "var(--brand-primary)" }}>
+    <DashboardLayout
+      isDarkMode={isDarkMode}
+      colors={c}
+      mounted={mounted}
+      activeTab={activeTab}
+      noPaddingTabs={["messages"]}
+      sidebar={
+        <DashboardSidebar
+          nav={NAV}
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          sidebarOpen={sidebarOpen}
+          colors={c}
+          isDarkMode={isDarkMode}
+          branding={branding}
+          centerName={centerName}
+          portalLabel="Teacher Portal"
+          portalIcon={GraduationCap}
+          badges={{ bookings: pendingBookings, homework: homeworkToGrade, quiz: quizAttempted }}
+          widths={{ open: "230px", closed: "60px" }}
+          onDarkModeToggle={toggleDarkMode}
+          onSettings={() => setShowSettingsSidebar(true)}
+          onLogout={handleLogout}
+        />
+      }
+      topBar={
+        <DashboardTopBar
+          sidebarOpen={sidebarOpen}
+          onToggle={() => setSidebarOpen(!sidebarOpen)}
+          roleName="Teacher"
+          activeLabel={activeLabel}
+          colors={c}
+          userInitial={(teacherInfo?.firstName?.[0] || "T").toUpperCase()}
+          onAvatarClick={() => setShowSettingsSidebar(true)}
+          actions={<>
+            <div style={{ background: "rgba(var(--brand-primary-rgb), 0.08)", border: "1px solid rgba(var(--brand-primary-rgb), 0.2)", borderRadius: "20px", padding: "4px 12px", fontSize: "11.5px", fontWeight: "700", color: "var(--brand-primary)" }}>
               👨‍🎓 {students.length} students
             </div>
-
             {pendingBookings > 0 && (
-              <div onClick={() => setActiveTab("bookings")}
-                style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: "20px", padding: "4px 12px", fontSize: "11.5px", fontWeight: "700", color: "#ef4444", cursor: "pointer" }}>
+              <div onClick={() => setActiveTab("bookings")} style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: "20px", padding: "4px 12px", fontSize: "11.5px", fontWeight: "700", color: "#ef4444", cursor: "pointer" }}>
                 🔔 {pendingBookings} pending
               </div>
             )}
-
             {pushSupported() && (
-              <button
-                onClick={togglePush}
-                title={pushEnabled ? "Disable push notifications" : "Enable push notifications"}
-                style={{
-                  background: pushEnabled ? "#16a34a" : (isDarkMode ? "#1e293b" : "#f1f5f9"),
-                  border: `1px solid ${pushEnabled ? "#16a34a" : c.border}`,
-                  borderRadius: "10px", padding: "7px 10px", cursor: "pointer",
-                  color: pushEnabled ? "#fff" : c.muted, display: "flex", alignItems: "center",
-                }}
-              >
+              <button onClick={togglePush} title={pushEnabled ? "Disable push notifications" : "Enable push notifications"}
+                style={{ background: pushEnabled ? "#16a34a" : (isDarkMode ? "#1e293b" : "#f1f5f9"), border: `1px solid ${pushEnabled ? "#16a34a" : c.border}`, borderRadius: "10px", padding: "7px 10px", cursor: "pointer", color: pushEnabled ? "#fff" : c.muted, display: "flex", alignItems: "center" }}>
                 <Bell size={16} fill={pushEnabled ? "currentColor" : "none"} />
               </button>
             )}
-
             <button onClick={() => setIsModalOpen(true)}
               style={{ background: "linear-gradient(135deg, var(--brand-primary), var(--brand-secondary))", color: "white", border: "none", borderRadius: "10px", padding: "8px 14px", fontSize: "12.5px", fontWeight: "700", cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: "6px" }}>
               <Plus size={14} /> New Class
             </button>
-
-            <div style={{ width: "34px", height: "34px", borderRadius: "10px", background: "linear-gradient(135deg, var(--brand-primary), var(--brand-secondary))", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", fontWeight: "800", color: "white", flexShrink: 0 }}>
-              {(teacherInfo?.firstName?.[0] || "T").toUpperCase()}
-            </div>
-          </header>
-
-          {/* Scrollable content */}
-          <main
-            style={{ flex: 1, overflowY: "auto", padding: activeTab === "messages" ? "0" : "24px", background: c.bg }}
-            className="td-scroll"
-          >
-            <div key={activeTab} className="td-content" style={{ background: c.card, borderRadius: "20px", border: `1px solid ${c.border}`, boxShadow: isDarkMode ? "none" : "0 4px 24px rgba(108,99,255,0.07), 0 1px 4px rgba(0,0,0,0.04)", minHeight: "calc(100vh - 112px)", padding: activeTab === "messages" ? "0" : "24px", overflow: activeTab === "messages" ? "hidden" : "visible" }}>
+          </>}
+        />
+      }
+    >
 
               {/* ─────────────────────────── DASHBOARD TAB ── */}
               {activeTab === "dashboard" && (
@@ -1015,10 +936,7 @@ export default function TeacherDashboard() {
                 />
               )}
 
-            </div>
-          </main>
-        </div>
-      </div>
+    </DashboardLayout>
 
       {/* ── Toast (original) ── */}
       {toast && (
@@ -1104,30 +1022,3 @@ export default function TeacherDashboard() {
   );
 }
 
-// ── Palette helper ────────────────────────────────────────────────────────────
-function palette(dark) {
-  return {
-    bg:      dark ? "linear-gradient(135deg, #0f0f1a 0%, #1a1030 40%, #0a1628 100%)" : "linear-gradient(135deg, #e8eeff 0%, #f0e8ff 40%, #e8f4ff 100%)",
-    card:    dark ? "#1a1d27" : "#ffffff",
-    border:  dark ? "#1e2235" : "#e8ecf4",
-    heading: dark ? "#e2e8f0" : "#1e293b",
-    text:    dark ? "#94a3b8" : "#475569",
-    muted:   dark ? "#374151" : "#94a3b8",
-  };
-}
-
-// ── Global CSS ────────────────────────────────────────────────────────────────
-function globalCSS(dark) {
-  return `
-    * { box-sizing: border-box; }
-    .td-scroll::-webkit-scrollbar { width: 4px; }
-    .td-scroll::-webkit-scrollbar-thumb { background: ${dark ? "#1e2235" : "#e0e4f4"}; border-radius: 4px; }
-    .td-nav-btn:hover { background: ${dark ? "rgba(var(--brand-primary-rgb), 0.12) !important" : "rgba(var(--brand-primary-rgb), 0.08) !important"}; color: var(--brand-primary) !important; }
-    @keyframes td-slide-up {
-      from { opacity: 0; transform: translateY(14px); }
-      to   { opacity: 1; transform: translateY(0); }
-    }
-    .td-content { animation: td-slide-up 0.35s ease both; }
-    .td-logout-btn:hover { background: rgba(239,68,68,0.08) !important; }
-  `;
-}

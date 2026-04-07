@@ -30,7 +30,7 @@ export default function TeacherSetup() {
 
   const verifyToken = async () => {
     try {
-      const res  = await fetch(`/api/teachers/verify-invite/${token}`, {
+      const res  = await fetch(`/api/v1/teachers/verify-invite/${token}`, {
         headers: { "x-center-slug": centerSlug },
       });
       const data = await res.json();
@@ -53,7 +53,7 @@ export default function TeacherSetup() {
     if (form.password.length < 8)               { setErrorMsg("Password must be at least 8 characters."); return; }
     setErrorMsg(""); setSubmitting(true);
     try {
-      const res  = await fetch("/api/teachers/setup-account", {
+      const res  = await fetch("/api/v1/teachers/setup-account", {
         method:  "POST",
         headers: { "Content-Type": "application/json", "x-center-slug": centerSlug },
         body:    JSON.stringify({ token, password: form.password, confirmPassword: form.confirmPassword }),

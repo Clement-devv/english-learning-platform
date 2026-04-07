@@ -1,5 +1,7 @@
 // server/socketServer.js - WITH PDF VISIBILITY CONTROL
 import { Server } from 'socket.io';
+import jwt from 'jsonwebtoken';
+import { config } from './config/config.js';
 
 export function initializeSocket(httpServer) {
   const io = new Server(httpServer, {
@@ -11,24 +13,45 @@ export function initializeSocket(httpServer) {
     maxHttpBufferSize: 10e6 // 10MB for PDF uploads
   });
 
-  // Store active whiteboard sessions
-  const whiteboardSessions = new Map(); // channelName -> { users: Set, locked: boolean, pdfData: object, pdfVisibleToStudents: boolean }
+  // ── JWT authentication for every socket connection ───────────────────────
+  // Client must pass the auth token in handshake: io(URL, { auth: { token } })
+  io.use((socket, next) => {
+    const token = socket.handshake.auth?.token;
+    if (!token) {
+      return next(new Error('Authentication required'));
+    }
+    try {
+      const decoded = jwt.verify(token, config.jwtSecret);
+      socket.userId   = decoded.id;
+      socket.userRole = decoded.role;     // role from JWT — not trusted from client
+      socket.centerId = decoded.centerId; // center slug the token was issued for
+      next();
+    } catch {
+      next(new Error('Invalid or expired token'));
+    }
+  });
+
+  // Scope a channel name to the authenticated center so rooms are always
+  // isolated even if two centers use the same booking ObjectId.
+  const tenantRoom = (socket, channelName) => `${socket.centerId}::${channelName}`;
+
+  // Store active whiteboard sessions keyed by tenant-scoped room name.
+  const whiteboardSessions = new Map();
 
   io.on('connection', (socket) => {
-    console.log('🔌 Socket connected:', socket.id);
+    console.log('🔌 Socket connected:', socket.id, `(${socket.centerId})`);
 
     // Join whiteboard room
-    socket.on('join-whiteboard', ({ channelName, userId, userName, userRole }) => {
+    socket.on('join-whiteboard', ({ channelName, userName }) => {
       try {
-        socket.join(channelName);
-        socket.userId = userId;
-        socket.userName = userName;
-        socket.userRole = userRole;
-        socket.channelName = channelName;
+        const room = tenantRoom(socket, channelName);
+        socket.join(room);
+        socket.userName    = userName;
+        socket.channelName = channelName; // original name kept for client-facing log messages
+        socket.roomName    = room;        // scoped name used for all room operations
 
-        // Initialize session if doesn't exist
-        if (!whiteboardSessions.has(channelName)) {
-          whiteboardSessions.set(channelName, {
+        if (!whiteboardSessions.has(room)) {
+          whiteboardSessions.set(room, {
             users: new Set(),
             locked: true,
             pdfData: null,
@@ -37,12 +60,12 @@ export function initializeSocket(httpServer) {
           });
         }
 
-        const session = whiteboardSessions.get(channelName);
-        session.users.add(userId);
+        const session = whiteboardSessions.get(room);
+        session.users.add(socket.userId);
 
         const userCount = session.users.size;
 
-        console.log(`✅ ${userName} (${userRole}) joined whiteboard: ${channelName} (${userCount} users)`);
+        console.log(`✅ ${userName} (${socket.userRole}) joined whiteboard: ${channelName} (${userCount} users)`);
 
         // Send current states to new joiner
         socket.emit('lock-status', session.locked);
@@ -54,20 +77,16 @@ export function initializeSocket(httpServer) {
             ...session.pdfData,
             visibleToStudents: session.pdfVisibleToStudents
           });
-          // Send current page so student jumps to where teacher is
           if (session.currentPage > 1) {
             socket.emit('pdf-page-sync', { page: session.currentPage });
           }
         }
 
-        // Notify all users in the room about user count
-        io.to(channelName).emit('user-count', userCount);
-
-        // Notify others that user joined
-        socket.to(channelName).emit('user-joined', {
-          userId,
+        io.to(room).emit('user-count', userCount);
+        socket.to(room).emit('user-joined', {
+          userId: socket.userId,
           userName,
-          userRole,
+          userRole: socket.userRole,
           userCount
         });
       } catch (err) {
@@ -78,7 +97,8 @@ export function initializeSocket(httpServer) {
     // Handle drawing events
     socket.on('drawing', (data) => {
       try {
-        const session = whiteboardSessions.get(data.channelName);
+        const room = tenantRoom(socket, data.channelName);
+        const session = whiteboardSessions.get(room);
         if (!session) return;
 
         if (socket.userRole === 'student' && session.locked) {
@@ -86,7 +106,7 @@ export function initializeSocket(httpServer) {
           return;
         }
 
-        socket.to(data.channelName).emit('drawing', data);
+        socket.to(room).emit('drawing', data);
       } catch (err) {
         console.error('drawing error:', err.message);
       }
@@ -95,7 +115,8 @@ export function initializeSocket(httpServer) {
     // Handle canvas clear
     socket.on('clear-canvas', (data) => {
       try {
-        const session = whiteboardSessions.get(data.channelName);
+        const room = tenantRoom(socket, data.channelName);
+        const session = whiteboardSessions.get(room);
         if (!session) return;
 
         if (socket.userRole === 'student' && session.locked) {
@@ -103,7 +124,7 @@ export function initializeSocket(httpServer) {
           return;
         }
 
-        socket.to(data.channelName).emit('clear-canvas', data);
+        socket.to(room).emit('clear-canvas', data);
       } catch (err) {
         console.error('clear-canvas error:', err.message);
       }
@@ -117,10 +138,11 @@ export function initializeSocket(httpServer) {
           return;
         }
 
-        const session = whiteboardSessions.get(channelName);
+        const room = tenantRoom(socket, channelName);
+        const session = whiteboardSessions.get(room);
         if (session) {
           session.locked = locked;
-          io.to(channelName).emit('lock-status', locked);
+          io.to(room).emit('lock-status', locked);
           console.log(`🔒 Whiteboard ${channelName} ${locked ? 'LOCKED' : 'UNLOCKED'} by ${socket.userName}`);
         }
       } catch (err) {
@@ -136,12 +158,13 @@ export function initializeSocket(httpServer) {
           return;
         }
 
-        const session = whiteboardSessions.get(channelName);
+        const room = tenantRoom(socket, channelName);
+        const session = whiteboardSessions.get(room);
         if (session) {
           session.pdfData = { pdfData, fileName, sharedBy };
           session.pdfVisibleToStudents = visibleToStudents || false;
 
-          io.to(channelName).emit('pdf-shared', {
+          io.to(room).emit('pdf-shared', {
             pdfData,
             fileName,
             sharedBy,
@@ -163,10 +186,11 @@ export function initializeSocket(httpServer) {
           return;
         }
 
-        const session = whiteboardSessions.get(channelName);
+        const room = tenantRoom(socket, channelName);
+        const session = whiteboardSessions.get(room);
         if (session) {
           session.pdfVisibleToStudents = visible;
-          io.to(channelName).emit('pdf-visibility-changed', visible);
+          io.to(room).emit('pdf-visibility-changed', visible);
           console.log(`👁️ PDF visibility in ${channelName}: Students ${visible ? 'CAN see' : 'CANNOT see'} (changed by ${socket.userName})`);
         }
       } catch (err) {
@@ -182,11 +206,12 @@ export function initializeSocket(httpServer) {
           return;
         }
 
-        const session = whiteboardSessions.get(channelName);
+        const room = tenantRoom(socket, channelName);
+        const session = whiteboardSessions.get(room);
         if (session) {
           session.pdfData = null;
           session.pdfVisibleToStudents = false;
-          io.to(channelName).emit('pdf-removed');
+          io.to(room).emit('pdf-removed');
           console.log(`📄 PDF removed from ${channelName} by ${socket.userName}`);
         }
       } catch (err) {
@@ -195,24 +220,25 @@ export function initializeSocket(httpServer) {
     });
 
     // Leave whiteboard room
-    socket.on('leave-whiteboard', ({ channelName, userId }) => {
+    socket.on('leave-whiteboard', ({ channelName }) => {
       try {
-        socket.leave(channelName);
+        const room = tenantRoom(socket, channelName);
+        socket.leave(room);
 
-        if (whiteboardSessions.has(channelName)) {
-          const session = whiteboardSessions.get(channelName);
-          session.users.delete(userId);
+        if (whiteboardSessions.has(room)) {
+          const session = whiteboardSessions.get(room);
+          session.users.delete(socket.userId);
 
           const userCount = session.users.size;
 
           if (userCount === 0) {
-            whiteboardSessions.delete(channelName);
+            whiteboardSessions.delete(room);
             console.log(`🗑️ Whiteboard session ${channelName} deleted (no users)`);
           } else {
-            io.to(channelName).emit('user-count', userCount);
+            io.to(room).emit('user-count', userCount);
           }
 
-          console.log(`👋 User ${userId} left whiteboard: ${channelName} (${userCount} users remaining)`);
+          console.log(`👋 User ${socket.userId} left whiteboard: ${channelName} (${userCount} users remaining)`);
         }
       } catch (err) {
         console.error('leave-whiteboard error:', err.message);
@@ -222,72 +248,75 @@ export function initializeSocket(httpServer) {
     // ── PDF content sync (teacher → student) ────────────────────────────────
 
     socket.on('pdf-stroke-start', (data) => {
-      try { socket.to(data.channelName).emit('pdf-stroke-start', data); }
+      try { socket.to(tenantRoom(socket, data.channelName)).emit('pdf-stroke-start', data); }
       catch (err) { console.error('pdf-stroke-start error:', err.message); }
     });
 
     socket.on('pdf-stroke-move', (data) => {
-      try { socket.to(data.channelName).emit('pdf-stroke-move', data); }
+      try { socket.to(tenantRoom(socket, data.channelName)).emit('pdf-stroke-move', data); }
       catch (err) { console.error('pdf-stroke-move error:', err.message); }
     });
 
     socket.on('pdf-stroke-end', (data) => {
-      try { socket.to(data.channelName).emit('pdf-stroke-end', data); }
+      try { socket.to(tenantRoom(socket, data.channelName)).emit('pdf-stroke-end', data); }
       catch (err) { console.error('pdf-stroke-end error:', err.message); }
     });
 
     socket.on('pdf-page-sync', (data) => {
       try {
-        const session = whiteboardSessions.get(data.channelName);
+        const room = tenantRoom(socket, data.channelName);
+        const session = whiteboardSessions.get(room);
         if (session) session.currentPage = data.page;
-        socket.to(data.channelName).emit('pdf-page-sync', data);
+        socket.to(room).emit('pdf-page-sync', data);
       } catch (err) { console.error('pdf-page-sync error:', err.message); }
     });
 
     socket.on('pdf-uploaded', (data) => {
       try {
-        const session = whiteboardSessions.get(data.channelName);
+        const room = tenantRoom(socket, data.channelName);
+        const session = whiteboardSessions.get(room);
         if (session) session.currentPage = 1;
-        socket.to(data.channelName).emit('pdf-uploaded', data);
+        socket.to(room).emit('pdf-uploaded', data);
       } catch (err) { console.error('pdf-uploaded error:', err.message); }
     });
 
     socket.on('pdf-clear-sync', (data) => {
-      try { socket.to(data.channelName).emit('pdf-clear-sync', data); }
+      try { socket.to(tenantRoom(socket, data.channelName)).emit('pdf-clear-sync', data); }
       catch (err) { console.error('pdf-clear-sync error:', err.message); }
     });
 
     // Whiteboard canvas state sync (used for undo + join catch-up)
     socket.on('wb-sync', (data) => {
-      try { socket.to(data.channelName).emit('wb-sync', data); }
+      try { socket.to(tenantRoom(socket, data.channelName)).emit('wb-sync', data); }
       catch (err) { console.error('wb-sync error:', err.message); }
     });
 
     // ── Emoji reactions (video call) ─────────────────────────────────────────
     socket.on('join-reactions', ({ channelName }) => {
       try {
-        socket.join(`reactions-${channelName}`);
-        // Track joined reaction rooms for cleanup on disconnect
+        const room = `reactions-${tenantRoom(socket, channelName)}`;
+        socket.join(room);
         if (!socket.reactionChannels) socket.reactionChannels = new Set();
         socket.reactionChannels.add(channelName);
       } catch (err) { console.error('join-reactions error:', err.message); }
     });
 
     socket.on('emoji-reaction', (data) => {
-      try { socket.to(`reactions-${data.channelName}`).emit('emoji-reaction', data); }
+      try { socket.to(`reactions-${tenantRoom(socket, data.channelName)}`).emit('emoji-reaction', data); }
       catch (err) { console.error('emoji-reaction error:', err.message); }
     });
 
     // ── Live chat (video call) ────────────────────────────────────────────────
     socket.on('join-chat', ({ channelName }) => {
       try {
-        socket.join(`chat-${channelName}`);
-        console.log(`💬 Socket joined chat room: chat-${channelName}`);
+        const room = `chat-${tenantRoom(socket, channelName)}`;
+        socket.join(room);
+        console.log(`💬 Socket joined chat room: ${room}`);
       } catch (err) { console.error('join-chat error:', err.message); }
     });
 
     socket.on('chat-message', (data) => {
-      try { socket.to(`chat-${data.channelName}`).emit('chat-message', data); }
+      try { socket.to(`chat-${tenantRoom(socket, data.channelName)}`).emit('chat-message', data); }
       catch (err) { console.error('chat-message error:', err.message); }
     });
 
@@ -296,19 +325,18 @@ export function initializeSocket(httpServer) {
       try {
         console.log('🔌 Socket disconnected:', socket.id);
 
-        // Clean up whiteboard session
-        if (socket.channelName && socket.userId) {
-          if (whiteboardSessions.has(socket.channelName)) {
-            const session = whiteboardSessions.get(socket.channelName);
+        if (socket.roomName && socket.userId) {
+          if (whiteboardSessions.has(socket.roomName)) {
+            const session = whiteboardSessions.get(socket.roomName);
             session.users.delete(socket.userId);
 
             const userCount = session.users.size;
 
             if (userCount === 0) {
-              whiteboardSessions.delete(socket.channelName);
+              whiteboardSessions.delete(socket.roomName);
             } else {
-              io.to(socket.channelName).emit('user-count', userCount);
-              io.to(socket.channelName).emit('user-left', {
+              io.to(socket.roomName).emit('user-count', userCount);
+              io.to(socket.roomName).emit('user-left', {
                 userId: socket.userId,
                 userName: socket.userName,
                 userCount
@@ -317,10 +345,9 @@ export function initializeSocket(httpServer) {
           }
         }
 
-        // Clean up reaction rooms
         if (socket.reactionChannels) {
           socket.reactionChannels.forEach(ch => {
-            socket.leave(`reactions-${ch}`);
+            socket.leave(`reactions-${tenantRoom(socket, ch)}`);
           });
         }
       } catch (err) {

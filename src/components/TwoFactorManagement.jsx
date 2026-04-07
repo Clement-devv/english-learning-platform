@@ -14,9 +14,9 @@ export default function TwoFactorManagement({ userType = 'student' }) {
   const [successMessage, setSuccessMessage] = useState('');
 
   const getToken = () => {
-    if (userType === 'teacher') return localStorage.getItem('teacherToken');
-    if (userType === 'admin') return localStorage.getItem('adminToken');
-    return localStorage.getItem('studentToken');
+    if (userType === 'teacher') return sessionStorage.getItem('teacherToken') || localStorage.getItem('teacherToken');
+    if (userType === 'admin')   return sessionStorage.getItem('adminToken')   || localStorage.getItem('adminToken');
+    return sessionStorage.getItem('studentToken') || localStorage.getItem('studentToken');
   };
 
   // Check 2FA status on mount
@@ -27,7 +27,7 @@ export default function TwoFactorManagement({ userType = 'student' }) {
   const fetchStatus = async () => {
     try {
       const token = getToken();
-      const response = await api.get('/api/2fa/status', {
+      const response = await api.get('/2fa/status', {
         headers: { Authorization: `Bearer ${token}` }
       });
       setTwoFactorEnabled(response.data.twoFactorEnabled);
@@ -47,7 +47,7 @@ export default function TwoFactorManagement({ userType = 'student' }) {
     
     try {
       const token = getToken();
-      const response = await api.post('/api/2fa/disable', 
+      const response = await api.post('/2fa/disable', 
         { password },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -79,7 +79,7 @@ export default function TwoFactorManagement({ userType = 'student' }) {
     
     try {
       const token = getToken();
-      const response = await api.post('/api/2fa/regenerate-backup-codes',
+      const response = await api.post('/2fa/regenerate-backup-codes',
         { password },
         { headers: { Authorization: `Bearer ${token}` } }
       );

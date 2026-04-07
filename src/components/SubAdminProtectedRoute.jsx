@@ -3,8 +3,8 @@ import React from "react";
 import { Navigate } from "react-router-dom";
 
 export default function SubAdminProtectedRoute({ children }) {
-  const token     = localStorage.getItem("subAdminToken");
-  const subAdminInfo = localStorage.getItem("subAdminInfo");
+  const token      = sessionStorage.getItem("subAdminToken") || localStorage.getItem("subAdminToken");
+  const subAdminInfo = sessionStorage.getItem("subAdminInfo") || localStorage.getItem("subAdminInfo");
 
   if (!token || !subAdminInfo) {
     return <Navigate to="/sub-admin/login" replace />;
@@ -14,14 +14,14 @@ export default function SubAdminProtectedRoute({ children }) {
   try {
     const payload = JSON.parse(atob(token.split(".")[1]));
     if (payload.exp && payload.exp * 1000 < Date.now()) {
-      localStorage.removeItem("subAdminToken");
-      localStorage.removeItem("subAdminInfo");
+      sessionStorage.removeItem("subAdminToken"); localStorage.removeItem("subAdminToken");
+      sessionStorage.removeItem("subAdminInfo");  localStorage.removeItem("subAdminInfo");
       return <Navigate to="/sub-admin/login" replace />;
     }
   } catch {
     // Malformed token
-    localStorage.removeItem("subAdminToken");
-    localStorage.removeItem("subAdminInfo");
+    sessionStorage.removeItem("subAdminToken"); localStorage.removeItem("subAdminToken");
+    sessionStorage.removeItem("subAdminInfo");  localStorage.removeItem("subAdminInfo");
     return <Navigate to="/sub-admin/login" replace />;
   }
 

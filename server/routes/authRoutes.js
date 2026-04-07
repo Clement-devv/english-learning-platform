@@ -6,7 +6,7 @@ import crypto from "crypto";
 import { config } from "../config/config.js";
 import { loginLimiter, passwordResetLimiter, trackFailedLogin, isAccountLocked, clearFailedAttempts } from "../middleware/rateLimiter.js";
 import { validatePasswordStrength } from "../utils/passwordUtils.js";
-import { createSession, cleanExpiredSessions } from "../utils/sessionManager.js";
+import { createSession, cleanExpiredSessions, pruneSessionsToLimit } from "../utils/sessionManager.js";
 import { sendForgotPasswordEmail, sendStudentForgotPasswordEmail, sendAdminForgotPasswordEmail } from "../utils/emailService.js";
 import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
 import { adminSchema } from "../schemas/adminSchema.js";
@@ -106,6 +106,7 @@ router.post("/verify-2fa-login", tenantMiddleware, loginLimiter, async (req, res
     const session = createSession(req, token);
     user.sessions = cleanExpiredSessions(user.sessions || []);
     user.sessions.push(session);
+    user.sessions = pruneSessionsToLimit(user.sessions);
     user.lastLogin = new Date();
     await user.save();
 
@@ -219,6 +220,7 @@ router.post("/teacher/login", tenantMiddleware, loginLimiter, async (req, res) =
     const session = createSession(req, token);
     teacher.sessions = cleanExpiredSessions(teacher.sessions || []);
     teacher.sessions.push(session);
+    teacher.sessions = pruneSessionsToLimit(teacher.sessions);
     teacher.lastLogin = new Date();
     await teacher.save();
 
@@ -314,7 +316,7 @@ router.post("/teacher/forgot-password", tenantMiddleware, passwordResetLimiter, 
       teacher.email,
       `${teacher.firstName} ${teacher.lastName}`,
       resetToken,
-      req.center.slug,
+      req.center,
       req.center?.centerName || ""
     );
 
@@ -450,6 +452,7 @@ router.post("/student/login", tenantMiddleware, loginLimiter, async (req, res) =
     const session = createSession(req, token);
     student.sessions = cleanExpiredSessions(student.sessions || []);
     student.sessions.push(session);
+    student.sessions = pruneSessionsToLimit(student.sessions);
     student.lastLogin = new Date();
     await student.save();
 
@@ -572,7 +575,7 @@ router.post("/student/forgot-password", tenantMiddleware, passwordResetLimiter, 
       student.email,
       `${student.firstName} ${student.surname}`,
       resetToken,
-      req.center.slug,
+      req.center,
       req.center?.centerName || ""
     );
 
@@ -708,6 +711,7 @@ router.post("/admin/login", tenantMiddleware, loginLimiter, async (req, res) => 
     const session = createSession(req, token);
     admin.sessions = cleanExpiredSessions(admin.sessions || []);
     admin.sessions.push(session);
+    admin.sessions = pruneSessionsToLimit(admin.sessions);
     admin.lastLogin = new Date();
     await admin.save();
 
@@ -839,7 +843,7 @@ router.post("/admin/forgot-password", tenantMiddleware, passwordResetLimiter, as
     admin.resetPasswordExpires = Date.now() + 3600000; // 1 hour
     await admin.save();
 
-    const emailResult = await sendAdminForgotPasswordEmail(admin.email, admin.firstName || admin.username, resetToken, req.center.slug, req.center?.centerName || "");
+    const emailResult = await sendAdminForgotPasswordEmail(admin.email, admin.firstName || admin.username, resetToken, req.center, req.center?.centerName || "");
 
     if (!emailResult.success) {
       console.error("Admin forgot-password email failed:", emailResult.error);

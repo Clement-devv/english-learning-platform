@@ -17,3 +17,7 @@ export const quizAttemptSchema = new Schema({
 
 quizAttemptSchema.index({ quizId: 1, studentId: 1 }, { unique: true });
 quizAttemptSchema.index({ teacherId: 1 });
+// Teacher views all attempts for a quiz sorted by submission time
+quizAttemptSchema.index({ teacherId: 1, quizId: 1, submittedAt: -1 });
+// Student history tab
+quizAttemptSchema.index({ studentId: 1, submittedAt: -1 });

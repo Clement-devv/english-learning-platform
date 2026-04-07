@@ -32,3 +32,6 @@ export const adminSchema = new mongoose.Schema({
   twoFactorBackupCodes: [String],
   twoFactorVerified: { type: Boolean, default: false },
 }, { timestamps: true });
+
+// Forgot-password token lookup
+adminSchema.index({ resetPasswordToken: 1 }, { sparse: true });

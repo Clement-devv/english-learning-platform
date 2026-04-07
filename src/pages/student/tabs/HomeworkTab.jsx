@@ -47,7 +47,7 @@ function StatusBadge({ status }) {
 
 function formatDate(d) {
   if (!d) return "—";
-  return new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+  return new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
 }
 
 function daysUntil(d) {
@@ -189,7 +189,7 @@ export default function StudentHomeworkTab({ studentInfo, isDarkMode }) {
   const fetchHomework = async () => {
     try {
       setLoading(true);
-      const { data } = await api.get("/api/homework/assigned");
+      const { data } = await api.get("/homework/assigned");
       setHomeworkList(data.homework || []);
     } catch {
       showToast("Failed to load homework", "error");
@@ -232,7 +232,7 @@ export default function StudentHomeworkTab({ studentInfo, isDarkMode }) {
       const fd = new FormData();
       fd.append("text", sf.text.trim());
       sf.files.forEach(f => fd.append("files", f));
-      const { data: submitData } = await api.post(`/api/homework/${hwId}/submit`, fd, { headers: { "Content-Type": "multipart/form-data" } });
+      const { data: submitData } = await api.post(`/homework/${hwId}/submit`, fd, { headers: { "Content-Type": "multipart/form-data" } });
       showToast("Homework submitted! Great job! 🎉");
       if (submitData?.streak?.incremented) setStreakToast(submitData.streak);
       setSubForms(prev => {
@@ -250,7 +250,7 @@ export default function StudentHomeworkTab({ studentInfo, isDarkMode }) {
   };
 
   const openFile = (type, fileId) => {
-    api.get(`/api/homework/file/${type}/${fileId}`, { responseType: "blob" })
+    api.get(`/homework/file/${type}/${fileId}`, { responseType: "blob" })
       .then(({ data }) => {
         const url = URL.createObjectURL(data);
         window.open(url, "_blank");
@@ -436,17 +436,22 @@ export default function StudentHomeworkTab({ studentInfo, isDarkMode }) {
                   <div style={{ borderTop: `2px solid ${col.border}`, padding: "20px", display: "flex", flexDirection: "column", gap: 18 }}>
 
                     {/* Instructions */}
-                    {hw.description && (
+                    {(hw.description || hw.instructionAudio?.fileId) && (
                       <div style={{ background: isDarkMode ? "#1f2235" : "#faf5ff", borderRadius: 12, padding: 14, border: `1.5px solid ${isDarkMode ? "#2a2d40" : "#e9d5ff"}` }}>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
                           <div style={{ fontSize: 11, fontWeight: 800, color: accent, textTransform: "uppercase", letterSpacing: "0.06em" }}>
                             Instructions
                           </div>
-                          <ListenButton text={hw.description} />
+                          {hw.description && <ListenButton text={hw.description} />}
                         </div>
-                        <p style={{ margin: 0, fontSize: 14, color: col.heading, whiteSpace: "pre-wrap", lineHeight: 1.6 }}>
-                          {hw.description}
-                        </p>
+                        {hw.description && (
+                          <p style={{ margin: 0, fontSize: 14, color: col.heading, whiteSpace: "pre-wrap", lineHeight: 1.6 }}>
+                            {hw.description}
+                          </p>
+                        )}
+                        {hw.instructionAudio?.fileId && (
+                          <InstructionAudioPlayer fileId={hw.instructionAudio.fileId} duration={hw.instructionAudio.duration} />
+                        )}
                       </div>
                     )}
 
@@ -662,6 +667,49 @@ export default function StudentHomeworkTab({ studentInfo, isDarkMode }) {
 }
 
 
+// ── Instruction audio player ───────────────────────────────────────────────────
+function InstructionAudioPlayer({ fileId, duration }) {
+  const [blobUrl, setBlobUrl] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [playing, setPlaying] = useState(false);
+  const audioRef = useRef(null);
+
+  const formatTime = (s) =>
+    `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(Math.round(s % 60)).padStart(2, "0")}`;
+
+  const load = async () => {
+    if (blobUrl) { togglePlay(); return; }
+    setLoading(true);
+    try {
+      const { default: api } = await import("../../../api");
+      const { data } = await api.get(`/homework/file/instruction-audio/${fileId}`, { responseType: "blob" });
+      const url = URL.createObjectURL(data);
+      setBlobUrl(url);
+      setTimeout(() => { audioRef.current?.play(); setPlaying(true); }, 50);
+    } catch { /* silent */ }
+    finally { setLoading(false); }
+  };
+
+  const togglePlay = () => {
+    if (!audioRef.current) return;
+    if (playing) { audioRef.current.pause(); setPlaying(false); }
+    else         { audioRef.current.play().catch(() => {}); setPlaying(true); }
+  };
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", background: "linear-gradient(135deg,rgba(124,58,237,0.1),rgba(168,85,247,0.07))", borderRadius: 10, border: "1px solid #ddd6fe", marginTop: 10 }}>
+      {blobUrl && <audio ref={audioRef} src={blobUrl} onEnded={() => setPlaying(false)} style={{ display: "none" }} />}
+      <Mic size={14} color="#7c3aed" />
+      <span style={{ fontSize: 12, fontWeight: 800, color: "#5b21b6", flex: 1 }}>Teacher's Voice Instructions</span>
+      {duration > 0 && <span style={{ fontSize: 11, color: "#7c3aed", fontWeight: 700 }}>{formatTime(duration)}</span>}
+      <button onClick={load} disabled={loading}
+        style={{ padding: "6px 14px", borderRadius: 8, border: "none", background: "#7c3aed", color: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 800, fontFamily: "inherit" }}>
+        {loading ? "Loading…" : playing ? "⏸ Pause" : "▶ Listen"}
+      </button>
+    </div>
+  );
+}
+
 // ── Student audio feedback player ─────────────────────────────────────────────
 function StudentAudioPlayer({ fileId, duration }) {
   const [blobUrl, setBlobUrl] = useState(null);
@@ -677,7 +725,7 @@ function StudentAudioPlayer({ fileId, duration }) {
     setLoading(true);
     try {
       const { default: api } = await import("../../../api");
-      const { data } = await api.get(`/api/homework/file/audio-feedback/${fileId}`, { responseType: "blob" });
+      const { data } = await api.get(`/homework/file/audio-feedback/${fileId}`, { responseType: "blob" });
       const url = URL.createObjectURL(data);
       setBlobUrl(url);
       setTimeout(() => { audioRef.current?.play(); setPlaying(true); }, 50);

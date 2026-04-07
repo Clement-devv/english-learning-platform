@@ -169,8 +169,7 @@ router.post("/auto-complete", verifyToken, async (req, res) => {
     }
 
     const requiredTime     = session?.requiredTime || Math.floor((booking.duration || 60) * 60 * 0.83);
-    const meetsRequirement = bothActiveTime >= requiredTime
-      || (serverConfirmedBothJoined && !session?.teacherLeftAt && !session?.studentLeftAt);
+    const meetsRequirement = bothActiveTime >= requiredTime;
 
     // Case 1: CLASS COMPLETED
     if (bothJoined && meetsRequirement) {

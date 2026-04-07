@@ -1,3 +1,4 @@
+// @ts-check
 import Center from '../models/master/Center.js';
 import { getDb } from '../config/dbManager.js';
 

@@ -19,6 +19,7 @@ import { restoreTeacher } from "../../../services/teacherService";
 import { downloadTeacherRoster } from "../../../utils/teacherPdf";
 import TeacherCard from "../components/TeacherCard";
 import TeacherModal from "../modals/TeacherModal";
+import Pagination from "../../../components/Pagination";
 import LessonMarkModal from "../modals/LessonMarkModal";
 import TeacherPaymentHistoryModal from "../modals/TeacherPaymentHistoryModal";
 
@@ -292,6 +293,8 @@ export default function TeachersTab({ onNotify, isDarkMode = false }) {
   const [payTarget, setPayTarget] = useState(null);
   const [payAllOpen, setPayAllOpen] = useState(false);
   const [payHistoryTeacher, setPayHistoryTeacher] = useState(null);
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 20;
 
   const [lessonModal, setLessonModal] = useState(null);
 
@@ -315,8 +318,8 @@ export default function TeachersTab({ onNotify, isDarkMode = false }) {
       setLoading(true);
       try {
         const [teachersRes, statsRes] = await Promise.all([
-          api.get("/api/teachers"),
-          api.get("/api/reviews/stats").catch(() => ({ data: [] })),
+          api.get("/teachers"),
+          api.get("/reviews/stats").catch(() => ({ data: [] })),
         ]);
         const ratingMap = {};
         (statsRes.data || []).forEach((s) => { ratingMap[String(s.teacherId)] = s; });
@@ -343,12 +346,12 @@ export default function TeachersTab({ onNotify, isDarkMode = false }) {
     try {
       if (editIndex !== null) {
         const id = teachers[editIndex]._id;
-        const res = await api.put(`/api/teachers/${id}`, teacherData);
+        const res = await api.put(`/teachers/${id}`, teacherData);
         setTeachers((prev) => prev.map((t, i) => (i === editIndex ? res.data : t)));
         onNotify?.(`Teacher updated: ${teacherData.firstName} ${teacherData.lastName}`);
         showToast(`${teacherData.firstName} ${teacherData.lastName} updated successfully!`);
       } else {
-        const res = await api.post("/api/teachers", teacherData);
+        const res = await api.post("/teachers", teacherData);
         setTeachers((prev) => [...prev, res.data.teacher ?? res.data]);
         onNotify?.(`Teacher created: ${teacherData.firstName} ${teacherData.lastName}`);
         showToast(`${teacherData.firstName} ${teacherData.lastName} added successfully!`);
@@ -372,7 +375,7 @@ export default function TeachersTab({ onNotify, isDarkMode = false }) {
   const handleConfirmDelete = async () => {
     if (!deleteTarget) return;
     try {
-      const res = await api.delete(`/api/teachers/${deleteTarget._id}`);
+      const res = await api.delete(`/teachers/${deleteTarget._id}`);
       setTeachers((prev) =>
         prev.map((t) => (t._id === deleteTarget._id ? { ...t, ...res.data.teacher } : t))
       );
@@ -406,7 +409,7 @@ export default function TeachersTab({ onNotify, isDarkMode = false }) {
     const teacher = teachers[index];
     if (!teacher) return;
     try {
-      const res = await api.put(`/api/teachers/${teacher._id}`, {
+      const res = await api.put(`/teachers/${teacher._id}`, {
         active: !teacher.active,
       });
       setTeachers((prev) => prev.map((t, i) => (i === index ? res.data : t)));
@@ -463,7 +466,7 @@ export default function TeachersTab({ onNotify, isDarkMode = false }) {
     if (!payTarget) return;
     const amount = payTarget.earned;
     try {
-      const res = await api.put(`/api/teachers/${payTarget._id}`, { earned: 0 });
+      const res = await api.put(`/teachers/${payTarget._id}`, { earned: 0 });
       setTeachers((prev) => prev.map((t) => (t._id === payTarget._id ? res.data : t)));
       showToast(`$${amount.toFixed(2)} paid to ${payTarget.firstName}!`);
     } catch (err) {
@@ -481,7 +484,7 @@ export default function TeachersTab({ onNotify, isDarkMode = false }) {
     setPayAllOpen(false);
     try {
       const results = await Promise.all(
-        unpaidTeachers.map((t) => api.put(`/api/teachers/${t._id}`, { earned: 0 }))
+        unpaidTeachers.map((t) => api.put(`/teachers/${t._id}`, { earned: 0 }))
       );
       const updated = results.map((r) => r.data);
       setTeachers((prev) =>
@@ -500,7 +503,7 @@ export default function TeachersTab({ onNotify, isDarkMode = false }) {
     if (!teacher) return;
     try {
       const newPass = Math.random().toString(36).slice(-8);
-      const res = await api.put(`/api/teachers/${teacher._id}`, {
+      const res = await api.put(`/teachers/${teacher._id}`, {
         password: newPass,
       });
       setTeachers((prev) =>
@@ -550,7 +553,7 @@ export default function TeachersTab({ onNotify, isDarkMode = false }) {
     const teacher = teachers[index];
     if (!teacher) return;
     try {
-      await api.post(`/api/teachers/${teacher._id}/resend-invite`);
+      await api.post(`/teachers/${teacher._id}/resend-invite`);
       showToast(`Invite resent to ${teacher.email}!`);
     } catch (err) {
       showToast(err.response?.data?.message || "Failed to resend invite", "error");
@@ -582,6 +585,13 @@ export default function TeachersTab({ onNotify, isDarkMode = false }) {
       continentFilter === "" || t.continent === continentFilter;
     return matchesSearch && matchesContinent;
   });
+
+  // ── Pagination ──────────────────────────────────────────────────────────────
+  const totalPages  = Math.ceil(filteredTeachers.length / PAGE_SIZE);
+  const pagedTeachers = filteredTeachers.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  // Reset to page 1 whenever filters change
+  useEffect(() => { setPage(1); }, [searchQuery, continentFilter, view]);
 
   // ── UI helpers ──────────────────────────────────────────────────────────────
   const base = isDarkMode ? "bg-gray-900" : "bg-gray-50";
@@ -863,13 +873,13 @@ export default function TeachersTab({ onNotify, isDarkMode = false }) {
       {!loading && filteredTeachers.length > 0 && (
         <>
           <p className={`text-xs mb-4 ${textSecondary}`}>
-            Showing {filteredTeachers.length} of {sourceList.length} teacher
-            {sourceList.length !== 1 ? "s" : ""}
+            Showing {Math.min((page - 1) * PAGE_SIZE + 1, filteredTeachers.length)}–{Math.min(page * PAGE_SIZE, filteredTeachers.length)} of {filteredTeachers.length} teacher
+            {filteredTeachers.length !== 1 ? "s" : ""}
             {searchQuery && ` matching "${searchQuery}"`}
           </p>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {filteredTeachers.map((teacher) => {
+            {pagedTeachers.map((teacher) => {
               const realIndex = teachers.findIndex((t) => t._id === teacher._id);
               const days = daysUntilDeletion(teacher.scheduledDeletionAt);
 
@@ -912,6 +922,15 @@ export default function TeachersTab({ onNotify, isDarkMode = false }) {
               );
             })}
           </div>
+
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            total={filteredTeachers.length}
+            pageSize={PAGE_SIZE}
+            onPage={setPage}
+            isDarkMode={isDarkMode}
+          />
         </>
       )}
 

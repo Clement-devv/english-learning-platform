@@ -12,3 +12,7 @@ export const notificationSchema = new mongoose.Schema({
 
 notificationSchema.index({ createdAt: -1 });
 notificationSchema.index({ read: 1, createdAt: -1 });
+// Fetch unread notifications for a specific sub-admin
+notificationSchema.index({ subAdminId: 1, read: 1, createdAt: -1 });
+// TTL: auto-delete notifications older than 90 days
+notificationSchema.index({ createdAt: 1 }, { expireAfterSeconds: 60 * 60 * 24 * 90 });

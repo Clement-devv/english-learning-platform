@@ -36,7 +36,17 @@ export const homeworkSchema = new Schema({
       mimeType: { type: String, default: '' },
     },
   },
+  instructionAudio: {
+    fileId:   { type: String, default: null },
+    duration: { type: Number, default: 0 },
+    size:     { type: Number, default: 0 },
+    mimeType: { type: String, default: '' },
+  },
 }, { timestamps: true });
 
 homeworkSchema.index({ teacherId: 1, createdAt: -1 });
 homeworkSchema.index({ studentId: 1, status: 1 });
+// Due-date sweep (reminder scheduler + student overdue view)
+homeworkSchema.index({ dueDate: 1, status: 1 });
+// Teacher grading queue: submitted homework sorted by date
+homeworkSchema.index({ teacherId: 1, status: 1, createdAt: -1 });

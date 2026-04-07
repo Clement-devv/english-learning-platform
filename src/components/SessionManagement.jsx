@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { Monitor, Smartphone, Tablet, Laptop, MapPin, Clock, AlertCircle, X } from 'lucide-react';
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api/v1';
 
 export default function SessionManagement({ isOpen, onClose, userType = 'student' }) {
   const [sessions, setSessions] = useState([]);
@@ -14,9 +14,9 @@ export default function SessionManagement({ isOpen, onClose, userType = 'student
 
   // ✅ FIXED: Get the correct token based on user type
   const getToken = () => {
-    if (userType === 'teacher') return localStorage.getItem('teacherToken');
-    if (userType === 'admin') return localStorage.getItem('adminToken');
-    return localStorage.getItem('studentToken');
+    if (userType === 'teacher') return sessionStorage.getItem('teacherToken') || localStorage.getItem('teacherToken');
+    if (userType === 'admin')   return sessionStorage.getItem('adminToken')   || localStorage.getItem('adminToken');
+    return sessionStorage.getItem('studentToken') || localStorage.getItem('studentToken');
   };
 
   useEffect(() => {

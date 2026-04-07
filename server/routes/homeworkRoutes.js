@@ -26,10 +26,11 @@ const getStudent  = (db) => db.models.Student  || db.model("Student",  studentSc
 const getTeacher  = (db) => db.models.Teacher  || db.model("Teacher",  teacherSchema);
 
 // ── Upload directories ────────────────────────────────────────────────────────
-const HW_DIR   = path.join(__dirname, "..", "uploads", "homework", "assignments");
-const SUB_DIR  = path.join(__dirname, "..", "uploads", "homework", "submissions");
-const AUD_DIR  = path.join(__dirname, "..", "uploads", "homework", "audio-feedback");
-[HW_DIR, SUB_DIR, AUD_DIR].forEach(d => { if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true }); });
+const HW_DIR      = path.join(__dirname, "..", "uploads", "homework", "assignments");
+const SUB_DIR     = path.join(__dirname, "..", "uploads", "homework", "submissions");
+const AUD_DIR     = path.join(__dirname, "..", "uploads", "homework", "audio-feedback");
+const INS_AUD_DIR = path.join(__dirname, "..", "uploads", "homework", "instruction-audio");
+[HW_DIR, SUB_DIR, AUD_DIR, INS_AUD_DIR].forEach(d => { if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true }); });
 
 // ── Multer for audio feedback ─────────────────────────────────────────────────
 const audioUpload = multer({
@@ -185,7 +186,8 @@ router.get("/my", verifyToken, async (req, res) => {
 
     const list = await getHomework(req.db).find({ teacherId: req.user.id })
       .populate("studentId", "firstName surname email")
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
 
     res.json({ success: true, homework: list });
   } catch (err) {
@@ -202,7 +204,8 @@ router.get("/assigned", verifyToken, async (req, res) => {
 
     const list = await getHomework(req.db).find({ studentId: req.user.id })
       .populate("teacherId", "firstName lastName email")
-      .sort({ dueDate: 1 });
+      .sort({ dueDate: 1 })
+      .lean();
 
     res.json({ success: true, homework: list });
   } catch (err) {
@@ -299,7 +302,11 @@ router.post("/:id/grade", verifyToken, async (req, res) => {
       return res.status(400).json({ message: "Score must be 0–100" });
     }
 
+    // Preserve audioFeedback that was uploaded before grading
+    const existingAudio = hw.grade?.audioFeedback;
     hw.grade  = { score, feedback, gradedAt: new Date() };
+    if (existingAudio?.fileId) hw.grade.audioFeedback = existingAudio;
+    hw.markModified("grade");
     hw.status = "graded";
     await hw.save();
 
@@ -329,6 +336,9 @@ router.delete("/:id", verifyToken, async (req, res) => {
     });
     if (hw.grade?.audioFeedback?.fileId) {
       try { fs.unlinkSync(path.join(AUD_DIR, hw.grade.audioFeedback.fileId)); } catch (_) {}
+    }
+    if (hw.instructionAudio?.fileId) {
+      try { fs.unlinkSync(path.join(INS_AUD_DIR, hw.instructionAudio.fileId)); } catch (_) {}
     }
 
     await hw.deleteOne();
@@ -373,8 +383,52 @@ router.post("/:id/audio-feedback", verifyToken, audioUpload.single("audio"), asy
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// POST /api/homework/:id/instruction-audio  — teacher attaches voice note to instructions
+// ─────────────────────────────────────────────────────────────────────────────
+const instructionAudioUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, INS_AUD_DIR),
+    filename:    (_req, _file, cb) => cb(null, crypto.randomUUID()),
+  }),
+  limits: { fileSize: 20 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype.startsWith("audio/")) return cb(null, true);
+    cb(new Error("Only audio files allowed"));
+  },
+});
+
+router.post("/:id/instruction-audio", verifyToken, instructionAudioUpload.single("audio"), async (req, res) => {
+  try {
+    if (req.user.role !== "teacher") return res.status(403).json({ message: "Teachers only" });
+    if (!req.file) return res.status(400).json({ message: "No audio file uploaded" });
+
+    const hw = await getHomework(req.db).findById(req.params.id);
+    if (!hw) return res.status(404).json({ message: "Homework not found" });
+    if (hw.teacherId.toString() !== req.user.id) return res.status(403).json({ message: "Access denied" });
+
+    // Delete old instruction audio if present
+    if (hw.instructionAudio?.fileId) {
+      try { fs.unlinkSync(path.join(INS_AUD_DIR, hw.instructionAudio.fileId)); } catch (_) {}
+    }
+
+    hw.instructionAudio = {
+      fileId:   req.file.filename,
+      duration: parseFloat(req.body.duration) || 0,
+      size:     req.file.size,
+      mimeType: req.file.mimetype,
+    };
+    await hw.save();
+
+    res.json({ success: true, instructionAudio: hw.instructionAudio });
+  } catch (err) {
+    if (req.file) { try { fs.unlinkSync(req.file.path); } catch (_) {} }
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // GET /api/homework/file/:type/:fileId  — securely serve a file
-// type = "assignment" | "submission" | "audio-feedback"
+// type = "assignment" | "submission" | "audio-feedback" | "instruction-audio"
 // Auth required — only the relevant teacher or student can download
 // ─────────────────────────────────────────────────────────────────────────────
 router.get("/file/:type/:fileId", verifyToken, async (req, res) => {
@@ -386,7 +440,24 @@ router.get("/file/:type/:fileId", verifyToken, async (req, res) => {
       return res.status(400).json({ message: "Invalid file ID" });
     }
 
-    // ── Audio feedback — special handling ─────────────────────────────────
+    // ── Instruction audio ──────────────────────────────────────────────────
+    if (type === "instruction-audio") {
+      const filePath = path.join(INS_AUD_DIR, fileId);
+      if (!fs.existsSync(filePath)) return res.status(404).json({ message: "File not found" });
+
+      const hw = await getHomework(req.db).findOne({ "instructionAudio.fileId": fileId });
+      if (!hw) return res.status(404).json({ message: "File not found" });
+
+      const isTeacher = req.user.role === "teacher" && hw.teacherId.toString() === req.user.id;
+      const isStudent = req.user.role === "student" && hw.studentId.toString() === req.user.id;
+      if (!isTeacher && !isStudent) return res.status(403).json({ message: "Access denied" });
+
+      res.setHeader("Content-Type", hw.instructionAudio.mimeType || "audio/webm");
+      res.setHeader("Accept-Ranges", "bytes");
+      return res.sendFile(filePath);
+    }
+
+    // ── Audio feedback ─────────────────────────────────────────────────────
     if (type === "audio-feedback") {
       const filePath = path.join(AUD_DIR, fileId);
       if (!fs.existsSync(filePath)) return res.status(404).json({ message: "File not found" });

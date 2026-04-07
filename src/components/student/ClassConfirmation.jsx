@@ -10,7 +10,7 @@ export default function ClassConfirmation({ booking, onConfirm, onDispute, onClo
   const handleConfirm = async () => {
     try {
       setLoading(true);
-      await api.patch(`/api/bookings/${booking.bookingId}/student-confirm`);
+      await api.patch(`/bookings/${booking.bookingId}/student-confirm`);
       onConfirm();
     } catch (err) {
       console.error('Error confirming:', err);
@@ -28,7 +28,7 @@ export default function ClassConfirmation({ booking, onConfirm, onDispute, onClo
 
     try {
       setLoading(true);
-      await api.patch(`/api/bookings/${booking.bookingId}/dispute`, { 
+      await api.patch(`/bookings/${booking.bookingId}/dispute`, { 
         reason: disputeReason 
       });
       onDispute();

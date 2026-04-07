@@ -89,7 +89,7 @@ export default function StudentCompletedTab({ studentId, isDarkMode }) {
     silent ? setRefreshing(true) : setLoading(true);
     try {
       // ?status=completed returns BOTH "completed" and "missed" from the backend
-      const { data } = await api.get(`/api/bookings/student/${studentId}?status=completed`);
+      const { data } = await api.get(`/bookings/student/${studentId}?status=completed`);
       const normalised = (Array.isArray(data) ? data : []).map((b) => ({
         id:                  b._id,
         status:              b.status,            // "completed" | "missed"

@@ -28,10 +28,15 @@ router.get("/teacher/:teacherId", verifyToken, async (req, res) => {
     const filter = { teacherId };
     if (status) filter.status = status;
 
+    const limit = Math.min(parseInt(req.query.limit) || 500, 1000);
+    const skip  = Math.max(parseInt(req.query.skip)  || 0,   0);
     const transactions = await getPaymentTransaction(req.db).find(filter)
       .populate("bookingId", "classTitle scheduledTime duration")
       .populate("paidBy", "firstName lastName")
-      .sort({ completedAt: -1 });
+      .sort({ completedAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean();
 
     const summary = {
       totalPending: 0, totalPaid: 0, totalEarned: 0,
@@ -63,11 +68,16 @@ router.get("/all", verifyToken, verifyAdmin, async (req, res) => {
     if (status) filter.status = status;
     if (teacherId) filter.teacherId = teacherId;
 
+    const limit = Math.min(parseInt(req.query.limit) || 500, 1000);
+    const skip  = Math.max(parseInt(req.query.skip)  || 0,   0);
     const transactions = await getPaymentTransaction(req.db).find(filter)
       .populate("teacherId", "firstName lastName email ratePerClass")
       .populate("bookingId", "classTitle scheduledTime duration")
       .populate("paidBy", "firstName lastName")
-      .sort({ completedAt: -1 });
+      .sort({ completedAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean();
 
     const teacherSummary = {};
 
@@ -184,44 +194,87 @@ router.patch("/teacher/:teacherId/pay-all", verifyToken, verifyAdmin, async (req
  */
 router.get("/summary", verifyToken, verifyAdmin, async (req, res) => {
   try {
-    const teachers = await getTeacher(req.db).find({ active: true })
-      .select("firstName lastName email ratePerClass earned lessonsCompleted bankName accountNumber accountName");
+    // Single aggregation — replaces 1 + 2N queries (was 81 DB round-trips for 40 teachers).
+    // Joins teacher fields directly; only fetches {status, amount} from transactions.
+    const rows = await getPaymentTransaction(req.db).aggregate([
+      // Group transactions by teacher + status in one pass
+      {
+        $group: {
+          _id: { teacherId: "$teacherId", status: "$status" },
+          totalAmount: { $sum: "$amount" },
+          count:       { $sum: 1 },
+        },
+      },
+      // Pivot pending vs paid into a single doc per teacher
+      {
+        $group: {
+          _id: "$_id.teacherId",
+          pendingAmount: { $sum: { $cond: [{ $eq: ["$_id.status", "pending"] }, "$totalAmount", 0] } },
+          paidAmount:    { $sum: { $cond: [{ $eq: ["$_id.status", "paid"]    }, "$totalAmount", 0] } },
+          pendingCount:  { $sum: { $cond: [{ $eq: ["$_id.status", "pending"] }, "$count",       0] } },
+          paidCount:     { $sum: { $cond: [{ $eq: ["$_id.status", "paid"]    }, "$count",       0] } },
+        },
+      },
+      // Join teacher profile (active teachers only)
+      {
+        $lookup: {
+          from: "teachers",
+          let: { tid: "$_id" },
+          pipeline: [
+            { $match: { $expr: { $and: [{ $eq: ["$_id", "$$tid"] }, { $eq: ["$active", true] }] } } },
+            { $project: { firstName: 1, lastName: 1, email: 1, ratePerClass: 1,
+                          earned: 1, lessonsCompleted: 1,
+                          bankName: 1, accountNumber: 1, accountName: 1 } },
+          ],
+          as: "teacher",
+        },
+      },
+      { $unwind: "$teacher" }, // drops rows whose teacher is inactive / deleted
+      // Shape to match original response
+      {
+        $project: {
+          _id: 0,
+          teacherId:       "$_id",
+          teacherName:     { $concat: ["$teacher.firstName", " ", "$teacher.lastName"] },
+          email:           "$teacher.email",
+          ratePerClass:    "$teacher.ratePerClass",
+          currentEarned:   "$teacher.earned",
+          lessonsCompleted:"$teacher.lessonsCompleted",
+          pendingAmount:   1,
+          paidAmount:      1,
+          pendingCount:    1,
+          paidCount:       1,
+          totalEarnings:   { $add: ["$pendingAmount", "$paidAmount"] },
+          bankName:        { $ifNull: ["$teacher.bankName",      ""] },
+          accountNumber:   { $ifNull: ["$teacher.accountNumber", ""] },
+          accountName:     { $ifNull: ["$teacher.accountName",   ""] },
+        },
+      },
+      { $sort: { teacherName: 1 } },
+    ]);
 
-    const summaryPromises = teachers.map(async (teacher) => {
-      const PaymentTransaction = getPaymentTransaction(req.db);
-      const [pendingTransactions, paidTransactions] = await Promise.all([
-        PaymentTransaction.find({ teacherId: teacher._id, status: "pending" }),
-        PaymentTransaction.find({ teacherId: teacher._id, status: "paid" }),
-      ]);
+    // Include active teachers with zero transactions (left-join style)
+    const teacherIdsInTx = new Set(rows.map(r => r.teacherId.toString()));
+    const zeroTxTeachers = await getTeacher(req.db)
+      .find({ active: true, _id: { $nin: Array.from(teacherIdsInTx) } })
+      .select("firstName lastName email ratePerClass earned lessonsCompleted bankName accountNumber accountName")
+      .lean();
+    const zeroRows = zeroTxTeachers.map(t => ({
+      teacherId: t._id, teacherName: `${t.firstName} ${t.lastName}`,
+      email: t.email, ratePerClass: t.ratePerClass,
+      currentEarned: t.earned, lessonsCompleted: t.lessonsCompleted,
+      pendingAmount: 0, paidAmount: 0, pendingCount: 0, paidCount: 0,
+      totalEarnings: 0,
+      bankName: t.bankName || "", accountNumber: t.accountNumber || "", accountName: t.accountName || "",
+    }));
 
-      const totalPending = pendingTransactions.reduce((sum, tx) => sum + tx.amount, 0);
-      const totalPaid    = paidTransactions.reduce((sum, tx) => sum + tx.amount, 0);
-
-      return {
-        teacherId: teacher._id,
-        teacherName: `${teacher.firstName} ${teacher.lastName}`,
-        email: teacher.email,
-        ratePerClass: teacher.ratePerClass,
-        currentEarned: teacher.earned,
-        lessonsCompleted: teacher.lessonsCompleted,
-        pendingAmount: totalPending,
-        paidAmount: totalPaid,
-        pendingCount: pendingTransactions.length,
-        paidCount: paidTransactions.length,
-        totalEarnings: totalPending + totalPaid,
-        bankName:      teacher.bankName      || "",
-        accountNumber: teacher.accountNumber || "",
-        accountName:   teacher.accountName   || "",
-      };
-    });
-
-    const summary = await Promise.all(summaryPromises);
+    const summary = [...rows, ...zeroRows];
 
     const overallTotals = {
-      totalPending: summary.reduce((sum, t) => sum + t.pendingAmount, 0),
-      totalPaid:    summary.reduce((sum, t) => sum + t.paidAmount, 0),
+      totalPending:  summary.reduce((sum, t) => sum + t.pendingAmount, 0),
+      totalPaid:     summary.reduce((sum, t) => sum + t.paidAmount,    0),
       totalTeachers: summary.length,
-      totalLessons:  summary.reduce((sum, t) => sum + t.lessonsCompleted, 0)
+      totalLessons:  summary.reduce((sum, t) => sum + (t.lessonsCompleted || 0), 0),
     };
 
     res.json({ teachers: summary, totals: overallTotals });

@@ -3,13 +3,15 @@
 
 import { getCachedCenter } from "./branding";
 
-const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const API = (import.meta.env.VITE_API_URL || "http://localhost:5000") + "/api/v1";
 
 function authHeader() {
+  const get = (key) => sessionStorage.getItem(key) || localStorage.getItem(key);
   const t =
-    localStorage.getItem("studentToken") ||
-    localStorage.getItem("teacherToken") ||
-    localStorage.getItem("token");
+    get("teacherToken") ||
+    get("studentToken") ||
+    get("adminToken")   ||
+    get("token");
   const slug = import.meta.env.VITE_CENTER_SLUG || getCachedCenter()?.slug;
   return {
     ...(t    ? { Authorization: `Bearer ${t}` } : {}),
@@ -55,7 +57,7 @@ export async function enablePush() {
     await navigator.serviceWorker.ready;
 
     // 3. Fetch VAPID public key from server
-    const keyRes = await fetch(`${API}/api/push/vapid-key`, { headers: authHeader() });
+    const keyRes = await fetch(`${API}/push/vapid-key`, { headers: authHeader() });
     if (!keyRes.ok) return { ok: false, reason: "no_vapid" };
     const { key } = await keyRes.json();
 
@@ -66,7 +68,7 @@ export async function enablePush() {
     });
 
     // 5. Save subscription to backend
-    await fetch(`${API}/api/push/subscribe`, {
+    await fetch(`${API}/push/subscribe`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...authHeader() },
       body: JSON.stringify({ subscription: sub.toJSON() }),
@@ -89,7 +91,7 @@ export async function disablePush() {
       const sub = await reg.pushManager.getSubscription();
       if (sub) await sub.unsubscribe();
     }
-    await fetch(`${API}/api/push/subscribe`, {
+    await fetch(`${API}/push/subscribe`, {
       method: "DELETE",
       headers: authHeader(),
     });
@@ -103,7 +105,7 @@ export async function disablePush() {
  */
 export async function getPushStatus() {
   try {
-    const res = await fetch(`${API}/api/push/status`, { headers: authHeader() });
+    const res = await fetch(`${API}/push/status`, { headers: authHeader() });
     const json = await res.json();
     return json.subscribed ?? false;
   } catch {

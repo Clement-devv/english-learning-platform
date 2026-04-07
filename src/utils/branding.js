@@ -1,6 +1,6 @@
 // src/utils/branding.js
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api/v1';
 
 // Default branding — matches src/index.css :root values
 // Used as fallback if fetch fails or center has no custom branding
@@ -26,9 +26,14 @@ export const DEFAULT_BRANDING = {
  */
 export const fetchBranding = async () => {
   try {
-    // In development: pass slug via env var or hardcode for testing
-    // Also check sessionStorage for impersonation mode
-    const slug = import.meta.env.VITE_CENTER_SLUG || sessionStorage.getItem('impersonationCenterSlug') || null;
+    // In production: server identifies the center from the Host header (custom domain).
+    // x-center-slug header is only sent as a fallback for:
+    //   1. Super admin impersonation (imp_center session)
+    //   2. Local development (VITE_CENTER_SLUG env var)
+    // Never send it if we're on a real custom domain — it would override Host-based routing.
+    const impersonationSlug = sessionStorage.getItem('impersonationCenterSlug');
+    const devSlug = import.meta.env.DEV ? (import.meta.env.VITE_CENTER_SLUG || null) : null;
+    const slug = impersonationSlug || devSlug;
 
     const headers = {};
     if (slug) headers['x-center-slug'] = slug;

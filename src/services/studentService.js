@@ -1,6 +1,6 @@
 import api from "../api"; // Use api instance instead of axios
 
-const API_URL = "/api/students"; // Remove base URL, api already has it
+const API_URL = "/students"; // Remove base URL, api already has it
 
 // 👉 Get all students
 export const getStudents = async () => {
@@ -64,12 +64,12 @@ export const getStudentPayments = async (id) => {
 
 // 👉 Get all payments (global)
 export const getAllPayments = async () => {
-  const res = await api.get("/api/payments");
+  const res = await api.get("/payments");
   return res.data;
 };
 
 // 👉 Get all lessons (global)
 export const getAllLessons = async () => {
-  const res = await api.get("/api/lessons");
+  const res = await api.get("/lessons");
   return res.data;
 };

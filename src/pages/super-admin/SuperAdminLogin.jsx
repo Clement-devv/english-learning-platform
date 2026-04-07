@@ -21,7 +21,7 @@ export default function SuperAdminLogin() {
     setError('');
     setLoading(true);
     try {
-      const response = await api.post('/api/super-admin/login', {
+      const response = await api.post('/super-admin/login', {
         email: email.trim(),
         password,
       });

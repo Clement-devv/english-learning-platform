@@ -8,8 +8,8 @@ import api from "../api";
  */
 export const getTeacherBookings = async (teacherId, status = null) => {
   const url = status 
-    ? `/api/bookings/teacher/${teacherId}?status=${status}`
-    : `/api/bookings/teacher/${teacherId}`;
+    ? `/bookings/teacher/${teacherId}?status=${status}`
+    : `/bookings/teacher/${teacherId}`;
   
   const res = await api.get(url);
   return res.data;
@@ -22,8 +22,8 @@ export const getTeacherBookings = async (teacherId, status = null) => {
  */
 export const getStudentBookings = async (studentId, status = null) => {
   const url = status 
-    ? `/api/bookings/student/${studentId}?status=${status}`
-    : `/api/bookings/student/${studentId}`;
+    ? `/bookings/student/${studentId}?status=${status}`
+    : `/bookings/student/${studentId}`;
   
   const res = await api.get(url);
   return res.data;
@@ -33,7 +33,7 @@ export const getStudentBookings = async (studentId, status = null) => {
  * Get all bookings (Admin only)
  */
 export const getAllBookings = async () => {
-  const res = await api.get("/api/bookings");
+  const res = await api.get("/bookings");
   return res.data;
 };
 
@@ -41,7 +41,7 @@ export const getAllBookings = async () => {
  * Create a new booking
  */
 export const createBooking = async (bookingData) => {
-  const res = await api.post("/api/bookings", bookingData);
+  const res = await api.post("/bookings", bookingData);
   return res.data.booking;
 };
 
@@ -49,7 +49,7 @@ export const createBooking = async (bookingData) => {
  * Teacher accepts a booking
  */
 export const acceptBooking = async (bookingId) => {
-  const res = await api.patch(`/api/bookings/${bookingId}/accept`);
+  const res = await api.patch(`/bookings/${bookingId}/accept`);
   return res.data.booking;
 };
 
@@ -57,7 +57,7 @@ export const acceptBooking = async (bookingId) => {
  * Teacher rejects a booking
  */
 export const rejectBooking = async (bookingId, reason = "") => {
-  const res = await api.patch(`/api/bookings/${bookingId}/reject`, { reason });
+  const res = await api.patch(`/bookings/${bookingId}/reject`, { reason });
   return res.data.booking;
 };
 
@@ -69,7 +69,7 @@ export const rejectBooking = async (bookingId, reason = "") => {
  * 3. Return updated booking and student info
  */
 export const completeBooking = async (bookingId) => {
-  const res = await api.patch(`/api/bookings/${bookingId}/complete`);
+  const res = await api.patch(`/bookings/${bookingId}/complete`);
   return res.data;
 };
 
@@ -77,7 +77,7 @@ export const completeBooking = async (bookingId) => {
  * Cancel a booking
  */
 export const cancelBooking = async (bookingId, reason = "") => {
-  const res = await api.patch(`/api/bookings/${bookingId}/cancel`, { reason });
+  const res = await api.patch(`/bookings/${bookingId}/cancel`, { reason });
   return res.data.booking;
 };
 
@@ -85,7 +85,7 @@ export const cancelBooking = async (bookingId, reason = "") => {
  * Delete a booking (Admin only)
  */
 export const deleteBooking = async (bookingId) => {
-  const res = await api.delete(`/api/bookings/${bookingId}`);
+  const res = await api.delete(`/bookings/${bookingId}`);
   return res.data;
 };
 
@@ -93,6 +93,6 @@ export const deleteBooking = async (bookingId) => {
  * Auto-complete expired bookings (for background/cron jobs)
  */
 export const autoCompleteExpiredBookings = async () => {
-  const res = await api.post("/api/bookings/auto-complete");
+  const res = await api.post("/bookings/auto-complete");
   return res.data;
 };

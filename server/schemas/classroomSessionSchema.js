@@ -26,3 +26,7 @@ export const classroomSessionSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 classroomSessionSchema.index({ bookingId: 1 }, { unique: true });
+// Active session lookup (heartbeat polling)
+classroomSessionSchema.index({ status: 1 });
+// Usage reporting by time range
+classroomSessionSchema.index({ classStartedAt: -1 });

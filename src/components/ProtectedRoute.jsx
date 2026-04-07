@@ -8,8 +8,8 @@ export default function ProtectedRoute({ children }) {
 
   useEffect(() => {
     const verifyToken = async () => {
-      const token = localStorage.getItem('teacherToken');
-      
+      const token = sessionStorage.getItem('teacherToken') || localStorage.getItem('teacherToken');
+
       if (!token) {
         setIsAuthenticated(false);
         setLoading(false);
@@ -17,14 +17,13 @@ export default function ProtectedRoute({ children }) {
       }
 
       try {
-        // Set token in api headers
         api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-        
-        // Verify token with backend
-        await api.get('/api/auth/verify');
+        await api.get('/auth/verify');
         setIsAuthenticated(true);
       } catch (error) {
         console.error('Token verification failed:', error);
+        sessionStorage.removeItem('teacherToken');
+        sessionStorage.removeItem('teacherInfo');
         localStorage.removeItem('teacherToken');
         localStorage.removeItem('teacherInfo');
         setIsAuthenticated(false);

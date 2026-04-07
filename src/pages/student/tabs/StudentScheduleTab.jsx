@@ -98,7 +98,7 @@ export default function StudentScheduleTab({ studentId, isDarkMode }) {
     if (!studentId) return;
     (async () => {
       try {
-        const { data } = await api.get(`/api/bookings/student/${studentId}?status=accepted`);
+        const { data } = await api.get(`/bookings/student/${studentId}?status=accepted`);
         const map = new Map();
         (data || []).forEach(b => {
           const t = b.teacherId;
@@ -137,8 +137,8 @@ export default function StudentScheduleTab({ studentId, isDarkMode }) {
     try {
       const end = new Date(weekStart); end.setDate(weekStart.getDate() + 7);
       const [availRes, bookRes] = await Promise.all([
-        api.get(`/api/teacher-availability/${teacher._id}?startDate=${weekStart.toISOString()}&endDate=${end.toISOString()}`),
-        api.get(`/api/bookings/student/${studentId}?status=accepted`),
+        api.get(`/teacher-availability/${teacher._id}?startDate=${weekStart.toISOString()}&endDate=${end.toISOString()}`),
+        api.get(`/bookings/student/${studentId}?status=accepted`),
       ]);
       if (availRes.data.hidden) {
         setHidden(true);

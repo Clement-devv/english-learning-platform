@@ -99,7 +99,7 @@ export default function ProfileTab({ teacherInfo, isDarkMode, onUpdate }) {
     if (!teacherInfo?._id && !teacherInfo?.id) return;
     const tid = teacherInfo._id || teacherInfo.id;
     setReviewsLoading(true);
-    api.get(`/api/reviews/teacher/${tid}`)
+    api.get(`/reviews/teacher/${tid}`)
       .then((res) => { setReviews(res.data.reviews || []); setReviewStats(res.data.stats || null); })
       .catch(() => {})
       .finally(() => setReviewsLoading(false));
@@ -142,7 +142,7 @@ export default function ProfileTab({ teacherInfo, isDarkMode, onUpdate }) {
     try {
       const fd = new FormData();
       fd.append("photo", file);
-      const res = await api.post(`/api/teachers/${teacherId}/photo`, fd, {
+      const res = await api.post(`/teachers/${teacherId}/photo`, fd, {
         headers: { "Content-Type": "multipart/form-data" },
       });
       setPhotoPreview(res.data.photo);
@@ -160,7 +160,7 @@ export default function ProfileTab({ teacherInfo, isDarkMode, onUpdate }) {
     setPhotoUploading(true);
     setPhotoError("");
     try {
-      await api.delete(`/api/teachers/${teacherId}/photo`);
+      await api.delete(`/teachers/${teacherId}/photo`);
       setPhotoPreview("");
       onUpdate({ ...teacherInfo, photo: "" });
     } catch {
@@ -175,7 +175,7 @@ export default function ProfileTab({ teacherInfo, isDarkMode, onUpdate }) {
     setSaving(true);
     setError("");
     try {
-      const { data } = await api.patch(`/api/teachers/${teacherId}/profile`, {
+      const { data } = await api.patch(`/teachers/${teacherId}/profile`, {
         displayName:       form.displayName.trim(),
         phone:             form.phone.trim(),
         timezone:          form.timezone,

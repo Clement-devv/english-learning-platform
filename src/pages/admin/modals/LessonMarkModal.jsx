@@ -91,7 +91,7 @@ export default function LessonMarkModal({
     setLoading(true);
     setError("");
     try {
-      const { data } = await api.get(`/api/admin/lessons/teacher/${teacherId}/students`);
+      const { data } = await api.get(`/admin/lessons/teacher/${teacherId}/students`);
       setStudentList(data.students || []);
     } catch (err) {
       setError("Could not load students for this teacher.");
@@ -104,7 +104,7 @@ export default function LessonMarkModal({
     setLoading(true);
     setError("");
     try {
-      const { data } = await api.get(`/api/admin/lessons/student/${studentId}/teachers`);
+      const { data } = await api.get(`/admin/lessons/student/${studentId}/teachers`);
       setTeacherList(data.teachers || []);
     } catch (err) {
       setError("Could not load teachers for this student.");
@@ -118,7 +118,7 @@ export default function LessonMarkModal({
     setError("");
     try {
       const { data } = await api.get(
-        `/api/admin/lessons/bookings?teacherId=${teacherId}&studentId=${studentId}&type=${mode}`
+        `/admin/lessons/bookings?teacherId=${teacherId}&studentId=${studentId}&type=${mode}`
       );
       setBookingList(data.bookings || []);
     } catch (err) {
@@ -172,7 +172,7 @@ export default function LessonMarkModal({
     setSubmitting(true);
     setError("");
     try {
-      const endpoint = isMarkMode ? "/api/admin/lessons/mark" : "/api/admin/lessons/unmark";
+      const endpoint = isMarkMode ? "/admin/lessons/mark" : "/admin/lessons/unmark";
       const payload = { bookingId: selectedBooking._id };
       if (!isMarkMode && reason) payload.reason = reason;
 

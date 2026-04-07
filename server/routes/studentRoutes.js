@@ -8,6 +8,7 @@ import {
   sendStudentWelcomeEmail,
   sendAccountDeletionWarningEmail,
   sendNewStudentRecordEmail,
+  getCenterBaseUrl,
 } from "../utils/emailService.js";
 import { generateStudentRecordPdf } from "../utils/recordPdfGenerator.js";
 import {
@@ -33,9 +34,14 @@ const getPayment  = (db) => db.models.Payment  || db.model("Payment",  paymentSc
 // ─── GET all students ─────────────────────────────────────────────────────────
 router.get("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
   try {
+    const limit = Math.min(parseInt(req.query.limit) || 500, 1000);
+    const skip  = Math.max(parseInt(req.query.skip)  || 0,   0);
     const students = await getStudent(req.db)
       .find()
-      .select("firstName surname email active noOfClasses age lastPaymentDate showTempPassword status createdAt phone country rank dateOfBirth")
+      .select("firstName surname email active noOfClasses age lastPaymentDate showTempPassword status createdAt phone country rank dateOfBirth scheduledDeletionAt")
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
       .lean();
     res.json(students);
   } catch (err) {
@@ -103,7 +109,8 @@ router.post("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
       inviteToken, inviteExpires,
     });
 
-    const setupUrl = `${config.frontendUrl}/student/setup?token=${inviteToken}&center=${req.center.slug}`;
+    const { baseUrl, needsSlug } = getCenterBaseUrl(req.center);
+    const setupUrl = `${baseUrl}/student/setup?token=${inviteToken}${needsSlug ? `&center=${req.center.slug}` : ""}`;
     const centerName = req.center?.centerName || "";
 
     try {
@@ -204,7 +211,8 @@ router.post("/:id/resend-invite", verifyToken, verifyAdmin, strictLimiter, async
     student.inviteExpires = inviteExpires;
     await student.save();
 
-    const setupUrl = `${config.frontendUrl}/student/setup?token=${inviteToken}&center=${req.center.slug}`;
+    const { baseUrl, needsSlug } = getCenterBaseUrl(req.center);
+    const setupUrl = `${baseUrl}/student/setup?token=${inviteToken}${needsSlug ? `&center=${req.center.slug}` : ""}`;
     await sendStudentInviteEmail(student, setupUrl, req.center?.centerName || "");
 
     res.json({ message: "Invite resent successfully" });

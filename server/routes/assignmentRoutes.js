@@ -17,11 +17,15 @@ const getStudent    = (db) => db.models.Student    || db.model("Student",    stu
 // Get all assignments
 router.get("/", async (req, res) => {
   try {
+    const limit = Math.min(parseInt(req.query.limit) || 500, 1000);
+    const skip  = Math.max(parseInt(req.query.skip)  || 0,   0);
     const assignments = await getAssignment(req.db)
       .find()
       .populate("teacherId", "firstName lastName email")
       .populate("studentId", "firstName surname email")
       .sort({ assignedDate: -1 })
+      .skip(skip)
+      .limit(limit)
       .lean();
     res.json(assignments);
   } catch (err) {

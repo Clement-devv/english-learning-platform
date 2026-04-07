@@ -19,7 +19,7 @@ export default function ManualPaymentModal({ isOpen, onClose, onSave, student, i
     setMethod("Manual");
     setAmountError("");
     setPricingLoading(true);
-    api.get("/api/class-pricing")
+    api.get("/class-pricing")
       .then(r => setPricing(r.data))
       .catch(() => setPricing(null))
       .finally(() => setPricingLoading(false));

@@ -33,55 +33,17 @@ console.log("  MongoDB:", process.env.MONGO_URI ? "✓ Configured" : "✗ Missin
 console.log("  JWT Secret:", process.env.JWT_SECRET ? "✓ Configured" : "✗ Missing");
 console.log("  Email:", process.env.EMAIL_USER ? "✓ Configured" : "✗ Missing");
 
-// Routes
-import teacherRoutes from "./routes/teacherRoutes.js";
-import studentRoutes from "./routes/studentRoutes.js";
-import paymentRoutes from "./routes/paymentRoutes.js";
-import lessonRoutes from "./routes/lessonRoutes.js"
-import assignmentRoutes from "./routes/assignmentRoutes.js";
-import authRoutes from "./routes/authRoutes.js";
-import agoraRoutes      from "./routes/agoraRoutes.js";
-import agoraUsageRoutes from "./routes/agoraUsageRoutes.js";
-import twoFactorRoutes from "./routes/twoFactorRoutes.js";
-import bookingRoutes from "./routes/bookingRoutes.js";
-import teacherAssignmentRoutes from "./routes/teacherAssignmentRoutes.js";
-import { initializeSocket } from './socketServer.js'; 
-import classroomRoutes from "./routes/classroomRoutes.js";
-import groupChatRoutes     from "./routes/groupChatRoutes.js";
-import directMessageRoutes from "./routes/directMessageRoutes.js";
-import paymentTransactionRoutes from "./routes/paymentTransactionRoutes.js";
-import recurringBookingsRoutes from "./routes/recurringBookingsRoutes.js";
-import analyticsRoutes from "./routes/analyticsRoutes.js";
+import { initializeSocket } from './socketServer.js';
 import { verifyEmailConfig } from "./utils/emailService.js";
-import { startReminderScheduler }       from "./utils/reminderScheduler.js";
-import adminLessonRoutes from "./routes/adminLessonRoutes.js";
-import subAdminRoutes     from "./routes/subAdminRoutes.js";
-import subAdminAuthRoutes from "./routes/subAdminAuthRoutes.js";
-import subAdminScopeRoutes from "./routes/subAdminScopeRoutes.js";
-import disputeRoutes from "./routes/disputeRoutes.js";
-import contentRoutes from "./routes/contentRoutes.js";
-import teacherAvailabilityRoutes from "./routes/teacherAvailabilityRoutes.js";
-import homeworkRoutes from "./routes/homeworkRoutes.js";
-import pronunciationRoutes from "./routes/pronunciationRoutes.js";
-import quizRoutes         from "./routes/quizRoutes.js";
-import grammarRoutes      from "./routes/grammarRoutes.js";
-import chatRoutes         from "./routes/chatRoutes.js";
-import quizTemplateRoutes from "./routes/quizTemplateRoutes.js";
-import vocabRoutes        from "./routes/vocabRoutes.js";
-import recordingRoutes, { startRecordingCleanup } from "./routes/recordingRoutes.js";
-import reportRoutes       from "./routes/reportRoutes.js";
+import { startReminderScheduler } from "./utils/reminderScheduler.js";
+import { startRecordingCleanup } from "./routes/recordingRoutes.js";
 import { startProgressReportScheduler } from "./utils/progressReportScheduler.js";
-import reviewRoutes       from "./routes/reviewRoutes.js";
-import referralRoutes     from "./routes/referralRoutes.js";
-import pushRoutes         from "./routes/pushRoutes.js";
-import notificationRoutes from "./routes/notificationRoutes.js";
-import centerRegistrationRoutes from "./routes/centerRegistrationRoutes.js";
-import centerConfigRoutes from "./routes/centerConfigRoutes.js";
-import superAdminRoutes from "./routes/superAdminRoutes.js";
-import classPricingRoutes from "./routes/classPricingRoutes.js";
+import v1Router from "./routes/v1.js";
 import Center from "./models/master/Center.js";
 import SuperAdmin from "./models/master/SuperAdmin.js";
-import { getDb } from "./config/dbManager.js";
+import { getDb, closeAllConnections } from "./config/dbManager.js";
+import { errorHandler, notFoundHandler, registerProcessHandlers } from "./middleware/errorHandler.js";
+import healthRoutes from "./routes/healthRoutes.js";
 
 const app = express();
 const httpServer = http.createServer(app);
@@ -141,12 +103,15 @@ app.use(compression({
   },
 }));
 
-app.use('/api/', apiLimiter);
+// Health checks — no rate limit, no auth, no tenant middleware
+app.use("/api/health", healthRoutes);
 
-app.use("/api/classroom", realtimeLimiter);
-app.use("/api/agora", realtimeLimiter);
+app.use("/api/v1/", apiLimiter);
 
-app.use("/api/group-chats", pollingLimiter);
+app.use("/api/v1/classroom",   realtimeLimiter);
+app.use("/api/v1/agora",       realtimeLimiter);
+
+app.use("/api/v1/group-chats", pollingLimiter);
 
 // MongoDB connection
 mongoose
@@ -218,60 +183,14 @@ app.get("/", (req, res) => {
   });
 });
 
-// Routes
-app.use("/api/teachers", teacherRoutes);
-app.use("/api/students", studentRoutes);
-app.use("/api/payments", paymentRoutes);
-app.use("/api/lessons", lessonRoutes);
-app.use("/api/assignments", assignmentRoutes);
-app.use("/api/auth", authRoutes);
-app.use("/api/agora",       agoraRoutes);
-app.use("/api/agora-usage", agoraUsageRoutes);
-app.use("/api/2fa", twoFactorRoutes);
-app.use("/api/bookings", bookingRoutes);
-app.use("/api/teachers", teacherAssignmentRoutes);
-app.use("/api/classroom", classroomRoutes);
-app.use("/api/group-chats",     groupChatRoutes);
-app.use("/api/direct-messages", directMessageRoutes);
-app.use("/api/payments", paymentTransactionRoutes);
-app.use("/api/recurring-bookings", recurringBookingsRoutes);
-app.use("/api/analytics", analyticsRoutes);
-app.use("/api/admin/lessons", adminLessonRoutes);
-app.use("/api/sub-admins",      subAdminRoutes);
-app.use("/api/sub-admin-auth",  subAdminAuthRoutes);
-app.use("/api/sub-admin-scope", subAdminScopeRoutes);
-app.use("/api/disputes",        disputeRoutes);
-app.use("/api/content",              contentRoutes);
-app.use("/api/teacher-availability", teacherAvailabilityRoutes);
-app.use("/api/homework",             homeworkRoutes);
-app.use("/api/pronunciation",        pronunciationRoutes);
-app.use("/api/quiz",                 quizRoutes);
-app.use("/api/quiz-templates",       quizTemplateRoutes);
-app.use("/api/grammar",              grammarRoutes);
-app.use("/api/chat",                 chatRoutes);
-app.use("/api/vocab",                vocabRoutes);
-app.use("/api/recordings",           recordingRoutes);
-app.use("/api/reports",              reportRoutes);
-app.use("/api/reviews",              reviewRoutes);
-app.use("/api/referrals",            referralRoutes);
-app.use("/api/push",                 pushRoutes);
-app.use("/api/notifications",        notificationRoutes);
-app.use("/api/register-center",      centerRegistrationRoutes);
-app.use("/api/center",               centerConfigRoutes);
-app.use("/api/super-admin",          superAdminRoutes);
-app.use("/api/class-pricing",        classPricingRoutes);
+// Versioned API
+app.use("/api/v1", v1Router);
 
 
 
-// Error handling middleware
-app.use((err, req, res, next) => {
-  console.error("🔥 Error:", err.message);
-  const status = err.status || err.statusCode || 500;
-  const isDev = config.nodeEnv === "development";
-  res.status(status).json({
-    error: isDev ? err.message : "An internal server error occurred",
-  });
-});
+// 404 + global error handlers (must come after all routes)
+app.use(notFoundHandler);
+app.use(errorHandler);
 
 // Verify email configuration on startup
 verifyEmailConfig()
@@ -293,21 +212,58 @@ httpServer.listen(PORT, () => {
   console.log(`🔌 Socket.IO initialized for whiteboard sharing`);
 });
 
-// Graceful shutdown handlers
+// Process-level uncaught exception + unhandled rejection handlers
+registerProcessHandlers();
+
+// ── Graceful shutdown ─────────────────────────────────────────────────────────
+// Order:
+//   1. Stop accepting new HTTP + WS connections
+//   2. Wait for in-flight HTTP requests to finish (httpServer.close)
+//   3. Close Socket.IO (drains active socket connections)
+//   4. Close all per-center MongoDB connections
+//   5. Close master MongoDB connection
+//   6. Exit cleanly
+// A 15-second hard-kill ensures we never hang forever (e.g. a stalled request).
+
+let isShuttingDown = false;
+
 const shutdown = async (signal) => {
-  console.log(`\n${signal} received — shutting down gracefully`);
-  httpServer.close(() => {
-    console.log("HTTP server closed");
-    mongoose.connection.close(false).then(() => {
-      console.log("MongoDB connection closed");
-      process.exit(0);
-    }).catch(() => process.exit(0));
-  });
-  // Force exit after 10 seconds if still hanging
-  setTimeout(() => {
-    console.error("Forced exit after timeout");
+  if (isShuttingDown) return;
+  isShuttingDown = true;
+
+  console.log(`\n${signal} received — starting graceful shutdown`);
+
+  // Hard-kill timer — if anything below stalls, we still exit
+  const forceExit = setTimeout(() => {
+    console.error("❌ Graceful shutdown timed out — forcing exit");
     process.exit(1);
-  }, 10_000).unref();
+  }, 15_000).unref();
+
+  try {
+    // 1. Stop accepting new connections
+    await new Promise((resolve) => httpServer.close(resolve));
+    console.log("✅ HTTP server closed (no new connections)");
+
+    // 2. Close Socket.IO (tells clients to reconnect elsewhere)
+    await new Promise((resolve) => io.close(resolve));
+    console.log("✅ Socket.IO closed");
+
+    // 3. Close all per-center DB connections
+    await closeAllConnections();
+    console.log("✅ Per-center DB connections closed");
+
+    // 4. Close master DB connection
+    await mongoose.connection.close(false);
+    console.log("✅ Master DB connection closed");
+
+    clearTimeout(forceExit);
+    console.log("👋 Shutdown complete");
+    process.exit(0);
+  } catch (err) {
+    console.error("❌ Error during shutdown:", err.message);
+    process.exit(1);
+  }
 };
+
 process.on("SIGTERM", () => shutdown("SIGTERM"));
 process.on("SIGINT",  () => shutdown("SIGINT"));

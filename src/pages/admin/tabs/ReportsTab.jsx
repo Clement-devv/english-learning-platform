@@ -48,7 +48,7 @@ export default function ReportsTab({ students = [], isDarkMode }) {
     if (!selectedStudent) return showToast("Please select a student", false);
     const q    = buildQuery(period, refDate);
     try {
-      const resp = await api.get(`/api/reports/preview/${selectedStudent}${q}`, { responseType: 'blob' });
+      const resp = await api.get(`/reports/preview/${selectedStudent}${q}`, { responseType: 'blob' });
       const objUrl = URL.createObjectURL(new Blob([resp.data]));
       window.open(objUrl, "_blank");
     } catch (e) {
@@ -61,7 +61,7 @@ export default function ReportsTab({ students = [], isDarkMode }) {
     setBusy(true);
     try {
       const q    = buildQuery(period, refDate);
-      const resp = await api.post(`/api/reports/send/${selectedStudent}${q}`);
+      const resp = await api.post(`/reports/send/${selectedStudent}${q}`);
       const data = resp.data;
       showToast(data.message || "Report sent!");
     } catch (e) {

@@ -15,6 +15,7 @@ import {
   Download,
 } from "lucide-react";
 import { downloadStudentRoster } from "../../../utils/studentPdf";
+import Pagination from "../../../components/Pagination";
 import StudentCard from "../components/StudentCard";
 import StudentModal from "../modals/StudentModal";
 import PaymentHistoryModal from "../modals/PaymentHistoryModal";
@@ -467,6 +468,13 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
       .includes(searchQuery.toLowerCase())
   );
 
+  // ── Pagination ───────────────────────────────────────────────────────────────
+  const PAGE_SIZE = 20;
+  const [page, setPage] = useState(1);
+  const totalPages    = Math.ceil(filteredStudents.length / PAGE_SIZE);
+  const pagedStudents = filteredStudents.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  useEffect(() => { setPage(1); }, [searchQuery, view]);
+
   const selectedStudentObj = students.find((s) => s._id === selectedStudent);
 
   // ── UI helpers ───────────────────────────────────────────────────────────────
@@ -686,13 +694,13 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
       {!loading && filteredStudents.length > 0 && (
         <>
           <p className={`text-xs mb-4 ${textSecondary}`}>
-            Showing {filteredStudents.length} of {sourceList.length} student
-            {sourceList.length !== 1 ? "s" : ""}
+            Showing {Math.min((page - 1) * PAGE_SIZE + 1, filteredStudents.length)}–{Math.min(page * PAGE_SIZE, filteredStudents.length)} of {filteredStudents.length} student
+            {filteredStudents.length !== 1 ? "s" : ""}
             {searchQuery && ` matching "${searchQuery}"`}
           </p>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {filteredStudents.map((student) => {
+            {pagedStudents.map((student) => {
               const days = daysUntilDeletion(student.scheduledDeletionAt);
               const isPendingDeletion = days !== null;
 
@@ -738,6 +746,15 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
               );
             })}
           </div>
+
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            total={filteredStudents.length}
+            pageSize={PAGE_SIZE}
+            onPage={setPage}
+            isDarkMode={isDarkMode}
+          />
         </>
       )}
 

@@ -159,8 +159,8 @@ export default function ConversationTab({ studentInfo, isDarkMode }) {
     const init = async () => {
       try {
         const [histRes, credRes] = await Promise.all([
-          api.get("/api/chat/history"),
-          api.get("/api/chat/credits"),
+          api.get("/chat/history"),
+          api.get("/chat/credits"),
         ]);
         if (!mountedRef.current) return;
         setMessages(histRes.data.messages || []);
@@ -210,7 +210,7 @@ export default function ConversationTab({ studentInfo, isDarkMode }) {
     setMessages(prev => [...prev, optimistic]);
 
     try {
-      const { data } = await api.post("/api/chat/message", { text: trimmed, level });
+      const { data } = await api.post("/chat/message", { text: trimmed, level });
       if (!mountedRef.current) return;
 
       const aiMsg = { _id: Date.now() + 2, role: "assistant", content: data.reply };
@@ -304,7 +304,7 @@ export default function ConversationTab({ studentInfo, isDarkMode }) {
   const clearHistory = async () => {
     if (!window.confirm("Clear your entire conversation history?")) return;
     try {
-      await api.delete("/api/chat/history");
+      await api.delete("/chat/history");
       setMessages([]);
       window.speechSynthesis?.cancel();
       setSpeakingId(null);

@@ -162,7 +162,7 @@ export default function CompletedClassesTab({ classes, teacherInfo, isDarkMode }
     try {
       setDisputeSubmitting(true);
       setDisputeError("");
-      await api.post(`/api/disputes/booking/${disputeBooking.id}`, { disputeReason: disputeReason.trim() });
+      await api.post(`/disputes/booking/${disputeBooking.id}`, { disputeReason: disputeReason.trim() });
       setDisputeSuccess("Dispute submitted successfully. The admin will review it shortly.");
       setLocalDisputed((prev) => ({ ...prev, [disputeBooking.id]: true }));
     } catch (err) {

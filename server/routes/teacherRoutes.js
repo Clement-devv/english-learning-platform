@@ -12,6 +12,7 @@ import {
   sendTeacherWelcomeEmail,
   sendTeacherAccountDeletionWarningEmail,
   sendNewTeacherRecordEmail,
+  getCenterBaseUrl,
 } from "../utils/emailService.js";
 import { generateTeacherRecordPdf } from "../utils/recordPdfGenerator.js";
 import { verifyToken, verifyAdmin, verifyAdminOrTeacher } from "../middleware/authMiddleware.js";
@@ -71,9 +72,14 @@ router.get("/:id", verifyToken, async (req, res) => {
 // ─── GET all teachers ─────────────────────────────────────────────────────────
 router.get("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
   try {
+    const limit = Math.min(parseInt(req.query.limit) || 500, 1000);
+    const skip  = Math.max(parseInt(req.query.skip)  || 0,   0);
     const teachers = await getTeacher(req.db)
       .find()
       .select("-password -inviteToken -twoFactorSecret -twoFactorBackupCodes")
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
       .lean();
     res.json(teachers);
   } catch (err) {
@@ -235,7 +241,8 @@ router.post("/", verifyToken, verifyAdmin, async (req, res) => {
       specializations: specializations || [], certifications: certifications || [],
     });
 
-    const setupUrl   = `${config.frontendUrl}/teacher/setup?token=${inviteToken}&center=${req.center.slug}`;
+    const { baseUrl: _tb1, needsSlug: _tn1 } = getCenterBaseUrl(req.center);
+    const setupUrl   = `${_tb1}/teacher/setup?token=${inviteToken}${_tn1 ? `&center=${req.center.slug}` : ""}`;
     const centerName = req.center?.centerName || "";
 
     try {
@@ -341,7 +348,8 @@ router.post("/:id/resend-invite", verifyToken, verifyAdmin, async (req, res) => 
     teacher.inviteExpires = new Date(Date.now() + 48 * 60 * 60 * 1000);
     await teacher.save();
 
-    const setupUrl = `${config.frontendUrl}/teacher/setup?token=${teacher.inviteToken}&center=${req.center.slug}`;
+    const { baseUrl: _tb2, needsSlug: _tn2 } = getCenterBaseUrl(req.center);
+    const setupUrl = `${_tb2}/teacher/setup?token=${teacher.inviteToken}${_tn2 ? `&center=${req.center.slug}` : ""}`;
     await sendTeacherInviteEmail(teacher, setupUrl, req.center?.centerName || "");
 
     res.json({ success: true, message: "Invite resent successfully" });

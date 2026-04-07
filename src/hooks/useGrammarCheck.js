@@ -67,7 +67,7 @@ export function useGrammarCheck() {
 
       try {
         const { data } = await api.post(
-          "/api/grammar/check",
+          "/api/v1/grammar/check",
           { text },
           { signal: controller.signal }
         );

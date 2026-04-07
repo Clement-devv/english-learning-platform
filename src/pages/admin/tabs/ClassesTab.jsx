@@ -291,7 +291,7 @@ function UpcomingRow({ booking, dm }) {
 
 // ── Agora monitor modal ───────────────────────────────────────────────────────
 function AgoraModal({ booking, onClose, dm }) {
-  const adminInfo = JSON.parse(localStorage.getItem("adminInfo") || "{}");
+  const adminInfo = JSON.parse(sessionStorage.getItem("adminInfo") || localStorage.getItem("adminInfo") || "{}");
   const adminId   = adminInfo._id || `admin_${Date.now()}`;
   const adminName = adminInfo.email ? `Admin (${adminInfo.email})` : "Admin";
 
@@ -359,7 +359,7 @@ export default function ClassesTab({ isDarkMode }) {
   const fetchSessions = useCallback(async (liveIds) => {
     if (!liveIds.length) return;
     const results = await Promise.allSettled(
-      liveIds.map((id) => api.get(`/api/classroom/session/${id}`))
+      liveIds.map((id) => api.get(`/classroom/session/${id}`))
     );
     setSessions((prev) => {
       const next = { ...prev };

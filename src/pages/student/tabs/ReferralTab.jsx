@@ -29,7 +29,7 @@ export default function ReferralTab({ isDarkMode }) {
   async function load() {
     setLoading(true);
     try {
-      const res = await api.get("/api/referrals/my");
+      const res = await api.get("/referrals/my");
       setData(res.data);
     } catch (e) {
       console.error("Referral load error:", e.message);

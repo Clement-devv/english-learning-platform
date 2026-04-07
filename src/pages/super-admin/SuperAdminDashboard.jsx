@@ -11,7 +11,7 @@ import {
 import api from '../../api';
 import { THEMES } from '../../data/themes';
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api/v1';
 
 const TIMEZONES = [
   'UTC','Africa/Lagos','Africa/Nairobi','Africa/Accra','Africa/Cairo',

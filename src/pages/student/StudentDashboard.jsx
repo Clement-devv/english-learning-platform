@@ -361,7 +361,7 @@ export default function StudentDashboard() {
 
   // ── Student info ──────────────────────────────────────────────────────────
   const [student, setStudent] = useState(() => {
-    const raw = localStorage.getItem("studentInfo");
+    const raw = sessionStorage.getItem("studentInfo") || localStorage.getItem("studentInfo");
     if (raw) {
       const p = JSON.parse(raw);
       return {
@@ -421,7 +421,7 @@ export default function StudentDashboard() {
   useEffect(() => {
     const checkHomework = async () => {
       try {
-        const { data } = await api.get("/api/homework/assigned");
+        const { data } = await api.get("/homework/assigned");
         const pending = (data.homework || []).filter(h => h.status === "assigned").length;
         setHomeworkPending(pending);
 
@@ -448,7 +448,7 @@ export default function StudentDashboard() {
   useEffect(() => {
     const checkQuizzes = async () => {
       try {
-        const { data } = await api.get("/api/quiz/assigned");
+        const { data } = await api.get("/quiz/assigned");
         const pending = (data.quizzes || []).filter(q => q.status === "assigned").length;
         setQuizPending(pending);
 
@@ -516,7 +516,7 @@ export default function StudentDashboard() {
       if (!studentId) { showToast("Please login again.", "error"); handleLogout(); return; }
 
       // Silently update student's timezone so bookings carry correct TZ
-      api.patch(`/api/students/${studentId}/timezone`, { timezone: getUserTimezone() }).catch(() => {});
+      api.patch(`/students/${studentId}/timezone`, { timezone: getUserTimezone() }).catch(() => {});
 
       const [accepted, completed, pendingConf] = await Promise.all([
         getStudentBookings(studentId, "accepted"),
@@ -583,13 +583,13 @@ export default function StudentDashboard() {
       // ✅ Fetch LIVE student data — localStorage goes stale after classes are deducted
       let classesRemaining = 0;
       try {
-        const { data: freshStudent } = await api.get(`/api/students/${studentId}`);
+        const { data: freshStudent } = await api.get(`/students/${studentId}`);
         classesRemaining = freshStudent?.noOfClasses || 0;
         // Keep localStorage in sync
-        const stored = JSON.parse(localStorage.getItem("studentInfo") || "{}");
-        localStorage.setItem("studentInfo", JSON.stringify({ ...stored, noOfClasses: classesRemaining }));
+        const stored = JSON.parse(sessionStorage.getItem("studentInfo") || localStorage.getItem("studentInfo") || "{}");
+        sessionStorage.setItem("studentInfo", JSON.stringify({ ...stored, noOfClasses: classesRemaining }));
       } catch {
-        classesRemaining = JSON.parse(localStorage.getItem("studentInfo") || "{}").noOfClasses || 0;
+        classesRemaining = JSON.parse(sessionStorage.getItem("studentInfo") || localStorage.getItem("studentInfo") || "{}").noOfClasses || 0;
       }
 
       const completedCount = completedList.length;
@@ -738,7 +738,7 @@ export default function StudentDashboard() {
     try {
       const bookingId = classItem.bookingId || classItem.id;
       if (!bookingId) { showToast("Missing booking ID","error"); return; }
-      const { data } = await api.get(`/api/bookings/${bookingId}`);
+      const { data } = await api.get(`/bookings/${bookingId}`);
       navigate("/classroom",{ state:{ classData:{ id:bookingId, bookingId, title:classItem.title||"Class", topic:classItem.topic||"English Lesson", duration:classItem.duration, teacherGoogleMeetLink: data.booking?.teacherId?.googleMeetLink||"" }, userRole:"student" }});
     } catch { showToast("Failed to join class","error"); }
   };

@@ -44,7 +44,7 @@ export default function ReviewsTab({ teacherInfo, isDarkMode }) {
     if (!teacherInfo?._id) return;
     setLoading(true);
     try {
-      const res = await api.get(`/api/reviews/teacher/${teacherInfo._id}`);
+      const res = await api.get(`/reviews/teacher/${teacherInfo._id}`);
       setData(res.data);
     } catch (e) {
       console.error("Reviews load error:", e.message);

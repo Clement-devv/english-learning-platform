@@ -39,7 +39,8 @@ router.get("/", verifyToken, async (req, res) => {
     const chats = await getGroupChat(req.db).find(filter)
       .populate("teacherId", "firstName lastName email")
       .populate("studentId", "firstName surname email")
-      .sort({ lastActivityAt: -1 });
+      .sort({ lastActivityAt: -1 })
+      .lean();
 
     res.json({ success: true, chats });
   } catch (error) {

@@ -27,8 +27,8 @@ export default function FlashcardsTab({ isDarkMode }) {
     try {
       setLoading(true);
       const [statsRes, dueRes] = await Promise.allSettled([
-        api.get("/api/vocab/stats"),
-        api.get("/api/vocab/due"),
+        api.get("/vocab/stats"),
+        api.get("/vocab/due"),
       ]);
       if (statsRes.status === "fulfilled") setStats(statsRes.value.data.stats || []);
       if (dueRes.status === "fulfilled")   setCards(dueRes.value.data.cards || []);
@@ -51,7 +51,7 @@ export default function FlashcardsTab({ isDarkMode }) {
   const submitRating = async (quality) => {
     const card = cards[idx];
     try {
-      const { data } = await api.post("/api/vocab/review", { listId: card.listId, wordId: card.wordId, quality });
+      const { data } = await api.post("/vocab/review", { listId: card.listId, wordId: card.wordId, quality });
       if (data?.streak?.incremented) setStreakToast(data.streak);
     } catch { /* silent */ }
 
