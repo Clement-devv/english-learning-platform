@@ -17,7 +17,20 @@ export const classroomSessionSchema = new mongoose.Schema({
     enum: ['waiting', 'active', 'completed', 'ended-early', 'incomplete', 'missed'],
     default: 'waiting',
   },
-  videoProvider: { type: String, enum: ['agora', 'googlemeet', null], default: null },
+  videoProvider:   { type: String, enum: ['agora', 'googlemeet', null], default: null },
+  contentPage:     { type: Number, default: 1   }, // current PDF page teacher is viewing
+  contentScale:    { type: Number, default: 1.3 }, // current PDF zoom level
+  contentAnnotation: {                             // latest annotation canvas for current page
+    page: { type: Number },
+    data: { type: String }, // base64 PNG data URL
+    ts:   { type: Number }, // Date.now() — student compares to skip unchanged frames
+  },
+  extendedTime:    { type: Number, default: 0 }, // total extra seconds added via time extensions
+  timeExtensions:  [{
+    minutes:    { type: Number },
+    extendedBy: { type: String },
+    extendedAt: { type: Date },
+  }],
   heartbeats: [{
     userRole:   { type: String, enum: ['teacher', 'student'] },
     timestamp:  Date,

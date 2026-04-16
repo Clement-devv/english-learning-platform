@@ -8,6 +8,7 @@ import { verifyToken } from "../middleware/authMiddleware.js";
 import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
 import { recordingSchema }  from "../schemas/recordingSchema.js";
 import { bookingSchema }    from "../schemas/bookingSchema.js";
+import logger from "../utils/logger.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const RECORDINGS_DIR = path.join(__dirname, "../uploads/recordings");
@@ -83,7 +84,7 @@ router.post("/upload", verifyToken, upload.single("recording"), async (req, res)
 
     res.status(201).json({ success: true, recording: rec });
   } catch (err) {
-    console.error("Recording upload error:", err);
+    logger.error("Recording upload error:", { error: err?.message });
     if (req.file) fs.unlink(req.file.path, () => {});
     res.status(500).json({ success: false, message: err.message });
   }
@@ -189,7 +190,7 @@ router.get("/:id/stream", verifyToken, async (req, res) => {
       fs.createReadStream(filePath).pipe(res);
     }
   } catch (err) {
-    console.error("Recording stream error:", err);
+    logger.error("Recording stream error:", { error: err?.message });
     res.status(500).json({ success: false, message: err.message });
   }
 });
@@ -220,11 +221,11 @@ export function startRecordingCleanup(db) {
     try {
       const expired = await Recording.find({ autoDeleteAt: { $lte: new Date() } });
       if (expired.length === 0) return;
-      console.log(`Auto-deleting ${expired.length} expired recording(s)...`);
+      logger.info(`Auto-deleting ${expired.length} expired recording(s)...`);
       for (const rec of expired) await purgeRecording(rec);
-      console.log(`Deleted ${expired.length} recording(s)`);
+      logger.info(`Deleted ${expired.length} recording(s)`);
     } catch (err) {
-      console.error("Recording cleanup error:", err);
+      logger.error("Recording cleanup error:", { error: err?.message });
     }
   };
 

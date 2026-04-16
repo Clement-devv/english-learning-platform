@@ -122,6 +122,14 @@ function ReviewForm({ booking, isDarkMode, onSubmitted }) {
 }
 
 // ── Main tab ──────────────────────────────────────────────────────────────────
+const getStudentId = () => {
+  try {
+    const raw = sessionStorage.getItem("studentInfo") || localStorage.getItem("studentInfo");
+    if (raw) { const p = JSON.parse(raw); return p._id || p.id; }
+  } catch { /* ignore */ }
+  return null;
+};
+
 export default function ReviewsTab({ isDarkMode }) {
   const [pending,   setPending]   = useState([]);   // completed bookings not yet reviewed
   const [myReviews, setMyReviews] = useState([]);   // already submitted
@@ -135,10 +143,12 @@ export default function ReviewsTab({ isDarkMode }) {
   const muted = isDarkMode ? "#94a3b8" : "#64748b";
 
   async function load() {
+    const studentId = getStudentId();
+    if (!studentId) { setLoading(false); return; }
     setLoading(true);
     try {
       const [bookingsRes, reviewsRes] = await Promise.all([
-        api.get("/bookings/student"),
+        api.get(`/bookings/student/${studentId}?status=completed`),
         api.get("/reviews/my"),
       ]);
 

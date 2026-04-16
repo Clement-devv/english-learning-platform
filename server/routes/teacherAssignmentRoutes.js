@@ -3,6 +3,7 @@ import express from "express";
 import { verifyToken } from "../middleware/authMiddleware.js";
 import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
 import { assignmentSchema } from "../schemas/assignmentSchema.js";
+import logger from "../utils/logger.js";
 
 const router = express.Router();
 router.use(tenantMiddleware);
@@ -36,7 +37,7 @@ router.get("/:teacherId/students", verifyToken, async (req, res) => {
       data: students
     });
   } catch (err) {
-    console.error("Error fetching assigned students:", err);
+    logger.error("Error fetching assigned students:", { error: err?.message });
     res.status(500).json({
       success: false,
       message: "Error fetching assigned students"
@@ -63,7 +64,7 @@ router.get("/:teacherId/assignments", verifyToken, async (req, res) => {
       data: assignments
     });
   } catch (err) {
-    console.error("Error fetching assignments:", err);
+    logger.error("Error fetching assignments:", { error: err?.message });
     res.status(500).json({
       success: false,
       message: "Error fetching assignments"

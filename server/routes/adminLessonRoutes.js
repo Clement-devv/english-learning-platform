@@ -12,6 +12,7 @@ import { teacherSchema }            from "../schemas/teacherSchema.js";
 import { studentSchema }            from "../schemas/studentSchema.js";
 import { assignmentSchema }         from "../schemas/assignmentSchema.js";
 import { paymentTransactionSchema } from "../schemas/paymentTransactionSchema.js";
+import logger from "../utils/logger.js";
 
 const router = express.Router();
 router.use(tenantMiddleware);
@@ -63,7 +64,7 @@ async function sendLessonMarkedEmails(teacher, student, booking, centerName = ""
       sendEmail({ centerName, to: student.email, subject: "Lesson Marked Completed 📚", html: studentHtml }),
     ]);
   } catch (err) {
-    console.error("📧 Mark notification email failed:", err.message);
+    logger.error("📧 Mark notification email failed:", { error: err?.message });
   }
 }
 
@@ -106,7 +107,7 @@ async function sendLessonUnmarkedEmails(teacher, student, booking, reason, cente
       sendEmail({ centerName, to: student.email, subject: "Lesson Status Updated ⚠️", html: studentHtml }),
     ]);
   } catch (err) {
-    console.error("📧 Unmark notification email failed:", err.message);
+    logger.error("📧 Unmark notification email failed:", { error: err?.message });
   }
 }
 
@@ -134,7 +135,7 @@ router.get("/teacher/:teacherId/students", verifyToken, verifyAdmin, async (req,
 
     res.json({ success: true, students });
   } catch (err) {
-    console.error("Error fetching teacher students:", err);
+    logger.error("Error fetching teacher students:", { error: err?.message });
     res.status(500).json({ success: false, message: "Error fetching students" });
   }
 });
@@ -165,7 +166,7 @@ router.get("/student/:studentId/teachers", verifyToken, verifyAdmin, async (req,
 
     res.json({ success: true, teachers });
   } catch (err) {
-    console.error("Error fetching student teachers:", err);
+    logger.error("Error fetching student teachers:", { error: err?.message });
     res.status(500).json({ success: false, message: "Error fetching teachers" });
   }
 });
@@ -197,7 +198,7 @@ router.get("/bookings", verifyToken, verifyAdmin, async (req, res) => {
 
     res.json({ success: true, bookings });
   } catch (err) {
-    console.error("Error fetching bookings for mark/unmark:", err);
+    logger.error("Error fetching bookings for mark/unmark:", { error: err?.message });
     res.status(500).json({ success: false, message: "Error fetching bookings" });
   }
 });
@@ -238,11 +239,11 @@ router.post("/mark", verifyToken, verifyAdmin, async (req, res) => {
           await sendLessonMarkedEmails(booking.teacherId, booking.studentId, booking, centerName);
         }
       } catch (emailErr) {
-        console.error("📧 Admin mark email failed:", emailErr.message);
+        logger.error("📧 Admin mark email failed:", emailErr.message);
       }
     });
 
-    console.log(`✅ Admin marked lesson complete | bookingId: ${bookingId}`);
+    logger.info(`✅ Admin marked lesson complete | bookingId: ${bookingId}`);
 
     return res.json({
       success: true,
@@ -251,7 +252,7 @@ router.post("/mark", verifyToken, verifyAdmin, async (req, res) => {
     });
 
   } catch (err) {
-    console.error("❌ Error marking lesson:", err.message);
+    logger.error("❌ Error marking lesson:", { error: err?.message });
     res.status(500).json({ success: false, message: "Error marking lesson: " + err.message });
   }
 });
@@ -335,11 +336,11 @@ router.post("/unmark", verifyToken, verifyAdmin, async (req, res) => {
         const updatedTeacher = await getTeacher(db).findById(teacherId);
         await sendLessonUnmarkedEmails(updatedTeacher, updatedStudent, booking, reason, centerName);
       } catch (emailErr) {
-        console.error("📧 Unmark email failed:", emailErr.message);
+        logger.error("📧 Unmark email failed:", emailErr.message);
       }
     });
 
-    console.log(`⚠️ Admin unmarked lesson | bookingId: ${bookingId} | Reason: ${reason || "none"}`);
+    logger.info(`⚠️ Admin unmarked lesson | bookingId: ${bookingId} | Reason: ${reason || "none"}`);
 
     return res.json({
       success: true,
@@ -364,7 +365,7 @@ router.post("/unmark", verifyToken, verifyAdmin, async (req, res) => {
     });
 
   } catch (err) {
-    console.error("❌ Error unmarking lesson:", err.message);
+    logger.error("❌ Error unmarking lesson:", { error: err?.message });
     res.status(500).json({ success: false, message: "Error unmarking lesson: " + err.message });
   }
 });

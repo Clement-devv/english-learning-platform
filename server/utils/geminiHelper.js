@@ -1,3 +1,4 @@
+import logger from "../utils/logger.js";
 /**
  * geminiHelper.js
  *
@@ -61,7 +62,7 @@ export async function callGemini(prompt, genConfig = {}, maxRetries = 2) {
         // Rate limited — wait then retry this model
         if (response.status === 429 || response.status === 503) {
           const waitMs = 1000 * Math.pow(2, attempt); // 1s, 2s, 4s
-          console.warn(`Gemini ${model} rate-limited (${response.status}), waiting ${waitMs}ms…`);
+          logger.warn(`Gemini ${model} rate-limited (${response.status}), waiting ${waitMs}ms…`);
           await sleep(waitMs);
           lastError = new Error(`${model} rate-limited (${response.status})`);
           continue; // retry same model
@@ -70,7 +71,7 @@ export async function callGemini(prompt, genConfig = {}, maxRetries = 2) {
         // Other non-OK responses (404, 400, etc.) — skip to next model immediately
         if (!response.ok) {
           const text = await response.text();
-          console.warn(`Gemini ${model} error ${response.status}: ${text.slice(0, 120)}`);
+          logger.warn(`Gemini ${model} error ${response.status}: ${text.slice(0, 120)}`);
           lastError = new Error(`${model} returned ${response.status}`);
           break; // try next model
         }
@@ -79,7 +80,7 @@ export async function callGemini(prompt, genConfig = {}, maxRetries = 2) {
         const raw  = data.candidates?.[0]?.content?.parts?.[0]?.text;
         if (!raw) throw new Error(`${model} returned empty content`);
 
-        console.log(`✅ Gemini response from ${model}`);
+        logger.info(`✅ Gemini response from ${model}`);
         return raw;
 
       } catch (err) {
@@ -133,6 +134,6 @@ export function extractJSONArray(raw) {
   }
 
   // 5. Last resort — log what we got so it shows in server console
-  console.error("Could not parse Gemini JSON. Raw response:\n", raw.slice(0, 500));
+  logger.error("Could not parse Gemini JSON. Raw response:\n", raw.slice(0, 500));
   throw new Error("AI returned invalid JSON — please try again");
 }

@@ -32,6 +32,7 @@ import {
   toggleStudent,
   recordLesson,
   apiResetPassword,
+  resendStudentInvite,
   addPayment,
   getAllPayments,
   getAllLessons,
@@ -432,6 +433,16 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
     }
   };
 
+  // ── Resend invite ───────────────────────────────────────────────────────────
+  const handleResendInvite = async (id) => {
+    try {
+      await resendStudentInvite(id);
+      showToast("Invite email resent successfully.", "success");
+    } catch (e) {
+      showToast("Could not resend invite. Please try again.", "error");
+    }
+  };
+
   // ── Copy password ───────────────────────────────────────────────────────────
   const handleCopyPassword = (id) => {
     const stu = students.find((s) => s._id === id);
@@ -740,6 +751,7 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
                       onViewLessons={() => handleViewLessons(student._id)}
                       onResetPassword={() => handleResetPassword(student._id)}
                       onCopyPassword={() => handleCopyPassword(student._id)}
+                      onResendInvite={() => handleResendInvite(student._id)}
                     />
                   </div>
                 </div>

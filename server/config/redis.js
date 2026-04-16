@@ -8,6 +8,7 @@
 // Errors never crash the server — Redis is an optional performance layer.
 
 import Redis from "ioredis";
+import logger from "../utils/logger.js";
 
 let redisClient = null;
 
@@ -22,17 +23,17 @@ if (process.env.REDIS_URL) {
     lazyConnect: false,
   });
 
-  redisClient.on("connect",   ()    => console.log("✅ Redis connected"));
-  redisClient.on("ready",     ()    => console.log("✅ Redis ready"));
-  redisClient.on("error",     (err) => console.warn("⚠️  Redis error:", err.message));
-  redisClient.on("close",     ()    => console.warn("⚠️  Redis connection closed"));
-  redisClient.on("reconnecting", () => console.log("🔄 Redis reconnecting…"));
+  redisClient.on("connect",   ()    => logger.info("✅ Redis connected"));
+  redisClient.on("ready",     ()    => logger.info("✅ Redis ready"));
+  redisClient.on("error",     (err) => logger.warn("⚠️  Redis error:", err.message));
+  redisClient.on("close",     ()    => logger.warn("⚠️  Redis connection closed"));
+  redisClient.on("reconnecting", () => logger.info("🔄 Redis reconnecting…"));
 } else {
   if (process.env.NODE_ENV === "production") {
-    console.warn(
-      "⚠️  REDIS_URL not set — rate limiters using in-memory store.\n" +
-      "   Counts reset on restart and are NOT shared across instances.\n" +
-      "   Set REDIS_URL in production for persistent rate limiting."
+    logger.warn(
+      "REDIS_URL not set — rate limiters using in-memory store. " +
+      "Counts reset on restart and are NOT shared across instances. " +
+      "Set REDIS_URL in production for persistent rate limiting."
     );
   }
 }

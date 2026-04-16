@@ -1,0 +1,4 @@
+Contact: mailto:security@yourdomain.com
+Expires: 2027-04-16T00:00:00.000Z
+Preferred-Languages: en
+Policy: https://yourdomain.com/security-policy

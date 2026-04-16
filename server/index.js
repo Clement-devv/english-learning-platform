@@ -2,6 +2,7 @@ import dotenv from "dotenv";
 dotenv.config();
 console.log("📧 Email configured:", process.env.EMAIL_USER ? "✓" : "✗");
 
+import logger from "./utils/logger.js";
 import express from "express";
 import mongoose from "mongoose";
 import cors from "cors";
@@ -29,21 +30,24 @@ import {
 } from "./middleware/security.js";
 
 console.log("✅ Environment Check:");
-console.log("  MongoDB:", process.env.MONGO_URI ? "✓ Configured" : "✗ Missing");
-console.log("  JWT Secret:", process.env.JWT_SECRET ? "✓ Configured" : "✗ Missing");
-console.log("  Email:", process.env.EMAIL_USER ? "✓ Configured" : "✗ Missing");
+logger.info("  MongoDB:", process.env.MONGO_URI ? "✓ Configured" : "✗ Missing");
+logger.info("  JWT Secret:", process.env.JWT_SECRET ? "✓ Configured" : "✗ Missing");
+logger.info("  Email:", process.env.EMAIL_USER ? "✓ Configured" : "✗ Missing");
 
 import { initializeSocket } from './socketServer.js';
 import { verifyEmailConfig } from "./utils/emailService.js";
 import { startReminderScheduler } from "./utils/reminderScheduler.js";
 import { startRecordingCleanup } from "./routes/recordingRoutes.js";
 import { startProgressReportScheduler } from "./utils/progressReportScheduler.js";
+import { startMissedClassScheduler } from "./utils/missedClassScheduler.js";
 import v1Router from "./routes/v1.js";
 import Center from "./models/master/Center.js";
 import SuperAdmin from "./models/master/SuperAdmin.js";
 import { getDb, closeAllConnections } from "./config/dbManager.js";
 import { errorHandler, notFoundHandler, registerProcessHandlers } from "./middleware/errorHandler.js";
 import healthRoutes from "./routes/healthRoutes.js";
+import { sweepExpiredSessionsFromDb } from "./utils/sessionManager.js";
+import { SESSION_CLEANUP_INTERVAL_MS } from "./config/constants.js";
 
 const app = express();
 const httpServer = http.createServer(app);
@@ -86,8 +90,18 @@ app.use(cors({
 // Make io available to routes if needed
 app.set('io', io);
 
-// Serve uploaded files (logos, favicons, recordings, etc.)
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// Public uploads — branding assets and teacher photos are needed before / outside auth
+app.use('/uploads/branding', express.static(path.join(__dirname, 'uploads', 'branding')));
+app.use('/uploads/teachers', express.static(path.join(__dirname, 'uploads', 'teachers')));
+
+// Block direct static access to private upload directories.
+// Clients must go through the authenticated API routes instead:
+//   recordings → GET /api/recordings/:id/stream  (verifyToken)
+//   content    → GET /api/content/file/:bookingId (verifyToken)
+//   homework   → GET /api/homework/... routes     (verifyToken)
+app.use('/uploads/recordings', (_req, res) => res.status(403).json({ message: 'Access denied' }));
+app.use('/uploads/content',    (_req, res) => res.status(403).json({ message: 'Access denied' }));
+app.use('/uploads/homework',   (_req, res) => res.status(403).json({ message: 'Access denied' }));
 
 // Body parser with size limits
 app.use(express.json(requestLimits.json));
@@ -106,6 +120,17 @@ app.use(compression({
 // Health checks — no rate limit, no auth, no tenant middleware
 app.use("/api/health", healthRoutes);
 
+// CSP violation reports — browsers POST here when a Content-Security-Policy is violated.
+// No auth required (reports come from the browser, before any JS runs).
+// Logs in production so you can spot real violations vs. browser extensions.
+app.post("/api/v1/csp-report", express.json({ type: "application/csp-report", limit: "10kb" }), (req, res) => {
+  if (config.nodeEnv === "production") {
+    const report = req.body?.["csp-report"] || req.body;
+    logger.warn("CSP violation:", JSON.stringify(report));
+  }
+  res.status(204).end();
+});
+
 app.use("/api/v1/", apiLimiter);
 
 app.use("/api/v1/classroom",   realtimeLimiter);
@@ -116,49 +141,66 @@ app.use("/api/v1/group-chats", pollingLimiter);
 // MongoDB connection
 mongoose
   .connect(process.env.MONGO_URI, {
-    maxPoolSize: 10,
-    minPoolSize: 2,
+    maxPoolSize: 20,
+    minPoolSize: 5,
     serverSelectionTimeoutMS: 5000,
     socketTimeoutMS: 45000,
     connectTimeoutMS: 10000,
     heartbeatFrequencyMS: 10000,
   })
   .then(async () => {
-    console.log("✅ Master MongoDB connected");
+    logger.info("Master MongoDB connected");
 
     // Start per-center schedulers for all currently active centers
     try {
       const activeCenters = await Center.find({ status: "active" }).select("slug");
-      console.log(`🏢 Found ${activeCenters.length} active center(s) — starting per-center schedulers`);
+      logger.info(`🏢 Found ${activeCenters.length} active center(s) — starting per-center schedulers`);
       for (const center of activeCenters) {
         const db = await getDb(center.slug);
         startReminderScheduler(db);
         startRecordingCleanup(db);
         startProgressReportScheduler(db);
+        startMissedClassScheduler(db);
       }
+
+      // Hourly background sweep: remove expired/inactive sessions from all
+      // center DBs so users who never log back in don't accumulate stale records.
+      setInterval(async () => {
+        for (const center of activeCenters) {
+          try {
+            const db = await getDb(center.slug);
+            await sweepExpiredSessionsFromDb(db);
+          } catch (e) {
+            logger.error(`Session sweep failed for ${center.slug}:`, { error: e?.message });
+          }
+        }
+      }, SESSION_CLEANUP_INTERVAL_MS);
     } catch (err) {
-      console.error("❌ Failed to start per-center schedulers:", err.message);
+      logger.error("❌ Failed to start per-center schedulers:", { error: err?.message });
     }
 
     // Master DB keep-alive ping
     setInterval(async () => {
       try {
         await mongoose.connection.db.admin().ping();
-        console.log('🏓 Master DB keep-alive ping');
+        logger.info('🏓 Master DB keep-alive ping');
       } catch (e) {
-        console.error('Master DB ping failed:', e.message);
+        logger.error('Master DB ping failed:', { error: e?.message });
       }
     }, 5 * 60 * 1000);
   })
   .catch((err) => {
-    console.error("❌ MongoDB connection error:", err);
+    logger.error("❌ MongoDB connection error:", { error: err?.message });
     process.exit(1);
   });
 
 
 
-// Root endpoint
+// Root endpoint — full structure only in development
 app.get("/", (req, res) => {
+  if (config.nodeEnv === 'production') {
+    return res.json({ message: "API is running" });
+  }
   res.json({
     message: "📘 English Teaching Platform API is running!",
     endpoints: {
@@ -196,20 +238,20 @@ app.use(errorHandler);
 verifyEmailConfig()
   .then(isValid => {
     if (isValid) {
-      console.log("✅ Email service configured");
+      logger.info("Email service configured");
     } else {
-      console.warn("⚠️ Email service not configured - notifications disabled");
+      logger.warn("Email service not configured - notifications disabled");
     }
   })
   .catch(err => {
-    console.error("❌ verifyEmailConfig threw:", err.message);
+    logger.error("❌ verifyEmailConfig threw:", { error: err?.message });
   });
 
 // Start server
 const PORT = process.env.PORT || 5000;
 httpServer.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
-  console.log(`🔌 Socket.IO initialized for whiteboard sharing`);
+  logger.info(`🚀 Server running on http://localhost:${PORT}`);
+  logger.info(`🔌 Socket.IO initialized for whiteboard sharing`);
 });
 
 // Process-level uncaught exception + unhandled rejection handlers
@@ -231,36 +273,36 @@ const shutdown = async (signal) => {
   if (isShuttingDown) return;
   isShuttingDown = true;
 
-  console.log(`\n${signal} received — starting graceful shutdown`);
+  logger.info(`\n${signal} received — starting graceful shutdown`);
 
   // Hard-kill timer — if anything below stalls, we still exit
   const forceExit = setTimeout(() => {
-    console.error("❌ Graceful shutdown timed out — forcing exit");
+    logger.error("❌ Graceful shutdown timed out — forcing exit");
     process.exit(1);
   }, 15_000).unref();
 
   try {
     // 1. Stop accepting new connections
     await new Promise((resolve) => httpServer.close(resolve));
-    console.log("✅ HTTP server closed (no new connections)");
+    logger.info("HTTP server closed");
 
     // 2. Close Socket.IO (tells clients to reconnect elsewhere)
     await new Promise((resolve) => io.close(resolve));
-    console.log("✅ Socket.IO closed");
+    logger.info("Socket.IO closed");
 
     // 3. Close all per-center DB connections
     await closeAllConnections();
-    console.log("✅ Per-center DB connections closed");
+    logger.info("Per-center DB connections closed");
 
     // 4. Close master DB connection
     await mongoose.connection.close(false);
-    console.log("✅ Master DB connection closed");
+    logger.info("Master DB connection closed");
 
     clearTimeout(forceExit);
-    console.log("👋 Shutdown complete");
+    logger.info("👋 Shutdown complete");
     process.exit(0);
   } catch (err) {
-    console.error("❌ Error during shutdown:", err.message);
+    logger.error("❌ Error during shutdown:", { error: err?.message });
     process.exit(1);
   }
 };

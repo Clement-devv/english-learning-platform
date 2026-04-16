@@ -26,8 +26,11 @@ import {
 } from "lucide-react";
 
 export default function GoogleMeetClassroom({ classData, userRole, onLeave, googleMeetLink }) {
-  const navigate  = useNavigate();
-  const bookingId = classData?.bookingId || classData?.id;
+  const navigate    = useNavigate();
+  const bookingId   = classData?.bookingId || classData?.id;
+  const channelName = `class-${bookingId}`;
+  const userName    = localStorage.getItem("name") || "User";
+  const userId      = localStorage.getItem("userId") || "";
 
   const core = useClassroomCore({ bookingId, userRole, duration: classData?.duration });
 
@@ -406,14 +409,14 @@ export default function GoogleMeetClassroom({ classData, userRole, onLeave, goog
         {/* Content tab */}
         {activeTab === "content" && (
           <div className="h-full">
-            <ContentViewer bookingId={bookingId} userRole={userRole} />
+            <ContentViewer bookingId={bookingId} userRole={userRole} channelName={channelName} />
           </div>
         )}
 
         {/* Whiteboard tab */}
         {activeTab === "whiteboard" && (
           <div className="h-full">
-            <WhiteboardTab bookingId={bookingId} userRole={userRole} />
+            <WhiteboardTab channelName={channelName} userRole={userRole} userId={userId} userName={userName} />
           </div>
         )}
       </div>

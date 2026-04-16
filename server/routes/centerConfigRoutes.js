@@ -9,6 +9,7 @@ import { verifyToken, verifyAdmin } from '../middleware/authMiddleware.js';
 import { isValidDomain, normalizeDomain } from '../utils/domainVerifier.js';
 import { sendDomainInstructionsEmail } from '../utils/emailService.js';
 import { config } from '../config/config.js';
+import logger from "../utils/logger.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
@@ -49,7 +50,7 @@ router.get('/config', tenantMiddleware, async (req, res) => {
       branding,
     });
   } catch (err) {
-    console.error('❌ Center config error:', err);
+    logger.error('❌ Center config error:', { error: err?.message });
     res.status(500).json({ success: false, message: 'Server error', error: err.message });
   }
 });
@@ -74,7 +75,7 @@ router.patch('/branding', tenantMiddleware, verifyToken, verifyAdmin, async (req
 
     res.json({ success: true, message: 'Branding updated' });
   } catch (err) {
-    console.error('❌ Branding update error:', err);
+    logger.error('❌ Branding update error:', { error: err?.message });
     res.status(500).json({ success: false, message: 'Server error', error: err.message });
   }
 });
@@ -111,7 +112,7 @@ router.post('/domain', tenantMiddleware, verifyToken, verifyAdmin, async (req, r
         normalized,
         serverIp
       );
-    } catch (e) { console.error('Domain instructions email failed:', e.message); }
+    } catch (e) { logger.error('Domain instructions email failed:', { error: e?.message }); }
 
     res.json({
       success: true,
@@ -123,7 +124,7 @@ router.post('/domain', tenantMiddleware, verifyToken, verifyAdmin, async (req, r
       },
     });
   } catch (err) {
-    console.error('❌ Domain submission error:', err);
+    logger.error('❌ Domain submission error:', { error: err?.message });
     res.status(500).json({ success: false, message: 'Failed to submit domain' });
   }
 });
@@ -170,7 +171,7 @@ router.post(
 
       res.json({ success: true, url: fileUrl });
     } catch (err) {
-      console.error('❌ Branding upload error:', err);
+      logger.error('❌ Branding upload error:', { error: err?.message });
       res.status(500).json({ success: false, message: 'Upload failed' });
     }
   }

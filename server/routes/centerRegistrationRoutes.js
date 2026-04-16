@@ -3,11 +3,13 @@ import bcrypt from 'bcryptjs';
 import Center from '../models/master/Center.js';
 import { config } from '../config/config.js';
 import { sendEmail } from '../utils/emailService.js';
+import { validateCenterRegistration } from '../middleware/validation.js';
+import logger from "../utils/logger.js";
 
 const router = express.Router();
 
 // POST /api/register-center — public, no auth, no tenantMiddleware
-router.post('/', async (req, res) => {
+router.post('/', validateCenterRegistration, async (req, res) => {
   try {
     const { centerName, slug, adminEmail, password, phone, country,
             website, description, timezone, address, maxTeachers, maxStudents, plan } = req.body;
@@ -61,7 +63,7 @@ router.post('/', async (req, res) => {
         `,
       });
     } catch (e) {
-      console.error('Center registration email to applicant failed:', e.message);
+      logger.error('Center registration email to applicant failed:', { error: e?.message });
     }
 
     // Notification to super admin
@@ -82,14 +84,14 @@ router.post('/', async (req, res) => {
           `,
         });
       } catch (e) {
-        console.error('Center registration notification to super admin failed:', e.message);
+        logger.error('Center registration notification to super admin failed:', { error: e?.message });
       }
     }
 
     res.status(201).json({ success: true, message: 'Registration received. Your application is pending approval.' });
 
   } catch (err) {
-    console.error('❌ Center registration error:', err);
+    logger.error('❌ Center registration error:', { error: err?.message });
     res.status(500).json({ success: false, message: 'Server error', error: err.message });
   }
 });

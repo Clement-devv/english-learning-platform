@@ -5,6 +5,8 @@ import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
 import { verifyToken, verifyAdminOrTeacher } from "../middleware/authMiddleware.js";
+import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
+import logger from "../utils/logger.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
@@ -39,7 +41,7 @@ const upload = multer({
 });
 
 // ── POST /api/content/upload — teachers and admins only ─────────────────────
-router.post("/upload", verifyToken, verifyAdminOrTeacher, upload.single("pdf"), (req, res) => {
+router.post("/upload", tenantMiddleware, verifyToken, verifyAdminOrTeacher, upload.single("pdf"), (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ success: false, message: "No file uploaded" });
@@ -57,13 +59,13 @@ router.post("/upload", verifyToken, verifyAdminOrTeacher, upload.single("pdf"), 
       size: req.file.size,
     });
   } catch (err) {
-    console.error("Upload error:", err);
+    logger.error("Upload error:", { error: err?.message });
     res.status(500).json({ success: false, message: "Upload failed" });
   }
 });
 
 // ── GET /api/content/info/:bookingId — authenticated users only ─────────────
-router.get("/info/:bookingId", verifyToken, (req, res) => {
+router.get("/info/:bookingId", tenantMiddleware, verifyToken, (req, res) => {
   const { bookingId } = req.params;
 
   // Prevent path traversal
@@ -88,7 +90,7 @@ router.get("/info/:bookingId", verifyToken, (req, res) => {
 });
 
 // ── GET /api/content/file/:bookingId — authenticated users only ─────────────
-router.get("/file/:bookingId", verifyToken, (req, res) => {
+router.get("/file/:bookingId", tenantMiddleware, verifyToken, (req, res) => {
   const { bookingId } = req.params;
 
   // Prevent path traversal
@@ -108,7 +110,7 @@ router.get("/file/:bookingId", verifyToken, (req, res) => {
 });
 
 // ── DELETE /api/content/:bookingId — teachers and admins only ───────────────
-router.delete("/:bookingId", verifyToken, verifyAdminOrTeacher, (req, res) => {
+router.delete("/:bookingId", tenantMiddleware, verifyToken, verifyAdminOrTeacher, (req, res) => {
   const { bookingId } = req.params;
 
   // Prevent path traversal

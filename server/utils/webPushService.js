@@ -2,6 +2,7 @@
 // Wraps the web-push library. Call sendPush() anywhere on the server.
 
 import webpush from "web-push";
+import logger from "./logger.js";
 
 const { VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_EMAIL } = process.env;
 
@@ -11,9 +12,9 @@ if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
     VAPID_PUBLIC_KEY,
     VAPID_PRIVATE_KEY
   );
-  console.log("✅ Web Push (VAPID) configured");
+  logger.info("✅ Web Push (VAPID) configured");
 } else {
-  console.warn("⚠️  VAPID keys missing — web push notifications disabled");
+  logger.warn("⚠️  VAPID keys missing — web push notifications disabled");
 }
 
 export const VAPID_PUB = VAPID_PUBLIC_KEY || null;
@@ -32,7 +33,7 @@ export async function sendPush(subscription, payload) {
     if (err.statusCode === 410 || err.statusCode === 404) {
       throw Object.assign(err, { stale: true });
     }
-    console.error("Web push send error:", err.message);
+    logger.error("Web push send error:", { error: err?.message });
   }
 }
 

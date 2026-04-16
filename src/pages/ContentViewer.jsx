@@ -30,9 +30,11 @@ export default function ContentViewer({ bookingId, userRole, channelName }) {
   const [uploading,   setUploading]   = useState(false);
 
   // ── Drawing state (teacher only) ───────────────────────────────────────────
-  const [tool,      setTool]      = useState("pointer");
-  const [color,     setColor]     = useState("#e74c3c");
-  const [isDrawing, setIsDrawing] = useState(false);
+  const [tool,         setTool]        = useState("pointer");
+  const [color,        setColor]       = useState("#e74c3c");
+  const [isDrawing,    setIsDrawing]   = useState(false);
+  const [pageInput,    setPageInput]   = useState("");   // controlled value while editing
+  const [editingPage,  setEditingPage] = useState(false);
 
   // ── Refs ───────────────────────────────────────────────────────────────────
   const pdfCanvasRef        = useRef(null);
@@ -50,6 +52,11 @@ export default function ContentViewer({ bookingId, userRole, channelName }) {
   const pendingPageRef      = useRef(null);   // page received before PDF was loaded
   const loadPdfRef          = useRef(null);   // stable ref to latest loadPdf callback
   const renderPageRef       = useRef(null);   // imperative render fn — called directly by socket (like canvas drawing events)
+  const scaleRef            = useRef(1.3);    // mirrors scale state for socket callbacks
+  const annotationSaveTimer = useRef(null);   // debounce timer for saving annotation to DB
+  const lastAnnotationTs    = useRef(0);      // student: timestamp of last applied annotation
+  const strokesRef          = useRef({});     // teacher: per-page stroke paths { [pageNum]: [{tool,color,points}] }
+  const currentStrokeRef    = useRef(null);   // teacher: stroke currently being drawn
 
   // Keep refs in sync with state
   useEffect(() => { currentPageRef.current = currentPage; }, [currentPage]);
@@ -57,6 +64,7 @@ export default function ContentViewer({ bookingId, userRole, channelName }) {
   useEffect(() => { toolRef.current = tool; }, [tool]);
   useEffect(() => { colorRef.current = color; }, [color]);
   useEffect(() => { pdfDocRef.current = pdfDoc; }, [pdfDoc]);
+  useEffect(() => { scaleRef.current = scale; }, [scale]);
 
   // ── Socket.IO connection ───────────────────────────────────────────────────
   useEffect(() => {
@@ -64,20 +72,28 @@ export default function ContentViewer({ bookingId, userRole, channelName }) {
 
     const userId   = localStorage.getItem("userId") || "unknown";
     const userName = localStorage.getItem("name")   || "User";
+    const token    = localStorage.getItem("teacherToken") || localStorage.getItem("studentToken");
 
-    const socket = io(import.meta.env.VITE_SOCKET_URL || "http://localhost:5000");
+    const socket = io(import.meta.env.VITE_SOCKET_URL || "http://localhost:5000", {
+      auth:       { token },
+      transports: ["websocket"],
+    });
     socketRef.current = socket;
 
     socket.emit("join-whiteboard", { channelName, userId, userName, userRole });
 
     if (isTeacher) {
-      // When a student joins mid-session, push the current page to them so
-      // they land on the same page as the teacher immediately.
+      // When a student joins mid-session, push the current page and zoom so
+      // they land on the same view as the teacher immediately.
       socket.on("user-joined", () => {
         if (pdfDocRef.current && socketRef.current && channelName) {
           socketRef.current.emit("pdf-page-sync", {
             channelName,
             page: currentPageRef.current,
+          });
+          socketRef.current.emit("pdf-zoom-sync", {
+            channelName,
+            scale: scaleRef.current,
           });
         }
       });
@@ -114,6 +130,9 @@ export default function ContentViewer({ bookingId, userRole, channelName }) {
         ctx.globalAlpha = 1;
         ctx.globalCompositeOperation = "source-over";
         annotationsRef.current[page] = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        // Suppress DB-poll annotation re-apply for 3 s — we just got live socket data,
+        // no need for the poll to clear + redraw the same strokes and cause a flicker.
+        lastAnnotationTs.current = Date.now() + 3000;
       });
 
       socket.on("pdf-page-sync", ({ page }) => {
@@ -153,7 +172,13 @@ export default function ContentViewer({ bookingId, userRole, channelName }) {
       // Teacher uploaded a new PDF — reload it on the student side
       socket.on("pdf-uploaded", () => {
         pendingPageRef.current = null; // new PDF always starts at page 1
+        setScale(1.3);
         loadPdfRef.current?.();
+      });
+
+      // Teacher changed zoom — follow immediately
+      socket.on("pdf-zoom-sync", ({ scale: newScale }) => {
+        setScale(newScale);
       });
     }
 
@@ -193,6 +218,7 @@ export default function ContentViewer({ bookingId, userRole, channelName }) {
       setCurrentPage(startPage);
       setHasPdf(true);
       annotationsRef.current = {};
+      strokesRef.current = {};
     } catch (err) {
       console.error("PDF load error:", err);
       setUploadError(
@@ -283,13 +309,107 @@ export default function ContentViewer({ bookingId, userRole, channelName }) {
   }, [saveAnnotations, numPages]);
 
   // ── Teacher: broadcast current page whenever it changes ───────────────────
-  // Using a useEffect (rather than an inline emit inside goToPage) ensures the
-  // emit always fires with a fresh ref value — callbacks can capture stale
-  // closures, but effects always see the latest render state.
   useEffect(() => {
     if (!isTeacher || !hasPdf || !channelName || !socketRef.current) return;
     socketRef.current.emit("pdf-page-sync", { channelName, page: currentPage });
   }, [currentPage, isTeacher, hasPdf, channelName]);
+
+  // ── Teacher: broadcast zoom level whenever it changes ─────────────────────
+  useEffect(() => {
+    if (!isTeacher || !hasPdf || !channelName || !socketRef.current) return;
+    socketRef.current.emit("pdf-zoom-sync", { channelName, scale });
+  }, [scale, isTeacher, hasPdf, channelName]);
+
+  // ── Teacher: persist page + scale to DB (debounced 600 ms) ────────────────
+  // Gives the student poll a reliable source of truth independent of sockets.
+  const contentSaveTimerRef = useRef(null);
+  useEffect(() => {
+    if (!isTeacher || !hasPdf || !bookingId) return;
+    clearTimeout(contentSaveTimerRef.current);
+    contentSaveTimerRef.current = setTimeout(() => {
+      api.patch(`/classroom/session/${bookingId}/content-state`, { page: currentPage, scale })
+        .catch(() => {}); // silent — polling is best-effort
+    }, 600);
+    return () => clearTimeout(contentSaveTimerRef.current);
+  }, [currentPage, scale, isTeacher, hasPdf, bookingId]);
+
+  // ── Student: poll content-state every 1.5 s — mirrors page, zoom, annotations ──
+  useEffect(() => {
+    if (isTeacher || !bookingId) return;
+    let timer;
+
+    const applyAnnotation = (ann) => {
+      if (!ann || ann.ts <= lastAnnotationTs.current) return;
+      if (ann.page !== currentPageRef.current) return;
+      lastAnnotationTs.current = ann.ts;
+
+      const canvas = annotationCanvasRef.current;
+      if (!canvas) return;
+      const ctx = canvas.getContext("2d");
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      if (!ann.data || ann.data === "[]") {
+        // Cleared state — update cache and return
+        annotationsRef.current[ann.page] = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        return;
+      }
+
+      // Parse stroke-path JSON and re-draw each stroke
+      try {
+        const strokes = JSON.parse(ann.data);
+        for (const stroke of strokes) {
+          if (!stroke.points || stroke.points.length < 1) continue;
+          applyStrokeStyle(ctx, stroke.tool, stroke.color);
+          ctx.beginPath();
+          ctx.moveTo(stroke.points[0].x * canvas.width, stroke.points[0].y * canvas.height);
+          for (let i = 1; i < stroke.points.length; i++) {
+            ctx.lineTo(stroke.points[i].x * canvas.width, stroke.points[i].y * canvas.height);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(stroke.points[i].x * canvas.width, stroke.points[i].y * canvas.height);
+          }
+        }
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = "source-over";
+        // Cache for page re-renders
+        annotationsRef.current[ann.page] = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      } catch (_) {}
+    };
+
+    const poll = async () => {
+      try {
+        const { data } = await api.get(`/classroom/session/${bookingId}/content-state`);
+
+        // ── Page sync ───────────────────────────────────────────────────────
+        const pg = data?.contentPage;
+        if (pg && pg !== currentPageRef.current) {
+          const annCanvas = annotationCanvasRef.current;
+          if (annCanvas) {
+            const ctx = annCanvas.getContext("2d");
+            annotationsRef.current[currentPageRef.current] = ctx.getImageData(0, 0, annCanvas.width, annCanvas.height);
+          }
+          currentPageRef.current = pg;
+          setCurrentPage(pg);
+          renderPageRef.current?.(pg);
+          lastAnnotationTs.current = 0; // reset so annotation for new page is applied
+        }
+
+        // ── Scale sync ──────────────────────────────────────────────────────
+        const sc = data?.contentScale;
+        if (sc && Math.abs(sc - scaleRef.current) > 0.01) {
+          setScale(sc);
+        }
+
+        // ── Annotation sync ─────────────────────────────────────────────────
+        applyAnnotation(data?.contentAnnotation);
+
+      } catch (_) {}
+      timer = setTimeout(poll, 1500);
+    };
+
+    timer = setTimeout(poll, 1500);
+    return () => clearTimeout(timer);
+  }, [isTeacher, bookingId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Upload handler ─────────────────────────────────────────────────────────
   const handleFileSelect = async (e) => {
@@ -343,18 +463,26 @@ export default function ContentViewer({ bookingId, userRole, channelName }) {
     e.preventDefault();
     const canvas = annotationCanvasRef.current;
     if (!canvas) return;
-    const pos = getPos(e, canvas);
+    const pos  = getPos(e, canvas);
     const ctx  = canvas.getContext("2d");
+    const norm = getNormPos(pos, canvas);
 
     applyStrokeStyle(ctx, toolRef.current, colorRef.current);
     ctx.beginPath();
     ctx.moveTo(pos.x, pos.y);
     lastPosRef.current = pos;
+
+    // Begin recording this stroke's path for DB sync
+    currentStrokeRef.current = {
+      tool:   toolRef.current,
+      color:  colorRef.current,
+      points: [norm],
+    };
+
     setIsDrawing(true);
 
     // Emit to students
     if (socketRef.current && channelName) {
-      const norm = getNormPos(pos, canvas);
       socketRef.current.emit("pdf-stroke-start", {
         channelName,
         page: currentPageRef.current,
@@ -371,8 +499,9 @@ export default function ContentViewer({ bookingId, userRole, channelName }) {
     e.preventDefault();
     const canvas = annotationCanvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    const pos = getPos(e, canvas);
+    const ctx  = canvas.getContext("2d");
+    const pos  = getPos(e, canvas);
+    const norm = getNormPos(pos, canvas);
 
     ctx.lineTo(pos.x, pos.y);
     ctx.stroke();
@@ -380,9 +509,13 @@ export default function ContentViewer({ bookingId, userRole, channelName }) {
     ctx.moveTo(pos.x, pos.y);
     lastPosRef.current = pos;
 
+    // Accumulate points for DB sync
+    if (currentStrokeRef.current) {
+      currentStrokeRef.current.points.push(norm);
+    }
+
     // Emit to students
     if (socketRef.current && channelName) {
-      const norm = getNormPos(pos, canvas);
       socketRef.current.emit("pdf-stroke-move", {
         channelName,
         page: currentPageRef.current,
@@ -395,24 +528,43 @@ export default function ContentViewer({ bookingId, userRole, channelName }) {
   const stopDraw = useCallback(() => {
     if (!isTeacher || !isDrawingRef.current) return;
     const canvas = annotationCanvasRef.current;
+    const page   = currentPageRef.current;
+
     if (canvas) {
       const ctx = canvas.getContext("2d");
       ctx.globalAlpha = 1;
       ctx.globalCompositeOperation = "source-over";
-      // Save annotations
-      annotationsRef.current[currentPageRef.current] = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      // Save canvas state locally for page-switch restoration
+      annotationsRef.current[page] = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+      // Append completed stroke to per-page stroke list and persist as JSON
+      if (currentStrokeRef.current && currentStrokeRef.current.points.length > 0) {
+        if (!strokesRef.current[page]) strokesRef.current[page] = [];
+        strokesRef.current[page].push(currentStrokeRef.current);
+        currentStrokeRef.current = null;
+
+        const strokeJson = JSON.stringify(strokesRef.current[page]);
+        clearTimeout(annotationSaveTimer.current);
+        annotationSaveTimer.current = setTimeout(() => {
+          api.patch(`/classroom/session/${bookingId}/content-state`, {
+            annotation:     strokeJson,
+            annotationPage: page,
+          }).catch(() => {});
+        }, 300);
+      }
     }
+
     setIsDrawing(false);
     lastPosRef.current = null;
 
-    // Emit to students
+    // Emit to students via socket (best-effort — polling is the reliable path)
     if (socketRef.current && channelName) {
       socketRef.current.emit("pdf-stroke-end", {
         channelName,
-        page: currentPageRef.current,
+        page,
       });
     }
-  }, [isTeacher, channelName]);
+  }, [isTeacher, channelName, bookingId]);
 
   const clearAnnotations = () => {
     const canvas = annotationCanvasRef.current;
@@ -421,12 +573,21 @@ export default function ContentViewer({ bookingId, userRole, channelName }) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     annotationsRef.current[currentPage] = null;
 
-    // Emit to students
-    if (isTeacher && socketRef.current && channelName) {
-      socketRef.current.emit("pdf-clear-sync", {
-        channelName,
-        page: currentPage,
-      });
+    if (isTeacher) {
+      strokesRef.current[currentPage] = [];
+
+      // Persist cleared state to DB
+      if (bookingId) {
+        api.patch(`/classroom/session/${bookingId}/content-state`, {
+          annotation:     "[]",
+          annotationPage: currentPage,
+        }).catch(() => {});
+      }
+
+      // Also emit via socket (best-effort)
+      if (socketRef.current && channelName) {
+        socketRef.current.emit("pdf-clear-sync", { channelName, page: currentPage });
+      }
     }
   };
 
@@ -487,7 +648,7 @@ export default function ContentViewer({ bookingId, userRole, channelName }) {
       {/* ── Toolbar ──────────────────────────────────────────────────────── */}
       <div className="flex-shrink-0 bg-white border-b border-gray-200 px-3 py-2 flex flex-wrap items-center gap-2 shadow-sm">
 
-        {/* Page navigation — teachers can flip pages; students follow automatically */}
+        {/* Page navigation */}
         <div className="flex items-center gap-1">
           {isTeacher && (
             <button
@@ -496,9 +657,45 @@ export default function ContentViewer({ bookingId, userRole, channelName }) {
               className="p-1.5 rounded-lg hover:bg-gray-100 disabled:opacity-40 transition-all"
             ><ChevronLeft className="w-4 h-4" /></button>
           )}
-          <span className="text-sm font-medium text-gray-700 min-w-[4rem] text-center">
-            {currentPage} / {numPages}
-          </span>
+
+          {/* Editable page number — click to type, Enter or blur to jump */}
+          <div className="flex items-center gap-1 text-sm font-medium text-gray-700">
+            {editingPage && isTeacher ? (
+              <input
+                autoFocus
+                type="number"
+                min={1}
+                max={numPages}
+                value={pageInput}
+                onChange={e => setPageInput(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === "Enter") {
+                    const n = parseInt(pageInput, 10);
+                    if (!isNaN(n)) goToPage(n);
+                    setEditingPage(false);
+                  }
+                  if (e.key === "Escape") setEditingPage(false);
+                }}
+                onBlur={() => {
+                  const n = parseInt(pageInput, 10);
+                  if (!isNaN(n)) goToPage(n);
+                  setEditingPage(false);
+                }}
+                className="w-10 text-center border border-purple-400 rounded-md px-1 py-0.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
+                style={{ MozAppearance: "textfield" }}
+              />
+            ) : (
+              <span
+                onClick={() => { if (isTeacher) { setPageInput(String(currentPage)); setEditingPage(true); } }}
+                title={isTeacher ? "Click to jump to page" : undefined}
+                className={`min-w-[2rem] text-center px-1 py-0.5 rounded ${isTeacher ? "cursor-pointer hover:bg-purple-100 hover:text-purple-700" : ""}`}
+              >
+                {currentPage}
+              </span>
+            )}
+            <span className="text-gray-400">/ {numPages}</span>
+          </div>
+
           {isTeacher && (
             <button
               onClick={() => goToPage(currentPage + 1)}
@@ -510,18 +707,22 @@ export default function ContentViewer({ bookingId, userRole, channelName }) {
 
         <div className="w-px h-5 bg-gray-200" />
 
-        {/* Zoom */}
-        <div className="flex items-center gap-1">
-          <button onClick={() => setScale(s => Math.max(0.6, +(s - 0.2).toFixed(1)))}
-            className="p-1.5 rounded-lg hover:bg-gray-100 transition-all">
-            <ZoomOut className="w-4 h-4" />
-          </button>
-          <span className="text-xs font-medium text-gray-600 w-10 text-center">{Math.round(scale * 100)}%</span>
-          <button onClick={() => setScale(s => Math.min(3, +(s + 0.2).toFixed(1)))}
-            className="p-1.5 rounded-lg hover:bg-gray-100 transition-all">
-            <ZoomIn className="w-4 h-4" />
-          </button>
-        </div>
+        {/* Zoom — teacher controls zoom; students follow automatically */}
+        {isTeacher ? (
+          <div className="flex items-center gap-1">
+            <button onClick={() => setScale(s => Math.max(0.6, +(s - 0.2).toFixed(1)))}
+              className="p-1.5 rounded-lg hover:bg-gray-100 transition-all">
+              <ZoomOut className="w-4 h-4" />
+            </button>
+            <span className="text-xs font-medium text-gray-600 w-10 text-center">{Math.round(scale * 100)}%</span>
+            <button onClick={() => setScale(s => Math.min(3, +(s + 0.2).toFixed(1)))}
+              className="p-1.5 rounded-lg hover:bg-gray-100 transition-all">
+              <ZoomIn className="w-4 h-4" />
+            </button>
+          </div>
+        ) : (
+          <span className="text-xs font-medium text-gray-400 w-10 text-center">{Math.round(scale * 100)}%</span>
+        )}
 
         {/* Teacher-only tools */}
         {isTeacher && (

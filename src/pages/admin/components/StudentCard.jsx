@@ -137,6 +137,7 @@ export default function StudentCard({
   onViewLessons,
   onResetPassword,
   onCopyPassword,
+  onResendInvite,
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -204,13 +205,20 @@ export default function StudentCard({
 
             {/* Name + email */}
             <div className="min-w-0">
-              <h3
-                className={`font-semibold text-sm leading-tight truncate ${
-                  isDarkMode ? "text-white" : "text-gray-900"
-                }`}
-              >
-                {fullName || "Unnamed Student"}
-              </h3>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3
+                  className={`font-semibold text-sm leading-tight truncate ${
+                    isDarkMode ? "text-white" : "text-gray-900"
+                  }`}
+                >
+                  {fullName || "Unnamed Student"}
+                </h3>
+                {student.status === "pending" && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-700 border border-amber-300 flex-shrink-0">
+                    ⏳ Pending Setup
+                  </span>
+                )}
+              </div>
               <p
                 className={`text-xs truncate flex items-center gap-1 mt-0.5 ${
                   isDarkMode ? "text-gray-400" : "text-gray-500"
@@ -317,6 +325,16 @@ export default function StudentCard({
                   isDarkMode={isDarkMode}
                   onClick={() => { downloadStudentCard(student); setMenuOpen(false); }}
                 />
+
+                {student.status === "pending" && (
+                  <DropdownItem
+                    icon={Mail}
+                    label="Resend Invite"
+                    color="blue"
+                    isDarkMode={isDarkMode}
+                    onClick={() => { onResendInvite(); setMenuOpen(false); }}
+                  />
+                )}
 
                 <div className={`my-1 h-px ${isDarkMode ? "bg-gray-700" : "bg-gray-100"}`} />
 

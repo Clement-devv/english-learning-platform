@@ -7,6 +7,7 @@ import { bookingSchema }          from "../schemas/bookingSchema.js";
 import { recurringPatternSchema } from "../schemas/recurringPatternSchema.js";
 import { studentSchema }          from "../schemas/studentSchema.js";
 import { teacherSchema }          from "../schemas/teacherSchema.js";
+import logger from "../utils/logger.js";
 
 const router = express.Router();
 router.use(tenantMiddleware);
@@ -23,7 +24,7 @@ const generateRecurringDates = (startDate, frequency, occurrences, daysOfWeek = 
   const dates = [];
   let currentDate = new Date(startDate);
 
-  console.log(`📅 Generating ${occurrences} dates with frequency: ${frequency}`);
+  logger.info(`📅 Generating ${occurrences} dates with frequency: ${frequency}`);
 
   try {
     switch (frequency) {
@@ -76,11 +77,11 @@ const generateRecurringDates = (startDate, frequency, occurrences, daysOfWeek = 
         throw new Error(`Invalid frequency: ${frequency}`);
     }
 
-    console.log(`✅ Generated ${dates.length} dates`);
+    logger.info(`✅ Generated ${dates.length} dates`);
     return dates.sort((a, b) => a - b);
 
   } catch (error) {
-    console.error("❌ Error generating dates:", error);
+    logger.error("❌ Error generating dates:", { error: error?.message });
     throw error;
   }
 };
@@ -92,9 +93,9 @@ const generateRecurringDates = (startDate, frequency, occurrences, daysOfWeek = 
  */
 router.post("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
   try {
-    console.log("📥 Recurring booking request received");
-    console.log("Request body:", JSON.stringify(req.body, null, 2));
-    console.log("User:", req.user);
+    logger.info("📥 Recurring booking request received");
+    logger.info("Request body:", JSON.stringify(req.body, null, 2));
+    logger.info("User:", req.user);
 
     const {
       teacherId,
@@ -111,10 +112,10 @@ router.post("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
     } = req.body;
 
     // === VALIDATION ===
-    console.log("🔍 Validating request...");
+    logger.info("🔍 Validating request...");
 
     if (!teacherId || !studentId || !classTitle || !startTime || !frequency) {
-      console.error("❌ Missing required fields");
+      logger.error("❌ Missing required fields");
       return res.status(400).json({
         success: false,
         message: "Teacher, student, class title, start time, and frequency are required",
@@ -129,7 +130,7 @@ router.post("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
     }
 
     if (!occurrences && !endDate) {
-      console.error("❌ Missing occurrences or endDate");
+      logger.error("❌ Missing occurrences or endDate");
       return res.status(400).json({
         success: false,
         message: "Either occurrences or end date must be specified"
@@ -153,7 +154,7 @@ router.post("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
     }
 
     // === VERIFY TEACHER AND STUDENT ===
-    console.log("🔍 Verifying teacher and student...");
+    logger.info("🔍 Verifying teacher and student...");
 
     const [teacher, student] = await Promise.all([
       getTeacher(req.db).findById(teacherId),
@@ -161,17 +162,17 @@ router.post("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
     ]);
 
     if (!teacher) {
-      console.error(`❌ Teacher not found: ${teacherId}`);
+      logger.error(`❌ Teacher not found: ${teacherId}`);
       return res.status(404).json({ success: false, message: "Teacher not found", teacherId });
     }
 
     if (!student) {
-      console.error(`❌ Student not found: ${studentId}`);
+      logger.error(`❌ Student not found: ${studentId}`);
       return res.status(404).json({ success: false, message: "Student not found", studentId });
     }
 
-    console.log(`✅ Teacher: ${teacher.firstName} ${teacher.lastName}`);
-    console.log(`✅ Student: ${student.firstName} ${student.surname}`);
+    logger.info(`✅ Teacher: ${teacher.firstName} ${teacher.lastName}`);
+    logger.info(`✅ Student: ${student.firstName} ${student.surname}`);
 
     // === CALCULATE OCCURRENCES ===
     let finalOccurrences = occurrences;
@@ -186,7 +187,7 @@ router.post("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
         case 'biweekly': finalOccurrences = Math.ceil(daysDiff / 14); break;
         case 'monthly':  finalOccurrences = Math.ceil(daysDiff / 30); break;
       }
-      console.log(`📊 Calculated occurrences from endDate: ${finalOccurrences}`);
+      logger.info(`📊 Calculated occurrences from endDate: ${finalOccurrences}`);
     }
 
     if (finalOccurrences < 2 || finalOccurrences > 100) {
@@ -197,7 +198,7 @@ router.post("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
     }
 
     // === CHECK STUDENT CLASSES ===
-    console.log(`🔍 Checking student classes: ${student.noOfClasses} available`);
+    logger.info(`🔍 Checking student classes: ${student.noOfClasses} available`);
     if (student.noOfClasses < finalOccurrences) {
       return res.status(400).json({
         success: false,
@@ -206,14 +207,14 @@ router.post("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
     }
 
     // === GENERATE DATES ===
-    console.log("📅 Generating booking dates...");
+    logger.info("📅 Generating booking dates...");
     const bookingDates = generateRecurringDates(parsedStartTime, frequency, finalOccurrences, daysOfWeek);
 
     if (bookingDates.length === 0) {
       return res.status(500).json({ success: false, message: "Failed to generate booking dates" });
     }
 
-    console.log(`✅ Generated ${bookingDates.length} booking dates`);
+    logger.info(`✅ Generated ${bookingDates.length} booking dates`);
 
     // === DETERMINE CREATOR INFO ===
     const isAdmin   = req.user.role === 'admin';
@@ -222,10 +223,10 @@ router.post("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
     const createdByModel  = isAdmin ? "Admin" : "Teacher";
     const bookingCreatedBy = isAdmin ? "admin" : "teacher";
 
-    console.log(`👤 Created by: ${createdByModel} (${req.user.id})`);
+    logger.info(`👤 Created by: ${createdByModel} (${req.user.id})`);
 
     // === CREATE RECURRING PATTERN ===
-    console.log("📝 Creating recurring pattern record...");
+    logger.info("📝 Creating recurring pattern record...");
 
     const recurringPattern = await getRecurringPattern(req.db).create({
       teacherId,
@@ -243,16 +244,16 @@ router.post("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
       status: "active"
     });
 
-    console.log(`✅ Recurring pattern created: ${recurringPattern._id}`);
+    logger.info(`✅ Recurring pattern created: ${recurringPattern._id}`);
 
     // === CREATE INDIVIDUAL BOOKINGS (with transaction if replica set) ===
-    console.log("📝 Creating individual bookings...");
+    logger.info("📝 Creating individual bookings...");
 
     let useTransactions = true;
     try {
       await req.db.db.admin().command({ replSetGetStatus: 1 });
     } catch (error) {
-      console.warn("⚠️ MongoDB is not running as a replica set. Transactions disabled.");
+      logger.warn("⚠️ MongoDB is not running as a replica set. Transactions disabled.");
       useTransactions = false;
     }
 
@@ -299,7 +300,7 @@ router.post("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
         }
 
         bookings.push(booking);
-        console.log(`  ✓ Booking ${i + 1}/${finalOccurrences} created`);
+        logger.info(`  ✓ Booking ${i + 1}/${finalOccurrences} created`);
       }
 
       recurringPattern.bookingIds = bookings.map(b => b._id);
@@ -311,7 +312,7 @@ router.post("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
         await recurringPattern.save();
       }
 
-      console.log(`✅ All bookings created and linked to pattern`);
+      logger.info(`✅ All bookings created and linked to pattern`);
 
       // === SEND EMAIL NOTIFICATION (Admin bookings only) ===
       if (isAdmin) {
@@ -321,13 +322,13 @@ router.post("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
             ...firstBooking.toObject(),
             notes: `Recurring class: ${frequency} for ${finalOccurrences} sessions. ${notes || ''}`
           }, req.center?.centerName || "");
-          console.log(`📧 Email notification sent to ${teacher.email}`);
+          logger.info(`📧 Email notification sent to ${teacher.email}`);
         } catch (emailError) {
-          console.error("📧 Email notification failed:", emailError.message);
+          logger.error("📧 Email notification failed:", emailError.message);
         }
       }
 
-      console.log(`✅ Successfully created ${bookings.length} recurring bookings`);
+      logger.info(`✅ Successfully created ${bookings.length} recurring bookings`);
 
       res.status(201).json({
         success: true,
@@ -351,8 +352,7 @@ router.post("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
     }
 
   } catch (err) {
-    console.error("❌ Error creating recurring bookings:", err);
-    console.error("Stack trace:", err.stack);
+    logger.error("❌ Error creating recurring bookings:", { error: err?.message, stack: err?.stack });
     res.status(500).json({
       success: false,
       message: "Error creating recurring bookings",
@@ -381,7 +381,7 @@ router.get("/", verifyToken, async (req, res) => {
 
     res.json({ success: true, patterns, count: patterns.length });
   } catch (err) {
-    console.error("❌ Error fetching recurring patterns:", err);
+    logger.error("❌ Error fetching recurring patterns:", { error: err?.message });
     res.status(500).json({ success: false, message: "Error fetching recurring patterns", error: err.message });
   }
 });
@@ -410,7 +410,7 @@ router.get("/:id", verifyToken, async (req, res) => {
 
     res.json({ success: true, pattern });
   } catch (err) {
-    console.error("❌ Error fetching recurring pattern:", err);
+    logger.error("❌ Error fetching recurring pattern:", { error: err?.message });
     res.status(500).json({ success: false, message: "Error fetching recurring pattern", error: err.message });
   }
 });
@@ -482,7 +482,7 @@ router.patch("/:id/cancel", verifyToken, verifyAdminOrTeacher, async (req, res) 
 
       if (useTransactions) await session.commitTransaction();
 
-      console.log(`🚫 Cancelled recurring pattern ${pattern._id}`);
+      logger.info(`🚫 Cancelled recurring pattern ${pattern._id}`);
 
       res.json({ success: true, message: "Recurring pattern cancelled successfully", pattern });
 
@@ -494,7 +494,7 @@ router.patch("/:id/cancel", verifyToken, verifyAdminOrTeacher, async (req, res) 
     }
 
   } catch (err) {
-    console.error("❌ Error cancelling recurring pattern:", err);
+    logger.error("❌ Error cancelling recurring pattern:", { error: err?.message });
     res.status(500).json({ success: false, message: "Error cancelling recurring pattern", error: err.message });
   }
 });
@@ -533,7 +533,7 @@ router.delete("/:id", verifyToken, verifyAdmin, async (req, res) => {
 
       if (useTransactions) await session.commitTransaction();
 
-      console.log(`🗑️ Deleted recurring pattern ${pattern._id} and all bookings`);
+      logger.info(`🗑️ Deleted recurring pattern ${pattern._id} and all bookings`);
 
       res.json({ success: true, message: "Recurring pattern and all bookings deleted successfully" });
 
@@ -545,7 +545,7 @@ router.delete("/:id", verifyToken, verifyAdmin, async (req, res) => {
     }
 
   } catch (err) {
-    console.error("❌ Error deleting recurring pattern:", err);
+    logger.error("❌ Error deleting recurring pattern:", { error: err?.message });
     res.status(500).json({ success: false, message: "Error deleting recurring pattern", error: err.message });
   }
 });

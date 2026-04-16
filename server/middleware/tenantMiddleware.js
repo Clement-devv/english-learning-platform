@@ -1,6 +1,7 @@
 // @ts-check
 import Center from '../models/master/Center.js';
 import { getDb } from '../config/dbManager.js';
+import logger from "../utils/logger.js";
 
 /**
  * Resolves the center from subdomain or custom domain.
@@ -52,7 +53,7 @@ export const tenantMiddleware = async (req, res, next) => {
     req.db = await getDb(center.slug);
     next();
   } catch (err) {
-    console.error('Tenant middleware error:', err);
+    logger.error('Tenant middleware error:', { error: err?.message });
     res.status(500).json({ success: false, message: 'Tenant resolution failed' });
   }
 };

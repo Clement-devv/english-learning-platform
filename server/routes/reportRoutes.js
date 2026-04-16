@@ -14,6 +14,7 @@ import { generateProgressReport } from "../utils/progressReportGenerator.js";
 import { sendProgressReport }     from "../utils/emailService.js";
 import { studentSchema } from "../schemas/studentSchema.js";
 import { bookingSchema } from "../schemas/bookingSchema.js";
+import logger from "../utils/logger.js";
 
 const router = express.Router();
 router.use(tenantMiddleware);
@@ -85,7 +86,7 @@ router.get(
       );
       res.send(pdf);
     } catch (err) {
-      console.error("Report preview error:", err);
+      logger.error("Report preview error:", { error: err?.message });
       res.status(500).json({ error: err.message });
     }
   }
@@ -114,7 +115,7 @@ router.post(
         res.status(500).json({ error: result.error });
       }
     } catch (err) {
-      console.error("Report send error:", err);
+      logger.error("Report send error:", { error: err?.message });
       res.status(500).json({ error: err.message });
     }
   }

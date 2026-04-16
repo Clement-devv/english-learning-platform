@@ -5,6 +5,7 @@ import { tenantMiddleware }    from "../middleware/tenantMiddleware.js";
 import { vocabListSchema }     from "../schemas/vocabListSchema.js";
 import { vocabProgressSchema } from "../schemas/vocabProgressSchema.js";
 import { recordActivity } from "../utils/streakService.js";
+import logger from "../utils/logger.js";
 
 const router = express.Router();
 router.use(tenantMiddleware);
@@ -63,7 +64,7 @@ router.get("/lists", verifyToken, async (req, res) => {
 
     res.status(403).json({ success: false, message: "Access denied" });
   } catch (err) {
-    console.error("GET /vocab/lists:", err);
+    logger.error("GET /vocab/lists:", { error: err?.message });
     res.status(500).json({ success: false, message: err.message });
   }
 });
@@ -82,7 +83,7 @@ router.post("/lists", verifyToken, async (req, res) => {
     const list = await getVocabList(req.db).create({ title: title.trim(), description: description?.trim() || "", teacherId, words });
     res.status(201).json({ success: true, list });
   } catch (err) {
-    console.error("POST /vocab/lists:", err);
+    logger.error("POST /vocab/lists:", { error: err?.message });
     res.status(500).json({ success: false, message: err.message });
   }
 });
@@ -104,7 +105,7 @@ router.put("/lists/:id", verifyToken, async (req, res) => {
     await list.save();
     res.json({ success: true, list });
   } catch (err) {
-    console.error("PUT /vocab/lists/:id:", err);
+    logger.error("PUT /vocab/lists/:id:", { error: err?.message });
     res.status(500).json({ success: false, message: err.message });
   }
 });
@@ -121,7 +122,7 @@ router.delete("/lists/:id", verifyToken, async (req, res) => {
     await getVocabProgress(req.db).deleteMany({ listId: req.params.id });
     res.json({ success: true, message: "List deleted" });
   } catch (err) {
-    console.error("DELETE /vocab/lists/:id:", err);
+    logger.error("DELETE /vocab/lists/:id:", { error: err?.message });
     res.status(500).json({ success: false, message: err.message });
   }
 });
@@ -151,7 +152,7 @@ router.post("/lists/:id/assign", verifyToken, async (req, res) => {
       .populate("assignedTo.studentId", "firstName surname email");
     res.json({ success: true, list: updated });
   } catch (err) {
-    console.error("POST /vocab/lists/:id/assign:", err);
+    logger.error("POST /vocab/lists/:id/assign:", { error: err?.message });
     res.status(500).json({ success: false, message: err.message });
   }
 });
@@ -211,7 +212,7 @@ router.get("/due", verifyToken, async (req, res) => {
 
     res.json({ success: true, cards });
   } catch (err) {
-    console.error("GET /vocab/due:", err);
+    logger.error("GET /vocab/due:", { error: err?.message });
     res.status(500).json({ success: false, message: err.message });
   }
 });
@@ -249,7 +250,7 @@ router.post("/review", verifyToken, async (req, res) => {
 
     res.json({ success: true, nextReviewDate: prog.nextReviewDate, interval: prog.interval, streak: streakResult });
   } catch (err) {
-    console.error("POST /vocab/review:", err);
+    logger.error("POST /vocab/review:", { error: err?.message });
     res.status(500).json({ success: false, message: err.message });
   }
 });
@@ -279,7 +280,7 @@ router.get("/stats", verifyToken, async (req, res) => {
 
     res.json({ success: true, stats });
   } catch (err) {
-    console.error("GET /vocab/stats:", err);
+    logger.error("GET /vocab/stats:", { error: err?.message });
     res.status(500).json({ success: false, message: err.message });
   }
 });

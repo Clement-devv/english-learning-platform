@@ -8,6 +8,7 @@ import { teacherSchema }            from "../schemas/teacherSchema.js";
 import { paymentTransactionSchema } from "../schemas/paymentTransactionSchema.js";
 import { classroomSessionSchema }   from "../schemas/classroomSessionSchema.js";
 import { recordActivity, recordClassCompletion } from "../utils/streakService.js";
+import logger from "../utils/logger.js";
 
 const getBooking            = (db) => db.models.Booking            || db.model("Booking",            bookingSchema);
 const getStudent            = (db) => db.models.Student            || db.model("Student",            studentSchema);
@@ -136,7 +137,7 @@ export async function completeClass(db, bookingId, markedBy = "system", options 
       await session.save();
     }
 
-    console.log(`[ClassCompletion] Booking ${bookingId} MISSED. ${missedBooking.missedReason}`);
+    logger.info(`[ClassCompletion] Booking ${bookingId} MISSED. ${missedBooking.missedReason}`);
 
     return {
       success:   true,
@@ -204,16 +205,15 @@ export async function completeClass(db, bookingId, markedBy = "system", options 
       );
     }
 
-    console.log(
-      `[ClassCompletion] "${claimedBooking.classTitle}" (${bookingId})\n` +
-      `   Teacher : ${teacher.firstName} ${teacher.lastName} → +$${ratePerClass} (total $${newEarned})\n` +
-      `   Student : ${student.firstName} ${student.surname} → credits left: ${newClassCount}`
-    );
+    logger.info(`[ClassCompletion] "${claimedBooking.classTitle}" (${bookingId})`, {
+      teacher: `${teacher.firstName} ${teacher.lastName}`, earned: newEarned,
+      student: `${student.firstName} ${student.surname}`, creditsLeft: newClassCount,
+    });
 
     // Fire-and-forget streak updates — never block completion
     const sid = String(studentId);
-    recordActivity(db, sid).catch((e) => console.error("[Streak] recordActivity error:", e.message));
-    recordClassCompletion(db, sid).catch((e) => console.error("[Streak] recordClassCompletion error:", e.message));
+    recordActivity(db, sid).catch((e) => logger.error("[Streak] recordActivity error:", { error: e?.message }));
+    recordClassCompletion(db, sid).catch((e) => logger.error("[Streak] recordClassCompletion error:", { error: e?.message }));
 
     return {
       success:                 true,
@@ -235,13 +235,12 @@ export async function completeClass(db, bookingId, markedBy = "system", options 
         { _id: bookingId, status: "processing" },
         { $set: { status: "accepted" } }
       );
-      console.warn(`[ClassCompletion] Error on ${bookingId}, reset to "accepted". Error: ${err.message}`);
+      logger.warn(`[ClassCompletion] Error on ${bookingId}, reset to "accepted". Error: ${err.message}`);
     } catch (resetErr) {
-      console.error(
-        `CRITICAL: Could not reset booking ${bookingId} after error!\n` +
-        `   Error        : ${err.message}\n` +
-        `   Reset error  : ${resetErr.message}\n` +
-        `   FIX: db.bookings.updateOne({_id: ObjectId("${bookingId}")}, {$set:{status:"accepted"}})`
+      logger.error(
+        `CRITICAL: Could not reset booking ${bookingId} after error!`,
+        { originalError: err.message, resetError: resetErr.message,
+          fix: `db.bookings.updateOne({_id:ObjectId("${bookingId}")},{$set:{status:"accepted"}})` }
       );
     }
 

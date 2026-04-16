@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { encryptField, decryptField } from '../utils/encryption.js';
 
 const sessionSchema = new mongoose.Schema({
   token: { type: String, required: true },
@@ -58,10 +59,10 @@ export const teacherSchema = new mongoose.Schema({
   deletionWarningEmailSent: { type: Boolean, default: false },
   photo:       { type: String, default: "" },
   displayName: { type: String, default: "" },
-  bankName:      { type: String, default: "" },
-  accountNumber: { type: String, default: "" },
-  accountName:   { type: String, default: "" },
-}, { timestamps: true });
+  bankName:      { type: String, default: "", set: encryptField, get: decryptField },
+  accountNumber: { type: String, default: "", set: encryptField, get: decryptField },
+  accountName:   { type: String, default: "", set: encryptField, get: decryptField },
+}, { timestamps: true, toJSON: { getters: true }, toObject: { getters: true } });
 
 // Lookup by status (admin lists active/pending/suspended teachers)
 teacherSchema.index({ status: 1 });

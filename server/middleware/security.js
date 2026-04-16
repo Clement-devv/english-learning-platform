@@ -1,7 +1,33 @@
 // middleware/security.js
+//
+// CSRF POSTURE: This API authenticates exclusively via JWT Bearer tokens sent
+// in the Authorization header. Browsers never automatically attach Authorization
+// headers to cross-site requests, so CSRF tokens are not required. Any cookies
+// set elsewhere (e.g. refresh tokens) MUST use SameSite=Strict + Secure + HttpOnly.
 import helmet from "helmet";
 import { sanitize as mongoSanitizeValue } from "express-mongo-sanitize";
-import { clean as xssClean } from "xss-clean/lib/xss.js";
+
+// Inline XSS sanitizer — replaces the abandoned xss-clean package.
+// Strips <script> blocks, event-handler attributes, and dangerous URI schemes
+// without encoding benign HTML (which would corrupt stored content).
+const XSS_PATTERNS = [
+  /<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi,
+  /on\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]*)/gi,
+  /javascript\s*:/gi,
+  /vbscript\s*:/gi,
+  /data\s*:\s*text\/html/gi,
+];
+
+function xssClean(value) {
+  if (typeof value === 'string') {
+    return XSS_PATTERNS.reduce((str, pattern) => str.replace(pattern, ''), value);
+  }
+  if (Array.isArray(value)) return value.map(xssClean);
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, xssClean(v)]));
+  }
+  return value;
+}
 
 /**
  * Security headers middleware
@@ -28,6 +54,9 @@ export const securityHeaders = helmet({
       frameSrc: ["'none'"],
       workerSrc: ["'self'", "blob:"],
       upgradeInsecureRequests: [],
+      // CSP violation reports — update this URL once you have a reporting endpoint
+      // (e.g. /api/v1/csp-report, or a third-party service like report-uri.com)
+      reportUri: ["/api/v1/csp-report"],
     },
   },
   hsts: {
@@ -129,7 +158,7 @@ export const parameterPollutionProtection = (req, res, next) => {
  * Prevents DoS attacks via large payloads
  */
 export const requestLimits = {
-  json: { limit: '10kb' },
+  json: { limit: '2mb' },
   urlencoded: { extended: true, limit: '10kb', parameterLimit: 50 }
 };
 

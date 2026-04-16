@@ -14,6 +14,7 @@ import { recordingSchema }            from "../schemas/recordingSchema.js";
 import { reviewSchema }               from "../schemas/reviewSchema.js";
 import { notificationSchema }         from "../schemas/notificationSchema.js";
 import { paymentTransactionSchema }   from "../schemas/paymentTransactionSchema.js";
+import logger from "../utils/logger.js";
 
 const router = express.Router();
 router.use(tenantMiddleware);
@@ -93,7 +94,7 @@ router.get("/overview", verifyToken, requireSubAdmin, async (req, res) => {
       },
     });
   } catch (err) {
-    console.error("Sub-admin overview error:", err);
+    logger.error("Sub-admin overview error:", { error: err?.message });
     res.status(500).json({ success: false, message: "Failed to load overview" });
   }
 });
@@ -122,7 +123,7 @@ router.get("/teachers", verifyToken, requireSubAdmin, async (req, res) => {
 
     res.json({ success: true, teachers: enriched, total: enriched.length });
   } catch (err) {
-    console.error("Sub-admin teachers error:", err);
+    logger.error("Sub-admin teachers error:", { error: err?.message });
     res.status(500).json({ success: false, message: "Failed to load teachers" });
   }
 });
@@ -162,7 +163,7 @@ router.get("/students", verifyToken, requireSubAdmin, async (req, res) => {
     const students = Array.from(studentMap.values());
     res.json({ success: true, students, total: students.length });
   } catch (err) {
-    console.error("Sub-admin students error:", err);
+    logger.error("Sub-admin students error:", { error: err?.message });
     res.status(500).json({ success: false, message: "Failed to load students" });
   }
 });
@@ -190,7 +191,7 @@ router.get("/bookings", verifyToken, requireSubAdmin, async (req, res) => {
 
     res.json({ success: true, bookings, total: bookings.length });
   } catch (err) {
-    console.error("Sub-admin bookings error:", err);
+    logger.error("Sub-admin bookings error:", { error: err?.message });
     res.status(500).json({ success: false, message: "Failed to load bookings" });
   }
 });
@@ -204,7 +205,7 @@ router.get("/me", verifyToken, requireSubAdmin, async (req, res) => {
 
     res.json({ success: true, subAdmin });
   } catch (err) {
-    console.error("Sub-admin me error:", err);
+    logger.error("Sub-admin me error:", { error: err?.message });
     res.status(500).json({ success: false, message: "Failed to load profile" });
   }
 });
@@ -231,7 +232,7 @@ router.get("/classes", verifyToken, requireSubAdmin, async (req, res) => {
 
     res.json({ success: true, bookings, total: bookings.length });
   } catch (err) {
-    console.error("Sub-admin classes error:", err);
+    logger.error("Sub-admin classes error:", { error: err?.message });
     res.status(500).json({ success: false, message: "Failed to load classes" });
   }
 });
@@ -275,11 +276,11 @@ router.post("/classes/mark", verifyToken, requireSubAdmin, async (req, res) => {
       subAdminId:  req.subAdmin._id,
       subAdminName,
       metadata: { bookingId, teacherName, studentName, classTitle: result.booking?.classTitle || "" },
-    }).catch((e) => console.error("Failed to save mark-class notification:", e));
+    }).catch((e) => logger.error("Failed to save mark-class notification:", { error: e?.message }));
 
     res.json({ success: true, message: "Lesson marked as completed.", ...result });
   } catch (err) {
-    console.error("Sub-admin mark class error:", err);
+    logger.error("Sub-admin mark class error:", { error: err?.message });
     res.status(500).json({ success: false, message: "Error marking lesson: " + err.message });
   }
 });
@@ -336,11 +337,11 @@ router.post("/classes/unmark", verifyToken, requireSubAdmin, async (req, res) =>
       subAdminId:  req.subAdmin._id,
       subAdminName,
       metadata: { bookingId, teacherName, studentName, classTitle: booking.classTitle || "" },
-    }).catch((e) => console.error("Failed to save unmark notification:", e));
+    }).catch((e) => logger.error("Failed to save unmark notification:", { error: e?.message }));
 
     res.json({ success: true, message: "Class reverted to accepted." });
   } catch (err) {
-    console.error("Sub-admin unmark class error:", err);
+    logger.error("Sub-admin unmark class error:", { error: err?.message });
     res.status(500).json({ success: false, message: "Error unmarking class: " + err.message });
   }
 });
@@ -379,7 +380,7 @@ router.get("/payments", verifyToken, requireSubAdmin, async (req, res) => {
 
     res.json({ success: true, payments, summary: Object.values(summary), total: payments.length });
   } catch (err) {
-    console.error("Sub-admin payments error:", err);
+    logger.error("Sub-admin payments error:", { error: err?.message });
     res.status(500).json({ success: false, message: "Failed to load payments" });
   }
 });
@@ -404,7 +405,7 @@ router.get("/recordings", verifyToken, requireSubAdmin, async (req, res) => {
 
     res.json({ success: true, recordings, total: recordings.length });
   } catch (err) {
-    console.error("Sub-admin recordings error:", err);
+    logger.error("Sub-admin recordings error:", { error: err?.message });
     res.status(500).json({ success: false, message: "Failed to load recordings" });
   }
 });
@@ -455,7 +456,7 @@ router.get("/reports", verifyToken, requireSubAdmin, async (req, res) => {
       total: completed.length,
     });
   } catch (err) {
-    console.error("Sub-admin reports error:", err);
+    logger.error("Sub-admin reports error:", { error: err?.message });
     res.status(500).json({ success: false, message: "Failed to load reports" });
   }
 });
@@ -492,7 +493,7 @@ router.get("/reviews", verifyToken, requireSubAdmin, async (req, res) => {
 
     res.json({ success: true, reviews, teacherRatings, total: reviews.length });
   } catch (err) {
-    console.error("Sub-admin reviews error:", err);
+    logger.error("Sub-admin reviews error:", { error: err?.message });
     res.status(500).json({ success: false, message: "Failed to load reviews" });
   }
 });

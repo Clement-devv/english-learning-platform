@@ -28,6 +28,8 @@ export function useClassroomCore({ bookingId, userRole, duration }) {
   const [bothActiveTime, setBothActiveTime] = useState(0);
   const [isTimerRunning, setIsTimerRunning] = useState(false);
   const [classStarted,   setClassStarted]   = useState(false);
+  const [extraSeconds,   setExtraSeconds]   = useState(0); // seconds added via time extensions
+  const extraSecondsRef = useRef(0);
 
   const classStartedRef    = useRef(false);
   const timerRef           = useRef(null);
@@ -37,8 +39,13 @@ export function useClassroomCore({ bookingId, userRole, duration }) {
   const bothActiveAccRef   = useRef(0);
   const joinConfirmedRef   = useRef(false);
   const hasAutoCompletedRef = useRef(false);
+  const minimizedRef       = useRef(false); // true = minimize nav, skip leaveSession on cleanup
 
   useEffect(() => { classStartedRef.current = classStarted; }, [classStarted]);
+  useEffect(() => { extraSecondsRef.current = extraSeconds; }, [extraSeconds]);
+
+  // ── Platform change detection ──────────────────────────────────────────────
+  const [sessionVideoProvider, setSessionVideoProvider] = useState(null);
 
   // ── Auto-complete + dispute state ──────────────────────────────────────────
   const [autoCompleting,    setAutoCompleting]    = useState(false);
@@ -51,8 +58,10 @@ export function useClassroomCore({ bookingId, userRole, duration }) {
   const [disputeSubmitted,  setDisputeSubmitted]   = useState(false);
 
   // ── Computed ───────────────────────────────────────────────────────────────
-  const classDurationSeconds = (duration || 60) * 60;
-  const requiredTime         = Math.floor(classDurationSeconds * 0.83);
+  // classDurationSeconds grows when time is extended; requiredTime is fixed (83% of original).
+  const baseDurationSeconds  = (duration || 60) * 60;
+  const classDurationSeconds = baseDurationSeconds + extraSeconds;
+  const requiredTime         = Math.floor(baseDurationSeconds * 0.83);
   const timeRemaining        = Math.max(0, classDurationSeconds - timeElapsed);
   const completionPct        = Math.min(100, Math.round((bothActiveTime / requiredTime) * 100));
 
@@ -280,6 +289,18 @@ export function useClassroomCore({ bookingId, userRole, duration }) {
           pollInterval = 5000; // slow down once class is active
         }
 
+        // ── Track video provider (detect platform switch) ─────────────────
+        if (s.videoProvider) setSessionVideoProvider(s.videoProvider);
+
+        // ── Detect time extension by the other participant ─────────────────
+        const serverExtended = s.extendedTime || 0;
+        if (serverExtended > extraSecondsRef.current) {
+          extraSecondsRef.current = serverExtended;
+          setExtraSeconds(serverExtended);
+          // Allow auto-complete to fire again after the extension
+          hasAutoCompletedRef.current = false;
+        }
+
         // ── Detect completion triggered by the other participant ───────────
         if ((s.status === "completed" || s.status === "incomplete") && !hasAutoCompletedRef.current) {
           hasAutoCompletedRef.current = true;
@@ -303,7 +324,8 @@ export function useClassroomCore({ bookingId, userRole, duration }) {
       clearTimeout(pollTimeout);
       clearInterval(timerRef.current);
       clearInterval(syncRef.current);
-      leaveSession(getCurrentBothActive());
+      if (!minimizedRef.current) leaveSession(getCurrentBothActive());
+      minimizedRef.current = false; // reset for potential remount
     };
   }, [bookingId]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -400,6 +422,29 @@ export function useClassroomCore({ bookingId, userRole, duration }) {
     handleAutoCompleteRef.current(cur);
   }, [bookingId, getCurrentBothActive, leaveSession]);
 
+  // ── minimizeSession ───────────────────────────────────────────────────────
+  // Call before navigating away when you want the session to stay alive on
+  // the server (no leaveSession POST). The heartbeat interval also stops,
+  // but the server session remains "active" and can be resumed.
+  const minimizeSession = useCallback(() => {
+    minimizedRef.current = true;
+  }, []);
+
+  // ── handleExtendTime ──────────────────────────────────────────────────────
+  const handleExtendTime = useCallback(async (minutes) => {
+    try {
+      await api.patch(`/classroom/session/${bookingId}/extend-time`, { minutes });
+      const addSec = minutes * 60;
+      extraSecondsRef.current += addSec;
+      setExtraSeconds(prev => prev + addSec);
+      // Allow auto-complete to fire again after the extension window ends
+      hasAutoCompletedRef.current = false;
+    } catch (err) {
+      console.error("[classroom] extend-time failed:", err);
+      throw err;
+    }
+  }, [bookingId]);
+
   return {
     // Presence state + setters (AgoraClassroom uses setters for SDK callbacks)
     isTeacherPresent, setIsTeacherPresent,
@@ -424,7 +469,11 @@ export function useClassroomCore({ bookingId, userRole, duration }) {
     disputeSubmitted, setDisputeSubmitted,
 
     // Actions
-    handleRefresh, handleLeaveEarly, joinConfirmedRef,
+    handleRefresh, handleLeaveEarly, handleExtendTime,
+    minimizeSession, extraSeconds, joinConfirmedRef,
+
+    // Platform
+    sessionVideoProvider,
 
     // Formatters
     formatTime, formatMinutes,

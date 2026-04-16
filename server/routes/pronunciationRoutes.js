@@ -3,6 +3,7 @@ import { verifyToken } from "../middleware/authMiddleware.js";
 import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
 import { pronunciationCacheSchema } from "../schemas/pronunciationCacheSchema.js";
 import { callGemini, extractJSONArray } from "../utils/geminiHelper.js";
+import logger from "../utils/logger.js";
 
 const router = express.Router();
 router.use(tenantMiddleware);
@@ -91,7 +92,7 @@ router.get("/sentences", verifyToken, async (req, res) => {
       return res.json({ success: true, sentences: cached.sentences, source: "cache" });
     }
   } catch (dbErr) {
-    console.error("PronunciationCache read error:", dbErr.message);
+    logger.error("PronunciationCache read error:", dbErr.message);
   }
 
   // ── 2. Generate with Gemini ─────────────────────────────────────────────────
@@ -106,11 +107,11 @@ router.get("/sentences", verifyToken, async (req, res) => {
       { upsert: true, new: true }
     );
 
-    console.log(`✅ Pronunciation cache refreshed — ${difficulty} (${sentences.length} sentences)`);
+    logger.info(`✅ Pronunciation cache refreshed — ${difficulty} (${sentences.length} sentences)`);
     return res.json({ success: true, sentences, source: "generated" });
 
   } catch (genErr) {
-    console.error("Gemini generation failed:", genErr.message);
+    logger.error("Gemini generation failed:", genErr.message);
     // ── 3. Fallback — tell frontend to use local bank ───────────────────────
     return res.json({ success: false, sentences: [], reason: genErr.message });
   }

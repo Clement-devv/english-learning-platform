@@ -8,7 +8,7 @@ export default function SettingsModal({ isOpen, onClose, userType = 'student' })
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-6 rounded-t-2xl sticky top-0 z-10">
           <div className="flex justify-between items-center">
@@ -31,7 +31,7 @@ export default function SettingsModal({ isOpen, onClose, userType = 'student' })
         </div>
 
         {/* Content */}
-        <div className="p-6">
+        <div className="p-6 bg-white dark:bg-gray-900 rounded-b-2xl">
           <TwoFactorManagement userType={userType} />
         </div>
       </div>

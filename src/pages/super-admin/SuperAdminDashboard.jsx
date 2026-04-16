@@ -10,6 +10,8 @@ import {
 } from 'lucide-react';
 import api from '../../api';
 import { THEMES } from '../../data/themes';
+import { LOGIN_THEMES } from '../../data/loginThemes';
+import { DASHBOARD_THEMES } from '../../data/dashboardThemes';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api/v1';
 
@@ -119,6 +121,148 @@ export default function SuperAdminDashboard() {
   const [allocMsg,         setAllocMsg]         = useState('');
   const [creditSearch,     setCreditSearch]     = useState('');
   const [expandedLog,      setExpandedLog]      = useState(null);  // centerId
+
+  // ── Dashboard theme assignment ────────────────────────────────────────────
+  const [dashThemeModal,      setDashThemeModal]      = useState(null);
+  const [dashThemeAssignments,setDashThemeAssignments]= useState({});
+  const [assigningDashTheme,  setAssigningDashTheme]  = useState(null);
+  const [dashThemeMsg,        setDashThemeMsg]        = useState('');
+  const [dashThemeTab,        setDashThemeTab]        = useState('student'); // 'student' | 'teacher'
+
+  const loadDashThemeAssignments = async () => {
+    try {
+      const res  = await fetch(`${API_BASE}/super-admin/dashboard-themes`, { headers: authHeaders });
+      const data = await res.json();
+      if (data.success) setDashThemeAssignments(data.assignments);
+    } catch (_) {}
+  };
+
+  const handleOpenDashThemeModal = (center) => {
+    setDashThemeModal(center);
+    setDashThemeMsg('');
+    loadDashThemeAssignments();
+  };
+
+  const handleAssignDashTheme = async (themeId) => {
+    if (!dashThemeModal) return;
+    setAssigningDashTheme(themeId);
+    setDashThemeMsg('');
+    try {
+      const res  = await fetch(`${API_BASE}/super-admin/centers/${dashThemeModal._id}/dashboard-theme`, {
+        method: 'PATCH',
+        headers: { ...authHeaders, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dashboardTheme: themeId }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message);
+      setDashThemeModal(c => c ? { ...c, branding: { ...c.branding, dashboardTheme: themeId } } : c);
+      setCenters(cs => cs.map(c =>
+        c._id === dashThemeModal._id ? { ...c, branding: { ...c.branding, dashboardTheme: themeId } } : c
+      ));
+      setDashThemeMsg(data.message);
+      loadDashThemeAssignments();
+    } catch (err) {
+      setDashThemeMsg(err.message || 'Failed to assign theme');
+    } finally {
+      setAssigningDashTheme(null);
+    }
+  };
+
+  const handleUnassignDashTheme = async () => {
+    if (!dashThemeModal) return;
+    setAssigningDashTheme('__unassign__');
+    setDashThemeMsg('');
+    try {
+      const res  = await fetch(`${API_BASE}/super-admin/centers/${dashThemeModal._id}/dashboard-theme`, {
+        method: 'PATCH',
+        headers: { ...authHeaders, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dashboardTheme: null }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message);
+      setDashThemeModal(c => c ? { ...c, branding: { ...c.branding, dashboardTheme: null } } : c);
+      setCenters(cs => cs.map(c =>
+        c._id === dashThemeModal._id ? { ...c, branding: { ...c.branding, dashboardTheme: null } } : c
+      ));
+      setDashThemeMsg('Dashboard theme unassigned');
+      loadDashThemeAssignments();
+    } catch (err) {
+      setDashThemeMsg(err.message || 'Failed to unassign');
+    } finally {
+      setAssigningDashTheme(null);
+    }
+  };
+
+  // ── Login theme assignment ─────────────────────────────────────────────────
+  const [loginThemeModal,      setLoginThemeModal]      = useState(null);  // center object
+  const [loginThemeAssignments,setLoginThemeAssignments]= useState({});    // { themeId: { id, name, slug } }
+  const [assigningLoginTheme,  setAssigningLoginTheme]  = useState(null);  // themeId being saved
+  const [loginThemeMsg,        setLoginThemeMsg]        = useState('');
+
+  const loadLoginThemeAssignments = async () => {
+    try {
+      const res  = await fetch(`${API_BASE}/super-admin/login-themes`, { headers: authHeaders });
+      const data = await res.json();
+      if (data.success) setLoginThemeAssignments(data.assignments);
+    } catch (_) {}
+  };
+
+  const handleOpenLoginThemeModal = (center) => {
+    setLoginThemeModal(center);
+    setLoginThemeMsg('');
+    loadLoginThemeAssignments();
+  };
+
+  const handleAssignLoginTheme = async (themeId) => {
+    if (!loginThemeModal) return;
+    setAssigningLoginTheme(themeId);
+    setLoginThemeMsg('');
+    try {
+      const res  = await fetch(`${API_BASE}/super-admin/centers/${loginThemeModal._id}/login-theme`, {
+        method: 'PATCH',
+        headers: { ...authHeaders, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ loginTheme: themeId }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message);
+      // Update local state
+      setLoginThemeModal(c => c ? { ...c, branding: { ...c.branding, loginTheme: themeId } } : c);
+      setCenters(cs => cs.map(c =>
+        c._id === loginThemeModal._id ? { ...c, branding: { ...c.branding, loginTheme: themeId } } : c
+      ));
+      setLoginThemeMsg(data.message);
+      loadLoginThemeAssignments();
+    } catch (err) {
+      setLoginThemeMsg(err.message || 'Failed to assign theme');
+    } finally {
+      setAssigningLoginTheme(null);
+    }
+  };
+
+  const handleUnassignLoginTheme = async () => {
+    if (!loginThemeModal) return;
+    setAssigningLoginTheme('__unassign__');
+    setLoginThemeMsg('');
+    try {
+      const res  = await fetch(`${API_BASE}/super-admin/centers/${loginThemeModal._id}/login-theme`, {
+        method: 'PATCH',
+        headers: { ...authHeaders, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ loginTheme: null }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message);
+      setLoginThemeModal(c => c ? { ...c, branding: { ...c.branding, loginTheme: null } } : c);
+      setCenters(cs => cs.map(c =>
+        c._id === loginThemeModal._id ? { ...c, branding: { ...c.branding, loginTheme: null } } : c
+      ));
+      setLoginThemeMsg('Login theme unassigned');
+      loadLoginThemeAssignments();
+    } catch (err) {
+      setLoginThemeMsg(err.message || 'Failed to unassign');
+    } finally {
+      setAssigningLoginTheme(null);
+    }
+  };
 
   const loadData = useCallback(() => {
     setLoading(true);
@@ -674,6 +818,20 @@ export default function SuperAdminDashboard() {
                             )}
                             <button onClick={() => setThemeCenter(c)} style={s.themeBtn} title="Set theme">
                               <Palette size={12} /> Theme
+                            </button>
+                            <button
+                              onClick={() => handleOpenLoginThemeModal(c)}
+                              style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '5px 12px', borderRadius: 7, fontSize: 12, fontWeight: 600, background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.2)', color: '#8b5cf6', cursor: 'pointer', fontFamily: 'inherit' }}
+                              title="Assign exclusive login page theme"
+                            >
+                              <Palette size={12} /> Login Page
+                            </button>
+                            <button
+                              onClick={() => handleOpenDashThemeModal(c)}
+                              style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '5px 12px', borderRadius: 7, fontSize: 12, fontWeight: 600, background: 'rgba(6,182,212,0.1)', border: '1px solid rgba(6,182,212,0.2)', color: '#06b6d4', cursor: 'pointer', fontFamily: 'inherit' }}
+                              title="Assign exclusive student dashboard theme"
+                            >
+                              <Palette size={12} /> Dashboard
                             </button>
                             <button onClick={() => setFeaturesCenter(c)} style={s.featuresBtn} title="Toggle features">
                               <ToggleRight size={12} /> Features
@@ -1819,6 +1977,270 @@ export default function SuperAdminDashboard() {
                   );
                 })}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Dashboard Theme Assignment Modal ── */}
+      {dashThemeModal && (
+        <div style={s.overlay} onClick={(e) => e.target === e.currentTarget && setDashThemeModal(null)}>
+          <div style={{ ...s.modal, maxWidth: '880px' }}>
+            <div style={s.modalHeader}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Palette size={18} color="#06b6d4" />
+                <span style={s.modalTitle}>Dashboard Theme</span>
+                <span style={{ fontSize: '13px', color: '#6b7280' }}>for {dashThemeModal.centerName}</span>
+              </div>
+              <button onClick={() => setDashThemeModal(null)} style={s.closeBtn}><X size={18} /></button>
+            </div>
+
+            {/* Student / Teacher tab selector */}
+            <div style={{ display: 'flex', gap: '4px', padding: '16px 24px 0', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+              {[
+                { key: 'student', label: '🎓 Student Dashboards' },
+                { key: 'teacher', label: '👩‍🏫 Teacher Dashboards' },
+              ].map(({ key, label }) => (
+                <button key={key} onClick={() => setDashThemeTab(key)}
+                  style={{ padding: '8px 18px', border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: 'inherit', fontSize: '13px', fontWeight: 600, color: dashThemeTab === key ? '#06b6d4' : '#6b7280', borderBottom: dashThemeTab === key ? '2px solid #06b6d4' : '2px solid transparent', marginBottom: '-1px', transition: 'all 0.15s' }}>
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            <div style={{ padding: '20px 24px 28px' }}>
+              {dashThemeTab === 'student' && (
+                <p style={{ ...s.stepDesc, marginBottom: '6px' }}>
+                  Each theme is <strong>exclusive</strong> — only one center can hold it. Students see this design after login. Themes change the entire layout, fonts, animations and vibe without affecting functionality.
+                </p>
+              )}
+              {dashThemeTab === 'teacher' && (
+                <div style={{ textAlign: 'center', padding: '40px 20px', color: '#4b5563' }}>
+                  <div style={{ fontSize: '40px', marginBottom: '12px' }}>🚧</div>
+                  <p style={{ fontSize: '15px', fontWeight: 600, color: '#9ca3af', marginBottom: '6px' }}>Teacher Dashboards Coming Soon</p>
+                  <p style={{ fontSize: '13px', color: '#6b7280' }}>We're building teacher dashboard designs. Student dashboards are being finalized first. Check back after all student designs are confirmed.</p>
+                </div>
+              )}
+              {dashThemeTab === 'student' && dashThemeMsg && (
+                <div style={{ padding: '8px 14px', borderRadius: '10px', fontSize: '13px', fontWeight: '600', marginBottom: '14px',
+                  background: dashThemeMsg.toLowerCase().includes('already') || dashThemeMsg.toLowerCase().includes('failed') ? 'rgba(239,68,68,.12)' : 'rgba(34,197,94,.12)',
+                  color: dashThemeMsg.toLowerCase().includes('already') || dashThemeMsg.toLowerCase().includes('failed') ? '#ef4444' : '#22c55e',
+                  border: `1px solid ${dashThemeMsg.toLowerCase().includes('already') || dashThemeMsg.toLowerCase().includes('failed') ? 'rgba(239,68,68,.2)' : 'rgba(34,197,94,.2)'}`,
+                }}>
+                  {dashThemeMsg}
+                </div>
+              )}
+
+              {dashThemeTab === 'student' && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: '14px', marginTop: '8px' }}>
+                {DASHBOARD_THEMES.map(theme => {
+                  const isActive    = dashThemeModal.branding?.dashboardTheme === theme.id;
+                  const takenBy     = !isActive && dashThemeAssignments[theme.id];
+                  const isAssigning = assigningDashTheme === theme.id;
+                  const isLocked    = !!takenBy;
+
+                  return (
+                    <div key={theme.id} style={{
+                      borderRadius: '16px',
+                      border: isActive ? `2px solid ${theme.preview.accent}` : isLocked ? '2px solid rgba(255,255,255,0.04)' : '2px solid rgba(255,255,255,0.08)',
+                      background: isActive ? `${theme.preview.accent}15` : isLocked ? 'rgba(255,255,255,0.01)' : 'rgba(255,255,255,0.03)',
+                      overflow: 'hidden',
+                      opacity: isLocked ? 0.5 : 1,
+                      transition: 'border-color .15s, background .15s',
+                    }}>
+                      {/* Preview — mini dashboard mockup */}
+                      <div style={{ height: '100px', background: theme.preview.bg, position: 'relative', overflow: 'hidden', padding: '10px' }}>
+                        {/* Mock nav bar */}
+                        <div style={{ display: 'flex', gap: '4px', marginBottom: '8px' }}>
+                          {[theme.preview.accent, `${theme.preview.accent}55`, `${theme.preview.accent}33`, `${theme.preview.accent}22`].map((bg, i) => (
+                            <div key={i} style={{ height: '18px', flex: i === 0 ? '0 0 48px' : '1', background: bg, borderRadius: '6px' }} />
+                          ))}
+                        </div>
+                        {/* Mock welcome banner */}
+                        <div style={{ height: '28px', background: `linear-gradient(135deg, ${theme.preview.accent}, ${theme.preview.card === '#ffffff' ? '#ec4899' : theme.preview.accent}99)`, borderRadius: '8px', marginBottom: '6px', display: 'flex', alignItems: 'center', paddingLeft: '8px' }}>
+                          <span style={{ fontSize: '14px' }}>{theme.emoji}</span>
+                          <div style={{ width: '60px', height: '6px', background: 'rgba(255,255,255,0.6)', borderRadius: '3px', marginLeft: '6px' }} />
+                        </div>
+                        {/* Mock stat cards */}
+                        <div style={{ display: 'flex', gap: '4px' }}>
+                          {[0,1,2,3].map(i => (
+                            <div key={i} style={{ flex: 1, height: '16px', background: theme.preview.card, border: `1px solid ${theme.preview.accent}30`, borderRadius: '5px' }} />
+                          ))}
+                        </div>
+                        {/* Theme name overlay */}
+                        <div style={{ position: 'absolute', bottom: '4px', right: '6px', fontSize: '18px' }}>{theme.emoji}</div>
+                      </div>
+
+                      {/* Info */}
+                      <div style={{ padding: '10px 12px 6px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '3px' }}>
+                          <span style={{ fontSize: '13px', fontWeight: '700', color: '#f1f5f9' }}>{theme.name}</span>
+                          {isActive && <CheckCircle size={14} color={theme.preview.accent} />}
+                        </div>
+                        <p style={{ margin: '0 0 5px', fontSize: '10px', color: '#6b7280', lineHeight: '1.4' }}>
+                          {theme.description}
+                        </p>
+                        {takenBy && (
+                          <p style={{ margin: '0 0 5px', fontSize: '10px', color: '#f59e0b', fontWeight: '700' }}>
+                            🔒 Held by {takenBy.name}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Action */}
+                      <div style={{ padding: '4px 12px 12px' }}>
+                        <button
+                          onClick={() => !isAssigning && !isActive && !isLocked && handleAssignDashTheme(theme.id)}
+                          disabled={isAssigning || isActive || isLocked}
+                          style={{
+                            width: '100%', padding: '7px 0', borderRadius: '8px', border: 'none',
+                            background: isActive ? `${theme.preview.accent}22` : isLocked ? 'rgba(255,255,255,0.04)' : theme.preview.accent,
+                            color: isActive ? theme.preview.accent : isLocked ? '#4b5563' : 'white',
+                            fontSize: '12px', fontWeight: '700',
+                            cursor: isAssigning || isActive || isLocked ? 'default' : 'pointer',
+                            fontFamily: 'inherit',
+                            opacity: isAssigning ? 0.6 : 1,
+                          }}
+                        >
+                          {isAssigning ? 'Assigning…' : isActive ? '✓ Assigned' : isLocked ? 'Taken' : 'Assign'}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>}
+
+              {/* Unassign row — only on student tab */}
+              {dashThemeTab === 'student' && dashThemeModal.branding?.dashboardTheme && (
+                <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '13px', color: '#6b7280' }}>
+                    Remove student dashboard theme → falls back to default (Sunshine Explorer)
+                  </span>
+                  <button
+                    onClick={handleUnassignDashTheme}
+                    disabled={assigningDashTheme === '__unassign__'}
+                    style={{ padding: '7px 16px', borderRadius: '8px', border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.08)', color: '#ef4444', fontSize: '12px', fontWeight: '700', cursor: 'pointer', fontFamily: 'inherit' }}
+                  >
+                    {assigningDashTheme === '__unassign__' ? 'Removing…' : 'Unassign'}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Login Theme Assignment Modal ── */}
+      {loginThemeModal && (
+        <div style={s.overlay} onClick={(e) => e.target === e.currentTarget && setLoginThemeModal(null)}>
+          <div style={{ ...s.modal, maxWidth: '820px' }}>
+            <div style={s.modalHeader}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Palette size={18} color="#8b5cf6" />
+                <span style={s.modalTitle}>Login Page Theme</span>
+                <span style={{ fontSize: '13px', color: '#6b7280' }}>for {loginThemeModal.centerName}</span>
+              </div>
+              <button onClick={() => setLoginThemeModal(null)} style={s.closeBtn}><X size={18} /></button>
+            </div>
+
+            <div style={{ padding: '20px 24px 28px' }}>
+              <p style={{ ...s.stepDesc, marginBottom: '6px' }}>
+                Each login theme is <strong>exclusive</strong> — only one center can hold it. Students see this page when they sign in.
+              </p>
+              {loginThemeMsg && (
+                <div style={{ padding: '8px 14px', borderRadius: '10px', fontSize: '13px', fontWeight: '600', marginBottom: '14px',
+                  background: loginThemeMsg.toLowerCase().includes('already') || loginThemeMsg.toLowerCase().includes('failed') ? 'rgba(239,68,68,.12)' : 'rgba(34,197,94,.12)',
+                  color: loginThemeMsg.toLowerCase().includes('already') || loginThemeMsg.toLowerCase().includes('failed') ? '#ef4444' : '#22c55e',
+                  border: `1px solid ${loginThemeMsg.toLowerCase().includes('already') || loginThemeMsg.toLowerCase().includes('failed') ? 'rgba(239,68,68,.2)' : 'rgba(34,197,94,.2)'}`,
+                }}>
+                  {loginThemeMsg}
+                </div>
+              )}
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: '14px', marginTop: '8px' }}>
+                {LOGIN_THEMES.map(theme => {
+                  const isActive      = loginThemeModal.branding?.loginTheme === theme.id;
+                  const takenBy       = !isActive && loginThemeAssignments[theme.id];
+                  const isAssigning   = assigningLoginTheme === theme.id;
+                  const isLocked      = !!takenBy;
+
+                  return (
+                    <div key={theme.id} style={{
+                      borderRadius: '14px',
+                      border: isActive ? '2px solid #8b5cf6' : isLocked ? '2px solid rgba(255,255,255,0.04)' : '2px solid rgba(255,255,255,0.08)',
+                      background: isActive ? 'rgba(139,92,246,0.12)' : isLocked ? 'rgba(255,255,255,0.01)' : 'rgba(255,255,255,0.03)',
+                      overflow: 'hidden',
+                      opacity: isLocked ? 0.5 : 1,
+                      transition: 'border-color .15s, background .15s, opacity .15s',
+                    }}>
+                      {/* Preview gradient */}
+                      <div style={{
+                        height: '72px',
+                        background: `linear-gradient(135deg, ${theme.preview.bgStart}, ${theme.preview.bgEnd})`,
+                        position: 'relative',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}>
+                        <span style={{ fontSize: '32px', filter: 'drop-shadow(0 4px 8px rgba(0,0,0,.4))' }}>{theme.emoji}</span>
+                        <div style={{
+                          position: 'absolute', bottom: '8px', right: '8px',
+                          width: '14px', height: '14px', borderRadius: '50%',
+                          background: theme.preview.accent, boxShadow: `0 0 8px ${theme.preview.accent}`,
+                        }} />
+                      </div>
+
+                      {/* Info */}
+                      <div style={{ padding: '10px 12px 6px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '3px' }}>
+                          <span style={{ fontSize: '13px', fontWeight: '700', color: '#f1f5f9' }}>{theme.name}</span>
+                          {isActive && <CheckCircle size={14} color="#8b5cf6" />}
+                        </div>
+                        <p style={{ margin: '0 0 6px', fontSize: '10px', color: '#6b7280', lineHeight: '1.4' }}>
+                          {theme.description}
+                        </p>
+                        {takenBy && (
+                          <p style={{ margin: '0 0 6px', fontSize: '10px', color: '#f59e0b', fontWeight: '700' }}>
+                            🔒 Held by {takenBy.name}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Action */}
+                      <div style={{ padding: '4px 12px 12px' }}>
+                        <button
+                          onClick={() => !isAssigning && !isActive && !isLocked && handleAssignLoginTheme(theme.id)}
+                          disabled={isAssigning || isActive || isLocked}
+                          style={{
+                            width: '100%', padding: '7px 0', borderRadius: '8px', border: 'none',
+                            background: isActive ? 'rgba(139,92,246,0.2)' : isLocked ? 'rgba(255,255,255,0.04)' : '#8b5cf6',
+                            color: isActive ? '#8b5cf6' : isLocked ? '#4b5563' : 'white',
+                            fontSize: '12px', fontWeight: '700',
+                            cursor: isAssigning || isActive || isLocked ? 'default' : 'pointer',
+                            fontFamily: 'inherit',
+                            opacity: isAssigning ? 0.6 : 1,
+                          }}
+                        >
+                          {isAssigning ? 'Assigning…' : isActive ? '✓ Assigned' : isLocked ? 'Taken' : 'Assign'}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Unassign row */}
+              {loginThemeModal.branding?.loginTheme && (
+                <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '13px', color: '#6b7280' }}>
+                    Remove login theme from this center → falls back to default (Space Explorer)
+                  </span>
+                  <button
+                    onClick={handleUnassignLoginTheme}
+                    disabled={assigningLoginTheme === '__unassign__'}
+                    style={{ padding: '7px 16px', borderRadius: '8px', border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.08)', color: '#ef4444', fontSize: '12px', fontWeight: '700', cursor: 'pointer', fontFamily: 'inherit' }}
+                  >
+                    {assigningLoginTheme === '__unassign__' ? 'Removing…' : 'Unassign'}
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>

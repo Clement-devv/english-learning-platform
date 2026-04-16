@@ -3,6 +3,7 @@ import express from "express";
 import { verifyToken, verifyAdmin } from "../middleware/authMiddleware.js";
 import { tenantMiddleware }         from "../middleware/tenantMiddleware.js";
 import { classPricingSchema }       from "../schemas/classPricingSchema.js";
+import logger from "../utils/logger.js";
 
 const router = express.Router();
 router.use(tenantMiddleware);
@@ -16,7 +17,7 @@ router.get("/", verifyToken, async (req, res) => {
     const pricing = await getPricing(req.db).findOne().lean();
     res.json(pricing || null);
   } catch (err) {
-    console.error(err);
+    logger.error(err);
     res.status(500).json({ message: "Error fetching pricing" });
   }
 });
@@ -36,7 +37,7 @@ router.put("/", verifyToken, verifyAdmin, async (req, res) => {
     );
     res.json({ message: "Pricing saved", pricing });
   } catch (err) {
-    console.error(err);
+    logger.error(err);
     res.status(500).json({ message: "Error saving pricing" });
   }
 });

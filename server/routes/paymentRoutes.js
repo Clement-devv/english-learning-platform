@@ -4,6 +4,8 @@ import { verifyToken, verifyAdmin } from "../middleware/authMiddleware.js";
 import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
 import { paymentSchema }  from "../schemas/paymentSchema.js";
 import { studentSchema }  from "../schemas/studentSchema.js";
+import { parsePagination } from "../utils/pagination.js";
+import logger from "../utils/logger.js";
 
 const router = express.Router();
 router.use(tenantMiddleware);
@@ -13,8 +15,7 @@ const getPayment = (db) => db.models.Payment || db.model("Payment", paymentSchem
 // Get all payments — admin only
 router.get("/", verifyToken, verifyAdmin, async (req, res) => {
   try {
-    const limit = Math.min(parseInt(req.query.limit) || 500, 1000);
-    const skip  = Math.max(parseInt(req.query.skip)  || 0,   0);
+    const { limit, skip } = parsePagination(req.query);
     const payments = await getPayment(req.db)
       .find()
       .populate("studentId", "firstName surname email")
@@ -24,7 +25,7 @@ router.get("/", verifyToken, verifyAdmin, async (req, res) => {
       .lean();
     res.json(payments);
   } catch (err) {
-    console.error(err);
+    logger.error(err);
     res.status(500).json({ message: "Error fetching payments" });
   }
 });

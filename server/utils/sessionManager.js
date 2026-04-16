@@ -1,6 +1,7 @@
 // utils/sessionManager.js
-import { UAParser } from "ua-parser-js";  // Changed from default import
+import { UAParser } from "ua-parser-js";
 import crypto from "crypto";
+import { SESSION_LIMIT, SESSION_EXPIRY_DAYS } from "../config/constants.js";
 
 /**
  * Extract device information from request
@@ -51,27 +52,41 @@ export const createSession = (req, jwtToken) => {
 };
 
 /**
- * Clean up expired sessions (older than 7 days)
+ * In-memory filter — removes inactive/expired sessions from a user's session array
+ * before saving. Runs on login; O(n) where n ≤ SESSION_LIMIT (trivially fast).
  */
 export const cleanExpiredSessions = (sessions) => {
-  const sevenDaysAgo = new Date();
-  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-
-  return sessions.filter(session =>
-    session.isActive && new Date(session.lastActivity) > sevenDaysAgo
-  );
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - SESSION_EXPIRY_DAYS);
+  return sessions.filter(s => s.isActive && new Date(s.lastActivity) > cutoff);
 };
 
 /**
  * Keep only the N most recent sessions.
  * Call this after pushing the new session to prevent unbounded growth.
  */
-const SESSION_LIMIT = 5;
-
 export const pruneSessionsToLimit = (sessions, limit = SESSION_LIMIT) => {
   if (sessions.length <= limit) return sessions;
   return sessions
     .slice()
     .sort((a, b) => new Date(b.loginTime) - new Date(a.loginTime))
     .slice(0, limit);
+};
+
+/**
+ * Background DB sweep — pulls expired/inactive sessions from every user
+ * document across the given center DB. Uses raw MongoDB collections so
+ * Mongoose models don't need to be registered first.
+ * Call hourly via setInterval for users who never log back in.
+ */
+export const sweepExpiredSessionsFromDb = async (db) => {
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - SESSION_EXPIRY_DAYS);
+  const pull = { $pull: { sessions: { $or: [{ isActive: false }, { lastActivity: { $lt: cutoff } }] } } };
+
+  await Promise.all([
+    db.collection('teachers').updateMany({}, pull),
+    db.collection('students').updateMany({}, pull),
+    db.collection('admins').updateMany({},   pull),
+  ]);
 };

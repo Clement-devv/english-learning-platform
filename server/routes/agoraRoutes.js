@@ -1,6 +1,7 @@
 // server/routes/agoraRoutes.js
 import express from 'express';
 import pkg from 'agora-access-token';
+import logger from "../utils/logger.js";
 const { RtcTokenBuilder, RtcRole } = pkg;
 
 const router = express.Router();
@@ -12,7 +13,7 @@ router.get('/token', (req, res) => {
   try {
     const { channel } = req.query;
 
-    console.log('📞 Token request:', { channel });
+    logger.info('📞 Token request:', { channel });
 
     if (!channel) {
       return res.status(400).json({
@@ -22,7 +23,7 @@ router.get('/token', (req, res) => {
     }
 
     if (!APP_ID || !APP_CERTIFICATE) {
-      console.error('❌ Agora credentials missing!');
+      logger.error('❌ Agora credentials missing!');
       return res.status(500).json({
         success: false,
         message: 'Video calling not configured'
@@ -45,7 +46,7 @@ router.get('/token', (req, res) => {
       privilegeExpiredTs
     );
 
-    console.log('✅ Token generated for channel:', channel);
+    logger.info('✅ Token generated for channel:', channel);
 
     res.json({
       success: true,
@@ -57,7 +58,7 @@ router.get('/token', (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ Token generation error:', error);
+    logger.error('❌ Token generation error:', { error: error?.message });
     res.status(500).json({
       success: false,
       message: 'Failed to generate token',

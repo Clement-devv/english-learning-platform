@@ -6,6 +6,7 @@ import { bookingSchema }            from "../schemas/bookingSchema.js";
 import { studentSchema }            from "../schemas/studentSchema.js";
 import { teacherSchema }            from "../schemas/teacherSchema.js";
 import { paymentTransactionSchema } from "../schemas/paymentTransactionSchema.js";
+import logger from "../utils/logger.js";
 
 const router = express.Router();
 router.use(tenantMiddleware);
@@ -57,11 +58,11 @@ router.post("/booking/:bookingId", verifyToken, async (req, res) => {
     booking.disputedBy = `${booking.teacherId.firstName} ${booking.teacherId.lastName} (Teacher)`;
     await booking.save();
 
-    console.log(`⚠️ Dispute raised by teacher ${booking.teacherId.firstName} for booking ${booking._id}`);
+    logger.info(`⚠️ Dispute raised by teacher ${booking.teacherId.firstName} for booking ${booking._id}`);
 
     res.json({ success: true, message: "Dispute submitted successfully. Admin will review it shortly." });
   } catch (err) {
-    console.error("❌ Error raising dispute:", err);
+    logger.error("❌ Error raising dispute:", { error: err?.message });
     res.status(500).json({ success: false, message: "Error raising dispute", error: err.message });
   }
 });
@@ -80,7 +81,7 @@ router.get("/", verifyToken, verifyAdmin, async (req, res) => {
 
     res.json({ success: true, disputes });
   } catch (err) {
-    console.error("❌ Error fetching disputes:", err);
+    logger.error("❌ Error fetching disputes:", { error: err?.message });
     res.status(500).json({ success: false, message: "Error fetching disputes" });
   }
 });
@@ -108,7 +109,7 @@ router.get("/stats", verifyToken, verifyAdmin, async (req, res) => {
       },
     });
   } catch (err) {
-    console.error("❌ Error fetching dispute stats:", err);
+    logger.error("❌ Error fetching dispute stats:", { error: err?.message });
     res.status(500).json({ success: false, message: "Error fetching stats" });
   }
 });
@@ -173,9 +174,10 @@ router.patch("/:bookingId/resolve", verifyToken, verifyAdmin, async (req, res) =
             type: "class_completion",
             classTitle: booking.classTitle,
             completedAt: new Date(),
+            studentName: `${booking.studentId.firstName || ""} ${booking.studentId.surname || ""}`.trim(),
             description: `Dispute approved: ${booking.classTitle} (missed → completed by admin)`,
           });
-          console.log(`💰 Teacher paid $${earned} after dispute approval for booking ${booking._id}`);
+          logger.info(`💰 Teacher paid $${earned} after dispute approval for booking ${booking._id}`);
         }
       }
     } else {
@@ -189,7 +191,7 @@ router.patch("/:bookingId/resolve", verifyToken, verifyAdmin, async (req, res) =
         if (student) {
           student.noOfClasses = (student.noOfClasses || 0) + 1;
           await student.save();
-          console.log(`✅ Refunded 1 class to student ${student.firstName}`);
+          logger.info(`✅ Refunded 1 class to student ${student.firstName}`);
         }
       }
     }
@@ -204,11 +206,11 @@ router.patch("/:bookingId/resolve", verifyToken, verifyAdmin, async (req, res) =
         ? "Dispute resolved in favour of teacher. Class marked as completed."
         : "Dispute resolved in favour of student. Student class refunded.";
 
-    console.log(`✅ Dispute resolved (${resolution}) for booking ${booking._id}`);
+    logger.info(`✅ Dispute resolved (${resolution}) for booking ${booking._id}`);
 
     res.json({ success: true, message: msg, booking });
   } catch (err) {
-    console.error("❌ Error resolving dispute:", err);
+    logger.error("❌ Error resolving dispute:", { error: err?.message });
     res.status(500).json({ success: false, message: "Error resolving dispute", error: err.message });
   }
 });

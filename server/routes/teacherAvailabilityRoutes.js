@@ -4,6 +4,7 @@ import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
 import { teacherAvailabilitySchema } from "../schemas/teacherAvailabilitySchema.js";
 import { bookingSchema }             from "../schemas/bookingSchema.js";
 import { teacherSchema }             from "../schemas/teacherSchema.js";
+import logger from "../utils/logger.js";
 
 // Returns true if [s1,e1) overlaps with [s2,e2)  (string "HH:MM" comparison)
 function timesOverlap(s1, e1, s2, e2) {
@@ -49,7 +50,7 @@ router.get("/:teacherId", verifyToken, async (req, res) => {
     const availability = await getTeacherAvailability(req.db).find(query).sort({ date: 1, startTime: 1 });
     res.json({ availability });
   } catch (err) {
-    console.error("Error fetching availability:", err);
+    logger.error("Error fetching availability:", { error: err?.message });
     res.status(500).json({ message: "Error fetching availability" });
   }
 });
@@ -126,7 +127,7 @@ router.post("/", verifyToken, async (req, res) => {
     await avail.save();
     res.status(201).json({ availability: avail, message: "Availability saved" });
   } catch (err) {
-    console.error("Error saving availability:", err);
+    logger.error("Error saving availability:", { error: err?.message });
     res.status(500).json({ message: "Error saving availability" });
   }
 });
@@ -138,7 +139,7 @@ router.delete("/:id", verifyToken, async (req, res) => {
     if (!avail) return res.status(404).json({ message: "Not found" });
     res.json({ message: "Availability removed" });
   } catch (err) {
-    console.error("Error deleting availability:", err);
+    logger.error("Error deleting availability:", { error: err?.message });
     res.status(500).json({ message: "Error deleting availability" });
   }
 });

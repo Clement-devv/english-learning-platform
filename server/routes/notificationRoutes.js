@@ -3,6 +3,7 @@ import express from "express";
 import { verifyToken, verifyAdmin } from "../middleware/authMiddleware.js";
 import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
 import { notificationSchema } from "../schemas/notificationSchema.js";
+import logger from "../utils/logger.js";
 
 const router = express.Router();
 router.use(tenantMiddleware);
@@ -23,7 +24,7 @@ router.get("/", verifyToken, verifyAdmin, async (req, res) => {
 
     res.json({ success: true, notifications, unreadCount });
   } catch (err) {
-    console.error("Notifications fetch error:", err);
+    logger.error("Notifications fetch error:", { error: err?.message });
     res.status(500).json({ success: false, message: "Failed to load notifications" });
   }
 });

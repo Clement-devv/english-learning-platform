@@ -1,0 +1,14 @@
+To prevent this from happening again
+Run this in PowerShell — just change your DNS to Google permanently (takes 2 minutes, totally safe):
+
+Windows + R → ncpa.cpl → Enter
+Right-click your WiFi/Ethernet → Properties
+IPv4 → Properties
+Set DNS to:
+
+   Preferred:  8.8.8.8
+   Alternate:  8.8.4.4
+
+OK → then in PowerShell:
+
+powershell   ipconfig /flushdns

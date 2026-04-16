@@ -6,6 +6,7 @@ import { chatCreditSchema }         from "../schemas/chatCreditSchema.js";
 import { conversationMessageSchema } from "../schemas/conversationMessageSchema.js";
 import { studentSchema }            from "../schemas/studentSchema.js";
 import Center                       from "../models/master/Center.js";
+import logger from "../utils/logger.js";
 
 const router = express.Router();
 router.use(tenantMiddleware);
@@ -150,7 +151,7 @@ router.post("/message", verifyToken, async (req, res) => {
       creditsRemaining: updated?.credits ?? 0,
     });
   } catch (err) {
-    console.error("Chat message error:", err.message);
+    logger.error("Chat message error:", { error: err?.message });
     res.status(500).json({ message: err.message });
   }
 });

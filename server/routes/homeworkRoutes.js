@@ -14,6 +14,7 @@ import {
   sendHomeworkSubmitted,
 } from "../utils/emailService.js";
 import { recordActivity } from "../utils/streakService.js";
+import logger from "../utils/logger.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
@@ -166,13 +167,24 @@ router.post("/", verifyToken, uploadAssignment.array("files", MAX_FILES), async 
       }
     }).catch(() => {});
 
+    // Push real-time update to student dashboard
+    try {
+      const io = req.app.get('io');
+      io.to(`student-room:${req.center.slug}:${studentId}`).emit('homework-assigned', {
+        title: '📚 New Homework!',
+        message: `Your teacher assigned: "${titleClean}"`,
+        homeworkId: hw._id,
+        dueDate,
+      });
+    } catch (_) {}
+
     res.status(201).json({ success: true, homework: hw });
   } catch (err) {
     // Clean up any uploaded files on error
     (req.files || []).forEach(f => {
       try { fs.unlinkSync(path.join(HW_DIR, f.filename)); } catch (_) {}
     });
-    console.error("Create homework error:", err);
+    logger.error("Create homework error:", { error: err?.message });
     res.status(500).json({ message: err.message });
   }
 });

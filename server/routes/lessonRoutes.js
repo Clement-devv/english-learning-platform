@@ -3,6 +3,8 @@ import express from "express";
 import { verifyToken, verifyAdminOrTeacher } from "../middleware/authMiddleware.js";
 import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
 import { lessonSchema } from "../schemas/lessonSchema.js";
+import { parsePagination } from "../utils/pagination.js";
+import logger from "../utils/logger.js";
 
 const router = express.Router();
 router.use(tenantMiddleware);
@@ -12,8 +14,7 @@ const getLesson = (db) => db.models.Lesson || db.model("Lesson", lessonSchema);
 // Get ALL lessons — admin and teachers only
 router.get("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
   try {
-    const limit = Math.min(parseInt(req.query.limit) || 500, 1000);
-    const skip  = Math.max(parseInt(req.query.skip)  || 0,   0);
+    const { limit, skip } = parsePagination(req.query);
     const lessons = await getLesson(req.db)
       .find()
       .populate("studentId", "firstName surname email")
@@ -23,7 +24,7 @@ router.get("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
       .lean();
     res.json(lessons);
   } catch (err) {
-    console.error(err);
+    logger.error(err);
     res.status(500).json({ message: "Error fetching lessons" });
   }
 });

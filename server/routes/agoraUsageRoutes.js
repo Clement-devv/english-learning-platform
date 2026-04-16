@@ -6,6 +6,7 @@ import express from 'express';
 import { tenantMiddleware } from '../middleware/tenantMiddleware.js';
 import { verifyToken } from '../middleware/authMiddleware.js';
 import AgoraUsage from '../models/master/AgoraUsage.js';
+import logger from "../utils/logger.js";
 
 const router = express.Router();
 
@@ -41,7 +42,7 @@ router.post('/log', tenantMiddleware, verifyToken, async (req, res) => {
 
     res.json({ success: true });
   } catch (err) {
-    console.error('❌ Agora usage log error:', err);
+    logger.error('❌ Agora usage log error:', { error: err?.message });
     // Non-critical — don't surface errors to the user during a call
     res.status(500).json({ success: false, message: 'Failed to log usage' });
   }

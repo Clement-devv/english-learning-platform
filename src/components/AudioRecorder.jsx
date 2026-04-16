@@ -34,16 +34,19 @@ export default function AudioRecorder({ onRecorded, isDarkMode }) {
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
-        ? "audio/webm;codecs=opus" : "audio/webm";
+      const mimeType =
+        MediaRecorder.isTypeSupported("audio/webm;codecs=opus") ? "audio/webm;codecs=opus" :
+        MediaRecorder.isTypeSupported("audio/webm")             ? "audio/webm"             :
+        MediaRecorder.isTypeSupported("audio/mp4")              ? "audio/mp4"              :
+        "";
 
-      const rec = new MediaRecorder(stream, { mimeType });
+      const rec = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
       mediaRecRef.current = rec;
       chunksRef.current   = [];
 
       rec.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data); };
       rec.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: mimeType });
+        const blob = new Blob(chunksRef.current, { type: mimeType || "audio/webm" });
         const url  = URL.createObjectURL(blob);
         setBlobUrl(url);
         durationRef.current = seconds;
@@ -76,10 +79,19 @@ export default function AudioRecorder({ onRecorded, isDarkMode }) {
     onRecorded(null, 0);
   };
 
-  const togglePlay = () => {
+  const togglePlay = async () => {
     if (!audioRef.current) return;
-    if (playing) { audioRef.current.pause(); setPlaying(false); }
-    else         { audioRef.current.play();  setPlaying(true);  }
+    if (playing) {
+      audioRef.current.pause();
+      setPlaying(false);
+    } else {
+      try {
+        await audioRef.current.play();
+        setPlaying(true);
+      } catch (err) {
+        console.error("Audio playback failed:", err);
+      }
+    }
   };
 
   return (

@@ -49,7 +49,7 @@ export default function RecordingsTab({ isDarkMode }) {
     if (blobUrls[rec._id]) { setPlaying(rec); return; }
     try {
       const resp = await api.get(`/recordings/${rec._id}/stream`, { responseType: 'blob' });
-      const blob = new Blob([resp.data]);
+      const blob = new Blob([resp.data], { type: resp.headers['content-type'] || 'video/webm' });
       const url  = URL.createObjectURL(blob);
       setBlobUrls(prev => ({ ...prev, [rec._id]: url }));
       setPlaying(rec);

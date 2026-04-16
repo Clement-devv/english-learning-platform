@@ -8,6 +8,7 @@ import { bookingSchema }              from "../schemas/bookingSchema.js";
 import { studentSchema }              from "../schemas/studentSchema.js";
 import { teacherSchema }              from "../schemas/teacherSchema.js";
 import { paymentTransactionSchema }   from "../schemas/paymentTransactionSchema.js";
+import logger from "../utils/logger.js";
 
 const router = express.Router();
 router.use(tenantMiddleware);
@@ -100,7 +101,7 @@ router.post("/attendance", verifyToken, async (req, res) => {
     await session.save();
     res.json({ message: "Attendance updated", session });
   } catch (err) {
-    console.error("Error updating attendance:", err);
+    logger.error("Error updating attendance:", { error: err?.message });
     res.status(500).json({ message: "Error updating attendance" });
   }
 });
@@ -201,6 +202,7 @@ router.post("/auto-complete", verifyToken, async (req, res) => {
         studentId: booking.studentId._id,
         amount: earned, status: "pending", type: "class_completion",
         classTitle: booking.classTitle, completedAt: new Date(),
+        studentName: `${booking.studentId.firstName || ""} ${booking.studentId.surname || ""}`.trim(),
         description: `Auto-completed: ${booking.classTitle} (system)`,
       });
 
@@ -247,7 +249,7 @@ router.post("/auto-complete", verifyToken, async (req, res) => {
       teacherJoined, studentJoined, bothActiveTime, requiredTime,
     });
   } catch (err) {
-    console.error("Auto-complete error:", err);
+    logger.error("Auto-complete error:", { error: err?.message });
     res.status(500).json({ message: "Error completing class: " + err.message });
   }
 });
@@ -279,6 +281,76 @@ router.patch("/session/:bookingId/video-provider", verifyToken, async (req, res)
     res.json({ session });
   } catch (err) {
     res.status(500).json({ message: "Error setting video provider" });
+  }
+});
+
+// PATCH /api/classroom/session/:bookingId/content-state  (teacher only)
+router.patch("/session/:bookingId/content-state", verifyToken, async (req, res) => {
+  try {
+    const { page, scale, annotation, annotationPage } = req.body;
+    const update = {};
+    if (page  != null) update.contentPage  = page;
+    if (scale != null) update.contentScale = scale;
+    if (annotation != null && annotationPage != null) {
+      update.contentAnnotation = { page: annotationPage, data: annotation, ts: Date.now() };
+    }
+    if (!Object.keys(update).length) return res.status(400).json({ message: "page, scale or annotation required" });
+
+    const session = await getClassroomSession(req.db).findOneAndUpdate(
+      { bookingId: req.params.bookingId },
+      { $set: update },
+      { new: true }
+    );
+    if (!session) return res.status(404).json({ message: "Session not found" });
+    res.json({
+      contentPage:       session.contentPage,
+      contentScale:      session.contentScale,
+      contentAnnotation: session.contentAnnotation,
+    });
+  } catch (err) {
+    res.status(500).json({ message: "Error updating content state" });
+  }
+});
+
+// GET /api/classroom/session/:bookingId/content-state  (student polls this)
+router.get("/session/:bookingId/content-state", verifyToken, async (req, res) => {
+  try {
+    const session = await getClassroomSession(req.db)
+      .findOne({ bookingId: req.params.bookingId })
+      .select("contentPage contentScale contentAnnotation");
+    if (!session) return res.status(404).json({ message: "Session not found" });
+    res.json({
+      contentPage:       session.contentPage  ?? 1,
+      contentScale:      session.contentScale ?? 1.3,
+      contentAnnotation: session.contentAnnotation ?? null,
+    });
+  } catch (err) {
+    res.status(500).json({ message: "Error fetching content state" });
+  }
+});
+
+// PATCH /api/classroom/session/:bookingId/extend-time
+router.patch("/session/:bookingId/extend-time", verifyToken, async (req, res) => {
+  try {
+    const { minutes } = req.body;
+    if (!minutes || minutes < 1 || minutes > 60)
+      return res.status(400).json({ message: "minutes must be between 1 and 60" });
+
+    const ClassroomSession = getClassroomSession(req.db);
+    const session = await ClassroomSession.findOne({ bookingId: req.params.bookingId });
+    if (!session) return res.status(404).json({ message: "Session not found" });
+    if (!["active", "waiting"].includes(session.status))
+      return res.status(400).json({ message: "Class is not active" });
+
+    const addSeconds = minutes * 60;
+    session.extendedTime = (session.extendedTime || 0) + addSeconds;
+    session.timeExtensions.push({ minutes, extendedBy: req.user.role, extendedAt: new Date() });
+    await session.save();
+
+    res.json({ session, addedSeconds: addSeconds });
+  } catch (err) {
+    logger.error("Extend-time error:", { error: err?.message });
+    res.status(500).json({ message: "Error extending class time" });
   }
 });
 
@@ -327,7 +399,7 @@ router.post("/end-early", verifyToken, async (req, res) => {
 
     res.json({ message: "Early-end logged for admin review", complaint });
   } catch (err) {
-    console.error("Error logging end-early:", err);
+    logger.error("Error logging end-early:", { error: err?.message });
     res.status(500).json({ message: "Error logging complaint" });
   }
 });
@@ -415,6 +487,7 @@ router.patch("/admin-complete/:bookingId", verifyToken, async (req, res) => {
       studentId: booking.studentId._id,
       amount: earned, status: "pending", type: "class_completion",
       classTitle: booking.classTitle, completedAt: new Date(),
+      studentName: `${booking.studentId.firstName || ""} ${booking.studentId.surname || ""}`.trim(),
       description: `Admin-approved: ${booking.classTitle} (dispute resolved)`,
     });
 
@@ -439,7 +512,7 @@ router.patch("/admin-complete/:bookingId", verifyToken, async (req, res) => {
       studentClassesRemaining: student?.noOfClasses ?? 0,
     });
   } catch (err) {
-    console.error("Admin-complete error:", err);
+    logger.error("Admin-complete error:", { error: err?.message });
     res.status(500).json({ message: "Error completing class: " + err.message });
   }
 });

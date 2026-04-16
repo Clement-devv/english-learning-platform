@@ -7,6 +7,7 @@ import { teacherSchema }    from "../schemas/teacherSchema.js";
 import { studentSchema }    from "../schemas/studentSchema.js";
 import { adminSchema }      from "../schemas/adminSchema.js";
 import { subAdminSchema }   from "../schemas/subAdminSchema.js";
+import logger from "../utils/logger.js";
 
 const router = express.Router();
 router.use(tenantMiddleware);
@@ -44,7 +45,7 @@ router.get("/", verifyToken, async (req, res) => {
 
     res.json({ success: true, chats });
   } catch (error) {
-    console.error("Error fetching chats:", error);
+    logger.error("Error fetching chats:", { error: error?.message });
     res.status(500).json({ success: false, message: "Failed to fetch chats", error: error.message });
   }
 });
@@ -74,7 +75,7 @@ router.get("/:chatId", verifyToken, async (req, res) => {
 
     res.json({ success: true, chat });
   } catch (error) {
-    console.error("Error fetching chat:", error);
+    logger.error("Error fetching chat:", { error: error?.message });
     res.status(500).json({ success: false, message: "Failed to fetch chat", error: error.message });
   }
 });
@@ -101,7 +102,7 @@ router.get("/:chatId/messages", verifyToken, async (req, res) => {
 
     res.json({ success: true, messages: chat.messages || [] });
   } catch (error) {
-    console.error("Error fetching messages:", error);
+    logger.error("Error fetching messages:", { error: error?.message });
     res.status(500).json({ success: false, message: "Failed to fetch messages", error: error.message });
   }
 });
@@ -183,7 +184,7 @@ router.post("/:chatId/messages", verifyToken, async (req, res) => {
 
     res.json({ success: true, message: "Message sent successfully", data: savedMessage });
   } catch (error) {
-    console.error("Error sending message:", error);
+    logger.error("Error sending message:", { error: error?.message });
     res.status(500).json({ success: false, message: "Failed to send message", error: error.message });
   }
 });
@@ -219,7 +220,7 @@ router.patch("/:chatId/mark-read", verifyToken, async (req, res) => {
     await chat.save();
     res.json({ success: true, message: "Messages marked as read" });
   } catch (error) {
-    console.error("Error marking messages as read:", error);
+    logger.error("Error marking messages as read:", { error: error?.message });
     res.status(500).json({ success: false, message: "Failed to mark messages as read", error: error.message });
   }
 });
@@ -235,7 +236,7 @@ router.delete("/:chatId", verifyToken, async (req, res) => {
 
     res.json({ success: true, message: "Chat deleted successfully" });
   } catch (error) {
-    console.error("Error deleting chat:", error);
+    logger.error("Error deleting chat:", { error: error?.message });
     res.status(500).json({ success: false, message: "Failed to delete chat", error: error.message });
   }
 });

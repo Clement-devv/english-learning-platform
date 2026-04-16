@@ -8,12 +8,47 @@ const __dirname  = dirname(__filename);
 dotenv.config({ path: resolve(__dirname, "../.env") });
 
 // Validate required environment variables
-const requiredEnvVars = ['JWT_SECRET', 'MONGO_URI', 'EMAIL_USER', 'EMAIL_PASSWORD', 'MASTER_DB_URI', 'DB_BASE_URI'];
+const requiredEnvVars = ['JWT_SECRET', 'MONGO_URI', 'EMAIL_USER', 'EMAIL_PASSWORD', 'MASTER_DB_URI', 'DB_BASE_URI', 'ENCRYPTION_KEY'];
 const missingEnvVars = requiredEnvVars.filter(varName => !process.env[varName]);
 
 if (missingEnvVars.length > 0) {
   console.error('❌ Missing required environment variables:', missingEnvVars);
+  if (missingEnvVars.includes('ENCRYPTION_KEY')) {
+    console.error('   Generate one with: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"');
+  }
   process.exit(1);
+}
+
+// Validate ENCRYPTION_KEY is exactly 64 hex characters (32 bytes for AES-256)
+if (!/^[0-9a-fA-F]{64}$/.test(process.env.ENCRYPTION_KEY)) {
+  console.error('❌ ENCRYPTION_KEY must be exactly 64 hex characters (32 bytes). Generate with:');
+  console.error('   node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"');
+  process.exit(1);
+}
+
+// Validate MongoDB URIs have credentials in production
+// A URI with auth looks like: mongodb://user:pass@host/db?authSource=admin
+// URIs without @ have no credentials and are unsafe outside localhost dev.
+const isProduction = (process.env.NODE_ENV || 'development') === 'production';
+const isTest       = process.env.NODE_ENV === 'test';
+if (!isTest) {
+  const mongoUris = [
+    { name: 'MONGO_URI',     value: process.env.MONGO_URI     },
+    { name: 'MASTER_DB_URI', value: process.env.MASTER_DB_URI },
+    { name: 'DB_BASE_URI',   value: process.env.DB_BASE_URI   },
+  ];
+  const unauthenticated = mongoUris.filter(u => !u.value.includes('@'));
+  if (unauthenticated.length > 0) {
+    const names = unauthenticated.map(u => u.name).join(', ');
+    if (isProduction) {
+      console.error(`❌ MongoDB URIs must include credentials in production: ${names}`);
+      console.error('   Use: mongodb://user:password@host:27017/db?authSource=admin');
+      process.exit(1);
+    } else {
+      console.warn(`⚠️  MongoDB URIs have no credentials (${names}). This is only safe on localhost.`);
+      console.warn('   In production use: mongodb://user:password@host:27017/db?authSource=admin');
+    }
+  }
 }
 
 // Validate JWT secret strength
@@ -45,8 +80,9 @@ export const config = {
   
   // Security
   jwtSecret: process.env.JWT_SECRET,
-  jwtExpiry: process.env.JWT_EXPIRY || '7d',
+  jwtExpiry: process.env.JWT_EXPIRY || '15m',
   bcryptRounds: parseInt(process.env.BCRYPT_ROUNDS) || 12,
+  encryptionKey: process.env.ENCRYPTION_KEY,
   
   // Password requirements
   passwordMinLength: 8,
@@ -97,3 +133,11 @@ export const config = {
 };
 
 export default config;
+
+// Standard JWT claims added to every token.
+// iss (issuer)  — identifies this platform as the token origin
+// aud (audience) — restricts the token to this platform's API
+export const JWT_STANDARD_CLAIMS = {
+  iss: 'english-learning-platform',
+  aud: 'elp-api',
+};

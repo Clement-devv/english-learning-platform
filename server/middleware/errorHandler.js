@@ -2,6 +2,8 @@
 // Central Express error handler — must be registered AFTER all routes.
 // Also exports process-level handlers for uncaught exceptions/rejections.
 
+import logger from "../utils/logger.js";
+
 const isDev = process.env.NODE_ENV === "development";
 
 // ── Custom error class routes can throw ──────────────────────────────────────
@@ -21,10 +23,10 @@ export function errorHandler(err, req, res, next) { // eslint-disable-line no-un
   // Log everything, but only include stack in dev
   const logLine = `🔥 [${req.method}] ${req.originalUrl} → ${status}: ${message}`;
   if (status >= 500) {
-    console.error(logLine);
-    if (isDev && err.stack) console.error(err.stack);
+    logger.error(logLine);
+    if (isDev && err.stack) logger.error(err.stack);
   } else {
-    console.warn(logLine);
+    logger.warn(logLine);
   }
 
   // Never leak internals in production for unexpected errors
@@ -44,15 +46,15 @@ export function notFoundHandler(req, res, next) {
 // unhandledRejection: non-fatal — log only; the request hits the error handler.
 export function registerProcessHandlers() {
   process.on("uncaughtException", (err) => {
-    console.error("💥 Uncaught Exception:", err.message);
-    if (isDev) console.error(err.stack);
+    logger.error("💥 Uncaught Exception:", { error: err?.message });
+    if (isDev) logger.error(err.stack);
     // Delegate to the graceful shutdown path via SIGTERM
     process.kill(process.pid, "SIGTERM");
   });
 
   process.on("unhandledRejection", (reason) => {
     const message = reason instanceof Error ? reason.message : String(reason);
-    console.error("💥 Unhandled Promise Rejection:", message);
-    if (isDev && reason instanceof Error) console.error(reason.stack);
+    logger.error("💥 Unhandled Promise Rejection:", message);
+    if (isDev && reason instanceof Error) logger.error(reason.stack);
   });
 }

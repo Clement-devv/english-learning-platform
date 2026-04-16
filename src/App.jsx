@@ -6,6 +6,7 @@ import {
 } from "react-router-dom";
 
 // Auth guards — small, always needed immediately
+import ActiveClassBanner       from "./components/ActiveClassBanner";
 import SuperAdminProtectedRoute from "./components/SuperAdminProtectedRoute";
 import AdminProtectedRoute    from "./components/AdminProtectedRoute";
 import SubAdminProtectedRoute from "./components/SubAdminProtectedRoute";
@@ -348,6 +349,7 @@ function App() {
       <Router>
       <div className="min-h-screen">
         <ImpersonationBanner />
+        <ActiveClassBanner />
         <NavigationButtons />
         <Suspense fallback={<PageLoader />}>
           <Routes>

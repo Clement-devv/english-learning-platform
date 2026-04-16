@@ -5,60 +5,62 @@ import { getUserTimezone, dualTime, tzCity } from "../../../utils/timezone";
 export default function ActiveClasses({ activeClasses, onJoin }) {
   const myTZ = getUserTimezone();
 
+  if (activeClasses.length === 0) {
+    return (
+      <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
+        No active classes right now.
+      </p>
+    );
+  }
+
   return (
-    <div className="bg-white rounded-2xl shadow-lg p-6">
-      <div className="flex items-center justify-between mb-6">
-        <h3 className="text-xl font-semibold text-gray-900">Active Classes</h3>
-        <span className="text-sm text-gray-500">{activeClasses.length} classes available</span>
-      </div>
+    <div className="space-y-4">
+      {activeClasses.map((cls) => {
+        const dual = cls.scheduledTime
+          ? dualTime(cls.scheduledTime, myTZ, cls.teacherTimezone)
+          : null;
+        const showTeacherTZ = dual && !dual.sameZone && cls.teacherTimezone;
 
-      <div className="space-y-4">
-        {activeClasses.map((cls) => {
-          const dual = cls.scheduledTime
-            ? dualTime(cls.scheduledTime, myTZ, cls.teacherTimezone)
-            : null;
-          const showTeacherTZ = dual && !dual.sameZone && cls.teacherTimezone;
-
-          return (
-            <div key={cls.id} className="border border-gray-200 rounded-xl p-5 hover:shadow-md transition-shadow">
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex-1">
-                  <div className="flex items-center space-x-3 mb-2">
-                    <h4 className="font-semibold text-gray-900">{cls.title}</h4>
-                    <StatusBadge status={cls.status} />
-                  </div>
-                  <p className="text-sm text-gray-600 mb-1">👩‍🏫 {cls.teacher}</p>
-
-                  {/* Student's local time */}
-                  <p className="text-sm font-medium text-gray-700 mb-0.5">
-                    🕒 {dual ? `${dual.myTime} ${dual.myAbbr}` : cls.time}
-                  </p>
-
-                  {/* Teacher's time when in a different timezone */}
-                  {showTeacherTZ && (
-                    <p className="text-xs text-indigo-500 mb-1">
-                      Teacher ({tzCity(cls.teacherTimezone)}): {dual.theirTime} {dual.theirAbbr}
-                    </p>
-                  )}
-
-                  <p className="text-sm text-gray-600 mb-3">📚 Topic: {cls.topic}</p>
+        return (
+          <div
+            key={cls.id}
+            className="border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-xl p-4 hover:shadow-md transition-shadow"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1 flex-wrap">
+                  <h4 className="font-semibold text-gray-900 dark:text-white text-sm">{cls.title}</h4>
+                  <StatusBadge status={cls.status} />
                 </div>
+                <p className="text-xs text-gray-600 dark:text-gray-300 mb-0.5">👩‍🏫 {cls.teacher}</p>
 
-                <button
-                  onClick={() => onJoin(cls)}
-                  className={`px-6 py-3 rounded-xl font-semibold transition-all duration-200 transform hover:scale-105 ${
-                    cls.status === "live"
-                      ? "bg-red-500 hover:bg-red-600 text-white animate-pulse"
-                      : "bg-blue-500 hover:bg-blue-600 text-white"
-                  }`}
-                >
-                  {cls.status === "live" ? "Join Live" : "Join Call"}
-                </button>
+                <p className="text-xs font-medium text-gray-700 dark:text-gray-200 mb-0.5">
+                  🕒 {dual ? `${dual.myTime} ${dual.myAbbr}` : cls.time}
+                </p>
+
+                {showTeacherTZ && (
+                  <p className="text-xs text-indigo-500 dark:text-indigo-400 mb-0.5">
+                    Teacher ({tzCity(cls.teacherTimezone)}): {dual.theirTime} {dual.theirAbbr}
+                  </p>
+                )}
+
+                <p className="text-xs text-gray-500 dark:text-gray-400">📚 {cls.topic}</p>
               </div>
+
+              <button
+                onClick={() => onJoin(cls)}
+                className={`flex-shrink-0 px-4 py-2 rounded-lg font-semibold text-sm transition-all duration-200 hover:scale-105 ${
+                  cls.status === "live"
+                    ? "bg-red-500 hover:bg-red-600 text-white animate-pulse"
+                    : "bg-blue-500 hover:bg-blue-600 text-white"
+                }`}
+              >
+                {cls.status === "live" ? "Join Live" : "Join Call"}
+              </button>
             </div>
-          );
-        })}
-      </div>
+          </div>
+        );
+      })}
     </div>
   );
 }

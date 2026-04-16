@@ -1,6 +1,7 @@
 // server/utils/emailService.js - ENHANCED WITH BOOKING NOTIFICATIONS
 import nodemailer from "nodemailer";
 import { config } from "../config/config.js";
+import logger from "../utils/logger.js";
 
 /**
  * Resolve the correct base URL for email links sent to a center's users.
@@ -51,14 +52,14 @@ const transporter = nodemailer.createTransport({
  */
 export const verifyEmailConfig = async () => {
   // Log what config was loaded so it's easy to debug missing env vars
-  console.log(`📧 Email config — host: ${config.emailHost}, port: ${config.emailPort}, user: ${config.emailUser || "(not set)"}`);
+  logger.info(`📧 Email config — host: ${config.emailHost}, port: ${config.emailPort}, user: ${config.emailUser || "(not set)"}`);
   try {
     await transporter.verify();
-    console.log("✅ Email service is ready");
+    logger.info("✅ Email service is ready");
     return true;
   } catch (error) {
-    console.error("❌ Email service error:", error.message);
-    console.error("⚠️ Email notifications will be disabled");
+    logger.error("❌ Email service error:", { error: error?.message });
+    logger.error("⚠️ Email notifications will be disabled");
     return false;
   }
 };
@@ -73,10 +74,10 @@ export const sendEmail = async (mailOptions) => {
       ...opts,
       from: `"${centerName || config.appName}" <${config.emailFrom}>`,
     });
-    console.log("📧 Email sent:", info.messageId);
+    logger.info("📧 Email sent:", info.messageId);
     return { success: true, messageId: info.messageId };
   } catch (error) {
-    console.error("❌ Email send failed:", error.message);
+    logger.error("❌ Email send failed:", { error: error?.message });
     return { success: false, error: error.message };
   }
 };
@@ -1377,10 +1378,11 @@ export const sendSubAdminWelcomeEmail = async (subAdmin, centerName = "") => {
  * @param {String} setupUrl - The account setup link
  */
 export const sendTeacherInviteEmail = async (teacher, setupUrl, centerName = "") => {
+  const displayName = centerName || config.appName;
   const mailOptions = {
     centerName,
     to: teacher.email,
-    subject: `You've been invited to join ${config.appName} as a Teacher 🎓`,
+    subject: `You've been invited to join ${displayName} as a Teacher 🎓`,
     html: `
       <!DOCTYPE html>
       <html>
@@ -1500,15 +1502,15 @@ export const sendTeacherInviteEmail = async (teacher, setupUrl, centerName = "")
             <div class="header">
               <div class="logo-ring">👨‍🏫</div>
               <h1>Welcome to the Team!</h1>
-              <p>${config.appName} Teacher Invitation</p>
+              <p>${displayName} Teacher Invitation</p>
             </div>
 
             <div class="body">
               <p class="greeting">Hi ${teacher.firstName} ${teacher.lastName},</p>
 
               <p class="text">
-                You've been invited to join <strong>${config.appName}</strong> as an 
-                <strong>English Teacher</strong>. You'll be able to manage your classes, 
+                You've been invited to join <strong>${displayName}</strong> as a
+                <strong>Teacher</strong>. You'll be able to manage your classes,
                 connect with students, and track your earnings — all in one place.
               </p>
 
@@ -1570,7 +1572,7 @@ export const sendTeacherInviteEmail = async (teacher, setupUrl, centerName = "")
             </div>
 
             <div class="footer">
-              <p>This is an automated message from <strong>${config.appName}</strong></p>
+              <p>This is an automated message from <strong>${displayName}</strong></p>
               <p>Please do not reply to this email · Contact support for assistance</p>
             </div>
 
@@ -1589,6 +1591,7 @@ export const sendTeacherInviteEmail = async (teacher, setupUrl, centerName = "")
  * @param {Object} teacher - Teacher document
  */
 export const sendTeacherWelcomeEmail = async (teacher, centerName = "") => {
+  const displayName = centerName || config.appName;
   const loginUrl = `${config.frontendUrl}/teacher/login`;
 
   const mailOptions = {
@@ -1630,8 +1633,8 @@ export const sendTeacherWelcomeEmail = async (teacher, centerName = "") => {
             <div class="body">
               <p class="greeting">Hi ${teacher.firstName} ${teacher.lastName},</p>
               <p class="text">
-                Your account has been successfully activated! You now have full access to 
-                <strong>${config.appName}</strong>'s teacher dashboard.
+                Your account has been successfully activated! You now have full access to
+                <strong>${displayName}</strong>'s teacher dashboard.
               </p>
               <div class="feature-grid">
                 <div class="feature"><div class="icon">📅</div><p>Schedule Classes</p></div>
@@ -1648,7 +1651,7 @@ export const sendTeacherWelcomeEmail = async (teacher, centerName = "") => {
               </p>
             </div>
             <div class="footer">
-              <p>This is an automated message from <strong>${config.appName}</strong></p>
+              <p>This is an automated message from <strong>${displayName}</strong></p>
             </div>
           </div>
         </div>
@@ -1667,10 +1670,11 @@ export const sendTeacherWelcomeEmail = async (teacher, centerName = "") => {
  * @param {String} setupUrl - Full URL to the setup page with token
  */
 export const sendStudentInviteEmail = async (student, setupUrl, centerName = "") => {
+  const displayName = centerName || config.appName;
   const mailOptions = {
     centerName,
     to:   student.email,
-    subject: `You've been invited to ${config.appName} — Set up your account`,
+    subject: `You've been invited to ${displayName} — Set up your account`,
     html: `
       <!DOCTYPE html>
       <html>
@@ -1709,11 +1713,11 @@ export const sendStudentInviteEmail = async (student, setupUrl, centerName = "")
           <div class="header">
             <div class="avatar">🎓</div>
             <h1>You're invited to learn!</h1>
-            <p>Your admin has set up your English learning account</p>
+            <p>Your admin has set up your account at ${displayName}</p>
           </div>
           <div class="body">
             <p>Hi <strong>${student.firstName}</strong>,</p>
-            <p>Welcome to <strong>${config.appName}</strong>! Your account has been created and you're ready to start your English learning journey. Just set up your password to get started.</p>
+            <p>Welcome to <strong>${displayName}</strong>! Your account has been created and you're ready to start your learning journey. Just set up your password to get started.</p>
 
             <div class="info-card">
               <div class="info-row">
@@ -1752,7 +1756,7 @@ export const sendStudentInviteEmail = async (student, setupUrl, centerName = "")
             </p>
           </div>
           <div class="footer">
-            <p>© ${new Date().getFullYear()} ${config.appName}. All rights reserved.</p>
+            <p>© ${new Date().getFullYear()} ${displayName}. All rights reserved.</p>
             <p>Having trouble? <a href="${setupUrl}">Copy this link</a> into your browser.</p>
           </div>
         </div>
@@ -1769,12 +1773,13 @@ export const sendStudentInviteEmail = async (student, setupUrl, centerName = "")
  * @param {Object} student - Student object { firstName, surname, email }
  */
 export const sendStudentWelcomeEmail = async (student, centerName = "") => {
+  const displayName = centerName || config.appName;
   const loginUrl = `${config.frontendUrl}/student/login`;
 
   const mailOptions = {
     centerName,
     to:   student.email,
-    subject: `Welcome to ${config.appName} — Your account is ready! 🎉`,
+    subject: `Welcome to ${displayName} — Your account is ready! 🎉`,
     html: `
       <!DOCTYPE html>
       <html>
@@ -1810,7 +1815,7 @@ export const sendStudentWelcomeEmail = async (student, centerName = "") => {
           </div>
           <div class="body">
             <p>Hi <strong>${student.firstName}</strong>,</p>
-            <p>Your <strong>${config.appName}</strong> account is now fully activated! You can login and start joining your English classes right away.</p>
+            <p>Your <strong>${displayName}</strong> account is now fully activated! You can login and start joining your classes right away.</p>
 
             <div class="steps">
               <div class="step"><div class="step-num">1</div><span class="step-text">Log in with your email and the password you just created</span></div>
@@ -1828,7 +1833,7 @@ export const sendStudentWelcomeEmail = async (student, centerName = "") => {
             </p>
           </div>
           <div class="footer">
-            <p>© ${new Date().getFullYear()} ${config.appName}. All rights reserved.</p>
+            <p>© ${new Date().getFullYear()} ${displayName}. All rights reserved.</p>
           </div>
         </div>
       </body>

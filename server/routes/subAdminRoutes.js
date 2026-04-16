@@ -8,6 +8,7 @@ import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
 import { subAdminSchema } from "../schemas/subAdminSchema.js";
 import { teacherSchema }  from "../schemas/teacherSchema.js";
 import { studentSchema }  from "../schemas/studentSchema.js";
+import logger from "../utils/logger.js";
 
 const router = express.Router();
 router.use(tenantMiddleware);
@@ -29,7 +30,7 @@ router.get("/", async (req, res) => {
 
     res.json({ success: true, subAdmins });
   } catch (err) {
-    console.error("Get sub-admins error:", err);
+    logger.error("Get sub-admins error:", { error: err?.message });
     res.status(500).json({ success: false, message: "Failed to fetch sub-admins" });
   }
 });
@@ -92,7 +93,7 @@ router.post("/invite", async (req, res) => {
       },
     });
   } catch (err) {
-    console.error("Invite sub-admin error:", err);
+    logger.error("Invite sub-admin error:", { error: err?.message });
     res.status(500).json({ success: false, message: "Failed to send invitation" });
   }
 });
@@ -117,7 +118,7 @@ router.post("/:id/resend-invite", async (req, res) => {
 
     res.json({ success: true, message: "Invitation resent successfully" });
   } catch (err) {
-    console.error("Resend invite error:", err);
+    logger.error("Resend invite error:", { error: err?.message });
     res.status(500).json({ success: false, message: "Failed to resend invitation" });
   }
 });
@@ -145,7 +146,7 @@ router.put("/:id", async (req, res) => {
 
     res.json({ success: true, message: "Sub-admin updated", subAdmin: updated });
   } catch (err) {
-    console.error("Update sub-admin error:", err);
+    logger.error("Update sub-admin error:", { error: err?.message });
     res.status(500).json({ success: false, message: "Failed to update sub-admin" });
   }
 });
@@ -168,7 +169,7 @@ router.patch("/:id/toggle-status", async (req, res) => {
       status: subAdmin.status,
     });
   } catch (err) {
-    console.error("Toggle status error:", err);
+    logger.error("Toggle status error:", { error: err?.message });
     res.status(500).json({ success: false, message: "Failed to toggle status" });
   }
 });
@@ -194,7 +195,7 @@ router.patch("/:id/assign-teachers", async (req, res) => {
 
     res.json({ success: true, message: "Teachers assigned successfully", assignedTeachers: updated.assignedTeachers });
   } catch (err) {
-    console.error("Assign teachers error:", err);
+    logger.error("Assign teachers error:", { error: err?.message });
     res.status(500).json({ success: false, message: "Failed to assign teachers" });
   }
 });
@@ -206,7 +207,7 @@ router.delete("/:id", async (req, res) => {
     if (!subAdmin) return res.status(404).json({ success: false, message: "Sub-admin not found" });
     res.json({ success: true, message: "Sub-admin deleted" });
   } catch (err) {
-    console.error("Delete sub-admin error:", err);
+    logger.error("Delete sub-admin error:", { error: err?.message });
     res.status(500).json({ success: false, message: "Failed to delete sub-admin" });
   }
 });

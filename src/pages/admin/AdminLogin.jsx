@@ -13,7 +13,7 @@ export default function AdminLogin() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [requires2FA, setRequires2FA] = useState(false);
-  const [tempUserId, setTempUserId] = useState(null);
+  const [pendingToken, setPendingToken] = useState(null);
   const [focused,       setFocused]      = useState(null);
   const [mounted,       setMounted]      = useState(false);
   const [view,          setView]         = useState('login'); // 'login' | 'forgot' | 'forgot-sent'
@@ -42,7 +42,7 @@ export default function AdminLogin() {
         navigate('/admin');
       } else if (response.data.requires2FA) {
         setRequires2FA(true);
-        setTempUserId(response.data.tempUserId);
+        setPendingToken(response.data.pendingToken);
       }
     } catch (err) {
       setError(err.response?.data?.message || 'Invalid credentials. Access denied.');
@@ -56,7 +56,7 @@ export default function AdminLogin() {
     setLoading(true);
     try {
       const response = await api.post('/auth/verify-2fa-login', {
-        tempUserId, twoFactorToken, backupCode, role: 'admin',
+        pendingToken, twoFactorToken, backupCode,
       });
       if (response.data.success) {
         sessionStorage.setItem('adminToken', response.data.token);

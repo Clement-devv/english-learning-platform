@@ -14,6 +14,7 @@ import {
 } from "../utils/emailService.js";
 import { callGemini, extractJSONArray } from "../utils/geminiHelper.js";
 import { recordActivity } from "../utils/streakService.js";
+import logger from "../utils/logger.js";
 
 // Multer — memory storage (no disk writes, PDF buffer passed straight to pdf-parse)
 const upload = multer({
@@ -109,9 +110,20 @@ router.post("/", verifyToken, async (req, res) => {
       }
     }).catch(() => {});
 
+    // Push real-time update to student dashboard
+    try {
+      const io = req.app.get('io');
+      io.to(`student-room:${req.center.slug}:${studentId}`).emit('quiz-assigned', {
+        title: '📝 New Quiz!',
+        message: `Your teacher assigned: "${title.trim().slice(0, 60)}"`,
+        quizId: quiz._id,
+        dueDate,
+      });
+    } catch (_) {}
+
     res.status(201).json({ success: true, quiz });
   } catch (err) {
-    console.error("Create quiz error:", err);
+    logger.error("Create quiz error:", { error: err?.message });
     res.status(500).json({ message: err.message });
   }
 });
@@ -242,7 +254,7 @@ router.post("/:id/attempt", verifyToken, async (req, res) => {
     const fullQuiz = quiz.toObject();
     res.json({ success: true, attempt, quiz: fullQuiz, streak: streakResult });
   } catch (err) {
-    console.error("Submit attempt error:", err);
+    logger.error("Submit attempt error:", { error: err?.message });
     res.status(500).json({ message: err.message });
   }
 });
@@ -277,8 +289,9 @@ router.post("/generate", verifyToken, async (req, res) => {
 
     if (!topic?.trim()) return res.status(400).json({ message: "Topic is required" });
 
-    if (!process.env.GEMINI_API_KEY) {
-      return res.status(503).json({ message: "AI generation is not configured on this server" });
+    const geminiKey = process.env.GEMINI_API_KEY;
+    if (!geminiKey || geminiKey.startsWith("CHANGE_ME")) {
+      return res.status(503).json({ message: "AI quiz generation is not configured — GEMINI_API_KEY is missing or not set." });
     }
 
     const safeCount = Math.min(Math.max(parseInt(count, 10) || 10, 1), 20);
@@ -335,7 +348,7 @@ Return ONLY a valid JSON array in this exact format:
     res.json({ success: true, questions: valid, generated: valid.length });
 
   } catch (err) {
-    console.error("Quiz generate error:", err.message);
+    logger.error("Quiz generate error:", { error: err?.message });
     res.status(500).json({ message: err.message });
   }
 });
@@ -455,7 +468,7 @@ Return ONLY a valid JSON array:
       res.json({ success: true, questions: valid, generated: valid.length });
 
     } catch (err) {
-      console.error("Generate-from-notes error:", err.message);
+      logger.error("Generate-from-notes error:", { error: err?.message });
       // Multer file type error
       if (err.message === "Only PDF files are allowed") {
         return res.status(400).json({ message: err.message });
@@ -471,7 +484,7 @@ Return ONLY a valid JSON array:
 // ─────────────────────────────────────────────────────────────────────────────
 router.get("/ai-models", verifyToken, async (req, res) => {
   const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) return res.status(503).json({ message: "GEMINI_API_KEY not set" });
+  if (!apiKey || apiKey.startsWith("CHANGE_ME")) return res.status(503).json({ message: "GEMINI_API_KEY not set" });
   try {
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`

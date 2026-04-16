@@ -2,12 +2,13 @@
 import express from "express";
 import jwt     from "jsonwebtoken";
 import crypto  from "crypto";
-import { config } from "../config/config.js";
+import { config, JWT_STANDARD_CLAIMS } from "../config/config.js";
 import { loginLimiter, passwordResetLimiter } from "../middleware/rateLimiter.js";
 import { sendSubAdminInviteEmail, sendSubAdminWelcomeEmail } from "../utils/emailService.js";
 import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
 import { subAdminSchema }   from "../schemas/subAdminSchema.js";
 import { teacherSchema }    from "../schemas/teacherSchema.js";
+import logger from "../utils/logger.js";
 
 const router = express.Router();
 router.use(tenantMiddleware);
@@ -47,6 +48,7 @@ router.post("/login", loginLimiter, async (req, res) => {
 
     const token = jwt.sign(
       {
+        ...JWT_STANDARD_CLAIMS,
         id: subAdmin._id,
         email: subAdmin.email,
         role: "sub-admin",
@@ -78,7 +80,7 @@ router.post("/login", loginLimiter, async (req, res) => {
       },
     });
   } catch (err) {
-    console.error("Sub-admin login error:", err);
+    logger.error("Sub-admin login error:", { error: err?.message });
     res.status(500).json({ success: false, message: "Server error during login" });
   }
 });
@@ -100,7 +102,7 @@ router.get("/verify-invite/:token", passwordResetLimiter, async (req, res) => {
       subAdmin: { firstName: subAdmin.firstName, lastName: subAdmin.lastName, email: subAdmin.email },
     });
   } catch (err) {
-    console.error("Verify invite error:", err);
+    logger.error("Verify invite error:", { error: err?.message });
     res.status(500).json({ success: false, message: "Server error" });
   }
 });
@@ -132,11 +134,11 @@ router.post("/setup-account", passwordResetLimiter, async (req, res) => {
     subAdmin.inviteExpires = null;
     await subAdmin.save();
 
-    sendSubAdminWelcomeEmail(subAdmin, req.center?.centerName || "").catch(console.error);
+    sendSubAdminWelcomeEmail(subAdmin, req.center?.centerName || "").catch(e => logger.error("Sub-admin welcome email failed:", { error: e?.message }));
 
     res.json({ success: true, message: "Account activated successfully! You can now log in." });
   } catch (err) {
-    console.error("Setup account error:", err);
+    logger.error("Setup account error:", { error: err?.message });
     res.status(500).json({ success: false, message: "Server error" });
   }
 });

@@ -44,6 +44,12 @@ export const apiResetPassword = async (id) => {
   return res.data;
 };
 
+// 👉 Resend invite email (pending students only)
+export const resendStudentInvite = async (id) => {
+  const res = await api.post(`${API_URL}/${id}/resend-invite`);
+  return res.data;
+};
+
 // 👉 Record lesson
 export const recordLesson = async (id, lessonData) => {
   const res = await api.post(`${API_URL}/${id}/lesson`, lessonData);

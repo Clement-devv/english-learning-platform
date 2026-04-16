@@ -6,6 +6,8 @@ import { bookingSchema }              from "../schemas/bookingSchema.js";
 import { teacherSchema }              from "../schemas/teacherSchema.js";
 import { studentSchema }              from "../schemas/studentSchema.js";
 import { paymentTransactionSchema }   from "../schemas/paymentTransactionSchema.js";
+import { parsePagination }            from "../utils/pagination.js";
+import logger from "../utils/logger.js";
 
 const router = express.Router();
 router.use(tenantMiddleware);
@@ -83,7 +85,7 @@ router.get("/overview", verifyToken, verifyAdmin, async (req, res) => {
       },
     });
   } catch (err) {
-    console.error("Error fetching analytics overview:", err);
+    logger.error("Error fetching analytics overview:", { error: err?.message });
     res.status(500).json({ success: false, message: "Error fetching analytics" });
   }
 });
@@ -114,7 +116,7 @@ router.get("/bookings-timeline", verifyToken, verifyAdmin, async (req, res) => {
 
     res.json({ success: true, data: timeline });
   } catch (err) {
-    console.error("Error fetching bookings timeline:", err);
+    logger.error("Error fetching bookings timeline:", { error: err?.message });
     res.status(500).json({ success: false, message: "Error fetching bookings timeline" });
   }
 });
@@ -161,12 +163,12 @@ router.get("/teacher-performance", verifyToken, verifyAdmin, async (req, res) =>
         },
       },
       { $sort: { lessonsCompleted: -1 } },
-      { $limit: parseInt(limit) },
+      { $limit: parsePagination({ limit }).limit },
     ]);
 
     res.json({ success: true, data: teacherStats });
   } catch (err) {
-    console.error("Error fetching teacher performance:", err);
+    logger.error("Error fetching teacher performance:", { error: err?.message });
     res.status(500).json({ success: false, message: "Error fetching teacher performance" });
   }
 });
@@ -205,12 +207,12 @@ router.get("/student-engagement", verifyToken, verifyAdmin, async (req, res) => 
         },
       },
       { $sort: { engagementScore: -1 } },
-      { $limit: parseInt(limit) },
+      { $limit: parsePagination({ limit }).limit },
     ]);
 
     res.json({ success: true, data: studentStats });
   } catch (err) {
-    console.error("Error fetching student engagement:", err);
+    logger.error("Error fetching student engagement:", { error: err?.message });
     res.status(500).json({ success: false, message: "Error fetching student engagement" });
   }
 });
@@ -250,7 +252,7 @@ router.get("/revenue-breakdown", verifyToken, verifyAdmin, async (req, res) => {
       },
     });
   } catch (err) {
-    console.error("Error fetching revenue breakdown:", err);
+    logger.error("Error fetching revenue breakdown:", { error: err?.message });
     res.status(500).json({ success: false, message: "Error fetching revenue breakdown" });
   }
 });
@@ -276,7 +278,7 @@ router.get("/popular-times", verifyToken, verifyAdmin, async (req, res) => {
 
     res.json({ success: true, data: formattedTimes });
   } catch (err) {
-    console.error("Error fetching popular times:", err);
+    logger.error("Error fetching popular times:", { error: err?.message });
     res.status(500).json({ success: false, message: "Error fetching popular times" });
   }
 });
@@ -313,7 +315,7 @@ router.get("/booking-acceptance-rate", verifyToken, verifyAdmin, async (req, res
 
     res.json({ success: true, data: acceptanceRate });
   } catch (err) {
-    console.error("Error fetching acceptance rate:", err);
+    logger.error("Error fetching acceptance rate:", { error: err?.message });
     res.status(500).json({ success: false, message: "Error fetching acceptance rate" });
   }
 });

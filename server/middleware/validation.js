@@ -1,6 +1,9 @@
 // middleware/validation.js
 import { body, param, query, validationResult } from 'express-validator';
 
+// Slug regex matching the same allowlist used in dbManager.js
+const SLUG_RE = /^[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$|^[a-z0-9]$/;
+
 /**
  * Validation error handler
  * Processes validation errors and returns formatted response
@@ -350,6 +353,193 @@ export const validateSearch = [
     .trim()
     .isLength({ max: 100 })
     .withMessage('Search query must not exceed 100 characters')
+    .escape(),
+  validate
+];
+
+// ── Factory: validate any named :param as a MongoDB ObjectId ─────────────────
+// Usage: validateParamMongoId('id') or validateParamMongoId('centerId')
+export const validateParamMongoId = (paramName) => [
+  param(paramName)
+    .isMongoId()
+    .withMessage(`Invalid ${paramName} format`),
+  validate
+];
+
+// ── Super admin login ─────────────────────────────────────────────────────────
+export const validateSuperAdminLogin = [
+  body('email')
+    .trim()
+    .isEmail()
+    .normalizeEmail()
+    .withMessage('Valid email is required')
+    .isLength({ max: 100 })
+    .withMessage('Email too long'),
+  body('password')
+    .notEmpty()
+    .withMessage('Password is required')
+    .isLength({ max: 128 })
+    .withMessage('Password too long'),
+  validate
+];
+
+// ── Center registration ───────────────────────────────────────────────────────
+export const validateCenterRegistration = [
+  body('centerName')
+    .trim()
+    .isLength({ min: 2, max: 100 })
+    .withMessage('Center name must be between 2 and 100 characters')
+    .escape(),
+  body('slug')
+    .trim()
+    .toLowerCase()
+    .matches(SLUG_RE)
+    .withMessage('Slug may only contain lowercase letters, numbers, and hyphens (2–63 chars)'),
+  body('adminEmail')
+    .trim()
+    .isEmail()
+    .normalizeEmail()
+    .withMessage('Valid admin email is required')
+    .isLength({ max: 100 })
+    .withMessage('Email too long'),
+  body('password')
+    .isLength({ min: 8, max: 128 })
+    .withMessage('Password must be between 8 and 128 characters')
+    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/)
+    .withMessage('Password must contain uppercase, lowercase, number, and special character'),
+  body('phone')
+    .optional({ nullable: true, checkFalsy: true })
+    .matches(/^\+?[\d\s\-().]{7,20}$/)
+    .withMessage('Invalid phone number'),
+  body('country')
+    .optional({ nullable: true, checkFalsy: true })
+    .trim()
+    .isLength({ max: 100 })
+    .escape(),
+  body('website')
+    .optional({ nullable: true, checkFalsy: true })
+    .isURL({ require_protocol: true })
+    .withMessage('Website must be a valid URL'),
+  body('timezone')
+    .optional()
+    .trim()
+    .isLength({ max: 60 })
+    .escape(),
+  body('maxTeachers')
+    .optional({ nullable: true, checkFalsy: true })
+    .isInt({ min: 1, max: 10000 })
+    .withMessage('maxTeachers must be between 1 and 10,000'),
+  body('maxStudents')
+    .optional({ nullable: true, checkFalsy: true })
+    .isInt({ min: 1, max: 100000 })
+    .withMessage('maxStudents must be between 1 and 100,000'),
+  body('plan')
+    .optional()
+    .isIn(['free', 'basic', 'pro', 'enterprise'])
+    .withMessage('Plan must be free, basic, pro, or enterprise'),
+  validate
+];
+
+// ── Super admin: center plan ──────────────────────────────────────────────────
+export const validateCenterPlan = [
+  ...validateParamMongoId('id').slice(0, -1), // include the param check, drop the validate call
+  body('plan')
+    .isIn(['free', 'basic', 'pro', 'enterprise'])
+    .withMessage('Plan must be free, basic, pro, or enterprise'),
+  validate
+];
+
+// ── Super admin: center seat limits ──────────────────────────────────────────
+export const validateCenterLimits = [
+  ...validateParamMongoId('id').slice(0, -1),
+  body('maxTeachers')
+    .optional()
+    .custom((v) => {
+      const n = Number(v);
+      if (isNaN(n) || (n !== -1 && n < 1)) throw new Error('maxTeachers must be -1 (unlimited) or ≥ 1');
+      return true;
+    }),
+  body('maxStudents')
+    .optional()
+    .custom((v) => {
+      const n = Number(v);
+      if (isNaN(n) || (n !== -1 && n < 1)) throw new Error('maxStudents must be -1 (unlimited) or ≥ 1');
+      return true;
+    }),
+  validate
+];
+
+// ── Super admin: broadcast email ──────────────────────────────────────────────
+export const validateBroadcast = [
+  body('subject')
+    .trim()
+    .isLength({ min: 1, max: 200 })
+    .withMessage('Subject is required and must be under 200 characters')
+    .escape(),
+  body('message')
+    .trim()
+    .isLength({ min: 1, max: 10000 })
+    .withMessage('Message is required and must be under 10,000 characters'),
+  validate
+];
+
+// ── Super admin: OTP send ─────────────────────────────────────────────────────
+export const validateOtpSend = [
+  body('adminEmail')
+    .trim()
+    .isEmail()
+    .normalizeEmail()
+    .withMessage('Valid admin email is required'),
+  validate
+];
+
+// ── Super admin: OTP verify ───────────────────────────────────────────────────
+export const validateOtpVerify = [
+  body('adminEmail')
+    .trim()
+    .isEmail()
+    .normalizeEmail()
+    .withMessage('Valid admin email is required'),
+  body('code')
+    .trim()
+    .matches(/^\d{6}$/)
+    .withMessage('OTP must be exactly 6 digits'),
+  validate
+];
+
+// ── Super admin: chat credit allocation ───────────────────────────────────────
+export const validateChatCredits = [
+  param('centerId')
+    .isMongoId()
+    .withMessage('Invalid centerId format'),
+  body('amount')
+    .isInt({ min: 1, max: 100000 })
+    .withMessage('Amount must be an integer between 1 and 100,000'),
+  body('note')
+    .optional()
+    .trim()
+    .isLength({ max: 200 })
+    .withMessage('Note must be under 200 characters')
+    .escape(),
+  validate
+];
+
+// ── Super admin: impersonate slug ─────────────────────────────────────────────
+export const validateSlugParam = [
+  param('slug')
+    .matches(SLUG_RE)
+    .withMessage('Invalid slug format'),
+  validate
+];
+
+// ── Super admin: reject / suspend / soft-delete — optional reason ─────────────
+export const validateCenterAction = [
+  ...validateParamMongoId('id').slice(0, -1),
+  body('reason')
+    .optional()
+    .trim()
+    .isLength({ max: 500 })
+    .withMessage('Reason must be under 500 characters')
     .escape(),
   validate
 ];

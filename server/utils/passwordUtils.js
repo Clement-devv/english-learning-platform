@@ -2,6 +2,7 @@
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import { config } from "../config/config.js";
+import logger from "../utils/logger.js";
 
 /**
  * Validate password complexity against requirements
@@ -150,7 +151,7 @@ export const isPasswordReused = async (userId, newPassword, userModel) => {
     
     return false;
   } catch (error) {
-    console.error('Error checking password history:', error);
+    logger.error('Error checking password history:', { error: error?.message });
     return false;
   }
 };

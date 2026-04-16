@@ -31,6 +31,8 @@ const centerSchema = new mongoose.Schema({
     favicon:        { type: String, default: null },
     loginBackground: { type: String, default: null },
     loginBgOverlay:  { type: Number, default: 0.45 },
+    loginTheme:      { type: String, default: null },  // exclusive — super admin assigns
+    dashboardTheme:  { type: String, default: null },  // exclusive — super admin assigns
     borderRadius:   { type: String, default: '8px' },
     shadowStyle:    { type: String, default: 'soft' },
     spacing:        { type: String, default: 'comfortable' },

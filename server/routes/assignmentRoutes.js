@@ -5,6 +5,8 @@ import { assignmentSchema } from "../schemas/assignmentSchema.js";
 import { groupChatSchema }  from "../schemas/groupChatSchema.js";
 import { teacherSchema }    from "../schemas/teacherSchema.js";
 import { studentSchema }    from "../schemas/studentSchema.js";
+import { parsePagination }  from "../utils/pagination.js";
+import logger from "../utils/logger.js";
 
 const router = express.Router();
 router.use(tenantMiddleware);
@@ -17,8 +19,7 @@ const getStudent    = (db) => db.models.Student    || db.model("Student",    stu
 // Get all assignments
 router.get("/", async (req, res) => {
   try {
-    const limit = Math.min(parseInt(req.query.limit) || 500, 1000);
-    const skip  = Math.max(parseInt(req.query.skip)  || 0,   0);
+    const { limit, skip } = parsePagination(req.query);
     const assignments = await getAssignment(req.db)
       .find()
       .populate("teacherId", "firstName lastName email")
@@ -29,7 +30,7 @@ router.get("/", async (req, res) => {
       .lean();
     res.json(assignments);
   } catch (err) {
-    console.error(err);
+    logger.error(err);
     res.status(500).json({ message: "Error fetching assignments" });
   }
 });
@@ -64,7 +65,7 @@ router.post("/", async (req, res) => {
       const student = await getStudent(req.db).findById(studentId);
 
       if (!teacher || !student) {
-        console.error("Teacher or Student not found for chat creation");
+        logger.error("Teacher or Student not found for chat creation");
         return res.status(201).json({
           message: "Assignment created but chat creation failed",
           assignment: populated,
@@ -94,12 +95,12 @@ router.post("/", async (req, res) => {
         });
       }
     } catch (chatErr) {
-      console.error("Error creating group chat:", chatErr);
+      logger.error("Error creating group chat:", chatErr);
     }
 
     res.status(201).json({ message: "Assignment created successfully", assignment: populated });
   } catch (err) {
-    console.error("Error creating assignment:", err);
+    logger.error("Error creating assignment:", { error: err?.message });
     res.status(500).json({ message: "Error creating assignment" });
   }
 });
@@ -117,12 +118,12 @@ router.delete("/:id", async (req, res) => {
         { isActive: false }
       );
     } catch (chatErr) {
-      console.error("Error deactivating group chat:", chatErr);
+      logger.error("Error deactivating group chat:", chatErr);
     }
 
     res.json({ message: "Assignment deleted" });
   } catch (err) {
-    console.error(err);
+    logger.error(err);
     res.status(500).json({ message: "Error deleting assignment" });
   }
 });

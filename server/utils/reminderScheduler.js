@@ -24,6 +24,7 @@ import {
   sendTeacherAccountDeletionFinalReminderEmail,
 } from "./emailService.js";
 import { sendPush } from "./webPushService.js";
+import logger from "../utils/logger.js";
 
 const getBooking     = (db) => db.models.Booking     || db.model("Booking",     bookingSchema);
 const getHomework    = (db) => db.models.Homework    || db.model("Homework",    homeworkSchema);
@@ -86,30 +87,30 @@ async function checkClassReminders(db) {
       const teacherKey = `${label}_t_${booking._id}`;
       if (await markSent(db, teacherKey, booking._id)) {
         sendClassTimedReminder(teacher, booking, "teacher", mins).catch(e =>
-          console.error(`Reminder email failed (${teacherKey}):`, e.message)
+          logger.error(`Reminder email failed (${teacherKey}):`, e.message)
         );
         getTeacher(db).findById(teacher._id).select("pushSubscription").then(t => {
           if (t?.pushSubscription) {
             sendPush(t.pushSubscription, { ...pushPayload, data: { url: "/teacher/dashboard" } })
-              .catch(e => console.error(`Push failed (teacher ${teacher.email}):`, e.message));
+              .catch(e => logger.error(`Push failed (teacher ${teacher.email}):`, e.message));
           }
-        }).catch(e => console.error(`Push subscription fetch failed:`, e.message));
-        console.log(`📧 Class reminder sent → teacher ${teacher.email} (${mins} min)`);
+        }).catch(e => logger.error(`Push subscription fetch failed:`, { error: e?.message }));
+        logger.info(`📧 Class reminder sent → teacher ${teacher.email} (${mins} min)`);
       }
 
       // Student reminder
       const studentKey = `${label}_s_${booking._id}`;
       if (await markSent(db, studentKey, booking._id)) {
         sendClassTimedReminder(student, booking, "student", mins).catch(e =>
-          console.error(`Reminder email failed (${studentKey}):`, e.message)
+          logger.error(`Reminder email failed (${studentKey}):`, e.message)
         );
         getStudent(db).findById(student._id).select("pushSubscription").then(s => {
           if (s?.pushSubscription) {
             sendPush(s.pushSubscription, pushPayload)
-              .catch(e => console.error(`Push failed (student ${student.email}):`, e.message));
+              .catch(e => logger.error(`Push failed (student ${student.email}):`, e.message));
           }
-        }).catch(e => console.error(`Push subscription fetch failed:`, e.message));
-        console.log(`📧 Class reminder sent → student ${student.email} (${mins} min)`);
+        }).catch(e => logger.error(`Push subscription fetch failed:`, { error: e?.message }));
+        logger.info(`📧 Class reminder sent → student ${student.email} (${mins} min)`);
       }
     }
   }
@@ -132,9 +133,9 @@ async function checkHomeworkReminders(db) {
     const key = `homework_30min_${hw._id}`;
     if (await markSent(db, key, hw._id)) {
       sendHomeworkDueReminder(student, hw, 30).catch(e =>
-        console.error(`Homework reminder failed:`, e.message)
+        logger.error(`Homework reminder failed:`, { error: e?.message })
       );
-      console.log(`📧 Homework due reminder → ${student.email} "${hw.title}"`);
+      logger.info(`📧 Homework due reminder → ${student.email} "${hw.title}"`);
     }
   }
 }
@@ -156,9 +157,9 @@ async function checkQuizReminders(db) {
     const key = `quiz_30min_${quiz._id}`;
     if (await markSent(db, key, quiz._id)) {
       sendQuizDueReminder(student, quiz, 30).catch(e =>
-        console.error(`Quiz reminder failed:`, e.message)
+        logger.error(`Quiz reminder failed:`, { error: e?.message })
       );
-      console.log(`📧 Quiz due reminder → ${student.email} "${quiz.title}"`);
+      logger.info(`📧 Quiz due reminder → ${student.email} "${quiz.title}"`);
     }
   }
 }
@@ -178,11 +179,11 @@ async function checkScheduledDeletions(db) {
 
   for (const student of pendingReminder) {
     sendAccountDeletionFinalReminderEmail(student, student.scheduledDeletionAt).catch((err) =>
-      console.error(`Final deletion reminder failed for ${student.email}:`, err.message)
+      logger.error(`Final deletion reminder failed for ${student.email}:`, { error: err?.message })
     );
     student.deletionWarningEmailSent = true;
     await student.save();
-    console.log(`📧 Final deletion reminder → ${student.email} (deletes ${student.scheduledDeletionAt})`);
+    logger.info(`📧 Final deletion reminder → ${student.email} (deletes ${student.scheduledDeletionAt})`);
   }
 
   // 2. Permanently delete students whose deletion date has passed.
@@ -190,11 +191,11 @@ async function checkScheduledDeletions(db) {
 
   for (const student of toDelete) {
     await student.deleteOne();
-    console.log(`🗑️  Student permanently deleted: ${student.email}`);
+    logger.info(`🗑️  Student permanently deleted: ${student.email}`);
   }
 
   if (toDelete.length > 0) {
-    console.log(`✅ Permanently deleted ${toDelete.length} scheduled student(s)`);
+    logger.info(`✅ Permanently deleted ${toDelete.length} scheduled student(s)`);
   }
 
   // 3. Send 24-hour final reminder to teachers whose deletion is within the next 24 hours.
@@ -205,11 +206,11 @@ async function checkScheduledDeletions(db) {
 
   for (const teacher of pendingTeacherReminder) {
     sendTeacherAccountDeletionFinalReminderEmail(teacher, teacher.scheduledDeletionAt).catch((err) =>
-      console.error(`Final teacher deletion reminder failed for ${teacher.email}:`, err.message)
+      logger.error(`Final teacher deletion reminder failed for ${teacher.email}:`, { error: err?.message })
     );
     teacher.deletionWarningEmailSent = true;
     await teacher.save();
-    console.log(`📧 Final teacher deletion reminder → ${teacher.email} (deletes ${teacher.scheduledDeletionAt})`);
+    logger.info(`📧 Final teacher deletion reminder → ${teacher.email} (deletes ${teacher.scheduledDeletionAt})`);
   }
 
   // 4. Permanently delete teachers whose deletion date has passed.
@@ -217,11 +218,11 @@ async function checkScheduledDeletions(db) {
 
   for (const teacher of teachersToDelete) {
     await teacher.deleteOne();
-    console.log(`🗑️  Teacher permanently deleted: ${teacher.email}`);
+    logger.info(`🗑️  Teacher permanently deleted: ${teacher.email}`);
   }
 
   if (teachersToDelete.length > 0) {
-    console.log(`✅ Permanently deleted ${teachersToDelete.length} scheduled teacher(s)`);
+    logger.info(`✅ Permanently deleted ${teachersToDelete.length} scheduled teacher(s)`);
   }
 }
 
@@ -229,7 +230,7 @@ async function checkScheduledDeletions(db) {
 function makeTick(db) {
   return async function runTick() {
     if (db.readyState !== 1) {
-      console.warn("⏰ Reminder scheduler skipped — DB not connected (readyState:", db.readyState, ")");
+      logger.warn("⏰ Reminder scheduler skipped — DB not connected (readyState:", db.readyState, ")");
       return;
     }
     try {
@@ -240,14 +241,14 @@ function makeTick(db) {
         checkScheduledDeletions(db),
       ]);
     } catch (err) {
-      console.error("Reminder scheduler error:", err.message);
+      logger.error("Reminder scheduler error:", { error: err?.message });
     }
   };
 }
 
 export function startReminderScheduler(db) {
   const centerSlug = db.name || "unknown";
-  console.log(`⏰ Reminder scheduler started for center: ${centerSlug} (60s interval)`);
+  logger.info(`⏰ Reminder scheduler started for center: ${centerSlug} (60s interval)`);
   const runTick = makeTick(db);
   // Don't run immediately — DB connection may still be opening (readyState 2).
   // The interval will fire once fully connected.

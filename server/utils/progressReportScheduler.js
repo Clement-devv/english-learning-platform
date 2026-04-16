@@ -12,6 +12,7 @@ import { bookingSchema }     from "../schemas/bookingSchema.js";
 import { reminderLogSchema } from "../schemas/reminderLogSchema.js";
 import { generateProgressReport } from "./progressReportGenerator.js";
 import { sendProgressReport }     from "./emailService.js";
+import logger from "../utils/logger.js";
 
 const getStudent     = (db) => db.models.Student     || db.model("Student",     studentSchema);
 const getBooking     = (db) => db.models.Booking     || db.model("Booking",     bookingSchema);
@@ -53,12 +54,12 @@ async function sendReport(db, student, period, from, to, logKey) {
     const pdfBuffer = await generateProgressReport(db, student, teacher, from, to, period);
     const result    = await sendProgressReport(student, pdfBuffer, period, from, to);
     if (result.success) {
-      console.log(`📊 ${period} report sent → ${student.email} (${from.toISOString().slice(0,10)})`);
+      logger.info(`📊 ${period} report sent → ${student.email} (${from.toISOString().slice(0,10)})`);
     } else {
-      console.error(`❌ Progress report failed → ${student.email}: ${result.error}`);
+      logger.error(`❌ Progress report failed → ${student.email}: ${result.error}`);
     }
   } catch (err) {
-    console.error(`❌ Progress report error for ${student.email}:`, err.message);
+    logger.error(`❌ Progress report error for ${student.email}:`, { error: err?.message });
   }
 }
 
@@ -106,14 +107,14 @@ function makeTick(db) {
         checkMonthlyReports(db),
       ]);
     } catch (err) {
-      console.error("Progress report scheduler error:", err.message);
+      logger.error("Progress report scheduler error:", { error: err?.message });
     }
   };
 }
 
 export function startProgressReportScheduler(db) {
   const centerSlug = db.name || "unknown";
-  console.log(`📊 Progress report scheduler started for center: ${centerSlug} (hourly check)`);
+  logger.info(`📊 Progress report scheduler started for center: ${centerSlug} (hourly check)`);
   const runTick = makeTick(db);
   setInterval(runTick, 60 * 60 * 1000);
 }

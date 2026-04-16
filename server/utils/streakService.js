@@ -15,6 +15,7 @@
 // block the main response.
 
 import { studentSchema } from "../schemas/studentSchema.js";
+import logger from "../utils/logger.js";
 
 const getStudent = (db) => db.models.Student || db.model("Student", studentSchema);
 
@@ -109,11 +110,11 @@ export async function recordActivity(db, studentId) {
     student.streakFreezes  -= 1;
     student.currentStreak  += 1;
     usedFreeze = true;
-    console.log(`[Streak] Freeze used for student ${studentId}. Freezes left: ${student.streakFreezes}`);
+    logger.info(`[Streak] Freeze used for student ${studentId}. Freezes left: ${student.streakFreezes}`);
   } else {
     // Streak broken — reset
     if (student.currentStreak > 0) {
-      console.log(`[Streak] Streak broken for student ${studentId}. Was ${student.currentStreak}.`);
+      logger.info(`[Streak] Streak broken for student ${studentId}. Was ${student.currentStreak}.`);
     }
     student.currentStreak = 1;
   }
@@ -126,7 +127,7 @@ export async function recordActivity(db, studentId) {
   student.activityDates    = pruneActivityDates(student.activityDates, today);
 
   await student.save();
-  console.log(`[Streak] Student ${studentId} daily streak → ${student.currentStreak}`);
+  logger.info(`[Streak] Student ${studentId} daily streak → ${student.currentStreak}`);
   return { incremented: true, newStreak: student.currentStreak, usedFreeze };
 }
 
@@ -165,5 +166,5 @@ export async function recordClassCompletion(db, studentId) {
 
   student.lastClassWeek = thisWeek;
   await student.save();
-  console.log(`[Streak] Student ${studentId} weekly class streak → ${student.weeklyClassStreak} (${thisWeek})`);
+  logger.info(`[Streak] Student ${studentId} weekly class streak → ${student.weeklyClassStreak} (${thisWeek})`);
 }

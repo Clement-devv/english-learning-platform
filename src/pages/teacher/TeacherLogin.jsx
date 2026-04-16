@@ -13,7 +13,7 @@ export default function TeacherLogin() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [requires2FA, setRequires2FA] = useState(false);
-  const [tempUserId, setTempUserId] = useState(null);
+  const [pendingToken, setPendingToken] = useState(null);
   const [focusedField, setFocusedField] = useState(null);
   const navigate = useNavigate();
   const { branding, center } = useBranding();
@@ -37,7 +37,7 @@ export default function TeacherLogin() {
         navigate('/teacher/dashboard');
       } else if (response.data.requires2FA) {
         setRequires2FA(true);
-        setTempUserId(response.data.tempUserId);
+        setPendingToken(response.data.pendingToken);
       }
     } catch (err) {
       setError(err.response?.data?.message || 'Login failed. Please check your credentials.');
@@ -51,7 +51,7 @@ export default function TeacherLogin() {
     setLoading(true);
     try {
       const response = await api.post('/auth/verify-2fa-login', {
-        tempUserId, twoFactorToken, backupCode, role: 'teacher'
+        pendingToken, twoFactorToken, backupCode,
       });
       if (response.data.success) {
         sessionStorage.setItem('teacherToken', response.data.token);

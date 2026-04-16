@@ -4,6 +4,7 @@ import { RedisStore } from "rate-limit-redis";
 import { logger } from "../utils/logger.js";
 import LoginAttempt from "../models/LoginAttempt.js";
 import redisClient from "../config/redis.js";
+import { MAX_LOGIN_ATTEMPTS, ACCOUNT_LOCK_MS } from "../config/constants.js";
 
 // Build a RedisStore for the given prefix when Redis is available,
 // otherwise return undefined so express-rate-limit uses its memory store.
@@ -24,8 +25,8 @@ const withStore = (prefix) => {
   return store ? { store } : {};
 };
 
-const MAX_ATTEMPTS  = 10;
-const LOCK_DURATION = 60 * 60 * 1000; // 1 hour in ms
+const MAX_ATTEMPTS  = MAX_LOGIN_ATTEMPTS;
+const LOCK_DURATION = ACCOUNT_LOCK_MS;
 
 /**
  * Track failed login attempts per identifier (email/username).
@@ -100,16 +101,10 @@ const createKeyGenerator = (useUser = true) => (req) => {
   return req.body?.email || req.body?.username || req.ip;
 };
 
-const shouldSkip = (req) => {
-  // Skip rate limiting for localhost in development
-  if (process.env.NODE_ENV === "development") {
-    return req.ip === "::1" || 
-           req.ip === "::ffff:127.0.0.1" ||
-           req.ip === "127.0.0.1" || 
-           req.hostname === "localhost";
-  }
-  return false;
-};
+// Only bypass for real loopback IPs — never trust the Host header (spoofable).
+// Works in both dev and production so a misconfigured NODE_ENV can't open limits.
+const LOOPBACK_IPS = new Set(["::1", "::ffff:127.0.0.1", "127.0.0.1"]);
+const shouldSkip = (req) => LOOPBACK_IPS.has(req.ip);
 
 // =========================================
 // 1. LOGIN LIMITER (Keep your existing strict security)

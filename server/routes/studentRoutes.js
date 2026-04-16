@@ -22,6 +22,8 @@ import { studentSchema }  from "../schemas/studentSchema.js";
 import { teacherSchema }  from "../schemas/teacherSchema.js";
 import { subAdminSchema } from "../schemas/subAdminSchema.js";
 import { paymentSchema }  from "../schemas/paymentSchema.js";
+import { parsePagination } from "../utils/pagination.js";
+import logger from "../utils/logger.js";
 
 const router = express.Router();
 router.use(tenantMiddleware);
@@ -34,8 +36,7 @@ const getPayment  = (db) => db.models.Payment  || db.model("Payment",  paymentSc
 // ─── GET all students ─────────────────────────────────────────────────────────
 router.get("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
   try {
-    const limit = Math.min(parseInt(req.query.limit) || 500, 1000);
-    const skip  = Math.max(parseInt(req.query.skip)  || 0,   0);
+    const { limit, skip } = parsePagination(req.query);
     const students = await getStudent(req.db)
       .find()
       .select("firstName surname email active noOfClasses age lastPaymentDate showTempPassword status createdAt phone country rank dateOfBirth scheduledDeletionAt")
@@ -45,8 +46,25 @@ router.get("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
       .lean();
     res.json(students);
   } catch (err) {
-    console.error(err);
+    logger.error(err);
     res.status(500).json({ message: "Server error fetching students" });
+  }
+});
+
+// ─── GET /streak  —  student fetches their own streak data ───────────────────
+// NOTE: Must be defined BEFORE /:id or Express would match /:id with id="streak"
+router.get("/streak", verifyToken, async (req, res) => {
+  try {
+    if (req.user.role !== "student") return res.status(403).json({ message: "Students only" });
+    const student = await getStudent(req.db)
+      .findById(req.user.id)
+      .select("currentStreak longestStreak lastActivityDate streakFreezes weeklyClassStreak longestWeeklyClassStreak lastClassWeek activityDates")
+      .lean();
+    if (!student) return res.status(404).json({ message: "Student not found" });
+    res.json(student);
+  } catch (err) {
+    logger.error("GET /streak error:", { error: err?.message });
+    res.status(500).json({ message: "Server error" });
   }
 });
 
@@ -62,7 +80,7 @@ router.get("/:id", verifyToken, async (req, res) => {
     if (!student) return res.status(404).json({ message: "Student not found" });
     res.json(student);
   } catch (err) {
-    console.error(err);
+    logger.error(err);
     res.status(500).json({ message: "Server error fetching student" });
   }
 });
@@ -116,7 +134,7 @@ router.post("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
     try {
       await sendStudentInviteEmail(student, setupUrl, centerName);
     } catch (emailError) {
-      console.error("Failed to send invite email:", emailError);
+      logger.error("Failed to send invite email:", emailError);
     }
 
     res.status(201).json({
@@ -124,8 +142,43 @@ router.post("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
       student: { ...student.toObject(), password: undefined, inviteToken: undefined },
     });
   } catch (err) {
-    console.error(err);
+    logger.error(err);
     res.status(500).json({ message: "Error creating student" });
+  }
+});
+
+// ─── POST resend invite email ─────────────────────────────────────────────────
+router.post("/:id/resend-invite", verifyToken, verifyAdminOrTeacher, async (req, res) => {
+  try {
+    const Student = getStudent(req.db);
+    const student = await Student.findById(req.params.id);
+
+    if (!student) {
+      return res.status(404).json({ message: "Student not found" });
+    }
+
+    if (student.status !== "pending") {
+      return res.status(400).json({ message: "This student has already completed their account setup." });
+    }
+
+    // Issue a fresh token and extend the expiry by 48 hours
+    const inviteToken   = crypto.randomBytes(32).toString("hex");
+    const inviteExpires = new Date(Date.now() + 48 * 60 * 60 * 1000);
+
+    student.inviteToken   = inviteToken;
+    student.inviteExpires = inviteExpires;
+    await student.save();
+
+    const { baseUrl, needsSlug } = getCenterBaseUrl(req.center);
+    const setupUrl   = `${baseUrl}/student/setup?token=${inviteToken}${needsSlug ? `&center=${req.center.slug}` : ""}`;
+    const centerName = req.center?.centerName || "";
+
+    await sendStudentInviteEmail(student, setupUrl, centerName);
+
+    res.json({ success: true, message: `Invite email resent to ${student.email}.` });
+  } catch (err) {
+    logger.error("Resend invite error:", { error: err?.message });
+    res.status(500).json({ message: "Failed to resend invite email." });
   }
 });
 
@@ -140,7 +193,7 @@ router.get("/verify-invite/:token", strictLimiter, async (req, res) => {
     }
     res.json({ valid: true, student: { firstName: student.firstName, surname: student.surname, email: student.email, noOfClasses: student.noOfClasses, age: student.age } });
   } catch (err) {
-    console.error(err);
+    logger.error(err);
     res.status(500).json({ message: "Error verifying invite" });
   }
 });
@@ -180,19 +233,19 @@ router.post("/setup-account", strictLimiter, async (req, res) => {
     const centerName = req.center?.centerName || "";
 
     try { await sendStudentWelcomeEmail(student, centerName); }
-    catch (e) { console.error("Failed to send welcome email:", e); }
+    catch (e) { logger.error("Failed to send welcome email:", { error: e?.message }); }
 
     // Fire-and-forget: send admin the student record PDF now that account is fully activated
     const adminEmail = req.center?.adminEmail;
     if (adminEmail) {
       generateStudentRecordPdf(student.toObject(), centerName)
         .then(pdf => sendNewStudentRecordEmail(adminEmail, student.toObject(), pdf, centerName))
-        .catch(err => console.error("Admin student record email failed:", err.message));
+        .catch(err => logger.error("Admin student record email failed:", { error: err?.message }));
     }
 
     res.json({ message: "Account activated successfully! You can now login.", student: { firstName: student.firstName, surname: student.surname, email: student.email } });
   } catch (err) {
-    console.error(err);
+    logger.error(err);
     res.status(500).json({ message: "Error setting up account" });
   }
 });
@@ -217,7 +270,7 @@ router.post("/:id/resend-invite", verifyToken, verifyAdmin, strictLimiter, async
 
     res.json({ message: "Invite resent successfully" });
   } catch (err) {
-    console.error(err);
+    logger.error(err);
     res.status(500).json({ message: "Error resending invite" });
   }
 });
@@ -252,12 +305,12 @@ router.put("/:id", verifyToken, verifyAdminOrTeacher, async (req, res) => {
 
     if (password) {
       try { await sendPasswordResetEmail(student.email, `${student.firstName} ${student.surname}`, password, "student", req.center?.centerName || ""); }
-      catch (e) { console.error("Failed to send password reset email:", e); }
+      catch (e) { logger.error("Failed to send password reset email:", { error: e?.message }); }
     }
 
     res.json({ message: "Student updated", student });
   } catch (err) {
-    console.error(err);
+    logger.error(err);
     res.status(400).json({ message: "Error updating student" });
   }
 });
@@ -273,7 +326,7 @@ router.patch("/:id/toggle", verifyToken, verifyAdmin, async (req, res) => {
     if (!student) return res.status(404).json({ message: "Student not found" });
     res.json({ message: `Student ${active ? "enabled" : "disabled"}`, student });
   } catch (err) {
-    console.error(err);
+    logger.error(err);
     res.status(500).json({ message: "Error toggling student status" });
   }
 });
@@ -292,11 +345,11 @@ router.delete("/:id", verifyToken, verifyAdmin, strictLimiter, async (req, res) 
     student.deletionWarningEmailSent = false;
     await student.save();
 
-    sendAccountDeletionWarningEmail(student, deletionDate, req.center?.centerName || "").catch(e => console.error("Deletion warning email failed:", e.message));
+    sendAccountDeletionWarningEmail(student, deletionDate, req.center?.centerName || "").catch(e => logger.error("Deletion warning email failed:", { error: e?.message }));
 
     res.json({ message: "Student scheduled for deletion", scheduledDeletionAt: deletionDate, student });
   } catch (err) {
-    console.error(err);
+    logger.error(err);
     res.status(500).json({ message: "Error scheduling student deletion" });
   }
 });
@@ -316,7 +369,7 @@ router.post("/:id/restore", verifyToken, verifyAdmin, async (req, res) => {
 
     res.json({ message: "Student account restored successfully", student });
   } catch (err) {
-    console.error(err);
+    logger.error(err);
     res.status(500).json({ message: "Error restoring student" });
   }
 });
@@ -335,11 +388,11 @@ router.post("/:id/reset-password", verifyToken, verifyAdminOrTeacher, strictLimi
     await student.save();
 
     try { await sendPasswordResetEmail(student.email, `${student.firstName} ${student.surname}`, newPass, "student", req.center?.centerName || ""); }
-    catch (e) { console.error("Failed to send password reset email:", e); }
+    catch (e) { logger.error("Failed to send password reset email:", { error: e?.message }); }
 
     res.json({ message: "Password reset successfully", tempPassword: newPass });
   } catch (err) {
-    console.error(err);
+    logger.error(err);
     res.status(500).json({ message: "Error resetting password" });
   }
 });
@@ -365,7 +418,7 @@ router.post("/:id/payment", verifyToken, verifyAdmin, async (req, res) => {
 
     res.json({ message: "Payment recorded", student, payment });
   } catch (err) {
-    console.error("Payment error:", err);
+    logger.error("Payment error:", { error: err?.message });
     res.status(500).json({ message: "Error recording payment" });
   }
 });
@@ -378,24 +431,8 @@ router.get("/:id/payments", verifyToken, async (req, res) => {
     const payments = await getPayment(req.db).find({ studentId: req.params.id }).sort({ date: -1 });
     res.json(payments);
   } catch (err) {
-    console.error(err);
+    logger.error(err);
     res.status(500).json({ message: "Error fetching payments" });
-  }
-});
-
-// ─── GET /streak  —  student fetches their own streak data ───────────────────
-router.get("/streak", verifyToken, async (req, res) => {
-  try {
-    if (req.user.role !== "student") return res.status(403).json({ message: "Students only" });
-    const student = await getStudent(req.db)
-      .findById(req.user.id)
-      .select("currentStreak longestStreak lastActivityDate streakFreezes weeklyClassStreak longestWeeklyClassStreak lastClassWeek activityDates")
-      .lean();
-    if (!student) return res.status(404).json({ message: "Student not found" });
-    res.json(student);
-  } catch (err) {
-    console.error("GET /streak error:", err);
-    res.status(500).json({ message: "Server error" });
   }
 });
 

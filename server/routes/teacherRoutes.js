@@ -22,6 +22,8 @@ import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
 import { teacherSchema }  from "../schemas/teacherSchema.js";
 import { studentSchema }  from "../schemas/studentSchema.js";
 import { subAdminSchema } from "../schemas/subAdminSchema.js";
+import { parsePagination } from "../utils/pagination.js";
+import logger from "../utils/logger.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
@@ -72,8 +74,7 @@ router.get("/:id", verifyToken, async (req, res) => {
 // ─── GET all teachers ─────────────────────────────────────────────────────────
 router.get("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
   try {
-    const limit = Math.min(parseInt(req.query.limit) || 500, 1000);
-    const skip  = Math.max(parseInt(req.query.skip)  || 0,   0);
+    const { limit, skip } = parsePagination(req.query);
     const teachers = await getTeacher(req.db)
       .find()
       .select("-password -inviteToken -twoFactorSecret -twoFactorBackupCodes")
@@ -118,7 +119,7 @@ router.post("/:id/photo", verifyToken, requireOwnerOrAdmin, (req, res, next) => 
     await teacher.save();
     res.json({ message: "Photo uploaded", photo: photoUrl });
   } catch (err) {
-    console.error(err);
+    logger.error(err);
     res.status(500).json({ message: "Error uploading photo" });
   }
 });
@@ -186,7 +187,7 @@ router.patch("/:id/google-meet", verifyToken, requireOwnerOrAdmin, async (req, r
     if (!teacher) return res.status(404).json({ message: "Teacher not found" });
     res.json({ message: "Google Meet link updated", googleMeetLink: teacher.googleMeetLink });
   } catch (err) {
-    console.error("Error updating Google Meet link:", err);
+    logger.error("Error updating Google Meet link:", { error: err?.message });
     res.status(500).json({ message: "Error updating Google Meet link" });
   }
 });
@@ -248,7 +249,7 @@ router.post("/", verifyToken, verifyAdmin, async (req, res) => {
     try {
       await sendTeacherInviteEmail(teacher, setupUrl, centerName);
     } catch (e) {
-      console.error("Failed to send teacher invite email:", e.message);
+      logger.error("Failed to send teacher invite email:", { error: e?.message });
     }
 
     // Fire-and-forget: send admin a record PDF
@@ -256,7 +257,7 @@ router.post("/", verifyToken, verifyAdmin, async (req, res) => {
     if (adminEmail) {
       generateTeacherRecordPdf(teacher.toObject(), centerName)
         .then(pdf => sendNewTeacherRecordEmail(adminEmail, teacher.toObject(), pdf, centerName))
-        .catch(err => console.error("Admin teacher record email failed:", err.message));
+        .catch(err => logger.error("Admin teacher record email failed:", { error: err?.message }));
     }
 
     const response = teacher.toObject();
@@ -269,7 +270,7 @@ router.post("/", verifyToken, verifyAdmin, async (req, res) => {
       teacher: response,
     });
   } catch (err) {
-    console.error("Create teacher error:", err);
+    logger.error("Create teacher error:", { error: err?.message });
     res.status(400).json({ message: err.message });
   }
 });
@@ -318,19 +319,19 @@ router.post("/setup-account", async (req, res) => {
     teacher.lastPasswordChange = new Date();
     await teacher.save();
 
-    try { await sendTeacherWelcomeEmail(teacher, req.center?.centerName || ""); } catch (e) { console.error("Welcome email failed:", e.message); }
+    try { await sendTeacherWelcomeEmail(teacher, req.center?.centerName || ""); } catch (e) { logger.error("Welcome email failed:", { error: e?.message }); }
 
     const adminEmail = req.center?.adminEmail;
     if (adminEmail) {
       const centerName = req.center?.centerName || "";
       generateTeacherRecordPdf(teacher.toObject(), centerName)
         .then((pdf) => sendNewTeacherRecordEmail(adminEmail, teacher.toObject(), pdf, centerName))
-        .catch((err) => console.error("Admin teacher record email failed:", err.message));
+        .catch((err) => logger.error("Admin teacher record email failed:", { error: err?.message }));
     }
 
     res.json({ success: true, message: "Account activated successfully! You can now log in." });
   } catch (err) {
-    console.error("Setup account error:", err);
+    logger.error("Setup account error:", { error: err?.message });
     res.status(500).json({ success: false, message: "Server error" });
   }
 });
@@ -402,7 +403,7 @@ router.put("/:id", verifyToken, verifyAdmin, async (req, res) => {
 
     if (password) {
       try { await sendPasswordResetEmail(teacher.email, `${teacher.firstName} ${teacher.lastName}`, password, "teacher", req.center?.centerName || ""); }
-      catch (e) { console.error("Password reset email failed:", e.message); }
+      catch (e) { logger.error("Password reset email failed:", { error: e?.message }); }
       const resp = teacher.toObject();
       resp.temporaryPassword = password;
       return res.json(resp);
@@ -429,7 +430,7 @@ router.delete("/:id", verifyToken, verifyAdmin, strictLimiter, async (req, res) 
     await teacher.save();
 
     sendTeacherAccountDeletionWarningEmail(teacher, deletionDate, req.center?.centerName || "").catch(e =>
-      console.error("Teacher deletion warning email failed:", e.message)
+      logger.error("Teacher deletion warning email failed:", { error: e?.message })
     );
 
     res.json({ message: "Teacher scheduled for deletion", scheduledDeletionAt: deletionDate, teacher });

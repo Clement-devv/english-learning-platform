@@ -4,6 +4,8 @@ import { verifyToken, verifyAdmin } from "../middleware/authMiddleware.js";
 import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
 import { paymentTransactionSchema } from "../schemas/paymentTransactionSchema.js";
 import { teacherSchema }            from "../schemas/teacherSchema.js";
+import { parsePagination }          from "../utils/pagination.js";
+import logger from "../utils/logger.js";
 
 const router = express.Router();
 router.use(tenantMiddleware);
@@ -28,15 +30,25 @@ router.get("/teacher/:teacherId", verifyToken, async (req, res) => {
     const filter = { teacherId };
     if (status) filter.status = status;
 
-    const limit = Math.min(parseInt(req.query.limit) || 500, 1000);
-    const skip  = Math.max(parseInt(req.query.skip)  || 0,   0);
+    const { limit, skip } = parsePagination(req.query);
     const transactions = await getPaymentTransaction(req.db).find(filter)
-      .populate("bookingId", "classTitle scheduledTime duration")
+      .populate("bookingId", "classTitle scheduledTime duration studentId")
+      .populate({ path: "studentId", select: "firstName surname" })
       .populate("paidBy", "firstName lastName")
       .sort({ completedAt: -1 })
       .skip(skip)
       .limit(limit)
       .lean();
+
+    // Back-fill studentName for old records that were saved without it
+    transactions.forEach(tx => {
+      if (!tx.studentName) {
+        const s = tx.studentId;
+        if (s && (s.firstName || s.surname)) {
+          tx.studentName = `${s.firstName || ""} ${s.surname || ""}`.trim();
+        }
+      }
+    });
 
     const summary = {
       totalPending: 0, totalPaid: 0, totalEarned: 0,
@@ -51,7 +63,7 @@ router.get("/teacher/:teacherId", verifyToken, async (req, res) => {
 
     res.json({ transactions, summary });
   } catch (err) {
-    console.error("Error fetching teacher payments:", err);
+    logger.error("Error fetching teacher payments:", { error: err?.message });
     res.status(500).json({ message: "Error fetching payment transactions" });
   }
 });
@@ -68,8 +80,7 @@ router.get("/all", verifyToken, verifyAdmin, async (req, res) => {
     if (status) filter.status = status;
     if (teacherId) filter.teacherId = teacherId;
 
-    const limit = Math.min(parseInt(req.query.limit) || 500, 1000);
-    const skip  = Math.max(parseInt(req.query.skip)  || 0,   0);
+    const { limit, skip } = parsePagination(req.query);
     const transactions = await getPaymentTransaction(req.db).find(filter)
       .populate("teacherId", "firstName lastName email ratePerClass")
       .populate("bookingId", "classTitle scheduledTime duration")
@@ -96,7 +107,7 @@ router.get("/all", verifyToken, verifyAdmin, async (req, res) => {
 
     res.json({ transactions, teacherSummary: Object.values(teacherSummary) });
   } catch (err) {
-    console.error("Error fetching all payments:", err);
+    logger.error("Error fetching all payments:", { error: err?.message });
     res.status(500).json({ message: "Error fetching payment transactions" });
   }
 });
@@ -127,7 +138,7 @@ router.patch("/:id/pay", verifyToken, verifyAdmin, async (req, res) => {
     transaction.notes = notes || "";
     await transaction.save();
 
-    console.log(`💳 Payment processed: $${transaction.amount} paid to ${transaction.teacherId.firstName} ${transaction.teacherId.lastName}`);
+    logger.info(`💳 Payment processed: $${transaction.amount} paid to ${transaction.teacherId.firstName} ${transaction.teacherId.lastName}`);
 
     const updatedTransaction = await getPaymentTransaction(req.db).findById(transaction._id)
       .populate("teacherId", "firstName lastName email")
@@ -136,7 +147,7 @@ router.patch("/:id/pay", verifyToken, verifyAdmin, async (req, res) => {
 
     res.json({ message: "Payment processed successfully", transaction: updatedTransaction });
   } catch (err) {
-    console.error("Error processing payment:", err);
+    logger.error("Error processing payment:", { error: err?.message });
     res.status(500).json({ message: "Error processing payment" });
   }
 });
@@ -172,7 +183,7 @@ router.patch("/teacher/:teacherId/pay-all", verifyToken, verifyAdmin, async (req
       await teacher.save();
     }
 
-    console.log(`💰 Bulk payment: $${totalAmount} paid to teacher ${teacherId} (${pendingTransactions.length} transactions)`);
+    logger.info(`💰 Bulk payment: $${totalAmount} paid to teacher ${teacherId} (${pendingTransactions.length} transactions)`);
 
     res.json({
       message: "All pending payments processed successfully",
@@ -183,7 +194,7 @@ router.patch("/teacher/:teacherId/pay-all", verifyToken, verifyAdmin, async (req
         : null,
     });
   } catch (err) {
-    console.error("Error processing bulk payment:", err);
+    logger.error("Error processing bulk payment:", { error: err?.message });
     res.status(500).json({ message: "Error processing bulk payment" });
   }
 });
@@ -279,7 +290,7 @@ router.get("/summary", verifyToken, verifyAdmin, async (req, res) => {
 
     res.json({ teachers: summary, totals: overallTotals });
   } catch (err) {
-    console.error("Error fetching payment summary:", err);
+    logger.error("Error fetching payment summary:", { error: err?.message });
     res.status(500).json({ message: "Error fetching payment summary" });
   }
 });
@@ -324,7 +335,7 @@ router.post("/manual", verifyToken, verifyAdmin, async (req, res) => {
 
     res.status(201).json({ message: "Manual payment transaction created", transaction });
   } catch (err) {
-    console.error("Error creating manual payment:", err);
+    logger.error("Error creating manual payment:", { error: err?.message });
     res.status(500).json({ message: "Error creating manual payment" });
   }
 });

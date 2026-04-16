@@ -11,6 +11,7 @@ import { bookingSchema }            from "../schemas/bookingSchema.js";
 import { teacherSchema }            from "../schemas/teacherSchema.js";
 import { studentSchema }            from "../schemas/studentSchema.js";
 import { paymentTransactionSchema } from "../schemas/paymentTransactionSchema.js";
+import logger from "../utils/logger.js";
 
 const router = express.Router();
 router.use(tenantMiddleware);
@@ -30,6 +31,9 @@ const canCreateBooking = (req, createdBy) => {
 // ─── GET single booking ───────────────────────────────────────────────────────
 router.get("/:id", verifyToken, async (req, res) => {
   try {
+    // Ensure Teacher and Student models are registered on this connection before populate
+    getTeacher(req.db);
+    getStudent(req.db);
     const booking = await getBooking(req.db).findById(req.params.id)
       .populate("teacherId", "firstName lastName email continent googleMeetLink")
       .populate("studentId", "firstName surname email noOfClasses");
@@ -43,7 +47,7 @@ router.get("/:id", verifyToken, async (req, res) => {
 
     res.json({ success: true, booking });
   } catch (err) {
-    console.error("Error fetching booking:", err);
+    logger.error("Error fetching booking:", { error: err?.message });
     if (err.name === "CastError") return res.status(400).json({ success: false, message: "Invalid booking ID format" });
     res.status(500).json({ success: false, message: "Error fetching booking" });
   }
@@ -90,9 +94,9 @@ router.post("/", verifyToken, async (req, res) => {
       .populate("studentId", "firstName surname email noOfClasses");
 
     if (createdBy === "admin") {
-      sendBookingRequestToTeacher(teacher, student, populatedBooking, req.center?.centerName || "").catch(e => console.error("Teacher booking email failed:", e.message));
+      sendBookingRequestToTeacher(teacher, student, populatedBooking, req.center?.centerName || "").catch(e => logger.error("Teacher booking email failed:", { error: e?.message }));
     }
-    sendBookingCreatedToStudent(student, teacher, populatedBooking, req.center?.centerName || "").catch(e => console.error("Student booking email failed:", e.message));
+    sendBookingCreatedToStudent(student, teacher, populatedBooking, req.center?.centerName || "").catch(e => logger.error("Student booking email failed:", { error: e?.message }));
 
     res.status(201).json({
       success: true,
@@ -100,7 +104,7 @@ router.post("/", verifyToken, async (req, res) => {
       booking: populatedBooking,
     });
   } catch (err) {
-    console.error("Error creating booking:", err);
+    logger.error("Error creating booking:", { error: err?.message });
     res.status(500).json({ success: false, message: "Error creating booking", error: err.message });
   }
 });
@@ -108,6 +112,8 @@ router.post("/", verifyToken, async (req, res) => {
 // ─── PATCH accept ─────────────────────────────────────────────────────────────
 router.patch("/:id/accept", verifyToken, async (req, res) => {
   try {
+    getTeacher(req.db);
+    getStudent(req.db);
     const Booking = getBooking(req.db);
     const booking = await Booking.findById(req.params.id)
       .populate("teacherId", "firstName lastName email")
@@ -125,11 +131,22 @@ router.patch("/:id/accept", verifyToken, async (req, res) => {
     await booking.save();
 
     try { await sendBookingAcceptedToStudent(booking.studentId, booking.teacherId, booking, req.center?.centerName || ""); }
-    catch (e) { console.error("Email notification failed:", e.message); }
+    catch (e) { logger.error("Email notification failed:", { error: e?.message }); }
+
+    // Push real-time update to student dashboard
+    try {
+      const io = req.app.get('io');
+      io.to(`student-room:${req.center.slug}:${booking.studentId._id}`).emit('booking-update', {
+        type: 'accepted',
+        title: '✅ Class Confirmed!',
+        message: `Your class "${booking.classTitle}" has been confirmed`,
+        bookingId: booking._id,
+      });
+    } catch (_) {}
 
     res.json({ success: true, message: "Booking accepted successfully", booking });
   } catch (err) {
-    console.error("Error accepting booking:", err);
+    logger.error("Error accepting booking:", { error: err?.message });
     res.status(500).json({ success: false, message: "Error accepting booking" });
   }
 });
@@ -137,6 +154,8 @@ router.patch("/:id/accept", verifyToken, async (req, res) => {
 // ─── PATCH reject ─────────────────────────────────────────────────────────────
 router.patch("/:id/reject", verifyToken, async (req, res) => {
   try {
+    getTeacher(req.db);
+    getStudent(req.db);
     const { reason } = req.body;
     const Booking = getBooking(req.db);
     const booking = await Booking.findById(req.params.id)
@@ -154,11 +173,22 @@ router.patch("/:id/reject", verifyToken, async (req, res) => {
     await booking.save();
 
     try { await sendBookingRejectedToStudent(booking.studentId, booking.teacherId, booking, req.center?.centerName || ""); }
-    catch (e) { console.error("Email notification failed:", e.message); }
+    catch (e) { logger.error("Email notification failed:", { error: e?.message }); }
+
+    // Push real-time update to student dashboard
+    try {
+      const io = req.app.get('io');
+      io.to(`student-room:${req.center.slug}:${booking.studentId._id}`).emit('booking-update', {
+        type: 'rejected',
+        title: '❌ Booking Declined',
+        message: `Your booking "${booking.classTitle}" was not accepted`,
+        bookingId: booking._id,
+      });
+    } catch (_) {}
 
     res.json({ success: true, message: "Booking rejected", booking });
   } catch (err) {
-    console.error("Error rejecting booking:", err);
+    logger.error("Error rejecting booking:", { error: err?.message });
     res.status(500).json({ success: false, message: "Error rejecting booking" });
   }
 });
@@ -166,6 +196,8 @@ router.patch("/:id/reject", verifyToken, async (req, res) => {
 // ─── PATCH complete ───────────────────────────────────────────────────────────
 router.patch("/:id/complete", verifyToken, async (req, res) => {
   try {
+    getTeacher(req.db);
+    getStudent(req.db);
     const Booking = getBooking(req.db);
     const booking = await Booking.findById(req.params.id)
       .populate("teacherId", "firstName lastName email ratePerClass lessonsCompleted earned googleMeetLink")
@@ -203,7 +235,18 @@ router.patch("/:id/complete", verifyToken, async (req, res) => {
     }
 
     try { await sendClassCompletedNotification(booking.teacherId, booking.studentId, booking); }
-    catch (e) { console.error("Email notification failed:", e.message); }
+    catch (e) { logger.error("Email notification failed:", { error: e?.message }); }
+
+    // Push real-time update to student dashboard
+    try {
+      const io = req.app.get('io');
+      io.to(`student-room:${req.center.slug}:${booking.studentId._id}`).emit('booking-update', {
+        type: 'completed',
+        title: '🎉 Class Completed!',
+        message: `Your class "${booking.classTitle}" has been marked as completed`,
+        bookingId: booking._id,
+      });
+    } catch (_) {}
 
     const updatedBooking = await Booking.findById(booking._id)
       .populate("teacherId", "firstName lastName earned lessonsCompleted")
@@ -217,7 +260,7 @@ router.patch("/:id/complete", verifyToken, async (req, res) => {
       teacherLessonsCompleted: updatedBooking.teacherId.lessonsCompleted,
     });
   } catch (err) {
-    console.error("Error completing booking:", err);
+    logger.error("Error completing booking:", { error: err?.message });
     res.status(500).json({ success: false, message: "Error completing booking", error: err.message });
   }
 });
@@ -225,6 +268,8 @@ router.patch("/:id/complete", verifyToken, async (req, res) => {
 // ─── GET all bookings ─────────────────────────────────────────────────────────
 router.get("/", verifyToken, verifyAdmin, async (req, res) => {
   try {
+    getTeacher(req.db);
+    getStudent(req.db);
     const { status } = req.query;
     const filter = status ? { status } : {};
     const bookings = await getBooking(req.db).find(filter)
@@ -233,7 +278,7 @@ router.get("/", verifyToken, verifyAdmin, async (req, res) => {
       .sort({ scheduledTime: -1 }).limit(500).lean();
     res.json(bookings);
   } catch (err) {
-    console.error("Error fetching bookings:", err);
+    logger.error("Error fetching bookings:", { error: err?.message });
     res.status(500).json({ success: false, message: "Error fetching bookings" });
   }
 });
@@ -246,6 +291,7 @@ router.get("/teacher/:teacherId", verifyToken, async (req, res) => {
     if (req.user.role === "teacher" && req.user.id !== teacherId)
       return res.status(403).json({ success: false, message: "You can only view your own bookings" });
 
+    getStudent(req.db);
     const filter = { teacherId };
     if (status === "completed") filter.status = { $in: ["completed", "missed"] };
     else if (status) filter.status = status;
@@ -255,7 +301,7 @@ router.get("/teacher/:teacherId", verifyToken, async (req, res) => {
       .sort({ scheduledTime: -1 }).limit(200).lean();
     res.json(bookings);
   } catch (err) {
-    console.error("Error fetching teacher bookings:", err);
+    logger.error("Error fetching teacher bookings:", { error: err?.message });
     res.status(500).json({ success: false, message: "Error fetching teacher bookings" });
   }
 });
@@ -268,6 +314,7 @@ router.get("/student/:studentId", verifyToken, async (req, res) => {
     if (req.user.role === "student" && req.user.id !== studentId)
       return res.status(403).json({ success: false, message: "You can only view your own bookings" });
 
+    getTeacher(req.db);
     const filter = { studentId };
     if (status === "completed") filter.status = { $in: ["completed", "missed"] };
     else if (status) filter.status = status;
@@ -277,7 +324,7 @@ router.get("/student/:studentId", verifyToken, async (req, res) => {
       .sort({ scheduledTime: 1 }).limit(200).lean();
     res.json(bookings);
   } catch (err) {
-    console.error("Error fetching student bookings:", err);
+    logger.error("Error fetching student bookings:", { error: err?.message });
     res.status(500).json({ success: false, message: "Error fetching student bookings" });
   }
 });
@@ -300,7 +347,7 @@ router.patch("/:id/cancel", verifyToken, async (req, res) => {
       .populate("studentId", "firstName surname email");
     res.json({ success: true, message: "Booking cancelled", booking: populatedBooking });
   } catch (err) {
-    console.error("Error cancelling booking:", err);
+    logger.error("Error cancelling booking:", { error: err?.message });
     res.status(500).json({ success: false, message: "Error cancelling booking" });
   }
 });
@@ -318,7 +365,7 @@ router.delete("/:id", verifyToken, async (req, res) => {
     await booking.deleteOne();
     res.json({ success: true, message: "Booking deleted successfully" });
   } catch (err) {
-    console.error("Error deleting booking:", err);
+    logger.error("Error deleting booking:", { error: err?.message });
     res.status(500).json({ success: false, message: "Error deleting booking" });
   }
 });

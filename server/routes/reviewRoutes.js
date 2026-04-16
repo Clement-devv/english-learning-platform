@@ -5,6 +5,7 @@ import { verifyToken, verifyStudent, verifyAdmin } from "../middleware/authMiddl
 import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
 import { reviewSchema }  from "../schemas/reviewSchema.js";
 import { bookingSchema } from "../schemas/bookingSchema.js";
+import logger from "../utils/logger.js";
 
 const router = express.Router();
 router.use(tenantMiddleware);
@@ -48,7 +49,7 @@ router.post("/", verifyToken, verifyStudent, async (req, res) => {
     if (err.code === 11000) {
       return res.status(409).json({ error: "You already reviewed this class" });
     }
-    console.error("Review create error:", err);
+    logger.error("Review create error:", { error: err?.message });
     res.status(500).json({ error: err.message });
   }
 });

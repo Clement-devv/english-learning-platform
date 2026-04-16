@@ -14,6 +14,7 @@ import { referralSchema } from "../schemas/referralSchema.js";
 import { studentSchema }  from "../schemas/studentSchema.js";
 import { teacherSchema }  from "../schemas/teacherSchema.js";
 import { subAdminSchema } from "../schemas/subAdminSchema.js";
+import logger from "../utils/logger.js";
 
 const router = express.Router();
 router.use(tenantMiddleware);
@@ -168,7 +169,7 @@ router.post("/:id/approve", verifyToken, verifyAdmin, async (req, res) => {
     const { baseUrl: _rb, needsSlug: _rn } = getCenterBaseUrl(req.center);
     const setupUrl = `${_rb}/student/setup?token=${inviteToken}${_rn ? `&center=${req.center.slug}` : ""}`;
     try { await sendStudentInviteEmail(newStudent, setupUrl, req.center?.centerName || ""); }
-    catch (emailErr) { console.error("Referral invite email failed:", emailErr.message); }
+    catch (emailErr) { logger.error("Referral invite email failed:", emailErr.message); }
 
     referral.status            = "invited";
     referral.referredStudentId = newStudent._id;
@@ -222,9 +223,9 @@ export async function completeReferral(studentId, db) {
     referral.creditedAt    = new Date();
     await referral.save();
 
-    console.log(`Referral credit: +1 class awarded to student ${referral.referrerId}`);
+    logger.info(`Referral credit: +1 class awarded to student ${referral.referrerId}`);
   } catch (err) {
-    console.error("completeReferral error:", err.message);
+    logger.error("completeReferral error:", { error: err?.message });
   }
 }
 

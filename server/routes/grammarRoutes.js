@@ -1,6 +1,7 @@
 import express from "express";
 import { verifyToken } from "../middleware/authMiddleware.js";
 import { callGemini } from "../utils/geminiHelper.js";
+import logger from "../utils/logger.js";
 
 const router = express.Router();
 
@@ -22,8 +23,8 @@ Text: ${safeText}`;
 
     const corrected = (await callGemini(prompt, { temperature: 0.1, maxOutputTokens: 1024 })).trim();
 
-    console.log("Grammar original :", safeText);
-    console.log("Grammar corrected:", corrected);
+    logger.info("Grammar original :", safeText);
+    logger.info("Grammar corrected:", corrected);
 
     // If Gemini returned nothing useful, no suggestions
     if (!corrected || corrected === safeText) {
@@ -52,10 +53,10 @@ Text: ${safeText}`;
       suggestions.push({ original: safeText, corrected: corrected });
     }
 
-    console.log("Grammar suggestions:", suggestions.length);
+    logger.info("Grammar suggestions:", suggestions.length);
     res.json({ success: true, suggestions });
   } catch (err) {
-    console.error("Grammar check error:", err.message);
+    logger.error("Grammar check error:", { error: err?.message });
     res.status(500).json({ success: false, message: err.message });
   }
 });
