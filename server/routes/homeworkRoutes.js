@@ -15,6 +15,7 @@ import {
 } from "../utils/emailService.js";
 import { recordActivity } from "../utils/streakService.js";
 import logger from "../utils/logger.js";
+import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
@@ -131,18 +132,18 @@ const uploadAssignment = makeUpload(HW_DIR);
 router.post("/", verifyToken, uploadAssignment.array("files", MAX_FILES), async (req, res) => {
   try {
     if (req.user.role !== "teacher") {
-      return res.status(403).json({ message: "Teachers only" });
+      return forbidden(res, "Teachers only");
     }
 
     const { studentId, title, description, dueDate } = req.body;
 
     if (!studentId || !title?.trim() || !dueDate) {
-      return res.status(400).json({ message: "studentId, title, and dueDate are required" });
+      return badRequest(res, "studentId, title, and dueDate are required");
     }
 
     // Verify student belongs to this teacher
     const student = await getStudent(req.db).findById(studentId);
-    if (!student) return res.status(404).json({ message: "Student not found" });
+    if (!student) return notFound(res, "Student not found");
 
     const titleClean = title.trim().slice(0, 200);
     const descClean  = (description || "").trim().slice(0, 2000);
@@ -185,7 +186,7 @@ router.post("/", verifyToken, uploadAssignment.array("files", MAX_FILES), async 
       try { fs.unlinkSync(path.join(HW_DIR, f.filename)); } catch (_) {}
     });
     logger.error("Create homework error:", { error: err?.message });
-    res.status(500).json({ message: err.message });
+    serverError(res, err.message);
   }
 });
 
@@ -194,16 +195,16 @@ router.post("/", verifyToken, uploadAssignment.array("files", MAX_FILES), async 
 // ─────────────────────────────────────────────────────────────────────────────
 router.get("/my", verifyToken, async (req, res) => {
   try {
-    if (req.user.role !== "teacher") return res.status(403).json({ message: "Teachers only" });
+    if (req.user.role !== "teacher") return forbidden(res, "Teachers only");
 
     const list = await getHomework(req.db).find({ teacherId: req.user.id })
-      .populate("studentId", "firstName surname email")
+      .populate("studentId", "firstName lastName email")
       .sort({ createdAt: -1 })
       .lean();
 
     res.json({ success: true, homework: list });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    serverError(res, err.message);
   }
 });
 
@@ -212,7 +213,7 @@ router.get("/my", verifyToken, async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 router.get("/assigned", verifyToken, async (req, res) => {
   try {
-    if (req.user.role !== "student") return res.status(403).json({ message: "Students only" });
+    if (req.user.role !== "student") return forbidden(res, "Students only");
 
     const list = await getHomework(req.db).find({ studentId: req.user.id })
       .populate("teacherId", "firstName lastName email")
@@ -221,7 +222,7 @@ router.get("/assigned", verifyToken, async (req, res) => {
 
     res.json({ success: true, homework: list });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    serverError(res, err.message);
   }
 });
 
@@ -232,18 +233,18 @@ router.get("/:id", verifyToken, async (req, res) => {
   try {
     const hw = await getHomework(req.db).findById(req.params.id)
       .populate("teacherId", "firstName lastName email")
-      .populate("studentId", "firstName surname email");
+      .populate("studentId", "firstName lastName email");
 
-    if (!hw) return res.status(404).json({ message: "Homework not found" });
+    if (!hw) return notFound(res, "Homework not found");
 
     // Only the assigned teacher or student can view
     const isTeacher = req.user.role === "teacher" && hw.teacherId._id.toString() === req.user.id;
     const isStudent = req.user.role === "student" && hw.studentId._id.toString() === req.user.id;
-    if (!isTeacher && !isStudent) return res.status(403).json({ message: "Access denied" });
+    if (!isTeacher && !isStudent) return forbidden(res, "Access denied");
 
     res.json({ success: true, homework: hw });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    serverError(res, err.message);
   }
 });
 
@@ -255,19 +256,19 @@ const uploadSubmission = makeUpload(SUB_DIR);
 router.post("/:id/submit", verifyToken, uploadSubmission.array("files", MAX_FILES), async (req, res) => {
   try {
     if (req.user.role !== "student") {
-      return res.status(403).json({ message: "Students only" });
+      return forbidden(res, "Students only");
     }
 
     const hw = await getHomework(req.db).findById(req.params.id);
-    if (!hw) return res.status(404).json({ message: "Homework not found" });
-    if (hw.studentId.toString() !== req.user.id) return res.status(403).json({ message: "Access denied" });
-    if (hw.status === "graded") return res.status(400).json({ message: "Already graded" });
+    if (!hw) return notFound(res, "Homework not found");
+    if (hw.studentId.toString() !== req.user.id) return forbidden(res, "Access denied");
+    if (hw.status === "graded") return badRequest(res, "Already graded");
 
     const text = (req.body.text || "").trim().slice(0, 5000);
     const attachments = processUploadedFiles(req.files || [], SUB_DIR);
 
     if (!text && attachments.length === 0) {
-      return res.status(400).json({ message: "Please provide text or a file" });
+      return badRequest(res, "Please provide text or a file");
     }
 
     hw.submission = { text, attachments, submittedAt: new Date() };
@@ -291,7 +292,7 @@ router.post("/:id/submit", verifyToken, uploadSubmission.array("files", MAX_FILE
     (req.files || []).forEach(f => {
       try { fs.unlinkSync(path.join(SUB_DIR, f.filename)); } catch (_) {}
     });
-    res.status(500).json({ message: err.message });
+    serverError(res, err.message);
   }
 });
 
@@ -300,18 +301,18 @@ router.post("/:id/submit", verifyToken, uploadSubmission.array("files", MAX_FILE
 // ─────────────────────────────────────────────────────────────────────────────
 router.post("/:id/grade", verifyToken, async (req, res) => {
   try {
-    if (req.user.role !== "teacher") return res.status(403).json({ message: "Teachers only" });
+    if (req.user.role !== "teacher") return forbidden(res, "Teachers only");
 
     const hw = await getHomework(req.db).findById(req.params.id);
-    if (!hw) return res.status(404).json({ message: "Homework not found" });
-    if (hw.teacherId.toString() !== req.user.id) return res.status(403).json({ message: "Access denied" });
-    if (hw.status !== "submitted") return res.status(400).json({ message: "No submission to grade" });
+    if (!hw) return notFound(res, "Homework not found");
+    if (hw.teacherId.toString() !== req.user.id) return forbidden(res, "Access denied");
+    if (hw.status !== "submitted") return badRequest(res, "No submission to grade");
 
     const score    = parseInt(req.body.score, 10);
     const feedback = (req.body.feedback || "").trim().slice(0, 2000);
 
     if (isNaN(score) || score < 0 || score > 100) {
-      return res.status(400).json({ message: "Score must be 0–100" });
+      return badRequest(res, "Score must be 0–100");
     }
 
     // Preserve audioFeedback that was uploaded before grading
@@ -324,7 +325,7 @@ router.post("/:id/grade", verifyToken, async (req, res) => {
 
     res.json({ success: true, homework: hw });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    serverError(res, err.message);
   }
 });
 
@@ -333,11 +334,11 @@ router.post("/:id/grade", verifyToken, async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 router.delete("/:id", verifyToken, async (req, res) => {
   try {
-    if (req.user.role !== "teacher") return res.status(403).json({ message: "Teachers only" });
+    if (req.user.role !== "teacher") return forbidden(res, "Teachers only");
 
     const hw = await getHomework(req.db).findById(req.params.id);
-    if (!hw) return res.status(404).json({ message: "Homework not found" });
-    if (hw.teacherId.toString() !== req.user.id) return res.status(403).json({ message: "Access denied" });
+    if (!hw) return notFound(res, "Homework not found");
+    if (hw.teacherId.toString() !== req.user.id) return forbidden(res, "Access denied");
 
     // Delete all associated files from disk
     hw.attachments.forEach(a => {
@@ -356,7 +357,7 @@ router.delete("/:id", verifyToken, async (req, res) => {
     await hw.deleteOne();
     res.json({ success: true, message: "Homework deleted" });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    serverError(res, err.message);
   }
 });
 
@@ -365,12 +366,12 @@ router.delete("/:id", verifyToken, async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 router.post("/:id/audio-feedback", verifyToken, audioUpload.single("audio"), async (req, res) => {
   try {
-    if (req.user.role !== "teacher") return res.status(403).json({ message: "Teachers only" });
-    if (!req.file) return res.status(400).json({ message: "No audio file uploaded" });
+    if (req.user.role !== "teacher") return forbidden(res, "Teachers only");
+    if (!req.file) return badRequest(res, "No audio file uploaded");
 
     const hw = await getHomework(req.db).findById(req.params.id);
-    if (!hw) return res.status(404).json({ message: "Homework not found" });
-    if (hw.teacherId.toString() !== req.user.id) return res.status(403).json({ message: "Access denied" });
+    if (!hw) return notFound(res, "Homework not found");
+    if (hw.teacherId.toString() !== req.user.id) return forbidden(res, "Access denied");
 
     // Delete old audio file from disk if one existed
     if (hw.grade?.audioFeedback?.fileId) {
@@ -390,7 +391,7 @@ router.post("/:id/audio-feedback", verifyToken, audioUpload.single("audio"), asy
     res.json({ success: true, audioFeedback: hw.grade.audioFeedback });
   } catch (err) {
     if (req.file) { try { fs.unlinkSync(req.file.path); } catch (_) {} }
-    res.status(500).json({ message: err.message });
+    serverError(res, err.message);
   }
 });
 
@@ -411,12 +412,12 @@ const instructionAudioUpload = multer({
 
 router.post("/:id/instruction-audio", verifyToken, instructionAudioUpload.single("audio"), async (req, res) => {
   try {
-    if (req.user.role !== "teacher") return res.status(403).json({ message: "Teachers only" });
-    if (!req.file) return res.status(400).json({ message: "No audio file uploaded" });
+    if (req.user.role !== "teacher") return forbidden(res, "Teachers only");
+    if (!req.file) return badRequest(res, "No audio file uploaded");
 
     const hw = await getHomework(req.db).findById(req.params.id);
-    if (!hw) return res.status(404).json({ message: "Homework not found" });
-    if (hw.teacherId.toString() !== req.user.id) return res.status(403).json({ message: "Access denied" });
+    if (!hw) return notFound(res, "Homework not found");
+    if (hw.teacherId.toString() !== req.user.id) return forbidden(res, "Access denied");
 
     // Delete old instruction audio if present
     if (hw.instructionAudio?.fileId) {
@@ -434,7 +435,7 @@ router.post("/:id/instruction-audio", verifyToken, instructionAudioUpload.single
     res.json({ success: true, instructionAudio: hw.instructionAudio });
   } catch (err) {
     if (req.file) { try { fs.unlinkSync(req.file.path); } catch (_) {} }
-    res.status(500).json({ message: err.message });
+    serverError(res, err.message);
   }
 });
 
@@ -449,20 +450,20 @@ router.get("/file/:type/:fileId", verifyToken, async (req, res) => {
 
     // Sanitise — fileId must be a UUID (alphanumeric + hyphens, exactly)
     if (!/^[0-9a-f-]{36}$/.test(fileId)) {
-      return res.status(400).json({ message: "Invalid file ID" });
+      return badRequest(res, "Invalid file ID");
     }
 
     // ── Instruction audio ──────────────────────────────────────────────────
     if (type === "instruction-audio") {
       const filePath = path.join(INS_AUD_DIR, fileId);
-      if (!fs.existsSync(filePath)) return res.status(404).json({ message: "File not found" });
+      if (!fs.existsSync(filePath)) return notFound(res, "File not found");
 
       const hw = await getHomework(req.db).findOne({ "instructionAudio.fileId": fileId });
-      if (!hw) return res.status(404).json({ message: "File not found" });
+      if (!hw) return notFound(res, "File not found");
 
       const isTeacher = req.user.role === "teacher" && hw.teacherId.toString() === req.user.id;
       const isStudent = req.user.role === "student" && hw.studentId.toString() === req.user.id;
-      if (!isTeacher && !isStudent) return res.status(403).json({ message: "Access denied" });
+      if (!isTeacher && !isStudent) return forbidden(res, "Access denied");
 
       res.setHeader("Content-Type", hw.instructionAudio.mimeType || "audio/webm");
       res.setHeader("Accept-Ranges", "bytes");
@@ -472,14 +473,14 @@ router.get("/file/:type/:fileId", verifyToken, async (req, res) => {
     // ── Audio feedback ─────────────────────────────────────────────────────
     if (type === "audio-feedback") {
       const filePath = path.join(AUD_DIR, fileId);
-      if (!fs.existsSync(filePath)) return res.status(404).json({ message: "File not found" });
+      if (!fs.existsSync(filePath)) return notFound(res, "File not found");
 
       const hw = await getHomework(req.db).findOne({ "grade.audioFeedback.fileId": fileId });
-      if (!hw) return res.status(404).json({ message: "File not found" });
+      if (!hw) return notFound(res, "File not found");
 
       const isTeacher = req.user.role === "teacher" && hw.teacherId.toString() === req.user.id;
       const isStudent = req.user.role === "student" && hw.studentId.toString() === req.user.id;
-      if (!isTeacher && !isStudent) return res.status(403).json({ message: "Access denied" });
+      if (!isTeacher && !isStudent) return forbidden(res, "Access denied");
 
       res.setHeader("Content-Type", hw.grade.audioFeedback.mimeType || "audio/webm");
       res.setHeader("Accept-Ranges", "bytes");
@@ -489,7 +490,7 @@ router.get("/file/:type/:fileId", verifyToken, async (req, res) => {
     const dir = type === "submission" ? SUB_DIR : HW_DIR;
     const filePath = path.join(dir, fileId);
 
-    if (!fs.existsSync(filePath)) return res.status(404).json({ message: "File not found" });
+    if (!fs.existsSync(filePath)) return notFound(res, "File not found");
 
     // Find the homework that contains this file to verify ownership
     const query = type === "submission"
@@ -497,11 +498,11 @@ router.get("/file/:type/:fileId", verifyToken, async (req, res) => {
       : { "attachments.fileId": fileId };
 
     const hw = await getHomework(req.db).findOne(query);
-    if (!hw) return res.status(404).json({ message: "File not found" });
+    if (!hw) return notFound(res, "File not found");
 
     const isTeacher = req.user.role === "teacher" && hw.teacherId.toString() === req.user.id;
     const isStudent = req.user.role === "student" && hw.studentId.toString() === req.user.id;
-    if (!isTeacher && !isStudent) return res.status(403).json({ message: "Access denied" });
+    if (!isTeacher && !isStudent) return forbidden(res, "Access denied");
 
     const attachList = type === "submission" ? hw.submission.attachments : hw.attachments;
     const att = attachList.find(a => a.fileId === fileId);
@@ -511,7 +512,7 @@ router.get("/file/:type/:fileId", verifyToken, async (req, res) => {
     res.setHeader("X-Content-Type-Options", "nosniff");
     res.sendFile(filePath);
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    serverError(res, err.message);
   }
 });
 

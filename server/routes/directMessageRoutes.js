@@ -7,6 +7,7 @@ import { teacherSchema }          from "../schemas/teacherSchema.js";
 import { studentSchema }          from "../schemas/studentSchema.js";
 import { adminSchema }            from "../schemas/adminSchema.js";
 import { subAdminSchema }         from "../schemas/subAdminSchema.js";
+import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
 
 const router = express.Router();
 router.use(tenantMiddleware);
@@ -27,7 +28,7 @@ async function getSenderInfo(id, role, db) {
   if (role === "student") {
     const s = await getStudent(db).findById(id);
     if (!s) return null;
-    return { name: `${s.firstName} ${s.surname}`, model: "Student" };
+    return { name: `${s.firstName} ${s.lastName}`, model: "Student" };
   }
   if (role === "admin") {
     const a = await getAdmin(db).findById(id);
@@ -64,13 +65,13 @@ router.get("/", verifyToken, async (req, res) => {
     const dms = await getDirectMessage(req.db).find(filter)
       .select("-messages")
       .populate("teacherId",  "firstName lastName email")
-      .populate("studentId",  "firstName surname email")
+      .populate("studentId",  "firstName lastName email")
       .populate("subAdminId", "firstName lastName email")
       .sort({ lastActivityAt: -1 });
 
     res.json({ success: true, dms });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    serverError(res, err.message);
   }
 });
 
@@ -80,10 +81,10 @@ router.post("/start", verifyToken, async (req, res) => {
     const { id: userId, role } = req.user;
 
     if (!["teacher", "student", "sub-admin"].includes(role))
-      return res.status(403).json({ message: "Only teachers, students and sub-admins can start an admin DM" });
+      return forbidden(res, "Only teachers, students and sub-admins can start an admin DM");
 
     const sender = await getSenderInfo(userId, role, req.db);
-    if (!sender) return res.status(404).json({ message: "User not found" });
+    if (!sender) return notFound(res, "User not found");
 
     let type, filter, create;
     if (role === "teacher") {
@@ -102,7 +103,7 @@ router.post("/start", verifyToken, async (req, res) => {
 
     res.json({ success: true, dm });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    serverError(res, err.message);
   }
 });
 
@@ -112,12 +113,12 @@ router.get("/:id/messages", verifyToken, async (req, res) => {
     const { id: userId, role } = req.user;
     const dm = await getDirectMessage(req.db).findById(req.params.id).lean();
 
-    if (!dm) return res.status(404).json({ message: "DM not found" });
-    if (!canAccess(dm, userId, role)) return res.status(403).json({ message: "Access denied" });
+    if (!dm) return notFound(res, "DM not found");
+    if (!canAccess(dm, userId, role)) return forbidden(res, "Access denied");
 
     res.json({ success: true, messages: dm.messages || [] });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    serverError(res, err.message);
   }
 });
 
@@ -127,15 +128,15 @@ router.post("/:id/messages", verifyToken, async (req, res) => {
     const { id: userId, role } = req.user;
     const { message } = req.body;
 
-    if (!message?.trim()) return res.status(400).json({ message: "Message cannot be empty" });
-    if (message.trim().length > 5000) return res.status(400).json({ message: "Message too long (max 5000 characters)" });
+    if (!message?.trim()) return badRequest(res, "Message cannot be empty");
+    if (message.trim().length > 5000) return badRequest(res, "Message too long (max 5000 characters)");
 
     const dm = await getDirectMessage(req.db).findById(req.params.id);
-    if (!dm) return res.status(404).json({ message: "DM not found" });
-    if (!canAccess(dm, userId, role)) return res.status(403).json({ message: "Access denied" });
+    if (!dm) return notFound(res, "DM not found");
+    if (!canAccess(dm, userId, role)) return forbidden(res, "Access denied");
 
     const sender = await getSenderInfo(userId, role, req.db);
-    if (!sender) return res.status(404).json({ message: "Sender not found" });
+    if (!sender) return notFound(res, "Sender not found");
 
     dm.messages.push({
       senderId:    userId,
@@ -159,7 +160,7 @@ router.post("/:id/messages", verifyToken, async (req, res) => {
     const saved = dm.messages[dm.messages.length - 1];
     res.json({ success: true, data: saved });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    serverError(res, err.message);
   }
 });
 
@@ -169,8 +170,8 @@ router.patch("/:id/mark-read", verifyToken, async (req, res) => {
     const { id: userId, role } = req.user;
     const dm = await getDirectMessage(req.db).findById(req.params.id);
 
-    if (!dm) return res.status(404).json({ message: "DM not found" });
-    if (!canAccess(dm, userId, role)) return res.status(403).json({ message: "Access denied" });
+    if (!dm) return notFound(res, "DM not found");
+    if (!canAccess(dm, userId, role)) return forbidden(res, "Access denied");
 
     if (role === "admin")           dm.unreadCount.admin    = 0;
     else if (role === "teacher")    dm.unreadCount.teacher  = 0;
@@ -180,7 +181,7 @@ router.patch("/:id/mark-read", verifyToken, async (req, res) => {
     await dm.save();
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    serverError(res, err.message);
   }
 });
 

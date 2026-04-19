@@ -795,7 +795,7 @@ export default function QuizTab({ teacherInfo, students, isDarkMode }) {
                   style={{ width: "100%", padding: "9px 12px", borderRadius: 10, border: `1.5px solid ${c.inputBorder}`, background: c.input, color: c.heading, fontSize: 13 }}>
                   <option value="">Select student…</option>
                   {(students || []).map(s => (
-                    <option key={s._id || s.id} value={s._id || s.id}>{s.firstName} {s.surname || s.lastName}</option>
+                    <option key={s._id || s.id} value={s._id || s.id}>{s.firstName} {s.lastName}</option>
                   ))}
                 </select>
               </div>
@@ -906,7 +906,7 @@ export default function QuizTab({ teacherInfo, students, isDarkMode }) {
                     <div style={{ minWidth: 0 }}>
                       <div style={{ fontWeight: 700, fontSize: 14, color: c.heading, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{quiz.title}</div>
                       <div style={{ fontSize: 12, color: c.body, marginTop: 2 }}>
-                        {student?.firstName} {student?.surname || student?.lastName} · {quiz.questions.length} Qs · ⏱ {quiz.timeLimit} min · Due {formatDate(quiz.dueDate)}
+                        {student?.firstName} {student?.lastName || student?.lastName} · {quiz.questions.length} Qs · ⏱ {quiz.timeLimit} min · Due {formatDate(quiz.dueDate)}
                       </div>
                     </div>
                   </div>

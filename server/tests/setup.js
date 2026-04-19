@@ -52,7 +52,7 @@ beforeAll(async () => {
   await Student.create({
     email: CREDENTIALS.student.email,
     firstName: 'Test',
-    surname: 'Student',
+    lastName: 'Student',
     password: hash,
     active: true,
     status: 'active',

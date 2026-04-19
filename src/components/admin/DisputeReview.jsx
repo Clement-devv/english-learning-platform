@@ -133,7 +133,7 @@ export default function DisputeReview({ isDarkMode }) {
                     </p>
                     <p style={{ margin: "2px 0 0", fontSize: "12px", color: col.muted }}>
                       {c.teacherId ? `${c.teacherId.firstName} ${c.teacherId.lastName}` : "?"} &nbsp;→&nbsp;
-                      {c.studentId ? `${c.studentId.firstName} ${c.studentId.surname}` : "?"}
+                      {c.studentId ? `${c.studentId.firstName} ${c.studentId.lastName}` : "?"}
                     </p>
                   </div>
                   <div style={{ flexShrink: 0 }}>

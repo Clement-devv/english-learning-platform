@@ -1,6 +1,8 @@
 // src/pages/super-admin/SuperAdminDashboard.jsx
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { TabErrorBoundary } from '../../components/ErrorBoundary';
+import { useAuth }           from '../../context/AuthContext.jsx';
 import {
   Crown, LogOut, Building2, CheckCircle, Clock,
   XCircle, PauseCircle, Plus, X, Eye, EyeOff,
@@ -10,8 +12,17 @@ import {
 } from 'lucide-react';
 import api from '../../api';
 import { THEMES } from '../../data/themes';
-import { LOGIN_THEMES } from '../../data/loginThemes';
+import { LOGIN_THEMES, TEACHER_LOGIN_THEMES } from '../../data/loginThemes';
 import { DASHBOARD_THEMES } from '../../data/dashboardThemes';
+import { TEACHER_DASHBOARD_THEMES } from '../../data/teacherDashboardThemes';
+import CentersTab  from './tabs/CentersTab';
+import DomainsTab  from './tabs/DomainsTab';
+import HealthTab   from './tabs/HealthTab';
+import UsageTab    from './tabs/UsageTab';
+import PeopleTab   from './tabs/PeopleTab';
+import ClassesTab  from './tabs/ClassesTab';
+import DeletedTab  from './tabs/DeletedTab';
+import CreditsTab  from './tabs/CreditsTab';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api/v1';
 
@@ -32,8 +43,7 @@ const EMPTY_FORM = {
 // OTP step: 'email' → 'otp' → 'form' → 'done'
 export default function SuperAdminDashboard() {
   const navigate = useNavigate();
-  const token    = localStorage.getItem('superAdminToken');
-  const info     = JSON.parse(localStorage.getItem('superAdminInfo') || '{}');
+  const { user: info, token, logout: authLogout } = useAuth();
   const authHeaders = { Authorization: `Bearer ${token}` };
 
   const [stats,    setStats]    = useState(null);
@@ -121,6 +131,22 @@ export default function SuperAdminDashboard() {
   const [allocMsg,         setAllocMsg]         = useState('');
   const [creditSearch,     setCreditSearch]     = useState('');
   const [expandedLog,      setExpandedLog]      = useState(null);  // centerId
+
+  // ── People tab ───────────────────────────────────────────────────────────
+  const [peopleCenter,  setPeopleCenter]  = useState('');
+  const [peopleData,    setPeopleData]    = useState({ teachers: [], students: [] });
+  const [peopleLoading, setPeopleLoading] = useState(false);
+  const [peopleSubTab,  setPeopleSubTab]  = useState('teachers');
+  const [peopleSearch,  setPeopleSearch]  = useState('');
+
+  // ── Classes tab ──────────────────────────────────────────────────────────
+  const [classesData,         setClassesData]         = useState([]);
+  const [classesLoading,      setClassesLoading]      = useState(false);
+  const [classesDateFrom,     setClassesDateFrom]     = useState('');
+  const [classesDateTo,       setClassesDateTo]       = useState('');
+  const [classesFilterCenter, setClassesFilterCenter] = useState('');
+  const [classesGrandTotal,   setClassesGrandTotal]   = useState(0);
+  const [classesExpanded,     setClassesExpanded]     = useState(null);
 
   // ── Dashboard theme assignment ────────────────────────────────────────────
   const [dashThemeModal,      setDashThemeModal]      = useState(null);
@@ -264,6 +290,76 @@ export default function SuperAdminDashboard() {
     }
   };
 
+  // ── Teacher login theme assignment ────────────────────────────────────────
+  const [teacherThemeModal,      setTeacherThemeModal]      = useState(null);
+  const [teacherThemeAssignments,setTeacherThemeAssignments]= useState({});
+  const [assigningTeacherTheme,  setAssigningTeacherTheme]  = useState(null);
+  const [teacherThemeMsg,        setTeacherThemeMsg]        = useState('');
+
+  const loadTeacherThemeAssignments = async () => {
+    try {
+      const res  = await fetch(`${API_BASE}/super-admin/teacher-login-themes`, { headers: authHeaders });
+      const data = await res.json();
+      if (data.success) setTeacherThemeAssignments(data.assignments);
+    } catch (_) {}
+  };
+
+  const handleOpenTeacherThemeModal = (center) => {
+    setTeacherThemeModal(center);
+    setTeacherThemeMsg('');
+    loadTeacherThemeAssignments();
+  };
+
+  const handleAssignTeacherTheme = async (themeId) => {
+    if (!teacherThemeModal) return;
+    setAssigningTeacherTheme(themeId);
+    setTeacherThemeMsg('');
+    try {
+      const res  = await fetch(`${API_BASE}/super-admin/centers/${teacherThemeModal._id}/teacher-login-theme`, {
+        method: 'PATCH',
+        headers: { ...authHeaders, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ teacherLoginTheme: themeId }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message);
+      setTeacherThemeModal(c => c ? { ...c, branding: { ...c.branding, teacherLoginTheme: themeId } } : c);
+      setCenters(cs => cs.map(c =>
+        c._id === teacherThemeModal._id ? { ...c, branding: { ...c.branding, teacherLoginTheme: themeId } } : c
+      ));
+      setTeacherThemeMsg(data.message);
+      loadTeacherThemeAssignments();
+    } catch (err) {
+      setTeacherThemeMsg(err.message || 'Failed to assign theme');
+    } finally {
+      setAssigningTeacherTheme(null);
+    }
+  };
+
+  const handleUnassignTeacherTheme = async () => {
+    if (!teacherThemeModal) return;
+    setAssigningTeacherTheme('__unassign__');
+    setTeacherThemeMsg('');
+    try {
+      const res  = await fetch(`${API_BASE}/super-admin/centers/${teacherThemeModal._id}/teacher-login-theme`, {
+        method: 'PATCH',
+        headers: { ...authHeaders, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ teacherLoginTheme: null }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message);
+      setTeacherThemeModal(c => c ? { ...c, branding: { ...c.branding, teacherLoginTheme: null } } : c);
+      setCenters(cs => cs.map(c =>
+        c._id === teacherThemeModal._id ? { ...c, branding: { ...c.branding, teacherLoginTheme: null } } : c
+      ));
+      setTeacherThemeMsg('Teacher login theme unassigned');
+      loadTeacherThemeAssignments();
+    } catch (err) {
+      setTeacherThemeMsg(err.message || 'Failed to unassign');
+    } finally {
+      setAssigningTeacherTheme(null);
+    }
+  };
+
   const loadData = useCallback(() => {
     setLoading(true);
     Promise.all([
@@ -302,13 +398,41 @@ export default function SuperAdminDashboard() {
       .finally(() => setCreditLoading(false));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const loadCenterPeople = useCallback((centerId) => {
+    if (!centerId) return;
+    setPeopleLoading(true);
+    fetch(`${API_BASE}/super-admin/centers/${centerId}/people`, { headers: authHeaders })
+      .then(r => r.json())
+      .then(d => { if (d.success) setPeopleData(d.data || { teachers: [], students: [] }); })
+      .catch(() => {})
+      .finally(() => setPeopleLoading(false));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const loadClasses = useCallback((from, to, centerId) => {
+    setClassesLoading(true);
+    const params = new URLSearchParams();
+    if (from)     params.set('from', from);
+    if (to)       params.set('to', to);
+    if (centerId) params.set('center', centerId);
+    fetch(`${API_BASE}/super-admin/classes?${params}`, { headers: authHeaders })
+      .then(r => r.json())
+      .then(d => {
+        if (d.success) {
+          setClassesData(d.centers || []);
+          setClassesGrandTotal(d.grandTotal || 0);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setClassesLoading(false));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => { loadData(); }, [loadData]);
   useEffect(() => { if (tab === 'credits') loadCredits(); }, [tab, loadCredits]);
   useEffect(() => { if (tab === 'health')  loadHealth();  }, [tab, loadHealth]);
+  useEffect(() => { if (tab === 'classes') loadClasses('', '', ''); }, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleLogout = () => {
-    localStorage.removeItem('superAdminToken');
-    localStorage.removeItem('superAdminInfo');
+    authLogout();
     navigate('/super-admin/login');
   };
 
@@ -725,6 +849,8 @@ export default function SuperAdminDashboard() {
             { key: 'health',  label: 'Health',         icon: Activity   },
             { key: 'domains', label: 'Custom Domains', icon: Globe      },
             { key: 'usage',   label: 'Agora Usage',    icon: BarChart2  },
+            { key: 'people',  label: 'People',         icon: Users      },
+            { key: 'classes', label: 'Classes',        icon: BarChart2  },
             { key: 'credits', label: 'AI Credits',     icon: Zap        },
             { key: 'deleted', label: 'Deleted',        icon: Trash2     },
           ].map(({ key, label, icon: Icon }) => (
@@ -752,583 +878,76 @@ export default function SuperAdminDashboard() {
           </button>
         </div>
 
-        {/* ── Centers Table ── */}
-        {tab === 'centers' && (
-          <div style={s.card}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-              <h2 style={s.sectionTitle}><Building2 size={16} color="#f59e0b" /> All Centers</h2>
-              <button onClick={loadData} style={s.refreshBtn} title="Refresh"><RefreshCw size={14} /></button>
-            </div>
-
-            {loading ? (
-              <div style={{ padding: '40px', textAlign: 'center', color: '#6b7280' }}>Loading…</div>
-            ) : centers.length === 0 ? (
-              <div style={{ padding: '40px', textAlign: 'center', color: '#6b7280' }}>
-                No centers yet.{' '}
-                <button onClick={() => setShowModal(true)} style={{ background: 'none', border: 'none', color: '#f59e0b', cursor: 'pointer', fontWeight: '600' }}>
-                  Create one →
-                </button>
-              </div>
-            ) : (
-              <div style={{ overflowX: 'auto' }}>
-                <table style={s.table}>
-                  <thead>
-                    <tr>
-                      {['Center', 'Slug', 'Plan', 'Status', 'Actions'].map(h => (
-                        <th key={h} style={s.th}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {centers.map(c => (
-                      <tr key={c._id} style={s.tr}>
-                        <td style={s.td}>
-                          <p style={{ margin: 0, fontWeight: '600', color: '#f1f5f9' }}>{c.centerName}</p>
-                          <p style={{ margin: 0, fontSize: '12px', color: '#6b7280' }}>{c.adminEmail}</p>
-                        </td>
-                        <td style={s.td}><code style={s.slug}>{c.slug}</code></td>
-                        <td style={s.td}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <span style={s.planBadge}>{c.plan || 'basic'}</span>
-                            <button
-                              onClick={() => { setPlanModal(c); setPlanSelected(c.plan || 'basic'); setPlanMsg(''); }}
-                              title="Change plan"
-                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', padding: '2px 4px', borderRadius: 4, lineHeight: 1 }}
-                            >✏️</button>
-                          </div>
-                        </td>
-                        <td style={s.td}>
-                          <span style={{ ...s.statusBadge, color: statusColor(c.status), borderColor: `${statusColor(c.status)}40`, background: `${statusColor(c.status)}12` }}>
-                            {statusIcon(c.status)} {c.status}
-                          </span>
-                        </td>
-                        <td style={s.td}>
-                          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                            {c.status === 'pending' && (
-                              <>
-                                <button onClick={() => handleApprove(c._id)} style={s.approveBtn}>Approve</button>
-                                <button onClick={() => handleReject(c._id)}  style={s.rejectBtn}>Reject</button>
-                              </>
-                            )}
-                            {c.status === 'active' && (
-                              <button onClick={() => handleSuspend(c._id)} style={s.suspendBtn}>Suspend</button>
-                            )}
-                            {(c.status === 'rejected' || c.status === 'suspended') && (
-                              <button onClick={() => handleApprove(c._id)} style={s.approveBtn}>Reactivate</button>
-                            )}
-                            <button onClick={() => setThemeCenter(c)} style={s.themeBtn} title="Set theme">
-                              <Palette size={12} /> Theme
-                            </button>
-                            <button
-                              onClick={() => handleOpenLoginThemeModal(c)}
-                              style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '5px 12px', borderRadius: 7, fontSize: 12, fontWeight: 600, background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.2)', color: '#8b5cf6', cursor: 'pointer', fontFamily: 'inherit' }}
-                              title="Assign exclusive login page theme"
-                            >
-                              <Palette size={12} /> Login Page
-                            </button>
-                            <button
-                              onClick={() => handleOpenDashThemeModal(c)}
-                              style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '5px 12px', borderRadius: 7, fontSize: 12, fontWeight: 600, background: 'rgba(6,182,212,0.1)', border: '1px solid rgba(6,182,212,0.2)', color: '#06b6d4', cursor: 'pointer', fontFamily: 'inherit' }}
-                              title="Assign exclusive student dashboard theme"
-                            >
-                              <Palette size={12} /> Dashboard
-                            </button>
-                            <button onClick={() => setFeaturesCenter(c)} style={s.featuresBtn} title="Toggle features">
-                              <ToggleRight size={12} /> Features
-                            </button>
-                            <button
-                              onClick={() => {
-                                setLimitsModal(c);
-                                setLimitsUnlimT(c.maxTeachers === -1);
-                                setLimitsUnlimS(c.maxStudents === -1);
-                                setLimitsTeachers(c.maxTeachers === -1 ? '' : String(c.maxTeachers || ''));
-                                setLimitsStudents(c.maxStudents === -1 ? '' : String(c.maxStudents || ''));
-                                setLimitsMsg('');
-                              }}
-                              style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '5px 12px', borderRadius: 7, fontSize: 12, fontWeight: 600, background: 'rgba(251,146,60,0.1)', border: '1px solid rgba(251,146,60,0.2)', color: '#fb923c', cursor: 'pointer', fontFamily: 'inherit' }}
-                              title="Edit seat limits"
-                            >
-                              <SlidersHorizontal size={12} /> Limits
-                            </button>
-                            {c.status === 'active' && (
-                              <button
-                                onClick={() => handleEnterAsAdmin(c)}
-                                disabled={impersonating === c._id}
-                                style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '5px 12px', borderRadius: 7, fontSize: 12, fontWeight: 600, background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.3)', color: '#818cf8', cursor: 'pointer', fontFamily: 'inherit' }}
-                                title="Open admin panel for this center (30 min session)"
-                              >
-                                <LogIn size={12} /> {impersonating === c._id ? '…' : 'Enter'}
-                              </button>
-                            )}
-                            <button onClick={() => setDeleteTarget(c)} style={s.deleteBtn} title="Schedule deletion">
-                              <Trash2 size={12} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ── Domains Table ── */}
-        {tab === 'domains' && (
-          <div style={s.card}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-              <h2 style={s.sectionTitle}><Globe size={16} color="#f59e0b" /> Custom Domains</h2>
-              <button onClick={loadData} style={s.refreshBtn} title="Refresh"><RefreshCw size={14} /></button>
-            </div>
-
-            {loading ? (
-              <div style={{ padding: '40px', textAlign: 'center', color: '#6b7280' }}>Loading…</div>
-            ) : domains.length === 0 ? (
-              <div style={{ padding: '40px', textAlign: 'center', color: '#6b7280' }}>
-                No custom domains submitted yet.
-              </div>
-            ) : (
-              <div style={{ overflowX: 'auto' }}>
-                <table style={s.table}>
-                  <thead>
-                    <tr>
-                      {['Center', 'Domain', 'Plan', 'DNS Status', 'Requested', 'Actions'].map(h => (
-                        <th key={h} style={s.th}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {domains.map(d => (
-                      <tr key={d._id} style={s.tr}>
-                        <td style={s.td}>
-                          <p style={{ margin: 0, fontWeight: '600', color: '#f1f5f9' }}>{d.centerName}</p>
-                          <code style={{ ...s.slug, fontSize: '11px' }}>{d.slug}</code>
-                        </td>
-                        <td style={s.td}>
-                          <span style={{ color: '#e2e8f0', fontFamily: 'monospace', fontSize: '13px' }}>{d.customDomain}</span>
-                        </td>
-                        <td style={s.td}><span style={s.planBadge}>{d.plan || 'basic'}</span></td>
-                        <td style={s.td}>
-                          {d.domainVerified ? (
-                            <span style={{ ...s.statusBadge, color: '#10b981', borderColor: '#10b98140', background: '#10b98112' }}>
-                              <CheckCircle size={12} /> Verified
-                            </span>
-                          ) : (
-                            <span style={{ ...s.statusBadge, color: '#f59e0b', borderColor: '#f59e0b40', background: '#f59e0b12' }}>
-                              <Clock size={12} /> Pending
-                            </span>
-                          )}
-                        </td>
-                        <td style={{ ...s.td, fontSize: '12px', color: '#6b7280' }}>
-                          {d.domainRequestedAt ? new Date(d.domainRequestedAt).toLocaleDateString() : '—'}
-                        </td>
-                        <td style={s.td}>
-                          <div style={{ display: 'flex', gap: '6px' }}>
-                            {!d.domainVerified && (
-                              <button
-                                onClick={() => handleVerifyDomain(d._id)}
-                                disabled={!!domainAction[d._id]}
-                                style={s.approveBtn}
-                              >
-                                {domainAction[d._id] === 'verifying' ? '…' : 'Verify DNS'}
-                              </button>
-                            )}
-                            <button
-                              onClick={() => handleRemoveDomain(d._id, d.customDomain)}
-                              disabled={!!domainAction[d._id]}
-                              style={s.rejectBtn}
-                            >
-                              {domainAction[d._id] === 'removing' ? '…' : <Trash2 size={13} />}
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        )}
-        {/* ── Health Tab ── */}
-        {tab === 'health' && (
-          <div style={s.card}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-              <h2 style={s.sectionTitle}><Activity size={16} color="#34d399" /> Center Health</h2>
-              <button onClick={loadHealth} style={s.refreshBtn} title="Refresh"><RefreshCw size={14} /></button>
-            </div>
-            <p style={{ margin: '0 0 16px', fontSize: '12px', color: '#6b7280' }}>
-              Live counts from each center's database. Last Activity shows the most recent booking.
-            </p>
-            {healthLoading ? (
-              <div style={{ padding: '40px', textAlign: 'center', color: '#6b7280' }}>Loading health data…</div>
-            ) : health.length === 0 ? (
-              <div style={{ padding: '40px', textAlign: 'center', color: '#6b7280' }}>No active centers.</div>
-            ) : (
-              <div style={{ overflowX: 'auto' }}>
-                <table style={s.table}>
-                  <thead>
-                    <tr>
-                      {['Center', 'Teachers', 'Students', 'Bookings (month)', 'Last Activity'].map(h => (
-                        <th key={h} style={s.th}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {health.map(h => {
-                      const daysSince = h.lastActivity
-                        ? Math.floor((Date.now() - new Date(h.lastActivity)) / 86400000)
-                        : null;
-                      const actColor = daysSince === null ? '#6b7280'
-                        : daysSince <= 7  ? '#34d399'
-                        : daysSince <= 30 ? '#f59e0b'
-                        : '#f87171';
-                      return (
-                        <tr key={h._id} style={s.tr}>
-                          <td style={s.td}>
-                            <p style={{ margin: 0, fontWeight: 600, color: '#f1f5f9' }}>{centers.find(c => c._id === String(h._id))?.centerName || h.slug}</p>
-                            <code style={{ ...s.slug, fontSize: 11 }}>{h.slug}</code>
-                          </td>
-                          <td style={s.td}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                              <UserCheck size={13} color="#818cf8" />
-                              <span style={{ fontWeight: 700, color: '#f1f5f9' }}>{h.teachers}</span>
-                              {h.maxTeachers && h.maxTeachers !== -1 && (
-                                <span style={{ color: '#6b7280', fontSize: 11 }}>/ {h.maxTeachers}</span>
-                              )}
-                            </div>
-                          </td>
-                          <td style={s.td}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                              <Users size={13} color="#34d399" />
-                              <span style={{ fontWeight: 700, color: '#f1f5f9' }}>{h.students}</span>
-                              {h.maxStudents && h.maxStudents !== -1 && (
-                                <span style={{ color: '#6b7280', fontSize: 11 }}>/ {h.maxStudents}</span>
-                              )}
-                            </div>
-                          </td>
-                          <td style={{ ...s.td, fontWeight: 700, color: h.bookingsThisMonth > 0 ? '#34d399' : '#6b7280' }}>
-                            {h.bookingsThisMonth}
-                          </td>
-                          <td style={{ ...s.td, color: actColor, fontSize: 12, fontWeight: 600 }}>
-                            {h.lastActivity
-                              ? daysSince === 0 ? 'Today'
-                              : daysSince === 1 ? 'Yesterday'
-                              : `${daysSince}d ago`
-                              : 'No bookings yet'}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ── Usage Tab ── */}
-        {tab === 'usage' && (
-          <div style={s.card}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-              <h2 style={s.sectionTitle}><BarChart2 size={16} color="#f59e0b" /> Agora Usage — {usageMonth || 'All Time'}</h2>
-              <button onClick={loadData} style={s.refreshBtn} title="Refresh"><RefreshCw size={14} /></button>
-            </div>
-
-            <p style={{ margin: '0 0 16px', fontSize: '12px', color: '#6b7280' }}>
-              Each row shows how many Agora minutes a center has used. Click a row to see the session-by-session breakdown for this month.
-            </p>
-
-            {loading ? (
-              <div style={{ padding: '40px', textAlign: 'center', color: '#6b7280' }}>Loading…</div>
-            ) : usage.length === 0 ? (
-              <div style={{ padding: '40px', textAlign: 'center', color: '#6b7280' }}>
-                No Agora usage recorded yet. Minutes will appear here after centers complete calls.
-              </div>
-            ) : (
-              <div style={{ overflowX: 'auto' }}>
-                <table style={s.table}>
-                  <thead>
-                    <tr>
-                      {['Center', 'This Month', 'Last Month', 'All Time', 'Sessions', ''].map(h => (
-                        <th key={h} style={s.th}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {usage.map(u => (
-                      <React.Fragment key={u.centerId}>
-                        <tr
-                          style={{ ...s.tr, cursor: 'pointer' }}
-                          onClick={() => toggleSessionDetail(u.centerId)}
-                        >
-                          <td style={s.td}>
-                            <p style={{ margin: 0, fontWeight: '600', color: '#f1f5f9' }}>{u.centerName}</p>
-                            <code style={{ ...s.slug, fontSize: '11px' }}>{u.centerId}</code>
-                          </td>
-                          <td style={s.td}>
-                            <span style={{ color: '#34d399', fontWeight: '700', fontSize: '15px' }}>{fmtMins(u.thisMonthMinutes)}</span>
-                          </td>
-                          <td style={s.td}>
-                            <span style={{ color: '#9ca3af', fontWeight: '600' }}>{fmtMins(u.lastMonthMinutes)}</span>
-                          </td>
-                          <td style={s.td}>
-                            <span style={{ color: '#f1f5f9', fontWeight: '600' }}>{fmtMins(u.totalMinutes)}</span>
-                          </td>
-                          <td style={s.td}>
-                            <span style={{ color: '#6b7280', fontSize: '13px' }}>{u.sessions} sessions</span>
-                          </td>
-                          <td style={s.td}>
-                            {loadingDetail[u.centerId]
-                              ? <span style={{ color: '#6b7280', fontSize: '12px' }}>Loading…</span>
-                              : expandedCenter === u.centerId
-                                ? <ChevronUp size={15} color="#f59e0b" />
-                                : <ChevronDown size={15} color="#6b7280" />
-                            }
-                          </td>
-                        </tr>
-
-                        {/* Session detail rows */}
-                        {expandedCenter === u.centerId && sessionDetail[u.centerId] && (
-                          <tr style={{ background: 'rgba(245,158,11,0.03)' }}>
-                            <td colSpan={6} style={{ padding: '0 14px 14px' }}>
-                              <div style={{
-                                borderTop: '1px solid rgba(245,158,11,0.15)',
-                                marginTop: '4px',
-                                paddingTop: '12px',
-                              }}>
-                                <p style={{ margin: '0 0 10px', fontSize: '12px', color: '#f59e0b', fontWeight: '700' }}>
-                                  Sessions in {usageMonth} — Total: {fmtMins(sessionDetail[u.centerId].totalMinutes)}
-                                </p>
-                                {sessionDetail[u.centerId].sessions.length === 0 ? (
-                                  <p style={{ color: '#6b7280', fontSize: '12px' }}>No sessions this month.</p>
-                                ) : (
-                                  <table style={{ ...s.table, fontSize: '12px' }}>
-                                    <thead>
-                                      <tr>
-                                        {['Date', 'Channel', 'Duration', 'Participants'].map(h => (
-                                          <th key={h} style={{ ...s.th, fontSize: '10px' }}>{h}</th>
-                                        ))}
-                                      </tr>
-                                    </thead>
-                                    <tbody>
-                                      {sessionDetail[u.centerId].sessions.map(sess => (
-                                        <tr key={sess._id} style={s.tr}>
-                                          <td style={{ ...s.td, color: '#9ca3af' }}>
-                                            {new Date(sess.sessionDate).toLocaleDateString()} {new Date(sess.sessionDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                          </td>
-                                          <td style={{ ...s.td }}>
-                                            <code style={{ ...s.slug, fontSize: '10px' }}>{sess.channelName || '—'}</code>
-                                          </td>
-                                          <td style={{ ...s.td, color: '#34d399', fontWeight: '600' }}>
-                                            {fmtMins(sess.durationMinutes)}
-                                          </td>
-                                          <td style={{ ...s.td, color: '#9ca3af' }}>
-                                            {sess.participantCount} {sess.participantCount === 1 ? 'person' : 'people'}
-                                          </td>
-                                        </tr>
-                                      ))}
-                                    </tbody>
-                                  </table>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        )}
-                      </React.Fragment>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ── Deleted Tab ── */}
-        {tab === 'deleted' && (
-          <div style={s.card}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-              <h2 style={s.sectionTitle}><Trash2 size={16} color="#ef4444" /> Scheduled for Deletion</h2>
-              <button onClick={loadData} style={s.refreshBtn} title="Refresh"><RefreshCw size={14} /></button>
-            </div>
-            <p style={{ margin: '0 0 16px', fontSize: '12px', color: '#6b7280' }}>
-              Centers below will be permanently deleted after their countdown expires. Restore them before the deadline to reactivate.
-            </p>
-
-            {deleted.length === 0 ? (
-              <div style={{ padding: '40px', textAlign: 'center', color: '#6b7280' }}>
-                No centers are currently scheduled for deletion.
-              </div>
-            ) : (
-              <div style={{ overflowX: 'auto' }}>
-                <table style={s.table}>
-                  <thead>
-                    <tr>
-                      {['Center', 'Slug', 'Deleted On', 'Permanent Deletion', 'Days Left', ''].map(h => (
-                        <th key={h} style={s.th}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {deleted.map(c => {
-                      const days = daysRemaining(c.scheduledDeletionAt);
-                      const urgent = days <= 2;
-                      return (
-                        <tr key={c._id} style={s.tr}>
-                          <td style={s.td}>
-                            <p style={{ margin: 0, fontWeight: '600', color: '#f1f5f9' }}>{c.centerName}</p>
-                            <p style={{ margin: 0, fontSize: '12px', color: '#6b7280' }}>{c.adminEmail}</p>
-                          </td>
-                          <td style={s.td}><code style={s.slug}>{c.slug}</code></td>
-                          <td style={{ ...s.td, fontSize: '12px', color: '#6b7280' }}>
-                            {c.deletedAt ? new Date(c.deletedAt).toLocaleDateString() : '—'}
-                          </td>
-                          <td style={{ ...s.td, fontSize: '12px', color: urgent ? '#f87171' : '#9ca3af', fontWeight: urgent ? '700' : '400' }}>
-                            {c.scheduledDeletionAt ? new Date(c.scheduledDeletionAt).toLocaleDateString() : '—'}
-                          </td>
-                          <td style={s.td}>
-                            <span style={{
-                              display: 'inline-flex', alignItems: 'center', gap: '5px',
-                              fontSize: '13px', fontWeight: '700',
-                              color: days === 0 ? '#ef4444' : urgent ? '#f59e0b' : '#34d399',
-                            }}>
-                              {days === 0 ? '⚠️ Expired' : `${days} day${days === 1 ? '' : 's'}`}
-                            </span>
-                          </td>
-                          <td style={s.td}>
-                            <button
-                              onClick={() => handleRestore(c)}
-                              disabled={restoring === c._id}
-                              style={s.approveBtn}
-                            >
-                              <RotateCcw size={12} />
-                              {restoring === c._id ? 'Restoring…' : 'Restore'}
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ── AI Chat Credits Tab ── */}
-        {tab === 'credits' && (
-          <div style={s.card}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: 10 }}>
-              <h2 style={s.sectionTitle}><Zap size={16} color="#a78bfa" /> AI Chat Credits</h2>
-              <button onClick={loadCredits} style={s.refreshBtn} title="Refresh"><RefreshCw size={14} /></button>
-            </div>
-
-            {/* Summary totals */}
-            {creditTotals && (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, marginBottom: 20 }}>
-                {[
-                  { label: 'Total Allocated', value: creditTotals.totalAllocated.toLocaleString(), color: '#a78bfa' },
-                  { label: 'Currently Available', value: creditTotals.totalBalance.toLocaleString(), color: '#34d399' },
-                  { label: 'Total Used by Students', value: creditTotals.totalUsed.toLocaleString(), color: '#fb923c' },
-                ].map(t => (
-                  <div key={t.label} style={{ background: 'rgba(167,139,250,0.08)', border: '1px solid rgba(167,139,250,0.2)', borderRadius: 10, padding: '14px 16px' }}>
-                    <p style={{ margin: '0 0 4px', fontSize: 11, color: '#9ca3af', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t.label}</p>
-                    <p style={{ margin: 0, fontSize: 24, fontWeight: 900, color: t.color }}>{t.value}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Search */}
-            <div style={{ position: 'relative', marginBottom: 14 }}>
-              <input
-                value={creditSearch}
-                onChange={e => setCreditSearch(e.target.value)}
-                placeholder="Search centers..."
-                style={{ ...s.input, paddingLeft: 32, width: '100%', boxSizing: 'border-box' }}
-              />
-              <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#6b7280', fontSize: 14 }}>🔍</span>
-            </div>
-
-            {creditLoading ? (
-              <div style={{ textAlign: 'center', padding: 40, color: '#6b7280' }}>Loading credits...</div>
-            ) : (
-              <div style={{ overflowX: 'auto' }}>
-                <table style={s.table}>
-                  <thead>
-                    <tr>
-                      {['Center', 'Plan', 'Balance', 'Total Allocated', 'Used', 'Log', ''].map(h => (
-                        <th key={h} style={s.th}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {creditCenters
-                      .filter(c => !creditSearch || c.centerName.toLowerCase().includes(creditSearch.toLowerCase()) || c.slug.includes(creditSearch.toLowerCase()))
-                      .map(c => (
-                        <React.Fragment key={c._id}>
-                          <tr style={s.tr}>
-                            <td style={s.td}>
-                              <p style={{ margin: 0, fontWeight: 600, color: '#f1f5f9', fontSize: 13 }}>{c.centerName}</p>
-                              <p style={{ margin: 0, fontSize: 11, color: '#6b7280' }}>{c.adminEmail}</p>
-                            </td>
-                            <td style={s.td}>
-                              <span style={{ background: 'rgba(167,139,250,0.15)', color: '#a78bfa', borderRadius: 6, padding: '2px 8px', fontSize: 11, fontWeight: 700, textTransform: 'uppercase' }}>{c.plan}</span>
-                            </td>
-                            <td style={s.td}>
-                              <span style={{
-                                fontWeight: 800, fontSize: 16,
-                                color: c.balance === 0 ? '#ef4444' : c.balance <= 50 ? '#f59e0b' : '#34d399',
-                              }}>{c.balance.toLocaleString()}</span>
-                            </td>
-                            <td style={{ ...s.td, color: '#9ca3af', fontSize: 13 }}>{c.totalAllocated.toLocaleString()}</td>
-                            <td style={{ ...s.td, color: '#fb923c', fontSize: 13 }}>{c.used.toLocaleString()}</td>
-                            <td style={s.td}>
-                              {c.log.length > 0 ? (
-                                <button
-                                  onClick={() => setExpandedLog(expandedLog === c._id ? null : c._id)}
-                                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', fontSize: 11, display: 'flex', alignItems: 'center', gap: 3 }}
-                                >
-                                  {expandedLog === c._id ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-                                  {c.log.length} entr{c.log.length === 1 ? 'y' : 'ies'}
-                                </button>
-                              ) : <span style={{ color: '#4b5563', fontSize: 11 }}>No log</span>}
-                            </td>
-                            <td style={s.td}>
-                              <button
-                                onClick={() => { setAllocModal(c); setAllocAmount(''); setAllocNote(''); setAllocMsg(''); }}
-                                style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#7c3aed,#4f46e5)', color: '#fff', fontWeight: 700, fontSize: 11, cursor: 'pointer' }}
-                              >
-                                <Zap size={12} /> Allocate
-                              </button>
-                            </td>
-                          </tr>
-                          {expandedLog === c._id && (
-                            <tr>
-                              <td colSpan={7} style={{ ...s.td, background: 'rgba(167,139,250,0.04)', padding: '10px 16px' }}>
-                                <p style={{ margin: '0 0 8px', fontSize: 11, fontWeight: 700, color: '#a78bfa', textTransform: 'uppercase' }}>Allocation Log (last 10)</p>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                                  {c.log.map((entry, i) => (
-                                    <div key={i} style={{ display: 'flex', gap: 12, fontSize: 11, color: '#9ca3af' }}>
-                                      <span style={{ color: '#34d399', fontWeight: 700, minWidth: 60 }}>+{entry.amount}</span>
-                                      <span>{entry.note || '—'}</span>
-                                      <span style={{ color: '#6b7280' }}>by {entry.by || '—'}</span>
-                                      <span style={{ marginLeft: 'auto' }}>{entry.createdAt ? new Date(entry.createdAt).toLocaleDateString('en-GB') : ''}</span>
-                                    </div>
-                                  ))}
-                                </div>
-                              </td>
-                            </tr>
-                          )}
-                        </React.Fragment>
-                      ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        )}
+        {/* ── Tab Components ── */}
+        <TabErrorBoundary key={tab}>
+          {tab === 'centers' && (
+            <CentersTab
+              centers={centers} loading={loading} loadData={loadData} setShowModal={setShowModal}
+              handleApprove={handleApprove} handleReject={handleReject} handleSuspend={handleSuspend}
+              handleEnterAsAdmin={handleEnterAsAdmin} impersonating={impersonating}
+              setDeleteTarget={setDeleteTarget}
+              setPlanModal={setPlanModal} setPlanSelected={setPlanSelected} setPlanMsg={setPlanMsg}
+              setThemeCenter={setThemeCenter}
+              handleOpenLoginThemeModal={handleOpenLoginThemeModal}
+              handleOpenTeacherThemeModal={handleOpenTeacherThemeModal}
+              handleOpenDashThemeModal={handleOpenDashThemeModal}
+              setFeaturesCenter={setFeaturesCenter}
+              setLimitsModal={setLimitsModal} setLimitsUnlimT={setLimitsUnlimT} setLimitsUnlimS={setLimitsUnlimS}
+              setLimitsTeachers={setLimitsTeachers} setLimitsStudents={setLimitsStudents} setLimitsMsg={setLimitsMsg}
+              statusColor={statusColor} statusIcon={statusIcon}
+            />
+          )}
+          {tab === 'domains' && (
+            <DomainsTab
+              domains={domains} loading={loading} loadData={loadData}
+              handleVerifyDomain={handleVerifyDomain} handleRemoveDomain={handleRemoveDomain}
+              domainAction={domainAction}
+            />
+          )}
+          {tab === 'health' && (
+            <HealthTab health={health} healthLoading={healthLoading} loadHealth={loadHealth} centers={centers} />
+          )}
+          {tab === 'usage' && (
+            <UsageTab
+              usage={usage} loading={loading} usageMonth={usageMonth} loadData={loadData}
+              expandedCenter={expandedCenter} sessionDetail={sessionDetail} loadingDetail={loadingDetail}
+              toggleSessionDetail={toggleSessionDetail} fmtMins={fmtMins}
+            />
+          )}
+          {tab === 'deleted' && (
+            <DeletedTab
+              deleted={deleted} loadData={loadData} restoring={restoring}
+              handleRestore={handleRestore} daysRemaining={daysRemaining}
+            />
+          )}
+          {tab === 'credits' && (
+            <CreditsTab
+              creditCenters={creditCenters} creditLoading={creditLoading} creditTotals={creditTotals}
+              loadCredits={loadCredits} creditSearch={creditSearch} setCreditSearch={setCreditSearch}
+              expandedLog={expandedLog} setExpandedLog={setExpandedLog}
+              setAllocModal={setAllocModal} setAllocAmount={setAllocAmount} setAllocNote={setAllocNote} setAllocMsg={setAllocMsg}
+            />
+          )}
+          {tab === 'people' && (
+            <PeopleTab
+              centers={centers} peopleCenter={peopleCenter} setPeopleCenter={setPeopleCenter}
+              peopleData={peopleData} peopleLoading={peopleLoading}
+              peopleSubTab={peopleSubTab} setPeopleSubTab={setPeopleSubTab}
+              peopleSearch={peopleSearch} setPeopleSearch={setPeopleSearch}
+              loadCenterPeople={loadCenterPeople}
+            />
+          )}
+          {tab === 'classes' && (
+            <ClassesTab
+              centers={centers}
+              classesData={classesData} classesLoading={classesLoading}
+              classesDateFrom={classesDateFrom} classesDateTo={classesDateTo} classesFilterCenter={classesFilterCenter}
+              setClassesDateFrom={setClassesDateFrom} setClassesDateTo={setClassesDateTo} setClassesFilterCenter={setClassesFilterCenter}
+              classesGrandTotal={classesGrandTotal} classesExpanded={classesExpanded} setClassesExpanded={setClassesExpanded}
+              loadClasses={loadClasses}
+            />
+          )}
+        </TabErrorBoundary>
 
       </div>
 
@@ -2238,6 +1857,119 @@ export default function SuperAdminDashboard() {
                     style={{ padding: '7px 16px', borderRadius: '8px', border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.08)', color: '#ef4444', fontSize: '12px', fontWeight: '700', cursor: 'pointer', fontFamily: 'inherit' }}
                   >
                     {assigningLoginTheme === '__unassign__' ? 'Removing…' : 'Unassign'}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Teacher Login Theme Modal ── */}
+      {teacherThemeModal && (
+        <div style={s.overlay} onClick={(e) => e.target === e.currentTarget && setTeacherThemeModal(null)}>
+          <div style={{ ...s.modal, maxWidth: '820px' }}>
+            <div style={s.modalHeader}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Palette size={18} color="#f59e0b" />
+                <span style={s.modalTitle}>Teacher Login Theme</span>
+                <span style={{ fontSize: '13px', color: '#6b7280' }}>for {teacherThemeModal.centerName}</span>
+              </div>
+              <button onClick={() => setTeacherThemeModal(null)} style={s.closeBtn}><X size={18} /></button>
+            </div>
+
+            <div style={{ padding: '20px 24px 28px' }}>
+              <p style={{ ...s.stepDesc, marginBottom: '6px' }}>
+                Each teacher login theme is <strong>exclusive</strong> — only one center can hold it. Teachers see this page when they sign in.
+              </p>
+              {teacherThemeMsg && (
+                <div style={{ padding: '8px 14px', borderRadius: '10px', fontSize: '13px', fontWeight: '600', marginBottom: '14px',
+                  background: teacherThemeMsg.toLowerCase().includes('already') || teacherThemeMsg.toLowerCase().includes('failed') ? 'rgba(239,68,68,.12)' : 'rgba(34,197,94,.12)',
+                  color: teacherThemeMsg.toLowerCase().includes('already') || teacherThemeMsg.toLowerCase().includes('failed') ? '#ef4444' : '#22c55e',
+                  border: `1px solid ${teacherThemeMsg.toLowerCase().includes('already') || teacherThemeMsg.toLowerCase().includes('failed') ? 'rgba(239,68,68,.2)' : 'rgba(34,197,94,.2)'}`,
+                }}>
+                  {teacherThemeMsg}
+                </div>
+              )}
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: '14px', marginTop: '8px' }}>
+                {TEACHER_LOGIN_THEMES.map(theme => {
+                  const isActive    = teacherThemeModal.branding?.teacherLoginTheme === theme.id;
+                  const takenBy     = !isActive && teacherThemeAssignments[theme.id];
+                  const isAssigning = assigningTeacherTheme === theme.id;
+                  const isLocked    = !!takenBy;
+
+                  return (
+                    <div key={theme.id} style={{
+                      borderRadius: '14px',
+                      border: isActive ? '2px solid #f59e0b' : isLocked ? '2px solid rgba(255,255,255,0.04)' : '2px solid rgba(255,255,255,0.08)',
+                      background: isActive ? 'rgba(245,158,11,0.12)' : isLocked ? 'rgba(255,255,255,0.01)' : 'rgba(255,255,255,0.03)',
+                      overflow: 'hidden',
+                      opacity: isLocked ? 0.5 : 1,
+                      transition: 'border-color .15s, background .15s, opacity .15s',
+                    }}>
+                      <div style={{
+                        height: '72px',
+                        background: `linear-gradient(135deg, ${theme.preview.bgStart}, ${theme.preview.bgEnd})`,
+                        position: 'relative',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}>
+                        <span style={{ fontSize: '32px', filter: 'drop-shadow(0 4px 8px rgba(0,0,0,.4))' }}>{theme.emoji}</span>
+                        <div style={{
+                          position: 'absolute', bottom: '8px', right: '8px',
+                          width: '14px', height: '14px', borderRadius: '50%',
+                          background: theme.preview.accent, boxShadow: `0 0 8px ${theme.preview.accent}`,
+                        }} />
+                      </div>
+
+                      <div style={{ padding: '10px 12px 6px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '3px' }}>
+                          <span style={{ fontSize: '13px', fontWeight: '700', color: '#f1f5f9' }}>{theme.name}</span>
+                          {isActive && <CheckCircle size={14} color="#f59e0b" />}
+                        </div>
+                        <p style={{ margin: '0 0 6px', fontSize: '10px', color: '#6b7280', lineHeight: '1.4' }}>
+                          {theme.description}
+                        </p>
+                        {takenBy && (
+                          <p style={{ margin: '0 0 6px', fontSize: '10px', color: '#f59e0b', fontWeight: '700' }}>
+                            🔒 Held by {takenBy.name}
+                          </p>
+                        )}
+                      </div>
+
+                      <div style={{ padding: '4px 12px 12px' }}>
+                        <button
+                          onClick={() => !isAssigning && !isActive && !isLocked && handleAssignTeacherTheme(theme.id)}
+                          disabled={isAssigning || isActive || isLocked}
+                          style={{
+                            width: '100%', padding: '7px 0', borderRadius: '8px', border: 'none',
+                            background: isActive ? 'rgba(245,158,11,0.2)' : isLocked ? 'rgba(255,255,255,0.04)' : '#f59e0b',
+                            color: isActive ? '#f59e0b' : isLocked ? '#4b5563' : '#0c0a00',
+                            fontSize: '12px', fontWeight: '700',
+                            cursor: isAssigning || isActive || isLocked ? 'default' : 'pointer',
+                            fontFamily: 'inherit',
+                            opacity: isAssigning ? 0.6 : 1,
+                          }}
+                        >
+                          {isAssigning ? 'Assigning…' : isActive ? '✓ Assigned' : isLocked ? 'Taken' : 'Assign'}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {teacherThemeModal.branding?.teacherLoginTheme && (
+                <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '13px', color: '#6b7280' }}>
+                    Remove teacher login theme from this center → falls back to default
+                  </span>
+                  <button
+                    onClick={handleUnassignTeacherTheme}
+                    disabled={assigningTeacherTheme === '__unassign__'}
+                    style={{ padding: '7px 16px', borderRadius: '8px', border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.08)', color: '#ef4444', fontSize: '12px', fontWeight: '700', cursor: 'pointer', fontFamily: 'inherit' }}
+                  >
+                    {assigningTeacherTheme === '__unassign__' ? 'Removing…' : 'Unassign'}
                   </button>
                 </div>
               )}

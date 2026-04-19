@@ -89,7 +89,7 @@ export default function RecordingsTab({ teachers = [], isDarkMode }) {
         </span>
         {playing.studentId && (
           <span style={{ fontSize: "13px", color: col.muted }}>
-            👤 {playing.studentId.firstName} {playing.studentId.surname}
+            👤 {playing.studentId.firstName} {playing.studentId.lastName}
           </span>
         )}
         {playing.fileSize > 0 && (
@@ -142,7 +142,7 @@ export default function RecordingsTab({ teachers = [], isDarkMode }) {
               <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
                 <span style={{ fontSize: "12px", color: col.muted }}>{formatDate(rec.createdAt)}</span>
                 {rec.duration > 0 && <span style={{ fontSize: "12px", color: col.muted }}>{formatDuration(rec.duration)}</span>}
-                {rec.studentId && <span style={{ fontSize: "12px", color: col.muted }}>👤 {rec.studentId.firstName} {rec.studentId.surname}</span>}
+                {rec.studentId && <span style={{ fontSize: "12px", color: col.muted }}>👤 {rec.studentId.firstName} {rec.studentId.lastName}</span>}
                 <span style={{ fontSize: "11px", fontWeight: 800, padding: "2px 8px", borderRadius: "20px", background: rec.visibleToStudent ? "rgba(16,185,129,0.12)" : "rgba(107,114,128,0.12)", color: rec.visibleToStudent ? "#10b981" : col.muted }}>
                   {rec.visibleToStudent ? "👁 Visible" : "🚫 Hidden"}
                 </span>

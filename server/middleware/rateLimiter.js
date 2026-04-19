@@ -2,7 +2,7 @@
 import rateLimit from "express-rate-limit";
 import { RedisStore } from "rate-limit-redis";
 import { logger } from "../utils/logger.js";
-import LoginAttempt from "../models/LoginAttempt.js";
+import LoginAttempt from "../models/master/LoginAttempt.js";
 import redisClient from "../config/redis.js";
 import { MAX_LOGIN_ATTEMPTS, ACCOUNT_LOCK_MS } from "../config/constants.js";
 
@@ -28,14 +28,20 @@ const withStore = (prefix) => {
 const MAX_ATTEMPTS  = MAX_LOGIN_ATTEMPTS;
 const LOCK_DURATION = ACCOUNT_LOCK_MS;
 
+// Build a tenant-scoped identifier so failed logins in Center A
+// don't lock out the same email in Center B.
+const scopedId = (identifier, centerSlug) =>
+  centerSlug ? `${identifier}:${centerSlug}` : identifier;
+
 /**
- * Track failed login attempts per identifier (email/username).
+ * Track failed login attempts per identifier (email/username) scoped by center.
  * Persisted in MongoDB so server restarts don't reset locks.
  */
-export const trackFailedLogin = async (identifier) => {
+export const trackFailedLogin = async (identifier, centerSlug = null) => {
+  const key = scopedId(identifier, centerSlug);
   const now = new Date();
   const record = await LoginAttempt.findOneAndUpdate(
-    { identifier },
+    { identifier: key },
     {
       $inc: { count: 1 },
       $setOnInsert: { firstAttemptAt: now },
@@ -46,7 +52,7 @@ export const trackFailedLogin = async (identifier) => {
   if (record.count >= MAX_ATTEMPTS && !record.lockUntil) {
     record.lockUntil = new Date(Date.now() + LOCK_DURATION);
     await record.save();
-    logger.security("ACCOUNT_LOCKED", { identifier, reason: "Too many failed login attempts" });
+    logger.security("ACCOUNT_LOCKED", { identifier: key, reason: "Too many failed login attempts" });
   }
 
   return record;
@@ -55,8 +61,9 @@ export const trackFailedLogin = async (identifier) => {
 /**
  * Check if account is locked.
  */
-export const isAccountLocked = async (identifier) => {
-  const record = await LoginAttempt.findOne({ identifier });
+export const isAccountLocked = async (identifier, centerSlug = null) => {
+  const key = scopedId(identifier, centerSlug);
+  const record = await LoginAttempt.findOne({ identifier: key });
   if (!record || !record.lockUntil) return { isLocked: false };
 
   if (Date.now() < record.lockUntil.getTime()) {
@@ -68,23 +75,25 @@ export const isAccountLocked = async (identifier) => {
   }
 
   // Lock expired — clean up
-  await LoginAttempt.deleteOne({ identifier });
+  await LoginAttempt.deleteOne({ identifier: key });
   return { isLocked: false };
 };
 
 /**
  * Clear failed login attempts on successful login.
  */
-export const clearFailedAttempts = async (identifier) => {
-  await LoginAttempt.deleteOne({ identifier });
-  logger.info("FAILED_ATTEMPTS_CLEARED", { identifier });
+export const clearFailedAttempts = async (identifier, centerSlug = null) => {
+  const key = scopedId(identifier, centerSlug);
+  await LoginAttempt.deleteOne({ identifier: key });
+  logger.info("FAILED_ATTEMPTS_CLEARED", { identifier: key });
 };
 
 /**
  * Get remaining attempts before lockout.
  */
-export const getRemainingAttempts = async (identifier) => {
-  const record = await LoginAttempt.findOne({ identifier });
+export const getRemainingAttempts = async (identifier, centerSlug = null) => {
+  const key = scopedId(identifier, centerSlug);
+  const record = await LoginAttempt.findOne({ identifier: key });
   if (!record) return MAX_ATTEMPTS;
   return Math.max(0, MAX_ATTEMPTS - record.count);
 };
@@ -119,9 +128,11 @@ export const loginLimiter = rateLimit({
   skip: shouldSkip,
   validate: { keyGeneratorIpFallback: false },
 
-  // Use email if provided, otherwise IP
+  // Scope key by center so lockouts in one center don't affect another
   keyGenerator: (req) => {
-    return req.body?.email || req.body?.username || req.ip;
+    const base = req.body?.email || req.body?.username || req.ip;
+    const slug = req.center?.slug || '';
+    return slug ? `${base}:${slug}` : base;
   },
 
   // Custom handler with detailed message
@@ -332,7 +343,7 @@ export const emailLimiter = rateLimit({
 });
 
 // No manual cleanup needed — MongoDB TTL index on LoginAttempt.firstAttemptAt
-// automatically removes records after 2 hours (see models/LoginAttempt.js).
+// automatically removes records after 2 hours (see models/master/LoginAttempt.js).
 
 // =========================================
 // EXPORTS

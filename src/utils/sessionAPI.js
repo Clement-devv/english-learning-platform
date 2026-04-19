@@ -16,7 +16,9 @@ const getAuthHeaders = () => {
 };
 
 /**
- * Fetch all active sessions for current user
+ * Fetch all active sessions for the current user.
+ * @returns {Promise<object>} Server response containing the sessions array.
+ * @throws {object} Error payload from the server, or `{ message: 'Failed to fetch sessions' }`.
  */
 export const fetchActiveSessions = async () => {
   try {
@@ -31,7 +33,10 @@ export const fetchActiveSessions = async () => {
 };
 
 /**
- * Logout from a specific session
+ * Logout from a specific session by its token.
+ * @param {string} sessionToken - The session token to invalidate.
+ * @returns {Promise<object>} Server confirmation response.
+ * @throws {object} Error payload from the server, or `{ message: 'Failed to logout session' }`.
  */
 export const logoutSession = async (sessionToken) => {
   try {
@@ -47,7 +52,9 @@ export const logoutSession = async (sessionToken) => {
 };
 
 /**
- * Logout from all devices except current
+ * Logout from all devices except the current one.
+ * @returns {Promise<object>} Server confirmation response.
+ * @throws {object} Error payload from the server, or `{ message: 'Failed to logout from all devices' }`.
  */
 export const logoutAllDevices = async () => {
   try {
@@ -63,7 +70,10 @@ export const logoutAllDevices = async () => {
 };
 
 /**
- * Logout from current session (complete logout)
+ * Full logout: invalidates the current session on the server and clears all local storage.
+ * Falls through to clear local storage even if the server call fails.
+ * @returns {Promise<{ success: true }>}
+ * @throws {object} Server error payload if the backend call fails.
  */
 export const logout = async () => {
   try {

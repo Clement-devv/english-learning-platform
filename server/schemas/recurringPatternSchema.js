@@ -64,7 +64,7 @@ recurringPatternSchema.methods.getStats = async function () {
 };
 
 recurringPatternSchema.statics.findActiveByTeacher = function (teacherId) {
-  return this.find({ teacherId, status: 'active' }).populate('studentId', 'firstName surname email');
+  return this.find({ teacherId, status: 'active' }).populate('studentId', 'firstName lastName email');
 };
 
 recurringPatternSchema.statics.findActiveByStudent = function (studentId) {

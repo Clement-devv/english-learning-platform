@@ -1,18 +1,5 @@
 import mongoose from 'mongoose';
-
-const sessionSchema = new mongoose.Schema({
-  token: { type: String, required: true },
-  deviceInfo: {
-    browser: String,
-    os: String,
-    device: String,
-  },
-  ipAddress: String,
-  location: String,
-  loginTime: { type: Date, default: Date.now },
-  lastActivity: { type: Date, default: Date.now },
-  isActive: { type: Boolean, default: true },
-});
+import { sessionSchema } from './shared/sessionSchema.js';
 
 export const adminSchema = new mongoose.Schema({
   username: { type: String, required: true, unique: true },

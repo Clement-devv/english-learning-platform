@@ -119,7 +119,7 @@ export default function StudentSetup() {
                   </div>
                   <div style={{ fontSize:"13px" }}>
                     <span style={{ color:c.muted }}>Classes: </span>
-                    <span style={{ fontWeight:"700", color:"#3b82f6" }}>{student.noOfClasses}</span>
+                    <span style={{ fontWeight:"700", color:"#3b82f6" }}>{student.classCredits}</span>
                   </div>
                 </div>
 

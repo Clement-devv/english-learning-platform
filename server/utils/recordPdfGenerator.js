@@ -88,7 +88,7 @@ export function generateStudentRecordPdf(student, centerName) {
     doc.on("end",   () => resolve(Buffer.concat(chunks)));
     doc.on("error", reject);
 
-    const fullName = `${student.firstName || ""} ${student.surname || ""}`.trim();
+    const fullName = `${student.firstName || ""} ${student.lastName || ""}`.trim();
 
     // ── Header ──
     drawHeader(doc, centerName, `New Student Record: ${fullName}`, "", "#2563eb");
@@ -109,7 +109,7 @@ export function generateStudentRecordPdf(student, centerName) {
 
     const personalRows = [
       ["First Name",    student.firstName],
-      ["Surname",       student.surname],
+      ["Surname",       student.lastName],
       ["Email Address", student.email],
       ["Phone Number",  student.phone],
       ["Country",       student.country],
@@ -126,7 +126,7 @@ export function generateStudentRecordPdf(student, centerName) {
 
     const academicRows = [
       ["Level / Rank",       student.rank],
-      ["Classes Purchased",  student.noOfClasses ?? 0],
+      ["Classes Purchased",  student.classCredits ?? 0],
       ["Account Status",     statusText],
     ];
     academicRows.forEach(([label, val], i) => {

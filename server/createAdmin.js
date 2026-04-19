@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 import bcryptjs from "bcryptjs";
 import dotenv from "dotenv";
-import Admin from "./models/Admin.js";
+import { adminSchema } from "./schemas/adminSchema.js";
 
 dotenv.config();
 
@@ -9,6 +9,7 @@ async function createAdmin() {
   try {
     await mongoose.connect(process.env.MONGO_URI);
     console.log("✅ Connected to MongoDB");
+    const Admin = mongoose.models.Admin || mongoose.model("Admin", adminSchema);
 
     // Check if admin already exists
     const existingAdmin = await Admin.findOne({ username: "admin" });

@@ -15,6 +15,7 @@ import { sendProgressReport }     from "../utils/emailService.js";
 import { studentSchema } from "../schemas/studentSchema.js";
 import { bookingSchema } from "../schemas/bookingSchema.js";
 import logger from "../utils/logger.js";
+import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
 
 const router = express.Router();
 router.use(tenantMiddleware);
@@ -72,7 +73,7 @@ router.get(
   async (req, res) => {
     try {
       const student = await getStudent(req.db).findById(req.params.studentId);
-      if (!student) return res.status(404).json({ error: "Student not found" });
+      if (!student) return notFound(res, "Student not found");
 
       const period  = req.query.period === "weekly" ? "weekly" : "monthly";
       const { from, to } = parseDateRange(period, req.query);
@@ -87,7 +88,7 @@ router.get(
       res.send(pdf);
     } catch (err) {
       logger.error("Report preview error:", { error: err?.message });
-      res.status(500).json({ error: err.message });
+      serverError(res, err.message);
     }
   }
 );
@@ -100,7 +101,7 @@ router.post(
   async (req, res) => {
     try {
       const student = await getStudent(req.db).findById(req.params.studentId);
-      if (!student) return res.status(404).json({ error: "Student not found" });
+      if (!student) return notFound(res, "Student not found");
       if (!student.email) return res.status(400).json({ error: "Student has no email address" });
 
       const period  = req.query.period === "weekly" ? "weekly" : "monthly";
@@ -116,7 +117,7 @@ router.post(
       }
     } catch (err) {
       logger.error("Report send error:", { error: err?.message });
-      res.status(500).json({ error: err.message });
+      serverError(res, err.message);
     }
   }
 );

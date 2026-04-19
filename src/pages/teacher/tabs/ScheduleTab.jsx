@@ -323,8 +323,8 @@ export default function ScheduleTab({
   const bookingStudentName = useCallback((b) => {
     const id = b.studentId?._id || b.studentId;
     const s  = findStudent(id);
-    if (s) return `${s.firstName} ${s.surname || ""}`.trim();
-    if (b.studentId?.firstName) return `${b.studentId.firstName} ${b.studentId.surname||""}`.trim();
+    if (s) return `${s.firstName} ${s.lastName || ""}`.trim();
+    if (b.studentId?.firstName) return `${b.studentId.firstName} ${b.studentId.lastName||""}`.trim();
     return "Student";
   }, [findStudent]);
 
@@ -559,7 +559,7 @@ export default function ScheduleTab({
                         {/* Student name */}
                         {hasStudent && height > 30 && (
                           <p style={{ margin:0, fontSize:"11px", fontWeight:"800", color:"#fff", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
-                            {student.firstName} {student.surname || ""}
+                            {student.firstName} {student.lastName || ""}
                           </p>
                         )}
                         {/* Time range */}
@@ -653,7 +653,7 @@ export default function ScheduleTab({
                     <option value="">— No student assigned —</option>
                     {students.map(s => (
                       <option key={s._id} value={s._id}>
-                        {s.firstName} {s.surname || ""} {s.noOfClasses > 0 ? `(${s.noOfClasses} classes left)` : "(inactive)"}
+                        {s.firstName} {s.lastName || ""} {s.classCredits > 0 ? `(${s.classCredits} classes left)` : "(inactive)"}
                       </option>
                     ))}
                   </select>
@@ -668,8 +668,8 @@ export default function ScheduleTab({
                         <span style={{ color:"#fff", fontWeight:"800", fontSize:"13px" }}>{s.firstName[0]}</span>
                       </div>
                       <div>
-                        <p style={{ margin:0, fontSize:"13px", fontWeight:"700", color:c.heading }}>{s.firstName} {s.surname||""}</p>
-                        <p style={{ margin:0, fontSize:"11px", color:"#0ea5e9" }}>{s.noOfClasses || 0} classes remaining</p>
+                        <p style={{ margin:0, fontSize:"13px", fontWeight:"700", color:c.heading }}>{s.firstName} {s.lastName||""}</p>
+                        <p style={{ margin:0, fontSize:"11px", color:"#0ea5e9" }}>{s.classCredits || 0} classes remaining</p>
                       </div>
                     </div>
                   );
@@ -794,8 +794,8 @@ export default function ScheduleTab({
                           <span style={{ color:"#fff", fontWeight:"800", fontSize:"16px" }}>{student.firstName[0]}</span>
                         </div>
                         <div>
-                          <p style={{ margin:0, fontSize:"15px", fontWeight:"800", color:c.heading }}>{student.firstName} {student.surname||""}</p>
-                          <p style={{ margin:0, fontSize:"12px", color:"#0ea5e9" }}>{student.noOfClasses||0} classes remaining</p>
+                          <p style={{ margin:0, fontSize:"15px", fontWeight:"800", color:c.heading }}>{student.firstName} {student.lastName||""}</p>
+                          <p style={{ margin:0, fontSize:"12px", color:"#0ea5e9" }}>{student.classCredits||0} classes remaining</p>
                         </div>
                       </div>
                     ) : (

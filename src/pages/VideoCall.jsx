@@ -2,10 +2,11 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import AgoraRTC from "agora-rtc-sdk-ng";
 import VirtualBackgroundExtension from "agora-extension-virtual-background";
-import { io } from "socket.io-client";
 
 AgoraRTC.setParameter("AUDIO_VOLUME_INDICATION_INTERVAL", 200);
 import api from "../api";
+import { useRecording }  from "../hooks/useRecording";
+import { useVideoChat }  from "../hooks/useVideoChat";
 import {
   Mic, MicOff, Video as VideoIcon, VideoOff,
   PhoneOff, Monitor, MonitorOff, Users, Loader,
@@ -19,18 +20,6 @@ try {
   vbCompatible = vbExtension.checkCompatibility();
   if (vbCompatible) AgoraRTC.registerExtensions([vbExtension]);
 } catch (_) {}
-
-// In production with custom domains the socket server is on the same origin.
-// Empty string tells socket.io-client to connect to window.location.origin.
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || "";
-
-const getSocketToken = () =>
-  sessionStorage.getItem("teacherToken") ||
-  sessionStorage.getItem("studentToken") ||
-  sessionStorage.getItem("adminToken") ||
-  localStorage.getItem("teacherToken") ||
-  localStorage.getItem("studentToken") ||
-  localStorage.getItem("adminToken");
 
 const BLUR_OPTIONS = [
   { id: "blur-1", label: "Light",  degree: 1 },
@@ -105,8 +94,7 @@ export default function VideoCall({
   userRole = "student",
   bookingId = null,
 }) {
-  const client    = useRef(null);
-  const socketRef = useRef(null);
+  const client = useRef(null);
 
   const [joined,          setJoined]          = useState(false);
   const [loading,         setLoading]         = useState(false);
@@ -122,18 +110,18 @@ export default function VideoCall({
   const [noiseCancelSupported, setNoiseCancelSupported] = useState(false);
   const [audioBlocked,    setAudioBlocked]    = useState(false); // browser autoplay blocked
 
-  // Emoji reactions
-  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const [floatingEmojis,  setFloatingEmojis]  = useState([]);
+  // ── Custom hooks ──────────────────────────────────────────────────────────
+  const {
+    showChat, setShowChat, chatInput, setChatInput,
+    messages, unreadCount, messagesEndRef,
+    sendMessage, toggleChat, resetChat,
+    floatingEmojis, showEmojiPicker, setShowEmojiPicker, sendEmoji,
+  } = useVideoChat(channelName, userName);
 
-  // Live chat
-  const [showChat,    setShowChat]    = useState(false);
-  const [chatInput,   setChatInput]   = useState("");
-  const [messages,    setMessages]    = useState([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const showChatRef    = useRef(false);
-  const messagesEndRef = useRef(null);
-  useEffect(() => { showChatRef.current = showChat; }, [showChat]);
+  const {
+    isRecording, uploadingRecording, recSeconds,
+    startRecording, stopRecording, formatRecTime,
+  } = useRecording(bookingId);
 
   // Virtual background
   const vbProcessorRef = useRef(null);
@@ -141,14 +129,6 @@ export default function VideoCall({
   const [showBgPanel, setShowBgPanel] = useState(false);
   const [bgLoading,   setBgLoading]  = useState(false);
 
-  // Recording
-  const [isRecording,       setIsRecording]       = useState(false);
-  const [uploadingRecording,setUploadingRecording] = useState(false);
-  const [recSeconds,        setRecSeconds]         = useState(0);
-  const mediaRecorderRef = useRef(null);
-  const chunksRef        = useRef([]);
-  const tabStreamRef     = useRef(null);
-  const recTimerRef      = useRef(null);
   const uploadInputRef = useRef(null);
   const customBgUrlRef = useRef(null);
 
@@ -181,11 +161,6 @@ export default function VideoCall({
   const mpCustomTrack  = useRef(null);   // custom Agora VideoTrack from canvas stream
   const mpActiveRef    = useRef(false);  // true while MP blur is running
   const mpBlurPx       = useRef(12);     // current blur strength in CSS pixels
-
-  // ── Auto-scroll chat to latest message ───────────────────────────────────
-  useEffect(() => {
-    if (showChat) messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, showChat]);
 
   // ── Agora autoplay unlock ─────────────────────────────────────────────────
   // Browsers block audio autoplay until a user gesture. Agora calls this
@@ -236,153 +211,11 @@ export default function VideoCall({
     };
   }, [resumeAudio]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Socket: reactions + chat ──────────────────────────────────────────────
-  useEffect(() => {
-    const sock = io(SOCKET_URL, {
-      transports: ["websocket"],
-      auth: { token: getSocketToken() },
-    });
-    socketRef.current = sock;
-
-    sock.on("connect", () => {
-      sock.emit("join-reactions", { channelName });
-      sock.emit("join-chat",      { channelName });
-    });
-
-    sock.on("emoji-reaction", ({ emoji }) => {
-      spawnFloatingEmoji(emoji);
-    });
-
-    sock.on("chat-message", ({ id, text, senderName, timestamp }) => {
-      setMessages(prev => [...prev, { id, text, senderName, timestamp, fromSelf: false }]);
-      if (!showChatRef.current) setUnreadCount(c => c + 1);
-    });
-
-    return () => { sock.disconnect(); socketRef.current = null; };
-  }, [channelName]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // ── Floating emoji ────────────────────────────────────────────────────────
-  const spawnFloatingEmoji = useCallback((emoji) => {
-    const id   = Date.now() + Math.random();
-    const x    = 15 + Math.random() * 70;
-    setFloatingEmojis(prev => [...prev, { id, emoji, x }]);
-    setTimeout(() => setFloatingEmojis(prev => prev.filter(e => e.id !== id)), 3200);
-  }, []);
-
-  const sendEmoji = useCallback((emoji) => {
-    spawnFloatingEmoji(emoji);
-    socketRef.current?.emit("emoji-reaction", { channelName, emoji });
-  }, [channelName, spawnFloatingEmoji]);
-
-  // ── Chat send ─────────────────────────────────────────────────────────────
-  const sendMessage = useCallback((e) => {
-    e.preventDefault();
-    const text = chatInput.trim();
-    if (!text) return;
-    const msg = {
-      id:         Date.now() + Math.random(),
-      text,
-      senderName: userName,
-      channelName,
-      timestamp:  new Date().toISOString(),
-    };
-    setMessages(prev => [...prev, { ...msg, fromSelf: true }]);
-    socketRef.current?.emit("chat-message", msg);
-    setChatInput("");
-  }, [chatInput, channelName, userName]);
-
-  // ── Recording ─────────────────────────────────────────────────────────────
-  const startRecording = useCallback(async () => {
-    try {
-      // Capture current browser tab — teacher selects "This Tab" in the picker
-      const stream = await navigator.mediaDevices.getDisplayMedia({
-        video: { frameRate: 15 },
-        audio: true,
-        // Chrome 109+: pre-select current tab to skip the picker prompt
-        preferCurrentTab: true,
-      });
-      tabStreamRef.current = stream;
-      chunksRef.current    = [];
-
-      const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9,opus")
-        ? "video/webm;codecs=vp9,opus"
-        : "video/webm";
-
-      const recorder = new MediaRecorder(stream, { mimeType });
-      mediaRecorderRef.current = recorder;
-
-      recorder.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data); };
-      recorder.onstop = () => handleRecordingStop(mimeType);
-
-      // If teacher stops screen share manually, treat as recording stop
-      stream.getVideoTracks()[0].onended = () => {
-        if (mediaRecorderRef.current?.state === "recording") {
-          mediaRecorderRef.current.stop();
-        }
-      };
-
-      recorder.start(1000); // collect chunks every 1s
-      setIsRecording(true);
-      setRecSeconds(0);
-      recTimerRef.current = setInterval(() => setRecSeconds(s => s + 1), 1000);
-    } catch (err) {
-      if (err.name !== "NotAllowedError") {
-        console.error("Recording start error:", err);
-      }
-    }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const stopRecording = useCallback(() => {
-    if (mediaRecorderRef.current?.state === "recording") {
-      mediaRecorderRef.current.stop();
-    }
-    tabStreamRef.current?.getTracks().forEach(t => t.stop());
-    clearInterval(recTimerRef.current);
-    setIsRecording(false);
-  }, []);
-
-  const handleRecordingStop = useCallback(async (mimeType) => {
-    const blob = new Blob(chunksRef.current, { type: mimeType });
-    chunksRef.current = [];
-    if (!bookingId || blob.size < 1000) return; // nothing to upload
-
-    try {
-      setUploadingRecording(true);
-      const ext  = mimeType.includes("mp4") ? ".mp4" : ".webm";
-      const form = new FormData();
-      form.append("recording", blob, `recording${ext}`);
-      form.append("bookingId", bookingId);
-      form.append("duration",  String(recSeconds));
-      const { default: api } = await import("../api");
-      await api.post("/recordings/upload", form, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-    } catch (err) {
-      console.error("Recording upload error:", err);
-    } finally {
-      setUploadingRecording(false);
-    }
-  }, [bookingId, recSeconds]);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (mediaRecorderRef.current?.state === "recording") mediaRecorderRef.current.stop();
-      tabStreamRef.current?.getTracks().forEach(t => t.stop());
-      clearInterval(recTimerRef.current);
-    };
-  }, []);
-
-  const formatRecTime = (s) => `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
-
-  const toggleChat = useCallback(() => {
-    setShowChat(v => {
-      if (!v) setUnreadCount(0);
-      return !v;
-    });
-    setShowEmojiPicker(false);
+  // toggleChat from useVideoChat also needs to close showBgPanel — wrap it
+  const handleToggleChat = useCallback(() => {
+    toggleChat();
     setShowBgPanel(false);
-  }, []);
+  }, [toggleChat]);
 
   // ── Agora event handlers ──────────────────────────────────────────────────
   const handleUserPublished = useCallback(async (user, mediaType) => {
@@ -502,6 +335,11 @@ export default function VideoCall({
       joinedAtRef.current  = Date.now();
       setJoined(true);
 
+      // Server-side Agora session tracking — teacher only (prevents double-counting)
+      if (userRole === 'teacher' && bookingId) {
+        api.post('/agora-usage/start', { channelName, bookingId }).catch(() => {});
+      }
+
       // Create audio and video tracks independently so one failure doesn't kill both.
       let audioTrack = null;
       let videoTrack = null;
@@ -567,16 +405,12 @@ export default function VideoCall({
     if (!joined && !hasJoinedRef.current) return;
     isLeavingRef.current = true;
 
-    // Log Agora usage before cleanup (fire-and-forget — never block the leave flow)
+    // Agora session tracking — teacher calls /end (server calculates duration server-side)
     if (joinedAtRef.current) {
-      const durationMinutes = Math.ceil((Date.now() - joinedAtRef.current) / 60000);
-      joinedAtRef.current   = null;
-      api.post('/agora-usage/log', {
-        channelName,
-        bookingId,
-        durationMinutes,
-        participantCount: remoteUsers.length + 1,
-      }).catch(() => {}); // non-critical — ignore if it fails
+      joinedAtRef.current = null;
+      if (userRole === 'teacher' && bookingId) {
+        api.post('/agora-usage/end', { bookingId }).catch(() => {});
+      }
     }
 
     try {
@@ -595,8 +429,7 @@ export default function VideoCall({
       setIsScreenSharing(false);
       setMicOn(true); setCamOn(true);
       setActiveBg("none"); setShowBgPanel(false);
-      setFloatingEmojis([]); setShowEmojiPicker(false);
-      setMessages([]); setUnreadCount(0); setShowChat(false); setChatInput("");
+      resetChat();
       onLeave?.();
     } catch (err) {
       console.error("❌ Leave error:", err);
@@ -1002,7 +835,7 @@ export default function VideoCall({
                   <MessageSquare className="w-5 h-5 text-white" />
                   <span className="font-bold text-white text-base">Class Chat</span>
                 </div>
-                <button onClick={toggleChat} className="text-white/70 hover:text-white transition-colors">
+                <button onClick={handleToggleChat} className="text-white/70 hover:text-white transition-colors">
                   <X className="w-5 h-5" />
                 </button>
               </div>
@@ -1145,7 +978,7 @@ export default function VideoCall({
               {/* ── Chat ── */}
               <div className="relative">
                 <CtrlBtn
-                  onClick={toggleChat}
+                  onClick={handleToggleChat}
                   label="Chat"
                   active={!showChat}
                   accent={showChat ? "indigo" : null}

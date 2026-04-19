@@ -36,7 +36,7 @@ export default function TeacherPaymentHistoryModal({ teacher, onClose, isDarkMod
     if (!teacher) return;
     setLoading(true);
     api
-      .get(`/api/v1/payments/teacher/${teacher._id}`)
+      .get(`/api/v1/payment-transactions/teacher/${teacher._id}`)
       .then((res) => {
         setTransactions(res.data.transactions || []);
         setSummary(res.data.summary || null);

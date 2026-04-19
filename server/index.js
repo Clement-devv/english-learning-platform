@@ -1,6 +1,5 @@
 import dotenv from "dotenv";
 dotenv.config();
-console.log("📧 Email configured:", process.env.EMAIL_USER ? "✓" : "✗");
 
 import logger from "./utils/logger.js";
 import express from "express";
@@ -29,7 +28,7 @@ import {
   requestLimits
 } from "./middleware/security.js";
 
-console.log("✅ Environment Check:");
+logger.info("✅ Environment Check:");
 logger.info("  MongoDB:", process.env.MONGO_URI ? "✓ Configured" : "✗ Missing");
 logger.info("  JWT Secret:", process.env.JWT_SECRET ? "✓ Configured" : "✗ Missing");
 logger.info("  Email:", process.env.EMAIL_USER ? "✓ Configured" : "✗ Missing");
@@ -164,17 +163,52 @@ mongoose
       }
 
       // Hourly background sweep: remove expired/inactive sessions from all
-      // center DBs so users who never log back in don't accumulate stale records.
+      // center DBs. Re-fetches active centers each tick so newly added centers
+      // are included without a server restart. Processed in batches of 10 to
+      // avoid opening too many DB connections simultaneously.
       setInterval(async () => {
-        for (const center of activeCenters) {
-          try {
-            const db = await getDb(center.slug);
-            await sweepExpiredSessionsFromDb(db);
-          } catch (e) {
-            logger.error(`Session sweep failed for ${center.slug}:`, { error: e?.message });
+        try {
+          const currentCenters = await Center.find({ status: "active" }).select("slug").lean();
+          for (let i = 0; i < currentCenters.length; i += 10) {
+            const batch = currentCenters.slice(i, i + 10);
+            await Promise.allSettled(batch.map(async (center) => {
+              try {
+                const db = await getDb(center.slug);
+                await sweepExpiredSessionsFromDb(db);
+              } catch (e) {
+                logger.error(`Session sweep failed for ${center.slug}:`, { error: e?.message });
+              }
+            }));
           }
+        } catch (e) {
+          logger.error("Session sweep: failed to fetch centers:", { error: e?.message });
         }
       }, SESSION_CLEANUP_INTERVAL_MS);
+
+      // Daily purge job: hard-delete center data for soft-deleted centers whose
+      // scheduledDeletionAt has passed. Drops the per-center MongoDB database.
+      setInterval(async () => {
+        try {
+          const due = await Center.find({
+            status: "deleted",
+            scheduledDeletionAt: { $lte: new Date() },
+          }).select("slug centerName").lean();
+
+          for (const center of due) {
+            try {
+              const db = await getDb(center.slug);
+              await db.dropDatabase();
+              await closeAllConnections();
+              await Center.deleteOne({ slug: center.slug });
+              logger.info(`🗑️ Purged center DB and record: ${center.slug} (${center.centerName})`);
+            } catch (e) {
+              logger.error(`Purge failed for ${center.slug}:`, { error: e?.message });
+            }
+          }
+        } catch (e) {
+          logger.error("Purge job: failed to fetch due centers:", { error: e?.message });
+        }
+      }, 24 * 60 * 60 * 1000); // once per day
     } catch (err) {
       logger.error("❌ Failed to start per-center schedulers:", { error: err?.message });
     }

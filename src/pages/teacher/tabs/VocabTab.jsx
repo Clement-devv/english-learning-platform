@@ -160,7 +160,7 @@ export default function VocabTab({ teacherInfo, students, isDarkMode }) {
                   <div style={{ width: "22px", height: "22px", borderRadius: "6px", border: `2px solid ${checked ? col.accent : col.border}`, background: checked ? col.accent : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                     {checked && <Check size={13} color="#fff" />}
                   </div>
-                  <span style={{ fontSize: "14px", fontWeight: 600, color: col.text }}>{s.firstName} {s.surname || s.lastName}</span>
+                  <span style={{ fontSize: "14px", fontWeight: 600, color: col.text }}>{s.firstName} {s.lastName}</span>
                 </button>
               );
             })
@@ -247,7 +247,7 @@ export default function VocabTab({ teacherInfo, students, isDarkMode }) {
                           if (!s) return null;
                           return (
                             <span key={s._id} style={{ padding: "4px 10px", borderRadius: "20px", background: isDarkMode ? "rgba(99,102,241,0.2)" : "rgba(99,102,241,0.1)", color: col.accent, fontSize: "12px", fontWeight: 700 }}>
-                              {s.firstName} {s.surname}
+                              {s.firstName} {s.lastName}
                             </span>
                           );
                         })}

@@ -548,7 +548,7 @@ export default function PaymentTab({ teacher, isDarkMode }) {
     if (silent) setRefreshing(true);
     else setLoading(true);
     try {
-      const { data } = await api.get(`/payments/teacher/${teacher._id}`);
+      const { data } = await api.get(`/payment-transactions/teacher/${teacher._id}`);
       setTransactions(data.transactions || []);
       setSummary(
         data.summary || {

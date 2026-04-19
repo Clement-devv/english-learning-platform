@@ -24,6 +24,7 @@ import { studentSchema }  from "../schemas/studentSchema.js";
 import { subAdminSchema } from "../schemas/subAdminSchema.js";
 import { parsePagination } from "../utils/pagination.js";
 import logger from "../utils/logger.js";
+import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
@@ -64,10 +65,10 @@ router.get("/:id", verifyToken, async (req, res) => {
       .findById(req.params.id)
       .select("-password -inviteToken -twoFactorSecret -twoFactorBackupCodes")
       .lean();
-    if (!teacher) return res.status(404).json({ message: "Teacher not found" });
+    if (!teacher) return notFound(res, "Teacher not found");
     res.json(teacher);
   } catch (err) {
-    res.status(500).json({ message: "Error fetching teacher data" });
+    serverError(res, "Error fetching teacher data");
   }
 });
 
@@ -84,7 +85,7 @@ router.get("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
       .lean();
     res.json(teachers);
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    serverError(res, err.message);
   }
 });
 
@@ -92,7 +93,7 @@ router.get("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
 const requireOwnerOrAdmin = (req, res, next) => {
   if (req.user?.role === "admin") return next();
   if (req.user?.role === "teacher" && String(req.user.id) === String(req.params.id)) return next();
-  return res.status(403).json({ message: "You can only update your own profile" });
+  return forbidden(res, "You can only update your own profile");
 };
 
 // ─── POST upload photo ────────────────────────────────────────────────────────
@@ -103,10 +104,10 @@ router.post("/:id/photo", verifyToken, requireOwnerOrAdmin, (req, res, next) => 
   });
 }, async (req, res) => {
   try {
-    if (!req.file) return res.status(400).json({ message: "No file uploaded" });
+    if (!req.file) return badRequest(res, "No file uploaded");
     const Teacher = getTeacher(req.db);
     const teacher = await Teacher.findById(req.params.id);
-    if (!teacher) return res.status(404).json({ message: "Teacher not found" });
+    if (!teacher) return notFound(res, "Teacher not found");
 
     // Delete old photo file if it exists
     if (teacher.photo) {
@@ -120,7 +121,7 @@ router.post("/:id/photo", verifyToken, requireOwnerOrAdmin, (req, res, next) => 
     res.json({ message: "Photo uploaded", photo: photoUrl });
   } catch (err) {
     logger.error(err);
-    res.status(500).json({ message: "Error uploading photo" });
+    serverError(res, "Error uploading photo");
   }
 });
 
@@ -129,7 +130,7 @@ router.delete("/:id/photo", verifyToken, requireOwnerOrAdmin, async (req, res) =
   try {
     const Teacher = getTeacher(req.db);
     const teacher = await Teacher.findById(req.params.id);
-    if (!teacher) return res.status(404).json({ message: "Teacher not found" });
+    if (!teacher) return notFound(res, "Teacher not found");
     if (teacher.photo) {
       const filePath = path.join(__dirname, "..", teacher.photo.replace(/^\//, ""));
       fs.unlink(filePath, () => {});
@@ -138,7 +139,7 @@ router.delete("/:id/photo", verifyToken, requireOwnerOrAdmin, async (req, res) =
     }
     res.json({ message: "Photo removed" });
   } catch (err) {
-    res.status(500).json({ message: "Error removing photo" });
+    serverError(res, "Error removing photo");
   }
 });
 
@@ -147,16 +148,16 @@ router.patch("/:id/schedule-visibility", verifyToken, requireOwnerOrAdmin, async
   try {
     const { showScheduleToStudents } = req.body;
     if (typeof showScheduleToStudents !== "boolean")
-      return res.status(400).json({ message: "showScheduleToStudents must be boolean" });
+      return badRequest(res, "showScheduleToStudents must be boolean");
     const teacher = await getTeacher(req.db).findByIdAndUpdate(
       req.params.id,
       { showScheduleToStudents },
       { new: true, select: "showScheduleToStudents" }
     );
-    if (!teacher) return res.status(404).json({ message: "Teacher not found" });
+    if (!teacher) return notFound(res, "Teacher not found");
     res.json({ showScheduleToStudents: teacher.showScheduleToStudents });
   } catch (err) {
-    res.status(500).json({ message: "Error updating schedule visibility" });
+    serverError(res, "Error updating schedule visibility");
   }
 });
 
@@ -165,13 +166,13 @@ router.patch("/:id/timezone", verifyToken, requireOwnerOrAdmin, async (req, res)
   try {
     const { timezone } = req.body;
     if (!timezone || typeof timezone !== "string")
-      return res.status(400).json({ message: "timezone required" });
+      return badRequest(res, "timezone required");
     try { Intl.DateTimeFormat(undefined, { timeZone: timezone }); }
-    catch { return res.status(400).json({ message: "Invalid timezone identifier" }); }
+    catch { return badRequest(res, "Invalid timezone identifier"); }
     await getTeacher(req.db).findByIdAndUpdate(req.params.id, { timezone });
     res.json({ ok: true });
   } catch (err) {
-    res.status(500).json({ message: "Error updating timezone" });
+    serverError(res, "Error updating timezone");
   }
 });
 
@@ -184,11 +185,11 @@ router.patch("/:id/google-meet", verifyToken, requireOwnerOrAdmin, async (req, r
       { googleMeetLink: googleMeetLink || "" },
       { new: true, select: "firstName lastName googleMeetLink" }
     );
-    if (!teacher) return res.status(404).json({ message: "Teacher not found" });
+    if (!teacher) return notFound(res, "Teacher not found");
     res.json({ message: "Google Meet link updated", googleMeetLink: teacher.googleMeetLink });
   } catch (err) {
     logger.error("Error updating Google Meet link:", { error: err?.message });
-    res.status(500).json({ message: "Error updating Google Meet link" });
+    serverError(res, "Error updating Google Meet link");
   }
 });
 
@@ -202,9 +203,9 @@ router.post("/", verifyToken, verifyAdmin, async (req, res) => {
     } = req.body;
 
     if (!firstName || !lastName || !email || !continent)
-      return res.status(400).json({ message: "First name, last name, email and continent are required" });
+      return badRequest(res, "First name, last name, email and continent are required");
     if (!["Africa", "Europe", "Asia", "Americas", "Oceania"].includes(continent))
-      return res.status(400).json({ message: "Invalid continent" });
+      return badRequest(res, "Invalid continent");
 
     const Teacher  = getTeacher(req.db);
     const Student  = getStudent(req.db);
@@ -216,9 +217,9 @@ router.post("/", verifyToken, verifyAdmin, async (req, res) => {
       Student.findOne({ email: normalizedEmail }).lean(),
       SubAdmin.findOne({ email: normalizedEmail }).lean(),
     ]);
-    if (asTeacher)  return res.status(400).json({ message: "Email is already registered as a teacher" });
-    if (asStudent)  return res.status(400).json({ message: "Email is already registered as a student" });
-    if (asSubAdmin) return res.status(400).json({ message: "Email is already registered as a sub-admin" });
+    if (asTeacher)  return badRequest(res, "Email is already registered as a teacher");
+    if (asStudent)  return badRequest(res, "Email is already registered as a student");
+    if (asSubAdmin) return badRequest(res, "Email is already registered as a sub-admin");
 
     // ── Check teacher seat limit (-1 = unlimited) ─────────────────────────
     const maxTeachers = req.center?.maxTeachers;
@@ -284,11 +285,11 @@ router.get("/verify-invite/:token", async (req, res) => {
       status:        "pending",
     });
     if (!teacher) {
-      return res.status(400).json({ success: false, message: "Invalid or expired invite link. Please contact your administrator." });
+      return badRequest(res, "Invalid or expired invite link. Please contact your administrator.");
     }
     res.json({ success: true, teacher: { firstName: teacher.firstName, lastName: teacher.lastName, email: teacher.email, continent: teacher.continent } });
   } catch (err) {
-    res.status(500).json({ success: false, message: "Server error" });
+    serverError(res);
   }
 });
 
@@ -297,18 +298,18 @@ router.post("/setup-account", async (req, res) => {
   try {
     const { token, password, confirmPassword } = req.body;
     if (!token || !password || !confirmPassword)
-      return res.status(400).json({ message: "All fields are required" });
+      return badRequest(res, "All fields are required");
     if (password !== confirmPassword)
-      return res.status(400).json({ message: "Passwords do not match" });
+      return badRequest(res, "Passwords do not match");
     if (password.length < 8)
-      return res.status(400).json({ message: "Password must be at least 8 characters" });
+      return badRequest(res, "Password must be at least 8 characters");
 
     const Teacher = getTeacher(req.db);
     const teacher = await Teacher.findOne({
       inviteToken: token, inviteExpires: { $gt: new Date() }, status: "pending",
     });
     if (!teacher) {
-      return res.status(400).json({ success: false, message: "Invalid or expired invite link. Please contact your administrator." });
+      return badRequest(res, "Invalid or expired invite link. Please contact your administrator.");
     }
 
     teacher.password           = await bcrypt.hash(password, config.bcryptRounds);
@@ -332,7 +333,7 @@ router.post("/setup-account", async (req, res) => {
     res.json({ success: true, message: "Account activated successfully! You can now log in." });
   } catch (err) {
     logger.error("Setup account error:", { error: err?.message });
-    res.status(500).json({ success: false, message: "Server error" });
+    serverError(res);
   }
 });
 
@@ -341,9 +342,9 @@ router.post("/:id/resend-invite", verifyToken, verifyAdmin, async (req, res) => 
   try {
     const Teacher = getTeacher(req.db);
     const teacher = await Teacher.findById(req.params.id);
-    if (!teacher) return res.status(404).json({ message: "Teacher not found" });
+    if (!teacher) return notFound(res, "Teacher not found");
     if (teacher.status !== "pending")
-      return res.status(400).json({ message: "Teacher account is already active" });
+      return badRequest(res, "Teacher account is already active");
 
     teacher.inviteToken   = crypto.randomBytes(32).toString("hex");
     teacher.inviteExpires = new Date(Date.now() + 48 * 60 * 60 * 1000);
@@ -355,7 +356,7 @@ router.post("/:id/resend-invite", verifyToken, verifyAdmin, async (req, res) => 
 
     res.json({ success: true, message: "Invite resent successfully" });
   } catch (err) {
-    res.status(500).json({ message: "Failed to resend invite" });
+    serverError(res, "Failed to resend invite");
   }
 });
 
@@ -373,10 +374,10 @@ router.patch("/:id/profile", verifyToken, requireOwnerOrAdmin, async (req, res) 
     const teacher = await getTeacher(req.db)
       .findByIdAndUpdate(req.params.id, updates, { new: true })
       .select("-password -inviteToken -twoFactorSecret -twoFactorBackupCodes");
-    if (!teacher) return res.status(404).json({ message: "Teacher not found" });
+    if (!teacher) return notFound(res, "Teacher not found");
     res.json(teacher);
   } catch (err) {
-    res.status(500).json({ message: "Error updating profile" });
+    serverError(res, "Error updating profile");
   }
 });
 
@@ -385,7 +386,7 @@ router.put("/:id", verifyToken, verifyAdmin, async (req, res) => {
   try {
     const { continent, password, ...otherUpdates } = req.body;
     if (continent && !["Africa", "Europe", "Asia", "Americas", "Oceania"].includes(continent))
-      return res.status(400).json({ message: "Invalid continent" });
+      return badRequest(res, "Invalid continent");
 
     let updateData = { ...otherUpdates, continent };
     if (password) {
@@ -399,7 +400,7 @@ router.put("/:id", verifyToken, verifyAdmin, async (req, res) => {
     const teacher = await getTeacher(req.db)
       .findByIdAndUpdate(req.params.id, updateData, { new: true, runValidators: true })
       .select("-password -inviteToken");
-    if (!teacher) return res.status(404).json({ message: "Teacher not found" });
+    if (!teacher) return notFound(res, "Teacher not found");
 
     if (password) {
       try { await sendPasswordResetEmail(teacher.email, `${teacher.firstName} ${teacher.lastName}`, password, "teacher", req.center?.centerName || ""); }
@@ -419,9 +420,9 @@ router.delete("/:id", verifyToken, verifyAdmin, strictLimiter, async (req, res) 
   try {
     const Teacher = getTeacher(req.db);
     const teacher = await Teacher.findById(req.params.id);
-    if (!teacher) return res.status(404).json({ message: "Teacher not found" });
+    if (!teacher) return notFound(res, "Teacher not found");
     if (teacher.scheduledDeletionAt)
-      return res.status(400).json({ message: "Teacher is already scheduled for deletion" });
+      return badRequest(res, "Teacher is already scheduled for deletion");
 
     const deletionDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
     teacher.active                   = false;
@@ -435,7 +436,7 @@ router.delete("/:id", verifyToken, verifyAdmin, strictLimiter, async (req, res) 
 
     res.json({ message: "Teacher scheduled for deletion", scheduledDeletionAt: deletionDate, teacher });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    serverError(res, err.message);
   }
 });
 
@@ -444,9 +445,9 @@ router.post("/:id/restore", verifyToken, verifyAdmin, async (req, res) => {
   try {
     const Teacher = getTeacher(req.db);
     const teacher = await Teacher.findById(req.params.id);
-    if (!teacher) return res.status(404).json({ message: "Teacher not found" });
+    if (!teacher) return notFound(res, "Teacher not found");
     if (!teacher.scheduledDeletionAt)
-      return res.status(400).json({ message: "Teacher is not scheduled for deletion" });
+      return badRequest(res, "Teacher is not scheduled for deletion");
 
     teacher.scheduledDeletionAt      = null;
     teacher.deletionWarningEmailSent = false;
@@ -455,7 +456,7 @@ router.post("/:id/restore", verifyToken, verifyAdmin, async (req, res) => {
 
     res.json({ message: "Teacher account restored successfully", teacher });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    serverError(res, err.message);
   }
 });
 

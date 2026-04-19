@@ -5,6 +5,7 @@ import { teacherAvailabilitySchema } from "../schemas/teacherAvailabilitySchema.
 import { bookingSchema }             from "../schemas/bookingSchema.js";
 import { teacherSchema }             from "../schemas/teacherSchema.js";
 import logger from "../utils/logger.js";
+import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
 
 // Returns true if [s1,e1) overlaps with [s2,e2)  (string "HH:MM" comparison)
 function timesOverlap(s1, e1, s2, e2) {
@@ -51,7 +52,7 @@ router.get("/:teacherId", verifyToken, async (req, res) => {
     res.json({ availability });
   } catch (err) {
     logger.error("Error fetching availability:", { error: err?.message });
-    res.status(500).json({ message: "Error fetching availability" });
+    serverError(res, "Error fetching availability");
   }
 });
 
@@ -61,13 +62,13 @@ router.post("/", verifyToken, async (req, res) => {
     const { teacherId, date, dayOfWeek, startTime, endTime, isRecurring, note, timezone } = req.body;
 
     if (!teacherId || !startTime || !endTime) {
-      return res.status(400).json({ message: "teacherId, startTime, and endTime are required" });
+      return badRequest(res, "teacherId, startTime, and endTime are required");
     }
     if (startTime >= endTime) {
-      return res.status(400).json({ message: "endTime must be after startTime" });
+      return badRequest(res, "endTime must be after startTime");
     }
     if (!isRecurring && !date) {
-      return res.status(400).json({ message: "date is required for non-recurring availability" });
+      return badRequest(res, "date is required for non-recurring availability");
     }
 
     // ── Conflict check against existing availability slots ────────────────────
@@ -128,7 +129,7 @@ router.post("/", verifyToken, async (req, res) => {
     res.status(201).json({ availability: avail, message: "Availability saved" });
   } catch (err) {
     logger.error("Error saving availability:", { error: err?.message });
-    res.status(500).json({ message: "Error saving availability" });
+    serverError(res, "Error saving availability");
   }
 });
 
@@ -136,11 +137,11 @@ router.post("/", verifyToken, async (req, res) => {
 router.delete("/:id", verifyToken, async (req, res) => {
   try {
     const avail = await getTeacherAvailability(req.db).findByIdAndDelete(req.params.id);
-    if (!avail) return res.status(404).json({ message: "Not found" });
+    if (!avail) return notFound(res, "Not found");
     res.json({ message: "Availability removed" });
   } catch (err) {
     logger.error("Error deleting availability:", { error: err?.message });
-    res.status(500).json({ message: "Error deleting availability" });
+    serverError(res, "Error deleting availability");
   }
 });
 

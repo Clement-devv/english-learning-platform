@@ -21,7 +21,7 @@ router.get("/:teacherId/students", verifyToken, async (req, res) => {
     const assignments = await getAssignment(req.db).find({ teacherId })
       .populate({
         path: "studentId",
-        select: "firstName surname email noOfClasses active age dateOfBirth rank lastPaymentDate"
+        select: "firstName lastName email classCredits active age dateOfBirth rank lastPaymentDate"
       })
       .sort({ assignedDate: -1 });
 
@@ -54,7 +54,7 @@ router.get("/:teacherId/assignments", verifyToken, async (req, res) => {
     const { teacherId } = req.params;
 
     const assignments = await getAssignment(req.db).find({ teacherId })
-      .populate("studentId", "firstName surname email noOfClasses active")
+      .populate("studentId", "firstName lastName email classCredits active")
       .populate("teacherId", "firstName lastName email continent")
       .sort({ assignedDate: -1 });
 

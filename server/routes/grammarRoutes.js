@@ -2,6 +2,7 @@ import express from "express";
 import { verifyToken } from "../middleware/authMiddleware.js";
 import { callGemini } from "../utils/geminiHelper.js";
 import logger from "../utils/logger.js";
+import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
 
 const router = express.Router();
 
@@ -57,7 +58,7 @@ Text: ${safeText}`;
     res.json({ success: true, suggestions });
   } catch (err) {
     logger.error("Grammar check error:", { error: err?.message });
-    res.status(500).json({ success: false, message: err.message });
+    serverError(res, err.message);
   }
 });
 

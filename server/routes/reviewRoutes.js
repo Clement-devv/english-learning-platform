@@ -6,6 +6,7 @@ import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
 import { reviewSchema }  from "../schemas/reviewSchema.js";
 import { bookingSchema } from "../schemas/bookingSchema.js";
 import logger from "../utils/logger.js";
+import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
 
 const router = express.Router();
 router.use(tenantMiddleware);
@@ -28,12 +29,12 @@ router.post("/", verifyToken, verifyStudent, async (req, res) => {
 
     const booking = await getBooking(req.db).findOne({ _id: bookingId, studentId, status: "completed" });
     if (!booking) {
-      return res.status(404).json({ error: "Completed booking not found" });
+      return notFound(res, "Completed booking not found");
     }
 
     const existing = await getReview(req.db).findOne({ bookingId });
     if (existing) {
-      return res.status(409).json({ error: "You already reviewed this class" });
+      return conflict(res, "You already reviewed this class");
     }
 
     const review = await getReview(req.db).create({
@@ -47,10 +48,10 @@ router.post("/", verifyToken, verifyStudent, async (req, res) => {
     res.status(201).json(review);
   } catch (err) {
     if (err.code === 11000) {
-      return res.status(409).json({ error: "You already reviewed this class" });
+      return conflict(res, "You already reviewed this class");
     }
     logger.error("Review create error:", { error: err?.message });
-    res.status(500).json({ error: err.message });
+    serverError(res, err.message);
   }
 });
 
@@ -63,7 +64,7 @@ router.get("/my", verifyToken, verifyStudent, async (req, res) => {
       .populate("teacherId", "firstName lastName");
     res.json(reviews);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    serverError(res, err.message);
   }
 });
 
@@ -78,7 +79,7 @@ router.get("/teacher/:teacherId", verifyToken, async (req, res) => {
 
     const reviews = await getReview(req.db).find({ teacherId: req.params.teacherId, flagged: false })
       .sort({ createdAt: -1 })
-      .populate("studentId", "firstName surname")
+      .populate("studentId", "firstName lastName")
       .populate("bookingId", "classTitle scheduledTime");
 
     const total  = reviews.length;
@@ -90,7 +91,7 @@ router.get("/teacher/:teacherId", verifyToken, async (req, res) => {
 
     res.json({ reviews, stats: { total, avgRating, dist } });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    serverError(res, err.message);
   }
 });
 
@@ -122,7 +123,7 @@ router.get("/stats", verifyToken, verifyAdmin, async (req, res) => {
 
     res.json(stats);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    serverError(res, err.message);
   }
 });
 
@@ -136,7 +137,7 @@ router.get("/", verifyToken, verifyAdmin, async (req, res) => {
 
     const reviews = await getReview(req.db).find(filter)
       .sort({ createdAt: -1 })
-      .populate("studentId", "firstName surname")
+      .populate("studentId", "firstName lastName")
       .populate("teacherId", "firstName lastName")
       .populate("bookingId", "classTitle scheduledTime");
 
@@ -162,7 +163,7 @@ router.get("/", verifyToken, verifyAdmin, async (req, res) => {
 
     res.json({ reviews, teacherStats });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    serverError(res, err.message);
   }
 });
 
@@ -175,10 +176,10 @@ router.patch("/:id/flag", verifyToken, verifyAdmin, async (req, res) => {
       { flagged: Boolean(flagged), flagReason },
       { new: true }
     );
-    if (!review) return res.status(404).json({ error: "Review not found" });
+    if (!review) return notFound(res, "Review not found");
     res.json(review);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    serverError(res, err.message);
   }
 });
 
@@ -186,10 +187,10 @@ router.patch("/:id/flag", verifyToken, verifyAdmin, async (req, res) => {
 router.delete("/:id", verifyToken, verifyAdmin, async (req, res) => {
   try {
     const review = await getReview(req.db).findByIdAndDelete(req.params.id);
-    if (!review) return res.status(404).json({ error: "Review not found" });
+    if (!review) return notFound(res, "Review not found");
     res.json({ ok: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    serverError(res, err.message);
   }
 });
 

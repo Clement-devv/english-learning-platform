@@ -52,3 +52,44 @@ export const LOGIN_THEMES = [
 ];
 
 export const getLoginThemeById = (id) => LOGIN_THEMES.find(t => t.id === id) || null;
+
+// ── Teacher login themes ──────────────────────────────────────────────────────
+// Each theme is exclusive — only one center can hold it at a time.
+
+export const TEACHER_LOGIN_THEMES = [
+  {
+    id:          'classroom-space',
+    name:        'Classroom in the Cosmos',
+    description: 'Dark space · floating desk & teacher · orbiting books · cyan glow',
+    preview: {
+      bgStart: '#06091a',
+      bgEnd:   '#0d1b4b',
+      accent:  '#22d3ee',
+    },
+    emoji: '🏫',
+  },
+  {
+    id:          'ocean-current',
+    name:        'Ocean Current',
+    description: 'Underwater ocean · sailing teaching materials · jellyfish · bioluminescent glow',
+    preview: {
+      bgStart: '#0ea5e9',
+      bgEnd:   '#030f1e',
+      accent:  '#22d3ee',
+    },
+    emoji: '🌊',
+  },
+  {
+    id:          'enchanted-grove',
+    name:        'Enchanted Grove',
+    description: 'Magical forest night · bark chalkboard · owl · woodland creatures · fireflies & mist',
+    preview: {
+      bgStart: '#052e16',
+      bgEnd:   '#010d04',
+      accent:  '#4ade80',
+    },
+    emoji: '🌿',
+  },
+];
+
+export const getTeacherLoginThemeById = (id) => TEACHER_LOGIN_THEMES.find(t => t.id === id) || null;

@@ -6,6 +6,7 @@ import { vocabListSchema }     from "../schemas/vocabListSchema.js";
 import { vocabProgressSchema } from "../schemas/vocabProgressSchema.js";
 import { recordActivity } from "../utils/streakService.js";
 import logger from "../utils/logger.js";
+import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
 
 const router = express.Router();
 router.use(tenantMiddleware);
@@ -40,7 +41,7 @@ router.get("/lists", verifyToken, async (req, res) => {
 
     if (role === "teacher") {
       const lists = await getVocabList(req.db).find({ teacherId: userId })
-        .populate("assignedTo.studentId", "firstName surname email")
+        .populate("assignedTo.studentId", "firstName lastName email")
         .sort({ createdAt: -1 });
       return res.json({ success: true, lists });
     }
@@ -62,10 +63,10 @@ router.get("/lists", verifyToken, async (req, res) => {
       return res.json({ success: true, lists: withProgress });
     }
 
-    res.status(403).json({ success: false, message: "Access denied" });
+    forbidden(res, "Access denied");
   } catch (err) {
     logger.error("GET /vocab/lists:", { error: err?.message });
-    res.status(500).json({ success: false, message: err.message });
+    serverError(res, err.message);
   }
 });
 
@@ -73,18 +74,18 @@ router.get("/lists", verifyToken, async (req, res) => {
 router.post("/lists", verifyToken, async (req, res) => {
   try {
     const { role, id: teacherId } = req.user;
-    if (role !== "teacher") return res.status(403).json({ success: false, message: "Teachers only" });
+    if (role !== "teacher") return forbidden(res, "Teachers only");
 
     const { title, description, words } = req.body;
-    if (!title?.trim()) return res.status(400).json({ success: false, message: "Title is required" });
+    if (!title?.trim()) return badRequest(res, "Title is required");
     if (!Array.isArray(words) || words.length === 0)
-      return res.status(400).json({ success: false, message: "At least one word is required" });
+      return badRequest(res, "At least one word is required");
 
     const list = await getVocabList(req.db).create({ title: title.trim(), description: description?.trim() || "", teacherId, words });
     res.status(201).json({ success: true, list });
   } catch (err) {
     logger.error("POST /vocab/lists:", { error: err?.message });
-    res.status(500).json({ success: false, message: err.message });
+    serverError(res, err.message);
   }
 });
 
@@ -92,10 +93,10 @@ router.post("/lists", verifyToken, async (req, res) => {
 router.put("/lists/:id", verifyToken, async (req, res) => {
   try {
     const { role, id: teacherId } = req.user;
-    if (role !== "teacher") return res.status(403).json({ success: false, message: "Teachers only" });
+    if (role !== "teacher") return forbidden(res, "Teachers only");
 
     const list = await getVocabList(req.db).findOne({ _id: req.params.id, teacherId });
-    if (!list) return res.status(404).json({ success: false, message: "List not found" });
+    if (!list) return notFound(res, "List not found");
 
     const { title, description, words } = req.body;
     if (title)       list.title       = title.trim();
@@ -106,7 +107,7 @@ router.put("/lists/:id", verifyToken, async (req, res) => {
     res.json({ success: true, list });
   } catch (err) {
     logger.error("PUT /vocab/lists/:id:", { error: err?.message });
-    res.status(500).json({ success: false, message: err.message });
+    serverError(res, err.message);
   }
 });
 
@@ -114,16 +115,16 @@ router.put("/lists/:id", verifyToken, async (req, res) => {
 router.delete("/lists/:id", verifyToken, async (req, res) => {
   try {
     const { role, id: teacherId } = req.user;
-    if (role !== "teacher") return res.status(403).json({ success: false, message: "Teachers only" });
+    if (role !== "teacher") return forbidden(res, "Teachers only");
 
     const list = await getVocabList(req.db).findOneAndDelete({ _id: req.params.id, teacherId });
-    if (!list) return res.status(404).json({ success: false, message: "List not found" });
+    if (!list) return notFound(res, "List not found");
 
     await getVocabProgress(req.db).deleteMany({ listId: req.params.id });
     res.json({ success: true, message: "List deleted" });
   } catch (err) {
     logger.error("DELETE /vocab/lists/:id:", { error: err?.message });
-    res.status(500).json({ success: false, message: err.message });
+    serverError(res, err.message);
   }
 });
 
@@ -131,14 +132,14 @@ router.delete("/lists/:id", verifyToken, async (req, res) => {
 router.post("/lists/:id/assign", verifyToken, async (req, res) => {
   try {
     const { role, id: teacherId } = req.user;
-    if (role !== "teacher") return res.status(403).json({ success: false, message: "Teachers only" });
+    if (role !== "teacher") return forbidden(res, "Teachers only");
 
     const list = await getVocabList(req.db).findOne({ _id: req.params.id, teacherId });
-    if (!list) return res.status(404).json({ success: false, message: "List not found" });
+    if (!list) return notFound(res, "List not found");
 
     const { studentIds, dueDate } = req.body; // studentIds: string[]
     if (!Array.isArray(studentIds) || studentIds.length === 0)
-      return res.status(400).json({ success: false, message: "Provide at least one studentId" });
+      return badRequest(res, "Provide at least one studentId");
 
     for (const sid of studentIds) {
       const already = list.assignedTo.some(a => a.studentId.toString() === sid);
@@ -149,11 +150,11 @@ router.post("/lists/:id/assign", verifyToken, async (req, res) => {
     await list.save();
 
     const updated = await getVocabList(req.db).findById(list._id)
-      .populate("assignedTo.studentId", "firstName surname email");
+      .populate("assignedTo.studentId", "firstName lastName email");
     res.json({ success: true, list: updated });
   } catch (err) {
     logger.error("POST /vocab/lists/:id/assign:", { error: err?.message });
-    res.status(500).json({ success: false, message: err.message });
+    serverError(res, err.message);
   }
 });
 
@@ -161,16 +162,16 @@ router.post("/lists/:id/assign", verifyToken, async (req, res) => {
 router.delete("/lists/:id/assign/:studentId", verifyToken, async (req, res) => {
   try {
     const { role, id: teacherId } = req.user;
-    if (role !== "teacher") return res.status(403).json({ success: false, message: "Teachers only" });
+    if (role !== "teacher") return forbidden(res, "Teachers only");
 
     const list = await getVocabList(req.db).findOne({ _id: req.params.id, teacherId });
-    if (!list) return res.status(404).json({ success: false, message: "List not found" });
+    if (!list) return notFound(res, "List not found");
 
     list.assignedTo = list.assignedTo.filter(a => a.studentId.toString() !== req.params.studentId);
     await list.save();
     res.json({ success: true, message: "Student unassigned" });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    serverError(res, err.message);
   }
 });
 
@@ -180,7 +181,7 @@ router.delete("/lists/:id/assign/:studentId", verifyToken, async (req, res) => {
 router.get("/due", verifyToken, async (req, res) => {
   try {
     const { id: studentId, role } = req.user;
-    if (role !== "student") return res.status(403).json({ success: false, message: "Students only" });
+    if (role !== "student") return forbidden(res, "Students only");
 
     // Get all lists assigned to this student
     const lists = await getVocabList(req.db).find({ "assignedTo.studentId": studentId });
@@ -213,7 +214,7 @@ router.get("/due", verifyToken, async (req, res) => {
     res.json({ success: true, cards });
   } catch (err) {
     logger.error("GET /vocab/due:", { error: err?.message });
-    res.status(500).json({ success: false, message: err.message });
+    serverError(res, err.message);
   }
 });
 
@@ -221,11 +222,11 @@ router.get("/due", verifyToken, async (req, res) => {
 router.post("/review", verifyToken, async (req, res) => {
   try {
     const { id: studentId, role } = req.user;
-    if (role !== "student") return res.status(403).json({ success: false, message: "Students only" });
+    if (role !== "student") return forbidden(res, "Students only");
 
     const { listId, wordId, quality } = req.body; // quality: 0-3
     if (quality === undefined || quality < 0 || quality > 3)
-      return res.status(400).json({ success: false, message: "quality must be 0-3" });
+      return badRequest(res, "quality must be 0-3");
 
     // Get or create progress record
     const VocabProgress = getVocabProgress(req.db);
@@ -251,7 +252,7 @@ router.post("/review", verifyToken, async (req, res) => {
     res.json({ success: true, nextReviewDate: prog.nextReviewDate, interval: prog.interval, streak: streakResult });
   } catch (err) {
     logger.error("POST /vocab/review:", { error: err?.message });
-    res.status(500).json({ success: false, message: err.message });
+    serverError(res, err.message);
   }
 });
 
@@ -259,7 +260,7 @@ router.post("/review", verifyToken, async (req, res) => {
 router.get("/stats", verifyToken, async (req, res) => {
   try {
     const { id: studentId, role } = req.user;
-    if (role !== "student") return res.status(403).json({ success: false, message: "Students only" });
+    if (role !== "student") return forbidden(res, "Students only");
 
     const lists = await getVocabList(req.db).find({ "assignedTo.studentId": studentId })
       .select("title words");
@@ -281,7 +282,7 @@ router.get("/stats", verifyToken, async (req, res) => {
     res.json({ success: true, stats });
   } catch (err) {
     logger.error("GET /vocab/stats:", { error: err?.message });
-    res.status(500).json({ success: false, message: err.message });
+    serverError(res, err.message);
   }
 });
 

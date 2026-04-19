@@ -4,7 +4,7 @@
 //   mode:      "mark" | "unmark"
 //   startWith: "teacher" | "student"  (which side to pick first)
 //   teacher:   { _id, firstName, lastName, ratePerClass } | null  (pre-fill)
-//   student:   { _id, firstName, surname, noOfClasses } | null    (pre-fill)
+//   student:   { _id, firstName, lastName, classCredits } | null    (pre-fill)
 //   onClose:   () => void
 //   onSuccess: (result) => void
 //   isDarkMode: boolean
@@ -314,12 +314,12 @@ export default function LessonMarkModal({
                           }`}
                         >
                           <p className={`font-semibold text-sm ${textPrimary}`}>
-                            {s.firstName} {s.surname}
+                            {s.firstName} {s.lastName}
                           </p>
                           <p className={`text-xs mt-0.5 ${textSecondary}`}>
-                            {s.email} · {s.noOfClasses} class{s.noOfClasses !== 1 ? "es" : ""} remaining
+                            {s.email} · {s.classCredits} class{s.classCredits !== 1 ? "es" : ""} remaining
                           </p>
-                          {isMarkMode && s.noOfClasses <= 0 && (
+                          {isMarkMode && s.classCredits <= 0 && (
                             <span className="inline-block mt-1 text-[10px] px-2 py-0.5 rounded-full bg-red-100 text-red-600">
                               No classes left
                             </span>
@@ -334,7 +334,7 @@ export default function LessonMarkModal({
                   <StepHeader
                     icon={GraduationCap}
                     title="Select Teacher"
-                    sub={`Teachers assigned to ${selectedStudent?.firstName} ${selectedStudent?.surname}`}
+                    sub={`Teachers assigned to ${selectedStudent?.firstName} ${selectedStudent?.lastName}`}
                   />
                   {loading ? (
                     <div className="flex justify-center py-8">
@@ -497,7 +497,7 @@ export default function LessonMarkModal({
                   />
                   <InfoRow
                     label="Student"
-                    value={`${selectedStudent?.firstName} ${selectedStudent?.surname}`}
+                    value={`${selectedStudent?.firstName} ${selectedStudent?.lastName}`}
                     textPrimary={textPrimary}
                     textSecondary={textSecondary}
                   />

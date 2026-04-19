@@ -1,5 +1,7 @@
 // src/pages/admin/AdminDashboard.jsx
 import React, { useState, useEffect, lazy, Suspense, useMemo } from "react";
+import { TabErrorBoundary } from "../../components/ErrorBoundary";
+import { useAuth }          from "../../context/AuthContext.jsx";
 import { useNavigate } from "react-router-dom";
 import {
   TrendingUp, Video, User, Home, Bell, Users, DollarSign,
@@ -133,13 +135,10 @@ export default function AdminDashboard() {
   const { isDarkMode, toggleDarkMode } = useDarkMode();
   const { branding, center } = useBranding();
   const centerName = center?.centerName || "Admin Panel";
-
-  const adminInfo = JSON.parse(sessionStorage.getItem("adminInfo") || localStorage.getItem("adminInfo") || "{}");
+  const { user: adminInfo, logout: authLogout } = useAuth();
 
   const handleLogout = () => {
-    localStorage.removeItem("adminToken");
-    localStorage.removeItem("adminSessionToken");
-    localStorage.removeItem("adminInfo");
+    authLogout();
     navigate("/admin/login");
   };
 
@@ -272,7 +271,9 @@ export default function AdminDashboard() {
         </div>
       )}
       <Suspense fallback={<TabLoader />}>
-        {tabContent}
+        <TabErrorBoundary key={activeTab}>
+          {tabContent}
+        </TabErrorBoundary>
       </Suspense>
     </DashboardLayout>
     <SettingsSidebar
@@ -284,7 +285,7 @@ export default function AdminDashboard() {
       userInfo={{
         firstName: adminInfo?.firstName || "Admin",
         lastName: adminInfo?.lastName || "User",
-        email: adminInfo?.email || localStorage.getItem("adminEmail") || "admin@example.com",
+        email: adminInfo?.email || "admin@example.com",
       }}
     />
     <SettingsModal isOpen={showSettingsModal} onClose={() => setShowSettingsModal(false)} userType="admin" />

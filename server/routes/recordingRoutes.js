@@ -9,6 +9,7 @@ import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
 import { recordingSchema }  from "../schemas/recordingSchema.js";
 import { bookingSchema }    from "../schemas/bookingSchema.js";
 import logger from "../utils/logger.js";
+import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const RECORDINGS_DIR = path.join(__dirname, "../uploads/recordings");
@@ -60,11 +61,11 @@ async function purgeRecording(rec) {
 router.post("/upload", verifyToken, upload.single("recording"), async (req, res) => {
   try {
     const { role, id: teacherId } = req.user;
-    if (role !== "teacher") return res.status(403).json({ success: false, message: "Teachers only" });
-    if (!req.file)          return res.status(400).json({ success: false, message: "No file uploaded" });
+    if (role !== "teacher") return forbidden(res, "Teachers only");
+    if (!req.file)          return badRequest(res, "No file uploaded");
 
     const { bookingId, duration, title } = req.body;
-    if (!bookingId) return res.status(400).json({ success: false, message: "bookingId is required" });
+    if (!bookingId) return badRequest(res, "bookingId is required");
 
     const booking   = await getBooking(req.db).findById(bookingId).select("studentId");
     const studentId = booking?.studentId || null;
@@ -86,7 +87,7 @@ router.post("/upload", verifyToken, upload.single("recording"), async (req, res)
   } catch (err) {
     logger.error("Recording upload error:", { error: err?.message });
     if (req.file) fs.unlink(req.file.path, () => {});
-    res.status(500).json({ success: false, message: err.message });
+    serverError(res, err.message);
   }
 });
 
@@ -98,34 +99,34 @@ router.get("/", verifyToken, async (req, res) => {
     if      (role === "teacher") filter.teacherId = userId;
     else if (role === "student") { filter.studentId = userId; filter.visibleToStudent = true; }
     else if (role === "admin")   filter = {};
-    else return res.status(403).json({ success: false, message: "Access denied" });
+    else return forbidden(res, "Access denied");
 
     const recordings = await getRecording(req.db).find(filter)
       .populate("bookingId", "classTitle scheduledTime")
       .populate("teacherId", "firstName lastName")
-      .populate("studentId", "firstName surname")
+      .populate("studentId", "firstName lastName")
       .sort({ createdAt: -1 });
 
     res.json({ success: true, recordings });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    serverError(res, err.message);
   }
 });
 
 // GET /api/recordings/teacher/:teacherId — admin views one teacher's recordings
 router.get("/teacher/:teacherId", verifyToken, async (req, res) => {
   try {
-    if (req.user.role !== "admin") return res.status(403).json({ success: false, message: "Admins only" });
+    if (req.user.role !== "admin") return forbidden(res, "Admins only");
 
     const recordings = await getRecording(req.db).find({ teacherId: req.params.teacherId })
       .populate("bookingId", "classTitle scheduledTime")
       .populate("teacherId", "firstName lastName")
-      .populate("studentId", "firstName surname")
+      .populate("studentId", "firstName lastName")
       .sort({ createdAt: -1 });
 
     res.json({ success: true, recordings });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    serverError(res, err.message);
   }
 });
 
@@ -133,17 +134,17 @@ router.get("/teacher/:teacherId", verifyToken, async (req, res) => {
 router.patch("/:id/visibility", verifyToken, async (req, res) => {
   try {
     const { role, id: teacherId } = req.user;
-    if (role !== "teacher") return res.status(403).json({ success: false, message: "Teachers only" });
+    if (role !== "teacher") return forbidden(res, "Teachers only");
 
     const rec = await getRecording(req.db).findOne({ _id: req.params.id, teacherId });
-    if (!rec) return res.status(404).json({ success: false, message: "Recording not found" });
+    if (!rec) return notFound(res, "Recording not found");
 
     rec.visibleToStudent = !rec.visibleToStudent;
     await rec.save();
 
     res.json({ success: true, visibleToStudent: rec.visibleToStudent });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    serverError(res, err.message);
   }
 });
 
@@ -152,18 +153,18 @@ router.get("/:id/stream", verifyToken, async (req, res) => {
   try {
     const { role, id: userId } = req.user;
     const rec = await getRecording(req.db).findById(req.params.id);
-    if (!rec) return res.status(404).json({ success: false, message: "Recording not found" });
+    if (!rec) return notFound(res, "Recording not found");
 
     if (role === "teacher" && rec.teacherId.toString() !== userId)
-      return res.status(403).json({ success: false, message: "Access denied" });
+      return forbidden(res, "Access denied");
     if (role === "student") {
       if (rec.studentId?.toString() !== userId || !rec.visibleToStudent)
-        return res.status(403).json({ success: false, message: "Access denied" });
+        return forbidden(res, "Access denied");
     }
 
     const filePath = path.join(RECORDINGS_DIR, rec.filename);
     if (!fs.existsSync(filePath))
-      return res.status(404).json({ success: false, message: "File not found on disk" });
+      return notFound(res, "File not found on disk");
 
     const stat     = fs.statSync(filePath);
     const fileSize = stat.size;
@@ -191,7 +192,7 @@ router.get("/:id/stream", verifyToken, async (req, res) => {
     }
   } catch (err) {
     logger.error("Recording stream error:", { error: err?.message });
-    res.status(500).json({ success: false, message: err.message });
+    serverError(res, err.message);
   }
 });
 
@@ -200,17 +201,17 @@ router.delete("/:id", verifyToken, async (req, res) => {
   try {
     const { role, id: userId } = req.user;
     const rec = await getRecording(req.db).findById(req.params.id);
-    if (!rec) return res.status(404).json({ success: false, message: "Not found" });
+    if (!rec) return notFound(res, "Not found");
 
     if (role === "student")
-      return res.status(403).json({ success: false, message: "Students cannot delete recordings" });
+      return forbidden(res, "Students cannot delete recordings");
     if (role === "teacher" && rec.teacherId.toString() !== userId)
-      return res.status(403).json({ success: false, message: "Access denied" });
+      return forbidden(res, "Access denied");
 
     await purgeRecording(rec);
     res.json({ success: true, message: "Recording deleted" });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    serverError(res, err.message);
   }
 });
 

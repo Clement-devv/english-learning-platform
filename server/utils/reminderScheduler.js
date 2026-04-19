@@ -61,7 +61,7 @@ async function checkClassReminders(db) {
     },
   })
     .populate("teacherId", "firstName lastName email")
-    .populate("studentId", "firstName surname email");
+    .populate("studentId", "firstName lastName email");
 
   for (const booking of bookings) {
     const teacher = booking.teacherId;

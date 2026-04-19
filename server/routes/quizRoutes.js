@@ -15,6 +15,7 @@ import {
 import { callGemini, extractJSONArray } from "../utils/geminiHelper.js";
 import { recordActivity } from "../utils/streakService.js";
 import logger from "../utils/logger.js";
+import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
 
 // Multer — memory storage (no disk writes, PDF buffer passed straight to pdf-parse)
 const upload = multer({
@@ -67,23 +68,23 @@ function validateQuestions(questions) {
 // ─────────────────────────────────────────────────────────────────────────────
 router.post("/", verifyToken, async (req, res) => {
   try {
-    if (req.user.role !== "teacher") return res.status(403).json({ message: "Teachers only" });
+    if (req.user.role !== "teacher") return forbidden(res, "Teachers only");
 
     const { studentId, title, instructions, timeLimit, dueDate, questions } = req.body;
 
     if (!studentId || !title?.trim() || !timeLimit || !dueDate) {
-      return res.status(400).json({ message: "studentId, title, timeLimit, and dueDate are required" });
+      return badRequest(res, "studentId, title, timeLimit, and dueDate are required");
     }
 
     const qError = validateQuestions(questions);
     if (qError) return res.status(400).json({ message: qError });
 
     const student = await getStudent(req.db).findById(studentId);
-    if (!student) return res.status(404).json({ message: "Student not found" });
+    if (!student) return notFound(res, "Student not found");
 
     const timeLimitNum = parseInt(timeLimit, 10);
     if (isNaN(timeLimitNum) || timeLimitNum < 1 || timeLimitNum > 300) {
-      return res.status(400).json({ message: "Time limit must be 1–300 minutes" });
+      return badRequest(res, "Time limit must be 1–300 minutes");
     }
 
     const quiz = await getQuiz(req.db).create({
@@ -124,7 +125,7 @@ router.post("/", verifyToken, async (req, res) => {
     res.status(201).json({ success: true, quiz });
   } catch (err) {
     logger.error("Create quiz error:", { error: err?.message });
-    res.status(500).json({ message: err.message });
+    serverError(res, err.message);
   }
 });
 
@@ -133,10 +134,10 @@ router.post("/", verifyToken, async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 router.get("/my", verifyToken, async (req, res) => {
   try {
-    if (req.user.role !== "teacher") return res.status(403).json({ message: "Teachers only" });
+    if (req.user.role !== "teacher") return forbidden(res, "Teachers only");
 
     const quizzes = await getQuiz(req.db).find({ teacherId: req.user.id })
-      .populate("studentId", "firstName surname email")
+      .populate("studentId", "firstName lastName email")
       .sort({ createdAt: -1 });
 
     // Attach attempt data to each quiz
@@ -152,7 +153,7 @@ router.get("/my", verifyToken, async (req, res) => {
 
     res.json({ success: true, quizzes: result });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    serverError(res, err.message);
   }
 });
 
@@ -161,7 +162,7 @@ router.get("/my", verifyToken, async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 router.get("/assigned", verifyToken, async (req, res) => {
   try {
-    if (req.user.role !== "student") return res.status(403).json({ message: "Students only" });
+    if (req.user.role !== "student") return forbidden(res, "Students only");
 
     const quizzes = await getQuiz(req.db).find({ studentId: req.user.id })
       .populate("teacherId", "firstName lastName")
@@ -190,7 +191,7 @@ router.get("/assigned", verifyToken, async (req, res) => {
 
     res.json({ success: true, quizzes: result });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    serverError(res, err.message);
   }
 });
 
@@ -199,17 +200,17 @@ router.get("/assigned", verifyToken, async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 router.post("/:id/attempt", verifyToken, async (req, res) => {
   try {
-    if (req.user.role !== "student") return res.status(403).json({ message: "Students only" });
+    if (req.user.role !== "student") return forbidden(res, "Students only");
 
     const quiz = await getQuiz(req.db).findById(req.params.id);
-    if (!quiz) return res.status(404).json({ message: "Quiz not found" });
-    if (quiz.studentId.toString() !== req.user.id) return res.status(403).json({ message: "Access denied" });
-    if (quiz.status === "attempted") return res.status(400).json({ message: "You have already attempted this quiz" });
+    if (!quiz) return notFound(res, "Quiz not found");
+    if (quiz.studentId.toString() !== req.user.id) return forbidden(res, "Access denied");
+    if (quiz.status === "attempted") return badRequest(res, "You have already attempted this quiz");
 
     const { answers, startedAt, timeTaken } = req.body;
 
     if (!Array.isArray(answers) || answers.length !== quiz.questions.length) {
-      return res.status(400).json({ message: "answers array length must match question count" });
+      return badRequest(res, "answers array length must match question count");
     }
 
     // Score calculation (server-side only)
@@ -255,7 +256,7 @@ router.post("/:id/attempt", verifyToken, async (req, res) => {
     res.json({ success: true, attempt, quiz: fullQuiz, streak: streakResult });
   } catch (err) {
     logger.error("Submit attempt error:", { error: err?.message });
-    res.status(500).json({ message: err.message });
+    serverError(res, err.message);
   }
 });
 
@@ -264,17 +265,17 @@ router.post("/:id/attempt", verifyToken, async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 router.delete("/:id", verifyToken, async (req, res) => {
   try {
-    if (req.user.role !== "teacher") return res.status(403).json({ message: "Teachers only" });
+    if (req.user.role !== "teacher") return forbidden(res, "Teachers only");
 
     const quiz = await getQuiz(req.db).findById(req.params.id);
-    if (!quiz) return res.status(404).json({ message: "Quiz not found" });
-    if (quiz.teacherId.toString() !== req.user.id) return res.status(403).json({ message: "Access denied" });
-    if (quiz.status === "attempted") return res.status(400).json({ message: "Cannot delete a quiz that has been attempted" });
+    if (!quiz) return notFound(res, "Quiz not found");
+    if (quiz.teacherId.toString() !== req.user.id) return forbidden(res, "Access denied");
+    if (quiz.status === "attempted") return badRequest(res, "Cannot delete a quiz that has been attempted");
 
     await quiz.deleteOne();
     res.json({ success: true, message: "Quiz deleted" });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    serverError(res, err.message);
   }
 });
 
@@ -283,11 +284,11 @@ router.delete("/:id", verifyToken, async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 router.post("/generate", verifyToken, async (req, res) => {
   try {
-    if (req.user.role !== "teacher") return res.status(403).json({ message: "Teachers only" });
+    if (req.user.role !== "teacher") return forbidden(res, "Teachers only");
 
     const { topic, count = 10, difficulty = "intermediate" } = req.body;
 
-    if (!topic?.trim()) return res.status(400).json({ message: "Topic is required" });
+    if (!topic?.trim()) return badRequest(res, "Topic is required");
 
     const geminiKey = process.env.GEMINI_API_KEY;
     if (!geminiKey || geminiKey.startsWith("CHANGE_ME")) {
@@ -349,7 +350,7 @@ Return ONLY a valid JSON array in this exact format:
 
   } catch (err) {
     logger.error("Quiz generate error:", { error: err?.message });
-    res.status(500).json({ message: err.message });
+    serverError(res, err.message);
   }
 });
 
@@ -364,7 +365,7 @@ router.post(
   upload.single("file"),          // optional PDF upload field named "file"
   async (req, res) => {
     try {
-      if (req.user.role !== "teacher") return res.status(403).json({ message: "Teachers only" });
+      if (req.user.role !== "teacher") return forbidden(res, "Teachers only");
 
       if (!process.env.ANTHROPIC_API_KEY) {
         return res.status(503).json({ message: "Claude AI is not configured on this server" });
@@ -382,12 +383,12 @@ router.post(
           await parser.destroy();
           if (pdfText) notesText = notesText ? `${notesText}\n\n${pdfText}` : pdfText;
         } catch (pdfErr) {
-          return res.status(400).json({ message: "Could not read PDF — try copying and pasting the text instead" });
+          return badRequest(res, "Could not read PDF — try copying and pasting the text instead");
         }
       }
 
       if (!notesText || notesText.length < 50) {
-        return res.status(400).json({ message: "Please provide lesson notes (at least 50 characters) or upload a PDF" });
+        return badRequest(res, "Please provide lesson notes (at least 50 characters) or upload a PDF");
       }
 
       const safeCount = Math.min(Math.max(parseInt(req.body.count, 10) || 10, 1), 20);
@@ -473,7 +474,7 @@ Return ONLY a valid JSON array:
       if (err.message === "Only PDF files are allowed") {
         return res.status(400).json({ message: err.message });
       }
-      res.status(500).json({ message: err.message });
+      serverError(res, err.message);
     }
   }
 );
@@ -498,7 +499,7 @@ router.get("/ai-models", verifyToken, async (req, res) => {
 
     res.json({ success: true, models });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    serverError(res, err.message);
   }
 });
 

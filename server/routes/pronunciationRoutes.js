@@ -4,6 +4,7 @@ import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
 import { pronunciationCacheSchema } from "../schemas/pronunciationCacheSchema.js";
 import { callGemini, extractJSONArray } from "../utils/geminiHelper.js";
 import logger from "../utils/logger.js";
+import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
 
 const router = express.Router();
 router.use(tenantMiddleware);
@@ -80,7 +81,7 @@ router.get("/sentences", verifyToken, async (req, res) => {
   const { difficulty = "beginner" } = req.query;
 
   if (!["beginner", "intermediate", "advanced"].includes(difficulty)) {
-    return res.status(400).json({ message: "Invalid difficulty" });
+    return badRequest(res, "Invalid difficulty");
   }
 
   // ── 1. Try cache ────────────────────────────────────────────────────────────

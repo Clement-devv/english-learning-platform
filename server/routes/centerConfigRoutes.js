@@ -10,6 +10,7 @@ import { isValidDomain, normalizeDomain } from '../utils/domainVerifier.js';
 import { sendDomainInstructionsEmail } from '../utils/emailService.js';
 import { config } from '../config/config.js';
 import logger from "../utils/logger.js";
+import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
@@ -51,7 +52,7 @@ router.get('/config', tenantMiddleware, async (req, res) => {
     });
   } catch (err) {
     logger.error('❌ Center config error:', { error: err?.message });
-    res.status(500).json({ success: false, message: 'Server error', error: err.message });
+    serverError(res, 'Server error');
   }
 });
 
@@ -76,7 +77,7 @@ router.patch('/branding', tenantMiddleware, verifyToken, verifyAdmin, async (req
     res.json({ success: true, message: 'Branding updated' });
   } catch (err) {
     logger.error('❌ Branding update error:', { error: err?.message });
-    res.status(500).json({ success: false, message: 'Server error', error: err.message });
+    serverError(res, 'Server error');
   }
 });
 
@@ -84,19 +85,19 @@ router.patch('/branding', tenantMiddleware, verifyToken, verifyAdmin, async (req
 router.post('/domain', tenantMiddleware, verifyToken, verifyAdmin, async (req, res) => {
   try {
     const { domain } = req.body;
-    if (!domain?.trim()) return res.status(400).json({ success: false, message: 'Domain is required' });
+    if (!domain?.trim()) return badRequest(res, 'Domain is required');
 
     if (!['pro', 'enterprise'].includes(req.center.plan)) {
-      return res.status(403).json({ success: false, message: 'Custom domains require a Pro or Enterprise plan' });
+      return forbidden(res, 'Custom domains require a Pro or Enterprise plan');
     }
 
     const normalized = normalizeDomain(domain);
     if (!isValidDomain(normalized)) {
-      return res.status(400).json({ success: false, message: 'Invalid domain format. Use: yourdomain.com or www.yourdomain.com' });
+      return badRequest(res, 'Invalid domain format. Use: yourdomain.com or www.yourdomain.com');
     }
 
     const existing = await Center.findOne({ customDomain: normalized, _id: { $ne: req.center._id } });
-    if (existing) return res.status(409).json({ success: false, message: 'This domain is already in use by another center' });
+    if (existing) return conflict(res, 'This domain is already in use by another center');
 
     const serverIp = config.serverIp;
     await Center.findByIdAndUpdate(req.center._id, {
@@ -153,7 +154,7 @@ router.post(
   },
   async (req, res) => {
     try {
-      if (!req.file) return res.status(400).json({ success: false, message: 'No file uploaded' });
+      if (!req.file) return badRequest(res, 'No file uploaded');
 
       const field = req.query.type === 'favicon' ? 'favicon' : req.query.type === 'loginBackground' ? 'loginBackground' : 'logo';
       const fileUrl  = `/uploads/branding/${req.center.slug}/${req.file.filename}`;

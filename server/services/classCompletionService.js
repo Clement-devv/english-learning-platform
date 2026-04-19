@@ -85,7 +85,7 @@ export async function completeClass(db, bookingId, markedBy = "system", options 
     { new: false }
   )
     .populate("teacherId", "firstName lastName email ratePerClass lessonsCompleted earned")
-    .populate("studentId", "firstName surname email noOfClasses active");
+    .populate("studentId", "firstName lastName email classCredits active");
 
   // ══════════════════════════════════════════════════════
   // STEP 2 — Idempotency guard
@@ -93,7 +93,7 @@ export async function completeClass(db, bookingId, markedBy = "system", options 
   if (!claimedBooking) {
     const existing = await Booking.findById(bookingId)
       .populate("teacherId", "firstName lastName earned lessonsCompleted")
-      .populate("studentId", "firstName surname noOfClasses");
+      .populate("studentId", "firstName lastName classCredits");
 
     if (!existing) throw new Error(`Booking ${bookingId} not found`);
 
@@ -104,7 +104,7 @@ export async function completeClass(db, bookingId, markedBy = "system", options 
         completed: existing.status === "completed",
         missed:    existing.status === "missed",
         booking:   existing,
-        studentClassesRemaining: existing.studentId?.noOfClasses ?? 0,
+        studentClassesRemaining: existing.studentId?.classCredits ?? 0,
         teacherEarned:           existing.teacherId?.earned       ?? 0,
       };
     }
@@ -146,7 +146,7 @@ export async function completeClass(db, bookingId, markedBy = "system", options 
       reason:    missedBooking.missedReason,
       attendance,
       booking:   missedBooking,
-      studentClassesRemaining: claimedBooking.studentId?.noOfClasses ?? 0,
+      studentClassesRemaining: claimedBooking.studentId?.classCredits ?? 0,
       teacherEarned:           claimedBooking.teacherId?.earned       ?? 0,
     };
   }
@@ -168,8 +168,8 @@ export async function completeClass(db, bookingId, markedBy = "system", options 
     // Write 2: Deduct 1 credit from student (floor at 0)
     const student = await Student.findById(studentId);
     if (!student) throw new Error(`Student ${studentId} not found`);
-    const newClassCount = Math.max(0, (student.noOfClasses || 0) - 1);
-    student.noOfClasses = newClassCount;
+    const newClassCount = Math.max(0, (student.classCredits || 0) - 1);
+    student.classCredits = newClassCount;
     if (newClassCount === 0) student.active = false;
     await student.save();
 
@@ -192,7 +192,7 @@ export async function completeClass(db, bookingId, markedBy = "system", options 
       status:      "pending",
       type:        "class_completion",
       classTitle:  claimedBooking.classTitle,
-      studentName: `${claimedBooking.studentId.firstName} ${claimedBooking.studentId.surname}`,
+      studentName: `${claimedBooking.studentId.firstName} ${claimedBooking.studentId.lastName}`,
       completedAt: now,
       description: `Completed by ${markedBy} — ${claimedBooking.classTitle}`,
     });
@@ -207,7 +207,7 @@ export async function completeClass(db, bookingId, markedBy = "system", options 
 
     logger.info(`[ClassCompletion] "${claimedBooking.classTitle}" (${bookingId})`, {
       teacher: `${teacher.firstName} ${teacher.lastName}`, earned: newEarned,
-      student: `${student.firstName} ${student.surname}`, creditsLeft: newClassCount,
+      student: `${student.firstName} ${student.lastName}`, creditsLeft: newClassCount,
     });
 
     // Fire-and-forget streak updates — never block completion

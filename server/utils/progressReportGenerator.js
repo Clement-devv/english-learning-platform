@@ -46,7 +46,7 @@ function badge(score) {
 // ── Main export ───────────────────────────────────────────────────────────────
 /**
  * @param {Object} db       - Per-center Mongoose connection (req.db)
- * @param {Object} student  - Student doc (firstName, surname, email)
+ * @param {Object} student  - Student doc (firstName, lastName, email)
  * @param {Object} teacher  - Teacher doc (firstName, lastName) or null
  * @param {Date}   from     - Start of reporting window
  * @param {Date}   to       - End of reporting window (exclusive)
@@ -123,7 +123,7 @@ export async function generateProgressReport(db, student, teacher, from, to, per
 
     // ── Student info ───────────────────────────────────────────────────────────
     doc.fillColor(DARK).font("Helvetica-Bold").fontSize(16)
-       .text(`${student.firstName} ${student.surname}`, pad, y);
+       .text(`${student.firstName} ${student.lastName}`, pad, y);
     y += 22;
     doc.fillColor(MUTED).font("Helvetica").fontSize(10)
        .text(student.email, pad, y);

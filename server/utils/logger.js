@@ -78,7 +78,7 @@ const consoleOutput = (level, message, meta) => {
   const timestamp = new Date().toISOString();
   const color = colors[level] || colors.RESET;
   
-  console.log(
+  console.log( // eslint-disable-line no-console
     `${color}[${timestamp}] ${level}:${colors.RESET}`,
     message,
     Object.keys(meta).length > 0 ? meta : ''

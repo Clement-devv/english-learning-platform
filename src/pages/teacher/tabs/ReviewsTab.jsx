@@ -160,7 +160,7 @@ export default function ReviewsTab({ teacherInfo, isDarkMode }) {
                 )}
 
                 <p style={{ margin: "8px 0 0", fontSize: 12, color: muted }}>
-                  — {r.studentId?.firstName ?? "Student"} {r.studentId?.surname ?? ""}
+                  — {r.studentId?.firstName ?? "Student"} {r.studentId?.lastName ?? ""}
                   {" · "}{fmt(r.createdAt)}
                 </p>
               </div>

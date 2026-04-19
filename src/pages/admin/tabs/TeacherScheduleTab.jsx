@@ -470,7 +470,7 @@ export default function TeacherScheduleTab({ teachers = [], isDarkMode }) {
                     const { top, height } = eventPos(startTime, endTime);
                     const isAcc = booking.status === "accepted";
                     const sName = booking.studentId?.firstName
-                      ? `${booking.studentId.firstName} ${booking.studentId.surname || ""}`.trim()
+                      ? `${booking.studentId.firstName} ${booking.studentId.lastName || ""}`.trim()
                       : "Student";
                     return (
                       <div key={booking._id} className="adm-tile"
@@ -553,7 +553,7 @@ export default function TeacherScheduleTab({ teachers = [], isDarkMode }) {
               const { startTime, endTime } = bookingTimes(b);
               const isAcc = b.status === "accepted";
               const sName = b.studentId?.firstName
-                ? `${b.studentId.firstName} ${b.studentId.surname || ""}`.trim()
+                ? `${b.studentId.firstName} ${b.studentId.lastName || ""}`.trim()
                 : "Student";
               return (
                 <>

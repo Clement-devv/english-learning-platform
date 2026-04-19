@@ -30,7 +30,7 @@ export const validate = (req, res, next) => {
 export const validateEmail = body('email')
   .trim()
   .isEmail()
-  .normalizeEmail()
+  .customSanitizer(v => v.toLowerCase())
   .withMessage('Please provide a valid email address')
   .isLength({ max: 100 })
   .withMessage('Email must not exceed 100 characters');
@@ -146,7 +146,7 @@ export const validateStudent = [
     .matches(/^[a-zA-Z\s'-]+$/)
     .withMessage('First name can only contain letters, spaces, hyphens, and apostrophes')
     .escape(),
-  body('surname')
+  body('lastName')
     .trim()
     .isLength({ min: 2, max: 50 })
     .withMessage('Surname must be between 2 and 50 characters')
@@ -158,7 +158,7 @@ export const validateStudent = [
     .optional()
     .isInt({ min: 5, max: 100 })
     .withMessage('Age must be between 5 and 100'),
-  body('noOfClasses')
+  body('classCredits')
     .optional()
     .isInt({ min: 0, max: 1000 })
     .withMessage('Number of classes must be between 0 and 1000'),
@@ -188,7 +188,7 @@ export const validateStudentUpdate = [
     .isLength({ min: 2, max: 50 })
     .matches(/^[a-zA-Z\s'-]+$/)
     .escape(),
-  body('surname')
+  body('lastName')
     .optional()
     .trim()
     .isLength({ min: 2, max: 50 })
@@ -197,11 +197,11 @@ export const validateStudentUpdate = [
   body('email')
     .optional()
     .isEmail()
-    .normalizeEmail(),
+    .customSanitizer(v => v.toLowerCase()),
   body('age')
     .optional()
     .isInt({ min: 5, max: 100 }),
-  body('noOfClasses')
+  body('classCredits')
     .optional()
     .isInt({ min: 0, max: 1000 }),
   body('active')
@@ -270,7 +270,7 @@ export const validateTeacherUpdate = [
   body('email')
     .optional()
     .isEmail()
-    .normalizeEmail(),
+    .customSanitizer(v => v.toLowerCase()),
   body('continent')
     .optional()
     .isIn(['Africa', 'Europe', 'Asia']),
@@ -370,11 +370,9 @@ export const validateParamMongoId = (paramName) => [
 export const validateSuperAdminLogin = [
   body('email')
     .trim()
-    .isEmail()
-    .normalizeEmail()
-    .withMessage('Valid email is required')
-    .isLength({ max: 100 })
-    .withMessage('Email too long'),
+    .isEmail().withMessage('Valid email is required')
+    .isLength({ max: 100 }).withMessage('Email too long')
+    .customSanitizer(v => v.toLowerCase()),
   body('password')
     .notEmpty()
     .withMessage('Password is required')
@@ -398,7 +396,7 @@ export const validateCenterRegistration = [
   body('adminEmail')
     .trim()
     .isEmail()
-    .normalizeEmail()
+    .customSanitizer(v => v.toLowerCase())
     .withMessage('Valid admin email is required')
     .isLength({ max: 100 })
     .withMessage('Email too long'),
@@ -488,7 +486,7 @@ export const validateOtpSend = [
   body('adminEmail')
     .trim()
     .isEmail()
-    .normalizeEmail()
+    .customSanitizer(v => v.toLowerCase())
     .withMessage('Valid admin email is required'),
   validate
 ];
@@ -498,7 +496,7 @@ export const validateOtpVerify = [
   body('adminEmail')
     .trim()
     .isEmail()
-    .normalizeEmail()
+    .customSanitizer(v => v.toLowerCase())
     .withMessage('Valid admin email is required'),
   body('code')
     .trim()

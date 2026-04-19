@@ -9,6 +9,7 @@ import { studentSchema }              from "../schemas/studentSchema.js";
 import { teacherSchema }              from "../schemas/teacherSchema.js";
 import { paymentTransactionSchema }   from "../schemas/paymentTransactionSchema.js";
 import logger from "../utils/logger.js";
+import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
 
 const router = express.Router();
 router.use(tenantMiddleware);
@@ -25,7 +26,7 @@ router.post("/attendance", verifyToken, async (req, res) => {
   try {
     const { bookingId, userRole, action, timestamp, activeTime } = req.body;
     if (!bookingId || !userRole || !action)
-      return res.status(400).json({ message: "bookingId, userRole, and action are required" });
+      return badRequest(res, "bookingId, userRole, and action are required");
 
     const ClassroomSession = getClassroomSession(req.db);
 
@@ -33,7 +34,7 @@ router.post("/attendance", verifyToken, async (req, res) => {
 
     if (!session) {
       const booking = await getBooking(req.db).findById(bookingId);
-      if (!booking) return res.status(404).json({ message: "Booking not found" });
+      if (!booking) return notFound(res, "Booking not found");
 
       const durationSeconds = (booking.duration || 60) * 60;
       const requiredSeconds = Math.floor(durationSeconds * 0.83);
@@ -102,7 +103,7 @@ router.post("/attendance", verifyToken, async (req, res) => {
     res.json({ message: "Attendance updated", session });
   } catch (err) {
     logger.error("Error updating attendance:", { error: err?.message });
-    res.status(500).json({ message: "Error updating attendance" });
+    serverError(res, "Error updating attendance");
   }
 });
 
@@ -110,15 +111,15 @@ router.post("/attendance", verifyToken, async (req, res) => {
 router.post("/auto-complete", verifyToken, async (req, res) => {
   try {
     const { bookingId, clientBothActiveTime, callerRole } = req.body;
-    if (!bookingId) return res.status(400).json({ message: "bookingId is required" });
+    if (!bookingId) return badRequest(res, "bookingId is required");
 
     const ClassroomSession = getClassroomSession(req.db);
 
     const booking = await getBooking(req.db).findById(bookingId)
       .populate("teacherId", "firstName lastName email ratePerClass lessonsCompleted earned")
-      .populate("studentId", "firstName surname email noOfClasses active");
+      .populate("studentId", "firstName lastName email classCredits active");
 
-    if (!booking) return res.status(404).json({ message: "Booking not found" });
+    if (!booking) return notFound(res, "Booking not found");
 
     if (booking.status === "completed" && !booking.adminRejected) {
       const existingSession = await ClassroomSession.findOne({ bookingId });
@@ -181,9 +182,9 @@ router.post("/auto-complete", verifyToken, async (req, res) => {
       await booking.save();
 
       const student = await getStudent(req.db).findById(booking.studentId._id);
-      if (student && student.noOfClasses > 0) {
-        student.noOfClasses -= 1;
-        if (student.noOfClasses === 0) student.active = false;
+      if (student && student.classCredits > 0) {
+        student.classCredits -= 1;
+        if (student.classCredits === 0) student.active = false;
         await student.save();
       }
 
@@ -202,7 +203,7 @@ router.post("/auto-complete", verifyToken, async (req, res) => {
         studentId: booking.studentId._id,
         amount: earned, status: "pending", type: "class_completion",
         classTitle: booking.classTitle, completedAt: new Date(),
-        studentName: `${booking.studentId.firstName || ""} ${booking.studentId.surname || ""}`.trim(),
+        studentName: `${booking.studentId.firstName || ""} ${booking.studentId.lastName || ""}`.trim(),
         description: `Auto-completed: ${booking.classTitle} (system)`,
       });
 
@@ -216,7 +217,7 @@ router.post("/auto-complete", verifyToken, async (req, res) => {
       return res.json({
         completed: true, missed: false, message: "Class completed successfully!",
         teacherJoined: true, studentJoined: true,
-        teacherEarned: earned, studentClassesRemaining: student?.noOfClasses ?? 0,
+        teacherEarned: earned, studentClassesRemaining: student?.classCredits ?? 0,
         bothActiveTime, requiredTime,
       });
     }
@@ -258,10 +259,10 @@ router.post("/auto-complete", verifyToken, async (req, res) => {
 router.get("/session/:bookingId", verifyToken, async (req, res) => {
   try {
     const session = await getClassroomSession(req.db).findOne({ bookingId: req.params.bookingId });
-    if (!session) return res.status(404).json({ message: "Session not found" });
+    if (!session) return notFound(res, "Session not found");
     res.json({ session });
   } catch (err) {
-    res.status(500).json({ message: "Error getting session" });
+    serverError(res, "Error getting session");
   }
 });
 
@@ -270,17 +271,17 @@ router.patch("/session/:bookingId/video-provider", verifyToken, async (req, res)
   try {
     const { videoProvider } = req.body;
     if (!["agora", "googlemeet"].includes(videoProvider))
-      return res.status(400).json({ message: "Invalid videoProvider" });
+      return badRequest(res, "Invalid videoProvider");
 
     const session = await getClassroomSession(req.db).findOneAndUpdate(
       { bookingId: req.params.bookingId },
       { videoProvider },
       { new: true }
     );
-    if (!session) return res.status(404).json({ message: "Session not found" });
+    if (!session) return notFound(res, "Session not found");
     res.json({ session });
   } catch (err) {
-    res.status(500).json({ message: "Error setting video provider" });
+    serverError(res, "Error setting video provider");
   }
 });
 
@@ -294,21 +295,21 @@ router.patch("/session/:bookingId/content-state", verifyToken, async (req, res) 
     if (annotation != null && annotationPage != null) {
       update.contentAnnotation = { page: annotationPage, data: annotation, ts: Date.now() };
     }
-    if (!Object.keys(update).length) return res.status(400).json({ message: "page, scale or annotation required" });
+    if (!Object.keys(update).length) return badRequest(res, "page, scale or annotation required");
 
     const session = await getClassroomSession(req.db).findOneAndUpdate(
       { bookingId: req.params.bookingId },
       { $set: update },
       { new: true }
     );
-    if (!session) return res.status(404).json({ message: "Session not found" });
+    if (!session) return notFound(res, "Session not found");
     res.json({
       contentPage:       session.contentPage,
       contentScale:      session.contentScale,
       contentAnnotation: session.contentAnnotation,
     });
   } catch (err) {
-    res.status(500).json({ message: "Error updating content state" });
+    serverError(res, "Error updating content state");
   }
 });
 
@@ -318,14 +319,14 @@ router.get("/session/:bookingId/content-state", verifyToken, async (req, res) =>
     const session = await getClassroomSession(req.db)
       .findOne({ bookingId: req.params.bookingId })
       .select("contentPage contentScale contentAnnotation");
-    if (!session) return res.status(404).json({ message: "Session not found" });
+    if (!session) return notFound(res, "Session not found");
     res.json({
       contentPage:       session.contentPage  ?? 1,
       contentScale:      session.contentScale ?? 1.3,
       contentAnnotation: session.contentAnnotation ?? null,
     });
   } catch (err) {
-    res.status(500).json({ message: "Error fetching content state" });
+    serverError(res, "Error fetching content state");
   }
 });
 
@@ -334,13 +335,13 @@ router.patch("/session/:bookingId/extend-time", verifyToken, async (req, res) =>
   try {
     const { minutes } = req.body;
     if (!minutes || minutes < 1 || minutes > 60)
-      return res.status(400).json({ message: "minutes must be between 1 and 60" });
+      return badRequest(res, "minutes must be between 1 and 60");
 
     const ClassroomSession = getClassroomSession(req.db);
     const session = await ClassroomSession.findOne({ bookingId: req.params.bookingId });
-    if (!session) return res.status(404).json({ message: "Session not found" });
+    if (!session) return notFound(res, "Session not found");
     if (!["active", "waiting"].includes(session.status))
-      return res.status(400).json({ message: "Class is not active" });
+      return badRequest(res, "Class is not active");
 
     const addSeconds = minutes * 60;
     session.extendedTime = (session.extendedTime || 0) + addSeconds;
@@ -350,7 +351,7 @@ router.patch("/session/:bookingId/extend-time", verifyToken, async (req, res) =>
     res.json({ session, addedSeconds: addSeconds });
   } catch (err) {
     logger.error("Extend-time error:", { error: err?.message });
-    res.status(500).json({ message: "Error extending class time" });
+    serverError(res, "Error extending class time");
   }
 });
 
@@ -358,7 +359,7 @@ router.patch("/session/:bookingId/extend-time", verifyToken, async (req, res) =>
 router.get("/check-completion/:bookingId", verifyToken, async (req, res) => {
   try {
     const session = await getClassroomSession(req.db).findOne({ bookingId: req.params.bookingId });
-    if (!session) return res.status(404).json({ message: "Session not found" });
+    if (!session) return notFound(res, "Session not found");
 
     const canComplete = session.bothActiveTime >= session.requiredTime;
     res.json({
@@ -369,7 +370,7 @@ router.get("/check-completion/:bookingId", verifyToken, async (req, res) => {
       percentage: Math.round((session.bothActiveTime / session.requiredTime) * 100),
     });
   } catch (err) {
-    res.status(500).json({ message: "Error checking completion" });
+    serverError(res, "Error checking completion");
   }
 });
 
@@ -384,9 +385,9 @@ router.post("/end-early", verifyToken, async (req, res) => {
 
     const booking = await getBooking(req.db).findById(bookingId)
       .populate("teacherId", "firstName lastName")
-      .populate("studentId", "firstName surname");
+      .populate("studentId", "firstName lastName");
 
-    if (!booking) return res.status(404).json({ message: "Booking not found" });
+    if (!booking) return notFound(res, "Booking not found");
 
     const ClassComplaint = getClassComplaint(req.db);
     const complaint = new ClassComplaint({
@@ -400,31 +401,31 @@ router.post("/end-early", verifyToken, async (req, res) => {
     res.json({ message: "Early-end logged for admin review", complaint });
   } catch (err) {
     logger.error("Error logging end-early:", { error: err?.message });
-    res.status(500).json({ message: "Error logging complaint" });
+    serverError(res, "Error logging complaint");
   }
 });
 
 // GET /api/classroom/complaints — admin only
 router.get("/complaints", verifyToken, async (req, res) => {
   try {
-    if (req.user.role !== "admin") return res.status(403).json({ message: "Admin only" });
+    if (req.user.role !== "admin") return forbidden(res, "Admin only");
     const { status } = req.query;
     const filter = status ? { status } : {};
     const complaints = await getClassComplaint(req.db).find(filter)
       .populate("bookingId", "classTitle scheduledTime duration")
       .populate("teacherId", "firstName lastName email")
-      .populate("studentId", "firstName surname email")
+      .populate("studentId", "firstName lastName email")
       .sort({ createdAt: -1 });
     res.json({ complaints });
   } catch (err) {
-    res.status(500).json({ message: "Error fetching complaints" });
+    serverError(res, "Error fetching complaints");
   }
 });
 
 // PATCH /api/classroom/complaints/:id — admin updates complaint status
 router.patch("/complaints/:id", verifyToken, async (req, res) => {
   try {
-    if (req.user.role !== "admin") return res.status(403).json({ message: "Admin only" });
+    if (req.user.role !== "admin") return forbidden(res, "Admin only");
     const { status, adminNotes, resolution } = req.body;
     const complaint = await getClassComplaint(req.db).findByIdAndUpdate(
       req.params.id,
@@ -433,27 +434,27 @@ router.patch("/complaints/:id", verifyToken, async (req, res) => {
     )
       .populate("bookingId", "classTitle scheduledTime duration")
       .populate("teacherId", "firstName lastName email")
-      .populate("studentId", "firstName surname email");
-    if (!complaint) return res.status(404).json({ message: "Complaint not found" });
+      .populate("studentId", "firstName lastName email");
+    if (!complaint) return notFound(res, "Complaint not found");
     res.json({ complaint });
   } catch (err) {
-    res.status(500).json({ message: "Error updating complaint" });
+    serverError(res, "Error updating complaint");
   }
 });
 
 // PATCH /api/classroom/admin-complete/:bookingId
 router.patch("/admin-complete/:bookingId", verifyToken, async (req, res) => {
   try {
-    if (req.user.role !== "admin") return res.status(403).json({ message: "Admin only" });
+    if (req.user.role !== "admin") return forbidden(res, "Admin only");
 
     const { complaintId, adminNotes } = req.body;
 
     const booking = await getBooking(req.db).findById(req.params.bookingId)
       .populate("teacherId", "firstName lastName email ratePerClass lessonsCompleted earned")
-      .populate("studentId", "firstName surname email noOfClasses active");
+      .populate("studentId", "firstName lastName email classCredits active");
 
-    if (!booking) return res.status(404).json({ message: "Booking not found" });
-    if (booking.status === "completed") return res.status(400).json({ message: "Already completed" });
+    if (!booking) return notFound(res, "Booking not found");
+    if (booking.status === "completed") return badRequest(res, "Already completed");
     if (!["missed", "accepted", "pending"].includes(booking.status))
       return res.status(400).json({ message: `Cannot complete booking with status: ${booking.status}` });
 
@@ -466,9 +467,9 @@ router.patch("/admin-complete/:bookingId", verifyToken, async (req, res) => {
     await booking.save();
 
     const student = await getStudent(req.db).findById(booking.studentId._id);
-    if (student && student.noOfClasses > 0) {
-      student.noOfClasses -= 1;
-      if (student.noOfClasses === 0) student.active = false;
+    if (student && student.classCredits > 0) {
+      student.classCredits -= 1;
+      if (student.classCredits === 0) student.active = false;
       await student.save();
     }
 
@@ -487,7 +488,7 @@ router.patch("/admin-complete/:bookingId", verifyToken, async (req, res) => {
       studentId: booking.studentId._id,
       amount: earned, status: "pending", type: "class_completion",
       classTitle: booking.classTitle, completedAt: new Date(),
-      studentName: `${booking.studentId.firstName || ""} ${booking.studentId.surname || ""}`.trim(),
+      studentName: `${booking.studentId.firstName || ""} ${booking.studentId.lastName || ""}`.trim(),
       description: `Admin-approved: ${booking.classTitle} (dispute resolved)`,
     });
 
@@ -509,7 +510,7 @@ router.patch("/admin-complete/:bookingId", verifyToken, async (req, res) => {
       success: true,
       message: `Class marked as completed by admin. Teacher earned $${earned}.`,
       teacherEarned: earned,
-      studentClassesRemaining: student?.noOfClasses ?? 0,
+      studentClassesRemaining: student?.classCredits ?? 0,
     });
   } catch (err) {
     logger.error("Admin-complete error:", { error: err?.message });

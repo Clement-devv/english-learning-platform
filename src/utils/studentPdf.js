@@ -84,7 +84,7 @@ export function downloadStudentRoster(students, centerName) {
   const active   = students.filter(s => s.active && !s.scheduledDeletionAt).length;
   const pending  = students.filter(s => s.status === "pending").length;
   const disabled = students.filter(s => !s.active && !s.scheduledDeletionAt).length;
-  const total    = students.reduce((n, s) => n + (s.noOfClasses || 0), 0);
+  const total    = students.reduce((n, s) => n + (s.classCredits || 0), 0);
 
   const pills = [
     { label: "Active",    value: active,   color: [5,  150, 105] },
@@ -109,13 +109,13 @@ export function downloadStudentRoster(students, centerName) {
   // Table
   const rows = students.map((s, i) => [
     i + 1,
-    `${s.firstName || ""} ${s.surname || ""}`.trim() || "—",
+    `${s.firstName || ""} ${s.lastName || ""}`.trim() || "—",
     s.email || "—",
     s.phone || "—",
     s.country || "—",
     s.rank || "—",
     s.age ? `${s.age}y` : "—",
-    s.noOfClasses ?? 0,
+    s.classCredits ?? 0,
     fmt(s.lastPaymentDate),
     fmt(s.dateOfBirth),
     statusLabel(s),
@@ -171,8 +171,8 @@ export function downloadStudentCard(student, centerName) {
   const W    = doc.internal.pageSize.getWidth();
   const now  = new Date();
 
-  const fullName = `${student.firstName || ""} ${student.surname || ""}`.trim() || "Student";
-  const initials = `${(student.firstName || " ")[0]}${(student.surname || " ")[0]}`.toUpperCase();
+  const fullName = `${student.firstName || ""} ${student.lastName || ""}`.trim() || "Student";
+  const initials = `${(student.firstName || " ")[0]}${(student.lastName || " ")[0]}`.toUpperCase();
   const sl       = statusLabel(student);
   const sc       = statusColors(sl);
 
@@ -225,14 +225,14 @@ export function downloadStudentCard(student, centerName) {
   // ── Details table ──
   const rows = [
     ["First Name",         student.firstName  || "—"],
-    ["Surname",            student.surname    || "—"],
+    ["Surname",            student.lastName    || "—"],
     ["Email Address",      student.email      || "—"],
     ["Phone Number",       student.phone      || "—"],
     ["Country",            student.country    || "—"],
     ["Level / Rank",       student.rank       || "—"],
     ["Age",                student.age ? `${student.age} years old` : "—"],
     ["Date of Birth",      student.dateOfBirth ? fmt(student.dateOfBirth) : "—"],
-    ["Classes Remaining",  String(student.noOfClasses ?? 0)],
+    ["Classes Remaining",  String(student.classCredits ?? 0)],
     ["Last Payment",       fmt(student.lastPaymentDate)],
     ["Account Status",     sl],
     ["Member Since",       fmt(student.createdAt)],

@@ -71,7 +71,7 @@ function DeleteConfirmModal({ student, onConfirm, onCancel, isDarkMode }) {
         <p className={`text-center text-sm mb-5 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
           You are about to schedule{" "}
           <span className="font-semibold text-red-500">
-            {student.firstName} {student.surname}
+            {student.firstName} {student.lastName}
           </span>{" "}
           for deletion.
         </p>
@@ -223,7 +223,7 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
           .map((p) => ({
             ...p,
             studentId: p.studentId._id,
-            student: `${p.studentId.firstName} ${p.studentId.surname}`,
+            student: `${p.studentId.firstName} ${p.studentId.lastName}`,
             amountDisplay: `₦${p.amount}`,
           }));
         setPaymentHistory(formattedPayments);
@@ -233,7 +233,7 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
           .map((l) => ({
             ...l,
             studentId: l.studentId._id,
-            student: `${l.studentId.firstName} ${l.studentId.surname}`,
+            student: `${l.studentId.firstName} ${l.studentId.lastName}`,
           }));
         setLessonHistory(formattedLessons);
       } catch (err) {
@@ -251,14 +251,14 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
       if (editId) {
         const updated = await updateStudent(editId, data);
         setStudents((prev) => prev.map((s) => (s._id === editId ? updated : s)));
-        onNotify?.(`Student updated: ${updated.firstName} ${updated.surname}`);
+        onNotify?.(`Student updated: ${updated.firstName} ${updated.lastName}`);
         showToast(`${updated.firstName} updated successfully!`);
         setEditId(null);
         setIsModalOpen(false);
       } else {
         const result = await createStudent(data);
         setStudents((prev) => [...prev, result.student]);
-        onNotify?.(`New student created: ${result.student.firstName} ${result.student.surname}`);
+        onNotify?.(`New student created: ${result.student.firstName} ${result.student.lastName}`);
         showToast(`${result.student.firstName} created successfully!`);
         return result;
       }
@@ -349,7 +349,7 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
       setStudents((prev) =>
         prev.map((s) =>
           s._id === lessonModal?.student?._id
-            ? { ...s, noOfClasses: result.student.noOfClasses, active: result.student.active }
+            ? { ...s, classCredits: result.student.classCredits, active: result.student.active }
             : s
         )
       );
@@ -379,7 +379,7 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
       const newEntry = {
         ...result.payment,
         studentId: selectedStudent,
-        student: stu ? `${stu.firstName} ${stu.surname}` : "Unknown",
+        student: stu ? `${stu.firstName} ${stu.lastName}` : "Unknown",
         amountDisplay: `₦${result.payment?.amount ?? paymentData.amount}`,
       };
       setPaymentHistory((prev) => [...prev, newEntry]);
@@ -461,8 +461,8 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
   const pendingDeletion = students.filter((s) => !!s.scheduledDeletionAt);
   const activeStudents = students.filter((s) => s.active && !s.scheduledDeletionAt);
   const disabledStudents = students.filter((s) => !s.active && !s.scheduledDeletionAt);
-  const zeroClassStudents = students.filter((s) => s.active && (s.noOfClasses ?? 0) <= 0);
-  const totalClasses = students.reduce((sum, s) => sum + (s.noOfClasses || 0), 0);
+  const zeroClassStudents = students.filter((s) => s.active && (s.classCredits ?? 0) <= 0);
+  const totalClasses = students.reduce((sum, s) => sum + (s.classCredits || 0), 0);
 
   const sourceList =
     view === "active"
@@ -474,7 +474,7 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
       : students;
 
   const filteredStudents = sourceList.filter((s) =>
-    `${s.firstName} ${s.surname} ${s.email}`
+    `${s.firstName} ${s.lastName} ${s.email}`
       .toLowerCase()
       .includes(searchQuery.toLowerCase())
   );

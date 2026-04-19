@@ -23,7 +23,7 @@ export const verifySuperAdmin = async (req, res, next) => {
     req.superAdmin = superAdmin;
     req.user = decoded;
     next();
-  } catch (err) {
+  } catch (_err) {
     return res.status(401).json({ success: false, message: 'Invalid token' });
   }
 };

@@ -5,6 +5,7 @@ import { config } from '../config/config.js';
 import { sendEmail } from '../utils/emailService.js';
 import { validateCenterRegistration } from '../middleware/validation.js';
 import logger from "../utils/logger.js";
+import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
 
 const router = express.Router();
 
@@ -15,18 +16,18 @@ router.post('/', validateCenterRegistration, async (req, res) => {
             website, description, timezone, address, maxTeachers, maxStudents, plan } = req.body;
 
     if (!centerName || !slug || !adminEmail || !password) {
-      return res.status(400).json({ success: false, message: 'centerName, slug, adminEmail, and password are required' });
+      return badRequest(res, 'centerName, slug, adminEmail, and password are required');
     }
 
     // Validate slug format: lowercase, alphanumeric + hyphens only
     if (!/^[a-z0-9-]+$/.test(slug)) {
-      return res.status(400).json({ success: false, message: 'Slug may only contain lowercase letters, numbers, and hyphens' });
+      return badRequest(res, 'Slug may only contain lowercase letters, numbers, and hyphens');
     }
 
     // Check slug uniqueness
     const existing = await Center.findOne({ slug });
     if (existing) {
-      return res.status(409).json({ success: false, message: 'That slug is already taken. Please choose another.' });
+      return conflict(res, 'That slug is already taken. Please choose another.');
     }
 
     const pendingPasswordHash = await bcrypt.hash(password, config.bcryptRounds);
@@ -92,7 +93,7 @@ router.post('/', validateCenterRegistration, async (req, res) => {
 
   } catch (err) {
     logger.error('❌ Center registration error:', { error: err?.message });
-    res.status(500).json({ success: false, message: 'Server error', error: err.message });
+    serverError(res, 'Server error');
   }
 });
 

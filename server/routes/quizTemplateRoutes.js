@@ -2,6 +2,7 @@ import express        from "express";
 import { verifyToken } from "../middleware/authMiddleware.js";
 import { tenantMiddleware }    from "../middleware/tenantMiddleware.js";
 import { quizTemplateSchema }  from "../schemas/quizTemplateSchema.js";
+import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
 
 const router = express.Router();
 router.use(tenantMiddleware);
@@ -26,10 +27,10 @@ function validateQuestions(questions) {
 // POST /api/quiz-templates  — save a new template
 router.post("/", verifyToken, async (req, res) => {
   try {
-    if (req.user.role !== "teacher") return res.status(403).json({ message: "Teachers only" });
+    if (req.user.role !== "teacher") return forbidden(res, "Teachers only");
 
     const { name, instructions, timeLimit, questions } = req.body;
-    if (!name?.trim()) return res.status(400).json({ message: "Template name is required" });
+    if (!name?.trim()) return badRequest(res, "Template name is required");
 
     const err = validateQuestions(questions);
     if (err) return res.status(400).json({ message: err });
@@ -49,47 +50,47 @@ router.post("/", verifyToken, async (req, res) => {
 
     res.status(201).json({ success: true, template: tmpl });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    serverError(res, err.message);
   }
 });
 
 // GET /api/quiz-templates  — list teacher's templates
 router.get("/", verifyToken, async (req, res) => {
   try {
-    if (req.user.role !== "teacher") return res.status(403).json({ message: "Teachers only" });
+    if (req.user.role !== "teacher") return forbidden(res, "Teachers only");
     const templates = await getQuizTemplate(req.db).find({ teacherId: req.user.id }).sort({ createdAt: -1 });
     res.json({ success: true, templates });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    serverError(res, err.message);
   }
 });
 
 // PATCH /api/quiz-templates/:id/use  — increment usage count
 router.patch("/:id/use", verifyToken, async (req, res) => {
   try {
-    if (req.user.role !== "teacher") return res.status(403).json({ message: "Teachers only" });
+    if (req.user.role !== "teacher") return forbidden(res, "Teachers only");
     const tmpl = await getQuizTemplate(req.db).findOneAndUpdate(
       { _id: req.params.id, teacherId: req.user.id },
       { $inc: { usageCount: 1 } },
       { new: true }
     );
-    if (!tmpl) return res.status(404).json({ message: "Template not found" });
+    if (!tmpl) return notFound(res, "Template not found");
     res.json({ success: true, template: tmpl });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    serverError(res, err.message);
   }
 });
 
 // DELETE /api/quiz-templates/:id
 router.delete("/:id", verifyToken, async (req, res) => {
   try {
-    if (req.user.role !== "teacher") return res.status(403).json({ message: "Teachers only" });
+    if (req.user.role !== "teacher") return forbidden(res, "Teachers only");
     const tmpl = await getQuizTemplate(req.db).findOne({ _id: req.params.id, teacherId: req.user.id });
-    if (!tmpl) return res.status(404).json({ message: "Template not found" });
+    if (!tmpl) return notFound(res, "Template not found");
     await tmpl.deleteOne();
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    serverError(res, err.message);
   }
 });
 

@@ -1,9 +1,9 @@
 import mongoose from "mongoose";
 import dotenv from "dotenv";
-import Assignment from "../models/Assignment.js";
-import GroupChat from "../models/GroupChat.js";
-import Teacher from "../models/Teacher.js";
-import Student from "../models/Student.js";
+import { assignmentSchema } from "./schemas/assignmentSchema.js";
+import { groupChatSchema } from "./schemas/groupChatSchema.js";
+import { teacherSchema } from "./schemas/teacherSchema.js";
+import { studentSchema } from "./schemas/studentSchema.js";
 
 dotenv.config();
 
@@ -11,6 +11,10 @@ const createMissingChats = async () => {
   try {
     await mongoose.connect(process.env.MONGODB_URI);
     console.log('✅ Connected to MongoDB');
+    const Assignment = mongoose.models.Assignment || mongoose.model("Assignment", assignmentSchema);
+    const GroupChat  = mongoose.models.GroupChat  || mongoose.model("GroupChat",  groupChatSchema);
+    const Teacher    = mongoose.models.Teacher    || mongoose.model("Teacher",    teacherSchema);
+    const Student    = mongoose.models.Student    || mongoose.model("Student",    studentSchema);
 
     // Get all assignments
     const assignments = await Assignment.find();
@@ -40,7 +44,7 @@ const createMissingChats = async () => {
         continue;
       }
 
-      const chatName = `${teacher.firstName} ${teacher.lastName} - ${student.firstName} ${student.surname}`;
+      const chatName = `${teacher.firstName} ${teacher.lastName} - ${student.firstName} ${student.lastName}`;
 
       // Create the chat
       await GroupChat.create({

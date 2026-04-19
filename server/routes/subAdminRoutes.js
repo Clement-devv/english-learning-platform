@@ -9,6 +9,7 @@ import { subAdminSchema } from "../schemas/subAdminSchema.js";
 import { teacherSchema }  from "../schemas/teacherSchema.js";
 import { studentSchema }  from "../schemas/studentSchema.js";
 import logger from "../utils/logger.js";
+import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
 
 const router = express.Router();
 router.use(tenantMiddleware);
@@ -41,7 +42,7 @@ router.post("/invite", async (req, res) => {
     const { firstName, lastName, email, assignmentType, region, assignedTeachers, permissions, notes } = req.body;
 
     if (!firstName || !lastName || !email)
-      return res.status(400).json({ success: false, message: "First name, last name and email are required" });
+      return badRequest(res, "First name, last name and email are required");
 
     const SubAdmin = getSubAdmin(req.db);
     const Teacher  = getTeacher(req.db);
@@ -53,9 +54,9 @@ router.post("/invite", async (req, res) => {
       Teacher.findOne({ email: normalizedEmail }).lean(),
       Student.findOne({ email: normalizedEmail }).lean(),
     ]);
-    if (asSubAdmin) return res.status(409).json({ success: false, message: "Email is already registered as a sub-admin" });
-    if (asTeacher)  return res.status(409).json({ success: false, message: "Email is already registered as a teacher" });
-    if (asStudent)  return res.status(409).json({ success: false, message: "Email is already registered as a student" });
+    if (asSubAdmin) return conflict(res, "Email is already registered as a sub-admin");
+    if (asTeacher)  return conflict(res, "Email is already registered as a teacher");
+    if (asStudent)  return conflict(res, "Email is already registered as a student");
 
     const inviteToken   = crypto.randomBytes(32).toString("hex");
     const inviteExpires = new Date(Date.now() + 48 * 60 * 60 * 1000);
@@ -103,9 +104,9 @@ router.post("/:id/resend-invite", async (req, res) => {
   try {
     const SubAdmin = getSubAdmin(req.db);
     const subAdmin = await SubAdmin.findById(req.params.id);
-    if (!subAdmin) return res.status(404).json({ success: false, message: "Sub-admin not found" });
+    if (!subAdmin) return notFound(res, "Sub-admin not found");
     if (subAdmin.status === "active")
-      return res.status(400).json({ success: false, message: "This sub-admin has already set up their account" });
+      return badRequest(res, "This sub-admin has already set up their account");
 
     subAdmin.inviteToken   = crypto.randomBytes(32).toString("hex");
     subAdmin.inviteExpires = new Date(Date.now() + 48 * 60 * 60 * 1000);
@@ -130,7 +131,7 @@ router.put("/:id", async (req, res) => {
 
     const SubAdmin = getSubAdmin(req.db);
     const subAdmin = await SubAdmin.findById(req.params.id);
-    if (!subAdmin) return res.status(404).json({ success: false, message: "Sub-admin not found" });
+    if (!subAdmin) return notFound(res, "Sub-admin not found");
 
     if (assignmentType) subAdmin.assignmentType = assignmentType;
     if (region !== undefined) subAdmin.region = region;
@@ -156,9 +157,9 @@ router.patch("/:id/toggle-status", async (req, res) => {
   try {
     const SubAdmin = getSubAdmin(req.db);
     const subAdmin = await SubAdmin.findById(req.params.id);
-    if (!subAdmin) return res.status(404).json({ success: false, message: "Sub-admin not found" });
+    if (!subAdmin) return notFound(res, "Sub-admin not found");
     if (subAdmin.status === "pending")
-      return res.status(400).json({ success: false, message: "Cannot toggle status of a pending sub-admin" });
+      return badRequest(res, "Cannot toggle status of a pending sub-admin");
 
     subAdmin.status = subAdmin.status === "active" ? "suspended" : "active";
     await subAdmin.save();
@@ -179,11 +180,11 @@ router.patch("/:id/assign-teachers", async (req, res) => {
   try {
     const { teacherIds } = req.body;
     if (!Array.isArray(teacherIds))
-      return res.status(400).json({ success: false, message: "teacherIds must be an array" });
+      return badRequest(res, "teacherIds must be an array");
 
     const SubAdmin = getSubAdmin(req.db);
     const subAdmin = await SubAdmin.findById(req.params.id);
-    if (!subAdmin) return res.status(404).json({ success: false, message: "Sub-admin not found" });
+    if (!subAdmin) return notFound(res, "Sub-admin not found");
 
     subAdmin.assignedTeachers = teacherIds;
     subAdmin.assignmentType   = "manual";
@@ -204,7 +205,7 @@ router.patch("/:id/assign-teachers", async (req, res) => {
 router.delete("/:id", async (req, res) => {
   try {
     const subAdmin = await getSubAdmin(req.db).findByIdAndDelete(req.params.id);
-    if (!subAdmin) return res.status(404).json({ success: false, message: "Sub-admin not found" });
+    if (!subAdmin) return notFound(res, "Sub-admin not found");
     res.json({ success: true, message: "Sub-admin deleted" });
   } catch (err) {
     logger.error("Delete sub-admin error:", { error: err?.message });

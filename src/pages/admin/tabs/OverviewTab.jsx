@@ -364,7 +364,7 @@ export default function OverviewTab({ isDarkMode }) {
                 ? `${booking.teacherId.firstName || ""} ${booking.teacherId.lastName || ""}`.trim()
                 : "—";
               const studentName = booking.studentId
-                ? `${booking.studentId.firstName || ""} ${booking.studentId.surname || ""}`.trim()
+                ? `${booking.studentId.firstName || ""} ${booking.studentId.lastName || ""}`.trim()
                 : "—";
 
               return (

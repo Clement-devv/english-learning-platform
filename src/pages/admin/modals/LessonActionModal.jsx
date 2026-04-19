@@ -281,7 +281,7 @@ export default function LessonActionModal({
                   <p className={`text-sm font-semibold ${textPrimary}`}>Select Teacher</p>
                   <p className={`text-xs ${textSecondary}`}>
                     Teachers assigned to{" "}
-                    <span className="font-medium">{student?.firstName} {student?.surname}</span>
+                    <span className="font-medium">{student?.firstName} {student?.lastName}</span>
                   </p>
                 </div>
               </div>
@@ -338,10 +338,10 @@ export default function LessonActionModal({
                 studentList.map((s) => (
                   <SelectRow
                     key={s._id}
-                    label={`${s.firstName} ${s.surname}`}
-                    sub={`${s.email} · ${s.noOfClasses} class${s.noOfClasses !== 1 ? "es" : ""} remaining`}
+                    label={`${s.firstName} ${s.lastName}`}
+                    sub={`${s.email} · ${s.classCredits} class${s.classCredits !== 1 ? "es" : ""} remaining`}
                     isDarkMode={isDarkMode}
-                    disabled={isMarking && s.noOfClasses <= 0}
+                    disabled={isMarking && s.classCredits <= 0}
                     onClick={() => { setStudent(s); setStep("class"); }}
                   />
                 ))
@@ -361,7 +361,7 @@ export default function LessonActionModal({
                     Select {isMarking ? "Accepted" : "Completed"} Class
                   </p>
                   <p className={`text-xs ${textSecondary}`}>
-                    {teacher?.firstName} {teacher?.lastName} ↔ {student?.firstName} {student?.surname}
+                    {teacher?.firstName} {teacher?.lastName} ↔ {student?.firstName} {student?.lastName}
                   </p>
                 </div>
               </div>
@@ -449,7 +449,7 @@ export default function LessonActionModal({
                   />
                   <InfoRow
                     label="Student"
-                    value={`${student?.firstName} ${student?.surname}`}
+                    value={`${student?.firstName} ${student?.lastName}`}
                     isDarkMode={isDarkMode}
                   />
                 </div>

@@ -29,8 +29,8 @@ import {
 import { downloadStudentCard } from "../../../utils/studentPdf";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-function getInitials(firstName = "", surname = "") {
-  return `${firstName.charAt(0)}${surname.charAt(0)}`.toUpperCase();
+function getInitials(firstName = "", lastName = "") {
+  return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
 }
 
 function getAvatarColor(name = "") {
@@ -144,11 +144,11 @@ export default function StudentCard({
   const [profileExpanded, setProfileExpanded] = useState(false);
   const menuRef = useRef(null);
 
-  const fullName = `${student.firstName || ""} ${student.surname || ""}`.trim();
-  const initials = getInitials(student.firstName, student.surname);
+  const fullName = `${student.firstName || ""} ${student.lastName || ""}`.trim();
+  const initials = getInitials(student.firstName, student.lastName);
   const avatarGradient = getAvatarColor(fullName);
   const isActive = student.active;
-  const urgency = getClassesUrgency(student.noOfClasses ?? 0);
+  const urgency = getClassesUrgency(student.classCredits ?? 0);
 
   useEffect(() => {
     function handleClickOutside(e) {
@@ -353,7 +353,7 @@ export default function StudentCard({
 
         {/* ── Classes remaining badge ── */}
         <div className="mb-4">
-          <ClassesBadge count={student.noOfClasses ?? 0} isDarkMode={isDarkMode} />
+          <ClassesBadge count={student.classCredits ?? 0} isDarkMode={isDarkMode} />
         </div>
 
         {/* ── Stats row ── */}
@@ -366,7 +366,7 @@ export default function StudentCard({
           />
           <StatPill
             label="Classes"
-            value={student.noOfClasses ?? 0}
+            value={student.classCredits ?? 0}
             color="amber"
             isDarkMode={isDarkMode}
           />

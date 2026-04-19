@@ -7,6 +7,7 @@ import { fileURLToPath } from "url";
 import { verifyToken, verifyAdminOrTeacher } from "../middleware/authMiddleware.js";
 import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
 import logger from "../utils/logger.js";
+import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
@@ -44,11 +45,11 @@ const upload = multer({
 router.post("/upload", tenantMiddleware, verifyToken, verifyAdminOrTeacher, upload.single("pdf"), (req, res) => {
   try {
     if (!req.file) {
-      return res.status(400).json({ success: false, message: "No file uploaded" });
+      return badRequest(res, "No file uploaded");
     }
     const bookingId = req.query.bookingId || req.body.bookingId;
     if (!bookingId) {
-      return res.status(400).json({ success: false, message: "bookingId required" });
+      return badRequest(res, "bookingId required");
     }
 
     res.json({
@@ -70,7 +71,7 @@ router.get("/info/:bookingId", tenantMiddleware, verifyToken, (req, res) => {
 
   // Prevent path traversal
   if (!/^[a-zA-Z0-9_-]{1,100}$/.test(bookingId)) {
-    return res.status(400).json({ success: false, message: "Invalid bookingId" });
+    return badRequest(res, "Invalid bookingId");
   }
 
   const filePath = path.join(UPLOAD_DIR, `${bookingId}.pdf`);
@@ -95,13 +96,13 @@ router.get("/file/:bookingId", tenantMiddleware, verifyToken, (req, res) => {
 
   // Prevent path traversal
   if (!/^[a-zA-Z0-9_-]{1,100}$/.test(bookingId)) {
-    return res.status(400).json({ success: false, message: "Invalid bookingId" });
+    return badRequest(res, "Invalid bookingId");
   }
 
   const filePath = path.join(UPLOAD_DIR, `${bookingId}.pdf`);
 
   if (!fs.existsSync(filePath)) {
-    return res.status(404).json({ success: false, message: "No PDF found for this booking" });
+    return notFound(res, "No PDF found for this booking");
   }
 
   res.setHeader("Content-Type", "application/pdf");
@@ -115,7 +116,7 @@ router.delete("/:bookingId", tenantMiddleware, verifyToken, verifyAdminOrTeacher
 
   // Prevent path traversal
   if (!/^[a-zA-Z0-9_-]{1,100}$/.test(bookingId)) {
-    return res.status(400).json({ success: false, message: "Invalid bookingId" });
+    return badRequest(res, "Invalid bookingId");
   }
 
   const filePath = path.join(UPLOAD_DIR, `${bookingId}.pdf`);

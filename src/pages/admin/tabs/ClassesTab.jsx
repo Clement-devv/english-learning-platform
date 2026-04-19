@@ -1,5 +1,6 @@
 // src/pages/admin/tabs/ClassesTab.jsx
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import { useAuth } from "../../../context/AuthContext.jsx";
 import {
   Video, ExternalLink, RefreshCw, Radio, Clock, BookOpen,
   AlertCircle, Monitor, Calendar, Loader2, X, Wifi, WifiOff,
@@ -150,7 +151,7 @@ function LiveTimer({ booking }) {
 // ── Single live class card ────────────────────────────────────────────────────
 function LiveClassCard({ booking, session, onJoinAgora, onJoinMeet, dm }) {
   const teacherName = `${booking.teacherId?.firstName ?? ""} ${booking.teacherId?.lastName ?? ""}`.trim() || "—";
-  const studentName = `${booking.studentId?.firstName ?? ""} ${booking.studentId?.surname ?? ""}`.trim() || "—";
+  const studentName = `${booking.studentId?.firstName ?? ""} ${booking.studentId?.lastName ?? ""}`.trim() || "—";
   const meetLink    = booking.teacherId?.googleMeetLink;
 
   const teacherStatus = getPresenceStatus(session, "teacher");
@@ -250,7 +251,7 @@ function LiveClassCard({ booking, session, onJoinAgora, onJoinMeet, dm }) {
 // ── Upcoming row ──────────────────────────────────────────────────────────────
 function UpcomingRow({ booking, dm }) {
   const teacherName = `${booking.teacherId?.firstName ?? ""} ${booking.teacherId?.lastName ?? ""}`.trim() || "—";
-  const studentName = `${booking.studentId?.firstName ?? ""} ${booking.studentId?.surname ?? ""}`.trim() || "—";
+  const studentName = `${booking.studentId?.firstName ?? ""} ${booking.studentId?.lastName ?? ""}`.trim() || "—";
   const [countdown, setCountdown] = useState("");
 
   useEffect(() => {
@@ -291,9 +292,9 @@ function UpcomingRow({ booking, dm }) {
 
 // ── Agora monitor modal ───────────────────────────────────────────────────────
 function AgoraModal({ booking, onClose, dm }) {
-  const adminInfo = JSON.parse(sessionStorage.getItem("adminInfo") || localStorage.getItem("adminInfo") || "{}");
-  const adminId   = adminInfo._id || `admin_${Date.now()}`;
-  const adminName = adminInfo.email ? `Admin (${adminInfo.email})` : "Admin";
+  const { user: adminInfo } = useAuth();
+  const adminId   = adminInfo?._id || `admin_${Date.now()}`;
+  const adminName = adminInfo?.email ? `Admin (${adminInfo.email})` : "Admin";
 
   return (
     <div className="fixed inset-0 bg-black/80 z-50 flex flex-col">

@@ -1,14 +1,19 @@
 // src/utils/timezone.js
 // Shared timezone helpers used across teacher and student views
 
-/** Returns the browser's IANA timezone string, e.g. "Africa/Lagos" */
+/**
+ * Returns the browser's IANA timezone string, e.g. `"Africa/Lagos"`.
+ * @returns {string}
+ */
 export function getUserTimezone() {
   return Intl.DateTimeFormat().resolvedOptions().timeZone;
 }
 
 /**
  * Format a Date (or ISO string) in a specific IANA timezone.
- * Returns e.g. "3:00 PM"
+ * @param {Date|string} date - The date/time to format.
+ * @param {string} tz - IANA timezone identifier (e.g. `"America/New_York"`).
+ * @returns {string} Formatted time string, e.g. `"3:00 PM"`.
  */
 export function formatInTZ(date, tz) {
   if (!date) return "";
@@ -26,7 +31,9 @@ export function formatInTZ(date, tz) {
 
 /**
  * Format full date+time in a specific timezone.
- * Returns e.g. "Mon, Mar 16 · 3:00 PM"
+ * @param {Date|string} date - The date/time to format.
+ * @param {string} tz - IANA timezone identifier.
+ * @returns {string} Formatted string, e.g. `"Mon, Mar 16 · 3:00 PM"`.
  */
 export function formatDateInTZ(date, tz) {
   if (!date) return "";
@@ -42,7 +49,9 @@ export function formatDateInTZ(date, tz) {
 }
 
 /**
- * Get short timezone abbreviation, e.g. "WAT", "ICT", "GMT+1"
+ * Get short timezone abbreviation, e.g. `"WAT"`, `"ICT"`, `"GMT+1"`.
+ * @param {string} tz - IANA timezone identifier.
+ * @returns {string} Abbreviation, or the original `tz` string on failure.
  */
 export function tzAbbr(tz) {
   if (!tz) return "";
@@ -59,7 +68,9 @@ export function tzAbbr(tz) {
 
 /**
  * Get a human-readable city/region label from an IANA timezone.
- * e.g. "Africa/Lagos" → "Lagos"  |  "Asia/Ho_Chi_Minh" → "Ho Chi Minh"
+ * e.g. `"Africa/Lagos"` → `"Lagos"`, `"Asia/Ho_Chi_Minh"` → `"Ho Chi Minh"`.
+ * @param {string} tz - IANA timezone identifier.
+ * @returns {string} City/region name with underscores replaced by spaces.
  */
 export function tzCity(tz) {
   if (!tz) return "";
@@ -71,9 +82,10 @@ export function tzCity(tz) {
  * Build a dual-time display string for bookings.
  * Returns an object: { myTime, theirTime, myAbbr, theirAbbr, theirCity }
  *
- * @param {Date|string} utcDate   - The UTC booking time
- * @param {string} myTZ           - Viewer's IANA timezone
- * @param {string} theirTZ        - The other party's IANA timezone
+ * @param {Date|string} utcDate - The UTC booking time.
+ * @param {string} myTZ - Viewer's IANA timezone.
+ * @param {string} theirTZ - The other party's IANA timezone.
+ * @returns {{ myTime: string, theirTime: string, myAbbr: string, theirAbbr: string, theirCity: string, sameZone: boolean }|null}
  */
 export function dualTime(utcDate, myTZ, theirTZ) {
   if (!utcDate) return null;

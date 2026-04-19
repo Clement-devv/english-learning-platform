@@ -1,22 +1,13 @@
 import mongoose from 'mongoose';
-
-const sessionSchema = new mongoose.Schema({
-  token: { type: String, required: true },
-  deviceInfo: { browser: String, os: String, device: String },
-  ipAddress: String,
-  location: String,
-  loginTime: { type: Date, default: Date.now },
-  lastActivity: { type: Date, default: Date.now },
-  isActive: { type: Boolean, default: true },
-});
+import { sessionSchema } from './shared/sessionSchema.js';
 
 export const studentSchema = new mongoose.Schema({
   firstName: { type: String, required: true },
-  surname: { type: String, required: true },
+  lastName: { type: String, required: true },
   email: { type: String, required: true, unique: true },
   password: { type: String, required: false },
   active: { type: Boolean, default: false },
-  noOfClasses: { type: Number, default: 0 },
+  classCredits: { type: Number, default: 0 },
   lastPaymentDate: Date,
   showTempPassword: { type: Boolean, default: false },
   age: { type: Number },
@@ -61,8 +52,8 @@ export const studentSchema = new mongoose.Schema({
 
 // Lookup by status (admin lists active/pending/suspended students)
 studentSchema.index({ status: 1 });
-// Analytics overview: countDocuments({ active: true, noOfClasses: { $gt: 0 } })
-studentSchema.index({ active: 1, noOfClasses: 1 });
+// Analytics overview: countDocuments({ active: true, classCredits: { $gt: 0 } })
+studentSchema.index({ active: 1, classCredits: 1 });
 // Forgot-password token lookup (sparse — most docs have no token)
 studentSchema.index({ resetPasswordToken: 1 }, { sparse: true });
 // Scheduled soft-delete sweep

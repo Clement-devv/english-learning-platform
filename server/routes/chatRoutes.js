@@ -7,6 +7,7 @@ import { conversationMessageSchema } from "../schemas/conversationMessageSchema.
 import { studentSchema }            from "../schemas/studentSchema.js";
 import Center                       from "../models/master/Center.js";
 import logger from "../utils/logger.js";
+import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
 
 const router = express.Router();
 router.use(tenantMiddleware);
@@ -34,7 +35,7 @@ Your job:
 // ── GET /api/chat/credits ─────────────────────────────────────────────────────
 router.get("/credits", verifyToken, async (req, res) => {
   try {
-    if (req.user.role !== "student") return res.status(403).json({ message: "Students only" });
+    if (req.user.role !== "student") return forbidden(res, "Students only");
 
     const record = await getChatCredit(req.db).findOne({ studentId: req.user.id });
     res.json({
@@ -43,14 +44,14 @@ router.get("/credits", verifyToken, async (req, res) => {
       totalUsed: record?.totalUsed ?? 0,
     });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    serverError(res, err.message);
   }
 });
 
 // ── GET /api/chat/history ─────────────────────────────────────────────────────
 router.get("/history", verifyToken, async (req, res) => {
   try {
-    if (req.user.role !== "student") return res.status(403).json({ message: "Students only" });
+    if (req.user.role !== "student") return forbidden(res, "Students only");
 
     const messages = await getConversationMessage(req.db)
       .find({ studentId: req.user.id })
@@ -60,30 +61,30 @@ router.get("/history", verifyToken, async (req, res) => {
 
     res.json({ success: true, messages: messages.reverse() });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    serverError(res, err.message);
   }
 });
 
 // ── DELETE /api/chat/history ──────────────────────────────────────────────────
 router.delete("/history", verifyToken, async (req, res) => {
   try {
-    if (req.user.role !== "student") return res.status(403).json({ message: "Students only" });
+    if (req.user.role !== "student") return forbidden(res, "Students only");
     await getConversationMessage(req.db).deleteMany({ studentId: req.user.id });
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    serverError(res, err.message);
   }
 });
 
 // ── POST /api/chat/message ────────────────────────────────────────────────────
 router.post("/message", verifyToken, async (req, res) => {
   try {
-    if (req.user.role !== "student") return res.status(403).json({ message: "Students only" });
+    if (req.user.role !== "student") return forbidden(res, "Students only");
 
     const { text, level = "beginner" } = req.body;
 
-    if (!text?.trim()) return res.status(400).json({ message: "Message text is required" });
-    if (text.trim().length > 1000) return res.status(400).json({ message: "Message too long (max 1000 chars)" });
+    if (!text?.trim()) return badRequest(res, "Message text is required");
+    if (text.trim().length > 1000) return badRequest(res, "Message too long (max 1000 chars)");
 
     if (!process.env.ANTHROPIC_API_KEY) {
       return res.status(503).json({ message: "Chat is not configured on this server" });
@@ -152,14 +153,14 @@ router.post("/message", verifyToken, async (req, res) => {
     });
   } catch (err) {
     logger.error("Chat message error:", { error: err?.message });
-    res.status(500).json({ message: err.message });
+    serverError(res, err.message);
   }
 });
 
 // ── GET /api/chat/center-credits  (admin sees their center's budget) ──────────
 router.get("/center-credits", verifyToken, async (req, res) => {
   try {
-    if (req.user.role !== "admin") return res.status(403).json({ message: "Admins only" });
+    if (req.user.role !== "admin") return forbidden(res, "Admins only");
     const center = await Center.findOne({ slug: req.center.slug })
       .select("chatCredits centerName").lean();
     res.json({
@@ -170,7 +171,7 @@ router.get("/center-credits", verifyToken, async (req, res) => {
       log:            (center?.chatCredits?.log || []).slice(-10).reverse(),
     });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    serverError(res, err.message);
   }
 });
 
@@ -178,16 +179,16 @@ router.get("/center-credits", verifyToken, async (req, res) => {
 router.post("/credits/grant", verifyToken, async (req, res) => {
   try {
     if (!["teacher", "admin"].includes(req.user.role)) {
-      return res.status(403).json({ message: "Teachers and admins only" });
+      return forbidden(res, "Teachers and admins only");
     }
 
     const { studentId, amount, note } = req.body;
     if (!studentId || !amount || amount < 1 || amount > 10000) {
-      return res.status(400).json({ message: "studentId and amount (1–10000) are required" });
+      return badRequest(res, "studentId and amount (1–10000) are required");
     }
 
     const student = await getStudent(req.db).findById(studentId);
-    if (!student) return res.status(404).json({ message: "Student not found" });
+    if (!student) return notFound(res, "Student not found");
 
     // ── Check & deduct from center's budget ──────────────────────────────────
     const deducted = await Center.findOneAndUpdate(
@@ -221,7 +222,7 @@ router.post("/credits/grant", verifyToken, async (req, res) => {
       message:          `${amount} credits granted to ${student.firstName}`,
     });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    serverError(res, err.message);
   }
 });
 
@@ -229,12 +230,12 @@ router.post("/credits/grant", verifyToken, async (req, res) => {
 router.get("/credits/student/:id", verifyToken, async (req, res) => {
   try {
     if (!["teacher", "admin"].includes(req.user.role)) {
-      return res.status(403).json({ message: "Teachers and admins only" });
+      return forbidden(res, "Teachers and admins only");
     }
     const record = await getChatCredit(req.db).findOne({ studentId: req.params.id });
     res.json({ success: true, credits: record?.credits ?? 0, totalUsed: record?.totalUsed ?? 0 });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    serverError(res, err.message);
   }
 });
 

@@ -9,6 +9,8 @@ import {
   CheckSquare, DollarSign, Film, BarChart2, Star, RotateCcw
 } from "lucide-react";
 import { useDarkMode } from "../../hooks/useDarkMode";
+import { TabErrorBoundary } from "../../components/ErrorBoundary";
+import { useAuth }          from "../../context/AuthContext.jsx";
 import MessagesTab from "../../components/chat/MessagesTab";
 import { getCachedCenter } from "../../utils/branding";
 import DashboardLayout  from "../../components/dashboard/DashboardLayout";
@@ -20,19 +22,15 @@ import { dashboardColors } from "../../utils/dashboardColors";
 export default function SubAdminDashboard() {
   const navigate   = useNavigate();
   const { isDarkMode, toggleDarkMode } = useDarkMode();
+  const { user: subAdminInfo, logout: authLogout } = useAuth();
 
   const [activeTab,    setActiveTab]    = useState("overview");
   const [sidebarOpen,  setSidebarOpen]  = useState(true);
-  const [subAdminInfo, setSubAdminInfo] = useState({});
   const [mounted,      setMounted]      = useState(false);
 
-  useEffect(() => {
-    setMounted(true);
-    const info = sessionStorage.getItem("subAdminInfo") || localStorage.getItem("subAdminInfo");
-    if (info) setSubAdminInfo(JSON.parse(info));
-  }, []);
+  useEffect(() => { setMounted(true); }, []);
 
-  const perms = subAdminInfo.permissions || {};
+  const perms = subAdminInfo?.permissions || {};
   const NAV = [
     { key: "overview",    label: "Overview",    icon: TrendingUp    },
     ...(perms.canViewClasses  !== false ? [{ key: "classes",    label: "Classes",    icon: CheckSquare   }] : []),
@@ -47,8 +45,7 @@ export default function SubAdminDashboard() {
   ];
 
   const handleLogout = () => {
-    localStorage.removeItem("subAdminToken");
-    localStorage.removeItem("subAdminInfo");
+    authLogout();
     navigate("/sub-admin/login");
   };
 
@@ -121,7 +118,9 @@ export default function SubAdminDashboard() {
         />
       }
     >
-      {renderTab()}
+      <TabErrorBoundary key={activeTab}>
+        {renderTab()}
+      </TabErrorBoundary>
     </DashboardLayout>
   );
 }
@@ -240,7 +239,7 @@ function OverviewPanel({ isDarkMode }) {
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <p style={{ margin: 0, fontSize: "13px", fontWeight: "700", color: c.heading, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{b.classTitle || "Class"}</p>
                     <p style={{ margin: 0, fontSize: "11.5px", color: c.muted }}>
-                      {b.teacherId?.firstName} {b.teacherId?.lastName} → {b.studentId?.firstName} {b.studentId?.surname}
+                      {b.teacherId?.firstName} {b.teacherId?.lastName} → {b.studentId?.firstName} {b.studentId?.lastName}
                     </p>
                   </div>
                   <span style={{ fontSize: "11px", fontWeight: "700", padding: "3px 9px", borderRadius: "20px", background: isDarkMode ? `${sc.color}20` : `${sc.color}15`, color: sc.color, flexShrink: 0 }}>
@@ -381,7 +380,7 @@ function StudentsPanel({ isDarkMode }) {
   useEffect(() => { load(); }, [load]);
 
   const filtered = students.filter((s) =>
-    `${s.firstName} ${s.surname} ${s.email}`.toLowerCase().includes(search.toLowerCase())
+    `${s.firstName} ${s.lastName} ${s.email}`.toLowerCase().includes(search.toLowerCase())
   );
 
   if (loading) return <Spinner />;
@@ -440,10 +439,10 @@ function StudentsPanel({ isDarkMode }) {
                 {/* Header */}
                 <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                   <div style={{ width: "46px", height: "46px", borderRadius: "14px", background: "linear-gradient(135deg, #10b981, #34d399)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "15px", fontWeight: "800", color: "white", flexShrink: 0 }}>
-                    {(s.firstName?.[0] || "")}{(s.surname?.[0] || "")}
+                    {(s.firstName?.[0] || "")}{(s.lastName?.[0] || "")}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ margin: 0, fontSize: "14px", fontWeight: "700", color: c.heading }}>{s.firstName} {s.surname}</p>
+                    <p style={{ margin: 0, fontSize: "14px", fontWeight: "700", color: c.heading }}>{s.firstName} {s.lastName}</p>
                     <p style={{ margin: "2px 0 0", fontSize: "12px", color: c.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.email}</p>
                   </div>
                   <span style={{ fontSize: "11px", fontWeight: "700", padding: "3px 9px", borderRadius: "20px", flexShrink: 0, background: s.active ? (isDarkMode ? "rgba(16,185,129,0.12)" : "#d1fae5") : (isDarkMode ? "rgba(107,114,128,0.12)" : "#f3f4f6"), color: s.active ? "#10b981" : "#6b7280" }}>
@@ -454,7 +453,7 @@ function StudentsPanel({ isDarkMode }) {
                 {/* Stats row */}
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px" }}>
                   {[
-                    { label: "Classes Left", value: s.noOfClasses ?? 0, color: "#6b82f0" },
+                    { label: "Classes Left", value: s.classCredits ?? 0, color: "#6b82f0" },
                     { label: "Age",          value: ageDisplay,          color: "#3b82f6" },
                     { label: "Level",        value: level,               color: "#10b981" },
                   ].map(({ label, value, color }) => (
@@ -605,7 +604,7 @@ function LiveClassesPanel({ isDarkMode }) {
             <p style={{ margin: "3px 0 0", fontSize: "12px", color: c.muted }}>
               👨‍🏫 {b.teacherId?.firstName} {b.teacherId?.lastName}
               &nbsp;→&nbsp;
-              👩‍🎓 {b.studentId?.firstName} {b.studentId?.surname}
+              👩‍🎓 {b.studentId?.firstName} {b.studentId?.lastName}
             </p>
             <p style={{ margin: "3px 0 0", fontSize: "11px", color: c.muted }}>
               {b.scheduledTime
@@ -1071,7 +1070,7 @@ function TeacherClassesView({ teacher, isDarkMode, canMark, onBack }) {
             {b.classTitle || "Class"}
           </p>
           <p style={{ margin: "2px 0 0", fontSize: "12px", color: c.muted }}>
-            👩‍🎓 {b.studentId?.firstName} {b.studentId?.surname}
+            👩‍🎓 {b.studentId?.firstName} {b.studentId?.lastName}
           </p>
           <p style={{ margin: "2px 0 0", fontSize: "11px", color: c.muted }}>
             {b.scheduledTime ? new Date(b.scheduledTime).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" }) : ""}
@@ -1266,7 +1265,7 @@ function PaymentsPanel({ isDarkMode }) {
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <p style={{ margin: 0, fontSize: "13.5px", fontWeight: "700", color: c.heading }}>{p.teacherId?.firstName} {p.teacherId?.lastName}</p>
-                  <p style={{ margin: "2px 0 0", fontSize: "12px", color: c.muted }}>Student: {p.studentId?.firstName} {p.studentId?.surname} · {p.createdAt ? new Date(p.createdAt).toLocaleDateString() : ""}</p>
+                  <p style={{ margin: "2px 0 0", fontSize: "12px", color: c.muted }}>Student: {p.studentId?.firstName} {p.studentId?.lastName} · {p.createdAt ? new Date(p.createdAt).toLocaleDateString() : ""}</p>
                 </div>
                 <p style={{ margin: 0, fontSize: "16px", fontWeight: "800", color: p.status === "paid" ? "#10b981" : "#f59e0b", flexShrink: 0 }}>${p.amount}</p>
                 <span style={{ fontSize: "11px", fontWeight: "700", padding: "3px 9px", borderRadius: "20px", background: p.status === "paid" ? (isDarkMode ? "rgba(16,185,129,0.12)" : "#d1fae5") : (isDarkMode ? "rgba(245,158,11,0.12)" : "#fef9c3"), color: p.status === "paid" ? "#10b981" : "#f59e0b", textTransform: "capitalize", flexShrink: 0 }}>
@@ -1395,7 +1394,7 @@ function TeacherRecordingsView({ teacher, isDarkMode, onBack }) {
 
   const filtered = useMemo(() =>
     recordings.filter((r) =>
-      `${r.title || ""} ${r.studentId?.firstName || ""} ${r.studentId?.surname || ""}`.toLowerCase().includes(search.toLowerCase())
+      `${r.title || ""} ${r.studentId?.firstName || ""} ${r.studentId?.lastName || ""}`.toLowerCase().includes(search.toLowerCase())
     ), [recordings, search]);
 
   const totalMins = recordings.reduce((s, r) => s + (r.duration ? Math.round(r.duration / 60) : 0), 0);
@@ -1453,7 +1452,7 @@ function TeacherRecordingsView({ teacher, isDarkMode, onBack }) {
                   {r.title || "Class Recording"}
                 </p>
                 <p style={{ margin: "2px 0 0", fontSize: "12px", color: c.muted }}>
-                  Student: {r.studentId?.firstName} {r.studentId?.surname || r.studentId?.lastName}
+                  Student: {r.studentId?.firstName} {r.studentId?.lastName || r.studentId?.lastName}
                 </p>
               </div>
               <p style={{ margin: 0, fontSize: "11.5px", color: c.muted, flexShrink: 0 }}>
@@ -1498,10 +1497,10 @@ function ReportsPanel({ isDarkMode }) {
   if (error)   return <ErrorState msg={error} onRetry={load} />;
 
   const filteredStudents = (data.studentProgress || []).filter((s) =>
-    `${s.student?.firstName} ${s.student?.surname} ${s.teacher?.firstName} ${s.teacher?.lastName}`.toLowerCase().includes(search.toLowerCase())
+    `${s.student?.firstName} ${s.student?.lastName} ${s.teacher?.firstName} ${s.teacher?.lastName}`.toLowerCase().includes(search.toLowerCase())
   );
   const filteredHistory = (data.completedBookings || []).filter((b) =>
-    `${b.studentId?.firstName} ${b.studentId?.surname} ${b.teacherId?.firstName} ${b.teacherId?.lastName} ${b.classTitle || ""}`.toLowerCase().includes(search.toLowerCase())
+    `${b.studentId?.firstName} ${b.studentId?.lastName} ${b.teacherId?.firstName} ${b.teacherId?.lastName} ${b.classTitle || ""}`.toLowerCase().includes(search.toLowerCase())
   );
 
   return (
@@ -1542,10 +1541,10 @@ function ReportsPanel({ isDarkMode }) {
                 <div key={s.student?._id || i} style={{ padding: "16px", background: c.card, border: `1px solid ${c.border}`, borderRadius: "14px" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "12px" }}>
                     <div style={{ width: "40px", height: "40px", borderRadius: "12px", background: "linear-gradient(135deg, #10b981, #34d399)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "14px", fontWeight: "800", color: "white", flexShrink: 0 }}>
-                      {s.student?.firstName?.[0]}{s.student?.surname?.[0]}
+                      {s.student?.firstName?.[0]}{s.student?.lastName?.[0]}
                     </div>
                     <div style={{ flex: 1 }}>
-                      <p style={{ margin: 0, fontSize: "14px", fontWeight: "700", color: c.heading }}>{s.student?.firstName} {s.student?.surname}</p>
+                      <p style={{ margin: 0, fontSize: "14px", fontWeight: "700", color: c.heading }}>{s.student?.firstName} {s.student?.lastName}</p>
                       <p style={{ margin: "2px 0 0", fontSize: "12px", color: c.muted }}>Teacher: {s.teacher?.firstName} {s.teacher?.lastName} · Last class: {s.lastClass ? new Date(s.lastClass).toLocaleDateString() : "N/A"}</p>
                     </div>
                     <div style={{ textAlign: "right", flexShrink: 0 }}>
@@ -1575,7 +1574,7 @@ function ReportsPanel({ isDarkMode }) {
                 <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#10b981", flexShrink: 0 }} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <p style={{ margin: 0, fontSize: "13.5px", fontWeight: "700", color: c.heading, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{b.classTitle || "Class"}</p>
-                  <p style={{ margin: "2px 0 0", fontSize: "12px", color: c.muted }}>👨‍🏫 {b.teacherId?.firstName} {b.teacherId?.lastName} → 👩‍🎓 {b.studentId?.firstName} {b.studentId?.surname}</p>
+                  <p style={{ margin: "2px 0 0", fontSize: "12px", color: c.muted }}>👨‍🏫 {b.teacherId?.firstName} {b.teacherId?.lastName} → 👩‍🎓 {b.studentId?.firstName} {b.studentId?.lastName}</p>
                 </div>
                 <span style={{ fontSize: "11px", color: c.muted, flexShrink: 0 }}>{b.scheduledTime ? new Date(b.scheduledTime).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : ""}</span>
               </div>
@@ -1680,7 +1679,7 @@ function ReviewsPanel({ isDarkMode }) {
                 <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "8px" }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <p style={{ margin: 0, fontSize: "13.5px", fontWeight: "700", color: c.heading }}>
-                      {r.studentId?.firstName} {r.studentId?.surname} → {r.teacherId?.firstName} {r.teacherId?.lastName}
+                      {r.studentId?.firstName} {r.studentId?.lastName} → {r.teacherId?.firstName} {r.teacherId?.lastName}
                     </p>
                     <p style={{ margin: "2px 0 0", fontSize: "11.5px", color: c.muted }}>{r.createdAt ? new Date(r.createdAt).toLocaleDateString() : ""}</p>
                   </div>

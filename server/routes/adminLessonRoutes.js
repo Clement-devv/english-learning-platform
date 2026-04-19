@@ -13,6 +13,7 @@ import { studentSchema }            from "../schemas/studentSchema.js";
 import { assignmentSchema }         from "../schemas/assignmentSchema.js";
 import { paymentTransactionSchema } from "../schemas/paymentTransactionSchema.js";
 import logger from "../utils/logger.js";
+import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
 
 const router = express.Router();
 router.use(tenantMiddleware);
@@ -37,7 +38,7 @@ async function sendLessonMarkedEmails(teacher, student, booking, centerName = ""
         <p style="color:#374151">An admin has marked your lesson as completed:</p>
         <div style="background:#f0fdf4;border-left:4px solid #16a34a;padding:16px;border-radius:6px;margin:16px 0">
           <p style="margin:4px 0;color:#15803d"><strong>Class:</strong> ${booking.classTitle}</p>
-          <p style="margin:4px 0;color:#15803d"><strong>Student:</strong> ${student.firstName} ${student.surname}</p>
+          <p style="margin:4px 0;color:#15803d"><strong>Student:</strong> ${student.firstName} ${student.lastName}</p>
           <p style="margin:4px 0;color:#15803d"><strong>Date:</strong> ${new Date(booking.scheduledTime).toLocaleString()}</p>
           <p style="margin:4px 0;color:#15803d"><strong>Amount added:</strong> $${teacher.ratePerClass}</p>
         </div>
@@ -54,7 +55,7 @@ async function sendLessonMarkedEmails(teacher, student, booking, centerName = ""
           <p style="margin:4px 0;color:#1d4ed8"><strong>Class:</strong> ${booking.classTitle}</p>
           <p style="margin:4px 0;color:#1d4ed8"><strong>Teacher:</strong> ${teacher.firstName} ${teacher.lastName}</p>
           <p style="margin:4px 0;color:#1d4ed8"><strong>Date:</strong> ${new Date(booking.scheduledTime).toLocaleString()}</p>
-          <p style="margin:4px 0;color:#1d4ed8"><strong>Classes remaining:</strong> ${student.noOfClasses}</p>
+          <p style="margin:4px 0;color:#1d4ed8"><strong>Classes remaining:</strong> ${student.classCredits}</p>
         </div>
         <p style="color:#374151">This class has been added to your completed classes. Keep up the great work! 🎓</p>
       </div></body></html>`;
@@ -78,7 +79,7 @@ async function sendLessonUnmarkedEmails(teacher, student, booking, reason, cente
         <p style="color:#374151">An admin has reversed a lesson completion:</p>
         <div style="background:#fef2f2;border-left:4px solid #dc2626;padding:16px;border-radius:6px;margin:16px 0">
           <p style="margin:4px 0;color:#b91c1c"><strong>Class:</strong> ${booking.classTitle}</p>
-          <p style="margin:4px 0;color:#b91c1c"><strong>Student:</strong> ${student.firstName} ${student.surname}</p>
+          <p style="margin:4px 0;color:#b91c1c"><strong>Student:</strong> ${student.firstName} ${student.lastName}</p>
           <p style="margin:4px 0;color:#b91c1c"><strong>Date:</strong> ${new Date(booking.scheduledTime).toLocaleString()}</p>
           <p style="margin:4px 0;color:#b91c1c"><strong>Amount deducted:</strong> $${teacher.ratePerClass}</p>
           ${reason ? `<p style="margin:4px 0;color:#b91c1c"><strong>Reason:</strong> ${reason}</p>` : ""}
@@ -119,7 +120,7 @@ router.get("/teacher/:teacherId/students", verifyToken, verifyAdmin, async (req,
     const { teacherId } = req.params;
 
     const assignments = await getAssignment(req.db).find({ teacherId })
-      .populate("studentId", "firstName surname email noOfClasses active")
+      .populate("studentId", "firstName lastName email classCredits active")
       .sort({ assignedDate: -1 });
 
     const students = assignments
@@ -127,9 +128,9 @@ router.get("/teacher/:teacherId/students", verifyToken, verifyAdmin, async (req,
       .map((a) => ({
         _id: a.studentId._id,
         firstName: a.studentId.firstName,
-        surname: a.studentId.surname,
+        lastName: a.studentId.lastName,
         email: a.studentId.email,
-        noOfClasses: a.studentId.noOfClasses,
+        classCredits: a.studentId.classCredits,
         active: a.studentId.active,
       }));
 
@@ -179,7 +180,7 @@ router.get("/bookings", verifyToken, verifyAdmin, async (req, res) => {
     const { teacherId, studentId, type } = req.query;
 
     if (!teacherId || !studentId) {
-      return res.status(400).json({ success: false, message: "teacherId and studentId required" });
+      return badRequest(res, "teacherId and studentId required");
     }
 
     let statusFilter;
@@ -188,12 +189,12 @@ router.get("/bookings", verifyToken, verifyAdmin, async (req, res) => {
     } else if (type === "unmark") {
       statusFilter = { status: "completed", adminRejected: { $ne: true } };
     } else {
-      return res.status(400).json({ success: false, message: "type must be 'mark' or 'unmark'" });
+      return badRequest(res, "type must be 'mark' or 'unmark'");
     }
 
     const bookings = await getBooking(req.db).find({ teacherId, studentId, ...statusFilter })
       .populate("teacherId", "firstName lastName ratePerClass")
-      .populate("studentId", "firstName surname")
+      .populate("studentId", "firstName lastName")
       .sort({ scheduledTime: -1 });
 
     res.json({ success: true, bookings });
@@ -214,7 +215,7 @@ router.post("/mark", verifyToken, verifyAdmin, async (req, res) => {
   const { bookingId } = req.body;
 
   if (!bookingId) {
-    return res.status(400).json({ success: false, message: "bookingId is required" });
+    return badRequest(res, "bookingId is required");
   }
 
   try {
@@ -234,7 +235,7 @@ router.post("/mark", verifyToken, verifyAdmin, async (req, res) => {
       try {
         const booking = await getBooking(db).findById(bookingId)
           .populate("teacherId", "firstName lastName email ratePerClass")
-          .populate("studentId", "firstName surname email noOfClasses");
+          .populate("studentId", "firstName lastName email classCredits");
         if (booking) {
           await sendLessonMarkedEmails(booking.teacherId, booking.studentId, booking, centerName);
         }
@@ -268,16 +269,16 @@ router.post("/unmark", verifyToken, verifyAdmin, async (req, res) => {
   const { bookingId, reason } = req.body;
 
   if (!bookingId) {
-    return res.status(400).json({ success: false, message: "bookingId is required" });
+    return badRequest(res, "bookingId is required");
   }
 
   try {
     const booking = await getBooking(req.db).findById(bookingId)
       .populate("teacherId", "firstName lastName email ratePerClass lessonsCompleted earned")
-      .populate("studentId", "firstName surname email noOfClasses active");
+      .populate("studentId", "firstName lastName email classCredits active");
 
     if (!booking) {
-      return res.status(404).json({ success: false, message: "Booking not found" });
+      return notFound(res, "Booking not found");
     }
 
     if (booking.status !== "completed") {
@@ -304,7 +305,7 @@ router.post("/unmark", verifyToken, verifyAdmin, async (req, res) => {
     // Restore student class credit
     const student = await getStudent(req.db).findById(booking.studentId._id);
     if (student) {
-      student.noOfClasses = (student.noOfClasses || 0) + 1;
+      student.classCredits = (student.classCredits || 0) + 1;
       student.active = true;
       await student.save();
     }
@@ -358,7 +359,7 @@ router.post("/unmark", verifyToken, verifyAdmin, async (req, res) => {
         rateDeducted: ratePerClass,
       },
       student: {
-        noOfClasses: student?.noOfClasses,
+        classCredits: student?.classCredits,
         active: student?.active,
         classRestored: true,
       },

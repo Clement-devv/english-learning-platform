@@ -369,7 +369,7 @@ export default function HomeworkTab({ teacherInfo, students, isDarkMode }) {
                   <option value="">Select student…</option>
                   {(students || []).map(s => (
                     <option key={s._id || s.id} value={s._id || s.id}>
-                      {s.firstName} {s.surname || s.lastName}
+                      {s.firstName} {s.lastName}
                     </option>
                   ))}
                 </select>
@@ -514,7 +514,7 @@ export default function HomeworkTab({ teacherInfo, students, isDarkMode }) {
                         {hw.title}
                       </div>
                       <div style={{ fontSize: 12, color: c.body, marginTop: 2 }}>
-                        {student?.firstName} {student?.surname || student?.lastName} ·{" "}
+                        {student?.firstName} {student?.lastName || student?.lastName} ·{" "}
                         <span style={{ color: overdue ? "#ef4444" : c.body }}>
                           Due {formatDate(hw.dueDate)}{overdue ? " — Overdue" : ""}
                         </span>

@@ -105,7 +105,7 @@ export default function GroupChatList({ userRole, onSelectChat, selectedChatId, 
           badgeColor: isDark ? "#bfdbfe" : "#1d4ed8", badgeBg: isDark ? "rgba(29,78,216,0.25)" : "rgba(29,78,216,0.10)" };
       }
       if (dm.type === "student-admin" && dm.studentId) {
-        const name = `${dm.studentId.firstName} ${dm.studentId.surname}`;
+        const name = `${dm.studentId.firstName} ${dm.studentId.lastName}`;
         return { name, initials: getInitials(name), roleBadge: "Student",
           avatarBg: "linear-gradient(135deg,#047857,#10b981)",
           badgeColor: isDark ? "#a7f3d0" : "#047857", badgeBg: isDark ? "rgba(4,120,87,0.25)" : "rgba(4,120,87,0.10)" };

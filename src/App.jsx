@@ -1,18 +1,14 @@
 import React, { useState, useEffect, lazy, Suspense } from "react";
 import { BrandingProvider } from './context/BrandingContext.jsx';
+import { AuthProvider }     from './context/AuthContext.jsx';
 import {
   BrowserRouter as Router, Routes, Route,
   Navigate, useNavigate, useLocation
 } from "react-router-dom";
 
-// Auth guards — small, always needed immediately
-import ActiveClassBanner       from "./components/ActiveClassBanner";
-import SuperAdminProtectedRoute from "./components/SuperAdminProtectedRoute";
-import AdminProtectedRoute    from "./components/AdminProtectedRoute";
-import SubAdminProtectedRoute from "./components/SubAdminProtectedRoute";
-import ProtectedRoute         from "./components/ProtectedRoute";
-import ClassroomProtectedRoute from "./components/ClassroomProtectedRoute";
-import StudentProtectedRoute  from "./components/StudentProtectedRoute";
+// Auth guard — single component for all roles
+import ActiveClassBanner from "./components/ActiveClassBanner";
+import AuthGuard         from "./components/AuthGuard";
 
 // Login pages — small, load fast, keep static
 import SuperAdminLogin     from "./pages/super-admin/SuperAdminLogin";
@@ -345,6 +341,7 @@ function ImpersonationBanner() {
 
 function App() {
   return (
+    <AuthProvider>
     <BrandingProvider>
       <Router>
       <div className="min-h-screen">
@@ -356,28 +353,28 @@ function App() {
             <Route path="/" element={<Navigate to="/admin/login" replace />} />
 
             <Route path="/super-admin/login"     element={<SuperAdminLogin />} />
-            <Route path="/super-admin/dashboard" element={<SuperAdminProtectedRoute><SuperAdminDashboard /></SuperAdminProtectedRoute>} />
+            <Route path="/super-admin/dashboard" element={<AuthGuard role="super-admin"><SuperAdminDashboard /></AuthGuard>} />
 
             <Route path="/admin/login"                      element={<AdminLogin />} />
             <Route path="/admin/reset-password/:token"     element={<AdminResetPassword />} />
-            <Route path="/admin" element={<AdminProtectedRoute><AdminDashboard /></AdminProtectedRoute>} />
+            <Route path="/admin" element={<AuthGuard role="admin"><AdminDashboard /></AuthGuard>} />
 
             <Route path="/sub-admin/login"     element={<SubAdminLogin />} />
             <Route path="/sub-admin/setup"     element={<SubAdminSetup />} />
-            <Route path="/sub-admin/dashboard" element={<SubAdminProtectedRoute><SubAdminDashboard /></SubAdminProtectedRoute>} />
+            <Route path="/sub-admin/dashboard" element={<AuthGuard role="sub-admin"><SubAdminDashboard /></AuthGuard>} />
 
-            <Route path="/classroom" element={<ClassroomProtectedRoute><Classroom /></ClassroomProtectedRoute>} />
+            <Route path="/classroom" element={<AuthGuard role="classroom"><Classroom /></AuthGuard>} />
 
             <Route path="/teacher/login"                 element={<TeacherLogin />} />
             <Route path="/teacher/forgot-password"       element={<ForgotPassword />} />
             <Route path="/teacher/reset-password/:token" element={<ResetPassword />} />
-            <Route path="/teacher/dashboard"             element={<ProtectedRoute><TeacherDashboard /></ProtectedRoute>} />
+            <Route path="/teacher/dashboard"             element={<AuthGuard role="teacher"><TeacherDashboard /></AuthGuard>} />
             <Route path="/teacher/setup"                 element={<TeacherSetup />} />
 
             <Route path="/student/login"                 element={<StudentLogin />} />
             <Route path="/student/forgot-password"       element={<StudentForgotPassword />} />
             <Route path="/student/reset-password/:token" element={<StudentResetPassword />} />
-            <Route path="/student/dashboard"             element={<StudentProtectedRoute><StudentDashboard /></StudentProtectedRoute>} />
+            <Route path="/student/dashboard"             element={<AuthGuard role="student"><StudentDashboard /></AuthGuard>} />
             <Route path="/student/setup"                 element={<StudentSetup />} />
 
             <Route path="/join" element={<Join />} />
@@ -388,6 +385,7 @@ function App() {
       </div>
     </Router>
     </BrandingProvider>
+    </AuthProvider>
   );
 }
 

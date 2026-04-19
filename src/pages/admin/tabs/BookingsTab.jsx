@@ -195,8 +195,8 @@ export default function BookingsTab({ teachers = [], students = [], onNotify, is
     try {
       const teacher = teachers.find((t) => t._id === teacherId);
       const student = students.find((s) => s._id === studentId);
-      if (student.noOfClasses <= 0) {
-        showToast(`${student.firstName} ${student.surname} has no classes remaining.`, "error");
+      if (student.classCredits <= 0) {
+        showToast(`${student.firstName} ${student.lastName} has no classes remaining.`, "error");
         return;
       }
       await createBooking({
@@ -208,7 +208,7 @@ export default function BookingsTab({ teachers = [], students = [], onNotify, is
         notes: notes.trim(),
         createdBy: "admin",
       });
-      showToast(`Booking sent to ${teacher.firstName} ${teacher.lastName} for ${student.firstName} ${student.surname}.`);
+      showToast(`Booking sent to ${teacher.firstName} ${teacher.lastName} for ${student.firstName} ${student.lastName}.`);
       if (onNotify) onNotify(`Booking request sent to ${teacher.firstName} ${teacher.lastName}`);
       clearForm();
     } catch (err) {
@@ -231,7 +231,7 @@ export default function BookingsTab({ teachers = [], students = [], onNotify, is
   };
 
   const selectedStudent = students.find((s) => s._id === studentId);
-  const noClassesLeft   = selectedStudent && selectedStudent.noOfClasses <= 0;
+  const noClassesLeft   = selectedStudent && selectedStudent.classCredits <= 0;
 
   const fieldCls = (key) =>
     `w-full rounded-lg border px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 transition ${th.input} ${errors[key] ? th.inputErr : ""}`;
@@ -316,18 +316,18 @@ export default function BookingsTab({ teachers = [], students = [], onNotify, is
                 isDarkMode={dm}
                 disabled={loading}
                 getId={(o) => o._id}
-                getLabel={(o) => `${o.firstName} ${o.surname}`}
+                getLabel={(o) => `${o.firstName} ${o.lastName}`}
                 renderOption={(o, isSelected, dark) => (
                   <div className="min-w-0 flex-1 flex items-center justify-between gap-2">
                     <div>
                       <div className={`text-sm ${isSelected ? "font-medium" : ""}`}>
-                        {o.firstName} {o.surname}
+                        {o.firstName} {o.lastName}
                       </div>
                       <div className={`text-xs ${dark ? "text-slate-500" : "text-slate-400"}`}>
-                        {o.noOfClasses} class{o.noOfClasses !== 1 ? "es" : ""} remaining
+                        {o.classCredits} class{o.classCredits !== 1 ? "es" : ""} remaining
                       </div>
                     </div>
-                    {o.noOfClasses <= 0 && (
+                    {o.classCredits <= 0 && (
                       <span className="text-xs px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 flex-shrink-0">No classes</span>
                     )}
                   </div>

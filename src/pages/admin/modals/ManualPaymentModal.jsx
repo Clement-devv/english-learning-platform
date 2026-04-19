@@ -129,7 +129,7 @@ export default function ManualPaymentModal({ isOpen, onClose, onSave, student, i
               <h2 style={{ fontSize: "16px", fontWeight: "800", color: textPri, margin: 0 }}>Record Payment</h2>
               {student && (
                 <p style={{ fontSize: "12px", color: textSec, margin: 0 }}>
-                  {student.firstName} {student.surname}
+                  {student.firstName} {student.lastName}
                 </p>
               )}
             </div>

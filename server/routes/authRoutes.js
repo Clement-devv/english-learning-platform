@@ -14,6 +14,7 @@ import { adminSchema } from "../schemas/adminSchema.js";
 import { teacherSchema } from "../schemas/teacherSchema.js";
 import { studentSchema } from "../schemas/studentSchema.js";
 import logger from "../utils/logger.js";
+import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
 
 const router = express.Router();
 
@@ -52,10 +53,11 @@ const createLoginHandler = ({
     const identifier = getIdentifier(req);
 
     if (!identifier || !password) {
-      return res.status(400).json({ message: "Email/username and password are required" });
+      return badRequest(res, "Email/username and password are required");
     }
 
-    const lockStatus = await isAccountLocked(identifier);
+    const centerSlug = req.center?.slug || null;
+    const lockStatus = await isAccountLocked(identifier, centerSlug);
     if (lockStatus.isLocked) {
       return res.status(423).json({
         message: `Account locked due to too many failed attempts. Try again in ${lockStatus.remainingTime} minute(s).`,
@@ -66,12 +68,12 @@ const createLoginHandler = ({
     const user  = await Model.findOne(buildFindQuery(identifier));
 
     if (!user) {
-      await trackFailedLogin(identifier);
+      await trackFailedLogin(identifier, centerSlug);
       return res.status(401).json({ message: invalidCredMsg });
     }
 
     if (!user.active) {
-      return res.status(403).json({ message: "Your account has been deactivated. Please contact admin." });
+      return forbidden(res, "Your account has been deactivated. Please contact admin.");
     }
 
     if (extraChecks) {
@@ -81,11 +83,11 @@ const createLoginHandler = ({
 
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
-      await trackFailedLogin(identifier);
+      await trackFailedLogin(identifier, centerSlug);
       return res.status(401).json({ message: invalidCredMsg });
     }
 
-    await clearFailedAttempts(identifier);
+    await clearFailedAttempts(identifier, centerSlug);
 
     if (user.twoFactorEnabled) {
       if (!twoFactorToken && !backupCode) {
@@ -118,7 +120,7 @@ const createLoginHandler = ({
       }
 
       if (!isValid) {
-        return res.status(401).json({ success: false, message: "Invalid 2FA code or backup code" });
+        return unauthorized(res, "Invalid 2FA code or backup code");
       }
     }
 
@@ -143,7 +145,7 @@ const createLoginHandler = ({
 
   } catch (err) {
     logger.error(`${role} login error:`, { error: err?.message });
-    res.status(500).json({ message: "Server error during login" });
+    serverError(res, "Server error during login");
   }
 };
 
@@ -153,7 +155,7 @@ const verifyToken = async (req, res, next) => {
   try {
     const token = req.headers.authorization?.split(" ")[1];
     if (!token) {
-      return res.status(401).json({ message: "No token provided" });
+      return unauthorized(res, "No token provided");
     }
 
     const decoded = jwt.verify(token, config.jwtSecret);
@@ -161,13 +163,13 @@ const verifyToken = async (req, res, next) => {
     const teacher = await Teacher.findById(decoded.id).select("-password");
 
     if (!teacher || !teacher.active) {
-      return res.status(401).json({ message: "Invalid token or inactive account" });
+      return unauthorized(res, "Invalid token or inactive account");
     }
 
     req.teacher = teacher;
     next();
   } catch (err) {
-    return res.status(401).json({ message: "Invalid token" });
+    return unauthorized(res, "Invalid token");
   }
 };
 
@@ -179,11 +181,11 @@ router.post("/verify-2fa-login", tenantMiddleware, loginLimiter, async (req, res
     const { pendingToken, twoFactorToken, backupCode } = req.body;
 
     if (!pendingToken) {
-      return res.status(400).json({ message: "Missing 2FA session token" });
+      return badRequest(res, "Missing 2FA session token");
     }
 
     if (!twoFactorToken && !backupCode) {
-      return res.status(400).json({ message: "2FA code or backup code required" });
+      return badRequest(res, "2FA code or backup code required");
     }
 
     // Decode the server-signed pending token — role and userId are never taken from the client
@@ -191,14 +193,14 @@ router.post("/verify-2fa-login", tenantMiddleware, loginLimiter, async (req, res
     try {
       pending = jwt.verify(pendingToken, config.jwtSecret);
     } catch (_) {
-      return res.status(401).json({ message: "2FA session expired. Please log in again." });
+      return unauthorized(res, "2FA session expired. Please log in again.");
     }
 
     const { tempUserId, role, centerId } = pending;
 
     // Ensure the pending token belongs to this tenant
     if (centerId !== req.center.slug) {
-      return res.status(401).json({ message: "Invalid session" });
+      return unauthorized(res, "Invalid session");
     }
 
     let UserModel;
@@ -206,17 +208,17 @@ router.post("/verify-2fa-login", tenantMiddleware, loginLimiter, async (req, res
       case "admin":   UserModel = getAdminModel(req.db);   break;
       case "teacher": UserModel = getTeacherModel(req.db); break;
       case "student": UserModel = getStudentModel(req.db); break;
-      default: return res.status(400).json({ message: "Invalid role" });
+      default: return badRequest(res, "Invalid role");
     }
 
     const user = await UserModel.findById(tempUserId);
 
     if (!user || !user.active) {
-      return res.status(403).json({ message: "User not found or inactive" });
+      return forbidden(res, "User not found or inactive");
     }
 
     if (!user.twoFactorEnabled) {
-      return res.status(400).json({ message: "2FA is not enabled for this user" });
+      return badRequest(res, "2FA is not enabled for this user");
     }
 
     let isValid = false;
@@ -235,7 +237,7 @@ router.post("/verify-2fa-login", tenantMiddleware, loginLimiter, async (req, res
     }
 
     if (!isValid) {
-      return res.status(401).json({ success: false, message: "Invalid 2FA code or backup code" });
+      return unauthorized(res, "Invalid 2FA code or backup code");
     }
 
     const token = jwt.sign(
@@ -272,7 +274,7 @@ router.post("/verify-2fa-login", tenantMiddleware, loginLimiter, async (req, res
 
   } catch (err) {
     logger.error("2FA verification error:", { error: err?.message });
-    res.status(500).json({ message: "Server error during 2FA verification" });
+    serverError(res, "Server error during 2FA verification");
   }
 });
 
@@ -316,7 +318,7 @@ router.post("/teacher/change-password", tenantMiddleware, verifyToken, async (re
     const { currentPassword, newPassword } = req.body;
 
     if (!currentPassword || !newPassword) {
-      return res.status(400).json({ message: "Current password and new password are required" });
+      return badRequest(res, "Current password and new password are required");
     }
 
     const { isValid, errors } = validatePasswordStrength(newPassword);
@@ -329,7 +331,7 @@ router.post("/teacher/change-password", tenantMiddleware, verifyToken, async (re
 
     const isCurrentPasswordValid = await bcrypt.compare(currentPassword, teacher.password);
     if (!isCurrentPasswordValid) {
-      return res.status(401).json({ message: "Current password is incorrect" });
+      return unauthorized(res, "Current password is incorrect");
     }
 
     teacher.password = await bcrypt.hash(newPassword, config.bcryptRounds);
@@ -340,7 +342,7 @@ router.post("/teacher/change-password", tenantMiddleware, verifyToken, async (re
 
   } catch (err) {
     logger.error("Change password error:", { error: err?.message });
-    res.status(500).json({ message: "Server error while changing password" });
+    serverError(res, "Server error while changing password");
   }
 });
 
@@ -350,7 +352,7 @@ router.post("/teacher/forgot-password", tenantMiddleware, passwordResetLimiter, 
     const { email } = req.body;
 
     if (!email) {
-      return res.status(400).json({ message: "Email is required" });
+      return badRequest(res, "Email is required");
     }
 
     const Teacher = getTeacherModel(req.db);
@@ -361,7 +363,7 @@ router.post("/teacher/forgot-password", tenantMiddleware, passwordResetLimiter, 
     }
 
     if (!teacher.active) {
-      return res.status(403).json({ message: "Your account is deactivated. Please contact admin." });
+      return forbidden(res, "Your account is deactivated. Please contact admin.");
     }
 
     const resetToken = crypto.randomBytes(32).toString("hex");
@@ -381,14 +383,14 @@ router.post("/teacher/forgot-password", tenantMiddleware, passwordResetLimiter, 
 
     if (!emailResult.success) {
       logger.error("Teacher forgot-password email failed:", emailResult.error);
-      return res.status(500).json({ message: "Could not send reset email. Please try again later." });
+      return serverError(res, "Could not send reset email. Please try again later.");
     }
 
     res.json({ success: true, message: "If that email exists, a reset link has been sent" });
 
   } catch (err) {
     logger.error("Forgot password error:", { error: err?.message });
-    res.status(500).json({ message: "Server error while processing request" });
+    serverError(res, "Server error while processing request");
   }
 });
 
@@ -399,7 +401,7 @@ router.post("/teacher/reset-password/:token", tenantMiddleware, passwordResetLim
     const resetToken = req.params.token;
 
     if (!newPassword) {
-      return res.status(400).json({ message: "New password is required" });
+      return badRequest(res, "New password is required");
     }
 
     const { isValid, errors } = validatePasswordStrength(newPassword);
@@ -416,7 +418,7 @@ router.post("/teacher/reset-password/:token", tenantMiddleware, passwordResetLim
     });
 
     if (!teacher) {
-      return res.status(400).json({ message: "Invalid or expired reset token. Please request a new one." });
+      return badRequest(res, "Invalid or expired reset token. Please request a new one.");
     }
 
     teacher.password = await bcrypt.hash(newPassword, config.bcryptRounds);
@@ -429,7 +431,7 @@ router.post("/teacher/reset-password/:token", tenantMiddleware, passwordResetLim
 
   } catch (err) {
     logger.error("Reset password error:", { error: err?.message });
-    res.status(500).json({ message: "Server error while resetting password" });
+    serverError(res, "Server error while resetting password");
   }
 });
 
@@ -460,7 +462,7 @@ router.get("/student/verify", tenantMiddleware, async (req, res) => {
     const token = req.headers.authorization?.split(" ")[1];
 
     if (!token) {
-      return res.status(401).json({ message: "No token provided" });
+      return unauthorized(res, "No token provided");
     }
 
     const decoded = jwt.verify(token, config.jwtSecret);
@@ -468,12 +470,12 @@ router.get("/student/verify", tenantMiddleware, async (req, res) => {
     const student = await Student.findById(decoded.id).select("-password");
 
     if (!student || !student.active) {
-      return res.status(401).json({ message: "Invalid token or inactive account" });
+      return unauthorized(res, "Invalid token or inactive account");
     }
 
     res.json({ success: true, student });
   } catch (err) {
-    res.status(401).json({ message: "Invalid token" });
+    unauthorized(res, "Invalid token");
   }
 });
 
@@ -483,14 +485,14 @@ router.post("/student/change-password", tenantMiddleware, async (req, res) => {
     const token = req.headers.authorization?.split(" ")[1];
 
     if (!token) {
-      return res.status(401).json({ message: "No token provided" });
+      return unauthorized(res, "No token provided");
     }
 
     const decoded = jwt.verify(token, config.jwtSecret);
     const { currentPassword, newPassword } = req.body;
 
     if (!currentPassword || !newPassword) {
-      return res.status(400).json({ message: "Current password and new password are required" });
+      return badRequest(res, "Current password and new password are required");
     }
 
     const { isValid, errors } = validatePasswordStrength(newPassword);
@@ -502,12 +504,12 @@ router.post("/student/change-password", tenantMiddleware, async (req, res) => {
     const student = await Student.findById(decoded.id);
 
     if (!student || !student.active) {
-      return res.status(401).json({ message: "Invalid account or inactive" });
+      return unauthorized(res, "Invalid account or inactive");
     }
 
     const isCurrentPasswordValid = await bcrypt.compare(currentPassword, student.password);
     if (!isCurrentPasswordValid) {
-      return res.status(401).json({ message: "Current password is incorrect" });
+      return unauthorized(res, "Current password is incorrect");
     }
 
     student.password = await bcrypt.hash(newPassword, config.bcryptRounds);
@@ -518,7 +520,7 @@ router.post("/student/change-password", tenantMiddleware, async (req, res) => {
 
   } catch (err) {
     logger.error("Student change password error:", { error: err?.message });
-    res.status(500).json({ message: "Server error while changing password" });
+    serverError(res, "Server error while changing password");
   }
 });
 
@@ -528,7 +530,7 @@ router.post("/student/forgot-password", tenantMiddleware, passwordResetLimiter, 
     const { email } = req.body;
 
     if (!email) {
-      return res.status(400).json({ message: "Email is required" });
+      return badRequest(res, "Email is required");
     }
 
     const Student = getStudentModel(req.db);
@@ -539,7 +541,7 @@ router.post("/student/forgot-password", tenantMiddleware, passwordResetLimiter, 
     }
 
     if (!student.active) {
-      return res.status(403).json({ message: "Your account is deactivated. Please contact your administrator." });
+      return forbidden(res, "Your account is deactivated. Please contact your administrator.");
     }
 
     const resetToken = crypto.randomBytes(32).toString("hex");
@@ -551,7 +553,7 @@ router.post("/student/forgot-password", tenantMiddleware, passwordResetLimiter, 
 
     const emailResult = await sendStudentForgotPasswordEmail(
       student.email,
-      `${student.firstName} ${student.surname}`,
+      `${student.firstName} ${student.lastName}`,
       resetToken,
       req.center,
       req.center?.centerName || ""
@@ -559,14 +561,14 @@ router.post("/student/forgot-password", tenantMiddleware, passwordResetLimiter, 
 
     if (!emailResult.success) {
       logger.error("Student forgot-password email failed:", emailResult.error);
-      return res.status(500).json({ message: "Could not send reset email. Please try again later." });
+      return serverError(res, "Could not send reset email. Please try again later.");
     }
 
     res.json({ success: true, message: "If that email exists, a reset link has been sent" });
 
   } catch (err) {
     logger.error("Student forgot password error:", { error: err?.message });
-    res.status(500).json({ message: "Server error while processing request" });
+    serverError(res, "Server error while processing request");
   }
 });
 
@@ -577,7 +579,7 @@ router.post("/student/reset-password/:token", tenantMiddleware, passwordResetLim
     const resetToken = req.params.token;
 
     if (!newPassword) {
-      return res.status(400).json({ message: "New password is required" });
+      return badRequest(res, "New password is required");
     }
 
     const { isValid, errors } = validatePasswordStrength(newPassword);
@@ -594,7 +596,7 @@ router.post("/student/reset-password/:token", tenantMiddleware, passwordResetLim
     });
 
     if (!student) {
-      return res.status(400).json({ message: "Invalid or expired reset token. Please request a new one." });
+      return badRequest(res, "Invalid or expired reset token. Please request a new one.");
     }
 
     student.password = await bcrypt.hash(newPassword, config.bcryptRounds);
@@ -607,7 +609,7 @@ router.post("/student/reset-password/:token", tenantMiddleware, passwordResetLim
 
   } catch (err) {
     logger.error("Student reset password error:", { error: err?.message });
-    res.status(500).json({ message: "Server error while resetting password" });
+    serverError(res, "Server error while resetting password");
   }
 });
 
@@ -640,13 +642,13 @@ router.get("/admin/verify", tenantMiddleware, async (req, res) => {
     const token = req.headers.authorization?.split(" ")[1];
 
     if (!token) {
-      return res.status(401).json({ message: "No token provided" });
+      return unauthorized(res, "No token provided");
     }
 
     const decoded = jwt.verify(token, config.jwtSecret);
 
     if (decoded.role !== "admin") {
-      return res.status(403).json({ message: "Admin access required" });
+      return forbidden(res, "Admin access required");
     }
 
     // Impersonation tokens skip the DB lookup — short-lived JWTs issued by super admin
@@ -665,12 +667,12 @@ router.get("/admin/verify", tenantMiddleware, async (req, res) => {
     const admin = await Admin.findById(decoded.id).select("-password");
 
     if (!admin || !admin.active) {
-      return res.status(401).json({ message: "Invalid token or inactive account" });
+      return unauthorized(res, "Invalid token or inactive account");
     }
 
     res.json({ success: true, admin });
   } catch (err) {
-    res.status(401).json({ message: "Invalid token" });
+    unauthorized(res, "Invalid token");
   }
 });
 
@@ -680,14 +682,14 @@ router.post("/admin/change-password", tenantMiddleware, async (req, res) => {
     const token = req.headers.authorization?.split(" ")[1];
 
     if (!token) {
-      return res.status(401).json({ message: "No token provided" });
+      return unauthorized(res, "No token provided");
     }
 
     const decoded = jwt.verify(token, config.jwtSecret);
     const { currentPassword, newPassword } = req.body;
 
     if (!currentPassword || !newPassword) {
-      return res.status(400).json({ message: "Current password and new password are required" });
+      return badRequest(res, "Current password and new password are required");
     }
 
     const { isValid, errors } = validatePasswordStrength(newPassword);
@@ -699,12 +701,12 @@ router.post("/admin/change-password", tenantMiddleware, async (req, res) => {
     const admin = await Admin.findById(decoded.id);
 
     if (!admin || !admin.active) {
-      return res.status(401).json({ message: "Invalid account or inactive" });
+      return unauthorized(res, "Invalid account or inactive");
     }
 
     const isCurrentPasswordValid = await bcrypt.compare(currentPassword, admin.password);
     if (!isCurrentPasswordValid) {
-      return res.status(401).json({ message: "Current password is incorrect" });
+      return unauthorized(res, "Current password is incorrect");
     }
 
     admin.password = await bcrypt.hash(newPassword, config.bcryptRounds);
@@ -715,7 +717,7 @@ router.post("/admin/change-password", tenantMiddleware, async (req, res) => {
 
   } catch (err) {
     logger.error("Admin change password error:", { error: err?.message });
-    res.status(500).json({ message: "Server error while changing password" });
+    serverError(res, "Server error while changing password");
   }
 });
 
@@ -724,7 +726,7 @@ router.post("/admin/change-password", tenantMiddleware, async (req, res) => {
 router.post("/admin/forgot-password", tenantMiddleware, passwordResetLimiter, async (req, res) => {
   try {
     const { email } = req.body;
-    if (!email) return res.status(400).json({ message: "Email is required" });
+    if (!email) return badRequest(res, "Email is required");
 
     const Admin = getAdminModel(req.db);
     const admin = await Admin.findOne({ email: email.toLowerCase() });
@@ -745,13 +747,13 @@ router.post("/admin/forgot-password", tenantMiddleware, passwordResetLimiter, as
 
     if (!emailResult.success) {
       logger.error("Admin forgot-password email failed:", emailResult.error);
-      return res.status(500).json({ message: "Could not send reset email. Please try again later." });
+      return serverError(res, "Could not send reset email. Please try again later.");
     }
 
     res.json({ success: true, message: "If that email exists, a reset link has been sent" });
   } catch (err) {
     logger.error("Admin forgot password error:", { error: err?.message });
-    res.status(500).json({ message: "Server error while processing request" });
+    serverError(res, "Server error while processing request");
   }
 });
 
@@ -761,7 +763,7 @@ router.post("/admin/reset-password/:token", tenantMiddleware, passwordResetLimit
     const { newPassword } = req.body;
     const resetToken = req.params.token;
 
-    if (!newPassword) return res.status(400).json({ message: "New password is required" });
+    if (!newPassword) return badRequest(res, "New password is required");
 
     const { isValid, errors } = validatePasswordStrength(newPassword);
     if (!isValid) return res.status(400).json({ message: errors[0], errors });
@@ -775,7 +777,7 @@ router.post("/admin/reset-password/:token", tenantMiddleware, passwordResetLimit
     });
 
     if (!admin) {
-      return res.status(400).json({ message: "Invalid or expired reset link. Please request a new one." });
+      return badRequest(res, "Invalid or expired reset link. Please request a new one.");
     }
 
     admin.password             = await bcrypt.hash(newPassword, config.bcryptRounds);
@@ -787,7 +789,7 @@ router.post("/admin/reset-password/:token", tenantMiddleware, passwordResetLimit
     res.json({ success: true, message: "Password reset successfully. You can now log in with your new password." });
   } catch (err) {
     logger.error("Admin reset password error:", { error: err?.message });
-    res.status(500).json({ message: "Server error while resetting password" });
+    serverError(res, "Server error while resetting password");
   }
 });
 
@@ -798,7 +800,7 @@ router.get("/sessions", tenantMiddleware, async (req, res) => {
     const token = req.headers.authorization?.split(" ")[1];
 
     if (!token) {
-      return res.status(401).json({ message: "No token provided" });
+      return unauthorized(res, "No token provided");
     }
 
     const decoded = jwt.verify(token, config.jwtSecret);
@@ -813,7 +815,7 @@ router.get("/sessions", tenantMiddleware, async (req, res) => {
     }
 
     if (!user) {
-      return res.status(404).json({ message: "User not found" });
+      return notFound(res, "User not found");
     }
 
     const activeSessions = user.sessions
@@ -832,7 +834,7 @@ router.get("/sessions", tenantMiddleware, async (req, res) => {
 
   } catch (err) {
     logger.error("Get sessions error:", { error: err?.message });
-    res.status(500).json({ message: "Server error" });
+    serverError(res);
   }
 });
 
@@ -847,14 +849,14 @@ router.post("/refresh", tenantMiddleware, async (req, res) => {
     const { sessionToken, expiredToken } = req.body;
 
     if (!sessionToken || !expiredToken) {
-      return res.status(400).json({ message: "sessionToken and expiredToken required" });
+      return badRequest(res, "sessionToken and expiredToken required");
     }
 
     // Decode without verifying — we only need the role + userId hint.
     // Trust is established by the DB session record below, not this decode.
     const decoded = jwt.decode(expiredToken);
     if (!decoded?.id || !decoded?.role) {
-      return res.status(401).json({ message: "Invalid token" });
+      return unauthorized(res, "Invalid token");
     }
 
     const { id: userId, role } = decoded;
@@ -864,18 +866,18 @@ router.post("/refresh", tenantMiddleware, async (req, res) => {
       case "admin":   UserModel = getAdminModel(req.db);   break;
       case "teacher": UserModel = getTeacherModel(req.db); break;
       case "student": UserModel = getStudentModel(req.db); break;
-      default: return res.status(401).json({ message: "Invalid token" });
+      default: return unauthorized(res, "Invalid token");
     }
 
     const user = await UserModel.findById(userId);
     if (!user || !user.active) {
-      return res.status(401).json({ message: "Account not found or inactive" });
+      return unauthorized(res, "Account not found or inactive");
     }
 
     // Find the matching session — this is the real auth check
     const session = user.sessions.find(s => s.token === sessionToken && s.isActive);
     if (!session) {
-      return res.status(401).json({ message: "Session expired. Please log in again." });
+      return unauthorized(res, "Session expired. Please log in again.");
     }
 
     // Check session hasn't exceeded the 7-day window
@@ -883,7 +885,7 @@ router.post("/refresh", tenantMiddleware, async (req, res) => {
     if (sessionAgeDays > SESSION_EXPIRY_DAYS) {
       session.isActive = false;
       await user.save();
-      return res.status(401).json({ message: "Session expired. Please log in again." });
+      return unauthorized(res, "Session expired. Please log in again.");
     }
 
     // Issue a fresh access token
@@ -902,7 +904,7 @@ router.post("/refresh", tenantMiddleware, async (req, res) => {
 
   } catch (err) {
     logger.error("Token refresh error:", { error: err?.message });
-    res.status(500).json({ message: "Server error" });
+    serverError(res);
   }
 });
 
@@ -912,11 +914,11 @@ router.post("/logout-session", tenantMiddleware, async (req, res) => {
     const { sessionToken } = req.body;
 
     if (!token) {
-      return res.status(401).json({ message: "No token provided" });
+      return unauthorized(res, "No token provided");
     }
 
     if (!sessionToken) {
-      return res.status(400).json({ message: "Session token required" });
+      return badRequest(res, "Session token required");
     }
 
     const decoded = jwt.verify(token, config.jwtSecret);
@@ -931,7 +933,7 @@ router.post("/logout-session", tenantMiddleware, async (req, res) => {
     }
 
     if (!user) {
-      return res.status(404).json({ message: "User not found" });
+      return notFound(res, "User not found");
     }
 
     const session = user.sessions.find(s => s.token === sessionToken);
@@ -940,12 +942,12 @@ router.post("/logout-session", tenantMiddleware, async (req, res) => {
       await user.save();
       res.json({ success: true, message: "Session logged out successfully" });
     } else {
-      res.status(404).json({ message: "Session not found" });
+      notFound(res, "Session not found");
     }
 
   } catch (err) {
     logger.error("Logout session error:", { error: err?.message });
-    res.status(500).json({ message: "Server error" });
+    serverError(res);
   }
 });
 
@@ -954,7 +956,7 @@ router.post("/logout-all-devices", tenantMiddleware, async (req, res) => {
     const token = req.headers.authorization?.split(" ")[1];
 
     if (!token) {
-      return res.status(401).json({ message: "No token provided" });
+      return unauthorized(res, "No token provided");
     }
 
     const decoded = jwt.verify(token, config.jwtSecret);
@@ -969,7 +971,7 @@ router.post("/logout-all-devices", tenantMiddleware, async (req, res) => {
     }
 
     if (!user) {
-      return res.status(404).json({ message: "User not found" });
+      return notFound(res, "User not found");
     }
 
     user.sessions = user.sessions.map(session => {
@@ -985,7 +987,7 @@ router.post("/logout-all-devices", tenantMiddleware, async (req, res) => {
 
   } catch (err) {
     logger.error("Logout all devices error:", { error: err?.message });
-    res.status(500).json({ message: "Server error" });
+    serverError(res);
   }
 });
 

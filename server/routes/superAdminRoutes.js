@@ -5,7 +5,8 @@ import crypto from 'crypto';
 import mongoose from 'mongoose';
 import SuperAdmin from '../models/master/SuperAdmin.js';
 import Center from '../models/master/Center.js';
-import AgoraUsage from '../models/master/AgoraUsage.js';
+import AgoraUsage   from '../models/master/AgoraUsage.js';
+import AgoraSession from '../models/master/AgoraSession.js';
 import { verifySuperAdmin } from '../middleware/superAdminMiddleware.js';
 import { loginLimiter } from '../middleware/rateLimiter.js';
 import { getDb } from '../config/dbManager.js';
@@ -31,6 +32,7 @@ import { teacherSchema } from '../schemas/teacherSchema.js';
 import { studentSchema }  from '../schemas/studentSchema.js';
 import { bookingSchema }  from '../schemas/bookingSchema.js';
 import logger from "../utils/logger.js";
+import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
 
 // In-memory OTP store: key = adminEmail, value = { code, expiresAt }
 const emailOtpStore = new Map();
@@ -43,17 +45,17 @@ router.post('/login', loginLimiter, validateSuperAdminLogin, async (req, res) =>
     const { email, password } = req.body;
 
     if (!email || !password) {
-      return res.status(400).json({ success: false, message: 'Email and password are required' });
+      return badRequest(res, 'Email and password are required');
     }
 
     const superAdmin = await SuperAdmin.findOne({ email });
     if (!superAdmin || !superAdmin.active) {
-      return res.status(401).json({ success: false, message: 'Invalid credentials' });
+      return unauthorized(res, 'Invalid credentials');
     }
 
     const isPasswordValid = await bcrypt.compare(password, superAdmin.password);
     if (!isPasswordValid) {
-      return res.status(401).json({ success: false, message: 'Invalid credentials' });
+      return unauthorized(res, 'Invalid credentials');
     }
 
     const token = jwt.sign(
@@ -82,7 +84,7 @@ router.post('/login', loginLimiter, validateSuperAdminLogin, async (req, res) =>
     });
   } catch (err) {
     logger.error('❌ Super admin login error:', { error: err?.message });
-    res.status(500).json({ success: false, message: 'Server error' });
+    serverError(res);
   }
 });
 
@@ -95,7 +97,7 @@ router.get('/centers', verifySuperAdmin, async (req, res) => {
     res.json({ success: true, centers });
   } catch (err) {
     logger.error('❌ Get centers error:', { error: err?.message });
-    res.status(500).json({ success: false, message: 'Server error' });
+    serverError(res);
   }
 });
 
@@ -106,7 +108,7 @@ router.get('/centers/pending', verifySuperAdmin, async (req, res) => {
     res.json({ success: true, centers });
   } catch (err) {
     logger.error('❌ Get pending centers error:', { error: err?.message });
-    res.status(500).json({ success: false, message: 'Server error' });
+    serverError(res);
   }
 });
 
@@ -115,21 +117,20 @@ router.patch('/centers/:id/approve', verifySuperAdmin, validateParamMongoId('id'
   try {
     const center = await Center.findById(req.params.id).select('+pendingPasswordHash');
     if (!center) {
-      return res.status(404).json({ success: false, message: 'Center not found' });
+      return notFound(res, 'Center not found');
     }
     if (center.status !== 'pending') {
       return res.status(400).json({ success: false, message: `Center is already ${center.status}` });
     }
     if (!center.pendingPasswordHash) {
-      return res.status(400).json({ success: false, message: 'No pending password hash found for this center' });
+      return badRequest(res, 'No pending password hash found for this center');
     }
 
     // Create the center's database and admin account
     const db = await getDb(center.slug);
 
     // Import admin schema to register on center DB
-    const { default: adminSchemaModule } = await import('../models/Admin.js');
-    const adminSchema = adminSchemaModule.schema;
+    const { adminSchema } = await import('../schemas/adminSchema.js');
     const Admin = db.models.Admin || db.model('Admin', adminSchema);
 
     await Admin.create({
@@ -171,7 +172,7 @@ router.patch('/centers/:id/approve', verifySuperAdmin, validateParamMongoId('id'
     res.json({ success: true, message: 'Center approved and admin account created', center });
   } catch (err) {
     logger.error('❌ Approve center error:', { error: err?.message });
-    res.status(500).json({ success: false, message: 'Server error' });
+    serverError(res);
   }
 });
 
@@ -181,7 +182,7 @@ router.patch('/centers/:id/reject', verifySuperAdmin, validateCenterAction, asyn
     const { rejectReason } = req.body;
     const center = await Center.findById(req.params.id).select('+pendingPasswordHash');
     if (!center) {
-      return res.status(404).json({ success: false, message: 'Center not found' });
+      return notFound(res, 'Center not found');
     }
 
     center.status       = 'rejected';
@@ -215,7 +216,7 @@ router.patch('/centers/:id/reject', verifySuperAdmin, validateCenterAction, asyn
     res.json({ success: true, message: 'Center rejected', center });
   } catch (err) {
     logger.error('❌ Reject center error:', { error: err?.message });
-    res.status(500).json({ success: false, message: 'Server error' });
+    serverError(res);
   }
 });
 
@@ -227,7 +228,7 @@ router.patch('/centers/:id/suspend', verifySuperAdmin, validateCenterAction, asy
       { status: 'suspended' },
       { new: true }
     );
-    if (!center) return res.status(404).json({ success: false, message: 'Center not found' });
+    if (!center) return notFound(res, 'Center not found');
 
     await writeAuditLog({
       action: 'CENTER_SUSPENDED', superAdmin: req.superAdmin,
@@ -237,7 +238,7 @@ router.patch('/centers/:id/suspend', verifySuperAdmin, validateCenterAction, asy
     res.json({ success: true, message: 'Center suspended', center });
   } catch (err) {
     logger.error('❌ Suspend center error:', { error: err?.message });
-    res.status(500).json({ success: false, message: 'Server error' });
+    serverError(res);
   }
 });
 
@@ -249,7 +250,7 @@ router.patch('/centers/:id/activate', verifySuperAdmin, validateParamMongoId('id
       { status: 'active' },
       { new: true }
     );
-    if (!center) return res.status(404).json({ success: false, message: 'Center not found' });
+    if (!center) return notFound(res, 'Center not found');
 
     await writeAuditLog({
       action: 'CENTER_ACTIVATED', superAdmin: req.superAdmin,
@@ -259,7 +260,7 @@ router.patch('/centers/:id/activate', verifySuperAdmin, validateParamMongoId('id
     res.json({ success: true, message: 'Center activated', center });
   } catch (err) {
     logger.error('❌ Activate center error:', { error: err?.message });
-    res.status(500).json({ success: false, message: 'Server error' });
+    serverError(res);
   }
 });
 
@@ -280,7 +281,7 @@ router.get('/stats', verifySuperAdmin, async (req, res) => {
     });
   } catch (err) {
     logger.error('❌ Stats error:', { error: err?.message });
-    res.status(500).json({ success: false, message: 'Server error' });
+    serverError(res);
   }
 });
 
@@ -326,7 +327,7 @@ router.get('/centers/health', verifySuperAdmin, async (req, res) => {
     res.json({ success: true, health });
   } catch (err) {
     logger.error('❌ Health error:', { error: err?.message });
-    res.status(500).json({ success: false, message: 'Server error' });
+    serverError(res);
   }
 });
 
@@ -335,7 +336,7 @@ router.post('/impersonate/:slug', verifySuperAdmin, validateSlugParam, async (re
   try {
     const center = await Center.findOne({ slug: req.params.slug, status: 'active' });
     if (!center) {
-      return res.status(404).json({ success: false, message: 'Center not found or inactive' });
+      return notFound(res, 'Center not found or inactive');
     }
 
     const token = jwt.sign(
@@ -359,7 +360,7 @@ router.post('/impersonate/:slug', verifySuperAdmin, validateSlugParam, async (re
     res.json({ success: true, token, center: { centerName: center.centerName, slug: center.slug } });
   } catch (err) {
     logger.error('❌ Impersonate error:', { error: err?.message });
-    res.status(500).json({ success: false, message: 'Server error' });
+    serverError(res);
   }
 });
 
@@ -368,10 +369,10 @@ router.patch('/centers/:id/plan', verifySuperAdmin, validateCenterPlan, async (r
   try {
     const { plan } = req.body;
     if (!['free', 'basic', 'pro', 'enterprise'].includes(plan)) {
-      return res.status(400).json({ success: false, message: 'Invalid plan value' });
+      return badRequest(res, 'Invalid plan value');
     }
     const center = await Center.findByIdAndUpdate(req.params.id, { plan }, { new: true });
-    if (!center) return res.status(404).json({ success: false, message: 'Center not found' });
+    if (!center) return notFound(res, 'Center not found');
 
     await writeAuditLog({
       action: 'CENTER_PLAN_UPDATED', superAdmin: req.superAdmin,
@@ -382,7 +383,7 @@ router.patch('/centers/:id/plan', verifySuperAdmin, validateCenterPlan, async (r
     res.json({ success: true, message: 'Plan updated', center });
   } catch (err) {
     logger.error('❌ Update plan error:', { error: err?.message });
-    res.status(500).json({ success: false, message: 'Server error' });
+    serverError(res);
   }
 });
 
@@ -391,7 +392,7 @@ router.patch('/centers/:id/features', verifySuperAdmin, validateParamMongoId('id
   try {
     const { agora, googleMeet, recording, pronunciation } = req.body;
     const center = await Center.findById(req.params.id);
-    if (!center) return res.status(404).json({ success: false, message: 'Center not found' });
+    if (!center) return notFound(res, 'Center not found');
 
     const update = {};
     if (agora         !== undefined) update['features.agora']         = !!agora;
@@ -410,7 +411,7 @@ router.patch('/centers/:id/features', verifySuperAdmin, validateParamMongoId('id
     res.json({ success: true, message: 'Features updated', features: updated.features });
   } catch (err) {
     logger.error('❌ Update features error:', { error: err?.message });
-    res.status(500).json({ success: false, message: 'Server error' });
+    serverError(res);
   }
 });
 
@@ -419,7 +420,7 @@ router.patch('/centers/:id/theme', verifySuperAdmin, validateParamMongoId('id'),
   try {
     const { primaryColor, secondaryColor, fontFamily, borderRadius, shadowStyle, spacing, theme } = req.body;
     const center = await Center.findById(req.params.id);
-    if (!center) return res.status(404).json({ success: false, message: 'Center not found' });
+    if (!center) return notFound(res, 'Center not found');
 
     await Center.findByIdAndUpdate(req.params.id, {
       'branding.primaryColor':   primaryColor,
@@ -434,7 +435,7 @@ router.patch('/centers/:id/theme', verifySuperAdmin, validateParamMongoId('id'),
     res.json({ success: true, message: `Theme "${theme}" applied to ${center.centerName}` });
   } catch (err) {
     logger.error('❌ Apply theme error:', { error: err?.message });
-    res.status(500).json({ success: false, message: 'Server error' });
+    serverError(res);
   }
 });
 
@@ -443,7 +444,7 @@ router.patch('/centers/:id/branding', verifySuperAdmin, validateParamMongoId('id
   try {
     const { primaryColor, secondaryColor, fontFamily, logo, favicon } = req.body;
     const center = await Center.findById(req.params.id);
-    if (!center) return res.status(404).json({ success: false, message: 'Center not found' });
+    if (!center) return notFound(res, 'Center not found');
 
     await Center.findByIdAndUpdate(req.params.id, {
       'branding.primaryColor':   primaryColor   !== undefined ? primaryColor   : center.branding.primaryColor,
@@ -456,7 +457,7 @@ router.patch('/centers/:id/branding', verifySuperAdmin, validateParamMongoId('id
     res.json({ success: true, message: 'Branding updated' });
   } catch (err) {
     logger.error('❌ Update branding error:', { error: err?.message });
-    res.status(500).json({ success: false, message: 'Server error' });
+    serverError(res);
   }
 });
 
@@ -474,7 +475,7 @@ router.get('/dashboard-themes', verifySuperAdmin, async (req, res) => {
     res.json({ success: true, assignments });
   } catch (err) {
     logger.error('❌ Dashboard themes error:', { error: err?.message });
-    res.status(500).json({ success: false, message: 'Server error' });
+    serverError(res);
   }
 });
 
@@ -483,7 +484,7 @@ router.patch('/centers/:id/dashboard-theme', verifySuperAdmin, validateParamMong
   try {
     const { dashboardTheme } = req.body;
     const center = await Center.findById(req.params.id);
-    if (!center) return res.status(404).json({ success: false, message: 'Center not found' });
+    if (!center) return notFound(res, 'Center not found');
 
     if (dashboardTheme) {
       const conflict = await Center.findOne({
@@ -510,7 +511,66 @@ router.patch('/centers/:id/dashboard-theme', verifySuperAdmin, validateParamMong
     res.json({ success: true, message: dashboardTheme ? `Dashboard theme "${dashboardTheme}" assigned to ${center.centerName}` : 'Dashboard theme unassigned' });
   } catch (err) {
     logger.error('❌ Dashboard theme assign error:', { error: err?.message });
-    res.status(500).json({ success: false, message: 'Server error' });
+    serverError(res);
+  }
+});
+
+// GET  /api/super-admin/teacher-dashboard-themes — list all teacher dashboard theme assignments
+router.get('/teacher-dashboard-themes', verifySuperAdmin, async (req, res) => {
+  try {
+    const centers = await Center.find({ status: { $ne: 'deleted' } })
+      .select('centerName slug branding.teacherDashboardTheme').lean();
+    const assignments = {};
+    centers.forEach(c => {
+      if (c.branding?.teacherDashboardTheme) {
+        assignments[c.branding.teacherDashboardTheme] = { id: c._id, name: c.centerName, slug: c.slug };
+      }
+    });
+    res.json({ success: true, assignments });
+  } catch (err) {
+    logger.error('❌ Teacher dashboard themes error:', { error: err?.message });
+    serverError(res);
+  }
+});
+
+// PATCH /api/super-admin/centers/:id/teacher-dashboard-theme — exclusively assign a teacher dashboard theme
+router.patch('/centers/:id/teacher-dashboard-theme', verifySuperAdmin, validateParamMongoId('id'), async (req, res) => {
+  try {
+    const { teacherDashboardTheme } = req.body;
+    const center = await Center.findById(req.params.id);
+    if (!center) return notFound(res, 'Center not found');
+
+    if (teacherDashboardTheme) {
+      const conflict = await Center.findOne({
+        'branding.teacherDashboardTheme': teacherDashboardTheme,
+        _id: { $ne: req.params.id },
+        status: { $ne: 'deleted' },
+      });
+      if (conflict) {
+        return res.status(409).json({
+          success: false,
+          message: `Teacher dashboard theme "${teacherDashboardTheme}" is already assigned to ${conflict.centerName}`,
+        });
+      }
+    }
+
+    await Center.findByIdAndUpdate(req.params.id, { 'branding.teacherDashboardTheme': teacherDashboardTheme || null });
+
+    await writeAuditLog({
+      action: 'TEACHER_DASHBOARD_THEME_ASSIGNED', superAdmin: req.superAdmin,
+      targetId: center._id.toString(), targetName: center.centerName,
+      details: { teacherDashboardTheme: teacherDashboardTheme || null }, ip: req.ip,
+    });
+
+    res.json({
+      success: true,
+      message: teacherDashboardTheme
+        ? `Teacher dashboard theme "${teacherDashboardTheme}" assigned to ${center.centerName}`
+        : 'Teacher dashboard theme unassigned',
+    });
+  } catch (err) {
+    logger.error('❌ Teacher dashboard theme assign error:', { error: err?.message });
+    serverError(res);
   }
 });
 
@@ -528,7 +588,7 @@ router.get('/login-themes', verifySuperAdmin, async (req, res) => {
     res.json({ success: true, assignments });
   } catch (err) {
     logger.error('❌ Login themes error:', { error: err?.message });
-    res.status(500).json({ success: false, message: 'Server error' });
+    serverError(res);
   }
 });
 
@@ -537,7 +597,7 @@ router.patch('/centers/:id/login-theme', verifySuperAdmin, validateParamMongoId(
   try {
     const { loginTheme } = req.body;   // null to unassign
     const center = await Center.findById(req.params.id);
-    if (!center) return res.status(404).json({ success: false, message: 'Center not found' });
+    if (!center) return notFound(res, 'Center not found');
 
     if (loginTheme) {
       const conflict = await Center.findOne({
@@ -564,7 +624,61 @@ router.patch('/centers/:id/login-theme', verifySuperAdmin, validateParamMongoId(
     res.json({ success: true, message: loginTheme ? `Login theme "${loginTheme}" assigned to ${center.centerName}` : 'Login theme unassigned' });
   } catch (err) {
     logger.error('❌ Login theme assign error:', { error: err?.message });
-    res.status(500).json({ success: false, message: 'Server error' });
+    serverError(res);
+  }
+});
+
+// GET  /api/super-admin/teacher-login-themes — list all teacher login theme assignments
+router.get('/teacher-login-themes', verifySuperAdmin, async (req, res) => {
+  try {
+    const centers = await Center.find({ status: { $ne: 'deleted' } })
+      .select('centerName slug branding.teacherLoginTheme').lean();
+    const assignments = {};
+    centers.forEach(c => {
+      if (c.branding?.teacherLoginTheme) {
+        assignments[c.branding.teacherLoginTheme] = { id: c._id, name: c.centerName, slug: c.slug };
+      }
+    });
+    res.json({ success: true, assignments });
+  } catch (err) {
+    logger.error('❌ Teacher login themes fetch error:', { error: err?.message });
+    serverError(res);
+  }
+});
+
+// PATCH /api/super-admin/centers/:id/teacher-login-theme — exclusively assign a teacher login theme
+router.patch('/centers/:id/teacher-login-theme', verifySuperAdmin, validateParamMongoId('id'), async (req, res) => {
+  try {
+    const { teacherLoginTheme } = req.body;
+    const center = await Center.findById(req.params.id);
+    if (!center) return notFound(res, 'Center not found');
+
+    if (teacherLoginTheme) {
+      const conflict = await Center.findOne({
+        'branding.teacherLoginTheme': teacherLoginTheme,
+        _id: { $ne: req.params.id },
+        status: { $ne: 'deleted' },
+      });
+      if (conflict) {
+        return res.status(409).json({
+          success: false,
+          message: `Theme "${teacherLoginTheme}" is already assigned to ${conflict.centerName}`,
+        });
+      }
+    }
+
+    await Center.findByIdAndUpdate(req.params.id, { 'branding.teacherLoginTheme': teacherLoginTheme || null });
+
+    await writeAuditLog({
+      action: 'TEACHER_LOGIN_THEME_ASSIGNED', superAdmin: req.superAdmin,
+      targetId: center._id.toString(), targetName: center.centerName,
+      details: { teacherLoginTheme: teacherLoginTheme || null }, ip: req.ip,
+    });
+
+    res.json({ success: true, message: teacherLoginTheme ? `Teacher login theme "${teacherLoginTheme}" assigned to ${center.centerName}` : 'Teacher login theme unassigned' });
+  } catch (err) {
+    logger.error('❌ Teacher login theme assign error:', { error: err?.message });
+    serverError(res);
   }
 });
 
@@ -573,7 +687,7 @@ router.post('/send-otp', verifySuperAdmin, validateOtpSend, async (req, res) => 
   try {
     const { adminEmail } = req.body;
     if (!adminEmail?.trim()) {
-      return res.status(400).json({ success: false, message: 'adminEmail is required' });
+      return badRequest(res, 'adminEmail is required');
     }
 
     const code = String(crypto.randomInt(100000, 1000000));
@@ -604,26 +718,26 @@ router.post('/verify-otp', verifySuperAdmin, validateOtpVerify, async (req, res)
   try {
     const { adminEmail, code } = req.body;
     if (!adminEmail || !code) {
-      return res.status(400).json({ success: false, message: 'adminEmail and code are required' });
+      return badRequest(res, 'adminEmail and code are required');
     }
 
     const entry = emailOtpStore.get(adminEmail.toLowerCase());
     if (!entry) {
-      return res.status(400).json({ success: false, message: 'No OTP found for this email. Please request a new code.' });
+      return badRequest(res, 'No OTP found for this email. Please request a new code.');
     }
     if (Date.now() > entry.expiresAt) {
       emailOtpStore.delete(adminEmail.toLowerCase());
-      return res.status(400).json({ success: false, message: 'OTP has expired. Please request a new code.' });
+      return badRequest(res, 'OTP has expired. Please request a new code.');
     }
     if (entry.code !== String(code).trim()) {
-      return res.status(400).json({ success: false, message: 'Incorrect code. Please try again.' });
+      return badRequest(res, 'Incorrect code. Please try again.');
     }
 
     emailOtpStore.delete(adminEmail.toLowerCase());
     res.json({ success: true, message: 'Email verified' });
   } catch (err) {
     logger.error('❌ Verify OTP error:', { error: err?.message });
-    res.status(500).json({ success: false, message: 'Server error' });
+    serverError(res);
   }
 });
 
@@ -637,7 +751,7 @@ router.get('/centers/domains', verifySuperAdmin, async (req, res) => {
     res.json({ success: true, centers });
   } catch (err) {
     logger.error('❌ Get domains error:', { error: err?.message });
-    res.status(500).json({ success: false, message: 'Server error' });
+    serverError(res);
   }
 });
 
@@ -645,9 +759,9 @@ router.get('/centers/domains', verifySuperAdmin, async (req, res) => {
 router.patch('/centers/:id/verify-domain', verifySuperAdmin, validateParamMongoId('id'), async (req, res) => {
   try {
     const center = await Center.findById(req.params.id);
-    if (!center) return res.status(404).json({ success: false, message: 'Center not found' });
+    if (!center) return notFound(res, 'Center not found');
     if (!center.customDomain) {
-      return res.status(400).json({ success: false, message: 'No custom domain set for this center' });
+      return badRequest(res, 'No custom domain set for this center');
     }
     if (!config.serverIp) {
       return res.status(500).json({ success: false, message: 'SERVER_IP not configured on this server' });
@@ -676,7 +790,7 @@ router.patch('/centers/:id/verify-domain', verifySuperAdmin, validateParamMongoI
     res.json({ success: true, message: `Domain ${center.customDomain} verified successfully` });
   } catch (err) {
     logger.error('❌ Verify domain error:', { error: err?.message });
-    res.status(500).json({ success: false, message: 'Server error' });
+    serverError(res);
   }
 });
 
@@ -684,7 +798,7 @@ router.patch('/centers/:id/verify-domain', verifySuperAdmin, validateParamMongoI
 router.patch('/centers/:id/remove-domain', verifySuperAdmin, validateParamMongoId('id'), async (req, res) => {
   try {
     const center = await Center.findById(req.params.id);
-    if (!center) return res.status(404).json({ success: false, message: 'Center not found' });
+    if (!center) return notFound(res, 'Center not found');
 
     await Center.findByIdAndUpdate(req.params.id, {
       $unset: {
@@ -706,7 +820,7 @@ router.patch('/centers/:id/remove-domain', verifySuperAdmin, validateParamMongoI
     res.json({ success: true, message: 'Custom domain removed' });
   } catch (err) {
     logger.error('❌ Remove domain error:', { error: err?.message });
-    res.status(500).json({ success: false, message: 'Server error' });
+    serverError(res);
   }
 });
 
@@ -717,7 +831,7 @@ router.get('/centers/deleted', verifySuperAdmin, async (req, res) => {
     res.json({ success: true, centers });
   } catch (err) {
     logger.error('❌ Get deleted centers error:', { error: err?.message });
-    res.status(500).json({ success: false, message: 'Server error' });
+    serverError(res);
   }
 });
 
@@ -725,9 +839,9 @@ router.get('/centers/deleted', verifySuperAdmin, async (req, res) => {
 router.patch('/centers/:id/soft-delete', verifySuperAdmin, validateCenterAction, async (req, res) => {
   try {
     const center = await Center.findById(req.params.id);
-    if (!center) return res.status(404).json({ success: false, message: 'Center not found' });
+    if (!center) return notFound(res, 'Center not found');
     if (center.status === 'deleted') {
-      return res.status(400).json({ success: false, message: 'Center is already scheduled for deletion' });
+      return badRequest(res, 'Center is already scheduled for deletion');
     }
 
     const deletedAt           = new Date();
@@ -756,7 +870,7 @@ router.patch('/centers/:id/soft-delete', verifySuperAdmin, validateCenterAction,
     res.json({ success: true, message: 'Center scheduled for deletion in 7 days. Warning email sent.', scheduledDeletionAt });
   } catch (err) {
     logger.error('❌ Soft delete error:', { error: err?.message });
-    res.status(500).json({ success: false, message: 'Server error' });
+    serverError(res);
   }
 });
 
@@ -764,9 +878,9 @@ router.patch('/centers/:id/soft-delete', verifySuperAdmin, validateCenterAction,
 router.patch('/centers/:id/restore', verifySuperAdmin, validateParamMongoId('id'), async (req, res) => {
   try {
     const center = await Center.findById(req.params.id);
-    if (!center) return res.status(404).json({ success: false, message: 'Center not found' });
+    if (!center) return notFound(res, 'Center not found');
     if (center.status !== 'deleted') {
-      return res.status(400).json({ success: false, message: 'Center is not in deleted state' });
+      return badRequest(res, 'Center is not in deleted state');
     }
 
     await Center.findByIdAndUpdate(req.params.id, {
@@ -798,11 +912,11 @@ router.patch('/centers/:id/restore', verifySuperAdmin, validateParamMongoId('id'
     res.json({ success: true, message: 'Center restored to active' });
   } catch (err) {
     logger.error('❌ Restore center error:', { error: err?.message });
-    res.status(500).json({ success: false, message: 'Server error' });
+    serverError(res);
   }
 });
 
-// GET /api/super-admin/usage — per-center Agora minutes summary
+// GET /api/super-admin/usage — per-center Agora minutes summary (accurate, from AgoraSession)
 // Returns thisMonth, lastMonth, and allTime totals for each center that has usage.
 router.get('/usage', verifySuperAdmin, async (req, res) => {
   try {
@@ -811,8 +925,16 @@ router.get('/usage', verifySuperAdmin, async (req, res) => {
     const lastDate  = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const lastMonth = `${lastDate.getFullYear()}-${String(lastDate.getMonth() + 1).padStart(2, '0')}`;
 
-    // All-time totals grouped by center
-    const allTime = await AgoraUsage.aggregate([
+    // Auto-abandon sessions that have been active for > 4 hours (browser crash / missed end)
+    const fourHoursAgo = new Date(Date.now() - 4 * 60 * 60 * 1000);
+    await AgoraSession.updateMany(
+      { status: 'active', startedAt: { $lt: fourHoursAgo } },
+      { $set: { status: 'abandoned' } },
+    );
+
+    // All-time totals grouped by center (completed sessions only)
+    const allTime = await AgoraSession.aggregate([
+      { $match: { status: 'completed' } },
       { $group: {
         _id:          '$centerId',
         centerName:   { $last: '$centerName' },
@@ -822,21 +944,27 @@ router.get('/usage', verifySuperAdmin, async (req, res) => {
       { $sort: { totalMinutes: -1 } },
     ]);
 
-    // This month totals
-    const thisMonthData = await AgoraUsage.aggregate([
-      { $match: { month: thisMonth } },
+    // This month totals (completed only)
+    const thisMonthData = await AgoraSession.aggregate([
+      { $match: { status: 'completed', month: thisMonth } },
       { $group: { _id: '$centerId', minutes: { $sum: '$durationMinutes' } } },
     ]);
 
-    // Last month totals
-    const lastMonthData = await AgoraUsage.aggregate([
-      { $match: { month: lastMonth } },
+    // Last month totals (completed only)
+    const lastMonthData = await AgoraSession.aggregate([
+      { $match: { status: 'completed', month: lastMonth } },
       { $group: { _id: '$centerId', minutes: { $sum: '$durationMinutes' } } },
     ]);
 
-    // Build lookup maps
-    const thisMonthMap = Object.fromEntries(thisMonthData.map(r => [r._id, r.minutes]));
-    const lastMonthMap = Object.fromEntries(lastMonthData.map(r => [r._id, r.minutes]));
+    // Count of currently active sessions per center
+    const activeSessions = await AgoraSession.aggregate([
+      { $match: { status: 'active' } },
+      { $group: { _id: '$centerId', active: { $sum: 1 } } },
+    ]);
+
+    const thisMonthMap  = Object.fromEntries(thisMonthData.map(r => [r._id, r.minutes]));
+    const lastMonthMap  = Object.fromEntries(lastMonthData.map(r => [r._id, r.minutes]));
+    const activeMap     = Object.fromEntries(activeSessions.map(r => [r._id, r.active]));
 
     const summary = allTime.map(c => ({
       centerId:         c._id,
@@ -845,12 +973,29 @@ router.get('/usage', verifySuperAdmin, async (req, res) => {
       sessions:         c.sessions,
       thisMonthMinutes: thisMonthMap[c._id] || 0,
       lastMonthMinutes: lastMonthMap[c._id] || 0,
+      activeSessions:   activeMap[c._id] || 0,
     }));
+
+    // Also include centers with active-only sessions (no completed yet)
+    for (const [centerId, active] of Object.entries(activeMap)) {
+      if (!summary.find(s => s.centerId === centerId)) {
+        const sess = await AgoraSession.findOne({ centerId, status: 'active' }).lean();
+        if (sess) summary.push({
+          centerId,
+          centerName:       sess.centerName,
+          totalMinutes:     0,
+          sessions:         0,
+          thisMonthMinutes: 0,
+          lastMonthMinutes: 0,
+          activeSessions:   active,
+        });
+      }
+    }
 
     res.json({ success: true, summary, thisMonth, lastMonth });
   } catch (err) {
     logger.error('❌ Usage summary error:', { error: err?.message });
-    res.status(500).json({ success: false, message: 'Server error' });
+    serverError(res);
   }
 });
 
@@ -863,16 +1008,18 @@ router.get('/usage/:centerId', verifySuperAdmin, async (req, res) => {
     const defaultMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     const month        = req.query.month || defaultMonth;
 
-    const sessions = await AgoraUsage.find({ centerId, month })
-      .sort({ sessionDate: -1 })
-      .limit(200);
+    const sessions = await AgoraSession.find({ centerId, month })
+      .sort({ startedAt: -1 })
+      .limit(200)
+      .lean();
 
-    const totalMinutes = sessions.reduce((sum, s) => sum + s.durationMinutes, 0);
+    const completedSessions = sessions.filter(s => s.status === 'completed');
+    const totalMinutes = completedSessions.reduce((sum, s) => sum + s.durationMinutes, 0);
 
     res.json({ success: true, sessions, totalMinutes, month, centerId });
   } catch (err) {
     logger.error('❌ Center usage detail error:', { error: err?.message });
-    res.status(500).json({ success: false, message: 'Server error' });
+    serverError(res);
   }
 });
 
@@ -885,18 +1032,18 @@ router.patch('/centers/:id/limits', verifySuperAdmin, validateCenterLimits, asyn
     if (maxTeachers !== undefined) {
       const v = Number(maxTeachers);
       if (isNaN(v) || (v !== -1 && v < 1))
-        return res.status(400).json({ success: false, message: 'maxTeachers must be -1 (unlimited) or ≥ 1' });
+        return badRequest(res, 'maxTeachers must be -1 (unlimited) or ≥ 1');
       update.maxTeachers = v;
     }
     if (maxStudents !== undefined) {
       const v = Number(maxStudents);
       if (isNaN(v) || (v !== -1 && v < 1))
-        return res.status(400).json({ success: false, message: 'maxStudents must be -1 (unlimited) or ≥ 1' });
+        return badRequest(res, 'maxStudents must be -1 (unlimited) or ≥ 1');
       update.maxStudents = v;
     }
 
     const center = await Center.findByIdAndUpdate(req.params.id, update, { new: true });
-    if (!center) return res.status(404).json({ success: false, message: 'Center not found' });
+    if (!center) return notFound(res, 'Center not found');
 
     await writeAuditLog({
       action: 'CENTER_LIMITS_UPDATED', superAdmin: req.superAdmin,
@@ -907,7 +1054,7 @@ router.patch('/centers/:id/limits', verifySuperAdmin, validateCenterLimits, asyn
     res.json({ success: true, maxTeachers: center.maxTeachers, maxStudents: center.maxStudents });
   } catch (err) {
     logger.error('❌ Update limits error:', { error: err?.message });
-    res.status(500).json({ success: false, message: 'Server error' });
+    serverError(res);
   }
 });
 
@@ -916,7 +1063,7 @@ router.post('/broadcast', verifySuperAdmin, validateBroadcast, async (req, res) 
   try {
     const { subject, message } = req.body;
     if (!subject?.trim() || !message?.trim())
-      return res.status(400).json({ success: false, message: 'Subject and message are required' });
+      return badRequest(res, 'Subject and message are required');
 
     const centers = await Center.find({ status: 'active' }).select('centerName adminEmail').lean();
     let sent = 0, failed = 0;
@@ -945,7 +1092,7 @@ router.post('/broadcast', verifySuperAdmin, validateBroadcast, async (req, res) 
     res.json({ success: true, sent, failed, total: centers.length });
   } catch (err) {
     logger.error('❌ Broadcast error:', { error: err?.message });
-    res.status(500).json({ success: false, message: 'Server error' });
+    serverError(res);
   }
 });
 
@@ -976,7 +1123,7 @@ router.get('/chat-credits', verifySuperAdmin, async (req, res) => {
     res.json({ success: true, centers: data, totals: { totalBalance, totalAllocated, totalUsed } });
   } catch (err) {
     logger.error('Chat credits list error:', { error: err?.message });
-    res.status(500).json({ success: false, message: 'Server error' });
+    serverError(res);
   }
 });
 
@@ -985,12 +1132,12 @@ router.post('/chat-credits/:centerId', verifySuperAdmin, validateChatCredits, as
   try {
     const { amount, note } = req.body;
     if (!amount || typeof amount !== 'number' || amount < 1 || amount > 100000) {
-      return res.status(400).json({ message: 'amount must be a number between 1 and 100,000' });
+      return badRequest(res, 'amount must be a number between 1 and 100,000');
     }
 
     const center = await Center.findById(req.params.centerId);
     if (!center || center.status !== 'active') {
-      return res.status(404).json({ message: 'Center not found or inactive' });
+      return notFound(res, 'Center not found or inactive');
     }
 
     const logEntry = {
@@ -1032,7 +1179,132 @@ router.post('/chat-credits/:centerId', verifySuperAdmin, validateChatCredits, as
     });
   } catch (err) {
     logger.error('Allocate chat credits error:', { error: err?.message });
-    res.status(500).json({ success: false, message: 'Server error' });
+    serverError(res);
+  }
+});
+
+// GET /api/super-admin/centers/:id/people — active teachers + students for one center
+router.get('/centers/:id/people', verifySuperAdmin, validateParamMongoId('id'), async (req, res) => {
+  try {
+    const center = await Center.findById(req.params.id);
+    if (!center) return notFound(res, 'Center not found');
+
+    const db      = await getDb(center.slug);
+    const Teacher = db.models.Teacher || db.model('Teacher', teacherSchema);
+    const Student = db.models.Student || db.model('Student', studentSchema);
+
+    const [teachers, students] = await Promise.all([
+      Teacher.find({ status: 'active' })
+        .select('firstName lastName email continent specializations lessonsCompleted createdAt')
+        .lean(),
+      Student.find({ status: 'active' })
+        .select('firstName lastName email country classCredits createdAt')
+        .lean(),
+    ]);
+
+    res.json({
+      success:    true,
+      centerName: center.centerName,
+      teachers: teachers.map(t => ({
+        _id:              t._id,
+        name:             `${t.firstName || ''} ${t.lastName || ''}`.trim() || t.email,
+        email:            t.email,
+        continent:        t.continent || '',
+        specializations:  t.specializations || [],
+        lessonsCompleted: t.lessonsCompleted || 0,
+        joinedAt:         t.createdAt,
+      })),
+      students: students.map(s => ({
+        _id:      s._id,
+        name:     `${s.firstName || ''} ${s.lastName || ''}`.trim() || s.email,
+        email:    s.email,
+        country:  s.country || '',
+        classes:  s.classCredits || 0,
+        joinedAt: s.createdAt,
+      })),
+    });
+  } catch (err) {
+    logger.error('❌ People error:', { error: err?.message });
+    serverError(res);
+  }
+});
+
+// GET /api/super-admin/classes — completed bookings across centers with optional date + center filter
+// Query: from (ISO date), to (ISO date), centerId (optional – single center)
+router.get('/classes', verifySuperAdmin, async (req, res) => {
+  try {
+    const { from, to, centerId } = req.query;
+
+    let targetCenters = await Center.find({ status: 'active' })
+      .select('_id centerName slug').lean();
+
+    if (centerId) {
+      targetCenters = targetCenters.filter(c => c._id.toString() === centerId);
+    }
+
+    const dateFilter = {};
+    if (from) dateFilter.$gte = new Date(from);
+    if (to) {
+      const toDate = new Date(to);
+      toDate.setHours(23, 59, 59, 999);
+      dateFilter.$lte = toDate;
+    }
+
+    const results = await Promise.all(targetCenters.map(async (center) => {
+      try {
+        const db      = await getDb(center.slug);
+        const Booking = db.models.Booking || db.model('Booking', bookingSchema);
+        const Teacher = db.models.Teacher || db.model('Teacher', teacherSchema);
+        const Student = db.models.Student || db.model('Student', studentSchema);
+
+        const query = { status: 'completed' };
+        if (Object.keys(dateFilter).length > 0) query.scheduledTime = dateFilter;
+
+        const bookings = await Booking.find(query).sort({ scheduledTime: -1 }).limit(500).lean();
+        if (!bookings.length) {
+          return { centerId: center._id, centerName: center.centerName, slug: center.slug, total: 0, classes: [] };
+        }
+
+        const tIds = [...new Set(bookings.map(b => b.teacherId?.toString()).filter(Boolean))];
+        const sIds = [...new Set(bookings.map(b => b.studentId?.toString()).filter(Boolean))];
+
+        const [teachers, students] = await Promise.all([
+          Teacher.find({ _id: { $in: tIds } }).select('firstName lastName').lean(),
+          Student.find({ _id: { $in: sIds } }).select('firstName lastName').lean(),
+        ]);
+
+        const tMap = Object.fromEntries(teachers.map(t => [t._id.toString(), `${t.firstName || ''} ${t.lastName || ''}`.trim()]));
+        const sMap = Object.fromEntries(students.map(s => [s._id.toString(), `${s.firstName || ''} ${s.lastName || ''}`.trim()]));
+
+        return {
+          centerId:   center._id,
+          centerName: center.centerName,
+          slug:       center.slug,
+          total:      bookings.length,
+          classes:    bookings.map(b => ({
+            _id:           b._id,
+            classTitle:    b.classTitle || 'Untitled',
+            topic:         b.topic || '',
+            teacherName:   tMap[b.teacherId?.toString()] || 'Unknown',
+            studentName:   sMap[b.studentId?.toString()] || 'Unknown',
+            scheduledTime: b.scheduledTime,
+            duration:      b.duration || 60,
+            completedAt:   b.completedAt || null,
+          })),
+        };
+      } catch {
+        return { centerId: center._id, centerName: center.centerName, slug: center.slug, total: 0, classes: [], error: true };
+      }
+    }));
+
+    // If no center filter, only return centers that have classes
+    const filtered    = centerId ? results : results.filter(c => c.total > 0);
+    const grandTotal  = filtered.reduce((sum, c) => sum + c.total, 0);
+
+    res.json({ success: true, centers: filtered, grandTotal });
+  } catch (err) {
+    logger.error('❌ Classes error:', { error: err?.message });
+    serverError(res);
   }
 });
 

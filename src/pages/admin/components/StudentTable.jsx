@@ -38,7 +38,7 @@ export default function StudentTable({
             students.map((s) => (
               <tr key={s._id} className="hover:bg-gray-50">
                 <td className="border p-2">{s.firstName}</td>
-                <td className="border p-2">{s.surname}</td>
+                <td className="border p-2">{s.lastName}</td>
                 <td className="border p-2">{s.email}</td>
 
                 {/* Password column */}
@@ -69,7 +69,7 @@ export default function StudentTable({
                 </td>
 
                 {/* Classes */}
-                <td className="border p-2 text-center">{s.noOfClasses ?? 0}</td>
+                <td className="border p-2 text-center">{s.classCredits ?? 0}</td>
 
                 {/* Actions */}
                 <td className="border p-2">

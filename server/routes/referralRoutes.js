@@ -15,6 +15,7 @@ import { studentSchema }  from "../schemas/studentSchema.js";
 import { teacherSchema }  from "../schemas/teacherSchema.js";
 import { subAdminSchema } from "../schemas/subAdminSchema.js";
 import logger from "../utils/logger.js";
+import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
 
 const router = express.Router();
 router.use(tenantMiddleware);
@@ -43,7 +44,7 @@ router.get("/my", verifyToken, verifyStudent, async (req, res) => {
 
     let student = await Student.findById(req.user.id)
       .select("referralCode referralCreditsEarned firstName");
-    if (!student) return res.status(404).json({ error: "Student not found" });
+    if (!student) return notFound(res, "Student not found");
 
     if (!student.referralCode) {
       student.referralCode = await makeUniqueCode(req.db);
@@ -69,7 +70,7 @@ router.get("/my", verifyToken, verifyStudent, async (req, res) => {
       referrals,
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    serverError(res, err.message);
   }
 });
 
@@ -84,7 +85,7 @@ router.post("/apply", async (req, res) => {
     const Referral = getReferral(req.db);
 
     const referrer = await Student.findOne({ referralCode: referralCode.trim().toUpperCase() });
-    if (!referrer) return res.status(404).json({ error: "Invalid referral code" });
+    if (!referrer) return notFound(res, "Invalid referral code");
 
     const normalizedRefEmail = email.toLowerCase().trim();
     const [existingStudent, existingTeacher, existingSubAdmin] = await Promise.all([
@@ -92,13 +93,13 @@ router.post("/apply", async (req, res) => {
       getTeacher(req.db).findOne({ email: normalizedRefEmail }).lean(),
       getSubAdmin(req.db).findOne({ email: normalizedRefEmail }).lean(),
     ]);
-    if (existingStudent)  return res.status(409).json({ error: "An account with this email already exists as a student" });
-    if (existingTeacher)  return res.status(409).json({ error: "An account with this email already exists as a teacher" });
-    if (existingSubAdmin) return res.status(409).json({ error: "An account with this email already exists as a sub-admin" });
+    if (existingStudent)  return conflict(res, "An account with this email already exists as a student");
+    if (existingTeacher)  return conflict(res, "An account with this email already exists as a teacher");
+    if (existingSubAdmin) return conflict(res, "An account with this email already exists as a sub-admin");
 
     const existingRef = await Referral.findOne({ referredEmail: email.toLowerCase().trim() });
     if (existingRef)
-      return res.status(409).json({ error: "An application for this email already exists" });
+      return conflict(res, "An application for this email already exists");
 
     const referral = await Referral.create({
       referrerId:        referrer._id,
@@ -110,7 +111,7 @@ router.post("/apply", async (req, res) => {
 
     res.status(201).json({ ok: true, referralId: referral._id });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    serverError(res, err.message);
   }
 });
 
@@ -123,12 +124,12 @@ router.get("/", verifyToken, verifyAdmin, async (req, res) => {
 
     const referrals = await Referral.find(filter)
       .sort({ createdAt: -1 })
-      .populate("referrerId", "firstName surname email referralCode")
-      .populate("referredStudentId", "firstName surname email status");
+      .populate("referrerId", "firstName lastName email referralCode")
+      .populate("referredStudentId", "firstName lastName email status");
 
     res.json(referrals);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    serverError(res, err.message);
   }
 });
 
@@ -139,7 +140,7 @@ router.post("/:id/approve", verifyToken, verifyAdmin, async (req, res) => {
     const Referral = getReferral(req.db);
 
     const referral = await Referral.findById(req.params.id).populate("referrerId");
-    if (!referral) return res.status(404).json({ error: "Referral not found" });
+    if (!referral) return notFound(res, "Referral not found");
     if (referral.status !== "pending")
       return res.status(400).json({ error: `Referral is already ${referral.status}` });
 
@@ -148,16 +149,16 @@ router.post("/:id/approve", verifyToken, verifyAdmin, async (req, res) => {
       getTeacher(req.db).findOne({ email: referral.referredEmail }).lean(),
       getSubAdmin(req.db).findOne({ email: referral.referredEmail }).lean(),
     ]);
-    if (emailAsStudent)  return res.status(409).json({ error: "Email already registered as a student" });
-    if (emailAsTeacher)  return res.status(409).json({ error: "Email already registered as a teacher" });
-    if (emailAsSubAdmin) return res.status(409).json({ error: "Email already registered as a sub-admin" });
+    if (emailAsStudent)  return conflict(res, "Email already registered as a student");
+    if (emailAsTeacher)  return conflict(res, "Email already registered as a teacher");
+    if (emailAsSubAdmin) return conflict(res, "Email already registered as a sub-admin");
 
     const inviteToken   = crypto.randomBytes(32).toString("hex");
     const inviteExpires = new Date(Date.now() + 48 * 60 * 60 * 1000);
 
     const newStudent = await Student.create({
       firstName:  referral.referredFirstName,
-      surname:    referral.referredLastName,
+      lastName:    referral.referredLastName,
       email:      referral.referredEmail,
       status:     "pending",
       active:     false,
@@ -177,7 +178,7 @@ router.post("/:id/approve", verifyToken, verifyAdmin, async (req, res) => {
 
     res.json({ ok: true, studentId: newStudent._id });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    serverError(res, err.message);
   }
 });
 
@@ -190,10 +191,10 @@ router.post("/:id/reject", verifyToken, verifyAdmin, async (req, res) => {
       { status: "rejected" },
       { new: true }
     );
-    if (!referral) return res.status(404).json({ error: "Referral not found" });
+    if (!referral) return notFound(res, "Referral not found");
     res.json({ ok: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    serverError(res, err.message);
   }
 });
 
@@ -215,7 +216,7 @@ export async function completeReferral(studentId, db) {
     if (!referral) return;
 
     await Student.findByIdAndUpdate(referral.referrerId, {
-      $inc: { noOfClasses: 1, referralCreditsEarned: 1 },
+      $inc: { classCredits: 1, referralCreditsEarned: 1 },
     });
 
     referral.status        = "active";

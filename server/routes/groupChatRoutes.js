@@ -8,6 +8,7 @@ import { studentSchema }    from "../schemas/studentSchema.js";
 import { adminSchema }      from "../schemas/adminSchema.js";
 import { subAdminSchema }   from "../schemas/subAdminSchema.js";
 import logger from "../utils/logger.js";
+import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
 
 const router = express.Router();
 router.use(tenantMiddleware);
@@ -34,12 +35,12 @@ router.get("/", verifyToken, async (req, res) => {
       const scope = req.user.teacherScope || [];
       filter.teacherId = { $in: scope };
     } else {
-      return res.status(403).json({ success: false, message: "Invalid user role" });
+      return forbidden(res, "Invalid user role");
     }
 
     const chats = await getGroupChat(req.db).find(filter)
       .populate("teacherId", "firstName lastName email")
-      .populate("studentId", "firstName surname email")
+      .populate("studentId", "firstName lastName email")
       .sort({ lastActivityAt: -1 })
       .lean();
 
@@ -58,9 +59,9 @@ router.get("/:chatId", verifyToken, async (req, res) => {
 
     const chat = await getGroupChat(req.db).findById(chatId)
       .populate("teacherId", "firstName lastName email")
-      .populate("studentId", "firstName surname email");
+      .populate("studentId", "firstName lastName email");
 
-    if (!chat) return res.status(404).json({ success: false, message: "Chat not found" });
+    if (!chat) return notFound(res, "Chat not found");
 
     const teacherIdStr = chat.teacherId?._id?.toString() || chat.teacherId?.toString();
     const studentIdStr = chat.studentId?._id?.toString() || chat.studentId?.toString();
@@ -70,7 +71,7 @@ router.get("/:chatId", verifyToken, async (req, res) => {
         teacherIdStr !== userId &&
         studentIdStr !== userId &&
         !(role === "sub-admin" && scope.includes(teacherIdStr))) {
-      return res.status(403).json({ success: false, message: "Access denied" });
+      return forbidden(res, "Access denied");
     }
 
     res.json({ success: true, chat });
@@ -90,14 +91,14 @@ router.get("/:chatId/messages", verifyToken, async (req, res) => {
       .select("chatName teacherId studentId assignmentId messages")
       .lean();
 
-    if (!chat) return res.status(404).json({ success: false, message: "Chat not found" });
+    if (!chat) return notFound(res, "Chat not found");
 
     const scope = req.user.teacherScope?.map(String) || [];
     if (role !== "admin" &&
         chat.teacherId.toString() !== userId &&
         chat.studentId.toString() !== userId &&
         !(role === "sub-admin" && scope.includes(chat.teacherId.toString()))) {
-      return res.status(403).json({ success: false, message: "Access denied" });
+      return forbidden(res, "Access denied");
     }
 
     res.json({ success: true, messages: chat.messages || [] });
@@ -118,40 +119,40 @@ router.post("/:chatId/messages", verifyToken, async (req, res) => {
 
     if (role === "teacher") {
       const teacher = await getTeacher(req.db).findById(senderId);
-      if (!teacher) return res.status(404).json({ success: false, message: "Teacher not found" });
+      if (!teacher) return notFound(res, "Teacher not found");
       senderName  = `${teacher.firstName} ${teacher.lastName}`;
       senderModel = "Teacher";
     } else if (role === "student") {
       const student = await getStudent(req.db).findById(senderId);
-      if (!student) return res.status(404).json({ success: false, message: "Student not found" });
-      senderName  = `${student.firstName} ${student.surname}`;
+      if (!student) return notFound(res, "Student not found");
+      senderName  = `${student.firstName} ${student.lastName}`;
       senderModel = "Student";
     } else if (role === "admin") {
       const admin = await getAdmin(req.db).findById(senderId);
-      if (!admin) return res.status(404).json({ success: false, message: "Admin not found" });
+      if (!admin) return notFound(res, "Admin not found");
       senderName  = `${admin.firstName} ${admin.lastName}`;
       senderModel = "Admin";
     } else if (role === "sub-admin") {
       const subAdmin = await getSubAdmin(req.db).findById(senderId);
-      if (!subAdmin) return res.status(404).json({ success: false, message: "Sub-admin not found" });
+      if (!subAdmin) return notFound(res, "Sub-admin not found");
       senderName  = `${subAdmin.firstName} ${subAdmin.lastName}`;
       senderModel = "SubAdmin";
     } else {
-      return res.status(403).json({ success: false, message: "Invalid user role" });
+      return forbidden(res, "Invalid user role");
     }
 
     if (!message || !message.trim())
-      return res.status(400).json({ success: false, message: "Message cannot be empty" });
+      return badRequest(res, "Message cannot be empty");
 
     const chat = await getGroupChat(req.db).findById(chatId);
-    if (!chat) return res.status(404).json({ success: false, message: "Chat not found" });
+    if (!chat) return notFound(res, "Chat not found");
 
     const sendScope = req.user.teacherScope?.map(String) || [];
     if (role !== "admin" &&
         chat.teacherId.toString() !== senderId &&
         chat.studentId.toString() !== senderId &&
         !(role === "sub-admin" && sendScope.includes(chat.teacherId.toString()))) {
-      return res.status(403).json({ success: false, message: "Access denied" });
+      return forbidden(res, "Access denied");
     }
 
     chat.messages.push({
@@ -196,14 +197,14 @@ router.patch("/:chatId/mark-read", verifyToken, async (req, res) => {
     const { id: userId, role } = req.user;
 
     const chat = await getGroupChat(req.db).findById(chatId);
-    if (!chat) return res.status(404).json({ success: false, message: "Chat not found" });
+    if (!chat) return notFound(res, "Chat not found");
 
     const mrScope = req.user.teacherScope?.map(String) || [];
     if (role !== "admin" &&
         chat.teacherId.toString() !== userId &&
         chat.studentId.toString() !== userId &&
         !(role === "sub-admin" && mrScope.includes(chat.teacherId.toString()))) {
-      return res.status(403).json({ success: false, message: "Access denied" });
+      return forbidden(res, "Access denied");
     }
 
     chat.messages.forEach((msg) => {
@@ -229,10 +230,10 @@ router.patch("/:chatId/mark-read", verifyToken, async (req, res) => {
 router.delete("/:chatId", verifyToken, async (req, res) => {
   try {
     if (req.user.role !== "admin")
-      return res.status(403).json({ success: false, message: "Only admins can delete chats" });
+      return forbidden(res, "Only admins can delete chats");
 
     const chat = await getGroupChat(req.db).findByIdAndDelete(req.params.chatId);
-    if (!chat) return res.status(404).json({ success: false, message: "Chat not found" });
+    if (!chat) return notFound(res, "Chat not found");
 
     res.json({ success: true, message: "Chat deleted successfully" });
   } catch (error) {

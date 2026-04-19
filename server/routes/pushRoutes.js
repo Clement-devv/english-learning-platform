@@ -7,6 +7,7 @@ import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
 import { studentSchema } from "../schemas/studentSchema.js";
 import { teacherSchema } from "../schemas/teacherSchema.js";
 import { VAPID_PUB, sendPush } from "../utils/webPushService.js";
+import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
 
 const router = express.Router();
 router.use(tenantMiddleware);
@@ -38,7 +39,7 @@ router.post("/subscribe", verifyToken, async (req, res) => {
 
     res.json({ ok: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    serverError(res, err.message);
   }
 });
 
@@ -49,7 +50,7 @@ router.delete("/subscribe", verifyToken, async (req, res) => {
     await Model.findByIdAndUpdate(req.user._id, { pushSubscription: null });
     res.json({ ok: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    serverError(res, err.message);
   }
 });
 
@@ -60,7 +61,7 @@ router.get("/status", verifyToken, async (req, res) => {
     const user  = await Model.findById(req.user._id).select("pushSubscription");
     res.json({ subscribed: !!user?.pushSubscription?.endpoint });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    serverError(res, err.message);
   }
 });
 

@@ -104,12 +104,12 @@ export default function PaymentsTab({ isDarkMode }) {
       setLoading(true);
       
       // Load payment summary
-      const summaryRes = await api.get("/payments/summary");
+      const summaryRes = await api.get("/payment-transactions/summary");
       setTeacherSummary(summaryRes.data.teachers);
       setTotals(summaryRes.data.totals);
 
       // Load all transactions
-      const txRes = await api.get("/payments/all");
+      const txRes = await api.get("/payment-transactions/all");
       setTransactions(txRes.data.transactions);
 
     } catch (err) {
@@ -124,7 +124,7 @@ export default function PaymentsTab({ isDarkMode }) {
     if (!window.confirm("Mark this payment as paid?")) return;
 
     try {
-      await api.patch(`/payments/${transactionId}/pay`, {
+      await api.patch(`/payment-transactions/${transactionId}/pay`, {
         paymentMethod,
         notes: paymentNotes
       });
@@ -160,7 +160,7 @@ export default function PaymentsTab({ isDarkMode }) {
     const { teacherId, teacherName, pendingAmount } = payAllTarget;
     setPayAllTarget(null);
     try {
-      const res = await api.patch(`/payments/teacher/${teacherId}/pay-all`, {
+      const res = await api.patch(`/payment-transactions/teacher/${teacherId}/pay-all`, {
         paymentMethod,
         notes: paymentNotes,
       });

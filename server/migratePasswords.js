@@ -4,7 +4,7 @@
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 import dotenv from "dotenv";
-import Teacher from "./models/Teacher.js";
+import { teacherSchema } from "./schemas/teacherSchema.js";
 
 dotenv.config();
 
@@ -13,6 +13,7 @@ async function migratePasswords() {
     // Connect to MongoDB
     await mongoose.connect(process.env.MONGO_URI);
     console.log("✅ Connected to MongoDB");
+    const Teacher = mongoose.models.Teacher || mongoose.model("Teacher", teacherSchema);
 
     // Find all teachers
     const teachers = await Teacher.find();

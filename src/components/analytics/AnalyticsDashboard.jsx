@@ -267,7 +267,7 @@ export default function AnalyticsDashboard({ isDarkMode }) {
                   #{index + 1}
                 </div>
                 <div>
-                  <p className={`font-semibold ${heading}`}>{student.firstName} {student.surname}</p>
+                  <p className={`font-semibold ${heading}`}>{student.firstName} {student.lastName}</p>
                   <p className={`text-xs ${mutedText}`}>{student.email}</p>
                 </div>
               </div>
@@ -283,7 +283,7 @@ export default function AnalyticsDashboard({ isDarkMode }) {
                 ))}
                 <div className={`p-2 rounded col-span-2 ${dm ? "bg-gray-700" : "bg-white"}`}>
                   <p className={`text-xs ${mutedText}`}>Classes Remaining</p>
-                  <p className="font-bold text-purple-500">{student.noOfClasses}</p>
+                  <p className="font-bold text-purple-500">{student.classCredits}</p>
                 </div>
               </div>
             </div>

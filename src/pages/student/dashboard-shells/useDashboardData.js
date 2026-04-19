@@ -5,6 +5,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { io } from "socket.io-client";
 import { useNavigate, useLocation } from "react-router-dom";
+import { useAuth } from "../../../context/AuthContext.jsx";
 import api from "../../../api";
 import { getUserTimezone } from "../../../utils/timezone";
 import { pushSupported, enablePush, disablePush, getPushStatus } from "../../../utils/pushNotifications";
@@ -57,6 +58,7 @@ export const TABS = [
 export function useDashboardData() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user: authUser, setUser: setAuthUser } = useAuth();
 
   // ── Modal / UI state ───────────────────────────────────────────────────────
   const [showChangePassword,    setShowChangePassword]    = useState(false);
@@ -96,20 +98,27 @@ export function useDashboardData() {
 
   // ── Student info ───────────────────────────────────────────────────────────
   const [student] = useState(() => {
-    const raw = sessionStorage.getItem("studentInfo") || localStorage.getItem("studentInfo");
-    if (raw) {
-      const p = JSON.parse(raw);
+    // Prefer auth context (avoids repeated localStorage reads); fall back to
+    // localStorage in case the context hasn't propagated yet (e.g. Vite HMR).
+    const p = authUser || (() => {
+      try {
+        const raw = sessionStorage.getItem("studentInfo") || localStorage.getItem("studentInfo");
+        return raw ? JSON.parse(raw) : null;
+      } catch { return null; }
+    })() || {};
+
+    if (p._id || p.id) {
       return {
         id: p._id || p.id,
         firstName: p.firstName || "",
-        surname: p.surname || p.lastName || "",
-        name: `${p.firstName || ""} ${p.surname || p.lastName || ""}`.trim(),
+        lastName: p.lastName || p.surname || "",
+        name: `${p.firstName || ""} ${p.lastName || p.surname || ""}`.trim(),
         email: p.email,
-        noOfClasses: p.noOfClasses || 0,
+        classCredits: p.classCredits || p.noOfClasses || 0,
         level: "Intermediate",
       };
     }
-    return { name: "Student", firstName: "Student", surname: "", level: "Intermediate" };
+    return { name: "Student", firstName: "Student", lastName: "", level: "Intermediate" };
   });
 
   // ── Data state ─────────────────────────────────────────────────────────────
@@ -308,11 +317,21 @@ export function useDashboardData() {
       let classesRemaining = 0;
       try {
         const { data: freshStudent } = await api.get(`/students/${studentId}`);
-        classesRemaining = freshStudent?.noOfClasses || 0;
-        const stored = JSON.parse(sessionStorage.getItem("studentInfo") || localStorage.getItem("studentInfo") || "{}");
-        sessionStorage.setItem("studentInfo", JSON.stringify({ ...stored, noOfClasses: classesRemaining }));
+        classesRemaining = freshStudent?.classCredits || 0;
+        // Sync into auth context (no-op if context unavailable) + localStorage fallback
+        setAuthUser({ classCredits: classesRemaining });
+        try {
+          const key = sessionStorage.getItem("studentInfo") ? "studentInfo" : null;
+          if (key) {
+            const stored = JSON.parse(sessionStorage.getItem(key) || "{}");
+            sessionStorage.setItem(key, JSON.stringify({ ...stored, classCredits: classesRemaining }));
+          } else {
+            const stored = JSON.parse(localStorage.getItem("studentInfo") || "{}");
+            localStorage.setItem("studentInfo", JSON.stringify({ ...stored, classCredits: classesRemaining }));
+          }
+        } catch { /* silent */ }
       } catch {
-        classesRemaining = JSON.parse(sessionStorage.getItem("studentInfo") || localStorage.getItem("studentInfo") || "{}").noOfClasses || 0;
+        classesRemaining = authUser?.classCredits || 0;
       }
 
       const completedCount = completedList.length;

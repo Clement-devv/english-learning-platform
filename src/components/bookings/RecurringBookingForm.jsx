@@ -157,8 +157,8 @@ export default function RecurringBookingForm({
 
     // Check student has enough classes
     const student = students.find(s => s._id === formData.studentId);
-    if (student && student.noOfClasses < occurrences) {
-      newErrors.studentId = `Student only has ${student.noOfClasses} classes remaining`;
+    if (student && student.classCredits < occurrences) {
+      newErrors.studentId = `Student only has ${student.classCredits} classes remaining`;
     }
 
     // Check start time is in future
@@ -272,7 +272,7 @@ export default function RecurringBookingForm({
               <option value="">-- Select Student --</option>
               {students.map(s => (
                 <option key={s._id} value={s._id}>
-                  {s.firstName} {s.surname} - {s.noOfClasses} classes
+                  {s.firstName} {s.lastName} - {s.classCredits} classes
                 </option>
               ))}
             </select>

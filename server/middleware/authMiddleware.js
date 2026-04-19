@@ -59,11 +59,20 @@ export const verifySubAdmin = async (req, res, next) => {
       return res.status(403).json({ message: "Sub-admin account inactive or not found" });
     }
     req.subAdmin = subAdmin;
-    req.teacherScope = subAdmin.assignmentType === "region"
-      ? null
-      : subAdmin.assignedTeachers.map(String);
+    if (subAdmin.assignmentType === "region") {
+      if (!subAdmin.region) {
+        // Region-type sub-admin with no region assigned — deny all access
+        req.teacherScope = [];
+      } else {
+        const Teacher = getTeacherModel(req.db);
+        const teachers = await Teacher.find({ continent: subAdmin.region }).select("_id").lean();
+        req.teacherScope = teachers.map(t => t._id.toString());
+      }
+    } else {
+      req.teacherScope = subAdmin.assignedTeachers.map(String);
+    }
     next();
-  } catch (err) {
+  } catch (_err) {
     return res.status(500).json({ message: "Authorization error" });
   }
 };
@@ -93,7 +102,7 @@ export const verifyAdmin = async (req, res, next) => {
     }
     req.admin = admin;
     next();
-  } catch (err) {
+  } catch (_err) {
     return res.status(500).json({ message: "Server error during authorization" });
   }
 };
@@ -118,7 +127,7 @@ export const verifyTeacher = async (req, res, next) => {
     }
     req.teacher = teacher;
     next();
-  } catch (err) {
+  } catch (_err) {
     return res.status(500).json({ message: "Server error during authorization" });
   }
 };
@@ -143,7 +152,7 @@ export const verifyStudent = async (req, res, next) => {
     }
     req.student = student;
     next();
-  } catch (err) {
+  } catch (_err) {
     return res.status(500).json({ message: "Server error during authorization" });
   }
 };
@@ -182,7 +191,7 @@ export const verifyAdminOrTeacher = async (req, res, next) => {
       return next();
     }
     return res.status(403).json({ message: "Admin or Teacher access required" });
-  } catch (err) {
+  } catch (_err) {
     return res.status(500).json({ message: "Server error during authorization" });
   }
 };

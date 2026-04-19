@@ -5,6 +5,7 @@ import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
 import { lessonSchema } from "../schemas/lessonSchema.js";
 import { parsePagination } from "../utils/pagination.js";
 import logger from "../utils/logger.js";
+import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
 
 const router = express.Router();
 router.use(tenantMiddleware);
@@ -17,7 +18,7 @@ router.get("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
     const { limit, skip } = parsePagination(req.query);
     const lessons = await getLesson(req.db)
       .find()
-      .populate("studentId", "firstName surname email")
+      .populate("studentId", "firstName lastName email")
       .sort({ date: -1 })
       .skip(skip)
       .limit(limit)
@@ -25,7 +26,7 @@ router.get("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
     res.json(lessons);
   } catch (err) {
     logger.error(err);
-    res.status(500).json({ message: "Error fetching lessons" });
+    serverError(res, "Error fetching lessons");
   }
 });
 

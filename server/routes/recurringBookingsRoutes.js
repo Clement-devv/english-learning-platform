@@ -8,6 +8,7 @@ import { recurringPatternSchema } from "../schemas/recurringPatternSchema.js";
 import { studentSchema }          from "../schemas/studentSchema.js";
 import { teacherSchema }          from "../schemas/teacherSchema.js";
 import logger from "../utils/logger.js";
+import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
 
 const router = express.Router();
 router.use(tenantMiddleware);
@@ -172,7 +173,7 @@ router.post("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
     }
 
     logger.info(`✅ Teacher: ${teacher.firstName} ${teacher.lastName}`);
-    logger.info(`✅ Student: ${student.firstName} ${student.surname}`);
+    logger.info(`✅ Student: ${student.firstName} ${student.lastName}`);
 
     // === CALCULATE OCCURRENCES ===
     let finalOccurrences = occurrences;
@@ -198,11 +199,11 @@ router.post("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
     }
 
     // === CHECK STUDENT CLASSES ===
-    logger.info(`🔍 Checking student classes: ${student.noOfClasses} available`);
-    if (student.noOfClasses < finalOccurrences) {
+    logger.info(`🔍 Checking student classes: ${student.classCredits} available`);
+    if (student.classCredits < finalOccurrences) {
       return res.status(400).json({
         success: false,
-        message: `Student only has ${student.noOfClasses} classes remaining, but ${finalOccurrences} bookings requested`
+        message: `Student only has ${student.classCredits} classes remaining, but ${finalOccurrences} bookings requested`
       });
     }
 
@@ -375,14 +376,14 @@ router.get("/", verifyToken, async (req, res) => {
 
     const patterns = await getRecurringPattern(req.db).find(query)
       .populate("teacherId", "firstName lastName email")
-      .populate("studentId", "firstName surname email")
+      .populate("studentId", "firstName lastName email")
       .populate("bookingIds", "scheduledTime status")
       .sort({ createdAt: -1 });
 
     res.json({ success: true, patterns, count: patterns.length });
   } catch (err) {
     logger.error("❌ Error fetching recurring patterns:", { error: err?.message });
-    res.status(500).json({ success: false, message: "Error fetching recurring patterns", error: err.message });
+    serverError(res, "Error fetching recurring patterns");
   }
 });
 
@@ -394,24 +395,24 @@ router.get("/:id", verifyToken, async (req, res) => {
   try {
     const pattern = await getRecurringPattern(req.db).findById(req.params.id)
       .populate("teacherId", "firstName lastName email")
-      .populate("studentId", "firstName surname email")
+      .populate("studentId", "firstName lastName email")
       .populate("bookingIds");
 
     if (!pattern) {
-      return res.status(404).json({ success: false, message: "Recurring pattern not found" });
+      return notFound(res, "Recurring pattern not found");
     }
 
     const isAdmin   = req.user.role === 'admin';
     const isTeacher = req.user.role === 'teacher' && pattern.teacherId._id.toString() === req.user.id;
 
     if (!isAdmin && !isTeacher) {
-      return res.status(403).json({ success: false, message: "Not authorized to view this recurring pattern" });
+      return forbidden(res, "Not authorized to view this recurring pattern");
     }
 
     res.json({ success: true, pattern });
   } catch (err) {
     logger.error("❌ Error fetching recurring pattern:", { error: err?.message });
-    res.status(500).json({ success: false, message: "Error fetching recurring pattern", error: err.message });
+    serverError(res, "Error fetching recurring pattern");
   }
 });
 
@@ -426,14 +427,14 @@ router.patch("/:id/cancel", verifyToken, verifyAdminOrTeacher, async (req, res) 
     const pattern = await getRecurringPattern(req.db).findById(req.params.id);
 
     if (!pattern) {
-      return res.status(404).json({ success: false, message: "Recurring pattern not found" });
+      return notFound(res, "Recurring pattern not found");
     }
 
     const isAdmin   = req.user.role === 'admin';
     const isTeacher = req.user.role === 'teacher' && pattern.teacherId.toString() === req.user.id;
 
     if (!isAdmin && !isTeacher) {
-      return res.status(403).json({ success: false, message: "Not authorized to cancel this recurring pattern" });
+      return forbidden(res, "Not authorized to cancel this recurring pattern");
     }
 
     let useTransactions = true;
@@ -495,7 +496,7 @@ router.patch("/:id/cancel", verifyToken, verifyAdminOrTeacher, async (req, res) 
 
   } catch (err) {
     logger.error("❌ Error cancelling recurring pattern:", { error: err?.message });
-    res.status(500).json({ success: false, message: "Error cancelling recurring pattern", error: err.message });
+    serverError(res, "Error cancelling recurring pattern");
   }
 });
 
@@ -508,7 +509,7 @@ router.delete("/:id", verifyToken, verifyAdmin, async (req, res) => {
     const pattern = await getRecurringPattern(req.db).findById(req.params.id);
 
     if (!pattern) {
-      return res.status(404).json({ success: false, message: "Recurring pattern not found" });
+      return notFound(res, "Recurring pattern not found");
     }
 
     let useTransactions = true;
@@ -546,7 +547,7 @@ router.delete("/:id", verifyToken, verifyAdmin, async (req, res) => {
 
   } catch (err) {
     logger.error("❌ Error deleting recurring pattern:", { error: err?.message });
-    res.status(500).json({ success: false, message: "Error deleting recurring pattern", error: err.message });
+    serverError(res, "Error deleting recurring pattern");
   }
 });
 

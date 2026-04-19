@@ -231,7 +231,7 @@ export default function AssignStudentsTab({ teachers = [], students = [], onNoti
   // ── filtered list ────────────────────────────────────────────────────────────
   const filtered = useMemo(() => {
     return assignments.filter((a) => {
-      const studentName = `${a.studentId?.firstName ?? ""} ${a.studentId?.surname ?? ""}`.toLowerCase();
+      const studentName = `${a.studentId?.firstName ?? ""} ${a.studentId?.lastName ?? ""}`.toLowerCase();
       const teacherName = `${a.teacherId?.displayName ?? ""} ${a.teacherId?.firstName ?? ""} ${a.teacherId?.lastName ?? ""}`.toLowerCase();
       const q = search.toLowerCase();
       const matchesSearch = !q || studentName.includes(q) || teacherName.includes(q);
@@ -357,7 +357,7 @@ export default function AssignStudentsTab({ teachers = [], students = [], onNoti
                 placeholder="Select a student…"
                 isDarkMode={isDarkMode}
                 getId={(o) => o._id}
-                getLabel={(o) => `${o.firstName} ${o.surname}`}
+                getLabel={(o) => `${o.firstName} ${o.lastName}`}
               />
             </div>
 
@@ -367,7 +367,7 @@ export default function AssignStudentsTab({ teachers = [], students = [], onNoti
                 {selectedStudent && (
                   <div className={t.muted}>
                     Student: <span className={`font-medium ${isDarkMode ? "text-violet-300" : "text-violet-700"}`}>
-                      {selectedStudent.firstName} {selectedStudent.surname}
+                      {selectedStudent.firstName} {selectedStudent.lastName}
                     </span>
                   </div>
                 )}
@@ -511,7 +511,7 @@ export default function AssignStudentsTab({ teachers = [], students = [], onNoti
                             <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${isDarkMode ? "bg-emerald-900/50 text-emerald-300" : "bg-emerald-100 text-emerald-600"}`}>
                               {(a.studentId?.firstName?.[0] ?? "?").toUpperCase()}
                             </div>
-                            <span className="flex-1 font-medium">{a.studentId?.firstName} {a.studentId?.surname}</span>
+                            <span className="flex-1 font-medium">{a.studentId?.firstName} {a.studentId?.lastName}</span>
                             <span className={`text-xs ${t.muted}`}>
                               {a.assignedDate ? new Date(a.assignedDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "—"}
                             </span>
@@ -552,7 +552,7 @@ export default function AssignStudentsTab({ teachers = [], students = [], onNoti
                             {(a.studentId?.firstName?.[0] ?? "?").toUpperCase()}
                           </div>
                           <span className="font-medium truncate">
-                            {a.studentId?.firstName} {a.studentId?.surname}
+                            {a.studentId?.firstName} {a.studentId?.lastName}
                           </span>
                         </div>
                       </td>

@@ -142,7 +142,7 @@ export default function ReferralsTab({ isDarkMode }) {
         referrals.map(r => {
           const meta = STATUS_META[r.status] ?? STATUS_META.pending;
           const referrerName = r.referrerId
-            ? `${r.referrerId.firstName} ${r.referrerId.surname}`
+            ? `${r.referrerId.firstName} ${r.referrerId.lastName}`
             : "Unknown";
           return (
             <div key={r._id} style={{

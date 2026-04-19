@@ -113,7 +113,7 @@ export default function ChatCreditsTab({ isDarkMode }) {
     const q = search.toLowerCase();
     return (
       s.firstName?.toLowerCase().includes(q) ||
-      s.surname?.toLowerCase().includes(q) ||
+      s.lastName?.toLowerCase().includes(q) ||
       s.email?.toLowerCase().includes(q)
     );
   });
@@ -259,7 +259,7 @@ export default function ChatCreditsTab({ isDarkMode }) {
                 }}>
                   <div>
                     <div style={{ fontWeight: 700, fontSize: 14, color: col.heading }}>
-                      {s.firstName} {s.surname}
+                      {s.firstName} {s.lastName}
                     </div>
                     <div style={{ fontSize: 11, color: col.muted, marginTop: 2 }}>
                       {s.status === "active" ? "✅ Active" : "⏳ Pending"}
@@ -315,7 +315,7 @@ export default function ChatCreditsTab({ isDarkMode }) {
               ⚡ Grant Chat Credits
             </h2>
             <p style={{ margin: "0 0 20px", fontSize: 13, color: col.muted }}>
-              Student: <strong style={{ color: col.body }}>{modal.student.firstName} {modal.student.surname}</strong>
+              Student: <strong style={{ color: col.body }}>{modal.student.firstName} {modal.student.lastName}</strong>
               &nbsp;· Current balance: <strong style={{ color: "#7c3aed" }}>{modal.student.credits} credits</strong>
             </p>
 

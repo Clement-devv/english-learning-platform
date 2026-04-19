@@ -24,6 +24,7 @@ import { subAdminSchema } from "../schemas/subAdminSchema.js";
 import { paymentSchema }  from "../schemas/paymentSchema.js";
 import { parsePagination } from "../utils/pagination.js";
 import logger from "../utils/logger.js";
+import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
 
 const router = express.Router();
 router.use(tenantMiddleware);
@@ -39,7 +40,7 @@ router.get("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
     const { limit, skip } = parsePagination(req.query);
     const students = await getStudent(req.db)
       .find()
-      .select("firstName surname email active noOfClasses age lastPaymentDate showTempPassword status createdAt phone country rank dateOfBirth scheduledDeletionAt")
+      .select("firstName lastName email active classCredits age lastPaymentDate showTempPassword status createdAt phone country rank dateOfBirth scheduledDeletionAt")
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
@@ -47,7 +48,7 @@ router.get("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
     res.json(students);
   } catch (err) {
     logger.error(err);
-    res.status(500).json({ message: "Server error fetching students" });
+    serverError(res, "Server error fetching students");
   }
 });
 
@@ -55,16 +56,16 @@ router.get("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
 // NOTE: Must be defined BEFORE /:id or Express would match /:id with id="streak"
 router.get("/streak", verifyToken, async (req, res) => {
   try {
-    if (req.user.role !== "student") return res.status(403).json({ message: "Students only" });
+    if (req.user.role !== "student") return forbidden(res, "Students only");
     const student = await getStudent(req.db)
       .findById(req.user.id)
       .select("currentStreak longestStreak lastActivityDate streakFreezes weeklyClassStreak longestWeeklyClassStreak lastClassWeek activityDates")
       .lean();
-    if (!student) return res.status(404).json({ message: "Student not found" });
+    if (!student) return notFound(res, "Student not found");
     res.json(student);
   } catch (err) {
     logger.error("GET /streak error:", { error: err?.message });
-    res.status(500).json({ message: "Server error" });
+    serverError(res);
   }
 });
 
@@ -72,25 +73,25 @@ router.get("/streak", verifyToken, async (req, res) => {
 router.get("/:id", verifyToken, async (req, res) => {
   try {
     if (req.user.role === "student" && req.user.id !== req.params.id)
-      return res.status(403).json({ message: "You can only view your own data" });
+      return forbidden(res, "You can only view your own data");
     const student = await getStudent(req.db)
       .findById(req.params.id)
-      .select("firstName surname email active noOfClasses age lastPaymentDate showTempPassword status twoFactorEnabled createdAt")
+      .select("firstName lastName email active classCredits age lastPaymentDate showTempPassword status twoFactorEnabled createdAt")
       .lean();
-    if (!student) return res.status(404).json({ message: "Student not found" });
+    if (!student) return notFound(res, "Student not found");
     res.json(student);
   } catch (err) {
     logger.error(err);
-    res.status(500).json({ message: "Server error fetching student" });
+    serverError(res, "Server error fetching student");
   }
 });
 
 // ─── POST create student (invite flow) ───────────────────────────────────────
 router.post("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
   try {
-    const { firstName, surname, email, age, dateOfBirth, rank, phone, country } = req.body;
-    if (!firstName || !surname || !email)
-      return res.status(400).json({ message: "Missing required fields" });
+    const { firstName, lastName, email, age, dateOfBirth, rank, phone, country } = req.body;
+    if (!firstName || !lastName || !email)
+      return badRequest(res, "Missing required fields");
 
     const Student  = getStudent(req.db);
     const Teacher  = getTeacher(req.db);
@@ -102,9 +103,9 @@ router.post("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
       Teacher.findOne({ email: normalizedEmail }).lean(),
       SubAdmin.findOne({ email: normalizedEmail }).lean(),
     ]);
-    if (asStudent)  return res.status(400).json({ message: "Email is already registered as a student" });
-    if (asTeacher)  return res.status(400).json({ message: "Email is already registered as a teacher" });
-    if (asSubAdmin) return res.status(400).json({ message: "Email is already registered as a sub-admin" });
+    if (asStudent)  return badRequest(res, "Email is already registered as a student");
+    if (asTeacher)  return badRequest(res, "Email is already registered as a teacher");
+    if (asSubAdmin) return badRequest(res, "Email is already registered as a sub-admin");
 
     // ── Check student seat limit (-1 = unlimited) ─────────────────────────
     const maxStudents = req.center?.maxStudents;
@@ -118,8 +119,8 @@ router.post("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
     const inviteExpires = new Date(Date.now() + 48 * 60 * 60 * 1000);
 
     const student = await Student.create({
-      firstName, surname, email: normalizedEmail, age,
-      noOfClasses: 0,
+      firstName, lastName, email: normalizedEmail, age,
+      classCredits: 0,
       phone: phone || "", country: country || "",
       dateOfBirth: dateOfBirth || null,
       rank: rank || "",
@@ -143,7 +144,7 @@ router.post("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
     });
   } catch (err) {
     logger.error(err);
-    res.status(500).json({ message: "Error creating student" });
+    serverError(res, "Error creating student");
   }
 });
 
@@ -154,11 +155,11 @@ router.post("/:id/resend-invite", verifyToken, verifyAdminOrTeacher, async (req,
     const student = await Student.findById(req.params.id);
 
     if (!student) {
-      return res.status(404).json({ message: "Student not found" });
+      return notFound(res, "Student not found");
     }
 
     if (student.status !== "pending") {
-      return res.status(400).json({ message: "This student has already completed their account setup." });
+      return badRequest(res, "This student has already completed their account setup.");
     }
 
     // Issue a fresh token and extend the expiry by 48 hours
@@ -178,7 +179,7 @@ router.post("/:id/resend-invite", verifyToken, verifyAdminOrTeacher, async (req,
     res.json({ success: true, message: `Invite email resent to ${student.email}.` });
   } catch (err) {
     logger.error("Resend invite error:", { error: err?.message });
-    res.status(500).json({ message: "Failed to resend invite email." });
+    serverError(res, "Failed to resend invite email.");
   }
 });
 
@@ -189,12 +190,12 @@ router.get("/verify-invite/:token", strictLimiter, async (req, res) => {
       inviteToken: req.params.token, inviteExpires: { $gt: new Date() }, status: "pending",
     });
     if (!student) {
-      return res.status(400).json({ message: "This invite link is invalid or has expired. Please ask your admin to resend the invitation." });
+      return badRequest(res, "This invite link is invalid or has expired. Please ask your admin to resend the invitation.");
     }
-    res.json({ valid: true, student: { firstName: student.firstName, surname: student.surname, email: student.email, noOfClasses: student.noOfClasses, age: student.age } });
+    res.json({ valid: true, student: { firstName: student.firstName, lastName: student.lastName, email: student.email, classCredits: student.classCredits, age: student.age } });
   } catch (err) {
     logger.error(err);
-    res.status(500).json({ message: "Error verifying invite" });
+    serverError(res, "Error verifying invite");
   }
 });
 
@@ -202,15 +203,15 @@ router.get("/verify-invite/:token", strictLimiter, async (req, res) => {
 router.post("/setup-account", strictLimiter, async (req, res) => {
   try {
     const { token, password } = req.body;
-    if (!token || !password) return res.status(400).json({ message: "Token and password are required" });
-    if (password.length < 8) return res.status(400).json({ message: "Password must be at least 8 characters" });
+    if (!token || !password) return badRequest(res, "Token and password are required");
+    if (password.length < 8) return badRequest(res, "Password must be at least 8 characters");
 
     const Student = getStudent(req.db);
     const student = await Student.findOne({
       inviteToken: token, inviteExpires: { $gt: new Date() }, status: "pending",
     });
     if (!student) {
-      return res.status(400).json({ message: "This invite link is invalid or has expired. Please ask your admin to resend the invitation." });
+      return badRequest(res, "This invite link is invalid or has expired. Please ask your admin to resend the invitation.");
     }
 
     student.password      = await bcrypt.hash(password, config.bcryptRounds);
@@ -243,10 +244,10 @@ router.post("/setup-account", strictLimiter, async (req, res) => {
         .catch(err => logger.error("Admin student record email failed:", { error: err?.message }));
     }
 
-    res.json({ message: "Account activated successfully! You can now login.", student: { firstName: student.firstName, surname: student.surname, email: student.email } });
+    res.json({ message: "Account activated successfully! You can now login.", student: { firstName: student.firstName, lastName: student.lastName, email: student.email } });
   } catch (err) {
     logger.error(err);
-    res.status(500).json({ message: "Error setting up account" });
+    serverError(res, "Error setting up account");
   }
 });
 
@@ -255,8 +256,8 @@ router.post("/:id/resend-invite", verifyToken, verifyAdmin, strictLimiter, async
   try {
     const Student = getStudent(req.db);
     const student = await Student.findById(req.params.id);
-    if (!student) return res.status(404).json({ message: "Student not found" });
-    if (student.status !== "pending") return res.status(400).json({ message: "Student has already set up their account" });
+    if (!student) return notFound(res, "Student not found");
+    if (student.status !== "pending") return badRequest(res, "Student has already set up their account");
 
     const inviteToken   = crypto.randomBytes(32).toString("hex");
     const inviteExpires = new Date(Date.now() + 48 * 60 * 60 * 1000);
@@ -271,7 +272,7 @@ router.post("/:id/resend-invite", verifyToken, verifyAdmin, strictLimiter, async
     res.json({ message: "Invite resent successfully" });
   } catch (err) {
     logger.error(err);
-    res.status(500).json({ message: "Error resending invite" });
+    serverError(res, "Error resending invite");
   }
 });
 
@@ -280,13 +281,13 @@ router.patch("/:id/timezone", verifyToken, async (req, res) => {
   try {
     const { timezone } = req.body;
     if (!timezone || typeof timezone !== "string")
-      return res.status(400).json({ message: "timezone required" });
+      return badRequest(res, "timezone required");
     try { Intl.DateTimeFormat(undefined, { timeZone: timezone }); }
-    catch { return res.status(400).json({ message: "Invalid timezone identifier" }); }
+    catch { return badRequest(res, "Invalid timezone identifier"); }
     await getStudent(req.db).findByIdAndUpdate(req.params.id, { timezone });
     res.json({ ok: true });
   } catch (err) {
-    res.status(500).json({ message: "Error updating timezone" });
+    serverError(res, "Error updating timezone");
   }
 });
 
@@ -301,17 +302,17 @@ router.put("/:id", verifyToken, verifyAdminOrTeacher, async (req, res) => {
     }
 
     const student = await getStudent(req.db).findByIdAndUpdate(req.params.id, updates, { new: true });
-    if (!student) return res.status(404).json({ message: "Student not found" });
+    if (!student) return notFound(res, "Student not found");
 
     if (password) {
-      try { await sendPasswordResetEmail(student.email, `${student.firstName} ${student.surname}`, password, "student", req.center?.centerName || ""); }
+      try { await sendPasswordResetEmail(student.email, `${student.firstName} ${student.lastName}`, password, "student", req.center?.centerName || ""); }
       catch (e) { logger.error("Failed to send password reset email:", { error: e?.message }); }
     }
 
     res.json({ message: "Student updated", student });
   } catch (err) {
     logger.error(err);
-    res.status(400).json({ message: "Error updating student" });
+    badRequest(res, "Error updating student");
   }
 });
 
@@ -319,15 +320,15 @@ router.put("/:id", verifyToken, verifyAdminOrTeacher, async (req, res) => {
 router.patch("/:id/toggle", verifyToken, verifyAdmin, async (req, res) => {
   try {
     const { active } = req.body;
-    if (typeof active !== "boolean") return res.status(400).json({ message: "active (boolean) is required" });
+    if (typeof active !== "boolean") return badRequest(res, "active (boolean) is required");
     const student = await getStudent(req.db)
       .findByIdAndUpdate(req.params.id, { active }, { new: true })
-      .select("firstName surname email active noOfClasses age lastPaymentDate status");
-    if (!student) return res.status(404).json({ message: "Student not found" });
+      .select("firstName lastName email active classCredits age lastPaymentDate status");
+    if (!student) return notFound(res, "Student not found");
     res.json({ message: `Student ${active ? "enabled" : "disabled"}`, student });
   } catch (err) {
     logger.error(err);
-    res.status(500).json({ message: "Error toggling student status" });
+    serverError(res, "Error toggling student status");
   }
 });
 
@@ -336,8 +337,8 @@ router.delete("/:id", verifyToken, verifyAdmin, strictLimiter, async (req, res) 
   try {
     const Student = getStudent(req.db);
     const student = await Student.findById(req.params.id);
-    if (!student) return res.status(404).json({ message: "Student not found" });
-    if (student.scheduledDeletionAt) return res.status(400).json({ message: "Student is already scheduled for deletion" });
+    if (!student) return notFound(res, "Student not found");
+    if (student.scheduledDeletionAt) return badRequest(res, "Student is already scheduled for deletion");
 
     const deletionDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
     student.active                   = false;
@@ -350,7 +351,7 @@ router.delete("/:id", verifyToken, verifyAdmin, strictLimiter, async (req, res) 
     res.json({ message: "Student scheduled for deletion", scheduledDeletionAt: deletionDate, student });
   } catch (err) {
     logger.error(err);
-    res.status(500).json({ message: "Error scheduling student deletion" });
+    serverError(res, "Error scheduling student deletion");
   }
 });
 
@@ -359,8 +360,8 @@ router.post("/:id/restore", verifyToken, verifyAdmin, async (req, res) => {
   try {
     const Student = getStudent(req.db);
     const student = await Student.findById(req.params.id);
-    if (!student) return res.status(404).json({ message: "Student not found" });
-    if (!student.scheduledDeletionAt) return res.status(400).json({ message: "Student is not scheduled for deletion" });
+    if (!student) return notFound(res, "Student not found");
+    if (!student.scheduledDeletionAt) return badRequest(res, "Student is not scheduled for deletion");
 
     student.scheduledDeletionAt      = null;
     student.deletionWarningEmailSent = false;
@@ -370,7 +371,7 @@ router.post("/:id/restore", verifyToken, verifyAdmin, async (req, res) => {
     res.json({ message: "Student account restored successfully", student });
   } catch (err) {
     logger.error(err);
-    res.status(500).json({ message: "Error restoring student" });
+    serverError(res, "Error restoring student");
   }
 });
 
@@ -379,7 +380,7 @@ router.post("/:id/reset-password", verifyToken, verifyAdminOrTeacher, strictLimi
   try {
     const Student = getStudent(req.db);
     const student = await Student.findById(req.params.id);
-    if (!student) return res.status(404).json({ message: "Student not found" });
+    if (!student) return notFound(res, "Student not found");
 
     const newPass          = Math.random().toString(36).slice(-8);
     student.password       = await bcrypt.hash(newPass, config.bcryptRounds);
@@ -387,13 +388,13 @@ router.post("/:id/reset-password", verifyToken, verifyAdminOrTeacher, strictLimi
     student.lastPasswordChange = new Date();
     await student.save();
 
-    try { await sendPasswordResetEmail(student.email, `${student.firstName} ${student.surname}`, newPass, "student", req.center?.centerName || ""); }
+    try { await sendPasswordResetEmail(student.email, `${student.firstName} ${student.lastName}`, newPass, "student", req.center?.centerName || ""); }
     catch (e) { logger.error("Failed to send password reset email:", { error: e?.message }); }
 
     res.json({ message: "Password reset successfully", tempPassword: newPass });
   } catch (err) {
     logger.error(err);
-    res.status(500).json({ message: "Error resetting password" });
+    serverError(res, "Error resetting password");
   }
 });
 
@@ -401,15 +402,15 @@ router.post("/:id/reset-password", verifyToken, verifyAdminOrTeacher, strictLimi
 router.post("/:id/payment", verifyToken, verifyAdmin, async (req, res) => {
   try {
     const { amount, classes, method = "Manual", status = "completed" } = req.body;
-    if (!amount || !classes) return res.status(400).json({ message: "Amount and number of classes are required" });
+    if (!amount || !classes) return badRequest(res, "Amount and number of classes are required");
 
     const Student = getStudent(req.db);
     const student = await Student.findById(req.params.id);
-    if (!student) return res.status(404).json({ message: "Student not found" });
+    if (!student) return notFound(res, "Student not found");
 
     student.lastPaymentDate = new Date();
     student.active          = true;
-    student.noOfClasses     = (student.noOfClasses || 0) + (parseInt(classes, 10) || 0);
+    student.classCredits     = (student.classCredits || 0) + (parseInt(classes, 10) || 0);
     await student.save();
 
     const payment = await getPayment(req.db).create({
@@ -419,7 +420,7 @@ router.post("/:id/payment", verifyToken, verifyAdmin, async (req, res) => {
     res.json({ message: "Payment recorded", student, payment });
   } catch (err) {
     logger.error("Payment error:", { error: err?.message });
-    res.status(500).json({ message: "Error recording payment" });
+    serverError(res, "Error recording payment");
   }
 });
 
@@ -427,12 +428,12 @@ router.post("/:id/payment", verifyToken, verifyAdmin, async (req, res) => {
 router.get("/:id/payments", verifyToken, async (req, res) => {
   try {
     if (req.user.role === "student" && req.user.id !== req.params.id)
-      return res.status(403).json({ message: "You can only view your own payments" });
+      return forbidden(res, "You can only view your own payments");
     const payments = await getPayment(req.db).find({ studentId: req.params.id }).sort({ date: -1 });
     res.json(payments);
   } catch (err) {
     logger.error(err);
-    res.status(500).json({ message: "Error fetching payments" });
+    serverError(res, "Error fetching payments");
   }
 });
 

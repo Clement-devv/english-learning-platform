@@ -65,7 +65,7 @@ export const rejectBooking = async (bookingId, reason = "") => {
  * Mark booking as completed (ENHANCED)
  * This will:
  * 1. Mark booking as completed
- * 2. Reduce student's noOfClasses by 1
+ * 2. Reduce student's classCredits by 1
  * 3. Return updated booking and student info
  */
 export const completeBooking = async (bookingId) => {

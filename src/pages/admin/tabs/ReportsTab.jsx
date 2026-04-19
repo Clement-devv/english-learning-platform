@@ -113,7 +113,7 @@ export default function ReportsTab({ students = [], isDarkMode }) {
             <option value="">— Select a student —</option>
             {students.map(s => (
               <option key={s._id} value={s._id}>
-                {s.firstName} {s.surname} · {s.email}
+                {s.firstName} {s.lastName} · {s.email}
               </option>
             ))}
           </select>

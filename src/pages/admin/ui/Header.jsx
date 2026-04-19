@@ -1,9 +1,10 @@
 // src/pages/admin/ui/Header.jsx
 import React from "react";
 import { LogOut, Shield } from "lucide-react";
+import { useAuth } from "../../../context/AuthContext.jsx";
 
 export default function Header({ onLogout }) {
-  const adminInfo = JSON.parse(sessionStorage.getItem("adminInfo") || localStorage.getItem("adminInfo") || "{}");
+  const { user: adminInfo } = useAuth();
 
   return (
     <header className="bg-white shadow-md">
@@ -23,7 +24,7 @@ export default function Header({ onLogout }) {
           {/* Right: Admin Info & Logout */}
           <div className="flex items-center gap-4">
             {/* Admin Info */}
-            {adminInfo.email && (
+            {adminInfo?.email && (
               <div className="hidden sm:block text-right">
                 <p className="text-sm font-semibold text-gray-900">
                   {adminInfo.firstName || "Admin"} {adminInfo.lastName || ""}

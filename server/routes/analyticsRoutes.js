@@ -44,7 +44,7 @@ router.get("/overview", verifyToken, verifyAdmin, async (req, res) => {
       Teacher.countDocuments(),
       Teacher.countDocuments({ active: true }),
       Student.countDocuments(),
-      Student.countDocuments({ active: true, noOfClasses: { $gt: 0 } }),
+      Student.countDocuments({ active: true, classCredits: { $gt: 0 } }),
       Booking.aggregate([
         { $match: bookingFilter },
         { $group: { _id: "$status", count: { $sum: 1 } } },
@@ -194,7 +194,7 @@ router.get("/student-engagement", verifyToken, verifyAdmin, async (req, res) => 
       },
       {
         $project: {
-          firstName: 1, surname: 1, email: 1, noOfClasses: 1,
+          firstName: 1, lastName: 1, email: 1, classCredits: 1,
           totalBookings:    { $size: "$bookings" },
           completedClasses: { $size: { $filter: { input: "$bookings", as: "b", cond: { $eq: ["$$b.status", "completed"] } } } },
           upcomingClasses:  { $size: { $filter: { input: "$bookings", as: "b", cond: { $eq: ["$$b.status", "accepted"] } } } },

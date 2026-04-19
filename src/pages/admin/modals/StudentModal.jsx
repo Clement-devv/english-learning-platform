@@ -55,7 +55,7 @@ const CEFR_LEVELS = [
 ];
 
 const EMPTY = {
-  firstName: "", surname: "", age: "", email: "",
+  firstName: "", lastName: "", age: "", email: "",
   dateOfBirth: "", rank: "",
   country: "", dialCode: "", phone: "",
 };
@@ -73,7 +73,7 @@ export default function StudentModal({ isOpen, onClose, onSave, initialData, isD
       const country = COUNTRIES.find(c => c.name === initialData.country) || null;
       setFormData({
         firstName:   initialData.firstName   || "",
-        surname:     initialData.surname     || "",
+        lastName:     initialData.lastName     || "",
         age:         initialData.age         || "",
         email:       initialData.email       || "",
         dateOfBirth: initialData.dateOfBirth ? String(initialData.dateOfBirth).slice(0, 10) : "",
@@ -217,7 +217,7 @@ export default function StudentModal({ isOpen, onClose, onSave, initialData, isD
                 </div>
                 <div>
                   <label style={lbl}>Surname *</label>
-                  <input style={inp} name="surname" value={formData.surname} onChange={handleChange} required placeholder="e.g. Nguyen" />
+                  <input style={inp} name="lastName" value={formData.lastName} onChange={handleChange} required placeholder="e.g. Nguyen" />
                 </div>
               </div>
 

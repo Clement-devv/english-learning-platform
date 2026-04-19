@@ -581,7 +581,7 @@ export default function ProfileTab({ teacherInfo, isDarkMode, onUpdate }) {
                           ))}
                         </div>
                         <span style={{ fontSize: 12, color: c.muted }}>
-                          {r.studentId?.firstName} {r.studentId?.surname} · {new Date(r.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                          {r.studentId?.firstName} {r.studentId?.lastName} · {new Date(r.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
                         </span>
                       </div>
                       {r.comment && (

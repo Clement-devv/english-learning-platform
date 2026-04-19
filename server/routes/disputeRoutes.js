@@ -7,6 +7,7 @@ import { studentSchema }            from "../schemas/studentSchema.js";
 import { teacherSchema }            from "../schemas/teacherSchema.js";
 import { paymentTransactionSchema } from "../schemas/paymentTransactionSchema.js";
 import logger from "../utils/logger.js";
+import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
 
 const router = express.Router();
 router.use(tenantMiddleware);
@@ -25,30 +26,30 @@ router.post("/booking/:bookingId", verifyToken, async (req, res) => {
     const { disputeReason } = req.body;
 
     if (!disputeReason || !disputeReason.trim()) {
-      return res.status(400).json({ success: false, message: "Dispute reason is required" });
+      return badRequest(res, "Dispute reason is required");
     }
 
     const booking = await getBooking(req.db).findById(req.params.bookingId)
       .populate("teacherId", "firstName lastName email")
-      .populate("studentId", "firstName surname email");
+      .populate("studentId", "firstName lastName email");
 
     if (!booking) {
-      return res.status(404).json({ success: false, message: "Booking not found" });
+      return notFound(res, "Booking not found");
     }
 
     // Only the assigned teacher can raise a dispute
     if (req.user.role !== "teacher" || booking.teacherId._id.toString() !== req.user.id) {
-      return res.status(403).json({ success: false, message: "Not authorized to raise a dispute for this booking" });
+      return forbidden(res, "Not authorized to raise a dispute for this booking");
     }
 
     // Can only dispute admin-rejected OR missed (attendance not met) classes
     if (!booking.adminRejected && booking.status !== "missed") {
-      return res.status(400).json({ success: false, message: "Can only raise a dispute on classes that were not completed" });
+      return badRequest(res, "Can only raise a dispute on classes that were not completed");
     }
 
     // Don't allow duplicate disputes
     if (booking.disputeRaised) {
-      return res.status(400).json({ success: false, message: "A dispute has already been raised for this class" });
+      return badRequest(res, "A dispute has already been raised for this class");
     }
 
     booking.disputeRaised = true;
@@ -63,7 +64,7 @@ router.post("/booking/:bookingId", verifyToken, async (req, res) => {
     res.json({ success: true, message: "Dispute submitted successfully. Admin will review it shortly." });
   } catch (err) {
     logger.error("❌ Error raising dispute:", { error: err?.message });
-    res.status(500).json({ success: false, message: "Error raising dispute", error: err.message });
+    serverError(res, "Error raising dispute");
   }
 });
 
@@ -75,7 +76,7 @@ router.get("/", verifyToken, verifyAdmin, async (req, res) => {
   try {
     const disputes = await getBooking(req.db).find({ disputeRaised: true, disputeStatus: "pending" })
       .populate("teacherId", "firstName lastName email")
-      .populate("studentId", "firstName surname email lastName")
+      .populate("studentId", "firstName lastName email lastName")
       .sort({ disputedAt: -1 })
       .lean();
 
@@ -124,19 +125,19 @@ router.patch("/:bookingId/resolve", verifyToken, verifyAdmin, async (req, res) =
     const { resolution, adminNotes } = req.body;
 
     if (!["approve_teacher", "approve_student"].includes(resolution)) {
-      return res.status(400).json({ success: false, message: "Invalid resolution value" });
+      return badRequest(res, "Invalid resolution value");
     }
 
     const booking = await getBooking(req.db).findById(req.params.bookingId)
       .populate("teacherId", "firstName lastName")
-      .populate("studentId", "firstName surname noOfClasses");
+      .populate("studentId", "firstName lastName classCredits");
 
     if (!booking) {
-      return res.status(404).json({ success: false, message: "Booking not found" });
+      return notFound(res, "Booking not found");
     }
 
     if (!booking.disputeRaised || booking.disputeStatus !== "pending") {
-      return res.status(400).json({ success: false, message: "No pending dispute found for this booking" });
+      return badRequest(res, "No pending dispute found for this booking");
     }
 
     if (resolution === "approve_teacher") {
@@ -152,9 +153,9 @@ router.patch("/:bookingId/resolve", verifyToken, verifyAdmin, async (req, res) =
       if (wasMissed) {
         // Missed class approved: deduct student class and pay teacher
         const student = await getStudent(req.db).findById(booking.studentId._id);
-        if (student && student.noOfClasses > 0) {
-          student.noOfClasses -= 1;
-          if (student.noOfClasses === 0) student.active = false;
+        if (student && student.classCredits > 0) {
+          student.classCredits -= 1;
+          if (student.classCredits === 0) student.active = false;
           await student.save();
         }
 
@@ -174,7 +175,7 @@ router.patch("/:bookingId/resolve", verifyToken, verifyAdmin, async (req, res) =
             type: "class_completion",
             classTitle: booking.classTitle,
             completedAt: new Date(),
-            studentName: `${booking.studentId.firstName || ""} ${booking.studentId.surname || ""}`.trim(),
+            studentName: `${booking.studentId.firstName || ""} ${booking.studentId.lastName || ""}`.trim(),
             description: `Dispute approved: ${booking.classTitle} (missed → completed by admin)`,
           });
           logger.info(`💰 Teacher paid $${earned} after dispute approval for booking ${booking._id}`);
@@ -189,7 +190,7 @@ router.patch("/:bookingId/resolve", verifyToken, verifyAdmin, async (req, res) =
       if (booking.adminRejected) {
         const student = await getStudent(req.db).findById(booking.studentId._id);
         if (student) {
-          student.noOfClasses = (student.noOfClasses || 0) + 1;
+          student.classCredits = (student.classCredits || 0) + 1;
           await student.save();
           logger.info(`✅ Refunded 1 class to student ${student.firstName}`);
         }
@@ -211,7 +212,7 @@ router.patch("/:bookingId/resolve", verifyToken, verifyAdmin, async (req, res) =
     res.json({ success: true, message: msg, booking });
   } catch (err) {
     logger.error("❌ Error resolving dispute:", { error: err?.message });
-    res.status(500).json({ success: false, message: "Error resolving dispute", error: err.message });
+    serverError(res, "Error resolving dispute");
   }
 });
 

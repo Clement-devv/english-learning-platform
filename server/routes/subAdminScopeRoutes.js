@@ -15,6 +15,7 @@ import { reviewSchema }               from "../schemas/reviewSchema.js";
 import { notificationSchema }         from "../schemas/notificationSchema.js";
 import { paymentTransactionSchema }   from "../schemas/paymentTransactionSchema.js";
 import logger from "../utils/logger.js";
+import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
 
 const router = express.Router();
 router.use(tenantMiddleware);
@@ -32,10 +33,10 @@ const getPaymentTransaction  = (db) => db.models.PaymentTransaction  || db.model
 // ── Auth middleware: must be an active sub-admin ──────────────────────────────
 const requireSubAdmin = async (req, res, next) => {
   if (!req.user || req.user.role !== "sub-admin")
-    return res.status(403).json({ success: false, message: "Sub-admin access required" });
+    return forbidden(res, "Sub-admin access required");
   const subAdmin = await getSubAdmin(req.db).findById(req.user.id);
   if (!subAdmin || subAdmin.status !== "active")
-    return res.status(403).json({ success: false, message: "Account inactive" });
+    return forbidden(res, "Account inactive");
   req.subAdmin = subAdmin;
   next();
 };
@@ -71,7 +72,7 @@ router.get("/overview", verifyToken, requireSubAdmin, async (req, res) => {
       getTeacher(req.db).find({ _id: { $in: teacherIds } }).select("firstName lastName active continent"),
       getBooking(req.db).find({ teacherId: { $in: teacherIds } })
         .populate("teacherId", "firstName lastName")
-        .populate("studentId", "firstName surname email")
+        .populate("studentId", "firstName lastName email")
         .sort({ scheduledTime: -1 }),
     ]);
 
@@ -134,7 +135,7 @@ router.get("/students", verifyToken, requireSubAdmin, async (req, res) => {
     const teacherIds = await getScopedTeacherIds(req.subAdmin, req.db);
 
     const bookings = await getBooking(req.db).find({ teacherId: { $in: teacherIds } })
-      .populate("studentId", "firstName surname email active noOfClasses age dateOfBirth rank")
+      .populate("studentId", "firstName lastName email active classCredits age dateOfBirth rank")
       .populate("teacherId", "firstName lastName");
 
     const studentMap = new Map();
@@ -177,7 +178,7 @@ router.get("/bookings", verifyToken, requireSubAdmin, async (req, res) => {
     let filterTeacherIds = teacherIds;
     if (teacherId) {
       if (!teacherIds.map(String).includes(teacherId))
-        return res.status(403).json({ success: false, message: "Teacher not in your scope" });
+        return forbidden(res, "Teacher not in your scope");
       filterTeacherIds = [teacherId];
     }
 
@@ -186,7 +187,7 @@ router.get("/bookings", verifyToken, requireSubAdmin, async (req, res) => {
 
     const bookings = await getBooking(req.db).find(filter)
       .populate("teacherId", "firstName lastName email continent googleMeetLink")
-      .populate("studentId", "firstName surname email")
+      .populate("studentId", "firstName lastName email")
       .sort({ scheduledTime: -1 });
 
     res.json({ success: true, bookings, total: bookings.length });
@@ -219,7 +220,7 @@ router.get("/classes", verifyToken, requireSubAdmin, async (req, res) => {
     let filterTeacherIds = teacherIds;
     if (teacherId) {
       if (!teacherIds.map(String).includes(teacherId))
-        return res.status(403).json({ success: false, message: "Teacher not in your scope" });
+        return forbidden(res, "Teacher not in your scope");
       filterTeacherIds = [teacherId];
     }
 
@@ -227,7 +228,7 @@ router.get("/classes", verifyToken, requireSubAdmin, async (req, res) => {
 
     const bookings = await getBooking(req.db).find({ teacherId: { $in: filterTeacherIds }, ...statusFilter })
       .populate("teacherId", "firstName lastName email ratePerClass")
-      .populate("studentId", "firstName surname email noOfClasses")
+      .populate("studentId", "firstName lastName email classCredits")
       .sort({ scheduledTime: -1 });
 
     res.json({ success: true, bookings, total: bookings.length });
@@ -241,17 +242,17 @@ router.get("/classes", verifyToken, requireSubAdmin, async (req, res) => {
 router.post("/classes/mark", verifyToken, requireSubAdmin, async (req, res) => {
   try {
     if (!req.subAdmin.permissions?.canMarkLessons)
-      return res.status(403).json({ success: false, message: "You do not have permission to mark lessons" });
+      return forbidden(res, "You do not have permission to mark lessons");
 
     const { bookingId } = req.body;
-    if (!bookingId) return res.status(400).json({ success: false, message: "bookingId is required" });
+    if (!bookingId) return badRequest(res, "bookingId is required");
 
     const booking = await getBooking(req.db).findById(bookingId).select("teacherId status");
-    if (!booking) return res.status(404).json({ success: false, message: "Booking not found" });
+    if (!booking) return notFound(res, "Booking not found");
 
     const teacherIds = await getScopedTeacherIds(req.subAdmin, req.db);
     if (!teacherIds.map(String).includes(booking.teacherId.toString()))
-      return res.status(403).json({ success: false, message: "This booking's teacher is not in your scope" });
+      return forbidden(res, "This booking's teacher is not in your scope");
 
     const result = await completeClass(req.db, bookingId, "sub-admin", { skipAttendanceCheck: true });
 
@@ -267,7 +268,7 @@ router.post("/classes/mark", verifyToken, requireSubAdmin, async (req, res) => {
       ? `${result.booking.teacherId.firstName || ""} ${result.booking.teacherId.lastName || ""}`.trim()
       : "";
     const studentName  = result.booking?.studentId
-      ? `${result.booking.studentId.firstName || ""} ${result.booking.studentId.surname || ""}`.trim()
+      ? `${result.booking.studentId.firstName || ""} ${result.booking.studentId.lastName || ""}`.trim()
       : "";
 
     getNotification(req.db).create({
@@ -289,23 +290,23 @@ router.post("/classes/mark", verifyToken, requireSubAdmin, async (req, res) => {
 router.post("/classes/unmark", verifyToken, requireSubAdmin, async (req, res) => {
   try {
     if (!req.subAdmin.permissions?.canMarkLessons)
-      return res.status(403).json({ success: false, message: "You do not have permission to unmark lessons" });
+      return forbidden(res, "You do not have permission to unmark lessons");
 
     const { bookingId } = req.body;
-    if (!bookingId) return res.status(400).json({ success: false, message: "bookingId is required" });
+    if (!bookingId) return badRequest(res, "bookingId is required");
 
     const Booking = getBooking(req.db);
     const booking = await Booking.findById(bookingId)
       .populate("teacherId", "firstName lastName ratePerClass earned lessonsCompleted")
-      .populate("studentId", "firstName surname noOfClasses active");
+      .populate("studentId", "firstName lastName classCredits active");
 
-    if (!booking) return res.status(404).json({ success: false, message: "Booking not found" });
+    if (!booking) return notFound(res, "Booking not found");
     if (booking.status !== "completed")
       return res.status(400).json({ success: false, message: `Cannot unmark a booking with status "${booking.status}"` });
 
     const teacherIds = await getScopedTeacherIds(req.subAdmin, req.db);
     if (!teacherIds.map(String).includes(booking.teacherId._id.toString()))
-      return res.status(403).json({ success: false, message: "This booking's teacher is not in your scope" });
+      return forbidden(res, "This booking's teacher is not in your scope");
 
     const ratePerClass = Math.round((parseFloat(booking.teacherId.ratePerClass) || 0) * 100) / 100;
 
@@ -315,7 +316,7 @@ router.post("/classes/unmark", verifyToken, requireSubAdmin, async (req, res) =>
     );
 
     await getStudent(req.db).findByIdAndUpdate(booking.studentId._id, {
-      $inc: { noOfClasses: 1 },
+      $inc: { classCredits: 1 },
       $set: { active: true },
     });
 
@@ -329,7 +330,7 @@ router.post("/classes/unmark", verifyToken, requireSubAdmin, async (req, res) =>
 
     const subAdminName = `${req.subAdmin.firstName} ${req.subAdmin.lastName}`;
     const teacherName  = `${booking.teacherId.firstName} ${booking.teacherId.lastName}`;
-    const studentName  = `${booking.studentId.firstName} ${booking.studentId.surname}`;
+    const studentName  = `${booking.studentId.firstName} ${booking.studentId.lastName}`;
 
     getNotification(req.db).create({
       type:        "class_unmarked",
@@ -350,7 +351,7 @@ router.post("/classes/unmark", verifyToken, requireSubAdmin, async (req, res) =>
 router.get("/payments", verifyToken, requireSubAdmin, async (req, res) => {
   try {
     if (!req.subAdmin.permissions?.canViewPayments)
-      return res.status(403).json({ success: false, message: "You do not have permission to view payments" });
+      return forbidden(res, "You do not have permission to view payments");
 
     const teacherIds = await getScopedTeacherIds(req.subAdmin, req.db);
     const { teacherId } = req.query;
@@ -358,13 +359,13 @@ router.get("/payments", verifyToken, requireSubAdmin, async (req, res) => {
     let filterTeacherIds = teacherIds;
     if (teacherId) {
       if (!teacherIds.map(String).includes(teacherId))
-        return res.status(403).json({ success: false, message: "Teacher not in your scope" });
+        return forbidden(res, "Teacher not in your scope");
       filterTeacherIds = [teacherId];
     }
 
     const payments = await getPayment(req.db).find({ teacherId: { $in: filterTeacherIds } })
       .populate("teacherId", "firstName lastName email ratePerClass")
-      .populate("studentId", "firstName surname email")
+      .populate("studentId", "firstName lastName email")
       .sort({ createdAt: -1 });
 
     const summary = {};
@@ -394,13 +395,13 @@ router.get("/recordings", verifyToken, requireSubAdmin, async (req, res) => {
     let filterTeacherIds = teacherIds;
     if (teacherId) {
       if (!teacherIds.map(String).includes(teacherId))
-        return res.status(403).json({ success: false, message: "Teacher not in your scope" });
+        return forbidden(res, "Teacher not in your scope");
       filterTeacherIds = [teacherId];
     }
 
     const recordings = await getRecording(req.db).find({ teacherId: { $in: filterTeacherIds } })
       .populate("teacherId", "firstName lastName email")
-      .populate("studentId", "firstName surname email")
+      .populate("studentId", "firstName lastName email")
       .sort({ createdAt: -1 });
 
     res.json({ success: true, recordings, total: recordings.length });
@@ -419,7 +420,7 @@ router.get("/reports", verifyToken, requireSubAdmin, async (req, res) => {
     let filterTeacherIds = teacherIds;
     if (teacherId) {
       if (!teacherIds.map(String).includes(teacherId))
-        return res.status(403).json({ success: false, message: "Teacher not in your scope" });
+        return forbidden(res, "Teacher not in your scope");
       filterTeacherIds = [teacherId];
     }
 
@@ -428,7 +429,7 @@ router.get("/reports", verifyToken, requireSubAdmin, async (req, res) => {
       status:    "completed",
     })
       .populate("teacherId", "firstName lastName email ratePerClass")
-      .populate("studentId", "firstName surname email noOfClasses")
+      .populate("studentId", "firstName lastName email classCredits")
       .sort({ scheduledTime: -1 });
 
     const studentProgress = new Map();
@@ -438,7 +439,7 @@ router.get("/reports", verifyToken, requireSubAdmin, async (req, res) => {
       if (!studentProgress.has(sid)) {
         studentProgress.set(sid, {
           student: b.studentId, teacher: b.teacherId,
-          completedClasses: 0, remainingClasses: b.studentId.noOfClasses || 0, lastClass: null,
+          completedClasses: 0, remainingClasses: b.studentId.classCredits || 0, lastClass: null,
         });
       }
       const entry = studentProgress.get(sid);
@@ -470,13 +471,13 @@ router.get("/reviews", verifyToken, requireSubAdmin, async (req, res) => {
     let filterTeacherIds = teacherIds;
     if (teacherId) {
       if (!teacherIds.map(String).includes(teacherId))
-        return res.status(403).json({ success: false, message: "Teacher not in your scope" });
+        return forbidden(res, "Teacher not in your scope");
       filterTeacherIds = [teacherId];
     }
 
     const reviews = await getReview(req.db).find({ teacherId: { $in: filterTeacherIds } })
       .populate("teacherId", "firstName lastName email")
-      .populate("studentId", "firstName surname email")
+      .populate("studentId", "firstName lastName email")
       .sort({ createdAt: -1 });
 
     const ratingMap = {};

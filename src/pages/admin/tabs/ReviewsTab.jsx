@@ -229,7 +229,7 @@ export default function ReviewsTab({ isDarkMode }) {
             </div>
 
             <div style={{ fontSize: 12, color: muted, marginTop: 4 }}>
-              Student: <strong style={{ color: text }}>{r.studentId?.firstName ?? "?"} {r.studentId?.surname ?? ""}</strong>
+              Student: <strong style={{ color: text }}>{r.studentId?.firstName ?? "?"} {r.studentId?.lastName ?? ""}</strong>
               {" · "}
               Teacher: <strong style={{ color: text }}>{r.teacherId?.firstName ?? "?"} {r.teacherId?.lastName ?? ""}</strong>
               {" · "}

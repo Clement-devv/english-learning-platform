@@ -1,7 +1,8 @@
 // src/components/ErrorBoundary.jsx
-// Catches JS errors in child component trees.
-// Distinguishes network/chunk-load failures from real app crashes so users
-// get a helpful "check your connection" prompt instead of a scary error screen.
+// Two exports:
+//   ErrorBoundary     — full-screen fallback, wraps the entire React tree in App.jsx
+//   TabErrorBoundary  — compact inline fallback, wraps individual dashboard tabs
+//                       Use key={activeTab} so it auto-resets when the user switches tabs.
 
 import { Component } from "react";
 
@@ -164,5 +165,108 @@ const styles = {
     marginBottom: "24px",
     whiteSpace: "pre-wrap",
     wordBreak: "break-word",
+  },
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TabErrorBoundary — compact inline fallback for individual dashboard sections.
+//
+// Usage:
+//   <TabErrorBoundary key={activeTab}>
+//     <SomeTab />
+//   </TabErrorBoundary>
+//
+// The key={activeTab} prop is important — it causes React to remount this
+// boundary (resetting error state) whenever the user switches to a different tab.
+// ─────────────────────────────────────────────────────────────────────────────
+export class TabErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+    this.handleReset = this.handleReset.bind(this);
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, info) {
+    console.error("[TabErrorBoundary]", error, info.componentStack);
+  }
+
+  handleReset() {
+    this.setState({ hasError: false, error: null });
+  }
+
+  render() {
+    if (!this.state.hasError) return this.props.children;
+
+    const isDev = import.meta.env.DEV;
+
+    return (
+      <div style={tabStyles.container}>
+        <div style={tabStyles.icon}>⚠️</div>
+        <p style={tabStyles.title}>This section failed to load</p>
+        <p style={tabStyles.body}>
+          An error occurred in this tab. Other parts of the dashboard are unaffected.
+        </p>
+        {isDev && this.state.error && (
+          <pre style={tabStyles.devError}>{this.state.error.message}</pre>
+        )}
+        <button onClick={this.handleReset} style={tabStyles.btn}>
+          Try again
+        </button>
+      </div>
+    );
+  }
+}
+
+const tabStyles = {
+  container: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "60px 24px",
+    textAlign: "center",
+    fontFamily: "system-ui, sans-serif",
+  },
+  icon: { fontSize: "36px", marginBottom: "12px" },
+  title: {
+    margin: "0 0 6px",
+    fontSize: "16px",
+    fontWeight: "600",
+    color: "#1e293b",
+  },
+  body: {
+    margin: "0 0 20px",
+    fontSize: "13px",
+    color: "#64748b",
+    lineHeight: 1.6,
+  },
+  devError: {
+    textAlign: "left",
+    background: "#fef2f2",
+    border: "1px solid #fecaca",
+    borderRadius: "8px",
+    padding: "10px",
+    fontSize: "11px",
+    color: "#b91c1c",
+    overflowX: "auto",
+    marginBottom: "16px",
+    whiteSpace: "pre-wrap",
+    wordBreak: "break-word",
+    maxWidth: "480px",
+    width: "100%",
+  },
+  btn: {
+    background: "var(--brand-primary, #4f46e5)",
+    color: "#fff",
+    border: "none",
+    borderRadius: "8px",
+    padding: "8px 24px",
+    fontSize: "13px",
+    fontWeight: "600",
+    cursor: "pointer",
   },
 };
