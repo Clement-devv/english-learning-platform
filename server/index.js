@@ -51,8 +51,8 @@ import { SESSION_CLEANUP_INTERVAL_MS } from "./config/constants.js";
 const app = express();
 const httpServer = http.createServer(app);
 
-// Initialize Socket.IO
-const io = initializeSocket(httpServer);
+// Initialize Socket.IO (async — sets up Redis adapter when REDIS_URL is set)
+const io = await initializeSocket(httpServer);
 
 // Trust proxy if behind reverse proxy
 if (config.trustProxy) {
@@ -137,11 +137,16 @@ app.use("/api/v1/agora",       realtimeLimiter);
 
 app.use("/api/v1/group-chats", pollingLimiter);
 
+// In PM2 cluster mode each worker gets NODE_APP_INSTANCE = '0', '1', '2'…
+// Only the first worker (or a non-clustered process) should run background
+// schedulers and sweep jobs — otherwise every instance fires the same job.
+const isFirstWorker = !process.env.NODE_APP_INSTANCE || process.env.NODE_APP_INSTANCE === '0';
+
 // MongoDB connection
 mongoose
   .connect(process.env.MONGO_URI, {
-    maxPoolSize: 20,
-    minPoolSize: 5,
+    maxPoolSize: 50,  // was 20 — supports up to 4 cluster instances × 50 = 200 total connections
+    minPoolSize: 10,  // was 5
     serverSelectionTimeoutMS: 5000,
     socketTimeoutMS: 45000,
     connectTimeoutMS: 10000,
@@ -150,67 +155,72 @@ mongoose
   .then(async () => {
     logger.info("Master MongoDB connected");
 
-    // Start per-center schedulers for all currently active centers
-    try {
-      const activeCenters = await Center.find({ status: "active" }).select("slug");
-      logger.info(`🏢 Found ${activeCenters.length} active center(s) — starting per-center schedulers`);
-      for (const center of activeCenters) {
-        const db = await getDb(center.slug);
-        startReminderScheduler(db);
-        startRecordingCleanup(db);
-        startProgressReportScheduler(db);
-        startMissedClassScheduler(db);
-      }
+    // Schedulers and sweep jobs run on the first worker only.
+    // In PM2 cluster mode all other workers skip this block entirely.
+    if (isFirstWorker) {
+      try {
+        const activeCenters = await Center.find({ status: "active" }).select("slug");
+        logger.info(`🏢 Found ${activeCenters.length} active center(s) — starting per-center schedulers`);
+        for (const center of activeCenters) {
+          const db = await getDb(center.slug);
+          startReminderScheduler(db);
+          startRecordingCleanup(db);
+          startProgressReportScheduler(db);
+          startMissedClassScheduler(db);
+        }
 
-      // Hourly background sweep: remove expired/inactive sessions from all
-      // center DBs. Re-fetches active centers each tick so newly added centers
-      // are included without a server restart. Processed in batches of 10 to
-      // avoid opening too many DB connections simultaneously.
-      setInterval(async () => {
-        try {
-          const currentCenters = await Center.find({ status: "active" }).select("slug").lean();
-          for (let i = 0; i < currentCenters.length; i += 10) {
-            const batch = currentCenters.slice(i, i + 10);
-            await Promise.allSettled(batch.map(async (center) => {
+        // Hourly background sweep: remove expired/inactive sessions from all
+        // center DBs. Re-fetches active centers each tick so newly added centers
+        // are included without a server restart. Processed in batches of 10 to
+        // avoid opening too many DB connections simultaneously.
+        setInterval(async () => {
+          try {
+            const currentCenters = await Center.find({ status: "active" }).select("slug").lean();
+            for (let i = 0; i < currentCenters.length; i += 10) {
+              const batch = currentCenters.slice(i, i + 10);
+              await Promise.allSettled(batch.map(async (center) => {
+                try {
+                  const db = await getDb(center.slug);
+                  await sweepExpiredSessionsFromDb(db);
+                } catch (e) {
+                  logger.error(`Session sweep failed for ${center.slug}:`, { error: e?.message });
+                }
+              }));
+            }
+          } catch (e) {
+            logger.error("Session sweep: failed to fetch centers:", { error: e?.message });
+          }
+        }, SESSION_CLEANUP_INTERVAL_MS);
+
+        // Daily purge job: hard-delete center data for soft-deleted centers whose
+        // scheduledDeletionAt has passed. Drops the per-center MongoDB database.
+        setInterval(async () => {
+          try {
+            const due = await Center.find({
+              status: "deleted",
+              scheduledDeletionAt: { $lte: new Date() },
+            }).select("slug centerName").lean();
+
+            for (const center of due) {
               try {
                 const db = await getDb(center.slug);
-                await sweepExpiredSessionsFromDb(db);
+                await db.dropDatabase();
+                await closeAllConnections();
+                await Center.deleteOne({ slug: center.slug });
+                logger.info(`🗑️ Purged center DB and record: ${center.slug} (${center.centerName})`);
               } catch (e) {
-                logger.error(`Session sweep failed for ${center.slug}:`, { error: e?.message });
+                logger.error(`Purge failed for ${center.slug}:`, { error: e?.message });
               }
-            }));
-          }
-        } catch (e) {
-          logger.error("Session sweep: failed to fetch centers:", { error: e?.message });
-        }
-      }, SESSION_CLEANUP_INTERVAL_MS);
-
-      // Daily purge job: hard-delete center data for soft-deleted centers whose
-      // scheduledDeletionAt has passed. Drops the per-center MongoDB database.
-      setInterval(async () => {
-        try {
-          const due = await Center.find({
-            status: "deleted",
-            scheduledDeletionAt: { $lte: new Date() },
-          }).select("slug centerName").lean();
-
-          for (const center of due) {
-            try {
-              const db = await getDb(center.slug);
-              await db.dropDatabase();
-              await closeAllConnections();
-              await Center.deleteOne({ slug: center.slug });
-              logger.info(`🗑️ Purged center DB and record: ${center.slug} (${center.centerName})`);
-            } catch (e) {
-              logger.error(`Purge failed for ${center.slug}:`, { error: e?.message });
             }
+          } catch (e) {
+            logger.error("Purge job: failed to fetch due centers:", { error: e?.message });
           }
-        } catch (e) {
-          logger.error("Purge job: failed to fetch due centers:", { error: e?.message });
-        }
-      }, 24 * 60 * 60 * 1000); // once per day
-    } catch (err) {
-      logger.error("❌ Failed to start per-center schedulers:", { error: err?.message });
+        }, 24 * 60 * 60 * 1000); // once per day
+      } catch (err) {
+        logger.error("❌ Failed to start per-center schedulers:", { error: err?.message });
+      }
+    } else {
+      logger.info(`⏭️ Worker ${process.env.NODE_APP_INSTANCE} — skipping schedulers (handled by worker 0)`);
     }
 
     // Master DB keep-alive ping

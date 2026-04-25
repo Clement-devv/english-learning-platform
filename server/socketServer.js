@@ -4,6 +4,23 @@ import jwt from 'jsonwebtoken';
 import { config } from './config/config.js';
 import Center from './models/master/Center.js';
 import logger from "./utils/logger.js";
+import { getDb } from './config/dbManager.js';
+import { ringLogSchema } from './schemas/ringLogSchema.js';
+import redisClient from './config/redis.js';
+
+function getRingLog(db) {
+  return db.models.RingLog || db.model("RingLog", ringLogSchema);
+}
+
+async function saveRingLog(centerId, data) {
+  try {
+    const db  = await getDb(centerId);
+    const Log = getRingLog(db);
+    await Log.create(data);
+  } catch (err) {
+    logger.error("saveRingLog error:", { error: err?.message });
+  }
+}
 
 async function isAllowedOrigin(origin) {
   if (!origin) return true; // same-origin / server-to-server
@@ -35,7 +52,7 @@ function makeRateLimiter() {
   };
 }
 
-export function initializeSocket(httpServer) {
+export async function initializeSocket(httpServer) {
   const io = new Server(httpServer, {
     cors: {
       origin: (origin, callback) => {
@@ -50,6 +67,25 @@ export function initializeSocket(httpServer) {
     // 1 MB covers whiteboard strokes, chat messages, and small sync payloads.
     maxHttpBufferSize: 1e6 // 1 MB
   });
+
+  // Redis adapter — required for Socket.IO to work correctly across PM2 cluster
+  // workers. Without it, io.to(room).emit() only reaches clients on THIS worker.
+  // Falls back to in-memory adapter if Redis is unavailable or the package is missing.
+  if (redisClient) {
+    try {
+      const { createAdapter } = await import('@socket.io/redis-adapter');
+      // ioredis auto-connects on first use; duplicate() creates a separate
+      // connection required because a subscribed client can't run other commands.
+      const pubClient = redisClient;
+      const subClient = redisClient.duplicate();
+      io.adapter(createAdapter(pubClient, subClient));
+      logger.info('✅ Socket.IO using Redis adapter (cluster-safe)');
+    } catch (err) {
+      logger.warn('⚠️ Socket.IO Redis adapter unavailable — using in-memory adapter. Run: npm install @socket.io/redis-adapter', { error: err?.message });
+    }
+  } else {
+    logger.warn('⚠️ REDIS_URL not set — Socket.IO using in-memory adapter. Clustering will NOT work correctly without Redis.');
+  }
 
   const checkRate = makeRateLimiter();
 
@@ -77,6 +113,10 @@ export function initializeSocket(httpServer) {
 
   // Store active whiteboard sessions keyed by tenant-scoped room name.
   const whiteboardSessions = new Map();
+
+  // Track in-flight rings: ringId → { callerId, callerRoom, targetUserId, targetRoom, timeout }
+  const activeRings = new Map();
+  const RING_TIMEOUT_MS = 30_000; // auto-cancel after 30 seconds
 
   io.on('connection', (socket) => {
     logger.info('🔌 Socket connected:', socket.id, `(${socket.centerId})`);
@@ -313,6 +353,122 @@ export function initializeSocket(httpServer) {
       } catch (err) { logger.error('join-student-room error:', { error: err?.message }); }
     });
 
+    // ── User personal room (any role — required for ring notifications) ───────
+    socket.on('join-user-room', () => {
+      try {
+        const room = `user-room:${socket.centerId}:${socket.userId}`;
+        socket.join(room);
+        socket.userRoomName = room;
+        logger.info(`🔔 User ${socket.userId} (${socket.userRole}) joined user-room`);
+      } catch (err) { logger.error('join-user-room error:', { error: err?.message }); }
+    });
+
+    // ── Ring / attention-call ─────────────────────────────────────────────────
+    // Caller emits ring-call → server forwards incoming-ring to target's user-room.
+    // The ring plays client-side audio and auto-cancels after RING_TIMEOUT_MS.
+    socket.on('ring-call', ({ targetUserId, callerName }) => {
+      try {
+        if (!targetUserId || !callerName) return;
+
+        const callerRoom = `user-room:${socket.centerId}:${socket.userId}`;
+        const targetRoom = `user-room:${socket.centerId}:${targetUserId}`;
+        const ringId = `${socket.centerId}:${socket.userId}:${targetUserId}:${Date.now()}`;
+
+        // Cancel any previous ring this caller already has in flight
+        for (const [id, ring] of activeRings) {
+          if (ring.callerId === socket.userId && ring.centerId === socket.centerId) {
+            clearTimeout(ring.timeout);
+            io.to(ring.targetRoom).emit('ring-cancelled', { ringId: id });
+            activeRings.delete(id);
+          }
+        }
+
+        const timeout = setTimeout(() => {
+          if (activeRings.has(ringId)) {
+            const r = activeRings.get(ringId);
+            activeRings.delete(ringId);
+            io.to(targetRoom).emit('ring-timeout', { ringId });
+            io.to(callerRoom).emit('ring-timeout', { ringId });
+            logger.info(`⏰ Ring ${ringId} timed out`);
+            saveRingLog(r.centerId, {
+              callerId:   r.callerId,
+              callerRole: r.callerRole,
+              callerName: r.callerName,
+              targetId:   r.targetUserId,
+              targetRole: r.targetRole,
+              outcome:    "missed",
+            });
+          }
+        }, RING_TIMEOUT_MS);
+
+        activeRings.set(ringId, {
+          callerId:   socket.userId,
+          callerRole: socket.userRole,
+          callerName,
+          callerRoom,
+          targetUserId,
+          targetRole:  null, // filled on join-user-room; best-effort
+          targetRoom,
+          centerId:   socket.centerId,
+          timeout,
+        });
+
+        io.to(targetRoom).emit('incoming-ring', {
+          ringId,
+          callerId: socket.userId,
+          callerName,
+          callerRole: socket.userRole,
+        });
+
+        socket.emit('ring-sent', { ringId, targetUserId });
+        logger.info(`🔔 Ring ${ringId}: ${socket.userId} (${socket.userRole}) → ${targetUserId}`);
+      } catch (err) { logger.error('ring-call error:', { error: err?.message }); }
+    });
+
+    // Caller cancels the ring before it is answered
+    socket.on('ring-cancel', ({ ringId }) => {
+      try {
+        const ring = activeRings.get(ringId);
+        if (!ring || ring.callerId !== socket.userId) return;
+        clearTimeout(ring.timeout);
+        activeRings.delete(ringId);
+        io.to(ring.targetRoom).emit('ring-cancelled', { ringId });
+        logger.info(`❌ Ring ${ringId} cancelled by caller`);
+      } catch (err) { logger.error('ring-cancel error:', { error: err?.message }); }
+    });
+
+    // Target answers — notify the caller so they can open the class / chat
+    socket.on('ring-answered', ({ ringId }) => {
+      try {
+        const ring = activeRings.get(ringId);
+        if (!ring || ring.targetUserId !== socket.userId) return;
+        clearTimeout(ring.timeout);
+        activeRings.delete(ringId);
+        io.to(ring.callerRoom).emit('ring-answered', { ringId, by: socket.userId });
+        logger.info(`✅ Ring ${ringId} answered by ${socket.userId}`);
+      } catch (err) { logger.error('ring-answered error:', { error: err?.message }); }
+    });
+
+    // Target declines — notify the caller
+    socket.on('ring-declined', ({ ringId }) => {
+      try {
+        const ring = activeRings.get(ringId);
+        if (!ring || ring.targetUserId !== socket.userId) return;
+        clearTimeout(ring.timeout);
+        activeRings.delete(ringId);
+        io.to(ring.callerRoom).emit('ring-declined', { ringId, by: socket.userId });
+        logger.info(`🚫 Ring ${ringId} declined by ${socket.userId}`);
+        saveRingLog(ring.centerId, {
+          callerId:   ring.callerId,
+          callerRole: ring.callerRole,
+          callerName: ring.callerName,
+          targetId:   ring.targetUserId,
+          targetRole: socket.userRole,
+          outcome:    "declined",
+        });
+      } catch (err) { logger.error('ring-declined error:', { error: err?.message }); }
+    });
+
     // ── PDF content sync (teacher → student) ────────────────────────────────
 
     socket.on('pdf-stroke-start', (data) => {
@@ -454,6 +610,20 @@ export function initializeSocket(httpServer) {
           socket.reactionChannels.forEach(ch => {
             socket.leave(`reactions-${tenantRoom(socket, ch)}`);
           });
+        }
+
+        // Clean up any in-flight rings involving this socket
+        for (const [ringId, ring] of activeRings) {
+          if (ring.centerId !== socket.centerId) continue;
+          if (ring.callerId === socket.userId) {
+            clearTimeout(ring.timeout);
+            io.to(ring.targetRoom).emit('ring-cancelled', { ringId, reason: 'offline' });
+            activeRings.delete(ringId);
+          } else if (ring.targetUserId === socket.userId) {
+            clearTimeout(ring.timeout);
+            io.to(ring.callerRoom).emit('ring-declined', { ringId, reason: 'offline' });
+            activeRings.delete(ringId);
+          }
         }
       } catch (err) {
         logger.error('disconnect cleanup error:', { error: err?.message });

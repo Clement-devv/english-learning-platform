@@ -35,6 +35,8 @@ const centerSchema = new mongoose.Schema({
     teacherLoginTheme:  { type: String, default: null },  // exclusive — super admin assigns (teacher)
     dashboardTheme:        { type: String, default: null },  // exclusive — super admin assigns (student)
     teacherDashboardTheme: { type: String, default: null },  // exclusive — super admin assigns (teacher)
+    adminDashboardTheme:      { type: String, default: null },  // exclusive — super admin assigns (admin)
+    subAdminDashboardTheme:   { type: String, default: null },  // exclusive — super admin assigns (sub-admin)
     borderRadius:   { type: String, default: '8px' },
     shadowStyle:    { type: String, default: 'soft' },
     spacing:        { type: String, default: 'comfortable' },
@@ -77,6 +79,30 @@ const centerSchema = new mongoose.Schema({
     type:  { type: String, default: 'A' },
     name:  { type: String, default: '@' },
     value: String,
+  },
+
+  // ── Certificate template (configured by super admin per center) ─────────────
+  certificateTemplate: {
+    organizationName: { type: String, default: '' },
+    primaryColor:     { type: String, default: '#f97316' },
+    secondaryColor:   { type: String, default: '#1e293b' },
+    accentColor:      { type: String, default: '#f43f5e' },
+    signatureName:    { type: String, default: '' },
+    signatureTitle:   { type: String, default: 'Director of Studies' },
+    footerText:       { type: String, default: '' },
+    completionMilestones: {
+      type: [{
+        count:       { type: Number, required: true },
+        title:       { type: String, required: true },
+        description: { type: String, default: '' },
+      }],
+      default: [
+        { count: 10,  title: 'English Starter Certificate',     description: 'Successfully completed 10 English lessons' },
+        { count: 25,  title: 'English Foundation Certificate',  description: 'Successfully completed 25 English lessons' },
+        { count: 50,  title: 'English Proficiency Certificate', description: 'Successfully completed 50 English lessons' },
+        { count: 100, title: 'English Excellence Certificate',  description: 'Successfully completed 100 English lessons' },
+      ],
+    },
   },
 
   // ── AI Chat Credit Budget (allocated by super admin) ──────────────────────

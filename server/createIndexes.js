@@ -33,6 +33,8 @@ async function createIndexes() {
     await db.collection("bookings").createIndex({ scheduledTime: 1 });
     await db.collection("bookings").createIndex({ status: 1, scheduledTime: -1 });
     await db.collection("bookings").createIndex({ recurringPatternId: 1 }, { sparse: true });
+    await db.collection("bookings").createIndex({ studentId: 1, scheduledTime: -1 }); // booking history by student
+    await db.collection("bookings").createIndex({ teacherId: 1, scheduledTime: -1 }); // booking history by teacher
     console.log("   ✅ bookings done");
 
     // ── Assignments ───────────────────────────────────────────────────────────
@@ -47,6 +49,7 @@ async function createIndexes() {
     await db.collection("groupchats").createIndex({ assignmentId: 1 });
     await db.collection("groupchats").createIndex({ teacherId: 1 });
     await db.collection("groupchats").createIndex({ studentId: 1 });
+    await db.collection("groupchats").createIndex({ assignmentId: 1, createdAt: -1 }); // chat history pagination
     console.log("   ✅ groupchats done");
 
     // ── Payments ──────────────────────────────────────────────────────────────
@@ -72,6 +75,12 @@ async function createIndexes() {
     await db.collection("recurringpatterns").createIndex({ teacherId: 1, status: 1 });
     await db.collection("recurringpatterns").createIndex({ studentId: 1 });
     console.log("   ✅ recurringpatterns done");
+
+    // ── Recordings ───────────────────────────────────────────────────────────
+    console.log("📝 recordings...");
+    await db.collection("recordings").createIndex({ studentId: 1, createdAt: -1 });
+    await db.collection("recordings").createIndex({ teacherId: 1, createdAt: -1 });
+    console.log("   ✅ recordings done");
 
     // ── Summary ───────────────────────────────────────────────────────────────
     console.log("\n🎉 All indexes created successfully!");

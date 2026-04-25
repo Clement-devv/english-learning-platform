@@ -578,3 +578,70 @@ export const sendStudentWelcomeEmail = async (student, centerName = "") => {
     `,
   });
 };
+
+export const sendParentInviteEmail = async (parent, setupUrl, centerName = "") => {
+  const displayName = centerName || config.appName;
+
+  return sendEmail({
+    centerName,
+    to: parent.email,
+    subject: `You're invited to monitor your child's progress at ${displayName}`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <style>
+          * { box-sizing: border-box; margin: 0; padding: 0; }
+          body { font-family: 'Segoe UI', Arial, sans-serif; background: #fff8f0; color: #333; }
+          .wrap { max-width: 600px; margin: 32px auto; background: #fff; border-radius: 20px; overflow: hidden; box-shadow: 0 8px 40px rgba(249,115,22,0.12); }
+          .header { background: linear-gradient(135deg, #f97316 0%, #f43f5e 100%); padding: 44px 40px; text-align: center; }
+          .header h1 { color: #fff; font-size: 26px; font-weight: 800; margin-bottom: 8px; }
+          .header p  { color: rgba(255,255,255,0.88); font-size: 15px; }
+          .avatar { width: 72px; height: 72px; border-radius: 50%; background: rgba(255,255,255,0.2); display: inline-flex; align-items: center; justify-content: center; font-size: 32px; margin-bottom: 16px; }
+          .body { padding: 40px; }
+          .body p { font-size: 15px; line-height: 1.7; color: #444; margin-bottom: 16px; }
+          .features { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 24px 0; }
+          .feature { background: #fff8f0; border: 1px solid #fed7aa; border-radius: 12px; padding: 16px; text-align: center; }
+          .feature .icon { font-size: 24px; margin-bottom: 6px; }
+          .feature .name { font-size: 13px; font-weight: 700; color: #92400e; }
+          .cta { text-align: center; margin: 32px 0; }
+          .btn { display: inline-block; padding: 16px 44px; background: linear-gradient(135deg, #f97316, #f43f5e); color: #fff; text-decoration: none; border-radius: 50px; font-size: 16px; font-weight: 800; box-shadow: 0 6px 20px rgba(249,115,22,0.35); }
+          .expiry { background: #fff7ed; border: 1px solid #fed7aa; border-radius: 10px; padding: 14px 20px; font-size: 13px; color: #92400e; text-align: center; margin-top: 16px; }
+          .footer { background: #fff8f0; padding: 24px 40px; text-align: center; border-top: 1px solid #ffe8cc; }
+          .footer p { font-size: 12px; color: #a89480; margin-bottom: 4px; }
+        </style>
+      </head>
+      <body>
+        <div class="wrap">
+          <div class="header">
+            <div class="avatar">👨‍👩‍👧</div>
+            <h1>You're invited!</h1>
+            <p>Track your child's learning progress at ${displayName}</p>
+          </div>
+          <div class="body">
+            <p>Hi <strong>${parent.firstName}</strong>,</p>
+            <p>Your child's school has created a Parent Portal account for you at <strong>${displayName}</strong>. Set up your password to start monitoring their progress in real time.</p>
+            <div class="features">
+              <div class="feature"><div class="icon">📅</div><div class="name">Class Schedule</div></div>
+              <div class="feature"><div class="icon">📝</div><div class="name">Homework &amp; Grades</div></div>
+              <div class="feature"><div class="icon">✅</div><div class="name">Attendance</div></div>
+              <div class="feature"><div class="icon">🏆</div><div class="name">Certificates</div></div>
+            </div>
+            <div class="cta">
+              <a href="${setupUrl}" class="btn">Set Up Your Account</a>
+            </div>
+            <div class="expiry">⏰ This invite link expires in 48 hours.</div>
+            <p style="margin-top:24px;font-size:13px;color:#a89480;">Can't click the button? Copy this link:<br/><a href="${setupUrl}" style="color:#f97316;word-break:break-all;">${setupUrl}</a></p>
+          </div>
+          <div class="footer">
+            <p>You received this because ${displayName} created a parent account for you.</p>
+            <p>© ${new Date().getFullYear()} ${displayName}</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `,
+  });
+};

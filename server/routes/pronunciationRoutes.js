@@ -1,10 +1,90 @@
 import express from "express";
+import multer from "multer";
+import OpenAI from "openai";
+import os from "os";
+import fs from "fs";
 import { verifyToken } from "../middleware/authMiddleware.js";
 import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
 import { pronunciationCacheSchema } from "../schemas/pronunciationCacheSchema.js";
 import { callGemini, extractJSONArray } from "../utils/geminiHelper.js";
 import logger from "../utils/logger.js";
 import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
+
+// ── OpenAI client — lazy so missing key doesn't crash the server ──────────────
+let _openai = null;
+function getOpenAI() {
+  if (!process.env.OPENAI_API_KEY) return null;
+  if (!_openai) _openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  return _openai;
+}
+
+// ── Multer — audio uploads to temp dir ───────────────────────────────────────
+const audioUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, os.tmpdir()),
+    filename: (_req, file, cb) => {
+      const ext = file.mimetype.includes("ogg") ? ".ogg"
+        : file.mimetype.includes("mp4") ? ".mp4"
+        : ".webm";
+      cb(null, `pron_${Date.now()}${ext}`);
+    },
+  }),
+  limits: { fileSize: 10 * 1024 * 1024 },
+});
+
+// ── Server-side word alignment ────────────────────────────────────────────────
+function levenshtein(a, b) {
+  const m = a.length, n = b.length;
+  const dp = Array.from({ length: m + 1 }, (_, i) =>
+    Array.from({ length: n + 1 }, (_, j) => (i === 0 ? j : j === 0 ? i : 0))
+  );
+  for (let i = 1; i <= m; i++)
+    for (let j = 1; j <= n; j++)
+      dp[i][j] = a[i - 1] === b[j - 1]
+        ? dp[i - 1][j - 1]
+        : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+  return dp[m][n];
+}
+
+function normalizeWord(w) { return w.toLowerCase().replace(/[^a-z']/g, ""); }
+
+function alignWords(expectedText, spokenText) {
+  const exp = expectedText.split(/\s+/).map(normalizeWord).filter(Boolean);
+  const spk = spokenText.split(/\s+/).map(normalizeWord).filter(Boolean);
+  return exp.map((e, i) => {
+    const s = spk[i] || "";
+    if (!s) return { expected: e, spoken: "", status: "missed" };
+    if (e === s) return { expected: e, spoken: s, status: "correct" };
+    const threshold = e.length <= 4 ? 1 : 2;
+    if (levenshtein(e, s) <= threshold) return { expected: e, spoken: s, status: "close" };
+    return { expected: e, spoken: s, status: "wrong" };
+  });
+}
+
+// ── Batch IPA + tips via GPT-3.5 ─────────────────────────────────────────────
+async function fetchIPA(words) {
+  const openai = getOpenAI();
+  if (!openai) return {};
+  const targets = words.filter(w => w.status !== "correct").map(w => w.expected);
+  if (targets.length === 0) return {};
+  const prompt = `For each English word below, provide the IPA transcription and a one-sentence pronunciation tip for a learner.
+Return ONLY valid JSON — no markdown fences, no explanation.
+Words: ${targets.join(", ")}
+Format: {"word": {"ipa": "/ɪpə/", "tip": "one-line tip"}}`;
+  try {
+    const resp = await openai.chat.completions.create({
+      model: "gpt-3.5-turbo",
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.3,
+      max_tokens: 600,
+    });
+    const raw = resp.choices[0].message.content.trim().replace(/^```json?\n?/, "").replace(/\n?```$/, "");
+    return JSON.parse(raw);
+  } catch (err) {
+    logger.error("IPA fetch error:", err.message);
+    return {};
+  }
+}
 
 const router = express.Router();
 router.use(tenantMiddleware);
@@ -115,6 +195,64 @@ router.get("/sentences", verifyToken, async (req, res) => {
     logger.error("Gemini generation failed:", genErr.message);
     // ── 3. Fallback — tell frontend to use local bank ───────────────────────
     return res.json({ success: false, sentences: [], reason: genErr.message });
+  }
+});
+
+// ── POST /api/pronunciation/analyze ──────────────────────────────────────────
+// Accepts multipart/form-data: audio (file) + targetText (string)
+// Returns: { success, transcript, percentage, words: [{expected,spoken,status,ipa,tip}] }
+router.post("/analyze", verifyToken, audioUpload.single("audio"), async (req, res) => {
+  const filePath = req.file?.path;
+  if (!filePath) return badRequest(res, "No audio file uploaded");
+
+  const { targetText } = req.body;
+  if (!targetText?.trim()) {
+    fs.unlink(filePath, () => {});
+    return badRequest(res, "targetText is required");
+  }
+
+  const openai = getOpenAI();
+  if (!openai) {
+    fs.unlink(filePath, () => {});
+    return res.status(503).json({ success: false, reason: "OpenAI API key not configured on this server." });
+  }
+
+  try {
+    // 1. Whisper transcription
+    const transcription = await openai.audio.transcriptions.create({
+      file: fs.createReadStream(filePath),
+      model: "whisper-1",
+      prompt: targetText,
+      language: "en",
+    });
+    const transcript = transcription.text.trim();
+
+    // 2. Word-level alignment
+    const words = alignWords(targetText, transcript);
+    const expLen = targetText.split(/\s+/).filter(Boolean).length;
+    const rawScore = words.reduce(
+      (sum, w) => sum + (w.status === "correct" ? 1 : w.status === "close" ? 0.5 : 0), 0
+    );
+    const percentage = Math.round((rawScore / expLen) * 100);
+
+    // 3. IPA + tips for flagged words (runs in parallel with no extra latency concern)
+    const ipaMap = await fetchIPA(words);
+
+    // 4. Enrich word list
+    const enriched = words.map(w => ({
+      ...w,
+      ipa: ipaMap[w.expected]?.ipa  || null,
+      tip: ipaMap[w.expected]?.tip  || null,
+    }));
+
+    logger.info(`Pronunciation analysis: ${percentage}% — "${transcript.slice(0, 60)}"`);
+    return res.json({ success: true, transcript, percentage, words: enriched });
+
+  } catch (err) {
+    logger.error("Pronunciation analysis error:", err.message);
+    return serverError(res, "Analysis failed — please try again");
+  } finally {
+    fs.unlink(filePath, () => {});
   }
 });
 

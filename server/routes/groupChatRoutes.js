@@ -9,6 +9,8 @@ import { adminSchema }      from "../schemas/adminSchema.js";
 import { subAdminSchema }   from "../schemas/subAdminSchema.js";
 import logger from "../utils/logger.js";
 import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
+import { validateObjectId } from '../middleware/validateObjectId.js';
+import { parsePagination } from '../utils/pagination.js';
 
 const router = express.Router();
 router.use(tenantMiddleware);
@@ -20,9 +22,11 @@ const getAdmin     = (db) => db.models.Admin     || db.model("Admin",     adminS
 const getSubAdmin  = (db) => db.models.SubAdmin  || db.model("SubAdmin",  subAdminSchema);
 
 // GET /api/group-chats — list chats for logged-in user
+// Query params: ?limit=50&skip=0
 router.get("/", verifyToken, async (req, res) => {
   try {
     const { id: userId, role } = req.user;
+    const { limit, skip } = parsePagination(req.query, 50, 100);
     let filter = {};
 
     if (role === "admin") {
@@ -42,9 +46,13 @@ router.get("/", verifyToken, async (req, res) => {
       .populate("teacherId", "firstName lastName email")
       .populate("studentId", "firstName lastName email")
       .sort({ lastActivityAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      // Exclude the full messages array from the list view — clients fetch messages separately
+      .select("-messages")
       .lean();
 
-    res.json({ success: true, chats });
+    res.json({ success: true, chats, hasMore: chats.length === limit });
   } catch (error) {
     logger.error("Error fetching chats:", { error: error?.message });
     res.status(500).json({ success: false, message: "Failed to fetch chats", error: error.message });
@@ -52,7 +60,7 @@ router.get("/", verifyToken, async (req, res) => {
 });
 
 // GET /api/group-chats/:chatId — get a specific chat
-router.get("/:chatId", verifyToken, async (req, res) => {
+router.get("/:chatId", verifyToken, validateObjectId("chatId"), async (req, res) => {
   try {
     const { chatId } = req.params;
     const { id: userId, role } = req.user;
@@ -82,14 +90,28 @@ router.get("/:chatId", verifyToken, async (req, res) => {
 });
 
 // GET /api/group-chats/:chatId/messages
-router.get("/:chatId/messages", verifyToken, async (req, res) => {
+// Query params:
+//   ?limit=50      — number of messages to return (max 200, default 50)
+//   ?offset=0      — how many messages from the end to skip (for "load older")
+//                    offset=0 → latest 50, offset=50 → messages 51-100, etc.
+router.get("/:chatId/messages", verifyToken, validateObjectId("chatId"), async (req, res) => {
   try {
     const { chatId } = req.params;
     const { id: userId, role } = req.user;
 
-    const chat = await getGroupChat(req.db).findById(chatId)
-      .select("chatName teacherId studentId assignmentId messages")
-      .lean();
+    const { limit } = parsePagination(req.query, 50, 200);
+    const rawOffset = parseInt(req.query.offset, 10);
+    const offset    = Number.isFinite(rawOffset) && rawOffset > 0 ? rawOffset : 0;
+
+    // Use MongoDB $slice to avoid loading the entire messages array into memory.
+    // $slice: [-N]        → last N messages (latest)
+    // $slice: [-(off+N), N] → N messages starting off positions from the end
+    const msgSlice = offset > 0 ? { $slice: [-(offset + limit), limit] } : { $slice: -limit };
+
+    const chat = await getGroupChat(req.db).findById(chatId, {
+      chatName: 1, teacherId: 1, studentId: 1, assignmentId: 1,
+      messages: msgSlice,
+    }).lean();
 
     if (!chat) return notFound(res, "Chat not found");
 
@@ -101,7 +123,11 @@ router.get("/:chatId/messages", verifyToken, async (req, res) => {
       return forbidden(res, "Access denied");
     }
 
-    res.json({ success: true, messages: chat.messages || [] });
+    const messages = chat.messages || [];
+    // If we got back exactly `limit` messages, there are likely older ones available.
+    const hasMore = messages.length === limit;
+
+    res.json({ success: true, messages, hasMore, limit, offset });
   } catch (error) {
     logger.error("Error fetching messages:", { error: error?.message });
     res.status(500).json({ success: false, message: "Failed to fetch messages", error: error.message });
@@ -109,7 +135,7 @@ router.get("/:chatId/messages", verifyToken, async (req, res) => {
 });
 
 // POST /api/group-chats/:chatId/messages — send a message
-router.post("/:chatId/messages", verifyToken, async (req, res) => {
+router.post("/:chatId/messages", verifyToken, validateObjectId("chatId"), async (req, res) => {
   try {
     const { chatId } = req.params;
     const { message } = req.body;
@@ -191,7 +217,7 @@ router.post("/:chatId/messages", verifyToken, async (req, res) => {
 });
 
 // PATCH /api/group-chats/:chatId/mark-read
-router.patch("/:chatId/mark-read", verifyToken, async (req, res) => {
+router.patch("/:chatId/mark-read", verifyToken, validateObjectId("chatId"), async (req, res) => {
   try {
     const { chatId } = req.params;
     const { id: userId, role } = req.user;
@@ -227,7 +253,7 @@ router.patch("/:chatId/mark-read", verifyToken, async (req, res) => {
 });
 
 // DELETE /api/group-chats/:chatId — admin only
-router.delete("/:chatId", verifyToken, async (req, res) => {
+router.delete("/:chatId", verifyToken, validateObjectId("chatId"), async (req, res) => {
   try {
     if (req.user.role !== "admin")
       return forbidden(res, "Only admins can delete chats");

@@ -11,6 +11,30 @@ router.use(tenantMiddleware);
 const getAssignment = (db) => db.models.Assignment || db.model("Assignment", assignmentSchema);
 
 /**
+ * GET /api/teacher-assignments/my-teachers
+ * Returns teachers directly assigned to the current student (any role with a valid token).
+ * Used by the student dashboard schedule tab.
+ */
+router.get("/my-teachers", verifyToken, async (req, res) => {
+  try {
+    const studentId = req.user?.id || req.user?._id;
+    if (!studentId) return res.status(400).json({ message: "No student ID in token" });
+    const assignments = await getAssignment(req.db)
+      .find({ studentId })
+      .populate("teacherId", "firstName lastName photo displayName")
+      .lean();
+    const teachers = assignments
+      .map(a => a.teacherId)
+      .filter(Boolean)
+      .map(t => ({ _id: t._id, firstName: t.firstName, lastName: t.lastName, photo: t.photo, displayName: t.displayName }));
+    res.json({ teachers });
+  } catch (err) {
+    logger.error("Error fetching student's teachers:", { error: err?.message });
+    res.status(500).json({ message: "Error fetching teachers" });
+  }
+});
+
+/**
  * GET /api/teachers/:teacherId/students
  * Get all students assigned to a specific teacher
  */

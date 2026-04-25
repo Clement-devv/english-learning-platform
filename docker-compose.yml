@@ -1,0 +1,83 @@
+version: "3.9"
+
+# English Learning Platform — Production Docker Compose
+# Usage:
+#   docker compose up -d          (start all services)
+#   docker compose logs -f app    (tail app logs)
+#   docker compose pull app && docker compose up -d app  (update app only)
+
+services:
+  app:
+    image: ghcr.io/YOUR_GITHUB_USERNAME/english-learning-platform:latest
+    container_name: elp-app
+    restart: unless-stopped
+    env_file: ./server/.env.production
+    environment:
+      NODE_ENV: production
+      PORT: "5000"
+      TRUST_PROXY: "true"
+      REDIS_URL: "redis://redis:6379"
+    volumes:
+      # Persist uploads across deployments (logos, recordings, homework)
+      - uploads_data:/app/server/uploads
+      # App logs accessible from host
+      - ./server/logs:/app/server/logs
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - elp-network
+    expose:
+      - "5000"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:5000/api/health/ready"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  redis:
+    image: redis:7-alpine
+    container_name: elp-redis
+    restart: unless-stopped
+    command: redis-server --save 60 1 --loglevel warning --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    networks:
+      - elp-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: elp-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"   # HTTP/3 (QUIC)
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data      # SSL certs — persisted across restarts
+      - caddy_config:/config
+    networks:
+      - elp-network
+    depends_on:
+      - app
+
+volumes:
+  uploads_data:
+    driver: local
+  redis_data:
+    driver: local
+  caddy_data:
+    driver: local
+  caddy_config:
+    driver: local
+
+networks:
+  elp-network:
+    driver: bridge

@@ -89,12 +89,18 @@ router.post('/login', loginLimiter, validateSuperAdminLogin, async (req, res) =>
 });
 
 // GET /api/super-admin/centers — all centers with optional status filter
+// Query params: ?status=active&limit=50&skip=0
 router.get('/centers', verifySuperAdmin, async (req, res) => {
   try {
     const { status } = req.query;
+    const limit = Math.min(parseInt(req.query.limit) || 50, 200);
+    const skip  = Math.max(parseInt(req.query.skip)  || 0,   0);
     const filter = status ? { status } : {};
-    const centers = await Center.find(filter).sort({ createdAt: -1 });
-    res.json({ success: true, centers });
+    const [centers, total] = await Promise.all([
+      Center.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+      Center.countDocuments(filter),
+    ]);
+    res.json({ success: true, centers, total, hasMore: skip + centers.length < total });
   } catch (err) {
     logger.error('❌ Get centers error:', { error: err?.message });
     serverError(res);
@@ -104,8 +110,13 @@ router.get('/centers', verifySuperAdmin, async (req, res) => {
 // GET /api/super-admin/centers/pending — pending registrations only
 router.get('/centers/pending', verifySuperAdmin, async (req, res) => {
   try {
-    const centers = await Center.find({ status: 'pending' }).sort({ createdAt: -1 });
-    res.json({ success: true, centers });
+    const limit = Math.min(parseInt(req.query.limit) || 50, 200);
+    const skip  = Math.max(parseInt(req.query.skip)  || 0,   0);
+    const [centers, total] = await Promise.all([
+      Center.find({ status: 'pending' }).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+      Center.countDocuments({ status: 'pending' }),
+    ]);
+    res.json({ success: true, centers, total, hasMore: skip + centers.length < total });
   } catch (err) {
     logger.error('❌ Get pending centers error:', { error: err?.message });
     serverError(res);
@@ -574,6 +585,124 @@ router.patch('/centers/:id/teacher-dashboard-theme', verifySuperAdmin, validateP
   }
 });
 
+// GET  /api/super-admin/admin-dashboard-themes — list all admin dashboard theme assignments
+router.get('/admin-dashboard-themes', verifySuperAdmin, async (req, res) => {
+  try {
+    const centers = await Center.find({ status: { $ne: 'deleted' } })
+      .select('centerName slug branding.adminDashboardTheme').lean();
+    const assignments = {};
+    centers.forEach(c => {
+      if (c.branding?.adminDashboardTheme) {
+        assignments[c.branding.adminDashboardTheme] = { id: c._id, name: c.centerName, slug: c.slug };
+      }
+    });
+    res.json({ success: true, assignments });
+  } catch (err) {
+    logger.error('❌ Admin dashboard themes error:', { error: err?.message });
+    serverError(res);
+  }
+});
+
+// PATCH /api/super-admin/centers/:id/admin-dashboard-theme — exclusively assign an admin dashboard theme
+router.patch('/centers/:id/admin-dashboard-theme', verifySuperAdmin, validateParamMongoId('id'), async (req, res) => {
+  try {
+    const { adminDashboardTheme } = req.body;
+    const center = await Center.findById(req.params.id);
+    if (!center) return notFound(res, 'Center not found');
+
+    if (adminDashboardTheme) {
+      const conflict = await Center.findOne({
+        'branding.adminDashboardTheme': adminDashboardTheme,
+        _id: { $ne: req.params.id },
+        status: { $ne: 'deleted' },
+      });
+      if (conflict) {
+        return res.status(409).json({
+          success: false,
+          message: `Admin dashboard theme "${adminDashboardTheme}" is already assigned to ${conflict.centerName}`,
+        });
+      }
+    }
+
+    await Center.findByIdAndUpdate(req.params.id, { 'branding.adminDashboardTheme': adminDashboardTheme || null });
+
+    await writeAuditLog({
+      action: 'ADMIN_DASHBOARD_THEME_ASSIGNED', superAdmin: req.superAdmin,
+      targetId: center._id.toString(), targetName: center.centerName,
+      details: { adminDashboardTheme: adminDashboardTheme || null }, ip: req.ip,
+    });
+
+    res.json({
+      success: true,
+      message: adminDashboardTheme
+        ? `Admin dashboard theme "${adminDashboardTheme}" assigned to ${center.centerName}`
+        : 'Admin dashboard theme unassigned',
+    });
+  } catch (err) {
+    logger.error('❌ Admin dashboard theme assign error:', { error: err?.message });
+    serverError(res);
+  }
+});
+
+// GET  /api/super-admin/sub-admin-dashboard-themes — list all sub-admin dashboard theme assignments
+router.get('/sub-admin-dashboard-themes', verifySuperAdmin, async (req, res) => {
+  try {
+    const centers = await Center.find({ status: { $ne: 'deleted' } })
+      .select('centerName slug branding.subAdminDashboardTheme').lean();
+    const assignments = {};
+    centers.forEach(c => {
+      if (c.branding?.subAdminDashboardTheme) {
+        assignments[c.branding.subAdminDashboardTheme] = { id: c._id, name: c.centerName, slug: c.slug };
+      }
+    });
+    res.json({ success: true, assignments });
+  } catch (err) {
+    logger.error('❌ Sub-admin dashboard themes error:', { error: err?.message });
+    serverError(res);
+  }
+});
+
+// PATCH /api/super-admin/centers/:id/sub-admin-dashboard-theme — exclusively assign a sub-admin dashboard theme
+router.patch('/centers/:id/sub-admin-dashboard-theme', verifySuperAdmin, validateParamMongoId('id'), async (req, res) => {
+  try {
+    const { subAdminDashboardTheme } = req.body;
+    const center = await Center.findById(req.params.id);
+    if (!center) return notFound(res, 'Center not found');
+
+    if (subAdminDashboardTheme) {
+      const conflict = await Center.findOne({
+        'branding.subAdminDashboardTheme': subAdminDashboardTheme,
+        _id: { $ne: req.params.id },
+        status: { $ne: 'deleted' },
+      });
+      if (conflict) {
+        return res.status(409).json({
+          success: false,
+          message: `Sub-admin dashboard theme "${subAdminDashboardTheme}" is already assigned to ${conflict.centerName}`,
+        });
+      }
+    }
+
+    await Center.findByIdAndUpdate(req.params.id, { 'branding.subAdminDashboardTheme': subAdminDashboardTheme || null });
+
+    await writeAuditLog({
+      action: 'SUBADMIN_DASHBOARD_THEME_ASSIGNED', superAdmin: req.superAdmin,
+      targetId: center._id.toString(), targetName: center.centerName,
+      details: { subAdminDashboardTheme: subAdminDashboardTheme || null }, ip: req.ip,
+    });
+
+    res.json({
+      success: true,
+      message: subAdminDashboardTheme
+        ? `Sub-admin dashboard theme "${subAdminDashboardTheme}" assigned to ${center.centerName}`
+        : 'Sub-admin dashboard theme unassigned',
+    });
+  } catch (err) {
+    logger.error('❌ Sub-admin dashboard theme assign error:', { error: err?.message });
+    serverError(res);
+  }
+});
+
 // GET  /api/super-admin/login-themes — list all login theme assignments
 router.get('/login-themes', verifySuperAdmin, async (req, res) => {
   try {
@@ -827,8 +956,13 @@ router.patch('/centers/:id/remove-domain', verifySuperAdmin, validateParamMongoI
 // GET /api/super-admin/centers/deleted — centers in soft-delete waiting period
 router.get('/centers/deleted', verifySuperAdmin, async (req, res) => {
   try {
-    const centers = await Center.find({ status: 'deleted' }).sort({ deletedAt: -1 });
-    res.json({ success: true, centers });
+    const limit = Math.min(parseInt(req.query.limit) || 50, 200);
+    const skip  = Math.max(parseInt(req.query.skip)  || 0,   0);
+    const [centers, total] = await Promise.all([
+      Center.find({ status: 'deleted' }).sort({ deletedAt: -1 }).skip(skip).limit(limit).lean(),
+      Center.countDocuments({ status: 'deleted' }),
+    ]);
+    res.json({ success: true, centers, total, hasMore: skip + centers.length < total });
   } catch (err) {
     logger.error('❌ Get deleted centers error:', { error: err?.message });
     serverError(res);
@@ -1305,6 +1439,34 @@ router.get('/classes', verifySuperAdmin, async (req, res) => {
   } catch (err) {
     logger.error('❌ Classes error:', { error: err?.message });
     serverError(res);
+  }
+});
+
+// PATCH /api/super-admin/centers/:id/certificate-template
+router.patch('/centers/:id/certificate-template', verifySuperAdmin, validateParamMongoId('id'), async (req, res) => {
+  try {
+    const { certificateTemplate } = req.body;
+    if (!certificateTemplate) return badRequest(res, 'certificateTemplate is required');
+
+    // Sanitise milestones
+    if (Array.isArray(certificateTemplate.completionMilestones)) {
+      certificateTemplate.completionMilestones = certificateTemplate.completionMilestones
+        .filter(m => m.count > 0 && m.title)
+        .sort((a, b) => a.count - b.count);
+    }
+
+    const center = await Center.findByIdAndUpdate(
+      req.params.id,
+      { $set: { certificateTemplate } },
+      { new: true, runValidators: true }
+    );
+    if (!center) return notFound(res, 'Center not found');
+
+    await writeAuditLog({ action: 'CERT_TEMPLATE_UPDATED', targetId: center._id, by: req.superAdmin?.email });
+    res.json({ success: true, message: 'Certificate template saved', center });
+  } catch (err) {
+    logger.error('Error saving certificate template:', { error: err?.message });
+    serverError(res, 'Error saving certificate template');
   }
 });
 

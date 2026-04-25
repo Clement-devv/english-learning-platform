@@ -4,6 +4,13 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
 
+  resolve: {
+    // Guarantee a single React instance across all chunks (including @react-three/fiber/drei).
+    // Without this, chunks split into vendor-three can load their own React copy, causing
+    // "Cannot read properties of null (reading 'useState')" on first load.
+    dedupe: ['react', 'react-dom', 'react-dom/client'],
+  },
+
   test: {
     globals: true,
     environment: 'jsdom',

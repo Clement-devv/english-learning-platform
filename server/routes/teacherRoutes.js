@@ -25,6 +25,9 @@ import { subAdminSchema } from "../schemas/subAdminSchema.js";
 import { parsePagination } from "../utils/pagination.js";
 import logger from "../utils/logger.js";
 import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
+import { cachedQuery, invalidateCache } from '../utils/cache.js';
+
+const teacherCacheKey = (slug, id) => `teacher:${slug}:${id}`;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
@@ -58,13 +61,36 @@ const getTeacher  = (db) => db.models.Teacher  || db.model("Teacher",  teacherSc
 const getStudent  = (db) => db.models.Student  || db.model("Student",  studentSchema);
 const getSubAdmin = (db) => db.models.SubAdmin || db.model("SubAdmin", subAdminSchema);
 
+// GET /teachers/for-booking — student-accessible list of active teachers whose
+// schedule is visible to students. Returns only the fields needed for the
+// booking calendar (no pay rates, earnings, or private info).
+router.get("/for-booking", verifyToken, async (req, res) => {
+  try {
+    if (!["student", "admin", "teacher"].includes(req.user?.role)) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    const teachers = await getTeacher(req.db)
+      .find({ active: true, showScheduleToStudents: { $ne: false } })
+      .select("firstName lastName photo bio continent specializations showScheduleToStudents")
+      .sort({ firstName: 1 })
+      .lean();
+    res.json({ teachers });
+  } catch (err) {
+    logger.error("for-booking teachers error:", { error: err?.message });
+    serverError(res, "Server error");
+  }
+});
+
 // ─── GET single teacher ───────────────────────────────────────────────────────
 router.get("/:id", verifyToken, async (req, res) => {
   try {
-    const teacher = await getTeacher(req.db)
-      .findById(req.params.id)
-      .select("-password -inviteToken -twoFactorSecret -twoFactorBackupCodes")
-      .lean();
+    const cacheKey = teacherCacheKey(req.center?.slug, req.params.id);
+    const teacher = await cachedQuery(cacheKey, 60, () =>
+      getTeacher(req.db)
+        .findById(req.params.id)
+        .select("-password -inviteToken -twoFactorSecret -twoFactorBackupCodes")
+        .lean()
+    );
     if (!teacher) return notFound(res, "Teacher not found");
     res.json(teacher);
   } catch (err) {
@@ -109,15 +135,18 @@ router.post("/:id/photo", verifyToken, requireOwnerOrAdmin, (req, res, next) => 
     const teacher = await Teacher.findById(req.params.id);
     if (!teacher) return notFound(res, "Teacher not found");
 
-    // Delete old photo file if it exists
+    // Delete old photo file if it exists.
+    // path.basename() prevents path traversal: only the filename is used,
+    // not any directory components that may have been stored.
     if (teacher.photo) {
-      const old = path.join(__dirname, "..", teacher.photo.replace(/^\//, ""));
+      const old = path.join(__dirname, "../uploads/teachers", path.basename(teacher.photo));
       fs.unlink(old, () => {});
     }
 
     const photoUrl = `/uploads/teachers/${req.file.filename}`;
     teacher.photo = photoUrl;
     await teacher.save();
+    await invalidateCache(teacherCacheKey(req.center?.slug, req.params.id));
     res.json({ message: "Photo uploaded", photo: photoUrl });
   } catch (err) {
     logger.error(err);
@@ -132,10 +161,11 @@ router.delete("/:id/photo", verifyToken, requireOwnerOrAdmin, async (req, res) =
     const teacher = await Teacher.findById(req.params.id);
     if (!teacher) return notFound(res, "Teacher not found");
     if (teacher.photo) {
-      const filePath = path.join(__dirname, "..", teacher.photo.replace(/^\//, ""));
+      const filePath = path.join(__dirname, "../uploads/teachers", path.basename(teacher.photo));
       fs.unlink(filePath, () => {});
       teacher.photo = "";
       await teacher.save();
+      await invalidateCache(teacherCacheKey(req.center?.slug, req.params.id));
     }
     res.json({ message: "Photo removed" });
   } catch (err) {
@@ -375,6 +405,7 @@ router.patch("/:id/profile", verifyToken, requireOwnerOrAdmin, async (req, res) 
       .findByIdAndUpdate(req.params.id, updates, { new: true })
       .select("-password -inviteToken -twoFactorSecret -twoFactorBackupCodes");
     if (!teacher) return notFound(res, "Teacher not found");
+    await invalidateCache(teacherCacheKey(req.center?.slug, req.params.id));
     res.json(teacher);
   } catch (err) {
     serverError(res, "Error updating profile");
@@ -402,6 +433,7 @@ router.put("/:id", verifyToken, verifyAdmin, async (req, res) => {
       .select("-password -inviteToken");
     if (!teacher) return notFound(res, "Teacher not found");
 
+    await invalidateCache(teacherCacheKey(req.center?.slug, req.params.id));
     if (password) {
       try { await sendPasswordResetEmail(teacher.email, `${teacher.firstName} ${teacher.lastName}`, password, "teacher", req.center?.centerName || ""); }
       catch (e) { logger.error("Password reset email failed:", { error: e?.message }); }
@@ -434,6 +466,7 @@ router.delete("/:id", verifyToken, verifyAdmin, strictLimiter, async (req, res) 
       logger.error("Teacher deletion warning email failed:", { error: e?.message })
     );
 
+    await invalidateCache(teacherCacheKey(req.center?.slug, req.params.id));
     res.json({ message: "Teacher scheduled for deletion", scheduledDeletionAt: deletionDate, teacher });
   } catch (err) {
     serverError(res, err.message);

@@ -93,26 +93,36 @@ export default function StudentScheduleTab({ studentId, isDarkMode }) {
   const weekEnd  = new Date(weekStart); weekEnd.setDate(weekStart.getDate() + 6);
   const weekLabel = `${weekStart.toLocaleDateString("en-US",{month:"short",day:"numeric"})} – ${weekEnd.toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}`;
 
-  // ── Load distinct teachers from accepted bookings ──────────────────────
+  // ── Load distinct teachers from both direct assignments and accepted bookings ──
   useEffect(() => {
     if (!studentId) return;
     (async () => {
       try {
-        const { data } = await api.get(`/bookings/student/${studentId}?status=accepted`);
+        const [assignRes, bookRes] = await Promise.allSettled([
+          api.get("/teacher-assignments/my-teachers"),
+          api.get(`/bookings/student/${studentId}?status=accepted`),
+        ]);
         const map = new Map();
-        (data || []).forEach(b => {
-          const t = b.teacherId;
-          if (t && !map.has(t._id || t)) {
-            map.set(t._id || t, {
-              _id:       t._id || t,
-              firstName: t.firstName || "Teacher",
-              lastName:  t.lastName  || "",
-            });
-          }
-        });
+        // From direct assignments
+        if (assignRes.status === "fulfilled") {
+          (assignRes.value.data?.teachers || []).forEach(t => {
+            if (t && !map.has(String(t._id))) {
+              map.set(String(t._id), { _id: t._id, firstName: t.firstName || "Teacher", lastName: t.lastName || "", photo: t.photo, displayName: t.displayName });
+            }
+          });
+        }
+        // From accepted bookings
+        if (bookRes.status === "fulfilled") {
+          (bookRes.value.data || []).forEach(b => {
+            const t = b.teacherId;
+            if (t && !map.has(String(t._id || t))) {
+              map.set(String(t._id || t), { _id: t._id || t, firstName: t.firstName || "Teacher", lastName: t.lastName || "" });
+            }
+          });
+        }
         const list = [...map.values()];
         setTeachers(list);
-        if (list.length === 1) setTeacher(list[0]); // auto-select if only one
+        if (list.length === 1) setTeacher(list[0]);
       } catch { /* silent */ }
     })();
   }, [studentId]);
@@ -191,7 +201,7 @@ export default function StudentScheduleTab({ studentId, isDarkMode }) {
           <div style={{ textAlign:"center", padding:"40px 20px", background:col.card, borderRadius:"20px", border:`1px solid ${col.border}` }}>
             <p style={{ fontSize:"40px", margin:"0 0 12px" }}>📚</p>
             <p style={{ margin:0, fontWeight:"700", color:col.heading }}>No teacher assigned yet</p>
-            <p style={{ margin:"6px 0 0", fontSize:"13px", color:col.muted }}>Once you have a confirmed class, your teacher's schedule will appear here.</p>
+            <p style={{ margin:"6px 0 0", fontSize:"13px", color:col.muted }}>Once your admin assigns you a teacher or you have a confirmed class, your teacher's schedule will appear here.</p>
           </div>
         ) : (
           <div style={{ display:"flex", flexDirection:"column", gap:"12px" }}>
@@ -201,8 +211,10 @@ export default function StudentScheduleTab({ studentId, isDarkMode }) {
                 onMouseEnter={e => { e.currentTarget.style.borderColor="#7c3aed"; e.currentTarget.style.transform="translateY(-1px)"; }}
                 onMouseLeave={e => { e.currentTarget.style.borderColor=col.border; e.currentTarget.style.transform=""; }}
               >
-                <div style={{ width:"44px", height:"44px", borderRadius:"50%", background:"linear-gradient(135deg,#7c3aed,#ec4899)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-                  <span style={{ color:"#fff", fontWeight:"800", fontSize:"16px" }}>{t.firstName[0]}</span>
+                <div style={{ width:"44px", height:"44px", borderRadius:"50%", background:"linear-gradient(135deg,#7c3aed,#ec4899)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, overflow:"hidden" }}>
+                  {t.photo
+                    ? <img src={t.photo} alt="" style={{ width:"44px", height:"44px", objectFit:"cover" }} />
+                    : <span style={{ color:"#fff", fontWeight:"800", fontSize:"16px" }}>{(t.firstName||"T")[0]}</span>}
                 </div>
                 <div>
                   <p style={{ margin:0, fontWeight:"800", fontSize:"15px", color:col.heading }}>{t.displayName?.trim() || `${t.firstName} ${t.lastName}`}</p>
@@ -239,8 +251,10 @@ export default function StudentScheduleTab({ studentId, isDarkMode }) {
         )}
 
         <div style={{ display:"flex", alignItems:"center", gap:"12px" }}>
-          <div style={{ width:"40px", height:"40px", borderRadius:"50%", background:"linear-gradient(135deg,#7c3aed,#ec4899)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-            <span style={{ color:"#fff", fontWeight:"800", fontSize:"14px" }}>{(teacher.displayName?.trim() || teacher.firstName)?.[0]}</span>
+          <div style={{ width:"40px", height:"40px", borderRadius:"50%", background:"linear-gradient(135deg,#7c3aed,#ec4899)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, overflow:"hidden" }}>
+            {teacher.photo
+              ? <img src={teacher.photo} alt="" style={{ width:"40px", height:"40px", objectFit:"cover" }} />
+              : <span style={{ color:"#fff", fontWeight:"800", fontSize:"14px" }}>{(teacher.displayName?.trim() || teacher.firstName || "T")[0]}</span>}
           </div>
           <div>
             <p style={{ margin:0, fontWeight:"800", fontSize:"16px", color:col.heading }}>

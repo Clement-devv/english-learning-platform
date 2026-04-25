@@ -2,6 +2,7 @@
 // Shared hook — all login theme components use this for state + handlers.
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../../context/AuthContext.jsx';
 import api from '../../../api';
 
 export function useLoginLogic() {
@@ -14,6 +15,7 @@ export function useLoginLogic() {
   const [pendingToken, setPendingToken] = useState(null);
   const [focusedField, setFocusedField] = useState(null);
   const navigate = useNavigate();
+  const { login } = useAuth();
 
   const handleInitialLogin = async (e) => {
     e.preventDefault();
@@ -25,6 +27,7 @@ export function useLoginLogic() {
         sessionStorage.setItem('studentToken',        response.data.token);
         sessionStorage.setItem('studentSessionToken', response.data.sessionToken);
         sessionStorage.setItem('studentInfo',         JSON.stringify(response.data.student));
+        login('student', response.data.student, response.data.token);
         navigate('/student/dashboard');
       } else if (response.data.requires2FA) {
         setRequires2FA(true);
@@ -48,6 +51,7 @@ export function useLoginLogic() {
         sessionStorage.setItem('studentToken',        response.data.token);
         sessionStorage.setItem('studentSessionToken', response.data.sessionToken);
         sessionStorage.setItem('studentInfo',         JSON.stringify(response.data.user));
+        login('student', response.data.user, response.data.token);
         navigate('/student/dashboard');
       }
     } catch (err) {

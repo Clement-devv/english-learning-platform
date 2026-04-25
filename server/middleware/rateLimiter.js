@@ -219,7 +219,7 @@ export const apiLimiter = rateLimit({
 export const realtimeLimiter = rateLimit({
   ...withStore("realtime"),
   windowMs: 1 * 60 * 1000,
-  max: 200,
+  max: 600, // was 200 — 20-student classroom sends ~600 heartbeats/min
   skip: shouldSkip,
   validate: { keyGeneratorIpFallback: false },
   keyGenerator: createKeyGenerator(true),

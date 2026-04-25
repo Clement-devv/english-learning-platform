@@ -402,7 +402,8 @@ function ResultScreen({ quiz, attempt, col, onDone }) {
 export default function StudentQuizTab({ studentInfo, isDarkMode }) {
   const col = isDarkMode
     ? { bg: "#0f1117", card: "#1a1d2e", border: "#2a2d40", heading: "#f0f4ff", body: "#c8cce0", muted: "#6b7090" }
-    : { bg: "#fff8f0", card: "#ffffff", border: "#ffe8cc", heading: "#2d1f6e", body: "#4a4060", muted: "#9b8ab0" };
+    : { bg: "#fff8f0", card: "#ffffff", border: "#ffe8cc", heading: "#3d2e20", body: "#5a4a3a", muted: "#a89480" };
+  const accent = isDarkMode ? "#fb923c" : "#f97316";
 
   const [quizzes,      setQuizzes]      = useState([]);
   const [loading,      setLoading]      = useState(true);
@@ -474,6 +475,11 @@ export default function StudentQuizTab({ studentInfo, isDarkMode }) {
   }
 
   // ── Quiz list ──────────────────────────────────────────────────────────────
+  const nextQuiz = quizzes.find(q => q.status === "assigned");
+  const avgScore = quizzes.filter(q => q.status === "attempted" && q.attempt?.percentage != null).length > 0
+    ? Math.round(quizzes.filter(q => q.status === "attempted" && q.attempt?.percentage != null).reduce((s, q) => s + q.attempt.percentage, 0) / quizzes.filter(q => q.status === "attempted" && q.attempt?.percentage != null).length)
+    : null;
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20, fontFamily: "'Nunito', sans-serif" }}>
 
@@ -492,42 +498,75 @@ export default function StudentQuizTab({ studentInfo, isDarkMode }) {
       )}
 
       {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
         <div>
-          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 900, color: col.heading }}>📝 My Quizzes</h1>
-          <p style={{ margin: "4px 0 0", fontSize: 13, color: col.muted }}>Take your tests and see your results!</p>
+          <div style={{ fontSize: 11.5, fontWeight: 800, color: accent, textTransform: "uppercase", letterSpacing: "0.1em" }}>Learning</div>
+          <h1 style={{ margin: "2px 0 0", fontSize: 28, fontWeight: 900, color: col.heading, letterSpacing: "-0.4px" }}>Quizzes</h1>
+          <p style={{ margin: "4px 0 0", fontSize: 14, color: col.muted, fontWeight: 600 }}>
+            {counts.assigned > 0 ? `${counts.assigned} ready to take` : "All quizzes done!"}{avgScore != null ? ` · avg score ${avgScore}%` : ""}
+          </p>
         </div>
         <button onClick={fetchQuizzes}
-          style={{ padding: "8px 16px", borderRadius: 12, border: `2px solid ${col.border}`, background: col.card, color: col.body, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 700 }}>
+          style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "10px 14px", borderRadius: 12, border: `2px solid ${col.border}`, background: col.card, color: col.body, cursor: "pointer", fontSize: 13, fontWeight: 800, fontFamily: "inherit" }}>
           <RefreshCw size={14} /> Refresh
         </button>
       </div>
 
-      {/* Stats */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12 }}>
+      {/* Featured next-up banner */}
+      {!loading && nextQuiz && (
+        <div style={{ background: "linear-gradient(135deg,#f97316,#f43f5e)", borderRadius: 24, padding: "22px 26px", color: "#fff", display: "flex", alignItems: "center", gap: 20, boxShadow: "0 16px 40px rgba(249,115,22,0.28)", position: "relative", overflow: "hidden" }}>
+          <div style={{ position: "absolute", right: -20, top: -30, width: 180, height: 180, borderRadius: "50%", background: "rgba(255,255,255,0.12)" }}/>
+          <div style={{ width: 60, height: 60, borderRadius: 18, background: "rgba(255,255,255,0.2)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, position: "relative" }}>
+            <BookOpen size={28} stroke="#fff" strokeWidth={2.2}/>
+          </div>
+          <div style={{ flex: 1, minWidth: 0, position: "relative" }}>
+            <div style={{ fontSize: 11.5, fontWeight: 800, letterSpacing: "0.1em", opacity: 0.9 }}>NEXT UP</div>
+            <div style={{ fontSize: 20, fontWeight: 900, marginTop: 2 }}>{nextQuiz.title}</div>
+            <div style={{ fontSize: 13, fontWeight: 600, opacity: 0.95, marginTop: 2 }}>{nextQuiz.questions?.length || "—"} questions · {nextQuiz.timeLimit} min · {nextQuiz.teacherId?.firstName} {nextQuiz.teacherId?.lastName}</div>
+          </div>
+          <button onClick={() => handleStartQuiz(nextQuiz)} style={{ position: "relative", display: "inline-flex", alignItems: "center", gap: 6, padding: "12px 22px", borderRadius: 999, border: "none", background: "#fff", color: "#c2410c", fontSize: 14, fontWeight: 900, cursor: "pointer", fontFamily: "inherit", boxShadow: "0 8px 20px rgba(0,0,0,0.15)", flexShrink: 0 }}>
+            Start quiz <ArrowRight size={14} stroke="#c2410c"/>
+          </button>
+        </div>
+      )}
+
+      {/* Stats strip */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12 }}>
         {[
-          { key: "all",       label: "All Quizzes",    emoji: "📝", color: "#7c3aed", bg: "#f5f3ff" },
-          { key: "assigned",  label: "To Attempt",     emoji: "⏳", color: "#d97706", bg: "#fffbeb" },
-          { key: "attempted", label: "Completed",      emoji: "🏆", color: "#059669", bg: "#ecfdf5" },
+          { key: "all",       label: "Total",        emoji: "📝", color: "#f97316", bg: "#fff7ed" },
+          { key: "assigned",  label: "Ready to take", emoji: "⏳", color: "#a16207", bg: "#fef3c7" },
+          { key: "attempted", label: "Completed",    emoji: "🏆", color: "#059669", bg: "#ecfdf5" },
+          { key: "_avg",      label: "Avg score",    emoji: "⭐", color: "#be185d", bg: "#fce7f3" },
         ].map(({ key, label, emoji, color, bg }) => (
-          <div key={key} onClick={() => setFilter(key)}
-            style={{ background: filter === key ? bg : col.card, border: `2.5px solid ${filter === key ? color : col.border}`, borderRadius: 16, padding: "14px 16px", cursor: "pointer", textAlign: "center" }}>
-            <div style={{ fontSize: 24, marginBottom: 4 }}>{emoji}</div>
-            <div style={{ fontSize: 24, fontWeight: 900, color }}>{counts[key]}</div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: col.muted, textTransform: "uppercase" }}>{label}</div>
+          <div key={key} onClick={() => key !== "_avg" && setFilter(key)}
+            style={{ background: col.card, border: `2px solid ${filter === key ? color : col.border}`, borderRadius: 18, padding: "14px 16px", cursor: key !== "_avg" ? "pointer" : "default", display: "flex", alignItems: "center", gap: 12, transition: "all 0.2s", boxShadow: filter === key ? `0 4px 16px ${color}25` : "none" }}>
+            <div style={{ width: 40, height: 40, borderRadius: 12, background: filter === key ? bg : (isDarkMode ? "rgba(255,255,255,0.05)" : "#f9f9f9"), display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>{emoji}</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 22, fontWeight: 900, color, letterSpacing: "-0.3px", lineHeight: 1.1 }}>
+                {key === "_avg" ? (avgScore != null ? `${avgScore}%` : "—") : counts[key]}
+              </div>
+              <div style={{ fontSize: 11.5, fontWeight: 700, color: col.muted }}>{label}</div>
+            </div>
           </div>
         ))}
       </div>
 
-      {/* Filter pills */}
-      <div style={{ display: "flex", gap: 6 }}>
-        {["all", "assigned", "attempted"].map(f => (
-          <button key={f} onClick={() => setFilter(f)}
-            style={{ padding: "6px 16px", borderRadius: 20, border: "none", fontSize: 13, fontWeight: 700, cursor: "pointer", background: filter === f ? "#7c3aed" : col.card, color: filter === f ? "#fff" : col.body, boxShadow: filter === f ? "0 2px 10px #7c3aed50" : "none" }}>
-            {f === "all" ? "📝 All" : f === "assigned" ? "⏳ To Attempt" : "🏆 Completed"}
-            {filter !== f && ` (${counts[f]})`}
-          </button>
-        ))}
+      {/* Filter chips */}
+      <div style={{ display: "flex", gap: 6, background: col.card, border: `2px solid ${col.border}`, borderRadius: 14, padding: 4, alignSelf: "flex-start" }}>
+        {[
+          { k: "all",       l: "All"       },
+          { k: "assigned",  l: "To take"   },
+          { k: "attempted", l: "Completed" },
+        ].map(f => {
+          const isActive = filter === f.k;
+          return (
+            <button key={f.k} onClick={() => setFilter(f.k)}
+              style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 10, border: "none", cursor: "pointer", fontFamily: "inherit", fontSize: 12.5, fontWeight: 800, background: isActive ? `linear-gradient(135deg,${accent},#fb923c)` : "transparent", color: isActive ? "#fff" : col.body, boxShadow: isActive ? `0 4px 12px ${accent}55` : "none", transition: "all 0.15s" }}>
+              {f.l}
+              <span style={{ padding: "1px 7px", borderRadius: 999, fontSize: 10.5, fontWeight: 900, background: isActive ? "rgba(255,255,255,0.28)" : (isDarkMode ? "rgba(255,255,255,0.1)" : "#fff3e6"), color: isActive ? "#fff" : col.muted }}>{counts[f.k]}</span>
+            </button>
+          );
+        })}
       </div>
 
       {/* List */}
@@ -562,10 +601,10 @@ export default function StudentQuizTab({ studentInfo, isDarkMode }) {
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 14, flex: 1, minWidth: 0 }}>
                     <div style={{
-                      width: 46, height: 46, borderRadius: "50%", flexShrink: 0,
+                      width: 48, height: 48, borderRadius: 14, flexShrink: 0,
                       background: quiz.status === "attempted"
                         ? "linear-gradient(135deg,#10b981,#059669)"
-                        : "linear-gradient(135deg,#7c3aed,#a855f7)",
+                        : "linear-gradient(135deg,#f97316,#fb923c)",
                       display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22,
                     }}>
                       {quiz.status === "attempted" ? "🏆" : "📝"}
@@ -602,9 +641,9 @@ export default function StudentQuizTab({ studentInfo, isDarkMode }) {
                       <button onClick={() => handleStartQuiz(quiz)}
                         style={{
                           padding: "8px 20px", borderRadius: 12, border: "none",
-                          background: "linear-gradient(135deg,#7c3aed,#a855f7)", color: "#fff",
-                          fontWeight: 800, fontSize: 13, cursor: "pointer",
-                          boxShadow: "0 2px 10px #7c3aed40", fontFamily: "'Nunito', sans-serif",
+                          background: "linear-gradient(135deg,#f97316,#f43f5e)", color: "#fff",
+                          fontWeight: 900, fontSize: 13, cursor: "pointer",
+                          boxShadow: "0 4px 14px rgba(249,115,22,0.4)", fontFamily: "'Nunito', sans-serif", borderRadius: 999,
                         }}>
                         Start Quiz 🚀
                       </button>

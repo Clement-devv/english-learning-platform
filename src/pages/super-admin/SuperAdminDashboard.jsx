@@ -8,13 +8,15 @@ import {
   XCircle, PauseCircle, Plus, X, Eye, EyeOff,
   Globe, RefreshCw, Trash2, Mail, KeyRound, Palette,
   BarChart2, ChevronDown, ChevronUp, ToggleLeft, ToggleRight, Video, Mic, Film,
-  AlertTriangle, RotateCcw, Zap, Send, Activity, Users, UserCheck, LogIn, Megaphone, SlidersHorizontal,
+  AlertTriangle, RotateCcw, Zap, Send, Activity, Users, UserCheck, LogIn, Megaphone, SlidersHorizontal, Award,
 } from 'lucide-react';
 import api from '../../api';
 import { THEMES } from '../../data/themes';
 import { LOGIN_THEMES, TEACHER_LOGIN_THEMES } from '../../data/loginThemes';
 import { DASHBOARD_THEMES } from '../../data/dashboardThemes';
 import { TEACHER_DASHBOARD_THEMES } from '../../data/teacherDashboardThemes';
+import { ADMIN_DASHBOARD_THEMES }       from '../../data/adminDashboardThemes';
+import { SUBADMIN_DASHBOARD_THEMES }   from '../../data/subAdminDashboardThemes';
 import CentersTab  from './tabs/CentersTab';
 import DomainsTab  from './tabs/DomainsTab';
 import HealthTab   from './tabs/HealthTab';
@@ -22,7 +24,8 @@ import UsageTab    from './tabs/UsageTab';
 import PeopleTab   from './tabs/PeopleTab';
 import ClassesTab  from './tabs/ClassesTab';
 import DeletedTab  from './tabs/DeletedTab';
-import CreditsTab  from './tabs/CreditsTab';
+import CreditsTab             from './tabs/CreditsTab';
+import CertificateTemplatesTab from './tabs/CertificateTemplatesTab';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api/v1';
 
@@ -43,8 +46,15 @@ const EMPTY_FORM = {
 // OTP step: 'email' → 'otp' → 'form' → 'done'
 export default function SuperAdminDashboard() {
   const navigate = useNavigate();
-  const { user: info, token, logout: authLogout } = useAuth();
-  const authHeaders = { Authorization: `Bearer ${token}` };
+  const { logout: authLogout } = useAuth();
+
+  // Super-admin uses localStorage exclusively. Read token and info directly so
+  // a concurrent teacher/student session (in sessionStorage) can't shadow them.
+  const superAdminToken = localStorage.getItem('superAdminToken');
+  const info = (() => {
+    try { return JSON.parse(localStorage.getItem('superAdminInfo') || 'null'); } catch { return null; }
+  })();
+  const authHeaders = { Authorization: `Bearer ${superAdminToken}` };
 
   const [stats,    setStats]    = useState(null);
   const [centers,  setCenters]  = useState([]);
@@ -153,7 +163,16 @@ export default function SuperAdminDashboard() {
   const [dashThemeAssignments,setDashThemeAssignments]= useState({});
   const [assigningDashTheme,  setAssigningDashTheme]  = useState(null);
   const [dashThemeMsg,        setDashThemeMsg]        = useState('');
-  const [dashThemeTab,        setDashThemeTab]        = useState('student'); // 'student' | 'teacher'
+  const [dashThemeTab,              setDashThemeTab]              = useState('student'); // 'student' | 'teacher' | 'admin' | 'subadmin'
+  const [teacherDashThemeAssignments, setTeacherDashThemeAssignments] = useState({});
+  const [assigningTeacherDashTheme,   setAssigningTeacherDashTheme]   = useState(null);
+  const [teacherDashThemeMsg,         setTeacherDashThemeMsg]         = useState('');
+  const [adminDashThemeAssignments,   setAdminDashThemeAssignments]   = useState({});
+  const [assigningAdminDashTheme,     setAssigningAdminDashTheme]     = useState(null);
+  const [adminDashThemeMsg,           setAdminDashThemeMsg]           = useState('');
+  const [subAdminDashThemeAssignments, setSubAdminDashThemeAssignments] = useState({});
+  const [assigningSubAdminDashTheme,   setAssigningSubAdminDashTheme]   = useState(null);
+  const [subAdminDashThemeMsg,         setSubAdminDashThemeMsg]         = useState('');
 
   const loadDashThemeAssignments = async () => {
     try {
@@ -166,7 +185,13 @@ export default function SuperAdminDashboard() {
   const handleOpenDashThemeModal = (center) => {
     setDashThemeModal(center);
     setDashThemeMsg('');
+    setTeacherDashThemeMsg('');
+    setAdminDashThemeMsg('');
+    setSubAdminDashThemeMsg('');
     loadDashThemeAssignments();
+    loadTeacherDashThemeAssignments();
+    loadAdminDashThemeAssignments();
+    loadSubAdminDashThemeAssignments();
   };
 
   const handleAssignDashTheme = async (themeId) => {
@@ -216,6 +241,183 @@ export default function SuperAdminDashboard() {
       setDashThemeMsg(err.message || 'Failed to unassign');
     } finally {
       setAssigningDashTheme(null);
+    }
+  };
+
+  // ── Teacher dashboard theme assignment ────────────────────────────────────
+  const loadTeacherDashThemeAssignments = async () => {
+    try {
+      const res  = await fetch(`${API_BASE}/super-admin/teacher-dashboard-themes`, { headers: authHeaders });
+      const data = await res.json();
+      if (data.success) setTeacherDashThemeAssignments(data.assignments);
+    } catch (_) {}
+  };
+
+  const handleAssignTeacherDashTheme = async (themeId) => {
+    if (!dashThemeModal) return;
+    setAssigningTeacherDashTheme(themeId);
+    setTeacherDashThemeMsg('');
+    try {
+      const res  = await fetch(`${API_BASE}/super-admin/centers/${dashThemeModal._id}/teacher-dashboard-theme`, {
+        method: 'PATCH',
+        headers: { ...authHeaders, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ teacherDashboardTheme: themeId }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message);
+      setDashThemeModal(c => c ? { ...c, branding: { ...c.branding, teacherDashboardTheme: themeId } } : c);
+      setCenters(cs => cs.map(c =>
+        c._id === dashThemeModal._id ? { ...c, branding: { ...c.branding, teacherDashboardTheme: themeId } } : c
+      ));
+      setTeacherDashThemeMsg(data.message);
+      loadTeacherDashThemeAssignments();
+    } catch (err) {
+      setTeacherDashThemeMsg(err.message || 'Failed to assign theme');
+    } finally {
+      setAssigningTeacherDashTheme(null);
+    }
+  };
+
+  const handleUnassignTeacherDashTheme = async () => {
+    if (!dashThemeModal) return;
+    setAssigningTeacherDashTheme('__unassign__');
+    setTeacherDashThemeMsg('');
+    try {
+      const res  = await fetch(`${API_BASE}/super-admin/centers/${dashThemeModal._id}/teacher-dashboard-theme`, {
+        method: 'PATCH',
+        headers: { ...authHeaders, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ teacherDashboardTheme: null }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message);
+      setDashThemeModal(c => c ? { ...c, branding: { ...c.branding, teacherDashboardTheme: null } } : c);
+      setCenters(cs => cs.map(c =>
+        c._id === dashThemeModal._id ? { ...c, branding: { ...c.branding, teacherDashboardTheme: null } } : c
+      ));
+      setTeacherDashThemeMsg('Teacher dashboard theme unassigned');
+      loadTeacherDashThemeAssignments();
+    } catch (err) {
+      setTeacherDashThemeMsg(err.message || 'Failed to unassign');
+    } finally {
+      setAssigningTeacherDashTheme(null);
+    }
+  };
+
+  // ── Admin dashboard theme assignment ─────────────────────────────────────
+  const loadAdminDashThemeAssignments = async () => {
+    try {
+      const res  = await fetch(`${API_BASE}/super-admin/admin-dashboard-themes`, { headers: authHeaders });
+      const data = await res.json();
+      if (data.success) setAdminDashThemeAssignments(data.assignments);
+    } catch (_) {}
+  };
+
+  const handleAssignAdminDashTheme = async (themeId) => {
+    if (!dashThemeModal) return;
+    setAssigningAdminDashTheme(themeId);
+    setAdminDashThemeMsg('');
+    try {
+      const res  = await fetch(`${API_BASE}/super-admin/centers/${dashThemeModal._id}/admin-dashboard-theme`, {
+        method: 'PATCH',
+        headers: { ...authHeaders, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adminDashboardTheme: themeId }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message);
+      setDashThemeModal(c => c ? { ...c, branding: { ...c.branding, adminDashboardTheme: themeId } } : c);
+      setCenters(cs => cs.map(c =>
+        c._id === dashThemeModal._id ? { ...c, branding: { ...c.branding, adminDashboardTheme: themeId } } : c
+      ));
+      setAdminDashThemeMsg(data.message);
+      loadAdminDashThemeAssignments();
+    } catch (err) {
+      setAdminDashThemeMsg(err.message || 'Failed to assign theme');
+    } finally {
+      setAssigningAdminDashTheme(null);
+    }
+  };
+
+  const handleUnassignAdminDashTheme = async () => {
+    if (!dashThemeModal) return;
+    setAssigningAdminDashTheme('__unassign__');
+    setAdminDashThemeMsg('');
+    try {
+      const res  = await fetch(`${API_BASE}/super-admin/centers/${dashThemeModal._id}/admin-dashboard-theme`, {
+        method: 'PATCH',
+        headers: { ...authHeaders, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adminDashboardTheme: null }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message);
+      setDashThemeModal(c => c ? { ...c, branding: { ...c.branding, adminDashboardTheme: null } } : c);
+      setCenters(cs => cs.map(c =>
+        c._id === dashThemeModal._id ? { ...c, branding: { ...c.branding, adminDashboardTheme: null } } : c
+      ));
+      setAdminDashThemeMsg('Admin dashboard theme unassigned');
+      loadAdminDashThemeAssignments();
+    } catch (err) {
+      setAdminDashThemeMsg(err.message || 'Failed to unassign');
+    } finally {
+      setAssigningAdminDashTheme(null);
+    }
+  };
+
+  // ── Sub-admin dashboard theme assignment ──────────────────────────────────
+  const loadSubAdminDashThemeAssignments = async () => {
+    try {
+      const res  = await fetch(`${API_BASE}/super-admin/sub-admin-dashboard-themes`, { headers: authHeaders });
+      const data = await res.json();
+      if (data.success) setSubAdminDashThemeAssignments(data.assignments);
+    } catch (_) {}
+  };
+
+  const handleAssignSubAdminDashTheme = async (themeId) => {
+    if (!dashThemeModal) return;
+    setAssigningSubAdminDashTheme(themeId);
+    setSubAdminDashThemeMsg('');
+    try {
+      const res  = await fetch(`${API_BASE}/super-admin/centers/${dashThemeModal._id}/sub-admin-dashboard-theme`, {
+        method: 'PATCH',
+        headers: { ...authHeaders, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subAdminDashboardTheme: themeId }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message);
+      setDashThemeModal(c => c ? { ...c, branding: { ...c.branding, subAdminDashboardTheme: themeId } } : c);
+      setCenters(cs => cs.map(c =>
+        c._id === dashThemeModal._id ? { ...c, branding: { ...c.branding, subAdminDashboardTheme: themeId } } : c
+      ));
+      setSubAdminDashThemeMsg(data.message);
+      loadSubAdminDashThemeAssignments();
+    } catch (err) {
+      setSubAdminDashThemeMsg(err.message || 'Failed to assign theme');
+    } finally {
+      setAssigningSubAdminDashTheme(null);
+    }
+  };
+
+  const handleUnassignSubAdminDashTheme = async () => {
+    if (!dashThemeModal) return;
+    setAssigningSubAdminDashTheme('__unassign__');
+    setSubAdminDashThemeMsg('');
+    try {
+      const res  = await fetch(`${API_BASE}/super-admin/centers/${dashThemeModal._id}/sub-admin-dashboard-theme`, {
+        method: 'PATCH',
+        headers: { ...authHeaders, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subAdminDashboardTheme: null }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message);
+      setDashThemeModal(c => c ? { ...c, branding: { ...c.branding, subAdminDashboardTheme: null } } : c);
+      setCenters(cs => cs.map(c =>
+        c._id === dashThemeModal._id ? { ...c, branding: { ...c.branding, subAdminDashboardTheme: null } } : c
+      ));
+      setSubAdminDashThemeMsg('Sub-admin dashboard theme unassigned');
+      loadSubAdminDashThemeAssignments();
+    } catch (err) {
+      setSubAdminDashThemeMsg(err.message || 'Failed to unassign');
+    } finally {
+      setAssigningSubAdminDashTheme(null);
     }
   };
 
@@ -432,6 +634,8 @@ export default function SuperAdminDashboard() {
   useEffect(() => { if (tab === 'classes') loadClasses('', '', ''); }, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleLogout = () => {
+    localStorage.removeItem('superAdminToken');
+    localStorage.removeItem('superAdminInfo');
     authLogout();
     navigate('/super-admin/login');
   };
@@ -804,7 +1008,7 @@ export default function SuperAdminDashboard() {
         <div style={s.headerLeft}>
           <Crown size={22} color="#f59e0b" />
           <span style={s.headerTitle}>Super Admin</span>
-          {info.firstName && <span style={s.headerSub}>{info.firstName} {info.lastName}</span>}
+          {info?.firstName && <span style={s.headerSub}>{info.firstName} {info.lastName}</span>}
         </div>
         <div style={{ display: 'flex', gap: '10px' }}>
           <button onClick={() => setShowModal(true)} style={s.createBtn}>
@@ -851,8 +1055,9 @@ export default function SuperAdminDashboard() {
             { key: 'usage',   label: 'Agora Usage',    icon: BarChart2  },
             { key: 'people',  label: 'People',         icon: Users      },
             { key: 'classes', label: 'Classes',        icon: BarChart2  },
-            { key: 'credits', label: 'AI Credits',     icon: Zap        },
-            { key: 'deleted', label: 'Deleted',        icon: Trash2     },
+            { key: 'credits',       label: 'AI Credits',    icon: Zap   },
+            { key: 'certificates',  label: 'Certificates',  icon: Award },
+            { key: 'deleted',       label: 'Deleted',       icon: Trash2 },
           ].map(({ key, label, icon: Icon }) => (
             <button
               key={key}
@@ -919,6 +1124,9 @@ export default function SuperAdminDashboard() {
               deleted={deleted} loadData={loadData} restoring={restoring}
               handleRestore={handleRestore} daysRemaining={daysRemaining}
             />
+          )}
+          {tab === 'certificates' && (
+            <CertificateTemplatesTab centers={centers} />
           )}
           {tab === 'credits' && (
             <CreditsTab
@@ -1614,11 +1822,13 @@ export default function SuperAdminDashboard() {
               <button onClick={() => setDashThemeModal(null)} style={s.closeBtn}><X size={18} /></button>
             </div>
 
-            {/* Student / Teacher tab selector */}
+            {/* Student / Teacher / Admin tab selector */}
             <div style={{ display: 'flex', gap: '4px', padding: '16px 24px 0', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
               {[
-                { key: 'student', label: '🎓 Student Dashboards' },
-                { key: 'teacher', label: '👩‍🏫 Teacher Dashboards' },
+                { key: 'student',  label: '🎓 Student Dashboards'   },
+                { key: 'teacher',  label: '👩‍🏫 Teacher Dashboards'  },
+                { key: 'admin',    label: '🛡️ Admin Dashboards'    },
+                { key: 'subadmin', label: '🔰 Sub-Admin Dashboards' },
               ].map(({ key, label }) => (
                 <button key={key} onClick={() => setDashThemeTab(key)}
                   style={{ padding: '8px 18px', border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: 'inherit', fontSize: '13px', fontWeight: 600, color: dashThemeTab === key ? '#06b6d4' : '#6b7280', borderBottom: dashThemeTab === key ? '2px solid #06b6d4' : '2px solid transparent', marginBottom: '-1px', transition: 'all 0.15s' }}>
@@ -1628,18 +1838,10 @@ export default function SuperAdminDashboard() {
             </div>
 
             <div style={{ padding: '20px 24px 28px' }}>
-              {dashThemeTab === 'student' && (
-                <p style={{ ...s.stepDesc, marginBottom: '6px' }}>
-                  Each theme is <strong>exclusive</strong> — only one center can hold it. Students see this design after login. Themes change the entire layout, fonts, animations and vibe without affecting functionality.
-                </p>
-              )}
-              {dashThemeTab === 'teacher' && (
-                <div style={{ textAlign: 'center', padding: '40px 20px', color: '#4b5563' }}>
-                  <div style={{ fontSize: '40px', marginBottom: '12px' }}>🚧</div>
-                  <p style={{ fontSize: '15px', fontWeight: 600, color: '#9ca3af', marginBottom: '6px' }}>Teacher Dashboards Coming Soon</p>
-                  <p style={{ fontSize: '13px', color: '#6b7280' }}>We're building teacher dashboard designs. Student dashboards are being finalized first. Check back after all student designs are confirmed.</p>
-                </div>
-              )}
+              <p style={{ ...s.stepDesc, marginBottom: '6px' }}>
+                Each theme is <strong>exclusive</strong> — only one center can hold it. {dashThemeTab === 'student' ? 'Students' : dashThemeTab === 'teacher' ? 'Teachers' : dashThemeTab === 'admin' ? 'Admins' : 'Sub-Admins'} see this design after login. Themes change the entire layout, fonts, animations and vibe without affecting functionality.
+              </p>
+
               {dashThemeTab === 'student' && dashThemeMsg && (
                 <div style={{ padding: '8px 14px', borderRadius: '10px', fontSize: '13px', fontWeight: '600', marginBottom: '14px',
                   background: dashThemeMsg.toLowerCase().includes('already') || dashThemeMsg.toLowerCase().includes('failed') ? 'rgba(239,68,68,.12)' : 'rgba(34,197,94,.12)',
@@ -1647,6 +1849,33 @@ export default function SuperAdminDashboard() {
                   border: `1px solid ${dashThemeMsg.toLowerCase().includes('already') || dashThemeMsg.toLowerCase().includes('failed') ? 'rgba(239,68,68,.2)' : 'rgba(34,197,94,.2)'}`,
                 }}>
                   {dashThemeMsg}
+                </div>
+              )}
+              {dashThemeTab === 'teacher' && teacherDashThemeMsg && (
+                <div style={{ padding: '8px 14px', borderRadius: '10px', fontSize: '13px', fontWeight: '600', marginBottom: '14px',
+                  background: teacherDashThemeMsg.toLowerCase().includes('already') || teacherDashThemeMsg.toLowerCase().includes('failed') ? 'rgba(239,68,68,.12)' : 'rgba(34,197,94,.12)',
+                  color: teacherDashThemeMsg.toLowerCase().includes('already') || teacherDashThemeMsg.toLowerCase().includes('failed') ? '#ef4444' : '#22c55e',
+                  border: `1px solid ${teacherDashThemeMsg.toLowerCase().includes('already') || teacherDashThemeMsg.toLowerCase().includes('failed') ? 'rgba(239,68,68,.2)' : 'rgba(34,197,94,.2)'}`,
+                }}>
+                  {teacherDashThemeMsg}
+                </div>
+              )}
+              {dashThemeTab === 'admin' && adminDashThemeMsg && (
+                <div style={{ padding: '8px 14px', borderRadius: '10px', fontSize: '13px', fontWeight: '600', marginBottom: '14px',
+                  background: adminDashThemeMsg.toLowerCase().includes('already') || adminDashThemeMsg.toLowerCase().includes('failed') ? 'rgba(239,68,68,.12)' : 'rgba(34,197,94,.12)',
+                  color: adminDashThemeMsg.toLowerCase().includes('already') || adminDashThemeMsg.toLowerCase().includes('failed') ? '#ef4444' : '#22c55e',
+                  border: `1px solid ${adminDashThemeMsg.toLowerCase().includes('already') || adminDashThemeMsg.toLowerCase().includes('failed') ? 'rgba(239,68,68,.2)' : 'rgba(34,197,94,.2)'}`,
+                }}>
+                  {adminDashThemeMsg}
+                </div>
+              )}
+              {dashThemeTab === 'subadmin' && subAdminDashThemeMsg && (
+                <div style={{ padding: '8px 14px', borderRadius: '10px', fontSize: '13px', fontWeight: '600', marginBottom: '14px',
+                  background: subAdminDashThemeMsg.toLowerCase().includes('already') || subAdminDashThemeMsg.toLowerCase().includes('failed') ? 'rgba(239,68,68,.12)' : 'rgba(34,197,94,.12)',
+                  color: subAdminDashThemeMsg.toLowerCase().includes('already') || subAdminDashThemeMsg.toLowerCase().includes('failed') ? '#ef4444' : '#22c55e',
+                  border: `1px solid ${subAdminDashThemeMsg.toLowerCase().includes('already') || subAdminDashThemeMsg.toLowerCase().includes('failed') ? 'rgba(239,68,68,.2)' : 'rgba(34,197,94,.2)'}`,
+                }}>
+                  {subAdminDashThemeMsg}
                 </div>
               )}
 
@@ -1728,7 +1957,71 @@ export default function SuperAdminDashboard() {
                 })}
               </div>}
 
-              {/* Unassign row — only on student tab */}
+              {dashThemeTab === 'teacher' && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: '14px', marginTop: '8px' }}>
+                {TEACHER_DASHBOARD_THEMES.map(theme => {
+                  const isActive    = dashThemeModal.branding?.teacherDashboardTheme === theme.id;
+                  const takenBy     = !isActive && teacherDashThemeAssignments[theme.id];
+                  const isAssigning = assigningTeacherDashTheme === theme.id;
+                  const isLocked    = !!takenBy;
+
+                  return (
+                    <div key={theme.id} style={{
+                      borderRadius: '16px',
+                      border: isActive ? `2px solid ${theme.preview.accent}` : isLocked ? '2px solid rgba(255,255,255,0.04)' : '2px solid rgba(255,255,255,0.08)',
+                      background: isActive ? `${theme.preview.accent}15` : isLocked ? 'rgba(255,255,255,0.01)' : 'rgba(255,255,255,0.03)',
+                      overflow: 'hidden',
+                      opacity: isLocked ? 0.5 : 1,
+                      transition: 'border-color .15s, background .15s',
+                    }}>
+                      <div style={{ height: '100px', background: theme.preview.bg, position: 'relative', overflow: 'hidden', padding: '10px' }}>
+                        <div style={{ display: 'flex', gap: '4px', marginBottom: '8px' }}>
+                          {[theme.preview.accent, `${theme.preview.accent}55`, `${theme.preview.accent}33`, `${theme.preview.accent}22`].map((bg, i) => (
+                            <div key={i} style={{ height: '18px', flex: i === 0 ? '0 0 48px' : '1', background: bg, borderRadius: '6px' }} />
+                          ))}
+                        </div>
+                        <div style={{ height: '28px', background: `linear-gradient(135deg, ${theme.preview.accent}, ${theme.preview.accent}99)`, borderRadius: '8px', marginBottom: '6px', display: 'flex', alignItems: 'center', paddingLeft: '8px' }}>
+                          <span style={{ fontSize: '14px' }}>{theme.emoji}</span>
+                          <div style={{ width: '60px', height: '6px', background: 'rgba(255,255,255,0.6)', borderRadius: '3px', marginLeft: '6px' }} />
+                        </div>
+                        <div style={{ display: 'flex', gap: '4px' }}>
+                          {[0,1,2,3].map(i => (
+                            <div key={i} style={{ flex: 1, height: '16px', background: theme.preview.card, border: `1px solid ${theme.preview.accent}30`, borderRadius: '5px' }} />
+                          ))}
+                        </div>
+                        <div style={{ position: 'absolute', bottom: '4px', right: '6px', fontSize: '18px' }}>{theme.emoji}</div>
+                      </div>
+                      <div style={{ padding: '10px 12px 6px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '3px' }}>
+                          <span style={{ fontSize: '13px', fontWeight: '700', color: '#f1f5f9' }}>{theme.name}</span>
+                          {isActive && <CheckCircle size={14} color={theme.preview.accent} />}
+                        </div>
+                        <p style={{ margin: '0 0 5px', fontSize: '10px', color: '#6b7280', lineHeight: '1.4' }}>{theme.description}</p>
+                        {takenBy && (
+                          <p style={{ margin: '0 0 5px', fontSize: '10px', color: '#f59e0b', fontWeight: '700' }}>🔒 Held by {takenBy.name}</p>
+                        )}
+                      </div>
+                      <div style={{ padding: '4px 12px 12px' }}>
+                        <button
+                          onClick={() => !isAssigning && !isActive && !isLocked && handleAssignTeacherDashTheme(theme.id)}
+                          disabled={isAssigning || isActive || isLocked}
+                          style={{
+                            width: '100%', padding: '7px 0', borderRadius: '8px', border: 'none',
+                            background: isActive ? `${theme.preview.accent}22` : isLocked ? 'rgba(255,255,255,0.04)' : theme.preview.accent,
+                            color: isActive ? theme.preview.accent : isLocked ? '#4b5563' : 'white',
+                            fontSize: '12px', fontWeight: '700',
+                            cursor: isAssigning || isActive || isLocked ? 'default' : 'pointer',
+                            fontFamily: 'inherit', opacity: isAssigning ? 0.6 : 1,
+                          }}
+                        >
+                          {isAssigning ? 'Assigning…' : isActive ? '✓ Assigned' : isLocked ? 'Taken' : 'Assign'}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>}
+
+              {/* Unassign row */}
               {dashThemeTab === 'student' && dashThemeModal.branding?.dashboardTheme && (
                 <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <span style={{ fontSize: '13px', color: '#6b7280' }}>
@@ -1740,6 +2033,179 @@ export default function SuperAdminDashboard() {
                     style={{ padding: '7px 16px', borderRadius: '8px', border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.08)', color: '#ef4444', fontSize: '12px', fontWeight: '700', cursor: 'pointer', fontFamily: 'inherit' }}
                   >
                     {assigningDashTheme === '__unassign__' ? 'Removing…' : 'Unassign'}
+                  </button>
+                </div>
+              )}
+              {dashThemeTab === 'teacher' && dashThemeModal.branding?.teacherDashboardTheme && (
+                <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '13px', color: '#6b7280' }}>
+                    Remove teacher dashboard theme → falls back to default (Sunshine Explorer)
+                  </span>
+                  <button
+                    onClick={handleUnassignTeacherDashTheme}
+                    disabled={assigningTeacherDashTheme === '__unassign__'}
+                    style={{ padding: '7px 16px', borderRadius: '8px', border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.08)', color: '#ef4444', fontSize: '12px', fontWeight: '700', cursor: 'pointer', fontFamily: 'inherit' }}
+                  >
+                    {assigningTeacherDashTheme === '__unassign__' ? 'Removing…' : 'Unassign'}
+                  </button>
+                </div>
+              )}
+
+              {dashThemeTab === 'admin' && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: '14px', marginTop: '8px' }}>
+                {ADMIN_DASHBOARD_THEMES.map(theme => {
+                  const isActive    = dashThemeModal.branding?.adminDashboardTheme === theme.id;
+                  const takenBy     = !isActive && adminDashThemeAssignments[theme.id];
+                  const isAssigning = assigningAdminDashTheme === theme.id;
+                  const isLocked    = !!takenBy;
+
+                  return (
+                    <div key={theme.id} style={{
+                      borderRadius: '16px',
+                      border: isActive ? `2px solid ${theme.preview.accent}` : isLocked ? '2px solid rgba(255,255,255,0.04)' : '2px solid rgba(255,255,255,0.08)',
+                      background: isActive ? `${theme.preview.accent}15` : isLocked ? 'rgba(255,255,255,0.01)' : 'rgba(255,255,255,0.03)',
+                      overflow: 'hidden',
+                      opacity: isLocked ? 0.5 : 1,
+                      transition: 'border-color .15s, background .15s',
+                    }}>
+                      <div style={{ height: '100px', background: theme.preview.bg, position: 'relative', overflow: 'hidden', padding: '10px' }}>
+                        <div style={{ display: 'flex', gap: '4px', marginBottom: '8px' }}>
+                          {[theme.preview.accent, `${theme.preview.accent}55`, `${theme.preview.accent}33`, `${theme.preview.accent}22`].map((bg, i) => (
+                            <div key={i} style={{ height: '18px', flex: i === 0 ? '0 0 48px' : '1', background: bg, borderRadius: '6px' }} />
+                          ))}
+                        </div>
+                        <div style={{ height: '28px', background: `linear-gradient(135deg, ${theme.preview.accent}, ${theme.preview.accent}99)`, borderRadius: '8px', marginBottom: '6px', display: 'flex', alignItems: 'center', paddingLeft: '8px' }}>
+                          <span style={{ fontSize: '14px' }}>{theme.emoji}</span>
+                          <div style={{ width: '60px', height: '6px', background: 'rgba(255,255,255,0.6)', borderRadius: '3px', marginLeft: '6px' }} />
+                        </div>
+                        <div style={{ display: 'flex', gap: '4px' }}>
+                          {[0,1,2,3].map(i => (
+                            <div key={i} style={{ flex: 1, height: '16px', background: theme.preview.card, border: `1px solid ${theme.preview.accent}30`, borderRadius: '5px' }} />
+                          ))}
+                        </div>
+                        <div style={{ position: 'absolute', bottom: '4px', right: '6px', fontSize: '18px' }}>{theme.emoji}</div>
+                      </div>
+                      <div style={{ padding: '10px 12px 6px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '3px' }}>
+                          <span style={{ fontSize: '13px', fontWeight: '700', color: '#f1f5f9' }}>{theme.name}</span>
+                          {isActive && <CheckCircle size={14} color={theme.preview.accent} />}
+                        </div>
+                        <p style={{ margin: '0 0 5px', fontSize: '10px', color: '#6b7280', lineHeight: '1.4' }}>{theme.description}</p>
+                        {takenBy && (
+                          <p style={{ margin: '0 0 5px', fontSize: '10px', color: '#f59e0b', fontWeight: '700' }}>🔒 Held by {takenBy.name}</p>
+                        )}
+                      </div>
+                      <div style={{ padding: '4px 12px 12px' }}>
+                        <button
+                          onClick={() => !isAssigning && !isActive && !isLocked && handleAssignAdminDashTheme(theme.id)}
+                          disabled={isAssigning || isActive || isLocked}
+                          style={{
+                            width: '100%', padding: '7px 0', borderRadius: '8px', border: 'none',
+                            background: isActive ? `${theme.preview.accent}22` : isLocked ? 'rgba(255,255,255,0.04)' : theme.preview.accent,
+                            color: isActive ? theme.preview.accent : isLocked ? '#4b5563' : 'white',
+                            fontSize: '12px', fontWeight: '700',
+                            cursor: isAssigning || isActive || isLocked ? 'default' : 'pointer',
+                            fontFamily: 'inherit', opacity: isAssigning ? 0.6 : 1,
+                          }}
+                        >
+                          {isAssigning ? 'Assigning…' : isActive ? '✓ Assigned' : isLocked ? 'Taken' : 'Assign'}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>}
+
+              {dashThemeTab === 'admin' && dashThemeModal.branding?.adminDashboardTheme && (
+                <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '13px', color: '#6b7280' }}>
+                    Remove admin dashboard theme → falls back to default (Sunshine Explorer)
+                  </span>
+                  <button
+                    onClick={handleUnassignAdminDashTheme}
+                    disabled={assigningAdminDashTheme === '__unassign__'}
+                    style={{ padding: '7px 16px', borderRadius: '8px', border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.08)', color: '#ef4444', fontSize: '12px', fontWeight: '700', cursor: 'pointer', fontFamily: 'inherit' }}
+                  >
+                    {assigningAdminDashTheme === '__unassign__' ? 'Removing…' : 'Unassign'}
+                  </button>
+                </div>
+              )}
+
+              {/* ── Sub-Admin Dashboard Themes ── */}
+              {dashThemeTab === 'subadmin' && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: '14px', marginTop: '8px' }}>
+                {SUBADMIN_DASHBOARD_THEMES.map(theme => {
+                  const isActive    = dashThemeModal.branding?.subAdminDashboardTheme === theme.id;
+                  const takenBy     = !isActive && subAdminDashThemeAssignments[theme.id];
+                  const isAssigning = assigningSubAdminDashTheme === theme.id;
+                  const isLocked    = !!takenBy;
+
+                  return (
+                    <div key={theme.id} style={{
+                      borderRadius: '16px',
+                      border: isActive ? `2px solid ${theme.preview.accent}` : isLocked ? '2px solid rgba(255,255,255,0.04)' : '2px solid rgba(255,255,255,0.08)',
+                      background: isActive ? `${theme.preview.accent}15` : isLocked ? 'rgba(255,255,255,0.01)' : 'rgba(255,255,255,0.03)',
+                      overflow: 'hidden',
+                      opacity: isLocked ? 0.5 : 1,
+                      transition: 'border-color .15s, background .15s',
+                    }}>
+                      <div style={{ height: '100px', background: theme.preview.bg, position: 'relative', overflow: 'hidden', padding: '10px' }}>
+                        <div style={{ display: 'flex', gap: '4px', marginBottom: '8px' }}>
+                          {[theme.preview.accent, `${theme.preview.accent}55`, `${theme.preview.accent}33`, `${theme.preview.accent}22`].map((bg, i) => (
+                            <div key={i} style={{ height: '18px', flex: i === 0 ? '0 0 48px' : '1', background: bg, borderRadius: '6px' }} />
+                          ))}
+                        </div>
+                        <div style={{ height: '28px', background: `linear-gradient(135deg, ${theme.preview.accent}, ${theme.preview.accent}99)`, borderRadius: '8px', marginBottom: '6px', display: 'flex', alignItems: 'center', paddingLeft: '8px' }}>
+                          <span style={{ fontSize: '14px' }}>{theme.emoji}</span>
+                          <div style={{ width: '60px', height: '6px', background: 'rgba(255,255,255,0.6)', borderRadius: '3px', marginLeft: '6px' }} />
+                        </div>
+                        <div style={{ display: 'flex', gap: '4px' }}>
+                          {[0,1,2,3].map(i => (
+                            <div key={i} style={{ flex: 1, height: '16px', background: theme.preview.card, border: `1px solid ${theme.preview.accent}30`, borderRadius: '5px' }} />
+                          ))}
+                        </div>
+                        <div style={{ position: 'absolute', bottom: '4px', right: '6px', fontSize: '18px' }}>{theme.emoji}</div>
+                      </div>
+                      <div style={{ padding: '10px 12px 6px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '3px' }}>
+                          <span style={{ fontSize: '13px', fontWeight: '700', color: '#f1f5f9' }}>{theme.name}</span>
+                          {isActive && <CheckCircle size={14} color={theme.preview.accent} />}
+                        </div>
+                        <p style={{ margin: '0 0 5px', fontSize: '10px', color: '#6b7280', lineHeight: '1.4' }}>{theme.description}</p>
+                        {takenBy && (
+                          <p style={{ margin: '0 0 5px', fontSize: '10px', color: '#f59e0b', fontWeight: '700' }}>🔒 Held by {takenBy.name}</p>
+                        )}
+                      </div>
+                      <div style={{ padding: '4px 12px 12px' }}>
+                        <button
+                          onClick={() => !isAssigning && !isActive && !isLocked && handleAssignSubAdminDashTheme(theme.id)}
+                          disabled={isAssigning || isActive || isLocked}
+                          style={{
+                            width: '100%', padding: '7px 0', borderRadius: '8px', border: 'none',
+                            background: isActive ? `${theme.preview.accent}22` : isLocked ? 'rgba(255,255,255,0.04)' : theme.preview.accent,
+                            color: isActive ? theme.preview.accent : isLocked ? '#4b5563' : 'white',
+                            fontSize: '12px', fontWeight: '700',
+                            cursor: isAssigning || isActive || isLocked ? 'default' : 'pointer',
+                            fontFamily: 'inherit', opacity: isAssigning ? 0.6 : 1,
+                          }}
+                        >
+                          {isAssigning ? 'Assigning…' : isActive ? '✓ Assigned' : isLocked ? 'Taken' : 'Assign'}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>}
+
+              {dashThemeTab === 'subadmin' && dashThemeModal.branding?.subAdminDashboardTheme && (
+                <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '13px', color: '#6b7280' }}>
+                    Remove sub-admin dashboard theme → falls back to default (Sunshine Explorer)
+                  </span>
+                  <button
+                    onClick={handleUnassignSubAdminDashTheme}
+                    disabled={assigningSubAdminDashTheme === '__unassign__'}
+                    style={{ padding: '7px 16px', borderRadius: '8px', border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.08)', color: '#ef4444', fontSize: '12px', fontWeight: '700', cursor: 'pointer', fontFamily: 'inherit' }}
+                  >
+                    {assigningSubAdminDashTheme === '__unassign__' ? 'Removing…' : 'Unassign'}
                   </button>
                 </div>
               )}

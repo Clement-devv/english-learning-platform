@@ -21,8 +21,8 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 const MAX_FILES     = 5;
 
 const STATUS_CONFIG = {
-  assigned:  { label: "To Do",     emoji: "📝", color: "#7c3aed", bg: "#f5f3ff" },
-  submitted: { label: "Submitted", emoji: "📤", color: "#d97706", bg: "#fffbeb" },
+  assigned:  { label: "To Do",     emoji: "📝", color: "#f97316", bg: "#fff7ed" },
+  submitted: { label: "Submitted", emoji: "📤", color: "#d97706", bg: "#fef3c7" },
   graded:    { label: "Graded",    emoji: "🌟", color: "#059669", bg: "#ecfdf5" },
 };
 
@@ -162,9 +162,9 @@ function FilePicker({ files, setFiles, accent }) {
 export default function StudentHomeworkTab({ studentInfo, isDarkMode }) {
   const col = isDarkMode
     ? { bg: "#0f1117", card: "#1a1d2e", cardAlt: "#1f2235", border: "#2a2d40", heading: "#f0f4ff", body: "#c8cce0", muted: "#6b7090", input: "#0f1117", inputBorder: "#475569" }
-    : { bg: "#fff8f0", card: "#ffffff", cardAlt: "#fffbf5", border: "#ffe8cc", heading: "#2d1f6e", body: "#4a4060", muted: "#9b8ab0", input: "#fff", inputBorder: "#e2d9f3" };
+    : { bg: "#fff8f0", card: "#ffffff", cardAlt: "#fffbf5", border: "#ffe8cc", heading: "#3d2e20", body: "#5a4a3a", muted: "#a89480", input: "#fff", inputBorder: "#fed7aa" };
 
-  const accent = "#7c3aed";
+  const accent = isDarkMode ? "#fb923c" : "#f97316";
 
   const [homeworkList, setHomeworkList] = useState([]);
   const [loading,      setLoading]      = useState(true);
@@ -260,9 +260,9 @@ export default function StudentHomeworkTab({ studentInfo, isDarkMode }) {
 
   // ── Stats row items ──────────────────────────────────────────────────────────
   const statsItems = [
-    { key: "all",       label: "All Tasks",  emoji: "📚", color: "#7c3aed", bg: "#f5f3ff" },
-    { key: "assigned",  label: "To Do",      emoji: "📝", color: "#d97706", bg: "#fffbeb" },
-    { key: "submitted", label: "Submitted",  emoji: "📤", color: "#2563eb", bg: "#eff6ff" },
+    { key: "all",       label: "All Tasks",  emoji: "📚", color: "#f97316", bg: "#fff7ed" },
+    { key: "assigned",  label: "To Do",      emoji: "📝", color: "#c2410c", bg: "#ffedd5" },
+    { key: "submitted", label: "Submitted",  emoji: "📤", color: "#a16207", bg: "#fef3c7" },
     { key: "graded",    label: "Graded",     emoji: "🌟", color: "#059669", bg: "#ecfdf5" },
   ];
 
@@ -286,57 +286,55 @@ export default function StudentHomeworkTab({ studentInfo, isDarkMode }) {
       )}
 
       {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
+      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
         <div>
-          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 900, color: col.heading }}>
-            📚 My Homework
-          </h1>
-          <p style={{ margin: "4px 0 0", fontSize: 13, color: col.muted }}>
-            Complete your assignments and earn stars!
+          <div style={{ fontSize: 11.5, fontWeight: 800, color: accent, textTransform: "uppercase", letterSpacing: "0.1em" }}>Learning</div>
+          <h1 style={{ margin: "2px 0 0", fontSize: 28, fontWeight: 900, color: col.heading, letterSpacing: "-0.4px" }}>Homework</h1>
+          <p style={{ margin: "4px 0 0", fontSize: 14, color: col.muted, fontWeight: 600 }}>
+            {counts.assigned > 0 ? `${counts.assigned} assignment${counts.assigned !== 1 ? "s" : ""} due soon · keep that streak going` : "All caught up — no pending assignments!"}
           </p>
         </div>
-        <button onClick={fetchHomework}
-          style={{
-            padding: "8px 16px", borderRadius: 12, border: `2px solid ${col.border}`,
-            background: col.card, color: col.body, cursor: "pointer",
-            display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 700,
-          }}>
-          <RefreshCw size={14} /> Refresh
-        </button>
+        <div style={{ display: "flex", gap: 10 }}>
+          <button onClick={fetchHomework}
+            style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "10px 14px", borderRadius: 12, border: `2px solid ${col.border}`, background: col.card, color: col.body, cursor: "pointer", fontSize: 13, fontWeight: 800, fontFamily: "inherit" }}>
+            <RefreshCw size={14} /> Refresh
+          </button>
+        </div>
       </div>
 
-      {/* Stats cards */}
+      {/* Stats strip */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12 }}>
         {statsItems.map(({ key, label, emoji, color, bg }) => (
           <div key={key} onClick={() => setFilter(key)}
             style={{
-              background: filter === key ? bg : col.card,
-              border: `2.5px solid ${filter === key ? color : col.border}`,
-              borderRadius: 16, padding: "14px 16px", cursor: "pointer",
-              transition: "all 0.2s", textAlign: "center",
+              background: col.card, border: `2px solid ${filter === key ? color : col.border}`,
+              borderRadius: 18, padding: "14px 16px", cursor: "pointer",
+              transition: "all 0.2s", display: "flex", alignItems: "center", gap: 12,
+              boxShadow: filter === key ? `0 4px 16px ${color}25` : "none",
             }}>
-            <div style={{ fontSize: 24, marginBottom: 4 }}>{emoji}</div>
-            <div style={{ fontSize: 24, fontWeight: 900, color }}>{counts[key]}</div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: col.muted, textTransform: "uppercase", letterSpacing: "0.05em" }}>{label}</div>
+            <div style={{ width: 40, height: 40, borderRadius: 12, background: filter === key ? bg : (isDarkMode ? "rgba(255,255,255,0.05)" : "#f9f9f9"), display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>{emoji}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 22, fontWeight: 900, color, letterSpacing: "-0.3px", lineHeight: 1.1 }}>{counts[key]}</div>
+                <div style={{ fontSize: 11.5, fontWeight: 700, color: col.muted }}>{label}</div>
+              </div>
           </div>
         ))}
       </div>
 
-      {/* Filter pills */}
-      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-        {["all", "assigned", "submitted", "graded"].map(f => {
-          const cfg = STATUS_CONFIG[f] || { emoji: "📚", color: accent };
+      {/* Filter chips */}
+      <div style={{ display: "flex", gap: 6, background: col.card, border: `2px solid ${col.border}`, borderRadius: 14, padding: 4, alignSelf: "flex-start", flexWrap: "wrap" }}>
+        {[
+          { k: "all",       l: "All",       count: counts.all       },
+          { k: "assigned",  l: "To do",     count: counts.assigned  },
+          { k: "submitted", l: "Submitted", count: counts.submitted },
+          { k: "graded",    l: "Graded",    count: counts.graded    },
+        ].map(f => {
+          const isActive = filter === f.k;
           return (
-            <button key={f} onClick={() => setFilter(f)}
-              style={{
-                padding: "6px 16px", borderRadius: 20, border: "none", fontSize: 13, fontWeight: 700,
-                cursor: "pointer", transition: "all 0.15s",
-                background: filter === f ? accent : col.card,
-                color:      filter === f ? "#fff"  : col.body,
-                boxShadow:  filter === f ? `0 2px 10px ${accent}50` : "none",
-              }}>
-              {f === "all" ? "📚 All" : `${cfg.emoji} ${cfg.label}`}
-              {filter !== f && ` (${counts[f]})`}
+            <button key={f.k} onClick={() => setFilter(f.k)}
+              style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 10, border: "none", cursor: "pointer", fontFamily: "inherit", fontSize: 12.5, fontWeight: 800, background: isActive ? `linear-gradient(135deg,${accent},#fb923c)` : "transparent", color: isActive ? "#fff" : col.body, boxShadow: isActive ? `0 4px 12px ${accent}55` : "none", transition: "all 0.15s" }}>
+              {f.l}
+              <span style={{ padding: "1px 7px", borderRadius: 999, fontSize: 10.5, fontWeight: 900, background: isActive ? "rgba(255,255,255,0.28)" : (isDarkMode ? "rgba(255,255,255,0.1)" : "#fff3e6"), color: isActive ? "#fff" : col.muted }}>{f.count}</span>
             </button>
           );
         })}
@@ -392,14 +390,14 @@ export default function StudentHomeworkTab({ studentInfo, isDarkMode }) {
                   <div style={{ display: "flex", alignItems: "center", gap: 14, flex: 1, minWidth: 0 }}>
                     {/* Icon bubble */}
                     <div style={{
-                      width: 44, height: 44, borderRadius: "50%", flexShrink: 0,
+                      width: 48, height: 48, borderRadius: 14, flexShrink: 0,
                       background: hw.status === "graded"
                         ? "linear-gradient(135deg,#10b981,#059669)"
                         : hw.status === "submitted"
                           ? "linear-gradient(135deg,#f59e0b,#d97706)"
-                          : `linear-gradient(135deg,${accent},#a855f7)`,
+                          : "linear-gradient(135deg,#f97316,#fb923c)",
                       display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: 20,
+                      fontSize: 22,
                     }}>
                       {hw.status === "graded" ? "🌟" : hw.status === "submitted" ? "📤" : "📝"}
                     </div>
@@ -437,7 +435,7 @@ export default function StudentHomeworkTab({ studentInfo, isDarkMode }) {
 
                     {/* Instructions */}
                     {(hw.description || hw.instructionAudio?.fileId) && (
-                      <div style={{ background: isDarkMode ? "#1f2235" : "#faf5ff", borderRadius: 12, padding: 14, border: `1.5px solid ${isDarkMode ? "#2a2d40" : "#e9d5ff"}` }}>
+                      <div style={{ background: isDarkMode ? "#1f2235" : "#fff7ed", borderRadius: 12, padding: 14, border: `1.5px solid ${isDarkMode ? "#2a2d40" : "#fed7aa"}` }}>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
                           <div style={{ fontSize: 11, fontWeight: 800, color: accent, textTransform: "uppercase", letterSpacing: "0.06em" }}>
                             Instructions
@@ -541,9 +539,9 @@ export default function StudentHomeworkTab({ studentInfo, isDarkMode }) {
                     {/* Submission form — only for "assigned" */}
                     {hw.status === "assigned" && (
                       <div style={{
-                        background: isDarkMode ? "#1f2235" : "#faf5ff",
+                        background: isDarkMode ? "#1f2235" : "#fffbf5",
                         borderRadius: 14, padding: "16px 20px",
-                        border: `2px solid ${accent}40`,
+                        border: `2px solid ${col.border}`,
                       }}>
                         <div style={{ fontSize: 12, fontWeight: 800, color: accent, marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.06em" }}>
                           ✏️ Submit Your Work
@@ -590,7 +588,7 @@ export default function StudentHomeworkTab({ studentInfo, isDarkMode }) {
                           rows={5}
                           style={{
                             width: "100%", padding: "12px 14px", borderRadius: 12,
-                            border: `2px solid ${isDarkMode ? "#2a2d40" : "#ddd6fe"}`,
+                            border: `2px solid ${isDarkMode ? "#2a2d40" : "#fed7aa"}`,
                             background: col.input, color: col.heading, fontSize: 14,
                             resize: "vertical", fontFamily: "'Nunito', sans-serif",
                             lineHeight: 1.6, boxSizing: "border-box", marginBottom: 8,
@@ -642,13 +640,13 @@ export default function StudentHomeworkTab({ studentInfo, isDarkMode }) {
                             disabled={submitting}
                             style={{
                               padding: "10px 28px", borderRadius: 12, border: "none",
-                              background: `linear-gradient(135deg,${accent},#a855f7)`,
-                              color: "#fff", fontWeight: 800, fontSize: 14,
+                              background: "linear-gradient(135deg,#f97316,#f43f5e)",
+                              color: "#fff", fontWeight: 900, fontSize: 14,
                               cursor: submitting ? "not-allowed" : "pointer",
                               opacity: submitting ? 0.7 : 1,
                               display: "flex", alignItems: "center", gap: 8,
-                              boxShadow: `0 4px 14px ${accent}40`,
-                              fontFamily: "'Nunito', sans-serif",
+                              boxShadow: "0 6px 16px rgba(249,115,22,0.4)",
+                              fontFamily: "'Nunito', sans-serif", borderRadius: 999,
                             }}>
                             <Send size={15} /> {submitting ? "Submitting…" : "Submit Homework 🚀"}
                           </button>
@@ -697,13 +695,13 @@ function InstructionAudioPlayer({ fileId, duration }) {
   };
 
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", background: "linear-gradient(135deg,rgba(124,58,237,0.1),rgba(168,85,247,0.07))", borderRadius: 10, border: "1px solid #ddd6fe", marginTop: 10 }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", background: "linear-gradient(135deg,rgba(249,115,22,0.08),rgba(251,146,60,0.05))", borderRadius: 10, border: "1px solid #fed7aa", marginTop: 10 }}>
       {blobUrl && <audio ref={audioRef} src={blobUrl} onEnded={() => setPlaying(false)} style={{ display: "none" }} />}
-      <Mic size={14} color="#7c3aed" />
-      <span style={{ fontSize: 12, fontWeight: 800, color: "#5b21b6", flex: 1 }}>Teacher's Voice Instructions</span>
-      {duration > 0 && <span style={{ fontSize: 11, color: "#7c3aed", fontWeight: 700 }}>{formatTime(duration)}</span>}
+      <Mic size={14} color="#f97316" />
+      <span style={{ fontSize: 12, fontWeight: 800, color: "#c2410c", flex: 1 }}>Teacher's Voice Instructions</span>
+      {duration > 0 && <span style={{ fontSize: 11, color: "#f97316", fontWeight: 700 }}>{formatTime(duration)}</span>}
       <button onClick={load} disabled={loading}
-        style={{ padding: "6px 14px", borderRadius: 8, border: "none", background: "#7c3aed", color: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 800, fontFamily: "inherit" }}>
+        style={{ padding: "6px 14px", borderRadius: 8, border: "none", background: "#f97316", color: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 800, fontFamily: "inherit" }}>
         {loading ? "Loading…" : playing ? "⏸ Pause" : "▶ Listen"}
       </button>
     </div>

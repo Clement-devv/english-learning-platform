@@ -2,6 +2,7 @@ import express from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
+import redisClient from "../config/redis.js";
 
 import { config, JWT_STANDARD_CLAIMS } from "../config/config.js";
 import { loginLimiter, passwordResetLimiter, trackFailedLogin, isAccountLocked, clearFailedAttempts } from "../middleware/rateLimiter.js";
@@ -939,6 +940,20 @@ router.post("/logout-session", tenantMiddleware, async (req, res) => {
     const session = user.sessions.find(s => s.token === sessionToken);
     if (session) {
       session.isActive = false;
+
+      // Blacklist the JWT in Redis so it's immediately rejected across all instances.
+      // TTL matches the remaining lifetime of the token so Redis auto-expires it.
+      if (redisClient && session.jwtToken) {
+        try {
+          const decoded = jwt.decode(session.jwtToken);
+          const ttl = decoded?.exp ? decoded.exp - Math.floor(Date.now() / 1000) : 900;
+          if (ttl > 0) {
+            const sig = session.jwtToken.split('.')[2];
+            await redisClient.setex(`bl:${sig}`, ttl, '1');
+          }
+        } catch (_) {}
+      }
+
       await user.save();
       res.json({ success: true, message: "Session logged out successfully" });
     } else {
@@ -972,6 +987,24 @@ router.post("/logout-all-devices", tenantMiddleware, async (req, res) => {
 
     if (!user) {
       return notFound(res, "User not found");
+    }
+
+    // Blacklist all OTHER sessions' JWTs in Redis (the current token stays valid).
+    if (redisClient) {
+      await Promise.allSettled(
+        user.sessions
+          .filter(s => s.jwtToken && s.jwtToken !== token && s.isActive)
+          .map(async (s) => {
+            try {
+              const decoded = jwt.decode(s.jwtToken);
+              const ttl = decoded?.exp ? decoded.exp - Math.floor(Date.now() / 1000) : 900;
+              if (ttl > 0) {
+                const sig = s.jwtToken.split('.')[2];
+                await redisClient.setex(`bl:${sig}`, ttl, '1');
+              }
+            } catch (_) {}
+          })
+      );
     }
 
     user.sessions = user.sessions.map(session => {

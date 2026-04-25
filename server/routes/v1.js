@@ -46,6 +46,10 @@ import centerRegistrationRoutes  from "./centerRegistrationRoutes.js";
 import centerConfigRoutes        from "./centerConfigRoutes.js";
 import superAdminRoutes          from "./superAdminRoutes.js";
 import classPricingRoutes        from "./classPricingRoutes.js";
+import ringRoutes                from "./ringRoutes.js";
+import groupClassRoutes          from "./groupClassRoutes.js";
+import certificateRoutes         from "./certificateRoutes.js";
+import parentRoutes              from "./parentRoutes.js";
 
 const router = Router();
 
@@ -90,5 +94,9 @@ router.use("/register-center",      centerRegistrationRoutes);
 router.use("/center",               centerConfigRoutes);
 router.use("/super-admin",          superAdminRoutes);
 router.use("/class-pricing",        classPricingRoutes);
+router.use("/ring",                 ringRoutes);
+router.use("/group-classes",        groupClassRoutes);
+router.use("/certificates",         certificateRoutes);
+router.use("/parents",              parentRoutes);
 
 export default router;

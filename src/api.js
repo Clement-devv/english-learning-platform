@@ -33,19 +33,28 @@ function getActiveSession() {
   if (sessionStorage.getItem("studentInfo") && getToken("studentToken")) {
     return { tokenKey: "studentToken", sessionKey: "studentSessionToken", infoKey: "studentInfo", loginPath: "/student/login" };
   }
+  if (sessionStorage.getItem("parentInfo") && getToken("parentToken")) {
+    return { tokenKey: "parentToken", sessionKey: null, infoKey: "parentInfo", loginPath: "/parent/login" };
+  }
   // Fallback: whichever token exists
   if (getToken("adminToken"))   return { tokenKey: "adminToken",   sessionKey: "adminSessionToken",   infoKey: "adminInfo",   loginPath: "/admin/login" };
   if (getToken("teacherToken")) return { tokenKey: "teacherToken", sessionKey: "teacherSessionToken", infoKey: "teacherInfo", loginPath: "/teacher/login" };
   if (getToken("studentToken")) return { tokenKey: "studentToken", sessionKey: "studentSessionToken", infoKey: "studentInfo", loginPath: "/student/login" };
+  if (getToken("parentToken"))  return { tokenKey: "parentToken",  sessionKey: null,                  infoKey: "parentInfo",  loginPath: "/parent/login" };
   return null;
 }
 
 // Add token + center slug to all requests automatically
 api.interceptors.request.use(
   (config) => {
-    const session = getActiveSession();
-    if (session) {
-      config.headers.Authorization = `Bearer ${getToken(session.tokenKey)}`;
+    // Only inject session token if the caller didn't already provide one.
+    // This lets AuthGuard (and super-admin fetch calls) use role-specific tokens
+    // without being overwritten by whichever session detectActiveRole found first.
+    if (!config.headers.Authorization) {
+      const session = getActiveSession();
+      if (session) {
+        config.headers.Authorization = `Bearer ${getToken(session.tokenKey)}`;
+      }
     }
 
     // Send x-center-slug header so tenantMiddleware can identify the center.

@@ -15,6 +15,8 @@ export const DEFAULT_BRANDING = {
   loginTheme:             null,
   teacherLoginTheme:      null,
   teacherDashboardTheme:  null,
+  adminDashboardTheme:       null,
+  subAdminDashboardTheme:    null,
   centerName:        'English Learning Platform',
   borderRadius:   '8px',
   shadowStyle:    'soft',

@@ -6,6 +6,8 @@ import crypto         from "crypto";
 import { fileURLToPath } from "url";
 import { verifyToken } from "../middleware/authMiddleware.js";
 import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
+import { validateObjectId } from "../middleware/validateObjectId.js";
+import { uploadLimiter } from "../middleware/rateLimiter.js";
 import { homeworkSchema } from "../schemas/homeworkSchema.js";
 import { studentSchema }  from "../schemas/studentSchema.js";
 import { teacherSchema }  from "../schemas/teacherSchema.js";
@@ -16,6 +18,8 @@ import {
 import { recordActivity } from "../utils/streakService.js";
 import logger from "../utils/logger.js";
 import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
+import { toStr, toObjectId } from '../utils/inputSanitizer.js';
+import { wrapUpload } from '../middleware/validateObjectId.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
@@ -60,25 +64,18 @@ const ALLOWED = {
 const MAX_FILE_SIZE  = 10 * 1024 * 1024; // 10 MB
 const MAX_FILES      = 5;
 
-// ── Validate magic bytes of a saved file ─────────────────────────────────────
-function checkMagicBytes(filePath, expectedMagic) {
-  if (!expectedMagic) return true; // e.g. plain text — skip
-  const fd  = fs.openSync(filePath, "r");
-  const buf = Buffer.alloc(expectedMagic.length);
-  fs.readSync(fd, buf, 0, expectedMagic.length, 0);
-  fs.closeSync(fd);
-  return expectedMagic.every((b, i) => buf[i] === b);
+// ── Validate magic bytes from an in-memory buffer ────────────────────────────
+function checkMagicBytesBuffer(buffer, expectedMagic) {
+  if (!expectedMagic) return true; // e.g. plain text — no magic bytes
+  if (buffer.length < expectedMagic.length) return false;
+  return expectedMagic.every((b, i) => buffer[i] === b);
 }
 
-// ── Multer config (used for both assignment + submission uploads) ──────────────
-function makeUpload(destDir) {
-  const storage = multer.diskStorage({
-    destination: (_req, _file, cb) => cb(null, destDir),
-    filename:    (_req, _file, cb) => cb(null, crypto.randomUUID()), // UUID — no extension on disk
-  });
-
+// ── Multer config — memory storage so magic bytes are validated BEFORE any
+//    file touches disk. Valid files are written manually after validation.
+function makeUpload() {
   return multer({
-    storage,
+    storage: multer.memoryStorage(),
     limits: { fileSize: MAX_FILE_SIZE, files: MAX_FILES },
     fileFilter: (_req, file, cb) => {
       const info = ALLOWED[file.mimetype];
@@ -97,22 +94,28 @@ function sanitiseName(name) {
   return path.basename(name).replace(/[^\w.\-\s]/g, "_").slice(0, 100);
 }
 
-// ── POST: validate magic bytes and build attachment record ────────────────────
+// ── Validate magic bytes from buffer and write valid files to disk ────────────
+// Files that fail magic-byte check are discarded — they never touch disk.
 function processUploadedFiles(files, destDir) {
   const attachments = [];
-  const toDelete    = [];
 
   for (const file of files) {
-    const info  = ALLOWED[file.mimetype];
-    const fPath = path.join(destDir, file.filename);
+    const info = ALLOWED[file.mimetype];
 
-    if (!checkMagicBytes(fPath, info?.magic)) {
-      toDelete.push(fPath);
+    if (!checkMagicBytesBuffer(file.buffer, info?.magic)) {
+      logger.warn("File rejected — magic bytes mismatch:", {
+        originalName: file.originalname,
+        mimetype:     file.mimetype,
+      });
       continue;
     }
 
+    const fileId  = crypto.randomUUID();
+    const outPath = path.join(destDir, fileId);
+    fs.writeFileSync(outPath, file.buffer);
+
     attachments.push({
-      fileId:       file.filename,
+      fileId,
       originalName: sanitiseName(file.originalname),
       size:         file.size,
       mimeType:     file.mimetype,
@@ -120,33 +123,30 @@ function processUploadedFiles(files, destDir) {
     });
   }
 
-  toDelete.forEach(p => { try { fs.unlinkSync(p); } catch (_) {} });
   return attachments;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /api/homework  — teacher creates homework
 // ─────────────────────────────────────────────────────────────────────────────
-const uploadAssignment = makeUpload(HW_DIR);
+const uploadAssignment = makeUpload();
 
-router.post("/", verifyToken, uploadAssignment.array("files", MAX_FILES), async (req, res) => {
+router.post("/", verifyToken, uploadLimiter, wrapUpload(uploadAssignment.array("files", MAX_FILES)), async (req, res) => {
   try {
     if (req.user.role !== "teacher") {
       return forbidden(res, "Teachers only");
     }
 
-    const { studentId, title, description, dueDate } = req.body;
-
-    if (!studentId || !title?.trim() || !dueDate) {
-      return badRequest(res, "studentId, title, and dueDate are required");
-    }
+    // Validate and coerce — throws { statusCode: 400 } on bad type/missing value
+    const studentId  = toObjectId(req.body.studentId, "studentId");
+    const titleClean = toStr(req.body.title,       "title",       { required: true, maxLen: 200 });
+    const descClean  = toStr(req.body.description, "description", { maxLen: 2000 });
+    const { dueDate } = req.body;
+    if (!dueDate) return badRequest(res, "dueDate is required");
 
     // Verify student belongs to this teacher
     const student = await getStudent(req.db).findById(studentId);
     if (!student) return notFound(res, "Student not found");
-
-    const titleClean = title.trim().slice(0, 200);
-    const descClean  = (description || "").trim().slice(0, 2000);
 
     const attachments = processUploadedFiles(req.files || [], HW_DIR);
 
@@ -163,10 +163,10 @@ router.post("/", verifyToken, uploadAssignment.array("files", MAX_FILES), async 
     getStudent(req.db).findById(studentId).then(studentDoc => {
       if (studentDoc) {
         getTeacher(req.db).findById(req.user.id).then(teacherDoc => {
-          if (teacherDoc) sendHomeworkAssigned(studentDoc, teacherDoc, hw).catch(() => {});
-        }).catch(() => {});
+          if (teacherDoc) sendHomeworkAssigned(studentDoc, teacherDoc, hw).catch(e => logger.warn("sendHomeworkAssigned failed:", { error: e?.message }));
+        }).catch(e => logger.warn("Teacher lookup for homework email failed:", { error: e?.message }));
       }
-    }).catch(() => {});
+    }).catch(e => logger.warn("Student lookup for homework email failed:", { error: e?.message }));
 
     // Push real-time update to student dashboard
     try {
@@ -229,7 +229,7 @@ router.get("/assigned", verifyToken, async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /api/homework/:id  — single homework detail
 // ─────────────────────────────────────────────────────────────────────────────
-router.get("/:id", verifyToken, async (req, res) => {
+router.get("/:id", verifyToken, validateObjectId("id"), async (req, res) => {
   try {
     const hw = await getHomework(req.db).findById(req.params.id)
       .populate("teacherId", "firstName lastName email")
@@ -251,9 +251,9 @@ router.get("/:id", verifyToken, async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /api/homework/:id/submit  — student submits homework
 // ─────────────────────────────────────────────────────────────────────────────
-const uploadSubmission = makeUpload(SUB_DIR);
+const uploadSubmission = makeUpload();
 
-router.post("/:id/submit", verifyToken, uploadSubmission.array("files", MAX_FILES), async (req, res) => {
+router.post("/:id/submit", verifyToken, uploadLimiter, validateObjectId("id"), wrapUpload(uploadSubmission.array("files", MAX_FILES)), async (req, res) => {
   try {
     if (req.user.role !== "student") {
       return forbidden(res, "Students only");
@@ -284,8 +284,8 @@ router.post("/:id/submit", verifyToken, uploadSubmission.array("files", MAX_FILE
       getTeacher(req.db).findById(hw.teacherId),
       getStudent(req.db).findById(req.user.id),
     ]).then(([teacherDoc, studentDoc]) => {
-      if (teacherDoc && studentDoc) sendHomeworkSubmitted(teacherDoc, studentDoc, hw).catch(() => {});
-    }).catch(() => {});
+      if (teacherDoc && studentDoc) sendHomeworkSubmitted(teacherDoc, studentDoc, hw).catch(e => logger.warn("sendHomeworkSubmitted failed:", { error: e?.message }));
+    }).catch(e => logger.warn("User lookup for submission email failed:", { error: e?.message }));
 
     res.json({ success: true, homework: hw, streak: streakResult });
   } catch (err) {
@@ -299,7 +299,7 @@ router.post("/:id/submit", verifyToken, uploadSubmission.array("files", MAX_FILE
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /api/homework/:id/grade  — teacher grades a submission
 // ─────────────────────────────────────────────────────────────────────────────
-router.post("/:id/grade", verifyToken, async (req, res) => {
+router.post("/:id/grade", verifyToken, validateObjectId("id"), async (req, res) => {
   try {
     if (req.user.role !== "teacher") return forbidden(res, "Teachers only");
 
@@ -332,7 +332,7 @@ router.post("/:id/grade", verifyToken, async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // DELETE /api/homework/:id  — teacher deletes homework
 // ─────────────────────────────────────────────────────────────────────────────
-router.delete("/:id", verifyToken, async (req, res) => {
+router.delete("/:id", verifyToken, validateObjectId("id"), async (req, res) => {
   try {
     if (req.user.role !== "teacher") return forbidden(res, "Teachers only");
 
@@ -364,7 +364,7 @@ router.delete("/:id", verifyToken, async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /api/homework/:id/audio-feedback  — teacher uploads voice note
 // ─────────────────────────────────────────────────────────────────────────────
-router.post("/:id/audio-feedback", verifyToken, audioUpload.single("audio"), async (req, res) => {
+router.post("/:id/audio-feedback", verifyToken, uploadLimiter, validateObjectId("id"), wrapUpload(audioUpload.single("audio")), async (req, res) => {
   try {
     if (req.user.role !== "teacher") return forbidden(res, "Teachers only");
     if (!req.file) return badRequest(res, "No audio file uploaded");
@@ -410,7 +410,7 @@ const instructionAudioUpload = multer({
   },
 });
 
-router.post("/:id/instruction-audio", verifyToken, instructionAudioUpload.single("audio"), async (req, res) => {
+router.post("/:id/instruction-audio", verifyToken, uploadLimiter, validateObjectId("id"), wrapUpload(instructionAudioUpload.single("audio")), async (req, res) => {
   try {
     if (req.user.role !== "teacher") return forbidden(res, "Teachers only");
     if (!req.file) return badRequest(res, "No audio file uploaded");

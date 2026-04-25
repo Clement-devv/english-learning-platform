@@ -1,6 +1,8 @@
 // server/routes/agoraRoutes.js
 import express from 'express';
 import pkg from 'agora-access-token';
+import { tenantMiddleware } from '../middleware/tenantMiddleware.js';
+import { verifyToken } from '../middleware/authMiddleware.js';
 import logger from "../utils/logger.js";
 const { RtcTokenBuilder, RtcRole } = pkg;
 
@@ -9,11 +11,12 @@ const router = express.Router();
 const APP_ID = process.env.AGORA_APP_ID;
 const APP_CERTIFICATE = process.env.AGORA_APP_CERTIFICATE;
 
-router.get('/token', (req, res) => {
+// Agora tokens must only be issued to authenticated users belonging to this center.
+router.get('/token', tenantMiddleware, verifyToken, (req, res) => {
   try {
     const { channel } = req.query;
 
-    logger.info('📞 Token request:', { channel });
+    logger.info('📞 Token request:', { channel, userId: req.user?.id, center: req.center?.slug });
 
     if (!channel) {
       return res.status(400).json({
@@ -61,8 +64,7 @@ router.get('/token', (req, res) => {
     logger.error('❌ Token generation error:', { error: error?.message });
     res.status(500).json({
       success: false,
-      message: 'Failed to generate token',
-      error: error.message
+      message: 'Failed to generate token'
     });
   }
 });

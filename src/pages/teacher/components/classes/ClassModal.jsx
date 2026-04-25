@@ -1,126 +1,114 @@
-// src/pages/teacher/components/classes/ClassModal.jsx 
-import React, { useState } from "react";
-import { X, Users, Calendar, Clock, BookOpen, Plus } from "lucide-react";
+// src/pages/teacher/components/classes/ClassModal.jsx
+import { useState } from 'react';
+import { X, Users, Calendar, Clock, BookOpen, Plus } from 'lucide-react';
 
-export default function ClassModal({ isOpen, onClose, onSave, students }) {
-  const [title, setTitle] = useState("");
-  const [topic, setTopic] = useState("");
-  const [time, setTime] = useState("");
-  const [duration, setDuration] = useState("60");
+const F = "'Nunito','Inter',sans-serif";
+
+export default function ClassModal({ isOpen, onClose, onSave, students, isDarkMode }) {
+  const [title,            setTitle]            = useState('');
+  const [topic,            setTopic]            = useState('');
+  const [time,             setTime]             = useState('');
+  const [duration,         setDuration]         = useState('60');
   const [selectedStudents, setSelectedStudents] = useState([]);
 
   if (!isOpen) return null;
 
+  const col = {
+    bg:       isDarkMode ? '#0f1117' : '#ffffff',
+    card:     isDarkMode ? '#1a1d2e' : '#ffffff',
+    header:   isDarkMode ? '#141620' : '#f8faff',
+    border:   isDarkMode ? '#2a2d40' : '#e2e8f0',
+    heading:  isDarkMode ? '#f0f4ff' : '#1e293b',
+    body:     isDarkMode ? '#c8cce0' : '#475569',
+    muted:    isDarkMode ? '#6b7090' : '#94a3b8',
+    input:    isDarkMode ? '#0f1117' : '#f8faff',
+    accent:   '#6366f1',
+    accentBg: isDarkMode ? 'rgba(99,102,241,0.12)' : '#eef2ff',
+    selBg:    isDarkMode ? 'rgba(99,102,241,0.18)' : '#eef2ff',
+    selBorder:isDarkMode ? 'rgba(99,102,241,0.5)'  : '#6366f1',
+    rowHover: isDarkMode ? 'rgba(255,255,255,0.04)' : '#f8faff',
+    overlay:  'rgba(0,0,0,0.55)',
+  };
+
+  const inp = {
+    width: '100%', background: col.input, border: `1.5px solid ${col.border}`,
+    borderRadius: 12, padding: '10px 14px', fontSize: 14, color: col.heading,
+    fontFamily: F, outline: 'none', boxSizing: 'border-box',
+    colorScheme: isDarkMode ? 'dark' : 'light',
+  };
+
+  const lbl = {
+    display: 'flex', alignItems: 'center', gap: 6,
+    fontSize: 12, fontWeight: 800, color: col.muted,
+    textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6,
+  };
+
   const handleStudentToggle = (student) => {
-    setSelectedStudents((prev) => {
-      const isSelected = prev.some((s) => s.id === student.id);
-      if (isSelected) {
-        return prev.filter((s) => s.id !== student.id);
-      } else {
-        return [...prev, student];
-      }
+    setSelectedStudents(prev => {
+      const isSelected = prev.some(s => s.id === student.id);
+      return isSelected ? prev.filter(s => s.id !== student.id) : [...prev, student];
     });
   };
 
   const handleSubmit = () => {
     if (!title || !topic || !time || selectedStudents.length === 0) {
-      alert("Please fill in all fields and select at least one student");
+      alert('Please fill in all fields and select at least one student');
       return;
     }
-
     onSave({
-      id: Date.now(),
-      title,
-      topic,
-      time,
+      id: Date.now(), title, topic, time,
       duration: parseInt(duration, 10),
       students: selectedStudents,
-      status: "scheduled",
+      status: 'scheduled',
     });
-
-    // Reset form
-    setTitle("");
-    setTopic("");
-    setTime("");
-    setDuration("60");
-    setSelectedStudents([]);
+    setTitle(''); setTopic(''); setTime(''); setDuration('60'); setSelectedStudents([]);
     onClose();
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl">
+    <div style={{ position: 'fixed', inset: 0, background: col.overlay, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: 16, fontFamily: F }}
+      onClick={onClose}>
+      <div onClick={e => e.stopPropagation()}
+        style={{ background: col.card, border: `1.5px solid ${col.border}`, borderRadius: 24, width: '100%', maxWidth: 600, maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 24px 64px rgba(0,0,0,0.25)' }}>
+
         {/* Header */}
-        <div className="sticky top-0 bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-6 rounded-t-2xl flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Plus className="w-6 h-6" />
-            <h2 className="text-2xl font-bold">Create New Class</h2>
+        <div style={{ background: 'linear-gradient(135deg,#6366f1,#4f46e5)', padding: '22px 24px', borderRadius: '24px 24px 0 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <Plus size={22} color="#fff"/>
+            <h2 style={{ margin: 0, fontSize: 20, fontWeight: 900, color: '#fff' }}>Create New Class</h2>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-white/20 rounded-full transition-colors"
-          >
-            <X className="w-6 h-6" />
+          <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: 10, padding: 8, cursor: 'pointer', display: 'flex', color: '#fff' }}>
+            <X size={18}/>
           </button>
         </div>
 
         {/* Body */}
-        <div className="p-6 space-y-6">
-          {/* Class Title */}
+        <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: 18 }}>
+
+          {/* Title */}
           <div>
-            <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
-              <BookOpen className="w-4 h-4 text-blue-600" />
-              Class Title *
-            </label>
-            <input
-              type="text"
-              placeholder="e.g., Advanced Grammar Session"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="w-full border-2 border-gray-200 rounded-lg px-4 py-3 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all outline-none"
-            />
+            <label style={lbl}><BookOpen size={13} color="#6366f1"/> Class Title *</label>
+            <input value={title} onChange={e => setTitle(e.target.value)}
+              placeholder="e.g., Advanced Grammar Session" style={inp}/>
           </div>
 
           {/* Topic */}
           <div>
-            <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
-              <BookOpen className="w-4 h-4 text-green-600" />
-              Topic/Description *
-            </label>
-            <input
-              type="text"
-              placeholder="e.g., Past Perfect Tense & Conditionals"
-              value={topic}
-              onChange={(e) => setTopic(e.target.value)}
-              className="w-full border-2 border-gray-200 rounded-lg px-4 py-3 focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all outline-none"
-            />
+            <label style={lbl}><BookOpen size={13} color="#10b981"/> Topic / Description *</label>
+            <input value={topic} onChange={e => setTopic(e.target.value)}
+              placeholder="e.g., Past Perfect Tense & Conditionals" style={inp}/>
           </div>
 
-          {/* Date & Time */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Date & Time + Duration */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
             <div>
-              <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
-                <Calendar className="w-4 h-4 text-purple-600" />
-                Date & Time *
-              </label>
-              <input
-                type="datetime-local"
-                value={time}
-                onChange={(e) => setTime(e.target.value)}
-                className="w-full border-2 border-gray-200 rounded-lg px-4 py-3 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all outline-none"
-              />
+              <label style={lbl}><Calendar size={13} color="#8b5cf6"/> Date & Time *</label>
+              <input type="datetime-local" value={time} onChange={e => setTime(e.target.value)} style={inp}/>
             </div>
-
             <div>
-              <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
-                <Clock className="w-4 h-4 text-orange-600" />
-                Duration (minutes) *
-              </label>
-              <select
-                value={duration}
-                onChange={(e) => setDuration(e.target.value)}
-                className="w-full border-2 border-gray-200 rounded-lg px-4 py-3 focus:border-orange-500 focus:ring-2 focus:ring-orange-200 transition-all outline-none"
-              >
+              <label style={lbl}><Clock size={13} color="#f97316"/> Duration *</label>
+              <select value={duration} onChange={e => setDuration(e.target.value)}
+                style={{ ...inp, cursor: 'pointer', appearance: 'auto' }}>
                 <option value="30">30 minutes</option>
                 <option value="45">45 minutes</option>
                 <option value="60">60 minutes</option>
@@ -130,76 +118,53 @@ export default function ClassModal({ isOpen, onClose, onSave, students }) {
             </div>
           </div>
 
-          {/* ✅ IMPROVED: Multi-student selection */}
+          {/* Students */}
           <div>
-            <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-3">
-              <Users className="w-4 h-4 text-indigo-600" />
-              Select Students * ({selectedStudents.length} selected)
-            </label>
-            
+            <label style={lbl}><Users size={13} color="#6366f1"/> Select Students * ({selectedStudents.length} selected)</label>
             {students && students.length > 0 ? (
-              <div className="border-2 border-gray-200 rounded-lg p-4 max-h-60 overflow-y-auto space-y-2">
-                {students.map((student) => {
-                  const isSelected = selectedStudents.some((s) => s.id === student.id);
+              <div style={{ border: `1.5px solid ${col.border}`, borderRadius: 14, padding: 10, maxHeight: 220, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {students.map(student => {
+                  const isSelected = selectedStudents.some(s => s.id === student.id);
                   return (
-                    <label
-                      key={student.id}
-                      className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all ${
-                        isSelected
-                          ? "bg-indigo-50 border-2 border-indigo-500"
-                          : "bg-gray-50 border-2 border-transparent hover:bg-gray-100"
-                      }`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={() => handleStudentToggle(student)}
-                        className="w-5 h-5 text-indigo-600 rounded focus:ring-2 focus:ring-indigo-500"
-                      />
-                      <div className="flex-1">
-                        <p className="font-medium text-gray-800">{student.name}</p>
-                        <p className="text-xs text-gray-500">{student.email}</p>
+                    <label key={student.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 10, cursor: 'pointer', background: isSelected ? col.selBg : 'transparent', border: `1.5px solid ${isSelected ? col.selBorder : 'transparent'}`, transition: 'background .12s' }}>
+                      <input type="checkbox" checked={isSelected} onChange={() => handleStudentToggle(student)}
+                        style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#6366f1' }}/>
+                      <div style={{ flex: 1 }}>
+                        <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: col.heading }}>{student.name}</p>
+                        <p style={{ margin: 0, fontSize: 11, color: col.muted }}>{student.email}</p>
                       </div>
                       {isSelected && (
-                        <span className="text-xs font-semibold text-indigo-600 bg-indigo-100 px-2 py-1 rounded-full">
-                          Selected
-                        </span>
+                        <span style={{ fontSize: 11, fontWeight: 800, color: col.accent, background: col.accentBg, borderRadius: 999, padding: '2px 8px' }}>Selected</span>
                       )}
                     </label>
                   );
                 })}
               </div>
             ) : (
-              <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-lg">
-                <Users className="w-12 h-12 mx-auto mb-2 text-gray-400" />
-                <p>No students assigned yet</p>
+              <div style={{ textAlign: 'center', padding: '32px 0', background: isDarkMode ? 'rgba(255,255,255,0.03)' : '#f8faff', borderRadius: 14, border: `1.5px dashed ${col.border}` }}>
+                <Users size={32} color={col.muted} style={{ margin: '0 auto 8px' }}/>
+                <p style={{ margin: 0, fontSize: 13, color: col.muted, fontWeight: 600 }}>No students assigned yet</p>
               </div>
             )}
           </div>
 
-          {/* Info box */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <p className="text-sm text-blue-800">
-              <strong>💡 Tip:</strong> You can select multiple students for a group class. 
-              All selected students will be scheduled for the same class time.
+          {/* Tip */}
+          <div style={{ background: col.accentBg, border: `1.5px solid ${isDarkMode?'rgba(99,102,241,0.3)':'#c7d2fe'}`, borderRadius: 12, padding: '12px 14px' }}>
+            <p style={{ margin: 0, fontSize: 12, color: isDarkMode ? '#a5b4fc' : '#4338ca', fontWeight: 600 }}>
+              <strong>Tip:</strong> You can select multiple students for a group class. All selected students will be scheduled for the same class time.
             </p>
           </div>
         </div>
 
         {/* Footer */}
-        <div className="sticky bottom-0 bg-gray-50 p-6 rounded-b-2xl flex justify-end gap-3 border-t">
-          <button
-            onClick={onClose}
-            className="px-6 py-3 bg-white border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 font-medium transition-colors"
-          >
+        <div style={{ padding: '16px 24px', borderTop: `1.5px solid ${col.border}`, background: col.header, borderRadius: '0 0 24px 24px', display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+          <button onClick={onClose}
+            style={{ background: 'none', border: `1.5px solid ${col.border}`, borderRadius: 12, padding: '10px 20px', fontSize: 13, fontWeight: 700, color: col.body, cursor: 'pointer', fontFamily: F }}>
             Cancel
           </button>
-          <button
-            onClick={handleSubmit}
-            className="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 font-medium shadow-lg transition-all flex items-center gap-2"
-          >
-            <Plus className="w-5 h-5" />
-            Create Class
+          <button onClick={handleSubmit}
+            style={{ background: 'linear-gradient(135deg,#6366f1,#4f46e5)', border: 'none', borderRadius: 12, padding: '10px 20px', fontSize: 13, fontWeight: 800, color: '#fff', cursor: 'pointer', fontFamily: F, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Plus size={15}/> Create Class
           </button>
         </div>
       </div>

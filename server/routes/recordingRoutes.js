@@ -10,11 +10,10 @@ import { recordingSchema }  from "../schemas/recordingSchema.js";
 import { bookingSchema }    from "../schemas/bookingSchema.js";
 import logger from "../utils/logger.js";
 import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
+import { wrapUpload } from '../middleware/validateObjectId.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const RECORDINGS_DIR = path.join(__dirname, "../uploads/recordings");
-
-if (!fs.existsSync(RECORDINGS_DIR)) fs.mkdirSync(RECORDINGS_DIR, { recursive: true });
 
 const AUTO_DELETE_DAYS = 30;
 
@@ -25,14 +24,52 @@ const ALLOWED_VIDEO_TYPES = {
   "video/quicktime": ".mov",
 };
 
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, RECORDINGS_DIR),
-  filename:    (_req, file,  cb) => {
-    const ext  = ALLOWED_VIDEO_TYPES[file.mimetype] || ".webm";
-    const name = `rec_${Date.now()}_${Math.random().toString(36).slice(2)}${ext}`;
-    cb(null, name);
-  },
-});
+// ── Storage backend ───────────────────────────────────────────────────────────
+// Set S3_BUCKET (+ AWS_REGION, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY) in
+// your environment to use S3. Otherwise recordings are saved to local disk.
+// Local disk is fine for a single-server setup but does NOT work when running
+// multiple instances — use S3 (or an NFS mount) for cluster deployments.
+
+let storage;
+let useS3 = false;
+
+if (process.env.S3_BUCKET) {
+  try {
+    const { S3Client } = await import('@aws-sdk/client-s3');
+    const { default: multerS3 } = await import('multer-s3');
+
+    const s3 = new S3Client({ region: process.env.AWS_REGION || 'us-east-1' });
+    useS3 = true;
+
+    storage = multerS3({
+      s3,
+      bucket: process.env.S3_BUCKET,
+      contentType: multerS3.AUTO_CONTENT_TYPE,
+      key: (_req, file, cb) => {
+        const ext  = ALLOWED_VIDEO_TYPES[file.mimetype] || '.webm';
+        const name = `recordings/rec_${Date.now()}_${Math.random().toString(36).slice(2)}${ext}`;
+        cb(null, name);
+      },
+    });
+
+    logger.info(`✅ Recording storage: S3 bucket "${process.env.S3_BUCKET}"`);
+  } catch (err) {
+    logger.warn('⚠️ S3_BUCKET set but S3 packages missing — falling back to local disk. Run: npm install @aws-sdk/client-s3 multer-s3', { error: err?.message });
+  }
+}
+
+if (!useS3) {
+  if (!fs.existsSync(RECORDINGS_DIR)) fs.mkdirSync(RECORDINGS_DIR, { recursive: true });
+  storage = multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, RECORDINGS_DIR),
+    filename:    (_req, file,  cb) => {
+      const ext  = ALLOWED_VIDEO_TYPES[file.mimetype] || ".webm";
+      const name = `rec_${Date.now()}_${Math.random().toString(36).slice(2)}${ext}`;
+      cb(null, name);
+    },
+  });
+  logger.info('📁 Recording storage: local disk (set S3_BUCKET to use S3)');
+}
 
 const upload = multer({
   storage,
@@ -50,15 +87,25 @@ const getRecording = (db) => db.models.Recording || db.model("Recording", record
 const getBooking   = (db) => db.models.Booking   || db.model("Booking",   bookingSchema);
 
 async function purgeRecording(rec) {
-  const filePath = path.join(RECORDINGS_DIR, rec.filename);
-  if (fs.existsSync(filePath)) {
-    try { fs.unlinkSync(filePath); } catch (_) {}
+  if (useS3 && rec.filename) {
+    try {
+      const { S3Client, DeleteObjectCommand } = await import('@aws-sdk/client-s3');
+      const s3 = new S3Client({ region: process.env.AWS_REGION || 'us-east-1' });
+      await s3.send(new DeleteObjectCommand({ Bucket: process.env.S3_BUCKET, Key: rec.filename }));
+    } catch (err) {
+      logger.warn(`Failed to delete S3 object "${rec.filename}":`, { error: err?.message });
+    }
+  } else {
+    const filePath = path.join(RECORDINGS_DIR, rec.filename);
+    if (fs.existsSync(filePath)) {
+      try { fs.unlinkSync(filePath); } catch (_) {}
+    }
   }
   await rec.deleteOne();
 }
 
 // POST /api/recordings/upload
-router.post("/upload", verifyToken, upload.single("recording"), async (req, res) => {
+router.post("/upload", verifyToken, wrapUpload(upload.single("recording")), async (req, res) => {
   try {
     const { role, id: teacherId } = req.user;
     if (role !== "teacher") return forbidden(res, "Teachers only");

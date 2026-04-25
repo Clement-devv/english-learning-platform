@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Lock, Eye, EyeOff, AlertCircle, Crown, ArrowRight, Mail } from 'lucide-react';
 import api from '../../api';
+import { useAuth } from '../../context/AuthContext.jsx';
 
 export default function SuperAdminLogin() {
   const [email,        setEmail]        = useState('');
@@ -13,6 +14,7 @@ export default function SuperAdminLogin() {
   const [focused,      setFocused]      = useState(null);
   const [mounted,      setMounted]      = useState(false);
   const navigate = useNavigate();
+  const { login } = useAuth();
 
   useEffect(() => { setMounted(true); }, []);
 
@@ -28,6 +30,7 @@ export default function SuperAdminLogin() {
       if (response.data.success) {
         localStorage.setItem('superAdminToken', response.data.token);
         localStorage.setItem('superAdminInfo', JSON.stringify(response.data.superAdmin));
+        login('super-admin', response.data.superAdmin, response.data.token);
         navigate('/super-admin/dashboard');
       }
     } catch (err) {

@@ -15,6 +15,7 @@ export default function ChatWindow({ chat, chatType = "group", userRole, onClose
   const [newMsgCount, setNewMsgCount] = useState(0);
   const [showEmoji,   setShowEmoji]   = useState(false);
 
+
   const scrollBoxRef    = useRef(null);
   const bottomRef       = useRef(null);
   const textareaRef     = useRef(null);

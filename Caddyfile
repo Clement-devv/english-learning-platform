@@ -1,0 +1,83 @@
+# English Learning Platform — Caddyfile
+# Caddy handles ALL HTTPS automatically — no certbot needed.
+#
+# Replace BEFORE deploying:
+#   yourplatform.com  → your actual domain (e.g. elearnhub.com)
+#   YOUR_EMAIL        → your email for Let's Encrypt cert expiry alerts
+#
+# DNS setup required at your registrar:
+#   A record: yourplatform.com    → YOUR_SERVER_IP
+#   A record: *.yourplatform.com  → YOUR_SERVER_IP   (wildcard — all center subdomains)
+
+{
+  email YOUR_EMAIL@example.com
+
+  # On-demand TLS: auto-provision certs for verified custom domains.
+  # Before issuing a cert for any domain not matching *.yourplatform.com,
+  # Caddy calls this endpoint. Your app returns 200 if the domain is verified, 404 otherwise.
+  on_demand_tls {
+    ask http://app:5000/api/v1/center/verify-caddy
+    interval 2m
+    burst 5
+  }
+}
+
+# ── Main platform + all center subdomains ──────────────────────────────────────
+# Handles: yourplatform.com, www.yourplatform.com, any-slug.yourplatform.com
+yourplatform.com, *.yourplatform.com {
+  reverse_proxy app:5000 {
+    header_up X-Forwarded-Proto {scheme}
+    header_up X-Forwarded-Host  {host}
+    header_up X-Real-IP         {remote_host}
+    # Needed for WebSocket (Socket.IO)
+    header_up Connection        {>Connection}
+    header_up Upgrade           {>Upgrade}
+    transport http {
+      keepalive 30s
+    }
+  }
+
+  # Security headers
+  header {
+    Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+    X-Content-Type-Options    "nosniff"
+    X-Frame-Options           "SAMEORIGIN"
+    Referrer-Policy           "strict-origin-when-cross-origin"
+    -Server
+  }
+
+  # Compress text assets
+  encode gzip zstd
+
+  # Cache static frontend assets (fingerprinted by Vite)
+  @static {
+    path_regexp \.(js|css|woff2?|ttf|otf|png|jpg|jpeg|gif|svg|ico|webp)$
+    not path /api/*
+  }
+  header @static Cache-Control "public, max-age=31536000, immutable"
+}
+
+# ── Custom center domains (e.g., sunshine-school.com) ─────────────────────────
+# on_demand TLS provisions SSL cert automatically for any verified custom domain.
+# The verify-caddy endpoint prevents cert issuance for unknown domains.
+:443 {
+  tls {
+    on_demand
+  }
+
+  reverse_proxy app:5000 {
+    header_up X-Forwarded-Proto {scheme}
+    header_up X-Forwarded-Host  {host}
+    header_up X-Real-IP         {remote_host}
+    header_up Connection        {>Connection}
+    header_up Upgrade           {>Upgrade}
+  }
+
+  encode gzip zstd
+
+  header {
+    Strict-Transport-Security "max-age=63072000"
+    X-Content-Type-Options    "nosniff"
+    -Server
+  }
+}

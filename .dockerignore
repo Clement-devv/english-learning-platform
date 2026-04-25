@@ -1,0 +1,35 @@
+# Dependencies — reinstalled inside container
+node_modules/
+server/node_modules/
+
+# Frontend build output — rebuilt inside container
+dist/
+
+# Environment files — injected at runtime via docker-compose env_file
+.env
+server/.env
+server/.env.production
+server/.env.local
+*.env
+
+# Logs — mounted as volume or written inside container
+server/logs/
+*.log
+
+# Uploads — mounted as Docker volume in production
+server/uploads/
+
+# Git & CI
+.git/
+.github/
+
+# Dev/editor files
+.vscode/
+.claude/
+*.md
+!server/package*.json
+!package*.json
+
+# OS noise
+.DS_Store
+Thumbs.db

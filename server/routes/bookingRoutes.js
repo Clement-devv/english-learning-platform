@@ -13,6 +13,10 @@ import { studentSchema }            from "../schemas/studentSchema.js";
 import { paymentTransactionSchema } from "../schemas/paymentTransactionSchema.js";
 import logger from "../utils/logger.js";
 import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
+import { checkAndAwardCertificates } from './certificateRoutes.js';
+import { validateObjectId } from '../middleware/validateObjectId.js';
+import { parsePagination } from '../utils/pagination.js';
+import { toStr, toObjectId } from '../utils/inputSanitizer.js';
 
 const router = express.Router();
 router.use(tenantMiddleware);
@@ -30,7 +34,7 @@ const canCreateBooking = (req, createdBy) => {
 };
 
 // ─── GET single booking ───────────────────────────────────────────────────────
-router.get("/:id", verifyToken, async (req, res) => {
+router.get("/:id", verifyToken, validateObjectId("id"), async (req, res) => {
   try {
     // Ensure Teacher and Student models are registered on this connection before populate
     getTeacher(req.db);
@@ -57,15 +61,20 @@ router.get("/:id", verifyToken, async (req, res) => {
 // ─── POST create booking ──────────────────────────────────────────────────────
 router.post("/", verifyToken, async (req, res) => {
   try {
-    const { teacherId, studentId, classTitle, topic, scheduledTime, duration, notes, createdBy = "admin" } = req.body;
+    const { scheduledTime, duration, createdBy = "admin" } = req.body;
+
+    // Validate and coerce — toStr/toObjectId throw { statusCode: 400 } on bad input,
+    // which the global errorHandler maps to a clean 400 JSON response.
+    const teacherId  = toObjectId(req.body.teacherId,  "teacherId");
+    const studentId  = toObjectId(req.body.studentId,  "studentId");
+    const classTitle = toStr(req.body.classTitle, "classTitle", { required: true, maxLen: 200 });
+    const topic      = toStr(req.body.topic,      "topic",      { maxLen: 500 });
+    const notes      = toStr(req.body.notes,      "notes",      { maxLen: 2000 });
 
     if (!canCreateBooking(req, createdBy))
       return forbidden(res, "You are not authorized to create bookings with this role");
-    if (!teacherId || !studentId || !classTitle || !scheduledTime)
-      return badRequest(res, "Teacher, student, class title, and scheduled time are required");
-    if (classTitle.length > 200) return badRequest(res, "Class title must be 200 characters or fewer");
-    if (topic && topic.length > 500) return badRequest(res, "Topic must be 500 characters or fewer");
-    if (notes && notes.length > 2000) return badRequest(res, "Notes must be 2000 characters or fewer");
+    if (!scheduledTime)
+      return badRequest(res, "scheduledTime is required");
 
     const [teacher, student] = await Promise.all([
       getTeacher(req.db).findById(teacherId),
@@ -111,7 +120,7 @@ router.post("/", verifyToken, async (req, res) => {
 });
 
 // ─── PATCH accept ─────────────────────────────────────────────────────────────
-router.patch("/:id/accept", verifyToken, async (req, res) => {
+router.patch("/:id/accept", verifyToken, validateObjectId("id"), async (req, res) => {
   try {
     getTeacher(req.db);
     getStudent(req.db);
@@ -153,7 +162,7 @@ router.patch("/:id/accept", verifyToken, async (req, res) => {
 });
 
 // ─── PATCH reject ─────────────────────────────────────────────────────────────
-router.patch("/:id/reject", verifyToken, async (req, res) => {
+router.patch("/:id/reject", verifyToken, validateObjectId("id"), async (req, res) => {
   try {
     getTeacher(req.db);
     getStudent(req.db);
@@ -195,7 +204,7 @@ router.patch("/:id/reject", verifyToken, async (req, res) => {
 });
 
 // ─── PATCH complete ───────────────────────────────────────────────────────────
-router.patch("/:id/complete", verifyToken, async (req, res) => {
+router.patch("/:id/complete", verifyToken, validateObjectId("id"), async (req, res) => {
   try {
     getTeacher(req.db);
     getStudent(req.db);
@@ -238,6 +247,11 @@ router.patch("/:id/complete", verifyToken, async (req, res) => {
     try { await sendClassCompletedNotification(booking.teacherId, booking.studentId, booking); }
     catch (e) { logger.error("Email notification failed:", { error: e?.message }); }
 
+    // Auto-award certificates for milestones reached
+    const newCerts = await checkAndAwardCertificates(
+      req.db, booking.studentId._id, req.center?.slug, req.center?._id
+    );
+
     // Push real-time update to student dashboard
     try {
       const io = req.app.get('io');
@@ -247,6 +261,15 @@ router.patch("/:id/complete", verifyToken, async (req, res) => {
         message: `Your class "${booking.classTitle}" has been marked as completed`,
         bookingId: booking._id,
       });
+      // Notify student of any new certificates
+      for (const cert of newCerts) {
+        io.to(`student-room:${req.center.slug}:${booking.studentId._id}`).emit('certificate-awarded', {
+          title:             '🏆 Certificate Earned!',
+          message:           `You've earned: ${cert.title}`,
+          certificateNumber: cert.certificateNumber,
+          certId:            cert._id,
+        });
+      }
     } catch (_) {}
 
     const updatedBooking = await Booking.findById(booking._id)
@@ -272,15 +295,19 @@ router.get("/", verifyToken, verifyAdmin, async (req, res) => {
     getTeacher(req.db);
     getStudent(req.db);
     const { status } = req.query;
+    const { limit, skip } = parsePagination(req.query, 100, 500);
     const filter = status ? { status } : {};
-    const bookings = await getBooking(req.db).find(filter)
-      .populate("teacherId", "firstName lastName email googleMeetLink")
-      .populate("studentId", "firstName lastName email")
-      .sort({ scheduledTime: -1 }).limit(500).lean();
-    res.json(bookings);
+    const [bookings, total] = await Promise.all([
+      getBooking(req.db).find(filter)
+        .populate("teacherId", "firstName lastName email googleMeetLink")
+        .populate("studentId", "firstName lastName email")
+        .sort({ scheduledTime: -1 }).skip(skip).limit(limit).lean(),
+      getBooking(req.db).countDocuments(filter),
+    ]);
+    res.json({ success: true, bookings, total, limit, skip });
   } catch (err) {
     logger.error("Error fetching bookings:", { error: err?.message });
-    res.status(500).json({ success: false, message: "Error fetching bookings" });
+    serverError(res, "Error fetching bookings");
   }
 });
 
@@ -293,17 +320,19 @@ router.get("/teacher/:teacherId", verifyToken, async (req, res) => {
       return forbidden(res, "You can only view your own bookings");
 
     getStudent(req.db);
+    const { limit, skip } = parsePagination(req.query, 50, 200);
     const filter = { teacherId };
     if (status === "completed") filter.status = { $in: ["completed", "missed"] };
+    else if (status?.includes(",")) filter.status = { $in: status.split(",") };
     else if (status) filter.status = status;
 
     const bookings = await getBooking(req.db).find(filter)
       .populate("studentId", "firstName lastName email classCredits")
-      .sort({ scheduledTime: -1 }).limit(200).lean();
+      .sort({ scheduledTime: -1 }).skip(skip).limit(limit).lean();
     res.json(bookings);
   } catch (err) {
     logger.error("Error fetching teacher bookings:", { error: err?.message });
-    res.status(500).json({ success: false, message: "Error fetching teacher bookings" });
+    serverError(res, "Error fetching teacher bookings");
   }
 });
 
@@ -312,17 +341,21 @@ router.get("/student/:studentId", verifyToken, async (req, res) => {
   try {
     const { studentId } = req.params;
     const { status } = req.query;
+
     if (req.user.role === "student" && req.user.id !== studentId)
       return forbidden(res, "You can only view your own bookings");
 
+    // Teachers may only view bookings where they are the assigned teacher
     getTeacher(req.db);
+    const { limit, skip } = parsePagination(req.query, 50, 200);
     const filter = { studentId };
+    if (req.user.role === "teacher") filter.teacherId = req.user.id;
     if (status === "completed") filter.status = { $in: ["completed", "missed"] };
     else if (status) filter.status = status;
 
     const bookings = await getBooking(req.db).find(filter)
       .populate("teacherId", "firstName lastName email continent googleMeetLink")
-      .sort({ scheduledTime: 1 }).limit(200).lean();
+      .sort({ scheduledTime: 1 }).skip(skip).limit(limit).lean();
     res.json(bookings);
   } catch (err) {
     logger.error("Error fetching student bookings:", { error: err?.message });
@@ -331,7 +364,7 @@ router.get("/student/:studentId", verifyToken, async (req, res) => {
 });
 
 // ─── PATCH cancel ─────────────────────────────────────────────────────────────
-router.patch("/:id/cancel", verifyToken, async (req, res) => {
+router.patch("/:id/cancel", verifyToken, validateObjectId("id"), async (req, res) => {
   try {
     const { reason } = req.body;
     const Booking = getBooking(req.db);
@@ -353,8 +386,79 @@ router.patch("/:id/cancel", verifyToken, async (req, res) => {
   }
 });
 
+// ─── POST student-request — student self-books a pending class ────────────────
+// Student picks a teacher + slot from the calendar; booking lands as "pending"
+// and goes into the teacher's accept/reject queue.
+router.post("/student-request", verifyToken, async (req, res) => {
+  try {
+    if (req.user.role !== "student")
+      return forbidden(res, "Only students can use this endpoint");
+
+    const { scheduledTime, duration, topic, notes } = req.body;
+    const teacherId  = toObjectId(req.body.teacherId, "teacherId");
+    const classTitle = toStr(req.body.classTitle || "Class Request", "classTitle", { maxLen: 200 });
+
+    if (!scheduledTime) return badRequest(res, "scheduledTime is required");
+    if (!teacherId)     return badRequest(res, "teacherId is required");
+
+    const [teacher, student] = await Promise.all([
+      getTeacher(req.db).findById(teacherId).select("firstName lastName email timezone active status"),
+      getStudent(req.db).findById(req.user.id).select("firstName lastName email classCredits timezone"),
+    ]);
+    if (!teacher || !teacher.active || teacher.status !== "active")
+      return notFound(res, "Teacher not found or unavailable");
+    if (!student) return notFound(res, "Student not found");
+
+    // Conflict check — don't allow double-booking same teacher at same time
+    const slotStart = new Date(scheduledTime);
+    const slotEnd   = new Date(slotStart.getTime() + ((duration || 60) * 60000));
+    const clashingBooking = await getBooking(req.db).findOne({
+      teacherId,
+      scheduledTime: { $lt: slotEnd, $gte: new Date(slotStart.getTime() - ((duration || 60) * 60000)) },
+      status: { $in: ["pending", "accepted"] },
+    });
+    if (clashingBooking)
+      return res.status(409).json({ success: false, message: "That time slot is already requested or booked" });
+
+    const Booking = getBooking(req.db);
+    const booking  = await Booking.create({
+      teacherId,
+      studentId:          req.user.id,
+      classTitle,
+      topic:              toStr(topic,  "topic",  { maxLen: 500 }) || "",
+      notes:              toStr(notes,  "notes",  { maxLen: 2000 }) || "",
+      scheduledTime:      slotStart,
+      duration:           duration || 60,
+      status:             "pending",
+      createdBy:          "student",
+      createdByUserId:    req.user.id,
+      createdByUserModel: "Student",
+      teacherTimezone:    teacher.timezone || "",
+      studentTimezone:    student.timezone || "",
+    });
+
+    const populated = await Booking.findById(booking._id)
+      .populate("teacherId", "firstName lastName email")
+      .populate("studentId", "firstName lastName email");
+
+    sendBookingRequestToTeacher(teacher, student, populated, req.center?.centerName || "")
+      .catch(e => logger.error("Teacher booking email failed:", { error: e?.message }));
+    sendBookingCreatedToStudent(student, teacher, populated, req.center?.centerName || "")
+      .catch(e => logger.error("Student booking email failed:", { error: e?.message }));
+
+    res.status(201).json({
+      success: true,
+      message: "Booking request sent to teacher — you'll be notified when they confirm",
+      booking: populated,
+    });
+  } catch (err) {
+    logger.error("Error creating student booking request:", { error: err?.message });
+    serverError(res, "Error creating booking request");
+  }
+});
+
 // ─── DELETE booking ───────────────────────────────────────────────────────────
-router.delete("/:id", verifyToken, async (req, res) => {
+router.delete("/:id", verifyToken, validateObjectId("id"), async (req, res) => {
   try {
     const booking = await getBooking(req.db).findById(req.params.id);
     if (!booking) return notFound(res, "Booking not found");

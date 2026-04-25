@@ -5,6 +5,7 @@ import { User, Lock, Eye, EyeOff, AlertCircle, ShieldCheck, ArrowRight, Mail, Ch
 import api from '../../api';
 import TwoFactorLogin from '../../components/TwoFactorLogin';
 import { useBranding } from '../../context/BrandingContext';
+import { useAuth } from '../../context/AuthContext.jsx';
 
 export default function AdminLogin() {
   const [username, setUsername] = useState('');
@@ -21,6 +22,7 @@ export default function AdminLogin() {
   const [forgotLoading, setForgotLoading]= useState(false);
   const [forgotError,   setForgotError]  = useState('');
   const navigate = useNavigate();
+  const { login } = useAuth();
   const { branding, center } = useBranding();
   const centerName = center?.centerName || 'English Learning Platform';
 
@@ -39,6 +41,7 @@ export default function AdminLogin() {
         sessionStorage.setItem('adminToken', response.data.token);
         sessionStorage.setItem('adminSessionToken', response.data.sessionToken);
         sessionStorage.setItem('adminInfo', JSON.stringify(response.data.admin));
+        login('admin', response.data.admin, response.data.token);
         navigate('/admin');
       } else if (response.data.requires2FA) {
         setRequires2FA(true);
@@ -62,6 +65,7 @@ export default function AdminLogin() {
         sessionStorage.setItem('adminToken', response.data.token);
         sessionStorage.setItem('adminSessionToken', response.data.sessionToken);
         sessionStorage.setItem('adminInfo', JSON.stringify(response.data.user));
+        login('admin', response.data.user, response.data.token);
         navigate('/admin');
       }
     } catch (err) {

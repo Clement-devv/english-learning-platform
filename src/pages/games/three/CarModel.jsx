@@ -27,6 +27,3 @@ const CarModel = forwardRef((props, ref) => {
 });
 
 export default CarModel;
-
-// Optional performance optimization
-useGLTF.preload("/src/assets/models/car.glb");

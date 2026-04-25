@@ -44,10 +44,10 @@ const router = express.Router();
 // GET /api/center/config — public, no auth required
 router.get('/config', tenantMiddleware, async (req, res) => {
   try {
-    const { centerName, slug, branding, plan, features } = req.center;
+    const { centerName, slug, branding, certificateTemplate, plan, features } = req.center;
     res.json({
       success: true,
-      center:  { centerName, slug, plan, features },
+      center:  { centerName, slug, plan, features, certificateTemplate },
       branding,
     });
   } catch (err) {
@@ -177,5 +177,61 @@ router.post(
     }
   }
 );
+
+// PATCH /api/center/certificate-template — admin configures their own center's certificate template
+router.patch('/certificate-template', tenantMiddleware, verifyToken, verifyAdmin, async (req, res) => {
+  try {
+    const { certificateTemplate } = req.body;
+    if (!certificateTemplate || typeof certificateTemplate !== 'object') {
+      return badRequest(res, 'certificateTemplate object is required');
+    }
+
+    const { organizationName, primaryColor, secondaryColor, accentColor,
+            signatureName, signatureTitle, footerText, completionMilestones } = certificateTemplate;
+
+    const update = {};
+    if (organizationName  !== undefined) update['certificateTemplate.organizationName']  = String(organizationName).slice(0, 200);
+    if (primaryColor      !== undefined) update['certificateTemplate.primaryColor']      = String(primaryColor).slice(0, 20);
+    if (secondaryColor    !== undefined) update['certificateTemplate.secondaryColor']    = String(secondaryColor).slice(0, 20);
+    if (accentColor       !== undefined) update['certificateTemplate.accentColor']       = String(accentColor).slice(0, 20);
+    if (signatureName     !== undefined) update['certificateTemplate.signatureName']     = String(signatureName).slice(0, 200);
+    if (signatureTitle    !== undefined) update['certificateTemplate.signatureTitle']    = String(signatureTitle).slice(0, 200);
+    if (footerText        !== undefined) update['certificateTemplate.footerText']        = String(footerText).slice(0, 500);
+    if (Array.isArray(completionMilestones)) {
+      const cleaned = completionMilestones
+        .filter(m => m && typeof m.count === 'number' && m.count > 0 && m.title)
+        .map(m => ({ count: m.count, title: String(m.title).slice(0, 200), description: String(m.description || '').slice(0, 500) }))
+        .sort((a, b) => a.count - b.count);
+      update['certificateTemplate.completionMilestones'] = cleaned;
+    }
+
+    await Center.findByIdAndUpdate(req.center._id, { $set: update });
+    res.json({ success: true, message: 'Certificate template updated' });
+  } catch (err) {
+    logger.error('❌ Certificate template update error:', { error: err?.message });
+    serverError(res, 'Server error');
+  }
+});
+
+// GET /api/v1/center/verify-caddy?domain=somesite.com
+// Called by Caddy's on_demand_tls before issuing a certificate for an unknown domain.
+// Returns 200 if the domain is an active verified custom domain, 404 otherwise.
+// This is a public endpoint (no auth) — Caddy calls it, not end users.
+router.get('/verify-caddy', async (req, res) => {
+  const domain = (req.query.domain || '').toLowerCase().trim();
+  if (!domain) return res.status(400).end();
+
+  try {
+    const center = await Center.findOne({
+      customDomain:  domain,
+      domainVerified: true,
+      status: 'active',
+    }).lean();
+
+    return res.status(center ? 200 : 404).end();
+  } catch {
+    return res.status(500).end();
+  }
+});
 
 export default router;

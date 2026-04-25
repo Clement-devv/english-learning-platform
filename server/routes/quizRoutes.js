@@ -16,6 +16,8 @@ import { callGemini, extractJSONArray } from "../utils/geminiHelper.js";
 import { recordActivity } from "../utils/streakService.js";
 import logger from "../utils/logger.js";
 import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
+import { validateObjectId, wrapUpload } from '../middleware/validateObjectId.js';
+import { toStr, toObjectId, toInt, toArray } from '../utils/inputSanitizer.js';
 
 // Multer — memory storage (no disk writes, PDF buffer passed straight to pdf-parse)
 const upload = multer({
@@ -50,11 +52,15 @@ function validateQuestions(questions) {
   for (let i = 0; i < questions.length; i++) {
     const q = questions[i];
     if (!q.question?.trim()) return `Question ${i + 1}: question text is required`;
+    if (typeof q.question === "string" && q.question.length > 10_000)
+      return `Question ${i + 1}: question text is too long`;
     if (!Array.isArray(q.options) || q.options.length < 2 || q.options.length > 4) {
       return `Question ${i + 1}: must have 2–4 options`;
     }
     for (const opt of q.options) {
       if (!opt?.text?.trim()) return `Question ${i + 1}: all options must have text`;
+      if (typeof opt.text === "string" && opt.text.length > 5_000)
+        return `Question ${i + 1}: option text is too long`;
     }
     if (typeof q.correctIndex !== "number" || q.correctIndex < 0 || q.correctIndex >= q.options.length) {
       return `Question ${i + 1}: correctIndex must point to a valid option`;
@@ -70,35 +76,36 @@ router.post("/", verifyToken, async (req, res) => {
   try {
     if (req.user.role !== "teacher") return forbidden(res, "Teachers only");
 
-    const { studentId, title, instructions, timeLimit, dueDate, questions } = req.body;
+    // Validate and coerce all string/id fields up front.
+    // toStr/toObjectId/toInt throw { statusCode: 400 } on bad input —
+    // the global errorHandler maps these to clean 400 JSON responses.
+    const studentId    = toObjectId(req.body.studentId, "studentId");
+    const title        = toStr(req.body.title,        "title",        { required: true, maxLen: 10_000 });
+    const instructions = toStr(req.body.instructions, "instructions", { maxLen: 50_000 });
+    const timeLimitNum = toInt(req.body.timeLimit, "timeLimit", { min: 1, max: 300 });
+    const { dueDate }  = req.body;
+    if (!dueDate) return badRequest(res, "dueDate is required");
 
-    if (!studentId || !title?.trim() || !timeLimit || !dueDate) {
-      return badRequest(res, "studentId, title, timeLimit, and dueDate are required");
-    }
-
+    const questions = toArray(req.body.questions, "questions", { minLen: 1, maxLen: 50 });
     const qError = validateQuestions(questions);
     if (qError) return res.status(400).json({ message: qError });
 
     const student = await getStudent(req.db).findById(studentId);
     if (!student) return notFound(res, "Student not found");
 
-    const timeLimitNum = parseInt(timeLimit, 10);
-    if (isNaN(timeLimitNum) || timeLimitNum < 1 || timeLimitNum > 300) {
-      return badRequest(res, "Time limit must be 1–300 minutes");
-    }
-
     const quiz = await getQuiz(req.db).create({
       teacherId:    req.user.id,
       studentId,
-      title:        title.trim().slice(0, 200),
-      instructions: (instructions || "").trim().slice(0, 2000),
+      title:        title.slice(0, 200),
+      instructions: instructions.slice(0, 2000),
       timeLimit:    timeLimitNum,
       dueDate:      new Date(dueDate),
       questions:    questions.map(q => ({
-        question:     q.question.trim().slice(0, 1000),
-        options:      q.options.map(o => ({ text: o.text.trim().slice(0, 500) })),
+        question:     toStr(q.question, "question", { required: true }).slice(0, 1000),
+        options:      toArray(q.options, "options", { minLen: 2, maxLen: 4 })
+                        .map(o => ({ text: toStr(o.text, "option text", { required: true }).slice(0, 500) })),
         correctIndex: q.correctIndex,
-        explanation:  (q.explanation || "").trim().slice(0, 500),
+        explanation:  toStr(q.explanation, "explanation").slice(0, 500),
       })),
     });
 
@@ -106,17 +113,17 @@ router.post("/", verifyToken, async (req, res) => {
     getStudent(req.db).findById(studentId).then(studentDoc => {
       if (studentDoc) {
         getTeacher(req.db).findById(req.user.id).then(teacherDoc => {
-          if (teacherDoc) sendQuizAssigned(studentDoc, teacherDoc, quiz).catch(() => {});
-        }).catch(() => {});
+          if (teacherDoc) sendQuizAssigned(studentDoc, teacherDoc, quiz).catch(e => logger.warn("sendQuizAssigned failed:", { error: e?.message }));
+        }).catch(e => logger.warn("Teacher lookup for quiz email failed:", { error: e?.message }));
       }
-    }).catch(() => {});
+    }).catch(e => logger.warn("Student lookup for quiz email failed:", { error: e?.message }));
 
     // Push real-time update to student dashboard
     try {
       const io = req.app.get('io');
       io.to(`student-room:${req.center.slug}:${studentId}`).emit('quiz-assigned', {
         title: '📝 New Quiz!',
-        message: `Your teacher assigned: "${title.trim().slice(0, 60)}"`,
+        message: `Your teacher assigned: "${title.slice(0, 60)}"`,
         quizId: quiz._id,
         dueDate,
       });
@@ -198,7 +205,7 @@ router.get("/assigned", verifyToken, async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /api/quiz/:id/attempt  — student submits answers
 // ─────────────────────────────────────────────────────────────────────────────
-router.post("/:id/attempt", verifyToken, async (req, res) => {
+router.post("/:id/attempt", verifyToken, validateObjectId("id"), async (req, res) => {
   try {
     if (req.user.role !== "student") return forbidden(res, "Students only");
 
@@ -248,8 +255,8 @@ router.post("/:id/attempt", verifyToken, async (req, res) => {
       getTeacher(req.db).findById(quiz.teacherId),
       getStudent(req.db).findById(req.user.id),
     ]).then(([teacherDoc, studentDoc]) => {
-      if (teacherDoc && studentDoc) sendQuizCompleted(teacherDoc, studentDoc, quiz, attempt).catch(() => {});
-    }).catch(() => {});
+      if (teacherDoc && studentDoc) sendQuizCompleted(teacherDoc, studentDoc, quiz, attempt).catch(e => logger.warn("sendQuizCompleted failed:", { error: e?.message }));
+    }).catch(e => logger.warn("User lookup for quiz completion email failed:", { error: e?.message }));
 
     // Return full quiz (with correct answers revealed) + attempt + streak
     const fullQuiz = quiz.toObject();
@@ -263,7 +270,7 @@ router.post("/:id/attempt", verifyToken, async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // DELETE /api/quiz/:id  — teacher deletes a quiz (only if not yet attempted)
 // ─────────────────────────────────────────────────────────────────────────────
-router.delete("/:id", verifyToken, async (req, res) => {
+router.delete("/:id", verifyToken, validateObjectId("id"), async (req, res) => {
   try {
     if (req.user.role !== "teacher") return forbidden(res, "Teachers only");
 

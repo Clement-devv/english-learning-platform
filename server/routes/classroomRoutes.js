@@ -251,7 +251,7 @@ router.post("/auto-complete", verifyToken, async (req, res) => {
     });
   } catch (err) {
     logger.error("Auto-complete error:", { error: err?.message });
-    res.status(500).json({ message: "Error completing class: " + err.message });
+    serverError(res, "Error completing class");
   }
 });
 
@@ -514,7 +514,7 @@ router.patch("/admin-complete/:bookingId", verifyToken, async (req, res) => {
     });
   } catch (err) {
     logger.error("Admin-complete error:", { error: err?.message });
-    res.status(500).json({ message: "Error completing class: " + err.message });
+    serverError(res, "Error completing class");
   }
 });
 

@@ -6,6 +6,11 @@ import { adminSchema }    from "../schemas/adminSchema.js";
 import { teacherSchema }  from "../schemas/teacherSchema.js";
 import { studentSchema }  from "../schemas/studentSchema.js";
 import { subAdminSchema } from "../schemas/subAdminSchema.js";
+import redisClient from "../config/redis.js";
+
+// The JWT signature (last segment) is unique per token — use it as the blacklist key.
+// This avoids storing the full token and is safe to expose in Redis.
+const blacklistKey = (token) => `bl:${token.split('.')[2]}`;
 
 // ─── Model helpers ────────────────────────────────────────────────────────────
 // All center routes run tenantMiddleware first, which sets req.db.
@@ -17,7 +22,8 @@ const getStudentModel  = (db) => db.models.Student  || db.model("Student",  stud
 const getSubAdminModel = (db) => db.models.SubAdmin || db.model("SubAdmin", subAdminSchema);
 
 // ─── verifyToken ──────────────────────────────────────────────────────────────
-// Only decodes the JWT and sets req.user — no DB query, unchanged from before.
+// Decodes the JWT, checks the Redis blacklist (cross-instance logout revocation),
+// then sets req.user.
 export const verifyToken = async (req, res, next) => {
   try {
     const token = req.headers.authorization?.split(" ")[1];
@@ -27,6 +33,19 @@ export const verifyToken = async (req, res, next) => {
     }
 
     const decoded = jwt.verify(token, config.jwtSecret);
+
+    // Check cross-instance revocation list — populated on logout when Redis is available.
+    if (redisClient) {
+      try {
+        const revoked = await redisClient.get(blacklistKey(token));
+        if (revoked) {
+          return res.status(401).json({ success: false, message: "Session has been revoked. Please log in again." });
+        }
+      } catch (_) {
+        // Redis unavailable — fail open (don't block requests, blacklist is best-effort)
+      }
+    }
+
     req.user = decoded;
     next();
   } catch (err) {

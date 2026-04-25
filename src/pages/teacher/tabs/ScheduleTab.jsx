@@ -150,18 +150,22 @@ export default function ScheduleTab({
     if (scrollRef.current) scrollRef.current.scrollTop = (8 - HOUR_START) * HOUR_HEIGHT - 16;
   }, []);
 
-  useEffect(() => { fetchAvailability(); }, [weekStart, teacherInfo?._id]); // eslint-disable-line
+  const teacherId = teacherInfo?._id || teacherInfo?.id;
+
+  useEffect(() => { fetchAvailability(); }, [weekStart, teacherId]); // eslint-disable-line
 
   const fetchAvailability = async () => {
-    if (!teacherInfo?._id) return;
+    if (!teacherId) return;
     setLoading(true);
     try {
       const end = new Date(weekStart); end.setDate(weekStart.getDate() + 7);
       const { data } = await api.get(
-        `/teacher-availability/${teacherInfo._id}?startDate=${weekStart.toISOString()}&endDate=${end.toISOString()}`
+        `/teacher-availability/${teacherId}?startDate=${weekStart.toISOString()}&endDate=${end.toISOString()}`
       );
       setAvailability(data.availability || []);
-    } catch { /* silent */ } finally { setLoading(false); }
+    } catch (err) {
+      showToast(err?.response?.data?.message || "Failed to load schedule", "error");
+    } finally { setLoading(false); }
   };
 
   const showToast = (msg, type = "success") => {
@@ -260,13 +264,13 @@ export default function ScheduleTab({
 
   // ── Save ──────────────────────────────────────────────────────────────────
   const handleSave = async () => {
-    if (!teacherInfo?._id || !addModal || addFormErr) return;
+    if (!teacherId || !addModal || addFormErr) return;
     const conflict = checkConflict(addModal.date, addForm.startTime, addForm.endTime);
     if (conflict) { showToast(conflict, "error"); return; }
     setSaving(true);
     try {
       await api.post("/teacher-availability", {
-        teacherId:   teacherInfo._id,
+        teacherId:   teacherId,
         studentId:   addForm.studentId || null,
         date:        addModal.date.toISOString(),
         dayOfWeek:   addModal.date.getDay(),
@@ -298,11 +302,11 @@ export default function ScheduleTab({
 
   // ── Toggle schedule visibility ───────────────────────────────────────────
   const toggleVisibility = async () => {
-    if (!teacherInfo?._id || togglingVis) return;
+    if (!teacherId || togglingVis) return;
     setTogglingVis(true);
     const next = !scheduleVisible;
     try {
-      await api.patch(`/teachers/${teacherInfo._id}/schedule-visibility`, {
+      await api.patch(`/teachers/${teacherId}/schedule-visibility`, {
         showScheduleToStudents: next,
       });
       setScheduleVisible(next);
@@ -368,7 +372,7 @@ export default function ScheduleTab({
         <div>
           <h1 style={{ margin:0, fontSize:"22px", fontWeight:"800", color:c.heading }}>My Schedule</h1>
           <p style={{ margin:"4px 0 0", fontSize:"13px", color:c.text, display:"flex", alignItems:"center", gap:"7px", flexWrap:"wrap" }}>
-            Block out your time and assign students to sessions
+            Mark your occupied time slots — students will book around these
             <span style={{ background:isDarkMode?"rgba(14,165,233,0.15)":"#e0f2fe", color:"#0284c7", borderRadius:"6px", padding:"2px 8px", fontSize:"11px", fontWeight:"700" }}>
               🌍 {myCity} · {myAbbr}
             </span>
@@ -451,7 +455,7 @@ export default function ScheduleTab({
         {[
           { color:"#7c3aed", radius:"3px", label:"Confirmed class" },
           { color:"#d97706", radius:"3px", label:"Pending request" },
-          { color:"#0ea5e9", radius:"3px", label:"Occupied (your schedule)" },
+          { color:"#0ea5e9", radius:"3px", label:"Occupied" },
         ].map(({ color, radius, label }) => (
           <div key={label} style={{ display:"flex", alignItems:"center", gap:"7px" }}>
             <span style={{ width:"10px", height:"10px", borderRadius:radius, background:color }}/>
@@ -459,7 +463,7 @@ export default function ScheduleTab({
           </div>
         ))}
         <span style={{ marginLeft:"auto", fontSize:"12px", color:c.muted, display:"flex", alignItems:"center", gap:"5px" }}>
-          <Plus size={11} color={c.muted}/> Click any empty slot to mark as occupied
+          <Plus size={11} color={c.muted}/> Click any empty time cell to mark it as occupied
         </span>
       </div>
 
@@ -552,27 +556,24 @@ export default function ScheduleTab({
                           boxShadow:"0 3px 10px rgba(14,165,233,0.3)",
                           border:"1px solid rgba(14,165,233,0.3)",
                         }}>
-                        {/* "OCCUPIED" badge */}
-                        <div style={{ display:"inline-flex", alignItems:"center", gap:"3px", background:"rgba(255,255,255,0.2)", borderRadius:"4px", padding:"1px 5px", marginBottom:"2px" }}>
-                          <span style={{ fontSize:"9px", fontWeight:"800", color:"#fff", textTransform:"uppercase", letterSpacing:"0.06em" }}>Occupied</span>
+                        {/* Badge row */}
+                        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:"2px" }}>
+                          <div style={{ display:"inline-flex", alignItems:"center", gap:"3px", background:"rgba(255,255,255,0.2)", borderRadius:"4px", padding:"1px 5px" }}>
+                            <span style={{ fontSize:"9px", fontWeight:"800", color:"#fff", textTransform:"uppercase", letterSpacing:"0.06em" }}>Occupied</span>
+                          </div>
+                          {avail.isRecurring && (
+                            <Repeat size={9} color="rgba(255,255,255,0.7)"/>
+                          )}
                         </div>
-                        {/* Student name */}
-                        {hasStudent && height > 30 && (
-                          <p style={{ margin:0, fontSize:"11px", fontWeight:"800", color:"#fff", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
+                        {/* Time — always visible */}
+                        <p style={{ margin:0, fontSize:"10px", fontWeight:"700", color:"#fff", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
+                          {fmt12(avail.startTime)} – {fmt12(avail.endTime)}
+                        </p>
+                        {/* Student name — only when there's room */}
+                        {hasStudent && height > 52 && (
+                          <p style={{ margin:"2px 0 0", fontSize:"11px", fontWeight:"800", color:"rgba(255,255,255,0.9)", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
                             {student.firstName} {student.lastName || ""}
                           </p>
-                        )}
-                        {/* Time range */}
-                        {height > (hasStudent ? 52 : 36) && (
-                          <p style={{ margin:"1px 0 0", fontSize:"10px", color:"rgba(255,255,255,0.85)" }}>
-                            {fmt12(avail.startTime)} – {fmt12(avail.endTime)}
-                          </p>
-                        )}
-                        {avail.isRecurring && height > 64 && (
-                          <div style={{ display:"flex", alignItems:"center", gap:"3px", marginTop:"2px" }}>
-                            <Repeat size={9} color="rgba(255,255,255,0.7)"/>
-                            <span style={{ fontSize:"9px", color:"rgba(255,255,255,0.7)" }}>Weekly</span>
-                          </div>
                         )}
                       </div>
                     );
@@ -622,6 +623,22 @@ export default function ScheduleTab({
         </div>
       </div>
 
+      {/* ── Empty schedule hint ── */}
+      {!loading && availability.length === 0 && (
+        <div style={{ background:isDarkMode?"rgba(14,165,233,0.08)":"#f0f9ff", border:`1.5px dashed ${isDarkMode?"rgba(14,165,233,0.3)":"#bae6fd"}`, borderRadius:"16px", padding:"20px 24px", display:"flex", alignItems:"center", gap:"16px" }}>
+          <div style={{ width:"44px", height:"44px", borderRadius:"14px", background:"linear-gradient(135deg,#0ea5e9,#0284c7)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+            <Calendar size={20} color="#fff" />
+          </div>
+          <div>
+            <p style={{ margin:"0 0 3px", fontSize:"14px", fontWeight:"800", color:c.heading }}>No occupied slots set for this week</p>
+            <p style={{ margin:0, fontSize:"12px", color:c.text }}>
+              Click on any time cell in the calendar above to add a slot students can book.
+              Recurring slots will appear every week automatically.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* ═══════════════════════ ADD SLOT MODAL ═══════════════════════ */}
       {addModal && (
         <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.5)", zIndex:999, display:"flex", alignItems:"center", justifyContent:"center", padding:"16px" }} onClick={() => setAddModal(null)}>
@@ -630,7 +647,7 @@ export default function ScheduleTab({
             {/* Modal header */}
             <div style={{ background:"linear-gradient(135deg,#0ea5e9,#0284c7)", padding:"20px 24px", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
               <div>
-                <p style={{ margin:0, fontSize:"11px", fontWeight:"700", color:"rgba(255,255,255,0.8)", textTransform:"uppercase", letterSpacing:"0.07em" }}>New Occupied Slot</p>
+                <p style={{ margin:0, fontSize:"11px", fontWeight:"700", color:"rgba(255,255,255,0.8)", textTransform:"uppercase", letterSpacing:"0.07em" }}>Mark as Occupied</p>
                 <p style={{ margin:"3px 0 0", fontSize:"17px", fontWeight:"800", color:"#fff" }}>
                   {addModal.date.toLocaleDateString("en-US",{ weekday:"long", month:"long", day:"numeric" })}
                 </p>

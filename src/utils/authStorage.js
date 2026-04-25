@@ -36,6 +36,12 @@ export const ROLE_CONFIG = {
     verifyPath: '/super-admin/stats',
     localOnly:  true, // token stored in localStorage only (not sessionStorage)
   },
+  parent: {
+    tokenKey:   'parentToken',
+    infoKey:    'parentInfo',
+    loginPath:  '/parent/login',
+    verifyPath: '/parents/verify',
+  },
 };
 
 /**

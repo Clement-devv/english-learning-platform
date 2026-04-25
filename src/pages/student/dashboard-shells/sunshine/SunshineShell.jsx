@@ -1,14 +1,18 @@
 // src/pages/student/dashboard-shells/sunshine/SunshineShell.jsx
 // Sunshine Explorer — warm orange palette, bubbly Nunito font, vertical sidebar nav.
 
-import { useState } from "react";
+import { useState, lazy, Suspense } from "react";
+const GroupClassTab        = lazy(() => import('../../tabs/GroupClassTab'));
+const BookingCalendarTab   = lazy(() => import('../../tabs/BookingCalendarTab'));
+const CertificatesTab      = lazy(() => import('../../tabs/CertificatesTab'));
 import Confetti from "react-confetti";
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell,
 } from "recharts";
 import {
-  Home, BookOpen, Brain, Mic2, MessageSquare, CalendarDays, BarChart2,
+  Home, BookOpen, FileText, Layers, Mic2, MessageSquare, MessageCircle,
+  CheckCircle2, CalendarDays, TrendingUp, Award, Users,
   Video, Star, Gift, Settings, LogOut, Bell, ChevronDown, ChevronRight,
   Moon, Sun, Shield, KeyRound,
 } from "lucide-react";
@@ -47,9 +51,9 @@ const NAV_GROUPS = [
   {
     label: "Learning",
     items: [
-      { key: "homework",      icon: "📚", label: "Homework",   lucide: BookOpen },
-      { key: "quiz",          icon: "📝", label: "Quizzes",    lucide: Brain    },
-      { key: "flashcards",    icon: "📖", label: "Flashcards", lucide: BookOpen },
+      { key: "homework",      icon: "📚", label: "Homework",   lucide: BookOpen  },
+      { key: "quiz",          icon: "📝", label: "Quizzes",    lucide: FileText  },
+      { key: "flashcards",    icon: "📖", label: "Flashcards", lucide: Layers    },
     ],
   },
   {
@@ -62,16 +66,19 @@ const NAV_GROUPS = [
   {
     label: "Classes",
     items: [
-      { key: "messages",          icon: "💬", label: "Messages",   lucide: MessageSquare },
-      { key: "completed-classes", icon: "✅", label: "Completed",  lucide: CalendarDays  },
-      { key: "schedule",          icon: "📅", label: "Schedule",   lucide: CalendarDays  },
+      { key: "book-class",        icon: "📆", label: "Book a Class",  lucide: CalendarDays  },
+      { key: "group-classes",     icon: "👥", label: "Group Classes", lucide: Users         },
+      { key: "messages",          icon: "💬", label: "Messages",      lucide: MessageCircle },
+      { key: "completed-classes", icon: "✅", label: "Completed",     lucide: CheckCircle2  },
+      { key: "schedule",          icon: "📅", label: "Schedule",      lucide: CalendarDays  },
     ],
   },
   {
     label: "Progress",
     items: [
-      { key: "charts", icon: "📊", label: "Charts",  lucide: BarChart2 },
-      { key: "badges", icon: "🏅", label: "Badges",  lucide: Star      },
+      { key: "charts",       icon: "📊", label: "Charts",       lucide: TrendingUp },
+      { key: "badges",       icon: "🏅", label: "Badges",       lucide: Award      },
+      { key: "certificates", icon: "🎓", label: "Certificates", lucide: Award      },
     ],
   },
   {
@@ -330,7 +337,7 @@ export default function SunshineShell() {
                       borderLeft: isActive ? `3px solid ${col.accent}` : "3px solid transparent",
                       marginBottom: 1,
                     }}>
-                    <span style={{ fontSize: 17, lineHeight: 1, flexShrink: 0 }}>{item.icon}</span>
+                    {(() => { const LI = item.lucide; return <LI size={17} strokeWidth={1.8} color={isActive ? col.accent : col.body} style={{ flexShrink: 0 }} />; })()}
                     <span style={{ flex: 1, fontSize: 13, fontWeight: isActive ? 800 : 600, color: isActive ? col.accent : col.body }}>
                       {item.label}
                     </span>
@@ -432,85 +439,111 @@ export default function SunshineShell() {
 
           {/* ══ DASHBOARD ══ */}
           {d.activeTab === "dashboard" && (
-            <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 22, fontFamily: F }}>
 
-              {/* Welcome banner */}
-              <div className="kid-card" style={{ background: dashTheme.welcomeGradient, borderRadius: "28px", padding: "28px 32px", color: "#fff", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "20px", boxShadow: `0 12px 40px ${dashTheme.welcomeShadow}` }}>
-                <div>
-                  <p style={{ margin: "0 0 4px", fontSize: "12px", fontWeight: 700, opacity: 0.85, letterSpacing: ".06em", textTransform: "uppercase" }}>Welcome back 🎉</p>
-                  <h1 style={{ margin: "0 0 8px", fontSize: "26px", fontWeight: 900 }}>Hey, {d.student.firstName}! 👋</h1>
-                  <p style={{ margin: 0, opacity: 0.9, fontSize: "15px" }}>
-                    You have <strong>{d.progress.classesRemaining}</strong> classes left. Let's learn something amazing today!
+              {/* Welcome hero */}
+              <div className="kid-card" style={{ background: "linear-gradient(135deg,#f97316 0%,#f43f5e 100%)", borderRadius: 28, padding: "26px 32px", color: "#fff", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 24, boxShadow: "0 16px 40px rgba(249,115,22,0.3)", position: "relative", overflow: "hidden" }}>
+                <div style={{ position: "absolute", right: -30, top: -40, width: 200, height: 200, borderRadius: "50%", background: "rgba(255,255,255,0.12)" }}/>
+                <div style={{ position: "absolute", right: 80, bottom: -50, width: 120, height: 120, borderRadius: "50%", background: "rgba(255,255,255,0.08)" }}/>
+                <div style={{ position: "relative", zIndex: 1, flex: 1, minWidth: 0 }}>
+                  <p style={{ margin: "0 0 4px", fontSize: 14, fontWeight: 700, opacity: 0.9 }}>Hi {d.student.firstName}!</p>
+                  <h1 style={{ margin: "0 0 8px", fontSize: 28, fontWeight: 900, letterSpacing: "-0.5px", lineHeight: 1.15 }}>Ready for today's adventure?</h1>
+                  <p style={{ margin: 0, fontSize: 14, fontWeight: 600, opacity: 0.95 }}>
+                    {d.homeworkPending > 0 ? `${d.homeworkPending} homework due` : "No pending homework"} · {d.progress.classesRemaining} classes left 🔥
                   </p>
                 </div>
-                <div style={{ fontSize: "72px", flexShrink: 0 }}>📚</div>
+                <div style={{ position: "relative", zIndex: 1, background: "rgba(255,255,255,0.18)", backdropFilter: "blur(8px)", borderRadius: 20, padding: "16px 22px", textAlign: "center", border: "2px solid rgba(255,255,255,0.25)", flexShrink: 0 }}>
+                  <div style={{ fontSize: 34 }}>🔥</div>
+                  <div style={{ fontSize: 32, fontWeight: 900, marginTop: 4 }}>{d.progress.streakDays}</div>
+                  <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.1em", opacity: 0.9 }}>DAY STREAK</div>
+                </div>
               </div>
 
               {/* Stats row */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(148px,1fr))", gap: "12px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 14 }}>
                 {[
-                  { icon: "✅", label: "Completed",  value: d.progress.completedLessons,  color: "#10b981", bg: d.isDarkMode ? "rgba(16,185,129,0.12)" : "#f0fdf4"  },
-                  { icon: "📅", label: "Remaining",  value: d.progress.classesRemaining,   color: "#3b82f6", bg: d.isDarkMode ? "rgba(59,130,246,0.12)"  : "#eff6ff"  },
-                  { icon: "🔥", label: "Day Streak", value: d.progress.streakDays,         color: "#f97316", bg: d.isDarkMode ? "rgba(249,115,22,0.12)"  : "#fff7ed"  },
-                  { icon: "⭐", label: "This Week",  value: d.progress.weeklyCompleted,    color: "#8b5cf6", bg: d.isDarkMode ? "rgba(139,92,246,0.12)"  : "#f5f3ff"  },
-                ].map(({ icon, label, value, color, bg }) => (
-                  <div key={label} className="kid-card" style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: "20px", padding: "18px 16px", textAlign: "center", boxShadow: "0 4px 12px rgba(0,0,0,0.05)" }}>
-                    <div style={{ width: "44px", height: "44px", borderRadius: "14px", background: bg, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 10px", fontSize: "22px" }}>{icon}</div>
-                    <div style={{ fontSize: "26px", fontWeight: 900, color, marginBottom: "4px" }}>{value}</div>
-                    <div style={{ fontSize: "11px", fontWeight: 700, color: col.muted, textTransform: "uppercase", letterSpacing: ".04em" }}>{label}</div>
+                  { icon: "📚", n: d.progress.completedLessons, l: "Classes done",   bg: "#fff3e6", fg: "#c2410c" },
+                  { icon: "📅", n: d.progress.classesRemaining, l: "Classes left",   bg: "#ffe8d6", fg: "#9a3412" },
+                  { icon: "🏅", n: d.badges.length,             l: "Badges earned",  bg: "#fee4e2", fg: "#b91c3c" },
+                  { icon: "⭐", n: d.progress.weeklyCompleted,  l: "This week",      bg: "#fef3c7", fg: "#a16207" },
+                ].map((s, i) => (
+                  <div key={i} className="kid-card" style={{ background: col.card, borderRadius: 22, padding: "18px 20px", border: `2px solid ${col.border}`, display: "flex", flexDirection: "column", gap: 6 }}>
+                    <div style={{ width: 44, height: 44, borderRadius: 14, background: s.bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>{s.icon}</div>
+                    <div style={{ fontSize: 26, fontWeight: 900, color: col.heading, letterSpacing: "-0.5px" }}>{s.n}</div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: col.muted }}>{s.l}</div>
                   </div>
                 ))}
               </div>
 
               {/* Classes + sidebar */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: "18px" }}>
-                <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 18 }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
 
                   {/* Live classes */}
-                  <div className="kid-card" style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: "24px", padding: "20px", boxShadow: "0 4px 12px rgba(0,0,0,0.05)" }}>
-                    <h2 style={{ margin: "0 0 14px", fontSize: "17px", fontWeight: 900, color: col.heading, display: "flex", alignItems: "center", gap: "8px" }}>
-                      🚀 Live & Starting Soon
-                      {d.activeClasses.length > 0 && <span style={{ background: "#ef4444", color: "#fff", borderRadius: "999px", padding: "2px 10px", fontSize: "12px", fontWeight: 900 }}>{d.activeClasses.length}</span>}
-                    </h2>
-                    <ActiveClasses activeClasses={d.activeClasses} onJoin={d.handleJoinClass} />
-                  </div>
+                  {d.activeClasses.length > 0 && (
+                    <div className="kid-card" style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: 24, padding: 20 }}>
+                      <h2 style={{ margin: "0 0 14px", fontSize: 17, fontWeight: 900, color: col.heading, display: "flex", alignItems: "center", gap: 8 }}>
+                        🚀 Live & Starting Soon
+                        <span style={{ background: "#ef4444", color: "#fff", borderRadius: 999, padding: "2px 10px", fontSize: 12, fontWeight: 900 }}>{d.activeClasses.length}</span>
+                      </h2>
+                      <ActiveClasses activeClasses={d.activeClasses} onJoin={d.handleJoinClass} />
+                    </div>
+                  )}
 
                   {/* Upcoming */}
-                  <div className="kid-card" style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: "24px", padding: "20px", boxShadow: "0 4px 12px rgba(0,0,0,0.05)" }}>
-                    <h2 style={{ margin: "0 0 14px", fontSize: "17px", fontWeight: 900, color: col.heading }}>📅 Upcoming Classes</h2>
+                  <div className="kid-card" style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: 24, padding: 22 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                      <h2 style={{ margin: 0, fontSize: 18, fontWeight: 900, color: col.heading, display: "flex", alignItems: "center", gap: 8 }}>
+                        📅 Upcoming classes
+                      </h2>
+                      <button className="kid-btn" onClick={() => d.setActiveTab("schedule")} style={{ background: "transparent", border: "none", color: col.accent, fontWeight: 800, cursor: "pointer", fontFamily: F, fontSize: 13, display: "flex", alignItems: "center", gap: 4 }}>
+                        View all →
+                      </button>
+                    </div>
                     <UpcomingClasses upcomingClasses={d.upcomingClasses} onEnroll={() => d.showToast("Coming soon!")} />
                   </div>
                 </div>
 
                 {/* Right column */}
-                <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-                  <div className="kid-card" style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: "24px", padding: "20px", boxShadow: "0 4px 12px rgba(0,0,0,0.05)" }}>
-                    <h2 style={{ margin: "0 0 12px", fontSize: "16px", fontWeight: 900, color: col.heading }}>📈 My Progress</h2>
+                <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+
+                  {/* Today's goal / progress */}
+                  <div className="kid-card" style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: 24, padding: 22 }}>
+                    <h3 style={{ margin: "0 0 12px", fontSize: 16, fontWeight: 900, color: col.heading, display: "flex", alignItems: "center", gap: 8 }}>
+                      🎯 My Progress
+                    </h3>
                     <ProgressCard progress={d.progress} />
                   </div>
 
                   <StreakWidget isDarkMode={d.isDarkMode} onLoad={d.handleStreakLoaded} />
 
-                  <div className="kid-card" style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: "24px", padding: "20px", boxShadow: "0 4px 12px rgba(0,0,0,0.05)" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
-                      <h2 style={{ margin: 0, fontSize: "16px", fontWeight: 900, color: col.heading }}>🏅 My Badges</h2>
-                      <button className="kid-btn" onClick={() => d.setActiveTab("badges")} style={{ background: d.isDarkMode ? "rgba(249,115,22,0.15)" : "#fff7ed", border: "none", color: col.accent, fontWeight: 800, borderRadius: "10px", padding: "4px 12px", cursor: "pointer", fontFamily: F, fontSize: "12px" }}>See all →</button>
+                  {/* Badges callout */}
+                  <div className="kid-card" style={{ background: d.isDarkMode ? "rgba(249,115,22,0.1)" : "linear-gradient(145deg,#fff7ed,#fef3c7)", border: `2px solid ${d.isDarkMode ? "rgba(249,115,22,0.25)" : "#fed7aa"}`, borderRadius: 24, padding: 22 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                      <h3 style={{ margin: 0, fontSize: 16, fontWeight: 900, color: col.heading, display: "flex", alignItems: "center", gap: 8 }}>🏅 Badges</h3>
+                      <button className="kid-btn" onClick={() => d.setActiveTab("badges")} style={{ background: "transparent", border: "none", color: col.accent, fontWeight: 800, borderRadius: 10, cursor: "pointer", fontFamily: F, fontSize: 12 }}>See all →</button>
                     </div>
-                    {d.badges.length === 0
-                      ? <p style={{ textAlign: "center", color: col.muted, fontSize: "13px", fontWeight: 600 }}>Complete classes to earn badges! 🌟</p>
-                      : <div style={{ display: "flex", flexWrap: "wrap", gap: "10px" }}>
-                          {d.badges.slice(-4).map(b => (
-                            <div key={b.id} title={b.name} style={{ textAlign: "center" }}>
-                              <div style={{ fontSize: "34px" }}>{b.icon}</div>
-                              <p style={{ margin: "3px 0 0", fontSize: "10px", fontWeight: 700, color: col.muted, maxWidth: "52px" }}>{b.name}</p>
-                            </div>
-                          ))}
-                        </div>
-                    }
+                    {d.badges.length === 0 ? (
+                      <p style={{ textAlign: "center", color: col.muted, fontSize: 13, fontWeight: 600, margin: 0 }}>Complete classes to earn badges! 🌟</p>
+                    ) : (
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+                        {d.badges.slice(-4).map(b => (
+                          <div key={b.id} title={b.name} style={{ textAlign: "center" }}>
+                            <div style={{ fontSize: 34 }}>{b.icon}</div>
+                            <p style={{ margin: "3px 0 0", fontSize: 10, fontWeight: 700, color: col.muted, maxWidth: 52 }}>{b.name}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {d.badges.length > 0 && (
+                      <button className="kid-btn" onClick={() => d.shareAchievement("badge")} style={{ marginTop: 14, width: "100%", background: dashTheme.accentGradient, color: "#fff", border: "none", borderRadius: 14, padding: "10px 16px", fontWeight: 900, fontSize: 13, fontFamily: F, cursor: "pointer", boxShadow: `0 6px 14px ${dashTheme.tabShadow}`, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                        🎉 Share achievement
+                      </button>
+                    )}
                   </div>
 
-                  <div className="kid-card" style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: "24px", padding: "20px", boxShadow: "0 4px 12px rgba(0,0,0,0.05)" }}>
-                    <h2 style={{ margin: "0 0 12px", fontSize: "16px", fontWeight: 900, color: col.heading }}>🔔 Notifications</h2>
+                  <div className="kid-card" style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: 24, padding: 20 }}>
+                    <h2 style={{ margin: "0 0 12px", fontSize: 16, fontWeight: 900, color: col.heading }}>🔔 Notifications</h2>
                     <NotificationsCard notifications={d.notifications} onClearAll={() => d.setNotifications([])} />
                   </div>
                 </div>
@@ -519,10 +552,10 @@ export default function SunshineShell() {
           )}
 
           {/* ══ HOMEWORK ══ */}
-          {d.activeTab === "homework" && <div style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: "24px", padding: "24px" }}><StudentHomeworkTab studentInfo={d.student} isDarkMode={d.isDarkMode} /></div>}
+          {d.activeTab === "homework" && <StudentHomeworkTab studentInfo={d.student} isDarkMode={d.isDarkMode} />}
 
           {/* ══ QUIZ ══ */}
-          {d.activeTab === "quiz" && <div style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: "24px", padding: "24px" }}><StudentQuizTab studentInfo={d.student} isDarkMode={d.isDarkMode} /></div>}
+          {d.activeTab === "quiz" && <StudentQuizTab studentInfo={d.student} isDarkMode={d.isDarkMode} />}
 
           {/* ══ FLASHCARDS ══ */}
           {d.activeTab === "flashcards" && <FlashcardsTab isDarkMode={d.isDarkMode} />}
@@ -532,6 +565,33 @@ export default function SunshineShell() {
 
           {/* ══ CONVERSATION ══ */}
           {d.activeTab === "conversation" && <div style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: "24px", padding: "24px" }}><ConversationTab studentInfo={d.student} isDarkMode={d.isDarkMode} /></div>}
+
+          {/* ══ CERTIFICATES ══ */}
+          {d.activeTab === "certificates" && (
+            <div style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: "24px", padding: "24px" }}>
+              <Suspense fallback={null}>
+                <CertificatesTab isDarkMode={d.isDarkMode} />
+              </Suspense>
+            </div>
+          )}
+
+          {/* ══ BOOK A CLASS ══ */}
+          {d.activeTab === "book-class" && (
+            <div style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: "24px", padding: "24px" }}>
+              <Suspense fallback={null}>
+                <BookingCalendarTab isDarkMode={d.isDarkMode} studentInfo={d.student} />
+              </Suspense>
+            </div>
+          )}
+
+          {/* ══ GROUP CLASSES ══ */}
+          {d.activeTab === "group-classes" && (
+            <div style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: "24px", padding: "24px" }}>
+              <Suspense fallback={null}>
+                <GroupClassTab isDarkMode={d.isDarkMode} studentInfo={d.student} />
+              </Suspense>
+            </div>
+          )}
 
           {/* ══ MESSAGES ══ */}
           {d.activeTab === "messages" && <div style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: "24px", overflow: "hidden" }}><MessagesTab userRole="student" /></div>}

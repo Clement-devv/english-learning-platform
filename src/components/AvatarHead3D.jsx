@@ -8,9 +8,6 @@ const AVATAR_URL =
   "https://models.readyplayer.me/6386aff88e9db6c4f73f3fa2.glb" +
   "?morphTargets=ARKit&textureAtlas=1024";
 
-// Pre-warm the GLTF loader so the model is cached on first render
-useGLTF.preload(AVATAR_URL);
-
 // ── The actual 3D mesh ─────────────────────────────────────────────────────
 function AvatarMesh({ isSpeaking }) {
   const { scene } = useGLTF(AVATAR_URL);
@@ -88,9 +85,19 @@ function Spinner({ isDarkMode }) {
   );
 }
 
+// Kick off the GLTF network request as soon as the component first mounts.
+// Calling preload() here (not at module level) avoids accessing React
+// internals before the fiber tree is initialized on first page load.
+function preloadOnce() {
+  let loaded = false;
+  return () => { if (!loaded) { loaded = true; useGLTF.preload(AVATAR_URL); } };
+}
+const triggerPreload = preloadOnce();
+
 // ── Public component ───────────────────────────────────────────────────────
 export default function AvatarHead3D({ isSpeaking, isDarkMode }) {
   const [webGlError, setWebGlError] = useState(false);
+  triggerPreload();
 
   if (webGlError) {
     return (

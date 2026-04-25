@@ -1,9 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import api from "../../../api";
 
-// ── Local sentence bank (Option 1) ────────────────────────────────────────────
-// 30 sentences per difficulty. Shuffled into a pool on load.
-// When pool is exhausted, Option 2 (Gemini via backend) fetches fresh sentences.
+// ── Local sentence bank ───────────────────────────────────────────────────────
 const LOCAL_SENTENCES = {
   beginner: [
     { text: "The cat sat on the mat.", focus: "Short vowels" },
@@ -103,7 +101,6 @@ const LOCAL_SENTENCES = {
   ],
 };
 
-// ── Fisher-Yates shuffle ───────────────────────────────────────────────────────
 function shuffle(arr) {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
@@ -113,40 +110,6 @@ function shuffle(arr) {
   return a;
 }
 
-// ── Levenshtein distance ───────────────────────────────────────────────────────
-function levenshtein(a, b) {
-  const m = a.length, n = b.length;
-  const dp = Array.from({ length: m + 1 }, (_, i) =>
-    Array.from({ length: n + 1 }, (_, j) => (i === 0 ? j : j === 0 ? i : 0))
-  );
-  for (let i = 1; i <= m; i++)
-    for (let j = 1; j <= n; j++)
-      dp[i][j] = a[i - 1] === b[j - 1]
-        ? dp[i - 1][j - 1]
-        : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
-  return dp[m][n];
-}
-
-function normalize(w) { return w.toLowerCase().replace(/[^a-z']/g, ""); }
-
-function compareWords(expectedText, spokenText) {
-  const expWords = expectedText.split(/\s+/).map(normalize).filter(Boolean);
-  const spkWords = spokenText.split(/\s+/).map(normalize).filter(Boolean);
-  const words = expWords.map((exp, i) => {
-    const spk = spkWords[i] || "";
-    if (!spk) return { expected: exp, spoken: "", status: "missed" };
-    if (exp === spk) return { expected: exp, spoken: spk, status: "correct" };
-    const threshold = exp.length <= 4 ? 1 : 2;
-    if (levenshtein(exp, spk) <= threshold) return { expected: exp, spoken: spk, status: "close" };
-    return { expected: exp, spoken: spk, status: "wrong" };
-  });
-  const score = words.reduce(
-    (sum, w) => sum + (w.status === "correct" ? 1 : w.status === "close" ? 0.5 : 0), 0
-  );
-  return { words, percentage: Math.round((score / expWords.length) * 100), total: expWords.length };
-}
-
-// ── Status colours (rgba so they work on light + dark) ────────────────────────
 const STATUS = {
   correct: { bg: "rgba(34,197,94,0.18)",  color: "#15803d", border: "rgba(34,197,94,0.45)"  },
   close:   { bg: "rgba(234,179,8,0.18)",   color: "#b45309", border: "rgba(234,179,8,0.45)"  },
@@ -162,28 +125,36 @@ const DIFF_LABELS = {
 
 // ── Component ──────────────────────────────────────────────────────────────────
 export default function PronunciationTab({ isDarkMode }) {
-  const [difficulty,     setDifficulty]     = useState("beginner");
-  const [pool,           setPool]           = useState(() => shuffle(LOCAL_SENTENCES.beginner));
-  const [sentenceIdx,    setSentenceIdx]    = useState(0);
-  const [phase,          setPhase]          = useState("ready"); // ready | listening | result
-  const [liveText,       setLiveText]       = useState("");
-  const [result,         setResult]         = useState(null);
-  const [scores,         setScores]         = useState([]);      // score per attempt (any sentence)
-  const [wordResults,    setWordResults]    = useState({});      // { poolIdx: percentage }
-  const [isFetching,     setIsFetching]     = useState(false);
-  const [fetchStatus,    setFetchStatus]    = useState(null);    // null | "ok" | "fallback"
-  const [noSupport,      setNoSupport]      = useState(false);
+  const [difficulty,      setDifficulty]      = useState("beginner");
+  const [pool,            setPool]            = useState(() => shuffle(LOCAL_SENTENCES.beginner));
+  const [sentenceIdx,     setSentenceIdx]     = useState(0);
+  // phase: ready | recording | analysing | result
+  const [phase,           setPhase]           = useState("ready");
+  const [result,          setResult]          = useState(null);
+  const [scores,          setScores]          = useState([]);
+  const [wordResults,     setWordResults]     = useState({});
+  const [isFetching,      setIsFetching]      = useState(false);
+  const [fetchStatus,     setFetchStatus]     = useState(null);
+  const [noMicPermission, setNoMicPermission] = useState(false);
+  const [analyseError,    setAnalyseError]    = useState(null);
 
-  const recognitionRef = useRef(null);
-  const finalRef       = useRef("");
-  const mountedRef     = useRef(true);
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef   = useRef([]);
+  const audioCtxRef      = useRef(null);
+  const analyserRef      = useRef(null);
+  const canvasRef        = useRef(null);
+  const animFrameRef     = useRef(null);
+  const mountedRef       = useRef(true);
 
-  // Stop speech recognition and TTS on unmount
   useEffect(() => {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
-      recognitionRef.current?.stop();
+      if (mediaRecorderRef.current?.state === "recording") {
+        mediaRecorderRef.current.stop();
+      }
+      cancelAnimationFrame(animFrameRef.current);
+      audioCtxRef.current?.close().catch(() => {});
       window.speechSynthesis?.cancel();
     };
   }, []);
@@ -199,19 +170,20 @@ export default function PronunciationTab({ isDarkMode }) {
     tip:     isDarkMode ? "rgba(139,92,246,0.12)" : "#faf5ff",
     tipBdr:  isDarkMode ? "#4c1d95"               : "#e9d5ff",
     progBg:  isDarkMode ? "#0f172a"               : "#f1f5f9",
+    ipaBg:   isDarkMode ? "rgba(255,255,255,0.04)" : "#f8faff",
   };
 
   // ── Text-to-speech ─────────────────────────────────────────────────────────
   const speakSentence = () => {
     if (!window.speechSynthesis) return;
     window.speechSynthesis.cancel();
-    const utt  = new SpeechSynthesisUtterance(sentence.text);
-    utt.lang   = "en-US";
-    utt.rate   = 0.82;
+    const utt = new SpeechSynthesisUtterance(sentence.text);
+    utt.lang  = "en-US";
+    utt.rate  = 0.82;
     window.speechSynthesis.speak(utt);
   };
 
-  // ── Fetch AI sentences from backend (Option 2) ─────────────────────────────
+  // ── Fetch AI sentences from backend ───────────────────────────────────────
   const fetchAISentences = useCallback(async (diff) => {
     if (!mountedRef.current) return null;
     setIsFetching(true);
@@ -231,66 +203,137 @@ export default function PronunciationTab({ isDarkMode }) {
     return null;
   }, []);
 
-  // ── Recording ──────────────────────────────────────────────────────────────
-  const startRecording = useCallback(() => {
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR) { setNoSupport(true); return; }
+  // ── Live waveform ──────────────────────────────────────────────────────────
+  const drawWaveform = useCallback((analyser) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    const bufLen = analyser.frequencyBinCount;
+    const data   = new Uint8Array(bufLen);
 
-    const rec = new SR();
-    rec.continuous     = false;
-    rec.interimResults = true;
-    rec.lang           = "en-US";
-    finalRef.current   = "";
-
-    rec.onresult = (e) => {
-      let interim = "", final = "";
-      for (let i = e.resultIndex; i < e.results.length; i++) {
-        if (e.results[i].isFinal) final += " " + e.results[i][0].transcript;
-        else interim += e.results[i][0].transcript;
+    const draw = () => {
+      animFrameRef.current = requestAnimationFrame(draw);
+      analyser.getByteTimeDomainData(data);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.lineWidth   = 2.5;
+      ctx.strokeStyle = "#ef4444";
+      ctx.beginPath();
+      const sliceW = canvas.width / bufLen;
+      let x = 0;
+      for (let i = 0; i < bufLen; i++) {
+        const v = data[i] / 128.0;
+        const y = (v * canvas.height) / 2;
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        x += sliceW;
       }
-      if (final) finalRef.current += final;
-      setLiveText((finalRef.current + " " + interim).trim());
+      ctx.lineTo(canvas.width, canvas.height / 2);
+      ctx.stroke();
     };
+    draw();
+  }, []);
 
-    rec.onend = () => {
-      const spoken = finalRef.current.trim();
-      if (spoken) {
-        const res = compareWords(sentence.text, spoken);
-        setResult(res);
-        setScores(prev => [...prev, res.percentage]);
-        setWordResults(prev => ({ ...prev, [sentenceIdx]: res.percentage }));
+  // ── Send audio to server for analysis ─────────────────────────────────────
+  const analyseAudio = useCallback(async (blob) => {
+    setAnalyseError(null);
+    try {
+      const formData = new FormData();
+      formData.append("audio", blob, "recording.webm");
+      formData.append("targetText", sentence.text);
+
+      const { data } = await api.post("/pronunciation/analyze", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
+      if (!mountedRef.current) return;
+
+      if (data.success) {
+        setResult({ percentage: data.percentage, words: data.words, transcript: data.transcript });
+        setScores(prev => [...prev, data.percentage]);
+        setWordResults(prev => ({ ...prev, [sentenceIdx]: data.percentage }));
         setPhase("result");
       } else {
+        setAnalyseError("Analysis failed. Please try again.");
         setPhase("ready");
       }
-    };
-
-    rec.onerror = (e) => { console.error("SpeechRecognition error:", e.error); setPhase("ready"); };
-
-    recognitionRef.current = rec;
-    rec.start();
-    setPhase("listening");
-    setLiveText("");
-    setResult(null);
+    } catch (err) {
+      console.error("Analysis error:", err);
+      if (mountedRef.current) {
+        setAnalyseError("Could not reach the server. Please try again.");
+        setPhase("ready");
+      }
+    }
   }, [sentence, sentenceIdx]);
 
-  const stopRecording = () => recognitionRef.current?.stop();
+  // ── Start recording ────────────────────────────────────────────────────────
+  const startRecording = useCallback(async () => {
+    setAnalyseError(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
-  // ── Next sentence — with exhaustion detection + AI fetch ──────────────────
+      // Waveform visualiser
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const source   = audioCtx.createMediaStreamSource(stream);
+      const analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 256;
+      source.connect(analyser);
+      audioCtxRef.current = audioCtx;
+      analyserRef.current = analyser;
+
+      // MediaRecorder
+      const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+        ? "audio/webm;codecs=opus"
+        : MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "";
+      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
+      audioChunksRef.current = [];
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+
+      recorder.onstop = async () => {
+        stream.getTracks().forEach(t => t.stop());
+        cancelAnimationFrame(animFrameRef.current);
+        audioCtxRef.current?.close().catch(() => {});
+
+        const blob = new Blob(audioChunksRef.current, { type: mimeType || "audio/webm" });
+        if (mountedRef.current) await analyseAudio(blob);
+      };
+
+      mediaRecorderRef.current = recorder;
+      recorder.start(100);
+      setPhase("recording");
+      setResult(null);
+
+      // Slight delay so canvas has mounted before drawing starts
+      setTimeout(() => drawWaveform(analyser), 60);
+
+    } catch (err) {
+      console.error("Microphone error:", err);
+      if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
+        setNoMicPermission(true);
+      } else {
+        setAnalyseError("Could not access microphone. Please check browser permissions.");
+      }
+    }
+  }, [analyseAudio, drawWaveform]);
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current?.state === "recording") {
+      mediaRecorderRef.current.stop();
+      setPhase("analysing");
+    }
+  };
+
+  // ── Navigation ─────────────────────────────────────────────────────────────
   const nextSentence = async () => {
     const isLast = sentenceIdx >= pool.length - 1;
-
     if (isLast) {
-      // Pool exhausted — try to get AI sentences
       const aiSentences = await fetchAISentences(difficulty);
-
       if (aiSentences) {
-        // Append AI sentences to pool and advance
         const newPool = [...pool, ...shuffle(aiSentences)];
         setPool(newPool);
         setSentenceIdx(sentenceIdx + 1);
       } else {
-        // Fallback: re-shuffle the local bank and start fresh
         setPool(shuffle([...LOCAL_SENTENCES[difficulty]]));
         setSentenceIdx(0);
         setWordResults({});
@@ -298,32 +341,30 @@ export default function PronunciationTab({ isDarkMode }) {
     } else {
       setSentenceIdx(sentenceIdx + 1);
     }
-
     setPhase("ready");
-    setLiveText("");
     setResult(null);
+    setAnalyseError(null);
   };
 
-  const tryAgain = () => { setPhase("ready"); setLiveText(""); setResult(null); };
+  const tryAgain = () => { setPhase("ready"); setResult(null); setAnalyseError(null); };
 
   const goTo = (idx) => {
     setSentenceIdx(idx);
     setPhase("ready");
-    setLiveText("");
     setResult(null);
+    setAnalyseError(null);
   };
 
-  // ── Change difficulty — reset everything ───────────────────────────────────
   const changeDifficulty = (d) => {
     setDifficulty(d);
     setPool(shuffle([...LOCAL_SENTENCES[d]]));
     setSentenceIdx(0);
     setPhase("ready");
-    setLiveText("");
     setResult(null);
     setScores([]);
     setWordResults({});
     setFetchStatus(null);
+    setAnalyseError(null);
   };
 
   // ── Derived ────────────────────────────────────────────────────────────────
@@ -343,16 +384,24 @@ export default function PronunciationTab({ isDarkMode }) {
     : result.percentage >= 55 ? "👍 Keep going!"
     : "💪 Try again!" : "";
 
-  // ── No support screen ──────────────────────────────────────────────────────
-  if (noSupport) return (
+  const ipaCards = result?.words?.filter(w => w.status !== "correct" && w.ipa) ?? [];
+
+  // ── No mic permission screen ───────────────────────────────────────────────
+  if (noMicPermission) return (
     <div style={{ textAlign: "center", padding: "60px 20px", fontFamily: "Nunito, sans-serif" }}>
-      <div style={{ fontSize: "52px", marginBottom: "16px" }}>⚠️</div>
-      <h3 style={{ color: col.heading, margin: "0 0 8px" }}>Browser Not Supported</h3>
-      <p style={{ color: col.sub }}>Please use Chrome or Edge for pronunciation practice.</p>
+      <div style={{ fontSize: "52px", marginBottom: "16px" }}>🎙️</div>
+      <h3 style={{ color: col.heading, margin: "0 0 8px" }}>Microphone Access Denied</h3>
+      <p style={{ color: col.sub, maxWidth: "340px", margin: "0 auto 20px", fontSize: "14px", lineHeight: 1.6 }}>
+        Please allow microphone access in your browser settings and reload the page to use pronunciation practice.
+      </p>
+      <button onClick={() => setNoMicPermission(false)}
+        style={{ background: "linear-gradient(135deg,#f97316,#fb923c)", border: "none", borderRadius: "12px", padding: "10px 24px", color: "#fff", fontWeight: 800, cursor: "pointer", fontFamily: "Nunito, sans-serif", fontSize: "14px" }}>
+        Try Again
+      </button>
     </div>
   );
 
-  // ── Loading screen (fetching AI sentences) ─────────────────────────────────
+  // ── AI sentence loading screen ─────────────────────────────────────────────
   if (isFetching) return (
     <div style={{ textAlign: "center", padding: "60px 20px", fontFamily: "Nunito, sans-serif" }}>
       <div style={{ fontSize: "52px", marginBottom: "16px", animation: "spin 1.2s linear infinite", display: "inline-block" }}>✨</div>
@@ -371,11 +420,11 @@ export default function PronunciationTab({ isDarkMode }) {
           🎤 Pronunciation Practice
         </h2>
         <p style={{ margin: "6px 0 0", color: col.sub, fontSize: "14px" }}>
-          Read the sentence aloud and get instant word-by-word feedback
+          Record yourself and get phoneme-level feedback powered by AI
         </p>
       </div>
 
-      {/* ── AI fetch status banner ─────────────────────────────────────────── */}
+      {/* ── Status banners ────────────────────────────────────────────────── */}
       {fetchStatus === "ok" && (
         <div style={{ background: "rgba(34,197,94,0.12)", border: "2px solid rgba(34,197,94,0.35)", borderRadius: "12px", padding: "10px 16px", color: "#15803d", fontWeight: 700, fontSize: "13px", textAlign: "center" }}>
           ✨ New AI-generated sentences added to your practice pool!
@@ -384,6 +433,11 @@ export default function PronunciationTab({ isDarkMode }) {
       {fetchStatus === "fallback" && (
         <div style={{ background: "rgba(249,115,22,0.1)", border: "2px solid rgba(249,115,22,0.3)", borderRadius: "12px", padding: "10px 16px", color: "#c2410c", fontWeight: 700, fontSize: "13px", textAlign: "center" }}>
           📚 Restarting with a fresh shuffle of your sentence bank
+        </div>
+      )}
+      {analyseError && (
+        <div style={{ background: "rgba(239,68,68,0.1)", border: "2px solid rgba(239,68,68,0.3)", borderRadius: "12px", padding: "10px 16px", color: "#dc2626", fontWeight: 700, fontSize: "13px", textAlign: "center" }}>
+          ⚠️ {analyseError}
         </div>
       )}
 
@@ -442,8 +496,8 @@ export default function PronunciationTab({ isDarkMode }) {
           {sentence.focus}
         </div>
 
-        {/* Sentence — plain or word-coloured after result */}
-        <div style={{ fontSize: "26px", fontWeight: 800, lineHeight: 1.7, color: col.heading, marginBottom: "20px", minHeight: "70px" }}>
+        {/* Sentence text — plain or word-coloured after result */}
+        <div style={{ fontSize: "24px", fontWeight: 800, lineHeight: 1.7, color: col.heading, marginBottom: "20px", minHeight: "70px" }}>
           {result ? (
             result.words.map((w, i) => {
               const s = STATUS[w.status];
@@ -466,6 +520,13 @@ export default function PronunciationTab({ isDarkMode }) {
           )}
         </div>
 
+        {/* Whisper transcript */}
+        {result?.transcript && (
+          <div style={{ background: isDarkMode ? "rgba(59,130,246,0.10)" : "#eff6ff", border: "1.5px solid rgba(59,130,246,0.3)", borderRadius: "10px", padding: "8px 14px", marginBottom: "16px", fontSize: "13px", color: isDarkMode ? "#93c5fd" : "#1d4ed8", fontWeight: 600 }}>
+            AI heard: "{result.transcript}"
+          </div>
+        )}
+
         {/* Hear button */}
         <button onClick={speakSentence} style={{ background: "transparent", border: `2px solid ${col.border}`, borderRadius: "12px", padding: "7px 18px", color: col.body, cursor: "pointer", fontFamily: "Nunito, sans-serif", fontSize: "13px", fontWeight: 700, marginBottom: "28px" }}>
           🔊 Hear correct pronunciation
@@ -484,19 +545,28 @@ export default function PronunciationTab({ isDarkMode }) {
           </div>
         )}
 
-        {/* ── LISTENING ─────────────────────────────────────────────────────── */}
-        {phase === "listening" && (
+        {/* ── RECORDING ─────────────────────────────────────────────────────── */}
+        {phase === "recording" && (
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "14px" }}>
+            <canvas
+              ref={canvasRef}
+              width={320} height={56}
+              style={{ borderRadius: "10px", background: isDarkMode ? "rgba(239,68,68,0.06)" : "#fff5f5", border: "2px solid rgba(239,68,68,0.22)", display: "block" }}
+            />
             <div style={{ position: "relative", width: "84px", height: "84px" }}>
               <div style={{ position: "absolute", inset: "-8px", borderRadius: "50%", border: "3px solid rgba(239,68,68,0.35)", animation: "ping 1.4s cubic-bezier(0,0,0.2,1) infinite" }} />
               <button onClick={stopRecording} style={{ width: "84px", height: "84px", borderRadius: "50%", background: "linear-gradient(135deg,#ef4444,#f87171)", border: "none", fontSize: "28px", cursor: "pointer", boxShadow: "0 6px 20px rgba(239,68,68,0.45)" }}>⏹️</button>
             </div>
-            <div style={{ color: "#ef4444", fontWeight: 800, fontSize: "14px" }}>🔴 Recording… speak clearly, then tap to stop</div>
-            {liveText && (
-              <div style={{ background: isDarkMode ? "rgba(59,130,246,0.12)" : "#eff6ff", border: "2px solid rgba(59,130,246,0.4)", borderRadius: "12px", padding: "12px 20px", color: "#3b82f6", fontSize: "15px", fontWeight: 700, maxWidth: "440px", width: "100%" }}>
-                "{liveText}"
-              </div>
-            )}
+            <div style={{ color: "#ef4444", fontWeight: 800, fontSize: "14px" }}>🔴 Recording… tap stop when you're done</div>
+          </div>
+        )}
+
+        {/* ── ANALYSING ─────────────────────────────────────────────────────── */}
+        {phase === "analysing" && (
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "14px" }}>
+            <div style={{ fontSize: "48px", animation: "spin 1s linear infinite", display: "inline-block" }}>✨</div>
+            <div style={{ color: col.body, fontWeight: 800, fontSize: "15px" }}>Analysing your pronunciation…</div>
+            <div style={{ color: col.sub, fontSize: "12px" }}>Powered by OpenAI Whisper</div>
           </div>
         )}
 
@@ -517,7 +587,7 @@ export default function PronunciationTab({ isDarkMode }) {
               ))}
             </div>
 
-            {/* Actions */}
+            {/* Action buttons */}
             <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", justifyContent: "center" }}>
               <button onClick={speakSentence} style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: "12px", padding: "10px 18px", color: col.body, cursor: "pointer", fontWeight: 800, fontFamily: "Nunito, sans-serif", fontSize: "14px" }}>🔊 Hear it again</button>
               <button onClick={tryAgain}      style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: "12px", padding: "10px 18px", color: col.body, cursor: "pointer", fontWeight: 800, fontFamily: "Nunito, sans-serif", fontSize: "14px" }}>🔄 Try Again</button>
@@ -525,11 +595,39 @@ export default function PronunciationTab({ isDarkMode }) {
                 {sentenceIdx >= pool.length - 1 ? "✨ Get New Sentences" : "Next Sentence →"}
               </button>
             </div>
+
+            {/* IPA correction cards */}
+            {ipaCards.length > 0 && (
+              <div style={{ width: "100%", maxWidth: "480px", textAlign: "left" }}>
+                <div style={{ fontSize: "12px", fontWeight: 800, color: col.sub, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "10px" }}>
+                  🔤 Pronunciation Guide
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                  {ipaCards.map((w, i) => {
+                    const s = STATUS[w.status];
+                    return (
+                      <div key={i} style={{ background: col.ipaBg, border: `2px solid ${s.border}`, borderRadius: "12px", padding: "12px 14px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap", marginBottom: w.tip ? "6px" : 0 }}>
+                          <span style={{ fontWeight: 900, fontSize: "16px", color: s.color }}>{w.expected}</span>
+                          <span style={{ fontSize: "15px", color: col.body, fontFamily: "'Courier New', monospace", fontWeight: 700 }}>{w.ipa}</span>
+                          {w.spoken && (
+                            <span style={{ fontSize: "12px", color: col.sub }}>you said: "<em>{w.spoken}</em>"</span>
+                          )}
+                        </div>
+                        {w.tip && (
+                          <p style={{ margin: 0, fontSize: "12px", color: col.body, lineHeight: 1.55 }}>{w.tip}</p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
 
-      {/* ── Dot navigation (max 20 dots, then just shows progress bar above) ── */}
+      {/* ── Dot navigation ────────────────────────────────────────────────── */}
       {pool.length <= 20 && (
         <div style={{ display: "flex", gap: "8px", justifyContent: "center", flexWrap: "wrap" }}>
           {pool.map((_, i) => {
@@ -557,13 +655,14 @@ export default function PronunciationTab({ isDarkMode }) {
           <li>Tap <strong>🔊 Hear it</strong> first to learn the correct rhythm and sounds</li>
           <li>Speak at a <strong>natural pace</strong> — not too fast, not too slow</li>
           <li><strong>Yellow</strong> words were almost right — small improvement needed</li>
-          <li>When you finish all sentences, AI generates a brand-new set for you</li>
-          <li>Works best in <strong>Chrome or Edge</strong> — Safari has limited support</li>
+          <li>The <strong>🔤 Pronunciation Guide</strong> shows IPA and tips for each missed word</li>
+          <li>Works best in <strong>Chrome or Edge</strong> — Safari may have limited support</li>
         </ul>
       </div>
 
       <style>{`
         @keyframes ping { 75%, 100% { transform: scale(1.5); opacity: 0; } }
+        @keyframes spin { to { transform: rotate(360deg); } }
       `}</style>
     </div>
   );

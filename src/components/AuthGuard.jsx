@@ -59,8 +59,7 @@ export default function AuthGuard({ role, children }) {
           }
 
           try {
-            api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-            await api.get(cfg.verifyPath);
+            await api.get(cfg.verifyPath, { headers: { Authorization: `Bearer ${token}` } });
             if (!cancelled) setStatus('ok');
             return;
           } catch {
@@ -98,10 +97,11 @@ export default function AuthGuard({ role, children }) {
         return;
       }
 
-      // All others: verify with backend
+      // All others: verify with backend.
+      // Pass token per-request (not via defaults) so a concurrent teacher/student
+      // session in the api interceptor cannot shadow it.
       try {
-        api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-        await api.get(cfg.verifyPath);
+        await api.get(cfg.verifyPath, { headers: { Authorization: `Bearer ${token}` } });
         if (!cancelled) setStatus('ok');
       } catch {
         clearTokens(cfg);

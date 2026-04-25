@@ -7,12 +7,16 @@ import {
 } from "react-router-dom";
 
 // Auth guard — single component for all roles
-import ActiveClassBanner from "./components/ActiveClassBanner";
-import AuthGuard         from "./components/AuthGuard";
+import ActiveClassBanner  from "./components/ActiveClassBanner";
+import AuthGuard          from "./components/AuthGuard";
+import { RingProvider }   from "./context/RingContext";
+import IncomingRingModal  from "./components/ring/IncomingRingModal";
 
 // Login pages — small, load fast, keep static
 import SuperAdminLogin     from "./pages/super-admin/SuperAdminLogin";
 import AdminLogin          from "./pages/admin/AdminLogin";
+import ParentLogin         from "./pages/parent/ParentLogin";
+import ParentSetup         from "./pages/parent/ParentSetup";
 import AdminResetPassword  from "./pages/admin/AdminResetPassword";
 import SubAdminLogin       from "./pages/sub-admin/SubAdminLogin";
 import TeacherLogin        from "./pages/teacher/TeacherLogin";
@@ -33,6 +37,7 @@ const StudentForgotPassword = lazy(() => import("./pages/student/ForgotPassword"
 const StudentResetPassword  = lazy(() => import("./pages/student/ResetPassword"));
 const Classroom           = lazy(() => import("./pages/Classroom"));
 const Join                = lazy(() => import("./pages/Join"));
+const ParentDashboard     = lazy(() => import("./pages/parent/ParentDashboard"));
 
 // Full-screen spinner shown while a lazy chunk loads
 function PageLoader() {
@@ -61,6 +66,7 @@ const HIDE_NAV_ON = [
   "/teacher/dashboard",
   "/student/dashboard",
   "/super-admin/dashboard",
+  "/parent/dashboard",
 ];
 
 function NavigationButtons() {
@@ -72,6 +78,7 @@ function NavigationButtons() {
   const [isAdminLoggedIn,    setIsAdminLoggedIn]    = useState(false);
   const [isTeacherLoggedIn,  setIsTeacherLoggedIn]  = useState(false);
   const [isStudentLoggedIn,  setIsStudentLoggedIn]  = useState(false);
+  const [isParentLoggedIn,   setIsParentLoggedIn]   = useState(false);
   const [isSubAdminLoggedIn, setIsSubAdminLoggedIn] = useState(false);
   const [installPrompt,      setInstallPrompt]      = useState(null);
   const [installed,          setInstalled]          = useState(false);
@@ -83,6 +90,7 @@ function NavigationButtons() {
     setIsTeacherLoggedIn(get("teacherToken"));
     setIsStudentLoggedIn(get("studentToken"));
     setIsSubAdminLoggedIn(get("subAdminToken"));
+    setIsParentLoggedIn(get("parentToken"));
   }, [location]);
 
   // Capture the PWA install prompt
@@ -104,7 +112,8 @@ function NavigationButtons() {
     path === "/admin" ||   // exact match — /admin/login must NOT be hidden
     HIDE_NAV_ON.some((p) => path.startsWith(p)) ||
     path.startsWith("/teacher/reset-password") ||
-    path.startsWith("/student/reset-password");
+    path.startsWith("/student/reset-password") ||
+    path.startsWith("/parent/setup");
 
   if (shouldHide) return null;
 
@@ -220,6 +229,15 @@ function NavigationButtons() {
             </>
           ) : (
             <NavBtn onClick={() => navigate("/student/login")} active={path === "/student/login"} color="#059669" bg="#d1fae5">Student</NavBtn>
+          )}
+
+          {isParentLoggedIn ? (
+            <>
+              <NavBtn onClick={() => navigate("/parent/dashboard")} active={path === "/parent/dashboard"} color="#f97316" bg="#fff7ed">Parent ↗</NavBtn>
+              <NavBtn onClick={() => logout(["parentToken","parentInfo"], setIsParentLoggedIn, "/parent/login")} color="#ef4444" bg="#fef2f2">Logout</NavBtn>
+            </>
+          ) : (
+            <NavBtn onClick={() => navigate("/parent/login")} active={path === "/parent/login"} color="#f97316" bg="#fff7ed">Parent</NavBtn>
           )}
         </div>
 
@@ -344,10 +362,12 @@ function App() {
     <AuthProvider>
     <BrandingProvider>
       <Router>
+      <RingProvider>
       <div className="min-h-screen">
         <ImpersonationBanner />
         <ActiveClassBanner />
         <NavigationButtons />
+        <IncomingRingModal />
         <Suspense fallback={<PageLoader />}>
           <Routes>
             <Route path="/" element={<Navigate to="/admin/login" replace />} />
@@ -377,12 +397,17 @@ function App() {
             <Route path="/student/dashboard"             element={<AuthGuard role="student"><StudentDashboard /></AuthGuard>} />
             <Route path="/student/setup"                 element={<StudentSetup />} />
 
+            <Route path="/parent/login"              element={<ParentLogin />} />
+            <Route path="/parent/setup/:token"      element={<ParentSetup />} />
+            <Route path="/parent/dashboard"         element={<AuthGuard role="parent"><ParentDashboard /></AuthGuard>} />
+
             <Route path="/join" element={<Join />} />
 
             <Route path="*" element={<Navigate to="/admin/login" replace />} />
           </Routes>
         </Suspense>
       </div>
+      </RingProvider>
     </Router>
     </BrandingProvider>
     </AuthProvider>

@@ -1,10 +1,12 @@
 import express from "express";
+import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
 import { verifyToken } from "../middleware/authMiddleware.js";
 import { callGemini } from "../utils/geminiHelper.js";
 import logger from "../utils/logger.js";
 import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
 
 const router = express.Router();
+router.use(tenantMiddleware);
 
 // POST /api/grammar/check
 router.post("/check", verifyToken, async (req, res) => {

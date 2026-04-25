@@ -49,10 +49,15 @@ export const teacherSchema = new mongoose.Schema({
   bankName:      { type: String, default: "", set: encryptField, get: decryptField },
   accountNumber: { type: String, default: "", set: encryptField, get: decryptField },
   accountName:   { type: String, default: "", set: encryptField, get: decryptField },
+
+  // ── Ring / attention-call preference ────────────────────────────────────────
+  ringEnabled: { type: Boolean, default: true },  // false = do not ring this teacher
 }, { timestamps: true, toJSON: { getters: true }, toObject: { getters: true } });
 
 // Lookup by status (admin lists active/pending/suspended teachers)
 teacherSchema.index({ status: 1 });
+// Sub-admin region scope filter (MT-3): find teachers by continent
+teacherSchema.index({ continent: 1 });
 // Analytics overview: countDocuments({ active: true })
 teacherSchema.index({ active: 1 });
 // Analytics overview: $match { earned: { $gt: 0 } } for pending payments

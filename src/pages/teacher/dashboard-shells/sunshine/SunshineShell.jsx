@@ -3,11 +3,12 @@
 // Warm amber/orange palette · rounded cards · Nunito font · grouped sidebar nav.
 // Mirrors the student SunshineShell pattern, adapted for teacher content.
 
-import React, { useState } from 'react';
+import React, { useState, lazy, Suspense } from 'react';
+const GroupClassesTab = lazy(() => import('../../tabs/GroupClassesTab'));
 import {
-  Home, Calendar, CheckCircle, Users, BookOpen, MessageCircle,
-  DollarSign, GraduationCap, Film, Star, User, CalendarDays,
-  Settings, LogOut, Plus, Repeat, RefreshCw, Video, Bell,
+  Home, Calendar, CheckCircle2, Users, BookOpen, MessageCircle,
+  DollarSign, Star, User, CalendarDays, FileText, Layers, ClipboardList,
+  Settings, LogOut, Plus, RefreshCw, Video, Bell,
 } from 'lucide-react';
 import { useBranding }              from '../../../../context/BrandingContext';
 import { useTeacherDashboardData }  from '../useTeacherDashboardData';
@@ -32,9 +33,9 @@ const palette = (dark) => ({
   card:     dark ? '#1a1d2e' : '#ffffff',
   cardAlt:  dark ? '#1f2235' : '#fffbf5',
   border:   dark ? '#2a2d40' : '#ffe8cc',
-  heading:  dark ? '#f0f4ff' : '#2d1f6e',
-  body:     dark ? '#c8cce0' : '#4a4060',
-  muted:    dark ? '#6b7090' : '#9b8ab0',
+  heading:  dark ? '#f0f4ff' : '#3d2e20',
+  body:     dark ? '#c8cce0' : '#5a4a3a',
+  muted:    dark ? '#6b7090' : '#a89480',
   accent:   dark ? '#fbbf24' : '#f97316',
   sidebar:  dark ? '#13111a' : '#ffffff',
 });
@@ -43,39 +44,40 @@ const palette = (dark) => ({
 const NAV_GROUPS = [
   {
     label: null,
-    items: [{ key: 'dashboard', icon: '🏠', label: 'Dashboard' }],
+    items: [{ key: 'dashboard', icon: '🏠', label: 'Dashboard', lucide: Home }],
   },
   {
     label: 'Teaching',
     items: [
-      { key: 'classes',           icon: '📅', label: 'My Classes'  },
-      { key: 'completed-classes', icon: '✅', label: 'Completed'   },
-      { key: 'schedule',          icon: '🗓️', label: 'Schedule'    },
+      { key: 'classes',           icon: '📅', label: 'My Classes',    lucide: CalendarDays  },
+      { key: 'group-classes',     icon: '👥', label: 'Group Classes', lucide: Users         },
+      { key: 'completed-classes', icon: '✅', label: 'Completed',     lucide: CheckCircle2  },
+      { key: 'schedule',          icon: '🗓️', label: 'Schedule',      lucide: Calendar      },
     ],
   },
   {
     label: 'Students',
     items: [
-      { key: 'students', icon: '👥', label: 'Students' },
-      { key: 'bookings', icon: '📖', label: 'Bookings'  },
+      { key: 'students', icon: '👥', label: 'Students', lucide: Users         },
+      { key: 'bookings', icon: '📖', label: 'Bookings',  lucide: ClipboardList },
     ],
   },
   {
     label: 'Content',
     items: [
-      { key: 'homework',    icon: '📚', label: 'Homework'   },
-      { key: 'quiz',        icon: '📝', label: 'Quizzes'    },
-      { key: 'vocab',       icon: '📒', label: 'Vocabulary' },
+      { key: 'homework',    icon: '📚', label: 'Homework',   lucide: BookOpen  },
+      { key: 'quiz',        icon: '📝', label: 'Quizzes',    lucide: FileText  },
+      { key: 'vocab',       icon: '📒', label: 'Vocabulary', lucide: Layers    },
     ],
   },
   {
     label: 'More',
     items: [
-      { key: 'messages',   icon: '💬', label: 'Messages'   },
-      { key: 'payment',    icon: '💰', label: 'Payment'    },
-      { key: 'recordings', icon: '🎬', label: 'Recordings' },
-      { key: 'reviews',    icon: '⭐', label: 'Reviews'    },
-      { key: 'profile',    icon: '👤', label: 'Profile'    },
+      { key: 'messages',   icon: '💬', label: 'Messages',   lucide: MessageCircle },
+      { key: 'payment',    icon: '💰', label: 'Payment',    lucide: DollarSign    },
+      { key: 'recordings', icon: '🎬', label: 'Recordings', lucide: Video         },
+      { key: 'reviews',    icon: '⭐', label: 'Reviews',    lucide: Star          },
+      { key: 'profile',    icon: '👤', label: 'Profile',    lucide: User          },
     ],
   },
 ];
@@ -194,7 +196,7 @@ export default function SunshineShell() {
                       borderLeft: isActive ? `3px solid ${col.accent}` : '3px solid transparent',
                       marginBottom: 1,
                     }}>
-                    <span style={{ fontSize: 16, lineHeight: 1, flexShrink: 0 }}>{item.icon}</span>
+                    {(() => { const LI = item.lucide; return <LI size={17} strokeWidth={1.8} color={isActive ? col.accent : col.body} style={{ flexShrink: 0 }} />; })()}
                     <span style={{ flex: 1, fontSize: 13, fontWeight: isActive ? 800 : 600, color: isActive ? col.accent : col.body }}>
                       {item.label}
                     </span>
@@ -284,34 +286,46 @@ export default function SunshineShell() {
           {d.activeTab === 'dashboard' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
-              {/* Welcome banner */}
-              <div className="ts-card" style={{ background: 'linear-gradient(135deg,#f97316,#ec4899,#8b5cf6)', borderRadius: 28, padding: '28px 32px', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 20, boxShadow: '0 12px 40px rgba(249,115,22,0.3)' }}>
-                <div>
-                  <p style={{ margin: '0 0 4px', fontSize: 12, fontWeight: 700, opacity: 0.85, letterSpacing: '.06em', textTransform: 'uppercase' }}>Welcome back 🎉</p>
-                  <h1 style={{ margin: '0 0 8px', fontSize: 26, fontWeight: 900, fontFamily: F }}>Hey, {d.teacherInfo?.firstName}! 👋</h1>
-                  <p style={{ margin: 0, opacity: 0.9, fontSize: 15 }}>
-                    You have <strong>{d.students.length}</strong> students,{' '}
-                    <strong>{d.classes.length}</strong> scheduled classes,{' '}
-                    and <strong>{d.pendingBookings}</strong> pending bookings.
-                  </p>
+              {/* Welcome hero */}
+              <div style={{ background: 'linear-gradient(135deg,#f97316 0%,#f43f5e 100%)', borderRadius: 28, padding: '28px 32px', color: '#fff', position: 'relative', overflow: 'hidden', boxShadow: '0 12px 40px rgba(249,115,22,0.3)' }}>
+                <div style={{ position: 'absolute', top: -30, right: -30, width: 160, height: 160, borderRadius: '50%', background: 'rgba(255,255,255,0.07)' }} />
+                <div style={{ position: 'absolute', bottom: -20, right: 60, width: 100, height: 100, borderRadius: '50%', background: 'rgba(255,255,255,0.05)' }} />
+                <div style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 20 }}>
+                  <div>
+                    <p style={{ margin: '0 0 4px', fontSize: 12, fontWeight: 700, opacity: 0.85, letterSpacing: '.08em', textTransform: 'uppercase' }}>Welcome back 🎉</p>
+                    <h1 style={{ margin: '0 0 10px', fontSize: 26, fontWeight: 900, fontFamily: F }}>Hey, {d.teacherInfo?.firstName}! 👋</h1>
+                    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                      <span style={{ background: 'rgba(255,255,255,0.2)', borderRadius: 999, padding: '4px 12px', fontSize: 13, fontWeight: 700 }}>
+                        👥 {d.students.length} students
+                      </span>
+                      <span style={{ background: 'rgba(255,255,255,0.2)', borderRadius: 999, padding: '4px 12px', fontSize: 13, fontWeight: 700 }}>
+                        📅 {d.classes.length} classes
+                      </span>
+                      {d.pendingBookings > 0 && (
+                        <span style={{ background: 'rgba(255,255,255,0.25)', borderRadius: 999, padding: '4px 12px', fontSize: 13, fontWeight: 700 }}>
+                          🔔 {d.pendingBookings} pending
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 64, flexShrink: 0, filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.2))' }}>👨‍🏫</div>
                 </div>
-                <div style={{ fontSize: 72, flexShrink: 0 }}>👨‍🏫</div>
               </div>
 
-              {/* Stat cards */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(148px,1fr))', gap: 12 }}>
+              {/* 4-stat strip */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
                 {[
-                  { icon: '👥', label: 'Students',   value: d.students.length,       color: '#8b5cf6', bg: d.isDarkMode ? 'rgba(139,92,246,0.12)'  : '#f5f3ff' },
-                  { icon: '📅', label: 'Classes',    value: d.classes.length,         color: '#3b82f6', bg: d.isDarkMode ? 'rgba(59,130,246,0.12)'  : '#eff6ff' },
-                  { icon: '✅', label: 'Completed',  value: d.completedCount,         color: '#10b981', bg: d.isDarkMode ? 'rgba(16,185,129,0.12)'  : '#f0fdf4' },
-                  { icon: '🔔', label: 'Bookings',   value: d.pendingBookings,        color: '#f59e0b', bg: d.isDarkMode ? 'rgba(245,158,11,0.12)'  : '#fffbeb' },
-                  { icon: '📚', label: 'To Grade',   value: d.homeworkToGrade,        color: '#ec4899', bg: d.isDarkMode ? 'rgba(236,72,153,0.12)'  : '#fdf2f8' },
-                  { icon: '📝', label: 'Quiz Done',  value: d.quizAttempted,          color: '#f97316', bg: d.isDarkMode ? 'rgba(249,115,22,0.12)'  : '#fff7ed' },
-                ].map(({ icon, label, value, color, bg }) => (
-                  <div key={label} className="ts-card" style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: 20, padding: '18px 16px', textAlign: 'center', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
-                    <div style={{ width: 44, height: 44, borderRadius: 14, background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 10px', fontSize: 22 }}>{icon}</div>
-                    <div style={{ fontSize: 26, fontWeight: 900, color, marginBottom: 4 }}>{value}</div>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: col.muted, textTransform: 'uppercase', letterSpacing: '.04em' }}>{label}</div>
+                  { lucide: Users,        n: d.students.length,  l: 'Students',    grad: 'linear-gradient(135deg,#f97316,#fb923c)' },
+                  { lucide: CalendarDays, n: d.classes.length,   l: 'Classes',     grad: 'linear-gradient(135deg,#f97316,#f43f5e)' },
+                  { lucide: CheckCircle2, n: d.completedCount,   l: 'Completed',   grad: 'linear-gradient(135deg,#10b981,#34d399)' },
+                  { lucide: BookOpen,     n: d.homeworkToGrade,  l: 'To Grade',    grad: 'linear-gradient(135deg,#f43f5e,#fb7185)' },
+                ].map(({ lucide: LI, n, l, grad }) => (
+                  <div key={l} className="ts-card" style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: 20, padding: '16px', textAlign: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+                    <div style={{ width: 44, height: 44, borderRadius: 14, background: grad, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 10px', boxShadow: '0 4px 10px rgba(249,115,22,0.25)' }}>
+                      <LI size={20} color="#fff" strokeWidth={2} />
+                    </div>
+                    <div style={{ fontSize: 26, fontWeight: 900, color: col.heading, marginBottom: 2, fontFamily: F }}>{n}</div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: col.muted, textTransform: 'uppercase', letterSpacing: '.05em' }}>{l}</div>
                   </div>
                 ))}
               </div>
@@ -425,8 +439,17 @@ export default function SunshineShell() {
             </div>
           )}
 
+          {/* ══ GROUP CLASSES TAB ══ */}
+          {d.activeTab === 'group-classes' && (
+            <TabErrorBoundary key="group-classes">
+              <Suspense fallback={null}>
+                <GroupClassesTab isDarkMode={d.isDarkMode} />
+              </Suspense>
+            </TabErrorBoundary>
+          )}
+
           {/* ══ OTHER TABS ══ */}
-          {d.activeTab !== 'dashboard' && (
+          {d.activeTab !== 'dashboard' && d.activeTab !== 'group-classes' && (
             <TabErrorBoundary key={d.activeTab}>
               <TeacherTabContent
                 d={d}

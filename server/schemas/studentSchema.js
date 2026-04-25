@@ -48,6 +48,9 @@ export const studentSchema = new mongoose.Schema({
   longestWeeklyClassStreak: { type: Number, default: 0 },
   lastClassWeek:            { type: String, default: null }, // e.g. "2026-W13"
   activityDates:            { type: [Date], default: [] },   // last 30 active days (for 7-day dots)
+
+  // ── Ring / attention-call preference ────────────────────────────────────────
+  ringEnabled: { type: Boolean, default: true },  // false = do not ring this student
 }, { timestamps: true });
 
 // Lookup by status (admin lists active/pending/suspended students)
