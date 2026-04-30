@@ -283,6 +283,71 @@ export const sendSubAdminWelcomeEmail = async (subAdmin, centerName = "") => {
   });
 };
 
+export const sendSubAdminForgotPasswordEmail = async (subAdmin, resetToken, center = null, centerName = "") => {
+  const { baseUrl, needsSlug } = getCenterBaseUrl(center);
+  const centerSlug  = typeof center === "string" ? center : center?.slug;
+  const centerParam = needsSlug && centerSlug ? `?center=${centerSlug}` : "";
+  const resetUrl    = `${baseUrl}/sub-admin/reset-password/${resetToken}${centerParam}`;
+  const name        = `${subAdmin.firstName} ${subAdmin.lastName}`;
+
+  return sendEmail({
+    centerName,
+    to: subAdmin.email,
+    subject: "Sub-Admin Password Reset Request",
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8" />
+        <style>
+          * { box-sizing: border-box; margin: 0; padding: 0; }
+          body { font-family: 'Segoe UI', Arial, sans-serif; background: #f0f4ff; padding: 40px 20px; }
+          .wrapper { max-width: 580px; margin: 0 auto; }
+          .card { background: white; border-radius: 20px; overflow: hidden; box-shadow: 0 8px 40px rgba(79,99,210,0.12); }
+          .header { background: linear-gradient(135deg, #1e2540 0%, #2d3a6e 100%); padding: 36px; text-align: center; }
+          .logo-ring { width: 64px; height: 64px; background: linear-gradient(135deg, #4f63d2, #6b82f0); border-radius: 18px; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 14px; font-size: 28px; }
+          .header h1 { color: white; font-size: 20px; font-weight: 700; }
+          .header p { color: rgba(255,255,255,0.55); font-size: 13px; margin-top: 4px; }
+          .body { padding: 36px; }
+          .greeting { font-size: 16px; font-weight: 600; color: #1e293b; margin-bottom: 12px; }
+          .text { font-size: 14px; color: #64748b; line-height: 1.7; margin-bottom: 12px; }
+          .cta-btn { display: block; padding: 16px; background: linear-gradient(135deg, #4f63d2, #6b82f0); color: white !important; text-decoration: none; border-radius: 14px; text-align: center; font-size: 15px; font-weight: 700; margin: 24px 0 12px; }
+          .expiry { text-align: center; font-size: 12px; color: #94a3b8; margin-bottom: 20px; }
+          .warning-box { background: #fef9c3; border: 1px solid #fde68a; border-radius: 12px; padding: 12px 16px; font-size: 13px; color: #92400e; margin-bottom: 20px; }
+          .link-fallback { word-break: break-all; font-size: 12px; color: #4f63d2; }
+          .footer { background: #f8faff; border-top: 1px solid #e8ecf8; padding: 18px 36px; text-align: center; font-size: 12px; color: #94a3b8; }
+        </style>
+      </head>
+      <body>
+        <div class="wrapper">
+          <div class="card">
+            <div class="header">
+              <div class="logo-ring">🔐</div>
+              <h1>Password Reset Request</h1>
+              <p>Sub-Admin Portal · ${centerName || config.appName}</p>
+            </div>
+            <div class="body">
+              <p class="greeting">Hi ${name},</p>
+              <p class="text">We received a request to reset the password for your sub-admin account. Click the button below to set a new password.</p>
+              <a href="${resetUrl}" class="cta-btn">🔑 Reset My Password</a>
+              <p class="expiry">⏰ This link expires in 1 hour</p>
+              <div class="warning-box">⚠️ If you did not request a password reset, please ignore this email. Your password will remain unchanged.</div>
+              <p class="text" style="font-size: 12.5px; color: #94a3b8;">
+                If the button above doesn't work, copy and paste this link:<br />
+                <a href="${resetUrl}" class="link-fallback">${resetUrl}</a>
+              </p>
+            </div>
+            <div class="footer">
+              <p>Automated message from <strong>${centerName || config.appName}</strong> · Do not reply</p>
+            </div>
+          </div>
+        </div>
+      </body>
+      </html>
+    `,
+  });
+};
+
 export const sendTeacherInviteEmail = async (teacher, setupUrl, centerName = "") => {
   const displayName = centerName || config.appName;
 

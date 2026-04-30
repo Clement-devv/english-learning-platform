@@ -14,10 +14,11 @@ import {
   Home, BookOpen, FileText, Layers, Mic2, MessageSquare, MessageCircle,
   CheckCircle2, CalendarDays, TrendingUp, Award, Users,
   Video, Star, Gift, Settings, LogOut, Bell, ChevronDown, ChevronRight,
-  Moon, Sun, Shield, KeyRound,
+  Moon, Sun, Shield, KeyRound, PhoneMissed, X,
 } from "lucide-react";
 import { useBranding }           from "../../../../context/BrandingContext";
 import { getDashboardThemeById } from "../../../../data/dashboardThemes";
+import { useRing }               from "../../../../context/RingContext";
 import ActiveClasses     from "../../components/ActiveClasses";
 import UpcomingClasses   from "../../components/UpcomingClasses";
 import ProgressCard      from "../../components/ProgressCard";
@@ -39,6 +40,7 @@ import FlashcardsTab       from "../../tabs/FlashcardsTab";
 import RecordingsTab       from "../../tabs/RecordingsTab";
 import ReviewsTab          from "../../tabs/ReviewsTab";
 import ReferralTab         from "../../tabs/ReferralTab";
+import LeaderboardTab      from "../../tabs/LeaderboardTab";
 import StreakWidget        from "../../components/StreakWidget";
 import { useDashboardData, BADGE_DEFINITIONS } from "../useDashboardData";
 
@@ -79,6 +81,7 @@ const NAV_GROUPS = [
       { key: "charts",       icon: "📊", label: "Charts",       lucide: TrendingUp },
       { key: "badges",       icon: "🏅", label: "Badges",       lucide: Award      },
       { key: "certificates", icon: "🎓", label: "Certificates", lucide: Award      },
+      { key: "leaderboard",  icon: "🏆", label: "Leaderboard",  lucide: Award      },
     ],
   },
   {
@@ -216,6 +219,7 @@ export default function SunshineShell() {
   const { branding, center } = useBranding();
   const dashTheme = getDashboardThemeById(branding.dashboardTheme);
   const d   = useDashboardData();
+  const { missedCalls, missedCallCount, clearMissedCalls } = useRing();
   const col = dashTheme.palette(d.isDarkMode);
   const F   = `'${dashTheme.font}',sans-serif`;
   const tooltipStyle = { backgroundColor: d.isDarkMode ? "#1a1d2e" : "#fff", border: `1px solid ${col.border}`, color: col.heading, borderRadius: "12px", fontFamily: F };
@@ -325,6 +329,7 @@ export default function SunshineShell() {
                             : item.key === "quiz"     && d.quizPending > 0     ? d.quizPending
                             : item.key === "badges"   ? (d.badges.length > 0 ? d.badges.length : null)
                             : item.key === "completed-classes" ? (d.completedClasses.length > 0 ? d.completedClasses.length : null)
+                            : item.key === "messages" && missedCallCount > 0   ? missedCallCount
                             : null;
                 return (
                   <button key={item.key} className="ss-navitem"
@@ -459,16 +464,53 @@ export default function SunshineShell() {
                 </div>
               </div>
 
+              {/* Missed calls alert */}
+              {missedCallCount > 0 && (
+                <div style={{ background: d.isDarkMode ? "rgba(239,68,68,0.1)" : "#fff5f5", border: `2px solid ${d.isDarkMode ? "rgba(239,68,68,0.3)" : "#fecaca"}`, borderRadius: 20, padding: "16px 20px", display: "flex", gap: 16, alignItems: "flex-start" }}>
+                  <div style={{ width: 44, height: 44, borderRadius: 14, background: "linear-gradient(135deg,#ef4444,#dc2626)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, boxShadow: "0 4px 12px rgba(239,68,68,0.35)" }}>
+                    <PhoneMissed size={20} color="#fff" />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                      <h3 style={{ margin: 0, fontSize: 14, fontWeight: 900, color: d.isDarkMode ? "#fca5a5" : "#dc2626", fontFamily: F }}>
+                        {missedCallCount} Missed Call{missedCallCount > 1 ? "s" : ""}
+                      </h3>
+                      <span style={{ fontSize: 11, color: col.muted, fontWeight: 600 }}>while you were away</span>
+                    </div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                      {missedCalls.map((mc, i) => (
+                        <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, background: d.isDarkMode ? "rgba(255,255,255,0.06)" : "#fff", border: `1px solid ${d.isDarkMode ? "rgba(239,68,68,0.2)" : "#fecaca"}`, borderRadius: 12, padding: "7px 12px" }}>
+                          <div style={{ width: 30, height: 30, borderRadius: 10, background: "linear-gradient(135deg,#ef4444,#f97316)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 900, color: "#fff", flexShrink: 0 }}>
+                            {(mc.callerName?.[0] || "?").toUpperCase()}
+                          </div>
+                          <div>
+                            <p style={{ margin: 0, fontSize: 12, fontWeight: 800, color: col.heading, lineHeight: 1.2 }}>{mc.callerName}</p>
+                            <p style={{ margin: 0, fontSize: 10, color: col.muted, fontWeight: 600 }}>
+                              {mc.callerRole === "teacher" ? "Teacher" : mc.callerRole === "admin" ? "Admin" : mc.callerRole} · {new Date(mc.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <button onClick={clearMissedCalls} title="Mark all as seen" style={{ background: d.isDarkMode ? "rgba(255,255,255,0.08)" : "#fff", border: `1px solid ${d.isDarkMode ? "rgba(255,255,255,0.12)" : "#fecaca"}`, borderRadius: 10, padding: "6px 12px", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontSize: 11, fontWeight: 700, color: col.muted, flexShrink: 0, fontFamily: F }}>
+                    <X size={12} /> Mark seen
+                  </button>
+                </div>
+              )}
+
               {/* Stats row */}
               <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 14 }}>
                 {[
-                  { icon: "📚", n: d.progress.completedLessons, l: "Classes done",   bg: "#fff3e6", fg: "#c2410c" },
-                  { icon: "📅", n: d.progress.classesRemaining, l: "Classes left",   bg: "#ffe8d6", fg: "#9a3412" },
-                  { icon: "🏅", n: d.badges.length,             l: "Badges earned",  bg: "#fee4e2", fg: "#b91c3c" },
-                  { icon: "⭐", n: d.progress.weeklyCompleted,  l: "This week",      bg: "#fef3c7", fg: "#a16207" },
+                  { Icon: BookOpen,     n: d.progress.completedLessons, l: "Classes done",  grad: "linear-gradient(135deg,#f97316,#fb923c)", shadow: "rgba(249,115,22,0.3)"  },
+                  { Icon: CalendarDays, n: d.progress.classesRemaining, l: "Classes left",  grad: "linear-gradient(135deg,#3b82f6,#60a5fa)", shadow: "rgba(59,130,246,0.3)"  },
+                  { Icon: Award,        n: d.badges.length,             l: "Badges earned", grad: "linear-gradient(135deg,#f43f5e,#fb7185)", shadow: "rgba(244,63,94,0.3)"   },
+                  { Icon: Star,         n: d.progress.weeklyCompleted,  l: "This week",     grad: "linear-gradient(135deg,#f59e0b,#fbbf24)", shadow: "rgba(245,158,11,0.3)"  },
                 ].map((s, i) => (
                   <div key={i} className="kid-card" style={{ background: col.card, borderRadius: 22, padding: "18px 20px", border: `2px solid ${col.border}`, display: "flex", flexDirection: "column", gap: 6 }}>
-                    <div style={{ width: 44, height: 44, borderRadius: 14, background: s.bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>{s.icon}</div>
+                    <div style={{ width: 44, height: 44, borderRadius: 14, background: s.grad, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: `0 4px 12px ${s.shadow}` }}>
+                      <s.Icon size={20} color="#fff" strokeWidth={2} />
+                    </div>
                     <div style={{ fontSize: 26, fontWeight: 900, color: col.heading, letterSpacing: "-0.5px" }}>{s.n}</div>
                     <div style={{ fontSize: 12, fontWeight: 700, color: col.muted }}>{s.l}</div>
                   </div>
@@ -648,9 +690,14 @@ export default function SunshineShell() {
             <BadgesTab badges={d.badges} progress={d.progress} completedClasses={d.completedClasses} col={col} isDarkMode={d.isDarkMode} shareAchievement={d.shareAchievement} accentGradient={dashTheme.accentGradient} tabShadow={dashTheme.tabShadow} fontFamily={dashTheme.font} />
           )}
 
-          {d.activeTab === "recordings" && <RecordingsTab isDarkMode={d.isDarkMode} />}
-          {d.activeTab === "reviews"    && <ReviewsTab    isDarkMode={d.isDarkMode} />}
-          {d.activeTab === "referral"   && <ReferralTab   isDarkMode={d.isDarkMode} />}
+          {d.activeTab === "recordings"  && <RecordingsTab  isDarkMode={d.isDarkMode} />}
+          {d.activeTab === "reviews"     && <ReviewsTab     isDarkMode={d.isDarkMode} />}
+          {d.activeTab === "referral"    && <ReferralTab    isDarkMode={d.isDarkMode} />}
+          {d.activeTab === "leaderboard" && (
+            <div style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: "24px", padding: "24px" }}>
+              <LeaderboardTab isDarkMode={d.isDarkMode} />
+            </div>
+          )}
         </main>
       </div>
 

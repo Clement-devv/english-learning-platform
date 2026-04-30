@@ -13,6 +13,7 @@ import { useAuth }          from '../../../../context/AuthContext.jsx';
 import { useDarkMode }      from '../../../../hooks/useDarkMode';
 import { TabErrorBoundary } from '../../../../components/ErrorBoundary';
 import { getCachedCenter }  from '../../../../utils/branding';
+import { clearAuth }        from '../../../../utils/authStorage.js';
 import {
   OverviewPanel, TeachersPanel, StudentsPanel, LiveClassesPanel,
   ClassesPanel, PaymentsPanel, RecordingsPanel, ReportsPanel,
@@ -47,7 +48,11 @@ export default function SunshineShell() {
 
   const [activeTab, setActiveTab] = useState('overview');
 
-  const handleLogout = () => { authLogout(); navigate('/sub-admin/login'); };
+  const handleLogout = () => {
+    clearAuth('sub-admin'); // always wipe tokens — don't rely on AuthContext.role
+    authLogout();
+    navigate('/sub-admin/login');
+  };
 
   // ── Permission-gated nav groups ──────────────────────────────────────────────
   const NAV_GROUPS = useMemo(() => [

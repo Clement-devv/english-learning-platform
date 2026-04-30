@@ -4,13 +4,18 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Users, Plus, X, ChevronDown, ChevronUp, Video, RefreshCw, Loader2 } from 'lucide-react';
 import api from '../../../api';
 import Classroom from '../../Classroom';
+import { formatDateInTZ, getUserTimezone, tzAbbr } from '../../../utils/timezone';
 
 const F = "'Nunito','Inter',sans-serif";
 const LEVELS   = ['A1','A2','B1','B2','C1','C2','Mixed'];
 const STATUSES = ['open','full','in-progress','completed','cancelled'];
+const myTZ = getUserTimezone();
 
-const fmtDate = (iso) =>
-  new Date(iso).toLocaleString('en-GB', { day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
+const fmtDate = (iso) => {
+  const label = formatDateInTZ(iso, myTZ);
+  const abbr  = tzAbbr(myTZ);
+  return `${label} (${abbr})`;
+};
 
 const STATUS_COLOR = {
   open:         '#10b981',

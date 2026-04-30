@@ -159,7 +159,7 @@ router.post('/forgot-password', tenantMiddleware, passwordResetLimiter, async (r
     parent.resetPasswordExpires = Date.now() + 3600000;
     await parent.save();
 
-    const baseUrl  = req.center.customDomain && req.center.domainVerified ? `https://${req.center.customDomain}` : config.appUrl;
+    const baseUrl  = req.center.customDomain && req.center.domainVerified ? `https://${req.center.customDomain}` : config.frontendUrl;
     const resetUrl = `${baseUrl}/parent/reset-password/${rawToken}`;
 
     // Fire-and-forget email (reuse student forgot-password email style)
@@ -357,7 +357,7 @@ router.post('/', tenantMiddleware, verifyToken, verifyAdmin, async (req, res) =>
       inviteExpires: new Date(Date.now() + 48 * 60 * 60 * 1000), // 48h
     });
 
-    const baseUrl  = req.center.customDomain && req.center.domainVerified ? `https://${req.center.customDomain}` : config.appUrl;
+    const baseUrl  = req.center.customDomain && req.center.domainVerified ? `https://${req.center.customDomain}` : config.frontendUrl;
     const setupUrl = `${baseUrl}/parent/setup/${rawToken}`;
 
     sendParentInviteEmail(parent, setupUrl, req.center?.centerName || '').catch(e =>
@@ -455,7 +455,7 @@ router.post('/:id/resend-invite', tenantMiddleware, verifyToken, verifyAdmin, as
     parent.inviteExpires = new Date(Date.now() + 48 * 60 * 60 * 1000);
     await parent.save();
 
-    const baseUrl  = req.center.customDomain && req.center.domainVerified ? `https://${req.center.customDomain}` : config.appUrl;
+    const baseUrl  = req.center.customDomain && req.center.domainVerified ? `https://${req.center.customDomain}` : config.frontendUrl;
     const setupUrl = `${baseUrl}/parent/setup/${rawToken}`;
 
     await sendParentInviteEmail(parent, setupUrl, req.center?.centerName || '').catch(e =>

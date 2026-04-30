@@ -177,17 +177,17 @@ networks:
 ### 1D. Create `Caddyfile` at project root
 
 This handles:
-- `*.yourplatform.com` → wildcard subdomain (each center gets `{slug}.yourplatform.com`)
+- `*.clemify.com` → wildcard subdomain (each center gets `{slug}.clemify.com`)
 - Any verified custom domain → same backend (Caddy's on-demand TLS provisions SSL automatically)
 - HTTP → HTTPS redirect (automatic with Caddy)
 
 ```caddyfile
-# Replace yourplatform.com with your actual domain
+# Replace clemify.com with your actual domain
 # Replace YOUR_EMAIL with your email for Let's Encrypt notifications
 
 {
   # Global options
-  email YOUR_EMAIL@example.com
+  email speak2clem@gmail.com
   
   # On-demand TLS — automatically provisions SSL for any custom domain
   # that hits this server. Only approve domains that are in your DB.
@@ -198,8 +198,8 @@ This handles:
   }
 }
 
-# Wildcard subdomain: slug.yourplatform.com
-*.yourplatform.com, yourplatform.com {
+# Wildcard subdomain: slug.clemify.com
+*.clemify.com, clemify.com {
   tls {
     dns cloudflare {env.CLOUDFLARE_API_TOKEN}
     # OR if not using Cloudflare:
@@ -428,12 +428,12 @@ nano server/.env.production
 # Set: REDIS_URL=redis://redis:6379  (uses Docker service name)
 # Set: TRUST_PROXY=true
 # Set: SERVER_IP=<your VPS public IP>
-# Set: CORS_ORIGINS=https://yourplatform.com,https://*.yourplatform.com
+# Set: CORS_ORIGINS=https://clemify.com,https://*.clemify.com
 
 # 4. Point your domain's DNS to this server
 # At your domain registrar (Namecheap, GoDaddy, Cloudflare):
-# Add A record: *.yourplatform.com → <VPS IP>
-# Add A record: yourplatform.com → <VPS IP>
+# Add A record: *.clemify.com → <VPS IP>
+# Add A record: clemify.com → <VPS IP>
 
 # 5. Start everything
 docker compose up -d
@@ -450,8 +450,8 @@ docker compose logs app --tail=50
 ### How domain routing works in this app
 
 ```
-User visits sunshine.yourplatform.com
-  → Caddy matches *.yourplatform.com wildcard cert
+User visits sunshine.clemify.com
+  → Caddy matches *.clemify.com wildcard cert
   → Forwards to app:5000
   → tenantMiddleware extracts slug from subdomain: "sunshine"
   → Loads Center with slug="sunshine" from master DB
@@ -505,7 +505,7 @@ const centers = await Center.find({ status: { $ne: 'deleted' } })
 centers.forEach(c => {
   const domain = c.customDomain
     ? `${c.customDomain} (${c.domainVerified ? '✅ verified' : '⏳ pending'})`
-    : `${c.slug}.yourplatform.com (wildcard)`;
+    : `${c.slug}.clemify.com (wildcard)`;
   console.log(`${c.centerName} → ${domain}`);
 });
 ```
@@ -564,9 +564,9 @@ docker compose ps
 docker stats
 
 # Health check endpoints
-curl https://yourplatform.com/api/health          # Full status
-curl https://yourplatform.com/api/health/ready    # Readiness (used by CI)
-curl https://yourplatform.com/api/health/live     # Liveness
+curl https://clemify.com/api/health          # Full status
+curl https://clemify.com/api/health/ready    # Readiness (used by CI)
+curl https://clemify.com/api/health/live     # Liveness
 ```
 
 ---
@@ -579,7 +579,7 @@ Internet
     ▼
 Caddy (port 80/443)
     │  Auto-HTTPS for all domains
-    │  *.yourplatform.com → wildcard cert
+    │  *.clemify.com → wildcard cert
     │  custom-domain.com → on-demand TLS
     │
     ▼
@@ -631,8 +631,8 @@ EMAIL_USER=your@gmail.com
 EMAIL_PASSWORD=xxxx xxxx xxxx xxxx
 
 # Frontend
-FRONTEND_URL=https://yourplatform.com
-CORS_ORIGINS=https://yourplatform.com,https://app.yourplatform.com
+FRONTEND_URL=https://clemify.com
+CORS_ORIGINS=https://clemify.com,https://app.clemify.com
 
 # Agora (video calls)
 AGORA_APP_ID=<from console.agora.io>

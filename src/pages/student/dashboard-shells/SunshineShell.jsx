@@ -4,6 +4,7 @@
 // Uses useDashboardData() hook for all state/logic.
 
 import { useState } from "react";
+import { CheckCircle2, CalendarDays, Flame, Star, BookOpen, Clock } from "lucide-react";
 import Confetti from "react-confetti";
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -315,14 +316,16 @@ export default function SunshineShell() {
 
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: "14px" }}>
               {[
-                { icon: "✅", label: "Completed",  value: d.progress.completedLessons, color: "#10b981", bg: d.isDarkMode ? "rgba(16,185,129,0.12)" : "#f0fdf4" },
-                { icon: "📅", label: "Remaining",  value: d.progress.classesRemaining,  color: "#3b82f6", bg: d.isDarkMode ? "rgba(59,130,246,0.12)" : "#eff6ff" },
-                { icon: "🔥", label: "Day Streak", value: d.progress.streakDays,        color: "#f97316", bg: d.isDarkMode ? "rgba(249,115,22,0.12)" : "#fff7ed" },
-                { icon: "⭐", label: "This Week",  value: d.progress.weeklyCompleted,   color: "#8b5cf6", bg: d.isDarkMode ? "rgba(139,92,246,0.12)" : "#f5f3ff" },
-              ].map(({ icon, label, value, color, bg }) => (
+                { Icon: CheckCircle2, label: "Completed",  value: d.progress.completedLessons, grad: "linear-gradient(135deg,#10b981,#34d399)", shadow: "rgba(16,185,129,0.3)"  },
+                { Icon: CalendarDays, label: "Remaining",  value: d.progress.classesRemaining,  grad: "linear-gradient(135deg,#3b82f6,#60a5fa)", shadow: "rgba(59,130,246,0.3)"  },
+                { Icon: Flame,        label: "Day Streak", value: d.progress.streakDays,        grad: "linear-gradient(135deg,#f97316,#fb923c)", shadow: "rgba(249,115,22,0.3)"  },
+                { Icon: Star,         label: "This Week",  value: d.progress.weeklyCompleted,   grad: "linear-gradient(135deg,#8b5cf6,#a78bfa)", shadow: "rgba(139,92,246,0.3)"  },
+              ].map(({ Icon, label, value, grad, shadow }) => (
                 <div key={label} className="kid-card" style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: "20px", padding: "18px 16px", textAlign: "center", boxShadow: "0 4px 12px rgba(0,0,0,0.06)" }}>
-                  <div style={{ width: "44px", height: "44px", borderRadius: "14px", background: bg, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 10px", fontSize: "22px" }}>{icon}</div>
-                  <div style={{ fontSize: "26px", fontWeight: 900, color, marginBottom: "4px" }}>{value}</div>
+                  <div style={{ width: "44px", height: "44px", borderRadius: "14px", background: grad, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 10px", boxShadow: `0 4px 10px ${shadow}` }}>
+                    <Icon size={20} color="#fff" strokeWidth={2} />
+                  </div>
+                  <div style={{ fontSize: "26px", fontWeight: 900, color: col.heading, marginBottom: "4px" }}>{value}</div>
                   <div style={{ fontSize: "12px", fontWeight: 700, color: col.muted, textTransform: "uppercase", letterSpacing: ".04em" }}>{label}</div>
                 </div>
               ))}
@@ -394,13 +397,15 @@ export default function SunshineShell() {
           <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "14px" }}>
               {[
-                { icon: "📚", label: "Total Classes", value: d.completedClasses.length, color: "#f97316" },
-                { icon: "🔥", label: "Day Streak",    value: d.progress.streakDays,     color: "#ec4899" },
-                { icon: "⏱️", label: "Total Hours",   value: d.completedClasses.length > 0 ? Math.round(d.completedClasses.reduce((s, c) => s + c.duration, 0) / 60) : 0, color: "#8b5cf6" },
-              ].map(({ icon, label, value, color }) => (
+                { Icon: BookOpen, label: "Total Classes", value: d.completedClasses.length, grad: "linear-gradient(135deg,#f97316,#fb923c)", shadow: "rgba(249,115,22,0.3)" },
+                { Icon: Flame,    label: "Day Streak",    value: d.progress.streakDays,     grad: "linear-gradient(135deg,#ec4899,#f9a8d4)", shadow: "rgba(236,72,153,0.3)"  },
+                { Icon: Clock,    label: "Total Hours",   value: d.completedClasses.length > 0 ? Math.round(d.completedClasses.reduce((s, c) => s + c.duration, 0) / 60) : 0, grad: "linear-gradient(135deg,#8b5cf6,#a78bfa)", shadow: "rgba(139,92,246,0.3)" },
+              ].map(({ Icon, label, value, grad, shadow }) => (
                 <div key={label} className="kid-card" style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: "24px", padding: "24px", textAlign: "center", boxShadow: "0 4px 12px rgba(0,0,0,0.06)" }}>
-                  <div style={{ fontSize: "40px", marginBottom: "8px" }}>{icon}</div>
-                  <div style={{ fontSize: "36px", fontWeight: 900, color, marginBottom: "4px" }}>{value}</div>
+                  <div style={{ width: 56, height: 56, borderRadius: 18, background: grad, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 12px", boxShadow: `0 6px 16px ${shadow}` }}>
+                    <Icon size={26} color="#fff" strokeWidth={2} />
+                  </div>
+                  <div style={{ fontSize: "36px", fontWeight: 900, color: col.heading, marginBottom: "4px" }}>{value}</div>
                   <div style={{ fontSize: "13px", fontWeight: 700, color: col.muted, textTransform: "uppercase", letterSpacing: ".04em" }}>{label}</div>
                 </div>
               ))}

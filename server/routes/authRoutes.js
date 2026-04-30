@@ -359,13 +359,10 @@ router.post("/teacher/forgot-password", tenantMiddleware, passwordResetLimiter, 
     const Teacher = getTeacherModel(req.db);
     const teacher = await Teacher.findOne({ email });
 
-    if (!teacher) {
-      return res.json({ success: true, message: "If that email exists, a reset link has been sent" });
-    }
-
-    if (!teacher.active) {
-      return forbidden(res, "Your account is deactivated. Please contact admin.");
-    }
+    if (!teacher)
+      return notFound(res, "No teacher account found with that email address.");
+    if (!teacher.active)
+      return forbidden(res, "Your account is deactivated. Please contact your administrator.");
 
     const resetToken = crypto.randomBytes(32).toString("hex");
     const hashedToken = crypto.createHash("sha256").update(resetToken).digest("hex");
@@ -387,7 +384,7 @@ router.post("/teacher/forgot-password", tenantMiddleware, passwordResetLimiter, 
       return serverError(res, "Could not send reset email. Please try again later.");
     }
 
-    res.json({ success: true, message: "If that email exists, a reset link has been sent" });
+    res.json({ success: true, message: "Password reset link sent successfully." });
 
   } catch (err) {
     logger.error("Forgot password error:", { error: err?.message });
@@ -537,13 +534,10 @@ router.post("/student/forgot-password", tenantMiddleware, passwordResetLimiter, 
     const Student = getStudentModel(req.db);
     const student = await Student.findOne({ email });
 
-    if (!student) {
-      return res.json({ success: true, message: "If that email exists, a reset link has been sent" });
-    }
-
-    if (!student.active) {
+    if (!student)
+      return notFound(res, "No student account found with that email address.");
+    if (!student.active)
       return forbidden(res, "Your account is deactivated. Please contact your administrator.");
-    }
 
     const resetToken = crypto.randomBytes(32).toString("hex");
     const hashedToken = crypto.createHash("sha256").update(resetToken).digest("hex");
@@ -565,7 +559,7 @@ router.post("/student/forgot-password", tenantMiddleware, passwordResetLimiter, 
       return serverError(res, "Could not send reset email. Please try again later.");
     }
 
-    res.json({ success: true, message: "If that email exists, a reset link has been sent" });
+    res.json({ success: true, message: "Password reset link sent successfully." });
 
   } catch (err) {
     logger.error("Student forgot password error:", { error: err?.message });
@@ -732,10 +726,10 @@ router.post("/admin/forgot-password", tenantMiddleware, passwordResetLimiter, as
     const Admin = getAdminModel(req.db);
     const admin = await Admin.findOne({ email: email.toLowerCase() });
 
-    // Always respond with success to avoid email enumeration
-    if (!admin || !admin.active) {
-      return res.json({ success: true, message: "If that email exists, a reset link has been sent" });
-    }
+    if (!admin)
+      return notFound(res, "No admin account found with that email address.");
+    if (!admin.active)
+      return forbidden(res, "Your account is deactivated. Please contact support.");
 
     const resetToken  = crypto.randomBytes(32).toString("hex");
     const hashedToken = crypto.createHash("sha256").update(resetToken).digest("hex");
@@ -751,7 +745,7 @@ router.post("/admin/forgot-password", tenantMiddleware, passwordResetLimiter, as
       return serverError(res, "Could not send reset email. Please try again later.");
     }
 
-    res.json({ success: true, message: "If that email exists, a reset link has been sent" });
+    res.json({ success: true, message: "Password reset link sent successfully." });
   } catch (err) {
     logger.error("Admin forgot password error:", { error: err?.message });
     serverError(res, "Server error while processing request");
@@ -881,9 +875,10 @@ router.post("/refresh", tenantMiddleware, async (req, res) => {
       return unauthorized(res, "Session expired. Please log in again.");
     }
 
-    // Check session hasn't exceeded the 7-day window
-    const sessionAgeDays = (Date.now() - new Date(session.loginTime).getTime()) / (1000 * 60 * 60 * 24);
-    if (sessionAgeDays > SESSION_EXPIRY_DAYS) {
+    // Check session hasn't been inactive longer than the sliding window
+    const lastSeen = session.lastActivity || session.loginTime;
+    const inactiveDays = (Date.now() - new Date(lastSeen).getTime()) / (1000 * 60 * 60 * 24);
+    if (inactiveDays > SESSION_EXPIRY_DAYS) {
       session.isActive = false;
       await user.save();
       return unauthorized(res, "Session expired. Please log in again.");

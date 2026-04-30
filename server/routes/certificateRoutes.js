@@ -89,7 +89,7 @@ async function buildCertificatePdf(cert, student, center) {
   const accent    = tpl.accentColor    || '#f43f5e';
 
   // QR code pointing to public verify URL
-  const verifyUrl = `${process.env.FRONTEND_URL || 'https://app.example.com'}/certificates/verify/${cert.certificateNumber}`;
+  const verifyUrl = `${process.env.FRONTEND_URL || 'https://clemify.com'}/certificates/verify/${cert.certificateNumber}`;
   const qrDataUrl = await QRCode.toDataURL(verifyUrl, { width: 80, margin: 1 });
   const qrBuffer  = Buffer.from(qrDataUrl.split(',')[1], 'base64');
 

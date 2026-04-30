@@ -27,6 +27,10 @@ function getActiveSession() {
   if (sessionStorage.getItem("adminInfo") && getToken("adminToken")) {
     return { tokenKey: "adminToken", sessionKey: "adminSessionToken", infoKey: "adminInfo", loginPath: "/admin/login" };
   }
+  if (sessionStorage.getItem("subAdminInfo") && getToken("subAdminToken")) {
+    // Sub-admins use a long-lived 7-day token with no refresh mechanism
+    return { tokenKey: "subAdminToken", sessionKey: null, infoKey: "subAdminInfo", loginPath: "/sub-admin/login" };
+  }
   if (sessionStorage.getItem("teacherInfo") && getToken("teacherToken")) {
     return { tokenKey: "teacherToken", sessionKey: "teacherSessionToken", infoKey: "teacherInfo", loginPath: "/teacher/login" };
   }
@@ -37,23 +41,54 @@ function getActiveSession() {
     return { tokenKey: "parentToken", sessionKey: null, infoKey: "parentInfo", loginPath: "/parent/login" };
   }
   // Fallback: whichever token exists
-  if (getToken("adminToken"))   return { tokenKey: "adminToken",   sessionKey: "adminSessionToken",   infoKey: "adminInfo",   loginPath: "/admin/login" };
-  if (getToken("teacherToken")) return { tokenKey: "teacherToken", sessionKey: "teacherSessionToken", infoKey: "teacherInfo", loginPath: "/teacher/login" };
-  if (getToken("studentToken")) return { tokenKey: "studentToken", sessionKey: "studentSessionToken", infoKey: "studentInfo", loginPath: "/student/login" };
-  if (getToken("parentToken"))  return { tokenKey: "parentToken",  sessionKey: null,                  infoKey: "parentInfo",  loginPath: "/parent/login" };
+  if (getToken("adminToken"))    return { tokenKey: "adminToken",    sessionKey: "adminSessionToken",    infoKey: "adminInfo",    loginPath: "/admin/login" };
+  if (getToken("subAdminToken")) return { tokenKey: "subAdminToken", sessionKey: null,                   infoKey: "subAdminInfo", loginPath: "/sub-admin/login" };
+  if (getToken("teacherToken"))  return { tokenKey: "teacherToken",  sessionKey: "teacherSessionToken",  infoKey: "teacherInfo",  loginPath: "/teacher/login" };
+  if (getToken("studentToken"))  return { tokenKey: "studentToken",  sessionKey: "studentSessionToken",  infoKey: "studentInfo",  loginPath: "/student/login" };
+  if (getToken("parentToken"))   return { tokenKey: "parentToken",   sessionKey: null,                   infoKey: "parentInfo",   loginPath: "/parent/login" };
   return null;
 }
 
-// Add token + center slug to all requests automatically
+// Add token + center slug to all requests automatically.
+// The interceptor is async so it can proactively refresh an expiring token
+// before the request leaves — this eliminates the 401 console noise that the
+// reactive-only approach produced.
 api.interceptors.request.use(
-  (config) => {
-    // Only inject session token if the caller didn't already provide one.
-    // This lets AuthGuard (and super-admin fetch calls) use role-specific tokens
-    // without being overwritten by whichever session detectActiveRole found first.
+  async (config) => {
     if (!config.headers.Authorization) {
       const session = getActiveSession();
       if (session) {
-        config.headers.Authorization = `Bearer ${getToken(session.tokenKey)}`;
+        let token = getToken(session.tokenKey);
+
+        // Proactive refresh: token expires within 90 s AND we have a session key
+        // (sub-admins use a 7-day token with no refresh endpoint, so skip them).
+        if (token && session.sessionKey && getToken(session.sessionKey) && isTokenExpiringSoon(token)) {
+          if (!isRefreshing) {
+            isRefreshing = true;
+            try {
+              token = await attemptRefresh(session);
+              processRefreshQueue(token, null);
+            } catch (e) {
+              processRefreshQueue(null, e);
+              // Fall through — the response interceptor will handle the resulting 401
+            } finally {
+              isRefreshing = false;
+            }
+          } else {
+            // Another request is already refreshing — wait for it
+            try {
+              token = await new Promise((resolve, reject) => {
+                refreshQueue.push({ resolve, reject });
+              });
+            } catch {
+              // Use whatever token we have; response interceptor is the safety net
+            }
+          }
+          // Re-read in case attemptRefresh stored a new value but threw before returning
+          token = token || getToken(session.tokenKey);
+        }
+
+        if (token) config.headers.Authorization = `Bearer ${token}`;
       }
     }
 
@@ -67,9 +102,7 @@ api.interceptors.request.use(
     const impersonationSlug = sessionStorage.getItem('impersonationCenterSlug');
     const devSlug = import.meta.env.DEV ? (import.meta.env.VITE_CENTER_SLUG || null) : null;
     const slug = impersonationSlug || devSlug || getCachedCenter()?.slug;
-    if (slug) {
-      config.headers["x-center-slug"] = slug;
-    }
+    if (slug) config.headers["x-center-slug"] = slug;
 
     return config;
   },
@@ -77,13 +110,29 @@ api.interceptors.request.use(
 );
 
 // ── Token refresh logic ───────────────────────────────────────────────────────
-// When the 15-min access token expires the server returns 401.
-// We silently call /auth/refresh with the long-lived sessionToken and retry
-// the original request once. If refresh also fails, we clear storage and
-// redirect to the login page.
+// Strategy: PROACTIVE refresh in the request interceptor + REACTIVE fallback in
+// the response interceptor.
+//
+// Proactive: before a request leaves, decode the JWT and check the exp field.
+// If less than 90 seconds remain we refresh first so the request goes out with
+// a fresh token — no 401 is ever generated and nothing appears in the console.
+//
+// Reactive (fallback): if a 401 still arrives (e.g. the clock drifted or the
+// token was already expired when the tab was restored from the background) we
+// refresh silently and retry once, exactly as before.
 
 let isRefreshing = false;
 let refreshQueue = []; // pending requests waiting for the new token
+
+// Decode the JWT payload and return true if the token expires within thresholdMs.
+function isTokenExpiringSoon(token, thresholdMs = 90_000) {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return typeof payload.exp === 'number' && (payload.exp * 1000 - Date.now()) < thresholdMs;
+  } catch {
+    return false;
+  }
+}
 
 function processRefreshQueue(newToken, error) {
   refreshQueue.forEach(({ resolve, reject }) => {
@@ -114,8 +163,10 @@ async function attemptRefresh(session) {
   return newToken;
 }
 
-// Handle token expiration — but never auto-logout on auth endpoints themselves
-// (login returning 401 for wrong password must not redirect to login page)
+// Reactive fallback: handle any 401 that still slips through (clock skew, tab
+// restored from background with an already-expired token, etc.).
+// Never auto-logout on auth endpoints — a login 401 for wrong password must not
+// redirect to the login page.
 const AUTH_PATHS = ["/login", "/forgot-password", "/reset-password", "/verify-invite", "/setup-account", "/verify-2fa", "/auth/refresh"];
 
 api.interceptors.response.use(
@@ -198,5 +249,17 @@ api.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+// Exported so RingContext (and other non-HTTP clients) can silently refresh
+// the access token without duplicating the refresh logic.
+export async function refreshToken() {
+  const session = getActiveSession();
+  if (!session?.sessionKey || !getToken(session.sessionKey)) return null;
+  try {
+    return await attemptRefresh(session);
+  } catch {
+    return null;
+  }
+}
 
 export default api;

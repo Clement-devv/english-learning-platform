@@ -1317,6 +1317,79 @@ router.post('/chat-credits/:centerId', verifySuperAdmin, validateChatCredits, as
   }
 });
 
+// ── GET /api/super-admin/pronunciation-credits  — all centers' balances ───────
+router.get('/pronunciation-credits', verifySuperAdmin, async (req, res) => {
+  try {
+    const centers = await Center.find({ status: 'active' })
+      .select('centerName slug adminEmail plan pronunciationCredits')
+      .lean();
+
+    const data = centers.map(c => ({
+      _id:            c._id,
+      centerName:     c.centerName,
+      slug:           c.slug,
+      adminEmail:     c.adminEmail,
+      plan:           c.plan,
+      balance:        c.pronunciationCredits?.balance        ?? 0,
+      totalAllocated: c.pronunciationCredits?.totalAllocated ?? 0,
+      used:           (c.pronunciationCredits?.totalAllocated ?? 0) - (c.pronunciationCredits?.balance ?? 0),
+      log:            (c.pronunciationCredits?.log || []).slice(-10).reverse(),
+    }));
+
+    const totalBalance   = data.reduce((n, c) => n + c.balance, 0);
+    const totalAllocated = data.reduce((n, c) => n + c.totalAllocated, 0);
+    const totalUsed      = data.reduce((n, c) => n + c.used, 0);
+
+    res.json({ success: true, centers: data, totals: { totalBalance, totalAllocated, totalUsed } });
+  } catch (err) {
+    logger.error('Pronunciation credits list error:', { error: err?.message });
+    serverError(res);
+  }
+});
+
+// ── POST /api/super-admin/pronunciation-credits/:centerId  — allocate ─────────
+router.post('/pronunciation-credits/:centerId', verifySuperAdmin, async (req, res) => {
+  try {
+    const { amount, note } = req.body;
+    if (!amount || typeof amount !== 'number' || amount < 1 || amount > 100000) {
+      return badRequest(res, 'amount must be a number between 1 and 100,000');
+    }
+
+    const center = await Center.findById(req.params.centerId);
+    if (!center || center.status !== 'active') return notFound(res, 'Center not found or inactive');
+
+    const logEntry = {
+      amount,
+      note:      note || 'Allocated by super admin',
+      by:        req.user?.username || 'superadmin',
+      createdAt: new Date(),
+    };
+
+    const currentLog = center.pronunciationCredits?.log || [];
+    const trimmedLog = currentLog.length >= 50 ? currentLog.slice(-49) : currentLog;
+
+    await Center.findByIdAndUpdate(center._id, {
+      $inc: {
+        'pronunciationCredits.balance':        amount,
+        'pronunciationCredits.totalAllocated': amount,
+      },
+      $set: { 'pronunciationCredits.log': [...trimmedLog, logEntry] },
+    });
+
+    const updated = await Center.findById(center._id).select('pronunciationCredits centerName').lean();
+
+    res.json({
+      success:        true,
+      message:        `${amount} pronunciation credits allocated to ${center.centerName}`,
+      balance:        updated.pronunciationCredits.balance,
+      totalAllocated: updated.pronunciationCredits.totalAllocated,
+    });
+  } catch (err) {
+    logger.error('Allocate pronunciation credits error:', { error: err?.message });
+    serverError(res);
+  }
+});
+
 // GET /api/super-admin/centers/:id/people — active teachers + students for one center
 router.get('/centers/:id/people', verifySuperAdmin, validateParamMongoId('id'), async (req, res) => {
   try {

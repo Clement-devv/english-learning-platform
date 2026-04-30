@@ -5,8 +5,16 @@
 import { createContext, useContext, useEffect, useRef, useState, useCallback } from "react";
 import { io } from "socket.io-client";
 import { useAuth } from "./AuthContext.jsx";
+import { detectActiveRole, getStoredToken } from "../utils/authStorage.js";
+import { refreshToken } from "../api.js";
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || "";
+
+// Storage-based fallback — used when useAuth() hasn't hydrated yet (e.g. HMR or first paint)
+function getSocketToken() {
+  const role = detectActiveRole();
+  return role ? getStoredToken(role) : null;
+}
 
 const RingContext = createContext(null);
 
@@ -40,7 +48,6 @@ function makeRingtone() {
   function ring() {
     if (stopped || !ctx) return;
     const t = ctx.currentTime;
-    // Ascending: C5 → E5 → G5
     chime(523, t);
     chime(659, t + 0.2);
     chime(784, t + 0.4);
@@ -56,31 +63,35 @@ function makeRingtone() {
   };
 }
 
-function getSocketToken() {
-  return (
-    sessionStorage.getItem("teacherToken") ||
-    sessionStorage.getItem("studentToken") ||
-    sessionStorage.getItem("adminToken") ||
-    sessionStorage.getItem("subAdminToken") ||
-    localStorage.getItem("teacherToken") ||
-    localStorage.getItem("studentToken") ||
-    localStorage.getItem("adminToken") ||
-    localStorage.getItem("superAdminToken")
-  );
-}
-
 export function RingProvider({ children }) {
-  const { user, role } = useAuth();
-  const socketRef      = useRef(null);
-  const ringtoneRef    = useRef(null);
+  const { role: authRole, token: authToken } = useAuth();
+  const socketRef       = useRef(null);
+  const ringtoneRef     = useRef(null);
+  const currentRingId   = useRef(null);  // ringId of our active outgoing call
+  const incomingRef     = useRef(null);  // mirror of incoming state for event handlers
 
-  // Incoming ring state
-  const [incoming, setIncoming] = useState(null); // { ringId, callerId, callerName, callerRole }
+  const [incoming,        setIncoming]        = useState(null);
+  const [callerEvent,     setCallerEvent]     = useState(null);
+  const [missedCalls,     setMissedCalls]     = useState([]);
+  // null = not yet known, true = connected, false = failed (auth error or offline)
+  const [socketConnected, setSocketConnected] = useState(null);
+  // Incrementing this triggers the socket effect to re-run with a fresh token
+  const [reconnectKey,    setReconnectKey]    = useState(0);
 
-  // Connect socket when user is logged in
+  // Keep incomingRef in sync so socket handlers can read current value without stale closure
+  useEffect(() => { incomingRef.current = incoming; }, [incoming]);
+
   useEffect(() => {
-    const token = getSocketToken();
-    if (!token || !role) return;
+    // Prefer sessionStorage token — it may be fresher than authToken after a silent refresh
+    const token = getSocketToken() || authToken;
+    const role  = authRole || detectActiveRole();
+
+    if (!token || !role) {
+      console.warn("[RingContext] No token/role — socket not started", { authToken: !!authToken, authRole });
+      return;
+    }
+
+    console.log("[RingContext] Starting socket for role:", role);
 
     const sock = io(SOCKET_URL, {
       transports: ["websocket"],
@@ -88,12 +99,46 @@ export function RingProvider({ children }) {
     });
     socketRef.current = sock;
 
-    const joinRoom = () => sock.emit("join-user-room");
-    sock.on("connect",   joinRoom);
-    sock.on("reconnect", joinRoom);
+    const joinRoom = () => {
+      console.log("[RingContext] Joining user room");
+      sock.emit("join-user-room");
+    };
 
+    sock.on("connect", () => {
+      console.log("[RingContext] Socket connected:", sock.id);
+      setSocketConnected(true);
+      joinRoom();
+    });
+
+    sock.on("connect_error", async (err) => {
+      console.error("[RingContext] Socket connect_error:", err.message);
+      setSocketConnected(false);
+      // Auth errors will never resolve on their own — stop retry loop and try
+      // to silently refresh the access token, then reconnect.
+      if (err.message.includes("expired") || err.message.includes("Invalid") || err.message.includes("Authentication")) {
+        sock.disconnect();
+        const newToken = await refreshToken();
+        if (newToken) {
+          console.log("[RingContext] Token refreshed — reconnecting socket");
+          setReconnectKey(k => k + 1);
+        }
+        // If refresh also fails, socketConnected=false warning banner remains visible
+      }
+    });
+
+    sock.on("disconnect", (reason) => {
+      console.warn("[RingContext] Socket disconnected:", reason);
+      if (reason !== "io client disconnect") {
+        setSocketConnected(false);
+      }
+    });
+
+    // Socket.IO v4 — reconnect fires on the Manager, but "connect" also
+    // fires after every reconnection, so no separate listener is needed.
+
+    // ── Receiver side ──────────────────────────────────────────────────────────
     sock.on("incoming-ring", (data) => {
-      // Ignore if already on a ring
+      console.log("[RingContext] incoming-ring received:", data);
       setIncoming((prev) => prev ?? data);
       ringtoneRef.current = makeRingtone();
     });
@@ -107,27 +152,63 @@ export function RingProvider({ children }) {
     sock.on("ring-timeout", () => {
       ringtoneRef.current?.stop();
       ringtoneRef.current = null;
+      if (incomingRef.current) {
+        const { callerName, callerRole } = incomingRef.current;
+        setMissedCalls((prev) => [...prev, { callerName, callerRole, at: Date.now() }]);
+      }
       setIncoming(null);
+      currentRingId.current = null;
     });
 
-    // Feedback events for the caller side
-    sock.on("ring-sent",    () => {});
-    sock.on("ring-answered", () => {});
-    sock.on("ring-declined", () => {});
+    // ── Caller side ────────────────────────────────────────────────────────────
+    sock.on("ring-sent", ({ ringId }) => {
+      console.log("[RingContext] ring-sent, ringId:", ringId);
+      currentRingId.current = ringId;
+    });
+
+    sock.on("ring-answered", ({ ringId, by }) => {
+      setCallerEvent({ type: "answered", ringId, by });
+      currentRingId.current = null;
+    });
+
+    sock.on("ring-declined", ({ ringId, by }) => {
+      setCallerEvent({ type: "declined", ringId, by });
+      currentRingId.current = null;
+    });
+
+    // Proactively refresh the JWT 3 minutes before it expires so the socket
+    // never goes down mid-session. 15m JWT → refresh at 12m intervals.
+    const refreshInterval = setInterval(async () => {
+      if (!sock.connected) return;
+      console.log("[RingContext] Proactive token refresh");
+      const newToken = await refreshToken();
+      if (newToken) {
+        // Reconnect with the new token — cleanest way to update socket auth
+        sock.disconnect();
+        setReconnectKey(k => k + 1);
+      }
+    }, 12 * 60 * 1000);
 
     return () => {
+      clearInterval(refreshInterval);
       ringtoneRef.current?.stop();
       sock.disconnect();
       socketRef.current = null;
+      currentRingId.current = null;
     };
-  }, [role]);
+  }, [authRole, authToken, reconnectKey]);
 
-  const ringUser = useCallback(({ targetUserId, callerName }) => {
-    socketRef.current?.emit("ring-call", { targetUserId, callerName });
+  const ringUser = useCallback(({ targetUserId, targetRole, callerName }) => {
+    console.log("[RingContext] ringUser called. socket ready?", !!socketRef.current?.connected, { targetUserId, targetRole, callerName });
+    socketRef.current?.emit("ring-call", { targetUserId, targetRole, callerName });
   }, []);
 
-  const cancelRing = useCallback((ringId) => {
-    socketRef.current?.emit("ring-cancel", { ringId });
+  // cancelRing uses the stored ringId from ring-sent — no argument needed
+  const cancelRing = useCallback(() => {
+    if (currentRingId.current) {
+      socketRef.current?.emit("ring-cancel", { ringId: currentRingId.current });
+      currentRingId.current = null;
+    }
   }, []);
 
   const answerRing = useCallback((ringId) => {
@@ -144,8 +225,19 @@ export function RingProvider({ children }) {
     setIncoming(null);
   }, []);
 
+  const consumeCallerEvent = useCallback(() => setCallerEvent(null), []);
+  const clearMissedCalls   = useCallback(() => setMissedCalls([]), []);
+  const missedCallCount    = missedCalls.length;
+
   return (
-    <RingContext.Provider value={{ ringUser, cancelRing, answerRing, declineRing, incoming, socket: socketRef }}>
+    <RingContext.Provider value={{
+      ringUser, cancelRing, answerRing, declineRing,
+      incoming,
+      callerEvent, consumeCallerEvent,
+      missedCalls, missedCallCount, clearMissedCalls,
+      socketConnected,
+      socket: socketRef,
+    }}>
       {children}
     </RingContext.Provider>
   );

@@ -70,20 +70,25 @@ self.addEventListener("fetch", (event) => {
   }
 
   // ── JS / CSS / Fonts / Images: cache-first (stale-while-revalidate) ───────
-  const isStaticAsset = /\.(js|css|woff2?|ttf|eot|png|jpg|jpeg|svg|ico|webp|avif|gif)(\?.*)?$/.test(
+  // Only cache same-origin assets — skip third-party URLs (Google Translate,
+  // external analytics, etc.) to avoid unhandled rejections when they're offline.
+  const isSameOrigin = url.origin === self.location.origin;
+  const isStaticAsset = isSameOrigin && /\.(js|css|woff2?|ttf|eot|png|jpg|jpeg|svg|ico|webp|avif|gif)(\?.*)?$/.test(
     url.pathname
   );
 
   if (isStaticAsset) {
     event.respondWith(
       caches.match(request).then((cached) => {
-        const networkFetch = fetch(request).then((response) => {
-          if (response.ok) {
-            const clone = response.clone();
-            caches.open(STATIC_CACHE).then((cache) => cache.put(request, clone));
-          }
-          return response;
-        });
+        const networkFetch = fetch(request)
+          .then((response) => {
+            if (response.ok) {
+              const clone = response.clone();
+              caches.open(STATIC_CACHE).then((cache) => cache.put(request, clone));
+            }
+            return response;
+          })
+          .catch(() => cached || Response.error());
         // Return cached immediately; update cache in background
         return cached || networkFetch;
       })

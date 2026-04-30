@@ -8,10 +8,11 @@ const GroupClassesTab = lazy(() => import('../../tabs/GroupClassesTab'));
 import {
   Home, Calendar, CheckCircle2, Users, BookOpen, MessageCircle,
   DollarSign, Star, User, CalendarDays, FileText, Layers, ClipboardList,
-  Settings, LogOut, Plus, RefreshCw, Video, Bell,
+  Settings, LogOut, Plus, RefreshCw, Video, Bell, BarChart2, PhoneMissed, X,
 } from 'lucide-react';
 import { useBranding }              from '../../../../context/BrandingContext';
 import { useTeacherDashboardData }  from '../useTeacherDashboardData';
+import { useRing }                  from '../../../../context/RingContext';
 import TeacherTabContent            from '../TeacherTabContent';
 import { TabErrorBoundary }         from '../../../../components/ErrorBoundary';
 import Classroom                    from '../../../Classroom';
@@ -73,11 +74,12 @@ const NAV_GROUPS = [
   {
     label: 'More',
     items: [
-      { key: 'messages',   icon: '💬', label: 'Messages',   lucide: MessageCircle },
-      { key: 'payment',    icon: '💰', label: 'Payment',    lucide: DollarSign    },
-      { key: 'recordings', icon: '🎬', label: 'Recordings', lucide: Video         },
-      { key: 'reviews',    icon: '⭐', label: 'Reviews',    lucide: Star          },
-      { key: 'profile',    icon: '👤', label: 'Profile',    lucide: User          },
+      { key: 'messages',          icon: '💬', label: 'Messages',        lucide: MessageCircle },
+      { key: 'payment',           icon: '💰', label: 'Payment',         lucide: DollarSign    },
+      { key: 'recordings',        icon: '🎬', label: 'Recordings',      lucide: Video         },
+      { key: 'reviews',           icon: '⭐', label: 'Reviews',         lucide: Star          },
+      { key: 'rating-dashboard',  icon: '📊', label: 'Rating Insights', lucide: BarChart2     },
+      { key: 'profile',           icon: '👤', label: 'Profile',         lucide: User          },
     ],
   },
 ];
@@ -86,11 +88,76 @@ const PAGE_LABEL = NAV_GROUPS.flatMap(g => g.items).reduce((m, i) => ({ ...m, [i
 const F = "'Nunito','Inter',sans-serif";
 const FONT_IMPORT = 'https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap';
 
+// ── Missed Calls Banner ────────────────────────────────────────────────────────
+const ROLE_LABEL = { teacher: 'Teacher', student: 'Student', admin: 'Admin', subAdmin: 'Sub-Admin' };
+
+function MissedCallsBanner({ missedCalls, clearMissedCalls, col, isDarkMode }) {
+  const formatTime = (ms) => {
+    const d = new Date(ms);
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
+  return (
+    <div style={{
+      background: isDarkMode ? 'rgba(239,68,68,0.1)' : '#fff5f5',
+      border: `2px solid ${isDarkMode ? 'rgba(239,68,68,0.3)' : '#fecaca'}`,
+      borderRadius: 20,
+      padding: '16px 20px',
+      display: 'flex',
+      gap: 16,
+      alignItems: 'flex-start',
+    }}>
+      {/* Icon */}
+      <div style={{ width: 44, height: 44, borderRadius: 14, background: 'linear-gradient(135deg,#ef4444,#dc2626)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 4px 12px rgba(239,68,68,0.35)' }}>
+        <PhoneMissed size={20} color='#fff' />
+      </div>
+
+      {/* Content */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+          <h3 style={{ margin: 0, fontSize: 14, fontWeight: 900, color: isDarkMode ? '#fca5a5' : '#dc2626', fontFamily: F }}>
+            {missedCalls.length} Missed Call{missedCalls.length > 1 ? 's' : ''}
+          </h3>
+          <span style={{ fontSize: 11, color: col.muted, fontWeight: 600 }}>while you were away</span>
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          {missedCalls.map((mc, i) => (
+            <div key={i} style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              background: isDarkMode ? 'rgba(255,255,255,0.06)' : '#fff',
+              border: `1px solid ${isDarkMode ? 'rgba(239,68,68,0.2)' : '#fecaca'}`,
+              borderRadius: 12, padding: '7px 12px',
+            }}>
+              <div style={{ width: 30, height: 30, borderRadius: 10, background: 'linear-gradient(135deg,#ef4444,#f97316)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 900, color: '#fff', flexShrink: 0 }}>
+                {(mc.callerName?.[0] || '?').toUpperCase()}
+              </div>
+              <div>
+                <p style={{ margin: 0, fontSize: 12, fontWeight: 800, color: col.heading, lineHeight: 1.2 }}>{mc.callerName}</p>
+                <p style={{ margin: 0, fontSize: 10, color: col.muted, fontWeight: 600 }}>{ROLE_LABEL[mc.callerRole] || mc.callerRole} · {formatTime(mc.at)}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Dismiss */}
+      <button
+        onClick={clearMissedCalls}
+        title='Mark all as seen'
+        style={{ background: isDarkMode ? 'rgba(255,255,255,0.08)' : '#fff', border: `1px solid ${isDarkMode ? 'rgba(255,255,255,0.12)' : '#fecaca'}`, borderRadius: 10, padding: '6px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 700, color: col.muted, flexShrink: 0, fontFamily: F }}
+      >
+        <X size={12} /> Mark seen
+      </button>
+    </div>
+  );
+}
+
 // ── Shell ──────────────────────────────────────────────────────────────────────
 export default function SunshineShell() {
   const { branding, center } = useBranding();
   const d   = useTeacherDashboardData();
   const col = palette(d.isDarkMode);
+  const { missedCalls, missedCallCount, clearMissedCalls } = useRing();
   const centerName = center?.centerName || 'Teacher Portal';
 
   const [showRecurringLocal, setShowRecurringLocal] = useState(false);
@@ -120,6 +187,7 @@ export default function SunshineShell() {
     if (key === 'bookings')  return d.pendingBookings > 0 ? d.pendingBookings : null;
     if (key === 'homework')  return d.homeworkToGrade > 0 ? d.homeworkToGrade : null;
     if (key === 'quiz')      return d.quizAttempted  > 0 ? d.quizAttempted  : null;
+    if (key === 'messages')  return missedCallCount   > 0 ? missedCallCount   : null;
     return null;
   };
 
@@ -308,9 +376,24 @@ export default function SunshineShell() {
                       )}
                     </div>
                   </div>
-                  <div style={{ fontSize: 64, flexShrink: 0, filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.2))' }}>👨‍🏫</div>
+                  {d.teacherInfo?.photo ? (
+                    <img
+                      src={d.teacherInfo.photo}
+                      alt={d.teacherInfo.firstName}
+                      style={{ width: 80, height: 80, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: '3px solid rgba(255,255,255,0.4)', boxShadow: '0 4px 20px rgba(0,0,0,0.25)' }}
+                    />
+                  ) : (
+                    <div style={{ width: 80, height: 80, borderRadius: '50%', flexShrink: 0, background: 'rgba(255,255,255,0.2)', border: '3px solid rgba(255,255,255,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 36, fontWeight: 900, color: '#fff', boxShadow: '0 4px 20px rgba(0,0,0,0.2)' }}>
+                      {(d.teacherInfo?.firstName?.[0] || 'T').toUpperCase()}
+                    </div>
+                  )}
                 </div>
               </div>
+
+              {/* Missed calls alert */}
+              {missedCallCount > 0 && (
+                <MissedCallsBanner missedCalls={missedCalls} clearMissedCalls={clearMissedCalls} col={col} isDarkMode={d.isDarkMode} />
+              )}
 
               {/* 4-stat strip */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
@@ -501,7 +584,7 @@ export default function SunshineShell() {
       )}
 
       {d.showSessionManagement && (
-        <SessionManagement onClose={() => d.setShowSessionManagement(false)} userType="teacher" />
+        <SessionManagement isOpen onClose={() => d.setShowSessionManagement(false)} userType="teacher" />
       )}
 
       {d.showSettingsSidebar && (

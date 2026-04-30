@@ -2,7 +2,7 @@
 // Shared logic hook — all state, effects, and handlers extracted from StudentDashboard.
 // Both SunshineShell and CRMShell (and any future shells) consume this hook.
 
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { io } from "socket.io-client";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../../context/AuthContext.jsx";
@@ -10,6 +10,43 @@ import api from "../../../api";
 import { getUserTimezone } from "../../../utils/timezone";
 import { pushSupported, enablePush, disablePush, getPushStatus } from "../../../utils/pushNotifications";
 import { getStudentBookings } from "../../../services/bookingService";
+
+// Heartbeat intervals
+const TICK_MS      = 30_000;  // base tick — client-side class status runs every tick
+const TICK_REFRESH = 2;       // every 60s — API: credits, fresh accepted list, confirmations
+
+// Classify a single accepted booking into active/upcoming buckets (matches fetchStudentData logic)
+function classifyBooking(booking, now = Date.now()) {
+  const sd   = new Date(booking.scheduledTime);
+  const diff = sd - now;
+  const data = {
+    id: booking._id || booking.id,
+    bookingId: booking._id || booking.id,
+    title: booking.classTitle || booking.title,
+    teacher: booking.teacherId
+      ? `${booking.teacherId.firstName} ${booking.teacherId.lastName}`
+      : booking.teacher || "",
+    teacherId: booking.teacherId?._id || booking.teacherId,
+    topic: booking.topic || "English Lesson",
+    scheduledTime: booking.scheduledTime,
+    scheduledDate: sd,
+    duration: booking.duration || 30,
+    notes: booking.notes || "",
+    teacherTimezone: booking.teacherTimezone || "",
+    studentTimezone: booking.studentTimezone || "",
+  };
+  const durationMs = (booking.duration || 30) * 60_000;
+  if (diff < 900_000 && diff > -durationMs) {
+    return { bucket: "active", item: { ...data, time: sd.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true }), status: diff < 0 ? "live" : "starting-soon", participants: 1, maxParticipants: 12 } };
+  }
+  if (diff > 0 && diff < 7_200_000) {
+    return { bucket: "active", item: { ...data, time: sd.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true }), status: "starting-soon", participants: 1, maxParticipants: 12 } };
+  }
+  if (diff > 0) {
+    return { bucket: "upcoming", item: { ...data, time: sd.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", hour12: true }), enrolled: true } };
+  }
+  return { bucket: "past", item: null };
+}
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || "";
 
@@ -264,6 +301,7 @@ export function useDashboardData() {
         getStudentBookings(studentId, "completed"),
         getStudentBookings(studentId, "pending_confirmation"),
       ]);
+      rawAcceptedRef.current = accepted;
 
       setPendingConfirmations(pendingConf.map(b => ({
         id: b._id, bookingId: b._id, title: b.classTitle,
@@ -360,6 +398,9 @@ export function useDashboardData() {
   const fetchStudentDataRef = useRef(null);
   useEffect(() => { fetchStudentDataRef.current = fetchStudentData; });
 
+  // ── rawAcceptedRef — raw accepted bookings for client-side reclassification ─
+  const rawAcceptedRef = useRef([]);
+
   // ── Socket.IO real-time updates ────────────────────────────────────────────
   useEffect(() => {
     const token = getStudentToken();
@@ -403,6 +444,70 @@ export function useDashboardData() {
       }
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── refreshCreditsAndConfirmations — silent background poll ──────────────
+  const refreshCreditsAndConfirmations = useCallback(async () => {
+    const studentId = student.id;
+    if (!studentId) return;
+    try {
+      const [acceptedRaw, { data: freshStudent }, pendingConf] = await Promise.all([
+        getStudentBookings(studentId, "accepted"),
+        api.get(`/students/${studentId}`),
+        getStudentBookings(studentId, "pending_confirmation"),
+      ]);
+      rawAcceptedRef.current = acceptedRaw;
+      const classesRemaining = freshStudent?.classCredits || 0;
+      setProgress(prev => ({ ...prev, classesRemaining, totalLessons: prev.completedLessons + classesRemaining }));
+      setPendingConfirmations(prev => {
+        const newConfs = pendingConf.map(b => ({
+          id: b._id, bookingId: b._id, title: b.classTitle,
+          teacher: `${b.teacherId.firstName} ${b.teacherId.lastName}`,
+          scheduledTime: b.scheduledTime, duration: b.duration,
+          teacherConfirmedAt: b.teacherConfirmedAt, autoConfirmAt: b.autoConfirmAt,
+          topic: b.topic || "English Lesson",
+        }));
+        if (newConfs.length > prev.length && "Notification" in window && Notification.permission === "granted") {
+          new Notification("✅ Class Confirmation", {
+            body: `Please confirm attendance for "${newConfs[0]?.title}"`,
+            icon: "/favicon.ico",
+          });
+        }
+        return newConfs;
+      });
+    } catch { /* silent */ }
+  }, [student.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Heartbeat tick counter ─────────────────────────────────────────────────
+  useEffect(() => {
+    const tickRef = { current: 0 };
+    const id = setInterval(() => {
+      if (document.visibilityState === "hidden") return;
+      tickRef.current += 1;
+      if (tickRef.current % TICK_REFRESH === 0) refreshCreditsAndConfirmations();
+    }, TICK_MS);
+    return () => clearInterval(id);
+  }, [refreshCreditsAndConfirmations]);
+
+  // ── Client-side class-status ticker (zero API calls) ──────────────────────
+  useEffect(() => {
+    const id = setInterval(() => {
+      const raw = rawAcceptedRef.current;
+      if (!raw.length) return;
+      const now = Date.now();
+      const active = [], upcoming = [];
+      raw.forEach(booking => {
+        const result = classifyBooking(booking, now);
+        if (result.bucket === "active") active.push(result.item);
+        else if (result.bucket === "upcoming") upcoming.push(result.item);
+      });
+      setActiveClasses(prev => {
+        const changed = active.length !== prev.length || active.some((a, i) => a.status !== prev[i]?.status);
+        return changed ? active : prev;
+      });
+      setUpcomingClasses(prev => (upcoming.length !== prev.length ? upcoming : prev));
+    }, TICK_MS);
+    return () => clearInterval(id);
+  }, []);
 
   // ── Badges ─────────────────────────────────────────────────────────────────
   const triggerCelebration = (msg, emoji) => {

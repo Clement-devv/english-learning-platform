@@ -1,19 +1,15 @@
 # English Learning Platform — Caddyfile
 # Caddy handles ALL HTTPS automatically — no certbot needed.
 #
-# Replace BEFORE deploying:
-#   yourplatform.com  → your actual domain (e.g. elearnhub.com)
-#   YOUR_EMAIL        → your email for Let's Encrypt cert expiry alerts
-#
-# DNS setup required at your registrar:
-#   A record: yourplatform.com    → YOUR_SERVER_IP
-#   A record: *.yourplatform.com  → YOUR_SERVER_IP   (wildcard — all center subdomains)
+# DNS setup required at your registrar (clemify.com):
+#   A record: clemify.com    → YOUR_SERVER_IP
+#   A record: *.clemify.com  → YOUR_SERVER_IP   (wildcard — all center subdomains)
 
 {
-  email YOUR_EMAIL@example.com
+  email speak2clem@gmail.com
 
   # On-demand TLS: auto-provision certs for verified custom domains.
-  # Before issuing a cert for any domain not matching *.yourplatform.com,
+  # Before issuing a cert for any domain not matching *.clemify.com,
   # Caddy calls this endpoint. Your app returns 200 if the domain is verified, 404 otherwise.
   on_demand_tls {
     ask http://app:5000/api/v1/center/verify-caddy
@@ -23,8 +19,8 @@
 }
 
 # ── Main platform + all center subdomains ──────────────────────────────────────
-# Handles: yourplatform.com, www.yourplatform.com, any-slug.yourplatform.com
-yourplatform.com, *.yourplatform.com {
+# Handles: clemify.com, www.clemify.com, any-slug.clemify.com
+clemify.com, *.clemify.com {
   reverse_proxy app:5000 {
     header_up X-Forwarded-Proto {scheme}
     header_up X-Forwarded-Host  {host}

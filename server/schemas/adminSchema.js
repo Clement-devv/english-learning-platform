@@ -18,6 +18,8 @@ export const adminSchema = new mongoose.Schema({
   twoFactorSecret: String,
   twoFactorBackupCodes: [String],
   twoFactorVerified: { type: Boolean, default: false },
+  pushSubscription: { type: Object, default: null },
+  ringEnabled: { type: Boolean, default: true },
 }, { timestamps: true });
 
 // Forgot-password token lookup

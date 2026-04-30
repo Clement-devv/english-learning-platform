@@ -1,9 +1,10 @@
 // src/pages/admin/tabs/SubAdminsTab.jsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
-  Plus, Users, Shield, Mail, RefreshCw, Trash2, Edit2,
+  Plus, Users, Shield, Trash2, Edit2,
   ChevronDown, ChevronUp, CheckCircle, XCircle, Clock,
-  Send, ToggleLeft, ToggleRight, Search, UserCheck, Globe
+  Send, ToggleLeft, ToggleRight, Search, UserCheck, Globe,
+  Copy, Link, X, UserPlus
 } from "lucide-react";
 import api from "../../../api";
 
@@ -17,6 +18,9 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
   const [searchQuery, setSearchQuery]     = useState("");
   const [actionLoading, setActionLoading] = useState({});
   const [toast, setToast]                 = useState({ msg: "", type: "" });
+  const [setupLink, setSetupLink]         = useState(null); // { name, url } shown after invite/resend
+  const [assignModal, setAssignModal]     = useState(null); // { sa, selected: [ids] }
+  const [assignSearch, setAssignSearch]   = useState("");
 
   const c = palette(isDarkMode);
 
@@ -79,8 +83,9 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
         await api.put(`/sub-admins/${editTarget._id}`, form);
         showToast("Sub-admin updated successfully");
       } else {
-        await api.post("/sub-admins/invite", form);
+        const { data } = await api.post("/sub-admins/invite", form);
         showToast(`Invitation sent to ${form.email} ✉️`);
+        if (data.setupUrl) setSetupLink({ name: form.email, url: data.setupUrl });
       }
       setShowForm(false);
       setEditTarget(null);
@@ -112,8 +117,9 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
   const handleResendInvite = async (sa) => {
     setAction(sa._id + "_resend", true);
     try {
-      await api.post(`/sub-admins/${sa._id}/resend-invite`);
+      const { data } = await api.post(`/sub-admins/${sa._id}/resend-invite`);
       showToast("Invitation resent ✉️");
+      if (data.setupUrl) setSetupLink({ name: sa.email, url: data.setupUrl });
     } catch (e) {
       showToast("Failed to resend", "error");
     } finally {
@@ -164,6 +170,36 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
     }));
   };
 
+  const openAssignModal = (sa) => {
+    const currentIds = sa.assignedTeachers?.map((t) => t._id || t) || [];
+    setAssignModal({ sa, selected: currentIds });
+    setAssignSearch("");
+  };
+
+  const toggleAssignTeacher = (id) => {
+    setAssignModal((prev) => ({
+      ...prev,
+      selected: prev.selected.includes(id)
+        ? prev.selected.filter((t) => t !== id)
+        : [...prev.selected, id],
+    }));
+  };
+
+  const handleSaveAssign = async () => {
+    const { sa, selected } = assignModal;
+    setAction(sa._id + "_assign", true);
+    try {
+      await api.patch(`/sub-admins/${sa._id}/assign-teachers`, { teacherIds: selected });
+      showToast(`Teachers updated for ${sa.firstName} ${sa.lastName}`);
+      setAssignModal(null);
+      fetchSubAdmins();
+    } catch (e) {
+      showToast(e.response?.data?.message || "Failed to save assignment", "error");
+    } finally {
+      setAction(sa._id + "_assign", false);
+    }
+  };
+
   const filtered = subAdmins.filter(
     (sa) =>
       `${sa.firstName} ${sa.lastName} ${sa.email}`.toLowerCase().includes(searchQuery.toLowerCase())
@@ -212,6 +248,67 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
           boxShadow: "0 4px 20px rgba(0,0,0,0.2)",
         }}>
           {toast.msg}
+        </div>
+      )}
+
+      {/* ── Setup link banner (shown after invite / resend when email may not deliver) ── */}
+      {setupLink && (
+        <div style={{
+          background: isDarkMode ? "#1a1d27" : "#fff",
+          border: `1.5px solid ${isDarkMode ? "#2d3a5e" : "#c7d2fe"}`,
+          borderRadius: "14px", padding: "18px 20px",
+          boxShadow: "0 4px 20px rgba(107,130,240,0.15)",
+        }}>
+          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "12px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              <div style={{
+                width: "36px", height: "36px", borderRadius: "10px", flexShrink: 0,
+                background: "linear-gradient(135deg, #4f63d2, #6b82f0)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}>
+                <Link size={16} color="white" />
+              </div>
+              <div>
+                <p style={{ margin: 0, fontSize: "14px", fontWeight: "700", color: c.heading }}>
+                  Account Setup Link
+                </p>
+                <p style={{ margin: "2px 0 0", fontSize: "12.5px", color: c.muted }}>
+                  Share this link with <strong style={{ color: c.text }}>{setupLink.name}</strong> to complete their account setup
+                  {" "}(use this if the email didn't arrive)
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setSetupLink(null)}
+              title="Dismiss"
+              style={{
+                background: "none", border: "none", cursor: "pointer",
+                color: c.muted, padding: "2px", flexShrink: 0,
+                display: "flex", alignItems: "center",
+              }}
+            >
+              <X size={16} />
+            </button>
+          </div>
+
+          <div style={{
+            marginTop: "14px",
+            display: "flex", alignItems: "center", gap: "8px",
+          }}>
+            <div style={{
+              flex: 1, padding: "10px 14px",
+              background: isDarkMode ? "#0f1117" : "#f0f4ff",
+              border: `1px solid ${isDarkMode ? "#1e2235" : "#dde3f8"}`,
+              borderRadius: "10px",
+              fontFamily: "monospace", fontSize: "12.5px",
+              color: isDarkMode ? "#a5b4fc" : "#4f46e5",
+              overflowX: "auto", whiteSpace: "nowrap",
+              userSelect: "all",
+            }}>
+              {setupLink.url}
+            </div>
+            <CopyBtn url={setupLink.url} isDarkMode={isDarkMode} />
+          </div>
         </div>
       )}
 
@@ -581,6 +678,17 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
                         {sa.status === "active" ? <ToggleRight size={14} /> : <ToggleLeft size={14} />}
                       </ActionBtn>
                     )}
+                    {sa.assignmentType !== "region" && (
+                      <ActionBtn
+                        onClick={() => openAssignModal(sa)}
+                        loading={actionLoading[sa._id + "_assign"]}
+                        title="Assign teachers"
+                        color="#10b981"
+                        isDarkMode={isDarkMode}
+                      >
+                        <UserPlus size={14} />
+                      </ActionBtn>
+                    )}
                     <ActionBtn
                       onClick={() => openEdit(sa)}
                       title="Edit"
@@ -689,6 +797,180 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
         </div>
       )}
 
+      {/* ── Assign Teachers Modal ── */}
+      {assignModal && (() => {
+        const { sa, selected } = assignModal;
+        const lc = assignSearch.toLowerCase();
+        const visibleTeachers = allTeachers.filter(
+          (t) => `${t.firstName} ${t.lastName} ${t.email}`.toLowerCase().includes(lc)
+        );
+        return (
+          <div style={{
+            position: "fixed", inset: 0, zIndex: 300,
+            background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            padding: "20px",
+          }}
+            onClick={() => setAssignModal(null)}
+          >
+            <div style={{
+              background: isDarkMode ? "#1a1d27" : "#ffffff",
+              border: `1px solid ${c.border}`,
+              borderRadius: "20px", width: "100%", maxWidth: "480px",
+              boxShadow: "0 24px 64px rgba(0,0,0,0.35)",
+              display: "flex", flexDirection: "column",
+              maxHeight: "85vh",
+            }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Modal header */}
+              <div style={{
+                padding: "20px 24px 16px",
+                borderBottom: `1px solid ${c.border}`,
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+              }}>
+                <div>
+                  <p style={{ margin: 0, fontSize: "15px", fontWeight: "800", color: c.heading }}>
+                    Assign Teachers
+                  </p>
+                  <p style={{ margin: "2px 0 0", fontSize: "12.5px", color: c.muted }}>
+                    {sa.firstName} {sa.lastName} · {selected.length} selected
+                  </p>
+                </div>
+                <button onClick={() => setAssignModal(null)} style={{
+                  background: "none", border: "none", cursor: "pointer",
+                  color: c.muted, display: "flex", padding: "4px",
+                }}>
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Search */}
+              <div style={{ padding: "14px 24px 0" }}>
+                <div style={{
+                  display: "flex", alignItems: "center", gap: "8px",
+                  background: isDarkMode ? "#0f1117" : "#f0f4ff",
+                  border: `1.5px solid ${c.border}`, borderRadius: "10px",
+                  padding: "0 12px",
+                }}>
+                  <Search size={14} color={c.muted} />
+                  <input
+                    autoFocus
+                    type="text"
+                    placeholder="Search teachers…"
+                    value={assignSearch}
+                    onChange={(e) => setAssignSearch(e.target.value)}
+                    style={{
+                      flex: 1, background: "transparent", border: "none", outline: "none",
+                      padding: "10px 0", fontSize: "13.5px", color: c.heading,
+                      fontFamily: "inherit",
+                    }}
+                  />
+                  {assignSearch && (
+                    <button onClick={() => setAssignSearch("")} style={{ background: "none", border: "none", cursor: "pointer", color: c.muted, padding: 0, display: "flex" }}>
+                      <X size={13} />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Teacher list */}
+              <div style={{ flex: 1, overflowY: "auto", padding: "10px 24px" }} className="sa-scroll">
+                {visibleTeachers.length === 0 ? (
+                  <p style={{ textAlign: "center", padding: "24px 0", fontSize: "13px", color: c.muted }}>
+                    No teachers match your search
+                  </p>
+                ) : visibleTeachers.map((t) => {
+                  const isSelected = selected.includes(t._id);
+                  return (
+                    <div
+                      key={t._id}
+                      onClick={() => toggleAssignTeacher(t._id)}
+                      style={{
+                        display: "flex", alignItems: "center", gap: "12px",
+                        padding: "10px 12px", borderRadius: "10px", cursor: "pointer",
+                        background: isSelected
+                          ? (isDarkMode ? "#1e2540" : "#eef1ff")
+                          : "transparent",
+                        marginBottom: "2px",
+                        transition: "background 0.12s",
+                      }}
+                    >
+                      {/* Checkbox */}
+                      <div style={{
+                        width: "20px", height: "20px", borderRadius: "6px", flexShrink: 0,
+                        background: isSelected ? "#6b82f0" : "transparent",
+                        border: `2px solid ${isSelected ? "#6b82f0" : c.border}`,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        transition: "all 0.12s",
+                      }}>
+                        {isSelected && <CheckCircle size={13} color="white" />}
+                      </div>
+
+                      {/* Avatar */}
+                      <div style={{
+                        width: "36px", height: "36px", borderRadius: "10px", flexShrink: 0,
+                        background: "linear-gradient(135deg, #3b82f6, #6b82f0)",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: "12px", fontWeight: "700", color: "white",
+                      }}>
+                        {t.firstName?.[0]}{t.lastName?.[0]}
+                      </div>
+
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p style={{ margin: 0, fontSize: "13.5px", fontWeight: "600", color: c.heading }}>
+                          {t.firstName} {t.lastName}
+                        </p>
+                        <p style={{ margin: 0, fontSize: "11.5px", color: c.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {t.email}{t.continent ? ` · ${t.continent}` : ""}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Footer */}
+              <div style={{
+                padding: "16px 24px",
+                borderTop: `1px solid ${c.border}`,
+                display: "flex", gap: "10px",
+              }}>
+                <button
+                  onClick={() => setAssignModal(null)}
+                  style={{
+                    flex: 1, padding: "11px", border: `1.5px solid ${c.border}`,
+                    borderRadius: "10px", background: "transparent", cursor: "pointer",
+                    color: c.text, fontSize: "13.5px", fontWeight: "700", fontFamily: "inherit",
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveAssign}
+                  disabled={actionLoading[sa._id + "_assign"]}
+                  style={{
+                    flex: 2, padding: "11px",
+                    background: "linear-gradient(135deg, #4f63d2, #6b82f0)",
+                    border: "none", borderRadius: "10px", cursor: "pointer",
+                    color: "white", fontSize: "13.5px", fontWeight: "700", fontFamily: "inherit",
+                    boxShadow: "0 4px 14px rgba(107,130,240,0.35)",
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
+                    opacity: actionLoading[sa._id + "_assign"] ? 0.6 : 1,
+                  }}
+                >
+                  {actionLoading[sa._id + "_assign"] ? (
+                    <><div style={{ width: "14px", height: "14px", border: "2px solid rgba(255,255,255,0.4)", borderTopColor: "white", borderRadius: "50%", animation: "sa-rotate 0.8s linear infinite" }} /> Saving…</>
+                  ) : (
+                    <><UserCheck size={15} /> Save ({selected.length} teachers)</>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       <style>{`
         .sa-spin { animation: sa-rotate 0.8s linear infinite; }
         @keyframes sa-rotate { to { transform: rotate(360deg); } }
@@ -714,6 +996,39 @@ function ActionBtn({ onClick, loading, title, color, isDarkMode, children }) {
       }}
     >
       {loading ? <div style={{ width: "12px", height: "12px", border: `2px solid ${color}`, borderTopColor: "transparent", borderRadius: "50%", animation: "sa-rotate 0.8s linear infinite" }} /> : children}
+    </button>
+  );
+}
+
+function CopyBtn({ url, isDarkMode }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // fallback: select text
+    }
+  };
+  return (
+    <button
+      onClick={handleCopy}
+      title="Copy link"
+      style={{
+        display: "flex", alignItems: "center", gap: "6px",
+        padding: "10px 16px", border: "none", borderRadius: "10px", cursor: "pointer",
+        background: copied
+          ? (isDarkMode ? "rgba(16,185,129,0.15)" : "#d1fae5")
+          : "linear-gradient(135deg, #4f63d2, #6b82f0)",
+        color: copied ? "#10b981" : "white",
+        fontSize: "13px", fontWeight: "700", fontFamily: "inherit",
+        flexShrink: 0, transition: "all 0.2s",
+        boxShadow: copied ? "none" : "0 2px 10px rgba(107,130,240,0.35)",
+      }}
+    >
+      {copied ? <CheckCircle size={14} /> : <Copy size={14} />}
+      {copied ? "Copied!" : "Copy"}
     </button>
   );
 }

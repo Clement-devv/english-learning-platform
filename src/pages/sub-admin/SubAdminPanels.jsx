@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { getCachedCenter } from "../../utils/branding";
 import { dashboardColors } from "../../utils/dashboardColors";
+import api from "../../api";
 import MessagesTab from "../../components/chat/MessagesTab";
 
 // ── Shared helpers ─────────────────────────────────────────────────────────────
@@ -421,12 +422,7 @@ export function AgoraSpectatorModal({ booking, isDarkMode, onClose }) {
       try {
         const AgoraRTC = (await import("agora-rtc-sdk-ng")).default;
         if (!mounted) return;
-        const token = sessionStorage.getItem("subAdminToken") || localStorage.getItem("subAdminToken");
-        const slug  = import.meta.env.VITE_CENTER_SLUG || getCachedCenter()?.slug;
-        const agoraHeaders = { Authorization: `Bearer ${token}` };
-        if (slug) agoraHeaders["x-center-slug"] = slug;
-        const res  = await fetch(`/api/v1/agora/token?channel=${booking._id}`, { headers: agoraHeaders });
-        const data = await res.json();
+        const { data } = await api.get(`/agora/token?channel=${booking._id}`);
         if (!data.success || !data.appId) throw new Error(data.message || "Could not get Agora token");
         if (!mounted) return;
         const client = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });

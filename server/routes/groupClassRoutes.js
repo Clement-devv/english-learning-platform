@@ -75,15 +75,16 @@ router.post("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
     const groupClass = await getGroupClass(req.db).create({
       teacherId,
       title,
-      description: description || "",
-      level:         level || "Mixed",
-      maxSeats:      maxSeats || 8,
-      pricePerSeat:  pricePerSeat || 1,
-      scheduledTime: new Date(scheduledTime),
-      duration:      duration || 60,
-      notes:         notes || "",
-      tags:          Array.isArray(tags) ? tags : [],
-      createdBy:     req.user.role === "admin" ? "admin" : "teacher",
+      description:     description || "",
+      level:           level || "Mixed",
+      maxSeats:        maxSeats || 8,
+      pricePerSeat:    pricePerSeat || 1,
+      scheduledTime:   new Date(scheduledTime),
+      teacherTimezone: teacher.timezone || "",
+      duration:        duration || 60,
+      notes:           notes || "",
+      tags:            Array.isArray(tags) ? tags : [],
+      createdBy:       req.user.role === "admin" ? "admin" : "teacher",
     });
 
     res.status(201).json({ success: true, message: "Group class created", groupClass });

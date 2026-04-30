@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { User, DollarSign, BookOpen, Award, X, ChevronDown, Banknote } from "lucide-react";
+import { TIMEZONE_OPTIONS } from "../../../utils/timezone";
 
 const SPECIALIZATIONS = [
   "General English", "Business English", "Conversation",
@@ -11,15 +12,6 @@ const CERTIFICATIONS = ["CELTA", "TEFL", "TESOL", "PGCE", "Delta", "Trinity Cert
 
 const CONTINENTS = ["Africa", "Americas", "Asia", "Europe", "Oceania"];
 
-const TIMEZONES = [
-  "UTC-12:00", "UTC-11:00", "UTC-10:00", "UTC-09:00",
-  "UTC-08:00 (PST)", "UTC-07:00 (MST)", "UTC-06:00 (CST)", "UTC-05:00 (EST)", "UTC-04:00 (AST)",
-  "UTC-03:00", "UTC-02:00", "UTC-01:00",
-  "UTC+00:00 (GMT)", "UTC+01:00 (WAT/CAT)", "UTC+02:00 (EET/SAST)", "UTC+03:00 (EAT)",
-  "UTC+04:00 (GST)", "UTC+05:00 (PKT)", "UTC+05:30 (IST)",
-  "UTC+06:00 (BST)", "UTC+07:00 (ICT)", "UTC+08:00 (CST/SGT)",
-  "UTC+09:00 (JST/KST)", "UTC+10:00 (AEST)", "UTC+11:00", "UTC+12:00 (NZST)",
-];
 
 const EMPTY = {
   firstName: "", lastName: "", email: "", phone: "", country: "",
@@ -223,7 +215,9 @@ export default function TeacherModal({ isOpen, onClose, onSave, initialData }) {
                 <div className="relative">
                   <select value={form.timezone} onChange={set("timezone")} className={inputCls + " appearance-none pr-8"}>
                     <option value="">Select timezone</option>
-                    {TIMEZONES.map((tz) => <option key={tz} value={tz}>{tz}</option>)}
+                    {TIMEZONE_OPTIONS.map((tz) => (
+                      <option key={tz.value} value={tz.value}>{tz.label}</option>
+                    ))}
                   </select>
                   <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                 </div>

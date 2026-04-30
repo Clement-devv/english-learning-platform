@@ -35,6 +35,8 @@ export const subAdminSchema = new mongoose.Schema(
     twoFactorEnabled:     { type: Boolean, default: false },
     twoFactorSecret:      { type: String,  default: null  },
     twoFactorBackupCodes: { type: [String], default: []   },
+    resetPasswordToken:   { type: String, default: null },
+    resetPasswordExpires: { type: Date,   default: null },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin', required: true },
     lastLogin:  { type: Date, default: null },
     notes:      { type: String, default: '' },

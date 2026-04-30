@@ -6,6 +6,7 @@ import { verifyToken } from "../middleware/authMiddleware.js";
 import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
 import { studentSchema } from "../schemas/studentSchema.js";
 import { teacherSchema } from "../schemas/teacherSchema.js";
+import { adminSchema } from "../schemas/adminSchema.js";
 import { VAPID_PUB, sendPush } from "../utils/webPushService.js";
 import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
 
@@ -14,6 +15,13 @@ router.use(tenantMiddleware);
 
 const getStudent = (db) => db.models.Student || db.model("Student", studentSchema);
 const getTeacher = (db) => db.models.Teacher || db.model("Teacher", teacherSchema);
+const getAdmin   = (db) => db.models.Admin   || db.model("Admin",   adminSchema);
+
+function getModelByRole(db, role) {
+  if (role === "student") return getStudent(db);
+  if (role === "admin" || role === "subAdmin") return getAdmin(db);
+  return getTeacher(db); // teacher and any other role
+}
 
 // ── GET /api/push/vapid-key  —  public, used by frontend to subscribe ─────────
 router.get("/vapid-key", (_req, res) => {
@@ -27,9 +35,8 @@ router.post("/subscribe", verifyToken, async (req, res) => {
     const { subscription } = req.body;
     if (!subscription?.endpoint) return res.status(400).json({ error: "Invalid subscription" });
 
-    const role  = req.user.role;
-    const Model = role === "student" ? getStudent(req.db) : getTeacher(req.db);
-    await Model.findByIdAndUpdate(req.user._id, { pushSubscription: subscription });
+    const Model = getModelByRole(req.db, req.user.role);
+    await Model.findByIdAndUpdate(req.user.id, { pushSubscription: subscription });
 
     sendPush(subscription, {
       title: "🔔 Notifications enabled!",
@@ -46,8 +53,8 @@ router.post("/subscribe", verifyToken, async (req, res) => {
 // ── DELETE /api/push/subscribe  —  unsubscribe ────────────────────────────────
 router.delete("/subscribe", verifyToken, async (req, res) => {
   try {
-    const Model = req.user.role === "student" ? getStudent(req.db) : getTeacher(req.db);
-    await Model.findByIdAndUpdate(req.user._id, { pushSubscription: null });
+    const Model = getModelByRole(req.db, req.user.role);
+    await Model.findByIdAndUpdate(req.user.id, { pushSubscription: null });
     res.json({ ok: true });
   } catch (err) {
     serverError(res, err.message);
@@ -57,8 +64,8 @@ router.delete("/subscribe", verifyToken, async (req, res) => {
 // ── GET /api/push/status  —  check if this user has an active subscription ────
 router.get("/status", verifyToken, async (req, res) => {
   try {
-    const Model = req.user.role === "student" ? getStudent(req.db) : getTeacher(req.db);
-    const user  = await Model.findById(req.user._id).select("pushSubscription");
+    const Model = getModelByRole(req.db, req.user.role);
+    const user  = await Model.findById(req.user.id).select("pushSubscription");
     res.json({ subscribed: !!user?.pushSubscription?.endpoint });
   } catch (err) {
     serverError(res, err.message);

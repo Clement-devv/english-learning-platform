@@ -2,7 +2,7 @@
 // Shared data hook for all teacher dashboard shells.
 // Mirrors the pattern of useDashboardData.js used by student shells.
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext.jsx';
 import api from '../../../api';
@@ -17,6 +17,26 @@ import {
   deleteBooking,
   cancelBooking,
 } from '../../../services/bookingService';
+
+// Heartbeat schedule (all intervals are multiples of TICK_MS):
+//   Every 30s  — pending bookings (critical: teacher needs to respond fast)
+//   Every 30s  — class status recomputation (client-side, no API)
+//   Every 60s  — accepted/active classes (cancellations, new live classes)
+//   Every 3min — completed classes (admin approvals, payment status)
+//   Every 5min — students list (new assignments, credit changes)
+const TICK_MS      = 30_000;
+const TICK_PENDING  = 1;   // every 1 tick  = 30s
+const TICK_ACTIVE   = 2;   // every 2 ticks = 60s
+const TICK_COMPLETED= 6;   // every 6 ticks = 3min
+const TICK_STUDENTS = 10;  // every 10 ticks = 5min
+
+function classStatus(scheduledTime) {
+  const diff = new Date(scheduledTime) - Date.now();
+  if (diff < -3_600_000)  return 'completed';
+  if (diff < 0)            return 'live';
+  if (diff < 900_000)      return 'upcoming-soon';
+  return 'scheduled';
+}
 
 export function useTeacherDashboardData() {
   const navigate  = useNavigate();
@@ -163,6 +183,223 @@ export function useTeacherDashboardData() {
     setTimeout(() => setToast(''), 3000);
   };
 
+  // ── Heartbeat helpers ──────────────────────────────────────────────────────
+  // These run silently in the background (no setLoading) so the UI doesn't flash.
+
+  const teacherIdRef = useRef(null); // kept up to date after first successful fetch
+
+  // Re-fetch pending booking requests. Notifies teacher if a new one arrives.
+  const refreshPending = useCallback(async () => {
+    const teacherId = teacherIdRef.current;
+    if (!teacherId) return;
+    try {
+      const pendingData = await getTeacherBookings(teacherId, 'pending');
+      setBookings(prev => {
+        const prevIds = new Set(prev.map(b => b.id));
+        const next    = pendingData.map(booking => {
+          const scheduledDate = new Date(booking.scheduledTime);
+          return {
+            id:             booking._id,
+            name:           `${booking.studentId.firstName} ${booking.studentId.lastName}`,
+            studentId:      booking.studentId._id,
+            studentName:    `${booking.studentId.firstName} ${booking.studentId.lastName}`,
+            classTitle:     booking.classTitle,
+            topic:          booking.topic,
+            time:           scheduledDate.toLocaleString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true }),
+            duration:       booking.duration,
+            notes:          booking.notes,
+            status:         booking.status,
+            isAdminBooking: booking.createdBy === 'admin',
+            scheduledTime:  booking.scheduledTime,
+            rawDate:        scheduledDate,
+            teacherTimezone: booking.teacherTimezone || '',
+            studentTimezone: booking.studentTimezone || '',
+          };
+        });
+        // Notify for each genuinely new booking
+        next.forEach(b => {
+          if (!prevIds.has(b.id) && 'Notification' in window && Notification.permission === 'granted') {
+            new Notification('📅 New Booking Request', {
+              body: `${b.name} wants to book "${b.classTitle}"`,
+              icon: '/favicon.ico',
+            });
+          }
+        });
+        return next;
+      });
+    } catch { /* silent — heartbeat failures shouldn't interrupt the teacher */ }
+  }, []);
+
+  // Re-fetch accepted classes. Updates status (scheduled/live/past) from server.
+  const refreshActive = useCallback(async () => {
+    const teacherId = teacherIdRef.current;
+    if (!teacherId) return;
+    try {
+      const acceptedData = await getTeacherBookings(teacherId, 'accepted');
+      const classesMap   = new Map();
+      acceptedData.forEach(booking => {
+        const scheduledDate = new Date(booking.scheduledTime);
+        const groupKey = `${booking.scheduledTime}_${booking.classTitle}`;
+        if (classesMap.has(groupKey)) {
+          const e = classesMap.get(groupKey);
+          e.students.push(`${booking.studentId.firstName} ${booking.studentId.lastName}`);
+          e.bookingIds.push(booking._id);
+        } else {
+          classesMap.set(groupKey, {
+            id:            booking._id,
+            title:         booking.classTitle,
+            topic:         booking.topic || 'Scheduled Lesson',
+            time:          scheduledDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
+            date:          scheduledDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+            fullDateTime:  scheduledDate.toLocaleString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true }),
+            scheduledTime: booking.scheduledTime,
+            scheduledDate,
+            status:        classStatus(booking.scheduledTime),
+            students:      [`${booking.studentId.firstName} ${booking.studentId.lastName}`],
+            duration:      booking.duration,
+            notes:         booking.notes,
+            bookingId:     booking._id,
+            bookingIds:    [booking._id],
+          });
+        }
+      });
+      const activeArr = [];
+      classesMap.forEach(cls => { if (cls.status !== 'completed') activeArr.push(cls); });
+      setClasses(activeArr);
+    } catch { /* silent */ }
+  }, []);
+
+  // Re-fetch completed classes so admin approvals / rejections appear automatically.
+  const refreshCompleted = useCallback(async () => {
+    const teacherId = teacherIdRef.current;
+    if (!teacherId) return;
+    try {
+      const completedData = await getTeacherBookings(teacherId, 'completed');
+      const missedData    = completedData.filter(b => b.status === 'missed');
+      const trueCompleted = completedData.filter(b => b.status === 'completed');
+
+      const completedMap = new Map();
+      trueCompleted.forEach(booking => {
+        const scheduledDate = new Date(booking.scheduledTime);
+        const groupKey = `${booking.scheduledTime}_${booking.classTitle}`;
+        if (completedMap.has(groupKey)) {
+          const entry = completedMap.get(groupKey);
+          entry.students.push(`${booking.studentId.firstName} ${booking.studentId.lastName}`);
+          if (booking.adminRejected) entry.adminRejected = true;
+        } else {
+          completedMap.set(groupKey, {
+            id: booking._id, title: booking.classTitle,
+            topic: booking.topic || 'Completed Lesson',
+            fullDateTime: new Date(booking.scheduledTime).toLocaleString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true }),
+            scheduledTime: booking.scheduledTime,
+            scheduledDate,
+            students: [`${booking.studentId.firstName} ${booking.studentId.lastName}`],
+            duration: booking.duration, status: 'completed',
+            officiallyCompleted: true,
+            adminRejected: booking.adminRejected || false,
+            adminRejectedReason: booking.adminRejectedReason || '',
+            adminRejectedAt: booking.adminRejectedAt || null,
+            disputeRaised: booking.disputeRaised || false,
+          });
+        }
+      });
+
+      const missedMap = new Map();
+      missedData.forEach(booking => {
+        const scheduledDate = new Date(booking.scheduledTime);
+        const groupKey = `${booking.scheduledTime}_${booking.classTitle}`;
+        if (missedMap.has(groupKey)) {
+          missedMap.get(groupKey).students.push(`${booking.studentId.firstName} ${booking.studentId.lastName}`);
+        } else {
+          missedMap.set(groupKey, {
+            id: booking._id, title: booking.classTitle,
+            topic: booking.topic || 'Missed Lesson',
+            fullDateTime: scheduledDate.toLocaleString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true }),
+            scheduledTime: booking.scheduledTime, scheduledDate,
+            students: [`${booking.studentId.firstName} ${booking.studentId.lastName}`],
+            duration: booking.duration, status: 'missed', isMissed: true,
+            missedReason: booking.missedReason || '',
+            adminRejected: booking.adminRejected || false,
+            adminRejectedReason: booking.adminRejectedReason || '',
+            disputeRaised: booking.disputeRaised || false,
+          });
+        }
+      });
+
+      setCompletedClasses([
+        ...Array.from(completedMap.values()),
+        ...Array.from(missedMap.values()),
+      ]);
+    } catch { /* silent */ }
+  }, []);
+
+  // Re-fetch assigned students so new assignments appear automatically.
+  const refreshStudents = useCallback(async () => {
+    const teacherId = teacherIdRef.current;
+    if (!teacherId) return;
+    try {
+      const studentsData = await getAssignedStudents(teacherId);
+      setStudents(studentsData.map(item => ({
+        _id:          item.student._id,
+        id:           item.student._id,
+        firstName:    item.student.firstName,
+        lastName:     item.student.lastName || '',
+        classCredits: item.student.classCredits || 0,
+        name:         `${item.student.firstName} ${item.student.lastName}`,
+        email:        item.student.email,
+        status:       item.student.active ? 'Active' : 'Inactive',
+        progress:     item.student.classCredits || 0,
+        active:       item.student.active,
+        age:          item.student.age || null,
+        dateOfBirth:  item.student.dateOfBirth || null,
+        rank:         item.student.rank || '',
+        assignmentId: item.assignmentId,
+        assignedDate: item.assignedDate,
+      })));
+    } catch { /* silent */ }
+  }, []);
+
+  // ── Heartbeat: smart tick counter ─────────────────────────────────────────
+  // Runs every TICK_MS. Skips when the browser tab is hidden (saves battery/network).
+  // Different data refreshes at different intervals via the tick counter.
+  useEffect(() => {
+    const tickRef = { current: 0 };
+    const id = setInterval(() => {
+      if (document.visibilityState === 'hidden') return;
+      tickRef.current += 1;
+      const tick = tickRef.current;
+
+      // Every 30s — most critical: new booking requests
+      if (tick % TICK_PENDING === 0) refreshPending();
+
+      // Every 60s — active/live class list
+      if (tick % TICK_ACTIVE === 0) refreshActive();
+
+      // Every 3min — completed classes & payment status
+      if (tick % TICK_COMPLETED === 0) refreshCompleted();
+
+      // Every 5min — student list (new assignments)
+      if (tick % TICK_STUDENTS === 0) refreshStudents();
+    }, TICK_MS);
+    return () => clearInterval(id);
+  }, [refreshPending, refreshActive, refreshCompleted, refreshStudents]);
+
+  // ── Class-status ticker (client-side, no API) ─────────────────────────────
+  // Re-derives scheduled/live/upcoming-soon/completed purely from the current
+  // time. Runs every 30s so the "LIVE" indicator turns on automatically.
+  useEffect(() => {
+    const id = setInterval(() => {
+      setClasses(prev => {
+        if (!prev.length) return prev;
+        const updated = prev.map(cls => ({ ...cls, status: classStatus(cls.scheduledTime) }));
+        // Only trigger a re-render if something actually changed
+        const changed = updated.some((cls, i) => cls.status !== prev[i].status);
+        return changed ? updated.filter(cls => cls.status !== 'completed') : prev;
+      });
+    }, TICK_MS);
+    return () => clearInterval(id);
+  }, []);
+
   // ── Fetch all teacher data ─────────────────────────────────────────────────
   const fetchTeacherData = async () => {
     try {
@@ -171,6 +408,7 @@ export function useTeacherDashboardData() {
       const teacherId = teacherData._id || teacherData.id;
       setGoogleMeetLink(teacherData.googleMeetLink || '');
       if (!teacherId) throw new Error('No teacher ID found');
+      teacherIdRef.current = teacherId; // make available to heartbeat helpers
 
       api.patch(`/teachers/${teacherId}/timezone`, { timezone: getUserTimezone() }).catch(() => {});
 
@@ -269,13 +507,16 @@ export function useTeacherDashboardData() {
       classesMap.forEach(cls => (cls.status === 'completed' ? finishedArr : activeArr).push(cls));
       setClasses(activeArr);
 
-      // Completed classes
+      // Completed classes — bookings officially marked status='completed' by the system
       const completedMap = new Map();
       trueCompleted.forEach(booking => {
         const scheduledDate = new Date(booking.scheduledTime);
         const groupKey = `${booking.scheduledTime}_${booking.classTitle}`;
         if (completedMap.has(groupKey)) {
-          completedMap.get(groupKey).students.push(`${booking.studentId.firstName} ${booking.studentId.lastName}`);
+          const entry = completedMap.get(groupKey);
+          entry.students.push(`${booking.studentId.firstName} ${booking.studentId.lastName}`);
+          // If ANY booking in the group was admin-rejected, mark the whole slot as rejected
+          if (booking.adminRejected) entry.adminRejected = true;
         } else {
           completedMap.set(groupKey, {
             id:                  booking._id,
@@ -287,6 +528,7 @@ export function useTeacherDashboardData() {
             students:            [`${booking.studentId.firstName} ${booking.studentId.lastName}`],
             duration:            booking.duration,
             status:              'completed',
+            officiallyCompleted: true,   // marked by server, not just past scheduled time
             adminRejected:       booking.adminRejected || false,
             adminRejectedReason: booking.adminRejectedReason || '',
             adminRejectedAt:     booking.adminRejectedAt || null,
@@ -477,7 +719,13 @@ export function useTeacherDashboardData() {
   const liveClasses    = classes.filter(c => c.status === 'live');
   const upcomingClasses = classes.filter(c => c.status === 'scheduled' || c.status === 'upcoming-soon');
   const pendingBookings = bookings.length;
-  const completedCount  = completedClasses.length;
+
+  // Only count classes officially marked 'completed' by the server AND not
+  // admin-rejected — i.e. the admin approved the class and the teacher was paid.
+  // Excludes: missed classes, stale accepted bookings, admin-rejected completions.
+  const completedCount = completedClasses.filter(
+    c => c.officiallyCompleted && !c.adminRejected
+  ).length;
 
   return {
     // State

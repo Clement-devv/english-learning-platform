@@ -15,6 +15,7 @@ import QuizTab             from '../tabs/QuizTab';
 import VocabTab            from '../tabs/VocabTab';
 import RecordingsTab       from '../tabs/RecordingsTab';
 import ReviewsTab          from '../tabs/ReviewsTab';
+import RatingDashboardTab  from '../tabs/RatingDashboardTab';
 import ProfileTab          from '../tabs/ProfileTab';
 import MessagesTab         from '../../../components/chat/MessagesTab';
 import { Calendar, Users } from 'lucide-react';
@@ -168,6 +169,15 @@ export default function TeacherTabContent({ d, wrapStyle = {}, msgStyle = {}, he
     return (
       <div style={wrapStyle}>
         <ReviewsTab teacherInfo={d.teacherInfo} isDarkMode={isDarkMode} />
+      </div>
+    );
+  }
+
+  // ── RATING DASHBOARD ──────────────────────────────────────────────────────
+  if (activeTab === 'rating-dashboard') {
+    return (
+      <div style={wrapStyle}>
+        <RatingDashboardTab teacherInfo={d.teacherInfo} isDarkMode={isDarkMode} />
       </div>
     );
   }

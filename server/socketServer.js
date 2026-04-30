@@ -6,6 +6,10 @@ import Center from './models/master/Center.js';
 import logger from "./utils/logger.js";
 import { getDb } from './config/dbManager.js';
 import { ringLogSchema } from './schemas/ringLogSchema.js';
+import { studentSchema } from './schemas/studentSchema.js';
+import { teacherSchema } from './schemas/teacherSchema.js';
+import { adminSchema } from './schemas/adminSchema.js';
+import { sendPush } from './utils/webPushService.js';
 import redisClient from './config/redis.js';
 
 function getRingLog(db) {
@@ -19,6 +23,33 @@ async function saveRingLog(centerId, data) {
     await Log.create(data);
   } catch (err) {
     logger.error("saveRingLog error:", { error: err?.message });
+  }
+}
+
+// Send a push notification to the target user if they have a stored subscription.
+// targetRole tells us which model to query.
+async function sendRingPush(centerId, targetUserId, targetRole, callerName) {
+  try {
+    const db = await getDb(centerId);
+    let Model;
+    if (targetRole === 'student')         Model = db.models.Student || db.model('Student', studentSchema);
+    else if (targetRole === 'teacher')    Model = db.models.Teacher || db.model('Teacher', teacherSchema);
+    else if (targetRole === 'admin' || targetRole === 'subAdmin')
+                                          Model = db.models.Admin   || db.model('Admin',   adminSchema);
+    else return;
+
+    const doc = await Model.findById(targetUserId).select('pushSubscription').lean();
+    if (!doc?.pushSubscription?.endpoint) return;
+
+    await sendPush(doc.pushSubscription, {
+      title: `📞 ${callerName} is ringing you`,
+      body:  'Open the app to answer',
+      icon:  '/icons/icon.svg',
+      badge: '/icons/icon.svg',
+      data:  { url: '/' },
+    });
+  } catch (err) {
+    logger.warn('sendRingPush error:', { error: err?.message });
   }
 }
 
@@ -366,7 +397,7 @@ export async function initializeSocket(httpServer) {
     // ── Ring / attention-call ─────────────────────────────────────────────────
     // Caller emits ring-call → server forwards incoming-ring to target's user-room.
     // The ring plays client-side audio and auto-cancels after RING_TIMEOUT_MS.
-    socket.on('ring-call', ({ targetUserId, callerName }) => {
+    socket.on('ring-call', ({ targetUserId, targetRole, callerName }) => {
       try {
         if (!targetUserId || !callerName) return;
 
@@ -407,7 +438,7 @@ export async function initializeSocket(httpServer) {
           callerName,
           callerRoom,
           targetUserId,
-          targetRole:  null, // filled on join-user-room; best-effort
+          targetRole:  targetRole || null,
           targetRoom,
           centerId:   socket.centerId,
           timeout,
@@ -422,6 +453,11 @@ export async function initializeSocket(httpServer) {
 
         socket.emit('ring-sent', { ringId, targetUserId });
         logger.info(`🔔 Ring ${ringId}: ${socket.userId} (${socket.userRole}) → ${targetUserId}`);
+
+        // Push notification so the target is alerted even when the app is in background
+        if (targetRole) {
+          sendRingPush(socket.centerId, targetUserId, targetRole, callerName).catch(() => {});
+        }
       } catch (err) { logger.error('ring-call error:', { error: err?.message }); }
     });
 

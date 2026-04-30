@@ -3,15 +3,16 @@
 // Warm amber/orange palette · grouped sidebar nav · Nunito font · dark mode support.
 // Same design language as student/teacher Sunshine shells.
 
-import React, { useState, useEffect, useMemo, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react';
 import {
   TrendingUp, Video, User, Home, Bell, Users, DollarSign,
-  Calendar, BarChart3, AlertTriangle, MessageCircle,
+  Calendar, BarChart3, AlertTriangle, MessageCircle, Mic,
   BookOpen, Shield, CalendarDays, FileText, Star, Palette, Globe,
   Settings, LogOut, CheckCircle2, ClipboardList, Award,
 } from 'lucide-react';
 import { useNavigate }            from 'react-router-dom';
 import { useAuth }                from '../../../../context/AuthContext.jsx';
+import { useRing }               from '../../../../context/RingContext';
 import { useBranding }            from '../../../../context/BrandingContext';
 import { useDarkMode }            from '../../../../hooks/useDarkMode';
 import { TabErrorBoundary }       from '../../../../components/ErrorBoundary';
@@ -37,7 +38,8 @@ const DisputeReview      = lazy(() => import('../../../../components/admin/Dispu
 const AnalyticsDashboard = lazy(() => import('../../../../components/analytics/AnalyticsDashboard'));
 const SubAdminsTab       = lazy(() => import('../../tabs/SubAdminsTab'));
 const TeacherScheduleTab = lazy(() => import('../../tabs/TeacherScheduleTab'));
-const ChatCreditsTab     = lazy(() => import('../../tabs/ChatCreditsTab'));
+const ChatCreditsTab          = lazy(() => import('../../tabs/ChatCreditsTab'));
+const PronunciationCreditsTab = lazy(() => import('../../tabs/PronunciationCreditsTab'));
 const RecordingsTab      = lazy(() => import('../../tabs/RecordingsTab'));
 const ReportsTab         = lazy(() => import('../../tabs/ReportsTab'));
 const ReviewsTab         = lazy(() => import('../../tabs/ReviewsTab'));
@@ -49,6 +51,11 @@ const GroupClassesTab                = lazy(() => import('../../tabs/GroupClasse
 const CertificatesTab                = lazy(() => import('../../tabs/CertificatesTab'));
 const CertificateTemplateSettingsTab = lazy(() => import('../../tabs/CertificateTemplateSettingsTab'));
 const ParentsTab                     = lazy(() => import('../../tabs/ParentsTab'));
+
+// ── Heartbeat intervals ───────────────────────────────────────────────────────
+const TICK_MS     = 30_000;
+const TICK_NOTIF  = 2;   // every 60s — unread notification count
+const TICK_PEOPLE = 6;   // every 3 min — teachers + students lists
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 const palette = (dark) => ({
@@ -109,8 +116,9 @@ const NAV_GROUPS = [
     items: [
       { key: 'payments',      label: 'Payments',      lucide: DollarSign     },
       { key: 'class-pricing', label: 'Class Pricing', lucide: DollarSign     },
-      { key: 'chat-credits',  label: 'Chat Credits',  lucide: MessageCircle  },
-      { key: 'disputes',      label: 'Disputes',      lucide: AlertTriangle  },
+      { key: 'chat-credits',          label: 'Chat Credits',          lucide: MessageCircle  },
+      { key: 'pronunciation-credits', label: 'Pronunciation Credits', lucide: Mic            },
+      { key: 'disputes',              label: 'Disputes',              lucide: AlertTriangle  },
     ],
   },
   {
@@ -147,6 +155,7 @@ export default function SunshineShell() {
   const { isDarkMode, toggleDarkMode } = useDarkMode();
   const col = palette(isDarkMode);
   const centerName = center?.centerName || 'Admin Panel';
+  const { missedCalls, missedCallCount, clearMissedCalls } = useRing();
 
   const [activeTab,       setActiveTab]       = useState('overview');
   const [teachers,        setTeachers]        = useState([]);
@@ -176,17 +185,37 @@ export default function SunshineShell() {
     })();
   }, []);
 
-  useEffect(() => {
-    const fetchUnread = async () => {
-      try {
-        const res = await api.get('/notifications/unread-count');
-        if (res.data.success) setUnreadNotif(res.data.count);
-      } catch (_) {}
-    };
-    fetchUnread();
-    const t = setInterval(fetchUnread, 60000);
-    return () => clearInterval(t);
+  const refreshNotif = useCallback(async () => {
+    // Skip if the token is missing entirely — avoids a guaranteed 401 when
+    // sessionStorage was cleared (tab restore after browser restart, etc.)
+    if (!sessionStorage.getItem('adminToken')) return;
+    try {
+      const res = await api.get('/notifications/unread-count');
+      if (res.data.success) setUnreadNotif(res.data.count);
+    } catch (_) {}
   }, []);
+
+  const refreshPeople = useCallback(async () => {
+    try {
+      const [t, s] = await Promise.all([getTeachers(), getStudents()]);
+      setTeachers(t);
+      setStudents(s);
+    } catch (_) {}
+  }, []);
+
+  // ── Heartbeat — single interval, visibility-aware ─────────────────────────
+  useEffect(() => {
+    refreshNotif();
+    const tickRef = { current: 0 };
+    const id = setInterval(() => {
+      if (document.visibilityState === 'hidden') return;
+      tickRef.current += 1;
+      const tick = tickRef.current;
+      if (tick % TICK_NOTIF  === 0) refreshNotif();
+      if (tick % TICK_PEOPLE === 0) refreshPeople();
+    }, TICK_MS);
+    return () => clearInterval(id);
+  }, [refreshNotif, refreshPeople]);
 
   const handleLogout = () => { authLogout(); navigate('/admin/login'); };
   const handleNotify = (note) => {
@@ -214,7 +243,8 @@ export default function SunshineShell() {
       case 'messages':          return <MessagesTab userRole="admin" onUnreadCount={setUnreadMessages} />;
       case 'payments':          return <PaymentsTab isDarkMode={isDarkMode} />;
       case 'class-pricing':     return <ClassPricingTab isDarkMode={isDarkMode} />;
-      case 'chat-credits':      return <ChatCreditsTab isDarkMode={isDarkMode} />;
+      case 'chat-credits':          return <ChatCreditsTab isDarkMode={isDarkMode} />;
+      case 'pronunciation-credits': return <PronunciationCreditsTab isDarkMode={isDarkMode} />;
       case 'disputes':          return <DisputeReview isDarkMode={isDarkMode} />;
       case 'recordings':        return <RecordingsTab teachers={teachers} isDarkMode={isDarkMode} />;
       case 'reports':           return <ReportsTab students={students} isDarkMode={isDarkMode} />;
@@ -298,7 +328,8 @@ export default function SunshineShell() {
               )}
               {group.items.map(item => {
                 const isActive = activeTab === item.key;
-                const badge = item.key === 'messages' ? (unreadMessages || null)
+                const msgBadge = (unreadMessages || 0) + missedCallCount;
+                const badge = item.key === 'messages' ? (msgBadge || null)
                             : item.key === 'notifications' ? (unreadNotif || null)
                             : null;
                 return (
@@ -419,6 +450,41 @@ export default function SunshineShell() {
                   ))}
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* Missed calls alert — visible on overview */}
+          {showHero && missedCallCount > 0 && (
+            <div style={{ background: isDarkMode ? 'rgba(239,68,68,0.1)' : '#fff5f5', border: `2px solid ${isDarkMode ? 'rgba(239,68,68,0.3)' : '#fecaca'}`, borderRadius: 20, padding: '16px 20px', display: 'flex', gap: 16, alignItems: 'flex-start', marginBottom: 24 }}>
+              <div style={{ width: 44, height: 44, borderRadius: 14, background: 'linear-gradient(135deg,#ef4444,#dc2626)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 4px 12px rgba(239,68,68,0.35)' }}>
+                <AlertTriangle size={20} color='#fff' />
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                  <h3 style={{ margin: 0, fontSize: 14, fontWeight: 900, color: isDarkMode ? '#fca5a5' : '#dc2626', fontFamily: F }}>
+                    {missedCallCount} Missed Call{missedCallCount > 1 ? 's' : ''}
+                  </h3>
+                  <span style={{ fontSize: 11, color: col.muted, fontWeight: 600 }}>while you were away</span>
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  {missedCalls.map((mc, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, background: isDarkMode ? 'rgba(255,255,255,0.06)' : '#fff', border: `1px solid ${isDarkMode ? 'rgba(239,68,68,0.2)' : '#fecaca'}`, borderRadius: 12, padding: '7px 12px' }}>
+                      <div style={{ width: 30, height: 30, borderRadius: 10, background: 'linear-gradient(135deg,#ef4444,#f97316)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 900, color: '#fff', flexShrink: 0 }}>
+                        {(mc.callerName?.[0] || '?').toUpperCase()}
+                      </div>
+                      <div>
+                        <p style={{ margin: 0, fontSize: 12, fontWeight: 800, color: col.heading, lineHeight: 1.2 }}>{mc.callerName}</p>
+                        <p style={{ margin: 0, fontSize: 10, color: col.muted, fontWeight: 600 }}>
+                          {mc.callerRole === 'teacher' ? 'Teacher' : mc.callerRole === 'student' ? 'Student' : mc.callerRole} · {new Date(mc.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <button onClick={clearMissedCalls} style={{ background: isDarkMode ? 'rgba(255,255,255,0.08)' : '#fff', border: `1px solid ${isDarkMode ? 'rgba(255,255,255,0.12)' : '#fecaca'}`, borderRadius: 10, padding: '6px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 700, color: col.muted, flexShrink: 0, fontFamily: F }}>
+                ✓ Mark seen
+              </button>
             </div>
           )}
 

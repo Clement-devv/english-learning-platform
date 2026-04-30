@@ -3,14 +3,25 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Users, Plus, X, ChevronDown, ChevronUp, RefreshCw, Loader2 } from 'lucide-react';
 import api from '../../../api';
+import { formatDateInTZ, getUserTimezone, tzAbbr } from '../../../utils/timezone';
 
 const F = "'Nunito','Inter',sans-serif";
+const adminTZ = getUserTimezone();
 
 const LEVELS   = ['A1','A2','B1','B2','C1','C2','Mixed'];
 const STATUSES = ['open','full','in-progress','completed','cancelled'];
 
-const fmtDate = (iso) =>
-  new Date(iso).toLocaleString('en-GB', { day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
+// Show the time in the teacher's stored timezone (if available) + admin's local time
+const fmtDate = (iso, teacherTimezone) => {
+  if (teacherTimezone && teacherTimezone !== adminTZ) {
+    const teacherTime = formatDateInTZ(iso, teacherTimezone);
+    const adminTime   = formatDateInTZ(iso, adminTZ);
+    const tAbbr = tzAbbr(teacherTimezone);
+    const aAbbr = tzAbbr(adminTZ);
+    return `${teacherTime} ${tAbbr} · ${adminTime} ${aAbbr} (you)`;
+  }
+  return `${formatDateInTZ(iso, adminTZ)} (${tzAbbr(adminTZ)})`;
+};
 
 const STATUS_COLOR = {
   open:        '#10b981',
@@ -241,7 +252,7 @@ export default function GroupClassesTab({ isDarkMode }) {
                   </div>
                   <div style={{ fontSize: 13, color: col.muted, marginTop: 4, display: 'flex', gap: 16, flexWrap: 'wrap' }}>
                     <span>👨‍🏫 {teacherName(gc.teacherId?._id || gc.teacherId)}</span>
-                    <span>📅 {fmtDate(gc.scheduledTime)}</span>
+                    <span>📅 {fmtDate(gc.scheduledTime, gc.teacherTimezone)}</span>
                     <span>⏱ {gc.duration}min</span>
                     <span>👥 {gc.enrollments?.length || 0}/{gc.maxSeats} seats</span>
                     <span>💳 {gc.pricePerSeat} credit/seat</span>

@@ -4,11 +4,27 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Users, Video, RefreshCw, Loader2, LogIn } from 'lucide-react';
 import api from '../../../api';
 import Classroom from '../../Classroom';
+import { formatDateInTZ, getUserTimezone, dualTime } from '../../../utils/timezone';
 
 const F = "'Nunito','Inter',sans-serif";
+const myTZ = getUserTimezone();
 
-const fmtDate = (iso) =>
-  new Date(iso).toLocaleString('en-GB', { day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
+// Show the time in the student's local timezone. If the teacher's timezone
+// differs, also show the teacher's local time so students know the reference.
+function GCTime({ scheduledTime, teacherTimezone }) {
+  const dt = dualTime(scheduledTime, myTZ, teacherTimezone || myTZ);
+  if (!dt) return null;
+  const dateLabel = formatDateInTZ(scheduledTime, myTZ);
+  if (dt.sameZone || !teacherTimezone) {
+    return <span>📅 {dateLabel} ({dt.myAbbr})</span>;
+  }
+  return (
+    <span>
+      📅 {dateLabel} ({dt.myAbbr})
+      <span style={{ opacity: 0.75, marginLeft: 4 }}>· {dt.theirTime} {dt.theirAbbr} teacher</span>
+    </span>
+  );
+}
 
 const STATUS_COLOR = {
   open:         '#10b981',
@@ -186,7 +202,7 @@ export default function GroupClassTab({ isDarkMode, studentInfo }) {
 
                   <div style={{ fontSize: 13, color: col.muted, display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 6 }}>
                     <span>👨‍🏫 {gc.teacherId?.firstName ? `${gc.teacherId.firstName} ${gc.teacherId.lastName}` : 'Teacher'}</span>
-                    <span>📅 {fmtDate(gc.scheduledTime)}</span>
+                    <GCTime scheduledTime={gc.scheduledTime} teacherTimezone={gc.teacherTimezone} />
                     <span>⏱ {gc.duration}min</span>
                     <span>💳 {gc.pricePerSeat} credit{gc.pricePerSeat !== 1 ? 's' : ''}</span>
                     {tab === 'browse' && <span style={{ color: seatsLeft <= 2 ? '#f59e0b' : col.muted }}>🪑 {seatsLeft} seat{seatsLeft !== 1 ? 's' : ''} left</span>}

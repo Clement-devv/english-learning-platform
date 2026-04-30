@@ -1,13 +1,11 @@
 // src/pages/admin/tabs/ClassesTab.jsx
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { useAuth } from "../../../context/AuthContext.jsx";
 import {
   Video, ExternalLink, RefreshCw, Radio, Clock, BookOpen,
   AlertCircle, Monitor, Calendar, Loader2, X, Wifi, WifiOff,
   CheckCircle2,
 } from "lucide-react";
 import { getAllBookings } from "../../../services/bookingService";
-import VideoCall from "../../VideoCall";
 import api from "../../../api";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -290,14 +288,60 @@ function UpcomingRow({ booking, dm }) {
   );
 }
 
-// ── Agora monitor modal ───────────────────────────────────────────────────────
+// ── Agora spectator modal (subscribe-only — admin cannot publish) ─────────────
 function AgoraModal({ booking, onClose, dm }) {
-  const { user: adminInfo } = useAuth();
-  const adminId   = adminInfo?._id || `admin_${Date.now()}`;
-  const adminName = adminInfo?.email ? `Admin (${adminInfo.email})` : "Admin";
+  const [phase,       setPhase]       = useState("connecting");
+  const [errorMsg,    setErrorMsg]    = useState("");
+  const [remoteUsers, setRemoteUsers] = useState([]);
+  const clientRef = useRef(null);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const AgoraRTC = (await import("agora-rtc-sdk-ng")).default;
+        if (!mounted) return;
+
+        const { data } = await api.get(`/agora/token?channel=${booking._id}`);
+        if (!data.success || !data.appId) throw new Error(data.message || "Could not get Agora token");
+        if (!mounted) return;
+
+        const client = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
+        clientRef.current = client;
+
+        client.on("user-published", async (user, mediaType) => {
+          await client.subscribe(user, mediaType);
+          if (mediaType === "audio") user.audioTrack?.play();
+          if (mediaType === "video") {
+            setRemoteUsers((prev) => {
+              const entry = { uid: user.uid, videoTrack: user.videoTrack };
+              return prev.find((u) => u.uid === user.uid)
+                ? prev.map((u) => (u.uid === user.uid ? entry : u))
+                : [...prev, entry];
+            });
+          }
+        });
+        client.on("user-unpublished", (user, mediaType) => {
+          if (mediaType === "audio") user.audioTrack?.stop();
+          if (mediaType === "video") setRemoteUsers((prev) => prev.filter((u) => u.uid !== user.uid));
+        });
+        client.on("user-left", (user) =>
+          setRemoteUsers((prev) => prev.filter((u) => u.uid !== user.uid))
+        );
+
+        await client.join(data.appId, data.channel, data.token, null);
+        if (!mounted) return;
+        setPhase("connected");
+      } catch (e) {
+        if (mounted) { setPhase("error"); setErrorMsg(e.message); }
+      }
+    })();
+    return () => { mounted = false; clientRef.current?.leave().catch(() => {}); };
+  }, [booking._id]);
 
   return (
     <div className="fixed inset-0 bg-black/80 z-50 flex flex-col">
+      {/* Header */}
       <div className={`flex items-center justify-between px-5 py-3 border-b flex-shrink-0
         ${dm ? "bg-[#13161f] border-[#1e2235]" : "bg-slate-900 border-slate-700"}`}>
         <div className="flex items-center gap-3">
@@ -309,7 +353,7 @@ function AgoraModal({ booking, onClose, dm }) {
             Monitoring: {booking.classTitle}
           </span>
           <span className="text-slate-400 text-xs">
-            ({booking.teacherId?.firstName} → {booking.studentId?.firstName})
+            ({booking.teacherId?.firstName} → {booking.studentId?.firstName}) · Spectator only
           </span>
         </div>
         <button
@@ -319,15 +363,55 @@ function AgoraModal({ booking, onClose, dm }) {
           <X size={14} /> Leave
         </button>
       </div>
-      <div className="flex-1 overflow-hidden">
-        <VideoCall
-          channelName={booking._id}
-          userId={adminId}
-          userName={adminName}
-          onLeave={onClose}
-          mode="video"
-        />
+
+      {/* Body */}
+      <div className="flex-1 flex flex-col items-center justify-center gap-4 p-6 overflow-auto">
+        {phase === "connecting" && (
+          <>
+            <Loader2 size={36} className="text-violet-400 animate-spin" />
+            <p className="text-slate-300 text-sm">Joining as spectator…</p>
+          </>
+        )}
+        {phase === "error" && (
+          <>
+            <AlertCircle size={36} className="text-red-400" />
+            <p className="text-red-400 font-semibold text-sm">Failed to connect</p>
+            <p className="text-slate-400 text-xs">{errorMsg}</p>
+          </>
+        )}
+        {phase === "connected" && remoteUsers.length === 0 && (
+          <>
+            <Monitor size={36} className="text-slate-500" />
+            <p className="text-slate-400 text-sm">Connected — waiting for video from teacher or student</p>
+          </>
+        )}
+        {remoteUsers.length > 0 && (
+          <div className="flex flex-wrap gap-4 w-full justify-center">
+            {remoteUsers.map((u) => (
+              <RemoteVideoTile key={u.uid} uid={u.uid} videoTrack={u.videoTrack} />
+            ))}
+          </div>
+        )}
       </div>
+    </div>
+  );
+}
+
+function RemoteVideoTile({ uid, videoTrack }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    if (videoTrack && ref.current) {
+      videoTrack.play(ref.current);
+      return () => videoTrack.stop();
+    }
+  }, [videoTrack]);
+  return (
+    <div className="relative rounded-xl overflow-hidden bg-slate-900 border border-slate-700"
+      style={{ width: "480px", maxWidth: "100%", aspectRatio: "16/9" }}>
+      <div ref={ref} className="w-full h-full" />
+      <span className="absolute bottom-2 left-2 text-xs bg-black/60 text-white px-2 py-0.5 rounded-full">
+        UID {uid}
+      </span>
     </div>
   );
 }

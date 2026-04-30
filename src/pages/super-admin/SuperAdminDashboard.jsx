@@ -11,6 +11,7 @@ import {
   AlertTriangle, RotateCcw, Zap, Send, Activity, Users, UserCheck, LogIn, Megaphone, SlidersHorizontal, Award,
 } from 'lucide-react';
 import api from '../../api';
+import { TIMEZONE_OPTIONS } from '../../utils/timezone';
 import { THEMES } from '../../data/themes';
 import { LOGIN_THEMES, TEACHER_LOGIN_THEMES } from '../../data/loginThemes';
 import { DASHBOARD_THEMES } from '../../data/dashboardThemes';
@@ -29,12 +30,6 @@ import CertificateTemplatesTab from './tabs/CertificateTemplatesTab';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api/v1';
 
-const TIMEZONES = [
-  'UTC','Africa/Lagos','Africa/Nairobi','Africa/Accra','Africa/Cairo',
-  'America/New_York','America/Chicago','America/Denver','America/Los_Angeles',
-  'America/Sao_Paulo','Asia/Dubai','Asia/Kolkata','Asia/Singapore',
-  'Asia/Tokyo','Australia/Sydney','Europe/London','Europe/Paris','Europe/Berlin',
-];
 
 const EMPTY_FORM = {
   centerName: '', slug: '', adminEmail: '', password: '',
@@ -134,13 +129,25 @@ export default function SuperAdminDashboard() {
   const [creditCenters,    setCreditCenters]    = useState([]);
   const [creditTotals,     setCreditTotals]     = useState(null);
   const [creditLoading,    setCreditLoading]    = useState(false);
-  const [allocModal,       setAllocModal]       = useState(null);  // center object
+  const [allocModal,       setAllocModal]       = useState(null);
   const [allocAmount,      setAllocAmount]      = useState('');
   const [allocNote,        setAllocNote]        = useState('');
   const [allocating,       setAllocating]       = useState(false);
   const [allocMsg,         setAllocMsg]         = useState('');
   const [creditSearch,     setCreditSearch]     = useState('');
-  const [expandedLog,      setExpandedLog]      = useState(null);  // centerId
+  const [expandedLog,      setExpandedLog]      = useState(null);
+
+  // ── Pronunciation Credits ─────────────────────────────────────────────────
+  const [pronCenters,      setPronCenters]      = useState([]);
+  const [pronTotals,       setPronTotals]       = useState(null);
+  const [pronLoading,      setPronLoading]      = useState(false);
+  const [pronAllocModal,   setPronAllocModal]   = useState(null);
+  const [pronAllocAmount,  setPronAllocAmount]  = useState('');
+  const [pronAllocNote,    setPronAllocNote]    = useState('');
+  const [pronAllocating,   setPronAllocating]   = useState(false);
+  const [pronAllocMsg,     setPronAllocMsg]     = useState('');
+  const [pronSearch,       setPronSearch]       = useState('');
+  const [pronExpandedLog,  setPronExpandedLog]  = useState(null);
 
   // ── People tab ───────────────────────────────────────────────────────────
   const [peopleCenter,  setPeopleCenter]  = useState('');
@@ -600,6 +607,15 @@ export default function SuperAdminDashboard() {
       .finally(() => setCreditLoading(false));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const loadPronCredits = useCallback(() => {
+    setPronLoading(true);
+    fetch(`${API_BASE}/super-admin/pronunciation-credits`, { headers: authHeaders })
+      .then(r => r.json())
+      .then(d => { if (d.success) { setPronCenters(d.centers); setPronTotals(d.totals); } })
+      .catch(() => {})
+      .finally(() => setPronLoading(false));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const loadCenterPeople = useCallback((centerId) => {
     if (!centerId) return;
     setPeopleLoading(true);
@@ -629,7 +645,7 @@ export default function SuperAdminDashboard() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { loadData(); }, [loadData]);
-  useEffect(() => { if (tab === 'credits') loadCredits(); }, [tab, loadCredits]);
+  useEffect(() => { if (tab === 'credits') { loadCredits(); loadPronCredits(); } }, [tab, loadCredits, loadPronCredits]);
   useEffect(() => { if (tab === 'health')  loadHealth();  }, [tab, loadHealth]);
   useEffect(() => { if (tab === 'classes') loadClasses('', '', ''); }, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1134,6 +1150,10 @@ export default function SuperAdminDashboard() {
               loadCredits={loadCredits} creditSearch={creditSearch} setCreditSearch={setCreditSearch}
               expandedLog={expandedLog} setExpandedLog={setExpandedLog}
               setAllocModal={setAllocModal} setAllocAmount={setAllocAmount} setAllocNote={setAllocNote} setAllocMsg={setAllocMsg}
+              pronCenters={pronCenters} pronLoading={pronLoading} pronTotals={pronTotals}
+              loadPronCredits={loadPronCredits} pronSearch={pronSearch} setPronSearch={setPronSearch}
+              pronExpandedLog={pronExpandedLog} setPronExpandedLog={setPronExpandedLog}
+              setPronAllocModal={setPronAllocModal} setPronAllocAmount={setPronAllocAmount} setPronAllocNote={setPronAllocNote} setPronAllocMsg={setPronAllocMsg}
             />
           )}
           {tab === 'people' && (
@@ -1348,6 +1368,89 @@ export default function SuperAdminDashboard() {
                   style={{ flex: 2, padding: '10px', borderRadius: 10, border: 'none', background: allocating || !allocAmount ? '#374151' : 'linear-gradient(135deg,#7c3aed,#4f46e5)', color: '#fff', fontWeight: 700, cursor: allocating || !allocAmount ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
                 >
                   <Send size={13} /> {allocating ? 'Allocating…' : 'Allocate Credits'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Pronunciation Credits Alloc Modal ── */}
+      {pronAllocModal && (
+        <div style={s.overlay} onClick={e => e.target === e.currentTarget && !pronAllocating && setPronAllocModal(null)}>
+          <div style={{ ...s.modal, maxWidth: 420 }}>
+            <div style={s.modalHeader}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: 16 }}>🎤</span>
+                <span style={s.modalTitle}>Allocate Pronunciation Credits</span>
+              </div>
+              {!pronAllocating && <button onClick={() => setPronAllocModal(null)} style={s.closeBtn}><X size={18} /></button>}
+            </div>
+
+            <div style={{ padding: 24 }}>
+              <div style={{ background: 'rgba(249,115,22,0.08)', border: '1px solid rgba(249,115,22,0.2)', borderRadius: 10, padding: '12px 14px', marginBottom: 18 }}>
+                <p style={{ margin: '0 0 2px', fontWeight: 700, color: '#f1f5f9', fontSize: 14 }}>{pronAllocModal.centerName}</p>
+                <p style={{ margin: 0, fontSize: 12, color: '#9ca3af' }}>{pronAllocModal.adminEmail}</p>
+                <p style={{ margin: '6px 0 0', fontSize: 12, color: '#fb923c', fontWeight: 600 }}>
+                  Current balance: <strong>{pronAllocModal.balance.toLocaleString()}</strong> credits
+                </p>
+              </div>
+
+              <p style={{ margin: '0 0 8px', fontSize: 12, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Quick amounts</p>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
+                {[100, 250, 500, 1000, 2000, 5000].map(n => (
+                  <button key={n} onClick={() => setPronAllocAmount(String(n))}
+                    style={{ padding: '6px 14px', borderRadius: 8, fontWeight: 700, fontSize: 12, cursor: 'pointer', border: pronAllocAmount === String(n) ? '2px solid #f97316' : '1px solid #374151', background: pronAllocAmount === String(n) ? 'rgba(249,115,22,0.2)' : 'rgba(255,255,255,0.04)', color: pronAllocAmount === String(n) ? '#fb923c' : '#9ca3af' }}>
+                    {n.toLocaleString()}
+                  </button>
+                ))}
+              </div>
+
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#9ca3af', marginBottom: 4, textTransform: 'uppercase' }}>Amount *</label>
+              <input type="number" min="1" max="100000" value={pronAllocAmount} onChange={e => setPronAllocAmount(e.target.value)}
+                placeholder="e.g. 500" style={{ ...s.input, width: '100%', boxSizing: 'border-box', marginBottom: 12 }} />
+
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#9ca3af', marginBottom: 4, textTransform: 'uppercase' }}>Note (optional)</label>
+              <input value={pronAllocNote} onChange={e => setPronAllocNote(e.target.value)} placeholder="e.g. Monthly allocation"
+                style={{ ...s.input, width: '100%', boxSizing: 'border-box', marginBottom: 18 }} />
+
+              {pronAllocMsg && (
+                <p style={{ margin: '0 0 14px', fontSize: 13, fontWeight: 700, color: pronAllocMsg.startsWith('✅') ? '#34d399' : '#f87171' }}>{pronAllocMsg}</p>
+              )}
+
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button onClick={() => setPronAllocModal(null)} disabled={pronAllocating}
+                  style={{ flex: 1, padding: '10px', borderRadius: 10, border: '1px solid #374151', background: 'transparent', color: '#9ca3af', fontWeight: 600, cursor: 'pointer' }}>
+                  Cancel
+                </button>
+                <button disabled={pronAllocating || !pronAllocAmount}
+                  onClick={async () => {
+                    const amt = parseInt(pronAllocAmount, 10);
+                    if (!amt || amt < 1 || amt > 100000) { setPronAllocMsg('Enter a valid amount (1–100,000)'); return; }
+                    setPronAllocating(true); setPronAllocMsg('');
+                    try {
+                      const res = await fetch(`${API_BASE}/super-admin/pronunciation-credits/${pronAllocModal._id}`, {
+                        method: 'POST', headers: { ...authHeaders, 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ amount: amt, note: pronAllocNote.trim() || undefined }),
+                      });
+                      const d = await res.json();
+                      if (d.success) {
+                        setPronAllocMsg(`✅ ${amt.toLocaleString()} credits allocated! New balance: ${d.balance.toLocaleString()}`);
+                        setPronCenters(prev => prev.map(c =>
+                          c._id === pronAllocModal._id
+                            ? { ...c, balance: d.balance, totalAllocated: d.totalAllocated, used: d.totalAllocated - d.balance }
+                            : c
+                        ));
+                        setPronTotals(prev => prev ? { ...prev, totalBalance: prev.totalBalance + amt, totalAllocated: prev.totalAllocated + amt } : prev);
+                        setPronAllocModal(null);
+                      } else {
+                        setPronAllocMsg('❌ ' + (d.message || 'Failed'));
+                      }
+                    } catch { setPronAllocMsg('❌ Network error'); }
+                    finally { setPronAllocating(false); }
+                  }}
+                  style={{ flex: 2, padding: '10px', borderRadius: 10, border: 'none', background: pronAllocating || !pronAllocAmount ? '#374151' : 'linear-gradient(135deg,#f97316,#fb923c)', color: '#fff', fontWeight: 700, cursor: pronAllocating || !pronAllocAmount ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                  🎤 {pronAllocating ? 'Allocating…' : 'Allocate Credits'}
                 </button>
               </div>
             </div>
@@ -2632,7 +2735,7 @@ export default function SuperAdminDashboard() {
                       onChange={e => setForm(f => ({ ...f, timezone: e.target.value }))}
                       disabled={creating}
                     >
-                      {TIMEZONES.map(tz => <option key={tz} value={tz}>{tz}</option>)}
+                      {TIMEZONE_OPTIONS.map(tz => <option key={tz.value} value={tz.value}>{tz.label}</option>)}
                     </select>
                   </div>
                 </div>

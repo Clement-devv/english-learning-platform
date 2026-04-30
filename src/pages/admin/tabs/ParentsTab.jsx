@@ -17,16 +17,17 @@ export default function ParentsTab({ isDarkMode }) {
     input:   isDarkMode ? '#0f1117' : '#fff8f0',
   };
 
-  const [parents,    setParents]    = useState([]);
-  const [students,   setStudents]   = useState([]);
-  const [loading,    setLoading]    = useState(true);
-  const [msg,        setMsg]        = useState('');
-  const [isErr,      setIsErr]      = useState(false);
-  const [search,     setSearch]     = useState('');
-  const [showModal,  setShowModal]  = useState(false);
-  const [editParent, setEditParent] = useState(null); // null = create, else parent obj
-  const [saving,     setSaving]     = useState(false);
-  const [resending,  setResending]  = useState(null);
+  const [parents,       setParents]       = useState([]);
+  const [students,      setStudents]      = useState([]);
+  const [loading,       setLoading]       = useState(true);
+  const [msg,           setMsg]           = useState('');
+  const [isErr,         setIsErr]         = useState(false);
+  const [search,        setSearch]        = useState('');
+  const [showModal,     setShowModal]     = useState(false);
+  const [editParent,    setEditParent]    = useState(null); // null = create, else parent obj
+  const [saving,        setSaving]        = useState(false);
+  const [resending,     setResending]     = useState(null);
+  const [studentSearch, setStudentSearch] = useState('');
 
   const EMPTY = { firstName: '', lastName: '', email: '', phone: '', children: [], notes: '' };
   const [form, setForm] = useState(EMPTY);
@@ -51,7 +52,7 @@ export default function ParentsTab({ isDarkMode }) {
 
   useEffect(() => { load(); }, [load]);
 
-  const openCreate = () => { setEditParent(null); setForm(EMPTY); setShowModal(true); };
+  const openCreate = () => { setEditParent(null); setForm(EMPTY); setStudentSearch(''); setShowModal(true); };
   const openEdit   = (p) => {
     setEditParent(p);
     setForm({
@@ -59,6 +60,7 @@ export default function ParentsTab({ isDarkMode }) {
       phone: p.phone || '', notes: p.notes || '',
       children: (p.children || []).map(c => c._id || c),
     });
+    setStudentSearch('');
     setShowModal(true);
   };
 
@@ -242,18 +244,69 @@ export default function ParentsTab({ isDarkMode }) {
               <div>
                 <label style={{ fontSize: 12, fontWeight: 800, color: col.muted, textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 8 }}>
                   Link to Students
+                  {form.children.length > 0 && (
+                    <span style={{ marginLeft: 8, fontWeight: 700, color: col.accent, textTransform: 'none', letterSpacing: 0 }}>
+                      ({form.children.length} selected)
+                    </span>
+                  )}
                 </label>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                  {students.map(s => {
-                    const selected = form.children.includes(s._id);
-                    return (
-                      <button key={s._id} type="button" onClick={() => toggleChild(s._id)}
-                        style={{ background: selected ? 'linear-gradient(135deg,#f97316,#f43f5e)' : col.input, color: selected ? '#fff' : col.body, border: `1.5px solid ${selected ? 'transparent' : col.border}`, borderRadius: 10, padding: '6px 12px', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: F }}>
-                        {s.firstName} {s.lastName}
-                      </button>
-                    );
-                  })}
-                  {students.length === 0 && <span style={{ fontSize: 13, color: col.muted }}>No students found</span>}
+
+                {/* Selected student pills */}
+                {form.children.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 8 }}>
+                    {form.children.map(id => {
+                      const s = students.find(st => st._id === id);
+                      if (!s) return null;
+                      return (
+                        <span key={id} style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'linear-gradient(135deg,#f97316,#f43f5e)', color: '#fff', borderRadius: 999, padding: '3px 10px', fontSize: 12, fontWeight: 700 }}>
+                          {s.firstName} {s.lastName}
+                          <button type="button" onClick={() => toggleChild(id)}
+                            style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.8)', cursor: 'pointer', padding: 0, fontSize: 13, lineHeight: 1, marginTop: 1 }}>
+                            ×
+                          </button>
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Search input */}
+                <div style={{ position: 'relative', marginBottom: 4 }}>
+                  <Search size={13} color={col.muted} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+                  <input
+                    value={studentSearch}
+                    onChange={e => setStudentSearch(e.target.value)}
+                    placeholder="Search students…"
+                    style={{ ...inp, paddingLeft: 30 }}
+                  />
+                </div>
+
+                {/* Scrollable student list */}
+                <div style={{ border: `1.5px solid ${col.border}`, borderRadius: 12, maxHeight: 180, overflowY: 'auto', background: col.input }}>
+                  {students
+                    .filter(s => {
+                      if (!studentSearch.trim()) return true;
+                      const q = studentSearch.toLowerCase();
+                      return `${s.firstName} ${s.lastName}`.toLowerCase().includes(q);
+                    })
+                    .map(s => {
+                      const selected = form.children.includes(s._id);
+                      return (
+                        <label key={s._id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', cursor: 'pointer', borderBottom: `1px solid ${col.border}`, background: selected ? (isDarkMode ? 'rgba(249,115,22,0.1)' : '#fff7ed') : 'transparent' }}>
+                          <input type="checkbox" checked={selected} onChange={() => toggleChild(s._id)}
+                            style={{ width: 15, height: 15, accentColor: col.accent, cursor: 'pointer', flexShrink: 0 }} />
+                          <span style={{ fontSize: 13, fontWeight: selected ? 800 : 600, color: selected ? col.accent : col.body }}>
+                            {s.firstName} {s.lastName}
+                          </span>
+                        </label>
+                      );
+                    })}
+                  {students.length === 0 && (
+                    <div style={{ padding: '12px 14px', fontSize: 13, color: col.muted }}>No students found</div>
+                  )}
+                  {students.length > 0 && studentSearch.trim() && students.filter(s => `${s.firstName} ${s.lastName}`.toLowerCase().includes(studentSearch.toLowerCase())).length === 0 && (
+                    <div style={{ padding: '12px 14px', fontSize: 13, color: col.muted }}>No matching students</div>
+                  )}
                 </div>
               </div>
 

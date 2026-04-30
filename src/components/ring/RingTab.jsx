@@ -28,8 +28,9 @@ function getInitials(name = "") {
 }
 
 export default function RingTab({ isDark }) {
-  const { user, role }           = useAuth();
-  const { ringUser, cancelRing } = useRing();
+  const { user, role }                                               = useAuth();
+  const { ringUser, cancelRing, callerEvent, consumeCallerEvent,
+          missedCallCount, clearMissedCalls, socketConnected }       = useRing();
 
   const [contacts,    setContacts]    = useState([]);
   const [loading,     setLoading]     = useState(true);
@@ -78,6 +79,30 @@ export default function RingTab({ isDark }) {
       .catch(() => {});
   }, []);
 
+  // Clear missed-call badge whenever the Ring tab is mounted/visible
+  useEffect(() => {
+    clearMissedCalls();
+  }, [clearMissedCalls]);
+
+  // React to caller-side feedback: ring was answered or declined by the target
+  useEffect(() => {
+    if (!callerEvent) return;
+    clearTimeout(ringTimerRef.current);
+    const { type, by } = callerEvent;
+
+    setRingingId(null);
+    if (by) {
+      const byStr = by.toString();
+      setCallStatus(prev => ({ ...prev, [byStr]: type })); // "answered" | "declined"
+      setTimeout(() => setCallStatus(prev => {
+        const next = { ...prev };
+        if (next[byStr] === type) delete next[byStr];
+        return next;
+      }), type === "answered" ? 5000 : 3000);
+    }
+    consumeCallerEvent();
+  }, [callerEvent, consumeCallerEvent]);
+
   // ── Ring a contact ────────────────────────────────────────────────────────
   const handleRing = useCallback((contact) => {
     if (ringingId) return;
@@ -85,7 +110,7 @@ export default function RingTab({ isDark }) {
       ? `${user.firstName || ""} ${user.lastName || ""}`.trim() || "Someone"
       : "Someone";
 
-    ringUser({ targetUserId: contact.id, callerName });
+    ringUser({ targetUserId: contact.id, targetRole: contact.role, callerName });
     setRingingId(contact.id);
     setCallStatus(prev => ({ ...prev, [contact.id]: "calling" }));
 
@@ -101,7 +126,7 @@ export default function RingTab({ isDark }) {
   const handleCancel = useCallback(() => {
     if (!ringingId) return;
     clearTimeout(ringTimerRef.current);
-    cancelRing(ringingId);
+    cancelRing(); // uses internal ringId ref — no argument needed
     setCallStatus(prev => ({ ...prev, [ringingId]: "missed" }));
     setRingingId(null);
     setTimeout(() => setCallStatus(prev => {
@@ -154,6 +179,27 @@ export default function RingTab({ isDark }) {
         .ring-contact-card:hover { background: ${isDark ? "rgba(255,255,255,0.04)" : "rgba(99,102,241,0.04)"} !important; }
       `}</style>
 
+      {/* ── Session expired warning ── */}
+      {socketConnected === false && (
+        <div style={{
+          background: isDark ? "rgba(239,68,68,0.12)" : "#fef2f2",
+          borderBottom: `1px solid ${isDark ? "rgba(239,68,68,0.25)" : "#fecaca"}`,
+          padding: "10px 20px",
+          display: "flex", alignItems: "center", gap: "10px",
+          flexShrink: 0,
+        }}>
+          <span style={{ fontSize: "16px" }}>⚠️</span>
+          <div style={{ flex: 1 }}>
+            <p style={{ margin: 0, fontSize: "12px", fontWeight: "800", color: isDark ? "#fca5a5" : "#dc2626" }}>
+              Session expired — ring is offline
+            </p>
+            <p style={{ margin: 0, fontSize: "11px", color: isDark ? "#f87171" : "#ef4444", opacity: 0.8 }}>
+              Log out and back in to restore calling
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* ── Header ── */}
       <div style={{
         padding: "16px 20px 12px",
@@ -162,13 +208,26 @@ export default function RingTab({ isDark }) {
         flexShrink: 0,
       }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
-          <div>
-            <h3 style={{ margin: 0, fontSize: "15px", fontWeight: "800", color: C.text }}>
-              📞 Ring
-            </h3>
-            <p style={{ margin: "2px 0 0", fontSize: "11px", color: C.sub }}>
-              {contacts.length} contact{contacts.length !== 1 ? "s" : ""} available
-            </p>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <div>
+              <h3 style={{ margin: 0, fontSize: "15px", fontWeight: "800", color: C.text }}>
+                📞 Ring
+              </h3>
+              <p style={{ margin: "2px 0 0", fontSize: "11px", color: C.sub }}>
+                {contacts.length} contact{contacts.length !== 1 ? "s" : ""} available
+              </p>
+            </div>
+            {missedCallCount > 0 && (
+              <div style={{
+                background: "#ef4444", color: "#fff",
+                borderRadius: "20px", padding: "2px 9px",
+                fontSize: "11px", fontWeight: "800",
+                display: "flex", alignItems: "center", gap: "4px",
+              }}>
+                <PhoneMissed size={11} />
+                {missedCallCount} missed
+              </div>
+            )}
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
@@ -351,22 +410,22 @@ export default function RingTab({ isDark }) {
                     ) : (
                       <button
                         onClick={() => handleRing(contact)}
-                        disabled={!!ringingId}
+                        disabled={!!ringingId || socketConnected === false}
                         style={{
                           width: "40px", height: "40px", borderRadius: "50%",
-                          background: ringingId
+                          background: (ringingId || socketConnected === false)
                             ? (isDark ? "#1e2235" : "#f1f5f9")
                             : "linear-gradient(135deg,#6366f1,#8b5cf6)",
                           border: "none",
-                          cursor: ringingId ? "not-allowed" : "pointer",
+                          cursor: (ringingId || socketConnected === false) ? "not-allowed" : "pointer",
                           flexShrink: 0,
                           display: "flex", alignItems: "center", justifyContent: "center",
-                          opacity: ringingId ? 0.45 : 1,
+                          opacity: (ringingId || socketConnected === false) ? 0.35 : 1,
                           transition: "all 0.15s",
-                          boxShadow: ringingId ? "none" : "0 4px 14px rgba(99,102,241,0.4)",
+                          boxShadow: (ringingId || socketConnected === false) ? "none" : "0 4px 14px rgba(99,102,241,0.4)",
                           color: "#fff",
                         }}
-                        title={`Ring ${contact.name}`}
+                        title={socketConnected === false ? "Session expired — please log out and back in" : `Ring ${contact.name}`}
                       >
                         <Phone size={16} />
                       </button>

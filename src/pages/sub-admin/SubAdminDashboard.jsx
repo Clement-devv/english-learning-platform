@@ -1,6 +1,6 @@
 // src/pages/sub-admin/SubAdminDashboard.jsx
-// Shell router — reads branding.subAdminDashboardTheme and loads the correct shell.
-// Default: Sunshine Explorer.
+// Shell router — reads the center's active theme and loads the correct shell.
+// Falls back through: subAdminDashboardTheme → dashboardTheme (center primary) → sunshine.
 import React, { lazy, Suspense } from 'react';
 import { useBranding } from '../../context/BrandingContext';
 
@@ -19,7 +19,9 @@ function LoadingFallback() {
 
 export default function SubAdminDashboard() {
   const { branding } = useBranding();
-  const Shell = SHELLS[branding.subAdminDashboardTheme] || SHELLS.sunshine;
+  // Prefer a sub-admin-specific theme; fall back to the center's primary theme.
+  const themeKey = branding.subAdminDashboardTheme || branding.dashboardTheme;
+  const Shell = SHELLS[themeKey] || SHELLS.sunshine;
   return (
     <Suspense fallback={<LoadingFallback />}>
       <Shell />

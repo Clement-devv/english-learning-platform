@@ -5,7 +5,7 @@
 export const MAX_LOGIN_ATTEMPTS  = 10;
 export const ACCOUNT_LOCK_MS     = 60 * 60 * 1000;   // 1 hour
 export const SESSION_LIMIT       = 5;                  // max concurrent sessions per user
-export const SESSION_EXPIRY_DAYS = 7;                  // sessions older than this are purged
+export const SESSION_EXPIRY_DAYS = 30;                 // sessions inactive longer than this are purged
 
 // ── Password reset ────────────────────────────────────────────────────────────
 export const RESET_TOKEN_EXPIRY_MS = 60 * 60 * 1000;  // 1 hour

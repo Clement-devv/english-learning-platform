@@ -4,7 +4,7 @@ import jwt     from "jsonwebtoken";
 import crypto  from "crypto";
 import { config, JWT_STANDARD_CLAIMS } from "../config/config.js";
 import { loginLimiter, passwordResetLimiter } from "../middleware/rateLimiter.js";
-import { sendSubAdminInviteEmail, sendSubAdminWelcomeEmail } from "../utils/emailService.js";
+import { sendSubAdminInviteEmail, sendSubAdminWelcomeEmail, sendSubAdminForgotPasswordEmail } from "../utils/emailService.js";
 import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
 import { subAdminSchema }   from "../schemas/subAdminSchema.js";
 import { teacherSchema }    from "../schemas/teacherSchema.js";
@@ -140,6 +140,72 @@ router.post("/setup-account", passwordResetLimiter, async (req, res) => {
     res.json({ success: true, message: "Account activated successfully! You can now log in." });
   } catch (err) {
     logger.error("Setup account error:", { error: err?.message });
+    serverError(res);
+  }
+});
+
+// POST /api/sub-admin-auth/forgot-password
+router.post("/forgot-password", passwordResetLimiter, async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) return badRequest(res, "Email is required");
+
+    const SubAdmin = getSubAdmin(req.db);
+    const subAdmin = await SubAdmin.findOne({ email: email.toLowerCase().trim() });
+
+    if (!subAdmin)
+      return notFound(res, "No sub-admin account found with that email address.");
+    if (subAdmin.status === "pending")
+      return badRequest(res, "Your account is not yet activated. Use the setup link from your invitation email, or ask the admin to resend it.");
+    if (subAdmin.status === "suspended")
+      return forbidden(res, "Your account has been suspended. Contact the main administrator.");
+
+    const rawToken   = crypto.randomBytes(32).toString("hex");
+    const hashedToken = crypto.createHash("sha256").update(rawToken).digest("hex");
+
+    subAdmin.resetPasswordToken   = hashedToken;
+    subAdmin.resetPasswordExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+    await subAdmin.save();
+
+    const emailResult = await sendSubAdminForgotPasswordEmail(subAdmin, rawToken, req.center, req.center?.centerName || "");
+    if (!emailResult?.success) {
+      logger.error("Sub-admin forgot-password email failed:", emailResult?.error);
+      return serverError(res, "Could not send reset email. Please try again later.");
+    }
+
+    res.json({ success: true, message: "Password reset link sent successfully." });
+  } catch (err) {
+    logger.error("Sub-admin forgot-password error:", { error: err?.message });
+    serverError(res);
+  }
+});
+
+// POST /api/sub-admin-auth/reset-password/:token
+router.post("/reset-password/:token", passwordResetLimiter, async (req, res) => {
+  try {
+    const { password, confirmPassword } = req.body;
+    if (!password || !confirmPassword) return badRequest(res, "All fields are required");
+    if (password !== confirmPassword)   return badRequest(res, "Passwords do not match");
+    if (password.length < 8)           return badRequest(res, "Password must be at least 8 characters");
+
+    const hashedToken = crypto.createHash("sha256").update(req.params.token).digest("hex");
+
+    const SubAdmin = getSubAdmin(req.db);
+    const subAdmin = await SubAdmin.findOne({
+      resetPasswordToken:   hashedToken,
+      resetPasswordExpires: { $gt: new Date() },
+    });
+
+    if (!subAdmin) return badRequest(res, "Reset link is invalid or has expired. Please request a new one.");
+
+    subAdmin.password             = password; // hashed by pre-save hook
+    subAdmin.resetPasswordToken   = null;
+    subAdmin.resetPasswordExpires = null;
+    await subAdmin.save();
+
+    res.json({ success: true, message: "Password reset successfully. You can now log in." });
+  } catch (err) {
+    logger.error("Sub-admin reset-password error:", { error: err?.message });
     serverError(res);
   }
 });

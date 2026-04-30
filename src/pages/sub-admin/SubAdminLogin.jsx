@@ -3,9 +3,12 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff, Shield, ArrowRight, Loader2 } from "lucide-react";
 import { useBranding } from '../../context/BrandingContext';
+import { useAuth } from '../../context/AuthContext';
+import api from '../../api';
 
 export default function SubAdminLogin() {
   const navigate    = useNavigate();
+  const { login }   = useAuth();
   const [form, setForm] = useState({ email: "", password: "" });
   const [showPw, setShowPw]   = useState(false);
   const [loading, setLoading] = useState(false);
@@ -17,8 +20,7 @@ export default function SubAdminLogin() {
 
   useEffect(() => {
     setMounted(true);
-    // If already logged in, redirect
-    if (sessionStorage.getItem("subAdminToken") || localStorage.getItem("subAdminToken")) {
+    if (sessionStorage.getItem("subAdminToken")) {
       navigate("/sub-admin/dashboard");
     }
   }, []);
@@ -28,21 +30,19 @@ export default function SubAdminLogin() {
     setError("");
     setLoading(true);
     try {
-      const res = await fetch("/api/v1/sub-admin-auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      });
-      const data = await res.json();
+      // Use api (axios) not raw fetch — the interceptor adds x-center-slug so
+      // tenantMiddleware can identify the center, otherwise it returns 400.
+      const { data } = await api.post("/sub-admin-auth/login", form);
       if (data.success) {
-        localStorage.setItem("subAdminToken", data.token);
-        localStorage.setItem("subAdminInfo", JSON.stringify(data.subAdmin));
+        sessionStorage.setItem("subAdminToken", data.token);
+        sessionStorage.setItem("subAdminInfo", JSON.stringify(data.subAdmin));
+        login("sub-admin", data.subAdmin, data.token);
         navigate("/sub-admin/dashboard");
       } else {
         setError(data.message || "Login failed. Please check your credentials.");
       }
-    } catch {
-      setError("Network error. Please check your connection.");
+    } catch (err) {
+      setError(err?.response?.data?.message || "Network error. Please check your connection.");
     } finally {
       setLoading(false);
     }
@@ -215,6 +215,23 @@ export default function SubAdminLogin() {
                 </div>
               </div>
 
+              {/* Forgot password */}
+              <div style={{ textAlign: "right", marginTop: "-4px" }}>
+                <button
+                  type="button"
+                  onClick={() => navigate("/sub-admin/forgot-password")}
+                  style={{
+                    background: "none", border: "none", cursor: "pointer",
+                    color: "#374151", fontSize: "12.5px", fontWeight: "600",
+                    padding: 0, fontFamily: "inherit",
+                    transition: "color 0.15s",
+                  }}
+                  className="sa-forgot-btn"
+                >
+                  Forgot password?
+                </button>
+              </div>
+
               {/* Submit */}
               <button
                 type="submit"
@@ -295,4 +312,5 @@ const css = `
   * { box-sizing: border-box; }
   @keyframes sa-spin { to { transform: rotate(360deg); } }
   .sa-portal-btn:hover { background: rgba(255,255,255,0.04) !important; color: #9ca3af !important; }
+  .sa-forgot-btn:hover { color: #a5b4fc !important; }
 `;

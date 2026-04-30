@@ -8,7 +8,7 @@ const { VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_EMAIL } = process.env;
 
 if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
   webpush.setVapidDetails(
-    VAPID_EMAIL || "mailto:admin@example.com",
+    VAPID_EMAIL || "mailto:speak2clem@gmail.com",
     VAPID_PUBLIC_KEY,
     VAPID_PRIVATE_KEY
   );

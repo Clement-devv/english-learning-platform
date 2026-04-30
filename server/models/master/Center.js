@@ -112,7 +112,19 @@ const centerSchema = new mongoose.Schema({
     log: [{
       amount:    Number,
       note:      String,
-      by:        String,   // super admin username
+      by:        String,
+      createdAt: { type: Date, default: Date.now },
+    }],
+  },
+
+  // ── Pronunciation Credit Budget (allocated by super admin) ───────────────
+  pronunciationCredits: {
+    balance:        { type: Number, default: 0, min: 0 },
+    totalAllocated: { type: Number, default: 0 },
+    log: [{
+      amount:    Number,
+      note:      String,
+      by:        String,
       createdAt: { type: Date, default: Date.now },
     }],
   },

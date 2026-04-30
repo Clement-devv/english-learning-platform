@@ -151,53 +151,38 @@ export default function IncomingRingModal() {
           {/* Action buttons */}
           <div style={{ display: "flex", gap: "16px", justifyContent: "center" }}>
 
-            {/* Decline */}
-            <button
-              onClick={() => declineRing(ringId)}
-              style={{
-                width: "64px", height: "64px",
-                borderRadius: "50%",
-                background: "#fef2f2",
-                border: "2px solid #fecaca",
-                cursor: "pointer",
-                fontSize: "26px",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                transition: "all 0.15s",
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = "#ef4444"; e.currentTarget.style.borderColor = "#ef4444"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = "#fef2f2"; e.currentTarget.style.borderColor = "#fecaca"; }}
-              title="Decline"
-            >
-              📵
-            </button>
-
-            {/* Answer */}
+            {/* Pick up */}
             <button
               onClick={() => answerRing(ringId)}
               style={{
-                width: "64px", height: "64px",
-                borderRadius: "50%",
-                background: "#f0fdf4",
-                border: "2px solid #bbf7d0",
+                display: "flex", alignItems: "center", gap: "10px",
+                padding: "14px 32px",
+                borderRadius: "50px",
+                background: "linear-gradient(135deg,#22c55e,#16a34a)",
+                border: "none",
                 cursor: "pointer",
-                fontSize: "26px",
-                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: "15px", fontWeight: "800",
+                color: "#fff",
+                boxShadow: "0 8px 24px rgba(34,197,94,0.4)",
                 transition: "all 0.15s",
+                fontFamily: "inherit",
               }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = "#22c55e"; e.currentTarget.style.borderColor = "#22c55e"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = "#f0fdf4"; e.currentTarget.style.borderColor = "#bbf7d0"; }}
-              title="Answer"
+              onMouseEnter={(e) => { e.currentTarget.style.transform = "scale(1.04)"; e.currentTarget.style.boxShadow = "0 12px 32px rgba(34,197,94,0.5)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.boxShadow = "0 8px 24px rgba(34,197,94,0.4)"; }}
             >
-              📲
+              📲 Pick Up
             </button>
           </div>
 
-          <p style={{
-            marginTop: "20px",
-            fontSize: "11px",
-            color: "#cbd5e1",
-          }}>
-            Tap 📲 to acknowledge · auto-dismisses in {secondsLeft}s
+          {/* Subtle decline link */}
+          <p style={{ marginTop: "16px", fontSize: "11px", color: "#cbd5e1" }}>
+            Auto-dismisses in {secondsLeft}s ·{" "}
+            <span
+              onClick={() => declineRing(ringId)}
+              style={{ cursor: "pointer", textDecoration: "underline", color: "#94a3b8" }}
+            >
+              decline
+            </span>
           </p>
         </div>
       </div>

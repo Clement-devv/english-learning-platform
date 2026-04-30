@@ -6,9 +6,14 @@ import fs from "fs";
 import { verifyToken } from "../middleware/authMiddleware.js";
 import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
 import { pronunciationCacheSchema } from "../schemas/pronunciationCacheSchema.js";
+import { pronunciationCreditSchema } from "../schemas/pronunciationCreditSchema.js";
+import Center from "../models/master/Center.js";
 import { callGemini, extractJSONArray } from "../utils/geminiHelper.js";
 import logger from "../utils/logger.js";
 import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
+
+const getPronunciationCredit = (db) =>
+  db.models.PronunciationCredit || db.model("PronunciationCredit", pronunciationCreditSchema);
 
 // ── OpenAI client — lazy so missing key doesn't crash the server ──────────────
 let _openai = null;
@@ -154,6 +159,91 @@ Format: [{"text": "The sentence here.", "focus": "Focus area label"}]`;
     .slice(0, 10);
 }
 
+// ── GET /api/pronunciation/credits  (student checks own balance) ─────────────
+router.get("/credits", verifyToken, async (req, res) => {
+  try {
+    const record = await getPronunciationCredit(req.db).findOne({ studentId: req.user.id });
+    res.json({ success: true, credits: record?.credits ?? 0, totalUsed: record?.totalUsed ?? 0 });
+  } catch (err) {
+    serverError(res, err.message);
+  }
+});
+
+// ── GET /api/pronunciation/credits/student/:id  (admin/teacher checks student) ─
+router.get("/credits/student/:id", verifyToken, async (req, res) => {
+  try {
+    if (!["teacher", "admin"].includes(req.user.role)) return forbidden(res, "Teachers and admins only");
+    const record = await getPronunciationCredit(req.db).findOne({ studentId: req.params.id });
+    res.json({ success: true, credits: record?.credits ?? 0, totalUsed: record?.totalUsed ?? 0 });
+  } catch (err) {
+    serverError(res, err.message);
+  }
+});
+
+// ── GET /api/pronunciation/center-credits  (admin sees center budget) ─────────
+router.get("/center-credits", verifyToken, async (req, res) => {
+  try {
+    if (req.user.role !== "admin") return forbidden(res, "Admins only");
+    const center = await Center.findOne({ slug: req.center.slug })
+      .select("pronunciationCredits centerName").lean();
+    res.json({
+      success:        true,
+      balance:        center?.pronunciationCredits?.balance        ?? 0,
+      totalAllocated: center?.pronunciationCredits?.totalAllocated ?? 0,
+      used:           (center?.pronunciationCredits?.totalAllocated ?? 0) - (center?.pronunciationCredits?.balance ?? 0),
+      log:            (center?.pronunciationCredits?.log || []).slice(-10).reverse(),
+    });
+  } catch (err) {
+    serverError(res, err.message);
+  }
+});
+
+// ── POST /api/pronunciation/credits/grant  (admin/teacher grants to student) ──
+router.post("/credits/grant", verifyToken, async (req, res) => {
+  try {
+    if (!["teacher", "admin"].includes(req.user.role)) return forbidden(res, "Teachers and admins only");
+
+    const { studentId, amount, note } = req.body;
+    if (!studentId || !amount || amount < 1 || amount > 10000) {
+      return badRequest(res, "studentId and amount (1–10000) are required");
+    }
+
+    // Check & deduct from center's pronunciation budget
+    const deducted = await Center.findOneAndUpdate(
+      { slug: req.center.slug, "pronunciationCredits.balance": { $gte: amount } },
+      { $inc: { "pronunciationCredits.balance": -amount } },
+      { new: true }
+    );
+    if (!deducted) {
+      const center = await Center.findOne({ slug: req.center.slug }).select("pronunciationCredits").lean();
+      const available = center?.pronunciationCredits?.balance ?? 0;
+      return res.status(402).json({
+        success: false,
+        message: `Insufficient pronunciation credit budget. Available: ${available}, requested: ${amount}. Ask your super admin to top up.`,
+        available,
+      });
+    }
+
+    const record = await getPronunciationCredit(req.db).findOneAndUpdate(
+      { studentId },
+      {
+        $inc:  { credits: amount },
+        $push: { log: { type: "grant", amount, note: note || `Granted by ${req.user.role}` } },
+      },
+      { upsert: true, new: true }
+    );
+
+    res.json({
+      success:       true,
+      credits:       record.credits,
+      centerBalance: deducted.pronunciationCredits.balance,
+      message:       `${amount} pronunciation credits granted`,
+    });
+  } catch (err) {
+    serverError(res, err.message);
+  }
+});
+
 // ── GET /api/pronunciation/sentences?difficulty=beginner ──────────────────────
 // Returns cached AI sentences or generates a fresh batch.
 // Frontend falls back to local bank if this returns { success: false }.
@@ -217,6 +307,13 @@ router.post("/analyze", verifyToken, audioUpload.single("audio"), async (req, re
     return res.status(503).json({ success: false, reason: "OpenAI API key not configured on this server." });
   }
 
+  // Check student has credits
+  const creditRecord = await getPronunciationCredit(req.db).findOne({ studentId: req.user.id });
+  if (!creditRecord || creditRecord.credits < 1) {
+    fs.unlink(filePath, () => {});
+    return res.status(402).json({ success: false, reason: "no_credits", message: "No pronunciation credits remaining. Ask your admin to top up." });
+  }
+
   try {
     // 1. Whisper transcription
     const transcription = await openai.audio.transcriptions.create({
@@ -245,8 +342,18 @@ router.post("/analyze", verifyToken, audioUpload.single("audio"), async (req, re
       tip: ipaMap[w.expected]?.tip  || null,
     }));
 
+    // Deduct 1 credit atomically
+    const updated = await getPronunciationCredit(req.db).findOneAndUpdate(
+      { studentId: req.user.id, credits: { $gte: 1 } },
+      {
+        $inc:  { credits: -1, totalUsed: 1 },
+        $push: { log: { type: "spend", amount: 1, note: "Pronunciation analysis" } },
+      },
+      { new: true }
+    );
+
     logger.info(`Pronunciation analysis: ${percentage}% — "${transcript.slice(0, 60)}"`);
-    return res.json({ success: true, transcript, percentage, words: enriched });
+    return res.json({ success: true, transcript, percentage, words: enriched, creditsRemaining: updated?.credits ?? 0 });
 
   } catch (err) {
     logger.error("Pronunciation analysis error:", err.message);

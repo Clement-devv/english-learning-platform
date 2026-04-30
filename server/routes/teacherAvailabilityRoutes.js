@@ -99,11 +99,16 @@ router.post("/", verifyToken, async (req, res) => {
         scheduledTime: { $gte: dayStart, $lte: dayEnd },
         status: { $in: ["pending", "accepted"] },
       });
+      // Convert booking UTC times to teacher's local timezone for correct comparison
+      const teacherTZ = timezone || "UTC";
+      const tzFormatter = new Intl.DateTimeFormat("en-GB", {
+        hour: "2-digit", minute: "2-digit", hour12: false, timeZone: teacherTZ,
+      });
       for (const b of existingBookings) {
         const bStart = new Date(b.scheduledTime);
         const bEnd   = new Date(bStart.getTime() + (b.duration || 60) * 60000);
-        const bST = `${String(bStart.getHours()).padStart(2,"0")}:${String(bStart.getMinutes()).padStart(2,"0")}`;
-        const bET = `${String(bEnd.getHours()).padStart(2,"0")}:${String(bEnd.getMinutes()).padStart(2,"0")}`;
+        const bST = tzFormatter.format(bStart);
+        const bET = tzFormatter.format(bEnd);
         if (timesOverlap(startTime, endTime, bST, bET)) {
           return res.status(409).json({
             message: `Time conflict: there is already a booked class at ${bST}–${bET}`,

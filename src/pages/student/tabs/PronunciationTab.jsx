@@ -137,6 +137,7 @@ export default function PronunciationTab({ isDarkMode }) {
   const [fetchStatus,     setFetchStatus]     = useState(null);
   const [noMicPermission, setNoMicPermission] = useState(false);
   const [analyseError,    setAnalyseError]    = useState(null);
+  const [credits,         setCredits]         = useState(null); // null = loading
 
   const mediaRecorderRef = useRef(null);
   const audioChunksRef   = useRef([]);
@@ -148,6 +149,9 @@ export default function PronunciationTab({ isDarkMode }) {
 
   useEffect(() => {
     mountedRef.current = true;
+    api.get("/pronunciation/credits")
+      .then(({ data }) => { if (mountedRef.current) setCredits(data.credits ?? 0); })
+      .catch(() => { if (mountedRef.current) setCredits(0); });
     return () => {
       mountedRef.current = false;
       if (mediaRecorderRef.current?.state === "recording") {
@@ -250,7 +254,12 @@ export default function PronunciationTab({ isDarkMode }) {
         setResult({ percentage: data.percentage, words: data.words, transcript: data.transcript });
         setScores(prev => [...prev, data.percentage]);
         setWordResults(prev => ({ ...prev, [sentenceIdx]: data.percentage }));
+        if (data.creditsRemaining !== undefined) setCredits(data.creditsRemaining);
         setPhase("result");
+      } else if (data.reason === "no_credits") {
+        setCredits(0);
+        setAnalyseError("No pronunciation credits remaining. Ask your admin to top up.");
+        setPhase("ready");
       } else {
         setAnalyseError("Analysis failed. Please try again.");
         setPhase("ready");
@@ -422,6 +431,16 @@ export default function PronunciationTab({ isDarkMode }) {
         <p style={{ margin: "6px 0 0", color: col.sub, fontSize: "14px" }}>
           Record yourself and get phoneme-level feedback powered by AI
         </p>
+        {/* Credit badge */}
+        {credits !== null && (
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 6, marginTop: 10, padding: "5px 14px", borderRadius: 999, fontSize: 13, fontWeight: 800,
+            background: credits === 0 ? "rgba(239,68,68,0.12)" : credits <= 5 ? "rgba(234,179,8,0.12)" : "rgba(249,115,22,0.12)",
+            color: credits === 0 ? "#dc2626" : credits <= 5 ? "#b45309" : "#ea580c",
+            border: `1.5px solid ${credits === 0 ? "rgba(239,68,68,0.3)" : credits <= 5 ? "rgba(234,179,8,0.3)" : "rgba(249,115,22,0.3)"}`,
+          }}>
+            🎤 {credits === 0 ? "No credits — ask your admin to top up" : `${credits} analysis credit${credits === 1 ? "" : "s"} remaining`}
+          </div>
+        )}
       </div>
 
       {/* ── Status banners ────────────────────────────────────────────────── */}
@@ -535,13 +554,22 @@ export default function PronunciationTab({ isDarkMode }) {
         {/* ── READY ─────────────────────────────────────────────────────────── */}
         {phase === "ready" && (
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "12px" }}>
-            <button
-              onClick={startRecording}
-              style={{ background: "linear-gradient(135deg,#f97316,#fb923c)", border: "none", borderRadius: "50%", width: "84px", height: "84px", fontSize: "34px", cursor: "pointer", boxShadow: "0 6px 24px rgba(249,115,22,0.45)", transition: "transform 0.15s, box-shadow 0.15s" }}
-              onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.1)"; e.currentTarget.style.boxShadow = "0 8px 28px rgba(249,115,22,0.55)"; }}
-              onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)";   e.currentTarget.style.boxShadow = "0 6px 24px rgba(249,115,22,0.45)"; }}
-            >🎤</button>
-            <span style={{ color: col.sub, fontSize: "13px", fontWeight: 700 }}>Tap to start recording</span>
+            {credits === 0 ? (
+              <>
+                <div style={{ width: "84px", height: "84px", borderRadius: "50%", background: "rgba(239,68,68,0.1)", border: "3px solid rgba(239,68,68,0.2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "34px" }}>🚫</div>
+                <span style={{ color: "#dc2626", fontSize: "13px", fontWeight: 800, textAlign: "center", maxWidth: 260 }}>No credits remaining — contact your admin</span>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={startRecording}
+                  style={{ background: "linear-gradient(135deg,#f97316,#fb923c)", border: "none", borderRadius: "50%", width: "84px", height: "84px", fontSize: "34px", cursor: "pointer", boxShadow: "0 6px 24px rgba(249,115,22,0.45)", transition: "transform 0.15s, box-shadow 0.15s" }}
+                  onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.1)"; e.currentTarget.style.boxShadow = "0 8px 28px rgba(249,115,22,0.55)"; }}
+                  onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)";   e.currentTarget.style.boxShadow = "0 6px 24px rgba(249,115,22,0.45)"; }}
+                >🎤</button>
+                <span style={{ color: col.sub, fontSize: "13px", fontWeight: 700 }}>Tap to start recording</span>
+              </>
+            )}
           </div>
         )}
 

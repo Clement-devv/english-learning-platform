@@ -25,8 +25,10 @@ import StudentLogin        from "./pages/student/StudentLogin";
 // Heavy pages — lazy loaded (each becomes its own JS chunk)
 const SuperAdminDashboard = lazy(() => import("./pages/super-admin/SuperAdminDashboard"));
 const AdminDashboard      = lazy(() => import("./pages/admin/AdminDashboard"));
-const SubAdminSetup       = lazy(() => import("./pages/sub-admin/SubAdminSetup"));
-const SubAdminDashboard   = lazy(() => import("./pages/sub-admin/SubAdminDashboard"));
+const SubAdminSetup            = lazy(() => import("./pages/sub-admin/SubAdminSetup"));
+const SubAdminDashboard        = lazy(() => import("./pages/sub-admin/SubAdminDashboard"));
+const SubAdminForgotPassword   = lazy(() => import("./pages/sub-admin/ForgotPassword"));
+const SubAdminResetPassword    = lazy(() => import("./pages/sub-admin/ResetPassword"));
 const TeacherDashboard    = lazy(() => import("./pages/teacher/TeacherDashboard"));
 const TeacherSetup        = lazy(() => import("./pages/teacher/TeacherSetup"));
 const ForgotPassword      = lazy(() => import("./pages/teacher/ForgotPassword"));
@@ -379,9 +381,11 @@ function App() {
             <Route path="/admin/reset-password/:token"     element={<AdminResetPassword />} />
             <Route path="/admin" element={<AuthGuard role="admin"><AdminDashboard /></AuthGuard>} />
 
-            <Route path="/sub-admin/login"     element={<SubAdminLogin />} />
-            <Route path="/sub-admin/setup"     element={<SubAdminSetup />} />
-            <Route path="/sub-admin/dashboard" element={<AuthGuard role="sub-admin"><SubAdminDashboard /></AuthGuard>} />
+            <Route path="/sub-admin/login"                  element={<SubAdminLogin />} />
+            <Route path="/sub-admin/forgot-password"        element={<SubAdminForgotPassword />} />
+            <Route path="/sub-admin/reset-password/:token"  element={<SubAdminResetPassword />} />
+            <Route path="/sub-admin/setup"                  element={<SubAdminSetup />} />
+            <Route path="/sub-admin/dashboard"              element={<AuthGuard role="sub-admin"><SubAdminDashboard /></AuthGuard>} />
 
             <Route path="/classroom" element={<AuthGuard role="classroom"><Classroom /></AuthGuard>} />
 

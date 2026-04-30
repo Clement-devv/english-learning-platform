@@ -5,6 +5,7 @@ import {
   Camera, Trash2, Loader, Lock, Star, MessageSquare,
 } from "lucide-react";
 import api from "../../../api";
+import { TIMEZONE_OPTIONS } from "../../../utils/timezone";
 
 const SPECIALIZATIONS = [
   "General English", "Business English", "Conversation",
@@ -14,15 +15,6 @@ const SPECIALIZATIONS = [
 
 const CERTIFICATIONS = ["CELTA", "TEFL", "TESOL", "PGCE", "Delta", "Trinity CertTESOL"];
 
-const TIMEZONES = [
-  "UTC-12:00", "UTC-11:00", "UTC-10:00", "UTC-09:00",
-  "UTC-08:00 (PST)", "UTC-07:00 (MST)", "UTC-06:00 (CST)", "UTC-05:00 (EST)", "UTC-04:00 (AST)",
-  "UTC-03:00", "UTC-02:00", "UTC-01:00",
-  "UTC+00:00 (GMT)", "UTC+01:00 (WAT/CAT)", "UTC+02:00 (EET/SAST)", "UTC+03:00 (EAT)",
-  "UTC+04:00 (GST)", "UTC+05:00 (PKT)", "UTC+05:30 (IST)",
-  "UTC+06:00 (BST)", "UTC+07:00 (ICT)", "UTC+08:00 (CST/SGT)",
-  "UTC+09:00 (JST/KST)", "UTC+10:00 (AEST)", "UTC+11:00", "UTC+12:00 (NZST)",
-];
 
 function Section({ icon: Icon, title, children, c }) {
   return (
@@ -414,7 +406,9 @@ export default function ProfileTab({ teacherInfo, isDarkMode, onUpdate }) {
               <div style={{ position: "relative" }}>
                 <select value={form.timezone} onChange={set("timezone")} style={selectStyle}>
                   <option value="">Select timezone</option>
-                  {TIMEZONES.map((tz) => <option key={tz} value={tz}>{tz}</option>)}
+                  {TIMEZONE_OPTIONS.map((tz) => (
+                    <option key={tz.value} value={tz.value}>{tz.label}</option>
+                  ))}
                 </select>
                 <ChevronDown size={13} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", pointerEvents: "none", color: c.muted }} />
               </div>
@@ -428,7 +422,9 @@ export default function ProfileTab({ teacherInfo, isDarkMode, onUpdate }) {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 18 }}>
             <InfoRow label="Rate per Class"      value={`$${teacherInfo.ratePerClass ?? 0}`} c={c} />
             <InfoRow label="Years of Experience" value={teacherInfo.yearsOfExperience ? `${teacherInfo.yearsOfExperience} yrs` : null} c={c} />
-            <InfoRow label="Timezone"            value={teacherInfo.timezone}            c={c} />
+            <InfoRow label="Timezone"
+              value={TIMEZONE_OPTIONS.find(t => t.value === teacherInfo.timezone)?.label || teacherInfo.timezone}
+              c={c} />
             <InfoRow label="Google Meet / Zoom"  value={teacherInfo.googleMeetLink}      c={c} />
           </div>
         )}

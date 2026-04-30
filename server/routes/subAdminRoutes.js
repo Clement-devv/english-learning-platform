@@ -88,6 +88,7 @@ router.post("/invite", async (req, res) => {
     res.status(201).json({
       success: true,
       message: `Invitation sent to ${email}`,
+      setupUrl,   // returned so admin can copy it if email delivery fails
       subAdmin: {
         id: subAdmin._id, firstName: subAdmin.firstName,
         lastName: subAdmin.lastName, email: subAdmin.email, status: subAdmin.status,
@@ -117,7 +118,7 @@ router.post("/:id/resend-invite", async (req, res) => {
     const setupUrl = `${_sb2}/sub-admin/setup?token=${subAdmin.inviteToken}${_sn2 ? `&center=${req.center.slug}` : ""}`;
     await sendSubAdminInviteEmail(subAdmin, setupUrl, req.admin, req.center?.centerName || "");
 
-    res.json({ success: true, message: "Invitation resent successfully" });
+    res.json({ success: true, message: "Invitation resent successfully", setupUrl });
   } catch (err) {
     logger.error("Resend invite error:", { error: err?.message });
     res.status(500).json({ success: false, message: "Failed to resend invitation" });

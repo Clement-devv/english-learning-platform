@@ -18,7 +18,7 @@ const getBooking = (db) => db.models.Booking || db.model("Booking", bookingSchem
 router.post("/", verifyToken, verifyStudent, async (req, res) => {
   try {
     const { bookingId, rating, comment } = req.body;
-    const studentId = req.user._id;
+    const studentId = req.user.id;
 
     if (!bookingId || !rating) {
       return res.status(400).json({ error: "bookingId and rating are required" });
@@ -58,7 +58,7 @@ router.post("/", verifyToken, verifyStudent, async (req, res) => {
 // ── GET /api/reviews/my  —  student's own reviews (which bookings are reviewed) ──
 router.get("/my", verifyToken, verifyStudent, async (req, res) => {
   try {
-    const reviews = await getReview(req.db).find({ studentId: req.user._id })
+    const reviews = await getReview(req.db).find({ studentId: req.user.id })
       .sort({ createdAt: -1 })
       .populate("bookingId", "classTitle scheduledTime")
       .populate("teacherId", "firstName lastName");
@@ -68,11 +68,92 @@ router.get("/my", verifyToken, verifyStudent, async (req, res) => {
   }
 });
 
+// ── GET /api/reviews/my-trends  —  teacher sees their rating trend over time ──
+// Weekly averages (last 12 weeks), top-rated individual classes, low-rated feedback.
+router.get("/my-trends", verifyToken, async (req, res) => {
+  try {
+    if (!["teacher", "admin"].includes(req.user.role)) {
+      return forbidden(res, "Access denied");
+    }
+    const teacherId = req.user.id;
+
+    const reviews = await getReview(req.db)
+      .find({ teacherId, flagged: false })
+      .sort({ createdAt: -1 })
+      .populate("bookingId", "classTitle scheduledTime")
+      .populate("studentId", "firstName");
+
+    // ISO week helper
+    function isoWeekKey(date) {
+      const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+      const day = d.getUTCDay() || 7;
+      d.setUTCDate(d.getUTCDate() + 4 - day);
+      const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+      const week = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+      return `${d.getUTCFullYear()}-W${String(week).padStart(2, "0")}`;
+    }
+
+    // Weekly averages
+    const weekMap = {};
+    reviews.forEach(r => {
+      const key = isoWeekKey(new Date(r.createdAt));
+      if (!weekMap[key]) weekMap[key] = { week: key, sum: 0, count: 0 };
+      weekMap[key].sum   += r.rating;
+      weekMap[key].count += 1;
+    });
+    const weeklyTrend = Object.values(weekMap)
+      .map(w => ({
+        week:        w.week,
+        avgRating:   Math.round((w.sum / w.count) * 10) / 10,
+        reviewCount: w.count,
+      }))
+      .sort((a, b) => a.week.localeCompare(b.week))
+      .slice(-12);
+
+    // Best-rated classes: top 5 individual reviews that have a booking title
+    const bestClasses = [...reviews]
+      .filter(r => r.bookingId?.classTitle)
+      .sort((a, b) => b.rating - a.rating || new Date(b.createdAt) - new Date(a.createdAt))
+      .slice(0, 5)
+      .map(r => ({
+        classTitle:    r.bookingId.classTitle,
+        scheduledTime: r.bookingId.scheduledTime,
+        rating:        r.rating,
+        comment:       r.comment || "",
+        studentName:   r.studentId?.firstName ?? "Student",
+      }));
+
+    // Low-rated feedback: reviews ≤2 stars that have a comment
+    const lowRated = reviews
+      .filter(r => r.rating <= 2 && r.comment)
+      .slice(0, 10)
+      .map(r => ({
+        rating:     r.rating,
+        comment:    r.comment,
+        classTitle: r.bookingId?.classTitle ?? "Class",
+        date:       r.createdAt,
+      }));
+
+    res.json({
+      success: true,
+      data: {
+        totalReviews: reviews.length,
+        weeklyTrend,
+        bestClasses,
+        lowRated,
+      },
+    });
+  } catch (err) {
+    logger.error("Error fetching teacher rating trends:", { error: err?.message });
+    serverError(res, err.message);
+  }
+});
+
 // ── GET /api/reviews/teacher/:teacherId  —  teacher sees their own reviews ───
 router.get("/teacher/:teacherId", verifyToken, async (req, res) => {
   try {
     const isAdmin = req.user.role === "admin";
-    const isOwner = req.user._id.toString() === req.params.teacherId;
+    const isOwner = req.user.id.toString() === req.params.teacherId;
     if (!isAdmin && !isOwner) {
       return res.status(403).json({ error: "Forbidden" });
     }

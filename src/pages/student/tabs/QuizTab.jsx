@@ -398,6 +398,90 @@ function ResultScreen({ quiz, attempt, col, onDone }) {
   );
 }
 
+// ── Start-quiz confirmation modal ─────────────────────────────────────────────
+function StartQuizModal({ quiz, onConfirm, onCancel, isDarkMode }) {
+  const col = isDarkMode
+    ? { bg: "#1a1d2e", border: "#2a2d40", heading: "#f0f4ff", body: "#c8cce0", muted: "#6b7090" }
+    : { bg: "#ffffff", border: "#e9d5ff", heading: "#2d1f6e", body: "#4a4060", muted: "#9b8ab0" };
+
+  if (!quiz) return null;
+
+  return (
+    <div style={{
+      position: "fixed", inset: 0, zIndex: 2000,
+      display: "flex", alignItems: "center", justifyContent: "center",
+      background: "rgba(0,0,0,0.55)", padding: 20,
+    }}>
+      <div style={{
+        background: col.bg, borderRadius: 24, padding: "32px 28px",
+        maxWidth: 440, width: "100%",
+        border: `2px solid ${col.border}`,
+        boxShadow: "0 24px 80px rgba(0,0,0,0.3)",
+        fontFamily: "'Nunito', sans-serif",
+      }}>
+        <div style={{ textAlign: "center", marginBottom: 24 }}>
+          <div style={{ fontSize: 52, marginBottom: 10 }}>📝</div>
+          <h2 style={{ margin: "0 0 6px", fontSize: 22, fontWeight: 900, color: col.heading }}>
+            Start Quiz?
+          </h2>
+          <p style={{ margin: 0, fontSize: 14, color: col.muted, fontWeight: 600 }}>
+            Are you ready to begin?
+          </p>
+        </div>
+
+        {/* Quiz info */}
+        <div style={{
+          background: isDarkMode ? "#1f2235" : "#f5f0ff",
+          borderRadius: 16, padding: "16px 18px", marginBottom: 20,
+          display: "flex", flexDirection: "column", gap: 8,
+        }}>
+          <div style={{ fontWeight: 800, fontSize: 16, color: col.heading }}>{quiz.title}</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 12, fontSize: 13, color: col.body, fontWeight: 600 }}>
+            <span>📋 {quiz.questions?.length || "—"} questions</span>
+            <span>⏱ {quiz.timeLimit} min</span>
+            <span>👩‍🏫 {quiz.teacherId?.firstName} {quiz.teacherId?.lastName}</span>
+          </div>
+        </div>
+
+        {/* Warning */}
+        <div style={{
+          background: isDarkMode ? "rgba(245,158,11,0.1)" : "#fffbeb",
+          border: `1.5px solid ${isDarkMode ? "rgba(245,158,11,0.3)" : "#fde68a"}`,
+          borderRadius: 12, padding: "10px 14px", marginBottom: 24,
+          display: "flex", gap: 10, alignItems: "flex-start",
+        }}>
+          <AlertTriangle size={16} color="#d97706" style={{ flexShrink: 0, marginTop: 2 }} />
+          <p style={{ margin: 0, fontSize: 12.5, color: isDarkMode ? "#fcd34d" : "#92400e", fontWeight: 700, lineHeight: 1.5 }}>
+            You only get <strong>one attempt</strong>. The timer starts immediately once you confirm. Make sure you're in a quiet place before you begin.
+          </p>
+        </div>
+
+        <div style={{ display: "flex", gap: 10 }}>
+          <button onClick={onCancel}
+            style={{
+              flex: 1, padding: "12px", borderRadius: 14,
+              border: `2px solid ${col.border}`, background: "transparent",
+              color: col.body, fontWeight: 700, fontSize: 14,
+              cursor: "pointer", fontFamily: "'Nunito', sans-serif",
+            }}>
+            Not yet
+          </button>
+          <button onClick={onConfirm}
+            style={{
+              flex: 2, padding: "12px", borderRadius: 14, border: "none",
+              background: "linear-gradient(135deg,#7c3aed,#a855f7)", color: "#fff",
+              fontWeight: 900, fontSize: 14, cursor: "pointer",
+              fontFamily: "'Nunito', sans-serif",
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+            }}>
+            Yes, start now! <ArrowRight size={16} />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 export default function StudentQuizTab({ studentInfo, isDarkMode }) {
   const col = isDarkMode
@@ -410,6 +494,7 @@ export default function StudentQuizTab({ studentInfo, isDarkMode }) {
   const [filter,       setFilter]       = useState("all");
   const [expandedId,   setExpandedId]   = useState(null);
   const [activeQuiz,   setActiveQuiz]   = useState(null);   // quiz being taken right now
+  const [pendingQuiz,  setPendingQuiz]  = useState(null);   // quiz awaiting confirmation modal
   const [resultData,   setResultData]   = useState(null);   // { quiz, attempt } after submission
   const [toast,        setToast]        = useState(null);
   const [streakToast,  setStreakToast]  = useState(null);
@@ -443,8 +528,14 @@ export default function StudentQuizTab({ studentInfo, isDarkMode }) {
 
   const handleStartQuiz = (quiz) => {
     if (quiz.status === "attempted") return;
-    if (!window.confirm(`You are about to start "${quiz.title}".\n\nTime limit: ${quiz.timeLimit} minutes.\nYou have ONE attempt only.\n\nReady?`)) return;
-    setActiveQuiz(quiz);
+    if (quiz.dueDate && daysUntil(quiz.dueDate) < 0) return; // overdue — blocked
+    setPendingQuiz(quiz);
+  };
+
+  const handleConfirmStart = () => {
+    if (!pendingQuiz) return;
+    setActiveQuiz(pendingQuiz);
+    setPendingQuiz(null);
   };
 
   const handleQuizComplete = (fullQuiz, attempt, streak) => {
@@ -458,6 +549,16 @@ export default function StudentQuizTab({ studentInfo, isDarkMode }) {
   if (activeQuiz) {
     return <QuizScreen quiz={activeQuiz} onComplete={handleQuizComplete} isDarkMode={isDarkMode} />;
   }
+
+  // ── Confirmation modal (rendered above quiz list) ──────────────────────────
+  const confirmModal = (
+    <StartQuizModal
+      quiz={pendingQuiz}
+      onConfirm={handleConfirmStart}
+      onCancel={() => setPendingQuiz(null)}
+      isDarkMode={isDarkMode}
+    />
+  );
 
   // ── Just finished — show result ────────────────────────────────────────────
   if (resultData) {
@@ -483,6 +584,7 @@ export default function StudentQuizTab({ studentInfo, isDarkMode }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20, fontFamily: "'Nunito', sans-serif" }}>
 
+      {confirmModal}
       <StreakToast data={streakToast} onDone={() => setStreakToast(null)} />
 
       {toast && (
@@ -513,22 +615,36 @@ export default function StudentQuizTab({ studentInfo, isDarkMode }) {
       </div>
 
       {/* Featured next-up banner */}
-      {!loading && nextQuiz && (
-        <div style={{ background: "linear-gradient(135deg,#f97316,#f43f5e)", borderRadius: 24, padding: "22px 26px", color: "#fff", display: "flex", alignItems: "center", gap: 20, boxShadow: "0 16px 40px rgba(249,115,22,0.28)", position: "relative", overflow: "hidden" }}>
-          <div style={{ position: "absolute", right: -20, top: -30, width: 180, height: 180, borderRadius: "50%", background: "rgba(255,255,255,0.12)" }}/>
-          <div style={{ width: 60, height: 60, borderRadius: 18, background: "rgba(255,255,255,0.2)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, position: "relative" }}>
-            <BookOpen size={28} stroke="#fff" strokeWidth={2.2}/>
+      {!loading && nextQuiz && (() => {
+        const bannerOverdue = nextQuiz.dueDate && daysUntil(nextQuiz.dueDate) < 0;
+        return (
+          <div style={{ background: "linear-gradient(135deg,#f97316,#f43f5e)", borderRadius: 24, padding: "22px 26px", color: "#fff", display: "flex", alignItems: "center", gap: 20, boxShadow: "0 16px 40px rgba(249,115,22,0.28)", position: "relative", overflow: "hidden" }}>
+            <div style={{ position: "absolute", right: -20, top: -30, width: 180, height: 180, borderRadius: "50%", background: "rgba(255,255,255,0.12)" }}/>
+            <div style={{ width: 60, height: 60, borderRadius: 18, background: "rgba(255,255,255,0.2)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, position: "relative" }}>
+              <BookOpen size={28} stroke="#fff" strokeWidth={2.2}/>
+            </div>
+            <div style={{ flex: 1, minWidth: 0, position: "relative" }}>
+              <div style={{ fontSize: 11.5, fontWeight: 800, letterSpacing: "0.1em", opacity: 0.9 }}>
+                {bannerOverdue ? "OVERDUE" : "NEXT UP"}
+              </div>
+              <div style={{ fontSize: 20, fontWeight: 900, marginTop: 2 }}>{nextQuiz.title}</div>
+              <div style={{ fontSize: 13, fontWeight: 600, opacity: 0.95, marginTop: 2 }}>
+                {nextQuiz.questions?.length || "—"} questions · {nextQuiz.timeLimit} min · {nextQuiz.teacherId?.firstName} {nextQuiz.teacherId?.lastName}
+              </div>
+            </div>
+            {bannerOverdue ? (
+              <div style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "12px 22px", borderRadius: 999, background: "rgba(255,255,255,0.2)", color: "rgba(255,255,255,0.7)", fontSize: 14, fontWeight: 800, flexShrink: 0 }}>
+                Overdue ⛔
+              </div>
+            ) : (
+              <button onClick={() => handleStartQuiz(nextQuiz)}
+                style={{ position: "relative", display: "inline-flex", alignItems: "center", gap: 6, padding: "12px 22px", borderRadius: 999, border: "none", background: "#fff", color: "#c2410c", fontSize: 14, fontWeight: 900, cursor: "pointer", fontFamily: "inherit", boxShadow: "0 8px 20px rgba(0,0,0,0.15)", flexShrink: 0 }}>
+                Start quiz <ArrowRight size={14} stroke="#c2410c"/>
+              </button>
+            )}
           </div>
-          <div style={{ flex: 1, minWidth: 0, position: "relative" }}>
-            <div style={{ fontSize: 11.5, fontWeight: 800, letterSpacing: "0.1em", opacity: 0.9 }}>NEXT UP</div>
-            <div style={{ fontSize: 20, fontWeight: 900, marginTop: 2 }}>{nextQuiz.title}</div>
-            <div style={{ fontSize: 13, fontWeight: 600, opacity: 0.95, marginTop: 2 }}>{nextQuiz.questions?.length || "—"} questions · {nextQuiz.timeLimit} min · {nextQuiz.teacherId?.firstName} {nextQuiz.teacherId?.lastName}</div>
-          </div>
-          <button onClick={() => handleStartQuiz(nextQuiz)} style={{ position: "relative", display: "inline-flex", alignItems: "center", gap: 6, padding: "12px 22px", borderRadius: 999, border: "none", background: "#fff", color: "#c2410c", fontSize: 14, fontWeight: 900, cursor: "pointer", fontFamily: "inherit", boxShadow: "0 8px 20px rgba(0,0,0,0.15)", flexShrink: 0 }}>
-            Start quiz <ArrowRight size={14} stroke="#c2410c"/>
-          </button>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Stats strip */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12 }}>
@@ -624,7 +740,7 @@ export default function StudentQuizTab({ studentInfo, isDarkMode }) {
                             background: overdue ? "#fee2e2" : days <= 2 ? "#fef3c7" : "#f0fdf4",
                             color: overdue ? "#dc2626" : days <= 2 ? "#d97706" : "#059669",
                           }}>
-                            {overdue ? `${Math.abs(days)}d overdue` : days === 0 ? "Due today!" : `${days}d left`}
+                            {overdue ? "Expired" : days === 0 ? "Due today!" : `${days}d left`}
                           </span>
                         )}
                       </div>
@@ -638,15 +754,29 @@ export default function StudentQuizTab({ studentInfo, isDarkMode }) {
                       </span>
                     )}
                     {quiz.status === "assigned" ? (
-                      <button onClick={() => handleStartQuiz(quiz)}
-                        style={{
-                          padding: "8px 20px", borderRadius: 12, border: "none",
-                          background: "linear-gradient(135deg,#f97316,#f43f5e)", color: "#fff",
-                          fontWeight: 900, fontSize: 13, cursor: "pointer",
-                          boxShadow: "0 4px 14px rgba(249,115,22,0.4)", fontFamily: "'Nunito', sans-serif", borderRadius: 999,
-                        }}>
-                        Start Quiz 🚀
-                      </button>
+                      overdue ? (
+                        <button disabled
+                          title="This quiz is past its due date and can no longer be started."
+                          style={{
+                            padding: "8px 20px", borderRadius: 999, border: "none",
+                            background: isDarkMode ? "#2a2d40" : "#f3f4f6",
+                            color: isDarkMode ? "#6b7090" : "#9ca3af",
+                            fontWeight: 700, fontSize: 13, cursor: "not-allowed",
+                            fontFamily: "'Nunito', sans-serif",
+                          }}>
+                          Overdue ⛔
+                        </button>
+                      ) : (
+                        <button onClick={() => handleStartQuiz(quiz)}
+                          style={{
+                            padding: "8px 20px", borderRadius: 999, border: "none",
+                            background: "linear-gradient(135deg,#f97316,#f43f5e)", color: "#fff",
+                            fontWeight: 900, fontSize: 13, cursor: "pointer",
+                            boxShadow: "0 4px 14px rgba(249,115,22,0.4)", fontFamily: "'Nunito', sans-serif",
+                          }}>
+                          Start Quiz 🚀
+                        </button>
+                      )
                     ) : (
                       <button onClick={() => setExpandedId(isExpanded ? null : quiz._id)}
                         style={{ padding: "8px 16px", borderRadius: 12, border: `2px solid ${col.border}`, background: col.card, color: col.body, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>

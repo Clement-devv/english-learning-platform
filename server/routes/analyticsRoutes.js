@@ -6,6 +6,7 @@ import { bookingSchema }              from "../schemas/bookingSchema.js";
 import { teacherSchema }              from "../schemas/teacherSchema.js";
 import { studentSchema }              from "../schemas/studentSchema.js";
 import { paymentTransactionSchema }   from "../schemas/paymentTransactionSchema.js";
+import { quizAttemptSchema }          from "../schemas/quizAttemptSchema.js";
 import { parsePagination }            from "../utils/pagination.js";
 import logger from "../utils/logger.js";
 import { serverError } from '../utils/apiResponse.js';
@@ -17,6 +18,7 @@ const getBooking            = (db) => db.models.Booking            || db.model("
 const getTeacher            = (db) => db.models.Teacher            || db.model("Teacher",            teacherSchema);
 const getStudent            = (db) => db.models.Student            || db.model("Student",            studentSchema);
 const getPaymentTransaction = (db) => db.models.PaymentTransaction || db.model("PaymentTransaction", paymentTransactionSchema);
+const getQuizAttempt        = (db) => db.models.QuizAttempt        || db.model("QuizAttempt",        quizAttemptSchema);
 
 // GET /api/analytics/overview
 router.get("/overview", verifyToken, verifyAdmin, async (req, res) => {
@@ -318,6 +320,86 @@ router.get("/booking-acceptance-rate", verifyToken, verifyAdmin, async (req, res
   } catch (err) {
     logger.error("Error fetching acceptance rate:", { error: err?.message });
     serverError(res, "Error fetching acceptance rate");
+  }
+});
+
+// GET /api/analytics/leaderboard — accessible to any authenticated center user
+// Returns top-10 lists for: streak, completed classes, quiz average score.
+router.get("/leaderboard", verifyToken, async (req, res) => {
+  try {
+    const Student     = getStudent(req.db);
+    const Booking     = getBooking(req.db);
+    const QuizAttempt = getQuizAttempt(req.db);
+
+    const [streakTop, classesTop, quizTop] = await Promise.all([
+      // Top 10 by current streak
+      Student.find({ currentStreak: { $gt: 0 }, status: "active" })
+        .sort({ currentStreak: -1 })
+        .limit(10)
+        .select("firstName lastName currentStreak longestStreak"),
+
+      // Top 10 by completed classes (aggregate from bookings)
+      Booking.aggregate([
+        { $match: { status: "completed" } },
+        { $group: { _id: "$studentId", completedClasses: { $sum: 1 } } },
+        { $sort:  { completedClasses: -1 } },
+        { $limit: 10 },
+        {
+          $lookup: {
+            from: "students",
+            let:  { sid: "$_id" },
+            pipeline: [
+              { $match: { $expr: { $eq: ["$_id", "$$sid"] } } },
+              { $project: { firstName: 1, lastName: 1 } },
+            ],
+            as: "student",
+          },
+        },
+        { $unwind: "$student" },
+        {
+          $project: {
+            completedClasses: 1,
+            firstName: "$student.firstName",
+            lastName:  "$student.lastName",
+          },
+        },
+      ]),
+
+      // Top 10 by average quiz percentage (minimum 1 attempt)
+      QuizAttempt.aggregate([
+        { $group: { _id: "$studentId", avgScore: { $avg: "$percentage" }, totalQuizzes: { $sum: 1 } } },
+        { $sort:  { avgScore: -1 } },
+        { $limit: 10 },
+        {
+          $lookup: {
+            from: "students",
+            let:  { sid: "$_id" },
+            pipeline: [
+              { $match: { $expr: { $eq: ["$_id", "$$sid"] } } },
+              { $project: { firstName: 1, lastName: 1 } },
+            ],
+            as: "student",
+          },
+        },
+        { $unwind: "$student" },
+        {
+          $project: {
+            avgScore:     { $round: ["$avgScore", 1] },
+            totalQuizzes: 1,
+            firstName:    "$student.firstName",
+            lastName:     "$student.lastName",
+          },
+        },
+      ]),
+    ]);
+
+    res.json({
+      success: true,
+      data: { streak: streakTop, classes: classesTop, quiz: quizTop },
+    });
+  } catch (err) {
+    logger.error("Error fetching leaderboard:", { error: err?.message });
+    serverError(res, "Error fetching leaderboard");
   }
 });
 
