@@ -639,14 +639,14 @@ export default function StudentHomeworkTab({ studentInfo, isDarkMode }) {
                             onClick={() => handleSubmit(hw._id)}
                             disabled={submitting}
                             style={{
-                              padding: "10px 28px", borderRadius: 12, border: "none",
+                              padding: "10px 28px", borderRadius: 999, border: "none",
                               background: "linear-gradient(135deg,#f97316,#f43f5e)",
                               color: "#fff", fontWeight: 900, fontSize: 14,
                               cursor: submitting ? "not-allowed" : "pointer",
                               opacity: submitting ? 0.7 : 1,
                               display: "flex", alignItems: "center", gap: 8,
                               boxShadow: "0 6px 16px rgba(249,115,22,0.4)",
-                              fontFamily: "'Nunito', sans-serif", borderRadius: 999,
+                              fontFamily: "'Nunito', sans-serif",
                             }}>
                             <Send size={15} /> {submitting ? "Submitting…" : "Submit Homework 🚀"}
                           </button>

@@ -18,7 +18,7 @@ function getRingLog(db) {
 
 async function saveRingLog(centerId, data) {
   try {
-    const db  = await getDb(centerId);
+    const db = await getDb(centerId);
     const Log = getRingLog(db);
     await Log.create(data);
   } catch (err) {
@@ -32,10 +32,10 @@ async function sendRingPush(centerId, targetUserId, targetRole, callerName) {
   try {
     const db = await getDb(centerId);
     let Model;
-    if (targetRole === 'student')         Model = db.models.Student || db.model('Student', studentSchema);
-    else if (targetRole === 'teacher')    Model = db.models.Teacher || db.model('Teacher', teacherSchema);
+    if (targetRole === 'student') Model = db.models.Student || db.model('Student', studentSchema);
+    else if (targetRole === 'teacher') Model = db.models.Teacher || db.model('Teacher', teacherSchema);
     else if (targetRole === 'admin' || targetRole === 'subAdmin')
-                                          Model = db.models.Admin   || db.model('Admin',   adminSchema);
+      Model = db.models.Admin || db.model('Admin', adminSchema);
     else return;
 
     const doc = await Model.findById(targetUserId).select('pushSubscription').lean();
@@ -43,10 +43,10 @@ async function sendRingPush(centerId, targetUserId, targetRole, callerName) {
 
     await sendPush(doc.pushSubscription, {
       title: `📞 ${callerName} is ringing you`,
-      body:  'Open the app to answer',
-      icon:  '/icons/icon.svg',
+      body: 'Open the app to answer',
+      icon: '/icons/icon.svg',
       badge: '/icons/icon.svg',
-      data:  { url: '/' },
+      data: { url: '/' },
     });
   } catch (err) {
     logger.warn('sendRingPush error:', { error: err?.message });
@@ -66,8 +66,8 @@ async function isAllowedOrigin(origin) {
 
 // Per-socket rate limiter — tracks event counts in a rolling 1-second window.
 // Sockets that exceed the limit are disconnected to prevent payload flooding.
-const SOCKET_RATE_LIMIT   = 60;  // max events per second per socket
-const SOCKET_RATE_WINDOW  = 1000; // ms
+const SOCKET_RATE_LIMIT = 60;  // max events per second per socket
+const SOCKET_RATE_WINDOW = 1000; // ms
 
 function makeRateLimiter() {
   const counts = new Map(); // socketId → { count, resetAt }
@@ -129,7 +129,7 @@ export async function initializeSocket(httpServer) {
     }
     try {
       const decoded = jwt.verify(token, config.jwtSecret);
-      socket.userId   = decoded.id;
+      socket.userId = decoded.id;
       socket.userRole = decoded.role;     // role from JWT — not trusted from client
       socket.centerId = decoded.centerId; // center slug the token was issued for
       next();
@@ -165,9 +165,9 @@ export async function initializeSocket(httpServer) {
       try {
         const room = tenantRoom(socket, channelName);
         socket.join(room);
-        socket.userName    = userName;
+        socket.userName = userName;
         socket.channelName = channelName; // original name kept for client-facing log messages
-        socket.roomName    = room;        // scoped name used for all room operations
+        socket.roomName = room;        // scoped name used for all room operations
 
         if (!whiteboardSessions.has(room)) {
           whiteboardSessions.set(room, {
@@ -422,25 +422,25 @@ export async function initializeSocket(httpServer) {
             io.to(callerRoom).emit('ring-timeout', { ringId });
             logger.info(`⏰ Ring ${ringId} timed out`);
             saveRingLog(r.centerId, {
-              callerId:   r.callerId,
+              callerId: r.callerId,
               callerRole: r.callerRole,
               callerName: r.callerName,
-              targetId:   r.targetUserId,
+              targetId: r.targetUserId,
               targetRole: r.targetRole,
-              outcome:    "missed",
+              outcome: "missed",
             });
           }
         }, RING_TIMEOUT_MS);
 
         activeRings.set(ringId, {
-          callerId:   socket.userId,
+          callerId: socket.userId,
           callerRole: socket.userRole,
           callerName,
           callerRoom,
           targetUserId,
-          targetRole:  targetRole || null,
+          targetRole: targetRole || null,
           targetRoom,
-          centerId:   socket.centerId,
+          centerId: socket.centerId,
           timeout,
         });
 
@@ -456,7 +456,7 @@ export async function initializeSocket(httpServer) {
 
         // Push notification so the target is alerted even when the app is in background
         if (targetRole) {
-          sendRingPush(socket.centerId, targetUserId, targetRole, callerName).catch(() => {});
+          sendRingPush(socket.centerId, targetUserId, targetRole, callerName).catch(() => { });
         }
       } catch (err) { logger.error('ring-call error:', { error: err?.message }); }
     });
@@ -495,12 +495,12 @@ export async function initializeSocket(httpServer) {
         io.to(ring.callerRoom).emit('ring-declined', { ringId, by: socket.userId });
         logger.info(`🚫 Ring ${ringId} declined by ${socket.userId}`);
         saveRingLog(ring.centerId, {
-          callerId:   ring.callerId,
+          callerId: ring.callerId,
           callerRole: ring.callerRole,
           callerName: ring.callerName,
-          targetId:   ring.targetUserId,
+          targetId: ring.targetUserId,
           targetRole: socket.userRole,
-          outcome:    "declined",
+          outcome: "declined",
         });
       } catch (err) { logger.error('ring-declined error:', { error: err?.message }); }
     });

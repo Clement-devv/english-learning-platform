@@ -1,0 +1,128 @@
+{
+  "nav": {
+    "home": "Home",
+    "learning": "Learning",
+    "homework": "Homework",
+    "quizzes": "Quizzes",
+    "flashcards": "Flashcards",
+    "practice": "Practice",
+    "speaking": "Speaking",
+    "aiChat": "AI Chat",
+    "classes": "Classes",
+    "bookClass": "Book a Class",
+    "groupClasses": "Group Classes",
+    "messages": "Messages",
+    "completed": "Completed",
+    "schedule": "Schedule",
+    "progress": "Progress",
+    "charts": "Charts",
+    "badges": "Badges",
+    "certificates": "Certificates",
+    "leaderboard": "Leaderboard",
+    "more": "More",
+    "recordings": "Recordings",
+    "reviews": "Reviews",
+    "invite": "Invite"
+  },
+  "sidebar": {
+    "learningPlatform": "Learning Platform",
+    "classesDone": "{{count}} classes done",
+    "darkMode": "Dark Mode",
+    "lightMode": "Light Mode",
+    "settings": "Settings",
+    "signOut": "Sign Out"
+  },
+  "dashboard": {
+    "greeting": "Hi {{name}}!",
+    "heroTitle": "Ready for today's adventure?",
+    "homeworkDue": "{{count}} homework due",
+    "noPendingHomework": "No pending homework",
+    "classesLeft": "{{count}} classes left",
+    "dayStreak": "DAY STREAK",
+    "stats": {
+      "classesDone": "Classes done",
+      "classesLeft": "Classes left",
+      "badgesEarned": "Badges earned",
+      "thisWeek": "This week"
+    },
+    "liveAndSoon": "Live & Starting Soon",
+    "upcomingClasses": "Upcoming classes",
+    "viewAll": "View all →",
+    "myProgress": "My Progress",
+    "notifications": "Notifications",
+    "badges": "Badges",
+    "seeAll": "See all →",
+    "shareAchievement": "🎉 Share achievement",
+    "noBadges": "Complete classes to earn badges! 🌟",
+    "attendanceNeeded": "Attendance Confirmation Needed!",
+    "attendanceBody": "Your teacher marked \"{{title}}\" complete. Can you confirm?",
+    "autoConfirm": "Auto-confirms in: {{time}}",
+    "review": "Review 👀",
+    "missedCall": "Missed Call",
+    "missedCalls": "Missed Calls",
+    "whileAway": "while you were away",
+    "markSeen": "Mark seen",
+    "keepUpWork": "Keep up the amazing work! 🌟",
+    "completedClasses": "Completed Classes"
+  },
+  "charts": {
+    "totalClasses": "Total Classes",
+    "dayStreak": "Day Streak",
+    "totalHours": "Total Hours",
+    "last7Days": "📊 Last 7 Days",
+    "last30Days": "📈 Last 30 Days",
+    "byTimeOfDay": "🕐 Classes by Time of Day",
+    "classes": "Classes"
+  },
+  "badges": {
+    "title": "🏅 Achievement Badges",
+    "noEarned": "Complete classes to start earning!",
+    "earned": "{{count}} of {{total}} earned · {{pct}}%",
+    "shareAll": "🎉 Share All",
+    "all": "🏅 All",
+    "journey": "🚀 Journey",
+    "consistency": "🔥 Consistency",
+    "weekly": "📅 Weekly",
+    "special": "⭐ Special",
+    "almostThere": "🎯 Almost There!",
+    "earnedBadge": "✓ Earned",
+    "locked": "🔒 Locked"
+  },
+  "share": {
+    "title": "🎉 Share Your Win!",
+    "copyClipboard": "📋 Copy to Clipboard",
+    "twitter": "🐦 Twitter",
+    "facebook": "📘 Facebook",
+    "whatsapp": "💬 WhatsApp",
+    "linkedin": "💼 LinkedIn"
+  },
+  "login": {
+    "subtitle": "Sign in to start your adventure!",
+    "submit": "Let's Go! 🚀",
+    "footer": "Your account is managed by your school 🏫",
+    "forgotPassword": "Forgot password?",
+    "email": "Email",
+    "password": "Password",
+    "signingIn": "Signing in…",
+    "badges": {
+      "lessons": "🎓 Expert lessons",
+      "classes": "🌍 Live classes",
+      "progress": "🏆 Track progress"
+    },
+    "hero": {
+      "h2": "Learn.\nGrow.\nShine.",
+      "p": "Your classroom adventure awaits!"
+    }
+  },
+  "common": {
+    "loading": "Loading…",
+    "error": "Something went wrong",
+    "save": "Save",
+    "cancel": "Cancel",
+    "back": "Back",
+    "close": "Close",
+    "switchLanguage": "Tiếng Việt",
+    "teacher": "Teacher",
+    "admin": "Admin"
+  }
+}

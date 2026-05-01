@@ -15,6 +15,7 @@ export const DEFAULT_BRANDING = {
   loginTheme:             null,
   teacherLoginTheme:      null,
   teacherDashboardTheme:  null,
+  adminLoginTheme:           'executive',
   adminDashboardTheme:       null,
   subAdminDashboardTheme:    null,
   centerName:        'English Learning Platform',

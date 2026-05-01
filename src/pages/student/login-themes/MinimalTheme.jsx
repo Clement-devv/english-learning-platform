@@ -6,14 +6,14 @@ import TwoFactorLogin from '../../../components/TwoFactorLogin';
 import { useBranding } from '../../../context/BrandingContext';
 import { useLoginLogic } from './useLoginLogic';
 
-export default function MinimalTheme() {
+export default function MinimalTheme({ loginHook } = {}) {
   const {
     email, setEmail, password, setPassword,
     showPassword, setShowPassword,
     error, loading, requires2FA,
     focusedField, setFocusedField,
     handleInitialLogin, handle2FAVerification, handleCancel2FA, navigate,
-  } = useLoginLogic();
+  } = (loginHook || useLoginLogic)();
 
   const { branding, center } = useBranding();
   const centerName = center?.centerName || 'English Learning Platform';

@@ -16,9 +16,11 @@ import {
   Video, Star, Gift, Settings, LogOut, Bell, ChevronDown, ChevronRight,
   Moon, Sun, Shield, KeyRound, PhoneMissed, X,
 } from "lucide-react";
+import { useTranslation }        from "react-i18next";
 import { useBranding }           from "../../../../context/BrandingContext";
 import { getDashboardThemeById } from "../../../../data/dashboardThemes";
 import { useRing }               from "../../../../context/RingContext";
+import LanguageSwitcher          from "../../../../components/LanguageSwitcher";
 import ActiveClasses     from "../../components/ActiveClasses";
 import UpcomingClasses   from "../../components/UpcomingClasses";
 import ProgressCard      from "../../components/ProgressCard";
@@ -47,49 +49,49 @@ import { useDashboardData, BADGE_DEFINITIONS } from "../useDashboardData";
 // ── Sidebar nav groups ────────────────────────────────────────────────────────
 const NAV_GROUPS = [
   {
-    label: null,
-    items: [{ key: "dashboard", icon: "🏠", label: "Home", lucide: Home }],
+    labelKey: null,
+    items: [{ key: "dashboard", icon: "🏠", labelKey: "nav.home", lucide: Home }],
   },
   {
-    label: "Learning",
+    labelKey: "nav.learning",
     items: [
-      { key: "homework",      icon: "📚", label: "Homework",   lucide: BookOpen  },
-      { key: "quiz",          icon: "📝", label: "Quizzes",    lucide: FileText  },
-      { key: "flashcards",    icon: "📖", label: "Flashcards", lucide: Layers    },
+      { key: "homework",      icon: "📚", labelKey: "nav.homework",   lucide: BookOpen  },
+      { key: "quiz",          icon: "📝", labelKey: "nav.quizzes",    lucide: FileText  },
+      { key: "flashcards",    icon: "📖", labelKey: "nav.flashcards", lucide: Layers    },
     ],
   },
   {
-    label: "Practice",
+    labelKey: "nav.practice",
     items: [
-      { key: "pronunciation", icon: "🎤", label: "Speaking",   lucide: Mic2          },
-      { key: "conversation",  icon: "🤖", label: "AI Chat",    lucide: MessageSquare },
+      { key: "pronunciation", icon: "🎤", labelKey: "nav.speaking", lucide: Mic2          },
+      { key: "conversation",  icon: "🤖", labelKey: "nav.aiChat",   lucide: MessageSquare },
     ],
   },
   {
-    label: "Classes",
+    labelKey: "nav.classes",
     items: [
-      { key: "book-class",        icon: "📆", label: "Book a Class",  lucide: CalendarDays  },
-      { key: "group-classes",     icon: "👥", label: "Group Classes", lucide: Users         },
-      { key: "messages",          icon: "💬", label: "Messages",      lucide: MessageCircle },
-      { key: "completed-classes", icon: "✅", label: "Completed",     lucide: CheckCircle2  },
-      { key: "schedule",          icon: "📅", label: "Schedule",      lucide: CalendarDays  },
+      { key: "book-class",        icon: "📆", labelKey: "nav.bookClass",     lucide: CalendarDays  },
+      { key: "group-classes",     icon: "👥", labelKey: "nav.groupClasses",  lucide: Users         },
+      { key: "messages",          icon: "💬", labelKey: "nav.messages",      lucide: MessageCircle },
+      { key: "completed-classes", icon: "✅", labelKey: "nav.completed",     lucide: CheckCircle2  },
+      { key: "schedule",          icon: "📅", labelKey: "nav.schedule",      lucide: CalendarDays  },
     ],
   },
   {
-    label: "Progress",
+    labelKey: "nav.progress",
     items: [
-      { key: "charts",       icon: "📊", label: "Charts",       lucide: TrendingUp },
-      { key: "badges",       icon: "🏅", label: "Badges",       lucide: Award      },
-      { key: "certificates", icon: "🎓", label: "Certificates", lucide: Award      },
-      { key: "leaderboard",  icon: "🏆", label: "Leaderboard",  lucide: Award      },
+      { key: "charts",       icon: "📊", labelKey: "nav.charts",       lucide: TrendingUp },
+      { key: "badges",       icon: "🏅", labelKey: "nav.badges",       lucide: Award      },
+      { key: "certificates", icon: "🎓", labelKey: "nav.certificates", lucide: Award      },
+      { key: "leaderboard",  icon: "🏆", labelKey: "nav.leaderboard",  lucide: Award      },
     ],
   },
   {
-    label: "More",
+    labelKey: "nav.more",
     items: [
-      { key: "recordings", icon: "🎬", label: "Recordings", lucide: Video   },
-      { key: "reviews",    icon: "⭐", label: "Reviews",    lucide: Star    },
-      { key: "referral",   icon: "🎁", label: "Invite",     lucide: Gift    },
+      { key: "recordings", icon: "🎬", labelKey: "nav.recordings", lucide: Video },
+      { key: "reviews",    icon: "⭐", labelKey: "nav.reviews",    lucide: Star  },
+      { key: "referral",   icon: "🎁", labelKey: "nav.invite",     lucide: Gift  },
     ],
   },
 ];
@@ -216,6 +218,7 @@ function BadgesTab({ badges, progress, completedClasses, col, isDarkMode, shareA
 // SunshineShell
 // ══════════════════════════════════════════════════════════════════════════════
 export default function SunshineShell() {
+  const { t } = useTranslation();
   const { branding, center } = useBranding();
   const dashTheme = getDashboardThemeById(branding.dashboardTheme);
   const d   = useDashboardData();
@@ -268,7 +271,7 @@ export default function SunshineShell() {
             <div className="pop-in" style={{ background: dashTheme.welcomeGradient, color: "#fff", padding: "40px 56px", borderRadius: "32px", textAlign: "center", boxShadow: "0 24px 64px rgba(0,0,0,0.3)", pointerEvents: "auto", maxWidth: "90vw" }}>
               <div style={{ fontSize: "72px", marginBottom: "12px" }}>{d.celebrationEmoji}</div>
               <h2 style={{ margin: "0 0 8px", fontSize: "28px", fontWeight: 900 }}>{d.celebrationMessage}</h2>
-              <p style={{ margin: "0 0 20px", opacity: 0.9, fontSize: "16px" }}>Keep up the amazing work! 🌟</p>
+              <p style={{ margin: "0 0 20px", opacity: 0.9, fontSize: "16px" }}>{t('dashboard.keepUpWork')}</p>
             </div>
           </div>
         </>
@@ -298,7 +301,7 @@ export default function SunshineShell() {
             </div>
             <div>
               <div style={{ fontSize: 15, fontWeight: 900, color: col.heading, lineHeight: 1.1 }}>{center?.centerName}</div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: col.muted }}>Learning Platform</div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: col.muted }}>{t('sidebar.learningPlatform')}</div>
             </div>
           </div>
         </div>
@@ -310,7 +313,7 @@ export default function SunshineShell() {
           </div>
           <div style={{ minWidth: 0 }}>
             <div style={{ fontSize: 13, fontWeight: 800, color: col.heading, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.student.firstName}</div>
-            <div style={{ fontSize: 11, fontWeight: 600, color: col.muted }}>{d.progress.completedLessons} classes done</div>
+            <div style={{ fontSize: 11, fontWeight: 600, color: col.muted }}>{t('sidebar.classesDone', { count: d.progress.completedLessons })}</div>
           </div>
         </div>
 
@@ -318,9 +321,9 @@ export default function SunshineShell() {
         <nav style={{ flex: 1, padding: "4px 8px" }}>
           {NAV_GROUPS.map((group, gi) => (
             <div key={gi} style={{ marginBottom: 4 }}>
-              {group.label && (
+              {group.labelKey && (
                 <div style={{ fontSize: 10, fontWeight: 800, color: col.muted, letterSpacing: "0.08em", textTransform: "uppercase", padding: "8px 8px 4px" }}>
-                  {group.label}
+                  {t(group.labelKey)}
                 </div>
               )}
               {group.items.map(item => {
@@ -344,7 +347,7 @@ export default function SunshineShell() {
                     }}>
                     {(() => { const LI = item.lucide; return <LI size={17} strokeWidth={1.8} color={isActive ? col.accent : col.body} style={{ flexShrink: 0 }} />; })()}
                     <span style={{ flex: 1, fontSize: 13, fontWeight: isActive ? 800 : 600, color: isActive ? col.accent : col.body }}>
-                      {item.label}
+                      {t(item.labelKey)}
                     </span>
                     {badge != null && (
                       <span style={{ background: isActive ? col.accent : (d.isDarkMode ? "rgba(249,115,22,0.3)" : "#fff7ed"), color: isActive ? "#fff" : col.accent, borderRadius: 999, fontSize: 10, fontWeight: 900, minWidth: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 5px", flexShrink: 0 }}>
@@ -362,7 +365,7 @@ export default function SunshineShell() {
         <div style={{ padding: "8px 8px 16px", borderTop: `2px solid ${col.border}` }}>
           {/* Dark mode toggle */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 12px", marginBottom: 4 }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: col.muted }}>{d.isDarkMode ? "Dark Mode" : "Light Mode"}</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: col.muted }}>{d.isDarkMode ? t('sidebar.darkMode') : t('sidebar.lightMode')}</span>
             <button onClick={() => d.setIsDarkMode(v => !v)}
               style={{ width: 40, height: 22, borderRadius: 999, border: "none", cursor: "pointer", background: d.isDarkMode ? col.accent : col.border, position: "relative", transition: "background .2s", flexShrink: 0 }}>
               <div style={{ width: 16, height: 16, borderRadius: "50%", background: "#fff", position: "absolute", top: 3, left: d.isDarkMode ? 21 : 3, transition: "left .2s" }} />
@@ -372,13 +375,15 @@ export default function SunshineShell() {
           <button className="ss-navitem" onClick={() => d.setShowSettingsSidebar(true)}
             style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", borderRadius: 14, border: "none", cursor: "pointer", background: "transparent", fontFamily: F, marginBottom: 1 }}>
             <Settings size={17} color={col.muted} />
-            <span style={{ fontSize: 13, fontWeight: 600, color: col.body }}>Settings</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: col.body }}>{t('sidebar.settings')}</span>
           </button>
+
+          <LanguageSwitcher col={col} fontFamily={dashTheme.font} />
 
           <button className="ss-navitem" onClick={d.handleLogout}
             style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", borderRadius: 14, border: "none", cursor: "pointer", background: "transparent", fontFamily: F }}>
             <LogOut size={17} color={col.muted} />
-            <span style={{ fontSize: 13, fontWeight: 600, color: col.body }}>Sign Out</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: col.body }}>{t('sidebar.signOut')}</span>
           </button>
         </div>
       </aside>
@@ -391,7 +396,7 @@ export default function SunshineShell() {
           {/* Page title */}
           <h1 style={{ margin: 0, fontSize: 18, fontWeight: 900, color: col.heading, flex: 1 }}>
             {NAV_GROUPS.flatMap(g => g.items).find(i => i.key === d.activeTab)?.icon}{" "}
-            {NAV_GROUPS.flatMap(g => g.items).find(i => i.key === d.activeTab)?.label || "Dashboard"}
+            {(() => { const it = NAV_GROUPS.flatMap(g => g.items).find(i => i.key === d.activeTab); return it ? t(it.labelKey) : t('nav.home'); })()}
           </h1>
 
           {/* Streak pill */}
@@ -426,18 +431,18 @@ export default function SunshineShell() {
               <div style={{ flex: 1 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
                   <span style={{ fontSize: "20px" }}>⚠️</span>
-                  <strong style={{ color: d.isDarkMode ? "#fbbf24" : "#92400e", fontSize: "14px" }}>Attendance Confirmation Needed!</strong>
+                  <strong style={{ color: d.isDarkMode ? "#fbbf24" : "#92400e", fontSize: "14px" }}>{t('dashboard.attendanceNeeded')}</strong>
                 </div>
                 <p style={{ margin: "0 0 4px", color: d.isDarkMode ? "#fcd34d" : "#b45309", fontSize: "13px" }}>
-                  Your teacher marked <strong>"{conf.title}"</strong> complete. Can you confirm?
+                  {t('dashboard.attendanceBody', { title: conf.title })}
                 </p>
                 <p style={{ margin: 0, color: d.isDarkMode ? "#f59e0b" : "#d97706", fontSize: "12px" }}>
-                  ⏰ Auto-confirms in: <strong>{d.getTimeRemaining(conf.autoConfirmAt)}</strong>
+                  ⏰ {t('dashboard.autoConfirm', { time: d.getTimeRemaining(conf.autoConfirmAt) })}
                 </p>
               </div>
               <button className="kid-btn" onClick={() => { d.setSelectedConfirmation(conf); d.setShowConfirmationModal(true); }}
                 style={{ background: "linear-gradient(135deg,#f59e0b,#fbbf24)", color: "#fff", border: "none", borderRadius: "14px", padding: "10px 18px", fontWeight: 800, cursor: "pointer", fontFamily: F, fontSize: "13px", flexShrink: 0 }}>
-                Review 👀
+                {t('dashboard.review')}
               </button>
             </div>
           ))}
@@ -451,16 +456,16 @@ export default function SunshineShell() {
                 <div style={{ position: "absolute", right: -30, top: -40, width: 200, height: 200, borderRadius: "50%", background: "rgba(255,255,255,0.12)" }}/>
                 <div style={{ position: "absolute", right: 80, bottom: -50, width: 120, height: 120, borderRadius: "50%", background: "rgba(255,255,255,0.08)" }}/>
                 <div style={{ position: "relative", zIndex: 1, flex: 1, minWidth: 0 }}>
-                  <p style={{ margin: "0 0 4px", fontSize: 14, fontWeight: 700, opacity: 0.9 }}>Hi {d.student.firstName}!</p>
-                  <h1 style={{ margin: "0 0 8px", fontSize: 28, fontWeight: 900, letterSpacing: "-0.5px", lineHeight: 1.15 }}>Ready for today's adventure?</h1>
+                  <p style={{ margin: "0 0 4px", fontSize: 14, fontWeight: 700, opacity: 0.9 }}>{t('dashboard.greeting', { name: d.student.firstName })}</p>
+                  <h1 style={{ margin: "0 0 8px", fontSize: 28, fontWeight: 900, letterSpacing: "-0.5px", lineHeight: 1.15 }}>{t('dashboard.heroTitle')}</h1>
                   <p style={{ margin: 0, fontSize: 14, fontWeight: 600, opacity: 0.95 }}>
-                    {d.homeworkPending > 0 ? `${d.homeworkPending} homework due` : "No pending homework"} · {d.progress.classesRemaining} classes left 🔥
+                    {d.homeworkPending > 0 ? t('dashboard.homeworkDue', { count: d.homeworkPending }) : t('dashboard.noPendingHomework')} · {t('dashboard.classesLeft', { count: d.progress.classesRemaining })} 🔥
                   </p>
                 </div>
                 <div style={{ position: "relative", zIndex: 1, background: "rgba(255,255,255,0.18)", backdropFilter: "blur(8px)", borderRadius: 20, padding: "16px 22px", textAlign: "center", border: "2px solid rgba(255,255,255,0.25)", flexShrink: 0 }}>
                   <div style={{ fontSize: 34 }}>🔥</div>
                   <div style={{ fontSize: 32, fontWeight: 900, marginTop: 4 }}>{d.progress.streakDays}</div>
-                  <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.1em", opacity: 0.9 }}>DAY STREAK</div>
+                  <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.1em", opacity: 0.9 }}>{t('dashboard.dayStreak')}</div>
                 </div>
               </div>
 
@@ -473,9 +478,9 @@ export default function SunshineShell() {
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
                       <h3 style={{ margin: 0, fontSize: 14, fontWeight: 900, color: d.isDarkMode ? "#fca5a5" : "#dc2626", fontFamily: F }}>
-                        {missedCallCount} Missed Call{missedCallCount > 1 ? "s" : ""}
+                        {missedCallCount} {missedCallCount > 1 ? t('dashboard.missedCalls') : t('dashboard.missedCall')}
                       </h3>
-                      <span style={{ fontSize: 11, color: col.muted, fontWeight: 600 }}>while you were away</span>
+                      <span style={{ fontSize: 11, color: col.muted, fontWeight: 600 }}>{t('dashboard.whileAway')}</span>
                     </div>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                       {missedCalls.map((mc, i) => (
@@ -486,7 +491,7 @@ export default function SunshineShell() {
                           <div>
                             <p style={{ margin: 0, fontSize: 12, fontWeight: 800, color: col.heading, lineHeight: 1.2 }}>{mc.callerName}</p>
                             <p style={{ margin: 0, fontSize: 10, color: col.muted, fontWeight: 600 }}>
-                              {mc.callerRole === "teacher" ? "Teacher" : mc.callerRole === "admin" ? "Admin" : mc.callerRole} · {new Date(mc.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                              {mc.callerRole === "teacher" ? t('common.teacher') : mc.callerRole === "admin" ? t('common.admin') : mc.callerRole} · {new Date(mc.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                             </p>
                           </div>
                         </div>
@@ -494,7 +499,7 @@ export default function SunshineShell() {
                     </div>
                   </div>
                   <button onClick={clearMissedCalls} title="Mark all as seen" style={{ background: d.isDarkMode ? "rgba(255,255,255,0.08)" : "#fff", border: `1px solid ${d.isDarkMode ? "rgba(255,255,255,0.12)" : "#fecaca"}`, borderRadius: 10, padding: "6px 12px", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontSize: 11, fontWeight: 700, color: col.muted, flexShrink: 0, fontFamily: F }}>
-                    <X size={12} /> Mark seen
+                    <X size={12} /> {t('dashboard.markSeen')}
                   </button>
                 </div>
               )}
@@ -502,10 +507,10 @@ export default function SunshineShell() {
               {/* Stats row */}
               <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 14 }}>
                 {[
-                  { Icon: BookOpen,     n: d.progress.completedLessons, l: "Classes done",  grad: "linear-gradient(135deg,#f97316,#fb923c)", shadow: "rgba(249,115,22,0.3)"  },
-                  { Icon: CalendarDays, n: d.progress.classesRemaining, l: "Classes left",  grad: "linear-gradient(135deg,#3b82f6,#60a5fa)", shadow: "rgba(59,130,246,0.3)"  },
-                  { Icon: Award,        n: d.badges.length,             l: "Badges earned", grad: "linear-gradient(135deg,#f43f5e,#fb7185)", shadow: "rgba(244,63,94,0.3)"   },
-                  { Icon: Star,         n: d.progress.weeklyCompleted,  l: "This week",     grad: "linear-gradient(135deg,#f59e0b,#fbbf24)", shadow: "rgba(245,158,11,0.3)"  },
+                  { Icon: BookOpen,     n: d.progress.completedLessons, l: t('dashboard.stats.classesDone'),  grad: "linear-gradient(135deg,#f97316,#fb923c)", shadow: "rgba(249,115,22,0.3)"  },
+                  { Icon: CalendarDays, n: d.progress.classesRemaining, l: t('dashboard.stats.classesLeft'),  grad: "linear-gradient(135deg,#3b82f6,#60a5fa)", shadow: "rgba(59,130,246,0.3)"  },
+                  { Icon: Award,        n: d.badges.length,             l: t('dashboard.stats.badgesEarned'), grad: "linear-gradient(135deg,#f43f5e,#fb7185)", shadow: "rgba(244,63,94,0.3)"   },
+                  { Icon: Star,         n: d.progress.weeklyCompleted,  l: t('dashboard.stats.thisWeek'),     grad: "linear-gradient(135deg,#f59e0b,#fbbf24)", shadow: "rgba(245,158,11,0.3)"  },
                 ].map((s, i) => (
                   <div key={i} className="kid-card" style={{ background: col.card, borderRadius: 22, padding: "18px 20px", border: `2px solid ${col.border}`, display: "flex", flexDirection: "column", gap: 6 }}>
                     <div style={{ width: 44, height: 44, borderRadius: 14, background: s.grad, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: `0 4px 12px ${s.shadow}` }}>
@@ -525,7 +530,7 @@ export default function SunshineShell() {
                   {d.activeClasses.length > 0 && (
                     <div className="kid-card" style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: 24, padding: 20 }}>
                       <h2 style={{ margin: "0 0 14px", fontSize: 17, fontWeight: 900, color: col.heading, display: "flex", alignItems: "center", gap: 8 }}>
-                        🚀 Live & Starting Soon
+                        🚀 {t('dashboard.liveAndSoon')}
                         <span style={{ background: "#ef4444", color: "#fff", borderRadius: 999, padding: "2px 10px", fontSize: 12, fontWeight: 900 }}>{d.activeClasses.length}</span>
                       </h2>
                       <ActiveClasses activeClasses={d.activeClasses} onJoin={d.handleJoinClass} />
@@ -536,10 +541,10 @@ export default function SunshineShell() {
                   <div className="kid-card" style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: 24, padding: 22 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
                       <h2 style={{ margin: 0, fontSize: 18, fontWeight: 900, color: col.heading, display: "flex", alignItems: "center", gap: 8 }}>
-                        📅 Upcoming classes
+                        📅 {t('dashboard.upcomingClasses')}
                       </h2>
                       <button className="kid-btn" onClick={() => d.setActiveTab("schedule")} style={{ background: "transparent", border: "none", color: col.accent, fontWeight: 800, cursor: "pointer", fontFamily: F, fontSize: 13, display: "flex", alignItems: "center", gap: 4 }}>
-                        View all →
+                        {t('dashboard.viewAll')}
                       </button>
                     </div>
                     <UpcomingClasses upcomingClasses={d.upcomingClasses} onEnroll={() => d.showToast("Coming soon!")} />
@@ -552,7 +557,7 @@ export default function SunshineShell() {
                   {/* Today's goal / progress */}
                   <div className="kid-card" style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: 24, padding: 22 }}>
                     <h3 style={{ margin: "0 0 12px", fontSize: 16, fontWeight: 900, color: col.heading, display: "flex", alignItems: "center", gap: 8 }}>
-                      🎯 My Progress
+                      🎯 {t('dashboard.myProgress')}
                     </h3>
                     <ProgressCard progress={d.progress} />
                   </div>
@@ -562,11 +567,11 @@ export default function SunshineShell() {
                   {/* Badges callout */}
                   <div className="kid-card" style={{ background: d.isDarkMode ? "rgba(249,115,22,0.1)" : "linear-gradient(145deg,#fff7ed,#fef3c7)", border: `2px solid ${d.isDarkMode ? "rgba(249,115,22,0.25)" : "#fed7aa"}`, borderRadius: 24, padding: 22 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                      <h3 style={{ margin: 0, fontSize: 16, fontWeight: 900, color: col.heading, display: "flex", alignItems: "center", gap: 8 }}>🏅 Badges</h3>
-                      <button className="kid-btn" onClick={() => d.setActiveTab("badges")} style={{ background: "transparent", border: "none", color: col.accent, fontWeight: 800, borderRadius: 10, cursor: "pointer", fontFamily: F, fontSize: 12 }}>See all →</button>
+                      <h3 style={{ margin: 0, fontSize: 16, fontWeight: 900, color: col.heading, display: "flex", alignItems: "center", gap: 8 }}>🏅 {t('dashboard.badges')}</h3>
+                      <button className="kid-btn" onClick={() => d.setActiveTab("badges")} style={{ background: "transparent", border: "none", color: col.accent, fontWeight: 800, borderRadius: 10, cursor: "pointer", fontFamily: F, fontSize: 12 }}>{t('dashboard.seeAll')}</button>
                     </div>
                     {d.badges.length === 0 ? (
-                      <p style={{ textAlign: "center", color: col.muted, fontSize: 13, fontWeight: 600, margin: 0 }}>Complete classes to earn badges! 🌟</p>
+                      <p style={{ textAlign: "center", color: col.muted, fontSize: 13, fontWeight: 600, margin: 0 }}>{t('dashboard.noBadges')}</p>
                     ) : (
                       <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
                         {d.badges.slice(-4).map(b => (
@@ -579,13 +584,13 @@ export default function SunshineShell() {
                     )}
                     {d.badges.length > 0 && (
                       <button className="kid-btn" onClick={() => d.shareAchievement("badge")} style={{ marginTop: 14, width: "100%", background: dashTheme.accentGradient, color: "#fff", border: "none", borderRadius: 14, padding: "10px 16px", fontWeight: 900, fontSize: 13, fontFamily: F, cursor: "pointer", boxShadow: `0 6px 14px ${dashTheme.tabShadow}`, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-                        🎉 Share achievement
+                        {t('dashboard.shareAchievement')}
                       </button>
                     )}
                   </div>
 
                   <div className="kid-card" style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: 24, padding: 20 }}>
-                    <h2 style={{ margin: "0 0 12px", fontSize: 16, fontWeight: 900, color: col.heading }}>🔔 Notifications</h2>
+                    <h2 style={{ margin: "0 0 12px", fontSize: 16, fontWeight: 900, color: col.heading }}>🔔 {t('dashboard.notifications')}</h2>
                     <NotificationsCard notifications={d.notifications} onClearAll={() => d.setNotifications([])} />
                   </div>
                 </div>
@@ -641,7 +646,7 @@ export default function SunshineShell() {
           {/* ══ COMPLETED ══ */}
           {d.activeTab === "completed-classes" && (
             <div style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: "24px", padding: "24px" }}>
-              <h2 style={{ margin: "0 0 20px", fontSize: "22px", fontWeight: 900, color: col.heading }}>✅ Completed Classes</h2>
+              <h2 style={{ margin: "0 0 20px", fontSize: "22px", fontWeight: 900, color: col.heading }}>✅ {t('dashboard.completedClasses')}</h2>
               <StudentCompletedTab studentId={d.student.id} isDarkMode={d.isDarkMode} />
             </div>
           )}
@@ -654,9 +659,9 @@ export default function SunshineShell() {
             <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "14px" }}>
                 {[
-                  { icon: "📚", label: "Total Classes", value: d.completedClasses.length,    color: "#f97316" },
-                  { icon: "🔥", label: "Day Streak",    value: d.progress.streakDays,         color: "#ec4899" },
-                  { icon: "⏱️", label: "Total Hours",   value: d.completedClasses.length > 0 ? Math.round(d.completedClasses.reduce((s,c) => s+c.duration,0)/60) : 0, color: "#8b5cf6" },
+                  { icon: "📚", label: t('charts.totalClasses'), value: d.completedClasses.length,    color: "#f97316" },
+                  { icon: "🔥", label: t('charts.dayStreak'),    value: d.progress.streakDays,         color: "#ec4899" },
+                  { icon: "⏱️", label: t('charts.totalHours'),   value: d.completedClasses.length > 0 ? Math.round(d.completedClasses.reduce((s,c) => s+c.duration,0)/60) : 0, color: "#8b5cf6" },
                 ].map(({ icon, label, value, color }) => (
                   <div key={label} className="kid-card" style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: "24px", padding: "24px", textAlign: "center" }}>
                     <div style={{ fontSize: "40px", marginBottom: "8px" }}>{icon}</div>
@@ -665,19 +670,19 @@ export default function SunshineShell() {
                   </div>
                 ))}
               </div>
-              {[{ title: "📊 Last 7 Days", data: d.chartData.last7, type: "bar" }, { title: "📈 Last 30 Days", data: d.chartData.last30, type: "line" }].map(({ title, data, type }) => (
+              {[{ title: t('charts.last7Days'), data: d.chartData.last7, type: "bar" }, { title: t('charts.last30Days'), data: d.chartData.last30, type: "line" }].map(({ title, data, type }) => (
                 <div key={title} className="kid-card" style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: "24px", padding: "24px" }}>
                   <h3 style={{ margin: "0 0 20px", fontSize: "18px", fontWeight: 900, color: col.heading }}>{title}</h3>
                   <ResponsiveContainer width="100%" height={240}>
                     {type === "bar"
-                      ? <BarChart data={data}><CartesianGrid strokeDasharray="3 3" stroke={col.border}/><XAxis dataKey="date" stroke={col.muted} style={{ fontFamily: F, fontSize: 11 }}/><YAxis stroke={col.muted} style={{ fontFamily: F, fontSize: 11 }}/><RechartsTooltip contentStyle={tooltipStyle}/><Bar dataKey="classes" fill="#f97316" radius={[8,8,0,0]} name="Classes"/></BarChart>
-                      : <LineChart data={data}><CartesianGrid strokeDasharray="3 3" stroke={col.border}/><XAxis dataKey="date" stroke={col.muted} style={{ fontFamily: F, fontSize: 11 }}/><YAxis stroke={col.muted} style={{ fontFamily: F, fontSize: 11 }}/><RechartsTooltip contentStyle={tooltipStyle}/><Line type="monotone" dataKey="classes" stroke="#f97316" strokeWidth={3} dot={{ fill:"#f97316", r:5 }} name="Classes"/></LineChart>
+                      ? <BarChart data={data}><CartesianGrid strokeDasharray="3 3" stroke={col.border}/><XAxis dataKey="date" stroke={col.muted} style={{ fontFamily: F, fontSize: 11 }}/><YAxis stroke={col.muted} style={{ fontFamily: F, fontSize: 11 }}/><RechartsTooltip contentStyle={tooltipStyle}/><Bar dataKey="classes" fill="#f97316" radius={[8,8,0,0]} name={t('charts.classes')}/></BarChart>
+                      : <LineChart data={data}><CartesianGrid strokeDasharray="3 3" stroke={col.border}/><XAxis dataKey="date" stroke={col.muted} style={{ fontFamily: F, fontSize: 11 }}/><YAxis stroke={col.muted} style={{ fontFamily: F, fontSize: 11 }}/><RechartsTooltip contentStyle={tooltipStyle}/><Line type="monotone" dataKey="classes" stroke="#f97316" strokeWidth={3} dot={{ fill:"#f97316", r:5 }} name={t('charts.classes')}/></LineChart>
                     }
                   </ResponsiveContainer>
                 </div>
               ))}
               <div className="kid-card" style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: "24px", padding: "24px" }}>
-                <h3 style={{ margin: "0 0 20px", fontSize: "18px", fontWeight: 900, color: col.heading }}>🕐 Classes by Time of Day</h3>
+                <h3 style={{ margin: "0 0 20px", fontSize: "18px", fontWeight: 900, color: col.heading }}>{t('charts.byTimeOfDay')}</h3>
                 <ResponsiveContainer width="100%" height={240}>
                   <PieChart><Pie data={d.chartData.timeDist} cx="50%" cy="50%" outerRadius={90} dataKey="value" label={({name,value})=>`${name}: ${value}`} labelLine={false}>{d.chartData.timeDist.map((e,i)=><Cell key={i} fill={e.color}/>)}</Pie><RechartsTooltip contentStyle={tooltipStyle}/></PieChart>
                 </ResponsiveContainer>
@@ -706,7 +711,7 @@ export default function SunshineShell() {
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999, padding: "16px" }}>
           <div className="pop-in kid-card" style={{ background: col.card, borderRadius: "28px", padding: "28px", maxWidth: "420px", width: "100%", boxShadow: "0 24px 64px rgba(0,0,0,0.3)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-              <h3 style={{ margin: 0, fontSize: "20px", fontWeight: 900, color: col.heading }}>🎉 Share Your Win!</h3>
+              <h3 style={{ margin: 0, fontSize: "20px", fontWeight: 900, color: col.heading }}>{t('share.title')}</h3>
               <button className="kid-btn" onClick={() => d.setShowShareModal(false)} style={{ background: col.border, border: "none", borderRadius: "50%", width: "34px", height: "34px", cursor: "pointer", fontSize: "16px", display: "flex", alignItems: "center", justifyContent: "center", color: col.body }}>✕</button>
             </div>
             <div style={{ background: d.isDarkMode ? "rgba(249,115,22,0.1)" : "#fff7ed", border: `2px solid ${d.isDarkMode ? "rgba(249,115,22,0.3)" : "#fed7aa"}`, borderRadius: "18px", padding: "16px", marginBottom: "18px" }}>
@@ -714,9 +719,9 @@ export default function SunshineShell() {
               <p style={{ margin: 0, fontSize: "14px", color: col.body, fontWeight: 600 }}>{d.shareData?.message}</p>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-              <button className="kid-btn" onClick={d.copyShareText} style={{ width: "100%", padding: "12px", border: `2px solid ${col.border}`, borderRadius: "16px", background: "transparent", color: col.heading, fontWeight: 800, cursor: "pointer", fontFamily: F, fontSize: "14px" }}>📋 Copy to Clipboard</button>
+              <button className="kid-btn" onClick={d.copyShareText} style={{ width: "100%", padding: "12px", border: `2px solid ${col.border}`, borderRadius: "16px", background: "transparent", color: col.heading, fontWeight: 800, cursor: "pointer", fontFamily: F, fontSize: "14px" }}>{t('share.copyClipboard')}</button>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-                {[["twitter","🐦 Twitter","#1DA1F2"],["facebook","📘 Facebook","#1877F2"],["whatsapp","💬 WhatsApp","#25D366"],["linkedin","💼 LinkedIn","#0A66C2"]].map(([p,label,bg])=>(
+                {[["twitter",t('share.twitter'),"#1DA1F2"],["facebook",t('share.facebook'),"#1877F2"],["whatsapp",t('share.whatsapp'),"#25D366"],["linkedin",t('share.linkedin'),"#0A66C2"]].map(([p,label,bg])=>(
                   <button key={p} className="kid-btn" onClick={()=>d.shareOnSocial(p)} style={{ padding:"11px", background:bg, color:"#fff", border:"none", borderRadius:"14px", fontWeight:800, cursor:"pointer", fontFamily:F, fontSize:"13px" }}>{label}</button>
                 ))}
               </div>

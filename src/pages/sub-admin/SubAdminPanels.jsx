@@ -409,12 +409,30 @@ export function RemoteVideo({ uid, videoTrack }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // AGORA SPECTATOR MODAL
 // ─────────────────────────────────────────────────────────────────────────────
+const SPECTATE_LIMIT = 300; // 5 minutes
+
 export function AgoraSpectatorModal({ booking, isDarkMode, onClose }) {
   const [phase,       setPhase]       = useState("connecting");
   const [errorMsg,    setErrorMsg]    = useState("");
   const [remoteUsers, setRemoteUsers] = useState([]);
+  const [secondsLeft, setSecondsLeft] = useState(SPECTATE_LIMIT);
   const clientRef = useRef(null);
   const c = dashboardColors(isDarkMode);
+
+  // 5-minute session limit — starts from mount
+  useEffect(() => {
+    const tick = setInterval(() => {
+      setSecondsLeft((s) => {
+        if (s <= 1) { onClose(); return 0; }
+        return s - 1;
+      });
+    }, 1000);
+    return () => clearInterval(tick);
+  }, [onClose]);
+
+  const timerMm   = String(Math.floor(secondsLeft / 60)).padStart(2, "0");
+  const timerSs   = String(secondsLeft % 60).padStart(2, "0");
+  const timerWarn = secondsLeft <= 60;
 
   useEffect(() => {
     let mounted = true;
@@ -422,7 +440,7 @@ export function AgoraSpectatorModal({ booking, isDarkMode, onClose }) {
       try {
         const AgoraRTC = (await import("agora-rtc-sdk-ng")).default;
         if (!mounted) return;
-        const { data } = await api.get(`/agora/token?channel=${booking._id}`);
+        const { data } = await api.get(`/agora/token?channel=class-${booking._id}`);
         if (!data.success || !data.appId) throw new Error(data.message || "Could not get Agora token");
         if (!mounted) return;
         const client = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
@@ -462,10 +480,27 @@ export function AgoraSpectatorModal({ booking, isDarkMode, onClose }) {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", borderBottom: `1px solid ${isDarkMode ? "#1e2235" : "#e8ecf4"}` }}>
           <div>
             <p style={{ margin: 0, fontSize: "15px", fontWeight: "800", color: isDarkMode ? "#e2e8f0" : "#1e293b" }}>{booking.classTitle || "Class"} — Spectator View</p>
-            <p style={{ margin: "2px 0 0", fontSize: "12px", color: isDarkMode ? "#6b7280" : "#94a3b8" }}>Agora channel · {booking._id}</p>
+            <p style={{ margin: "2px 0 0", fontSize: "12px", color: isDarkMode ? "#6b7280" : "#94a3b8" }}>Agora channel · class-{booking._id}</p>
           </div>
-          <button onClick={onClose} style={{ width: "32px", height: "32px", borderRadius: "8px", border: "none", cursor: "pointer", background: isDarkMode ? "#1e2235" : "#f0f4ff", color: isDarkMode ? "#6b7280" : "#94a3b8", fontSize: "18px", display: "flex", alignItems: "center", justifyContent: "center" }}>×</button>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <span style={{
+              fontFamily: "monospace", fontSize: "13px", fontWeight: "800",
+              padding: "4px 10px", borderRadius: "8px",
+              background: timerWarn ? "rgba(239,68,68,0.18)" : (isDarkMode ? "#1e2235" : "#f0f4ff"),
+              color: timerWarn ? "#f87171" : (isDarkMode ? "#94a3b8" : "#6366f1"),
+              border: `1px solid ${timerWarn ? "rgba(239,68,68,0.35)" : (isDarkMode ? "#2d3148" : "#e0e7ff")}`,
+              animation: timerWarn ? "db-pulse 1s ease-in-out infinite" : "none",
+            }}>
+              ⏱ {timerMm}:{timerSs}
+            </span>
+            <button onClick={onClose} style={{ width: "32px", height: "32px", borderRadius: "8px", border: "none", cursor: "pointer", background: isDarkMode ? "#1e2235" : "#f0f4ff", color: isDarkMode ? "#6b7280" : "#94a3b8", fontSize: "18px", display: "flex", alignItems: "center", justifyContent: "center" }}>×</button>
+          </div>
         </div>
+        {timerWarn && (
+          <div style={{ background: "rgba(239,68,68,0.12)", borderBottom: `1px solid rgba(239,68,68,0.25)`, padding: "6px 20px", textAlign: "center", fontSize: "12px", fontWeight: "700", color: "#f87171" }}>
+            Session ending in {secondsLeft}s — spectating limit is 5 minutes
+          </div>
+        )}
         <div style={{ flex: 1, padding: "20px", overflowY: "auto", minHeight: "300px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: phase === "connected" && remoteUsers.length > 0 ? "flex-start" : "center", gap: "16px" }}>
           {phase === "connecting" && (<><Loader2 size={36} color="#6366f1" style={{ animation: "db-spin 0.8s linear infinite" }} /><p style={{ margin: 0, color: isDarkMode ? "#6b7280" : "#94a3b8", fontSize: "14px" }}>Joining class as spectator…</p></>)}
           {phase === "error" && (<><XCircle size={36} color="#ef4444" /><p style={{ margin: 0, color: "#ef4444", fontSize: "14px", fontWeight: "600" }}>Failed to connect</p><p style={{ margin: 0, color: isDarkMode ? "#6b7280" : "#94a3b8", fontSize: "12px" }}>{errorMsg}</p></>)}

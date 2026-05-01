@@ -11,6 +11,7 @@ import {
   Mic, MicOff, Video as VideoIcon, VideoOff,
   PhoneOff, Monitor, MonitorOff, Users, Loader,
   Smile, Layers, Upload, X, MessageSquare, Send, Waves, Circle, Square,
+  ChevronUp, Check,
 } from "lucide-react";
 
 // ── Virtual background ────────────────────────────────────────────────────────
@@ -109,6 +110,10 @@ export default function VideoCall({
   const [noiseCancel,     setNoiseCancel]     = useState(true);
   const [noiseCancelSupported, setNoiseCancelSupported] = useState(false);
   const [audioBlocked,    setAudioBlocked]    = useState(false); // browser autoplay blocked
+  const [micError,        setMicError]        = useState(null);  // NOT_READABLE or similar
+  const [micDevices,      setMicDevices]      = useState([]);
+  const [selectedMicId,   setSelectedMicId]   = useState(null);
+  const [showMicPicker,   setShowMicPicker]   = useState(false);
 
   // ── Custom hooks ──────────────────────────────────────────────────────────
   const {
@@ -215,6 +220,7 @@ export default function VideoCall({
   const handleToggleChat = useCallback(() => {
     toggleChat();
     setShowBgPanel(false);
+    setShowMicPicker(false);
   }, [toggleChat]);
 
   // ── Agora event handlers ──────────────────────────────────────────────────
@@ -334,6 +340,7 @@ export default function VideoCall({
       hasJoinedRef.current = true;
       joinedAtRef.current  = Date.now();
       setJoined(true);
+      loadMicDevices();
 
       // Server-side Agora session tracking — teacher only (prevents double-counting)
       if (userRole === 'teacher' && bookingId) {
@@ -345,9 +352,30 @@ export default function VideoCall({
       let videoTrack = null;
 
       try {
+        // Pre-warm: native getUserMedia flushes stale OS-level hardware locks
+        // (NOT_READABLE often means a previous session didn't fully release the device)
+        try {
+          const warm = await navigator.mediaDevices.getUserMedia({ audio: true });
+          warm.getTracks().forEach(t => t.stop());
+        } catch (_) {}
+
         audioTrack = await AgoraRTC.createMicrophoneAudioTrack({ encoderConfig: "speech_standard" });
+        setMicError(null);
       } catch (err) {
         console.warn("⚠️ Microphone unavailable:", err.message);
+        if (err.code === "NOT_READABLE" || err.name === "NotReadableError") {
+          // Hardware lock — wait 800ms and retry with no constraints
+          await new Promise(r => setTimeout(r, 800));
+          try {
+            audioTrack = await AgoraRTC.createMicrophoneAudioTrack();
+            setMicError(null);
+          } catch (retryErr) {
+            console.warn("⚠️ Microphone retry failed:", retryErr.message);
+            setMicError("Microphone is in use by another app. Close it and click Retry Mic.");
+          }
+        } else {
+          setMicError("Microphone could not be accessed. Click Retry Mic to try again.");
+        }
       }
 
       try {
@@ -460,6 +488,59 @@ export default function VideoCall({
       setNoiseCancel(next);
     } catch (err) { console.error("Noise cancel toggle failed:", err); }
   };
+
+  const retryMic = async () => {
+    if (!client.current || !joined) return;
+    setMicError(null);
+    try {
+      // Pre-warm to clear any stale hardware lock
+      try {
+        const warm = await navigator.mediaDevices.getUserMedia({ audio: true });
+        warm.getTracks().forEach(t => t.stop());
+      } catch (_) {}
+      const track = await AgoraRTC.createMicrophoneAudioTrack({ encoderConfig: "speech_standard" });
+      await client.current.publish([track]);
+      setLocalAudioTrack(track);
+      setMicOn(true);
+    } catch (err) {
+      console.warn("Mic retry failed:", err.message);
+      setMicError("Still can't access mic. Close other apps using it and try again.");
+    }
+  };
+
+  const loadMicDevices = useCallback(async () => {
+    try {
+      const devices = await AgoraRTC.getMicrophones();
+      setMicDevices(devices);
+    } catch (_) {}
+  }, []);
+
+  const switchMic = async (deviceId) => {
+    setShowMicPicker(false);
+    if (!client.current || !joined) return;
+    try {
+      if (localAudioTrack) {
+        // setDevice switches the hardware source on the existing published track —
+        // no unpublish/recreate needed, no OS lock cycle
+        await localAudioTrack.setDevice(deviceId);
+      } else {
+        // No track yet (mic failed on join) — create and publish fresh
+        const track = await AgoraRTC.createMicrophoneAudioTrack({
+          microphoneId: deviceId,
+          encoderConfig: "speech_standard",
+        });
+        await client.current.publish([track]);
+        setLocalAudioTrack(track);
+        setMicOn(true);
+      }
+      setSelectedMicId(deviceId);
+      setMicError(null);
+    } catch (err) {
+      console.warn("switchMic failed:", err.message);
+      setMicError("Could not switch microphone — close other apps using the mic and try again.");
+    }
+  };
+
   const toggleScreenShare = async () => {
     try {
       if (!isScreenSharing) {
@@ -908,6 +989,22 @@ export default function VideoCall({
           </div>
         )}
 
+        {/* Microphone unavailable banner */}
+        {micError && !localAudioTrack && (
+          <div className="bg-red-950/80 border-t border-red-800/50 px-4 py-2 flex items-center justify-between gap-3 flex-shrink-0 backdrop-blur-sm">
+            <div className="flex items-center gap-2 text-red-300 text-xs font-medium">
+              <MicOff className="w-3.5 h-3.5 flex-shrink-0" />
+              {micError}
+            </div>
+            <button
+              onClick={retryMic}
+              className="px-3 py-1.5 bg-red-700 hover:bg-red-600 active:scale-95 text-white text-xs font-semibold rounded-lg transition-all flex-shrink-0"
+            >
+              Retry Mic
+            </button>
+          </div>
+        )}
+
         {/* Audio autoplay unlock banner */}
         {audioBlocked && (
           <div className="bg-amber-950/80 border-t border-amber-800/50 px-4 py-2 flex items-center justify-between gap-3 flex-shrink-0 backdrop-blur-sm">
@@ -930,15 +1027,50 @@ export default function VideoCall({
             style={{ background: "linear-gradient(to top, rgba(0,0,0,0.55) 0%, transparent 100%)" }}>
             <div className="flex items-end justify-center gap-2 relative">
 
-              {/* ── Mic ── */}
-              <CtrlBtn
-                onClick={toggleMic}
-                label={micOn ? "Mute" : "Unmuted"}
-                active={micOn}
-                danger={!micOn}
-              >
-                {micOn ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
-              </CtrlBtn>
+              {/* ── Mic + device picker ── */}
+              <div className="relative flex flex-col items-center">
+                {/* Device picker popover */}
+                {showMicPicker && (
+                  <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-50 rounded-2xl border border-white/10 overflow-hidden"
+                    style={{ background: "rgba(18,18,22,0.97)", backdropFilter: "blur(20px)", boxShadow: "0 20px 60px rgba(0,0,0,0.6)", minWidth: "230px", maxWidth: "min(90vw,320px)" }}>
+                    <div className="px-3 py-2 border-b border-white/10 text-[11px] font-semibold text-white/40 uppercase tracking-wider">
+                      Microphone
+                    </div>
+                    {micDevices.length === 0
+                      ? <p className="px-4 py-3 text-xs text-white/40">No devices found</p>
+                      : micDevices.map(d => {
+                          const active = selectedMicId ? d.deviceId === selectedMicId : d.deviceId === (localAudioTrack?.getMediaStreamTrack?.()?.getSettings?.()?.deviceId);
+                          return (
+                            <button key={d.deviceId} onClick={() => switchMic(d.deviceId)}
+                              className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-white/8 transition-colors text-sm text-white/80">
+                              <Check className={`w-3.5 h-3.5 flex-shrink-0 ${active ? "text-green-400" : "opacity-0"}`} />
+                              <span className="truncate">{d.label || `Microphone ${d.deviceId.slice(0,6)}`}</span>
+                            </button>
+                          );
+                        })
+                    }
+                  </div>
+                )}
+                {/* Caret to open picker */}
+                {joined && (
+                  <button
+                    onClick={() => { setShowMicPicker(v => !v); loadMicDevices(); }}
+                    className="mb-0.5 px-1.5 py-0.5 rounded-md text-white/40 hover:text-white/80 hover:bg-white/10 transition-all"
+                    title="Choose microphone"
+                  >
+                    <ChevronUp className="w-3 h-3" />
+                  </button>
+                )}
+                <CtrlBtn
+                  onClick={localAudioTrack ? toggleMic : retryMic}
+                  label={!localAudioTrack ? "No Mic" : micOn ? "Mute" : "Unmuted"}
+                  active={micOn && !!localAudioTrack}
+                  danger={!micOn || !localAudioTrack}
+                  title={!localAudioTrack ? "Microphone unavailable — click to retry" : undefined}
+                >
+                  {localAudioTrack && micOn ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
+                </CtrlBtn>
+              </div>
 
               {/* ── Camera ── */}
               <CtrlBtn
@@ -965,7 +1097,7 @@ export default function VideoCall({
                 <div className="relative">
                   {BgPanel}
                   <CtrlBtn
-                    onClick={() => { setShowBgPanel(v => !v); setShowEmojiPicker(false); setShowChat(false); }}
+                    onClick={() => { setShowBgPanel(v => !v); setShowEmojiPicker(false); setShowChat(false); setShowMicPicker(false); }}
                     label="Background"
                     active={!showBgPanel && activeBg === "none"}
                     accent={activeBg !== "none" || showBgPanel ? "purple" : null}
@@ -1008,7 +1140,7 @@ export default function VideoCall({
                   </div>
                 )}
                 <CtrlBtn
-                  onClick={() => { setShowEmojiPicker(v => !v); setShowBgPanel(false); }}
+                  onClick={() => { setShowEmojiPicker(v => !v); setShowBgPanel(false); setShowMicPicker(false); }}
                   label="React"
                   active={!showEmojiPicker}
                   accent={showEmojiPicker ? "yellow" : null}

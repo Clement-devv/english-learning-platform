@@ -1,0 +1,128 @@
+{
+  "nav": {
+    "home": "Trang chủ",
+    "learning": "Học tập",
+    "homework": "Bài tập",
+    "quizzes": "Kiểm tra",
+    "flashcards": "Thẻ từ vựng",
+    "practice": "Luyện tập",
+    "speaking": "Luyện nói",
+    "aiChat": "Chat AI",
+    "classes": "Lớp học",
+    "bookClass": "Đặt lịch học",
+    "groupClasses": "Lớp nhóm",
+    "messages": "Tin nhắn",
+    "completed": "Đã hoàn thành",
+    "schedule": "Lịch học",
+    "progress": "Tiến độ",
+    "charts": "Biểu đồ",
+    "badges": "Huy hiệu",
+    "certificates": "Chứng chỉ",
+    "leaderboard": "Bảng xếp hạng",
+    "more": "Thêm",
+    "recordings": "Bản ghi âm",
+    "reviews": "Đánh giá",
+    "invite": "Mời bạn bè"
+  },
+  "sidebar": {
+    "learningPlatform": "Nền tảng học tập",
+    "classesDone": "Đã học {{count}} buổi",
+    "darkMode": "Chế độ tối",
+    "lightMode": "Chế độ sáng",
+    "settings": "Cài đặt",
+    "signOut": "Đăng xuất"
+  },
+  "dashboard": {
+    "greeting": "Xin chào {{name}}!",
+    "heroTitle": "Sẵn sàng cho buổi học hôm nay chưa?",
+    "homeworkDue": "{{count}} bài tập cần làm",
+    "noPendingHomework": "Không có bài tập nào",
+    "classesLeft": "Còn {{count}} buổi học",
+    "dayStreak": "NGÀY LIÊN TIẾP",
+    "stats": {
+      "classesDone": "Buổi đã học",
+      "classesLeft": "Buổi còn lại",
+      "badgesEarned": "Huy hiệu",
+      "thisWeek": "Tuần này"
+    },
+    "liveAndSoon": "Đang diễn ra & Sắp bắt đầu",
+    "upcomingClasses": "Lớp học sắp tới",
+    "viewAll": "Xem tất cả →",
+    "myProgress": "Tiến độ của tôi",
+    "notifications": "Thông báo",
+    "badges": "Huy hiệu",
+    "seeAll": "Xem tất cả →",
+    "shareAchievement": "🎉 Chia sẻ thành tích",
+    "noBadges": "Hoàn thành lớp học để nhận huy hiệu! 🌟",
+    "attendanceNeeded": "Cần xác nhận điểm danh!",
+    "attendanceBody": "Giáo viên đã đánh dấu \"{{title}}\" hoàn thành. Bạn xác nhận không?",
+    "autoConfirm": "Tự động xác nhận sau: {{time}}",
+    "review": "Xem lại 👀",
+    "missedCall": "Cuộc gọi nhỡ",
+    "missedCalls": "Cuộc gọi nhỡ",
+    "whileAway": "khi bạn vắng mặt",
+    "markSeen": "Đánh dấu đã xem",
+    "keepUpWork": "Tiếp tục phát huy nhé! 🌟",
+    "completedClasses": "Các buổi học đã hoàn thành"
+  },
+  "charts": {
+    "totalClasses": "Tổng số buổi",
+    "dayStreak": "Ngày liên tiếp",
+    "totalHours": "Tổng số giờ",
+    "last7Days": "📊 7 ngày qua",
+    "last30Days": "📈 30 ngày qua",
+    "byTimeOfDay": "🕐 Lớp học theo thời gian trong ngày",
+    "classes": "Buổi học"
+  },
+  "badges": {
+    "title": "🏅 Huy hiệu thành tích",
+    "noEarned": "Hoàn thành lớp học để bắt đầu nhận huy hiệu!",
+    "earned": "Đã nhận {{count}} / {{total}} · {{pct}}%",
+    "shareAll": "🎉 Chia sẻ tất cả",
+    "all": "🏅 Tất cả",
+    "journey": "🚀 Hành trình",
+    "consistency": "🔥 Kiên trì",
+    "weekly": "📅 Hàng tuần",
+    "special": "⭐ Đặc biệt",
+    "almostThere": "🎯 Gần đạt rồi!",
+    "earnedBadge": "✓ Đã nhận",
+    "locked": "🔒 Chưa mở khóa"
+  },
+  "share": {
+    "title": "🎉 Chia sẻ thành tích!",
+    "copyClipboard": "📋 Sao chép văn bản",
+    "twitter": "🐦 Twitter",
+    "facebook": "📘 Facebook",
+    "whatsapp": "💬 WhatsApp",
+    "linkedin": "💼 LinkedIn"
+  },
+  "login": {
+    "subtitle": "Đăng nhập để bắt đầu hành trình học tập!",
+    "submit": "Bắt đầu thôi! 🚀",
+    "footer": "Tài khoản của bạn được quản lý bởi nhà trường 🏫",
+    "forgotPassword": "Quên mật khẩu?",
+    "email": "Email",
+    "password": "Mật khẩu",
+    "signingIn": "Đang đăng nhập…",
+    "badges": {
+      "lessons": "🎓 Bài học chuyên nghiệp",
+      "classes": "🌍 Lớp học trực tiếp",
+      "progress": "🏆 Theo dõi tiến độ"
+    },
+    "hero": {
+      "h2": "Học.\nPhát triển.\nTỏa sáng.",
+      "p": "Hành trình học tập của bạn đang chờ!"
+    }
+  },
+  "common": {
+    "loading": "Đang tải…",
+    "error": "Đã xảy ra lỗi",
+    "save": "Lưu",
+    "cancel": "Hủy",
+    "back": "Quay lại",
+    "close": "Đóng",
+    "switchLanguage": "English",
+    "teacher": "Giáo viên",
+    "admin": "Quản trị viên"
+  }
+}

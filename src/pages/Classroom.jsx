@@ -272,16 +272,238 @@ export default function Classroom({ classData, userRole: propUserRole, onLeave, 
 
       ) : (
 
-        /* ── Student: wait for teacher to choose ── */
-        <div className="max-w-sm w-full text-center">
-          <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 ${dm ? "bg-purple-900/40" : "bg-purple-100"}`}>
-            <Loader className="w-10 h-10 text-purple-500 animate-spin" />
-          </div>
-          <h2 className={`text-2xl font-bold mb-3 ${dm ? "text-gray-100" : "text-gray-800"}`}>Waiting for Teacher</h2>
-          <p className={dm ? "text-gray-400" : "text-gray-600"}>Your teacher is selecting the video platform. This page will update automatically.</p>
-        </div>
+        /* ── Student: animated waiting screen ── */
+        <WaitingForTeacher />
 
       )}
+    </div>
+  );
+}
+
+// ── Animated waiting screen ───────────────────────────────────────────────────
+const TIPS = [
+  "💡 Tip: Try to speak as much English as possible today!",
+  "🎯 Goal: Focus on pronunciation — say words slowly and clearly.",
+  "📚 Fun fact: Learning 5 new words a day = 1,825 words a year!",
+  "🌟 Remember: Mistakes are how we learn. Don't be shy!",
+  "🚀 Challenge: Use a word you learned last class today!",
+  "🎵 Tip: Singing songs in English helps you remember vocabulary!",
+];
+
+const FLOATERS = [
+  { emoji: "📚", top: "8%",  left: "6%",  size: 38, dur: 3.2, delay: 0    },
+  { emoji: "⭐", top: "12%", left: "88%", size: 34, dur: 2.8, delay: 0.5  },
+  { emoji: "✏️", top: "72%", left: "5%",  size: 32, dur: 3.5, delay: 1.0  },
+  { emoji: "🚀", top: "75%", left: "90%", size: 36, dur: 2.6, delay: 0.3  },
+  { emoji: "💡", top: "40%", left: "3%",  size: 30, dur: 4.0, delay: 0.8  },
+  { emoji: "🎮", top: "42%", left: "93%", size: 34, dur: 3.1, delay: 1.4  },
+  { emoji: "🌈", top: "20%", left: "50%", size: 28, dur: 3.8, delay: 0.2  },
+  { emoji: "🎒", top: "82%", left: "48%", size: 32, dur: 2.9, delay: 1.1  },
+  { emoji: "🎨", top: "58%", left: "18%", size: 28, dur: 3.4, delay: 0.6  },
+  { emoji: "🦋", top: "30%", left: "80%", size: 30, dur: 3.0, delay: 1.7  },
+  { emoji: "🌟", top: "88%", left: "20%", size: 26, dur: 3.6, delay: 0.9  },
+  { emoji: "🎵", top: "15%", left: "70%", size: 30, dur: 2.7, delay: 1.3  },
+];
+
+function WaitingForTeacher() {
+  const [tipIdx, setTipIdx] = useState(0);
+  const [dotCount, setDotCount] = useState(1);
+
+  useEffect(() => {
+    const tipTimer = setInterval(() => setTipIdx(i => (i + 1) % TIPS.length), 4000);
+    const dotTimer = setInterval(() => setDotCount(d => (d % 3) + 1), 600);
+    return () => { clearInterval(tipTimer); clearInterval(dotTimer); };
+  }, []);
+
+  return (
+    <div style={{
+      position: "fixed", inset: 0, overflow: "hidden",
+      background: "linear-gradient(135deg,#f5f3ff 0%,#ede9fe 40%,#e0f2fe 100%)",
+      display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+    }}>
+      <style>{`
+        @keyframes wft-float {
+          0%,100% { transform: translateY(0px) rotate(0deg); }
+          33%      { transform: translateY(-14px) rotate(6deg); }
+          66%      { transform: translateY(-7px) rotate(-4deg); }
+        }
+        @keyframes wft-bob {
+          0%,100% { transform: translateY(0px); }
+          50%      { transform: translateY(-10px); }
+        }
+        @keyframes wft-blink {
+          0%,90%,100% { scaleY: 1; }
+          95%          { transform: scaleY(0.05); }
+        }
+        @keyframes wft-dot1 { 0%,100%{opacity:.2;transform:scale(0.8)} 33%{opacity:1;transform:scale(1.2)} }
+        @keyframes wft-dot2 { 0%,100%{opacity:.2;transform:scale(0.8)} 55%{opacity:1;transform:scale(1.2)} }
+        @keyframes wft-dot3 { 0%,100%{opacity:.2;transform:scale(0.8)} 77%{opacity:1;transform:scale(1.2)} }
+        @keyframes wft-tip  { 0%{opacity:0;transform:translateY(10px)} 15%,85%{opacity:1;transform:translateY(0)} 100%{opacity:0;transform:translateY(-10px)} }
+        @keyframes wft-pulse{ 0%,100%{box-shadow:0 0 0 0 rgba(139,92,246,.35)} 50%{box-shadow:0 0 0 16px rgba(139,92,246,0)} }
+        @keyframes wft-spin { to{transform:rotate(360deg)} }
+        @keyframes wft-eyes { 0%,88%,100%{transform:scaleY(1)} 92%{transform:scaleY(0.08)} }
+        @keyframes wft-wave {
+          0%{transform:rotate(0deg)} 15%{transform:rotate(20deg)} 30%{transform:rotate(-10deg)}
+          45%{transform:rotate(20deg)} 60%{transform:rotate(0deg)} 100%{transform:rotate(0deg)}
+        }
+      `}</style>
+
+      {/* Floating background items */}
+      {FLOATERS.map((f, i) => (
+        <div key={i} style={{
+          position: "absolute", top: f.top, left: f.left,
+          fontSize: f.size, pointerEvents: "none", userSelect: "none",
+          animation: `wft-float ${f.dur}s ease-in-out ${f.delay}s infinite`,
+          opacity: 0.75,
+        }}>
+          {f.emoji}
+        </div>
+      ))}
+
+      {/* Main card */}
+      <div style={{
+        display: "flex", flexDirection: "column", alignItems: "center", gap: 0,
+        animation: "wft-bob 3.5s ease-in-out infinite",
+      }}>
+
+        {/* Kid at computer SVG */}
+        <svg viewBox="0 0 220 200" width="260" height="240" style={{ overflow: "visible" }}>
+          {/* Floor shadow */}
+          <ellipse cx="110" cy="192" rx="72" ry="8" fill="rgba(139,92,246,0.12)" />
+
+          {/* Desk */}
+          <rect x="28" y="148" width="164" height="14" rx="5" fill="#c4a882" />
+          <rect x="38" y="160" width="11" height="32" rx="4" fill="#b8986a" />
+          <rect x="171" y="160" width="11" height="32" rx="4" fill="#b8986a" />
+
+          {/* Laptop base / keyboard */}
+          <rect x="56" y="132" width="108" height="18" rx="6" fill="#374151" />
+          <rect x="62" y="136" width="96" height="10" rx="3" fill="#4b5563" />
+          {/* Keyboard keys (decorative) */}
+          {[68,80,92,104,116,128,140].map(x => (
+            <rect key={x} x={x} y="138" width="8" height="6" rx="1.5" fill="#6b7280" />
+          ))}
+
+          {/* Laptop screen */}
+          <rect x="56" y="72" width="108" height="66" rx="8" fill="#1e1b4b" />
+          {/* Screen bezel */}
+          <rect x="60" y="76" width="100" height="58" rx="5" fill="#111827" />
+          {/* Screen glow */}
+          <rect x="60" y="76" width="100" height="58" rx="5" fill="url(#screenGlow)" opacity="0.6" />
+
+          {/* Defs */}
+          <defs>
+            <radialGradient id="screenGlow" cx="50%" cy="50%" r="55%">
+              <stop offset="0%" stopColor="#818cf8" stopOpacity="0.5" />
+              <stop offset="100%" stopColor="#1e1b4b" stopOpacity="0" />
+            </radialGradient>
+          </defs>
+
+          {/* Screen content: pulsing dots */}
+          <circle cx="96"  cy="105" r="6" fill="#a78bfa" style={{ animation: "wft-dot1 1.5s ease-in-out infinite" }} />
+          <circle cx="110" cy="105" r="6" fill="#818cf8" style={{ animation: "wft-dot2 1.5s ease-in-out infinite" }} />
+          <circle cx="124" cy="105" r="6" fill="#6366f1" style={{ animation: "wft-dot3 1.5s ease-in-out infinite" }} />
+          {/* Screen text lines */}
+          <rect x="72" y="85" width="76" height="5" rx="2.5" fill="#4c1d95" opacity="0.7" />
+          <rect x="80" y="94" width="60" height="4" rx="2" fill="#3b0764" opacity="0.5" />
+
+          {/* Laptop hinge */}
+          <rect x="56" y="136" width="108" height="5" rx="2" fill="#1f2937" />
+
+          {/* Kid body */}
+          <rect x="84" y="118" width="52" height="38" rx="16" fill="#f59e0b" />
+          {/* Shirt design */}
+          <path d="M 95 126 Q 110 136 125 126" stroke="#d97706" strokeWidth="2" fill="none" />
+
+          {/* Left arm (waving) */}
+          <g style={{ transformOrigin: "78px 122px", animation: "wft-wave 2.5s ease-in-out 1s infinite" }}>
+            <rect x="54" y="116" width="28" height="13" rx="6.5" fill="#f59e0b" transform="rotate(-20 68 122)" />
+            <circle cx="52" cy="127" r="9" fill="#fde68a" />
+            {/* Fingers */}
+            <ellipse cx="46" cy="121" rx="4" ry="6" fill="#fde68a" transform="rotate(-30 46 121)" />
+            <ellipse cx="42" cy="128" rx="4" ry="6" fill="#fde68a" transform="rotate(-50 42 128)" />
+          </g>
+
+          {/* Right arm (on keyboard) */}
+          <rect x="138" y="118" width="28" height="13" rx="6.5" fill="#f59e0b" transform="rotate(20 152 124)" />
+          <circle cx="170" cy="129" r="9" fill="#fde68a" />
+
+          {/* Head */}
+          <circle cx="110" cy="82" r="32" fill="#fde68a" />
+
+          {/* Hair */}
+          <path d="M 78 76 Q 82 48 110 46 Q 138 48 142 76 Q 130 58 110 58 Q 90 58 78 76 Z" fill="#92400e" />
+          {/* Hair tufts */}
+          <ellipse cx="102" cy="49" rx="7" ry="10" fill="#92400e" transform="rotate(-15 102 49)" />
+          <ellipse cx="118" cy="49" rx="7" ry="10" fill="#92400e" transform="rotate(15 118 49)" />
+
+          {/* Headphones band */}
+          <path d="M 80 78 Q 80 50 110 50 Q 140 50 140 78" stroke="#6366f1" strokeWidth="6" fill="none" strokeLinecap="round" />
+          {/* Headphone cups */}
+          <rect x="72" y="72" width="16" height="20" rx="8" fill="#6366f1" />
+          <rect x="132" y="72" width="16" height="20" rx="8" fill="#6366f1" />
+          <rect x="75" y="75" width="10" height="14" rx="5" fill="#818cf8" />
+          <rect x="135" y="75" width="10" height="14" rx="5" fill="#818cf8" />
+
+          {/* Eyes (blinking) */}
+          <g style={{ transformOrigin: "100px 79px", animation: "wft-eyes 3.5s ease-in-out infinite" }}>
+            <ellipse cx="100" cy="79" rx="6" ry="7" fill="#1f2937" />
+          </g>
+          <g style={{ transformOrigin: "120px 79px", animation: "wft-eyes 3.5s ease-in-out 0.1s infinite" }}>
+            <ellipse cx="120" cy="79" rx="6" ry="7" fill="#1f2937" />
+          </g>
+          {/* Eye shine */}
+          <circle cx="103" cy="76" r="2.5" fill="white" />
+          <circle cx="123" cy="76" r="2.5" fill="white" />
+
+          {/* Smile */}
+          <path d="M 97 90 Q 110 102 123 90" stroke="#b45309" strokeWidth="3" fill="none" strokeLinecap="round" />
+
+          {/* Cheeks */}
+          <circle cx="88" cy="88" r="9" fill="#fca5a5" opacity="0.45" />
+          <circle cx="132" cy="88" r="9" fill="#fca5a5" opacity="0.45" />
+
+          {/* Stars flying out of screen */}
+          <text x="170" y="80" fontSize="16" style={{ animation: "wft-float 2.1s ease-in-out 0.3s infinite" }}>✨</text>
+          <text x="46"  y="70" fontSize="14" style={{ animation: "wft-float 2.6s ease-in-out 0.8s infinite" }}>⭐</text>
+        </svg>
+
+        {/* Title */}
+        <div style={{ textAlign: "center", marginTop: 4 }}>
+          <h2 style={{ margin: "0 0 8px", fontSize: 28, fontWeight: 900, color: "#4c1d95", letterSpacing: "-0.5px" }}>
+            Class is starting soon!
+          </h2>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, marginBottom: 20 }}>
+            <span style={{ fontSize: 14, fontWeight: 700, color: "#7c3aed" }}>Your teacher is getting ready</span>
+            <span style={{ display: "inline-flex", gap: 3 }}>
+              {[1,2,3].map(n => (
+                <span key={n} style={{
+                  width: 7, height: 7, borderRadius: "50%", background: "#8b5cf6", display: "inline-block",
+                  animation: `wft-dot${n} 1.2s ease-in-out infinite`,
+                }} />
+              ))}
+            </span>
+          </div>
+
+          {/* Rotating tips */}
+          <div style={{
+            maxWidth: 340, margin: "0 auto",
+            padding: "12px 20px", borderRadius: 16,
+            background: "rgba(139,92,246,0.1)", border: "2px solid rgba(139,92,246,0.2)",
+          }}>
+            <p key={tipIdx} style={{
+              margin: 0, fontSize: 13, fontWeight: 700, color: "#5b21b6",
+              animation: "wft-tip 4s ease-in-out forwards",
+            }}>
+              {TIPS[tipIdx]}
+            </p>
+          </div>
+
+          <p style={{ margin: "16px 0 0", fontSize: 11, color: "#a78bfa", fontWeight: 600 }}>
+            This page updates automatically — no need to refresh!
+          </p>
+        </div>
+      </div>
     </div>
   );
 }

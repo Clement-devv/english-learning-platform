@@ -289,11 +289,29 @@ function UpcomingRow({ booking, dm }) {
 }
 
 // ── Agora spectator modal (subscribe-only — admin cannot publish) ─────────────
+const SPECTATE_LIMIT = 300; // 5 minutes
+
 function AgoraModal({ booking, onClose, dm }) {
   const [phase,       setPhase]       = useState("connecting");
   const [errorMsg,    setErrorMsg]    = useState("");
   const [remoteUsers, setRemoteUsers] = useState([]);
+  const [secondsLeft, setSecondsLeft] = useState(SPECTATE_LIMIT);
   const clientRef = useRef(null);
+
+  // 5-minute session limit — starts from mount
+  useEffect(() => {
+    const tick = setInterval(() => {
+      setSecondsLeft((s) => {
+        if (s <= 1) { onClose(); return 0; }
+        return s - 1;
+      });
+    }, 1000);
+    return () => clearInterval(tick);
+  }, [onClose]);
+
+  const timerMm  = String(Math.floor(secondsLeft / 60)).padStart(2, "0");
+  const timerSs  = String(secondsLeft % 60).padStart(2, "0");
+  const timerWarn = secondsLeft <= 60;
 
   useEffect(() => {
     let mounted = true;
@@ -302,7 +320,7 @@ function AgoraModal({ booking, onClose, dm }) {
         const AgoraRTC = (await import("agora-rtc-sdk-ng")).default;
         if (!mounted) return;
 
-        const { data } = await api.get(`/agora/token?channel=${booking._id}`);
+        const { data } = await api.get(`/agora/token?channel=class-${booking._id}`);
         if (!data.success || !data.appId) throw new Error(data.message || "Could not get Agora token");
         if (!mounted) return;
 
@@ -356,13 +374,26 @@ function AgoraModal({ booking, onClose, dm }) {
             ({booking.teacherId?.firstName} → {booking.studentId?.firstName}) · Spectator only
           </span>
         </div>
-        <button
-          onClick={onClose}
-          className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-red-600 text-white text-sm transition"
-        >
-          <X size={14} /> Leave
-        </button>
+        <div className="flex items-center gap-3">
+          <span className={`text-xs font-mono font-bold px-2.5 py-1 rounded-lg border
+            ${timerWarn
+              ? "bg-red-900/40 border-red-700/50 text-red-300 animate-pulse"
+              : "bg-slate-800 border-slate-700 text-slate-300"}`}>
+            ⏱ {timerMm}:{timerSs}
+          </span>
+          <button
+            onClick={onClose}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-red-600 text-white text-sm transition"
+          >
+            <X size={14} /> Leave
+          </button>
+        </div>
       </div>
+      {timerWarn && (
+        <div className="bg-red-900/30 border-b border-red-800/40 px-5 py-1.5 text-center text-xs text-red-300 font-semibold">
+          Session ending in {secondsLeft}s — spectating limit is 5 minutes
+        </div>
+      )}
 
       {/* Body */}
       <div className="flex-1 flex flex-col items-center justify-center gap-4 p-6 overflow-auto">
