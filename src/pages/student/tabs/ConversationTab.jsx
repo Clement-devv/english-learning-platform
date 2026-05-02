@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, lazy, Suspense } from "react";
 import api from "../../../api";
-import { Send, Trash2, RefreshCw, Zap, Mic, MicOff, Volume2, VolumeX, Box, Circle } from "lucide-react";
+import { Send, Trash2, RefreshCw, Zap, Mic, MicOff, Volume2, VolumeX, Circle, Bot } from "lucide-react";
+import AvatarPuppet from "../../../components/AvatarPuppet";
 
 // Lazy-load the heavy Three.js bundle — only downloaded when student switches to 3D
 const AvatarHead3D = lazy(() => import("../../../components/AvatarHead3D"));
@@ -118,18 +119,23 @@ export default function ConversationTab({ studentInfo, isDarkMode }) {
   const [autoSpeak,  setAutoSpeak]  = useState(true);  // auto-read AI replies
   const [speakingId, setSpeakingId] = useState(null);  // message _id being spoken
 
-  // Avatar mode — persisted in localStorage
-  const [avatarMode, setAvatarMode] = useState(
-    () => localStorage.getItem("chatAvatarMode") || "classic"
-  );
+  // Avatar mode — "classic" | "puppet"
+  // "3d" is reserved for when a working model URL is configured;
+  // treat any stored "3d" value as "puppet" so AvatarHead3D never mounts.
+  const [avatarMode, setAvatarMode] = useState(() => {
+    const stored = localStorage.getItem("chatAvatarMode") || "puppet";
+    return stored === "3d" ? "puppet" : stored;
+  });
 
-  const toggleAvatarMode = () => {
+  const cycleAvatarMode = () => {
     setAvatarMode(prev => {
-      const next = prev === "classic" ? "3d" : "classic";
+      const next = prev === "puppet" ? "classic" : "puppet";
       localStorage.setItem("chatAvatarMode", next);
       return next;
     });
   };
+
+  const toggleAvatarMode = cycleAvatarMode;
 
   const bottomRef       = useRef(null);
   const inputRef        = useRef(null);
@@ -364,19 +370,19 @@ export default function ConversationTab({ studentInfo, isDarkMode }) {
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
           {credits !== null && <CreditBadge credits={credits} />}
 
-          {/* Avatar mode toggle */}
+          {/* Avatar toggle: puppet ↔ classic */}
           <button
-            onClick={toggleAvatarMode}
-            title={avatarMode === "3d" ? "Switch to classic view" : "Switch to 3D avatar"}
+            onClick={cycleAvatarMode}
+            title={avatarMode === "puppet" ? "Hide robot avatar" : "Show robot avatar"}
             style={{
               display: "flex", alignItems: "center", gap: 5, padding: "6px 12px",
-              borderRadius: 10, border: `2px solid ${avatarMode === "3d" ? "#7c3aed" : col.border}`,
-              background: avatarMode === "3d" ? "#f5f3ff" : col.card,
-              color: avatarMode === "3d" ? "#7c3aed" : col.muted,
-              fontSize: 12, fontWeight: 700, cursor: "pointer",
+              borderRadius: 10, cursor: "pointer", fontSize: 12, fontWeight: 700,
+              border: `2px solid ${avatarMode === "puppet" ? "#10b981" : col.border}`,
+              background: avatarMode === "puppet" ? "#ecfdf5" : col.card,
+              color: avatarMode === "puppet" ? "#059669" : col.muted,
             }}>
-            {avatarMode === "3d" ? <Box size={13} /> : <Circle size={13} />}
-            {avatarMode === "3d" ? "3D On" : "3D Off"}
+            {avatarMode === "puppet" ? <Bot size={13} /> : <Circle size={13} />}
+            {avatarMode === "puppet" ? "Robot On" : "Robot Off"}
           </button>
 
           {/* Auto-speak toggle */}
@@ -405,6 +411,29 @@ export default function ConversationTab({ studentInfo, isDarkMode }) {
           </button>
         </div>
       </div>
+
+      {/* Robot puppet panel — lightweight, zero GPU */}
+      {avatarMode === "puppet" && (
+        <div style={{
+          height: 240, flexShrink: 0, borderRadius: 16, overflow: "hidden",
+          margin: "12px 0 0",
+          background: isDarkMode
+            ? "linear-gradient(180deg,#0f1117 0%,#1a1d2e 100%)"
+            : "linear-gradient(180deg,#ecfdf5 0%,#d1fae5 100%)",
+          border: `2px solid ${isDarkMode ? "#134e4a" : "#6ee7b7"}`,
+          position: "relative",
+        }}>
+          {speakingId && (
+            <div style={{
+              position: "absolute", inset: 0, borderRadius: 16, pointerEvents: "none",
+              boxShadow: "inset 0 0 30px #10b98140",
+              border: "2px solid #10b98160",
+              zIndex: 2,
+            }} />
+          )}
+          <AvatarPuppet isSpeaking={!!speakingId} isDarkMode={isDarkMode} />
+        </div>
+      )}
 
       {/* 3D Avatar Panel — only rendered when student picks 3D mode */}
       {avatarMode === "3d" && (

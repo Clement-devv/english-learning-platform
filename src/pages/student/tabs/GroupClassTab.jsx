@@ -69,6 +69,7 @@ export default function GroupClassTab({ isDarkMode, studentInfo }) {
   const [msg,         setMsg]         = useState('');
   const [enrolling,   setEnrolling]   = useState({});
   const [activeClass, setActiveClass] = useState(null);
+  const [myCredits,   setMyCredits]   = useState(null);
 
   const flash = (m) => { setMsg(m); setTimeout(() => setMsg(''), 4000); };
 
@@ -89,10 +90,21 @@ export default function GroupClassTab({ isDarkMode, studentInfo }) {
 
   useEffect(() => { load(); }, [load]);
 
+  // Fetch own credit balance
+  useEffect(() => {
+    const myId = studentInfo?.id || studentInfo?._id;
+    if (!myId) return;
+    api.get(`/students/${myId}`).then(r => {
+      const credits = r.data?.student?.classCredits ?? r.data?.classCredits;
+      if (credits !== undefined) setMyCredits(credits);
+    }).catch(() => {});
+  }, [studentInfo?.id, studentInfo?._id]);
+
   const handleEnroll = async (gc) => {
     setEnrolling(p => ({ ...p, [gc._id]: true }));
     try {
-      await api.post(`/group-classes/${gc._id}/enroll`);
+      const res = await api.post(`/group-classes/${gc._id}/enroll`);
+      if (res.data.creditsRemaining !== undefined) setMyCredits(res.data.creditsRemaining);
       flash(`Enrolled in "${gc.title}" — ${gc.pricePerSeat} credit(s) deducted`);
       load();
     } catch (e) {
@@ -118,7 +130,7 @@ export default function GroupClassTab({ isDarkMode, studentInfo }) {
   if (activeClass) {
     return (
       <Classroom
-        classData={{ id: activeClass._id, title: activeClass.title }}
+        classData={{ id: activeClass._id, title: activeClass.title, isGroupClass: true }}
         userRole="student"
         onLeave={() => { setActiveClass(null); load(); }}
       />
@@ -164,10 +176,11 @@ export default function GroupClassTab({ isDarkMode, studentInfo }) {
         </div>
       )}
 
-      {/* Credits reminder */}
-      {studentInfo?.classCredits !== undefined && (
+      {/* Credits balance */}
+      {myCredits !== null && (
         <div style={{ background: isDarkMode ? 'rgba(249,115,22,0.08)' : '#fff7ed', border: `1.5px solid ${isDarkMode ? 'rgba(249,115,22,0.2)' : '#fed7aa'}`, borderRadius: 14, padding: '10px 16px', marginBottom: 16, fontSize: 13, fontWeight: 700, color: col.accent }}>
-          💳 You have <strong>{studentInfo.classCredits}</strong> class credit{studentInfo.classCredits !== 1 ? 's' : ''}
+          💳 Class credits: <strong>{myCredits}</strong>
+          {myCredits === 0 && <span style={{ marginLeft: 8, color: '#ef4444', fontWeight: 600 }}>— Contact your school to top up</span>}
         </div>
       )}
 
@@ -198,6 +211,9 @@ export default function GroupClassTab({ isDarkMode, studentInfo }) {
                     <span style={{ fontSize: 15, fontWeight: 800, color: col.heading }}>{gc.title}</span>
                     <Badge status={gc.status} />
                     <LevelBadge level={gc.level} />
+                    {gc.enrollmentMode === 'invite-only' && (
+                      <span style={{ fontSize: 11, background: '#6366f118', color: '#6366f1', borderRadius: 999, padding: '2px 8px', fontWeight: 700 }}>🔒 Invite-Only</span>
+                    )}
                   </div>
 
                   <div style={{ fontSize: 13, color: col.muted, display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 6 }}>
@@ -226,10 +242,10 @@ export default function GroupClassTab({ isDarkMode, studentInfo }) {
                   {tab === 'browse' && gc.status === 'open' && (
                     <button
                       onClick={() => handleEnroll(gc)}
-                      disabled={enrolling[gc._id] || (studentInfo?.classCredits || 0) < gc.pricePerSeat}
-                      style={btn('linear-gradient(135deg,#f97316,#f43f5e)', '#fff', enrolling[gc._id] || (studentInfo?.classCredits || 0) < gc.pricePerSeat)}>
+                      disabled={enrolling[gc._id] || (myCredits ?? 0) < gc.pricePerSeat}
+                      style={btn('linear-gradient(135deg,#f97316,#f43f5e)', '#fff', enrolling[gc._id] || (myCredits ?? 0) < gc.pricePerSeat)}>
                       <LogIn size={13} style={{ display: 'inline', marginRight: 4 }} />
-                      {enrolling[gc._id] ? 'Enrolling...' : (studentInfo?.classCredits || 0) < gc.pricePerSeat ? 'Not enough credits' : 'Enroll'}
+                      {enrolling[gc._id] ? 'Enrolling…' : (myCredits ?? 0) < gc.pricePerSeat ? 'Not enough credits' : 'Enroll'}
                     </button>
                   )}
                   {tab === 'enrolled' && !['completed','cancelled'].includes(gc.status) && (

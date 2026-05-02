@@ -8,7 +8,7 @@ import {
   XCircle, PauseCircle, Plus, X, Eye, EyeOff,
   Globe, RefreshCw, Trash2, Mail, KeyRound, Palette,
   BarChart2, ChevronDown, ChevronUp, ToggleLeft, ToggleRight, Video, Mic, Film,
-  AlertTriangle, RotateCcw, Zap, Send, Activity, Users, UserCheck, LogIn, Megaphone, SlidersHorizontal, Award,
+  AlertTriangle, RotateCcw, Zap, Send, Activity, Users, UserCheck, LogIn, Megaphone, SlidersHorizontal, Award, Sun, Moon,
 } from 'lucide-react';
 import api from '../../api';
 import { TIMEZONE_OPTIONS } from '../../utils/timezone';
@@ -57,6 +57,7 @@ export default function SuperAdminDashboard() {
   const [loading,  setLoading]  = useState(true);
   const [tab,      setTab]      = useState('centers'); // 'centers' | 'domains'
   const [error,    setError]    = useState('');
+  const [darkMode, setDarkMode] = useState(() => localStorage.getItem('saAdminDark') !== 'false');
 
   // ── Create center modal ──────────────────────────────────────────────────
   const [showModal, setShowModal]       = useState(false);
@@ -124,6 +125,7 @@ export default function SuperAdminDashboard() {
   const [broadcastMessage, setBroadcastMessage] = useState('');
   const [broadcasting,     setBroadcasting]     = useState(false);
   const [broadcastResult,  setBroadcastResult]  = useState(null);
+  const [broadcastTarget,  setBroadcastTarget]  = useState('all'); // 'all' | center _id
 
   // ── AI Chat Credits ───────────────────────────────────────────────────────
   const [creditCenters,    setCreditCenters]    = useState([]);
@@ -648,6 +650,7 @@ export default function SuperAdminDashboard() {
   useEffect(() => { if (tab === 'credits') { loadCredits(); loadPronCredits(); } }, [tab, loadCredits, loadPronCredits]);
   useEffect(() => { if (tab === 'health')  loadHealth();  }, [tab, loadHealth]);
   useEffect(() => { if (tab === 'classes') loadClasses('', '', ''); }, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { localStorage.setItem('saAdminDark', String(darkMode)); }, [darkMode]);
 
   const handleLogout = () => {
     localStorage.removeItem('superAdminToken');
@@ -994,10 +997,12 @@ export default function SuperAdminDashboard() {
     setBroadcasting(true);
     setBroadcastResult(null);
     try {
+      const body = { subject: broadcastSubject, message: broadcastMessage };
+      if (broadcastTarget !== 'all') body.centerId = broadcastTarget;
       const res  = await fetch(`${API_BASE}/super-admin/broadcast`, {
         method: 'POST',
         headers: { ...authHeaders, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ subject: broadcastSubject, message: broadcastMessage }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
       if (data.success) setBroadcastResult(data);
@@ -1017,166 +1022,180 @@ export default function SuperAdminDashboard() {
     return <XCircle size={13} />;
   };
 
+  const s = buildStyles(darkMode);
+  const TABS = [
+    { key: 'centers',      label: 'Centers',        icon: Building2  },
+    { key: 'health',       label: 'Health',          icon: Activity   },
+    { key: 'domains',      label: 'Custom Domains',  icon: Globe      },
+    { key: 'usage',        label: 'Agora Usage',     icon: BarChart2  },
+    { key: 'people',       label: 'People',          icon: Users      },
+    { key: 'classes',      label: 'Classes',         icon: Video      },
+    { key: 'credits',      label: 'AI Credits',      icon: Zap        },
+    { key: 'certificates', label: 'Certificates',    icon: Award      },
+    { key: 'deleted',      label: 'Deleted',         icon: Trash2     },
+  ];
+
   return (
     <div style={s.root}>
-      {/* Header */}
-      <div style={s.header}>
-        <div style={s.headerLeft}>
-          <Crown size={22} color="#f59e0b" />
-          <span style={s.headerTitle}>Super Admin</span>
-          {info?.firstName && <span style={s.headerSub}>{info.firstName} {info.lastName}</span>}
+
+      {/* ── Sidebar ── */}
+      <div style={s.sidebar}>
+        {/* Brand */}
+        <div style={s.sidebarBrand}>
+          <div style={s.sidebarLogoWrap}>
+            <Crown size={20} color="#fff" />
+          </div>
+          <div>
+            <div style={s.sidebarBrandName}>SuperAdmin</div>
+            {info?.firstName && <div style={s.sidebarBrandSub}>{info.firstName} {info.lastName}</div>}
+          </div>
         </div>
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <button onClick={() => setShowModal(true)} style={s.createBtn}>
-            <Plus size={15} /> Create Center
+
+        {/* Nav items */}
+        <nav style={s.sidebarNav}>
+          {TABS.map(({ key, label, icon: Icon }) => (
+            <button key={key} onClick={() => setTab(key)} style={{ ...s.navItem, ...(tab === key ? s.navItemActive : {}) }}>
+              <Icon size={16} style={{ flexShrink: 0 }} />
+              <span style={{ flex: 1 }}>{label}</span>
+              {key === 'domains'  && domains.length > 0 && <span style={s.navBadge}>{domains.length}</span>}
+              {key === 'deleted'  && deleted.length > 0 && <span style={{ ...s.navBadge, background: '#ef4444' }}>{deleted.length}</span>}
+            </button>
+          ))}
+        </nav>
+
+        {/* Footer actions */}
+        <div style={s.sidebarFooter}>
+          <button
+            onClick={() => { setBroadcastModal(true); setBroadcastSubject(''); setBroadcastMessage(''); setBroadcastResult(null); setBroadcastTarget('all'); }}
+            style={s.broadcastBtn}
+          >
+            <Megaphone size={14} /> Broadcast
+          </button>
+          <button onClick={() => setDarkMode(d => !d)} style={s.darkToggleBtn}>
+            {darkMode ? <Sun size={14} /> : <Moon size={14} />}
+            {darkMode ? 'Light Mode' : 'Dark Mode'}
           </button>
           <button onClick={handleLogout} style={s.logoutBtn}>
-            <LogOut size={15} /> Logout
+            <LogOut size={14} /> Logout
           </button>
         </div>
       </div>
 
-      <div style={s.body}>
-        {error && <p style={{ color: '#ef4444', marginBottom: '16px' }}>{error}</p>}
+      {/* ── Main area ── */}
+      <div style={s.main}>
 
-        {/* Stats */}
-        {stats && (
-          <div style={s.statsRow}>
-            {[
-              { label: 'Total',     value: stats.total,     color: '#6366f1', icon: Building2   },
-              { label: 'Active',    value: stats.active,    color: '#10b981', icon: CheckCircle },
-              { label: 'Pending',   value: stats.pending,   color: '#f59e0b', icon: Clock       },
-              { label: 'Suspended', value: stats.suspended, color: '#ef4444', icon: PauseCircle },
-            ].map(({ label, value, color, icon: Icon }) => (
-              <div key={label} style={s.statCard}>
-                <div style={{ ...s.statIcon, background: `${color}18` }}>
-                  <Icon size={18} color={color} />
-                </div>
-                <div>
-                  <p style={s.statValue}>{value ?? '—'}</p>
-                  <p style={s.statLabel}>{label}</p>
-                </div>
-              </div>
-            ))}
+        {/* Top bar */}
+        <div style={s.topBar}>
+          <div>
+            <div style={s.topBarTitle}>{TABS.find(t => t.key === tab)?.label || 'Dashboard'}</div>
+            {error && <p style={{ color: '#ef4444', margin: '4px 0 0', fontSize: 13 }}>{error}</p>}
           </div>
-        )}
-
-        {/* Tab switcher */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: 8 }}>
-          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-          {[
-            { key: 'centers', label: 'Centers',        icon: Building2  },
-            { key: 'health',  label: 'Health',         icon: Activity   },
-            { key: 'domains', label: 'Custom Domains', icon: Globe      },
-            { key: 'usage',   label: 'Agora Usage',    icon: BarChart2  },
-            { key: 'people',  label: 'People',         icon: Users      },
-            { key: 'classes', label: 'Classes',        icon: BarChart2  },
-            { key: 'credits',       label: 'AI Credits',    icon: Zap   },
-            { key: 'certificates',  label: 'Certificates',  icon: Award },
-            { key: 'deleted',       label: 'Deleted',       icon: Trash2 },
-          ].map(({ key, label, icon: Icon }) => (
-            <button
-              key={key}
-              onClick={() => setTab(key)}
-              style={{ ...s.tabBtn, ...(tab === key ? s.tabBtnActive : {}) }}
-            >
-              <Icon size={14} /> {label}
-              {key === 'domains' && domains.length > 0 && (
-                <span style={s.tabBadge}>{domains.length}</span>
-              )}
-              {key === 'deleted' && deleted.length > 0 && (
-                <span style={{ ...s.tabBadge, background: '#ef4444' }}>{deleted.length}</span>
-              )}
-            </button>
-          ))}
-          </div>
-          {/* Broadcast button */}
-          <button
-            onClick={() => { setBroadcastModal(true); setBroadcastSubject(''); setBroadcastMessage(''); setBroadcastResult(null); }}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#f59e0b,#d97706)', color: '#0c0a00', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}
-          >
-            <Megaphone size={14} /> Broadcast
+          <button onClick={() => setShowModal(true)} style={s.createBtn}>
+            <Plus size={15} /> Create Center
           </button>
         </div>
 
-        {/* ── Tab Components ── */}
-        <TabErrorBoundary key={tab}>
-          {tab === 'centers' && (
-            <CentersTab
-              centers={centers} loading={loading} loadData={loadData} setShowModal={setShowModal}
-              handleApprove={handleApprove} handleReject={handleReject} handleSuspend={handleSuspend}
-              handleEnterAsAdmin={handleEnterAsAdmin} impersonating={impersonating}
-              setDeleteTarget={setDeleteTarget}
-              setPlanModal={setPlanModal} setPlanSelected={setPlanSelected} setPlanMsg={setPlanMsg}
-              setThemeCenter={setThemeCenter}
-              handleOpenLoginThemeModal={handleOpenLoginThemeModal}
-              handleOpenTeacherThemeModal={handleOpenTeacherThemeModal}
-              handleOpenDashThemeModal={handleOpenDashThemeModal}
-              setFeaturesCenter={setFeaturesCenter}
-              setLimitsModal={setLimitsModal} setLimitsUnlimT={setLimitsUnlimT} setLimitsUnlimS={setLimitsUnlimS}
-              setLimitsTeachers={setLimitsTeachers} setLimitsStudents={setLimitsStudents} setLimitsMsg={setLimitsMsg}
-              statusColor={statusColor} statusIcon={statusIcon}
-            />
+        <div style={s.content}>
+          {/* Stats strip — centres tab only */}
+          {stats && tab === 'centers' && (
+            <div style={s.statsRow}>
+              {[
+                { label: 'Total',     value: stats.total,     color: '#0ea5e9', icon: Building2   },
+                { label: 'Active',    value: stats.active,    color: '#10b981', icon: CheckCircle },
+                { label: 'Pending',   value: stats.pending,   color: '#f59e0b', icon: Clock       },
+                { label: 'Suspended', value: stats.suspended, color: '#ef4444', icon: PauseCircle },
+              ].map(({ label, value, color, icon: Icon }) => (
+                <div key={label} style={s.statCard}>
+                  <div style={{ ...s.statIcon, background: `${color}18` }}>
+                    <Icon size={18} color={color} />
+                  </div>
+                  <div>
+                    <p style={s.statValue}>{value ?? '—'}</p>
+                    <p style={s.statLabel}>{label}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
-          {tab === 'domains' && (
-            <DomainsTab
-              domains={domains} loading={loading} loadData={loadData}
-              handleVerifyDomain={handleVerifyDomain} handleRemoveDomain={handleRemoveDomain}
-              domainAction={domainAction}
-            />
-          )}
-          {tab === 'health' && (
-            <HealthTab health={health} healthLoading={healthLoading} loadHealth={loadHealth} centers={centers} />
-          )}
-          {tab === 'usage' && (
-            <UsageTab
-              usage={usage} loading={loading} usageMonth={usageMonth} loadData={loadData}
-              expandedCenter={expandedCenter} sessionDetail={sessionDetail} loadingDetail={loadingDetail}
-              toggleSessionDetail={toggleSessionDetail} fmtMins={fmtMins}
-            />
-          )}
-          {tab === 'deleted' && (
-            <DeletedTab
-              deleted={deleted} loadData={loadData} restoring={restoring}
-              handleRestore={handleRestore} daysRemaining={daysRemaining}
-            />
-          )}
-          {tab === 'certificates' && (
-            <CertificateTemplatesTab centers={centers} />
-          )}
-          {tab === 'credits' && (
-            <CreditsTab
-              creditCenters={creditCenters} creditLoading={creditLoading} creditTotals={creditTotals}
-              loadCredits={loadCredits} creditSearch={creditSearch} setCreditSearch={setCreditSearch}
-              expandedLog={expandedLog} setExpandedLog={setExpandedLog}
-              setAllocModal={setAllocModal} setAllocAmount={setAllocAmount} setAllocNote={setAllocNote} setAllocMsg={setAllocMsg}
-              pronCenters={pronCenters} pronLoading={pronLoading} pronTotals={pronTotals}
-              loadPronCredits={loadPronCredits} pronSearch={pronSearch} setPronSearch={setPronSearch}
-              pronExpandedLog={pronExpandedLog} setPronExpandedLog={setPronExpandedLog}
-              setPronAllocModal={setPronAllocModal} setPronAllocAmount={setPronAllocAmount} setPronAllocNote={setPronAllocNote} setPronAllocMsg={setPronAllocMsg}
-            />
-          )}
-          {tab === 'people' && (
-            <PeopleTab
-              centers={centers} peopleCenter={peopleCenter} setPeopleCenter={setPeopleCenter}
-              peopleData={peopleData} peopleLoading={peopleLoading}
-              peopleSubTab={peopleSubTab} setPeopleSubTab={setPeopleSubTab}
-              peopleSearch={peopleSearch} setPeopleSearch={setPeopleSearch}
-              loadCenterPeople={loadCenterPeople}
-            />
-          )}
-          {tab === 'classes' && (
-            <ClassesTab
-              centers={centers}
-              classesData={classesData} classesLoading={classesLoading}
-              classesDateFrom={classesDateFrom} classesDateTo={classesDateTo} classesFilterCenter={classesFilterCenter}
-              setClassesDateFrom={setClassesDateFrom} setClassesDateTo={setClassesDateTo} setClassesFilterCenter={setClassesFilterCenter}
-              classesGrandTotal={classesGrandTotal} classesExpanded={classesExpanded} setClassesExpanded={setClassesExpanded}
-              loadClasses={loadClasses}
-            />
-          )}
-        </TabErrorBoundary>
 
+          {/* ── Tab content ── */}
+          <TabErrorBoundary key={tab}>
+            {tab === 'centers' && (
+              <CentersTab
+                centers={centers} loading={loading} loadData={loadData} setShowModal={setShowModal}
+                handleApprove={handleApprove} handleReject={handleReject} handleSuspend={handleSuspend}
+                handleEnterAsAdmin={handleEnterAsAdmin} impersonating={impersonating}
+                setDeleteTarget={setDeleteTarget}
+                setPlanModal={setPlanModal} setPlanSelected={setPlanSelected} setPlanMsg={setPlanMsg}
+                setThemeCenter={setThemeCenter}
+                handleOpenLoginThemeModal={handleOpenLoginThemeModal}
+                handleOpenTeacherThemeModal={handleOpenTeacherThemeModal}
+                handleOpenDashThemeModal={handleOpenDashThemeModal}
+                setFeaturesCenter={setFeaturesCenter}
+                setLimitsModal={setLimitsModal} setLimitsUnlimT={setLimitsUnlimT} setLimitsUnlimS={setLimitsUnlimS}
+                setLimitsTeachers={setLimitsTeachers} setLimitsStudents={setLimitsStudents} setLimitsMsg={setLimitsMsg}
+                statusColor={statusColor} statusIcon={statusIcon}
+              />
+            )}
+            {tab === 'domains' && (
+              <DomainsTab
+                domains={domains} loading={loading} loadData={loadData}
+                handleVerifyDomain={handleVerifyDomain} handleRemoveDomain={handleRemoveDomain}
+                domainAction={domainAction}
+              />
+            )}
+            {tab === 'health' && (
+              <HealthTab health={health} healthLoading={healthLoading} loadHealth={loadHealth} centers={centers} />
+            )}
+            {tab === 'usage' && (
+              <UsageTab
+                usage={usage} loading={loading} usageMonth={usageMonth} loadData={loadData}
+                expandedCenter={expandedCenter} sessionDetail={sessionDetail} loadingDetail={loadingDetail}
+                toggleSessionDetail={toggleSessionDetail} fmtMins={fmtMins}
+              />
+            )}
+            {tab === 'deleted' && (
+              <DeletedTab
+                deleted={deleted} loadData={loadData} restoring={restoring}
+                handleRestore={handleRestore} daysRemaining={daysRemaining}
+              />
+            )}
+            {tab === 'certificates' && (
+              <CertificateTemplatesTab centers={centers} />
+            )}
+            {tab === 'credits' && (
+              <CreditsTab
+                creditCenters={creditCenters} creditLoading={creditLoading} creditTotals={creditTotals}
+                loadCredits={loadCredits} creditSearch={creditSearch} setCreditSearch={setCreditSearch}
+                expandedLog={expandedLog} setExpandedLog={setExpandedLog}
+                setAllocModal={setAllocModal} setAllocAmount={setAllocAmount} setAllocNote={setAllocNote} setAllocMsg={setAllocMsg}
+                pronCenters={pronCenters} pronLoading={pronLoading} pronTotals={pronTotals}
+                loadPronCredits={loadPronCredits} pronSearch={pronSearch} setPronSearch={setPronSearch}
+                pronExpandedLog={pronExpandedLog} setPronExpandedLog={setPronExpandedLog}
+                setPronAllocModal={setPronAllocModal} setPronAllocAmount={setPronAllocAmount} setPronAllocNote={setPronAllocNote} setPronAllocMsg={setPronAllocMsg}
+              />
+            )}
+            {tab === 'people' && (
+              <PeopleTab
+                centers={centers} peopleCenter={peopleCenter} setPeopleCenter={setPeopleCenter}
+                peopleData={peopleData} peopleLoading={peopleLoading}
+                peopleSubTab={peopleSubTab} setPeopleSubTab={setPeopleSubTab}
+                peopleSearch={peopleSearch} setPeopleSearch={setPeopleSearch}
+                loadCenterPeople={loadCenterPeople}
+              />
+            )}
+            {tab === 'classes' && (
+              <ClassesTab
+                centers={centers}
+                classesData={classesData} classesLoading={classesLoading}
+                classesDateFrom={classesDateFrom} classesDateTo={classesDateTo} classesFilterCenter={classesFilterCenter}
+                setClassesDateFrom={setClassesDateFrom} setClassesDateTo={setClassesDateTo} setClassesFilterCenter={setClassesFilterCenter}
+                classesGrandTotal={classesGrandTotal} classesExpanded={classesExpanded} setClassesExpanded={setClassesExpanded}
+                loadClasses={loadClasses}
+              />
+            )}
+          </TabErrorBoundary>
+        </div>
       </div>
 
       {/* ── Plan Editor Modal ── */}
@@ -1548,65 +1567,141 @@ export default function SuperAdminDashboard() {
       )}
 
       {/* ── Broadcast Email Modal ── */}
-      {broadcastModal && (
-        <div style={s.overlay} onClick={e => e.target === e.currentTarget && !broadcasting && setBroadcastModal(false)}>
-          <div style={{ ...s.modal, maxWidth: 500 }}>
-            <div style={s.modalHeader}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <Megaphone size={16} color="#f59e0b" />
-                <span style={s.modalTitle}>Broadcast to All Centers</span>
-              </div>
-              {!broadcasting && <button onClick={() => setBroadcastModal(false)} style={s.closeBtn}><X size={18} /></button>}
-            </div>
-            <div style={{ padding: 24 }}>
-              {broadcastResult ? (
-                <div style={{ textAlign: 'center', padding: '20px 0' }}>
-                  <CheckCircle size={40} color="#34d399" style={{ marginBottom: 12 }} />
-                  <p style={{ margin: '0 0 6px', fontSize: 16, fontWeight: 700, color: '#f1f5f9' }}>Broadcast Sent!</p>
-                  <p style={{ margin: 0, fontSize: 13, color: '#9ca3af' }}>{broadcastResult.sent} emails sent, {broadcastResult.failed} failed (of {broadcastResult.total} centers)</p>
-                  <button onClick={() => setBroadcastModal(false)} style={{ ...s.approveBtn, marginTop: 20, padding: '8px 24px' }}>Done</button>
+      {broadcastModal && (() => {
+        const activeCenters  = centers.filter(c => c.status === 'active');
+        const selectedCenter = activeCenters.find(c => c._id === broadcastTarget);
+        const recipientLabel = broadcastTarget === 'all'
+          ? `all ${activeCenters.length} active centers`
+          : selectedCenter ? `${selectedCenter.centerName} only` : 'select a center below';
+        const canSend = broadcastSubject.trim() && broadcastMessage.trim() &&
+          (broadcastTarget === 'all' || !!selectedCenter);
+        return (
+          <div style={s.overlay} onClick={e => e.target === e.currentTarget && !broadcasting && setBroadcastModal(false)}>
+            <div style={{ ...s.modal, maxWidth: 520 }}>
+              <div style={s.modalHeader}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <Megaphone size={16} color="#0ea5e9" />
+                  <span style={s.modalTitle}>Broadcast Email</span>
                 </div>
-              ) : (
-                <>
-                  <div style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 10, padding: '10px 14px', marginBottom: 18, fontSize: 12, color: '#9ca3af' }}>
-                    This will email <strong style={{ color: '#f59e0b' }}>all {centers.filter(c => c.status === 'active').length} active centers</strong> simultaneously.
+                {!broadcasting && <button onClick={() => setBroadcastModal(false)} style={s.closeBtn}><X size={18} /></button>}
+              </div>
+
+              <div style={{ padding: 24 }}>
+                {broadcastResult ? (
+                  <div style={{ textAlign: 'center', padding: '20px 0' }}>
+                    <CheckCircle size={42} color="#34d399" style={{ marginBottom: 14 }} />
+                    <p style={{ margin: '0 0 6px', fontSize: 17, fontWeight: 700, color: s.modalTitle.color }}>Sent!</p>
+                    <p style={{ margin: 0, fontSize: 13, color: '#6b7280' }}>
+                      {broadcastResult.sent} email{broadcastResult.sent !== 1 ? 's' : ''} sent
+                      {broadcastResult.failed > 0 && `, ${broadcastResult.failed} failed`}
+                      {' '}(of {broadcastResult.total} center{broadcastResult.total !== 1 ? 's' : ''})
+                    </p>
+                    <button onClick={() => setBroadcastModal(false)} style={{ ...s.submitBtn, marginTop: 22 }}>Done</button>
                   </div>
+                ) : (
+                  <>
+                    {/* ── Target selector ── */}
+                    <p style={{ margin: '0 0 8px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Send To</p>
+                    <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+                      {[
+                        { key: 'all',      label: '📢 All Centers',      desc: `${activeCenters.length} active` },
+                        { key: 'specific', label: '🏫 Specific Center',  desc: 'Choose one below' },
+                      ].map(opt => {
+                        const active = broadcastTarget === 'all' ? opt.key === 'all' : opt.key === 'specific';
+                        return (
+                          <button
+                            key={opt.key}
+                            onClick={() => setBroadcastTarget(opt.key === 'all' ? 'all' : '')}
+                            disabled={broadcasting}
+                            style={{
+                              flex: 1, padding: '10px 12px', borderRadius: 10, cursor: 'pointer',
+                              textAlign: 'left', fontFamily: 'inherit',
+                              border: active ? '2px solid #0ea5e9' : `1px solid ${s.input.border}`,
+                              background: active ? 'rgba(14,165,233,0.1)' : s.input.background,
+                              transition: 'all 0.15s',
+                            }}
+                          >
+                            <div style={{ fontSize: 13, fontWeight: 700, color: active ? '#0ea5e9' : '#6b7280' }}>{opt.label}</div>
+                            <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>{opt.desc}</div>
+                          </button>
+                        );
+                      })}
+                    </div>
 
-                  <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#9ca3af', marginBottom: 4, textTransform: 'uppercase' }}>Subject *</label>
-                  <input
-                    value={broadcastSubject}
-                    onChange={e => setBroadcastSubject(e.target.value)}
-                    placeholder="e.g. Scheduled maintenance on Sunday"
-                    style={{ ...s.input, width: '100%', boxSizing: 'border-box', marginBottom: 14 }}
-                    disabled={broadcasting}
-                  />
+                    {/* ── Center picker (specific mode) ── */}
+                    {broadcastTarget !== 'all' && (
+                      <div style={{ marginBottom: 16 }}>
+                        <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#6b7280', marginBottom: 6, textTransform: 'uppercase' }}>Select Center *</label>
+                        <select
+                          value={broadcastTarget}
+                          onChange={e => setBroadcastTarget(e.target.value)}
+                          disabled={broadcasting}
+                          style={{ ...s.input, width: '100%', boxSizing: 'border-box', cursor: 'pointer' }}
+                        >
+                          <option value="">— choose a center —</option>
+                          {activeCenters.map(c => (
+                            <option key={c._id} value={c._id}>{c.centerName} ({c.adminEmail})</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
 
-                  <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#9ca3af', marginBottom: 4, textTransform: 'uppercase' }}>Message *</label>
-                  <textarea
-                    value={broadcastMessage}
-                    onChange={e => setBroadcastMessage(e.target.value)}
-                    placeholder="Write your message here…"
-                    rows={6}
-                    style={{ ...s.input, width: '100%', boxSizing: 'border-box', marginBottom: 18, resize: 'vertical', height: 120 }}
-                    disabled={broadcasting}
-                  />
+                    {/* ── Recipient info banner ── */}
+                    <div style={{ background: 'rgba(14,165,233,0.07)', border: '1px solid rgba(14,165,233,0.2)', borderRadius: 10, padding: '9px 14px', marginBottom: 18, fontSize: 12, color: '#6b7280' }}>
+                      This will email <strong style={{ color: '#0ea5e9' }}>{recipientLabel}</strong>.
+                    </div>
 
-                  <div style={{ display: 'flex', gap: 10 }}>
-                    <button onClick={() => setBroadcastModal(false)} disabled={broadcasting} style={{ flex: 1, padding: '10px', borderRadius: 10, border: '1px solid #374151', background: 'transparent', color: '#9ca3af', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Cancel</button>
-                    <button
-                      disabled={broadcasting || !broadcastSubject.trim() || !broadcastMessage.trim()}
-                      onClick={handleBroadcast}
-                      style={{ flex: 2, padding: '10px', borderRadius: 10, border: 'none', background: broadcasting || !broadcastSubject.trim() || !broadcastMessage.trim() ? '#374151' : 'linear-gradient(135deg,#f59e0b,#d97706)', color: broadcasting || !broadcastSubject.trim() || !broadcastMessage.trim() ? '#6b7280' : '#0c0a00', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
-                    >
-                      <Send size={13} /> {broadcasting ? 'Sending…' : 'Send to All Centers'}
-                    </button>
-                  </div>
-                </>
-              )}
+                    {/* ── Subject ── */}
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#6b7280', marginBottom: 5, textTransform: 'uppercase' }}>Subject *</label>
+                    <input
+                      value={broadcastSubject}
+                      onChange={e => setBroadcastSubject(e.target.value)}
+                      placeholder="e.g. Scheduled maintenance on Sunday"
+                      style={{ ...s.input, width: '100%', boxSizing: 'border-box', marginBottom: 14 }}
+                      disabled={broadcasting}
+                    />
+
+                    {/* ── Message ── */}
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#6b7280', marginBottom: 5, textTransform: 'uppercase' }}>Message *</label>
+                    <textarea
+                      value={broadcastMessage}
+                      onChange={e => setBroadcastMessage(e.target.value)}
+                      placeholder="Write your message here…"
+                      rows={6}
+                      style={{ ...s.input, width: '100%', boxSizing: 'border-box', marginBottom: 20, resize: 'vertical', height: 120 }}
+                      disabled={broadcasting}
+                    />
+
+                    <div style={{ display: 'flex', gap: 10 }}>
+                      <button
+                        onClick={() => setBroadcastModal(false)}
+                        disabled={broadcasting}
+                        style={s.cancelBtn}
+                      >Cancel</button>
+                      <button
+                        disabled={broadcasting || !canSend}
+                        onClick={handleBroadcast}
+                        style={{
+                          flex: 2, padding: '10px', borderRadius: 10, border: 'none',
+                          background: !canSend || broadcasting ? (s.input.background) : 'linear-gradient(135deg,#0284c7,#38bdf8)',
+                          color: !canSend || broadcasting ? '#6b7280' : '#fff',
+                          fontWeight: 700, cursor: !canSend || broadcasting ? 'not-allowed' : 'pointer',
+                          fontFamily: 'inherit', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                          boxShadow: canSend && !broadcasting ? '0 4px 12px rgba(14,165,233,0.3)' : 'none',
+                          transition: 'all 0.15s',
+                        }}
+                      >
+                        <Send size={13} />
+                        {broadcasting ? 'Sending…' : broadcastTarget === 'all' ? 'Send to All Centers' : `Send to ${selectedCenter?.centerName || 'Center'}`}
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ── Delete Confirm Modal ── */}
       {deleteTarget && (
@@ -2861,226 +2956,310 @@ function ErrorBox({ msg }) {
   );
 }
 
-const s = {
-  root: {
-    minHeight: '100vh',
-    background: '#09080e',
-    color: '#f1f5f9',
-    fontFamily: "'Sora', 'Segoe UI', sans-serif",
-  },
-  header: {
-    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    padding: '16px 28px',
-    background: 'rgba(245,158,11,0.06)',
-    borderBottom: '1px solid rgba(245,158,11,0.12)',
-  },
-  headerLeft: { display: 'flex', alignItems: 'center', gap: '10px' },
-  headerTitle: { fontSize: '18px', fontWeight: '700', color: '#f1f5f9' },
-  headerSub:   { fontSize: '13px', color: '#6b7280' },
-  createBtn: {
-    display: 'flex', alignItems: 'center', gap: '6px',
-    padding: '8px 16px', borderRadius: '8px',
-    background: 'linear-gradient(135deg, #b45309, #f59e0b)',
-    border: 'none', color: '#0c0a00',
-    fontSize: '13px', fontWeight: '700',
-    cursor: 'pointer', fontFamily: 'inherit',
-  },
-  logoutBtn: {
-    display: 'flex', alignItems: 'center', gap: '6px',
-    padding: '8px 14px', borderRadius: '8px',
-    background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)',
-    color: '#f87171', fontSize: '13px', fontWeight: '600',
-    cursor: 'pointer', fontFamily: 'inherit',
-  },
-  body: { padding: '28px', maxWidth: '1100px', margin: '0 auto' },
-  statsRow: {
-    display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-    gap: '16px', marginBottom: '24px',
-  },
-  statCard: {
-    display: 'flex', alignItems: 'center', gap: '14px',
-    padding: '18px 20px', borderRadius: '14px',
-    background: 'rgba(255,255,255,0.04)',
-    border: '1px solid rgba(255,255,255,0.07)',
-  },
-  statIcon: {
-    width: '40px', height: '40px', borderRadius: '10px',
-    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-  },
-  statValue: { margin: '0 0 2px', fontSize: '24px', fontWeight: '700', color: '#f1f5f9' },
-  statLabel: { margin: 0, fontSize: '12px', color: '#6b7280' },
-  tabRow: { display: 'flex', gap: '8px', marginBottom: '16px' },
-  tabBtn: {
-    display: 'flex', alignItems: 'center', gap: '6px',
-    padding: '7px 16px', borderRadius: '8px', fontSize: '13px', fontWeight: '600',
-    background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
-    color: '#6b7280', cursor: 'pointer', fontFamily: 'inherit',
-  },
-  tabBtnActive: {
-    background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.25)',
-    color: '#f59e0b',
-  },
-  tabBadge: {
-    minWidth: '18px', height: '18px', borderRadius: '9px',
-    background: '#f59e0b', color: '#0c0a00',
-    fontSize: '10px', fontWeight: '800',
-    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-    padding: '0 4px',
-  },
-  card: {
-    background: 'rgba(255,255,255,0.03)',
-    border: '1px solid rgba(255,255,255,0.07)',
-    borderRadius: '16px', padding: '20px',
-  },
-  sectionTitle: {
-    display: 'flex', alignItems: 'center', gap: '8px',
-    fontSize: '15px', fontWeight: '700', color: '#f1f5f9',
-    margin: 0,
-  },
-  refreshBtn: {
-    background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
-    borderRadius: '7px', color: '#6b7280', cursor: 'pointer',
-    padding: '6px', display: 'flex', alignItems: 'center',
-  },
-  table: { width: '100%', borderCollapse: 'collapse' },
-  th: {
-    textAlign: 'left', padding: '10px 14px',
-    fontSize: '11px', fontWeight: '700', letterSpacing: '0.08em',
-    color: '#6b7280', textTransform: 'uppercase',
-    borderBottom: '1px solid rgba(255,255,255,0.06)',
-  },
-  tr: { borderBottom: '1px solid rgba(255,255,255,0.04)' },
-  td: { padding: '12px 14px', verticalAlign: 'middle' },
-  slug: {
-    fontSize: '12px', padding: '2px 8px', borderRadius: '6px',
-    background: 'rgba(245,158,11,0.1)', color: '#f59e0b',
-    fontFamily: 'monospace',
-  },
-  planBadge: {
-    fontSize: '11px', padding: '2px 8px', borderRadius: '20px',
-    background: 'rgba(99,102,241,0.12)', color: '#818cf8',
-    fontWeight: '600', textTransform: 'capitalize',
-  },
-  statusBadge: {
-    display: 'inline-flex', alignItems: 'center', gap: '5px',
-    fontSize: '12px', fontWeight: '600',
-    padding: '3px 10px', borderRadius: '20px',
-    border: '1px solid', textTransform: 'capitalize',
-  },
-  approveBtn: {
-    display: 'inline-flex', alignItems: 'center', gap: '4px',
-    padding: '5px 12px', borderRadius: '7px', fontSize: '12px', fontWeight: '600',
-    background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.25)',
-    color: '#34d399', cursor: 'pointer', fontFamily: 'inherit',
-  },
-  rejectBtn: {
-    display: 'inline-flex', alignItems: 'center', gap: '4px',
-    padding: '5px 12px', borderRadius: '7px', fontSize: '12px', fontWeight: '600',
-    background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)',
-    color: '#f87171', cursor: 'pointer', fontFamily: 'inherit',
-  },
-  suspendBtn: {
-    display: 'inline-flex', alignItems: 'center', gap: '4px',
-    padding: '5px 12px', borderRadius: '7px', fontSize: '12px', fontWeight: '600',
-    background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)',
-    color: '#f59e0b', cursor: 'pointer', fontFamily: 'inherit',
-  },
-  themeBtn: {
-    display: 'inline-flex', alignItems: 'center', gap: '4px',
-    padding: '5px 12px', borderRadius: '7px', fontSize: '12px', fontWeight: '600',
-    background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)',
-    color: '#818cf8', cursor: 'pointer', fontFamily: 'inherit',
-  },
-  featuresBtn: {
-    display: 'inline-flex', alignItems: 'center', gap: '4px',
-    padding: '5px 12px', borderRadius: '7px', fontSize: '12px', fontWeight: '600',
-    background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)',
-    color: '#34d399', cursor: 'pointer', fontFamily: 'inherit',
-  },
-  deleteBtn: {
-    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-    padding: '5px 8px', borderRadius: '7px', fontSize: '12px',
-    background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)',
-    color: '#f87171', cursor: 'pointer', fontFamily: 'inherit',
-  },
+function buildStyles(isDark) {
+  const sky    = '#0ea5e9';
+  const skyDim = isDark ? 'rgba(14,165,233,0.14)' : 'rgba(14,165,233,0.09)';
+  const skyBdr = isDark ? 'rgba(14,165,233,0.28)' : 'rgba(14,165,233,0.35)';
+  const bg     = isDark ? '#060e1c' : '#f0f9ff';
+  const sbBg   = isDark ? 'linear-gradient(180deg,#0a1830 0%,#060e1c 100%)' : '#ffffff';
+  const card   = isDark ? 'rgba(14,165,233,0.05)' : '#ffffff';
+  const bdr    = isDark ? 'rgba(14,165,233,0.12)' : '#bae6fd';
+  const text   = isDark ? '#f0f9ff' : '#0c1a2e';
+  const muted  = isDark ? '#64748b' : '#64748b';
+  const font   = "'Sora','Segoe UI',sans-serif";
+  const mBg    = isDark ? '#0d1f36' : '#ffffff';
+  const mBdr   = isDark ? 'rgba(14,165,233,0.2)' : '#bae6fd';
 
-  // Modal
-  overlay: {
-    position: 'fixed', inset: 0, zIndex: 1000,
-    background: 'rgba(0,0,0,0.8)',
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    padding: '20px',
-  },
-  modal: {
-    background: '#110f1a',
-    border: '1px solid rgba(245,158,11,0.2)',
-    borderRadius: '18px',
-    width: '100%', maxWidth: '620px',
-    maxHeight: '92vh', overflowY: 'auto',
-    boxShadow: '0 24px 80px rgba(0,0,0,0.7)',
-  },
-  modalHeader: {
-    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    padding: '20px 24px',
-    borderBottom: '1px solid rgba(255,255,255,0.07)',
-    position: 'sticky', top: 0, background: '#110f1a', zIndex: 1,
-  },
-  modalTitle: { fontSize: '16px', fontWeight: '700', color: '#f1f5f9' },
-  stepTag: {
-    fontSize: '11px', fontWeight: '700',
-    background: 'rgba(245,158,11,0.12)', color: '#f59e0b',
-    padding: '2px 8px', borderRadius: '20px',
-  },
-  closeBtn: {
-    background: 'none', border: 'none', color: '#6b7280',
-    cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center',
-  },
-  modalForm: { padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' },
-  stepDesc: { margin: 0, fontSize: '13.5px', color: '#9ca3af', lineHeight: '1.6' },
-  twoCol: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' },
-  field: { display: 'flex', flexDirection: 'column', gap: '6px' },
-  label: {
-    fontSize: '11.5px', fontWeight: '700', color: '#9ca3af',
-    textTransform: 'uppercase', letterSpacing: '0.07em',
-  },
-  input: {
-    width: '100%', padding: '10px 14px',
-    background: 'rgba(255,255,255,0.04)',
-    border: '1px solid rgba(255,255,255,0.1)',
-    borderRadius: '10px', color: '#f1f5f9',
-    fontSize: '14px', fontFamily: 'inherit',
-    outline: 'none', boxSizing: 'border-box',
-  },
-  passwordWrap: {
-    display: 'flex', alignItems: 'center',
-    padding: '0 14px',
-    background: 'rgba(255,255,255,0.04)',
-    border: '1px solid rgba(255,255,255,0.1)',
-    borderRadius: '10px', height: '42px', gap: '8px',
-  },
-  eyeBtn: {
-    background: 'none', border: 'none', color: '#6b7280',
-    cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center',
-  },
-  modalNote: {
-    fontSize: '12px', color: '#6b7280',
-    background: 'rgba(245,158,11,0.06)',
-    border: '1px solid rgba(245,158,11,0.12)',
-    borderRadius: '8px', padding: '10px 14px',
-    lineHeight: '1.5',
-  },
-  cancelBtn: {
-    padding: '10px 20px', borderRadius: '10px',
-    background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
-    color: '#9ca3af', fontSize: '14px', fontWeight: '600',
-    cursor: 'pointer', fontFamily: 'inherit',
-  },
-  submitBtn: {
-    display: 'inline-flex', alignItems: 'center', gap: '7px',
-    padding: '10px 22px', borderRadius: '10px',
-    background: 'linear-gradient(135deg, #b45309, #f59e0b)',
-    border: 'none', color: '#0c0a00',
-    fontSize: '14px', fontWeight: '700',
-    cursor: 'pointer', fontFamily: 'inherit',
-  },
-};
+  return {
+    // ── Shell ────────────────────────────────────────────────────────────────
+    root: {
+      minHeight: '100vh', display: 'flex',
+      background: bg, color: text, fontFamily: font,
+    },
+
+    // ── Sidebar ──────────────────────────────────────────────────────────────
+    sidebar: {
+      width: 232, flexShrink: 0,
+      background: sbBg,
+      borderRight: `1px solid ${bdr}`,
+      display: 'flex', flexDirection: 'column',
+      height: '100vh', position: 'sticky', top: 0,
+      overflowY: 'auto',
+    },
+    sidebarBrand: {
+      display: 'flex', alignItems: 'center', gap: 12,
+      padding: '22px 18px 18px',
+      borderBottom: `1px solid ${bdr}`,
+    },
+    sidebarLogoWrap: {
+      width: 38, height: 38, borderRadius: 12, flexShrink: 0,
+      background: 'linear-gradient(135deg,#0284c7,#38bdf8)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      boxShadow: '0 4px 14px rgba(14,165,233,0.45)',
+    },
+    sidebarBrandName: { fontSize: 15, fontWeight: 800, color: text, lineHeight: 1.1 },
+    sidebarBrandSub:  { fontSize: 11, color: muted, marginTop: 3 },
+    sidebarNav: {
+      flex: 1, overflowY: 'auto',
+      padding: '10px 8px',
+      display: 'flex', flexDirection: 'column', gap: 2,
+    },
+    navItem: {
+      display: 'flex', alignItems: 'center', gap: 10,
+      padding: '9px 12px', borderRadius: 10,
+      fontSize: 13, fontWeight: 600,
+      background: 'transparent', border: 'none',
+      color: muted, cursor: 'pointer',
+      fontFamily: font, width: '100%', textAlign: 'left',
+      transition: 'all 0.15s',
+    },
+    navItemActive: {
+      background: skyDim,
+      color: sky,
+      borderLeft: `3px solid ${sky}`,
+      paddingLeft: 9,
+      boxShadow: isDark ? 'inset 0 0 12px rgba(14,165,233,0.06)' : 'none',
+    },
+    navBadge: {
+      minWidth: 18, height: 18, borderRadius: 9,
+      background: sky, color: '#fff',
+      fontSize: 10, fontWeight: 800,
+      display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px',
+    },
+    sidebarFooter: {
+      padding: '10px 8px 14px',
+      borderTop: `1px solid ${bdr}`,
+      display: 'flex', flexDirection: 'column', gap: 5,
+    },
+    broadcastBtn: {
+      display: 'flex', alignItems: 'center', gap: 8,
+      padding: '9px 12px', borderRadius: 10,
+      fontSize: 13, fontWeight: 700,
+      background: 'linear-gradient(135deg,#f59e0b,#d97706)',
+      border: 'none', color: '#fff',
+      cursor: 'pointer', fontFamily: font, width: '100%',
+    },
+    darkToggleBtn: {
+      display: 'flex', alignItems: 'center', gap: 8,
+      padding: '9px 12px', borderRadius: 10,
+      fontSize: 13, fontWeight: 600,
+      background: isDark ? 'rgba(255,255,255,0.06)' : skyDim,
+      border: `1px solid ${bdr}`,
+      color: isDark ? '#94a3b8' : '#0284c7',
+      cursor: 'pointer', fontFamily: font, width: '100%',
+    },
+    logoutBtn: {
+      display: 'flex', alignItems: 'center', gap: 8,
+      padding: '9px 12px', borderRadius: 10,
+      fontSize: 13, fontWeight: 600,
+      background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.18)',
+      color: '#f87171', cursor: 'pointer',
+      fontFamily: font, width: '100%',
+    },
+
+    // ── Main area ────────────────────────────────────────────────────────────
+    main: {
+      flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflowY: 'auto',
+    },
+    topBar: {
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      padding: '18px 28px',
+      background: isDark ? 'rgba(14,165,233,0.04)' : 'rgba(14,165,233,0.03)',
+      borderBottom: `1px solid ${bdr}`,
+      position: 'sticky', top: 0, zIndex: 10,
+      backdropFilter: 'blur(10px)',
+    },
+    topBarTitle: { fontSize: 20, fontWeight: 800, color: text },
+    createBtn: {
+      display: 'flex', alignItems: 'center', gap: 6,
+      padding: '9px 18px', borderRadius: 10,
+      background: 'linear-gradient(135deg,#0284c7,#38bdf8)',
+      border: 'none', color: '#fff',
+      fontSize: 13, fontWeight: 700, cursor: 'pointer',
+      fontFamily: font, boxShadow: '0 4px 12px rgba(14,165,233,0.35)',
+    },
+    content: { padding: '24px 28px', flex: 1 },
+
+    // ── Stats row ────────────────────────────────────────────────────────────
+    statsRow: {
+      display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(190px,1fr))',
+      gap: 16, marginBottom: 24,
+    },
+    statCard: {
+      display: 'flex', alignItems: 'center', gap: 14,
+      padding: '18px 20px', borderRadius: 14,
+      background: card, border: `1px solid ${bdr}`,
+      boxShadow: isDark ? 'none' : '0 2px 10px rgba(14,165,233,0.07)',
+    },
+    statIcon: {
+      width: 40, height: 40, borderRadius: 10, flexShrink: 0,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+    },
+    statValue: { margin: '0 0 2px', fontSize: 24, fontWeight: 700, color: text },
+    statLabel: { margin: 0, fontSize: 12, color: muted },
+
+    // ── Legacy tab row (kept for any tab that still renders it) ───────────────
+    tabRow: { display: 'flex', gap: 8, marginBottom: 16 },
+    tabBtn: {
+      display: 'flex', alignItems: 'center', gap: 6,
+      padding: '7px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600,
+      background: isDark ? 'rgba(255,255,255,0.04)' : '#f1f9ff',
+      border: `1px solid ${bdr}`,
+      color: muted, cursor: 'pointer', fontFamily: font,
+    },
+    tabBtnActive: { background: skyDim, border: `1px solid ${skyBdr}`, color: sky },
+    tabBadge: {
+      minWidth: 18, height: 18, borderRadius: 9,
+      background: sky, color: '#fff',
+      fontSize: 10, fontWeight: 800,
+      display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px',
+    },
+
+    // ── Shared card / table ──────────────────────────────────────────────────
+    card: { background: card, border: `1px solid ${bdr}`, borderRadius: 16, padding: 20 },
+    sectionTitle: {
+      display: 'flex', alignItems: 'center', gap: 8,
+      fontSize: 15, fontWeight: 700, color: text, margin: 0,
+    },
+    refreshBtn: {
+      background: isDark ? 'rgba(255,255,255,0.05)' : skyDim,
+      border: `1px solid ${bdr}`, borderRadius: 7, color: muted,
+      cursor: 'pointer', padding: 6, display: 'flex', alignItems: 'center',
+    },
+    table: { width: '100%', borderCollapse: 'collapse' },
+    th: {
+      textAlign: 'left', padding: '10px 14px',
+      fontSize: 11, fontWeight: 700, letterSpacing: '0.08em',
+      color: muted, textTransform: 'uppercase',
+      borderBottom: `1px solid ${bdr}`,
+    },
+    tr: { borderBottom: `1px solid ${bdr}` },
+    td: { padding: '12px 14px', verticalAlign: 'middle' },
+    slug: {
+      fontSize: 12, padding: '2px 8px', borderRadius: 6,
+      background: isDark ? 'rgba(14,165,233,0.1)' : 'rgba(14,165,233,0.08)',
+      color: sky, fontFamily: 'monospace',
+    },
+    planBadge: {
+      fontSize: 11, padding: '2px 8px', borderRadius: 20,
+      background: isDark ? 'rgba(99,102,241,0.12)' : 'rgba(99,102,241,0.1)',
+      color: '#818cf8', fontWeight: 600, textTransform: 'capitalize',
+    },
+    statusBadge: {
+      display: 'inline-flex', alignItems: 'center', gap: 5,
+      fontSize: 12, fontWeight: 600, padding: '3px 10px', borderRadius: 20,
+      border: '1px solid', textTransform: 'capitalize',
+    },
+
+    // ── Action buttons ────────────────────────────────────────────────────────
+    approveBtn: {
+      display: 'inline-flex', alignItems: 'center', gap: 4,
+      padding: '5px 12px', borderRadius: 7, fontSize: 12, fontWeight: 600,
+      background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.25)',
+      color: '#34d399', cursor: 'pointer', fontFamily: font,
+    },
+    rejectBtn: {
+      display: 'inline-flex', alignItems: 'center', gap: 4,
+      padding: '5px 12px', borderRadius: 7, fontSize: 12, fontWeight: 600,
+      background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)',
+      color: '#f87171', cursor: 'pointer', fontFamily: font,
+    },
+    suspendBtn: {
+      display: 'inline-flex', alignItems: 'center', gap: 4,
+      padding: '5px 12px', borderRadius: 7, fontSize: 12, fontWeight: 600,
+      background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)',
+      color: '#f59e0b', cursor: 'pointer', fontFamily: font,
+    },
+    themeBtn: {
+      display: 'inline-flex', alignItems: 'center', gap: 4,
+      padding: '5px 12px', borderRadius: 7, fontSize: 12, fontWeight: 600,
+      background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)',
+      color: '#818cf8', cursor: 'pointer', fontFamily: font,
+    },
+    featuresBtn: {
+      display: 'inline-flex', alignItems: 'center', gap: 4,
+      padding: '5px 12px', borderRadius: 7, fontSize: 12, fontWeight: 600,
+      background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)',
+      color: '#34d399', cursor: 'pointer', fontFamily: font,
+    },
+    deleteBtn: {
+      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+      padding: '5px 8px', borderRadius: 7, fontSize: 12,
+      background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)',
+      color: '#f87171', cursor: 'pointer', fontFamily: font,
+    },
+
+    // ── Modals ────────────────────────────────────────────────────────────────
+    overlay: {
+      position: 'fixed', inset: 0, zIndex: 1000,
+      background: 'rgba(0,0,0,0.75)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
+    },
+    modal: {
+      background: mBg, border: `1px solid ${mBdr}`,
+      borderRadius: 18, width: '100%', maxWidth: 620,
+      maxHeight: '92vh', overflowY: 'auto',
+      boxShadow: '0 24px 80px rgba(0,0,0,0.55)',
+    },
+    modalHeader: {
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      padding: '20px 24px', borderBottom: `1px solid ${mBdr}`,
+      position: 'sticky', top: 0, background: mBg, zIndex: 1,
+    },
+    modalTitle: { fontSize: 16, fontWeight: 700, color: isDark ? '#f0f9ff' : '#0c1a2e' },
+    stepTag: {
+      fontSize: 11, fontWeight: 700,
+      background: 'rgba(14,165,233,0.12)', color: sky,
+      padding: '2px 8px', borderRadius: 20,
+    },
+    closeBtn: {
+      background: 'none', border: 'none', color: muted,
+      cursor: 'pointer', padding: 4, display: 'flex', alignItems: 'center',
+    },
+    modalForm: { padding: 24, display: 'flex', flexDirection: 'column', gap: 16 },
+    stepDesc: { margin: 0, fontSize: 13.5, color: muted, lineHeight: 1.6 },
+    twoCol: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 },
+    field: { display: 'flex', flexDirection: 'column', gap: 6 },
+    label: {
+      fontSize: 11.5, fontWeight: 700, color: muted,
+      textTransform: 'uppercase', letterSpacing: '0.07em',
+    },
+    input: {
+      width: '100%', padding: '10px 14px',
+      background: isDark ? 'rgba(255,255,255,0.04)' : '#f8fafc',
+      border: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : '#cbd5e1'}`,
+      borderRadius: 10, color: isDark ? '#f0f9ff' : '#0f172a',
+      fontSize: 14, fontFamily: font, outline: 'none', boxSizing: 'border-box',
+    },
+    passwordWrap: {
+      display: 'flex', alignItems: 'center',
+      padding: '0 14px',
+      background: isDark ? 'rgba(255,255,255,0.04)' : '#f8fafc',
+      border: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : '#cbd5e1'}`,
+      borderRadius: 10, height: 42, gap: 8,
+    },
+    eyeBtn: {
+      background: 'none', border: 'none', color: muted,
+      cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center',
+    },
+    modalNote: {
+      fontSize: 12, color: muted,
+      background: 'rgba(14,165,233,0.06)', border: '1px solid rgba(14,165,233,0.15)',
+      borderRadius: 8, padding: '10px 14px', lineHeight: 1.5,
+    },
+    cancelBtn: {
+      padding: '10px 20px', borderRadius: 10,
+      background: isDark ? 'rgba(255,255,255,0.05)' : '#f1f9ff',
+      border: `1px solid ${bdr}`,
+      color: muted, fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: font,
+    },
+    submitBtn: {
+      display: 'inline-flex', alignItems: 'center', gap: 7,
+      padding: '10px 22px', borderRadius: 10,
+      background: 'linear-gradient(135deg,#0284c7,#38bdf8)',
+      border: 'none', color: '#fff',
+      fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: font,
+      boxShadow: '0 4px 14px rgba(14,165,233,0.35)',
+    },
+  };
+}

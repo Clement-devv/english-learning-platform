@@ -1,9 +1,10 @@
 // src/pages/teacher/tabs/GroupClassesTab.jsx
 // Teacher view: create own group classes, view enrollments, join classroom, mark attendance/complete.
 import React, { useState, useEffect, useCallback } from 'react';
-import { Users, Plus, X, ChevronDown, ChevronUp, Video, RefreshCw, Loader2 } from 'lucide-react';
+import { Users, Plus, X, ChevronDown, ChevronUp, Video, RefreshCw, Loader2, Lock, Globe, Search, UserMinus } from 'lucide-react';
 import api from '../../../api';
 import Classroom from '../../Classroom';
+import DateTimePicker from '../../../components/DateTimePicker';
 import { formatDateInTZ, getUserTimezone, tzAbbr } from '../../../utils/timezone';
 
 const F = "'Nunito','Inter',sans-serif";
@@ -36,6 +37,7 @@ function Badge({ status }) {
 const BLANK_FORM = {
   title: '', description: '', level: 'Mixed', maxSeats: 8,
   pricePerSeat: 1, scheduledTime: '', duration: 60, notes: '', tags: '',
+  enrollmentMode: 'open',
 };
 
 export default function GroupClassesTab({ isDarkMode }) {
@@ -63,7 +65,11 @@ export default function GroupClassesTab({ isDarkMode }) {
   const [attTarget,  setAttTarget]  = useState(null);
   const [attMap,     setAttMap]     = useState({});
 
-  const [activeClass, setActiveClass] = useState(null);
+  const [activeClass,    setActiveClass]    = useState(null);
+  const [inviteTarget,   setInviteTarget]   = useState(null);   // gc being managed
+  const [inviteSearch,   setInviteSearch]   = useState('');
+  const [inviteResults,  setInviteResults]  = useState([]);
+  const [inviteLoading,  setInviteLoading]  = useState(false);
 
   const flash = (m) => { setMsg(m); setTimeout(() => setMsg(''), 4000); };
 
@@ -89,6 +95,7 @@ export default function GroupClassesTab({ isDarkMode }) {
       await api.post('/group-classes', {
         ...form,
         tags: form.tags ? form.tags.split(',').map(t => t.trim()).filter(Boolean) : [],
+        enrollmentMode: form.enrollmentMode || 'open',
       });
       flash('Group class created');
       setShowCreate(false);
@@ -99,6 +106,45 @@ export default function GroupClassesTab({ isDarkMode }) {
     } finally {
       setSaving(false);
     }
+  };
+
+  const searchStudents = async (q) => {
+    setInviteSearch(q);
+    if (!q.trim()) { setInviteResults([]); return; }
+    setInviteLoading(true);
+    try {
+      const { data } = await api.get(`/group-classes/students/search?q=${encodeURIComponent(q)}`);
+      setInviteResults(data.students || []);
+    } catch { setInviteResults([]); }
+    finally { setInviteLoading(false); }
+  };
+
+  const addInvite = async (studentId) => {
+    if (!inviteTarget) return;
+    try {
+      await api.patch(`/group-classes/${inviteTarget._id}/invite`, { add: studentId });
+      setInviteTarget(prev => ({
+        ...prev,
+        invitedStudents: [...(prev.invitedStudents || []), studentId],
+      }));
+      setInviteResults([]);
+      setInviteSearch('');
+      load();
+    } catch (e) { flash(e.response?.data?.message || 'Failed to invite'); }
+  };
+
+  const removeInvite = async (studentId) => {
+    if (!inviteTarget) return;
+    try {
+      await api.patch(`/group-classes/${inviteTarget._id}/invite`, { remove: studentId });
+      setInviteTarget(prev => ({
+        ...prev,
+        invitedStudents: (prev.invitedStudents || []).filter(id =>
+          (id._id || id).toString() !== studentId.toString()
+        ),
+      }));
+      load();
+    } catch (e) { flash(e.response?.data?.message || 'Failed to remove'); }
   };
 
   const handleStart = async (gc) => {
@@ -150,7 +196,7 @@ export default function GroupClassesTab({ isDarkMode }) {
   if (activeClass) {
     return (
       <Classroom
-        classData={{ id: activeClass._id, title: activeClass.title }}
+        classData={{ id: activeClass._id, title: activeClass.title, isGroupClass: true }}
         userRole="teacher"
         onLeave={() => { setActiveClass(null); load(); }}
       />
@@ -208,6 +254,11 @@ export default function GroupClassesTab({ isDarkMode }) {
                     <span style={{ fontSize: 15, fontWeight: 800, color: col.heading }}>{gc.title}</span>
                     <Badge status={gc.status} />
                     <span style={{ fontSize: 12, color: col.muted, background: isDarkMode ? '#2a2d40' : '#fff7ed', borderRadius: 999, padding: '2px 8px' }}>{gc.level}</span>
+                    {gc.enrollmentMode === 'invite-only' && (
+                      <span style={{ fontSize: 11, background: '#6366f122', color: '#6366f1', borderRadius: 999, padding: '2px 8px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 3 }}>
+                        <Lock size={10} /> Invite-Only
+                      </span>
+                    )}
                   </div>
                   <div style={{ fontSize: 13, color: col.muted, marginTop: 4, display: 'flex', gap: 14, flexWrap: 'wrap' }}>
                     <span>📅 {fmtDate(gc.scheduledTime)}</span>
@@ -267,6 +318,12 @@ export default function GroupClassesTab({ isDarkMode }) {
                         Mark Complete
                       </button>
                     )}
+                    {gc.enrollmentMode === 'invite-only' && ['open','full'].includes(gc.status) && (
+                      <button onClick={() => { setInviteTarget(gc); setInviteSearch(''); setInviteResults([]); }}
+                        style={{ ...btn('linear-gradient(135deg,#6366f1,#8b5cf6)'), display: 'flex', alignItems: 'center', gap: 5 }}>
+                        <Lock size={13} /> Manage Invites ({(gc.invitedStudents || []).length})
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
@@ -311,11 +368,35 @@ export default function GroupClassesTab({ isDarkMode }) {
               <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 10 }}>
                 <div>
                   <label style={{ fontSize: 12, fontWeight: 800, color: col.muted, textTransform: 'uppercase', letterSpacing: '.06em' }}>Scheduled Time *</label>
-                  <input type="datetime-local" value={form.scheduledTime} onChange={e => setForm(p => ({ ...p, scheduledTime: e.target.value }))} style={{ ...inp, marginTop: 4 }} />
+                  <DateTimePicker
+                    value={form.scheduledTime}
+                    onChange={v => setForm(p => ({ ...p, scheduledTime: v }))}
+                    placeholder="Pick date & time"
+                    isDarkMode={isDarkMode}
+                    inputStyle={{ ...inp, marginTop: 4 }}
+                  />
                 </div>
                 <div>
                   <label style={{ fontSize: 12, fontWeight: 800, color: col.muted, textTransform: 'uppercase', letterSpacing: '.06em' }}>Duration (min)</label>
                   <input type="number" min={15} max={300} value={form.duration} onChange={e => setForm(p => ({ ...p, duration: +e.target.value }))} style={{ ...inp, marginTop: 4 }} />
+                </div>
+              </div>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 800, color: col.muted, textTransform: 'uppercase', letterSpacing: '.06em' }}>Enrollment Mode</label>
+                <div style={{ display: 'flex', gap: 10, marginTop: 6 }}>
+                  {[
+                    { val: 'open',         label: '🌐 Open',         hint: 'Any student with credits can join' },
+                    { val: 'invite-only',  label: '🔒 Invite-Only',  hint: 'Only students you invite can enroll' },
+                  ].map(m => (
+                    <button key={m.val} onClick={() => setForm(p => ({ ...p, enrollmentMode: m.val }))} style={{
+                      flex: 1, border: `2px solid ${form.enrollmentMode === m.val ? col.accent : col.border}`,
+                      background: form.enrollmentMode === m.val ? col.accent + '18' : 'transparent',
+                      borderRadius: 12, padding: '10px 12px', cursor: 'pointer', textAlign: 'left', fontFamily: F,
+                    }}>
+                      <div style={{ fontWeight: 800, fontSize: 13, color: form.enrollmentMode === m.val ? col.accent : col.heading }}>{m.label}</div>
+                      <div style={{ fontSize: 11, color: col.muted, marginTop: 2 }}>{m.hint}</div>
+                    </button>
+                  ))}
                 </div>
               </div>
               <div>
@@ -328,6 +409,79 @@ export default function GroupClassesTab({ isDarkMode }) {
               <button onClick={handleCreate} disabled={saving} style={btn('linear-gradient(135deg,#f97316,#f43f5e)')}>
                 {saving ? 'Creating...' : 'Create Class'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Invite Management Modal ── */}
+      {inviteTarget && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: 16 }}>
+          <div style={{ background: col.card, borderRadius: 24, padding: 28, width: '100%', maxWidth: 480, maxHeight: '85vh', overflowY: 'auto', fontFamily: F }}>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16 }}>
+              <Lock size={16} color={col.accent} style={{ marginRight: 8 }} />
+              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 900, color: col.heading, flex: 1 }}>Manage Invites — {inviteTarget.title}</h3>
+              <button onClick={() => setInviteTarget(null)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={18} color={col.muted} /></button>
+            </div>
+            <p style={{ fontSize: 13, color: col.muted, margin: '0 0 14px' }}>Only invited students can enroll. Search by name or email.</p>
+
+            {/* Search */}
+            <div style={{ position: 'relative', marginBottom: 8 }}>
+              <Search size={14} color={col.muted} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
+              <input
+                value={inviteSearch}
+                onChange={e => searchStudents(e.target.value)}
+                placeholder="Search students…"
+                style={{ ...inp, paddingLeft: 34 }}
+              />
+            </div>
+
+            {/* Search results */}
+            {inviteLoading && <p style={{ fontSize: 13, color: col.muted }}>Searching…</p>}
+            {inviteResults.length > 0 && (
+              <div style={{ border: `1.5px solid ${col.border}`, borderRadius: 12, marginBottom: 14, overflow: 'hidden' }}>
+                {inviteResults.map(s => {
+                  const alreadyInvited = (inviteTarget.invitedStudents || []).some(
+                    id => (id._id || id).toString() === s._id.toString()
+                  );
+                  return (
+                    <div key={s._id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderBottom: `1px solid ${col.border}` }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: col.heading }}>{s.firstName} {s.lastName}</div>
+                        <div style={{ fontSize: 11, color: col.muted }}>{s.email} · {s.classCredits ?? 0} credits</div>
+                      </div>
+                      {alreadyInvited
+                        ? <span style={{ fontSize: 11, color: '#10b981', fontWeight: 700 }}>✓ Invited</span>
+                        : <button onClick={() => addInvite(s._id)} style={{ ...btn('linear-gradient(135deg,#10b981,#34d399)'), padding: '6px 14px', fontSize: 12 }}>Invite</button>
+                      }
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Current invited list */}
+            <p style={{ fontSize: 12, fontWeight: 800, color: col.muted, textTransform: 'uppercase', letterSpacing: '.06em', margin: '0 0 8px' }}>
+              Invited Students ({(inviteTarget.invitedStudents || []).length})
+            </p>
+            {(inviteTarget.invitedStudents || []).length === 0
+              ? <p style={{ fontSize: 13, color: col.muted }}>No students invited yet.</p>
+              : (inviteTarget.invitedStudents || []).map((entry, i) => {
+                  const id   = entry._id || entry;
+                  const name = entry.firstName ? `${entry.firstName} ${entry.lastName}` : String(id).slice(-6);
+                  return (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', background: isDarkMode ? '#0f1117' : '#fff8f0', borderRadius: 10, marginBottom: 6 }}>
+                      <span style={{ flex: 1, fontSize: 13, fontWeight: 700, color: col.body }}>{name}</span>
+                      <button onClick={() => removeInvite(id)} title="Remove invite" style={{ background: '#ef444420', border: 'none', borderRadius: 8, padding: '4px 10px', cursor: 'pointer', color: '#ef4444', display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <UserMinus size={13} /> Remove
+                      </button>
+                    </div>
+                  );
+                })
+            }
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
+              <button onClick={() => setInviteTarget(null)} style={btn('linear-gradient(135deg,#6366f1,#8b5cf6)')}>Done</button>
             </div>
           </div>
         </div>

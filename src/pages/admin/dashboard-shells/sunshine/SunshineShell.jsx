@@ -9,6 +9,7 @@ import {
   Calendar, BarChart3, AlertTriangle, MessageCircle, Mic,
   BookOpen, Shield, CalendarDays, FileText, Star, Palette, Globe,
   Settings, LogOut, CheckCircle2, ClipboardList, Award,
+  Megaphone, Send, X, CheckCircle,
 } from 'lucide-react';
 import { useNavigate }            from 'react-router-dom';
 import { useAuth }                from '../../../../context/AuthContext.jsx';
@@ -169,6 +170,20 @@ export default function SunshineShell() {
   const [notifications,   setNotifications]   = useState([]);
   const [toast,           setToast]           = useState('');
 
+  // ── Broadcast ──────────────────────────────────────────────────────────────
+  const [broadcastModal,   setBroadcastModal]   = useState(false);
+  const [broadcastSubject, setBroadcastSubject] = useState('');
+  const [broadcastMessage, setBroadcastMessage] = useState('');
+  const [broadcastTargets, setBroadcastTargets] = useState({
+    teachers: { enabled: false, mode: 'all', ids: [] },
+    students: { enabled: false, mode: 'all', ids: [] },
+    parents:  { enabled: false, mode: 'all', ids: [] },
+  });
+  const [broadcastSearch,  setBroadcastSearch]  = useState({ teachers: '', students: '', parents: '' });
+  const [broadcastParents, setBroadcastParents] = useState([]);
+  const [broadcasting,     setBroadcasting]     = useState(false);
+  const [broadcastResult,  setBroadcastResult]  = useState(null);
+
   const activeTeachers = teachers.filter(t => t.active && t.status === 'active' && !t.scheduledDeletionAt);
 
   useEffect(() => {
@@ -223,6 +238,66 @@ export default function SunshineShell() {
       ? { message: note, date: new Date().toISOString() }
       : { ...note, date: note.date || new Date().toISOString() };
     setNotifications(p => [full, ...p]);
+  };
+
+  const toggleGroup = (group) => {
+    setBroadcastTargets(prev => ({
+      ...prev,
+      [group]: { ...prev[group], enabled: !prev[group].enabled, ids: [] },
+    }));
+  };
+  const setGroupMode = (group, mode) => {
+    setBroadcastTargets(prev => ({ ...prev, [group]: { ...prev[group], mode, ids: [] } }));
+  };
+  const togglePersonId = (group, id) => {
+    setBroadcastTargets(prev => {
+      const ids = prev[group].ids;
+      return { ...prev, [group]: { ...prev[group], ids: ids.includes(id) ? ids.filter(i => i !== id) : [...ids, id] } };
+    });
+  };
+  const selectAllInGroup = (group, peopleList) => {
+    setBroadcastTargets(prev => ({
+      ...prev,
+      [group]: { ...prev[group], ids: peopleList.map(p => p._id || p.id) },
+    }));
+  };
+
+  const handleBroadcast = async () => {
+    setBroadcasting(true);
+    setBroadcastResult(null);
+    try {
+      const targets = Object.fromEntries(
+        Object.entries(broadcastTargets)
+          .filter(([, t]) => t.enabled)
+          .map(([group, t]) => [group, t.mode === 'specific' ? { mode: 'specific', ids: t.ids } : { mode: 'all' }])
+      );
+      const res = await api.post('/admin/lessons/broadcast', {
+        subject: broadcastSubject, message: broadcastMessage, targets,
+      });
+      if (res.data.success) setBroadcastResult(res.data);
+      else throw new Error(res.data.message);
+    } catch (err) {
+      alert(err.response?.data?.message || err.message || 'Broadcast failed');
+    } finally {
+      setBroadcasting(false);
+    }
+  };
+
+  const openBroadcast = async () => {
+    setBroadcastModal(true);
+    setBroadcastSubject('');
+    setBroadcastMessage('');
+    setBroadcastTargets({
+      teachers: { enabled: false, mode: 'all', ids: [] },
+      students: { enabled: false, mode: 'all', ids: [] },
+      parents:  { enabled: false, mode: 'all', ids: [] },
+    });
+    setBroadcastSearch({ teachers: '', students: '', parents: '' });
+    setBroadcastResult(null);
+    try {
+      const res = await api.get('/parents');
+      setBroadcastParents(res.data.parents || res.data || []);
+    } catch (_) { setBroadcastParents([]); }
   };
 
   const tabContent = useMemo(() => {
@@ -368,6 +443,11 @@ export default function SunshineShell() {
               <div style={{ width: 16, height: 16, borderRadius: '50%', background: '#fff', position: 'absolute', top: 3, left: isDarkMode ? 21 : 3, transition: 'left .2s' }} />
             </button>
           </div>
+          <button className="as-nav" onClick={openBroadcast}
+            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 14, border: 'none', cursor: 'pointer', background: isDarkMode ? 'rgba(249,115,22,0.1)' : '#fff7ed', fontFamily: F, marginBottom: 1 }}>
+            <Megaphone size={17} color={col.accent} />
+            <span style={{ fontSize: 13, fontWeight: 700, color: col.accent }}>Broadcast Email</span>
+          </button>
           <button className="as-nav" onClick={() => setShowSettingsSidebar(true)}
             style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 14, border: 'none', cursor: 'pointer', background: 'transparent', fontFamily: F, marginBottom: 1 }}>
             <Settings size={17} color={col.muted} />
@@ -496,6 +576,204 @@ export default function SunshineShell() {
           </Suspense>
         </main>
       </div>
+
+      {/* ── Broadcast Modal ── */}
+      {broadcastModal && (() => {
+        const GROUPS = [
+          { key: 'teachers', emoji: '👩‍🏫', label: 'Teachers', people: teachers.filter(t => t.active) },
+          { key: 'students', emoji: '👨‍🎓', label: 'Students', people: students.filter(s => s.active) },
+          { key: 'parents',  emoji: '👪',   label: 'Parents',  people: broadcastParents },
+        ];
+
+        const anyEnabled  = Object.values(broadcastTargets).some(t => t.enabled);
+        const specificOk  = Object.entries(broadcastTargets)
+          .filter(([, t]) => t.enabled && t.mode === 'specific')
+          .every(([, t]) => t.ids.length > 0);
+        const canSend = broadcastSubject.trim() && broadcastMessage.trim() && anyEnabled && specificOk;
+
+        const summaryParts = Object.entries(broadcastTargets)
+          .filter(([, t]) => t.enabled)
+          .map(([g, t]) => t.mode === 'all'
+            ? `all ${g}`
+            : `${t.ids.length} selected ${g}`);
+        const recipientSummary = summaryParts.length ? summaryParts.join(', ') : 'nobody selected';
+
+        const enabledLabel = Object.entries(broadcastTargets)
+          .filter(([, t]) => t.enabled)
+          .map(([g, t]) => t.mode === 'all'
+            ? g.charAt(0).toUpperCase() + g.slice(1)
+            : `${t.ids.length} ${g}`)
+          .join(' & ') || '—';
+
+        const ov  = { position: 'fixed', inset: 0, zIndex: 9000, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 };
+        const box = { background: isDarkMode ? '#1a1d2e' : '#ffffff', border: `2px solid ${col.border}`, borderRadius: 24, width: '100%', maxWidth: 540, maxHeight: '92vh', overflowY: 'auto', boxShadow: '0 24px 60px rgba(0,0,0,0.4)', fontFamily: F };
+        const inp = { width: '100%', boxSizing: 'border-box', padding: '9px 13px', background: isDarkMode ? 'rgba(255,255,255,0.05)' : '#fff8f0', border: `2px solid ${col.border}`, borderRadius: 10, color: col.heading, fontSize: 13, fontFamily: F, outline: 'none' };
+        const lbl = { display: 'block', fontSize: 11, fontWeight: 800, color: col.muted, marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.07em' };
+
+        return (
+          <div style={ov} onClick={e => e.target === e.currentTarget && !broadcasting && setBroadcastModal(false)}>
+            <div style={box}>
+
+              {/* Header */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 22px', borderBottom: `2px solid ${col.border}` }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ width: 36, height: 36, borderRadius: 12, background: ACCENT_GRADIENT, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Megaphone size={18} color="#fff" />
+                  </div>
+                  <span style={{ fontSize: 16, fontWeight: 900, color: col.heading }}>Broadcast Email</span>
+                </div>
+                {!broadcasting && <button onClick={() => setBroadcastModal(false)} style={{ background: 'none', border: 'none', color: col.muted, cursor: 'pointer', padding: 4, display: 'flex' }}><X size={20} /></button>}
+              </div>
+
+              <div style={{ padding: 22 }}>
+                {broadcastResult ? (
+                  /* ── Success ── */
+                  <div style={{ textAlign: 'center', padding: '24px 0' }}>
+                    <CheckCircle size={44} color="#10b981" style={{ marginBottom: 14 }} />
+                    <p style={{ margin: '0 0 6px', fontSize: 18, fontWeight: 900, color: col.heading }}>Sent!</p>
+                    <p style={{ margin: '0 0 4px', fontSize: 13, color: col.body }}>
+                      <strong style={{ color: '#10b981' }}>{broadcastResult.sent}</strong> email{broadcastResult.sent !== 1 ? 's' : ''} delivered
+                      {broadcastResult.failed > 0 && <>, <strong style={{ color: '#ef4444' }}>{broadcastResult.failed}</strong> failed</>}
+                    </p>
+                    <p style={{ margin: '0 0 24px', fontSize: 12, color: col.muted }}>Total: {broadcastResult.total}</p>
+                    <button onClick={() => setBroadcastModal(false)} style={{ padding: '10px 32px', borderRadius: 14, border: 'none', background: ACCENT_GRADIENT, color: '#fff', fontWeight: 800, fontSize: 14, cursor: 'pointer', fontFamily: F }}>Done</button>
+                  </div>
+                ) : (
+                  <>
+                    {/* ── Group toggle cards ── */}
+                    <p style={{ ...lbl, marginBottom: 8 }}>Who should receive this?</p>
+                    <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+                      {GROUPS.map(g => {
+                        const t = broadcastTargets[g.key];
+                        return (
+                          <button key={g.key} onClick={() => !broadcasting && toggleGroup(g.key)} style={{
+                            flex: 1, padding: '10px 6px', borderRadius: 14, cursor: 'pointer', textAlign: 'center', fontFamily: F,
+                            border: t.enabled ? `2px solid ${col.accent}` : `2px solid ${col.border}`,
+                            background: t.enabled ? (isDarkMode ? 'rgba(249,115,22,0.15)' : '#fff7ed') : 'transparent',
+                            transition: 'all 0.15s',
+                          }}>
+                            <div style={{ fontSize: 22, marginBottom: 3 }}>{g.emoji}</div>
+                            <div style={{ fontSize: 12, fontWeight: 800, color: t.enabled ? col.accent : col.body }}>{g.label}</div>
+                            <div style={{ fontSize: 10, color: col.muted, marginTop: 2 }}>
+                              {t.enabled && t.mode === 'specific' ? `${t.ids.length} selected` : `${g.people.length}`}
+                            </div>
+                            {t.enabled && (
+                              <div style={{ width: 18, height: 18, borderRadius: '50%', background: col.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '5px auto 0' }}>
+                                <CheckCircle2 size={11} color="#fff" />
+                              </div>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* ── Per-group expansion ── */}
+                    {GROUPS.filter(g => broadcastTargets[g.key].enabled).map(g => {
+                      const t      = broadcastTargets[g.key];
+                      const search = broadcastSearch[g.key];
+                      const filtered = g.people.filter(p =>
+                        `${p.firstName || ''} ${p.lastName || ''} ${p.email || ''}`.toLowerCase().includes(search.toLowerCase())
+                      );
+                      return (
+                        <div key={g.key} style={{ background: isDarkMode ? 'rgba(249,115,22,0.06)' : '#fffbf5', border: `2px solid ${isDarkMode ? 'rgba(249,115,22,0.2)' : '#fed7aa'}`, borderRadius: 14, padding: 14, marginBottom: 12 }}>
+                          {/* Group header */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+                            <span style={{ fontSize: 14 }}>{g.emoji}</span>
+                            <span style={{ fontSize: 13, fontWeight: 800, color: col.accent }}>{g.label}</span>
+                          </div>
+
+                          {/* All / Specific toggle */}
+                          <div style={{ display: 'flex', gap: 6, marginBottom: t.mode === 'specific' ? 10 : 0 }}>
+                            {[
+                              { mode: 'all',      label: `All ${g.label}` },
+                              { mode: 'specific', label: 'Choose specific' },
+                            ].map(opt => (
+                              <button key={opt.mode} onClick={() => setGroupMode(g.key, opt.mode)} style={{
+                                flex: 1, padding: '7px 10px', borderRadius: 10, cursor: 'pointer', fontFamily: F, fontSize: 12, fontWeight: 700,
+                                border: t.mode === opt.mode ? `2px solid ${col.accent}` : `2px solid ${col.border}`,
+                                background: t.mode === opt.mode ? (isDarkMode ? 'rgba(249,115,22,0.18)' : '#fff7ed') : 'transparent',
+                                color: t.mode === opt.mode ? col.accent : col.muted,
+                                transition: 'all 0.12s',
+                              }}>{opt.label}</button>
+                            ))}
+                          </div>
+
+                          {/* Specific picker */}
+                          {t.mode === 'specific' && (
+                            <>
+                              {/* Search + select all row */}
+                              <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+                                <input
+                                  value={search}
+                                  onChange={e => setBroadcastSearch(prev => ({ ...prev, [g.key]: e.target.value }))}
+                                  placeholder={`Search ${g.label.toLowerCase()}…`}
+                                  style={{ ...inp, flex: 1, padding: '7px 11px', fontSize: 12 }}
+                                />
+                                <button
+                                  onClick={() => selectAllInGroup(g.key, filtered)}
+                                  style={{ padding: '7px 11px', borderRadius: 10, border: `2px solid ${col.border}`, background: 'transparent', color: col.accent, fontWeight: 700, fontSize: 11, cursor: 'pointer', fontFamily: F, whiteSpace: 'nowrap' }}
+                                >Select all</button>
+                              </div>
+
+                              {/* Scrollable list */}
+                              <div style={{ maxHeight: 170, overflowY: 'auto', borderRadius: 10, border: `2px solid ${col.border}`, background: isDarkMode ? 'rgba(255,255,255,0.03)' : '#fff' }}>
+                                {filtered.length === 0 ? (
+                                  <div style={{ padding: 16, textAlign: 'center', fontSize: 12, color: col.muted }}>No results</div>
+                                ) : filtered.map(p => {
+                                  const id      = p._id || p.id;
+                                  const checked = t.ids.includes(id);
+                                  return (
+                                    <label key={id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', cursor: 'pointer', borderBottom: `1px solid ${col.border}`, background: checked ? (isDarkMode ? 'rgba(249,115,22,0.08)' : '#fff7ed') : 'transparent' }}>
+                                      <input type="checkbox" checked={checked} onChange={() => togglePersonId(g.key, id)} style={{ accentColor: col.accent, width: 15, height: 15, flexShrink: 0 }} />
+                                      <div style={{ flex: 1, minWidth: 0 }}>
+                                        <div style={{ fontSize: 13, fontWeight: 700, color: col.heading, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                          {p.firstName} {p.lastName}
+                                        </div>
+                                        <div style={{ fontSize: 11, color: col.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.email}</div>
+                                      </div>
+                                    </label>
+                                  );
+                                })}
+                              </div>
+                              {t.ids.length > 0 && (
+                                <div style={{ marginTop: 5, fontSize: 11, fontWeight: 700, color: col.accent }}>{t.ids.length} selected</div>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      );
+                    })}
+
+                    {/* ── Recipient summary ── */}
+                    {anyEnabled && (
+                      <div style={{ background: isDarkMode ? 'rgba(249,115,22,0.07)' : '#fff7ed', border: `2px solid ${isDarkMode ? 'rgba(249,115,22,0.2)' : '#fed7aa'}`, borderRadius: 12, padding: '8px 13px', marginBottom: 14, fontSize: 12, color: col.body }}>
+                        This will email <strong style={{ color: col.accent }}>{recipientSummary}</strong>.
+                      </div>
+                    )}
+
+                    {/* ── Subject ── */}
+                    <label style={lbl}>Subject *</label>
+                    <input value={broadcastSubject} onChange={e => setBroadcastSubject(e.target.value)} placeholder="e.g. Important update" style={{ ...inp, marginBottom: 12 }} disabled={broadcasting} />
+
+                    {/* ── Message ── */}
+                    <label style={lbl}>Message *</label>
+                    <textarea value={broadcastMessage} onChange={e => setBroadcastMessage(e.target.value)} placeholder="Write your message here…" rows={5} style={{ ...inp, marginBottom: 18, resize: 'vertical', height: 120 }} disabled={broadcasting} />
+
+                    {/* ── Actions ── */}
+                    <div style={{ display: 'flex', gap: 10 }}>
+                      <button onClick={() => setBroadcastModal(false)} disabled={broadcasting} style={{ flex: 1, padding: '11px', borderRadius: 14, border: `2px solid ${col.border}`, background: 'transparent', color: col.body, fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: F }}>Cancel</button>
+                      <button disabled={!canSend || broadcasting} onClick={handleBroadcast} style={{ flex: 2, padding: '11px', borderRadius: 14, border: 'none', background: canSend && !broadcasting ? ACCENT_GRADIENT : (isDarkMode ? '#2a2d40' : '#f5f0ec'), color: canSend && !broadcasting ? '#fff' : col.muted, fontWeight: 800, fontSize: 13, cursor: canSend && !broadcasting ? 'pointer' : 'not-allowed', fontFamily: F, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, boxShadow: canSend && !broadcasting ? `0 4px 14px ${TAB_SHADOW}` : 'none', transition: 'all 0.15s' }}>
+                        <Send size={14} />
+                        {broadcasting ? 'Sending…' : `Send to ${enabledLabel}`}
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Overlays */}
       <SettingsSidebar

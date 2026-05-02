@@ -21,8 +21,9 @@ import { Video, Loader, XCircle } from "lucide-react";
 // Heavy classroom components — loaded only when a provider is actually chosen.
 // AgoraClassroom pulls in agora-rtc-sdk-ng (3.4 MB); lazy import keeps it out
 // of the initial bundle for users who never enter a classroom.
-const AgoraClassroom      = lazy(() => import("./classroom/AgoraClassroom"));
-const GoogleMeetClassroom = lazy(() => import("./classroom/GoogleMeetClassroom"));
+const AgoraClassroom       = lazy(() => import("./classroom/AgoraClassroom"));
+const GoogleMeetClassroom  = lazy(() => import("./classroom/GoogleMeetClassroom"));
+const GroupAgoraClassroom  = lazy(() => import("./classroom/GroupAgoraClassroom"));
 
 export default function Classroom({ classData, userRole: propUserRole, onLeave, teacherGoogleMeetLink }) {
   const navigate    = useNavigate();
@@ -31,6 +32,7 @@ export default function Classroom({ classData, userRole: propUserRole, onLeave, 
 
   const finalClassData = classData || stateData.classData;
   const userRole       = propUserRole || stateData.userRole || localStorage.getItem("role");
+  const isGroupClass   = !!finalClassData?.isGroupClass;
   const bookingId      = finalClassData?.bookingId || finalClassData?.id;
 
   const { isDarkMode } = useDarkMode();
@@ -53,6 +55,7 @@ export default function Classroom({ classData, userRole: propUserRole, onLeave, 
 
   // ── Fetch Google Meet link if not passed in props ─────────────────────────
   useEffect(() => {
+    if (isGroupClass) return;
     if (!resolvedMeetLink && bookingId) {
       setMeetLinkLoading(true);
       api.get(`/bookings/${bookingId}`)
@@ -72,7 +75,7 @@ export default function Classroom({ classData, userRole: propUserRole, onLeave, 
 
   // ── On mount: pick up existing videoProvider (e.g. after minimize/platform-switch) ─
   useEffect(() => {
-    if (!bookingId) return;
+    if (isGroupClass || !bookingId) return;
     api.get(`/classroom/session/${bookingId}`)
       .then(({ data }) => {
         if (data?.session?.videoProvider) setActiveVideoProvider(data.session.videoProvider);
@@ -82,7 +85,7 @@ export default function Classroom({ classData, userRole: propUserRole, onLeave, 
 
   // ── Ensure the session document exists before teacher picks a platform ────
   useEffect(() => {
-    if (!bookingId) return;
+    if (isGroupClass || !bookingId) return;
     const join = async () => {
       try {
         await api.post("/classroom/attendance", {
@@ -99,7 +102,7 @@ export default function Classroom({ classData, userRole: propUserRole, onLeave, 
 
   // ── Student: poll for teacher's platform choice ───────────────────────────
   useEffect(() => {
-    if (userRole === "teacher" || activeVideoProvider || !bookingId) return;
+    if (isGroupClass || userRole === "teacher" || activeVideoProvider || !bookingId) return;
     let timeout;
     const poll = async () => {
       try {
@@ -153,6 +156,19 @@ export default function Classroom({ classData, userRole: propUserRole, onLeave, 
           </button>
         </div>
       </div>
+    );
+  }
+
+  // ── Group class: go directly to GroupAgoraClassroom, no platform selection ─
+  if (isGroupClass) {
+    return (
+      <Suspense fallback={<ClassroomLoader label="Loading group class…" />}>
+        <GroupAgoraClassroom
+          classData={finalClassData}
+          userRole={userRole}
+          onLeave={onLeave}
+        />
+      </Suspense>
     );
   }
 

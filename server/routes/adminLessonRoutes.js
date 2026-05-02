@@ -12,6 +12,7 @@ import { teacherSchema }            from "../schemas/teacherSchema.js";
 import { studentSchema }            from "../schemas/studentSchema.js";
 import { assignmentSchema }         from "../schemas/assignmentSchema.js";
 import { paymentTransactionSchema } from "../schemas/paymentTransactionSchema.js";
+import { parentSchema }             from "../schemas/parentSchema.js";
 import logger from "../utils/logger.js";
 import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
 
@@ -23,6 +24,7 @@ const getTeacher            = (db) => db.models.Teacher            || db.model("
 const getStudent            = (db) => db.models.Student            || db.model("Student",            studentSchema);
 const getAssignment         = (db) => db.models.Assignment         || db.model("Assignment",         assignmentSchema);
 const getPaymentTransaction = (db) => db.models.PaymentTransaction || db.model("PaymentTransaction", paymentTransactionSchema);
+const getParent             = (db) => db.models.Parent             || db.model("Parent",             parentSchema);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Email helpers
@@ -368,6 +370,82 @@ router.post("/unmark", verifyToken, verifyAdmin, async (req, res) => {
   } catch (err) {
     logger.error("❌ Error unmarking lesson:", { error: err?.message });
     res.status(500).json({ success: false, message: "Error unmarking lesson: " + err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/v1/admin/lessons/broadcast — email teachers, students, and/or parents
+// Body: { subject, message, targets: { teachers?: { mode, ids? }, students?: { mode, ids? }, parents?: { mode, ids? } } }
+// ─────────────────────────────────────────────────────────────────────────────
+router.post('/broadcast', verifyToken, verifyAdmin, async (req, res) => {
+  try {
+    const { subject, message, targets } = req.body;
+
+    if (!subject?.trim() || !message?.trim())
+      return badRequest(res, 'Subject and message are required');
+    if (!targets || typeof targets !== 'object' || Object.keys(targets).length === 0)
+      return badRequest(res, 'Select at least one audience group');
+
+    const db         = req.db;
+    const centerName = req.center?.centerName || 'Your School';
+    const recipients = [];
+
+    if (targets.teachers) {
+      const query = targets.teachers.mode === 'specific' && targets.teachers.ids?.length
+        ? { _id: { $in: targets.teachers.ids }, active: true }
+        : { active: true };
+      const list = await getTeacher(db).find(query).select('firstName lastName email').lean();
+      for (const t of list) {
+        if (t.email) recipients.push({ email: t.email, name: `${t.firstName || ''} ${t.lastName || ''}`.trim() || 'Teacher' });
+      }
+    }
+
+    if (targets.students) {
+      const query = targets.students.mode === 'specific' && targets.students.ids?.length
+        ? { _id: { $in: targets.students.ids }, active: true }
+        : { active: true };
+      const list = await getStudent(db).find(query).select('firstName lastName email').lean();
+      for (const s of list) {
+        if (s.email) recipients.push({ email: s.email, name: `${s.firstName || ''} ${s.lastName || ''}`.trim() || 'Student' });
+      }
+    }
+
+    if (targets.parents) {
+      const query = targets.parents.mode === 'specific' && targets.parents.ids?.length
+        ? { _id: { $in: targets.parents.ids } }
+        : {};
+      const list = await getParent(db).find(query).select('firstName lastName email').lean();
+      for (const p of list) {
+        if (p.email) recipients.push({ email: p.email, name: `${p.firstName || ''} ${p.lastName || ''}`.trim() || 'Parent' });
+      }
+    }
+
+    if (recipients.length === 0)
+      return badRequest(res, 'No email addresses found for the selected audience');
+
+    let sent = 0, failed = 0;
+
+    await Promise.all(recipients.map(async (r) => {
+      try {
+        await sendEmail({
+          centerName,
+          to:      r.email,
+          subject: subject.trim(),
+          html: `
+            <p>Dear <strong>${r.name}</strong>,</p>
+            <div style="white-space:pre-line">${message.trim()}</div>
+            <br/>
+            <p>— The ${centerName} Team</p>
+          `,
+        });
+        sent++;
+      } catch { failed++; }
+    }));
+
+    res.json({ success: true, sent, failed, total: recipients.length });
+  } catch (err) {
+    logger.error('❌ Admin broadcast error:', { error: err?.message });
+    serverError(res);
   }
 });
 

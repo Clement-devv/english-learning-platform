@@ -24,6 +24,8 @@ export const groupClassSchema = new mongoose.Schema({
     default: 'open',
   },
   enrollments:  { type: [enrollmentSchema], default: [] },
+  enrollmentMode:  { type: String, enum: ['open', 'invite-only'], default: 'open' },
+  invitedStudents: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Student' }],
   notes:        { type: String, default: '' },
   tags:         { type: [String], default: [] },
   completedAt:  Date,

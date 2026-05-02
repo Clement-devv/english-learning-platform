@@ -1192,14 +1192,21 @@ router.patch('/centers/:id/limits', verifySuperAdmin, validateCenterLimits, asyn
   }
 });
 
-// POST /api/super-admin/broadcast — email all active center admins
+// POST /api/super-admin/broadcast — email all active centers, or a specific one
 router.post('/broadcast', verifySuperAdmin, validateBroadcast, async (req, res) => {
   try {
-    const { subject, message } = req.body;
+    const { subject, message, centerId } = req.body;
     if (!subject?.trim() || !message?.trim())
       return badRequest(res, 'Subject and message are required');
 
-    const centers = await Center.find({ status: 'active' }).select('centerName adminEmail').lean();
+    const query = centerId
+      ? { _id: centerId }
+      : { status: 'active' };
+    const centers = await Center.find(query).select('centerName adminEmail').lean();
+
+    if (centers.length === 0)
+      return badRequest(res, 'No centers found for the selected target');
+
     let sent = 0, failed = 0;
 
     await Promise.all(centers.map(async (center) => {
@@ -1220,7 +1227,7 @@ router.post('/broadcast', verifySuperAdmin, validateBroadcast, async (req, res) 
 
     await writeAuditLog({
       action: 'BROADCAST_SENT', superAdmin: req.superAdmin,
-      details: { subject: subject.trim(), sent, failed, total: centers.length }, ip: req.ip,
+      details: { subject: subject.trim(), sent, failed, total: centers.length, centerId: centerId || 'all' }, ip: req.ip,
     });
 
     res.json({ success: true, sent, failed, total: centers.length });
@@ -1401,10 +1408,10 @@ router.get('/centers/:id/people', verifySuperAdmin, validateParamMongoId('id'), 
     const Student = db.models.Student || db.model('Student', studentSchema);
 
     const [teachers, students] = await Promise.all([
-      Teacher.find({ status: 'active' })
+      Teacher.find({ $or: [{ active: true }, { status: 'active' }] })
         .select('firstName lastName email continent specializations lessonsCompleted createdAt')
         .lean(),
-      Student.find({ status: 'active' })
+      Student.find({ $or: [{ active: true }, { status: 'active' }] })
         .select('firstName lastName email country classCredits createdAt')
         .lean(),
     ]);

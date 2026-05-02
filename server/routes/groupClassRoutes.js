@@ -33,7 +33,9 @@ router.get("/", verifyToken, async (req, res) => {
     } else if (req.user.role === "student") {
       filter.$or = [
         { "enrollments.studentId": req.user.id },
-        { status: "open" },
+        { status: "open", enrollmentMode: "open" },
+        { status: "open", enrollmentMode: { $exists: false } },
+        { status: "open", enrollmentMode: "invite-only", invitedStudents: req.user.id },
       ];
     } else if (req.user.role === "admin" || req.user.role === "sub-admin") {
       if (qTeacherId) filter.teacherId = qTeacherId;
@@ -72,6 +74,9 @@ router.post("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
     const teacher = await getTeacher(req.db).findById(teacherId);
     if (!teacher) return notFound(res, "Teacher not found");
 
+    const enrollmentMode = ["open", "invite-only"].includes(req.body.enrollmentMode)
+      ? req.body.enrollmentMode : "open";
+
     const groupClass = await getGroupClass(req.db).create({
       teacherId,
       title,
@@ -82,6 +87,8 @@ router.post("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
       scheduledTime:   new Date(scheduledTime),
       teacherTimezone: teacher.timezone || "",
       duration:        duration || 60,
+      enrollmentMode,
+      invitedStudents: [],
       notes:           notes || "",
       tags:            Array.isArray(tags) ? tags : [],
       createdBy:       req.user.role === "admin" ? "admin" : "teacher",
@@ -91,6 +98,24 @@ router.post("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
   } catch (err) {
     logger.error("Error creating group class:", { error: err?.message });
     serverError(res, "Error creating group class");
+  }
+});
+
+// ─── GET /students/search — teacher searches students for inviting ─────────────
+// Must be defined before /:id to avoid ObjectId match on "students"
+router.get("/students/search", verifyToken, verifyAdminOrTeacher, async (req, res) => {
+  try {
+    const q = (req.query.q || "").trim();
+    if (!q) return res.json({ success: true, students: [] });
+    const regex = new RegExp(q, "i");
+    const students = await getStudent(req.db)
+      .find({ $or: [{ firstName: regex }, { lastName: regex }, { email: regex }] })
+      .select("firstName lastName email _id classCredits")
+      .limit(20).lean();
+    res.json({ success: true, students });
+  } catch (err) {
+    logger.error("Error searching students:", { error: err?.message });
+    serverError(res, "Error searching students");
   }
 });
 
@@ -131,7 +156,7 @@ router.patch("/:id", verifyToken, verifyAdminOrTeacher, validateObjectId("id"), 
       return badRequest(res, "Cannot edit a completed or cancelled class");
 
     const allowed = ["title", "description", "level", "maxSeats", "pricePerSeat",
-                     "scheduledTime", "duration", "notes", "tags"];
+                     "scheduledTime", "duration", "notes", "tags", "enrollmentMode"];
     allowed.forEach(field => {
       if (req.body[field] !== undefined) gc[field] = req.body[field];
     });
@@ -181,6 +206,12 @@ router.post("/:id/enroll", verifyToken, validateObjectId("id"), async (req, res)
     if (!student) return notFound(res, "Student not found");
 
     if (gc.status !== "open") return badRequest(res, `Class is ${gc.status} — enrollment is closed`);
+
+    // Invite-only check: students must be on the invited list
+    if (role === "student" && gc.enrollmentMode === "invite-only") {
+      const isInvited = gc.invitedStudents.some(id => id.toString() === studentId.toString());
+      if (!isInvited) return forbidden(res, "This class is invite-only. Contact your teacher to be added.");
+    }
 
     const alreadyEnrolled = gc.enrollments.some(
       e => e.studentId.toString() === studentId.toString()
@@ -414,6 +445,52 @@ router.patch("/:id/start", verifyToken, validateObjectId("id"), async (req, res)
   } catch (err) {
     logger.error("Error starting group class:", { error: err?.message });
     serverError(res, "Error starting group class");
+  }
+});
+
+// ─── PATCH /:id/invite — teacher adds/removes invited students ────────────────
+router.patch("/:id/invite", verifyToken, verifyAdminOrTeacher, validateObjectId("id"), async (req, res) => {
+  try {
+    const gc = await getGroupClass(req.db).findById(req.params.id);
+    if (!gc) return notFound(res, "Group class not found");
+
+    if (req.user.role === "teacher" && gc.teacherId.toString() !== req.user.id)
+      return forbidden(res, "You can only manage your own group classes");
+
+    const { add, remove } = req.body;
+
+    if (add) {
+      const addId = add.toString();
+      if (!gc.invitedStudents.some(id => id.toString() === addId)) {
+        gc.invitedStudents.push(addId);
+      }
+    }
+
+    if (remove) {
+      const removeId = remove.toString();
+      gc.invitedStudents = gc.invitedStudents.filter(id => id.toString() !== removeId);
+    }
+
+    await gc.save();
+
+    // Notify added student via socket
+    if (add) {
+      try {
+        const io   = req.app.get("io");
+        const slug = req.center?.slug;
+        io.to(`student-room:${slug}:${add}`).emit("group-class-update", {
+          type: "invited",
+          title: "📩 You've been invited to a group class",
+          message: `You can now enroll in "${gc.title}"`,
+          groupClassId: gc._id,
+        });
+      } catch (_) {}
+    }
+
+    res.json({ success: true, invitedStudents: gc.invitedStudents });
+  } catch (err) {
+    logger.error("Error updating invite list:", { error: err?.message });
+    serverError(res, "Error updating invite list");
   }
 });
 

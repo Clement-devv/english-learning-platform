@@ -588,6 +588,72 @@ export async function initializeSocket(httpServer) {
       } catch (err) { logger.error('classroom-tab-notify error:', { error: err?.message }); }
     });
 
+    // ── Group class signaling ─────────────────────────────────────────────────
+    socket.on('join-group-room', ({ groupClassId }) => {
+      try {
+        const room = `group-${tenantRoom(socket, groupClassId)}`;
+        socket.join(room);
+        socket.groupClassId = groupClassId;
+        socket.to(room).emit('group-user-joined', {
+          userId: socket.userId,
+          userName: socket.userName,
+          role: socket.userRole,
+        });
+      } catch (err) { logger.error('join-group-room error:', { error: err?.message }); }
+    });
+
+    socket.on('group-hand-raise', ({ groupClassId }) => {
+      try {
+        const room = `group-${tenantRoom(socket, groupClassId)}`;
+        socket.to(room).emit('group-hand-raise', {
+          userId: socket.userId,
+          userName: socket.userName,
+        });
+      } catch (err) { logger.error('group-hand-raise error:', { error: err?.message }); }
+    });
+
+    socket.on('group-hand-lower', ({ groupClassId }) => {
+      try {
+        const room = `group-${tenantRoom(socket, groupClassId)}`;
+        socket.to(room).emit('group-hand-lower', {
+          userId: socket.userId,
+          userName: socket.userName,
+        });
+      } catch (err) { logger.error('group-hand-lower error:', { error: err?.message }); }
+    });
+
+    socket.on('group-promote', ({ groupClassId, targetUserId }) => {
+      try {
+        if (socket.userRole !== 'teacher') return;
+        const room = `group-${tenantRoom(socket, groupClassId)}`;
+        io.to(room).emit('group-promote', { targetUserId });
+      } catch (err) { logger.error('group-promote error:', { error: err?.message }); }
+    });
+
+    socket.on('group-demote', ({ groupClassId, targetUserId }) => {
+      try {
+        if (socket.userRole !== 'teacher') return;
+        const room = `group-${tenantRoom(socket, groupClassId)}`;
+        io.to(room).emit('group-demote', { targetUserId });
+      } catch (err) { logger.error('group-demote error:', { error: err?.message }); }
+    });
+
+    socket.on('group-end-class', ({ groupClassId }) => {
+      try {
+        if (socket.userRole !== 'teacher') return;
+        const room = `group-${tenantRoom(socket, groupClassId)}`;
+        io.to(room).emit('group-class-ended', {});
+      } catch (err) { logger.error('group-end-class error:', { error: err?.message }); }
+    });
+
+    socket.on('group-kick', ({ groupClassId, targetUserId }) => {
+      try {
+        if (socket.userRole !== 'teacher') return;
+        const room = `group-${tenantRoom(socket, groupClassId)}`;
+        io.to(room).emit('group-kicked', { targetUserId });
+      } catch (err) { logger.error('group-kick error:', { error: err?.message }); }
+    });
+
     // ── Emoji reactions (video call) ─────────────────────────────────────────
     socket.on('join-reactions', ({ channelName }) => {
       try {
@@ -640,6 +706,14 @@ export async function initializeSocket(httpServer) {
               });
             }
           }
+        }
+
+        if (socket.groupClassId) {
+          const room = `group-${tenantRoom(socket, socket.groupClassId)}`;
+          socket.to(room).emit('group-user-left', {
+            userId: socket.userId,
+            userName: socket.userName,
+          });
         }
 
         if (socket.reactionChannels) {

@@ -1,6 +1,17 @@
-import { Suspense, useRef, useEffect, useState, lazy } from "react";
+import { Suspense, useRef, useEffect, useState, Component } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
+import AvatarPuppet from "./AvatarPuppet";
+
+// Catches Three.js render errors so they don't crash the whole page
+class AvatarErrorBoundary extends Component {
+  constructor(props) { super(props); this.state = { failed: false }; }
+  static getDerivedStateFromError() { return { failed: true }; }
+  render() {
+    if (this.state.failed) return this.props.fallback;
+    return this.props.children;
+  }
+}
 
 // ── Neutral teacher avatar from Ready Player Me ────────────────────────────
 // To use your own avatar: create one at https://readyplayer.me, then replace the ID below
@@ -85,48 +96,53 @@ function Spinner({ isDarkMode }) {
   );
 }
 
-// Kick off the GLTF network request as soon as the component first mounts.
-// Calling preload() here (not at module level) avoids accessing React
-// internals before the fiber tree is initialized on first page load.
-function preloadOnce() {
-  let loaded = false;
-  return () => { if (!loaded) { loaded = true; useGLTF.preload(AVATAR_URL); } };
-}
-const triggerPreload = preloadOnce();
-
 // ── Public component ───────────────────────────────────────────────────────
+// Checks URL reachability first — avoids React Suspense throw + error banner
+// when the RPM domain is blocked or offline.
 export default function AvatarHead3D({ isSpeaking, isDarkMode }) {
+  // "checking" | "ok" | "failed"
+  const [urlStatus, setUrlStatus] = useState("checking");
   const [webGlError, setWebGlError] = useState(false);
-  triggerPreload();
 
-  if (webGlError) {
-    return (
-      <div style={{
-        display: "flex", alignItems: "center", justifyContent: "center",
-        height: "100%", flexDirection: "column", gap: 8,
-        color: isDarkMode ? "#a78bfa" : "#7c3aed", fontSize: 13, fontWeight: 700,
-      }}>
-        <span style={{ fontSize: 32 }}>🤖</span>
-        3D not supported on this device
-      </div>
-    );
+  useEffect(() => {
+    const ctrl = new AbortController();
+    fetch(AVATAR_URL, { method: "HEAD", mode: "no-cors", signal: ctrl.signal })
+      .then(() => { if (!ctrl.signal.aborted) setUrlStatus("ok"); })
+      .catch(() => { if (!ctrl.signal.aborted) setUrlStatus("failed"); });
+    return () => ctrl.abort();
+  }, []);
+
+  // Puppet in all failure cases — no error banner, no React Suspense throw
+  if (urlStatus === "failed" || webGlError) {
+    return <AvatarPuppet isSpeaking={isSpeaking} isDarkMode={isDarkMode} />;
   }
 
+  // Still probing the network
+  if (urlStatus === "checking") {
+    return <Spinner isDarkMode={isDarkMode} />;
+  }
+
+  // URL reachable — attempt Three.js; AvatarErrorBoundary catches any GL errors
   return (
     <div style={{ width: "100%", height: "100%", position: "relative" }}>
-      <Suspense fallback={<Spinner isDarkMode={isDarkMode} />}>
-        <Canvas
-          // Frame the avatar's head — RPM head centre is around y=1.63
-          camera={{ position: [0, 1.63, 0.62], fov: 28 }}
-          gl={{ antialias: true, failIfMajorPerformanceCaveat: false }}
-          onCreated={({ gl }) => {
-            if (!gl) setWebGlError(true);
-          }}
-          style={{ width: "100%", height: "100%", borderRadius: 16 }}
-        >
-          <AvatarScene isSpeaking={isSpeaking} />
-        </Canvas>
-      </Suspense>
+      <AvatarErrorBoundary fallback={<AvatarPuppet isSpeaking={isSpeaking} isDarkMode={isDarkMode} />}>
+        <Suspense fallback={<Spinner isDarkMode={isDarkMode} />}>
+          <Canvas
+            camera={{ position: [0, 1.63, 0.62], fov: 28 }}
+            gl={{ antialias: true, failIfMajorPerformanceCaveat: false }}
+            onCreated={({ gl }) => {
+              if (!gl) { setWebGlError(true); return; }
+              gl.domElement.addEventListener("webglcontextlost", (e) => {
+                e.preventDefault();
+                setWebGlError(true);
+              }, { once: true });
+            }}
+            style={{ width: "100%", height: "100%", borderRadius: 16 }}
+          >
+            <AvatarScene isSpeaking={isSpeaking} />
+          </Canvas>
+        </Suspense>
+      </AvatarErrorBoundary>
     </div>
   );
 }
