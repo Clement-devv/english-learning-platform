@@ -53,7 +53,9 @@ router.post('/log', tenantMiddleware, verifyToken, async (req, res) => {
 
 // ── POST /api/agora-usage/start ─────────────────────────────────────────────
 // Teacher calls this when they successfully join an Agora channel.
-// Creates/resets the session record — upsert by bookingId prevents duplicates.
+// If the session is already active (teacher reconnected after a refresh/blip),
+// the original startedAt is preserved so no time is lost.
+// If the session is new or was previously completed, startedAt resets to now.
 router.post('/start', tenantMiddleware, verifyToken, async (req, res) => {
   try {
     const { channelName, bookingId } = req.body;
@@ -62,6 +64,10 @@ router.post('/start', tenantMiddleware, verifyToken, async (req, res) => {
     const now   = new Date();
     const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
+    // Preserve startedAt for active sessions (teacher reconnected) so no minutes are lost
+    const existing  = await AgoraSession.findOne({ bookingId }).lean();
+    const startedAt = (existing && existing.status === 'active') ? existing.startedAt : now;
+
     await AgoraSession.findOneAndUpdate(
       { bookingId },
       {
@@ -69,7 +75,7 @@ router.post('/start', tenantMiddleware, verifyToken, async (req, res) => {
           centerId:        req.center.slug,
           centerName:      req.center.centerName,
           channelName:     channelName || null,
-          startedAt:       now,
+          startedAt,
           endedAt:         null,
           durationSeconds: 0,
           durationMinutes: 0,

@@ -1060,15 +1060,26 @@ router.get('/usage', verifySuperAdmin, async (req, res) => {
     const lastMonth = `${lastDate.getFullYear()}-${String(lastDate.getMonth() + 1).padStart(2, '0')}`;
 
     // Auto-abandon sessions that have been active for > 4 hours (browser crash / missed end)
-    const fourHoursAgo = new Date(Date.now() - 4 * 60 * 60 * 1000);
-    await AgoraSession.updateMany(
-      { status: 'active', startedAt: { $lt: fourHoursAgo } },
-      { $set: { status: 'abandoned' } },
-    );
+    // Duration is calculated from startedAt so these minutes are not lost.
+    const fourHoursAgo  = new Date(Date.now() - 4 * 60 * 60 * 1000);
+    const staleSessions = await AgoraSession.find({
+      status: 'active', startedAt: { $lt: fourHoursAgo },
+    }).lean();
 
-    // All-time totals grouped by center (completed sessions only)
+    if (staleSessions.length > 0) {
+      const abandonTime = new Date();
+      await Promise.all(staleSessions.map(s => {
+        const durationSeconds = Math.max(0, Math.floor((abandonTime - s.startedAt) / 1000));
+        const durationMinutes = durationSeconds > 0 ? Math.ceil(durationSeconds / 60) : 0;
+        return AgoraSession.findByIdAndUpdate(s._id, {
+          $set: { status: 'abandoned', endedAt: abandonTime, durationSeconds, durationMinutes },
+        });
+      }));
+    }
+
+    // All-time totals grouped by center (completed + abandoned — both have real duration)
     const allTime = await AgoraSession.aggregate([
-      { $match: { status: 'completed' } },
+      { $match: { status: { $in: ['completed', 'abandoned'] } } },
       { $group: {
         _id:          '$centerId',
         centerName:   { $last: '$centerName' },
@@ -1078,15 +1089,15 @@ router.get('/usage', verifySuperAdmin, async (req, res) => {
       { $sort: { totalMinutes: -1 } },
     ]);
 
-    // This month totals (completed only)
+    // This month totals (completed + abandoned)
     const thisMonthData = await AgoraSession.aggregate([
-      { $match: { status: 'completed', month: thisMonth } },
+      { $match: { status: { $in: ['completed', 'abandoned'] }, month: thisMonth } },
       { $group: { _id: '$centerId', minutes: { $sum: '$durationMinutes' } } },
     ]);
 
-    // Last month totals (completed only)
+    // Last month totals (completed + abandoned)
     const lastMonthData = await AgoraSession.aggregate([
-      { $match: { status: 'completed', month: lastMonth } },
+      { $match: { status: { $in: ['completed', 'abandoned'] }, month: lastMonth } },
       { $group: { _id: '$centerId', minutes: { $sum: '$durationMinutes' } } },
     ]);
 
@@ -1147,12 +1158,51 @@ router.get('/usage/:centerId', verifySuperAdmin, async (req, res) => {
       .limit(200)
       .lean();
 
-    const completedSessions = sessions.filter(s => s.status === 'completed');
+    const completedSessions = sessions.filter(s => s.status === 'completed' || s.status === 'abandoned');
     const totalMinutes = completedSessions.reduce((sum, s) => sum + s.durationMinutes, 0);
 
     res.json({ success: true, sessions, totalMinutes, month, centerId });
   } catch (err) {
     logger.error('❌ Center usage detail error:', { error: err?.message });
+    serverError(res);
+  }
+});
+
+// POST /api/super-admin/migrate-legacy-usage
+// One-time idempotent migration: converts AgoraUsage (legacy /log endpoint) records
+// into AgoraSession records so they appear in the usage dashboard.
+// Safe to run multiple times — already-migrated records are skipped.
+router.post('/migrate-legacy-usage', verifySuperAdmin, async (req, res) => {
+  try {
+    const legacyRecords = await AgoraUsage.find({}).lean();
+    let migrated = 0, skipped = 0;
+
+    for (const r of legacyRecords) {
+      const bookingId = r.bookingId ? `legacy-${r.bookingId}` : `legacy-usage-${r._id}`;
+      const exists    = await AgoraSession.findOne({ bookingId }).lean();
+      if (exists) { skipped++; continue; }
+
+      const endedAt   = r.sessionDate || r.createdAt || new Date();
+      const startedAt = new Date(endedAt.getTime() - (r.durationMinutes || 0) * 60 * 1000);
+
+      await AgoraSession.create({
+        bookingId,
+        centerId:        r.centerId,
+        centerName:      r.centerName,
+        channelName:     r.channelName || null,
+        startedAt,
+        endedAt,
+        durationSeconds: (r.durationMinutes || 0) * 60,
+        durationMinutes: r.durationMinutes || 0,
+        status:          'completed',
+        month:           r.month,
+      });
+      migrated++;
+    }
+
+    res.json({ success: true, migrated, skipped, total: legacyRecords.length });
+  } catch (err) {
+    logger.error('❌ Legacy usage migration error:', { error: err?.message });
     serverError(res);
   }
 });

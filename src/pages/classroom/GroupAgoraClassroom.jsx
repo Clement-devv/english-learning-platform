@@ -149,6 +149,7 @@ export default function GroupAgoraClassroom({ classData, userRole, onLeave }) {
   const myUserIdRef        = useRef(null);
   const joinedRef          = useRef(false);
   const destroyedRef       = useRef(false);
+  const trackingStartedRef = useRef(false);
 
   const [joined,       setJoined]       = useState(false);
   const [micOn,        setMicOn]        = useState(true);
@@ -180,6 +181,11 @@ export default function GroupAgoraClassroom({ classData, userRole, onLeave }) {
 
   // ── Cleanup helper ─────────────────────────────────────────────────────────
   const doCleanup = useCallback(async (endClass = false) => {
+    // End usage tracking for teacher before tearing down the channel
+    if (userRole === "teacher" && trackingStartedRef.current) {
+      trackingStartedRef.current = false;
+      api.post('/agora-usage/end', { bookingId: groupClassId }).catch(() => {});
+    }
     destroyedRef.current = true;
     try {
       if (socketRef.current) {
@@ -247,6 +253,12 @@ export default function GroupAgoraClassroom({ classData, userRole, onLeave }) {
         await c.join(appId, channelName, token, uid);
         if (destroyedRef.current) return;
         joinedRef.current = true;
+
+        // Usage tracking — teacher only (prevents double-counting per class)
+        if (userRole === "teacher" && !trackingStartedRef.current) {
+          trackingStartedRef.current = true;
+          api.post('/agora-usage/start', { channelName, bookingId: groupClassId }).catch(() => {});
+        }
 
         // ── Publish tracks ──
         if (userRole === "teacher") {

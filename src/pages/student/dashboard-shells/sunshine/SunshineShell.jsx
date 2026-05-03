@@ -279,7 +279,7 @@ export default function SunshineShell() {
 
       {/* Toast */}
       {d.toast && (
-        <div className="pop-in" style={{ position: "fixed", top: "20px", right: "20px", zIndex: 9999, padding: "14px 24px", borderRadius: "20px", fontWeight: 700, fontSize: "14px", background: d.toast.type === "error" ? "#ef4444" : "#10b981", color: "#fff", fontFamily: F, boxShadow: "0 8px 24px rgba(0,0,0,0.15)", zIndex: 99999 }}>
+        <div className="pop-in" style={{ position: "fixed", top: "20px", right: "20px", zIndex: 99999, padding: "14px 24px", borderRadius: "20px", fontWeight: 700, fontSize: "14px", background: d.toast.type === "error" ? "#ef4444" : "#10b981", color: "#fff", fontFamily: F, boxShadow: "0 8px 24px rgba(0,0,0,0.15)" }}>
           {d.toast.type === "error" ? "😬" : "✅"} {d.toast.message}
         </div>
       )}

@@ -1,40 +1,97 @@
-import React from 'react';
-import { BarChart2, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
+import React, { useState } from 'react';
+import { BarChart2, RefreshCw, ChevronDown, ChevronUp, Database } from 'lucide-react';
 import styles from '../SuperAdmin.module.css';
 
 export default function UsageTab({
   usage, loading, usageMonth, loadData,
   expandedCenter, sessionDetail, loadingDetail, toggleSessionDetail,
-  fmtMins }) {
+  fmtMins, centers = [], detailMonth, onMonthChange, authHeaders, apiBase }) {
+
+  const [migrating,    setMigrating]    = useState(false);
+  const [migrateMsg,   setMigrateMsg]   = useState('');
+
+  const handleMigrate = async () => {
+    if (!window.confirm('Migrate legacy AgoraUsage records into the new AgoraSession table?\nThis is safe to run multiple times — already-migrated records are skipped.')) return;
+    setMigrating(true);
+    setMigrateMsg('');
+    try {
+      const res  = await fetch(`${apiBase}/super-admin/migrate-legacy-usage`, {
+        method: 'POST', headers: { ...authHeaders, 'Content-Type': 'application/json' },
+      });
+      const data = await res.json();
+      if (data.success) {
+        setMigrateMsg(`✅ Done — ${data.migrated} migrated, ${data.skipped} already existed (total: ${data.total})`);
+        loadData();
+      } else {
+        setMigrateMsg(`❌ ${data.message || 'Migration failed'}`);
+      }
+    } catch { setMigrateMsg('❌ Request failed'); }
+    finally  { setMigrating(false); }
+  };
+
+  // Merge usage data with all centers so 0-usage centers still show
+  const usageMap   = Object.fromEntries(usage.map(u => [u.centerId, u]));
+  const allRows    = centers.length > 0
+    ? centers.map(c => usageMap[c.slug] || {
+        centerId: c.slug, centerName: c.centerName,
+        totalMinutes: 0, sessions: 0,
+        thisMonthMinutes: 0, lastMonthMinutes: 0, activeSessions: 0,
+      }).sort((a, b) => b.totalMinutes - a.totalMinutes)
+    : usage; // fallback if centers not passed
+
   return (
     <div className={styles.card}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
         <h2 className={styles.sectionTitle}><BarChart2 size={16} color="#f59e0b" /> Agora Usage — {usageMonth || 'All Time'}</h2>
-        <button onClick={loadData} className={styles.refreshBtn} title="Refresh"><RefreshCw size={14} /></button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button onClick={handleMigrate} disabled={migrating}
+            style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 11px', borderRadius: 8, border: '1px solid #374151', background: 'transparent', color: '#9ca3af', fontSize: 12, cursor: 'pointer' }}
+            title="Import old AgoraUsage records into the new tracking table (one-time)">
+            <Database size={12} />{migrating ? 'Migrating…' : 'Import Legacy'}
+          </button>
+          <button onClick={loadData} className={styles.refreshBtn} title="Refresh"><RefreshCw size={14} /></button>
+        </div>
       </div>
 
-      <p style={{ margin: '0 0 16px', fontSize: '12px', color: '#6b7280' }}>
-        Accurate server-tracked Agora minutes per center. Only the teacher's session is counted (no double-counting). Click a row to see individual sessions.
-      </p>
+      {migrateMsg && (
+        <div style={{ marginBottom: 12, padding: '8px 12px', borderRadius: 8, background: migrateMsg.startsWith('✅') ? 'rgba(52,211,153,0.1)' : 'rgba(239,68,68,0.1)', color: migrateMsg.startsWith('✅') ? '#34d399' : '#f87171', fontSize: 12 }}>
+          {migrateMsg}
+        </div>
+      )}
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
+        <p style={{ margin: 0, fontSize: '12px', color: '#6b7280', flex: 1 }}>
+          Accurate server-tracked Agora minutes per center. Only the teacher's session is counted (no double-counting). Click a row to see individual sessions.
+        </p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+          <span style={{ fontSize: 11, color: '#6b7280', whiteSpace: 'nowrap' }}>Drill-down month:</span>
+          <input
+            type="month"
+            value={detailMonth || ''}
+            onChange={e => onMonthChange && onMonthChange(e.target.value)}
+            style={{ padding: '4px 8px', borderRadius: 7, border: '1px solid #374151', background: '#1f2937', color: '#f1f5f9', fontSize: 12, cursor: 'pointer' }}
+          />
+        </div>
+      </div>
 
       {loading ? (
         <div style={{ padding: '40px', textAlign: 'center', color: '#6b7280' }}>Loading…</div>
-      ) : usage.length === 0 ? (
+      ) : allRows.length === 0 ? (
         <div style={{ padding: '40px', textAlign: 'center', color: '#6b7280' }}>
-          No Agora usage recorded yet. Minutes will appear here after centers complete calls.
+          No centers found yet.
         </div>
       ) : (
         <div style={{ overflowX: 'auto' }}>
           <table className={styles.table}>
             <thead>
               <tr>
-                {['Center', 'This Month', 'Last Month', 'All Time', 'Completed', 'Live', ''].map(h => (
+                {['Center', 'This Month', 'Last Month', 'All Time', 'Sessions', 'Live', ''].map(h => (
                   <th key={h} className={styles.th}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {usage.map(u => (
+              {allRows.map(u => (
                 <React.Fragment key={u.centerId}>
                   <tr
                     className={styles.tr} style={{ cursor: 'pointer' }}
@@ -83,10 +140,10 @@ export default function UsageTab({
                           paddingTop: '12px',
                         }}>
                           <p style={{ margin: '0 0 10px', fontSize: '12px', color: '#f59e0b', fontWeight: '700' }}>
-                            Sessions in {usageMonth || 'current month'} — Completed: {fmtMins(sessionDetail[u.centerId].totalMinutes)}
+                            Sessions in {detailMonth || usageMonth || 'current month'} — Total: {fmtMins(sessionDetail[u.centerId].totalMinutes)}
                           </p>
                           {sessionDetail[u.centerId].sessions.length === 0 ? (
-                            <p style={{ color: '#6b7280', fontSize: '12px' }}>No sessions this month.</p>
+                            <p style={{ color: '#6b7280', fontSize: '12px' }}>No sessions for this month.</p>
                           ) : (
                             <table className={styles.table} style={{ fontSize: '12px' }}>
                               <thead>
@@ -100,6 +157,7 @@ export default function UsageTab({
                                 {sessionDetail[u.centerId].sessions.map(sess => {
                                   const statusColor = sess.status === 'completed' ? '#34d399'
                                     : sess.status === 'active'    ? '#f59e0b'
+                                    : sess.status === 'abandoned' ? '#fb923c'
                                     : '#6b7280';
                                   return (
                                     <tr key={sess._id} className={styles.tr}>

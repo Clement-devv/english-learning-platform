@@ -79,6 +79,7 @@ export default function SuperAdminDashboard() {
   // ── Usage ────────────────────────────────────────────────────────────────
   const [usage,         setUsage]         = useState([]);
   const [usageMonth,    setUsageMonth]    = useState('');
+  const [detailMonth,   setDetailMonth]   = useState(''); // month shown in session drill-down
   const [expandedCenter,setExpandedCenter]= useState(null); // centerId with sessions open
   const [sessionDetail, setSessionDetail] = useState({});   // { [centerId]: { sessions, totalMinutes } }
   const [loadingDetail, setLoadingDetail] = useState({});   // { [centerId]: true }
@@ -584,7 +585,7 @@ export default function SuperAdminDashboard() {
         if (s.success)   setStats(s.stats);
         if (c.success)   setCenters(c.centers);
         if (d.success)   setDomains(d.centers);
-        if (u.success)   { setUsage(u.summary); setUsageMonth(u.thisMonth); }
+        if (u.success)   { setUsage(u.summary); setUsageMonth(u.thisMonth); setDetailMonth(prev => prev || u.thisMonth); }
         if (del.success) setDeleted(del.centers);
       })
       .catch(() => setError('Failed to load data'))
@@ -810,13 +811,19 @@ export default function SuperAdminDashboard() {
   };
 
   // ── Usage actions ────────────────────────────────────────────────────────
+  const changeDetailMonth = (month) => {
+    setDetailMonth(month);
+    setSessionDetail({});   // clear cache so rows re-fetch with new month
+    setExpandedCenter(null);
+  };
+
   const toggleSessionDetail = async (centerId) => {
     if (expandedCenter === centerId) { setExpandedCenter(null); return; }
     setExpandedCenter(centerId);
-    if (sessionDetail[centerId]) return; // already loaded
+    if (sessionDetail[centerId]) return; // already loaded for current detailMonth
     setLoadingDetail(d => ({ ...d, [centerId]: true }));
     try {
-      const res  = await fetch(`${API_BASE}/super-admin/usage/${centerId}?month=${usageMonth}`, { headers: authHeaders });
+      const res  = await fetch(`${API_BASE}/super-admin/usage/${centerId}?month=${detailMonth}`, { headers: authHeaders });
       const data = await res.json();
       if (data.success) setSessionDetail(d => ({ ...d, [centerId]: { sessions: data.sessions, totalMinutes: data.totalMinutes } }));
     } catch { /* silent */ } finally {
@@ -1152,6 +1159,8 @@ export default function SuperAdminDashboard() {
                 usage={usage} loading={loading} usageMonth={usageMonth} loadData={loadData}
                 expandedCenter={expandedCenter} sessionDetail={sessionDetail} loadingDetail={loadingDetail}
                 toggleSessionDetail={toggleSessionDetail} fmtMins={fmtMins}
+                centers={centers} detailMonth={detailMonth} onMonthChange={changeDetailMonth}
+                authHeaders={authHeaders} apiBase={API_BASE}
               />
             )}
             {tab === 'deleted' && (
