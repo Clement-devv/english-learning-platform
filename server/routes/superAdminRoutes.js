@@ -1600,4 +1600,86 @@ router.patch('/centers/:id/certificate-template', verifySuperAdmin, validatePara
   }
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Landing page management (super admin only)
+// ─────────────────────────────────────────────────────────────────────────────
+
+// GET /api/super-admin/centers/:id/landing-page
+router.get('/centers/:id/landing-page', verifySuperAdmin, validateParamMongoId('id'), async (req, res) => {
+  try {
+    const center = await Center.findById(req.params.id).lean();
+    if (!center) return notFound(res, 'Center not found');
+    res.json({ success: true, landingPage: center.landingPage || {} });
+  } catch (err) {
+    logger.error('Error fetching landing page:', { error: err?.message });
+    serverError(res);
+  }
+});
+
+// PATCH /api/super-admin/centers/:id/landing-page
+// Updates design + content (does not publish — use the /publish endpoint)
+router.patch('/centers/:id/landing-page', verifySuperAdmin, validateParamMongoId('id'), async (req, res) => {
+  try {
+    const { landingPage } = req.body;
+    if (!landingPage || typeof landingPage !== 'object') return badRequest(res, 'landingPage object required');
+
+    // Sanitise teachers array: ensure each teacher has at least a name
+    if (Array.isArray(landingPage.teachers)) {
+      landingPage.teachers = landingPage.teachers
+        .filter(t => t && t.name && t.name.trim())
+        .map((t, i) => ({ ...t, order: i }));
+    }
+
+    // Build $set payload using dot-notation so we do a partial merge
+    const setPayload = {};
+    for (const [key, val] of Object.entries(landingPage)) {
+      if (key === 'published' || key === 'publishedAt') continue; // protected
+      setPayload[`landingPage.${key}`] = val;
+    }
+    setPayload['landingPage.updatedBy'] = req.superAdmin?.email || 'superadmin';
+
+    const center = await Center.findByIdAndUpdate(
+      req.params.id,
+      { $set: setPayload },
+      { new: true, runValidators: true }
+    );
+    if (!center) return notFound(res, 'Center not found');
+
+    await writeAuditLog({ action: 'LANDING_PAGE_UPDATED', targetId: center._id, by: req.superAdmin?.email });
+    res.json({ success: true, message: 'Landing page saved', landingPage: center.landingPage });
+  } catch (err) {
+    logger.error('Error saving landing page:', { error: err?.message });
+    serverError(res);
+  }
+});
+
+// PATCH /api/super-admin/centers/:id/landing-page/publish
+// Toggles published flag
+router.patch('/centers/:id/landing-page/publish', verifySuperAdmin, validateParamMongoId('id'), async (req, res) => {
+  try {
+    const { published } = req.body;
+    if (typeof published !== 'boolean') return badRequest(res, 'published (boolean) required');
+
+    const center = await Center.findByIdAndUpdate(
+      req.params.id,
+      {
+        $set: {
+          'landingPage.published':    published,
+          'landingPage.publishedAt':  published ? new Date() : null,
+          'landingPage.updatedBy':    req.superAdmin?.email || 'superadmin',
+        },
+      },
+      { new: true }
+    );
+    if (!center) return notFound(res, 'Center not found');
+
+    const action = published ? 'LANDING_PAGE_PUBLISHED' : 'LANDING_PAGE_UNPUBLISHED';
+    await writeAuditLog({ action, targetId: center._id, by: req.superAdmin?.email });
+    res.json({ success: true, message: published ? 'Landing page published' : 'Landing page unpublished', published });
+  } catch (err) {
+    logger.error('Error toggling landing page publish:', { error: err?.message });
+    serverError(res);
+  }
+});
+
 export default router;

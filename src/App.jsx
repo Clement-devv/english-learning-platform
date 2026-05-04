@@ -40,6 +40,7 @@ const StudentResetPassword  = lazy(() => import("./pages/student/ResetPassword")
 const Classroom           = lazy(() => import("./pages/Classroom"));
 const Join                = lazy(() => import("./pages/Join"));
 const ParentDashboard     = lazy(() => import("./pages/parent/ParentDashboard"));
+const CenterLandingPage   = lazy(() => import("./pages/landing-page/CenterLandingPage"));
 
 // Full-screen spinner shown while a lazy chunk loads
 function PageLoader() {
@@ -111,6 +112,7 @@ function NavigationButtons() {
   };
 
   const shouldHide =
+    path === "/" ||        // center landing page has its own nav
     path === "/admin" ||   // exact match — /admin/login must NOT be hidden
     HIDE_NAV_ON.some((p) => path.startsWith(p)) ||
     path.startsWith("/teacher/reset-password") ||
@@ -372,7 +374,7 @@ function App() {
         <IncomingRingModal />
         <Suspense fallback={<PageLoader />}>
           <Routes>
-            <Route path="/" element={<Navigate to="/admin/login" replace />} />
+            <Route path="/" element={<CenterLandingPage />} />
 
             <Route path="/super-admin/login"     element={<SuperAdminLogin />} />
             <Route path="/super-admin/dashboard" element={<AuthGuard role="super-admin"><SuperAdminDashboard /></AuthGuard>} />

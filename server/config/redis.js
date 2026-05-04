@@ -20,7 +20,7 @@ if (process.env.REDIS_URL) {
     maxRetriesPerRequest: 1,
     // Reconnect with exponential back-off, capped at 30 s
     retryStrategy: (times) => Math.min(times * 500, 30_000),
-    lazyConnect: false,
+    lazyConnect: true,
   });
 
   redisClient.on("connect",   ()    => logger.info("✅ Redis connected"));

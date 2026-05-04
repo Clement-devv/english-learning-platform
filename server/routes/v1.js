@@ -50,6 +50,7 @@ import ringRoutes                from "./ringRoutes.js";
 import groupClassRoutes          from "./groupClassRoutes.js";
 import certificateRoutes         from "./certificateRoutes.js";
 import parentRoutes              from "./parentRoutes.js";
+import publicRoutes              from "./publicRoutes.js";
 
 const router = Router();
 
@@ -98,5 +99,6 @@ router.use("/ring",                 ringRoutes);
 router.use("/group-classes",        groupClassRoutes);
 router.use("/certificates",         certificateRoutes);
 router.use("/parents",              parentRoutes);
+router.use("/public",               publicRoutes);
 
 export default router;

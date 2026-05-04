@@ -1,4 +1,4 @@
-import { Building2, RefreshCw, Palette, ToggleRight, SlidersHorizontal, LogIn, Trash2 } from 'lucide-react';
+import { Building2, RefreshCw, Palette, ToggleRight, SlidersHorizontal, LogIn, Trash2, Globe } from 'lucide-react';
 import styles from '../SuperAdmin.module.css';
 
 export default function CentersTab({
@@ -8,7 +8,9 @@ export default function CentersTab({
   setThemeCenter, handleOpenLoginThemeModal, handleOpenTeacherThemeModal, handleOpenDashThemeModal,
   setFeaturesCenter,
   setLimitsModal, setLimitsUnlimT, setLimitsUnlimS, setLimitsTeachers, setLimitsStudents, setLimitsMsg,
-  statusColor, statusIcon }) {
+  statusColor, statusIcon,
+  onEditWebsite,
+}) {
   return (
     <div className={styles.card}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
@@ -30,7 +32,7 @@ export default function CentersTab({
           <table className={styles.table}>
             <thead>
               <tr>
-                {['Center', 'Slug', 'Plan', 'Status', 'Actions'].map(h => (
+                {['Center', 'Slug', 'Plan', 'Status', 'Website', 'Actions'].map(h => (
                   <th key={h} className={styles.th}>{h}</th>
                 ))}
               </tr>
@@ -57,6 +59,9 @@ export default function CentersTab({
                     <span className={styles.statusBadge} style={{ color: statusColor(c.status), borderColor: `${statusColor(c.status)}40`, background: `${statusColor(c.status)}12` }}>
                       {statusIcon(c.status)} {c.status}
                     </span>
+                  </td>
+                  <td className={styles.td}>
+                    <WebsiteCell center={c} onEdit={onEditWebsite} />
                   </td>
                   <td className={styles.td}>
                     <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
@@ -133,6 +138,53 @@ export default function CentersTab({
             </tbody>
           </table>
         </div>
+      )}
+    </div>
+  );
+}
+
+function WebsiteCell({ center, onEdit }) {
+  const lp        = center.landingPage;
+  const published = lp?.published;
+  const template  = lp?.template;
+  const hasPage   = lp && (lp.hero?.headline || lp.about?.body || lp.teachers?.length);
+
+  let badge, badgeColor, badgeBg;
+  if (published) {
+    badge = 'Live'; badgeColor = '#10b981'; badgeBg = 'rgba(16,185,129,0.1)';
+  } else if (hasPage) {
+    badge = 'Draft'; badgeColor = '#f59e0b'; badgeBg = 'rgba(245,158,11,0.1)';
+  } else {
+    badge = 'None'; badgeColor = '#64748b'; badgeBg = 'rgba(100,116,139,0.08)';
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-start' }}>
+      <span style={{
+        fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 6,
+        color: badgeColor, background: badgeBg,
+        border: `1px solid ${badgeColor}30`,
+        textTransform: 'uppercase', letterSpacing: '0.06em',
+      }}>
+        {badge}
+      </span>
+      {template && published && (
+        <span style={{ fontSize: 11, color: '#64748b', textTransform: 'capitalize' }}>
+          {template}
+        </span>
+      )}
+      {onEdit && (
+        <button
+          onClick={() => onEdit(center)}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 4,
+            padding: '4px 10px', borderRadius: 6, border: '1px solid rgba(99,102,241,0.25)',
+            background: 'rgba(99,102,241,0.08)', color: '#818cf8',
+            cursor: 'pointer', fontSize: 11, fontWeight: 600, fontFamily: 'inherit',
+          }}
+        >
+          <Globe size={11} /> Edit
+        </button>
       )}
     </div>
   );

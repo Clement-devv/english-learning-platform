@@ -105,6 +105,73 @@ const centerSchema = new mongoose.Schema({
     },
   },
 
+  // ── Center public landing page (managed exclusively by super admin) ─────────
+  landingPage: {
+    published:  { type: Boolean, default: false },
+    template:   { type: String, default: 'classic' },
+
+    design: {
+      primaryColor:   { type: String, default: '#4F46E5' },
+      secondaryColor: { type: String, default: '#E0E7FF' },
+      accentColor:    { type: String, default: '#f59e0b' },
+      bgColor:        { type: String, default: '#ffffff' },
+      textColor:      { type: String, default: '#1e293b' },
+      mutedColor:     { type: String, default: '#64748b' },
+      fontFamily:     { type: String, default: 'Inter' },
+      heroStyle:      { type: String, default: 'gradient' }, // 'gradient' | 'solid' | 'image'
+      heroImage:      { type: String, default: null },
+      navStyle:       { type: String, default: 'light' },    // 'light' | 'dark' | 'colored'
+    },
+
+    hero: {
+      headline:         { type: String, default: '' },
+      subheadline:      { type: String, default: '' },
+      ctaText:          { type: String, default: 'Start Learning' },
+      ctaUrl:           { type: String, default: '/student/login' },
+      secondaryCtaText: { type: String, default: '' },
+      secondaryCtaUrl:  { type: String, default: '' },
+    },
+
+    about: {
+      enabled: { type: Boolean, default: true },
+      title:   { type: String, default: 'About Us' },
+      body:    { type: String, default: '' },
+      image:   { type: String, default: null },
+    },
+
+    teachers: [{
+      name:  { type: String, default: '' },
+      photo: { type: String, default: null },
+      title: { type: String, default: '' },
+      bio:   { type: String, default: '' },
+      order: { type: Number, default: 0 },
+    }],
+
+    links: {
+      studentLogin: { type: String, default: '' },
+      teacherLogin: { type: String, default: '' },
+      facebook:     { type: String, default: '' },
+      instagram:    { type: String, default: '' },
+      youtube:      { type: String, default: '' },
+      whatsapp:     { type: String, default: '' },
+    },
+
+    contact: {
+      enabled: { type: Boolean, default: false },
+      email:   { type: String, default: '' },
+      phone:   { type: String, default: '' },
+      address: { type: String, default: '' },
+    },
+
+    seo: {
+      title:       { type: String, default: '' },
+      description: { type: String, default: '' },
+    },
+
+    updatedBy:   { type: String, default: null },
+    publishedAt: { type: Date,   default: null },
+  },
+
   // ── AI Chat Credit Budget (allocated by super admin) ──────────────────────
   chatCredits: {
     balance:        { type: Number, default: 0, min: 0 },

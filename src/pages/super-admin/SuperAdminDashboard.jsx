@@ -27,6 +27,7 @@ import ClassesTab  from './tabs/ClassesTab';
 import DeletedTab  from './tabs/DeletedTab';
 import CreditsTab             from './tabs/CreditsTab';
 import CertificateTemplatesTab from './tabs/CertificateTemplatesTab';
+import LandingPagesTab         from './tabs/LandingPagesTab';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api/v1';
 
@@ -119,6 +120,14 @@ export default function SuperAdminDashboard() {
 
   // ── Impersonation ─────────────────────────────────────────────────────────
   const [impersonating, setImpersonating] = useState(null); // centerId being entered
+
+  // ── Website (landing page) cross-tab navigation ───────────────────────────
+  const [websitesFocusId, setWebsitesFocusId] = useState(null); // centerId to auto-expand in Websites tab
+
+  const handleEditWebsite = (center) => {
+    setWebsitesFocusId(center._id);
+    setTab('websites');
+  };
 
   // ── Broadcast email ───────────────────────────────────────────────────────
   const [broadcastModal,   setBroadcastModal]   = useState(false);
@@ -1039,6 +1048,7 @@ export default function SuperAdminDashboard() {
     { key: 'classes',      label: 'Classes',         icon: Video      },
     { key: 'credits',      label: 'AI Credits',      icon: Zap        },
     { key: 'certificates', label: 'Certificates',    icon: Award      },
+    { key: 'websites',     label: 'Websites',        icon: Globe      },
     { key: 'deleted',      label: 'Deleted',         icon: Trash2     },
   ];
 
@@ -1142,6 +1152,7 @@ export default function SuperAdminDashboard() {
                 setLimitsModal={setLimitsModal} setLimitsUnlimT={setLimitsUnlimT} setLimitsUnlimS={setLimitsUnlimS}
                 setLimitsTeachers={setLimitsTeachers} setLimitsStudents={setLimitsStudents} setLimitsMsg={setLimitsMsg}
                 statusColor={statusColor} statusIcon={statusIcon}
+                onEditWebsite={handleEditWebsite}
               />
             )}
             {tab === 'domains' && (
@@ -1171,6 +1182,9 @@ export default function SuperAdminDashboard() {
             )}
             {tab === 'certificates' && (
               <CertificateTemplatesTab centers={centers} />
+            )}
+            {tab === 'websites' && (
+              <LandingPagesTab centers={centers} darkMode={darkMode} focusCenterId={websitesFocusId} />
             )}
             {tab === 'credits' && (
               <CreditsTab

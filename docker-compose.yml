@@ -1,17 +1,17 @@
-version: "3.9"
-
 # English Learning Platform — Production Docker Compose
 # Usage:
-#   docker compose up -d          (start all services)
-#   docker compose logs -f app    (tail app logs)
-#   docker compose pull app && docker compose up -d app  (update app only)
+#   docker compose up -d                              (start all services)
+#   docker compose logs -f app                        (tail app logs)
+#   docker compose up -d --force-recreate --build app (rebuild and restart app)
 
 services:
   app:
-    image: ghcr.io/clement-devv/english-learning-platform:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: elp-app
     restart: unless-stopped
-    env_file: ./server/.env.production
+    env_file: ./server/.env
     environment:
       NODE_ENV: production
       PORT: "5000"

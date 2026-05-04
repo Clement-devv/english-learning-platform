@@ -13,8 +13,6 @@
   # Caddy calls this endpoint. Your app returns 200 if the domain is verified, 404 otherwise.
   on_demand_tls {
     ask http://app:5000/api/v1/center/verify-caddy
-    interval 2m
-    burst 5
   }
 }
 
