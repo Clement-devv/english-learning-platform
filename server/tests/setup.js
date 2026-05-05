@@ -4,13 +4,14 @@ import bcrypt from 'bcryptjs'
 
 // Set required env vars BEFORE any server modules are imported.
 // config.js calls process.exit(1) if these are missing.
-process.env.JWT_SECRET   = 'test-jwt-secret-for-vitest-only-abc123xyz!'
-process.env.MONGO_URI    = 'mongodb://localhost/test'
-process.env.MASTER_DB_URI = 'mongodb://localhost/test-master'
-process.env.DB_BASE_URI  = 'mongodb://localhost/'
-process.env.EMAIL_USER   = 'test@example.com'
-process.env.EMAIL_PASSWORD = 'testpassword'
-process.env.NODE_ENV     = 'test'
+process.env.JWT_SECRET      = 'test-jwt-secret-for-vitest-only-abc123xyz!'
+process.env.MONGO_URI       = 'mongodb://localhost/test'
+process.env.MASTER_DB_URI   = 'mongodb://localhost/test-master'
+process.env.DB_BASE_URI     = 'mongodb://localhost/'
+process.env.EMAIL_USER      = 'test@example.com'
+process.env.EMAIL_PASSWORD  = 'testpassword'
+process.env.ENCRYPTION_KEY  = 'a'.repeat(64)   // 64 hex chars — satisfies AES-256 key requirement
+process.env.NODE_ENV        = 'test'
 
 // Exported so test files can reference the same credentials
 export const CREDENTIALS = {
