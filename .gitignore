@@ -16,3 +16,6 @@ server/uploads/content/
 server/uploads/recordings/
 server/uploads/homework/
 # Keep branding and teacher photos tracked (small, intentional assets)
+
+# Markdown docs
+*.md

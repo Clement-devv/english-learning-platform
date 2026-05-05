@@ -6,16 +6,8 @@ import LoginAttempt from "../models/master/LoginAttempt.js";
 import redisClient from "../config/redis.js";
 import { MAX_LOGIN_ATTEMPTS, ACCOUNT_LOCK_MS } from "../config/constants.js";
 
-// Build a RedisStore for the given prefix when Redis is available,
-// otherwise return undefined so express-rate-limit uses its memory store.
 const makeStore = (prefix) => {
-  if (!redisClient) return undefined;
-  return new RedisStore({
-    // ioredis exposes a generic .call() method that rate-limit-redis uses
-    // to send arbitrary Redis commands (INCR, EXPIRE, etc.)
-    sendCommand: (...args) => redisClient.call(...args),
-    prefix: `rl:${prefix}:`,
-  });
+  return undefined;
 };
 
 // Spread helper — only adds { store } when Redis is available so we don't

@@ -18,10 +18,8 @@ services:
       TRUST_PROXY: "true"
       REDIS_URL: "redis://redis:6379"
     volumes:
-      # Persist uploads across deployments (logos, recordings, homework)
-      - uploads_data:/app/server/uploads
-      # App logs accessible from host
-      - ./server/logs:/app/server/logs
+      - /opt/elp/server/uploads:/app/server/uploads
+      - /opt/elp/server/logs:/app/server/logs
     depends_on:
       redis:
         condition: service_healthy
@@ -69,8 +67,6 @@ services:
       - app
 
 volumes:
-  uploads_data:
-    driver: local
   redis_data:
     driver: local
   caddy_data:

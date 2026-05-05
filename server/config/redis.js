@@ -16,7 +16,7 @@ if (process.env.REDIS_URL) {
   redisClient = new Redis(process.env.REDIS_URL, {
     // Don't queue commands while disconnected — fail fast so the app keeps
     // working (memory store kicks in) rather than accumulating a queue.
-    enableOfflineQueue: false,
+    enableOfflineQueue: true,
     maxRetriesPerRequest: 1,
     // Reconnect with exponential back-off, capped at 30 s
     retryStrategy: (times) => Math.min(times * 500, 30_000),

@@ -9,6 +9,7 @@ import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const frontendPath = path.join(__dirname, '../dist');
 
 import {
   apiLimiter,
@@ -240,7 +241,7 @@ mongoose
 // Root endpoint — full structure only in development
 app.get("/", (req, res) => {
   if (config.nodeEnv === 'production') {
-    return res.json({ message: "API is running" });
+    return res.sendFile(path.join(frontendPath, 'index.html'));
   }
   res.json({
     message: "📘 English Teaching Platform API is running!",
@@ -269,14 +270,11 @@ app.get("/", (req, res) => {
 // Versioned API
 app.use("/api/v1", v1Router);
 
-/* Serve React frontend
-const frontendPath = path.join(__dirname, '../dist');
+// Serve React frontend
 app.use(express.static(frontendPath));
 app.get('/{*path}', (req, res) => {
   res.sendFile(path.join(frontendPath, 'index.html'));
-});*/
-
-
+});
 
 // 404 + global error handlers (must come after all routes)
 app.use(notFoundHandler);
