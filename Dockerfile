@@ -4,7 +4,7 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install
 COPY . .
-RUN NODE_OPTIONS=--max-old-space-size=1536 npm run build
+RUN VITE_API_URL=https://clemify.com NODE_OPTIONS=--max-old-space-size=1536 npm run build
 
 # Stage 2 — production server (lean image, no devDeps)
 FROM node:20-alpine
