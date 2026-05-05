@@ -4,6 +4,7 @@ node_modules/
 server/node_modules/
 .env
 .env.*
+!/.env.production
 dist/
 build/
 *.log
