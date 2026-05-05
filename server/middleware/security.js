@@ -37,8 +37,8 @@ export const securityHeaders = helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "https://translate.google.com", "https://translate.googleapis.com"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://www.gstatic.com"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "https://translate.google.com", "https://translate.googleapis.com", "https://translate-pa.googleapis.com"],
       imgSrc: ["'self'", "https:", "data:"],
       connectSrc: [
         "'self'",
@@ -49,6 +49,7 @@ export const securityHeaders = helmet({
         "wss://*.sd-rtn.com",
         // Google Translate API
         "https://translate.googleapis.com",
+        "https://translate-pa.googleapis.com",
       ],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
       objectSrc: ["'none'"],
