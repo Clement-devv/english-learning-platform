@@ -9,3 +9,10 @@ build/
 *.log
 .vscode/
 .DS_Store
+.env.production
+
+# User-uploaded files — never commit these
+server/uploads/content/
+server/uploads/recordings/
+server/uploads/homework/
+# Keep branding and teacher photos tracked (small, intentional assets)

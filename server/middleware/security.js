@@ -37,8 +37,8 @@ export const securityHeaders = helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "https://fonts.googleapis.com"],
-      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "https://translate.google.com", "https://translate.googleapis.com"],
       imgSrc: ["'self'", "https:", "data:"],
       connectSrc: [
         "'self'",
@@ -47,6 +47,8 @@ export const securityHeaders = helmet({
         "wss://*.agora.io",
         "https://*.sd-rtn.com",
         "wss://*.sd-rtn.com",
+        // Google Translate API
+        "https://translate.googleapis.com",
       ],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
       objectSrc: ["'none'"],
@@ -79,8 +81,8 @@ export const securityHeaders = helmet({
 const MONGO_SANITIZE_OPTS = { replaceWith: '_' };
 
 export const noSqlInjectionProtection = (req, res, next) => {
-  if (req.body)    req.body    = mongoSanitizeValue(req.body,    MONGO_SANITIZE_OPTS);
-  if (req.params)  req.params  = mongoSanitizeValue(req.params,  MONGO_SANITIZE_OPTS);
+  if (req.body) req.body = mongoSanitizeValue(req.body, MONGO_SANITIZE_OPTS);
+  if (req.params) req.params = mongoSanitizeValue(req.params, MONGO_SANITIZE_OPTS);
   if (req.headers) req.headers = mongoSanitizeValue(req.headers, MONGO_SANITIZE_OPTS);
   if (req.query) {
     const sanitized = mongoSanitizeValue(req.query, MONGO_SANITIZE_OPTS);
@@ -102,7 +104,7 @@ export const noSqlInjectionProtection = (req, res, next) => {
  * xss cleaner directly and apply it safely via Object.defineProperty.
  */
 export const xssProtection = (req, res, next) => {
-  if (req.body)   req.body   = xssClean(req.body);
+  if (req.body) req.body = xssClean(req.body);
   if (req.params) req.params = xssClean(req.params);
   if (req.query) {
     Object.defineProperty(req, 'query', {
@@ -186,10 +188,10 @@ export const sanitizeRequest = (req, res, next) => {
       }
     }
   };
-  
+
   if (req.body) sanitizeObject(req.body);
   if (req.query) sanitizeObject(req.query);
   if (req.params) sanitizeObject(req.params);
-  
+
   next();
 };

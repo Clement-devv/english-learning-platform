@@ -8,17 +8,17 @@ import path from "path";
 import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
-const __dirname  = path.dirname(__filename);
+const __dirname = path.dirname(__filename);
 
-import { 
+import {
   apiLimiter,
-  realtimeLimiter,  
-  pollingLimiter,   
+  realtimeLimiter,
+  pollingLimiter,
   loginLimiter
 } from "./middleware/rateLimiter.js";
 import { config } from "./config/config.js";
-import { 
-  securityHeaders, 
+import {
+  securityHeaders,
   noSqlInjectionProtection,
   xssProtection,
   parameterPollutionProtection,
@@ -96,8 +96,8 @@ app.use('/uploads/teachers', express.static(path.join(__dirname, 'uploads', 'tea
 //   content    → GET /api/content/file/:bookingId (verifyToken)
 //   homework   → GET /api/homework/... routes     (verifyToken)
 app.use('/uploads/recordings', (_req, res) => res.status(403).json({ message: 'Access denied' }));
-app.use('/uploads/content',    (_req, res) => res.status(403).json({ message: 'Access denied' }));
-app.use('/uploads/homework',   (_req, res) => res.status(403).json({ message: 'Access denied' }));
+app.use('/uploads/content', (_req, res) => res.status(403).json({ message: 'Access denied' }));
+app.use('/uploads/homework', (_req, res) => res.status(403).json({ message: 'Access denied' }));
 
 // Body parser with size limits
 app.use(express.json(requestLimits.json));
@@ -129,8 +129,8 @@ app.post("/api/v1/csp-report", express.json({ type: "application/csp-report", li
 
 app.use("/api/v1/", apiLimiter);
 
-app.use("/api/v1/classroom",   realtimeLimiter);
-app.use("/api/v1/agora",       realtimeLimiter);
+app.use("/api/v1/classroom", realtimeLimiter);
+app.use("/api/v1/agora", realtimeLimiter);
 
 app.use("/api/v1/group-chats", pollingLimiter);
 
@@ -269,6 +269,13 @@ app.get("/", (req, res) => {
 // Versioned API
 app.use("/api/v1", v1Router);
 
+/* Serve React frontend
+const frontendPath = path.join(__dirname, '../dist');
+app.use(express.static(frontendPath));
+app.get('/{*path}', (req, res) => {
+  res.sendFile(path.join(frontendPath, 'index.html'));
+});*/
+
 
 
 // 404 + global error handlers (must come after all routes)
@@ -349,4 +356,4 @@ const shutdown = async (signal) => {
 };
 
 process.on("SIGTERM", () => shutdown("SIGTERM"));
-process.on("SIGINT",  () => shutdown("SIGINT"));
+process.on("SIGINT", () => shutdown("SIGINT"));

@@ -2,6 +2,9 @@
 // THE single source of truth for all class completion logic.
 // Routes (classroom, admin, booking) all call completeClass() — nothing else.
 
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 import { bookingSchema }            from "../schemas/bookingSchema.js";
 import { studentSchema }            from "../schemas/studentSchema.js";
 import { teacherSchema }            from "../schemas/teacherSchema.js";
@@ -9,6 +12,22 @@ import { paymentTransactionSchema } from "../schemas/paymentTransactionSchema.js
 import { classroomSessionSchema }   from "../schemas/classroomSessionSchema.js";
 import { recordActivity, recordClassCompletion } from "../utils/streakService.js";
 import logger from "../utils/logger.js";
+
+const __filename   = fileURLToPath(import.meta.url);
+const __dirname    = path.dirname(__filename);
+const CONTENT_DIR  = path.join(__dirname, "..", "uploads", "content");
+
+function tryDeletePdf(bookingId) {
+  try {
+    const filePath = path.join(CONTENT_DIR, `${String(bookingId)}.pdf`);
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+      logger.info(`[ClassCompletion] PDF deleted for booking ${bookingId}`);
+    }
+  } catch (err) {
+    logger.warn(`[ClassCompletion] Could not delete PDF for ${bookingId}:`, { error: err?.message });
+  }
+}
 
 const getBooking            = (db) => db.models.Booking            || db.model("Booking",            bookingSchema);
 const getStudent            = (db) => db.models.Student            || db.model("Student",            studentSchema);
@@ -137,6 +156,7 @@ export async function completeClass(db, bookingId, markedBy = "system", options 
       await session.save();
     }
 
+    tryDeletePdf(bookingId);
     logger.info(`[ClassCompletion] Booking ${bookingId} MISSED. ${missedBooking.missedReason}`);
 
     return {
@@ -204,6 +224,9 @@ export async function completeClass(db, bookingId, markedBy = "system", options 
         { $set: { status: "completed", classEndedAt: now, bothActiveTime: attendance.bothActiveTime } }
       );
     }
+
+    // Write 6: Delete class PDF — non-blocking, failure never rolls back completion
+    tryDeletePdf(bookingId);
 
     logger.info(`[ClassCompletion] "${claimedBooking.classTitle}" (${bookingId})`, {
       teacher: `${teacher.firstName} ${teacher.lastName}`, earned: newEarned,

@@ -67,11 +67,17 @@ export default defineConfig({
             return 'vendor-emoji';
           }
 
-          // ── Core React + Router ───────────────────────────────────────────
+          // ── Core React + Router + ecosystem (must all be in one chunk so
+          //    React is available when these packages initialise their contexts)
           if (
             id.includes('node_modules/react/') ||
             id.includes('node_modules/react-dom/') ||
-            id.includes('react-router-dom')
+            id.includes('react-router-dom') ||
+            id.includes('react-i18next') ||
+            id.includes('/i18next/') ||
+            id.includes('node_modules/react-is/') ||
+            id.includes('@sentry/react') ||
+            id.includes('react-confetti')
           ) {
             return 'vendor-react';
           }
