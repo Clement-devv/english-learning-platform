@@ -67,25 +67,11 @@ export default defineConfig({
             return 'vendor-emoji';
           }
 
-          // ── Core React + Router + ecosystem (must all be in one chunk so
-          //    React is available when these packages initialise their contexts)
-          if (
-            id.includes('node_modules/react/') ||
-            id.includes('node_modules/react-dom/') ||
-            id.includes('react-router-dom') ||
-            id.includes('react-i18next') ||
-            id.includes('/i18next/') ||
-            id.includes('node_modules/react-is/') ||
-            id.includes('@sentry/react') ||
-            id.includes('react-confetti')
-          ) {
-            return 'vendor-react';
-          }
-
-          // ── All other node_modules ────────────────────────────────────────
-          if (id.includes('node_modules')) {
-            return 'vendor-misc';
-          }
+          // React and all React-ecosystem packages intentionally left unsplit.
+          // Putting them in a separate chunk creates circular dependencies with
+          // vendor-misc (e.g. @sentry/react → @sentry/browser → back), causing
+          // React to be undefined when createContext is called at init time.
+          // Let Vite bundle them into the main app chunk — they're small.
         },
       },
     },
