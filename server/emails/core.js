@@ -15,10 +15,13 @@ export const getCenterBaseUrl = (center) => {
 };
 
 const transporter = nodemailer.createTransport({
-  host:       config.emailHost,
-  port:       config.emailPort,
-  secure:     config.emailPort === 465,
-  requireTLS: config.emailPort === 587,
+  host:              config.emailHost,
+  port:              config.emailPort,
+  secure:            config.emailPort === 465,
+  requireTLS:        config.emailPort === 587,
+  connectionTimeout: 10_000,   // fail in 10s if port is blocked
+  greetingTimeout:   10_000,
+  socketTimeout:     15_000,
   auth: {
     user: config.emailUser,
     pass: config.emailPassword,
