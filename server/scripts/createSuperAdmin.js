@@ -5,8 +5,8 @@ dotenv.config();
 import SuperAdmin from '../models/master/SuperAdmin.js';
 
 async function createSuperAdmin() {
-  const email = process.env.production.SUPER_ADMIN_EMAIL;
-  const password = process.env.productionSUPER_ADMIN_INITIAL_PASSWORD;
+  const email = process.env.SUPER_ADMIN_EMAIL;
+  const password = process.env.SUPER_ADMIN_INITIAL_PASSWORD;
 
   if (!email) {
     console.error('❌ SUPER_ADMIN_EMAIL is not set in your .env');
