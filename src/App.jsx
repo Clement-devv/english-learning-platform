@@ -41,6 +41,7 @@ const Classroom           = lazy(() => import("./pages/Classroom"));
 const Join                = lazy(() => import("./pages/Join"));
 const ParentDashboard     = lazy(() => import("./pages/parent/ParentDashboard"));
 const CenterLandingPage   = lazy(() => import("./pages/landing-page/CenterLandingPage"));
+const ClemifyHome         = lazy(() => import("./pages/clemify-home/ClemifyHome"));
 
 // Full-screen spinner shown while a lazy chunk loads
 function PageLoader() {
@@ -361,6 +362,16 @@ function ImpersonationBanner() {
   );
 }
 
+// On center subdomains (school.clemify.com) or custom domains show the center landing page.
+// On clemify.com / localhost (main domain) show the Clemify company home page.
+function HomeRoute() {
+  const h = window.location.hostname;
+  const isCenter =
+    h.endsWith('.clemify.com') ||                            // center subdomain
+    (!h.includes('clemify.com') && h !== 'localhost' && h !== '127.0.0.1'); // custom domain
+  return isCenter ? <CenterLandingPage /> : <ClemifyHome />;
+}
+
 function App() {
   return (
     <AuthProvider>
@@ -374,7 +385,7 @@ function App() {
         <IncomingRingModal />
         <Suspense fallback={<PageLoader />}>
           <Routes>
-            <Route path="/" element={<CenterLandingPage />} />
+            <Route path="/" element={<HomeRoute />} />
 
             <Route path="/super-admin/login"     element={<SuperAdminLogin />} />
             <Route path="/super-admin/dashboard" element={<AuthGuard role="super-admin"><SuperAdminDashboard /></AuthGuard>} />
