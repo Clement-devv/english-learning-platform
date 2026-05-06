@@ -23,12 +23,6 @@ clemify.com, *.clemify.com {
     header_up X-Forwarded-Proto {scheme}
     header_up X-Forwarded-Host  {host}
     header_up X-Real-IP         {remote_host}
-    # Needed for WebSocket (Socket.IO)
-    header_up Connection        {>Connection}
-    header_up Upgrade           {>Upgrade}
-    transport http {
-      keepalive 30s
-    }
   }
 
   # Security headers
@@ -63,8 +57,6 @@ clemify.com, *.clemify.com {
     header_up X-Forwarded-Proto {scheme}
     header_up X-Forwarded-Host  {host}
     header_up X-Real-IP         {remote_host}
-    header_up Connection        {>Connection}
-    header_up Upgrade           {>Upgrade}
   }
 
   encode gzip zstd
