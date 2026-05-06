@@ -359,10 +359,8 @@ router.post("/teacher/forgot-password", tenantMiddleware, passwordResetLimiter, 
     const Teacher = getTeacherModel(req.db);
     const teacher = await Teacher.findOne({ email });
 
-    if (!teacher)
-      return notFound(res, "No teacher account found with that email address.");
-    if (!teacher.active)
-      return forbidden(res, "Your account is deactivated. Please contact your administrator.");
+    if (!teacher || !teacher.active)
+      return res.json({ success: true, message: "If that email is registered, a reset link has been sent." });
 
     const resetToken = crypto.randomBytes(32).toString("hex");
     const hashedToken = crypto.createHash("sha256").update(resetToken).digest("hex");
@@ -534,10 +532,8 @@ router.post("/student/forgot-password", tenantMiddleware, passwordResetLimiter, 
     const Student = getStudentModel(req.db);
     const student = await Student.findOne({ email });
 
-    if (!student)
-      return notFound(res, "No student account found with that email address.");
-    if (!student.active)
-      return forbidden(res, "Your account is deactivated. Please contact your administrator.");
+    if (!student || !student.active)
+      return res.json({ success: true, message: "If that email is registered, a reset link has been sent." });
 
     const resetToken = crypto.randomBytes(32).toString("hex");
     const hashedToken = crypto.createHash("sha256").update(resetToken).digest("hex");
@@ -726,10 +722,8 @@ router.post("/admin/forgot-password", tenantMiddleware, passwordResetLimiter, as
     const Admin = getAdminModel(req.db);
     const admin = await Admin.findOne({ email: email.toLowerCase() });
 
-    if (!admin)
-      return notFound(res, "No admin account found with that email address.");
-    if (!admin.active)
-      return forbidden(res, "Your account is deactivated. Please contact support.");
+    if (!admin || !admin.active)
+      return res.json({ success: true, message: "If that email is registered, a reset link has been sent." });
 
     const resetToken  = crypto.randomBytes(32).toString("hex");
     const hashedToken = crypto.createHash("sha256").update(resetToken).digest("hex");
