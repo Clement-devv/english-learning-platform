@@ -1,28 +1,36 @@
+import { fileURLToPath } from 'url';
+import { dirname, resolve } from 'path';
+import dotenv from 'dotenv';
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
-import dotenv from 'dotenv';
-dotenv.config();
-import SuperAdmin from '../models/master/SuperAdmin.js';
 
-async function createSuperAdmin() {
-  const email = process.env.SUPER_ADMIN_EMAIL;
-  const password = process.env.SUPER_ADMIN_INITIAL_PASSWORD;
+// Load .env with an explicit path so this works regardless of cwd or ESM hoisting
+const __filename = fileURLToPath(import.meta.url);
+const __dirname  = dirname(__filename);
+dotenv.config({ path: resolve(__dirname, '../.env') });
 
-  if (!email) {
-    console.error('❌ SUPER_ADMIN_EMAIL is not set in your .env');
-    process.exit(1);
-  }
-  if (!password) {
-    console.error('❌ SUPER_ADMIN_INITIAL_PASSWORD is not set in your .env');
-    console.error('   Add it temporarily, run this script, then remove it.');
-    process.exit(1);
-  }
-  if (password.length < 12) {
-    console.error('❌ SUPER_ADMIN_INITIAL_PASSWORD must be at least 12 characters');
-    process.exit(1);
-  }
+const email    = process.env.SUPER_ADMIN_EMAIL;
+const password = process.env.SUPER_ADMIN_INITIAL_PASSWORD;
+const mongoUri = process.env.MONGO_URI;
 
-  await mongoose.connect(process.env.MONGO_URI);
+if (!email)    { console.error('❌ SUPER_ADMIN_EMAIL not set in .env');            process.exit(1); }
+if (!password) { console.error('❌ SUPER_ADMIN_INITIAL_PASSWORD not set in .env'); process.exit(1); }
+if (!mongoUri) { console.error('❌ MONGO_URI not set in .env');                    process.exit(1); }
+if (password.length < 12) { console.error('❌ Password must be ≥ 12 characters'); process.exit(1); }
+
+// Inline schema — avoids importing config.js (which calls process.exit if vars missing)
+const superAdminSchema = new mongoose.Schema({
+  firstName: String,
+  lastName:  String,
+  email:     { type: String, unique: true },
+  password:  String,
+  role:      { type: String, default: 'superadmin' },
+}, { timestamps: true });
+
+async function run() {
+  await mongoose.connect(mongoUri);
+
+  const SuperAdmin = mongoose.models.SuperAdmin || mongoose.model('SuperAdmin', superAdminSchema);
 
   const existing = await SuperAdmin.findOne({ email });
   if (existing) {
@@ -31,17 +39,11 @@ async function createSuperAdmin() {
   }
 
   const hashed = await bcrypt.hash(password, 12);
-  await SuperAdmin.create({
-    firstName: 'Super',
-    lastName: 'Admin',
-    email,
-    password: hashed,
-    role: 'superadmin',
-  });
+  await SuperAdmin.create({ firstName: 'Super', lastName: 'Admin', email, password: hashed });
 
   console.log('✅ Super admin created:', email);
-  console.log('👉 Now remove SUPER_ADMIN_INITIAL_PASSWORD from your .env');
+  console.log('👉 Remove SUPER_ADMIN_INITIAL_PASSWORD from your .env now');
   process.exit(0);
 }
 
-createSuperAdmin().catch(e => { console.error(e); process.exit(1); });
+run().catch(e => { console.error(e); process.exit(1); });
