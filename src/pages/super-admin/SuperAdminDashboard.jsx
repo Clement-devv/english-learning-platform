@@ -8,7 +8,7 @@ import {
   XCircle, PauseCircle, Plus, X, Eye, EyeOff,
   Globe, RefreshCw, Trash2, Mail, KeyRound, Palette,
   BarChart2, ChevronDown, ChevronUp, ToggleLeft, ToggleRight, Video, Mic, Film,
-  AlertTriangle, RotateCcw, Zap, Send, Activity, Users, UserCheck, LogIn, Megaphone, SlidersHorizontal, Award, Sun, Moon,
+  AlertTriangle, RotateCcw, Zap, Send, Activity, Users, UserCheck, LogIn, Megaphone, SlidersHorizontal, Award, Sun, Moon, Menu,
 } from 'lucide-react';
 import api from '../../api';
 import { TIMEZONE_OPTIONS } from '../../utils/timezone';
@@ -52,13 +52,25 @@ export default function SuperAdminDashboard() {
   })();
   const authHeaders = { Authorization: `Bearer ${superAdminToken}` };
 
-  const [stats,    setStats]    = useState(null);
-  const [centers,  setCenters]  = useState([]);
-  const [domains,  setDomains]  = useState([]);
-  const [loading,  setLoading]  = useState(true);
-  const [tab,      setTab]      = useState('centers'); // 'centers' | 'domains'
-  const [error,    setError]    = useState('');
+  const [stats,       setStats]       = useState(null);
+  const [centers,     setCenters]     = useState([]);
+  const [domains,     setDomains]     = useState([]);
+  const [loading,     setLoading]     = useState(true);
+  const [tab,         setTab]         = useState('centers');
+  const [error,       setError]       = useState('');
+  const [isMobile,    setIsMobile]    = useState(() => window.innerWidth < 768);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('saAdminDark') !== 'false');
+
+  useEffect(() => {
+    const onResize = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      if (!mobile) setSidebarOpen(false);
+    };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   // ── Create center modal ──────────────────────────────────────────────────
   const [showModal, setShowModal]       = useState(false);
@@ -1038,7 +1050,7 @@ export default function SuperAdminDashboard() {
     return <XCircle size={13} />;
   };
 
-  const s = buildStyles(darkMode);
+  const s = buildStyles(darkMode, isMobile, sidebarOpen);
   const TABS = [
     { key: 'centers',      label: 'Centers',        icon: Building2  },
     { key: 'health',       label: 'Health',          icon: Activity   },
@@ -1054,6 +1066,9 @@ export default function SuperAdminDashboard() {
 
   return (
     <div style={s.root}>
+
+      {/* ── Mobile sidebar backdrop ── */}
+      <div style={s.sidebarOverlay} onClick={() => setSidebarOpen(false)} />
 
       {/* ── Sidebar ── */}
       <div style={s.sidebar}>
@@ -1071,7 +1086,7 @@ export default function SuperAdminDashboard() {
         {/* Nav items */}
         <nav style={s.sidebarNav}>
           {TABS.map(({ key, label, icon: Icon }) => (
-            <button key={key} onClick={() => setTab(key)} style={{ ...s.navItem, ...(tab === key ? s.navItemActive : {}) }}>
+            <button key={key} onClick={() => { setTab(key); if (isMobile) setSidebarOpen(false); }} style={{ ...s.navItem, ...(tab === key ? s.navItemActive : {}) }}>
               <Icon size={16} style={{ flexShrink: 0 }} />
               <span style={{ flex: 1 }}>{label}</span>
               {key === 'domains'  && domains.length > 0 && <span style={s.navBadge}>{domains.length}</span>}
@@ -1103,9 +1118,14 @@ export default function SuperAdminDashboard() {
 
         {/* Top bar */}
         <div style={s.topBar}>
-          <div>
-            <div style={s.topBarTitle}>{TABS.find(t => t.key === tab)?.label || 'Dashboard'}</div>
-            {error && <p style={{ color: '#ef4444', margin: '4px 0 0', fontSize: 13 }}>{error}</p>}
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            <button style={s.hamburgerBtn} onClick={() => setSidebarOpen(o => !o)}>
+              <Menu size={18} />
+            </button>
+            <div>
+              <div style={s.topBarTitle}>{TABS.find(t => t.key === tab)?.label || 'Dashboard'}</div>
+              {error && <p style={{ color: '#ef4444', margin: '4px 0 0', fontSize: 13 }}>{error}</p>}
+            </div>
           </div>
           <button onClick={() => setShowModal(true)} style={s.createBtn}>
             <Plus size={15} /> Create Center
@@ -2979,7 +2999,7 @@ function ErrorBox({ msg }) {
   );
 }
 
-function buildStyles(isDark) {
+function buildStyles(isDark, isMobile = false, sidebarOpen = false) {
   const sky    = '#0ea5e9';
   const skyDim = isDark ? 'rgba(14,165,233,0.14)' : 'rgba(14,165,233,0.09)';
   const skyBdr = isDark ? 'rgba(14,165,233,0.28)' : 'rgba(14,165,233,0.35)';
@@ -3006,8 +3026,20 @@ function buildStyles(isDark) {
       background: sbBg,
       borderRight: `1px solid ${bdr}`,
       display: 'flex', flexDirection: 'column',
-      height: '100vh', position: 'sticky', top: 0,
-      overflowY: 'auto',
+      height: '100vh', overflowY: 'auto',
+      ...(isMobile ? {
+        position: 'fixed', top: 0, left: 0, zIndex: 300,
+        transform: sidebarOpen ? 'translateX(0)' : 'translateX(-100%)',
+        transition: 'transform 0.28s ease',
+        boxShadow: '4px 0 24px rgba(0,0,0,0.45)',
+      } : {
+        position: 'sticky', top: 0,
+      }),
+    },
+    sidebarOverlay: {
+      display: isMobile && sidebarOpen ? 'block' : 'none',
+      position: 'fixed', inset: 0, zIndex: 299,
+      background: 'rgba(0,0,0,0.55)',
     },
     sidebarBrand: {
       display: 'flex', alignItems: 'center', gap: 12,
@@ -3093,6 +3125,14 @@ function buildStyles(isDark) {
       backdropFilter: 'blur(10px)',
     },
     topBarTitle: { fontSize: 20, fontWeight: 800, color: text },
+    hamburgerBtn: {
+      display: isMobile ? 'flex' : 'none',
+      alignItems: 'center', justifyContent: 'center',
+      width: 38, height: 38, borderRadius: 10,
+      background: isDark ? 'rgba(14,165,233,0.1)' : 'rgba(14,165,233,0.08)',
+      border: `1px solid ${bdr}`,
+      color: sky, cursor: 'pointer', flexShrink: 0, marginRight: 10,
+    },
     createBtn: {
       display: 'flex', alignItems: 'center', gap: 6,
       padding: '9px 18px', borderRadius: 10,
