@@ -58,6 +58,7 @@ async function isAllowedOrigin(origin) {
   if (config.corsOrigins.includes(origin)) return true;
   try {
     const hostname = new URL(origin).hostname;
+    if (hostname.endsWith('.clemify.com')) return true;
     const match = await Center.findOne({ customDomain: hostname, domainVerified: true });
     if (match) return true;
   } catch (_) { /* invalid URL */ }
