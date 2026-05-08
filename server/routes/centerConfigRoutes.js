@@ -222,6 +222,14 @@ router.get('/verify-caddy', async (req, res) => {
   if (!domain) return res.status(400).end();
 
   try {
+    // Allow any active center subdomain under clemify.com
+    if (domain.endsWith('.clemify.com')) {
+      const slug = domain.replace(/\.clemify\.com$/, '');
+      const sub = await Center.findOne({ slug, status: 'active' }).lean();
+      return res.status(sub ? 200 : 404).end();
+    }
+
+    // Allow verified custom domains
     const center = await Center.findOne({
       customDomain:  domain,
       domainVerified: true,

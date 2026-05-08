@@ -16,16 +16,14 @@
   }
 }
 
-# ── Main platform + all center subdomains ──────────────────────────────────────
-# Handles: clemify.com, www.clemify.com, any-slug.clemify.com
-clemify.com, *.clemify.com {
+# ── Main platform (clemify.com only — static cert) ────────────────────────────
+clemify.com, www.clemify.com {
   reverse_proxy app:5000 {
     header_up X-Forwarded-Proto {scheme}
     header_up X-Forwarded-Host  {host}
     header_up X-Real-IP         {remote_host}
   }
 
-  # Security headers
   header {
     Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
     X-Content-Type-Options    "nosniff"
@@ -34,10 +32,8 @@ clemify.com, *.clemify.com {
     -Server
   }
 
-  # Compress text assets
   encode gzip zstd
 
-  # Cache static frontend assets (fingerprinted by Vite)
   @static {
     path_regexp \.(js|css|woff2?|ttf|otf|png|jpg|jpeg|gif|svg|ico|webp)$
     not path /api/*
@@ -45,9 +41,9 @@ clemify.com, *.clemify.com {
   header @static Cache-Control "public, max-age=31536000, immutable"
 }
 
-# ── Custom center domains (e.g., sunshine-school.com) ─────────────────────────
-# on_demand TLS provisions SSL cert automatically for any verified custom domain.
-# The verify-caddy endpoint prevents cert issuance for unknown domains.
+# ── Center subdomains + custom domains — on-demand TLS ────────────────────────
+# Caddy calls verify-caddy before issuing any cert.
+# Covers: slug.clemify.com  AND  mannieenglish.com
 :443 {
   tls {
     on_demand
