@@ -19,7 +19,8 @@ export const getDb = async (centerSlug) => {
     throw new Error(`Invalid center slug: "${centerSlug}"`);
   }
   if (connections[centerSlug]) return connections[centerSlug];
-  const uri = `${process.env.DB_BASE_URI}/${encodeURIComponent(centerSlug)}`;
+  const base = (process.env.DB_BASE_URI || '').replace(/\/+$/, '');
+  const uri = `${base}/${encodeURIComponent(centerSlug)}`;
   const conn = await mongoose.createConnection(uri, mongooseOptions);
   connections[centerSlug] = conn;
   logger.info(`✅ DB connected: db_${centerSlug}`);
