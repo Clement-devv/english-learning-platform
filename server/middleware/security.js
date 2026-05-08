@@ -42,6 +42,9 @@ export const securityHeaders = helmet({
       imgSrc: ["'self'", "https:", "data:"],
       connectSrc: [
         "'self'",
+        // Main platform API — center subdomains send API calls to clemify.com
+        "https://clemify.com",
+        "wss://clemify.com",
         // Agora RTC / RTM servers
         "https://*.agora.io",
         "wss://*.agora.io",
