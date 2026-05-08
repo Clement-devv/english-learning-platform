@@ -39,7 +39,18 @@ export const fetchBranding = async () => {
     // Never send it if we're on a real custom domain — it would override Host-based routing.
     const impersonationSlug = sessionStorage.getItem('impersonationCenterSlug');
     const devSlug = import.meta.env.DEV ? (import.meta.env.VITE_CENTER_SLUG || null) : null;
-    const slug = impersonationSlug || devSlug;
+
+    // In production on a subdomain (mannie-english.clemify.com), API calls go to
+    // clemify.com so the server can't detect the center from the Host header.
+    // Extract the slug from the subdomain and send it as x-center-slug.
+    // For custom domains the Host header IS the custom domain, so no slug needed.
+    const subdomainSlug = (() => {
+      const h = window.location.hostname;
+      if (h.endsWith('.clemify.com')) return h.replace(/\.clemify\.com$/, '');
+      return null;
+    })();
+
+    const slug = impersonationSlug || devSlug || subdomainSlug;
 
     const headers = {};
     if (slug) headers['x-center-slug'] = slug;

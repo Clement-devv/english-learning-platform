@@ -101,7 +101,14 @@ api.interceptors.request.use(
     // so we must NOT hardcode a slug that would override that routing.
     const impersonationSlug = sessionStorage.getItem('impersonationCenterSlug');
     const devSlug = import.meta.env.DEV ? (import.meta.env.VITE_CENTER_SLUG || null) : null;
-    const slug = impersonationSlug || devSlug || getCachedCenter()?.slug;
+    // On subdomains (mannie-english.clemify.com), API calls go to clemify.com
+    // so the server can't detect the center from Host. Extract slug from subdomain.
+    const subdomainSlug = (() => {
+      const h = window.location.hostname;
+      if (h.endsWith('.clemify.com')) return h.replace(/\.clemify\.com$/, '');
+      return null;
+    })();
+    const slug = impersonationSlug || devSlug || subdomainSlug || getCachedCenter()?.slug;
     if (slug) config.headers["x-center-slug"] = slug;
 
     return config;
