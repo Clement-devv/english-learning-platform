@@ -44,10 +44,10 @@ const router = express.Router();
 // GET /api/center/config — public, no auth required
 router.get('/config', tenantMiddleware, async (req, res) => {
   try {
-    const { centerName, slug, branding, certificateTemplate, plan, features } = req.center;
+    const { centerName, slug, branding, certificateTemplate, plan, features, customDomain, domainVerified } = req.center;
     res.json({
       success: true,
-      center:  { centerName, slug, plan, features, certificateTemplate },
+      center:  { centerName, slug, plan, features, certificateTemplate, customDomain, domainVerified },
       branding,
     });
   } catch (err) {

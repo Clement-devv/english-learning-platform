@@ -55,6 +55,18 @@ export const fetchBranding = async () => {
     const data = await res.json();
     if (!data.success) return { branding: DEFAULT_BRANDING, center: null };
 
+    // If the center has a verified custom domain and we're on the old subdomain, redirect.
+    const { customDomain, domainVerified } = data.center || {};
+    if (customDomain && domainVerified && !import.meta.env.DEV) {
+      const currentHost = window.location.hostname;
+      if (currentHost !== customDomain && currentHost !== `www.${customDomain}`) {
+        window.location.replace(
+          `https://${customDomain}${window.location.pathname}${window.location.search}`
+        );
+        return { branding: DEFAULT_BRANDING, center: null };
+      }
+    }
+
     return {
       branding: { ...DEFAULT_BRANDING, ...data.branding },
       center:   data.center,
