@@ -2,7 +2,19 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" id="vp" />
+    <script>
+      // App pages (admin/teacher/student/super-admin) use a fixed 1280px desktop
+      // viewport so the full UI is visible — users can pinch-zoom to interact.
+      // Landing pages keep device-width so they stay mobile-responsive.
+      (function () {
+        var p = window.location.pathname;
+        var isApp = /^\/(admin|teacher|student|parent|sub-admin|super-admin)/.test(p);
+        if (isApp) {
+          document.getElementById('vp').content = 'width=1280, viewport-fit=cover';
+        }
+      })();
+    </script>
     <title>Clemify — Learning Platform</title>
 
     <!-- PWA manifest -->
