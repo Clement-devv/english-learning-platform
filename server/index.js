@@ -69,9 +69,13 @@ app.use(cors({
     if (!origin) return callback(null, true);
     if (config.corsOrigins.includes(origin)) return callback(null, true);
 
-    // Check if origin matches a verified custom domain
     try {
       const hostname = new URL(origin).hostname;
+
+      // Allow any center subdomain under clemify.com
+      if (hostname.endsWith('.clemify.com')) return callback(null, true);
+
+      // Allow verified custom domains
       const match = await Center.findOne({ customDomain: hostname, domainVerified: true });
       if (match) return callback(null, true);
     } catch (_) { /* invalid URL — fall through */ }
