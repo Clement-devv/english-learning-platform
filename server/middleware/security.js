@@ -34,6 +34,13 @@ function xssClean(value) {
  * Protects against common web vulnerabilities
  */
 export const securityHeaders = helmet({
+  permissionsPolicy: {
+    features: {
+      camera:         ["'self'"],
+      microphone:     ["'self'"],
+      displayCapture: ["'self'"],
+    },
+  },
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],

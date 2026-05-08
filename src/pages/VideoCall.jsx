@@ -111,6 +111,7 @@ export default function VideoCall({
   const [noiseCancelSupported, setNoiseCancelSupported] = useState(false);
   const [audioBlocked,    setAudioBlocked]    = useState(false); // browser autoplay blocked
   const [micError,        setMicError]        = useState(null);  // NOT_READABLE or similar
+  const [camError,        setCamError]        = useState(null);  // camera creation failed
   const [micDevices,      setMicDevices]      = useState([]);
   const [selectedMicId,   setSelectedMicId]   = useState(null);
   const [showMicPicker,   setShowMicPicker]   = useState(false);
@@ -272,18 +273,23 @@ export default function VideoCall({
   // ── Unmount cleanup ───────────────────────────────────────────────────────
   useEffect(() => {
     return () => {
-      localAudioTrackRef.current?.stop();  localAudioTrackRef.current?.close();
-      localVideoTrackRef.current?.stop();  localVideoTrackRef.current?.close();
-      screenTrackRef.current?.stop();      screenTrackRef.current?.close();
-      // MediaPipe sync teardown (can't await here)
+      // Tear down MediaPipe and VB processor before closing tracks to ensure
+      // the OS camera light turns off immediately (pipeline detach first).
       mpActiveRef.current = false;
       cancelAnimationFrame(mpRafId.current);
       if (mpSegRef.current)      { try { mpSegRef.current.close();              } catch (_) {} mpSegRef.current = null; }
       if (mpVideoEl.current)     { mpVideoEl.current.srcObject = null;           mpVideoEl.current = null; }
       if (mpCustomTrack.current) { try { mpCustomTrack.current.stop(); mpCustomTrack.current.close(); } catch (_) {} mpCustomTrack.current = null; }
+      if (vbProcessorRef.current) { vbProcessorRef.current.release().catch(() => {}); vbProcessorRef.current = null; }
+
+      // Explicitly stop the underlying MediaStreamTrack so the OS indicator turns off
+      try { localVideoTrackRef.current?.getMediaStreamTrack()?.stop(); } catch (_) {}
+      localAudioTrackRef.current?.stop();  localAudioTrackRef.current?.close();
+      localVideoTrackRef.current?.stop();  localVideoTrackRef.current?.close();
+      screenTrackRef.current?.stop();      screenTrackRef.current?.close();
+
       const c = client.current;
       if (c) { c.removeAllListeners(); c.leave().catch(() => {}); client.current = null; }
-      if (vbProcessorRef.current) { vbProcessorRef.current.release().catch(() => {}); vbProcessorRef.current = null; }
       if (customBgUrlRef.current) { URL.revokeObjectURL(customBgUrlRef.current); customBgUrlRef.current = null; }
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -380,8 +386,18 @@ export default function VideoCall({
 
       try {
         videoTrack = await AgoraRTC.createCameraVideoTrack({ encoderConfig: "480p_2", optimizationMode: "motion" });
+        setCamError(null);
       } catch (err) {
-        console.warn("⚠️ Camera unavailable:", err.message);
+        console.warn("⚠️ Camera unavailable:", err.message, err);
+        if (err.name === "NotAllowedError" || err.code === "PERMISSION_DENIED") {
+          setCamError("Camera permission denied. Allow camera access in your browser settings.");
+        } else if (err.name === "NotReadableError" || err.code === "NOT_READABLE") {
+          setCamError("Camera is in use by another app. Close it and click Retry Camera.");
+        } else if (err.name === "NotFoundError") {
+          setCamError("No camera found on this device.");
+        } else {
+          setCamError("Camera could not be accessed. Click Retry Camera to try again.");
+        }
       }
 
       if (!audioTrack && !videoTrack) {
@@ -442,12 +458,22 @@ export default function VideoCall({
     }
 
     try {
+      // Stop MediaPipe and VB processor FIRST — they hold WebGL/canvas refs to
+      // the camera stream. Closing the track while they're still attached can
+      // leave the OS camera light on until the tab is refreshed.
       if (mpActiveRef.current) await stopMPBlur();
+      if (vbProcessorRef.current) { try { await vbProcessorRef.current.release(); } catch (_) {} vbProcessorRef.current = null; }
+
+      // Now it's safe to stop/close the tracks — the pipeline is detached.
+      // Also explicitly stop the underlying MediaStreamTrack so the OS-level
+      // camera indicator turns off immediately.
+      if (localVideoTrack) {
+        try { localVideoTrack.getMediaStreamTrack()?.stop(); } catch (_) {}
+        localVideoTrack.stop(); localVideoTrack.close();
+      }
       localAudioTrack?.stop(); localAudioTrack?.close();
-      localVideoTrack?.stop(); localVideoTrack?.close();
       screenTrack?.stop();     screenTrack?.close();
       if (client.current) await client.current.leave();
-      if (vbProcessorRef.current) { try { await vbProcessorRef.current.release(); } catch (_) {} vbProcessorRef.current = null; }
       if (customBgUrlRef.current) { URL.revokeObjectURL(customBgUrlRef.current); customBgUrlRef.current = null; }
       setJoined(false);
       hasJoinedRef.current = false;
@@ -456,6 +482,7 @@ export default function VideoCall({
       setLocalAudioTrack(null); setLocalVideoTrack(null); setScreenTrack(null);
       setIsScreenSharing(false);
       setMicOn(true); setCamOn(true);
+      setMicError(null); setCamError(null);
       setActiveBg("none"); setShowBgPanel(false);
       resetChat();
       onLeave?.();
@@ -478,6 +505,21 @@ export default function VideoCall({
     const next = !camOn;
     await localVideoTrack.setEnabled(next);
     setCamOn(next);
+  };
+
+  const retryCamera = async () => {
+    if (!joined || localVideoTrack) return;
+    try {
+      setCamError(null);
+      const track = await AgoraRTC.createCameraVideoTrack({ encoderConfig: "480p_2", optimizationMode: "motion" });
+      localVideoTrackRef.current = track;
+      setLocalVideoTrack(track);
+      await client.current?.publish([track]);
+      if (localContainer.current) track.play(localContainer.current);
+    } catch (err) {
+      console.warn("⚠️ Camera retry failed:", err.message, err);
+      setCamError("Camera still unavailable. Check permissions and close other apps using the camera.");
+    }
   };
   const toggleNoiseCancel = async () => {
     if (!localAudioTrack) return;
@@ -749,6 +791,15 @@ export default function VideoCall({
       {joined ? (
         <>
           <div ref={localContainer} className="w-full h-full" />
+          {camError && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900/90 p-4 text-center">
+              <VideoOff className="w-10 h-10 text-red-400 mb-2" />
+              <p className="text-white/80 text-sm mb-3">{camError}</p>
+              <button onClick={retryCamera} className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-sm font-semibold rounded-xl transition-colors">
+                Retry Camera
+              </button>
+            </div>
+          )}
           <div className="absolute bottom-3 left-3 bg-black/60 backdrop-blur-sm px-2.5 py-1 rounded-lg">
             <span className={`font-medium text-white/90 ${compact ? "text-xs" : "text-sm"}`}>{userName} (You)</span>
           </div>
