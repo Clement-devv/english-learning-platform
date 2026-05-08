@@ -8,7 +8,7 @@ const __dirname  = dirname(__filename);
 dotenv.config({ path: resolve(__dirname, "../.env") });
 
 // Validate required environment variables
-const requiredEnvVars = ['JWT_SECRET', 'MONGO_URI', 'EMAIL_USER', 'EMAIL_PASSWORD', 'MASTER_DB_URI', 'DB_BASE_URI', 'ENCRYPTION_KEY'];
+const requiredEnvVars = ['JWT_SECRET', 'MONGO_URI', 'MASTER_DB_URI', 'DB_BASE_URI', 'ENCRYPTION_KEY'];
 const missingEnvVars = requiredEnvVars.filter(varName => !process.env[varName]);
 
 if (missingEnvVars.length > 0) {
