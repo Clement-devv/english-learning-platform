@@ -116,6 +116,13 @@ export default function VideoCall({
   const [micDevices,      setMicDevices]      = useState([]);
   const [selectedMicId,   setSelectedMicId]   = useState(null);
   const [showMicPicker,   setShowMicPicker]   = useState(false);
+  const [isMobile,        setIsMobile]        = useState(() => window.innerWidth < 768);
+
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener("resize", handler);
+    return () => window.removeEventListener("resize", handler);
+  }, []);
 
   // ── Custom hooks ──────────────────────────────────────────────────────────
   const {
@@ -1270,7 +1277,7 @@ export default function VideoCall({
             {/* Local video – PiP overlay, bottom-right corner */}
             {joined && (
               <div className="absolute bottom-4 right-4 z-20 rounded-2xl overflow-hidden shadow-2xl ring-2 ring-white/20"
-                style={{ width: '176px', height: '132px' }}>
+                style={{ width: isMobile ? '96px' : '176px', height: isMobile ? '72px' : '132px' }}>
                 <div ref={localContainer} className="pip-local w-full h-full bg-gray-800" />
                 {camError && (
                   <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900/90 p-2 text-center">

@@ -658,10 +658,16 @@ export default function AgoraClassroom({ classData, userRole, onLeave, googleMee
         {/* VideoCall — must never unmount while active (unmounting calls client.leave()) */}
         <div style={{
           position: "absolute",
-          zIndex: activeTab === "video" ? 10 : 5,
-          ...(activeTab === "video" ? { inset: 0 }
-            : activeTab === "content" ? { right: 0, top: 0, bottom: 0, width: "196px" }
-            : { inset: 0, visibility: "hidden", pointerEvents: "none" }),
+          zIndex: activeTab === "video" ? 10 : (isMobile && activeTab === "content") ? 20 : 5,
+          ...(activeTab === "video"
+            ? { inset: 0 }
+            : activeTab === "content"
+              ? isMobile
+                // Mobile content view: small overlay in bottom-right corner
+                ? { right: 8, bottom: 8, width: 100, height: 150, borderRadius: 12, overflow: "hidden" }
+                // Desktop content view: sidebar on the right
+                : { right: 0, top: 0, bottom: 0, width: "196px" }
+              : { inset: 0, visibility: "hidden", pointerEvents: "none" }),
         }}>
           <VideoCall
             key={`video-${bookingId}`}
@@ -686,7 +692,8 @@ export default function AgoraClassroom({ classData, userRole, onLeave, googleMee
         <div style={{
           position: "absolute",
           top: 0, bottom: 0, left: 0,
-          right: activeTab === "content" ? "196px" : 0,
+          // Mobile: full width. Desktop: leaves room for sidebar video on right.
+          right: (activeTab === "content" && !isMobile) ? "196px" : 0,
           zIndex: activeTab === "content" ? 10 : 1,
           visibility: activeTab === "content" ? "visible" : "hidden",
           pointerEvents: activeTab === "content" ? "auto" : "none",
