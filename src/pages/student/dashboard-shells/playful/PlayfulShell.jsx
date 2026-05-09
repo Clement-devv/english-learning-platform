@@ -3,7 +3,7 @@
 // Dark icon sidebar | full-width hero banner | colorful category tile grid | What's New panel.
 // Inspired by: vivid game/learning platform UIs. Poppins font. Round everything.
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Home, BookOpen, Mic2, MessageSquare, CalendarDays, BarChart2,
   MoreHorizontal, Bell, Search, LogOut, Settings, ChevronRight,
@@ -182,6 +182,13 @@ export default function PlayfulShell() {
 
   const [showSettings, setShowSettings] = useState(false);
   const [show2FA,      setShow2FA]      = useState(false);
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   const activeSection = NAV.find(n => n.tabs.includes(d.activeTab))?.id || "dashboard";
   const subTabs = SUB_TABS[activeSection] || [];
@@ -240,7 +247,7 @@ export default function PlayfulShell() {
       {/* ── SIDEBAR ──────────────────────────────────────────────────────────── */}
       <aside style={{
         width:72, flexShrink:0, background:P.sidebar,
-        display:"flex", flexDirection:"column", alignItems:"center",
+        display: isMobile ? "none" : "flex", flexDirection:"column", alignItems:"center",
         padding:"18px 0", gap:2, zIndex:100,
         boxShadow:"3px 0 20px rgba(0,0,0,0.25)",
       }}>
@@ -306,7 +313,7 @@ export default function PlayfulShell() {
 
           {/* Sub-tab pills */}
           {subTabs.length>0 && (
-            <div style={{display:"flex",gap:6}}>
+            <div style={{display:"flex",gap:6,overflowX:"auto",flexShrink:1,minWidth:0}}>
               {subTabs.map(st=>(
                 <button key={st.key} onClick={()=>d.setActiveTab(st.key)}
                   style={{padding:"5px 14px",borderRadius:999,fontSize:12,fontWeight:700,border:"none",cursor:"pointer",fontFamily:"Poppins,sans-serif",
@@ -322,11 +329,13 @@ export default function PlayfulShell() {
           <div style={{flex:1}}/>
 
           {/* Search */}
+          {!isMobile && (
           <div style={{position:"relative"}}>
             <Search size={14} style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",color:P.textMuted}}/>
             <input placeholder="Search anything..."
               style={{width:200,height:36,background:P.inputBg,border:"none",borderRadius:12,padding:"0 10px 0 30px",fontSize:13,color:P.text,outline:"none",fontFamily:"Poppins,sans-serif"}}/>
           </div>
+          )}
 
           {/* Dark mode */}
           <button onClick={()=>d.setIsDarkMode(v=>!v)}
@@ -355,11 +364,11 @@ export default function PlayfulShell() {
         </header>
 
         {/* ── SCROLL AREA ── */}
-        <main style={{flex:1,overflowY:"auto",padding:24}}>
+        <main style={{flex:1,overflowY:"auto",padding: isMobile ? "16px 14px 80px" : 24}}>
 
           {/* ════════════════ DASHBOARD HOME ════════════════ */}
           {d.activeTab==="dashboard" && (
-            <div style={{display:"flex",gap:20,alignItems:"flex-start"}}>
+            <div style={{display:"flex",flexDirection: isMobile ? "column" : "row",gap:20,alignItems:"flex-start"}}>
 
               {/* LEFT */}
               <div style={{flex:1,display:"flex",flexDirection:"column",gap:20,minWidth:0}}>
@@ -377,7 +386,7 @@ export default function PlayfulShell() {
                   <div style={{position:"absolute",top:10,right:20,width:60,height:60,borderRadius:"50%",background:"rgba(255,255,255,0.12)",pointerEvents:"none"}}/>
 
                   {/* Text */}
-                  <div style={{zIndex:1,maxWidth:"58%"}}>
+                  <div style={{zIndex:1,maxWidth: isMobile ? "100%" : "58%"}}>
                     <div style={{display:"inline-block",background:"rgba(255,255,255,0.25)",borderRadius:999,padding:"3px 14px",fontSize:11,fontWeight:700,color:"#fff",letterSpacing:1,marginBottom:10,backdropFilter:"blur(6px)"}}>
                       {hasLive ? "🔴 LIVE NOW" : d.homeworkPending>0 ? "📋 DUE TODAY" : "🌟 DAILY GOAL"}
                     </div>
@@ -394,7 +403,7 @@ export default function PlayfulShell() {
                   </div>
 
                   {/* Emoji characters */}
-                  <div style={{zIndex:1,display:"flex",gap:8,alignItems:"flex-end",paddingRight:8}}>
+                  {!isMobile && <div style={{zIndex:1,display:"flex",gap:8,alignItems:"flex-end",paddingRight:8}}>
                     {heroEmojis.map((e,i)=>(
                       <div key={i} style={{
                         fontSize:i===1?56:40, lineHeight:1,
@@ -404,7 +413,7 @@ export default function PlayfulShell() {
                         animation:`float${i} 3s ease-in-out infinite`,
                       }}>{e}</div>
                     ))}
-                  </div>
+                  </div>}
                   <style>{`
                     @keyframes float0{0%,100%{transform:translateY(0) rotate(-12deg)}50%{transform:translateY(-8px) rotate(-12deg)}}
                     @keyframes float1{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}
@@ -418,7 +427,7 @@ export default function PlayfulShell() {
                     <h2 style={{margin:0,fontSize:16,fontWeight:800,color:P.text}}>Lesson Categories</h2>
                     <span style={{fontSize:13,color:P.textMuted}}>Pick where to continue</span>
                   </div>
-                  <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12}}>
+                  <div style={{display:"grid",gridTemplateColumns: isMobile ? "repeat(2,1fr)" : "repeat(4,1fr)",gap:12}}>
                     {TILES.map(tile=>{
                       const badge = tile.tab==="homework" ? d.homeworkPending : tile.tab==="quiz" ? d.quizPending : 0;
                       return (
@@ -463,7 +472,7 @@ export default function PlayfulShell() {
               </div>
 
               {/* RIGHT PANEL */}
-              <div style={{width:290,flexShrink:0,display:"flex",flexDirection:"column",gap:16}}>
+              <div style={{width: isMobile ? "100%" : 290,flexShrink:0,display:"flex",flexDirection:"column",gap:16}}>
 
                 {/* Stats row */}
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
@@ -578,7 +587,7 @@ export default function PlayfulShell() {
           {/* ════ CHARTS ════ */}
           {d.activeTab==="charts"&&(
             <div style={{display:"flex",flexDirection:"column",gap:16}}>
-              <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12}}>
+              <div style={{display:"grid",gridTemplateColumns: isMobile ? "1fr" : "repeat(3,1fr)",gap:12}}>
                 {[
                   {label:"Total Classes",value:d.completedClasses.length,g:[P.blue,P.teal],emoji:"🎓"},
                   {label:"Day Streak",   value:d.progress.streakDays,    g:[P.coral,P.orange],emoji:"🔥"},
@@ -681,6 +690,68 @@ export default function PlayfulShell() {
           onClose={()=>{d.setShowConfirmationModal(false);d.setSelectedConfirmation(null);}}
           onConfirmed={()=>{d.setShowConfirmationModal(false);d.setSelectedConfirmation(null);d.fetchStudentData();}}
         />
+      )}
+
+      {/* ── MOBILE BOTTOM NAV ── */}
+      {isMobile && (
+        <nav style={{ position:'fixed', bottom:0, left:0, right:0, height:60, background:P.sidebar, borderTop:'1px solid rgba(255,255,255,0.1)', display:'flex', zIndex:200, boxShadow:'0 -4px 20px rgba(0,0,0,0.3)' }}>
+          {[
+            { key:'dashboard', Icon:Home,          label:'Home',    dot:P.pink   },
+            { key:'homework',  Icon:BookOpen,       label:'Study',   dot:P.blue   },
+            { key:'messages',  Icon:MessageSquare,  label:'Chat',    dot:P.green  },
+            { key:'schedule',  Icon:CalendarDays,   label:'Classes', dot:P.teal   },
+          ].map(({ key, Icon, label, dot }) => {
+            const isActive = d.activeTab === key || (key==='homework' && ['homework','quiz','flashcards'].includes(d.activeTab));
+            return (
+              <button key={key} onClick={() => d.setActiveTab(key)}
+                style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:3, border:'none', background:'transparent', cursor:'pointer', fontFamily:"'Poppins',sans-serif", color: isActive ? dot : 'rgba(255,255,255,0.5)', borderTop: isActive ? `3px solid ${dot}` : '3px solid transparent' }}>
+                <Icon size={20} strokeWidth={isActive ? 2.2 : 1.8} />
+                <span style={{ fontSize:10, fontWeight: isActive ? 700 : 500 }}>{label}</span>
+              </button>
+            );
+          })}
+          <button onClick={() => setShowMobileMenu(true)}
+            style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:3, border:'none', background:'transparent', cursor:'pointer', fontFamily:"'Poppins',sans-serif", color:'rgba(255,255,255,0.5)', borderTop:'3px solid transparent' }}>
+            <MoreHorizontal size={20} strokeWidth={1.8} />
+            <span style={{ fontSize:10, fontWeight:500 }}>More</span>
+          </button>
+        </nav>
+      )}
+
+      {/* ── MOBILE MENU SHEET ── */}
+      {isMobile && showMobileMenu && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.55)', zIndex:9500 }} onClick={() => setShowMobileMenu(false)}>
+          <div style={{ position:'absolute', bottom:0, left:0, right:0, background:P.white, borderRadius:'20px 20px 0 0', padding:'12px 16px 44px', maxHeight:'78vh', overflowY:'auto' }} onClick={e => e.stopPropagation()}>
+            <div style={{ width:36, height:4, background:P.border, borderRadius:999, margin:'0 auto 16px' }} />
+            <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
+              {NAV.filter(n => !['dashboard','messages','classes'].includes(n.id)).flatMap(n => n.tabs).map(tab => {
+                const navItem = NAV.find(n => n.tabs.includes(tab));
+                const isActive = d.activeTab === tab;
+                const label = {homework:'Homework',quiz:'Quizzes',flashcards:'Flashcards',pronunciation:'Speaking',conversation:'AI Chat','completed-classes':'Completed',charts:'Charts',badges:'Badges',recordings:'Recordings',reviews:'Reviews',referral:'Invite'}[tab] || tab;
+                if (!navItem) return null;
+                const Icon = navItem.Icon;
+                return (
+                  <button key={tab} onClick={() => { d.setActiveTab(tab); setShowMobileMenu(false); }}
+                    style={{ display:'flex', alignItems:'center', gap:12, padding:'11px 14px', borderRadius:14, border:'none', background: isActive ? P.inputBg : 'transparent', color: isActive ? P.pink : P.text, cursor:'pointer', fontFamily:"'Poppins',sans-serif", width:'100%', fontSize:14, fontWeight: isActive ? 700 : 500 }}>
+                    <Icon size={18} color={isActive ? P.pink : P.textMuted} strokeWidth={1.8} />
+                    {label}
+                  </button>
+                );
+              })}
+              <div style={{ borderTop:`1px solid ${P.border}`, margin:'8px 0 4px' }} />
+              <button onClick={() => { setShowMobileMenu(false); setShowSettings(true); }}
+                style={{ display:'flex', alignItems:'center', gap:12, padding:'11px 14px', borderRadius:14, border:'none', background:'transparent', color:P.text, cursor:'pointer', fontFamily:"'Poppins',sans-serif", width:'100%', fontSize:14, fontWeight:500 }}>
+                <Settings size={18} color={P.textMuted} strokeWidth={1.8} />
+                Settings
+              </button>
+              <button onClick={d.handleLogout}
+                style={{ display:'flex', alignItems:'center', gap:12, padding:'11px 14px', borderRadius:14, border:'none', background:'transparent', color:P.coral, cursor:'pointer', fontFamily:"'Poppins',sans-serif", width:'100%', fontSize:14, fontWeight:600 }}>
+                <LogOut size={18} color={P.coral} strokeWidth={1.8} />
+                Sign Out
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Toast */}

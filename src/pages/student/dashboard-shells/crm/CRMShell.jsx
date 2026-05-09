@@ -2,7 +2,7 @@
 // "Island Academy" — floating island subject cards, circular progress donut,
 // soft green/teal sidebar, illustrated feel. Inspired by kids-friendly LMS UIs.
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Confetti from "react-confetti";
 import {
   Home, BookOpen, Mic2, MessageSquare, CalendarDays, BarChart2,
@@ -283,6 +283,13 @@ export default function CRMShell() {
   const d = useDashboardData();
   const [showSettings, setShowSettings] = useState(false);
   const [show2FA,       setShow2FA]       = useState(false);
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   const F = "'Nunito',sans-serif";
 
@@ -353,7 +360,7 @@ export default function CRMShell() {
       <aside style={{
         width: 230, flexShrink: 0,
         background: `linear-gradient(180deg,${ACC.sidebar} 0%,#0F5C34 100%)`,
-        display: "flex", flexDirection: "column",
+        display: isMobile ? "none" : "flex", flexDirection: "column",
         overflowY: "auto", overflowX: "hidden", zIndex: 100,
       }}>
         {/* Brand */}
@@ -454,11 +461,11 @@ export default function CRMShell() {
       <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden" }}>
 
         {/* Top bar */}
-        <header style={{ height:62, background:P.card, borderBottom:`1px solid ${P.border}`, display:"flex", alignItems:"center", padding:"0 24px", gap:14, flexShrink:0 }}>
+        <header style={{ height:62, background:P.card, borderBottom:`1px solid ${P.border}`, display:"flex", alignItems:"center", padding: isMobile ? "0 12px" : "0 24px", gap: isMobile ? 8 : 14, flexShrink:0 }}>
           <h1 style={{ margin:0, fontSize:18, fontWeight:900, color:P.text, flex:1 }}>
             {PAGE_TITLES[d.activeTab] || "Dashboard"}
           </h1>
-          {d.progress.streakDays > 0 && (
+          {d.progress.streakDays > 0 && !isMobile && (
             <div style={{ display:"flex", alignItems:"center", gap:5, background: d.isDarkMode?"rgba(249,115,22,0.15)":"#FFF7ED", border:`1px solid ${d.isDarkMode?"rgba(249,115,22,0.3)":"#FED7AA"}`, borderRadius:999, padding:"5px 12px" }}>
               <span style={{ fontSize:15 }}>🔥</span>
               <span style={{ fontSize:13, fontWeight:800, color:ACC.orange }}>{d.progress.streakDays} day streak</span>
@@ -477,7 +484,7 @@ export default function CRMShell() {
         </header>
 
         {/* Scroll area */}
-        <main style={{ flex:1, overflowY:"auto", padding:24 }}>
+        <main style={{ flex:1, overflowY:"auto", padding: isMobile ? "16px 14px 80px" : 24 }}>
 
           {/* Pending confirmation banners */}
           {d.pendingConfirmations.map(conf => (
@@ -515,7 +522,7 @@ export default function CRMShell() {
                     You have <strong>{d.progress.classesRemaining}</strong> classes left. Let's grow today!
                   </p>
                 </div>
-                <div style={{ fontSize:72, flexShrink:0, filter:"drop-shadow(0 6px 12px rgba(0,0,0,0.2))" }}>🌳</div>
+                {!isMobile && <div style={{ fontSize:72, flexShrink:0, filter:"drop-shadow(0 6px 12px rgba(0,0,0,0.2))" }}>🌳</div>}
               </div>
 
               {/* Stats row */}
@@ -535,7 +542,7 @@ export default function CRMShell() {
               </div>
 
               {/* Middle: donut + live classes + upcoming */}
-              <div style={{ display:"grid", gridTemplateColumns:"200px 1fr 1fr", gap:16 }}>
+              <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "200px 1fr 1fr", gap:16 }}>
 
                 {/* Donut progress */}
                 <div style={{ background:P.card, border:`1px solid ${P.border}`, borderRadius:20, padding:"20px 16px", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center" }}>
@@ -588,7 +595,7 @@ export default function CRMShell() {
               </div>
 
               {/* Streak + recent badges */}
-              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16 }}>
+              <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap:16 }}>
                 <StreakWidget isDarkMode={d.isDarkMode} onLoad={d.handleStreakLoaded} />
                 <div style={{ background:P.card, border:`1px solid ${P.border}`, borderRadius:20, padding:18 }}>
                   <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12 }}>
@@ -630,7 +637,7 @@ export default function CRMShell() {
           {/* ═══ CHARTS ═══ */}
           {d.activeTab==="charts" && (
             <div style={{display:"flex",flexDirection:"column",gap:20}}>
-              <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:14}}>
+              <div style={{display:"grid",gridTemplateColumns: isMobile ? "1fr" : "repeat(3,1fr)",gap:14}}>
                 {[
                   {icon:"📚",label:"Total Classes",value:d.completedClasses.length,color:ACC.green},
                   {icon:"🔥",label:"Day Streak",value:d.progress.streakDays,color:ACC.orange},
@@ -643,7 +650,7 @@ export default function CRMShell() {
                   </div>
                 ))}
               </div>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
+              <div style={{display:"grid",gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",gap:16}}>
                 <div style={{background:P.card,border:`1px solid ${P.border}`,borderRadius:20,padding:24}}>
                   <h3 style={{margin:"0 0 16px",fontSize:16,fontWeight:800,color:P.text}}>Classes Per Month</h3>
                   <ResponsiveContainer width="100%" height={200}>
@@ -739,6 +746,66 @@ export default function CRMShell() {
           onClose={()=>{d.setShowConfirmationModal(false);d.setSelectedConfirmation(null);}}
           onConfirmed={()=>{d.setShowConfirmationModal(false);d.setSelectedConfirmation(null);d.fetchStudentData();}}
         />
+      )}
+
+      {/* ── MOBILE BOTTOM NAV ── */}
+      {isMobile && (
+        <nav style={{ position:'fixed', bottom:0, left:0, right:0, height:60, background:`linear-gradient(90deg,${ACC.sidebar},#0F5C34)`, borderTop:'1px solid rgba(255,255,255,0.12)', display:'flex', zIndex:200, boxShadow:'0 -4px 20px rgba(0,0,0,0.25)' }}>
+          {[
+            { key:'dashboard', Icon:Home,          label:'Home'    },
+            { key:'homework',  Icon:BookOpen,       label:'Learn'   },
+            { key:'messages',  Icon:MessageSquare,  label:'Chat'    },
+            { key:'schedule',  Icon:CalendarDays,   label:'Classes' },
+          ].map(({ key, Icon, label }) => {
+            const isActive = d.activeTab === key;
+            return (
+              <button key={key} onClick={() => d.setActiveTab(key)}
+                style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:3, border:'none', background:'transparent', cursor:'pointer', fontFamily:F, color: isActive ? '#fff' : 'rgba(255,255,255,0.5)', borderTop: isActive ? `3px solid ${ACC.green}` : '3px solid transparent' }}>
+                <Icon size={20} strokeWidth={isActive ? 2.2 : 1.8} />
+                <span style={{ fontSize:10, fontWeight: isActive ? 800 : 600 }}>{label}</span>
+              </button>
+            );
+          })}
+          <button onClick={() => setShowMobileMenu(true)}
+            style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:3, border:'none', background:'transparent', cursor:'pointer', fontFamily:F, color:'rgba(255,255,255,0.5)', borderTop:'3px solid transparent' }}>
+            <Settings size={20} strokeWidth={1.8} />
+            <span style={{ fontSize:10, fontWeight:600 }}>More</span>
+          </button>
+        </nav>
+      )}
+
+      {/* ── MOBILE MENU SHEET ── */}
+      {isMobile && showMobileMenu && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', zIndex:9500 }} onClick={() => setShowMobileMenu(false)}>
+          <div style={{ position:'absolute', bottom:0, left:0, right:0, background:P.card, borderRadius:'20px 20px 0 0', padding:'12px 16px 44px', maxHeight:'78vh', overflowY:'auto' }} onClick={e => e.stopPropagation()}>
+            <div style={{ width:36, height:4, background:P.border, borderRadius:999, margin:'0 auto 16px' }} />
+            <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
+              {NAV_GROUPS.flatMap(g => g.items)
+                .filter(item => !['dashboard','homework','messages','schedule'].includes(item.key))
+                .map(item => {
+                  const isActive = d.activeTab === item.key;
+                  return (
+                    <button key={item.key} onClick={() => { d.setActiveTab(item.key); setShowMobileMenu(false); }}
+                      style={{ display:'flex', alignItems:'center', gap:12, padding:'11px 14px', borderRadius:14, border:'none', background: isActive ? `${ACC.green}18` : 'transparent', color: isActive ? ACC.green : P.text, cursor:'pointer', fontFamily:F, width:'100%', fontSize:14, fontWeight: isActive ? 800 : 600 }}>
+                      <item.Icon size={18} color={isActive ? ACC.green : P.textMuted} strokeWidth={1.8} />
+                      {item.label}
+                    </button>
+                  );
+                })}
+              <div style={{ borderTop:`1px solid ${P.border}`, margin:'8px 0 4px' }} />
+              <button onClick={() => { setShowMobileMenu(false); setShowSettings(true); }}
+                style={{ display:'flex', alignItems:'center', gap:12, padding:'11px 14px', borderRadius:14, border:'none', background:'transparent', color:P.text, cursor:'pointer', fontFamily:F, width:'100%', fontSize:14, fontWeight:600 }}>
+                <Settings size={18} color={P.textMuted} />
+                Settings
+              </button>
+              <button onClick={d.handleLogout}
+                style={{ display:'flex', alignItems:'center', gap:12, padding:'11px 14px', borderRadius:14, border:'none', background:'transparent', color:'#ef4444', cursor:'pointer', fontFamily:F, width:'100%', fontSize:14, fontWeight:600 }}>
+                <LogOut size={18} color="#ef4444" />
+                Sign Out
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

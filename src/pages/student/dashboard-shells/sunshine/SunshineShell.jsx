@@ -1,7 +1,7 @@
 // src/pages/student/dashboard-shells/sunshine/SunshineShell.jsx
 // Sunshine Explorer — warm orange palette, bubbly Nunito font, vertical sidebar nav.
 
-import { useState, lazy, Suspense } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
 const GroupClassTab        = lazy(() => import('../../tabs/GroupClassTab'));
 const BookingCalendarTab   = lazy(() => import('../../tabs/BookingCalendarTab'));
 const CertificatesTab      = lazy(() => import('../../tabs/CertificatesTab'));
@@ -223,6 +223,13 @@ export default function SunshineShell() {
   const dashTheme = getDashboardThemeById(branding.dashboardTheme);
   const d   = useDashboardData();
   const { missedCalls, missedCallCount, clearMissedCalls } = useRing();
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
   const col = dashTheme.palette(d.isDarkMode);
   const F   = `'${dashTheme.font}',sans-serif`;
   const tooltipStyle = { backgroundColor: d.isDarkMode ? "#1a1d2e" : "#fff", border: `1px solid ${col.border}`, color: col.heading, borderRadius: "12px", fontFamily: F };
@@ -289,7 +296,7 @@ export default function SunshineShell() {
         width: 220, flexShrink: 0,
         background: d.isDarkMode ? "#13111a" : "#fff",
         borderRight: `2px solid ${col.border}`,
-        display: "flex", flexDirection: "column",
+        display: isMobile ? "none" : "flex", flexDirection: "column",
         overflowY: "auto", overflowX: "hidden",
         zIndex: 100,
       }}>
@@ -392,7 +399,7 @@ export default function SunshineShell() {
       <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
 
         {/* ── TOP BAR ── */}
-        <header style={{ height: 64, background: d.isDarkMode ? "#13111a" : "#fff", borderBottom: `2px solid ${col.border}`, display: "flex", alignItems: "center", padding: "0 24px", gap: 16, flexShrink: 0 }}>
+        <header style={{ height: 64, background: d.isDarkMode ? "#13111a" : "#fff", borderBottom: `2px solid ${col.border}`, display: "flex", alignItems: "center", padding: isMobile ? "0 12px" : "0 24px", gap: isMobile ? 8 : 16, flexShrink: 0 }}>
           {/* Page title */}
           <h1 style={{ margin: 0, fontSize: 18, fontWeight: 900, color: col.heading, flex: 1 }}>
             {NAV_GROUPS.flatMap(g => g.items).find(i => i.key === d.activeTab)?.icon}{" "}
@@ -400,7 +407,7 @@ export default function SunshineShell() {
           </h1>
 
           {/* Streak pill */}
-          {d.progress.streakDays > 0 && (
+          {d.progress.streakDays > 0 && !isMobile && (
             <div style={{ display: "flex", alignItems: "center", gap: 6, background: d.isDarkMode ? "rgba(249,115,22,0.15)" : "#fff7ed", border: `2px solid ${d.isDarkMode ? "rgba(249,115,22,0.3)" : "#fed7aa"}`, borderRadius: 999, padding: "5px 14px" }}>
               <span style={{ fontSize: 16 }}>🔥</span>
               <span style={{ fontSize: 13, fontWeight: 800, color: col.accent }}>{d.progress.streakDays} day streak</span>
@@ -423,7 +430,7 @@ export default function SunshineShell() {
         </header>
 
         {/* ── SCROLL AREA ── */}
-        <main style={{ flex: 1, overflowY: "auto", padding: 24 }}>
+        <main style={{ flex: 1, overflowY: "auto", padding: isMobile ? "16px 14px 80px" : 24 }}>
 
           {/* Pending confirmation banner */}
           {d.pendingConfirmations.length > 0 && d.pendingConfirmations.map(conf => (
@@ -462,7 +469,7 @@ export default function SunshineShell() {
                     {d.homeworkPending > 0 ? t('dashboard.homeworkDue', { count: d.homeworkPending }) : t('dashboard.noPendingHomework')} · {t('dashboard.classesLeft', { count: d.progress.classesRemaining })} 🔥
                   </p>
                 </div>
-                <div style={{ position: "relative", zIndex: 1, background: "rgba(255,255,255,0.18)", backdropFilter: "blur(8px)", borderRadius: 20, padding: "16px 22px", textAlign: "center", border: "2px solid rgba(255,255,255,0.25)", flexShrink: 0 }}>
+                <div style={{ position: "relative", zIndex: 1, background: "rgba(255,255,255,0.18)", backdropFilter: "blur(8px)", borderRadius: 20, padding: "16px 22px", textAlign: "center", border: "2px solid rgba(255,255,255,0.25)", flexShrink: 0, display: isMobile ? "none" : "block" }}>
                   <div style={{ fontSize: 34 }}>🔥</div>
                   <div style={{ fontSize: 32, fontWeight: 900, marginTop: 4 }}>{d.progress.streakDays}</div>
                   <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.1em", opacity: 0.9 }}>{t('dashboard.dayStreak')}</div>
@@ -505,7 +512,7 @@ export default function SunshineShell() {
               )}
 
               {/* Stats row */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 14 }}>
+              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2,1fr)" : "repeat(4,1fr)", gap: 14 }}>
                 {[
                   { Icon: BookOpen,     n: d.progress.completedLessons, l: t('dashboard.stats.classesDone'),  grad: "linear-gradient(135deg,#f97316,#fb923c)", shadow: "rgba(249,115,22,0.3)"  },
                   { Icon: CalendarDays, n: d.progress.classesRemaining, l: t('dashboard.stats.classesLeft'),  grad: "linear-gradient(135deg,#3b82f6,#60a5fa)", shadow: "rgba(59,130,246,0.3)"  },
@@ -523,7 +530,7 @@ export default function SunshineShell() {
               </div>
 
               {/* Classes + sidebar */}
-              <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 18 }}>
+              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1.4fr 1fr", gap: 18 }}>
                 <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
 
                   {/* Live classes */}
@@ -657,7 +664,7 @@ export default function SunshineShell() {
           {/* ══ CHARTS ══ */}
           {d.activeTab === "charts" && (
             <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "14px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3,1fr)", gap: "14px" }}>
                 {[
                   { icon: "📚", label: t('charts.totalClasses'), value: d.completedClasses.length,    color: "#f97316" },
                   { icon: "🔥", label: t('charts.dayStreak'),    value: d.progress.streakDays,         color: "#ec4899" },
@@ -746,6 +753,67 @@ export default function SunshineShell() {
           onConfirm={()=>{ d.setShowConfirmationModal(false); d.setSelectedConfirmation(null); d.showToast("Class confirmed! ✅"); d.fetchStudentData(); }}
           onDispute={()=>{ d.setShowConfirmationModal(false); d.setSelectedConfirmation(null); d.showToast("Dispute submitted."); d.fetchStudentData(); }}
           onClose={()=>{ d.setShowConfirmationModal(false); d.setSelectedConfirmation(null); }} />
+      )}
+
+      {/* ── MOBILE BOTTOM NAV ── */}
+      {isMobile && (
+        <nav style={{ position:'fixed', bottom:0, left:0, right:0, height:60, background: d.isDarkMode ? '#13111a' : '#fff', borderTop:`2px solid ${col.border}`, display:'flex', zIndex:200, boxShadow:'0 -4px 16px rgba(0,0,0,0.08)' }}>
+          {[
+            { key:'dashboard', Icon:Home, label:'Home' },
+            { key:'homework',  Icon:BookOpen, label:'Study' },
+            { key:'messages',  Icon:MessageCircle, label:'Chat' },
+            { key:'schedule',  Icon:CalendarDays, label:'Classes' },
+          ].map(({ key, Icon, label }) => {
+            const isActive = d.activeTab === key;
+            return (
+              <button key={key} onClick={() => d.setActiveTab(key)}
+                style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:3, border:'none', background:'transparent', cursor:'pointer', fontFamily:F, color: isActive ? col.accent : col.muted, borderTop: isActive ? `3px solid ${col.accent}` : '3px solid transparent' }}>
+                <Icon size={20} strokeWidth={isActive ? 2.2 : 1.8} />
+                <span style={{ fontSize:10, fontWeight: isActive ? 800 : 600 }}>{label}</span>
+              </button>
+            );
+          })}
+          <button onClick={() => setShowMobileMenu(true)}
+            style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:3, border:'none', background:'transparent', cursor:'pointer', fontFamily:F, color: col.muted, borderTop:'3px solid transparent' }}>
+            <Settings size={20} strokeWidth={1.8} />
+            <span style={{ fontSize:10, fontWeight:600 }}>More</span>
+          </button>
+        </nav>
+      )}
+
+      {/* ── MOBILE MENU SHEET ── */}
+      {isMobile && showMobileMenu && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', zIndex:9500 }} onClick={() => setShowMobileMenu(false)}>
+          <div style={{ position:'absolute', bottom:0, left:0, right:0, background: d.isDarkMode ? '#13111a' : '#fff', borderRadius:'20px 20px 0 0', padding:'12px 16px 40px', maxHeight:'75vh', overflowY:'auto' }} onClick={e => e.stopPropagation()}>
+            <div style={{ width:36, height:4, background:col.border, borderRadius:999, margin:'0 auto 16px' }} />
+            <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
+              {NAV_GROUPS.flatMap(g => g.items)
+                .filter(item => !['dashboard','homework','messages','schedule'].includes(item.key))
+                .map(item => {
+                  const LI = item.lucide;
+                  const isActive = d.activeTab === item.key;
+                  return (
+                    <button key={item.key} onClick={() => { d.setActiveTab(item.key); setShowMobileMenu(false); }}
+                      style={{ display:'flex', alignItems:'center', gap:12, padding:'11px 14px', borderRadius:14, border:'none', background: isActive ? (d.isDarkMode ? 'rgba(249,115,22,0.18)' : '#fff7ed') : 'transparent', color: isActive ? col.accent : col.body, cursor:'pointer', fontFamily:F, width:'100%' }}>
+                      <LI size={18} color={isActive ? col.accent : col.muted} strokeWidth={1.8} />
+                      <span style={{ fontSize:14, fontWeight: isActive ? 800 : 600 }}>{t(item.labelKey)}</span>
+                    </button>
+                  );
+                })}
+              <div style={{ borderTop:`1px solid ${col.border}`, margin:'8px 0 4px' }} />
+              <button onClick={() => { setShowMobileMenu(false); d.setShowSettingsSidebar(true); }}
+                style={{ display:'flex', alignItems:'center', gap:12, padding:'11px 14px', borderRadius:14, border:'none', background:'transparent', color:col.body, cursor:'pointer', fontFamily:F, width:'100%' }}>
+                <Settings size={18} color={col.muted} strokeWidth={1.8} />
+                <span style={{ fontSize:14, fontWeight:600 }}>{t('sidebar.settings')}</span>
+              </button>
+              <button onClick={d.handleLogout}
+                style={{ display:'flex', alignItems:'center', gap:12, padding:'11px 14px', borderRadius:14, border:'none', background:'transparent', color:'#ef4444', cursor:'pointer', fontFamily:F, width:'100%' }}>
+                <LogOut size={18} color="#ef4444" strokeWidth={1.8} />
+                <span style={{ fontSize:14, fontWeight:600 }}>{t('sidebar.signOut')}</span>
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

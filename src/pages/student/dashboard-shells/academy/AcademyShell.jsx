@@ -3,7 +3,7 @@
 // assignment cards, donut statistics, class-wall feed.
 // NO purple. Accent: #F97316 (warm orange).
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Home, BookOpen, Mic2, MessageSquare, CalendarDays, BarChart2,
   Bell, Search, LogOut, Settings, ChevronRight, ChevronLeft,
@@ -218,6 +218,13 @@ export default function AcademyShell() {
   const [show2FA,           setShow2FA]           = useState(false);
   const [wallTab,           setWallTab]           = useState("wall");
   const [marksPage,         setMarksPage]         = useState(0);
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   const activeSection = NAV.find(n => n.tabs.includes(d.activeTab))?.id || "dashboard";
   const subTabs = SUB_TABS[activeSection] || [];
@@ -266,7 +273,7 @@ export default function AcademyShell() {
       <aside style={{
         width:"190px", flexShrink:0,
         background:P.sideGrad,
-        display:"flex", flexDirection:"column",
+        display: isMobile ? "none" : "flex", flexDirection:"column",
         padding:"20px 12px", gap:"2px",
         boxShadow:"2px 0 12px rgba(249,115,22,0.15)",
         zIndex:100,
@@ -323,7 +330,7 @@ export default function AcademyShell() {
       <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden" }}>
 
         {/* ── TOP BAR ── */}
-        <header style={{ height:"64px", background:P.white, borderBottom:`1px solid ${P.border}`, display:"flex", alignItems:"center", padding:"0 24px", gap:"16px", flexShrink:0, zIndex:50 }}>
+        <header style={{ height:"64px", background:P.white, borderBottom:`1px solid ${P.border}`, display:"flex", alignItems:"center", padding: isMobile ? "0 12px" : "0 24px", gap: isMobile ? "8px" : "16px", flexShrink:0, zIndex:50 }}>
 
           {/* Page title */}
           <div style={{ display:"flex", alignItems:"center", gap:"8px", minWidth:"160px" }}>
@@ -338,7 +345,7 @@ export default function AcademyShell() {
 
           {/* Sub-tab pills */}
           {subTabs.length > 0 && (
-            <div style={{ display:"flex", gap:"6px" }}>
+            <div style={{ display:"flex", gap:"6px", overflowX:"auto", flexShrink:1, minWidth:0 }}>
               {subTabs.map(st => (
                 <button key={st.key} onClick={() => d.setActiveTab(st.key)}
                   style={{ padding:"6px 14px", borderRadius:"999px", fontSize:"13px", fontWeight:600, border:"none", cursor:"pointer", background:d.activeTab === st.key ? P.orange : P.border, color:d.activeTab === st.key ? "#fff" : P.textSub }}>
@@ -351,11 +358,13 @@ export default function AcademyShell() {
           <div style={{ flex:1 }} />
 
           {/* Search */}
+          {!isMobile && (
           <div style={{ position:"relative" }}>
             <Search size={15} style={{ position:"absolute", left:"10px", top:"50%", transform:"translateY(-50%)", color:P.textMuted }} />
             <input placeholder="Search..."
               style={{ width:"180px", height:"36px", background:P.inputBg, border:`1px solid ${P.border}`, borderRadius:"10px", padding:"0 10px 0 32px", fontSize:"13px", color:P.text, outline:"none", fontFamily:"Inter,sans-serif" }} />
           </div>
+          )}
 
           {/* Dark mode toggle */}
           <button onClick={() => d.setIsDarkMode(v => !v)}
@@ -374,22 +383,24 @@ export default function AcademyShell() {
 
           {/* User info */}
           <div style={{ display:"flex", alignItems:"center", gap:"10px" }}>
-            <div style={{ width:"36px", height:"36px", borderRadius:"50%", background:P.orangeGrad, display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontWeight:700, fontSize:"14px" }}>
+            <div style={{ width:"36px", height:"36px", borderRadius:"50%", background:P.orangeGrad, display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontWeight:700, fontSize:"14px", flexShrink:0 }}>
               {(d.student.firstName?.[0] || "S").toUpperCase()}
             </div>
+            {!isMobile && (
             <div style={{ lineHeight:1.2 }}>
               <div style={{ fontSize:"14px", fontWeight:600, color:P.text }}>{d.student.name || "Student"}</div>
               <div style={{ fontSize:"12px", color:P.textMuted }}>Student</div>
             </div>
+            )}
           </div>
         </header>
 
         {/* ── SCROLL AREA ── */}
-        <main style={{ flex:1, overflowY:"auto", padding:"24px" }}>
+        <main style={{ flex:1, overflowY:"auto", padding: isMobile ? "16px 14px 80px" : "24px" }}>
 
           {/* ═══ DASHBOARD ═══ */}
           {d.activeTab === "dashboard" && (
-            <div style={{ display:"flex", gap:"20px", alignItems:"flex-start" }}>
+            <div style={{ display:"flex", flexDirection: isMobile ? "column" : "row", gap:"20px", alignItems:"flex-start" }}>
 
               {/* Left column */}
               <div style={{ flex:1, display:"flex", flexDirection:"column", gap:"20px", minWidth:0 }}>
@@ -538,7 +549,7 @@ export default function AcademyShell() {
               </div>
 
               {/* Right column */}
-              <div style={{ width:"300px", flexShrink:0, display:"flex", flexDirection:"column", gap:"20px" }}>
+              <div style={{ width: isMobile ? "100%" : "300px", flexShrink:0, display:"flex", flexDirection:"column", gap:"20px" }}>
 
                 {/* Latest Marks */}
                 <div className="aca-card" style={{ background:P.card, borderRadius:"16px", padding:"20px", border:`1px solid ${P.border}`, boxShadow:"0 1px 6px rgba(0,0,0,0.05)" }}>
@@ -725,7 +736,7 @@ export default function AcademyShell() {
           {/* ═══ CHARTS ═══ */}
           {d.activeTab === "charts" && (
             <div style={{ display:"flex", flexDirection:"column", gap:"16px" }}>
-              <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:"12px" }}>
+              <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3,1fr)", gap:"12px" }}>
                 {[
                   { label:"Total Classes", value:d.completedClasses.length, color:P.orange, icon:"🎓" },
                   { label:"Day Streak",    value:d.progress.streakDays,     color:P.red,    icon:"🔥" },
@@ -840,6 +851,64 @@ export default function AcademyShell() {
           onClose={() => { d.setShowConfirmationModal(false); d.setSelectedConfirmation(null); }}
           onConfirmed={() => { d.setShowConfirmationModal(false); d.setSelectedConfirmation(null); d.fetchStudentData(); }}
         />
+      )}
+
+      {/* ── MOBILE BOTTOM NAV ── */}
+      {isMobile && (
+        <nav style={{ position:'fixed', bottom:0, left:0, right:0, height:60, background:P.orange, borderTop:'1px solid rgba(255,255,255,0.2)', display:'flex', zIndex:200, boxShadow:'0 -4px 20px rgba(249,115,22,0.3)' }}>
+          {[
+            { key:'dashboard',         Icon:Home,          label:'Home'    },
+            { key:'homework',          Icon:BookOpen,       label:'Study'   },
+            { key:'messages',          Icon:MessageSquare,  label:'Chat'    },
+            { key:'completed-classes', Icon:CalendarDays,   label:'Classes' },
+          ].map(({ key, Icon, label }) => {
+            const isActive = d.activeTab === key;
+            return (
+              <button key={key} onClick={() => d.setActiveTab(key)}
+                style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:3, border:'none', background:'transparent', cursor:'pointer', fontFamily:"'Inter',sans-serif", color: isActive ? '#fff' : 'rgba(255,255,255,0.6)', borderTop: isActive ? '3px solid #fff' : '3px solid transparent' }}>
+                <Icon size={20} strokeWidth={isActive ? 2.2 : 1.8} />
+                <span style={{ fontSize:10, fontWeight: isActive ? 700 : 500 }}>{label}</span>
+              </button>
+            );
+          })}
+          <button onClick={() => setShowMobileMenu(true)}
+            style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:3, border:'none', background:'transparent', cursor:'pointer', fontFamily:"'Inter',sans-serif", color:'rgba(255,255,255,0.6)', borderTop:'3px solid transparent' }}>
+            <Settings size={20} strokeWidth={1.8} />
+            <span style={{ fontSize:10, fontWeight:500 }}>More</span>
+          </button>
+        </nav>
+      )}
+
+      {/* ── MOBILE MENU SHEET ── */}
+      {isMobile && showMobileMenu && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', zIndex:9500 }} onClick={() => setShowMobileMenu(false)}>
+          <div style={{ position:'absolute', bottom:0, left:0, right:0, background:P.white, borderRadius:'20px 20px 0 0', padding:'12px 16px 44px', maxHeight:'78vh', overflowY:'auto' }} onClick={e => e.stopPropagation()}>
+            <div style={{ width:36, height:4, background:P.border, borderRadius:999, margin:'0 auto 16px' }} />
+            <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
+              {NAV.filter(n => !['dashboard','messages','classes'].includes(n.id)).map(n => {
+                const isActive = n.tabs.includes(d.activeTab);
+                return (
+                  <button key={n.id} onClick={() => { d.setActiveTab(n.tabs[0]); setShowMobileMenu(false); }}
+                    style={{ display:'flex', alignItems:'center', gap:12, padding:'11px 14px', borderRadius:14, border:'none', background: isActive ? `${P.orange}15` : 'transparent', color: isActive ? P.orange : P.text, cursor:'pointer', fontFamily:"'Inter',sans-serif", width:'100%', fontSize:14, fontWeight: isActive ? 700 : 500 }}>
+                    <n.Icon size={18} color={isActive ? P.orange : P.textSub} strokeWidth={1.8} />
+                    {n.label}
+                  </button>
+                );
+              })}
+              <div style={{ borderTop:`1px solid ${P.border}`, margin:'8px 0 4px' }} />
+              <button onClick={() => { setShowMobileMenu(false); setShowSettingsPanel(true); }}
+                style={{ display:'flex', alignItems:'center', gap:12, padding:'11px 14px', borderRadius:14, border:'none', background:'transparent', color:P.text, cursor:'pointer', fontFamily:"'Inter',sans-serif", width:'100%', fontSize:14, fontWeight:500 }}>
+                <Settings size={18} color={P.textSub} strokeWidth={1.8} />
+                Settings
+              </button>
+              <button onClick={d.handleLogout}
+                style={{ display:'flex', alignItems:'center', gap:12, padding:'11px 14px', borderRadius:14, border:'none', background:'transparent', color:P.red, cursor:'pointer', fontFamily:"'Inter',sans-serif", width:'100%', fontSize:14, fontWeight:600 }}>
+                <LogOut size={18} color={P.red} strokeWidth={1.8} />
+                Sign Out
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Toast */}
