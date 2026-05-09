@@ -7,7 +7,7 @@
 //     Agora fires onUserJoined faster than the DB poll, so it gives real-time detection.
 //   - Setting presence to FALSE: ONLY via Agora onUserLeft callback. Poll never forces false.
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { io } from "socket.io-client";
 import VideoCall from "../VideoCall";
@@ -28,6 +28,13 @@ export default function AgoraClassroom({ classData, userRole, onLeave, googleMee
   const userName    = localStorage.getItem("name") || "User";
   const userId      = localStorage.getItem("userId") || "";
   const channelName = `class-${bookingId}`;
+
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener("resize", handler);
+    return () => window.removeEventListener("resize", handler);
+  }, []);
 
   const { isDarkMode } = useDarkMode();
   const dm = isDarkMode;
@@ -172,6 +179,9 @@ export default function AgoraClassroom({ classData, userRole, onLeave, googleMee
     navigate(userRole === "teacher" ? "/teacher/dashboard" : "/student/dashboard");
   };
 
+  // Clear saved classroom state when properly ending (not minimizing)
+  const clearClassroomState = () => sessionStorage.removeItem("classroomState");
+
   // Teacher: switch platform
   const handleSwitchPlatform = async (newProvider) => {
     setPlatformSwitching(true);
@@ -252,6 +262,7 @@ export default function AgoraClassroom({ classData, userRole, onLeave, googleMee
               </div>
               <button
                 onClick={() => {
+                  clearClassroomState();
                   if (onLeave) onLeave();
                   else navigate(userRole === "teacher" ? "/teacher/dashboard" : "/student/dashboard",
                     { state: { classCompleted: true, activeTab: "payment" } });
@@ -346,6 +357,7 @@ export default function AgoraClassroom({ classData, userRole, onLeave, googleMee
                 </div>
               )}
               <button onClick={() => {
+                clearClassroomState();
                 if (onLeave) onLeave();
                 else navigate(userRole === "teacher" ? "/teacher/dashboard" : "/student/dashboard",
                   { state: { classMissed: true, activeTab: userRole === "teacher" ? "completed-classes" : "dashboard" } });
@@ -364,184 +376,187 @@ export default function AgoraClassroom({ classData, userRole, onLeave, googleMee
     <div className={`h-screen flex flex-col ${dm ? "bg-gray-900" : "bg-gradient-to-br from-purple-50 via-blue-50 to-pink-50"}`}>
 
       {/* HEADER */}
-      <div className={`border-b px-5 py-2.5 flex-shrink-0 ${dm ? "bg-gray-900 border-gray-700/60" : "bg-white border-gray-200"}`}
+      <div className={`border-b flex-shrink-0 ${dm ? "bg-gray-900 border-gray-700/60" : "bg-white border-gray-200"}`}
         style={{ boxShadow: dm ? "0 1px 0 rgba(255,255,255,0.04)" : "0 1px 3px rgba(0,0,0,0.06)" }}>
 
-        {/* ── Top row: title + actions ── */}
-        <div className="flex items-center justify-between mb-2.5">
-          <div className="min-w-0">
-            <h1 className={`text-base font-semibold leading-tight truncate ${dm ? "text-gray-100" : "text-gray-900"}`}>
+        {/* ── Row 1: back button · title · actions ── */}
+        <div className={`flex items-center gap-2 ${isMobile ? "px-3 py-2" : "px-5 py-2.5"}`}>
+
+          {/* Back / Dashboard button — always visible, prominent on mobile */}
+          <button onClick={handleMinimize}
+            title="Back to dashboard (class stays active)"
+            className={`flex-shrink-0 inline-flex items-center justify-center transition-all duration-150 active:scale-95 ${
+              isMobile
+                ? `w-9 h-9 rounded-xl ${dm ? "bg-gray-800 text-gray-300 hover:bg-gray-700" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`
+                : `gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border ${dm ? "border-gray-700 text-gray-400 hover:bg-gray-800 hover:text-gray-200 hover:border-gray-600" : "border-gray-200 text-gray-500 hover:bg-gray-50 hover:text-gray-700"}`
+            }`}>
+            <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7"/>
+            </svg>
+            {!isMobile && "Dashboard"}
+          </button>
+
+          {/* Title */}
+          <div className="flex-1 min-w-0">
+            <h1 className={`font-semibold leading-tight truncate ${isMobile ? "text-sm" : "text-base"} ${dm ? "text-gray-100" : "text-gray-900"}`}>
               {classData?.title || "Class"}
             </h1>
-            {classData?.topic && (
+            {classData?.topic && !isMobile && (
               <p className={`text-xs truncate ${dm ? "text-gray-500" : "text-gray-400"}`}>{classData.topic}</p>
             )}
           </div>
 
-          <div className="flex items-center gap-1.5 ml-4 flex-shrink-0">
+          {/* Right-side actions */}
+          <div className="flex items-center gap-1.5 flex-shrink-0">
 
-            {/* Dashboard — ghost */}
-            <button onClick={handleMinimize}
-              title="Back to dashboard (class stays active)"
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all duration-150 active:scale-95 ${
-                dm ? "border-gray-700 text-gray-400 hover:bg-gray-800 hover:text-gray-200 hover:border-gray-600"
-                   : "border-gray-200 text-gray-500 hover:bg-gray-50 hover:text-gray-700"
-              }`}>
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
-                <polyline strokeLinecap="round" strokeLinejoin="round" points="9 22 9 12 15 12 15 22"/>
-              </svg>
-              Dashboard
-            </button>
-
-            {/* Change Platform — violet solid (teacher only) */}
-            {userRole === "teacher" && (
-              <div className="relative" ref={platformRef}>
-                <button onClick={() => setPlatformOpen(o => !o)} disabled={platformSwitching}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-violet-600 hover:bg-violet-500 active:bg-violet-700 active:scale-95 text-white shadow-sm transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed">
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M8 7h12M8 12h12M8 17h12M4 7h.01M4 12h.01M4 17h.01"/>
-                  </svg>
-                  {platformSwitching ? "Switching…" : "Platform"}
-                </button>
-
-                {platformOpen && (
-                  <div className={`absolute right-0 top-full mt-1.5 border rounded-xl shadow-2xl p-3 z-50 w-52 ${
-                    dm ? "bg-gray-800 border-gray-700" : "bg-white border-gray-100"
-                  }`} style={{ boxShadow: dm ? "0 20px 60px rgba(0,0,0,0.5)" : "0 20px 60px rgba(0,0,0,0.12)" }}>
-                    <p className={`text-[11px] font-semibold uppercase tracking-wider mb-2.5 ${dm ? "text-gray-500" : "text-gray-400"}`}>
-                      Switch platform
-                    </p>
-                    <button onClick={() => { setPlatformOpen(false); handleSwitchPlatform("googlemeet"); }}
-                      disabled={!googleMeetLink}
-                      className="w-full py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-semibold transition-all duration-150 flex items-center justify-center gap-2">
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.069A1 1 0 0121 8.87v6.26a1 1 0 01-1.447.9L15 14M3 8a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/>
-                      </svg>
-                      Google Meet
-                    </button>
-                    {!googleMeetLink && (
-                      <p className={`text-[11px] text-center mt-2 ${dm ? "text-amber-500" : "text-amber-600"}`}>
-                        No Meet link on your profile
-                      </p>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Add Time — emerald solid (teacher only) */}
-            {userRole === "teacher" && (
+            {/* On mobile: teacher-only extras collapsed into ⋮ menu */}
+            {isMobile && userRole === "teacher" && (
               <div className="relative" ref={extendRef}>
-                <button onClick={() => { setExtendOpen(o => !o); setExtendMsg(""); }}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 active:scale-95 text-white shadow-sm transition-all duration-150">
-                  <PlusCircle className="w-3.5 h-3.5" />
-                  Add Time
+                <button onClick={() => { setExtendOpen(o => !o); setExtendMsg(""); setPlatformOpen(false); }}
+                  className={`w-9 h-9 flex items-center justify-center rounded-xl transition-all active:scale-95 ${dm ? "bg-gray-800 text-gray-300 hover:bg-gray-700" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                    <circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/>
+                  </svg>
                 </button>
-
                 {extendOpen && (
-                  <div className={`absolute right-0 top-full mt-1.5 border rounded-xl shadow-2xl p-3 z-50 w-52 ${
-                    dm ? "bg-gray-800 border-gray-700" : "bg-white border-gray-100"
-                  }`} style={{ boxShadow: dm ? "0 20px 60px rgba(0,0,0,0.5)" : "0 20px 60px rgba(0,0,0,0.12)" }}>
-                    <p className={`text-[11px] font-semibold uppercase tracking-wider mb-2.5 ${dm ? "text-gray-500" : "text-gray-400"}`}>
-                      Extend duration
-                    </p>
+                  <div className={`absolute right-0 top-full mt-1.5 border rounded-xl shadow-2xl p-3 z-50 w-52 ${dm ? "bg-gray-800 border-gray-700" : "bg-white border-gray-100"}`}
+                    style={{ boxShadow: dm ? "0 20px 60px rgba(0,0,0,0.5)" : "0 20px 60px rgba(0,0,0,0.12)" }}>
+                    <p className={`text-[11px] font-semibold uppercase tracking-wider mb-2.5 ${dm ? "text-gray-500" : "text-gray-400"}`}>Extend duration</p>
                     {extendMsg ? (
-                      <p className={`text-xs text-center font-semibold py-1.5 rounded-lg ${
-                        extendMsg.startsWith("✓")
-                          ? dm ? "bg-emerald-900/40 text-emerald-400" : "bg-emerald-50 text-emerald-600"
-                          : dm ? "bg-red-900/40 text-red-400" : "bg-red-50 text-red-500"
-                      }`}>{extendMsg}</p>
+                      <p className={`text-xs text-center font-semibold py-1.5 rounded-lg mb-2 ${extendMsg.startsWith("✓") ? dm ? "bg-emerald-900/40 text-emerald-400" : "bg-emerald-50 text-emerald-600" : dm ? "bg-red-900/40 text-red-400" : "bg-red-50 text-red-500"}`}>{extendMsg}</p>
                     ) : (
-                      <div className="flex gap-1.5">
+                      <div className="flex gap-1.5 mb-3">
                         {[5, 10, 15].map(mins => (
                           <button key={mins} disabled={extendLoading}
                             onClick={async () => {
                               setExtendLoading(true);
-                              try {
-                                await handleExtendTime(mins);
-                                setExtendMsg(`✓ +${mins} min added`);
-                                setTimeout(() => { setExtendOpen(false); setExtendMsg(""); }, 1500);
-                              } catch {
-                                setExtendMsg("Failed — try again");
-                              } finally { setExtendLoading(false); }
+                              try { await handleExtendTime(mins); setExtendMsg(`✓ +${mins} min added`); setTimeout(() => { setExtendOpen(false); setExtendMsg(""); }, 1500); }
+                              catch { setExtendMsg("Failed — try again"); }
+                              finally { setExtendLoading(false); }
                             }}
-                            className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-all duration-150 active:scale-95 disabled:opacity-50 ${
-                              dm ? "bg-emerald-700 hover:bg-emerald-600 text-white" : "bg-emerald-600 hover:bg-emerald-500 text-white"
-                            }`}>
+                            className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-all active:scale-95 disabled:opacity-50 ${dm ? "bg-emerald-700 hover:bg-emerald-600 text-white" : "bg-emerald-600 hover:bg-emerald-500 text-white"}`}>
                             +{mins}m
                           </button>
                         ))}
                       </div>
                     )}
-                    {extraSeconds > 0 && (
-                      <p className={`text-[11px] text-center mt-2 ${dm ? "text-gray-500" : "text-gray-400"}`}>
-                        +{Math.round(extraSeconds / 60)} min added
-                      </p>
-                    )}
+                    <div className={`h-px mb-3 ${dm ? "bg-gray-700" : "bg-gray-100"}`} />
+                    <p className={`text-[11px] font-semibold uppercase tracking-wider mb-2 ${dm ? "text-gray-500" : "text-gray-400"}`}>Switch platform</p>
+                    <button onClick={() => { setExtendOpen(false); handleSwitchPlatform("googlemeet"); }}
+                      disabled={!googleMeetLink}
+                      className="w-full py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-semibold flex items-center justify-center gap-2">
+                      Google Meet
+                    </button>
                   </div>
                 )}
               </div>
             )}
 
-            {/* Refresh — icon-only ghost */}
-            <button onClick={handleRefresh} title="Refresh presence"
-              className={`p-1.5 rounded-lg transition-all duration-150 active:scale-95 ${
-                dm ? "text-gray-500 hover:bg-gray-800 hover:text-gray-300" : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-              }`}>
-              <RefreshCw className="w-4 h-4" />
-            </button>
+            {/* Desktop-only: Platform + Add Time buttons */}
+            {!isMobile && userRole === "teacher" && (
+              <>
+                <div className="relative" ref={platformRef}>
+                  <button onClick={() => setPlatformOpen(o => !o)} disabled={platformSwitching}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-violet-600 hover:bg-violet-500 active:bg-violet-700 active:scale-95 text-white shadow-sm transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed">
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M8 7h12M8 12h12M8 17h12M4 7h.01M4 12h.01M4 17h.01"/>
+                    </svg>
+                    {platformSwitching ? "Switching…" : "Platform"}
+                  </button>
+                  {platformOpen && (
+                    <div className={`absolute right-0 top-full mt-1.5 border rounded-xl shadow-2xl p-3 z-50 w-52 ${dm ? "bg-gray-800 border-gray-700" : "bg-white border-gray-100"}`}
+                      style={{ boxShadow: dm ? "0 20px 60px rgba(0,0,0,0.5)" : "0 20px 60px rgba(0,0,0,0.12)" }}>
+                      <p className={`text-[11px] font-semibold uppercase tracking-wider mb-2.5 ${dm ? "text-gray-500" : "text-gray-400"}`}>Switch platform</p>
+                      <button onClick={() => { setPlatformOpen(false); handleSwitchPlatform("googlemeet"); }}
+                        disabled={!googleMeetLink}
+                        className="w-full py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-semibold transition-all duration-150 flex items-center justify-center gap-2">
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.069A1 1 0 0121 8.87v6.26a1 1 0 01-1.447.9L15 14M3 8a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/>
+                        </svg>
+                        Google Meet
+                      </button>
+                      {!googleMeetLink && <p className={`text-[11px] text-center mt-2 ${dm ? "text-amber-500" : "text-amber-600"}`}>No Meet link on your profile</p>}
+                    </div>
+                  )}
+                </div>
 
-            {/* Leave Early — red solid */}
+                <div className="relative" ref={extendRef}>
+                  <button onClick={() => { setExtendOpen(o => !o); setExtendMsg(""); }}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 active:scale-95 text-white shadow-sm transition-all duration-150">
+                    <PlusCircle className="w-3.5 h-3.5" />
+                    Add Time
+                  </button>
+                  {extendOpen && (
+                    <div className={`absolute right-0 top-full mt-1.5 border rounded-xl shadow-2xl p-3 z-50 w-52 ${dm ? "bg-gray-800 border-gray-700" : "bg-white border-gray-100"}`}
+                      style={{ boxShadow: dm ? "0 20px 60px rgba(0,0,0,0.5)" : "0 20px 60px rgba(0,0,0,0.12)" }}>
+                      <p className={`text-[11px] font-semibold uppercase tracking-wider mb-2.5 ${dm ? "text-gray-500" : "text-gray-400"}`}>Extend duration</p>
+                      {extendMsg ? (
+                        <p className={`text-xs text-center font-semibold py-1.5 rounded-lg ${extendMsg.startsWith("✓") ? dm ? "bg-emerald-900/40 text-emerald-400" : "bg-emerald-50 text-emerald-600" : dm ? "bg-red-900/40 text-red-400" : "bg-red-50 text-red-500"}`}>{extendMsg}</p>
+                      ) : (
+                        <div className="flex gap-1.5">
+                          {[5, 10, 15].map(mins => (
+                            <button key={mins} disabled={extendLoading}
+                              onClick={async () => {
+                                setExtendLoading(true);
+                                try { await handleExtendTime(mins); setExtendMsg(`✓ +${mins} min added`); setTimeout(() => { setExtendOpen(false); setExtendMsg(""); }, 1500); }
+                                catch { setExtendMsg("Failed — try again"); }
+                                finally { setExtendLoading(false); }
+                              }}
+                              className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-all duration-150 active:scale-95 disabled:opacity-50 ${dm ? "bg-emerald-700 hover:bg-emerald-600 text-white" : "bg-emerald-600 hover:bg-emerald-500 text-white"}`}>
+                              +{mins}m
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      {extraSeconds > 0 && <p className={`text-[11px] text-center mt-2 ${dm ? "text-gray-500" : "text-gray-400"}`}>+{Math.round(extraSeconds / 60)} min added</p>}
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+
+            {/* Refresh — icon-only, hidden on mobile to save space */}
+            {!isMobile && (
+              <button onClick={handleRefresh} title="Refresh presence"
+                className={`p-1.5 rounded-lg transition-all duration-150 active:scale-95 ${dm ? "text-gray-500 hover:bg-gray-800 hover:text-gray-300" : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"}`}>
+                <RefreshCw className="w-4 h-4" />
+              </button>
+            )}
+
+            {/* Leave — always visible */}
             <button onClick={() => setShowLeaveModal(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-red-600 hover:bg-red-500 active:bg-red-700 active:scale-95 text-white shadow-sm transition-all duration-150">
-              <Power className="w-3.5 h-3.5" />
-              Leave
+              className={`inline-flex items-center gap-1.5 rounded-lg font-medium bg-red-600 hover:bg-red-500 active:bg-red-700 active:scale-95 text-white shadow-sm transition-all duration-150 ${isMobile ? "w-9 h-9 justify-center" : "px-3 py-1.5 text-xs"}`}
+              title="Leave class">
+              <Power className="w-3.5 h-3.5 flex-shrink-0" />
+              {!isMobile && "Leave"}
             </button>
           </div>
         </div>
 
-        {/* ── Bottom row: timer · tabs · presence ── */}
-        <div className="flex items-center justify-between gap-4">
+        {/* ── Row 2: timer · tabs · presence ── */}
+        <div className={`flex items-center justify-between gap-2 border-t ${isMobile ? "px-3 py-1.5" : "px-5 py-2"} ${dm ? "border-gray-800" : "border-gray-100"}`}>
 
-          {/* Timer block */}
-          <div className="flex flex-col gap-0.5 min-w-0">
-            <div className="flex items-center gap-2.5">
-              <div className="flex items-center gap-1.5">
-                <Clock className={`w-3.5 h-3.5 ${dm ? "text-purple-400" : "text-purple-500"}`} />
-                <span className={`text-lg font-bold tabular-nums ${
-                  timeRemaining < 60 ? "text-red-500 animate-pulse" : dm ? "text-purple-300" : "text-purple-700"
-                }`}>
-                  {formatTime(timeRemaining)}
-                </span>
-              </div>
+          {/* Timer */}
+          <div className="flex items-center gap-1.5 min-w-0 flex-shrink-0">
+            <Clock className={`w-3.5 h-3.5 flex-shrink-0 ${dm ? "text-purple-400" : "text-purple-500"}`} />
+            <span className={`font-bold tabular-nums ${isMobile ? "text-base" : "text-lg"} ${timeRemaining < 60 ? "text-red-500 animate-pulse" : dm ? "text-purple-300" : "text-purple-700"}`}>
+              {formatTime(timeRemaining)}
+            </span>
+            {!isMobile && (
               <span className={`text-xs tabular-nums ${dm ? "text-gray-600" : "text-gray-400"}`}>
                 {formatTime(timeElapsed)} elapsed
               </span>
-            </div>
-            <div className="flex items-center gap-1.5 text-xs">
-              <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${isTimerRunning ? "bg-emerald-500 animate-pulse" : dm ? "bg-gray-600" : "bg-gray-300"}`} />
-              <span className={dm ? "text-gray-500" : "text-gray-400"}>
-                {classStarted
-                  ? `Together ${formatTime(bothActiveTime)} / ${formatTime(requiredTime)} · ${completionPct}%`
-                  : "Waiting for both to join…"}
-              </span>
-            </div>
-            <div className={`w-40 h-1 rounded-full mt-0.5 overflow-hidden ${dm ? "bg-gray-700" : "bg-gray-200"}`}>
-              <div className={`h-full rounded-full transition-all duration-1000 ${completionPct >= 100 ? "bg-emerald-500" : "bg-purple-500"}`}
-                style={{ width: `${Math.min(completionPct, 100)}%` }} />
-            </div>
-            {extraSeconds > 0 && (
-              <span className="text-[11px] text-emerald-500 font-medium mt-0.5">
-                +{Math.round(extraSeconds / 60)} min extended
-              </span>
+            )}
+            {!isMobile && classStarted && (
+              <div className={`w-24 h-1 rounded-full ml-1 overflow-hidden ${dm ? "bg-gray-700" : "bg-gray-200"}`}>
+                <div className={`h-full rounded-full transition-all duration-1000 ${completionPct >= 100 ? "bg-emerald-500" : "bg-purple-500"}`}
+                  style={{ width: `${Math.min(completionPct, 100)}%` }} />
+              </div>
             )}
           </div>
 
-          {/* Segmented tab control + teacher notify */}
-          <div className="flex items-center gap-2 flex-shrink-0">
-
-            {/* Tabs */}
+          {/* Tabs */}
+          <div className="flex items-center gap-1.5 flex-shrink-0">
             <div className={`flex items-center rounded-xl p-0.5 ${dm ? "bg-gray-800" : "bg-gray-100"}`}>
               {[
                 { id: "video",      Icon: Video,    label: "Video"   },
@@ -551,66 +566,43 @@ export default function AgoraClassroom({ classData, userRole, onLeave, googleMee
                 const isBlinking = blinkTab === id && userRole === "student";
                 return (
                   <button key={id} onClick={() => switchTab(id)}
-                    className={`relative inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-[10px] text-xs font-semibold transition-all duration-150 ${
+                    className={`relative inline-flex items-center gap-1 rounded-[10px] font-semibold transition-all duration-150 ${isMobile ? "px-2.5 py-1.5 text-[11px]" : "px-3.5 py-1.5 text-xs"} ${
                       activeTab === id
                         ? dm ? "bg-gray-700 text-white shadow-sm" : "bg-white text-gray-900 shadow-sm"
-                        : isBlinking
-                          ? "bg-violet-600 text-white shadow-md"
-                          : dm ? "text-gray-500 hover:text-gray-300" : "text-gray-500 hover:text-gray-700"
+                        : isBlinking ? "bg-violet-600 text-white shadow-md"
+                        : dm ? "text-gray-500 hover:text-gray-300" : "text-gray-500 hover:text-gray-700"
                     } ${isBlinking ? "animate-pulse" : ""}`}>
-
-                    {/* Blinking ring for student */}
-                    {isBlinking && (
-                      <span className="absolute inset-0 rounded-[10px] ring-2 ring-violet-400 ring-offset-1 ring-offset-transparent animate-ping pointer-events-none" />
-                    )}
-
+                    {isBlinking && <span className="absolute inset-0 rounded-[10px] ring-2 ring-violet-400 ring-offset-1 ring-offset-transparent animate-ping pointer-events-none" />}
                     <Icon className="w-3.5 h-3.5 flex-shrink-0" />
-                    {isBlinking ? "👆 Click me!" : label}
-
-                    {/* Bouncing dot */}
-                    {isBlinking && (
-                      <span className="absolute -top-1.5 -right-1.5 w-3 h-3 bg-red-500 rounded-full border-2 border-white dark:border-gray-900 animate-bounce" />
-                    )}
+                    {isMobile ? (isBlinking ? "!" : "") : (isBlinking ? "👆" : label)}
+                    {isBlinking && <span className="absolute -top-1.5 -right-1.5 w-3 h-3 bg-red-500 rounded-full border-2 border-white animate-bounce" />}
                   </button>
                 );
               })}
             </div>
 
-            {/* Teacher-only: ping a tab without forcing switch */}
-            {userRole === "teacher" && (
+            {/* Teacher-only ping — hidden on mobile */}
+            {!isMobile && userRole === "teacher" && (
               <div className="relative" ref={notifyRef}>
-                <button
-                  onClick={() => setNotifyOpen(o => !o)}
-                  title="Ping student to switch tab"
-                  className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 active:scale-95 ${
-                    dm ? "bg-gray-800 border border-gray-700 text-gray-400 hover:text-gray-200 hover:border-gray-500"
-                       : "bg-white border border-gray-200 text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                  }`}>
-                  {/* Megaphone icon */}
+                <button onClick={() => setNotifyOpen(o => !o)} title="Ping student to switch tab"
+                  className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 active:scale-95 ${dm ? "bg-gray-800 border border-gray-700 text-gray-400 hover:text-gray-200 hover:border-gray-500" : "bg-white border border-gray-200 text-gray-500 hover:text-gray-700 hover:border-gray-300"}`}>
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/>
                   </svg>
                   Ping
                 </button>
-
                 {notifyOpen && (
-                  <div className={`absolute right-0 top-full mt-1.5 border rounded-xl shadow-2xl p-3 z-50 w-44 ${
-                    dm ? "bg-gray-800 border-gray-700" : "bg-white border-gray-100"
-                  }`} style={{ boxShadow: dm ? "0 20px 60px rgba(0,0,0,0.5)" : "0 20px 60px rgba(0,0,0,0.12)" }}>
-                    <p className={`text-[11px] font-semibold uppercase tracking-wider mb-2 ${dm ? "text-gray-500" : "text-gray-400"}`}>
-                      Ping student to…
-                    </p>
+                  <div className={`absolute right-0 top-full mt-1.5 border rounded-xl shadow-2xl p-3 z-50 w-44 ${dm ? "bg-gray-800 border-gray-700" : "bg-white border-gray-100"}`}
+                    style={{ boxShadow: dm ? "0 20px 60px rgba(0,0,0,0.5)" : "0 20px 60px rgba(0,0,0,0.12)" }}>
+                    <p className={`text-[11px] font-semibold uppercase tracking-wider mb-2 ${dm ? "text-gray-500" : "text-gray-400"}`}>Ping student to…</p>
                     {[
                       { id: "video",      Icon: Video,   label: "Go to Video"   },
                       { id: "content",    Icon: FileText, label: "Go to Content" },
                       { id: "whiteboard", Icon: PenTool,  label: "Go to Board"   },
                     ].map(({ id, Icon, label }) => (
                       <button key={id} onClick={() => notifyTab(id)}
-                        className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium mb-1 last:mb-0 transition-all active:scale-95 ${
-                          dm ? "hover:bg-gray-700 text-gray-300" : "hover:bg-violet-50 text-gray-700 hover:text-violet-700"
-                        }`}>
-                        <Icon className="w-3.5 h-3.5 flex-shrink-0" />
-                        {label}
+                        className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium mb-1 last:mb-0 transition-all active:scale-95 ${dm ? "hover:bg-gray-700 text-gray-300" : "hover:bg-violet-50 text-gray-700 hover:text-violet-700"}`}>
+                        <Icon className="w-3.5 h-3.5 flex-shrink-0" />{label}
                       </button>
                     ))}
                   </div>
@@ -620,15 +612,15 @@ export default function AgoraClassroom({ classData, userRole, onLeave, googleMee
           </div>
 
           {/* Presence badges */}
-          <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex items-center gap-1.5 flex-shrink-0">
             {[
-              { label: "Teacher", present: isTeacherPresent },
-              { label: "Student", present: isStudentPresent },
+              { label: isMobile ? "T" : "Teacher", present: isTeacherPresent },
+              { label: isMobile ? "S" : "Student", present: isStudentPresent },
             ].map(({ label, present }) => (
-              <div key={label} className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium border ${
+              <div key={label} className={`inline-flex items-center gap-1 rounded-lg font-medium border ${isMobile ? "px-2 py-0.5 text-[11px]" : "px-2.5 py-1 text-xs"} ${
                 present
                   ? dm ? "bg-emerald-900/30 border-emerald-700/50 text-emerald-400" : "bg-emerald-50 border-emerald-200 text-emerald-700"
-                  : dm ? "bg-gray-800 border-gray-700 text-gray-500"               : "bg-gray-50 border-gray-200 text-gray-400"
+                  : dm ? "bg-gray-800 border-gray-700 text-gray-500" : "bg-gray-50 border-gray-200 text-gray-400"
               }`}>
                 <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${present ? "bg-emerald-500" : dm ? "bg-gray-600" : "bg-gray-300"}`} />
                 {label}
@@ -730,7 +722,7 @@ export default function AgoraClassroom({ classData, userRole, onLeave, googleMee
                 }`}>
                 <X className="w-3.5 h-3.5" /> Stay
               </button>
-              <button onClick={handleLeaveEarly}
+              <button onClick={() => { clearClassroomState(); handleLeaveEarly(); }}
                 className="flex-1 inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg text-sm font-medium bg-red-600 hover:bg-red-500 active:bg-red-700 active:scale-95 text-white transition-all duration-150 shadow-sm">
                 <Power className="w-3.5 h-3.5" /> Leave
               </button>

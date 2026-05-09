@@ -30,8 +30,13 @@ export default function Classroom({ classData, userRole: propUserRole, onLeave, 
   const location    = useLocation();
   const stateData   = location.state || {};
 
-  const finalClassData = classData || stateData.classData;
-  const userRole       = propUserRole || stateData.userRole || localStorage.getItem("role");
+  // Restore classData from sessionStorage when location.state is lost on page refresh
+  const savedState = (() => {
+    try { return JSON.parse(sessionStorage.getItem("classroomState") || "{}"); } catch { return {}; }
+  })();
+
+  const finalClassData = classData || stateData.classData || savedState.classData;
+  const userRole       = propUserRole || stateData.userRole || savedState.userRole || localStorage.getItem("role");
   const isGroupClass   = !!finalClassData?.isGroupClass;
   const bookingId      = finalClassData?.bookingId || finalClassData?.id;
 
@@ -67,6 +72,13 @@ export default function Classroom({ classData, userRole: propUserRole, onLeave, 
         .finally(() => setMeetLinkLoading(false));
     }
   }, [bookingId]);
+
+  // ── Persist classData so page refresh doesn't break the classroom ────────
+  useEffect(() => {
+    if (finalClassData && userRole) {
+      sessionStorage.setItem("classroomState", JSON.stringify({ classData: finalClassData, userRole }));
+    }
+  }, [bookingId, userRole]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Clear minimize banner when classroom actually loads ──────────────────
   useEffect(() => {
