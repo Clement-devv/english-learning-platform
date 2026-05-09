@@ -83,6 +83,11 @@ export default function SharedWhiteboard({
     socket.on('pdf-shared', handlePdfShared);
     socket.on('pdf-removed', handlePdfRemoved);
     socket.on('pdf-visibility-changed', handlePdfVisibilityChanged); // NEW
+    socket.on('canvas-state', ({ dataUrl }) => {
+      if (!dataUrl) return;
+      setHistory([dataUrl]);
+      setHistoryStep(0);
+    });
 
     return () => {
       socket.emit('leave-whiteboard', { channelName, userId });
@@ -93,6 +98,7 @@ export default function SharedWhiteboard({
       socket.off('pdf-shared');
       socket.off('pdf-removed');
       socket.off('pdf-visibility-changed');
+      socket.off('canvas-state');
       socket.disconnect();
     };
   }, [channelName, userId, userName, userRole]);
@@ -283,7 +289,13 @@ export default function SharedWhiteboard({
     if (!canvas) return;
 
     const ctx = canvas.getContext('2d');
-    
+
+    // Scale normalized [0,1] coords to this canvas's actual pixel dimensions
+    const x = data.x * canvas.width;
+    const y = data.y * canvas.height;
+    const startX = data.startX != null ? data.startX * canvas.width : 0;
+    const startY = data.startY != null ? data.startY * canvas.height : 0;
+
     ctx.strokeStyle = data.tool === 'eraser' ? '#ffffff' : data.color;
     ctx.lineWidth = data.tool === 'eraser' ? data.lineWidth * 3 : data.lineWidth;
     ctx.lineCap = 'round';
@@ -291,29 +303,29 @@ export default function SharedWhiteboard({
 
     if (data.type === 'start') {
       ctx.beginPath();
-      ctx.moveTo(data.x, data.y);
+      ctx.moveTo(x, y);
     } else if (data.type === 'draw') {
-      ctx.lineTo(data.x, data.y);
+      ctx.lineTo(x, y);
       ctx.stroke();
     } else if (data.type === 'end') {
       if (data.tool === 'line') {
         ctx.beginPath();
-        ctx.moveTo(data.startX, data.startY);
-        ctx.lineTo(data.x, data.y);
+        ctx.moveTo(startX, startY);
+        ctx.lineTo(x, y);
         ctx.stroke();
       } else if (data.tool === 'circle') {
         const radius = Math.sqrt(
-          Math.pow(data.x - data.startX, 2) + 
-          Math.pow(data.y - data.startY, 2)
+          Math.pow(x - startX, 2) +
+          Math.pow(y - startY, 2)
         );
         ctx.beginPath();
-        ctx.arc(data.startX, data.startY, radius, 0, 2 * Math.PI);
+        ctx.arc(startX, startY, radius, 0, 2 * Math.PI);
         ctx.stroke();
       } else if (data.tool === 'rectangle') {
-        const width = data.x - data.startX;
-        const height = data.y - data.startY;
+        const width = x - startX;
+        const height = y - startY;
         ctx.beginPath();
-        ctx.rect(data.startX, data.startY, width, height);
+        ctx.rect(startX, startY, width, height);
         ctx.stroke();
       }
     }
@@ -333,6 +345,7 @@ export default function SharedWhiteboard({
     newHistory.push(dataUrl);
     setHistory(newHistory);
     setHistoryStep(newHistory.length - 1);
+    socket.emit('save-canvas-state', { channelName, dataUrl });
   };
 
   const startDrawing = (e) => {
@@ -358,7 +371,8 @@ export default function SharedWhiteboard({
     }
 
     socket.emit('drawing', {
-      channelName, userId, type: 'start', tool, color, lineWidth, x, y
+      channelName, userId, type: 'start', tool, color, lineWidth,
+      x: x / canvas.width, y: y / canvas.height,
     });
   };
 
@@ -376,7 +390,8 @@ export default function SharedWhiteboard({
       ctx.stroke();
 
       socket.emit('drawing', {
-        channelName, userId, type: 'draw', tool, color, lineWidth, x, y
+        channelName, userId, type: 'draw', tool, color, lineWidth,
+        x: x / canvas.width, y: y / canvas.height,
       });
     }
   };
@@ -412,8 +427,10 @@ export default function SharedWhiteboard({
     }
 
     socket.emit('drawing', {
-      channelName, userId, type: 'end', tool, color, lineWidth, x, y,
-      startX: startPointRef.current.x, startY: startPointRef.current.y
+      channelName, userId, type: 'end', tool, color, lineWidth,
+      x: x / canvas.width, y: y / canvas.height,
+      startX: startPointRef.current.x / canvas.width,
+      startY: startPointRef.current.y / canvas.height,
     });
 
     setIsDrawing(false);

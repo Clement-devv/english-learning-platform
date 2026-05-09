@@ -178,6 +178,7 @@ export async function initializeSocket(httpServer) {
             pdfVisibleToStudents: false,
             currentPage: 1,
             currentScale: 1.3,
+            canvasSnapshot: null,
           });
         }
 
@@ -210,6 +211,11 @@ export async function initializeSocket(httpServer) {
           socket.emit('pdf-zoom-sync', { scale: session.currentScale });
         }
 
+        // Restore canvas drawing for rejoining users (tab-switch recovery)
+        if (session.canvasSnapshot) {
+          socket.emit('canvas-state', { dataUrl: session.canvasSnapshot });
+        }
+
         io.to(room).emit('user-count', userCount);
         socket.to(room).emit('user-joined', {
           userId: socket.userId,
@@ -240,6 +246,17 @@ export async function initializeSocket(httpServer) {
       }
     });
 
+    // Persist canvas snapshot so rejoining users (tab-switch) see current drawing
+    socket.on('save-canvas-state', ({ channelName, dataUrl }) => {
+      try {
+        const room = tenantRoom(socket, channelName);
+        const session = whiteboardSessions.get(room);
+        if (session && dataUrl) session.canvasSnapshot = dataUrl;
+      } catch (err) {
+        logger.error('save-canvas-state error:', { error: err?.message });
+      }
+    });
+
     // Handle canvas clear
     socket.on('clear-canvas', (data) => {
       try {
@@ -252,6 +269,7 @@ export async function initializeSocket(httpServer) {
           return;
         }
 
+        session.canvasSnapshot = null;
         socket.to(room).emit('clear-canvas', data);
       } catch (err) {
         logger.error('clear-canvas error:', { error: err?.message });

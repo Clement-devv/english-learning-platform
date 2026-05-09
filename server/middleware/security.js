@@ -52,11 +52,20 @@ export const securityHeaders = helmet({
         // Main platform API — center subdomains send API calls to clemify.com
         "https://clemify.com",
         "wss://clemify.com",
-        // Agora RTC / RTM servers
+        // Agora RTC / RTM servers.
+        // CSP wildcards match only ONE subdomain level, so *.agora.io does NOT
+        // cover *.edge.agora.io. Agora edge servers also use port 4714 (non-default
+        // for wss) so we need :* port wildcards on each pattern.
         "https://*.agora.io",
         "wss://*.agora.io",
+        "wss://*.agora.io:*",
+        "wss://*.edge.agora.io",
+        "wss://*.edge.agora.io:*",
         "https://*.sd-rtn.com",
         "wss://*.sd-rtn.com",
+        "wss://*.sd-rtn.com:*",
+        "wss://*.edge.sd-rtn.com",
+        "wss://*.edge.sd-rtn.com:*",
         // Google Translate API
         "https://translate.googleapis.com",
         "https://translate-pa.googleapis.com",
