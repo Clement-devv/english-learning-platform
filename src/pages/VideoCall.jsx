@@ -327,11 +327,65 @@ export default function VideoCall({
   const joinCall = async () => {
     if (isJoiningRef.current || hasJoinedRef.current) return;
     let channelJoined = false;
+    let audioTrack = null;
+    let videoTrack = null;
     try {
       isJoiningRef.current = true;
       setLoading(true);
       setError(null);
 
+      // ── Step 1: Acquire media tracks BEFORE joining ───────────────────────
+      // Camera/mic must be grabbed here, while we're still in the synchronous
+      // call-stack of the user's tap/click. On iOS Safari the browser revokes
+      // the getUserMedia permission if the call arrives after a long async gap
+      // (e.g. the Agora join() retrying through edge-server timeouts).
+
+      try {
+        // Pre-warm: flush stale OS-level hardware locks
+        try {
+          const warm = await navigator.mediaDevices.getUserMedia({ audio: true });
+          warm.getTracks().forEach(t => t.stop());
+        } catch (_) {}
+
+        audioTrack = await AgoraRTC.createMicrophoneAudioTrack({ encoderConfig: "speech_standard" });
+        setMicError(null);
+      } catch (err) {
+        console.warn("⚠️ Microphone unavailable:", err.code, err.name, err.message);
+        if (err.code === "NOT_READABLE" || err.name === "NotReadableError") {
+          await new Promise(r => setTimeout(r, 800));
+          try {
+            audioTrack = await AgoraRTC.createMicrophoneAudioTrack();
+            setMicError(null);
+          } catch (retryErr) {
+            console.warn("⚠️ Microphone retry failed:", retryErr.code, retryErr.message);
+            setMicError("Microphone is in use by another app. Close it and click Retry Mic.");
+          }
+        } else {
+          setMicError("Microphone could not be accessed. Click Retry Mic to try again.");
+        }
+      }
+
+      try {
+        videoTrack = await AgoraRTC.createCameraVideoTrack({ encoderConfig: "480p_2", optimizationMode: "motion" });
+        setCamError(null);
+      } catch (err) {
+        console.warn("⚠️ Camera unavailable:", err.code, err.name, err.message);
+        if (err.name === "NotAllowedError" || err.code === "PERMISSION_DENIED") {
+          setCamError("Camera permission denied. Allow camera access in your browser settings.");
+        } else if (err.name === "NotReadableError" || err.code === "NOT_READABLE") {
+          setCamError("Camera is in use by another app. Close it and click Retry Camera.");
+        } else if (err.name === "NotFoundError" || err.code === "DEVICE_NOT_FOUND") {
+          setCamError("No camera found on this device.");
+        } else {
+          setCamError("Camera could not be accessed. Click Retry Camera to try again.");
+        }
+      }
+
+      if (!audioTrack && !videoTrack) {
+        throw new Error("Cannot access camera or microphone. Check browser permissions.");
+      }
+
+      // ── Step 2: Create client and join channel ────────────────────────────
       const newClient = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
       newClient.on("user-published",          handleUserPublished);
       newClient.on("user-unpublished",        handleUserUnpublished);
@@ -354,57 +408,7 @@ export default function VideoCall({
         api.post('/agora-usage/start', { channelName, bookingId }).catch(() => {});
       }
 
-      // Create audio and video tracks independently so one failure doesn't kill both.
-      let audioTrack = null;
-      let videoTrack = null;
-
-      try {
-        // Pre-warm: native getUserMedia flushes stale OS-level hardware locks
-        // (NOT_READABLE often means a previous session didn't fully release the device)
-        try {
-          const warm = await navigator.mediaDevices.getUserMedia({ audio: true });
-          warm.getTracks().forEach(t => t.stop());
-        } catch (_) {}
-
-        audioTrack = await AgoraRTC.createMicrophoneAudioTrack({ encoderConfig: "speech_standard" });
-        setMicError(null);
-      } catch (err) {
-        console.warn("⚠️ Microphone unavailable:", err.message);
-        if (err.code === "NOT_READABLE" || err.name === "NotReadableError") {
-          // Hardware lock — wait 800ms and retry with no constraints
-          await new Promise(r => setTimeout(r, 800));
-          try {
-            audioTrack = await AgoraRTC.createMicrophoneAudioTrack();
-            setMicError(null);
-          } catch (retryErr) {
-            console.warn("⚠️ Microphone retry failed:", retryErr.message);
-            setMicError("Microphone is in use by another app. Close it and click Retry Mic.");
-          }
-        } else {
-          setMicError("Microphone could not be accessed. Click Retry Mic to try again.");
-        }
-      }
-
-      try {
-        videoTrack = await AgoraRTC.createCameraVideoTrack({ encoderConfig: "480p_2", optimizationMode: "motion" });
-        setCamError(null);
-      } catch (err) {
-        console.warn("⚠️ Camera unavailable:", err.message, err);
-        if (err.name === "NotAllowedError" || err.code === "PERMISSION_DENIED") {
-          setCamError("Camera permission denied. Allow camera access in your browser settings.");
-        } else if (err.name === "NotReadableError" || err.code === "NOT_READABLE") {
-          setCamError("Camera is in use by another app. Close it and click Retry Camera.");
-        } else if (err.name === "NotFoundError") {
-          setCamError("No camera found on this device.");
-        } else {
-          setCamError("Camera could not be accessed. Click Retry Camera to try again.");
-        }
-      }
-
-      if (!audioTrack && !videoTrack) {
-        throw new Error("Cannot access camera or microphone. Check browser permissions.");
-      }
-
+      // ── Step 3: VB processor, noise constraints, publish ─────────────────
       if (videoTrack && vbCompatible) {
         try {
           const processor = vbExtension.createProcessor();
@@ -415,13 +419,12 @@ export default function VideoCall({
         } catch (vbErr) { console.warn("⚠️ VB init failed:", vbErr); }
       }
 
-      // Apply browser-native noise suppression (Chrome, Edge, Firefox)
       if (audioTrack) {
         try {
           const msTrack = audioTrack.getMediaStreamTrack();
           await msTrack.applyConstraints({ noiseSuppression: true, autoGainControl: true, echoCancellation: true });
           setNoiseCancelSupported(true);
-        } catch (_) { /* browser doesn't support applyConstraints — button stays hidden */ }
+        } catch (_) {}
       }
 
       if (audioTrack) setLocalAudioTrack(audioTrack);
@@ -429,7 +432,11 @@ export default function VideoCall({
       const tracksToPublish = [audioTrack, videoTrack].filter(Boolean);
       await client.current.publish(tracksToPublish);
     } catch (err) {
-      console.error("❌ Join error:", err);
+      console.error("❌ Join error:", err.code, err.name, err.message);
+      // Release any tracks that were created before the join failed
+      try { videoTrack?.getMediaStreamTrack()?.stop(); } catch (_) {}
+      audioTrack?.stop(); audioTrack?.close();
+      videoTrack?.stop(); videoTrack?.close();
       let msg = "Failed to join call";
       if (err.code === "INVALID_OPERATION") msg = "Already connected — please refresh.";
       else if (err.message?.includes("camera") || err.message?.includes("microphone"))
