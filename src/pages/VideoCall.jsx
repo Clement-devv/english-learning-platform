@@ -409,24 +409,10 @@ export default function VideoCall({
       }
 
       // ── Step 3: Expose tracks to UI immediately so toggle works right away ──
-      // setLocalVideoTrack MUST happen before VB init — VB processor.init() can
-      // take 1-3 s (WASM load) and the control bar is already visible. Without
-      // this, the camera toggle button does nothing during that window because
-      // localVideoTrack is still null.
       if (audioTrack) setLocalAudioTrack(audioTrack);
       if (videoTrack) setLocalVideoTrack(videoTrack);
 
-      // ── Step 4: VB processor (async — track refs are already live above) ──
-      if (videoTrack && vbCompatible) {
-        try {
-          const processor = vbExtension.createProcessor();
-          await processor.init();
-          videoTrack.pipe(processor).pipe(videoTrack.processorDestination);
-          vbProcessorRef.current = processor;
-          setActiveBg("none");
-        } catch (vbErr) { console.warn("⚠️ VB init failed:", vbErr); }
-      }
-
+      // ── Step 4: Noise suppression (fast, synchronous constraint) ──────────
       if (audioTrack) {
         try {
           const msTrack = audioTrack.getMediaStreamTrack();
@@ -435,8 +421,28 @@ export default function VideoCall({
         } catch (_) {}
       }
 
+      // ── Step 5: PUBLISH TRACKS NOW — before VB init ───────────────────────
+      // VB processor.init() loads a WASM module that takes 1-5s and can hang
+      // indefinitely on some mobile browsers. Publishing first ensures remote
+      // users see us immediately. VB pipes into the already-published track
+      // in-place (Agora streams the updated frames automatically).
       const tracksToPublish = [audioTrack, videoTrack].filter(Boolean);
       await client.current.publish(tracksToPublish);
+
+      // ── Step 6: VB processor (async, non-blocking — already published) ────
+      // 8-second timeout prevents a hung WASM load from blocking anything else.
+      if (videoTrack && vbCompatible) {
+        try {
+          const processor = vbExtension.createProcessor();
+          await Promise.race([
+            processor.init(),
+            new Promise((_, rej) => setTimeout(() => rej(new Error("VB init timeout")), 8000)),
+          ]);
+          videoTrack.pipe(processor).pipe(videoTrack.processorDestination);
+          vbProcessorRef.current = processor;
+          setActiveBg("none");
+        } catch (vbErr) { console.warn("⚠️ VB init failed:", vbErr); }
+      }
     } catch (err) {
       console.error("❌ Join error:", err.code, err.name, err.message);
       // Release any tracks that were created before the join failed
