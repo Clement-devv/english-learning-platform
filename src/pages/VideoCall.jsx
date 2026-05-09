@@ -408,7 +408,15 @@ export default function VideoCall({
         api.post('/agora-usage/start', { channelName, bookingId }).catch(() => {});
       }
 
-      // ── Step 3: VB processor, noise constraints, publish ─────────────────
+      // ── Step 3: Expose tracks to UI immediately so toggle works right away ──
+      // setLocalVideoTrack MUST happen before VB init — VB processor.init() can
+      // take 1-3 s (WASM load) and the control bar is already visible. Without
+      // this, the camera toggle button does nothing during that window because
+      // localVideoTrack is still null.
+      if (audioTrack) setLocalAudioTrack(audioTrack);
+      if (videoTrack) setLocalVideoTrack(videoTrack);
+
+      // ── Step 4: VB processor (async — track refs are already live above) ──
       if (videoTrack && vbCompatible) {
         try {
           const processor = vbExtension.createProcessor();
@@ -427,8 +435,6 @@ export default function VideoCall({
         } catch (_) {}
       }
 
-      if (audioTrack) setLocalAudioTrack(audioTrack);
-      if (videoTrack) setLocalVideoTrack(videoTrack);
       const tracksToPublish = [audioTrack, videoTrack].filter(Boolean);
       await client.current.publish(tracksToPublish);
     } catch (err) {
@@ -509,23 +515,39 @@ export default function VideoCall({
     setMicOn(next);
   };
   const toggleCamera = async () => {
-    if (!localVideoTrack) return;
+    // No track at all — treat toggle as a retry (camera failed on join)
+    if (!localVideoTrack) { await retryCamera(); return; }
     const next = !camOn;
-    await localVideoTrack.setEnabled(next);
-    setCamOn(next);
+    try {
+      await localVideoTrack.setEnabled(next);
+      setCamOn(next);
+    } catch (err) {
+      console.warn("⚠️ toggleCamera setEnabled failed:", err.code, err.name, err.message);
+      // Track is in a bad state — recreate it when turning on
+      if (next === true) await retryCamera();
+    }
   };
 
   const retryCamera = async () => {
-    if (!joined || localVideoTrack) return;
+    if (!joined) return;
     try {
       setCamError(null);
+      // Clean up any existing broken track before creating a new one
+      if (localVideoTrack) {
+        try { await client.current?.unpublish([localVideoTrack]); } catch (_) {}
+        try { localVideoTrack.getMediaStreamTrack()?.stop(); } catch (_) {}
+        try { localVideoTrack.stop(); localVideoTrack.close(); } catch (_) {}
+        setLocalVideoTrack(null);
+        localVideoTrackRef.current = null;
+      }
       const track = await AgoraRTC.createCameraVideoTrack({ encoderConfig: "480p_2", optimizationMode: "motion" });
       localVideoTrackRef.current = track;
       setLocalVideoTrack(track);
       await client.current?.publish([track]);
       if (localContainer.current) track.play(localContainer.current);
+      setCamOn(true);
     } catch (err) {
-      console.warn("⚠️ Camera retry failed:", err.message, err);
+      console.warn("⚠️ Camera retry failed:", err.code, err.name, err.message);
       setCamError("Camera still unavailable. Check permissions and close other apps using the camera.");
     }
   };
