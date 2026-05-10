@@ -760,6 +760,14 @@ export default function SunshineShell() {
           onClose={()=>{ d.setShowConfirmationModal(false); d.setSelectedConfirmation(null); }} />
       )}
 
+      {/* Floating pill to switch back to mobile view — visible when user forced desktop on a phone */}
+      {forcedMode === "desktop" && (
+        <button onClick={() => setViewMode("auto")}
+          style={{ position:'fixed', bottom:16, right:16, zIndex:9999, display:'flex', alignItems:'center', gap:6, padding:'10px 16px', borderRadius:999, background: col.accent, color:'#fff', border:'none', cursor:'pointer', fontFamily:F, fontSize:13, fontWeight:800, boxShadow:'0 4px 18px rgba(249,115,22,0.45)' }}>
+          📱 Mobile View
+        </button>
+      )}
+
       {/* ── MOBILE BOTTOM NAV ── */}
       {isMobile && (
         <nav style={{ position:'fixed', bottom:0, left:0, right:0, height:60, background: d.isDarkMode ? '#13111a' : '#fff', borderTop:`2px solid ${col.border}`, display:'flex', zIndex:200, boxShadow:'0 -4px 16px rgba(0,0,0,0.08)' }}>
