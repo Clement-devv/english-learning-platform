@@ -27,6 +27,14 @@ export function useViewMode() {
     if (mode === "auto") localStorage.removeItem(KEY);
     else localStorage.setItem(KEY, mode);
     setForcedMode(mode === "auto" ? null : mode);
+    // Sync viewport meta so desktop/mobile UIs render at the correct scale
+    const vp = document.getElementById("vp");
+    if (vp) {
+      const useMobile = mode !== "desktop" && window.screen.width < 768;
+      vp.content = useMobile
+        ? "width=device-width, initial-scale=1.0, viewport-fit=cover"
+        : "width=1280, viewport-fit=cover";
+    }
     setIsMobile(compute());
   };
 

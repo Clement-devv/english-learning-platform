@@ -11,7 +11,14 @@
         var p = window.location.pathname;
         var isApp = /^\/(admin|teacher|student|parent|sub-admin|super-admin)/.test(p);
         if (isApp) {
-          document.getElementById('vp').content = 'width=1280, viewport-fit=cover';
+          // Phones (screen.width < 768) get device-width so mobile UI renders at actual size.
+          // Respect explicit user preference stored in localStorage.
+          var saved = localStorage.getItem('viewMode');
+          var isPhone = window.screen.width < 768;
+          var useMobile = isPhone && saved !== 'desktop';
+          document.getElementById('vp').content = useMobile
+            ? 'width=device-width, initial-scale=1.0, viewport-fit=cover'
+            : 'width=1280, viewport-fit=cover';
         }
       })();
     </script>

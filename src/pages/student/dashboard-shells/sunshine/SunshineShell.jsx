@@ -477,9 +477,9 @@ export default function SunshineShell() {
                 <div style={{ position: "absolute", right: -30, top: -40, width: 200, height: 200, borderRadius: "50%", background: "rgba(255,255,255,0.12)" }}/>
                 <div style={{ position: "absolute", right: 80, bottom: -50, width: 120, height: 120, borderRadius: "50%", background: "rgba(255,255,255,0.08)" }}/>
                 <div style={{ position: "relative", zIndex: 1, flex: 1, minWidth: 0 }}>
-                  <p style={{ margin: "0 0 4px", fontSize: 14, fontWeight: 700, opacity: 0.9 }}>{t('dashboard.greeting', { name: d.student.firstName })}</p>
-                  <h1 style={{ margin: "0 0 8px", fontSize: 28, fontWeight: 900, letterSpacing: "-0.5px", lineHeight: 1.15 }}>{t('dashboard.heroTitle')}</h1>
-                  <p style={{ margin: 0, fontSize: 14, fontWeight: 600, opacity: 0.95 }}>
+                  <p style={{ margin: "0 0 4px", fontSize: isMobile ? 15 : 14, fontWeight: 700, opacity: 0.9 }}>{t('dashboard.greeting', { name: d.student.firstName })}</p>
+                  <h1 style={{ margin: "0 0 8px", fontSize: isMobile ? 34 : 28, fontWeight: 900, letterSpacing: "-0.5px", lineHeight: 1.15 }}>{t('dashboard.heroTitle')}</h1>
+                  <p style={{ margin: 0, fontSize: isMobile ? 15 : 14, fontWeight: 600, opacity: 0.95 }}>
                     {d.homeworkPending > 0 ? t('dashboard.homeworkDue', { count: d.homeworkPending }) : t('dashboard.noPendingHomework')} · {t('dashboard.classesLeft', { count: d.progress.classesRemaining })} 🔥
                   </p>
                 </div>
@@ -533,12 +533,12 @@ export default function SunshineShell() {
                   { Icon: Award,        n: d.badges.length,             l: t('dashboard.stats.badgesEarned'), grad: "linear-gradient(135deg,#f43f5e,#fb7185)", shadow: "rgba(244,63,94,0.3)"   },
                   { Icon: Star,         n: d.progress.weeklyCompleted,  l: t('dashboard.stats.thisWeek'),     grad: "linear-gradient(135deg,#f59e0b,#fbbf24)", shadow: "rgba(245,158,11,0.3)"  },
                 ].slice(0, isMobile ? 2 : 4).map((s, i) => (
-                  <div key={i} className="kid-card" style={{ background: col.card, borderRadius: 22, padding: "18px 20px", border: `2px solid ${col.border}`, display: "flex", flexDirection: "column", gap: 6 }}>
-                    <div style={{ width: 44, height: 44, borderRadius: 14, background: s.grad, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: `0 4px 12px ${s.shadow}` }}>
-                      <s.Icon size={20} color="#fff" strokeWidth={2} />
+                  <div key={i} className="kid-card" style={{ background: col.card, borderRadius: isMobile ? 28 : 22, padding: isMobile ? "24px 20px 28px" : "18px 20px", border: `2px solid ${col.border}`, display: "flex", flexDirection: "column", gap: isMobile ? 10 : 6 }}>
+                    <div style={{ width: isMobile ? 66 : 44, height: isMobile ? 66 : 44, borderRadius: isMobile ? 18 : 14, background: s.grad, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: `0 4px 12px ${s.shadow}` }}>
+                      <s.Icon size={isMobile ? 30 : 20} color="#fff" strokeWidth={2} />
                     </div>
-                    <div style={{ fontSize: 26, fontWeight: 900, color: col.heading, letterSpacing: "-0.5px" }}>{s.n}</div>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: col.muted }}>{s.l}</div>
+                    <div style={{ fontSize: isMobile ? 44 : 26, fontWeight: 900, color: col.heading, letterSpacing: "-0.5px", marginTop: isMobile ? 4 : 0 }}>{s.n}</div>
+                    <div style={{ fontSize: isMobile ? 14 : 12, fontWeight: 700, color: col.muted }}>{s.l}</div>
                   </div>
                 ))}
               </div>
