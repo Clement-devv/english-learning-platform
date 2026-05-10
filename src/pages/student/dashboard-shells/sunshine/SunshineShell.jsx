@@ -2,6 +2,7 @@
 // Sunshine Explorer — warm orange palette, bubbly Nunito font, vertical sidebar nav.
 
 import { useState, useEffect, lazy, Suspense } from "react";
+import { useViewMode } from "../../../../hooks/useViewMode";
 const GroupClassTab        = lazy(() => import('../../tabs/GroupClassTab'));
 const BookingCalendarTab   = lazy(() => import('../../tabs/BookingCalendarTab'));
 const CertificatesTab      = lazy(() => import('../../tabs/CertificatesTab'));
@@ -223,13 +224,8 @@ export default function SunshineShell() {
   const dashTheme = getDashboardThemeById(branding.dashboardTheme);
   const d   = useDashboardData();
   const { missedCalls, missedCallCount, clearMissedCalls } = useRing();
-  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
+  const { isMobile, forcedMode, setViewMode } = useViewMode();
   const [showMobileMenu, setShowMobileMenu] = useState(false);
-  useEffect(() => {
-    const onResize = () => setIsMobile(window.innerWidth < 768);
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, []);
   const col = dashTheme.palette(d.isDarkMode);
   const F   = `'${dashTheme.font}',sans-serif`;
   const tooltipStyle = { backgroundColor: d.isDarkMode ? "#1a1d2e" : "#fff", border: `1px solid ${col.border}`, color: col.heading, borderRadius: "12px", fontFamily: F };
@@ -392,6 +388,15 @@ export default function SunshineShell() {
             <LogOut size={17} color={col.muted} />
             <span style={{ fontSize: 13, fontWeight: 600, color: col.body }}>{t('sidebar.signOut')}</span>
           </button>
+
+          {/* Switch back to mobile view (only shown when user forced desktop on a phone) */}
+          {forcedMode === "desktop" && (
+            <button className="ss-navitem" onClick={() => setViewMode("auto")}
+              style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", borderRadius: 14, border: "none", cursor: "pointer", background: d.isDarkMode ? "rgba(249,115,22,0.1)" : "#fff7ed", fontFamily: F, marginTop: 4 }}>
+              <span style={{ fontSize: 15 }}>📱</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: col.accent }}>Mobile View</span>
+            </button>
+          )}
         </div>
       </aside>
 
@@ -787,6 +792,25 @@ export default function SunshineShell() {
           <div style={{ position:'absolute', bottom:0, left:0, right:0, background: d.isDarkMode ? '#13111a' : '#fff', borderRadius:'20px 20px 0 0', padding:'12px 16px 40px', maxHeight:'75vh', overflowY:'auto' }} onClick={e => e.stopPropagation()}>
             <div style={{ width:36, height:4, background:col.border, borderRadius:999, margin:'0 auto 16px' }} />
             <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
+
+              {/* View mode toggle */}
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 14px 14px', marginBottom:2 }}>
+                <span style={{ fontSize:13, fontWeight:700, color:col.muted }}>View</span>
+                <div style={{ display:'flex', background: d.isDarkMode ? 'rgba(255,255,255,0.06)' : '#f3f4f6', borderRadius:12, padding:3, gap:2 }}>
+                  {[{ mode:'auto', label:'📱 Mobile' }, { mode:'desktop', label:'🖥️ Desktop' }].map(({ mode, label }) => {
+                    const active = mode === 'desktop' ? forcedMode === 'desktop' : forcedMode !== 'desktop';
+                    return (
+                      <button key={mode} onClick={() => { setViewMode(mode); if (mode === 'desktop') setShowMobileMenu(false); }}
+                        style={{ padding:'6px 14px', borderRadius:10, border:'none', cursor:'pointer', fontFamily:F, fontSize:12, fontWeight:800, transition:'all 0.15s',
+                          background: active ? col.accent : 'transparent',
+                          color: active ? '#fff' : col.muted }}>
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
               {NAV_GROUPS.flatMap(g => g.items)
                 .filter(item => !['dashboard','homework','messages','schedule'].includes(item.key))
                 .map(item => {
