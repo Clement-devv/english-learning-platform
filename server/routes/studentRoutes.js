@@ -233,7 +233,7 @@ router.post("/setup-account", strictLimiter, async (req, res) => {
 
     const centerName = req.center?.centerName || "";
 
-    try { await sendStudentWelcomeEmail(student, centerName); }
+    try { await sendStudentWelcomeEmail(student, centerName, req.center); }
     catch (e) { logger.error("Failed to send welcome email:", { error: e?.message }); }
 
     // Fire-and-forget: send admin the student record PDF now that account is fully activated
@@ -305,7 +305,7 @@ router.put("/:id", verifyToken, verifyAdminOrTeacher, async (req, res) => {
     if (!student) return notFound(res, "Student not found");
 
     if (password) {
-      try { await sendPasswordResetEmail(student.email, `${student.firstName} ${student.lastName}`, password, "student", req.center?.centerName || ""); }
+      try { await sendPasswordResetEmail(student.email, `${student.firstName} ${student.lastName}`, password, "student", req.center?.centerName || "", req.center); }
       catch (e) { logger.error("Failed to send password reset email:", { error: e?.message }); }
     }
 
@@ -388,7 +388,7 @@ router.post("/:id/reset-password", verifyToken, verifyAdminOrTeacher, strictLimi
     student.lastPasswordChange = new Date();
     await student.save();
 
-    try { await sendPasswordResetEmail(student.email, `${student.firstName} ${student.lastName}`, newPass, "student", req.center?.centerName || ""); }
+    try { await sendPasswordResetEmail(student.email, `${student.firstName} ${student.lastName}`, newPass, "student", req.center?.centerName || "", req.center); }
     catch (e) { logger.error("Failed to send password reset email:", { error: e?.message }); }
 
     res.json({ message: "Password reset successfully", tempPassword: newPass });

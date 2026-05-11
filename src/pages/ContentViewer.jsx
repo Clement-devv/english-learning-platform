@@ -65,6 +65,10 @@ export default function ContentViewer({ bookingId, userRole, channelName }) {
   useEffect(() => { colorRef.current = color; }, [color]);
   useEffect(() => { pdfDocRef.current = pdfDoc; }, [pdfDoc]);
   useEffect(() => { scaleRef.current = scale; }, [scale]);
+  const hasPdfRef  = useRef(false);
+  const loadingRef = useRef(true);
+  useEffect(() => { hasPdfRef.current  = hasPdf;   }, [hasPdf]);
+  useEffect(() => { loadingRef.current = loading;  }, [loading]);
 
   // ── Socket.IO connection ───────────────────────────────────────────────────
   useEffect(() => {
@@ -72,7 +76,9 @@ export default function ContentViewer({ bookingId, userRole, channelName }) {
 
     const userId   = localStorage.getItem("userId") || "unknown";
     const userName = localStorage.getItem("name")   || "User";
-    const token    = localStorage.getItem("teacherToken") || localStorage.getItem("studentToken");
+    const token    =
+      sessionStorage.getItem("teacherToken") || sessionStorage.getItem("studentToken") ||
+      localStorage.getItem("teacherToken")   || localStorage.getItem("studentToken");
 
     const socket = io(import.meta.env.VITE_SOCKET_URL || "http://localhost:5000", {
       auth:       { token },
@@ -378,6 +384,16 @@ export default function ContentViewer({ bookingId, userRole, channelName }) {
 
     const poll = async () => {
       try {
+        // No PDF loaded yet — check if teacher uploaded one (polling fallback for socket miss)
+        if (!hasPdfRef.current) {
+          if (!loadingRef.current) {
+            const { data: info } = await api.get(`/content/info/${bookingId}`).catch(() => ({ hasPdf: false }));
+            if (info.hasPdf) loadPdfRef.current?.();
+          }
+          timer = setTimeout(poll, 2000);
+          return;
+        }
+
         const { data } = await api.get(`/classroom/session/${bookingId}/content-state`);
 
         // ── Page sync ───────────────────────────────────────────────────────

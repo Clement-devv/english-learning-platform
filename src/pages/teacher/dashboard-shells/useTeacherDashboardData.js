@@ -5,6 +5,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext.jsx';
+import { io } from 'socket.io-client';
 import api from '../../../api';
 import { useDarkMode } from '../../../hooks/useDarkMode';
 import { getUserTimezone } from '../../../utils/timezone';
@@ -17,6 +18,8 @@ import {
   deleteBooking,
   cancelBooking,
 } from '../../../services/bookingService';
+
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || '';
 
 // Heartbeat schedule (all intervals are multiples of TICK_MS):
 //   Every 30s  — pending bookings (critical: teacher needs to respond fast)
@@ -71,6 +74,7 @@ export function useTeacherDashboardData() {
 
   // ── Push notifications ─────────────────────────────────────────────────────
   const [pushEnabled,       setPushEnabled]       = useState(false);
+  const [unreadMessages,    setUnreadMessages]    = useState(0);
 
   // ── Modal visibility ───────────────────────────────────────────────────────
   const [showChangePassword,     setShowChangePassword]     = useState(false);
@@ -82,11 +86,57 @@ export function useTeacherDashboardData() {
   const [isModalOpen,            setIsModalOpen]            = useState(false);
   const [confirmModal,           setConfirmModal]           = useState({ open: false, type: null, classId: null });
 
-  // ── Push bootstrap ─────────────────────────────────────────────────────────
+  // ── Push bootstrap — auto-subscribe on first login ─────────────────────────
   useEffect(() => {
     if (!pushSupported()) return;
-    getPushStatus().then(setPushEnabled);
+    getPushStatus().then(async subscribed => {
+      if (subscribed) {
+        setPushEnabled(true);
+      } else if (Notification.permission !== 'denied') {
+        const { ok } = await enablePush();
+        setPushEnabled(ok);
+      }
+    });
   }, []);
+
+  // ── Socket connection — real-time messages and booking events ──────────────
+  useEffect(() => {
+    const token = sessionStorage.getItem('teacherToken') || localStorage.getItem('teacherToken');
+    if (!token) return;
+
+    let socket = null;
+    let cancelled = false;
+
+    const tid = setTimeout(() => {
+      if (cancelled) return;
+      socket = io(SOCKET_URL, { transports: ['websocket'], auth: { token } });
+      socket.on('connect', () => { socket.emit('join-teacher-room'); });
+      socket.on('new-direct-message', ({ senderName, message }) => {
+        setUnreadMessages(prev => prev + 1);
+        if ('Notification' in window && Notification.permission === 'granted') {
+          new Notification(`💬 Message from ${senderName}`, { body: message, icon: '/favicon.ico' });
+        }
+      });
+    }, 0);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(tid);
+      if (socket) { socket.removeAllListeners(); socket.disconnect(); }
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Unread messages count — fetch on mount, reset when messages tab opened ─
+  useEffect(() => {
+    api.get('/direct-messages').then(({ data }) => {
+      const total = (data.dms || []).reduce((sum, dm) => sum + (dm.unreadCount?.teacher || 0), 0);
+      setUnreadMessages(total);
+    }).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === 'messages') setUnreadMessages(0);
+  }, [activeTab]);
 
   async function togglePush() {
     if (pushEnabled) {
@@ -740,8 +790,9 @@ export function useTeacherDashboardData() {
     googleMeetLink, setGoogleMeetLink,
     // Computed
     pendingBookings, completedCount, homeworkToGrade, quizAttempted,
-    // Push
+    // Push & messages
     pushEnabled, pushSupported, togglePush,
+    unreadMessages, setUnreadMessages,
     // Classroom
     isClassroomOpen, activeClass,
     // Modals

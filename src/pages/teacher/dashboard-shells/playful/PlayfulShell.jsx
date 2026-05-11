@@ -224,6 +224,7 @@ export default function PlayfulShell() {
           const isActive = id === activeSection;
           const badge = id === 'bookings' && d.pendingBookings > 0 ? d.pendingBookings
                       : id === 'content' && (d.homeworkToGrade + d.quizAttempted) > 0 ? (d.homeworkToGrade + d.quizAttempted)
+                      : id === 'messages' && d.unreadMessages > 0 ? d.unreadMessages
                       : null;
           return (
             <button key={id} className="pft-nav" title={label}
@@ -373,9 +374,10 @@ export default function PlayfulShell() {
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
                     {TILES.map(tile => {
-                      const badge = tile.tab === 'bookings' ? d.pendingBookings
-                                  : tile.tab === 'homework' ? d.homeworkToGrade
-                                  : tile.tab === 'quiz'     ? d.quizAttempted
+                      const badge = tile.tab === 'bookings'  ? d.pendingBookings
+                                  : tile.tab === 'homework'  ? d.homeworkToGrade
+                                  : tile.tab === 'quiz'      ? d.quizAttempted
+                                  : tile.tab === 'messages'  ? d.unreadMessages
                                   : 0;
                       return (
                         <div key={tile.tab} className="pft-tile"

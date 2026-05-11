@@ -5,14 +5,20 @@ import logger from "../utils/logger.js";
 
 /**
  * Resolve the correct base URL for email links sent to a center's users.
- * - Custom domain verified → https://www.sunshine.com (no ?center= slug needed)
- * - Otherwise            → FRONTEND_URL + ?center=slug as fallback
+ * - Custom domain verified → https://www.sunshine.com
+ * - Slug known            → https://slug.clemify.com  (subdomain that always works)
+ * - Neither               → FRONTEND_URL (last resort)
  */
 export const getCenterBaseUrl = (center) => {
   if (center?.customDomain && center?.domainVerified) {
     return { baseUrl: `https://${center.customDomain}`, needsSlug: false };
   }
-  return { baseUrl: config.frontendUrl, needsSlug: true };
+  const slug = typeof center === "string" ? center : center?.slug;
+  if (slug) {
+    const rootDomain = config.frontendUrl.replace(/^https?:\/\//, "").split("/")[0];
+    return { baseUrl: `https://${slug}.${rootDomain}`, needsSlug: false };
+  }
+  return { baseUrl: config.frontendUrl, needsSlug: false };
 };
 
 // ── Transport selection ───────────────────────────────────────────────────────

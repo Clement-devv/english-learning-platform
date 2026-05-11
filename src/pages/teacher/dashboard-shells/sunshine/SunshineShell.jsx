@@ -187,7 +187,7 @@ export default function SunshineShell() {
     if (key === 'bookings')  return d.pendingBookings > 0 ? d.pendingBookings : null;
     if (key === 'homework')  return d.homeworkToGrade > 0 ? d.homeworkToGrade : null;
     if (key === 'quiz')      return d.quizAttempted  > 0 ? d.quizAttempted  : null;
-    if (key === 'messages')  return missedCallCount   > 0 ? missedCallCount   : null;
+    if (key === 'messages')  return d.unreadMessages > 0 ? d.unreadMessages : null;
     return null;
   };
 

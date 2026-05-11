@@ -17,6 +17,7 @@ import { checkAndAwardCertificates } from './certificateRoutes.js';
 import { validateObjectId } from '../middleware/validateObjectId.js';
 import { parsePagination } from '../utils/pagination.js';
 import { toStr, toObjectId } from '../utils/inputSanitizer.js';
+import { sendPush } from '../utils/webPushService.js';
 
 const router = express.Router();
 router.use(tenantMiddleware);
@@ -104,9 +105,25 @@ router.post("/", verifyToken, async (req, res) => {
       .populate("studentId", "firstName lastName email classCredits");
 
     if (createdBy === "admin") {
-      sendBookingRequestToTeacher(teacher, student, populatedBooking, req.center?.centerName || "").catch(e => logger.error("Teacher booking email failed:", { error: e?.message }));
+      sendBookingRequestToTeacher(teacher, student, populatedBooking, req.center?.centerName || "", req.center).catch(e => logger.error("Teacher booking email failed:", { error: e?.message }));
     }
-    sendBookingCreatedToStudent(student, teacher, populatedBooking, req.center?.centerName || "").catch(e => logger.error("Student booking email failed:", { error: e?.message }));
+    sendBookingCreatedToStudent(student, teacher, populatedBooking, req.center?.centerName || "", req.center).catch(e => logger.error("Student booking email failed:", { error: e?.message }));
+
+    // Push real-time update + device notification to student
+    try {
+      const io = req.app.get('io');
+      if (io) {
+        io.to(`student-room:${req.center.slug}:${studentId.toString()}`).emit('booking-update', {
+          type: 'created',
+          title: '📅 New Class Scheduled!',
+          message: `A new class "${classTitle}" has been scheduled for you`,
+          bookingId: booking._id,
+        });
+      }
+      if (student.pushSubscription?.endpoint) {
+        sendPush(student.pushSubscription, { title: '📅 New Class Scheduled!', body: `"${classTitle}" has been booked for you`, icon: '/icons/icon.svg', data: { url: '/student/dashboard' } }).catch(() => {});
+      }
+    } catch (_) {}
 
     res.status(201).json({
       success: true,
@@ -140,10 +157,10 @@ router.patch("/:id/accept", verifyToken, validateObjectId("id"), async (req, res
     booking.acceptedAt = new Date();
     await booking.save();
 
-    try { await sendBookingAcceptedToStudent(booking.studentId, booking.teacherId, booking, req.center?.centerName || ""); }
+    try { await sendBookingAcceptedToStudent(booking.studentId, booking.teacherId, booking, req.center?.centerName || "", req.center); }
     catch (e) { logger.error("Email notification failed:", { error: e?.message }); }
 
-    // Push real-time update to student dashboard
+    // Push real-time update + device notification to student
     try {
       const io = req.app.get('io');
       io.to(`student-room:${req.center.slug}:${booking.studentId._id}`).emit('booking-update', {
@@ -152,6 +169,10 @@ router.patch("/:id/accept", verifyToken, validateObjectId("id"), async (req, res
         message: `Your class "${booking.classTitle}" has been confirmed`,
         bookingId: booking._id,
       });
+      getStudent(req.db).findById(booking.studentId._id).select('pushSubscription').then(s => {
+        if (s?.pushSubscription?.endpoint)
+          sendPush(s.pushSubscription, { title: '✅ Class Confirmed!', body: `"${booking.classTitle}" is confirmed`, icon: '/icons/icon.svg', data: { url: '/student/dashboard' } }).catch(() => {});
+      }).catch(() => {});
     } catch (_) {}
 
     res.json({ success: true, message: "Booking accepted successfully", booking });
@@ -182,10 +203,10 @@ router.patch("/:id/reject", verifyToken, validateObjectId("id"), async (req, res
     booking.rejectedAt      = new Date();
     await booking.save();
 
-    try { await sendBookingRejectedToStudent(booking.studentId, booking.teacherId, booking, req.center?.centerName || ""); }
+    try { await sendBookingRejectedToStudent(booking.studentId, booking.teacherId, booking, req.center?.centerName || "", req.center); }
     catch (e) { logger.error("Email notification failed:", { error: e?.message }); }
 
-    // Push real-time update to student dashboard
+    // Push real-time update + device notification to student
     try {
       const io = req.app.get('io');
       io.to(`student-room:${req.center.slug}:${booking.studentId._id}`).emit('booking-update', {
@@ -194,6 +215,10 @@ router.patch("/:id/reject", verifyToken, validateObjectId("id"), async (req, res
         message: `Your booking "${booking.classTitle}" was not accepted`,
         bookingId: booking._id,
       });
+      getStudent(req.db).findById(booking.studentId._id).select('pushSubscription').then(s => {
+        if (s?.pushSubscription?.endpoint)
+          sendPush(s.pushSubscription, { title: '❌ Booking Declined', body: `"${booking.classTitle}" was not accepted`, icon: '/icons/icon.svg', data: { url: '/student/dashboard' } }).catch(() => {});
+      }).catch(() => {});
     } catch (_) {}
 
     res.json({ success: true, message: "Booking rejected", booking });
@@ -244,7 +269,7 @@ router.patch("/:id/complete", verifyToken, validateObjectId("id"), async (req, r
       });
     }
 
-    try { await sendClassCompletedNotification(booking.teacherId, booking.studentId, booking); }
+    try { await sendClassCompletedNotification(booking.teacherId, booking.studentId, booking, req.center?.centerName || "", req.center); }
     catch (e) { logger.error("Email notification failed:", { error: e?.message }); }
 
     // Auto-award certificates for milestones reached
@@ -252,7 +277,7 @@ router.patch("/:id/complete", verifyToken, validateObjectId("id"), async (req, r
       req.db, booking.studentId._id, req.center?.slug, req.center?._id
     );
 
-    // Push real-time update to student dashboard
+    // Push real-time update + device notification to student
     try {
       const io = req.app.get('io');
       io.to(`student-room:${req.center.slug}:${booking.studentId._id}`).emit('booking-update', {
@@ -261,6 +286,10 @@ router.patch("/:id/complete", verifyToken, validateObjectId("id"), async (req, r
         message: `Your class "${booking.classTitle}" has been marked as completed`,
         bookingId: booking._id,
       });
+      getStudent(req.db).findById(booking.studentId._id).select('pushSubscription').then(s => {
+        if (s?.pushSubscription?.endpoint)
+          sendPush(s.pushSubscription, { title: '🎉 Class Completed!', body: `"${booking.classTitle}" is done — great work!`, icon: '/icons/icon.svg', data: { url: '/student/dashboard' } }).catch(() => {});
+      }).catch(() => {});
       // Notify student of any new certificates
       for (const cert of newCerts) {
         io.to(`student-room:${req.center.slug}:${booking.studentId._id}`).emit('certificate-awarded', {
@@ -441,9 +470,9 @@ router.post("/student-request", verifyToken, async (req, res) => {
       .populate("teacherId", "firstName lastName email")
       .populate("studentId", "firstName lastName email");
 
-    sendBookingRequestToTeacher(teacher, student, populated, req.center?.centerName || "")
+    sendBookingRequestToTeacher(teacher, student, populated, req.center?.centerName || "", req.center)
       .catch(e => logger.error("Teacher booking email failed:", { error: e?.message }));
-    sendBookingCreatedToStudent(student, teacher, populated, req.center?.centerName || "")
+    sendBookingCreatedToStudent(student, teacher, populated, req.center?.centerName || "", req.center)
       .catch(e => logger.error("Student booking email failed:", { error: e?.message }));
 
     res.status(201).json({

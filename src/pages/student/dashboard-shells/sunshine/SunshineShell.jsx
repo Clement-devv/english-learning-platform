@@ -433,14 +433,6 @@ export default function SunshineShell() {
             🔔
           </button>
 
-          {/* Desktop mode switch — mobile only */}
-          {isMobile && (
-            <button className="kid-btn" onClick={() => setViewMode('desktop')} title="Switch to Desktop View"
-              style={{ height: 38, borderRadius: 12, border: `2px solid ${col.border}`, background: col.cardAlt, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, padding: '0 10px', flexShrink: 0 }}>
-              <span style={{ fontSize: 15 }}>🖥️</span>
-              <span style={{ fontSize: 11, fontWeight: 800, color: col.muted, fontFamily: F }}>Desktop</span>
-            </button>
-          )}
         </header>
 
         {/* ── SCROLL AREA ── */}
@@ -759,7 +751,8 @@ export default function SunshineShell() {
           onChangePassword={()=>{ d.setShowSettingsSidebar(false); d.setShowChangePassword(true); }}
           onManageSessions={()=>{ d.setShowSettingsSidebar(false); d.setShowSessionManagement(true); }}
           onManage2FA={()=>{ d.setShowSettingsSidebar(false); d.setShowSettingsModal(true); }}
-          userInfo={{ firstName: d.student.firstName, lastName: d.student.lastName, email: d.student.email }} />
+          userInfo={{ firstName: d.student.firstName, lastName: d.student.lastName, email: d.student.email }}
+          isMobile={isMobile} forcedMode={forcedMode} onSetViewMode={setViewMode} />
       )}
       {d.showSettingsModal && <SettingsModal isOpen onClose={() => d.setShowSettingsModal(false)} userType="student" />}
       {d.showConfirmationModal && d.selectedConfirmation && (
@@ -787,10 +780,18 @@ export default function SunshineShell() {
             { key:'schedule',  Icon:CalendarDays, label:'Classes' },
           ].map(({ key, Icon, label }) => {
             const isActive = d.activeTab === key;
+            const badge = key === 'messages' && d.unreadMessages > 0 ? d.unreadMessages : 0;
             return (
               <button key={key} onClick={() => d.setActiveTab(key)}
                 style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:4, border:'none', background:'transparent', cursor:'pointer', fontFamily:F, color: isActive ? col.accent : col.muted, position:'relative', height:62, paddingBottom:6 }}>
-                <Icon size={22} strokeWidth={isActive ? 2.4 : 1.8} />
+                <div style={{ position:'relative' }}>
+                  <Icon size={22} strokeWidth={isActive ? 2.4 : 1.8} />
+                  {badge > 0 && (
+                    <span style={{ position:'absolute', top:-7, right:-10, background:'#ef4444', color:'#fff', borderRadius:999, minWidth:18, height:18, fontSize:10, fontWeight:800, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 4px', lineHeight:1, border:'2px solid '+(d.isDarkMode?'#13111a':'#fff') }}>
+                      {badge > 99 ? '99+' : badge}
+                    </span>
+                  )}
+                </div>
                 <span style={{ fontSize:10, fontWeight: isActive ? 800 : 600 }}>{label}</span>
                 {isActive && <span style={{ position:'absolute', bottom:0, left:'50%', transform:'translateX(-50%)', width:28, height:3, borderRadius:'3px 3px 0 0', background:col.accent }} />}
               </button>
@@ -810,24 +811,6 @@ export default function SunshineShell() {
           <div style={{ position:'absolute', bottom:0, left:0, right:0, background: d.isDarkMode ? '#13111a' : '#fff', borderRadius:'20px 20px 0 0', padding:'12px 16px 40px', maxHeight:'75vh', overflowY:'auto' }} onClick={e => e.stopPropagation()}>
             <div style={{ width:36, height:4, background:col.border, borderRadius:999, margin:'0 auto 16px' }} />
             <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
-
-              {/* View mode toggle */}
-              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 14px 14px', marginBottom:2 }}>
-                <span style={{ fontSize:13, fontWeight:700, color:col.muted }}>View</span>
-                <div style={{ display:'flex', background: d.isDarkMode ? 'rgba(255,255,255,0.06)' : '#f3f4f6', borderRadius:12, padding:3, gap:2 }}>
-                  {[{ mode:'auto', label:'📱 Mobile' }, { mode:'desktop', label:'🖥️ Desktop' }].map(({ mode, label }) => {
-                    const active = mode === 'desktop' ? forcedMode === 'desktop' : forcedMode !== 'desktop';
-                    return (
-                      <button key={mode} onClick={() => { setViewMode(mode); if (mode === 'desktop') setShowMobileMenu(false); }}
-                        style={{ padding:'6px 14px', borderRadius:10, border:'none', cursor:'pointer', fontFamily:F, fontSize:12, fontWeight:800, transition:'all 0.15s',
-                          background: active ? col.accent : 'transparent',
-                          color: active ? '#fff' : col.muted }}>
-                        {label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
 
               {NAV_GROUPS.flatMap(g => g.items)
                 .filter(item => !['dashboard','homework','messages','schedule'].includes(item.key))

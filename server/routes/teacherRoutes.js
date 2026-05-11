@@ -350,7 +350,7 @@ router.post("/setup-account", async (req, res) => {
     teacher.lastPasswordChange = new Date();
     await teacher.save();
 
-    try { await sendTeacherWelcomeEmail(teacher, req.center?.centerName || ""); } catch (e) { logger.error("Welcome email failed:", { error: e?.message }); }
+    try { await sendTeacherWelcomeEmail(teacher, req.center?.centerName || "", req.center); } catch (e) { logger.error("Welcome email failed:", { error: e?.message }); }
 
     const adminEmail = req.center?.adminEmail;
     if (adminEmail) {
@@ -435,7 +435,7 @@ router.put("/:id", verifyToken, verifyAdmin, async (req, res) => {
 
     await invalidateCache(teacherCacheKey(req.center?.slug, req.params.id));
     if (password) {
-      try { await sendPasswordResetEmail(teacher.email, `${teacher.firstName} ${teacher.lastName}`, password, "teacher", req.center?.centerName || ""); }
+      try { await sendPasswordResetEmail(teacher.email, `${teacher.firstName} ${teacher.lastName}`, password, "teacher", req.center?.centerName || "", req.center); }
       catch (e) { logger.error("Password reset email failed:", { error: e?.message }); }
       const resp = teacher.toObject();
       resp.temporaryPassword = password;

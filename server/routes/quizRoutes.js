@@ -18,6 +18,7 @@ import logger from "../utils/logger.js";
 import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
 import { validateObjectId, wrapUpload } from '../middleware/validateObjectId.js';
 import { toStr, toObjectId, toInt, toArray } from '../utils/inputSanitizer.js';
+import { sendPush } from '../utils/webPushService.js';
 
 // Multer — memory storage (no disk writes, PDF buffer passed straight to pdf-parse)
 const upload = multer({
@@ -118,7 +119,7 @@ router.post("/", verifyToken, async (req, res) => {
       }
     }).catch(e => logger.warn("Student lookup for quiz email failed:", { error: e?.message }));
 
-    // Push real-time update to student dashboard
+    // Push real-time update + device notification to student
     try {
       const io = req.app.get('io');
       io.to(`student-room:${req.center.slug}:${studentId}`).emit('quiz-assigned', {
@@ -127,6 +128,10 @@ router.post("/", verifyToken, async (req, res) => {
         quizId: quiz._id,
         dueDate,
       });
+      getStudent(req.db).findById(studentId).select('pushSubscription').then(s => {
+        if (s?.pushSubscription?.endpoint)
+          sendPush(s.pushSubscription, { title: '📝 New Quiz!', body: `Your teacher assigned: "${title.slice(0, 60)}"`, icon: '/icons/icon.svg', data: { url: '/student/dashboard?tab=quiz' } }).catch(() => {});
+      }).catch(() => {});
     } catch (_) {}
 
     res.status(201).json({ success: true, quiz });

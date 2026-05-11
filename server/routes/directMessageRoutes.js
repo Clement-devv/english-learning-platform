@@ -8,6 +8,8 @@ import { studentSchema }          from "../schemas/studentSchema.js";
 import { adminSchema }            from "../schemas/adminSchema.js";
 import { subAdminSchema }         from "../schemas/subAdminSchema.js";
 import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
+import { sendPush } from '../utils/webPushService.js';
+import logger from '../utils/logger.js';
 
 const router = express.Router();
 router.use(tenantMiddleware);
@@ -158,6 +160,52 @@ router.post("/:id/messages", verifyToken, async (req, res) => {
 
     await dm.save();
     const saved = dm.messages[dm.messages.length - 1];
+
+    // ── Real-time notification to recipient ──────────────────────────────────
+    const payload = {
+      dmId:       dm._id.toString(),
+      message:    message.trim().slice(0, 120),
+      senderName: sender.name,
+      senderRole: role,
+    };
+    try {
+      const io = req.app.get('io');
+      const slug = req.center?.slug;
+      if (io && slug) {
+        if (role === 'admin') {
+          // Admin → teacher / student / sub-admin
+          if (dm.type === 'teacher-admin' && dm.teacherId) {
+            io.to(`teacher-room:${slug}:${dm.teacherId}`).emit('new-direct-message', payload);
+            // Push notification
+            getTeacher(req.db).findById(dm.teacherId).select('pushSubscription').then(t => {
+              if (t?.pushSubscription?.endpoint)
+                sendPush(t.pushSubscription, { title: `💬 Message from Admin`, body: message.trim().slice(0, 100), icon: '/icons/icon.svg', data: { url: '/teacher/dashboard?tab=messages' } }).catch(() => {});
+            }).catch(() => {});
+          } else if (dm.type === 'student-admin' && dm.studentId) {
+            io.to(`student-room:${slug}:${dm.studentId}`).emit('new-direct-message', payload);
+            getStudent(req.db).findById(dm.studentId).select('pushSubscription').then(s => {
+              if (s?.pushSubscription?.endpoint)
+                sendPush(s.pushSubscription, { title: `💬 Message from Admin`, body: message.trim().slice(0, 100), icon: '/icons/icon.svg', data: { url: '/student/dashboard?tab=messages' } }).catch(() => {});
+            }).catch(() => {});
+          } else if (dm.type === 'sub-admin-admin' && dm.subAdminId) {
+            io.to(`admin-room:${slug}:${dm.subAdminId}`).emit('new-direct-message', payload);
+          }
+        } else {
+          // Teacher / student / sub-admin → admin broadcast
+          io.to(`admin-broadcast:${slug}`).emit('new-direct-message', payload);
+          // Push to all admins with a subscription
+          getAdmin(req.db).find({ pushSubscription: { $exists: true, $ne: null } }).select('pushSubscription').lean().then(admins => {
+            admins.forEach(a => {
+              if (a.pushSubscription?.endpoint)
+                sendPush(a.pushSubscription, { title: `💬 Message from ${sender.name}`, body: message.trim().slice(0, 100), icon: '/icons/icon.svg', data: { url: '/admin/dashboard?tab=messages' } }).catch(() => {});
+            });
+          }).catch(() => {});
+        }
+      }
+    } catch (err) {
+      logger.warn('DM real-time notify error:', { error: err?.message });
+    }
+
     res.json({ success: true, data: saved });
   } catch (err) {
     serverError(res, err.message);

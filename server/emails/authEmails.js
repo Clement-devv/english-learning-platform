@@ -18,7 +18,8 @@ export const sendWelcomeEmail = async (email, name, password, centerName = "") =
   });
 };
 
-export const sendPasswordResetEmail = async (email, name, newPassword, role = "teacher", centerName = "") => {
+export const sendPasswordResetEmail = async (email, name, newPassword, role = "teacher", centerName = "", center = null) => {
+  const { baseUrl } = getCenterBaseUrl(center);
   const loginPath = role === "student" ? "/student/login" : role === "admin" ? "/admin/login" : "/teacher/login";
   return sendEmail({
     centerName,
@@ -30,7 +31,7 @@ export const sendPasswordResetEmail = async (email, name, newPassword, role = "t
       <p>Your password has been reset by an administrator.</p>
       <p><strong>New Password:</strong> ${newPassword}</p>
       <p>Please change this password after logging in.</p>
-      <p>Login here: <a href="${config.frontendUrl}${loginPath}">${config.frontendUrl}${loginPath}</a></p>
+      <p>Login here: <a href="${baseUrl}${loginPath}">${baseUrl}${loginPath}</a></p>
     `,
   });
 };
@@ -220,8 +221,9 @@ export const sendSubAdminInviteEmail = async (subAdmin, setupUrl, createdBy, cen
   });
 };
 
-export const sendSubAdminWelcomeEmail = async (subAdmin, centerName = "") => {
-  const loginUrl = `${config.frontendUrl}/sub-admin/login`;
+export const sendSubAdminWelcomeEmail = async (subAdmin, centerName = "", center = null) => {
+  const { baseUrl } = getCenterBaseUrl(center);
+  const loginUrl = `${baseUrl}/sub-admin/login`;
 
   return sendEmail({
     centerName,
@@ -433,9 +435,10 @@ export const sendTeacherInviteEmail = async (teacher, setupUrl, centerName = "")
   });
 };
 
-export const sendTeacherWelcomeEmail = async (teacher, centerName = "") => {
+export const sendTeacherWelcomeEmail = async (teacher, centerName = "", center = null) => {
   const displayName = centerName || config.appName;
-  const loginUrl    = `${config.frontendUrl}/teacher/login`;
+  const { baseUrl } = getCenterBaseUrl(center);
+  const loginUrl    = `${baseUrl}/teacher/login`;
 
   return sendEmail({
     centerName,
@@ -579,9 +582,10 @@ export const sendStudentInviteEmail = async (student, setupUrl, centerName = "")
   });
 };
 
-export const sendStudentWelcomeEmail = async (student, centerName = "") => {
+export const sendStudentWelcomeEmail = async (student, centerName = "", center = null) => {
   const displayName = centerName || config.appName;
-  const loginUrl    = `${config.frontendUrl}/student/login`;
+  const { baseUrl } = getCenterBaseUrl(center);
+  const loginUrl    = `${baseUrl}/student/login`;
 
   return sendEmail({
     centerName,

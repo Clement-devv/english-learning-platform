@@ -392,8 +392,6 @@ export async function initializeSocket(httpServer) {
     });
 
     // ── Student personal room (dashboard real-time updates) ─────────────────
-    // Students join their own room so the server can push booking, homework,
-    // and quiz updates without the student needing to refresh.
     socket.on('join-student-room', () => {
       try {
         if (socket.userRole !== 'student') return;
@@ -401,6 +399,28 @@ export async function initializeSocket(httpServer) {
         socket.join(room);
         logger.info(`📡 Student ${socket.userId} joined personal room (${socket.centerId})`);
       } catch (err) { logger.error('join-student-room error:', { error: err?.message }); }
+    });
+
+    // ── Teacher personal room (booking requests, messages) ───────────────────
+    socket.on('join-teacher-room', () => {
+      try {
+        if (socket.userRole !== 'teacher') return;
+        const room = `teacher-room:${socket.centerId}:${socket.userId}`;
+        socket.join(room);
+        logger.info(`👨‍🏫 Teacher ${socket.userId} joined personal room (${socket.centerId})`);
+      } catch (err) { logger.error('join-teacher-room error:', { error: err?.message }); }
+    });
+
+    // ── Admin broadcast room (messages from teachers/students) ───────────────
+    socket.on('join-admin-room', () => {
+      try {
+        if (!['admin', 'sub-admin'].includes(socket.userRole)) return;
+        const broadcast = `admin-broadcast:${socket.centerId}`;
+        const personal  = `admin-room:${socket.centerId}:${socket.userId}`;
+        socket.join(broadcast);
+        socket.join(personal);
+        logger.info(`👔 Admin ${socket.userId} joined admin rooms (${socket.centerId})`);
+      } catch (err) { logger.error('join-admin-room error:', { error: err?.message }); }
     });
 
     // ── User personal room (any role — required for ring notifications) ───────

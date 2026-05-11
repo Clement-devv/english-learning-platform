@@ -52,7 +52,7 @@ function inWindow(scheduledTime, targetMins, marginMins = 4) {
 }
 
 // ── Class reminders ──────────────────────────────────────────────────────────
-async function checkClassReminders(db) {
+async function checkClassReminders(db, centerSlug) {
   const bookings = await getBooking(db).find({
     status: "accepted",
     scheduledTime: {
@@ -86,7 +86,7 @@ async function checkClassReminders(db) {
       // Teacher reminder
       const teacherKey = `${label}_t_${booking._id}`;
       if (await markSent(db, teacherKey, booking._id)) {
-        sendClassTimedReminder(teacher, booking, "teacher", mins).catch(e =>
+        sendClassTimedReminder(teacher, booking, "teacher", mins, "", centerSlug).catch(e =>
           logger.error(`Reminder email failed (${teacherKey}):`, e.message)
         );
         getTeacher(db).findById(teacher._id).select("pushSubscription").then(t => {
@@ -101,7 +101,7 @@ async function checkClassReminders(db) {
       // Student reminder
       const studentKey = `${label}_s_${booking._id}`;
       if (await markSent(db, studentKey, booking._id)) {
-        sendClassTimedReminder(student, booking, "student", mins).catch(e =>
+        sendClassTimedReminder(student, booking, "student", mins, "", centerSlug).catch(e =>
           logger.error(`Reminder email failed (${studentKey}):`, e.message)
         );
         getStudent(db).findById(student._id).select("pushSubscription").then(s => {
@@ -227,7 +227,7 @@ async function checkScheduledDeletions(db) {
 }
 
 // ── Main tick (runs every 60 s per center) ───────────────────────────────────
-function makeTick(db) {
+function makeTick(db, centerSlug) {
   return async function runTick() {
     if (db.readyState !== 1) {
       logger.warn("⏰ Reminder scheduler skipped — DB not connected (readyState:", db.readyState, ")");
@@ -235,7 +235,7 @@ function makeTick(db) {
     }
     try {
       await Promise.all([
-        checkClassReminders(db),
+        checkClassReminders(db, centerSlug),
         checkHomeworkReminders(db),
         checkQuizReminders(db),
         checkScheduledDeletions(db),
@@ -249,7 +249,7 @@ function makeTick(db) {
 export function startReminderScheduler(db) {
   const centerSlug = db.name || "unknown";
   logger.info(`⏰ Reminder scheduler started for center: ${centerSlug} (60s interval)`);
-  const runTick = makeTick(db);
+  const runTick = makeTick(db, centerSlug);
   // Don't run immediately — DB connection may still be opening (readyState 2).
   // The interval will fire once fully connected.
   setInterval(runTick, 60 * 1000);

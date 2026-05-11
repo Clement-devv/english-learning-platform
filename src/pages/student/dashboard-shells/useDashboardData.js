@@ -116,6 +116,7 @@ export function useDashboardData() {
     typeof Notification !== "undefined" ? Notification.permission : "default"
   );
   const [activeTab,             setActiveTab]             = useState("dashboard");
+  const [unreadMessages,        setUnreadMessages]        = useState(0);
   const [homeworkPending,       setHomeworkPending]       = useState(0);
   const prevHomeworkRef = useRef(null);
   const [quizPending,           setQuizPending]           = useState(0);
@@ -193,15 +194,35 @@ export function useDashboardData() {
     localStorage.setItem("darkMode", isDarkMode);
   }, [isDarkMode]);
 
-  // ── Push notification status ───────────────────────────────────────────────
+  // ── Push notifications — auto-subscribe on first login ────────────────────
   useEffect(() => {
     if (!pushSupported()) return;
     setNotificationPermission(Notification.permission);
-    getPushStatus().then(subscribed => {
-      setNotificationsEnabled(subscribed);
-      localStorage.setItem("notificationsEnabled", subscribed ? "true" : "false");
+    getPushStatus().then(async subscribed => {
+      if (subscribed) {
+        setNotificationsEnabled(true);
+        localStorage.setItem("notificationsEnabled", "true");
+      } else if (Notification.permission !== "denied") {
+        // Auto-request permission and subscribe — user doesn't need to opt-in manually
+        const { ok } = await enablePush();
+        setNotificationsEnabled(ok);
+        setNotificationPermission(ok ? "granted" : Notification.permission);
+        localStorage.setItem("notificationsEnabled", ok ? "true" : "false");
+      }
     });
   }, []);
+
+  // ── Unread messages — fetch count on mount and reset when tab opened ───────
+  useEffect(() => {
+    api.get("/direct-messages").then(({ data }) => {
+      const total = (data.dms || []).reduce((sum, dm) => sum + (dm.unreadCount?.student || 0), 0);
+      setUnreadMessages(total);
+    }).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === "messages") setUnreadMessages(0);
+  }, [activeTab]);
 
   // ── Homework count polling ─────────────────────────────────────────────────
   useEffect(() => {
@@ -418,6 +439,12 @@ export function useDashboardData() {
       socket = io(SOCKET_URL, { transports: ["websocket"], auth: { token } });
 
       socket.on("connect", () => { socket.emit("join-student-room"); });
+      socket.on("new-direct-message", ({ senderName, message }) => {
+        setUnreadMessages(prev => prev + 1);
+        if ("Notification" in window && Notification.permission === "granted") {
+          new Notification(`💬 Message from ${senderName}`, { body: message, icon: "/favicon.ico" });
+        }
+      });
       socket.on("booking-update", ({ title, message, type }) => {
         showToast(message, type === "rejected" ? "error" : "success");
         if ("Notification" in window && Notification.permission === "granted") new Notification(title, { body: message, icon: "/favicon.ico" });
@@ -645,6 +672,7 @@ export function useDashboardData() {
   // ── Return everything shells need ──────────────────────────────────────────
   return {
     student, activeTab, setActiveTab,
+    unreadMessages, setUnreadMessages,
     loading, isDarkMode, setIsDarkMode,
     toast, showToast,
     showCelebration, celebrationMessage, celebrationEmoji, newBadge,

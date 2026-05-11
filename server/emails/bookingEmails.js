@@ -1,5 +1,5 @@
 import { config } from "../config/config.js";
-import { sendEmail } from "./core.js";
+import { sendEmail, getCenterBaseUrl } from "./core.js";
 
 const formatDate = (date) => new Date(date).toLocaleDateString('en-US', {
   weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
@@ -9,7 +9,8 @@ const formatTime = (date) => new Date(date).toLocaleTimeString('en-US', {
   hour: '2-digit', minute: '2-digit',
 });
 
-export const sendBookingRequestToTeacher = async (teacher, student, booking, centerName = "") => {
+export const sendBookingRequestToTeacher = async (teacher, student, booking, centerName = "", center = null) => {
+  const { baseUrl } = getCenterBaseUrl(center);
   const formattedDate = formatDate(booking.scheduledTime);
   const formattedTime = formatTime(booking.scheduledTime);
 
@@ -58,7 +59,7 @@ export const sendBookingRequestToTeacher = async (teacher, student, booking, cen
               ${booking.notes ? `<div class="booking-detail"><span class="label">Notes:</span> <span class="value">${booking.notes}</span></div>` : ''}
             </div>
             <div style="text-align: center; margin-top: 30px;">
-              <a href="${config.frontendUrl}/teacher/dashboard?tab=bookings" class="button">View &amp; Accept Request</a>
+              <a href="${baseUrl}/teacher/dashboard?tab=bookings" class="button">View &amp; Accept Request</a>
             </div>
             <p style="margin-top: 30px; color: #666; font-size: 14px;">
               Please respond to this booking request as soon as possible. Students are waiting to schedule their classes with you!
@@ -75,7 +76,8 @@ export const sendBookingRequestToTeacher = async (teacher, student, booking, cen
   });
 };
 
-export const sendBookingAcceptedToStudent = async (student, teacher, booking, centerName = "") => {
+export const sendBookingAcceptedToStudent = async (student, teacher, booking, centerName = "", center = null) => {
+  const { baseUrl } = getCenterBaseUrl(center);
   const formattedDate = formatDate(booking.scheduledTime);
   const formattedTime = formatTime(booking.scheduledTime);
 
@@ -128,7 +130,7 @@ export const sendBookingAcceptedToStudent = async (student, teacher, booking, ce
               <strong>⏰ Reminder:</strong> Please join the class 5 minutes before the scheduled time to ensure everything is working properly.
             </div>
             <div style="text-align: center; margin-top: 30px;">
-              <a href="${config.frontendUrl}/student/dashboard?tab=classes" class="button">View My Classes</a>
+              <a href="${baseUrl}/student/dashboard?tab=classes" class="button">View My Classes</a>
             </div>
             <p style="margin-top: 30px; color: #666; font-size: 14px;">
               You'll receive another reminder 24 hours before your class. See you in class! 📚
@@ -145,7 +147,8 @@ export const sendBookingAcceptedToStudent = async (student, teacher, booking, ce
   });
 };
 
-export const sendBookingRejectedToStudent = async (student, teacher, booking, centerName = "") => {
+export const sendBookingRejectedToStudent = async (student, teacher, booking, centerName = "", center = null) => {
+  const { baseUrl } = getCenterBaseUrl(center);
   const formattedDate = formatDate(booking.scheduledTime);
   const formattedTime = formatTime(booking.scheduledTime);
 
@@ -202,7 +205,7 @@ export const sendBookingRejectedToStudent = async (student, teacher, booking, ce
               or contact support to help you find an available time slot.
             </p>
             <div style="text-align: center; margin-top: 30px;">
-              <a href="${config.frontendUrl}/student/dashboard" class="button">Schedule Another Class</a>
+              <a href="${baseUrl}/student/dashboard" class="button">Schedule Another Class</a>
             </div>
           </div>
           <div class="footer">
@@ -216,7 +219,8 @@ export const sendBookingRejectedToStudent = async (student, teacher, booking, ce
   });
 };
 
-export const sendClassReminder = async (user, booking, role, centerName = "") => {
+export const sendClassReminder = async (user, booking, role, centerName = "", center = null) => {
+  const { baseUrl } = getCenterBaseUrl(center);
   const formattedDate = formatDate(booking.scheduledTime);
   const formattedTime = formatTime(booking.scheduledTime);
 
@@ -268,7 +272,7 @@ export const sendClassReminder = async (user, booking, role, centerName = "") =>
               <div class="checklist-item">✓ Join 5 minutes early</div>
             </div>
             <div style="text-align: center; margin-top: 30px;">
-              <a href="${config.frontendUrl}/${role}/dashboard" class="button">Go to Dashboard</a>
+              <a href="${baseUrl}/${role}/dashboard" class="button">Go to Dashboard</a>
             </div>
           </div>
           <div class="footer">
@@ -282,7 +286,8 @@ export const sendClassReminder = async (user, booking, role, centerName = "") =>
   });
 };
 
-export const sendClassCompletedNotification = async (teacher, student, booking, centerName = "") => {
+export const sendClassCompletedNotification = async (teacher, student, booking, centerName = "", center = null) => {
+  const { baseUrl } = getCenterBaseUrl(center);
   await Promise.all([
     sendEmail({
       centerName,
@@ -296,7 +301,7 @@ export const sendClassCompletedNotification = async (teacher, student, booking, 
           <p>Hi ${teacher.firstName},</p>
           <p>Your class "${booking.classTitle}" with ${student.firstName} ${student.lastName} has been marked as completed.</p>
           <p><strong>Payment Status:</strong> $${teacher.ratePerClass} has been added to your pending earnings.</p>
-          <p>View your payment dashboard: <a href="${config.frontendUrl}/teacher/dashboard?tab=payment">Payment Dashboard</a></p>
+          <p>View your payment dashboard: <a href="${baseUrl}/teacher/dashboard?tab=payment">Payment Dashboard</a></p>
         </body>
         </html>
       `,
@@ -314,7 +319,7 @@ export const sendClassCompletedNotification = async (teacher, student, booking, 
           <p>Your class "${booking.classTitle}" with ${teacher.firstName} ${teacher.lastName} has been completed.</p>
           <p><strong>Classes Remaining:</strong> ${student.classCredits}</p>
           <p>Keep up the great work!</p>
-          <p><a href="${config.frontendUrl}/student/dashboard">View Your Dashboard</a></p>
+          <p><a href="${baseUrl}/student/dashboard">View Your Dashboard</a></p>
         </body>
         </html>
       `,
@@ -322,7 +327,8 @@ export const sendClassCompletedNotification = async (teacher, student, booking, 
   ]);
 };
 
-export const sendBookingCreatedToStudent = async (student, teacher, booking, centerName = "") => {
+export const sendBookingCreatedToStudent = async (student, teacher, booking, centerName = "", center = null) => {
+  const { baseUrl } = getCenterBaseUrl(center);
   const formattedDate = formatDate(booking.scheduledTime);
   const formattedTime = formatTime(booking.scheduledTime);
 
@@ -354,7 +360,7 @@ export const sendBookingCreatedToStudent = async (student, teacher, booking, cen
           <div class="row"><span class="label">Teacher:</span> ${teacher.firstName} ${teacher.lastName}</div>
         </div>
         <div style="text-align:center;margin-top:20px">
-          <a href="${config.frontendUrl}/student/dashboard" class="btn">View Dashboard</a>
+          <a href="${baseUrl}/student/dashboard" class="btn">View Dashboard</a>
         </div>
       </div>
       <div class="footer"><p>This is an automated message from ${config.appName}</p></div>
@@ -362,7 +368,8 @@ export const sendBookingCreatedToStudent = async (student, teacher, booking, cen
   });
 };
 
-export const sendClassTimedReminder = async (user, booking, role, minutesLeft, centerName = "") => {
+export const sendClassTimedReminder = async (user, booking, role, minutesLeft, centerName = "", center = null) => {
+  const { baseUrl } = getCenterBaseUrl(center);
   const formattedTime = formatTime(booking.scheduledTime);
   const urgency      = minutesLeft <= 5  ? '🚨' : minutesLeft <= 30 ? '⚡' : '⏰';
   const urgencyText  = minutesLeft <= 5  ? 'starts in 5 minutes — join NOW!'
@@ -395,7 +402,7 @@ export const sendClassTimedReminder = async (user, booking, role, minutesLeft, c
         </div>
         ${minutesLeft <= 5 ? '<p style="color:#e74c3c;font-weight:bold;text-align:center;font-size:16px">Please join the class immediately!</p>' : ''}
         <div style="text-align:center;margin-top:20px">
-          <a href="${config.frontendUrl}/${role}/dashboard" class="btn">Join Class Now</a>
+          <a href="${baseUrl}/${role}/dashboard" class="btn">Join Class Now</a>
         </div>
       </div>
       <div class="footer"><p>Automated reminder from ${config.appName}</p></div>
