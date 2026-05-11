@@ -261,6 +261,15 @@ export default function SunshineShell() {
         @keyframes popIn { from{transform:scale(0.5);opacity:0} to{transform:scale(1);opacity:1} }
         .wiggle:hover { animation: wiggle 0.4s; }
         @keyframes wiggle { 0%,100%{transform:rotate(0)} 25%{transform:rotate(-5deg)} 75%{transform:rotate(5deg)} }
+        .fade-up { animation: fadeUp 0.45s cubic-bezier(0.22,1,0.36,1) both; }
+        @keyframes fadeUp { from{opacity:0;transform:translateY(18px)} to{opacity:1;transform:translateY(0)} }
+        .hero-float { animation: heroFloat 5s ease-in-out infinite; }
+        @keyframes heroFloat { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-4px)} }
+        .hero-orb { animation: heroOrb 7s ease-in-out infinite; }
+        @keyframes heroOrb { 0%,100%{transform:scale(1) rotate(0deg)} 50%{transform:scale(1.15) rotate(15deg)} }
+        .stat-card { animation: fadeUp 0.45s cubic-bezier(0.22,1,0.36,1) both; }
+        .stat-card:nth-child(1){animation-delay:0.05s} .stat-card:nth-child(2){animation-delay:0.12s}
+        .lang-switcher-btn:hover { background: ${d.isDarkMode ? 'rgba(249,115,22,0.1)' : 'rgba(249,115,22,0.06)'} !important; }
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: ${dashTheme.scrollbarThumb(d.isDarkMode)}; border-radius: 10px; }
@@ -465,20 +474,20 @@ export default function SunshineShell() {
             <div style={{ display: "flex", flexDirection: "column", gap: 22, fontFamily: F }}>
 
               {/* Welcome hero */}
-              <div className="kid-card" style={{ background: "linear-gradient(135deg,#f97316 0%,#f43f5e 100%)", borderRadius: 28, padding: "26px 32px", color: "#fff", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 24, boxShadow: "0 16px 40px rgba(249,115,22,0.3)", position: "relative", overflow: "hidden" }}>
-                <div style={{ position: "absolute", right: -30, top: -40, width: 200, height: 200, borderRadius: "50%", background: "rgba(255,255,255,0.12)" }}/>
-                <div style={{ position: "absolute", right: 80, bottom: -50, width: 120, height: 120, borderRadius: "50%", background: "rgba(255,255,255,0.08)" }}/>
+              <div className="kid-card hero-float fade-up" style={{ background: "linear-gradient(135deg,#f97316 0%,#f43f5e 100%)", borderRadius: isMobile ? 22 : 28, padding: isMobile ? "14px 18px" : "26px 32px", color: "#fff", display: "flex", justifyContent: "space-between", alignItems: "center", gap: isMobile ? 12 : 24, boxShadow: "0 16px 40px rgba(249,115,22,0.3)", position: "relative", overflow: "hidden" }}>
+                <div className="hero-orb" style={{ position: "absolute", right: -30, top: -40, width: 180, height: 180, borderRadius: "50%", background: "rgba(255,255,255,0.12)", pointerEvents: "none" }}/>
+                <div style={{ position: "absolute", right: 70, bottom: -40, width: 100, height: 100, borderRadius: "50%", background: "rgba(255,255,255,0.07)", pointerEvents: "none" }}/>
                 <div style={{ position: "relative", zIndex: 1, flex: 1, minWidth: 0 }}>
-                  <p style={{ margin: "0 0 4px", fontSize: isMobile ? 15 : 14, fontWeight: 700, opacity: 0.9 }}>{t('dashboard.greeting', { name: d.student.firstName })}</p>
-                  <h1 style={{ margin: "0 0 8px", fontSize: isMobile ? 34 : 28, fontWeight: 900, letterSpacing: "-0.5px", lineHeight: 1.15 }}>{t('dashboard.heroTitle')}</h1>
-                  <p style={{ margin: 0, fontSize: isMobile ? 15 : 14, fontWeight: 600, opacity: 0.95 }}>
+                  <p style={{ margin: "0 0 2px", fontSize: isMobile ? 11 : 14, fontWeight: 700, opacity: 0.88 }}>{t('dashboard.greeting', { name: d.student.firstName })}</p>
+                  <h1 style={{ margin: "0 0 5px", fontSize: isMobile ? 20 : 28, fontWeight: 900, letterSpacing: "-0.5px", lineHeight: 1.2 }}>{t('dashboard.heroTitle')}</h1>
+                  <p style={{ margin: 0, fontSize: isMobile ? 11 : 14, fontWeight: 600, opacity: 0.9 }}>
                     {d.homeworkPending > 0 ? t('dashboard.homeworkDue', { count: d.homeworkPending }) : t('dashboard.noPendingHomework')} · {t('dashboard.classesLeft', { count: d.progress.classesRemaining })} 🔥
                   </p>
                 </div>
-                <div style={{ position: "relative", zIndex: 1, background: "rgba(255,255,255,0.18)", backdropFilter: "blur(8px)", borderRadius: 20, padding: "16px 22px", textAlign: "center", border: "2px solid rgba(255,255,255,0.25)", flexShrink: 0, display: isMobile ? "none" : "block" }}>
-                  <div style={{ fontSize: 34 }}>🔥</div>
-                  <div style={{ fontSize: 32, fontWeight: 900, marginTop: 4 }}>{d.progress.streakDays}</div>
-                  <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.1em", opacity: 0.9 }}>{t('dashboard.dayStreak')}</div>
+                <div style={{ position: "relative", zIndex: 1, background: "rgba(255,255,255,0.18)", backdropFilter: "blur(8px)", borderRadius: isMobile ? 14 : 20, padding: isMobile ? "10px 14px" : "16px 22px", textAlign: "center", border: "2px solid rgba(255,255,255,0.25)", flexShrink: 0 }}>
+                  <div style={{ fontSize: isMobile ? 22 : 34 }}>🔥</div>
+                  <div style={{ fontSize: isMobile ? 22 : 32, fontWeight: 900, marginTop: 2 }}>{d.progress.streakDays}</div>
+                  <div style={{ fontSize: isMobile ? 9 : 11, fontWeight: 800, letterSpacing: "0.1em", opacity: 0.9 }}>{t('dashboard.dayStreak')}</div>
                 </div>
               </div>
 
@@ -524,13 +533,13 @@ export default function SunshineShell() {
                   { Icon: CalendarDays, n: d.progress.classesRemaining, l: t('dashboard.stats.classesLeft'),  grad: "linear-gradient(135deg,#3b82f6,#60a5fa)", shadow: "rgba(59,130,246,0.3)"  },
                   { Icon: Award,        n: d.badges.length,             l: t('dashboard.stats.badgesEarned'), grad: "linear-gradient(135deg,#f43f5e,#fb7185)", shadow: "rgba(244,63,94,0.3)"   },
                   { Icon: Star,         n: d.progress.weeklyCompleted,  l: t('dashboard.stats.thisWeek'),     grad: "linear-gradient(135deg,#f59e0b,#fbbf24)", shadow: "rgba(245,158,11,0.3)"  },
-                ].slice(0, isMobile ? 2 : 4).map((s, i) => (
-                  <div key={i} className="kid-card" style={{ background: col.card, borderRadius: isMobile ? 28 : 22, padding: isMobile ? "24px 20px 28px" : "18px 20px", border: `2px solid ${col.border}`, display: "flex", flexDirection: "column", gap: isMobile ? 10 : 6 }}>
-                    <div style={{ width: isMobile ? 66 : 44, height: isMobile ? 66 : 44, borderRadius: isMobile ? 18 : 14, background: s.grad, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: `0 4px 12px ${s.shadow}` }}>
-                      <s.Icon size={isMobile ? 30 : 20} color="#fff" strokeWidth={2} />
+                ].map((s, i) => (
+                  <div key={i} className="kid-card stat-card" style={{ background: col.card, borderRadius: isMobile ? 20 : 22, padding: isMobile ? "16px 14px" : "18px 20px", border: `2px solid ${col.border}`, display: "flex", flexDirection: "column", gap: isMobile ? 6 : 6 }}>
+                    <div style={{ width: isMobile ? 40 : 44, height: isMobile ? 40 : 44, borderRadius: isMobile ? 13 : 14, background: s.grad, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: `0 4px 12px ${s.shadow}` }}>
+                      <s.Icon size={isMobile ? 20 : 20} color="#fff" strokeWidth={2} />
                     </div>
-                    <div style={{ fontSize: isMobile ? 44 : 26, fontWeight: 900, color: col.heading, letterSpacing: "-0.5px", marginTop: isMobile ? 4 : 0 }}>{s.n}</div>
-                    <div style={{ fontSize: isMobile ? 14 : 12, fontWeight: 700, color: col.muted }}>{s.l}</div>
+                    <div style={{ fontSize: isMobile ? 28 : 26, fontWeight: 900, color: col.heading, letterSpacing: "-0.5px" }}>{s.n}</div>
+                    <div style={{ fontSize: isMobile ? 11 : 12, fontWeight: 700, color: col.muted }}>{s.l}</div>
                   </div>
                 ))}
               </div>
@@ -826,6 +835,7 @@ export default function SunshineShell() {
                   );
                 })}
               <div style={{ borderTop:`1px solid ${col.border}`, margin:'8px 0 4px' }} />
+              <LanguageSwitcher col={col} fontFamily={F} />
               <button onClick={() => { setShowMobileMenu(false); d.setShowSettingsSidebar(true); }}
                 style={{ display:'flex', alignItems:'center', gap:12, padding:'11px 14px', borderRadius:14, border:'none', background:'transparent', color:col.body, cursor:'pointer', fontFamily:F, width:'100%' }}>
                 <Settings size={18} color={col.muted} strokeWidth={1.8} />
