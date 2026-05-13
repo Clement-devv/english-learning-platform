@@ -11,6 +11,7 @@ export default function ModernTemplate({ center, lp }) {
   const urls = {
     student: lp.links?.studentLogin || '/student/login',
     teacher: lp.links?.teacherLogin || '/teacher/login',
+    admin:   '/admin/login',
   };
   useDocTitle(lp.seo?.title || center.centerName);
 
@@ -30,6 +31,8 @@ export default function ModernTemplate({ center, lp }) {
 /* ── Nav ──────────────────────────────────────────────────────────────────── */
 function ModernNav({ center, D, urls }) {
   const scrolled = useScrolled();
+  const isMobile = useIsMobile();
+  const [menuOpen, setMenuOpen] = useState(false);
   const navColor = D.navStyle === 'colored';
   const navDark  = D.navStyle === 'dark';
 
@@ -37,6 +40,8 @@ function ModernNav({ center, D, urls }) {
   if (navColor)     { bg = D.primary; txtColor = '#fff';    border = 'rgba(255,255,255,0.15)'; }
   else if (navDark) { bg = '#0f172a'; txtColor = '#f1f5f9'; border = 'rgba(255,255,255,0.08)'; }
   else              { bg = scrolled ? '#ffffff' : 'rgba(255,255,255,0.93)'; txtColor = '#1e293b'; border = scrolled ? 'rgba(0,0,0,0.08)' : 'transparent'; }
+
+  const menuBg = (navColor || navDark) ? '#0f172a' : '#fff';
 
   return (
     <nav style={{
@@ -54,19 +59,57 @@ function ModernNav({ center, D, urls }) {
           : <span style={{ fontSize: 19, fontWeight: 800, color: navColor ? '#fff' : D.primary, letterSpacing: '-0.02em' }}>{center.centerName}</span>
         }
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <a href={urls.teacher} style={{ fontSize: 13, fontWeight: 600, color: navColor ? 'rgba(255,255,255,0.8)' : txtColor, textDecoration: 'none', padding: '7px 16px', borderRadius: 8, border: navColor ? '1px solid rgba(255,255,255,0.2)' : '1px solid rgba(0,0,0,0.1)' }}>
-          Teacher
-        </a>
-        <a href={urls.student} style={{
-          fontSize: 13, fontWeight: 700, padding: '9px 22px', borderRadius: 10,
-          background: `linear-gradient(135deg, ${D.primary}, ${adjustHex(D.primary, -25)})`,
-          color: '#fff', textDecoration: 'none',
-          boxShadow: `0 4px 16px ${D.primary}45`,
-        }}>
-          Student Login
-        </a>
-      </div>
+
+      {/* Desktop links */}
+      {!isMobile && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <a href={urls.admin} style={{ fontSize: 12, fontWeight: 500, color: navColor ? 'rgba(255,255,255,0.45)' : '#94a3b8', textDecoration: 'none', padding: '6px 12px', borderRadius: 8 }}>
+            Admin
+          </a>
+          <a href={urls.teacher} style={{ fontSize: 13, fontWeight: 600, color: navColor ? 'rgba(255,255,255,0.8)' : txtColor, textDecoration: 'none', padding: '7px 16px', borderRadius: 8, border: navColor ? '1px solid rgba(255,255,255,0.2)' : '1px solid rgba(0,0,0,0.1)' }}>
+            Teacher
+          </a>
+          <a href={urls.student} style={{
+            fontSize: 13, fontWeight: 700, padding: '9px 22px', borderRadius: 10,
+            background: `linear-gradient(135deg, ${D.primary}, ${adjustHex(D.primary, -25)})`,
+            color: '#fff', textDecoration: 'none',
+            boxShadow: `0 4px 16px ${D.primary}45`,
+          }}>
+            Student Login
+          </a>
+        </div>
+      )}
+
+      {/* Mobile hamburger */}
+      {isMobile && (
+        <button onClick={() => setMenuOpen(v => !v)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 6, color: navColor || navDark ? '#fff' : '#1e293b' }}>
+          <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round">
+            {menuOpen
+              ? <><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></>
+              : <><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></>
+            }
+          </svg>
+        </button>
+      )}
+
+      {/* Mobile slide-down menu */}
+      {isMobile && menuOpen && (
+        <div style={{ position: 'absolute', top: 68, left: 0, right: 0, background: menuBg, borderBottom: '1px solid rgba(0,0,0,0.08)', padding: '12px 5% 20px', display: 'flex', flexDirection: 'column', gap: 4, boxShadow: '0 8px 24px rgba(0,0,0,0.1)', zIndex: 99 }}>
+          <a href={urls.student} onClick={() => setMenuOpen(false)} style={{
+            fontSize: 15, fontWeight: 700, padding: '13px 16px', borderRadius: 10, textDecoration: 'none',
+            background: `linear-gradient(135deg, ${D.primary}, ${adjustHex(D.primary, -25)})`,
+            color: '#fff', textAlign: 'center', marginBottom: 4,
+          }}>
+            Student Login
+          </a>
+          <a href={urls.teacher} onClick={() => setMenuOpen(false)} style={{ fontSize: 14, fontWeight: 600, color: navDark ? '#f1f5f9' : '#475569', textDecoration: 'none', padding: '10px 16px', borderRadius: 10 }}>
+            Teacher Login
+          </a>
+          <a href={urls.admin} onClick={() => setMenuOpen(false)} style={{ fontSize: 12, fontWeight: 500, color: navDark ? 'rgba(255,255,255,0.4)' : '#94a3b8', textDecoration: 'none', padding: '8px 16px', borderRadius: 10 }}>
+            Admin Login
+          </a>
+        </div>
+      )}
     </nav>
   );
 }
@@ -158,7 +201,7 @@ function ModernHero({ center, lp, D }) {
 function ModernAbout({ about, D }) {
   const isMobile = useIsMobile();
   return (
-    <section style={{ padding: '96px 5%', background: D.bg }}>
+    <section style={{ padding: isMobile ? '64px 6%' : '96px 5%', background: D.bg }}>
       <div style={{ maxWidth:1100, margin:'0 auto', display:'grid', gridTemplateColumns: (!isMobile && about.image) ? '1fr 1fr' : '1fr', gap:64, alignItems:'center' }}>
         {/* Image first on desktop */}
         {!isMobile && about.image && (
@@ -191,15 +234,16 @@ function ModernAbout({ about, D }) {
 
 /* ── Teachers ─────────────────────────────────────────────────────────────── */
 function ModernTeachers({ teachers, D }) {
+  const isMobile = useIsMobile();
   const sorted = sortedTeachers(teachers);
   return (
-    <section style={{ padding:'96px 5%', background:`${D.secondary}20` }}>
+    <section style={{ padding: isMobile ? '64px 6%' : '96px 5%', background:`${D.secondary}20` }}>
       <div style={{ maxWidth:1100, margin:'0 auto' }}>
         <div style={{ textAlign:'center', marginBottom:52 }}>
           <SectionLabel color={D.primary} font={D.font}>Our Team</SectionLabel>
           <h2 style={{ fontSize:'clamp(1.6rem,3vw,2.4rem)', fontWeight:800, color:D.text, margin:'14px 0 0', letterSpacing:'-0.02em' }}>Meet the Teachers</h2>
         </div>
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(260px,1fr))', gap:24 }}>
+        <div style={{ display:'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill,minmax(260px,1fr))', gap:24 }}>
           {sorted.map((t, i) => (
             <ModernTeacherCard key={i} teacher={t} D={D} index={i} />
           ))}
@@ -262,9 +306,10 @@ function ModernCtaBand({ lp, D, urls, center }) {
 
 /* ── Contact ──────────────────────────────────────────────────────────────── */
 function ModernContact({ contact, links, D }) {
+  const isMobile = useIsMobile();
   const socials = Object.keys(SOCIAL_ICONS).filter(k => links?.[k]);
   return (
-    <section style={{ padding:'96px 5%', background: D.bg }}>
+    <section style={{ padding: isMobile ? '64px 6%' : '96px 5%', background: D.bg }}>
       <div style={{ maxWidth:900, margin:'0 auto' }}>
         <div style={{ textAlign:'center', marginBottom:48 }}>
           <SectionLabel color={D.primary} font={D.font}>Contact</SectionLabel>

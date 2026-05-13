@@ -1,10 +1,11 @@
 // src/pages/admin/AdminLogin.jsx
 // Shell picker — delegates to the theme assigned to this center.
-import React, { lazy, Suspense } from 'react';
-import { useBranding } from '../../context/BrandingContext';
+import React, { lazy, Suspense, useState, useEffect } from 'react';
+import { useBranding }    from '../../context/BrandingContext';
+import { fetchBranding }  from '../../utils/branding';
 
 const THEMES = {
-  executive:        lazy(() => import('./login-themes/ExecutiveTheme')),
+  executive:         lazy(() => import('./login-themes/ExecutiveTheme')),
   'corporate-slate': lazy(() => import('./login-themes/CorporateSlateTheme')),
 };
 
@@ -16,8 +17,17 @@ const LoadingScreen = () => (
 );
 
 export default function AdminLogin() {
-  const { branding } = useBranding();
-  const Theme = THEMES[branding.adminLoginTheme] || THEMES.executive;
+  const { branding: cached } = useBranding();
+  // Start with the cached theme so there's no flash, then confirm with a fresh fetch
+  const [themeId, setThemeId] = useState(cached.adminLoginTheme);
+
+  useEffect(() => {
+    fetchBranding()
+      .then(({ branding }) => setThemeId(branding.adminLoginTheme))
+      .catch(() => {});
+  }, []);
+
+  const Theme = THEMES[themeId] || THEMES.executive;
   return (
     <Suspense fallback={<LoadingScreen />}>
       <Theme />

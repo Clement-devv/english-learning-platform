@@ -52,6 +52,18 @@ export default function SuperAdminDashboard() {
   })();
   const authHeaders = { Authorization: `Bearer ${superAdminToken}` };
 
+  // Wraps fetch — if the server returns 401 (expired token) redirect to login immediately
+  const saFetch = useCallback(async (url, opts = {}) => {
+    const res = await fetch(url, { ...opts, headers: { ...authHeaders, ...(opts.headers || {}) } });
+    if (res.status === 401) {
+      localStorage.removeItem('superAdminToken');
+      localStorage.removeItem('superAdminInfo');
+      navigate('/super-admin/login');
+      throw new Error('Session expired');
+    }
+    return res;
+  }, [authHeaders, navigate]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const [stats,       setStats]       = useState(null);
   const [centers,     setCenters]     = useState([]);
   const [domains,     setDomains]     = useState([]);
@@ -601,7 +613,7 @@ export default function SuperAdminDashboard() {
 
   const loadAdminLoginThemeAssignments = async () => {
     try {
-      const res  = await fetch(`${API_BASE}/super-admin/admin-login-themes`, { headers: authHeaders });
+      const res  = await saFetch(`${API_BASE}/super-admin/admin-login-themes`);
       const data = await res.json();
       if (data.success) setAdminLoginThemeAssignments(data.assignments);
     } catch (_) {}
@@ -618,9 +630,9 @@ export default function SuperAdminDashboard() {
     setAssigningAdminLoginTheme(themeId);
     setAdminLoginThemeMsg('');
     try {
-      const res  = await fetch(`${API_BASE}/super-admin/centers/${adminLoginThemeModal._id}/admin-login-theme`, {
+      const res  = await saFetch(`${API_BASE}/super-admin/centers/${adminLoginThemeModal._id}/admin-login-theme`, {
         method: 'PATCH',
-        headers: { ...authHeaders, 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ adminLoginTheme: themeId }),
       });
       const data = await res.json();
@@ -632,7 +644,7 @@ export default function SuperAdminDashboard() {
       setAdminLoginThemeMsg(data.message);
       loadAdminLoginThemeAssignments();
     } catch (err) {
-      setAdminLoginThemeMsg(err.message || 'Failed to assign theme');
+      if (err.message !== 'Session expired') setAdminLoginThemeMsg(err.message || 'Failed to assign theme');
     } finally {
       setAssigningAdminLoginTheme(null);
     }
@@ -643,9 +655,9 @@ export default function SuperAdminDashboard() {
     setAssigningAdminLoginTheme('__unassign__');
     setAdminLoginThemeMsg('');
     try {
-      const res  = await fetch(`${API_BASE}/super-admin/centers/${adminLoginThemeModal._id}/admin-login-theme`, {
+      const res  = await saFetch(`${API_BASE}/super-admin/centers/${adminLoginThemeModal._id}/admin-login-theme`, {
         method: 'PATCH',
-        headers: { ...authHeaders, 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ adminLoginTheme: null }),
       });
       const data = await res.json();
@@ -657,7 +669,7 @@ export default function SuperAdminDashboard() {
       setAdminLoginThemeMsg('Admin login theme unassigned');
       loadAdminLoginThemeAssignments();
     } catch (err) {
-      setAdminLoginThemeMsg(err.message || 'Failed to unassign');
+      if (err.message !== 'Session expired') setAdminLoginThemeMsg(err.message || 'Failed to unassign');
     } finally {
       setAssigningAdminLoginTheme(null);
     }

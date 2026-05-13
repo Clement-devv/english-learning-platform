@@ -127,10 +127,10 @@ export default function SubAdminCorporateSlateTheme() {
               {forgotError && <div className="cs-err"><AlertCircle size={14} color="#f87171" /><span>{forgotError}</span></div>}
               <form onSubmit={handleForgotPassword} className="cs-form">
                 <div className="cs-field">
-                  <label className="cs-lbl">Sub-Admin Email</label>
+                  <label htmlFor="sa-cs-forgot-email" className="cs-lbl">Sub-Admin Email</label>
                   <div className={`cs-inp-wrap${focusedField === 'forgot' ? ' cs-focused' : ''}`}>
                     <Mail size={14} color={focusedField === 'forgot' ? '#818cf8' : '#4b5563'} />
-                    <input type="email" value={forgotEmail} onChange={e => setForgotEmail(e.target.value)}
+                    <input id="sa-cs-forgot-email" name="email" type="email" value={forgotEmail} onChange={e => setForgotEmail(e.target.value)}
                       onFocus={() => setFocusedField('forgot')} onBlur={() => setFocusedField(null)}
                       placeholder="subadmin@example.com" required disabled={forgotLoading} className="cs-inp" autoFocus />
                   </div>
@@ -171,19 +171,19 @@ export default function SubAdminCorporateSlateTheme() {
               {error && <div className="cs-err"><AlertCircle size={14} color="#f87171" /><span>{error}</span></div>}
               <form onSubmit={handleInitialLogin} className="cs-form">
                 <div className="cs-field">
-                  <label className="cs-lbl">Username or Email</label>
+                  <label htmlFor="sa-cs-username" className="cs-lbl">Username or Email</label>
                   <div className={`cs-inp-wrap${focusedField === 'user' ? ' cs-focused' : ''}`}>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={focusedField === 'user' ? '#818cf8' : '#4b5563'} strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                    <input type="text" value={username} onChange={e => setUsername(e.target.value)}
+                    <input id="sa-cs-username" name="username" type="text" value={username} onChange={e => setUsername(e.target.value)}
                       onFocus={() => setFocusedField('user')} onBlur={() => setFocusedField(null)}
                       placeholder="subadmin@example.com" required disabled={loading} className="cs-inp" />
                   </div>
                 </div>
                 <div className="cs-field">
-                  <label className="cs-lbl">Password</label>
+                  <label htmlFor="sa-cs-password" className="cs-lbl">Password</label>
                   <div className={`cs-inp-wrap${focusedField === 'pass' ? ' cs-focused' : ''}`}>
                     <Lock size={14} color={focusedField === 'pass' ? '#818cf8' : '#4b5563'} />
-                    <input type={showPassword ? 'text' : 'password'} value={password}
+                    <input id="sa-cs-password" name="password" type={showPassword ? 'text' : 'password'} value={password}
                       onChange={e => setPassword(e.target.value)}
                       onFocus={() => setFocusedField('pass')} onBlur={() => setFocusedField(null)}
                       placeholder="••••••••••••" required disabled={loading} className="cs-inp" />

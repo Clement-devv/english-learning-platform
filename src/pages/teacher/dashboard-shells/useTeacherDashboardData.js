@@ -760,6 +760,7 @@ export function useTeacherDashboardData() {
     localStorage.removeItem('teacherToken');
     localStorage.removeItem('teacherSessionToken');
     localStorage.removeItem('teacherInfo');
+    localStorage.removeItem('pwa-last-role');
     navigate('/teacher/login');
   };
 

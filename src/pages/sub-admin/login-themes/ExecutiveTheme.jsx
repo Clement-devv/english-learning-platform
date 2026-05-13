@@ -160,10 +160,10 @@ export default function SubAdminExecutiveTheme() {
               {forgotError && <div className="ex-err"><AlertCircle size={14} color="#f87171" /><span>{forgotError}</span></div>}
               <form onSubmit={handleForgotPassword} className="ex-form">
                 <div className="ex-field">
-                  <label className="ex-lbl">Email Address</label>
+                  <label htmlFor="sa-ex-forgot-email" className="ex-lbl">Email Address</label>
                   <div className={`ex-inp-wrap${focusedField === 'forgot' ? ' ex-focused-indigo' : ''}`}>
                     <Mail size={14} color={focusedField === 'forgot' ? '#818cf8' : '#4b5563'} />
-                    <input type="email" value={forgotEmail} onChange={e => setForgotEmail(e.target.value)}
+                    <input id="sa-ex-forgot-email" name="email" type="email" value={forgotEmail} onChange={e => setForgotEmail(e.target.value)}
                       onFocus={() => setFocusedField('forgot')} onBlur={() => setFocusedField(null)}
                       placeholder="you@example.com" required disabled={forgotLoading} className="ex-inp" autoFocus />
                   </div>
@@ -206,19 +206,19 @@ export default function SubAdminExecutiveTheme() {
               {error && <div className="ex-err"><AlertCircle size={14} color="#f87171" /><span>{error}</span></div>}
               <form onSubmit={handleInitialLogin} className="ex-form">
                 <div className="ex-field">
-                  <label className="ex-lbl">Email Address</label>
+                  <label htmlFor="sa-ex-username" className="ex-lbl">Email Address</label>
                   <div className={`ex-inp-wrap${focusedField === 'user' ? ' ex-focused-indigo' : ''}`}>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={focusedField === 'user' ? '#818cf8' : '#4b5563'} strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-                    <input type="text" value={username} onChange={e => setUsername(e.target.value)}
+                    <input id="sa-ex-username" name="username" type="text" value={username} onChange={e => setUsername(e.target.value)}
                       onFocus={() => setFocusedField('user')} onBlur={() => setFocusedField(null)}
                       placeholder="you@example.com" required disabled={loading} className="ex-inp" />
                   </div>
                 </div>
                 <div className="ex-field">
-                  <label className="ex-lbl">Password</label>
+                  <label htmlFor="sa-ex-password" className="ex-lbl">Password</label>
                   <div className={`ex-inp-wrap${focusedField === 'pass' ? ' ex-focused-indigo' : ''}`}>
                     <Lock size={14} color={focusedField === 'pass' ? '#818cf8' : '#4b5563'} />
-                    <input type={showPassword ? 'text' : 'password'} value={password}
+                    <input id="sa-ex-password" name="password" type={showPassword ? 'text' : 'password'} value={password}
                       onChange={e => setPassword(e.target.value)}
                       onFocus={() => setFocusedField('pass')} onBlur={() => setFocusedField(null)}
                       placeholder="••••••••••••" required disabled={loading} className="ex-inp" />

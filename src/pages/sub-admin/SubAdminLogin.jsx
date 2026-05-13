@@ -1,7 +1,8 @@
 // src/pages/sub-admin/SubAdminLogin.jsx
 // Shell picker — mirrors the admin login theme so both always look the same.
-import React, { lazy, Suspense } from 'react';
-import { useBranding } from '../../context/BrandingContext';
+import React, { lazy, Suspense, useState, useEffect } from 'react';
+import { useBranding }   from '../../context/BrandingContext';
+import { fetchBranding } from '../../utils/branding';
 
 const THEMES = {
   executive:          lazy(() => import('./login-themes/ExecutiveTheme')),
@@ -16,9 +17,16 @@ const LoadingScreen = () => (
 );
 
 export default function SubAdminLogin() {
-  const { branding } = useBranding();
-  // Sub-admin always mirrors the admin login theme
-  const Theme = THEMES[branding.adminLoginTheme] || THEMES.executive;
+  const { branding: cached } = useBranding();
+  const [themeId, setThemeId] = useState(cached.adminLoginTheme);
+
+  useEffect(() => {
+    fetchBranding()
+      .then(({ branding }) => setThemeId(branding.adminLoginTheme))
+      .catch(() => {});
+  }, []);
+
+  const Theme = THEMES[themeId] || THEMES.executive;
   return (
     <Suspense fallback={<LoadingScreen />}>
       <Theme />

@@ -305,6 +305,7 @@ export function useDashboardData() {
   // ── handleLogout must be defined before fetchStudentData ──────────────────
   const handleLogout = () => {
     ["studentToken", "studentSessionToken", "studentInfo"].forEach(k => localStorage.removeItem(k));
+    localStorage.removeItem('pwa-last-role');
     navigate("/student/login");
   };
 

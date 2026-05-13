@@ -319,6 +319,7 @@ export default function SunshineShell() {
   const handleLogout = () => {
     sessionStorage.removeItem('parentToken');
     sessionStorage.removeItem('parentInfo');
+    localStorage.removeItem('pwa-last-role');
     navigate('/parent/login');
   };
 

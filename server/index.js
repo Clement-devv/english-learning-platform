@@ -1,3 +1,12 @@
+import * as Sentry from "@sentry/node";
+
+Sentry.init({
+  dsn: process.env.SENTRY_DSN,
+  environment: process.env.NODE_ENV || "development",
+  tracesSampleRate: 0.1,
+  enabled: !!process.env.SENTRY_DSN,
+});
+
 import logger from "./utils/logger.js";
 import express from "express";
 import mongoose from "mongoose";
@@ -326,17 +335,24 @@ app.get('/manifest.json', async (req, res) => {
           ],
       shortcuts: [
         {
-          name: 'My Classes',
-          short_name: 'Classes',
-          description: 'View your upcoming classes',
-          url: '/?tab=dashboard',
+          name: 'Student Login',
+          short_name: 'Student',
+          description: 'Sign in as a student',
+          url: '/student/login',
           icons: [{ src: '/icons/icon.svg', sizes: 'any' }],
         },
         {
-          name: 'Messages',
-          short_name: 'Messages',
-          description: 'Open your messages',
-          url: '/?tab=messages',
+          name: 'Teacher Login',
+          short_name: 'Teacher',
+          description: 'Sign in as a teacher',
+          url: '/teacher/login',
+          icons: [{ src: '/icons/icon.svg', sizes: 'any' }],
+        },
+        {
+          name: 'Admin Login',
+          short_name: 'Admin',
+          description: 'Sign in as an admin',
+          url: '/admin/login',
           icons: [{ src: '/icons/icon.svg', sizes: 'any' }],
         },
       ],
@@ -355,6 +371,7 @@ app.get('/{*path}', (req, res) => {
 
 // 404 + global error handlers (must come after all routes)
 app.use(notFoundHandler);
+Sentry.setupExpressErrorHandler(app);
 app.use(errorHandler);
 
 // Verify email configuration on startup

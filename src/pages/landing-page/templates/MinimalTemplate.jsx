@@ -10,6 +10,7 @@ export default function MinimalTemplate({ center, lp }) {
   const urls = {
     student: lp.links?.studentLogin || '/student/login',
     teacher: lp.links?.teacherLogin || '/teacher/login',
+    admin:   '/admin/login',
   };
   useDocTitle(lp.seo?.title || center.centerName);
 
@@ -28,11 +29,14 @@ export default function MinimalTemplate({ center, lp }) {
 /* ── Nav ──────────────────────────────────────────────────────────────────── */
 function MinimalNav({ center, D, urls }) {
   const scrolled = useScrolled();
+  const isMobile = useIsMobile();
+  const [menuOpen, setMenuOpen] = useState(false);
+
   return (
     <nav style={{
       position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100,
-      background: scrolled ? '#fff' : 'transparent',
-      borderBottom: `1px solid ${scrolled ? 'rgba(0,0,0,0.06)' : 'transparent'}`,
+      background: scrolled || menuOpen ? '#fff' : 'transparent',
+      borderBottom: `1px solid ${(scrolled || menuOpen) ? 'rgba(0,0,0,0.06)' : 'transparent'}`,
       boxShadow: scrolled ? '0 1px 12px rgba(0,0,0,0.05)' : 'none',
       transition: 'all 0.3s ease',
       height: 64, display: 'flex', alignItems: 'center', padding: '0 6%',
@@ -44,17 +48,59 @@ function MinimalNav({ center, D, urls }) {
           : <span style={{ fontSize: 17, fontWeight: 700, color: D.text, letterSpacing: '-0.01em' }}>{center.centerName}</span>
         }
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-        <a href={urls.teacher} style={{ fontSize: 13, color: D.muted, textDecoration: 'none', fontWeight: 500 }}>
-          Teachers
-        </a>
-        <a href={urls.student} style={{
-          fontSize: 13, fontWeight: 700, padding: '8px 20px', borderRadius: 9,
-          background: D.primary, color: '#fff', textDecoration: 'none',
-        }}>
-          Login
-        </a>
-      </div>
+
+      {/* Desktop links */}
+      {!isMobile && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <a href={urls.admin} style={{ fontSize: 12, color: '#cbd5e1', textDecoration: 'none', fontWeight: 400 }}>
+            Admin
+          </a>
+          <a href={urls.teacher} style={{ fontSize: 13, color: D.muted, textDecoration: 'none', fontWeight: 500 }}>
+            Teachers
+          </a>
+          <a href={urls.student} style={{
+            fontSize: 13, fontWeight: 700, padding: '8px 20px', borderRadius: 9,
+            background: D.primary, color: '#fff', textDecoration: 'none',
+          }}>
+            Login
+          </a>
+        </div>
+      )}
+
+      {/* Mobile: Login button + hamburger */}
+      {isMobile && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <a href={urls.student} style={{
+            fontSize: 13, fontWeight: 700, padding: '7px 16px', borderRadius: 9,
+            background: D.primary, color: '#fff', textDecoration: 'none',
+          }}>
+            Login
+          </a>
+          <button onClick={() => setMenuOpen(v => !v)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: D.text }}>
+            <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round">
+              {menuOpen
+                ? <><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></>
+                : <><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></>
+              }
+            </svg>
+          </button>
+        </div>
+      )}
+
+      {/* Mobile slide-down menu */}
+      {isMobile && menuOpen && (
+        <div style={{ position: 'absolute', top: 64, left: 0, right: 0, background: '#fff', borderBottom: '1px solid rgba(0,0,0,0.06)', padding: '12px 6% 20px', display: 'flex', flexDirection: 'column', gap: 4, boxShadow: '0 8px 24px rgba(0,0,0,0.07)', zIndex: 99 }}>
+          <a href={urls.student} onClick={() => setMenuOpen(false)} style={{ fontSize: 14, fontWeight: 700, color: D.primary, textDecoration: 'none', padding: '10px 12px', borderRadius: 8 }}>
+            Student Login
+          </a>
+          <a href={urls.teacher} onClick={() => setMenuOpen(false)} style={{ fontSize: 14, fontWeight: 500, color: D.muted, textDecoration: 'none', padding: '10px 12px', borderRadius: 8 }}>
+            Teacher Login
+          </a>
+          <a href={urls.admin} onClick={() => setMenuOpen(false)} style={{ fontSize: 12, fontWeight: 400, color: '#cbd5e1', textDecoration: 'none', padding: '8px 12px', borderRadius: 8 }}>
+            Admin Login
+          </a>
+        </div>
+      )}
     </nav>
   );
 }
@@ -127,8 +173,9 @@ function MinimalHero({ center, lp, D }) {
 
 /* ── About ────────────────────────────────────────────────────────────────── */
 function MinimalAbout({ about, D }) {
+  const isMobile = useIsMobile();
   return (
-    <section style={{ padding: '100px 10%', background: '#fff', borderTop: '1px solid rgba(0,0,0,0.05)' }}>
+    <section style={{ padding: isMobile ? '64px 6%' : '100px 10%', background: '#fff', borderTop: '1px solid rgba(0,0,0,0.05)' }}>
       <div style={{ maxWidth: 720, margin: '0 auto', textAlign: 'center' }}>
         <SectionLabel color={D.primary} font={D.font}>About</SectionLabel>
         <h2 style={{ fontSize: 'clamp(1.5rem,2.8vw,2.2rem)', fontWeight: 700, color: D.text, margin: '16px 0 24px', letterSpacing: '-0.02em' }}>
@@ -147,9 +194,10 @@ function MinimalAbout({ about, D }) {
 
 /* ── Teachers ─────────────────────────────────────────────────────────────── */
 function MinimalTeachers({ teachers, D }) {
+  const isMobile = useIsMobile();
   const sorted = sortedTeachers(teachers);
   return (
-    <section style={{ padding: '100px 10%', background: '#fafafa', borderTop: '1px solid rgba(0,0,0,0.05)' }}>
+    <section style={{ padding: isMobile ? '64px 6%' : '100px 10%', background: '#fafafa', borderTop: '1px solid rgba(0,0,0,0.05)' }}>
       <div style={{ maxWidth: 720, margin: '0 auto' }}>
         <div style={{ marginBottom: 48 }}>
           <SectionLabel color={D.primary} font={D.font}>Team</SectionLabel>
@@ -209,9 +257,10 @@ function MinimalTeacherRow({ teacher, D }) {
 
 /* ── Contact ──────────────────────────────────────────────────────────────── */
 function MinimalContact({ contact, links, D }) {
+  const isMobile = useIsMobile();
   const socials = Object.keys(SOCIAL_ICONS).filter(k => links?.[k]);
   return (
-    <section style={{ padding: '100px 10%', background: '#fff', borderTop: '1px solid rgba(0,0,0,0.05)' }}>
+    <section style={{ padding: isMobile ? '64px 6%' : '100px 10%', background: '#fff', borderTop: '1px solid rgba(0,0,0,0.05)' }}>
       <div style={{ maxWidth: 600, margin: '0 auto', textAlign: 'center' }}>
         <SectionLabel color={D.primary} font={D.font}>Contact</SectionLabel>
         <h2 style={{ fontSize: 'clamp(1.5rem,2.8vw,2.2rem)', fontWeight: 700, color: D.text, margin: '16px 0 32px', letterSpacing: '-0.02em' }}>

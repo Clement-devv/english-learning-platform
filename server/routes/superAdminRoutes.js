@@ -61,7 +61,7 @@ router.post('/login', loginLimiter, validateSuperAdminLogin, async (req, res) =>
     const token = jwt.sign(
       { ...JWT_STANDARD_CLAIMS, id: superAdmin._id, role: 'superadmin', email: superAdmin.email },
       config.jwtSecret,
-      { expiresIn: config.jwtExpiry }
+      { expiresIn: process.env.JWT_SA_EXPIRY || '8h' }
     );
 
     superAdmin.sessions.push({ token, isActive: true, loginTime: new Date() });

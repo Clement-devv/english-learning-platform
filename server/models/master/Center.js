@@ -33,6 +33,7 @@ const centerSchema = new mongoose.Schema({
     loginBgOverlay:  { type: Number, default: 0.45 },
     loginTheme:         { type: String, default: null },  // exclusive — super admin assigns (student)
     teacherLoginTheme:  { type: String, default: null },  // exclusive — super admin assigns (teacher)
+    adminLoginTheme:    { type: String, default: null },  // exclusive — super admin assigns (admin+sub-admin)
     dashboardTheme:        { type: String, default: null },  // exclusive — super admin assigns (student)
     teacherDashboardTheme: { type: String, default: null },  // exclusive — super admin assigns (teacher)
     adminDashboardTheme:      { type: String, default: null },  // exclusive — super admin assigns (admin)

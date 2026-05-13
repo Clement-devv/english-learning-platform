@@ -10,6 +10,7 @@ export default function ClassicTemplate({ center, lp }) {
   const urls = {
     student: lp.links?.studentLogin || '/student/login',
     teacher: lp.links?.teacherLogin || '/teacher/login',
+    admin:   '/admin/login',
   };
   useDocTitle(lp.seo?.title || center.centerName);
 
@@ -144,6 +145,13 @@ function ClassicNav({ center, D, urls }) {
                     <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 500 }}>Manage your classes</div>
                   </div>
                 </a>
+                <div style={{ height: 1, background: '#f1f5f9', margin: '4px 0' }} />
+                <a href={urls.admin} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px', borderRadius: 10, textDecoration: 'none', color: '#94a3b8', fontSize: 12, fontWeight: 500 }}
+                   onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+                   onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                  <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth={2} strokeLinecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+                  Admin Login
+                </a>
               </div>
             )}
           </div>
@@ -158,7 +166,7 @@ function ClassicNav({ center, D, urls }) {
           display: 'inline-flex', alignItems: 'center', gap: 7,
         }}>
           <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
-          Join as Student
+          {isMobile ? 'Join' : 'Join as Student'}
         </a>
 
         {/* Mobile hamburger */}
@@ -186,6 +194,10 @@ function ClassicNav({ center, D, urls }) {
           <a href={urls.teacher} onClick={() => setMenuOpen(false)}
              style={{ fontSize: 13, fontWeight: 600, color: '#94a3b8', textDecoration: 'none', padding: '8px 12px', borderRadius: 10 }}>
             Teacher Login
+          </a>
+          <a href={urls.admin} onClick={() => setMenuOpen(false)}
+             style={{ fontSize: 12, fontWeight: 500, color: '#cbd5e1', textDecoration: 'none', padding: '6px 12px', borderRadius: 10 }}>
+            Admin Login
           </a>
         </div>
       )}

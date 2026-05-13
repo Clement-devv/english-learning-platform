@@ -40,6 +40,7 @@ export function AuthProvider({ children }) {
     setRole(newRole);
     setUserState(userInfo);
     setToken(authToken);
+    localStorage.setItem('pwa-last-role', newRole);
   }, []);
 
   /**
@@ -62,6 +63,7 @@ export function AuthProvider({ children }) {
    */
   const logout = useCallback(() => {
     if (role) clearAuth(role);
+    localStorage.removeItem('pwa-last-role');
     setRole(null);
     setUserState(null);
     setToken(null);

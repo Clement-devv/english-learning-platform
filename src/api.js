@@ -212,6 +212,7 @@ api.interceptors.response.use(
           removeToken(session.tokenKey);
           removeToken(session.sessionKey);
           removeToken(session.infoKey);
+          localStorage.removeItem('pwa-last-role');
           window.location.href = session.loginPath;
           return Promise.reject(error);
         } finally {
@@ -224,6 +225,7 @@ api.interceptors.response.use(
         removeToken(session.tokenKey);
         removeToken(session.sessionKey);
         removeToken(session.infoKey);
+        localStorage.removeItem('pwa-last-role');
         window.location.href = session.loginPath;
       }
       return Promise.reject(error);

@@ -52,6 +52,18 @@ export const fetchBranding = async () => {
 
     const slug = impersonationSlug || devSlug || subdomainSlug;
 
+    // Detect if we're on the platform root domain (clemify.com itself).
+    // If no slug is available and we're not on a potential center custom domain,
+    // skip the fetch — there's no center to identify and the request would 400.
+    const platformHost = (() => {
+      try { return new URL(API_BASE).hostname; } catch { return 'localhost'; }
+    })();
+    const isOnPlatformRoot = !slug && (
+      window.location.hostname === platformHost ||
+      window.location.hostname === `www.${platformHost}`
+    );
+    if (isOnPlatformRoot) return { branding: DEFAULT_BRANDING, center: null };
+
     const headers = {};
     if (slug) headers['x-center-slug'] = slug;
 
