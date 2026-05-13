@@ -318,6 +318,7 @@ function AgoraModal({ booking, onClose, dm }) {
     (async () => {
       try {
         const AgoraRTC = (await import("agora-rtc-sdk-ng")).default;
+        AgoraRTC.setLogLevel(import.meta.env.DEV ? 0 : 3);
         if (!mounted) return;
 
         const { data } = await api.get(`/agora/token?channel=class-${booking._id}`);

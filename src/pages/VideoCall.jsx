@@ -4,6 +4,7 @@ import AgoraRTC from "agora-rtc-sdk-ng";
 import VirtualBackgroundExtension from "agora-extension-virtual-background";
 
 AgoraRTC.setParameter("AUDIO_VOLUME_INDICATION_INTERVAL", 200);
+AgoraRTC.setLogLevel(import.meta.env.DEV ? 0 : 3); // 0=DEBUG in dev, 3=ERROR only in prod
 import api from "../api";
 import { useRecording }  from "../hooks/useRecording";
 import { useVideoChat }  from "../hooks/useVideoChat";

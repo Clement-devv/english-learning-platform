@@ -83,8 +83,9 @@ export const fetchBranding = async () => {
       center:   data.center,
     };
   } catch (err) {
-    // Branding fetch failed — app still works with defaults
-    console.warn('Branding fetch failed, using defaults:', err.message);
+    // AbortError = component unmounted before fetch completed — not a real failure
+    if (err.name === 'AbortError') return { branding: DEFAULT_BRANDING, center: null };
+    if (import.meta.env.DEV) console.warn('Branding fetch failed, using defaults:', err.message);
     return { branding: DEFAULT_BRANDING, center: null };
   }
 };

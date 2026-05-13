@@ -3,6 +3,7 @@
 // Students = audience by default; promoted students switch to host role to speak
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import AgoraRTC from "agora-rtc-sdk-ng";
+AgoraRTC.setLogLevel(import.meta.env.DEV ? 0 : 3);
 import { io } from "socket.io-client";
 import api from "../../api";
 import { useDarkMode } from "../../hooks/useDarkMode";

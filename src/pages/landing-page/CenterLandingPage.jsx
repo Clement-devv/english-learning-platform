@@ -22,7 +22,10 @@ export default function CenterLandingPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`${API}/public/landing-page`)
+    const headers = {};
+    const devSlug = import.meta.env.DEV ? (import.meta.env.VITE_CENTER_SLUG || null) : null;
+    if (devSlug) headers['x-center-slug'] = devSlug;
+    fetch(`${API}/public/landing-page`, { headers })
       .then(r => r.json())
       .then(d => {
         if (d.success) setData(d);

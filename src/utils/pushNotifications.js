@@ -12,7 +12,12 @@ function authHeader() {
     get("studentToken") ||
     get("adminToken")   ||
     get("token");
-  const slug = import.meta.env.VITE_CENTER_SLUG || getCachedCenter()?.slug;
+  const subdomainSlug = (() => {
+    const h = window.location.hostname;
+    if (h.endsWith('.clemify.com')) return h.replace(/\.clemify\.com$/, '');
+    return null;
+  })();
+  const slug = import.meta.env.VITE_CENTER_SLUG || subdomainSlug || getCachedCenter()?.slug;
   return {
     ...(t    ? { Authorization: `Bearer ${t}` } : {}),
     ...(slug ? { "x-center-slug": slug }         : {}),

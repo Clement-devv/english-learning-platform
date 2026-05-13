@@ -9,6 +9,7 @@ import { detectActiveRole, getStoredToken } from "../utils/authStorage.js";
 import { refreshToken } from "../api.js";
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || "";
+const log = (...args) => { if (import.meta.env.DEV) console.log(...args); };
 
 // Storage-based fallback — used when useAuth() hasn't hydrated yet (e.g. HMR or first paint)
 function getSocketToken() {
@@ -87,11 +88,11 @@ export function RingProvider({ children }) {
     const role  = authRole || detectActiveRole();
 
     if (!token || !role) {
-      console.warn("[RingContext] No token/role — socket not started", { authToken: !!authToken, authRole });
+      log("[RingContext] No token/role — socket not started", { authToken: !!authToken, authRole });
       return;
     }
 
-    console.log("[RingContext] Starting socket for role:", role);
+    log("[RingContext] Starting socket for role:", role);
 
     const sock = io(SOCKET_URL, {
       transports: ["websocket"],
@@ -100,12 +101,12 @@ export function RingProvider({ children }) {
     socketRef.current = sock;
 
     const joinRoom = () => {
-      console.log("[RingContext] Joining user room");
+      log("[RingContext] Joining user room");
       sock.emit("join-user-room");
     };
 
     sock.on("connect", () => {
-      console.log("[RingContext] Socket connected:", sock.id);
+      log("[RingContext] Socket connected:", sock.id);
       setSocketConnected(true);
       joinRoom();
     });
@@ -119,7 +120,7 @@ export function RingProvider({ children }) {
         sock.disconnect();
         const newToken = await refreshToken();
         if (newToken) {
-          console.log("[RingContext] Token refreshed — reconnecting socket");
+          log("[RingContext] Token refreshed — reconnecting socket");
           setReconnectKey(k => k + 1);
         }
         // If refresh also fails, socketConnected=false warning banner remains visible
@@ -127,7 +128,7 @@ export function RingProvider({ children }) {
     });
 
     sock.on("disconnect", (reason) => {
-      console.warn("[RingContext] Socket disconnected:", reason);
+      log("[RingContext] Socket disconnected:", reason);
       if (reason !== "io client disconnect") {
         setSocketConnected(false);
       }
@@ -138,7 +139,7 @@ export function RingProvider({ children }) {
 
     // ── Receiver side ──────────────────────────────────────────────────────────
     sock.on("incoming-ring", (data) => {
-      console.log("[RingContext] incoming-ring received:", data);
+      log("[RingContext] incoming-ring received:", data);
       setIncoming((prev) => prev ?? data);
       ringtoneRef.current = makeRingtone();
     });
@@ -162,7 +163,7 @@ export function RingProvider({ children }) {
 
     // ── Caller side ────────────────────────────────────────────────────────────
     sock.on("ring-sent", ({ ringId }) => {
-      console.log("[RingContext] ring-sent, ringId:", ringId);
+      log("[RingContext] ring-sent, ringId:", ringId);
       currentRingId.current = ringId;
     });
 
@@ -180,7 +181,7 @@ export function RingProvider({ children }) {
     // never goes down mid-session. 15m JWT → refresh at 12m intervals.
     const refreshInterval = setInterval(async () => {
       if (!sock.connected) return;
-      console.log("[RingContext] Proactive token refresh");
+      log("[RingContext] Proactive token refresh");
       const newToken = await refreshToken();
       if (newToken) {
         // Reconnect with the new token — cleanest way to update socket auth
@@ -199,7 +200,7 @@ export function RingProvider({ children }) {
   }, [authRole, authToken, reconnectKey]);
 
   const ringUser = useCallback(({ targetUserId, targetRole, callerName }) => {
-    console.log("[RingContext] ringUser called. socket ready?", !!socketRef.current?.connected, { targetUserId, targetRole, callerName });
+    log("[RingContext] ringUser called. socket ready?", !!socketRef.current?.connected, { targetUserId, targetRole, callerName });
     socketRef.current?.emit("ring-call", { targetUserId, targetRole, callerName });
   }, []);
 

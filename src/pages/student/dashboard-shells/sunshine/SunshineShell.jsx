@@ -15,7 +15,7 @@ import {
   Home, BookOpen, FileText, Layers, Mic2, MessageSquare, MessageCircle,
   CheckCircle2, CalendarDays, TrendingUp, Award, Users,
   Video, Star, Gift, Settings, LogOut, Bell, ChevronDown, ChevronRight,
-  Moon, Sun, Shield, KeyRound, PhoneMissed, X,
+  Moon, Sun, Shield, KeyRound, PhoneMissed, X, Radio, Target,
 } from "lucide-react";
 import { useTranslation }        from "react-i18next";
 import { useBranding }           from "../../../../context/BrandingContext";
@@ -131,7 +131,7 @@ function BadgesTab({ badges, progress, completedClasses, col, isDarkMode, shareA
       <div style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: "24px", padding: "24px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px", marginBottom: "20px" }}>
           <div>
-            <h2 style={{ margin: "0 0 4px", fontSize: "22px", fontWeight: 900, color: col.heading }}>🏅 Achievement Badges</h2>
+            <h2 style={{ margin: "0 0 4px", fontSize: "22px", fontWeight: 900, color: col.heading, display: "flex", alignItems: "center", gap: 8 }}><Award size={20} color={col.accent} strokeWidth={2} /> Achievement Badges</h2>
             <p style={{ margin: 0, color: col.muted, fontSize: "14px", fontWeight: 600 }}>
               {badges.length === 0 ? "Complete classes to start earning!" : `${badges.length} of ${BADGE_DEFINITIONS.length} earned · ${pct}%`}
             </p>
@@ -187,7 +187,7 @@ function BadgesTab({ badges, progress, completedClasses, col, isDarkMode, shareA
 
       {nextUp.length > 0 && (
         <div style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: "24px", padding: "24px" }}>
-          <h3 style={{ margin: "0 0 16px", fontSize: "20px", fontWeight: 900, color: col.heading }}>🎯 Almost There!</h3>
+          <h3 style={{ margin: "0 0 16px", fontSize: "20px", fontWeight: 900, color: col.heading, display: "flex", alignItems: "center", gap: 8 }}><Target size={19} color={col.accent} strokeWidth={2} /> Almost There!</h3>
           <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
             {nextUp.map(badge => {
               const cur = getCur(badge);
@@ -415,8 +415,8 @@ export default function SunshineShell() {
         {/* ── TOP BAR ── */}
         <header style={{ height: 64, background: d.isDarkMode ? "#13111a" : "#fff", borderBottom: `2px solid ${col.border}`, display: "flex", alignItems: "center", padding: isMobile ? "0 12px" : "0 24px", gap: isMobile ? 8 : 16, flexShrink: 0 }}>
           {/* Page title */}
-          <h1 style={{ margin: 0, fontSize: 18, fontWeight: 900, color: col.heading, flex: 1 }}>
-            {NAV_GROUPS.flatMap(g => g.items).find(i => i.key === d.activeTab)?.icon}{" "}
+          <h1 style={{ margin: 0, fontSize: 18, fontWeight: 900, color: col.heading, flex: 1, display: 'flex', alignItems: 'center', gap: 8 }}>
+            {(() => { const it = NAV_GROUPS.flatMap(g => g.items).find(i => i.key === d.activeTab); const LI = it?.lucide || Home; return <LI size={20} strokeWidth={2.2} color={col.accent} />; })()}
             {(() => { const it = NAV_GROUPS.flatMap(g => g.items).find(i => i.key === d.activeTab); return it ? t(it.labelKey) : t('nav.home'); })()}
           </h1>
 
@@ -552,7 +552,7 @@ export default function SunshineShell() {
                   {d.activeClasses.length > 0 && (
                     <div className="kid-card" style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: 24, padding: 20 }}>
                       <h2 style={{ margin: "0 0 14px", fontSize: 17, fontWeight: 900, color: col.heading, display: "flex", alignItems: "center", gap: 8 }}>
-                        🚀 {t('dashboard.liveAndSoon')}
+                        <Radio size={18} color="#ef4444" strokeWidth={2} /> {t('dashboard.liveAndSoon')}
                         <span style={{ background: "#ef4444", color: "#fff", borderRadius: 999, padding: "2px 10px", fontSize: 12, fontWeight: 900 }}>{d.activeClasses.length}</span>
                       </h2>
                       <ActiveClasses activeClasses={d.activeClasses} onJoin={d.handleJoinClass} />
@@ -563,7 +563,7 @@ export default function SunshineShell() {
                   <div className="kid-card" style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: 24, padding: 22 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
                       <h2 style={{ margin: 0, fontSize: 18, fontWeight: 900, color: col.heading, display: "flex", alignItems: "center", gap: 8 }}>
-                        📅 {t('dashboard.upcomingClasses')}
+                        <CalendarDays size={18} color={col.accent} strokeWidth={2} /> {t('dashboard.upcomingClasses')}
                       </h2>
                       <button className="kid-btn" onClick={() => d.setActiveTab("schedule")} style={{ background: "transparent", border: "none", color: col.accent, fontWeight: 800, cursor: "pointer", fontFamily: F, fontSize: 13, display: "flex", alignItems: "center", gap: 4 }}>
                         {t('dashboard.viewAll')}
@@ -579,7 +579,7 @@ export default function SunshineShell() {
                   {/* Today's goal / progress */}
                   <div className="kid-card" style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: 24, padding: 22 }}>
                     <h3 style={{ margin: "0 0 12px", fontSize: 16, fontWeight: 900, color: col.heading, display: "flex", alignItems: "center", gap: 8 }}>
-                      🎯 {t('dashboard.myProgress')}
+                      <Target size={17} color={col.accent} strokeWidth={2} /> {t('dashboard.myProgress')}
                     </h3>
                     <ProgressCard progress={d.progress} />
                   </div>
@@ -589,7 +589,7 @@ export default function SunshineShell() {
                   {/* Badges callout */}
                   <div className="kid-card" style={{ background: d.isDarkMode ? "rgba(249,115,22,0.1)" : "linear-gradient(145deg,#fff7ed,#fef3c7)", border: `2px solid ${d.isDarkMode ? "rgba(249,115,22,0.25)" : "#fed7aa"}`, borderRadius: 24, padding: 22 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                      <h3 style={{ margin: 0, fontSize: 16, fontWeight: 900, color: col.heading, display: "flex", alignItems: "center", gap: 8 }}>🏅 {t('dashboard.badges')}</h3>
+                      <h3 style={{ margin: 0, fontSize: 16, fontWeight: 900, color: col.heading, display: "flex", alignItems: "center", gap: 8 }}><Award size={17} color={col.accent} strokeWidth={2} /> {t('dashboard.badges')}</h3>
                       <button className="kid-btn" onClick={() => d.setActiveTab("badges")} style={{ background: "transparent", border: "none", color: col.accent, fontWeight: 800, borderRadius: 10, cursor: "pointer", fontFamily: F, fontSize: 12 }}>{t('dashboard.seeAll')}</button>
                     </div>
                     {d.badges.length === 0 ? (
@@ -612,7 +612,7 @@ export default function SunshineShell() {
                   </div>
 
                   <div className="kid-card" style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: 24, padding: 20 }}>
-                    <h2 style={{ margin: "0 0 12px", fontSize: 16, fontWeight: 900, color: col.heading }}>🔔 {t('dashboard.notifications')}</h2>
+                    <h2 style={{ margin: "0 0 12px", fontSize: 16, fontWeight: 900, color: col.heading, display: "flex", alignItems: "center", gap: 8 }}><Bell size={17} color={col.accent} strokeWidth={2} /> {t('dashboard.notifications')}</h2>
                     <NotificationsCard notifications={d.notifications} onClearAll={() => d.setNotifications([])} />
                   </div>
                 </div>
@@ -668,7 +668,7 @@ export default function SunshineShell() {
           {/* ══ COMPLETED ══ */}
           {d.activeTab === "completed-classes" && (
             <div style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: "24px", padding: "24px" }}>
-              <h2 style={{ margin: "0 0 20px", fontSize: "22px", fontWeight: 900, color: col.heading }}>✅ {t('dashboard.completedClasses')}</h2>
+              <h2 style={{ margin: "0 0 20px", fontSize: "22px", fontWeight: 900, color: col.heading, display: "flex", alignItems: "center", gap: 8 }}><CheckCircle2 size={20} color={col.accent} strokeWidth={2} /> {t('dashboard.completedClasses')}</h2>
               <StudentCompletedTab studentId={d.student.id} isDarkMode={d.isDarkMode} />
             </div>
           )}

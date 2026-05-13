@@ -41,11 +41,11 @@ function getActiveSession() {
     return { tokenKey: "parentToken", sessionKey: null, infoKey: "parentInfo", loginPath: "/parent/login" };
   }
   // Fallback: whichever token exists
-  if (getToken("adminToken"))    return { tokenKey: "adminToken",    sessionKey: "adminSessionToken",    infoKey: "adminInfo",    loginPath: "/admin/login" };
-  if (getToken("subAdminToken")) return { tokenKey: "subAdminToken", sessionKey: null,                   infoKey: "subAdminInfo", loginPath: "/sub-admin/login" };
-  if (getToken("teacherToken"))  return { tokenKey: "teacherToken",  sessionKey: "teacherSessionToken",  infoKey: "teacherInfo",  loginPath: "/teacher/login" };
-  if (getToken("studentToken"))  return { tokenKey: "studentToken",  sessionKey: "studentSessionToken",  infoKey: "studentInfo",  loginPath: "/student/login" };
-  if (getToken("parentToken"))   return { tokenKey: "parentToken",   sessionKey: null,                   infoKey: "parentInfo",   loginPath: "/parent/login" };
+  if (getToken("adminToken")) return { tokenKey: "adminToken", sessionKey: "adminSessionToken", infoKey: "adminInfo", loginPath: "/admin/login" };
+  if (getToken("subAdminToken")) return { tokenKey: "subAdminToken", sessionKey: null, infoKey: "subAdminInfo", loginPath: "/sub-admin/login" };
+  if (getToken("teacherToken")) return { tokenKey: "teacherToken", sessionKey: "teacherSessionToken", infoKey: "teacherInfo", loginPath: "/teacher/login" };
+  if (getToken("studentToken")) return { tokenKey: "studentToken", sessionKey: "studentSessionToken", infoKey: "studentInfo", loginPath: "/student/login" };
+  if (getToken("parentToken")) return { tokenKey: "parentToken", sessionKey: null, infoKey: "parentInfo", loginPath: "/parent/login" };
   return null;
 }
 
@@ -150,8 +150,8 @@ function processRefreshQueue(newToken, error) {
 }
 
 async function attemptRefresh(session) {
-  const expiredToken   = getToken(session.tokenKey);
-  const sessionToken   = getToken(session.sessionKey);
+  const expiredToken = getToken(session.tokenKey);
+  const sessionToken = getToken(session.sessionKey);
   const impersonationSlug = sessionStorage.getItem('impersonationCenterSlug');
   const devSlug = import.meta.env.DEV ? (import.meta.env.VITE_CENTER_SLUG || null) : null;
   const slug = impersonationSlug || devSlug || getCachedCenter()?.slug;
