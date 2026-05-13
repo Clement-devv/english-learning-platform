@@ -490,7 +490,10 @@ export default function ClemifyHome() {
       <nav className={`ch-nav${scrolled ? ' ch-nav--scrolled' : ''}`}>
         <div className="ch-nav-inner">
           <div className="ch-logo">
-            <img src="/icons/icon.svg" alt="Clemify" style={{ height: 32, width: 32, display: 'block' }} />
+            <svg width="30" height="30" viewBox="0 0 512 512" aria-label="Clemify">
+              <polygon points="256,52 430,153 430,355 256,456 82,355 82,153" fill="none" stroke="#f5c842" strokeWidth="32"/>
+              <path d="M 322,170 A 104,104 0 1 0 322,342" fill="none" stroke="#f5c842" strokeWidth="72" strokeLinecap="round"/>
+            </svg>
             <span>Clem<span className="ch-logo-accent">ify</span></span>
           </div>
           <ul className="ch-nav-links">
@@ -740,7 +743,10 @@ export default function ClemifyHome() {
         <div className="ch-container ch-footer-inner">
           <div className="ch-footer-brand">
             <div className="ch-logo">
-              <img src="/icons/icon.svg" alt="Clemify" style={{ height: 32, width: 32, display: 'block' }} />
+              <svg width="30" height="30" viewBox="0 0 512 512" aria-label="Clemify">
+              <polygon points="256,52 430,153 430,355 256,456 82,355 82,153" fill="none" stroke="#f5c842" strokeWidth="32"/>
+              <path d="M 322,170 A 104,104 0 1 0 322,342" fill="none" stroke="#f5c842" strokeWidth="72" strokeLinecap="round"/>
+            </svg>
               <span>Clem<span className="ch-logo-accent">ify</span></span>
             </div>
             <p>English Learning Platform</p>
