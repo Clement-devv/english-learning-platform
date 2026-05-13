@@ -69,7 +69,6 @@
   font-size: 1.4rem; font-weight: 800; letter-spacing: -0.5px;
   color: var(--ch-text-1);
 }
-.ch-logo-hex    { color: var(--ch-gold); font-size: 1.45rem; line-height: 1; }
 .ch-logo-accent { color: var(--ch-gold); }
 
 .ch-nav-links { display: flex; list-style: none; gap: 1.8rem; margin-left: auto; }

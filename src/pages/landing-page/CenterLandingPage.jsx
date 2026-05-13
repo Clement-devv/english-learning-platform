@@ -23,8 +23,11 @@ export default function CenterLandingPage() {
 
   useEffect(() => {
     const headers = {};
+    const h = window.location.hostname;
+    const subdomainSlug = h.endsWith('.clemify.com') ? h.replace(/\.clemify\.com$/, '') : null;
     const devSlug = import.meta.env.DEV ? (import.meta.env.VITE_CENTER_SLUG || null) : null;
-    if (devSlug) headers['x-center-slug'] = devSlug;
+    const slug = devSlug || subdomainSlug;
+    if (slug) headers['x-center-slug'] = slug;
     fetch(`${API}/public/landing-page`, { headers })
       .then(r => r.json())
       .then(d => {

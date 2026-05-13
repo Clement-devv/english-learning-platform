@@ -490,7 +490,7 @@ export default function ClemifyHome() {
       <nav className={`ch-nav${scrolled ? ' ch-nav--scrolled' : ''}`}>
         <div className="ch-nav-inner">
           <div className="ch-logo">
-            <span className="ch-logo-hex">&#11042;</span>
+            <img src="/icons/icon.svg" alt="Clemify" style={{ height: 32, width: 32, display: 'block' }} />
             <span>Clem<span className="ch-logo-accent">ify</span></span>
           </div>
           <ul className="ch-nav-links">
@@ -740,7 +740,7 @@ export default function ClemifyHome() {
         <div className="ch-container ch-footer-inner">
           <div className="ch-footer-brand">
             <div className="ch-logo">
-              <span className="ch-logo-hex">&#11042;</span>
+              <img src="/icons/icon.svg" alt="Clemify" style={{ height: 32, width: 32, display: 'block' }} />
               <span>Clem<span className="ch-logo-accent">ify</span></span>
             </div>
             <p>English Learning Platform</p>
