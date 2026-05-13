@@ -93,10 +93,7 @@ export default function SubAdminExecutiveTheme() {
                     ))}
                   </div>
                   <div className="ex-screen-hr" />
-                  <div className="ex-mini-stats">
-                    <span className="ex-mstat">Active: <b>8</b></span>
-                    <span className="ex-mstat">Students: <b>64</b></span>
-                  </div>
+                  <div className="ex-live-badge"><span className="ex-live-dot-sm" />LIVE</div>
                 </div>
                 <div className="ex-stand" />
                 <div className="ex-base" />
@@ -109,10 +106,9 @@ export default function SubAdminExecutiveTheme() {
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#818cf8" strokeWidth="2.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
               </div>
               <div className="ex-fc-body">
-                <div className="ex-fc-val">64</div>
-                <div className="ex-fc-lbl">My Students</div>
+                <div className="ex-fc-feat">My Team</div>
+                <div className="ex-fc-status"><span className="ex-live-dot" style={{ background: '#818cf8' }} />Live</div>
               </div>
-              <div className="ex-fc-badge ex-fc-badge-indigo">↑ 5</div>
             </div>
 
             <div className="ex-fcard ex-fc2">
@@ -120,10 +116,9 @@ export default function SubAdminExecutiveTheme() {
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#c084fc" strokeWidth="2.5"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
               </div>
               <div className="ex-fc-body">
-                <div className="ex-fc-val">8</div>
-                <div className="ex-fc-lbl">Teachers</div>
+                <div className="ex-fc-feat">Track Progress</div>
+                <div className="ex-fc-status"><span className="ex-live-dot" style={{ background: '#c084fc' }} />Active</div>
               </div>
-              <div className="ex-fc-badge ex-fc-badge-purple">↑ 2</div>
             </div>
 
             <div className="ex-fcard ex-fc3">
@@ -131,10 +126,9 @@ export default function SubAdminExecutiveTheme() {
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" strokeWidth="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
               </div>
               <div className="ex-fc-body">
-                <div className="ex-fc-val">312</div>
-                <div className="ex-fc-lbl">Completions</div>
+                <div className="ex-fc-feat">Live Sessions</div>
+                <div className="ex-fc-status"><span className="ex-live-dot" style={{ background: '#fbbf24' }} />Running</div>
               </div>
-              <div className="ex-fc-badge" style={{ color:'#fbbf24', background:'rgba(245,158,11,.1)', borderColor:'rgba(245,158,11,.2)' }}>↑ 14%</div>
             </div>
           </div>
 
@@ -304,7 +298,7 @@ const css = `
 .ex-logo-icon { width:34px;height:34px;border-radius:10px;background:rgba(99,102,241,.07);border:1px solid rgba(99,102,241,.14);display:flex;align-items:center;justify-content:center; }
 .ex-logo-name { font-size:12.5px; font-weight:700; color:#475569; }
 
-.ex-scene { position:relative; width:420px; height:340px; margin-bottom:28px; flex-shrink:0; }
+.ex-scene { position:relative; width:560px; height:460px; margin-bottom:16px; flex-shrink:0; }
 .ex-lines { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; overflow:visible; }
 .ex-dl  { animation:ex-dash 2.8s linear infinite; }
 .ex-dl2 { animation:ex-dash 2.8s linear infinite; animation-delay:-.9s; }
@@ -312,40 +306,43 @@ const css = `
 @keyframes ex-dash { to{stroke-dashoffset:-18} }
 
 .ex-monitor-wrap { position:absolute; left:50%; top:50%; transform:translate(-50%,-54%); animation:ex-mfloat 5s ease-in-out infinite; }
-@keyframes ex-mfloat { 0%,100%{transform:translate(-50%,-54%) rotateX(3deg)} 50%{transform:translate(-50%,calc(-54% - 12px)) rotateX(-1deg)} }
-.ex-monitor { width:200px; display:flex; flex-direction:column; align-items:center; }
-.ex-screen { width:200px;height:126px;background:linear-gradient(155deg,#09152a,#060e1e);border:1px solid rgba(99,102,241,.22);border-radius:10px 10px 0 0;padding:10px 12px 8px;position:relative;overflow:hidden;box-shadow:0 0 50px rgba(99,102,241,.08),inset 0 0 24px rgba(99,102,241,.03); }
+@keyframes ex-mfloat { 0%,100%{transform:translate(-50%,-54%) rotateX(3deg)} 50%{transform:translate(-50%,calc(-54% - 16px)) rotateX(-1deg)} }
+.ex-monitor { width:280px; display:flex; flex-direction:column; align-items:center; }
+.ex-screen { width:280px;height:176px;background:linear-gradient(155deg,#09152a,#060e1e);border:1px solid rgba(99,102,241,.22);border-radius:12px 12px 0 0;padding:13px 15px 10px;position:relative;overflow:hidden;box-shadow:0 0 70px rgba(99,102,241,.10),inset 0 0 32px rgba(99,102,241,.04); }
 .ex-screen-indigo { border-color:rgba(99,102,241,.25) !important; }
-.ex-screen-topbar { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
-.ex-screen-dots { display:flex; gap:4px; }
-.ex-sdot { width:5px;height:5px;border-radius:50%; }
-.ex-sdot-g { background:#34d399;box-shadow:0 0 5px #34d399;animation:ex-blink 2s ease-in-out infinite; }
+.ex-screen-topbar { display:flex; align-items:center; justify-content:space-between; margin-bottom:11px; }
+.ex-screen-dots { display:flex; gap:5px; }
+.ex-sdot { width:7px;height:7px;border-radius:50%; }
+.ex-sdot-g { background:#34d399;box-shadow:0 0 7px #34d399;animation:ex-blink 2s ease-in-out infinite; }
 .ex-sdot-y { background:#fbbf24; } .ex-sdot-r { background:#f87171; }
 @keyframes ex-blink { 0%,100%{opacity:1} 50%{opacity:.3} }
-.ex-screen-title { font-size:8px;font-weight:700;color:rgba(99,102,241,.6);letter-spacing:.08em;text-transform:uppercase; }
-.ex-chart { display:flex; align-items:flex-end; gap:4px; height:60px; }
-.ex-bar { flex:1;border-radius:3px 3px 0 0;background:linear-gradient(to top,rgba(34,211,238,.7),rgba(99,102,241,.5));animation:ex-grow 1.4s cubic-bezier(.34,1.56,.64,1) both; }
+.ex-screen-title { font-size:10px;font-weight:700;color:rgba(99,102,241,.6);letter-spacing:.08em;text-transform:uppercase; }
+.ex-chart { display:flex; align-items:flex-end; gap:5px; height:96px; }
+.ex-bar { flex:1;border-radius:4px 4px 0 0;background:linear-gradient(to top,rgba(34,211,238,.7),rgba(99,102,241,.5));animation:ex-grow 1.4s cubic-bezier(.34,1.56,.64,1) both; }
 .ex-bar-indigo { background:linear-gradient(to top,rgba(99,102,241,.7),rgba(168,85,247,.5)) !important; }
 @keyframes ex-grow { from{transform:scaleY(0);transform-origin:bottom;opacity:0} to{transform:scaleY(1);transform-origin:bottom;opacity:1} }
-.ex-screen-hr { height:1px;background:rgba(99,102,241,.1);margin-top:6px; }
-.ex-mini-stats { display:flex; gap:12px; margin-top:5px; }
-.ex-mstat { font-size:8.5px;color:#374151;font-weight:600;letter-spacing:.04em; }
-.ex-mstat b { color:rgba(99,102,241,.7);font-weight:800; }
-.ex-stand { width:22px;height:18px;background:linear-gradient(180deg,#0c1830,#08111e);border:1px solid rgba(99,102,241,.1);border-top:none;clip-path:polygon(20% 0%,80% 0%,100% 100%,0% 100%); }
-.ex-base { width:70px;height:5px;border-radius:4px;margin-top:-1px;background:linear-gradient(90deg,transparent,rgba(99,102,241,.18),transparent); }
+.ex-screen-hr { height:1px;background:rgba(99,102,241,.1);margin-top:9px; }
+.ex-live-badge { display:flex; align-items:center; gap:6px; margin-top:7px; font-size:9px; font-weight:800; color:rgba(99,102,241,.6); letter-spacing:.12em; }
+.ex-live-dot-sm { width:5px; height:5px; border-radius:50%; background:#34d399; flex-shrink:0; animation:ex-blink 2s ease-in-out infinite; }
+.ex-stand { width:32px;height:26px;background:linear-gradient(180deg,#0c1830,#08111e);border:1px solid rgba(99,102,241,.1);border-top:none;clip-path:polygon(20% 0%,80% 0%,100% 100%,0% 100%); }
+.ex-base { width:96px;height:6px;border-radius:4px;margin-top:-1px;background:linear-gradient(90deg,transparent,rgba(99,102,241,.22),transparent); }
 
-.ex-fcard { position:absolute;background:rgba(8,15,28,.88);backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:9px 12px;display:flex;align-items:center;gap:9px;min-width:116px;box-shadow:0 10px 30px rgba(0,0,0,.5); }
-.ex-fc1 { top:14px;left:8px;animation:ex-fl1 4.8s ease-in-out infinite; }
-.ex-fc2 { top:14px;right:8px;animation:ex-fl2 5.2s ease-in-out infinite; }
-.ex-fc3 { bottom:28px;left:50%;animation:ex-fl3 4.4s ease-in-out infinite; }
-@keyframes ex-fl1 { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-9px)} }
-@keyframes ex-fl2 { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-11px)} }
-@keyframes ex-fl3 { 0%,100%{transform:translateX(-50%) translateY(0)} 50%{transform:translateX(-50%) translateY(-8px)} }
-.ex-fc-icon { width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0; }
+.ex-fcard { position:absolute;background:rgba(8,15,28,.88);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:12px 16px;display:flex;align-items:center;gap:12px;min-width:142px;box-shadow:0 12px 36px rgba(0,0,0,.55); }
+.ex-fc1 { top:18px;left:10px;animation:ex-fl1 4.8s ease-in-out infinite; }
+.ex-fc2 { top:18px;right:10px;animation:ex-fl2 5.2s ease-in-out infinite; }
+.ex-fc3 { bottom:36px;left:50%;animation:ex-fl3 4.4s ease-in-out infinite; }
+@keyframes ex-fl1 { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
+@keyframes ex-fl2 { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-12px)} }
+@keyframes ex-fl3 { 0%,100%{transform:translateX(-50%) translateY(0)} 50%{transform:translateX(-50%) translateY(-9px)} }
+.ex-fc-icon { width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0; }
 .ex-fc-body { flex:1; }
 .ex-fc-val  { font-size:14px;font-weight:800;color:#e2e8f0;letter-spacing:-.3px; }
 .ex-fc-lbl  { font-size:9.5px;color:#374151;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-top:1px; }
 .ex-fc-badge { font-size:9.5px;font-weight:800;padding:2px 6px;border-radius:100px;color:#34d399;background:rgba(52,211,153,.1);border:1px solid rgba(52,211,153,.18);white-space:nowrap; }
+.ex-fc-feat { font-size:13px; font-weight:700; color:#e2e8f0; letter-spacing:-.2px; white-space:nowrap; }
+.ex-fc-status { display:flex; align-items:center; gap:5px; margin-top:3px; font-size:10px; color:#4b5563; font-weight:600; }
+.ex-live-dot { width:6px; height:6px; border-radius:50%; flex-shrink:0; animation:ex-live-pulse 2s ease-in-out infinite; }
+@keyframes ex-live-pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
 .ex-fc-badge-indigo { color:#818cf8 !important;background:rgba(99,102,241,.1) !important;border-color:rgba(99,102,241,.2) !important; }
 .ex-fc-badge-purple  { color:#c084fc !important;background:rgba(168,85,247,.1) !important;border-color:rgba(168,85,247,.2) !important; }
 
@@ -424,7 +421,7 @@ const css = `
 @media (max-width:960px) {
   .ex-root { flex-direction:column; }
   .ex-left { min-height:auto; padding:44px 28px 32px; }
-  .ex-scene { width:340px; height:280px; }
+  .ex-scene { width:460px; height:380px; }
   .ex-right { width:100%; min-height:auto; padding:32px 22px 48px; }
 }
 @media (max-width:540px) {

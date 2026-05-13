@@ -8,6 +8,7 @@ import {
 // Auth guard — single component for all roles
 import ActiveClassBanner  from "./components/ActiveClassBanner";
 import AuthGuard          from "./components/AuthGuard";
+import PWAInstallPrompt   from "./components/PWAInstallPrompt";
 import { RingProvider }   from "./context/RingContext";
 import IncomingRingModal  from "./components/ring/IncomingRingModal";
 
@@ -60,39 +61,6 @@ function PageLoader() {
   );
 }
 
-// Floating PWA install prompt — appears bottom-right, unobtrusive
-function InstallPrompt() {
-  const [installPrompt, setInstallPrompt] = useState(null);
-  const [installed,     setInstalled]     = useState(false);
-  const [dismissed,     setDismissed]     = useState(false);
-
-  useEffect(() => {
-    const handler = (e) => { e.preventDefault(); setInstallPrompt(e); };
-    window.addEventListener("beforeinstallprompt", handler);
-    window.addEventListener("appinstalled", () => { setInstallPrompt(null); setInstalled(true); });
-    return () => window.removeEventListener("beforeinstallprompt", handler);
-  }, []);
-
-  const handleInstall = async () => {
-    if (!installPrompt) return;
-    installPrompt.prompt();
-    const { outcome } = await installPrompt.userChoice;
-    if (outcome === "accepted") { setInstallPrompt(null); setInstalled(true); }
-  };
-
-  if (dismissed || installed || !installPrompt) return null;
-
-  return (
-    <div style={{ position: "fixed", bottom: 24, right: 20, zIndex: 9000, display: "flex", alignItems: "center", gap: 10, background: "#1e293b", color: "#fff", borderRadius: 14, padding: "10px 16px 10px 14px", boxShadow: "0 8px 28px rgba(0,0,0,0.22)", fontFamily: "inherit" }}>
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
-      </svg>
-      <span style={{ fontSize: 13, fontWeight: 700 }}>Install App</span>
-      <button onClick={handleInstall} style={{ background: "#4f63d2", color: "#fff", border: "none", borderRadius: 8, padding: "5px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>Install</button>
-      <button onClick={() => setDismissed(true)} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.5)", cursor: "pointer", padding: 2, fontSize: 16, lineHeight: 1 }}>×</button>
-    </div>
-  );
-}
 
 function ImpersonationBanner() {
   const location = useLocation();
@@ -174,7 +142,7 @@ function App() {
       <div className="min-h-screen">
         <ImpersonationBanner />
         <ActiveClassBanner />
-        <InstallPrompt />
+        <PWAInstallPrompt />
         <IncomingRingModal />
         <Suspense fallback={<PageLoader />}>
           <Routes>

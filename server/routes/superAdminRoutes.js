@@ -811,6 +811,60 @@ router.patch('/centers/:id/teacher-login-theme', verifySuperAdmin, validateParam
   }
 });
 
+// GET  /api/super-admin/admin-login-themes — list all admin login theme assignments
+router.get('/admin-login-themes', verifySuperAdmin, async (req, res) => {
+  try {
+    const centers = await Center.find({ status: { $ne: 'deleted' } })
+      .select('centerName slug branding.adminLoginTheme').lean();
+    const assignments = {};
+    centers.forEach(c => {
+      if (c.branding?.adminLoginTheme) {
+        assignments[c.branding.adminLoginTheme] = { id: c._id, name: c.centerName, slug: c.slug };
+      }
+    });
+    res.json({ success: true, assignments });
+  } catch (err) {
+    logger.error('❌ Admin login themes fetch error:', { error: err?.message });
+    serverError(res);
+  }
+});
+
+// PATCH /api/super-admin/centers/:id/admin-login-theme — exclusively assign an admin login theme
+router.patch('/centers/:id/admin-login-theme', verifySuperAdmin, validateParamMongoId('id'), async (req, res) => {
+  try {
+    const { adminLoginTheme } = req.body;
+    const center = await Center.findById(req.params.id);
+    if (!center) return notFound(res, 'Center not found');
+
+    if (adminLoginTheme) {
+      const conflict = await Center.findOne({
+        'branding.adminLoginTheme': adminLoginTheme,
+        _id: { $ne: req.params.id },
+        status: { $ne: 'deleted' },
+      });
+      if (conflict) {
+        return res.status(409).json({
+          success: false,
+          message: `Theme "${adminLoginTheme}" is already assigned to ${conflict.centerName}`,
+        });
+      }
+    }
+
+    await Center.findByIdAndUpdate(req.params.id, { 'branding.adminLoginTheme': adminLoginTheme || null });
+
+    await writeAuditLog({
+      action: 'ADMIN_LOGIN_THEME_ASSIGNED', superAdmin: req.superAdmin,
+      targetId: center._id.toString(), targetName: center.centerName,
+      details: { adminLoginTheme: adminLoginTheme || null }, ip: req.ip,
+    });
+
+    res.json({ success: true, message: adminLoginTheme ? `Admin login theme "${adminLoginTheme}" assigned to ${center.centerName}` : 'Admin login theme unassigned' });
+  } catch (err) {
+    logger.error('❌ Admin login theme assign error:', { error: err?.message });
+    serverError(res);
+  }
+});
+
 // POST /api/super-admin/send-otp — email OTP to verify admin email before center creation
 router.post('/send-otp', verifySuperAdmin, validateOtpSend, async (req, res) => {
   try {

@@ -93,3 +93,34 @@ export const TEACHER_LOGIN_THEMES = [
 ];
 
 export const getTeacherLoginThemeById = (id) => TEACHER_LOGIN_THEMES.find(t => t.id === id) || null;
+
+// ── Admin login themes ────────────────────────────────────────────────────────
+// Each theme is exclusive — only one center can hold it at a time.
+// 'executive' is the default (no assignment needed).
+
+export const ADMIN_LOGIN_THEMES = [
+  {
+    id:          'executive',
+    name:        'Executive Command',
+    description: 'Dark navy · floating dashboard monitor · stat cards · flowing data lines · cyan glow',
+    preview: {
+      bgStart: '#060a14',
+      bgEnd:   '#0d1b4b',
+      accent:  '#22d3ee',
+    },
+    emoji: '🏛',
+  },
+  {
+    id:          'corporate-slate',
+    name:        'Corporate Slate',
+    description: 'Deep slate · geometric grid · flowing org-chart nodes · indigo accent · professional',
+    preview: {
+      bgStart: '#0f172a',
+      bgEnd:   '#1e293b',
+      accent:  '#818cf8',
+    },
+    emoji: '🏢',
+  },
+];
+
+export const getAdminLoginThemeById = (id) => ADMIN_LOGIN_THEMES.find(t => t.id === id) || null;

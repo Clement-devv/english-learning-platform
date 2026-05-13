@@ -8,7 +8,7 @@ const GroupClassesTab = lazy(() => import('../../tabs/GroupClassesTab'));
 import {
   Home, Calendar, CheckCircle2, Users, BookOpen, MessageCircle,
   DollarSign, Star, User, CalendarDays, FileText, Layers, ClipboardList,
-  Settings, LogOut, Plus, RefreshCw, Video, Bell, BarChart2, PhoneMissed, X,
+  Settings, LogOut, Plus, RefreshCw, Video, Bell, BarChart2, PhoneMissed, X, Clock4,
 } from 'lucide-react';
 import { useBranding }              from '../../../../context/BrandingContext';
 import { useTeacherDashboardData }  from '../useTeacherDashboardData';
@@ -26,7 +26,6 @@ import SettingsModal                from '../../../../components/SettingsModal';
 import GoogleMeetSettings           from '../../../../components/GoogleMeetSettings';
 import LiveClasses                  from '../../components/dashboard/LiveClasses';
 import UpcomingClasses              from '../../components/dashboard/UpcomingClasses';
-import QuickStats                   from '../../components/dashboard/QuickStats';
 
 // ── Palette ────────────────────────────────────────────────────────────────────
 const palette = (dark) => ({
@@ -513,11 +512,32 @@ export default function SunshineShell() {
                     </div>
                   )}
 
-                  <QuickStats
-                    stats={{ totalStudents: d.students.length, totalClasses: d.classes.length, totalBookings: d.bookings.length }}
-                    isDarkMode={d.isDarkMode}
-                  />
                 </div>
+              </div>
+
+              {/* Summary stats — full width below classes */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14 }}>
+                {[
+                  { lucide: Users,        value: d.students.length,   label: 'Total Students',    sub: '+2 this month',       grad: 'linear-gradient(135deg,#3b82f6,#6366f1)' },
+                  { lucide: CalendarDays, value: d.classes.length,    label: 'Scheduled Classes', sub: 'Next 7 days',          grad: 'linear-gradient(135deg,#a855f7,#ec4899)' },
+                  { lucide: Clock4,       value: d.pendingBookings,   label: 'Pending Requests',  sub: 'Needs attention',      grad: 'linear-gradient(135deg,#f59e0b,#f97316)' },
+                  { lucide: CheckCircle2, value: d.completedCount,    label: 'Completed Today',   sub: 'Great progress!',      grad: 'linear-gradient(135deg,#10b981,#34d399)' },
+                ].map(({ lucide: LI, value, label, sub, grad }) => (
+                  <div key={label} className="ts-card" style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: 20, overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
+                    <div style={{ height: 4, background: grad }} />
+                    <div style={{ padding: '18px 18px 16px' }}>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14 }}>
+                        <div style={{ width: 42, height: 42, borderRadius: 12, background: grad, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 10px rgba(0,0,0,0.15)' }}>
+                          <LI size={20} color="#fff" strokeWidth={2} />
+                        </div>
+                        <span style={{ fontSize: 32, fontWeight: 900, color: col.heading, lineHeight: 1, fontFamily: F }}>{value}</span>
+                      </div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: col.body, marginBottom: 3 }}>{label}</div>
+                      <div style={{ fontSize: 11, color: col.muted }}>{sub}</div>
+                    </div>
+                    <div style={{ height: 3, background: grad, transform: 'scaleX(0)', transformOrigin: 'left', transition: 'transform 0.3s' }} />
+                  </div>
+                ))}
               </div>
             </div>
           )}

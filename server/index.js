@@ -274,6 +274,79 @@ app.get("/", (req, res) => {
 // Versioned API
 app.use("/api/v1", v1Router);
 
+// Dynamic PWA manifest — serves center-branded manifest per tenant
+app.get('/manifest.json', async (req, res) => {
+  try {
+    const host = (req.headers.host || '').split(':')[0];
+    let center = null;
+
+    // Try custom domain first
+    center = await Center.findOne({ customDomain: host, status: 'active' }).lean();
+
+    // Try subdomain (abc.clemify.com → slug = abc)
+    if (!center) {
+      const parts = host.split('.');
+      if (parts.length >= 3) {
+        center = await Center.findOne({ slug: parts[0], status: 'active' }).lean();
+      }
+    }
+
+    // No center resolved — serve the platform default
+    if (!center) {
+      return res.sendFile(path.join(frontendPath, 'manifest.json'));
+    }
+
+    const b = center.branding || {};
+    const name = center.centerName;
+    const shortName = name.length > 14 ? name.split(' ')[0] : name;
+    const icon = b.favicon || b.logo || null;
+
+    res.setHeader('Content-Type', 'application/manifest+json');
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    return res.json({
+      name,
+      short_name: shortName,
+      description: `${name} — Online Learning Platform`,
+      start_url: '/',
+      scope: '/',
+      display: 'standalone',
+      orientation: 'portrait-primary',
+      background_color: '#0a0d1f',
+      theme_color: b.primaryColor || '#4F46E5',
+      categories: ['education'],
+      lang: 'en',
+      icons: icon
+        ? [
+            { src: icon, sizes: 'any', type: 'image/png', purpose: 'any' },
+            { src: icon, sizes: 'any', type: 'image/png', purpose: 'maskable' },
+          ]
+        : [
+            { src: '/icons/icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' },
+            { src: '/icons/icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'maskable' },
+          ],
+      shortcuts: [
+        {
+          name: 'My Classes',
+          short_name: 'Classes',
+          description: 'View your upcoming classes',
+          url: '/?tab=dashboard',
+          icons: [{ src: '/icons/icon.svg', sizes: 'any' }],
+        },
+        {
+          name: 'Messages',
+          short_name: 'Messages',
+          description: 'Open your messages',
+          url: '/?tab=messages',
+          icons: [{ src: '/icons/icon.svg', sizes: 'any' }],
+        },
+      ],
+    });
+  } catch (err) {
+    logger.error('Dynamic manifest error:', { error: err?.message });
+    return res.sendFile(path.join(frontendPath, 'manifest.json'));
+  }
+});
+
 // Serve React frontend
 app.use(express.static(frontendPath));
 app.get('/{*path}', (req, res) => {

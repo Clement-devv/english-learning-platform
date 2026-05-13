@@ -4,7 +4,8 @@ import React, { lazy, Suspense } from 'react';
 import { useBranding } from '../../context/BrandingContext';
 
 const THEMES = {
-  executive: lazy(() => import('./login-themes/ExecutiveTheme')),
+  executive:        lazy(() => import('./login-themes/ExecutiveTheme')),
+  'corporate-slate': lazy(() => import('./login-themes/CorporateSlateTheme')),
 };
 
 const LoadingScreen = () => (

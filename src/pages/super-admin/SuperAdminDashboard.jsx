@@ -13,7 +13,7 @@ import {
 import api from '../../api';
 import { TIMEZONE_OPTIONS } from '../../utils/timezone';
 import { THEMES } from '../../data/themes';
-import { LOGIN_THEMES, TEACHER_LOGIN_THEMES } from '../../data/loginThemes';
+import { LOGIN_THEMES, TEACHER_LOGIN_THEMES, ADMIN_LOGIN_THEMES } from '../../data/loginThemes';
 import { DASHBOARD_THEMES } from '../../data/dashboardThemes';
 import { TEACHER_DASHBOARD_THEMES } from '../../data/teacherDashboardThemes';
 import { ADMIN_DASHBOARD_THEMES }       from '../../data/adminDashboardThemes';
@@ -593,6 +593,76 @@ export default function SuperAdminDashboard() {
     }
   };
 
+  // ── Admin login theme assignment ─────────────────────────────────────────
+  const [adminLoginThemeModal,      setAdminLoginThemeModal]      = useState(null);
+  const [adminLoginThemeAssignments,setAdminLoginThemeAssignments]= useState({});
+  const [assigningAdminLoginTheme,  setAssigningAdminLoginTheme]  = useState(null);
+  const [adminLoginThemeMsg,        setAdminLoginThemeMsg]        = useState('');
+
+  const loadAdminLoginThemeAssignments = async () => {
+    try {
+      const res  = await fetch(`${API_BASE}/super-admin/admin-login-themes`, { headers: authHeaders });
+      const data = await res.json();
+      if (data.success) setAdminLoginThemeAssignments(data.assignments);
+    } catch (_) {}
+  };
+
+  const handleOpenAdminLoginThemeModal = (center) => {
+    setAdminLoginThemeModal(center);
+    setAdminLoginThemeMsg('');
+    loadAdminLoginThemeAssignments();
+  };
+
+  const handleAssignAdminLoginTheme = async (themeId) => {
+    if (!adminLoginThemeModal) return;
+    setAssigningAdminLoginTheme(themeId);
+    setAdminLoginThemeMsg('');
+    try {
+      const res  = await fetch(`${API_BASE}/super-admin/centers/${adminLoginThemeModal._id}/admin-login-theme`, {
+        method: 'PATCH',
+        headers: { ...authHeaders, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adminLoginTheme: themeId }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message);
+      setAdminLoginThemeModal(c => c ? { ...c, branding: { ...c.branding, adminLoginTheme: themeId } } : c);
+      setCenters(cs => cs.map(c =>
+        c._id === adminLoginThemeModal._id ? { ...c, branding: { ...c.branding, adminLoginTheme: themeId } } : c
+      ));
+      setAdminLoginThemeMsg(data.message);
+      loadAdminLoginThemeAssignments();
+    } catch (err) {
+      setAdminLoginThemeMsg(err.message || 'Failed to assign theme');
+    } finally {
+      setAssigningAdminLoginTheme(null);
+    }
+  };
+
+  const handleUnassignAdminLoginTheme = async () => {
+    if (!adminLoginThemeModal) return;
+    setAssigningAdminLoginTheme('__unassign__');
+    setAdminLoginThemeMsg('');
+    try {
+      const res  = await fetch(`${API_BASE}/super-admin/centers/${adminLoginThemeModal._id}/admin-login-theme`, {
+        method: 'PATCH',
+        headers: { ...authHeaders, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adminLoginTheme: null }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message);
+      setAdminLoginThemeModal(c => c ? { ...c, branding: { ...c.branding, adminLoginTheme: null } } : c);
+      setCenters(cs => cs.map(c =>
+        c._id === adminLoginThemeModal._id ? { ...c, branding: { ...c.branding, adminLoginTheme: null } } : c
+      ));
+      setAdminLoginThemeMsg('Admin login theme unassigned');
+      loadAdminLoginThemeAssignments();
+    } catch (err) {
+      setAdminLoginThemeMsg(err.message || 'Failed to unassign');
+    } finally {
+      setAssigningAdminLoginTheme(null);
+    }
+  };
+
   const loadData = useCallback(() => {
     setLoading(true);
     Promise.all([
@@ -1167,6 +1237,7 @@ export default function SuperAdminDashboard() {
                 setThemeCenter={setThemeCenter}
                 handleOpenLoginThemeModal={handleOpenLoginThemeModal}
                 handleOpenTeacherThemeModal={handleOpenTeacherThemeModal}
+                handleOpenAdminLoginThemeModal={handleOpenAdminLoginThemeModal}
                 handleOpenDashThemeModal={handleOpenDashThemeModal}
                 setFeaturesCenter={setFeaturesCenter}
                 setLimitsModal={setLimitsModal} setLimitsUnlimT={setLimitsUnlimT} setLimitsUnlimS={setLimitsUnlimS}
@@ -2677,6 +2748,89 @@ export default function SuperAdminDashboard() {
                     style={{ padding: '7px 16px', borderRadius: '8px', border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.08)', color: '#ef4444', fontSize: '12px', fontWeight: '700', cursor: 'pointer', fontFamily: 'inherit' }}
                   >
                     {assigningTeacherTheme === '__unassign__' ? 'Removing…' : 'Unassign'}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Admin Login Theme Modal ── */}
+      {adminLoginThemeModal && (
+        <div style={s.overlay} onClick={(e) => e.target === e.currentTarget && setAdminLoginThemeModal(null)}>
+          <div style={{ ...s.modal, maxWidth: '820px' }}>
+            <div style={s.modalHeader}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Palette size={18} color="#22d3ee" />
+                <span style={s.modalTitle}>Admin Login Theme</span>
+                <span style={{ fontSize: '13px', color: '#6b7280' }}>for {adminLoginThemeModal.centerName}</span>
+              </div>
+              <button onClick={() => setAdminLoginThemeModal(null)} style={s.closeBtn}><X size={18} /></button>
+            </div>
+
+            <div style={{ padding: '20px 24px 28px' }}>
+              <p style={{ ...s.stepDesc, marginBottom: '6px' }}>
+                Each admin login theme is <strong>exclusive</strong> — only one center can hold it. Admins see this page when they sign in. <em>Executive Command</em> is the default for all centers.
+              </p>
+              {adminLoginThemeMsg && (
+                <div style={{ padding: '8px 14px', borderRadius: '10px', fontSize: '13px', fontWeight: '600', marginBottom: '14px',
+                  background: adminLoginThemeMsg.toLowerCase().includes('already') || adminLoginThemeMsg.toLowerCase().includes('failed') ? 'rgba(239,68,68,.12)' : 'rgba(34,197,94,.12)',
+                  color: adminLoginThemeMsg.toLowerCase().includes('already') || adminLoginThemeMsg.toLowerCase().includes('failed') ? '#ef4444' : '#22c55e',
+                  border: `1px solid ${adminLoginThemeMsg.toLowerCase().includes('already') || adminLoginThemeMsg.toLowerCase().includes('failed') ? 'rgba(239,68,68,.2)' : 'rgba(34,197,94,.2)'}`,
+                }}>
+                  {adminLoginThemeMsg}
+                </div>
+              )}
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: '14px', marginTop: '8px' }}>
+                {ADMIN_LOGIN_THEMES.map(theme => {
+                  const isActive    = (adminLoginThemeModal.branding?.adminLoginTheme || 'executive') === theme.id;
+                  const takenBy     = !isActive && adminLoginThemeAssignments[theme.id];
+                  const isAssigning = assigningAdminLoginTheme === theme.id;
+                  const isLocked    = !!takenBy;
+
+                  return (
+                    <div key={theme.id} style={{
+                      borderRadius: '14px',
+                      border: isActive ? '2px solid #22d3ee' : isLocked ? '2px solid rgba(255,255,255,0.04)' : '2px solid rgba(255,255,255,0.08)',
+                      background: isActive ? 'rgba(34,211,238,0.08)' : isLocked ? 'rgba(255,255,255,0.01)' : 'rgba(255,255,255,0.03)',
+                      overflow: 'hidden',
+                      opacity: isLocked ? 0.5 : 1,
+                      transition: 'border-color .15s, background .15s',
+                    }}>
+                      <div style={{ height: '72px', background: `linear-gradient(135deg, ${theme.preview.bgStart}, ${theme.preview.bgEnd})`, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <span style={{ fontSize: '32px', filter: 'drop-shadow(0 4px 8px rgba(0,0,0,.4))' }}>{theme.emoji}</span>
+                        <div style={{ position: 'absolute', bottom: '8px', right: '8px', width: '14px', height: '14px', borderRadius: '50%', background: theme.preview.accent, boxShadow: `0 0 8px ${theme.preview.accent}` }} />
+                      </div>
+                      <div style={{ padding: '10px 12px 6px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '3px' }}>
+                          <span style={{ fontSize: '13px', fontWeight: '700', color: '#f1f5f9' }}>{theme.name}</span>
+                          {isActive && <CheckCircle size={14} color="#22d3ee" />}
+                        </div>
+                        <p style={{ margin: '0 0 6px', fontSize: '10px', color: '#6b7280', lineHeight: '1.4' }}>{theme.description}</p>
+                        {takenBy && <p style={{ margin: '0 0 6px', fontSize: '10px', color: '#22d3ee', fontWeight: '700' }}>🔒 Held by {takenBy.name}</p>}
+                      </div>
+                      <div style={{ padding: '4px 12px 12px' }}>
+                        <button
+                          onClick={() => !isAssigning && !isActive && !isLocked && handleAssignAdminLoginTheme(theme.id)}
+                          disabled={isAssigning || isActive || isLocked}
+                          style={{ width: '100%', padding: '7px 0', borderRadius: '8px', border: 'none', background: isActive ? 'rgba(34,211,238,0.15)' : isLocked ? 'rgba(255,255,255,0.04)' : '#22d3ee', color: isActive ? '#22d3ee' : isLocked ? '#4b5563' : '#060a14', fontSize: '12px', fontWeight: '700', cursor: isAssigning || isActive || isLocked ? 'default' : 'pointer', fontFamily: 'inherit', opacity: isAssigning ? 0.6 : 1 }}
+                        >
+                          {isAssigning ? 'Assigning…' : isActive ? '✓ Active' : isLocked ? 'Taken' : 'Assign'}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {adminLoginThemeModal.branding?.adminLoginTheme && (
+                <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '13px', color: '#6b7280' }}>Remove custom theme → falls back to Executive Command (default)</span>
+                  <button onClick={handleUnassignAdminLoginTheme} disabled={assigningAdminLoginTheme === '__unassign__'}
+                    style={{ padding: '7px 16px', borderRadius: '8px', border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.08)', color: '#ef4444', fontSize: '12px', fontWeight: '700', cursor: 'pointer', fontFamily: 'inherit' }}>
+                    {assigningAdminLoginTheme === '__unassign__' ? 'Removing…' : 'Unassign'}
                   </button>
                 </div>
               )}

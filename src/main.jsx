@@ -27,6 +27,13 @@ if (_impToken && _impCenter) {
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Register service worker early so Chrome counts this visit toward installability
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => {});
+  });
+}
+
 // Fetch and apply branding BEFORE rendering React
 // If fetch fails, defaults from index.css are already applied
 fetchBranding().then(({ branding, center }) => {

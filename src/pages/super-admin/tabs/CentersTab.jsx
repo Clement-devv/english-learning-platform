@@ -5,7 +5,7 @@ export default function CentersTab({
   centers, loading, loadData, setShowModal,
   handleApprove, handleReject, handleSuspend, handleEnterAsAdmin, impersonating,
   setDeleteTarget, setPlanModal, setPlanSelected, setPlanMsg,
-  setThemeCenter, handleOpenLoginThemeModal, handleOpenTeacherThemeModal, handleOpenDashThemeModal,
+  setThemeCenter, handleOpenLoginThemeModal, handleOpenTeacherThemeModal, handleOpenAdminLoginThemeModal, handleOpenDashThemeModal,
   setFeaturesCenter,
   setLimitsModal, setLimitsUnlimT, setLimitsUnlimS, setLimitsTeachers, setLimitsStudents, setLimitsMsg,
   statusColor, statusIcon,
@@ -93,6 +93,13 @@ export default function CentersTab({
                         title="Assign exclusive teacher login page theme"
                       >
                         <Palette size={12} /> Teacher Login
+                      </button>
+                      <button
+                        onClick={() => handleOpenAdminLoginThemeModal(c)}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '5px 12px', borderRadius: 7, fontSize: 12, fontWeight: 600, background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.25)', color: '#a5b4fc', cursor: 'pointer', fontFamily: 'inherit' }}
+                        title="Assign exclusive admin login page theme"
+                      >
+                        <Palette size={12} /> Admin Login
                       </button>
                       <button
                         onClick={() => handleOpenDashThemeModal(c)}
