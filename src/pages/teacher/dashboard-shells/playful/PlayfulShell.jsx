@@ -129,7 +129,7 @@ export default function PlayfulShell() {
 
   const [showSettings,       setShowSettings]       = useState(false);
   const [showRecurringLocal, setShowRecurringLocal] = useState(false);
-  const { isMobile, forcedMode, setViewMode } = useViewMode();
+  const { isMobile, forcedMode, setViewMode, isSmallScreen } = useViewMode();
   const [showMobileMenu, setShowMobileMenu] = useState(false);
 
   const tipStyle = { background: P.card, border: `1px solid ${P.border}`, borderRadius: 12, fontSize: 13, fontFamily: F, color: P.text };
@@ -269,8 +269,8 @@ export default function PlayfulShell() {
           style={{ width: 52, height: 52, borderRadius: 16, border: 'none', cursor: 'pointer', background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', color: P.sideText, marginBottom: 4 }}>
           <LogOut size={20} strokeWidth={1.8} />
         </button>
-        {forcedMode === 'desktop' && (
-          <button className="pft-nav" title="Mobile View" onClick={() => setViewMode('auto')}
+        {isSmallScreen && !isMobile && (
+          <button className="pft-nav" title="Mobile View" onClick={() => setViewMode('mobile')}
             style={{ width: 52, height: 52, borderRadius: 16, border: 'none', cursor: 'pointer', background: `${P.pink}22`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, marginBottom: 4 }}>
             📱
           </button>
@@ -619,9 +619,9 @@ export default function PlayfulShell() {
         <SettingsModal isOpen={d.showSettingsModal} onClose={() => d.setShowSettingsModal(false)} userType="teacher" />
       )}
 
-      {/* Floating pill — switch back to mobile view when user forced desktop on a phone */}
-      {forcedMode === 'desktop' && (
-        <button onClick={() => setViewMode('auto')}
+      {/* Floating pill — switch to mobile view on small screens showing desktop layout */}
+      {isSmallScreen && !isMobile && (
+        <button onClick={() => setViewMode('mobile')}
           style={{ position: 'fixed', bottom: 16, right: 16, zIndex: 9999, display: 'flex', alignItems: 'center', gap: 6, padding: '10px 16px', borderRadius: 999, background: `linear-gradient(135deg,${P.pink},${P.coral})`, color: '#fff', border: 'none', cursor: 'pointer', fontFamily: F, fontSize: 13, fontWeight: 800, boxShadow: `0 4px 18px ${P.pink}66` }}>
           📱 Mobile View
         </button>

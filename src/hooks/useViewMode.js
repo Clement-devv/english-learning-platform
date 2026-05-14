@@ -12,9 +12,13 @@ function compute() {
 
 export function useViewMode() {
   const [isMobile, setIsMobile] = useState(compute);
+  const [isSmallScreen, setIsSmallScreen] = useState(() => window.screen.width < 768);
 
   useEffect(() => {
-    const handler = () => setIsMobile(compute());
+    const handler = () => {
+      setIsMobile(compute());
+      setIsSmallScreen(window.screen.width < 768);
+    };
     window.addEventListener("resize", handler);
     return () => window.removeEventListener("resize", handler);
   }, []);
@@ -37,5 +41,5 @@ export function useViewMode() {
     setIsMobile(compute());
   };
 
-  return { isMobile, forcedMode, setViewMode };
+  return { isMobile, forcedMode, setViewMode, isSmallScreen };
 }

@@ -161,7 +161,7 @@ export default function SunshineShell() {
   const centerName = center?.centerName || 'Teacher Portal';
 
   const [showRecurringLocal, setShowRecurringLocal] = useState(false);
-  const { isMobile, forcedMode, setViewMode } = useViewMode();
+  const { isMobile, forcedMode, setViewMode, isSmallScreen } = useViewMode();
   const [showMobileMenu, setShowMobileMenu] = useState(false);
 
   // ── Loading ──────────────────────────────────────────────────────────────
@@ -301,8 +301,8 @@ export default function SunshineShell() {
             <LogOut size={17} color={col.muted} />
             <span style={{ fontSize: 13, fontWeight: 600, color: col.body }}>Sign Out</span>
           </button>
-          {forcedMode === 'desktop' && (
-            <button className="ts-nav" onClick={() => setViewMode('auto')}
+          {isSmallScreen && !isMobile && (
+            <button className="ts-nav" onClick={() => setViewMode('mobile')}
               style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 14, border: 'none', cursor: 'pointer', background: d.isDarkMode ? 'rgba(249,115,22,0.1)' : '#fff7ed', fontFamily: F, marginTop: 4 }}>
               <span style={{ fontSize: 15 }}>📱</span>
               <span style={{ fontSize: 13, fontWeight: 700, color: col.accent }}>Mobile View</span>
@@ -634,9 +634,9 @@ export default function SunshineShell() {
         <SettingsModal isOpen={d.showSettingsModal} onClose={() => d.setShowSettingsModal(false)} userType="teacher" />
       )}
 
-      {/* Floating pill — switch back to mobile view when user forced desktop on a phone */}
-      {forcedMode === 'desktop' && (
-        <button onClick={() => setViewMode('auto')}
+      {/* Floating pill — switch to mobile view on small screens showing desktop layout */}
+      {isSmallScreen && !isMobile && (
+        <button onClick={() => setViewMode('mobile')}
           style={{ position: 'fixed', bottom: 16, right: 16, zIndex: 9999, display: 'flex', alignItems: 'center', gap: 6, padding: '10px 16px', borderRadius: 999, background: col.accent, color: '#fff', border: 'none', cursor: 'pointer', fontFamily: F, fontSize: 13, fontWeight: 800, boxShadow: '0 4px 18px rgba(249,115,22,0.45)' }}>
           📱 Mobile View
         </button>

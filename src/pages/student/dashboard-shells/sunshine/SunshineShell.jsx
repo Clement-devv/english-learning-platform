@@ -224,7 +224,7 @@ export default function SunshineShell() {
   const dashTheme = getDashboardThemeById(branding.dashboardTheme);
   const d   = useDashboardData();
   const { missedCalls, missedCallCount, clearMissedCalls } = useRing();
-  const { isMobile, forcedMode, setViewMode } = useViewMode();
+  const { isMobile, forcedMode, setViewMode, isSmallScreen } = useViewMode();
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const col = dashTheme.palette(d.isDarkMode);
   const F   = `'${dashTheme.font}',sans-serif`;
@@ -398,9 +398,9 @@ export default function SunshineShell() {
             <span style={{ fontSize: 13, fontWeight: 600, color: col.body }}>{t('sidebar.signOut')}</span>
           </button>
 
-          {/* Switch back to mobile view (only shown when user forced desktop on a phone) */}
-          {forcedMode === "desktop" && (
-            <button className="ss-navitem" onClick={() => setViewMode("auto")}
+          {/* Switch to mobile view (shown on small screens when currently in desktop layout) */}
+          {isSmallScreen && !isMobile && (
+            <button className="ss-navitem" onClick={() => setViewMode("mobile")}
               style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", borderRadius: 14, border: "none", cursor: "pointer", background: d.isDarkMode ? "rgba(249,115,22,0.1)" : "#fff7ed", fontFamily: F, marginTop: 4 }}>
               <span style={{ fontSize: 15 }}>📱</span>
               <span style={{ fontSize: 13, fontWeight: 700, color: col.accent }}>Mobile View</span>
@@ -771,9 +771,9 @@ export default function SunshineShell() {
           onClose={()=>{ d.setShowConfirmationModal(false); d.setSelectedConfirmation(null); }} />
       )}
 
-      {/* Floating pill to switch back to mobile view — visible when user forced desktop on a phone */}
-      {forcedMode === "desktop" && (
-        <button onClick={() => setViewMode("auto")}
+      {/* Floating pill to switch to mobile view — visible on small screens in desktop layout */}
+      {isSmallScreen && !isMobile && (
+        <button onClick={() => setViewMode("mobile")}
           style={{ position:'fixed', bottom:16, right:16, zIndex:9999, display:'flex', alignItems:'center', gap:6, padding:'10px 16px', borderRadius:999, background: col.accent, color:'#fff', border:'none', cursor:'pointer', fontFamily:F, fontSize:13, fontWeight:800, boxShadow:'0 4px 18px rgba(249,115,22,0.45)' }}>
           📱 Mobile View
         </button>
