@@ -10,6 +10,7 @@ export default function MinimalTemplate({ center, lp }) {
   const urls = {
     student: lp.links?.studentLogin || '/student/login',
     teacher: lp.links?.teacherLogin || '/teacher/login',
+    parent:  lp.links?.parentLogin  || '/parent/login',
     admin:   '/admin/login',
   };
   useDocTitle(lp.seo?.title || center.centerName);
@@ -55,6 +56,9 @@ function MinimalNav({ center, D, urls }) {
           <a href={urls.admin} style={{ fontSize: 12, color: '#cbd5e1', textDecoration: 'none', fontWeight: 400 }}>
             Admin
           </a>
+          <a href={urls.parent} style={{ fontSize: 13, color: D.muted, textDecoration: 'none', fontWeight: 500 }}>
+            Parents
+          </a>
           <a href={urls.teacher} style={{ fontSize: 13, color: D.muted, textDecoration: 'none', fontWeight: 500 }}>
             Teachers
           </a>
@@ -95,6 +99,9 @@ function MinimalNav({ center, D, urls }) {
           </a>
           <a href={urls.teacher} onClick={() => setMenuOpen(false)} style={{ fontSize: 14, fontWeight: 500, color: D.muted, textDecoration: 'none', padding: '10px 12px', borderRadius: 8 }}>
             Teacher Login
+          </a>
+          <a href={urls.parent} onClick={() => setMenuOpen(false)} style={{ fontSize: 14, fontWeight: 500, color: D.muted, textDecoration: 'none', padding: '10px 12px', borderRadius: 8 }}>
+            Parent Login
           </a>
           <a href={urls.admin} onClick={() => setMenuOpen(false)} style={{ fontSize: 12, fontWeight: 400, color: '#cbd5e1', textDecoration: 'none', padding: '8px 12px', borderRadius: 8 }}>
             Admin Login
@@ -303,6 +310,7 @@ function MinimalFooter({ center, D, links }) {
         <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
           {links?.studentLogin && <a href={links.studentLogin} style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', textDecoration: 'none' }}>Students</a>}
           {links?.teacherLogin && <a href={links.teacherLogin} style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', textDecoration: 'none' }}>Teachers</a>}
+          {links?.parentLogin  && <a href={links.parentLogin}  style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', textDecoration: 'none' }}>Parents</a>}
           <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>© {new Date().getFullYear()} {center.centerName}</span>
         </div>
       </div>

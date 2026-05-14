@@ -64,7 +64,7 @@ const DEFAULT_LP = {
   },
   about: { enabled: true, title: 'About Us', body: '', image: '' },
   teachers: [],
-  links: { studentLogin: '', teacherLogin: '', facebook: '', instagram: '', youtube: '', whatsapp: '' },
+  links: { studentLogin: '', teacherLogin: '', parentLogin: '', facebook: '', instagram: '', youtube: '', whatsapp: '' },
   contact: { enabled: false, email: '', phone: '', address: '' },
   seo: { title: '', description: '' },
 };
@@ -387,6 +387,7 @@ export default function LandingPagesTab({ centers, darkMode, focusCenterId }) {
                   <div style={s.grid2}>
                     <TextField label="Student Login URL" value={lp.links?.studentLogin} onChange={v => setField(cid,'links.studentLogin',v)} placeholder="/student/login" s={s} />
                     <TextField label="Teacher Login URL" value={lp.links?.teacherLogin} onChange={v => setField(cid,'links.teacherLogin',v)} placeholder="/teacher/login" s={s} />
+                    <TextField label="Parent Login URL" value={lp.links?.parentLogin} onChange={v => setField(cid,'links.parentLogin',v)} placeholder="/parent/login" s={s} />
                     <TextField label="Facebook URL" value={lp.links?.facebook} onChange={v => setField(cid,'links.facebook',v)} placeholder="https://facebook.com/..." s={s} />
                     <TextField label="Instagram URL" value={lp.links?.instagram} onChange={v => setField(cid,'links.instagram',v)} placeholder="https://instagram.com/..." s={s} />
                     <TextField label="YouTube URL" value={lp.links?.youtube} onChange={v => setField(cid,'links.youtube',v)} placeholder="https://youtube.com/..." s={s} />

@@ -6,9 +6,8 @@ function compute() {
   const saved = localStorage.getItem(KEY);
   if (saved === "desktop") return false;
   if (saved === "mobile")  return true;
-  // Use screen.width (physical device width) so viewport meta overrides don't fool us.
-  // The app sets viewport=1280 for app pages, which makes innerWidth unreliable on phones.
-  return window.screen.width < 768;
+  // Default is always desktop — user must explicitly opt in to mobile view.
+  return false;
 }
 
 export function useViewMode() {

@@ -11,6 +11,7 @@ export default function ModernTemplate({ center, lp }) {
   const urls = {
     student: lp.links?.studentLogin || '/student/login',
     teacher: lp.links?.teacherLogin || '/teacher/login',
+    parent:  lp.links?.parentLogin  || '/parent/login',
     admin:   '/admin/login',
   };
   useDocTitle(lp.seo?.title || center.centerName);
@@ -66,6 +67,9 @@ function ModernNav({ center, D, urls }) {
           <a href={urls.admin} style={{ fontSize: 12, fontWeight: 500, color: navColor ? 'rgba(255,255,255,0.45)' : '#94a3b8', textDecoration: 'none', padding: '6px 12px', borderRadius: 8 }}>
             Admin
           </a>
+          <a href={urls.parent} style={{ fontSize: 13, fontWeight: 600, color: navColor ? 'rgba(255,255,255,0.8)' : txtColor, textDecoration: 'none', padding: '7px 16px', borderRadius: 8, border: navColor ? '1px solid rgba(255,255,255,0.2)' : '1px solid rgba(0,0,0,0.1)' }}>
+            Parent
+          </a>
           <a href={urls.teacher} style={{ fontSize: 13, fontWeight: 600, color: navColor ? 'rgba(255,255,255,0.8)' : txtColor, textDecoration: 'none', padding: '7px 16px', borderRadius: 8, border: navColor ? '1px solid rgba(255,255,255,0.2)' : '1px solid rgba(0,0,0,0.1)' }}>
             Teacher
           </a>
@@ -104,6 +108,9 @@ function ModernNav({ center, D, urls }) {
           </a>
           <a href={urls.teacher} onClick={() => setMenuOpen(false)} style={{ fontSize: 14, fontWeight: 600, color: navDark ? '#f1f5f9' : '#475569', textDecoration: 'none', padding: '10px 16px', borderRadius: 10 }}>
             Teacher Login
+          </a>
+          <a href={urls.parent} onClick={() => setMenuOpen(false)} style={{ fontSize: 14, fontWeight: 600, color: navDark ? '#f1f5f9' : '#475569', textDecoration: 'none', padding: '10px 16px', borderRadius: 10 }}>
+            Parent Login
           </a>
           <a href={urls.admin} onClick={() => setMenuOpen(false)} style={{ fontSize: 12, fontWeight: 500, color: navDark ? 'rgba(255,255,255,0.4)' : '#94a3b8', textDecoration: 'none', padding: '8px 16px', borderRadius: 10 }}>
             Admin Login
@@ -377,6 +384,7 @@ function ModernFooter({ center, D, links }) {
             <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
               {links?.studentLogin && <a href={links.studentLogin} style={{ color:'rgba(255,255,255,0.65)', textDecoration:'none', fontSize:14 }}>Student Login</a>}
               {links?.teacherLogin && <a href={links.teacherLogin} style={{ color:'rgba(255,255,255,0.65)', textDecoration:'none', fontSize:14 }}>Teacher Login</a>}
+              {links?.parentLogin  && <a href={links.parentLogin}  style={{ color:'rgba(255,255,255,0.65)', textDecoration:'none', fontSize:14 }}>Parent Login</a>}
             </div>
           </div>
           {/* Contact col */}

@@ -4,6 +4,7 @@
 // Mirrors the student SunshineShell pattern, adapted for teacher content.
 
 import React, { useState, lazy, Suspense } from 'react';
+import { useViewMode } from '../../../../hooks/useViewMode';
 const GroupClassesTab = lazy(() => import('../../tabs/GroupClassesTab'));
 import {
   Home, Calendar, CheckCircle2, Users, BookOpen, MessageCircle,
@@ -160,6 +161,8 @@ export default function SunshineShell() {
   const centerName = center?.centerName || 'Teacher Portal';
 
   const [showRecurringLocal, setShowRecurringLocal] = useState(false);
+  const { isMobile, forcedMode, setViewMode } = useViewMode();
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
 
   // ── Loading ──────────────────────────────────────────────────────────────
   if (d.loading) {
@@ -212,7 +215,7 @@ export default function SunshineShell() {
         width: 220, flexShrink: 0,
         background: col.sidebar,
         borderRight: `2px solid ${col.border}`,
-        display: 'flex', flexDirection: 'column',
+        display: isMobile ? 'none' : 'flex', flexDirection: 'column',
         overflowY: 'auto', overflowX: 'hidden',
         zIndex: 100,
       }}>
@@ -298,6 +301,13 @@ export default function SunshineShell() {
             <LogOut size={17} color={col.muted} />
             <span style={{ fontSize: 13, fontWeight: 600, color: col.body }}>Sign Out</span>
           </button>
+          {forcedMode === 'desktop' && (
+            <button className="ts-nav" onClick={() => setViewMode('auto')}
+              style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 14, border: 'none', cursor: 'pointer', background: d.isDarkMode ? 'rgba(249,115,22,0.1)' : '#fff7ed', fontFamily: F, marginTop: 4 }}>
+              <span style={{ fontSize: 15 }}>📱</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: col.accent }}>Mobile View</span>
+            </button>
+          )}
         </div>
       </aside>
 
@@ -305,27 +315,29 @@ export default function SunshineShell() {
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
         {/* ── TOP BAR ── */}
-        <header style={{ height: 64, background: col.sidebar, borderBottom: `2px solid ${col.border}`, display: 'flex', alignItems: 'center', padding: '0 24px', gap: 14, flexShrink: 0 }}>
+        <header style={{ height: 64, background: col.sidebar, borderBottom: `2px solid ${col.border}`, display: 'flex', alignItems: 'center', padding: isMobile ? '0 12px' : '0 24px', gap: isMobile ? 8 : 14, flexShrink: 0 }}>
           <h1 style={{ margin: 0, fontSize: 18, fontWeight: 900, color: col.heading, flex: 1, fontFamily: F }}>
             {PAGE_LABEL[d.activeTab] || 'Dashboard'}
           </h1>
 
-          {/* Student count pill */}
-          <div style={{ background: d.isDarkMode ? 'rgba(249,115,22,0.12)' : '#fff7ed', border: `2px solid ${d.isDarkMode ? 'rgba(249,115,22,0.25)' : '#fed7aa'}`, borderRadius: 999, padding: '5px 14px', display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ fontSize: 14 }}>👨‍🎓</span>
-            <span style={{ fontSize: 13, fontWeight: 800, color: col.accent }}>{d.students.length} students</span>
-          </div>
+          {/* Student count pill — desktop only */}
+          {!isMobile && (
+            <div style={{ background: d.isDarkMode ? 'rgba(249,115,22,0.12)' : '#fff7ed', border: `2px solid ${d.isDarkMode ? 'rgba(249,115,22,0.25)' : '#fed7aa'}`, borderRadius: 999, padding: '5px 14px', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontSize: 14 }}>👨‍🎓</span>
+              <span style={{ fontSize: 13, fontWeight: 800, color: col.accent }}>{d.students.length} students</span>
+            </div>
+          )}
 
-          {/* Pending bookings pill */}
-          {d.pendingBookings > 0 && (
+          {/* Pending bookings pill — desktop only */}
+          {!isMobile && d.pendingBookings > 0 && (
             <div onClick={() => d.setActiveTab('bookings')} style={{ background: d.isDarkMode ? 'rgba(239,68,68,0.1)' : '#fef2f2', border: `2px solid ${d.isDarkMode ? 'rgba(239,68,68,0.25)' : '#fecaca'}`, borderRadius: 999, padding: '5px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
               <span style={{ fontSize: 14 }}>🔔</span>
               <span style={{ fontSize: 13, fontWeight: 800, color: '#ef4444' }}>{d.pendingBookings} pending</span>
             </div>
           )}
 
-          {/* Push toggle */}
-          {d.pushSupported() && (
+          {/* Push toggle — desktop only */}
+          {!isMobile && d.pushSupported() && (
             <button onClick={d.togglePush} title={d.pushEnabled ? 'Disable push notifications' : 'Enable push notifications'}
               style={{ width: 38, height: 38, borderRadius: 12, border: `2px solid ${col.border}`, background: d.pushEnabled ? '#16a34a' : col.cardAlt, cursor: 'pointer', color: d.pushEnabled ? '#fff' : col.muted, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Bell size={16} fill={d.pushEnabled ? 'currentColor' : 'none'} />
@@ -334,13 +346,13 @@ export default function SunshineShell() {
 
           {/* New Class button */}
           <button className="ts-btn" onClick={() => d.setIsModalOpen(true)}
-            style={{ background: accentGradient, color: 'white', border: 'none', borderRadius: 12, padding: '9px 16px', fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: F, display: 'flex', alignItems: 'center', gap: 6, boxShadow: `0 4px 14px ${tabShadow}` }}>
-            <Plus size={14} /> New Class
+            style={{ background: accentGradient, color: 'white', border: 'none', borderRadius: 12, padding: isMobile ? '8px 12px' : '9px 16px', fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: F, display: 'flex', alignItems: 'center', gap: 6, boxShadow: `0 4px 14px ${tabShadow}` }}>
+            <Plus size={14} />{isMobile ? '' : ' New Class'}
           </button>
         </header>
 
         {/* ── SCROLL AREA ── */}
-        <main style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
+        <main style={{ flex: 1, overflowY: 'auto', padding: isMobile ? `16px 14px calc(80px + env(safe-area-inset-bottom, 0px))` : 24 }}>
 
           {/* Toast */}
           {d.toast && (
@@ -354,7 +366,7 @@ export default function SunshineShell() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
               {/* Welcome hero */}
-              <div style={{ background: 'linear-gradient(135deg,#f97316 0%,#f43f5e 100%)', borderRadius: 28, padding: '28px 32px', color: '#fff', position: 'relative', overflow: 'hidden', boxShadow: '0 12px 40px rgba(249,115,22,0.3)' }}>
+              <div style={{ background: 'linear-gradient(135deg,#f97316 0%,#f43f5e 100%)', borderRadius: isMobile ? 22 : 28, padding: isMobile ? '18px 20px' : '28px 32px', color: '#fff', position: 'relative', overflow: 'hidden', boxShadow: '0 12px 40px rgba(249,115,22,0.3)' }}>
                 <div style={{ position: 'absolute', top: -30, right: -30, width: 160, height: 160, borderRadius: '50%', background: 'rgba(255,255,255,0.07)' }} />
                 <div style={{ position: 'absolute', bottom: -20, right: 60, width: 100, height: 100, borderRadius: '50%', background: 'rgba(255,255,255,0.05)' }} />
                 <div style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 20 }}>
@@ -395,7 +407,7 @@ export default function SunshineShell() {
               )}
 
               {/* 4-stat strip */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2,1fr)' : 'repeat(4,1fr)', gap: 12 }}>
                 {[
                   { lucide: Users,        n: d.students.length,  l: 'Students',    grad: 'linear-gradient(135deg,#f97316,#fb923c)' },
                   { lucide: CalendarDays, n: d.classes.length,   l: 'Classes',     grad: 'linear-gradient(135deg,#f97316,#f43f5e)' },
@@ -446,7 +458,7 @@ export default function SunshineShell() {
               )}
 
               {/* Classes area */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: 18 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 300px', gap: 18 }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                   <div className="ts-card" style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: 24, padding: 20 }}>
                     <h2 style={{ margin: '0 0 14px', fontSize: 17, fontWeight: 900, color: col.heading, fontFamily: F, display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -516,7 +528,7 @@ export default function SunshineShell() {
               </div>
 
               {/* Summary stats — full width below classes */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2,1fr)' : 'repeat(4,1fr)', gap: 14 }}>
                 {[
                   { lucide: Users,        value: d.students.length,   label: 'Total Students',    sub: '+2 this month',       grad: 'linear-gradient(135deg,#3b82f6,#6366f1)' },
                   { lucide: CalendarDays, value: d.classes.length,    label: 'Scheduled Classes', sub: 'Next 7 days',          grad: 'linear-gradient(135deg,#a855f7,#ec4899)' },
@@ -620,6 +632,89 @@ export default function SunshineShell() {
 
       {d.showSettingsModal && (
         <SettingsModal isOpen={d.showSettingsModal} onClose={() => d.setShowSettingsModal(false)} userType="teacher" />
+      )}
+
+      {/* Floating pill — switch back to mobile view when user forced desktop on a phone */}
+      {forcedMode === 'desktop' && (
+        <button onClick={() => setViewMode('auto')}
+          style={{ position: 'fixed', bottom: 16, right: 16, zIndex: 9999, display: 'flex', alignItems: 'center', gap: 6, padding: '10px 16px', borderRadius: 999, background: col.accent, color: '#fff', border: 'none', cursor: 'pointer', fontFamily: F, fontSize: 13, fontWeight: 800, boxShadow: '0 4px 18px rgba(249,115,22,0.45)' }}>
+          📱 Mobile View
+        </button>
+      )}
+
+      {/* ── MOBILE BOTTOM NAV ── */}
+      {isMobile && (
+        <nav style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: d.isDarkMode ? '#13111a' : '#fff', borderTop: `2px solid ${col.border}`, display: 'flex', zIndex: 200, boxShadow: '0 -4px 20px rgba(0,0,0,0.12)', paddingBottom: 'env(safe-area-inset-bottom,0px)' }}>
+          {[
+            { key: 'dashboard', Icon: Home,          label: 'Home'     },
+            { key: 'classes',   Icon: CalendarDays,  label: 'Classes'  },
+            { key: 'students',  Icon: Users,          label: 'Students' },
+            { key: 'messages',  Icon: MessageCircle, label: 'Messages' },
+          ].map(({ key, Icon, label }) => {
+            const isActive = d.activeTab === key;
+            const badge = key === 'messages' && d.unreadMessages > 0 ? d.unreadMessages : 0;
+            return (
+              <button key={key} onClick={() => d.setActiveTab(key)}
+                style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: F, color: isActive ? col.accent : col.muted, position: 'relative', height: 62, paddingBottom: 6 }}>
+                <div style={{ position: 'relative' }}>
+                  <Icon size={22} strokeWidth={isActive ? 2.4 : 1.8} />
+                  {badge > 0 && (
+                    <span style={{ position: 'absolute', top: -7, right: -10, background: '#ef4444', color: '#fff', borderRadius: 999, minWidth: 18, height: 18, fontSize: 10, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px', border: `2px solid ${d.isDarkMode ? '#13111a' : '#fff'}` }}>
+                      {badge > 99 ? '99+' : badge}
+                    </span>
+                  )}
+                </div>
+                <span style={{ fontSize: 10, fontWeight: isActive ? 800 : 600 }}>{label}</span>
+                {isActive && <span style={{ position: 'absolute', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: 28, height: 3, borderRadius: '3px 3px 0 0', background: col.accent }} />}
+              </button>
+            );
+          })}
+          <button onClick={() => setShowMobileMenu(true)}
+            style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: F, color: col.muted, height: 62, paddingBottom: 6 }}>
+            <Settings size={22} strokeWidth={1.8} />
+            <span style={{ fontSize: 10, fontWeight: 600 }}>More</span>
+          </button>
+        </nav>
+      )}
+
+      {/* ── MOBILE MENU SHEET ── */}
+      {isMobile && showMobileMenu && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 9500 }} onClick={() => setShowMobileMenu(false)}>
+          <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: d.isDarkMode ? '#13111a' : '#fff', borderRadius: '20px 20px 0 0', padding: '12px 16px 40px', maxHeight: '75vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+            <div style={{ width: 36, height: 4, background: col.border, borderRadius: 999, margin: '0 auto 16px' }} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              {NAV_GROUPS.flatMap(g => g.items)
+                .filter(item => !['dashboard', 'classes', 'students', 'messages'].includes(item.key))
+                .map(item => {
+                  const LI = item.lucide;
+                  const isActive = d.activeTab === item.key;
+                  return (
+                    <button key={item.key} onClick={() => { d.setActiveTab(item.key); setShowMobileMenu(false); }}
+                      style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', borderRadius: 14, border: 'none', background: isActive ? (d.isDarkMode ? 'rgba(249,115,22,0.18)' : '#fff7ed') : 'transparent', color: isActive ? col.accent : col.body, cursor: 'pointer', fontFamily: F, width: '100%' }}>
+                      <LI size={18} color={isActive ? col.accent : col.muted} strokeWidth={1.8} />
+                      <span style={{ fontSize: 14, fontWeight: isActive ? 800 : 600 }}>{item.label}</span>
+                    </button>
+                  );
+                })}
+              <div style={{ borderTop: `1px solid ${col.border}`, margin: '8px 0 4px' }} />
+              <button onClick={() => { setShowMobileMenu(false); d.setShowSettingsSidebar(true); }}
+                style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', borderRadius: 14, border: 'none', background: 'transparent', color: col.body, cursor: 'pointer', fontFamily: F, width: '100%' }}>
+                <Settings size={18} color={col.muted} strokeWidth={1.8} />
+                <span style={{ fontSize: 14, fontWeight: 600 }}>Settings</span>
+              </button>
+              <button onClick={() => setViewMode('desktop')}
+                style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', borderRadius: 14, border: 'none', background: 'transparent', color: col.body, cursor: 'pointer', fontFamily: F, width: '100%' }}>
+                <span style={{ fontSize: 18 }}>🖥️</span>
+                <span style={{ fontSize: 14, fontWeight: 600 }}>Desktop View</span>
+              </button>
+              <button onClick={d.handleLogout}
+                style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', borderRadius: 14, border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer', fontFamily: F, width: '100%' }}>
+                <LogOut size={18} color="#ef4444" strokeWidth={1.8} />
+                <span style={{ fontSize: 14, fontWeight: 600 }}>Sign Out</span>
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -4,6 +4,7 @@
 // Mirrors the student PlayfulShell pattern, adapted for teacher content.
 
 import React, { useState } from 'react';
+import { useViewMode } from '../../../../hooks/useViewMode';
 import {
   Home, Calendar, CheckCircle, Users, BookOpen, MessageCircle,
   DollarSign, GraduationCap, Film, Star, User, CalendarDays,
@@ -128,6 +129,8 @@ export default function PlayfulShell() {
 
   const [showSettings,       setShowSettings]       = useState(false);
   const [showRecurringLocal, setShowRecurringLocal] = useState(false);
+  const { isMobile, forcedMode, setViewMode } = useViewMode();
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
 
   const tipStyle = { background: P.card, border: `1px solid ${P.border}`, borderRadius: 12, fontSize: 13, fontFamily: F, color: P.text };
 
@@ -206,7 +209,7 @@ export default function PlayfulShell() {
       {/* ── SIDEBAR ──────────────────────────────────────────────────────── */}
       <aside style={{
         width: 72, flexShrink: 0, background: P.sidebar,
-        display: 'flex', flexDirection: 'column', alignItems: 'center',
+        display: isMobile ? 'none' : 'flex', flexDirection: 'column', alignItems: 'center',
         padding: '18px 0', gap: 2, zIndex: 100,
         boxShadow: '3px 0 20px rgba(0,0,0,0.25)',
       }}>
@@ -266,13 +269,19 @@ export default function PlayfulShell() {
           style={{ width: 52, height: 52, borderRadius: 16, border: 'none', cursor: 'pointer', background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', color: P.sideText, marginBottom: 4 }}>
           <LogOut size={20} strokeWidth={1.8} />
         </button>
+        {forcedMode === 'desktop' && (
+          <button className="pft-nav" title="Mobile View" onClick={() => setViewMode('auto')}
+            style={{ width: 52, height: 52, borderRadius: 16, border: 'none', cursor: 'pointer', background: `${P.pink}22`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, marginBottom: 4 }}>
+            📱
+          </button>
+        )}
       </aside>
 
       {/* ── MAIN ─────────────────────────────────────────────────────────── */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
         {/* ── TOP BAR ── */}
-        <header style={{ height: 64, background: P.white, borderBottom: `1px solid ${P.border}`, display: 'flex', alignItems: 'center', padding: '0 24px', gap: 14, flexShrink: 0 }}>
+        <header style={{ height: 64, background: P.white, borderBottom: `1px solid ${P.border}`, display: 'flex', alignItems: 'center', padding: isMobile ? '0 12px' : '0 24px', gap: isMobile ? 8 : 14, flexShrink: 0 }}>
           <h1 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: P.text, whiteSpace: 'nowrap' }}>
             {PAGE_TITLE[d.activeTab] || 'Home'}
           </h1>
@@ -294,37 +303,41 @@ export default function PlayfulShell() {
 
           <div style={{ flex: 1 }} />
 
-          {/* Pending bookings */}
-          {d.pendingBookings > 0 && (
+          {/* Pending bookings — desktop only */}
+          {!isMobile && d.pendingBookings > 0 && (
             <div onClick={() => d.setActiveTab('bookings')} style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 999, padding: '5px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
               <span style={{ fontSize: 13 }}>🔔</span>
               <span style={{ fontSize: 12, fontWeight: 700, color: '#ef4444' }}>{d.pendingBookings} pending</span>
             </div>
           )}
 
-          {/* Dark mode */}
-          <button onClick={d.toggleDarkMode}
-            style={{ width: 36, height: 36, borderRadius: 12, border: `1px solid ${P.border}`, background: P.inputBg, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: P.textSub }}>
-            {d.isDarkMode ? <Sun size={15} /> : <Moon size={15} />}
-          </button>
+          {/* Dark mode — desktop only */}
+          {!isMobile && (
+            <button onClick={d.toggleDarkMode}
+              style={{ width: 36, height: 36, borderRadius: 12, border: `1px solid ${P.border}`, background: P.inputBg, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: P.textSub }}>
+              {d.isDarkMode ? <Sun size={15} /> : <Moon size={15} />}
+            </button>
+          )}
 
           {/* New Class */}
           <button className="pft-btn" onClick={() => d.setIsModalOpen(true)}
-            style={{ background: `linear-gradient(135deg,${P.pink},${P.coral})`, color: '#fff', border: 'none', borderRadius: 12, padding: '9px 16px', fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: F, display: 'flex', alignItems: 'center', gap: 6, boxShadow: `0 4px 14px ${P.pink}55` }}>
-            <Plus size={14} /> New Class
+            style={{ background: `linear-gradient(135deg,${P.pink},${P.coral})`, color: '#fff', border: 'none', borderRadius: 12, padding: isMobile ? '8px 12px' : '9px 16px', fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: F, display: 'flex', alignItems: 'center', gap: 6, boxShadow: `0 4px 14px ${P.pink}55` }}>
+            <Plus size={14} />{isMobile ? '' : ' New Class'}
           </button>
 
-          {/* Avatar */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-            <div style={{ width: 36, height: 36, borderRadius: 12, background: `linear-gradient(135deg,${P.pink},${P.orange})`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 800, fontSize: 15, boxShadow: `0 3px 10px ${P.pink}55`, cursor: 'pointer' }}
-              onClick={() => setShowSettings(true)}>
-              {(d.teacherInfo?.firstName?.[0] || 'T').toUpperCase()}
+          {/* Avatar — desktop only */}
+          {!isMobile && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+              <div style={{ width: 36, height: 36, borderRadius: 12, background: `linear-gradient(135deg,${P.pink},${P.orange})`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 800, fontSize: 15, boxShadow: `0 3px 10px ${P.pink}55`, cursor: 'pointer' }}
+                onClick={() => setShowSettings(true)}>
+                {(d.teacherInfo?.firstName?.[0] || 'T').toUpperCase()}
+              </div>
             </div>
-          </div>
+          )}
         </header>
 
         {/* ── SCROLL AREA ── */}
-        <main style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
+        <main style={{ flex: 1, overflowY: 'auto', padding: isMobile ? `16px 14px calc(80px + env(safe-area-inset-bottom, 0px))` : 24 }}>
 
           {/* Toast */}
           {d.toast && (
@@ -335,7 +348,7 @@ export default function PlayfulShell() {
 
           {/* ════ DASHBOARD HOME ════ */}
           {d.activeTab === 'dashboard' && (
-            <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
+            <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 20, alignItems: 'flex-start' }}>
 
               {/* LEFT column */}
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 20, minWidth: 0 }}>
@@ -372,7 +385,7 @@ export default function PlayfulShell() {
                     <h2 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: P.text }}>Quick Access</h2>
                     <span style={{ fontSize: 13, color: P.textMuted }}>Jump to any section</span>
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2,1fr)' : 'repeat(4,1fr)', gap: 12 }}>
                     {TILES.map(tile => {
                       const badge = tile.tab === 'bookings'  ? d.pendingBookings
                                   : tile.tab === 'homework'  ? d.homeworkToGrade
@@ -412,7 +425,7 @@ export default function PlayfulShell() {
               </div>
 
               {/* RIGHT panel */}
-              <div style={{ width: 290, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div style={{ width: isMobile ? '100%' : 290, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 16 }}>
 
                 {/* Stat tiles */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
@@ -604,6 +617,86 @@ export default function PlayfulShell() {
 
       {d.showSettingsModal && (
         <SettingsModal isOpen={d.showSettingsModal} onClose={() => d.setShowSettingsModal(false)} userType="teacher" />
+      )}
+
+      {/* Floating pill — switch back to mobile view when user forced desktop on a phone */}
+      {forcedMode === 'desktop' && (
+        <button onClick={() => setViewMode('auto')}
+          style={{ position: 'fixed', bottom: 16, right: 16, zIndex: 9999, display: 'flex', alignItems: 'center', gap: 6, padding: '10px 16px', borderRadius: 999, background: `linear-gradient(135deg,${P.pink},${P.coral})`, color: '#fff', border: 'none', cursor: 'pointer', fontFamily: F, fontSize: 13, fontWeight: 800, boxShadow: `0 4px 18px ${P.pink}66` }}>
+          📱 Mobile View
+        </button>
+      )}
+
+      {/* ── MOBILE BOTTOM NAV ── */}
+      {isMobile && (
+        <nav style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: P.white, borderTop: `1px solid ${P.border}`, display: 'flex', zIndex: 200, boxShadow: '0 -4px 20px rgba(0,0,0,0.10)', paddingBottom: 'env(safe-area-inset-bottom,0px)' }}>
+          {[
+            { key: 'dashboard', Icon: Home,          label: 'Home',     dot: P.pink   },
+            { key: 'classes',   Icon: Calendar,      label: 'Classes',  dot: P.blue   },
+            { key: 'students',  Icon: Users,          label: 'Students', dot: P.green  },
+            { key: 'messages',  Icon: MessageCircle, label: 'Messages', dot: P.teal   },
+          ].map(({ key, Icon, label, dot }) => {
+            const isActive = d.activeTab === key;
+            const badge = key === 'messages' && d.unreadMessages > 0 ? d.unreadMessages : 0;
+            return (
+              <button key={key} onClick={() => d.setActiveTab(key)}
+                style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: F, color: isActive ? dot : P.textMuted, position: 'relative', height: 62, paddingBottom: 6 }}>
+                <div style={{ position: 'relative' }}>
+                  <Icon size={22} strokeWidth={isActive ? 2.4 : 1.8} />
+                  {badge > 0 && (
+                    <span style={{ position: 'absolute', top: -7, right: -10, background: P.coral, color: '#fff', borderRadius: 999, minWidth: 18, height: 18, fontSize: 10, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px', border: `2px solid ${P.white}` }}>
+                      {badge > 99 ? '99+' : badge}
+                    </span>
+                  )}
+                </div>
+                <span style={{ fontSize: 10, fontWeight: isActive ? 800 : 600 }}>{label}</span>
+                {isActive && <span style={{ position: 'absolute', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: 28, height: 3, borderRadius: '3px 3px 0 0', background: dot }} />}
+              </button>
+            );
+          })}
+          <button onClick={() => setShowMobileMenu(true)}
+            style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: F, color: P.textMuted, height: 62, paddingBottom: 6 }}>
+            <Settings size={22} strokeWidth={1.8} />
+            <span style={{ fontSize: 10, fontWeight: 600 }}>More</span>
+          </button>
+        </nav>
+      )}
+
+      {/* ── MOBILE MENU SHEET ── */}
+      {isMobile && showMobileMenu && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 9500 }} onClick={() => setShowMobileMenu(false)}>
+          <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: P.white, borderRadius: '20px 20px 0 0', padding: '12px 16px 40px', maxHeight: '75vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+            <div style={{ width: 36, height: 4, background: P.border, borderRadius: 999, margin: '0 auto 16px' }} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              {NAV.filter(n => !['dashboard','classes','students','messages'].includes(n.id)).map(({ id, Icon, label, tab, dot }) => {
+                const isActive = d.activeTab === tab || (id === 'content' && ['homework','quiz','vocab'].includes(d.activeTab)) || (id === 'more' && ['payment','recordings','reviews','profile'].includes(d.activeTab));
+                return (
+                  <button key={id} onClick={() => { d.setActiveTab(tab); setShowMobileMenu(false); }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', borderRadius: 14, border: 'none', background: isActive ? `${dot}18` : 'transparent', color: isActive ? dot : P.text, cursor: 'pointer', fontFamily: F, width: '100%' }}>
+                    <Icon size={18} color={isActive ? dot : P.textMuted} strokeWidth={1.8} />
+                    <span style={{ fontSize: 14, fontWeight: isActive ? 800 : 600 }}>{label}</span>
+                  </button>
+                );
+              })}
+              <div style={{ borderTop: `1px solid ${P.border}`, margin: '8px 0 4px' }} />
+              <button onClick={() => { setShowMobileMenu(false); setShowSettings(true); }}
+                style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', borderRadius: 14, border: 'none', background: 'transparent', color: P.text, cursor: 'pointer', fontFamily: F, width: '100%' }}>
+                <Settings size={18} color={P.textMuted} strokeWidth={1.8} />
+                <span style={{ fontSize: 14, fontWeight: 600 }}>Settings</span>
+              </button>
+              <button onClick={() => setViewMode('desktop')}
+                style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', borderRadius: 14, border: 'none', background: 'transparent', color: P.text, cursor: 'pointer', fontFamily: F, width: '100%' }}>
+                <span style={{ fontSize: 18 }}>🖥️</span>
+                <span style={{ fontSize: 14, fontWeight: 600 }}>Desktop View</span>
+              </button>
+              <button onClick={d.handleLogout}
+                style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', borderRadius: 14, border: 'none', background: 'transparent', color: P.coral, cursor: 'pointer', fontFamily: F, width: '100%' }}>
+                <LogOut size={18} color={P.coral} strokeWidth={1.8} />
+                <span style={{ fontSize: 14, fontWeight: 600 }}>Sign Out</span>
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

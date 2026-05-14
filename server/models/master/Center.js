@@ -151,6 +151,7 @@ const centerSchema = new mongoose.Schema({
     links: {
       studentLogin: { type: String, default: '' },
       teacherLogin: { type: String, default: '' },
+      parentLogin:  { type: String, default: '' },
       facebook:     { type: String, default: '' },
       instagram:    { type: String, default: '' },
       youtube:      { type: String, default: '' },

@@ -10,6 +10,7 @@ export default function ClassicTemplate({ center, lp }) {
   const urls = {
     student: lp.links?.studentLogin || '/student/login',
     teacher: lp.links?.teacherLogin || '/teacher/login',
+    parent:  lp.links?.parentLogin  || '/parent/login',
     admin:   '/admin/login',
   };
   useDocTitle(lp.seo?.title || center.centerName);
@@ -146,6 +147,18 @@ function ClassicNav({ center, D, urls }) {
                   </div>
                 </a>
                 <div style={{ height: 1, background: '#f1f5f9', margin: '4px 0' }} />
+                <a href={urls.parent} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', borderRadius: 10, textDecoration: 'none', color: '#475569', fontSize: 13.5, fontWeight: 600 }}
+                   onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
+                   onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                  <span style={{ width: 34, height: 34, borderRadius: 10, background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth={2.2} strokeLinecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                  </span>
+                  <div>
+                    <div>Parent Login</div>
+                    <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 500 }}>Track your child's progress</div>
+                  </div>
+                </a>
+                <div style={{ height: 1, background: '#f1f5f9', margin: '4px 0' }} />
                 <a href={urls.admin} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px', borderRadius: 10, textDecoration: 'none', color: '#94a3b8', fontSize: 12, fontWeight: 500 }}
                    onMouseEnter={e => e.currentTarget.style.background = '#f8fafc'}
                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
@@ -194,6 +207,10 @@ function ClassicNav({ center, D, urls }) {
           <a href={urls.teacher} onClick={() => setMenuOpen(false)}
              style={{ fontSize: 13, fontWeight: 600, color: '#94a3b8', textDecoration: 'none', padding: '8px 12px', borderRadius: 10 }}>
             Teacher Login
+          </a>
+          <a href={urls.parent} onClick={() => setMenuOpen(false)}
+             style={{ fontSize: 13, fontWeight: 600, color: '#94a3b8', textDecoration: 'none', padding: '8px 12px', borderRadius: 10 }}>
+            Parent Login
           </a>
           <a href={urls.admin} onClick={() => setMenuOpen(false)}
              style={{ fontSize: 12, fontWeight: 500, color: '#cbd5e1', textDecoration: 'none', padding: '6px 12px', borderRadius: 10 }}>
@@ -517,6 +534,7 @@ function ClassicFooter({ center, D, links }) {
             <p style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.1em', margin: 0 }}>Quick Links</p>
             {links?.studentLogin && <a href={links.studentLogin} style={fLink}>Student Login</a>}
             {links?.teacherLogin && <a href={links.teacherLogin} style={fLink}>Teacher Login</a>}
+            {links?.parentLogin  && <a href={links.parentLogin}  style={fLink}>Parent Login</a>}
             <a href="#about"    style={fLink}>About</a>
             <a href="#contact"  style={fLink}>Contact</a>
           </div>
