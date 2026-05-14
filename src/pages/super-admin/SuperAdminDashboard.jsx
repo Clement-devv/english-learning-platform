@@ -760,7 +760,7 @@ export default function SuperAdminDashboard() {
     localStorage.removeItem('superAdminToken');
     localStorage.removeItem('superAdminInfo');
     authLogout();
-    navigate('/super-admin/login');
+    navigate('/super-admin/login', { replace: true });
   };
 
   // ── Centers actions ──────────────────────────────────────────────────────

@@ -232,7 +232,7 @@ export default function SunshineShell() {
     return () => clearInterval(id);
   }, [refreshNotif, refreshPeople]);
 
-  const handleLogout = () => { authLogout(); navigate('/admin/login'); };
+  const handleLogout = () => { authLogout(); navigate('/admin/login', { replace: true }); };
   const handleNotify = (note) => {
     const full = typeof note === 'string'
       ? { message: note, date: new Date().toISOString() }

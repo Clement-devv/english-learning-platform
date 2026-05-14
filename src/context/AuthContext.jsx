@@ -12,6 +12,7 @@
 // AuthProvider must sit inside <Router> (login() navigates to the login page on logout).
 
 import { createContext, useCallback, useContext, useState } from 'react';
+import api from '../api.js';
 import {
   detectActiveRole,
   getStoredUser,
@@ -59,10 +60,21 @@ export function AuthProvider({ children }) {
 
   /**
    * Clear all auth storage for the current role and reset context state.
+   * Also blacklists the JWT server-side (fire and forget).
    * Does NOT navigate — callers should redirect after calling logout().
    */
   const logout = useCallback(() => {
-    if (role) clearAuth(role);
+    if (role) {
+      const cfg = ROLE_CONFIG[role];
+      if (cfg?.sessionTokenKey) {
+        const sessionToken = sessionStorage.getItem(cfg.sessionTokenKey) || localStorage.getItem(cfg.sessionTokenKey);
+        const currentToken = getStoredToken(role);
+        if (sessionToken && currentToken) {
+          api.post('/auth/logout-session', { sessionToken }).catch(() => {});
+        }
+      }
+      clearAuth(role);
+    }
     localStorage.removeItem('pwa-last-role');
     setRole(null);
     setUserState(null);

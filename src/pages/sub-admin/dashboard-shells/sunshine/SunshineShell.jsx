@@ -49,9 +49,9 @@ export default function SunshineShell() {
   const [activeTab, setActiveTab] = useState('overview');
 
   const handleLogout = () => {
-    clearAuth('sub-admin'); // always wipe tokens — don't rely on AuthContext.role
+    clearAuth('sub-admin');
     authLogout();
-    navigate('/sub-admin/login');
+    navigate('/sub-admin/login', { replace: true });
   };
 
   // ── Permission-gated nav groups ──────────────────────────────────────────────

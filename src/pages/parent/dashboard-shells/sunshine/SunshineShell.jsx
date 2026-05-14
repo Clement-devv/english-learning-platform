@@ -317,10 +317,12 @@ export default function SunshineShell() {
   }, [selectedId, activeTab]);
 
   const handleLogout = () => {
-    sessionStorage.removeItem('parentToken');
-    sessionStorage.removeItem('parentInfo');
+    ['parentToken', 'parentInfo'].forEach(k => {
+      sessionStorage.removeItem(k);
+      localStorage.removeItem(k);
+    });
     localStorage.removeItem('pwa-last-role');
-    navigate('/parent/login');
+    navigate('/parent/login', { replace: true });
   };
 
   if (authLoading) {

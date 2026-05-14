@@ -212,6 +212,19 @@ export function useDashboardData() {
     });
   }, []);
 
+  // ── Session guard: re-verify when tab becomes visible (catches force-logout from another device) ──
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        // A lightweight call — if the JWT was blacklisted, the api interceptor
+        // will get a 401, fail the refresh (session.isActive = false), and redirect to login.
+        api.get('/auth/student/verify').catch(() => {});
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, []);
+
   // ── Unread messages — fetch count on mount and reset when tab opened ───────
   useEffect(() => {
     api.get("/direct-messages").then(({ data }) => {
@@ -304,9 +317,20 @@ export function useDashboardData() {
 
   // ── handleLogout must be defined before fetchStudentData ──────────────────
   const handleLogout = () => {
-    ["studentToken", "studentSessionToken", "studentInfo"].forEach(k => localStorage.removeItem(k));
+    // Blacklist the JWT server-side so it can't be reused (fire and forget)
+    const token        = sessionStorage.getItem('studentToken') || localStorage.getItem('studentToken');
+    const sessionToken = sessionStorage.getItem('studentSessionToken') || localStorage.getItem('studentSessionToken');
+    if (token && sessionToken) {
+      api.post('/auth/logout-session', { sessionToken }).catch(() => {});
+    }
+    // Wipe both storage tiers so the back button can't restore the session
+    ['studentToken', 'studentSessionToken', 'studentInfo'].forEach(k => {
+      sessionStorage.removeItem(k);
+      localStorage.removeItem(k);
+    });
     localStorage.removeItem('pwa-last-role');
-    navigate("/student/login");
+    // replace: true removes this entry from history so back button can't return to dashboard
+    navigate('/student/login', { replace: true });
   };
 
   // ── Fetch data ─────────────────────────────────────────────────────────────

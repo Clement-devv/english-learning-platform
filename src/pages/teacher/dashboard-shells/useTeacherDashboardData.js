@@ -126,6 +126,17 @@ export function useTeacherDashboardData() {
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── Session guard: re-verify when tab becomes visible (catches force-logout from another device) ──
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        api.get('/auth/verify').catch(() => {});
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, []);
+
   // ── Unread messages count — fetch on mount, reset when messages tab opened ─
   useEffect(() => {
     api.get('/direct-messages').then(({ data }) => {
@@ -757,11 +768,17 @@ export function useTeacherDashboardData() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('teacherToken');
-    localStorage.removeItem('teacherSessionToken');
-    localStorage.removeItem('teacherInfo');
+    const token        = sessionStorage.getItem('teacherToken') || localStorage.getItem('teacherToken');
+    const sessionToken = sessionStorage.getItem('teacherSessionToken') || localStorage.getItem('teacherSessionToken');
+    if (token && sessionToken) {
+      api.post('/auth/logout-session', { sessionToken }).catch(() => {});
+    }
+    ['teacherToken', 'teacherSessionToken', 'teacherInfo'].forEach(k => {
+      sessionStorage.removeItem(k);
+      localStorage.removeItem(k);
+    });
     localStorage.removeItem('pwa-last-role');
-    navigate('/teacher/login');
+    navigate('/teacher/login', { replace: true });
   };
 
   const handlePasswordChangeSuccess = (msg) => showToast(msg);

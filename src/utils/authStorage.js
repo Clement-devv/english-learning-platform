@@ -6,22 +6,25 @@
 /** Per-role storage and routing config */
 export const ROLE_CONFIG = {
   teacher: {
-    tokenKey:   'teacherToken',
-    infoKey:    'teacherInfo',
-    loginPath:  '/teacher/login',
-    verifyPath: '/auth/verify',
+    tokenKey:        'teacherToken',
+    sessionTokenKey: 'teacherSessionToken',
+    infoKey:         'teacherInfo',
+    loginPath:       '/teacher/login',
+    verifyPath:      '/auth/verify',
   },
   student: {
-    tokenKey:   'studentToken',
-    infoKey:    'studentInfo',
-    loginPath:  '/student/login',
-    verifyPath: '/auth/student/verify',
+    tokenKey:        'studentToken',
+    sessionTokenKey: 'studentSessionToken',
+    infoKey:         'studentInfo',
+    loginPath:       '/student/login',
+    verifyPath:      '/auth/student/verify',
   },
   admin: {
-    tokenKey:   'adminToken',
-    infoKey:    'adminInfo',
-    loginPath:  '/admin/login',
-    verifyPath: '/auth/admin/verify',
+    tokenKey:        'adminToken',
+    sessionTokenKey: 'adminSessionToken',
+    infoKey:         'adminInfo',
+    loginPath:       '/admin/login',
+    verifyPath:      '/auth/admin/verify',
   },
   'sub-admin': {
     tokenKey:   'subAdminToken',
@@ -30,16 +33,16 @@ export const ROLE_CONFIG = {
     clientSide: true, // verified via JWT exp decode — no network request
   },
   'super-admin': {
-    tokenKey:   'superAdminToken',
-    infoKey:    'superAdminInfo',
-    loginPath:  '/super-admin/login',
+    tokenKey:  'superAdminToken',
+    infoKey:   'superAdminInfo',
+    loginPath: '/super-admin/login',
     verifyPath: '/super-admin/stats',
     localOnly:  true, // token stored in localStorage only (not sessionStorage)
   },
   parent: {
-    tokenKey:   'parentToken',
-    infoKey:    'parentInfo',
-    loginPath:  '/parent/login',
+    tokenKey:  'parentToken',
+    infoKey:   'parentInfo',
+    loginPath: '/parent/login',
     verifyPath: '/parents/verify',
   },
 };
@@ -111,7 +114,7 @@ export function saveUserInfo(role, info) {
 }
 
 /**
- * Remove all auth storage for a role (both tiers).
+ * Remove all auth storage for a role (both tiers), including session token.
  * @param {string} role
  */
 export function clearAuth(role) {
@@ -121,4 +124,8 @@ export function clearAuth(role) {
   sessionStorage.removeItem(cfg.infoKey);
   localStorage.removeItem(cfg.tokenKey);
   localStorage.removeItem(cfg.infoKey);
+  if (cfg.sessionTokenKey) {
+    sessionStorage.removeItem(cfg.sessionTokenKey);
+    localStorage.removeItem(cfg.sessionTokenKey);
+  }
 }
