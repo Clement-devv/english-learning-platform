@@ -163,6 +163,13 @@ export default function SunshineShell() {
   const PAGE_LABEL = ALL_ITEMS.reduce((m, i) => ({ ...m, [i.key]: i.label }), {});
   const { missedCalls, missedCallCount, clearMissedCalls } = useRing();
 
+  // Admin always renders in desktop layout — force desktop viewport on every mount
+  // (covers SPA navigation where index.html startup script doesn't re-run)
+  useEffect(() => {
+    const vp = document.getElementById('vp');
+    if (vp) vp.content = 'width=1280, viewport-fit=cover';
+  }, []);
+
   const [activeTab,       setActiveTab]       = useState('overview');
   const [teachers,        setTeachers]        = useState([]);
   const [students,        setStudents]        = useState([]);
