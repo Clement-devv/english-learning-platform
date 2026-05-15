@@ -165,5 +165,51 @@
       "whileAway": "khi bạn vắng mặt",
       "markSeen":  "Đánh dấu đã xem"
     }
+  },
+  "admin": {
+    "nav": {
+      "overview":             "Tổng quan",
+      "analytics":            "Phân tích",
+      "notifications":        "Thông báo",
+      "messages":             "Tin nhắn",
+      "subAdmins":            "Quản trị phụ",
+      "teachers":             "Giáo viên",
+      "teacherSchedules":     "Lịch dạy giáo viên",
+      "students":             "Học viên",
+      "parents":              "Phụ huynh",
+      "applications":         "Đơn đăng ký",
+      "assignStudents":       "Phân công học viên",
+      "allClasses":           "Tất cả lớp học",
+      "groupClasses":         "Lớp nhóm",
+      "bookings":             "Đặt lịch",
+      "recordings":           "Bản ghi âm",
+      "certificates":         "Chứng chỉ",
+      "progressReports":      "Báo cáo tiến độ",
+      "reviews":              "Đánh giá",
+      "referrals":            "Giới thiệu",
+      "payments":             "Thanh toán",
+      "classPricing":         "Giá lớp học",
+      "chatCredits":          "Tín dụng chat",
+      "pronunciationCredits": "Tín dụng phát âm",
+      "disputes":             "Tranh chấp",
+      "branding":             "Thương hiệu",
+      "customDomain":         "Tên miền riêng",
+      "certTemplate":         "Mẫu chứng chỉ"
+    },
+    "navGroup": {
+      "analytics": "Phân tích",
+      "people":    "Con người",
+      "classes":   "Lớp học",
+      "finance":   "Tài chính",
+      "settings":  "Cài đặt"
+    },
+    "sidebar": {
+      "portal":         "Bảng quản trị",
+      "darkMode":       "Chế độ tối",
+      "lightMode":      "Chế độ sáng",
+      "broadcastEmail": "Gửi email hàng loạt",
+      "settings":       "Cài đặt",
+      "signOut":        "Đăng xuất"
+    }
   }
 }

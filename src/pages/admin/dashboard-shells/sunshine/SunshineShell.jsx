@@ -24,6 +24,7 @@ import api                        from '../../../../api';
 import { getTeachers }            from '../../../../services/teacherService';
 import { getStudents }            from '../../../../services/studentService';
 import LanguageSwitcher           from '../../../../components/LanguageSwitcher';
+import { useTranslation }         from 'react-i18next';
 
 // Tab components — lazy loaded
 const OverviewTab        = lazy(() => import('../../tabs/OverviewTab'));
@@ -73,68 +74,65 @@ const palette = (dark) => ({
 });
 
 // ── Nav groups ────────────────────────────────────────────────────────────────
-const NAV_GROUPS = [
+const makeNavGroups = (t) => [
   {
     label: null,
     items: [
-      { key: 'overview',  label: 'Overview',  lucide: TrendingUp },
+      { key: 'overview',  label: t('admin.nav.overview'),  lucide: TrendingUp },
     ],
   },
   {
-    label: 'Analytics',
+    label: t('admin.navGroup.analytics'),
     items: [
-      { key: 'analytics',     label: 'Analytics',     lucide: BarChart3       },
-      { key: 'notifications', label: 'Notifications', lucide: Bell            },
-      { key: 'messages',      label: 'Messages',      lucide: MessageCircle   },
-      { key: 'sub-admins',    label: 'Sub-Admins',    lucide: Shield          },
+      { key: 'analytics',     label: t('admin.nav.analytics'),     lucide: BarChart3       },
+      { key: 'notifications', label: t('admin.nav.notifications'), lucide: Bell            },
+      { key: 'messages',      label: t('admin.nav.messages'),      lucide: MessageCircle   },
+      { key: 'sub-admins',    label: t('admin.nav.subAdmins'),     lucide: Shield          },
     ],
   },
   {
-    label: 'People',
+    label: t('admin.navGroup.people'),
     items: [
-      { key: 'teachers',          label: 'Teachers',          lucide: Video        },
-      { key: 'teacher-schedules', label: 'Teacher Schedules', lucide: CalendarDays },
-      { key: 'students',          label: 'Students',          lucide: User         },
-      { key: 'parents',           label: 'Parents',           lucide: Users        },
-      { key: 'applications',      label: 'Applications',      lucide: Home         },
-      { key: 'assign',            label: 'Assign Students',   lucide: Users        },
+      { key: 'teachers',          label: t('admin.nav.teachers'),         lucide: Video        },
+      { key: 'teacher-schedules', label: t('admin.nav.teacherSchedules'), lucide: CalendarDays },
+      { key: 'students',          label: t('admin.nav.students'),         lucide: User         },
+      { key: 'parents',           label: t('admin.nav.parents'),          lucide: Users        },
+      { key: 'applications',      label: t('admin.nav.applications'),     lucide: Home         },
+      { key: 'assign',            label: t('admin.nav.assignStudents'),   lucide: Users        },
     ],
   },
   {
-    label: 'Classes',
+    label: t('admin.navGroup.classes'),
     items: [
-      { key: 'classes',       label: 'All Classes',    lucide: BookOpen     },
-      { key: 'group-classes', label: 'Group Classes',  lucide: Users        },
-      { key: 'bookings',   label: 'Bookings',         lucide: ClipboardList},
-      { key: 'recordings',    label: 'Recordings',       lucide: Video    },
-      { key: 'certificates',  label: 'Certificates',     lucide: Award    },
-      { key: 'reports',       label: 'Progress Reports', lucide: FileText },
-      { key: 'reviews',       label: 'Reviews',          lucide: Star     },
-      { key: 'referrals',     label: 'Referrals',        lucide: Users    },
+      { key: 'classes',       label: t('admin.nav.allClasses'),      lucide: BookOpen     },
+      { key: 'group-classes', label: t('admin.nav.groupClasses'),    lucide: Users        },
+      { key: 'bookings',      label: t('admin.nav.bookings'),        lucide: ClipboardList},
+      { key: 'recordings',    label: t('admin.nav.recordings'),      lucide: Video        },
+      { key: 'certificates',  label: t('admin.nav.certificates'),    lucide: Award        },
+      { key: 'reports',       label: t('admin.nav.progressReports'), lucide: FileText     },
+      { key: 'reviews',       label: t('admin.nav.reviews'),         lucide: Star         },
+      { key: 'referrals',     label: t('admin.nav.referrals'),       lucide: Users        },
     ],
   },
   {
-    label: 'Finance',
+    label: t('admin.navGroup.finance'),
     items: [
-      { key: 'payments',      label: 'Payments',      lucide: DollarSign     },
-      { key: 'class-pricing', label: 'Class Pricing', lucide: DollarSign     },
-      { key: 'chat-credits',          label: 'Chat Credits',          lucide: MessageCircle  },
-      { key: 'pronunciation-credits', label: 'Pronunciation Credits', lucide: Mic            },
-      { key: 'disputes',              label: 'Disputes',              lucide: AlertTriangle  },
+      { key: 'payments',              label: t('admin.nav.payments'),             lucide: DollarSign    },
+      { key: 'class-pricing',         label: t('admin.nav.classPricing'),         lucide: DollarSign    },
+      { key: 'chat-credits',          label: t('admin.nav.chatCredits'),          lucide: MessageCircle },
+      { key: 'pronunciation-credits', label: t('admin.nav.pronunciationCredits'), lucide: Mic           },
+      { key: 'disputes',              label: t('admin.nav.disputes'),             lucide: AlertTriangle },
     ],
   },
   {
-    label: 'Settings',
+    label: t('admin.navGroup.settings'),
     items: [
-      { key: 'branding',      label: 'Branding',              lucide: Palette },
-      { key: 'domain',        label: 'Custom Domain',         lucide: Globe   },
-      { key: 'cert-template', label: 'Certificate Template',  lucide: Award   },
+      { key: 'branding',      label: t('admin.nav.branding'),      lucide: Palette },
+      { key: 'domain',        label: t('admin.nav.customDomain'),  lucide: Globe   },
+      { key: 'cert-template', label: t('admin.nav.certTemplate'),  lucide: Award   },
     ],
   },
 ];
-
-const ALL_ITEMS = NAV_GROUPS.flatMap(g => g.items);
-const PAGE_LABEL = ALL_ITEMS.reduce((m, i) => ({ ...m, [i.key]: i.label }), {});
 const F = "'Nunito','Inter',sans-serif";
 const FONT_IMPORT = 'https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap';
 const ACCENT_GRADIENT = 'linear-gradient(135deg,#f97316 0%,#f43f5e 100%)';
@@ -152,11 +150,16 @@ function TabLoader() {
 // ── Shell ─────────────────────────────────────────────────────────────────────
 export default function SunshineShell() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { user: adminInfo, logout: authLogout } = useAuth();
   const { branding, center } = useBranding();
   const { isDarkMode, toggleDarkMode } = useDarkMode();
   const col = palette(isDarkMode);
   const centerName = center?.centerName || 'Admin Panel';
+
+  const NAV_GROUPS = makeNavGroups(t);
+  const ALL_ITEMS  = NAV_GROUPS.flatMap(g => g.items);
+  const PAGE_LABEL = ALL_ITEMS.reduce((m, i) => ({ ...m, [i.key]: i.label }), {});
   const { missedCalls, missedCallCount, clearMissedCalls } = useRing();
 
   const [activeTab,       setActiveTab]       = useState('overview');
@@ -375,7 +378,7 @@ export default function SunshineShell() {
             </div>
             <div>
               <div style={{ fontSize: 13, fontWeight: 900, color: col.heading, lineHeight: 1.2 }}>{centerName}</div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: col.muted }}>Admin Panel</div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: col.muted }}>{t('admin.sidebar.portal')}</div>
               {branding?.partnershipText && (
                 <div style={{ fontSize: 10, color: col.muted, opacity: 0.75, marginTop: 2, fontStyle: 'italic' }}>{branding.partnershipText}</div>
               )}
@@ -441,7 +444,7 @@ export default function SunshineShell() {
         {/* Bottom controls */}
         <div style={{ padding: '8px 8px 16px', borderTop: `2px solid ${col.border}` }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', marginBottom: 4 }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: col.muted }}>{isDarkMode ? 'Dark Mode' : 'Light Mode'}</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: col.muted }}>{isDarkMode ? t('admin.sidebar.darkMode') : t('admin.sidebar.lightMode')}</span>
             <button onClick={toggleDarkMode}
               style={{ width: 40, height: 22, borderRadius: 999, border: 'none', cursor: 'pointer', background: isDarkMode ? col.accent : col.border, position: 'relative', transition: 'background .2s', flexShrink: 0 }}>
               <div style={{ width: 16, height: 16, borderRadius: '50%', background: '#fff', position: 'absolute', top: 3, left: isDarkMode ? 21 : 3, transition: 'left .2s' }} />
@@ -450,18 +453,18 @@ export default function SunshineShell() {
           <button className="as-nav" onClick={openBroadcast}
             style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 14, border: 'none', cursor: 'pointer', background: isDarkMode ? 'rgba(249,115,22,0.1)' : '#fff7ed', fontFamily: F, marginBottom: 1 }}>
             <Megaphone size={17} color={col.accent} />
-            <span style={{ fontSize: 13, fontWeight: 700, color: col.accent }}>Broadcast Email</span>
+            <span style={{ fontSize: 13, fontWeight: 700, color: col.accent }}>{t('admin.sidebar.broadcastEmail')}</span>
           </button>
           <button className="as-nav" onClick={() => setShowSettingsSidebar(true)}
             style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 14, border: 'none', cursor: 'pointer', background: 'transparent', fontFamily: F, marginBottom: 1 }}>
             <Settings size={17} color={col.muted} />
-            <span style={{ fontSize: 13, fontWeight: 600, color: col.body }}>Settings</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: col.body }}>{t('admin.sidebar.settings')}</span>
           </button>
           <LanguageSwitcher col={col} fontFamily={F} />
           <button className="as-nav" onClick={handleLogout}
             style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 14, border: 'none', cursor: 'pointer', background: 'transparent', fontFamily: F }}>
             <LogOut size={17} color={col.muted} />
-            <span style={{ fontSize: 13, fontWeight: 600, color: col.body }}>Sign Out</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: col.body }}>{t('admin.sidebar.signOut')}</span>
           </button>
         </div>
       </aside>

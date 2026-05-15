@@ -165,5 +165,51 @@
       "whileAway": "while you were away",
       "markSeen":  "Mark seen"
     }
+  },
+  "admin": {
+    "nav": {
+      "overview":             "Overview",
+      "analytics":            "Analytics",
+      "notifications":        "Notifications",
+      "messages":             "Messages",
+      "subAdmins":            "Sub-Admins",
+      "teachers":             "Teachers",
+      "teacherSchedules":     "Teacher Schedules",
+      "students":             "Students",
+      "parents":              "Parents",
+      "applications":         "Applications",
+      "assignStudents":       "Assign Students",
+      "allClasses":           "All Classes",
+      "groupClasses":         "Group Classes",
+      "bookings":             "Bookings",
+      "recordings":           "Recordings",
+      "certificates":         "Certificates",
+      "progressReports":      "Progress Reports",
+      "reviews":              "Reviews",
+      "referrals":            "Referrals",
+      "payments":             "Payments",
+      "classPricing":         "Class Pricing",
+      "chatCredits":          "Chat Credits",
+      "pronunciationCredits": "Pronunciation Credits",
+      "disputes":             "Disputes",
+      "branding":             "Branding",
+      "customDomain":         "Custom Domain",
+      "certTemplate":         "Certificate Template"
+    },
+    "navGroup": {
+      "analytics": "Analytics",
+      "people":    "People",
+      "classes":   "Classes",
+      "finance":   "Finance",
+      "settings":  "Settings"
+    },
+    "sidebar": {
+      "portal":         "Admin Panel",
+      "darkMode":       "Dark Mode",
+      "lightMode":      "Light Mode",
+      "broadcastEmail": "Broadcast Email",
+      "settings":       "Settings",
+      "signOut":        "Sign Out"
+    }
   }
 }
