@@ -23,6 +23,7 @@ import SessionManagement            from '../../../../components/SessionManageme
 import SettingsModal                from '../../../../components/SettingsModal';
 import GoogleMeetSettings           from '../../../../components/GoogleMeetSettings';
 import LiveClasses                  from '../../components/dashboard/LiveClasses';
+import LanguageSwitcher             from '../../../../components/LanguageSwitcher';
 import UpcomingClasses              from '../../components/dashboard/UpcomingClasses';
 
 // ── Palette ────────────────────────────────────────────────────────────────────
@@ -265,6 +266,9 @@ export default function PlayfulShell() {
           style={{ width: 52, height: 52, borderRadius: 16, border: 'none', cursor: 'pointer', background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', color: P.sideText }}>
           <Settings size={20} strokeWidth={1.8} />
         </button>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 4 }}>
+          <LanguageSwitcher compact col={{ border: 'rgba(255,255,255,0.15)', body: P.sideText }} fontFamily={F} />
+        </div>
         <button className="pft-nav" title="Sign out" onClick={d.handleLogout}
           style={{ width: 52, height: 52, borderRadius: 16, border: 'none', cursor: 'pointer', background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', color: P.sideText, marginBottom: 4 }}>
           <LogOut size={20} strokeWidth={1.8} />
@@ -684,6 +688,7 @@ export default function PlayfulShell() {
                 <Settings size={18} color={P.textMuted} strokeWidth={1.8} />
                 <span style={{ fontSize: 14, fontWeight: 600 }}>Settings</span>
               </button>
+              <LanguageSwitcher col={{ body: P.text, muted: P.textMuted, border: P.border }} fontFamily={F} />
               <button onClick={() => setViewMode('desktop')}
                 style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', borderRadius: 14, border: 'none', background: 'transparent', color: P.text, cursor: 'pointer', fontFamily: F, width: '100%' }}>
                 <span style={{ fontSize: 18 }}>🖥️</span>

@@ -27,6 +27,8 @@ import SettingsModal                from '../../../../components/SettingsModal';
 import GoogleMeetSettings           from '../../../../components/GoogleMeetSettings';
 import LiveClasses                  from '../../components/dashboard/LiveClasses';
 import UpcomingClasses              from '../../components/dashboard/UpcomingClasses';
+import LanguageSwitcher             from '../../../../components/LanguageSwitcher';
+import { useTranslation }           from 'react-i18next';
 
 // ── Palette ────────────────────────────────────────────────────────────────────
 const palette = (dark) => ({
@@ -42,49 +44,47 @@ const palette = (dark) => ({
 });
 
 // ── Nav groups ─────────────────────────────────────────────────────────────────
-const NAV_GROUPS = [
+const makeNavGroups = (t) => [
   {
     label: null,
-    items: [{ key: 'dashboard', icon: '🏠', label: 'Dashboard', lucide: Home }],
+    items: [{ key: 'dashboard', icon: '🏠', label: t('teacher.nav.dashboard'), lucide: Home }],
   },
   {
-    label: 'Teaching',
+    label: t('teacher.navGroup.teaching'),
     items: [
-      { key: 'classes',           icon: '📅', label: 'My Classes',    lucide: CalendarDays  },
-      { key: 'group-classes',     icon: '👥', label: 'Group Classes', lucide: Users         },
-      { key: 'completed-classes', icon: '✅', label: 'Completed',     lucide: CheckCircle2  },
-      { key: 'schedule',          icon: '🗓️', label: 'Schedule',      lucide: Calendar      },
+      { key: 'classes',           icon: '📅', label: t('teacher.nav.myClasses'),    lucide: CalendarDays  },
+      { key: 'group-classes',     icon: '👥', label: t('teacher.nav.groupClasses'), lucide: Users         },
+      { key: 'completed-classes', icon: '✅', label: t('teacher.nav.completed'),    lucide: CheckCircle2  },
+      { key: 'schedule',          icon: '🗓️', label: t('teacher.nav.schedule'),     lucide: Calendar      },
     ],
   },
   {
-    label: 'Students',
+    label: t('teacher.navGroup.students'),
     items: [
-      { key: 'students', icon: '👥', label: 'Students', lucide: Users         },
-      { key: 'bookings', icon: '📖', label: 'Bookings',  lucide: ClipboardList },
+      { key: 'students', icon: '👥', label: t('teacher.nav.students'), lucide: Users         },
+      { key: 'bookings', icon: '📖', label: t('teacher.nav.bookings'), lucide: ClipboardList },
     ],
   },
   {
-    label: 'Content',
+    label: t('teacher.navGroup.content'),
     items: [
-      { key: 'homework',    icon: '📚', label: 'Homework',   lucide: BookOpen  },
-      { key: 'quiz',        icon: '📝', label: 'Quizzes',    lucide: FileText  },
-      { key: 'vocab',       icon: '📒', label: 'Vocabulary', lucide: Layers    },
+      { key: 'homework', icon: '📚', label: t('teacher.nav.homework'),   lucide: BookOpen },
+      { key: 'quiz',     icon: '📝', label: t('teacher.nav.quizzes'),    lucide: FileText },
+      { key: 'vocab',    icon: '📒', label: t('teacher.nav.vocabulary'), lucide: Layers   },
     ],
   },
   {
-    label: 'More',
+    label: t('teacher.navGroup.more'),
     items: [
-      { key: 'messages',          icon: '💬', label: 'Messages',        lucide: MessageCircle },
-      { key: 'payment',           icon: '💰', label: 'Payment',         lucide: DollarSign    },
-      { key: 'recordings',        icon: '🎬', label: 'Recordings',      lucide: Video         },
-      { key: 'reviews',           icon: '⭐', label: 'Reviews',         lucide: Star          },
-      { key: 'rating-dashboard',  icon: '📊', label: 'Rating Insights', lucide: BarChart2     },
-      { key: 'profile',           icon: '👤', label: 'Profile',         lucide: User          },
+      { key: 'messages',         icon: '💬', label: t('teacher.nav.messages'),        lucide: MessageCircle },
+      { key: 'payment',          icon: '💰', label: t('teacher.nav.payment'),         lucide: DollarSign    },
+      { key: 'recordings',       icon: '🎬', label: t('teacher.nav.recordings'),      lucide: Video         },
+      { key: 'reviews',          icon: '⭐', label: t('teacher.nav.reviews'),         lucide: Star          },
+      { key: 'rating-dashboard', icon: '📊', label: t('teacher.nav.ratingInsights'), lucide: BarChart2     },
+      { key: 'profile',          icon: '👤', label: t('teacher.nav.profile'),         lucide: User          },
     ],
   },
 ];
-
-const PAGE_LABEL = NAV_GROUPS.flatMap(g => g.items).reduce((m, i) => ({ ...m, [i.key]: i.label }), {});
 const F = "'Nunito','Inter',sans-serif";
 const FONT_IMPORT = 'https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap';
 
@@ -92,6 +92,7 @@ const FONT_IMPORT = 'https://fonts.googleapis.com/css2?family=Nunito:wght@400;60
 const ROLE_LABEL = { teacher: 'Teacher', student: 'Student', admin: 'Admin', subAdmin: 'Sub-Admin' };
 
 function MissedCallsBanner({ missedCalls, clearMissedCalls, col, isDarkMode }) {
+  const { t } = useTranslation();
   const formatTime = (ms) => {
     const d = new Date(ms);
     return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -107,18 +108,16 @@ function MissedCallsBanner({ missedCalls, clearMissedCalls, col, isDarkMode }) {
       gap: 16,
       alignItems: 'flex-start',
     }}>
-      {/* Icon */}
       <div style={{ width: 44, height: 44, borderRadius: 14, background: 'linear-gradient(135deg,#ef4444,#dc2626)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 4px 12px rgba(239,68,68,0.35)' }}>
         <PhoneMissed size={20} color='#fff' />
       </div>
 
-      {/* Content */}
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
           <h3 style={{ margin: 0, fontSize: 14, fontWeight: 900, color: isDarkMode ? '#fca5a5' : '#dc2626', fontFamily: F }}>
-            {missedCalls.length} Missed Call{missedCalls.length > 1 ? 's' : ''}
+            {t(missedCalls.length > 1 ? 'teacher.missedCalls.title_plural' : 'teacher.missedCalls.title', { count: missedCalls.length })}
           </h3>
-          <span style={{ fontSize: 11, color: col.muted, fontWeight: 600 }}>while you were away</span>
+          <span style={{ fontSize: 11, color: col.muted, fontWeight: 600 }}>{t('teacher.missedCalls.whileAway')}</span>
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
           {missedCalls.map((mc, i) => (
@@ -140,13 +139,12 @@ function MissedCallsBanner({ missedCalls, clearMissedCalls, col, isDarkMode }) {
         </div>
       </div>
 
-      {/* Dismiss */}
       <button
         onClick={clearMissedCalls}
         title='Mark all as seen'
         style={{ background: isDarkMode ? 'rgba(255,255,255,0.08)' : '#fff', border: `1px solid ${isDarkMode ? 'rgba(255,255,255,0.12)' : '#fecaca'}`, borderRadius: 10, padding: '6px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 700, color: col.muted, flexShrink: 0, fontFamily: F }}
       >
-        <X size={12} /> Mark seen
+        <X size={12} /> {t('teacher.missedCalls.markSeen')}
       </button>
     </div>
   );
@@ -154,11 +152,14 @@ function MissedCallsBanner({ missedCalls, clearMissedCalls, col, isDarkMode }) {
 
 // ── Shell ──────────────────────────────────────────────────────────────────────
 export default function SunshineShell() {
+  const { t } = useTranslation();
   const { branding, center } = useBranding();
   const d   = useTeacherDashboardData();
   const col = palette(d.isDarkMode);
   const { missedCalls, missedCallCount, clearMissedCalls } = useRing();
-  const centerName = center?.centerName || 'Teacher Portal';
+  const centerName = center?.centerName || t('teacher.sidebar.portal');
+  const NAV_GROUPS = makeNavGroups(t);
+  const PAGE_LABEL = NAV_GROUPS.flatMap(g => g.items).reduce((m, i) => ({ ...m, [i.key]: i.label }), {});
 
   const [showRecurringLocal, setShowRecurringLocal] = useState(false);
   const { isMobile, forcedMode, setViewMode, isSmallScreen } = useViewMode();
@@ -227,7 +228,7 @@ export default function SunshineShell() {
             </div>
             <div>
               <div style={{ fontSize: 14, fontWeight: 900, color: col.heading, lineHeight: 1.1 }}>{centerName}</div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: col.muted }}>Teacher Portal</div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: col.muted }}>{t('teacher.sidebar.portal')}</div>
               {branding?.partnershipText && (
                 <div style={{ fontSize: 10, color: col.muted, opacity: 0.75, marginTop: 2, fontStyle: 'italic' }}>{branding.partnershipText}</div>
               )}
@@ -288,7 +289,7 @@ export default function SunshineShell() {
         {/* Bottom */}
         <div style={{ padding: '8px 8px 16px', borderTop: `2px solid ${col.border}` }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', marginBottom: 4 }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: col.muted }}>{d.isDarkMode ? 'Dark Mode' : 'Light Mode'}</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: col.muted }}>{d.isDarkMode ? t('teacher.sidebar.darkMode') : t('teacher.sidebar.lightMode')}</span>
             <button onClick={d.toggleDarkMode}
               style={{ width: 40, height: 22, borderRadius: 999, border: 'none', cursor: 'pointer', background: d.isDarkMode ? col.accent : col.border, position: 'relative', transition: 'background .2s', flexShrink: 0 }}>
               <div style={{ width: 16, height: 16, borderRadius: '50%', background: '#fff', position: 'absolute', top: 3, left: d.isDarkMode ? 21 : 3, transition: 'left .2s' }} />
@@ -297,18 +298,19 @@ export default function SunshineShell() {
           <button className="ts-nav" onClick={() => d.setShowSettingsSidebar(true)}
             style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 14, border: 'none', cursor: 'pointer', background: 'transparent', fontFamily: F, marginBottom: 1 }}>
             <Settings size={17} color={col.muted} />
-            <span style={{ fontSize: 13, fontWeight: 600, color: col.body }}>Settings</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: col.body }}>{t('teacher.sidebar.settings')}</span>
           </button>
+          <LanguageSwitcher col={col} fontFamily={F} />
           <button className="ts-nav" onClick={d.handleLogout}
             style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 14, border: 'none', cursor: 'pointer', background: 'transparent', fontFamily: F }}>
             <LogOut size={17} color={col.muted} />
-            <span style={{ fontSize: 13, fontWeight: 600, color: col.body }}>Sign Out</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: col.body }}>{t('teacher.sidebar.signOut')}</span>
           </button>
           {isSmallScreen && !isMobile && (
             <button className="ts-nav" onClick={() => setViewMode('mobile')}
               style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 14, border: 'none', cursor: 'pointer', background: d.isDarkMode ? 'rgba(249,115,22,0.1)' : '#fff7ed', fontFamily: F, marginTop: 4 }}>
               <span style={{ fontSize: 15 }}>📱</span>
-              <span style={{ fontSize: 13, fontWeight: 700, color: col.accent }}>Mobile View</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: col.accent }}>{t('teacher.sidebar.mobileView')}</span>
             </button>
           )}
         </div>
@@ -320,7 +322,7 @@ export default function SunshineShell() {
         {/* ── TOP BAR ── */}
         <header style={{ height: 64, background: col.sidebar, borderBottom: `2px solid ${col.border}`, display: 'flex', alignItems: 'center', padding: isMobile ? '0 12px' : '0 24px', gap: isMobile ? 8 : 14, flexShrink: 0 }}>
           <h1 style={{ margin: 0, fontSize: 18, fontWeight: 900, color: col.heading, flex: 1, fontFamily: F }}>
-            {PAGE_LABEL[d.activeTab] || 'Dashboard'}
+            {PAGE_LABEL[d.activeTab] || t('teacher.nav.dashboard')}
           </h1>
 
           {/* Student count pill — desktop only */}
@@ -649,10 +651,10 @@ export default function SunshineShell() {
       {isMobile && (
         <nav style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: d.isDarkMode ? '#13111a' : '#fff', borderTop: `2px solid ${col.border}`, display: 'flex', zIndex: 200, boxShadow: '0 -4px 20px rgba(0,0,0,0.12)', paddingBottom: 'env(safe-area-inset-bottom,0px)' }}>
           {[
-            { key: 'dashboard', Icon: Home,          label: 'Home'     },
-            { key: 'classes',   Icon: CalendarDays,  label: 'Classes'  },
-            { key: 'students',  Icon: Users,          label: 'Students' },
-            { key: 'messages',  Icon: MessageCircle, label: 'Messages' },
+            { key: 'dashboard', Icon: Home,          label: t('teacher.nav.dashboard') },
+            { key: 'classes',   Icon: CalendarDays,  label: t('teacher.nav.myClasses') },
+            { key: 'students',  Icon: Users,          label: t('teacher.nav.students')  },
+            { key: 'messages',  Icon: MessageCircle, label: t('teacher.nav.messages')  },
           ].map(({ key, Icon, label }) => {
             const isActive = d.activeTab === key;
             const badge = key === 'messages' && d.unreadMessages > 0 ? d.unreadMessages : 0;
@@ -703,17 +705,18 @@ export default function SunshineShell() {
               <button onClick={() => { setShowMobileMenu(false); d.setShowSettingsSidebar(true); }}
                 style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', borderRadius: 14, border: 'none', background: 'transparent', color: col.body, cursor: 'pointer', fontFamily: F, width: '100%' }}>
                 <Settings size={18} color={col.muted} strokeWidth={1.8} />
-                <span style={{ fontSize: 14, fontWeight: 600 }}>Settings</span>
+                <span style={{ fontSize: 14, fontWeight: 600 }}>{t('teacher.sidebar.settings')}</span>
               </button>
+              <LanguageSwitcher col={col} fontFamily={F} />
               <button onClick={() => setViewMode('desktop')}
                 style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', borderRadius: 14, border: 'none', background: 'transparent', color: col.body, cursor: 'pointer', fontFamily: F, width: '100%' }}>
                 <span style={{ fontSize: 18 }}>🖥️</span>
-                <span style={{ fontSize: 14, fontWeight: 600 }}>Desktop View</span>
+                <span style={{ fontSize: 14, fontWeight: 600 }}>{t('teacher.sidebar.desktopView')}</span>
               </button>
               <button onClick={d.handleLogout}
                 style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', borderRadius: 14, border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer', fontFamily: F, width: '100%' }}>
                 <LogOut size={18} color="#ef4444" strokeWidth={1.8} />
-                <span style={{ fontSize: 14, fontWeight: 600 }}>Sign Out</span>
+                <span style={{ fontSize: 14, fontWeight: 600 }}>{t('teacher.sidebar.signOut')}</span>
               </button>
             </div>
           </div>

@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Calendar, BookOpen, Award, LayoutDashboard, LogOut, RefreshCw, Loader2, Users, CheckCircle2, ClipboardList } from 'lucide-react';
 import api from '../../../../api';
+import LanguageSwitcher from '../../../../components/LanguageSwitcher';
 
 const F = "'Nunito','Inter',sans-serif";
 const ACCENT  = 'linear-gradient(135deg,#f97316,#f43f5e)';
@@ -407,6 +408,7 @@ export default function SunshineShell() {
         </nav>
 
         <div style={{ padding: '8px 8px 16px', borderTop: `2px solid ${col.border}` }}>
+          <LanguageSwitcher col={col} fontFamily={F} />
           <button className="p-nav" onClick={handleLogout}
             style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 14, border: 'none', cursor: 'pointer', background: 'transparent', fontFamily: F }}>
             <LogOut size={17} color={col.muted} />

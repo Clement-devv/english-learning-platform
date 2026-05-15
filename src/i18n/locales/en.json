@@ -124,5 +124,46 @@
     "switchLanguage": "Tiếng Việt",
     "teacher": "Teacher",
     "admin": "Admin"
+  },
+  "teacher": {
+    "nav": {
+      "dashboard":     "Dashboard",
+      "myClasses":     "My Classes",
+      "groupClasses":  "Group Classes",
+      "completed":     "Completed",
+      "schedule":      "Schedule",
+      "students":      "Students",
+      "bookings":      "Bookings",
+      "homework":      "Homework",
+      "quizzes":       "Quizzes",
+      "vocabulary":    "Vocabulary",
+      "messages":      "Messages",
+      "payment":       "Payment",
+      "recordings":    "Recordings",
+      "reviews":       "Reviews",
+      "ratingInsights":"Rating Insights",
+      "profile":       "Profile"
+    },
+    "navGroup": {
+      "teaching": "Teaching",
+      "students":  "Students",
+      "content":   "Content",
+      "more":      "More"
+    },
+    "sidebar": {
+      "portal":      "Teacher Portal",
+      "darkMode":    "Dark Mode",
+      "lightMode":   "Light Mode",
+      "settings":    "Settings",
+      "signOut":     "Sign Out",
+      "mobileView":  "Mobile View",
+      "desktopView": "Desktop View"
+    },
+    "missedCalls": {
+      "title":    "{{count}} Missed Call",
+      "title_plural": "{{count}} Missed Calls",
+      "whileAway": "while you were away",
+      "markSeen":  "Mark seen"
+    }
   }
 }

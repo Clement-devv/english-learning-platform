@@ -19,6 +19,7 @@ import {
   ClassesPanel, PaymentsPanel, RecordingsPanel, ReportsPanel,
   ReviewsPanel, MessagesTab,
 } from '../../SubAdminPanels.jsx';
+import LanguageSwitcher from '../../../../components/LanguageSwitcher';
 
 // ── Design tokens ──────────────────────────────────────────────────────────────
 const palette = (dark) => ({
@@ -216,6 +217,7 @@ export default function SunshineShell() {
             </div>
             <span style={{ fontSize: 13, fontWeight: 600, color: col.body }}>{isDarkMode ? 'Light Mode' : 'Dark Mode'}</span>
           </button>
+          <LanguageSwitcher col={col} fontFamily={F} />
           <button className="sa-nav" onClick={handleLogout}
             style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 14, border: 'none', cursor: 'pointer', background: 'transparent', fontFamily: F, marginTop: 2 }}>
             <div style={{ width: 30, height: 30, borderRadius: 10, flexShrink: 0, background: isDarkMode ? 'rgba(239,68,68,0.08)' : '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

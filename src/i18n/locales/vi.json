@@ -124,5 +124,46 @@
     "switchLanguage": "English",
     "teacher": "Giáo viên",
     "admin": "Quản trị viên"
+  },
+  "teacher": {
+    "nav": {
+      "dashboard":     "Trang chủ",
+      "myClasses":     "Lớp học của tôi",
+      "groupClasses":  "Lớp nhóm",
+      "completed":     "Đã hoàn thành",
+      "schedule":      "Lịch dạy",
+      "students":      "Học viên",
+      "bookings":      "Đặt lịch",
+      "homework":      "Bài tập",
+      "quizzes":       "Kiểm tra",
+      "vocabulary":    "Từ vựng",
+      "messages":      "Tin nhắn",
+      "payment":       "Thanh toán",
+      "recordings":    "Bản ghi âm",
+      "reviews":       "Đánh giá",
+      "ratingInsights":"Phân tích đánh giá",
+      "profile":       "Hồ sơ"
+    },
+    "navGroup": {
+      "teaching": "Giảng dạy",
+      "students":  "Học viên",
+      "content":   "Nội dung",
+      "more":      "Thêm"
+    },
+    "sidebar": {
+      "portal":      "Cổng giáo viên",
+      "darkMode":    "Chế độ tối",
+      "lightMode":   "Chế độ sáng",
+      "settings":    "Cài đặt",
+      "signOut":     "Đăng xuất",
+      "mobileView":  "Giao diện di động",
+      "desktopView": "Giao diện máy tính"
+    },
+    "missedCalls": {
+      "title":    "{{count}} cuộc gọi nhỡ",
+      "title_plural": "{{count}} cuộc gọi nhỡ",
+      "whileAway": "khi bạn vắng mặt",
+      "markSeen":  "Đánh dấu đã xem"
+    }
   }
 }

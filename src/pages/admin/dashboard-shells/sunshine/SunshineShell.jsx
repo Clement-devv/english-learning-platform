@@ -23,6 +23,7 @@ import SettingsModal              from '../../../../components/SettingsModal';
 import api                        from '../../../../api';
 import { getTeachers }            from '../../../../services/teacherService';
 import { getStudents }            from '../../../../services/studentService';
+import LanguageSwitcher           from '../../../../components/LanguageSwitcher';
 
 // Tab components — lazy loaded
 const OverviewTab        = lazy(() => import('../../tabs/OverviewTab'));
@@ -456,6 +457,7 @@ export default function SunshineShell() {
             <Settings size={17} color={col.muted} />
             <span style={{ fontSize: 13, fontWeight: 600, color: col.body }}>Settings</span>
           </button>
+          <LanguageSwitcher col={col} fontFamily={F} />
           <button className="as-nav" onClick={handleLogout}
             style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 14, border: 'none', cursor: 'pointer', background: 'transparent', fontFamily: F }}>
             <LogOut size={17} color={col.muted} />
