@@ -66,6 +66,9 @@ if (config.trustProxy) {
   app.set('trust proxy', 1);
 }
 
+// Serve static frontend assets BEFORE CORS — public files need no origin check
+app.use(express.static(frontendPath));
+
 // Security Middleware
 app.use(securityHeaders);
 app.use(noSqlInjectionProtection);
@@ -363,8 +366,7 @@ app.get('/manifest.json', async (req, res) => {
   }
 });
 
-// Serve React frontend
-app.use(express.static(frontendPath));
+// SPA fallback — all unmatched routes serve index.html
 app.get('/{*path}', (req, res) => {
   res.sendFile(path.join(frontendPath, 'index.html'));
 });
