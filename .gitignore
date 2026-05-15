@@ -1,16 +1,21 @@
-.env
-node_modules
+# Dependencies
 node_modules/
 server/node_modules/
+
+# Environment files — never commit secrets
 .env
 .env.*
-!/.env.production
+server/.env
+server/.env.*
+
+# Build output
 dist/
 build/
+
+# Logs & editor
 *.log
 .vscode/
 .DS_Store
-.env.production
 
 # User-uploaded files — never commit these
 server/uploads/content/
