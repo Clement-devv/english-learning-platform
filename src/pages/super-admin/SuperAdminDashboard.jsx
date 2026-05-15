@@ -142,6 +142,12 @@ export default function SuperAdminDashboard() {
   const [limitsSaving,  setLimitsSaving]  = useState(false);
   const [limitsMsg,     setLimitsMsg]     = useState('');
 
+  // ── Partnership text modal ────────────────────────────────────────────────
+  const [partnershipModal,  setPartnershipModal]  = useState(null);  // center object
+  const [partnershipText,   setPartnershipText]   = useState('');
+  const [partnershipSaving, setPartnershipSaving] = useState(false);
+  const [partnershipMsg,    setPartnershipMsg]    = useState('');
+
   // ── Impersonation ─────────────────────────────────────────────────────────
   const [impersonating, setImpersonating] = useState(null); // centerId being entered
 
@@ -1254,6 +1260,7 @@ export default function SuperAdminDashboard() {
                 setFeaturesCenter={setFeaturesCenter}
                 setLimitsModal={setLimitsModal} setLimitsUnlimT={setLimitsUnlimT} setLimitsUnlimS={setLimitsUnlimS}
                 setLimitsTeachers={setLimitsTeachers} setLimitsStudents={setLimitsStudents} setLimitsMsg={setLimitsMsg}
+                setPartnershipModal={(c) => { setPartnershipModal(c); setPartnershipText(c.branding?.partnershipText || ''); setPartnershipMsg(''); }}
                 statusColor={statusColor} statusIcon={statusIcon}
                 onEditWebsite={handleEditWebsite}
               />
@@ -1686,6 +1693,66 @@ export default function SuperAdminDashboard() {
                   }}
                   style={{ flex: 2, padding: '10px', borderRadius: 10, border: 'none', background: limitsSaving ? '#374151' : 'linear-gradient(135deg,#fb923c,#ea580c)', color: '#fff', fontWeight: 700, cursor: limitsSaving ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}
                 >{limitsSaving ? 'Saving…' : 'Save Limits'}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Partnership Text Modal ── */}
+      {partnershipModal && (
+        <div style={s.overlay} onClick={e => e.target === e.currentTarget && !partnershipSaving && setPartnershipModal(null)}>
+          <div style={{ ...s.modal, maxWidth: 420 }}>
+            <div style={s.modalHeader}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <Users size={16} color="#a78bfa" />
+                <span style={s.modalTitle}>Partnership Text</span>
+              </div>
+              {!partnershipSaving && <button onClick={() => setPartnershipModal(null)} style={s.closeBtn}><X size={18} /></button>}
+            </div>
+            <div style={{ padding: 24 }}>
+              <div style={{ background: 'rgba(167,139,250,0.08)', border: '1px solid rgba(167,139,250,0.2)', borderRadius: 10, padding: '12px 14px', marginBottom: 20 }}>
+                <p style={{ margin: '0 0 2px', fontWeight: 700, color: '#f1f5f9', fontSize: 14 }}>{partnershipModal.centerName}</p>
+                <p style={{ margin: 0, fontSize: 12, color: '#9ca3af' }}>Shown in sidebar and landing page footer</p>
+              </div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', marginBottom: 8 }}>Partnership Text</label>
+              <input
+                type="text"
+                placeholder='e.g. In partnership with Ego'
+                maxLength={80}
+                value={partnershipText}
+                onChange={e => setPartnershipText(e.target.value)}
+                style={{ ...s.input, width: '100%', boxSizing: 'border-box', marginBottom: 6 }}
+              />
+              <p style={{ margin: '0 0 20px', fontSize: 11, color: '#6b7280' }}>Leave blank to remove. Shown in admin/teacher/student sidebars and landing page footer.</p>
+
+              {partnershipMsg && (
+                <p style={{ margin: '0 0 14px', fontSize: 13, fontWeight: 700, color: partnershipMsg.startsWith('✅') ? '#34d399' : '#f87171' }}>{partnershipMsg}</p>
+              )}
+
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button onClick={() => setPartnershipModal(null)} disabled={partnershipSaving} style={{ flex: 1, padding: '10px', borderRadius: 10, border: '1px solid #374151', background: 'transparent', color: '#9ca3af', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Cancel</button>
+                <button
+                  disabled={partnershipSaving}
+                  onClick={async () => {
+                    setPartnershipSaving(true); setPartnershipMsg('');
+                    try {
+                      const res = await fetch(`${API_BASE}/super-admin/centers/${partnershipModal._id}/branding`, {
+                        method: 'PATCH', headers: { ...authHeaders, 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ partnershipText }),
+                      });
+                      const d = await res.json();
+                      if (d.success) {
+                        setCenters(prev => prev.map(c => c._id === partnershipModal._id
+                          ? { ...c, branding: { ...c.branding, partnershipText } } : c));
+                        setPartnershipMsg('✅ Saved');
+                        setTimeout(() => setPartnershipModal(null), 800);
+                      } else { setPartnershipMsg('❌ ' + (d.message || 'Failed')); }
+                    } catch { setPartnershipMsg('❌ Network error'); }
+                    finally { setPartnershipSaving(false); }
+                  }}
+                  style={{ flex: 2, padding: '10px', borderRadius: 10, border: 'none', background: partnershipSaving ? '#374151' : 'linear-gradient(135deg,#a78bfa,#7c3aed)', color: '#fff', fontWeight: 700, cursor: partnershipSaving ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}
+                >{partnershipSaving ? 'Saving…' : 'Save'}</button>
               </div>
             </div>
           </div>

@@ -114,7 +114,7 @@ router.post("/", verifyToken, async (req, res) => {
     getStudent(req.db).findById(studentId).then(studentDoc => {
       if (studentDoc) {
         getTeacher(req.db).findById(req.user.id).then(teacherDoc => {
-          if (teacherDoc) sendQuizAssigned(studentDoc, teacherDoc, quiz).catch(e => logger.warn("sendQuizAssigned failed:", { error: e?.message }));
+          if (teacherDoc) sendQuizAssigned(studentDoc, teacherDoc, quiz, req.center?.centerName || "", req.center).catch(e => logger.warn("sendQuizAssigned failed:", { error: e?.message }));
         }).catch(e => logger.warn("Teacher lookup for quiz email failed:", { error: e?.message }));
       }
     }).catch(e => logger.warn("Student lookup for quiz email failed:", { error: e?.message }));
@@ -260,7 +260,7 @@ router.post("/:id/attempt", verifyToken, validateObjectId("id"), async (req, res
       getTeacher(req.db).findById(quiz.teacherId),
       getStudent(req.db).findById(req.user.id),
     ]).then(([teacherDoc, studentDoc]) => {
-      if (teacherDoc && studentDoc) sendQuizCompleted(teacherDoc, studentDoc, quiz, attempt).catch(e => logger.warn("sendQuizCompleted failed:", { error: e?.message }));
+      if (teacherDoc && studentDoc) sendQuizCompleted(teacherDoc, studentDoc, quiz, attempt, req.center?.centerName || "", req.center).catch(e => logger.warn("sendQuizCompleted failed:", { error: e?.message }));
     }).catch(e => logger.warn("User lookup for quiz completion email failed:", { error: e?.message }));
 
     // Return full quiz (with correct answers revealed) + attempt + streak

@@ -117,7 +117,7 @@ async function checkClassReminders(db, centerSlug) {
 }
 
 // ── Homework due reminders ───────────────────────────────────────────────────
-async function checkHomeworkReminders(db) {
+async function checkHomeworkReminders(db, centerSlug) {
   const homeworks = await getHomework(db).find({
     status:  "assigned",
     dueDate: {
@@ -132,7 +132,7 @@ async function checkHomeworkReminders(db) {
 
     const key = `homework_30min_${hw._id}`;
     if (await markSent(db, key, hw._id)) {
-      sendHomeworkDueReminder(student, hw, 30).catch(e =>
+      sendHomeworkDueReminder(student, hw, 30, "", centerSlug).catch(e =>
         logger.error(`Homework reminder failed:`, { error: e?.message })
       );
       logger.info(`📧 Homework due reminder → ${student.email} "${hw.title}"`);
@@ -141,7 +141,7 @@ async function checkHomeworkReminders(db) {
 }
 
 // ── Quiz due reminders ───────────────────────────────────────────────────────
-async function checkQuizReminders(db) {
+async function checkQuizReminders(db, centerSlug) {
   const quizzes = await getQuiz(db).find({
     status:  "assigned",
     dueDate: {
@@ -156,7 +156,7 @@ async function checkQuizReminders(db) {
 
     const key = `quiz_30min_${quiz._id}`;
     if (await markSent(db, key, quiz._id)) {
-      sendQuizDueReminder(student, quiz, 30).catch(e =>
+      sendQuizDueReminder(student, quiz, 30, "", centerSlug).catch(e =>
         logger.error(`Quiz reminder failed:`, { error: e?.message })
       );
       logger.info(`📧 Quiz due reminder → ${student.email} "${quiz.title}"`);
@@ -236,8 +236,8 @@ function makeTick(db, centerSlug) {
     try {
       await Promise.all([
         checkClassReminders(db, centerSlug),
-        checkHomeworkReminders(db),
-        checkQuizReminders(db),
+        checkHomeworkReminders(db, centerSlug),
+        checkQuizReminders(db, centerSlug),
         checkScheduledDeletions(db),
       ]);
     } catch (err) {

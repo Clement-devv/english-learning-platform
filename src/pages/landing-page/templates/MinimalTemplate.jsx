@@ -311,7 +311,12 @@ function MinimalFooter({ center, D, links }) {
           {links?.studentLogin && <a href={links.studentLogin} style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', textDecoration: 'none' }}>Students</a>}
           {links?.teacherLogin && <a href={links.teacherLogin} style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', textDecoration: 'none' }}>Teachers</a>}
           {links?.parentLogin  && <a href={links.parentLogin}  style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', textDecoration: 'none' }}>Parents</a>}
-          <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>© {new Date().getFullYear()} {center.centerName}</span>
+          <div style={{ textAlign: 'right' }}>
+            <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>© {new Date().getFullYear()} {center.centerName}</span>
+            {center.partnershipText && (
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 3, fontStyle: 'italic' }}>{center.partnershipText}</div>
+            )}
+          </div>
         </div>
       </div>
     </footer>

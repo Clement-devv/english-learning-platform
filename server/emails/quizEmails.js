@@ -1,7 +1,8 @@
 import { config } from "../config/config.js";
-import { sendEmail } from "./core.js";
+import { sendEmail, getCenterBaseUrl } from "./core.js";
 
-export const sendQuizAssigned = async (student, teacher, quiz, centerName = "") => {
+export const sendQuizAssigned = async (student, teacher, quiz, centerName = "", center = null) => {
+  const { baseUrl } = getCenterBaseUrl(center);
   const dueDate = new Date(quiz.dueDate).toLocaleDateString('en-US', {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
   });
@@ -36,7 +37,7 @@ export const sendQuizAssigned = async (student, teacher, quiz, centerName = "") 
         <div class="due"><strong>📅 Due Date:</strong> ${dueDate}</div>
         <div class="warning"><strong>⚠️ Note:</strong> You only have <strong>one attempt</strong>. Once started, the timer cannot be paused.</div>
         <div style="text-align:center;margin-top:20px">
-          <a href="${config.frontendUrl}/student/dashboard" class="btn">Take Quiz</a>
+          <a href="${baseUrl}/student/dashboard" class="btn">Take Quiz</a>
         </div>
       </div>
       <div class="footer"><p>Automated message from ${config.appName}</p></div>
@@ -44,7 +45,8 @@ export const sendQuizAssigned = async (student, teacher, quiz, centerName = "") 
   });
 };
 
-export const sendQuizCompleted = async (teacher, student, quiz, attempt, centerName = "") => {
+export const sendQuizCompleted = async (teacher, student, quiz, attempt, centerName = "", center = null) => {
+  const { baseUrl } = getCenterBaseUrl(center);
   const scoreColor = attempt.percentage >= 80 ? '#10b981' : attempt.percentage >= 60 ? '#f59e0b' : '#ef4444';
   const trophy     = attempt.percentage >= 90 ? '🏆' : attempt.percentage >= 75 ? '🥇' : attempt.percentage >= 60 ? '🥈' : '🥉';
 
@@ -81,7 +83,7 @@ export const sendQuizCompleted = async (teacher, student, quiz, attempt, centerN
           <div class="row"><span class="label">Score:</span> ${attempt.score}/${attempt.totalQuestions} (${attempt.percentage}%)</div>
         </div>
         <div style="text-align:center;margin-top:20px">
-          <a href="${config.frontendUrl}/teacher/dashboard" class="btn">View Results</a>
+          <a href="${baseUrl}/teacher/dashboard" class="btn">View Results</a>
         </div>
       </div>
       <div class="footer"><p>Automated message from ${config.appName}</p></div>
@@ -89,7 +91,8 @@ export const sendQuizCompleted = async (teacher, student, quiz, attempt, centerN
   });
 };
 
-export const sendQuizDueReminder = async (student, quiz, minutesLeft, centerName = "") => {
+export const sendQuizDueReminder = async (student, quiz, minutesLeft, centerName = "", center = null) => {
+  const { baseUrl } = getCenterBaseUrl(center);
   const dueTime = new Date(quiz.dueDate).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 
   return sendEmail({
@@ -117,7 +120,7 @@ export const sendQuizDueReminder = async (student, quiz, minutesLeft, centerName
         </div>
         <p>If you haven't started yet, log in now and complete the quiz before the deadline.</p>
         <div style="text-align:center;margin-top:20px">
-          <a href="${config.frontendUrl}/student/dashboard" class="btn">Take Quiz Now</a>
+          <a href="${baseUrl}/student/dashboard" class="btn">Take Quiz Now</a>
         </div>
       </div>
       <div class="footer"><p>Automated reminder from ${config.appName}</p></div>

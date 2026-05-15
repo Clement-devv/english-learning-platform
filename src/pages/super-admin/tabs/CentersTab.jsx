@@ -1,4 +1,4 @@
-import { Building2, RefreshCw, Palette, ToggleRight, SlidersHorizontal, LogIn, Trash2, Globe } from 'lucide-react';
+import { Building2, RefreshCw, Palette, ToggleRight, SlidersHorizontal, LogIn, Trash2, Globe, Users } from 'lucide-react';
 import styles from '../SuperAdmin.module.css';
 
 export default function CentersTab({
@@ -8,6 +8,7 @@ export default function CentersTab({
   setThemeCenter, handleOpenLoginThemeModal, handleOpenTeacherThemeModal, handleOpenAdminLoginThemeModal, handleOpenDashThemeModal,
   setFeaturesCenter,
   setLimitsModal, setLimitsUnlimT, setLimitsUnlimS, setLimitsTeachers, setLimitsStudents, setLimitsMsg,
+  setPartnershipModal,
   statusColor, statusIcon,
   onEditWebsite,
 }) {
@@ -124,6 +125,13 @@ export default function CentersTab({
                         title="Edit seat limits"
                       >
                         <SlidersHorizontal size={12} /> Limits
+                      </button>
+                      <button
+                        onClick={() => setPartnershipModal(c)}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '5px 12px', borderRadius: 7, fontSize: 12, fontWeight: 600, background: 'rgba(167,139,250,0.1)', border: '1px solid rgba(167,139,250,0.2)', color: '#a78bfa', cursor: 'pointer', fontFamily: 'inherit' }}
+                        title="Set partnership text"
+                      >
+                        <Users size={12} /> Partnership
                       </button>
                       {c.status === 'active' && (
                         <button

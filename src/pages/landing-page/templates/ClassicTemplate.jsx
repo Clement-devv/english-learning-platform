@@ -540,7 +540,12 @@ function ClassicFooter({ center, D, links }) {
           </div>
         </div>
         <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', paddingTop: 24, display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, fontSize: 12 }}>
-          <span>© {new Date().getFullYear()} {center.centerName}. All rights reserved.</span>
+          <div>
+            <span>© {new Date().getFullYear()} {center.centerName}. All rights reserved.</span>
+            {center.partnershipText && (
+              <span style={{ display: 'block', fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 4, fontStyle: 'italic' }}>{center.partnershipText}</span>
+            )}
+          </div>
           <span style={{ color: 'rgba(255,255,255,0.3)' }}>Powered by Clemify</span>
         </div>
       </div>

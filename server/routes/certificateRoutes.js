@@ -9,6 +9,7 @@ import { certificateSchema }  from '../schemas/certificateSchema.js';
 import { studentSchema }      from '../schemas/studentSchema.js';
 import { bookingSchema }      from '../schemas/bookingSchema.js';
 import Center from '../models/master/Center.js';
+import { getCenterBaseUrl } from '../emails/core.js';
 import logger from '../utils/logger.js';
 import { ok, created, badRequest, forbidden, notFound, serverError } from '../utils/apiResponse.js';
 import { validateObjectId } from '../middleware/validateObjectId.js';
@@ -88,8 +89,9 @@ async function buildCertificatePdf(cert, student, center) {
   const secondary = tpl.secondaryColor || '#1e293b';
   const accent    = tpl.accentColor    || '#f43f5e';
 
-  // QR code pointing to public verify URL
-  const verifyUrl = `${process.env.FRONTEND_URL || 'https://clemify.com'}/certificates/verify/${cert.certificateNumber}`;
+  // QR code pointing to public verify URL — uses center's custom domain or slug subdomain
+  const { baseUrl } = getCenterBaseUrl(center);
+  const verifyUrl = `${baseUrl}/certificates/verify/${cert.certificateNumber}`;
   const qrDataUrl = await QRCode.toDataURL(verifyUrl, { width: 80, margin: 1 });
   const qrBuffer  = Buffer.from(qrDataUrl.split(',')[1], 'base64');
 

@@ -38,10 +38,11 @@ const centerSchema = new mongoose.Schema({
     teacherDashboardTheme: { type: String, default: null },  // exclusive — super admin assigns (teacher)
     adminDashboardTheme:      { type: String, default: null },  // exclusive — super admin assigns (admin)
     subAdminDashboardTheme:   { type: String, default: null },  // exclusive — super admin assigns (sub-admin)
-    borderRadius:   { type: String, default: '8px' },
-    shadowStyle:    { type: String, default: 'soft' },
-    spacing:        { type: String, default: 'comfortable' },
-    theme:          { type: String, default: null },
+    borderRadius:    { type: String, default: '8px' },
+    shadowStyle:     { type: String, default: 'soft' },
+    spacing:         { type: String, default: 'comfortable' },
+    theme:           { type: String, default: null },
+    partnershipText: { type: String, default: '' },
   },
 
   phone:       String,

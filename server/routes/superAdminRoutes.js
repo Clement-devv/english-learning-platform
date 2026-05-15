@@ -453,16 +453,17 @@ router.patch('/centers/:id/theme', verifySuperAdmin, validateParamMongoId('id'),
 // PATCH /api/super-admin/centers/:id/branding
 router.patch('/centers/:id/branding', verifySuperAdmin, validateParamMongoId('id'), async (req, res) => {
   try {
-    const { primaryColor, secondaryColor, fontFamily, logo, favicon } = req.body;
+    const { primaryColor, secondaryColor, fontFamily, logo, favicon, partnershipText } = req.body;
     const center = await Center.findById(req.params.id);
     if (!center) return notFound(res, 'Center not found');
 
     await Center.findByIdAndUpdate(req.params.id, {
-      'branding.primaryColor':   primaryColor   !== undefined ? primaryColor   : center.branding.primaryColor,
-      'branding.secondaryColor': secondaryColor !== undefined ? secondaryColor : center.branding.secondaryColor,
-      'branding.fontFamily':     fontFamily     !== undefined ? fontFamily     : center.branding.fontFamily,
-      'branding.logo':           logo           !== undefined ? logo           : center.branding.logo,
-      'branding.favicon':        favicon        !== undefined ? favicon        : center.branding.favicon,
+      'branding.primaryColor':    primaryColor    !== undefined ? primaryColor    : center.branding.primaryColor,
+      'branding.secondaryColor':  secondaryColor  !== undefined ? secondaryColor  : center.branding.secondaryColor,
+      'branding.fontFamily':      fontFamily      !== undefined ? fontFamily      : center.branding.fontFamily,
+      'branding.logo':            logo            !== undefined ? logo            : center.branding.logo,
+      'branding.favicon':         favicon         !== undefined ? favicon         : center.branding.favicon,
+      'branding.partnershipText': partnershipText !== undefined ? partnershipText : center.branding.partnershipText,
     });
 
     res.json({ success: true, message: 'Branding updated' });

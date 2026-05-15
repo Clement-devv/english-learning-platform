@@ -164,7 +164,7 @@ router.post("/", verifyToken, uploadLimiter, wrapUpload(uploadAssignment.array("
     getStudent(req.db).findById(studentId).then(studentDoc => {
       if (studentDoc) {
         getTeacher(req.db).findById(req.user.id).then(teacherDoc => {
-          if (teacherDoc) sendHomeworkAssigned(studentDoc, teacherDoc, hw).catch(e => logger.warn("sendHomeworkAssigned failed:", { error: e?.message }));
+          if (teacherDoc) sendHomeworkAssigned(studentDoc, teacherDoc, hw, req.center?.centerName || "", req.center).catch(e => logger.warn("sendHomeworkAssigned failed:", { error: e?.message }));
         }).catch(e => logger.warn("Teacher lookup for homework email failed:", { error: e?.message }));
       }
     }).catch(e => logger.warn("Student lookup for homework email failed:", { error: e?.message }));
@@ -289,7 +289,7 @@ router.post("/:id/submit", verifyToken, uploadLimiter, validateObjectId("id"), w
       getTeacher(req.db).findById(hw.teacherId),
       getStudent(req.db).findById(req.user.id),
     ]).then(([teacherDoc, studentDoc]) => {
-      if (teacherDoc && studentDoc) sendHomeworkSubmitted(teacherDoc, studentDoc, hw).catch(e => logger.warn("sendHomeworkSubmitted failed:", { error: e?.message }));
+      if (teacherDoc && studentDoc) sendHomeworkSubmitted(teacherDoc, studentDoc, hw, req.center?.centerName || "", req.center).catch(e => logger.warn("sendHomeworkSubmitted failed:", { error: e?.message }));
     }).catch(e => logger.warn("User lookup for submission email failed:", { error: e?.message }));
 
     res.json({ success: true, homework: hw, streak: streakResult });

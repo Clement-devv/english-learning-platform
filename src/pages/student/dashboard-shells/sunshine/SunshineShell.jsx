@@ -314,6 +314,9 @@ export default function SunshineShell() {
             <div>
               <div style={{ fontSize: 15, fontWeight: 900, color: col.heading, lineHeight: 1.1 }}>{center?.centerName}</div>
               <div style={{ fontSize: 11, fontWeight: 700, color: col.muted }}>{t('sidebar.learningPlatform')}</div>
+              {branding?.partnershipText && (
+                <div style={{ fontSize: 10, color: col.muted, opacity: 0.75, marginTop: 2, fontStyle: 'italic' }}>{branding.partnershipText}</div>
+              )}
             </div>
           </div>
         </div>

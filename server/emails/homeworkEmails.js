@@ -1,7 +1,8 @@
 import { config } from "../config/config.js";
-import { sendEmail } from "./core.js";
+import { sendEmail, getCenterBaseUrl } from "./core.js";
 
-export const sendHomeworkAssigned = async (student, teacher, homework, centerName = "") => {
+export const sendHomeworkAssigned = async (student, teacher, homework, centerName = "", center = null) => {
+  const { baseUrl } = getCenterBaseUrl(center);
   const dueDate = new Date(homework.dueDate).toLocaleDateString('en-US', {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
   });
@@ -33,7 +34,7 @@ export const sendHomeworkAssigned = async (student, teacher, homework, centerNam
         </div>
         <div class="due"><strong>⏰ Due Date:</strong> ${dueDate}</div>
         <div style="text-align:center;margin-top:20px">
-          <a href="${config.frontendUrl}/student/dashboard" class="btn">View Homework</a>
+          <a href="${baseUrl}/student/dashboard" class="btn">View Homework</a>
         </div>
       </div>
       <div class="footer"><p>Automated message from ${config.appName}</p></div>
@@ -41,7 +42,8 @@ export const sendHomeworkAssigned = async (student, teacher, homework, centerNam
   });
 };
 
-export const sendHomeworkSubmitted = async (teacher, student, homework, centerName = "") => {
+export const sendHomeworkSubmitted = async (teacher, student, homework, centerName = "", center = null) => {
+  const { baseUrl } = getCenterBaseUrl(center);
   return sendEmail({
     centerName,
     to: teacher.email,
@@ -67,7 +69,7 @@ export const sendHomeworkSubmitted = async (teacher, student, homework, centerNa
           <div class="row"><span class="label">Submitted:</span> ${new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}</div>
         </div>
         <div style="text-align:center;margin-top:20px">
-          <a href="${config.frontendUrl}/teacher/dashboard" class="btn">Grade Now</a>
+          <a href="${baseUrl}/teacher/dashboard" class="btn">Grade Now</a>
         </div>
       </div>
       <div class="footer"><p>Automated message from ${config.appName}</p></div>
@@ -75,7 +77,8 @@ export const sendHomeworkSubmitted = async (teacher, student, homework, centerNa
   });
 };
 
-export const sendHomeworkDueReminder = async (student, homework, minutesLeft, centerName = "") => {
+export const sendHomeworkDueReminder = async (student, homework, minutesLeft, centerName = "", center = null) => {
+  const { baseUrl } = getCenterBaseUrl(center);
   const dueDate = new Date(homework.dueDate).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 
   return sendEmail({
@@ -99,7 +102,7 @@ export const sendHomeworkDueReminder = async (student, homework, minutesLeft, ce
         </div>
         <p>If you haven't submitted yet, please log in and submit your work before the deadline.</p>
         <div style="text-align:center;margin-top:20px">
-          <a href="${config.frontendUrl}/student/dashboard" class="btn">Submit Now</a>
+          <a href="${baseUrl}/student/dashboard" class="btn">Submit Now</a>
         </div>
       </div>
       <div class="footer"><p>Automated reminder from ${config.appName}</p></div>

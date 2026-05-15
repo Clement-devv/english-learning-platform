@@ -26,14 +26,15 @@ router.get('/landing-page', tenantMiddleware, async (req, res) => {
     res.json({
       success: true,
       center: {
-        centerName:  center.centerName,
-        slug:        center.slug,
-        logo:        center.branding?.logo || null,
-        favicon:     center.branding?.favicon || null,
-        description: center.description || '',
-        country:     center.country || '',
-        phone:       center.phone || '',
-        website:     center.website || '',
+        centerName:      center.centerName,
+        slug:            center.slug,
+        logo:            center.branding?.logo || null,
+        favicon:         center.branding?.favicon || null,
+        partnershipText: center.branding?.partnershipText || '',
+        description:     center.description || '',
+        country:         center.country || '',
+        phone:           center.phone || '',
+        website:         center.website || '',
       },
       landingPage: {
         template:    lp.template,
