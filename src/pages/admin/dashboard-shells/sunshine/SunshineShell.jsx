@@ -25,6 +25,7 @@ import { getTeachers }            from '../../../../services/teacherService';
 import { getStudents }            from '../../../../services/studentService';
 import LanguageSwitcher           from '../../../../components/LanguageSwitcher';
 import { useTranslation }         from 'react-i18next';
+import ChangePassword             from '../../../../components/admin/auth/ChangePassword';
 
 // Tab components — lazy loaded
 const OverviewTab        = lazy(() => import('../../tabs/OverviewTab'));
@@ -168,9 +169,10 @@ export default function SunshineShell() {
   const [loading,         setLoading]         = useState(true);
   const [unreadMessages,  setUnreadMessages]  = useState(0);
   const [unreadNotif,     setUnreadNotif]     = useState(0);
-  const [showSettingsSidebar, setShowSettingsSidebar] = useState(false);
-  const [showSettingsModal,   setShowSettingsModal]   = useState(false);
-  const [showSessionMgmt,     setShowSessionMgmt]     = useState(false);
+  const [showSettingsSidebar,  setShowSettingsSidebar]  = useState(false);
+  const [showSettingsModal,    setShowSettingsModal]    = useState(false);
+  const [showSessionMgmt,      setShowSessionMgmt]      = useState(false);
+  const [showChangePassword,   setShowChangePassword]   = useState(false);
   const [notifications,   setNotifications]   = useState([]);
   const [toast,           setToast]           = useState('');
 
@@ -787,7 +789,7 @@ export default function SunshineShell() {
       <SettingsSidebar
         isOpen={showSettingsSidebar}
         onClose={() => setShowSettingsSidebar(false)}
-        onChangePassword={() => { setShowSettingsSidebar(false); }}
+        onChangePassword={() => { setShowSettingsSidebar(false); setShowChangePassword(true); }}
         onManageSessions={() => { setShowSettingsSidebar(false); setShowSessionMgmt(true); }}
         onManage2FA={() => { setShowSettingsSidebar(false); setShowSettingsModal(true); }}
         userInfo={{
@@ -799,6 +801,12 @@ export default function SunshineShell() {
       <SettingsModal isOpen={showSettingsModal} onClose={() => setShowSettingsModal(false)} userType="admin" />
       {showSessionMgmt && (
         <SessionManagement isOpen={showSessionMgmt} onClose={() => setShowSessionMgmt(false)} userType="admin" />
+      )}
+      {showChangePassword && (
+        <ChangePassword
+          onClose={() => setShowChangePassword(false)}
+          onSuccess={(msg) => { setShowChangePassword(false); setToast(msg); setTimeout(() => setToast(''), 3000); }}
+        />
       )}
     </div>
   );
