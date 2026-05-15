@@ -66,8 +66,9 @@ if (config.trustProxy) {
   app.set('trust proxy', 1);
 }
 
-// Serve static frontend assets BEFORE CORS — public files need no origin check
-app.use(express.static(frontendPath));
+// Serve /assets chunks BEFORE CORS — JS/CSS bundles are public, no origin check needed.
+// Only /assets is served here; manifest.json stays dynamic (handled later as a route).
+app.use('/assets', express.static(path.join(frontendPath, 'assets')));
 
 // Security Middleware
 app.use(securityHeaders);
@@ -342,21 +343,21 @@ app.get('/manifest.json', async (req, res) => {
           short_name: 'Student',
           description: 'Sign in as a student',
           url: '/student/login',
-          icons: [{ src: '/icons/icon.svg', sizes: 'any' }],
+          icons: [{ src: icon || '/icons/icon.svg', sizes: 'any' }],
         },
         {
           name: 'Teacher Login',
           short_name: 'Teacher',
           description: 'Sign in as a teacher',
           url: '/teacher/login',
-          icons: [{ src: '/icons/icon.svg', sizes: 'any' }],
+          icons: [{ src: icon || '/icons/icon.svg', sizes: 'any' }],
         },
         {
           name: 'Admin Login',
           short_name: 'Admin',
           description: 'Sign in as an admin',
           url: '/admin/login',
-          icons: [{ src: '/icons/icon.svg', sizes: 'any' }],
+          icons: [{ src: icon || '/icons/icon.svg', sizes: 'any' }],
         },
       ],
     });

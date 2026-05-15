@@ -112,7 +112,7 @@ export function RingProvider({ children }) {
     });
 
     sock.on("connect_error", async (err) => {
-      console.error("[RingContext] Socket connect_error:", err.message);
+      if (import.meta.env.DEV) console.error("[RingContext] Socket connect_error:", err.message);
       setSocketConnected(false);
       // Auth errors will never resolve on their own — stop retry loop and try
       // to silently refresh the access token, then reconnect.

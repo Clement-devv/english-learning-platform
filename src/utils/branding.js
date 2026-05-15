@@ -175,6 +175,18 @@ export const applyBranding = (branding, center) => {
     }
     favicon.href = branding.favicon;
   }
+
+  // 9. Apple touch icon — iOS uses this for PWA home screen, ignores the manifest icons
+  const pwaIcon = branding.favicon || branding.logo;
+  if (pwaIcon) {
+    let appleIcon = document.querySelector("link[rel='apple-touch-icon']");
+    if (!appleIcon) {
+      appleIcon = document.createElement('link');
+      appleIcon.rel = 'apple-touch-icon';
+      document.head.appendChild(appleIcon);
+    }
+    appleIcon.href = pwaIcon;
+  }
 };
 
 /**
