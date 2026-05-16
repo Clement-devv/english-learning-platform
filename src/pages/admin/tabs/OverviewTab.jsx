@@ -6,6 +6,7 @@ import {
   BookOpen, Activity, ArrowUpRight, Loader2
 } from "lucide-react";
 import api from "../../../api";
+import { useCurrencySymbol } from "../../../hooks/useCurrencySymbol";
 
 export default function OverviewTab({ isDarkMode }) {
   const [overview, setOverview] = useState(null);
@@ -15,6 +16,7 @@ export default function OverviewTab({ isDarkMode }) {
   const [error, setError] = useState(null);
 
   const c = palette(isDarkMode);
+  const sym = useCurrencySymbol();
 
   const fetchData = async (isRefresh = false) => {
     try {
@@ -47,7 +49,7 @@ export default function OverviewTab({ isDarkMode }) {
 
   // ── helpers ──────────────────────────────────────────────────────────────
   const fmt = (n) => (n === undefined || n === null ? "—" : Number(n).toLocaleString());
-  const fmtMoney = (n) => (n === undefined || n === null ? "—" : `$${Number(n).toFixed(2)}`);
+  const fmtMoney = (n) => (n === undefined || n === null ? "—" : `${sym}${Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
   const timeAgo = (date) => {
     if (!date) return "";
     const diff = Date.now() - new Date(date);

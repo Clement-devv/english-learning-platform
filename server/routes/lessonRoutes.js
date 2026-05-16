@@ -2,27 +2,42 @@
 import express from "express";
 import { verifyToken, verifyAdminOrTeacher } from "../middleware/authMiddleware.js";
 import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
-import { lessonSchema } from "../schemas/lessonSchema.js";
+import { bookingSchema } from "../schemas/bookingSchema.js";
 import { parsePagination } from "../utils/pagination.js";
 import logger from "../utils/logger.js";
-import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
+import { serverError } from '../utils/apiResponse.js';
 
 const router = express.Router();
 router.use(tenantMiddleware);
 
-const getLesson = (db) => db.models.Lesson || db.model("Lesson", lessonSchema);
+const getBooking = (db) => db.models.Booking || db.model("Booking", bookingSchema);
 
-// Get ALL lessons — admin and teachers only
+// Get all completed lessons — sourced from completed bookings
 router.get("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
   try {
-    const { limit, skip } = parsePagination(req.query);
-    const lessons = await getLesson(req.db)
-      .find()
+    const { limit, skip } = parsePagination(req.query, 500, 2000);
+
+    const bookings = await getBooking(req.db)
+      .find({ status: "completed" })
       .populate("studentId", "firstName lastName email")
-      .sort({ date: -1 })
+      .populate("teacherId", "firstName lastName")
+      .sort({ completedAt: -1 })
       .skip(skip)
       .limit(limit)
       .lean();
+
+    const lessons = bookings
+      .filter((b) => b.studentId)
+      .map((b) => ({
+        _id: b._id,
+        studentId: b.studentId,
+        teacher: b.teacherId
+          ? `${b.teacherId.firstName} ${b.teacherId.lastName}`
+          : "Unknown",
+        date: b.completedAt || b.scheduledTime,
+        classTitle: b.classTitle,
+      }));
+
     res.json(lessons);
   } catch (err) {
     logger.error(err);

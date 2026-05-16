@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import { createBooking } from "../../../services/bookingService";
 import {
   Repeat, Plus, X, Search, ChevronDown, Calendar, Clock,
-  BookOpen, User, Video, FileText, Info, Loader2, AlertCircle,
+  BookOpen, User, Video, FileText, Info, Loader2, AlertCircle, FlaskConical,
 } from "lucide-react";
 import RecurringBookingForm from "../../../components/bookings/RecurringBookingForm";
 
@@ -144,6 +144,7 @@ export default function BookingsTab({ teachers = [], students = [], onNotify, is
   const [duration, setDuration]         = useState("60");
   const [scheduledTime, setScheduledTime] = useState("");
   const [notes, setNotes]               = useState("");
+  const [isTrial, setIsTrial]           = useState(false);
   const [toast, setToast]               = useState({ message: "", type: "" });
   const [loading, setLoading]           = useState(false);
   const [errors, setErrors]             = useState({});
@@ -195,7 +196,7 @@ export default function BookingsTab({ teachers = [], students = [], onNotify, is
     try {
       const teacher = teachers.find((t) => t._id === teacherId);
       const student = students.find((s) => s._id === studentId);
-      if (student.classCredits <= 0) {
+      if (!isTrial && student.classCredits <= 0) {
         showToast(`${student.firstName} ${student.lastName} has no classes remaining.`, "error");
         return;
       }
@@ -207,6 +208,7 @@ export default function BookingsTab({ teachers = [], students = [], onNotify, is
         scheduledTime,
         notes: notes.trim(),
         createdBy: "admin",
+        isTrial,
       });
       showToast(`Booking sent to ${teacher.firstName} ${teacher.lastName} for ${student.firstName} ${student.lastName}.`);
       if (onNotify) onNotify(`Booking request sent to ${teacher.firstName} ${teacher.lastName}`);
@@ -221,7 +223,7 @@ export default function BookingsTab({ teachers = [], students = [], onNotify, is
   const clearForm = () => {
     setTeacherId(""); setStudentId(""); setClassTitle("");
     setTopic(""); setDuration("60"); setScheduledTime("");
-    setNotes(""); setErrors({});
+    setNotes(""); setIsTrial(false); setErrors({});
   };
 
   const getMinDateTime = () => {
@@ -231,7 +233,7 @@ export default function BookingsTab({ teachers = [], students = [], onNotify, is
   };
 
   const selectedStudent = students.find((s) => s._id === studentId);
-  const noClassesLeft   = selectedStudent && selectedStudent.classCredits <= 0;
+  const noClassesLeft   = !isTrial && selectedStudent && selectedStudent.classCredits <= 0;
 
   const fieldCls = (key) =>
     `w-full rounded-lg border px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 transition ${th.input} ${errors[key] ? th.inputErr : ""}`;
@@ -427,6 +429,31 @@ export default function BookingsTab({ teachers = [], students = [], onNotify, is
               <div className={`text-right text-xs mt-1 ${th.muted}`}>{notes.length}/500</div>
             </div>
 
+            {/* Trial Lesson Toggle */}
+            <div
+              onClick={() => !loading && setIsTrial((p) => !p)}
+              className={`flex items-center justify-between gap-3 px-4 py-3 rounded-xl border cursor-pointer select-none transition
+                ${isTrial
+                  ? dm ? "bg-amber-900/20 border-amber-700/50" : "bg-amber-50 border-amber-300"
+                  : dm ? "bg-[#13161f] border-[#2a2f45] hover:border-amber-600/40" : "bg-white border-slate-200 hover:border-amber-300"
+                }`}
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <FlaskConical size={16} className={isTrial ? "text-amber-500" : dm ? "text-slate-500" : "text-slate-400"} />
+                <div className="min-w-0">
+                  <div className={`text-sm font-semibold ${isTrial ? "text-amber-500" : dm ? "text-slate-200" : "text-slate-700"}`}>
+                    Trial Lesson
+                  </div>
+                  <div className={`text-xs ${dm ? "text-slate-500" : "text-slate-400"}`}>
+                    No credit deducted · No payment recorded · Student keeps their balance
+                  </div>
+                </div>
+              </div>
+              <div className={`w-10 h-5 rounded-full flex-shrink-0 transition-colors relative ${isTrial ? "bg-amber-500" : dm ? "bg-slate-700" : "bg-slate-300"}`}>
+                <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${isTrial ? "left-5" : "left-0.5"}`} />
+              </div>
+            </div>
+
             {/* Action buttons */}
             <div className="flex gap-3 pt-1">
               <button
@@ -436,6 +463,8 @@ export default function BookingsTab({ teachers = [], students = [], onNotify, is
               >
                 {loading ? (
                   <><Loader2 size={15} className="animate-spin" /> Sending…</>
+                ) : isTrial ? (
+                  <><FlaskConical size={15} /> Send Trial Booking</>
                 ) : (
                   <><Plus size={15} /> Send Booking Request</>
                 )}

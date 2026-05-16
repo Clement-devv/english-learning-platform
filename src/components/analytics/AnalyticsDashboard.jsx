@@ -12,6 +12,7 @@ import {
   RefreshCw
 } from "lucide-react";
 import api from "../../api";
+import { useCurrencySymbol, fmtMoney } from "../../hooks/useCurrencySymbol";
 
 export default function AnalyticsDashboard({ isDarkMode }) {
   const [loading, setLoading] = useState(true);
@@ -24,6 +25,7 @@ export default function AnalyticsDashboard({ isDarkMode }) {
   const [acceptanceRate, setAcceptanceRate] = useState([]);
   const [period, setPeriod] = useState("week");
 
+  const sym = useCurrencySymbol();
   const dm = isDarkMode;
 
   // ── colour tokens ──────────────────────────────────────────────────────────
@@ -146,7 +148,7 @@ export default function AnalyticsDashboard({ isDarkMode }) {
         <StatCard icon={Users}     title="Active Teachers" value={overview.users.teachers.active} subtitle={`${overview.users.teachers.total} total`}                           color="blue"   />
         <StatCard icon={Users}     title="Active Students" value={overview.users.students.active} subtitle={`${overview.users.students.total} total`}                           color="green"  />
         <StatCard icon={Calendar}  title="Total Bookings"  value={overview.bookings.total}         subtitle={`${overview.bookings.byStatus.completed} completed`}                color="purple" />
-        <StatCard icon={DollarSign} title="Total Revenue"  value={`$${overview.revenue.total.toFixed(2)}`} subtitle={`$${overview.revenue.pending.toFixed(2)} pending`}         color="orange" />
+        <StatCard icon={DollarSign} title="Total Revenue"  value={fmtMoney(overview.revenue.total, sym)} subtitle={`${fmtMoney(overview.revenue.pending, sym)} pending`}         color="orange" />
       </div>
 
       {/* Booking Status Breakdown */}
@@ -192,7 +194,7 @@ export default function AnalyticsDashboard({ isDarkMode }) {
             ].map(({ label, value, c }) => (
               <div key={label} className={`text-center p-4 rounded-lg ${c}`}>
                 <p className={`text-sm mb-1 ${subText}`}>{label}</p>
-                <p className="text-3xl font-bold">${(value || 0).toFixed(2)}</p>
+                <p className="text-3xl font-bold">{fmtMoney(value, sym)}</p>
               </div>
             ))}
           </div>
@@ -211,8 +213,8 @@ export default function AnalyticsDashboard({ isDarkMode }) {
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className={`font-bold ${heading}`}>${teacher.totalEarned.toFixed(2)}</p>
-                  <p className="text-sm text-yellow-500">${teacher.pendingAmount.toFixed(2)} pending</p>
+                  <p className={`font-bold ${heading}`}>{fmtMoney(teacher.totalEarned, sym)}</p>
+                  <p className="text-sm text-yellow-500">{fmtMoney(teacher.pendingAmount, sym)} pending</p>
                 </div>
               </div>
             ))}
@@ -238,7 +240,7 @@ export default function AnalyticsDashboard({ isDarkMode }) {
                 </div>
                 <div className="text-right">
                   <p className="font-bold text-purple-500">{teacher.lessonsCompleted} classes</p>
-                  <p className={`text-sm ${mutedText}`}>${teacher.earned.toFixed(2)} earned</p>
+                  <p className={`text-sm ${mutedText}`}>{fmtMoney(teacher.earned, sym)} earned</p>
                 </div>
               </div>
               <div className={`flex items-center gap-4 text-sm mb-2 ${subText}`}>

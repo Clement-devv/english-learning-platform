@@ -28,6 +28,7 @@ import {
   MessageSquare,
 } from "lucide-react";
 import api from "../../../api";
+import { useCurrencySymbol, fmtMoney } from "../../../hooks/useCurrencySymbol";
 
 // ─── tiny helpers ────────────────────────────────────────────────────────────
 const fmtDate = (d) =>
@@ -41,8 +42,6 @@ const fmtDate = (d) =>
       })
     : "—";
 
-const fmtMoney = (n) => `$${parseFloat(n || 0).toFixed(2)}`;
-
 // Step names
 const STEPS = ["select_a", "select_b", "pick_class", "confirm", "done"];
 
@@ -55,6 +54,8 @@ export default function LessonMarkModal({
   onSuccess,
   isDarkMode = false,
 }) {
+  const sym = useCurrencySymbol();
+  const fmt = (n) => fmtMoney(n, sym);
   const isMarkMode = mode === "mark";
 
   // ── State ──────────────────────────────────────────────────────────────────
@@ -358,7 +359,7 @@ export default function LessonMarkModal({
                             {t.displayName?.trim() || `${t.firstName} ${t.lastName}`}
                           </p>
                           <p className={`text-xs mt-0.5 ${textSecondary}`}>
-                            {t.email} · Rate: {fmtMoney(t.ratePerClass)}/class
+                            {t.email} · Rate: {fmt(t.ratePerClass)}/class
                           </p>
                         </button>
                       ))}
@@ -379,7 +380,7 @@ export default function LessonMarkModal({
                 title={isMarkMode ? "Select Class to Mark" : "Select Class to Unmark"}
                 sub={
                   isMarkMode
-                    ? "Choose an accepted (pending) class to mark as completed"
+                    ? "Choose a class that was not successfully completed"
                     : "Choose a completed class to reverse"
                 }
               />
@@ -392,7 +393,7 @@ export default function LessonMarkModal({
                   <BookOpen className="w-10 h-10 mx-auto mb-2 opacity-30" />
                   <p className="text-sm">
                     {isMarkMode
-                      ? "No accepted classes found for this pair."
+                      ? "No incomplete classes found for this pair."
                       : "No completed classes found for this pair."}
                   </p>
                 </div>
@@ -429,10 +430,20 @@ export default function LessonMarkModal({
                           className={`flex-shrink-0 text-xs px-2 py-1 rounded-full font-medium ${
                             b.status === "completed"
                               ? "bg-emerald-100 text-emerald-700"
-                              : "bg-blue-100 text-blue-700"
+                              : b.status === "missed"
+                              ? "bg-red-100 text-red-700"
+                              : b.status === "accepted"
+                              ? "bg-blue-100 text-blue-700"
+                              : "bg-yellow-100 text-yellow-700"
                           }`}
                         >
-                          {b.status === "completed" ? "Completed" : "Accepted"}
+                          {b.status === "completed"
+                            ? "Completed"
+                            : b.status === "missed"
+                            ? "Missed"
+                            : b.status === "accepted"
+                            ? "Accepted"
+                            : "Pending"}
                         </span>
                       </div>
                     </button>
@@ -522,7 +533,7 @@ export default function LessonMarkModal({
                       </li>
                       <li className="text-xs text-emerald-700 flex items-center gap-2">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0" />
-                        Teacher earnings +{fmtMoney(selectedTeacher?.ratePerClass)}
+                        Teacher earnings +{fmt(selectedTeacher?.ratePerClass)}
                       </li>
                       <li className="text-xs text-emerald-700 flex items-center gap-2">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0" />
@@ -549,7 +560,7 @@ export default function LessonMarkModal({
                       </li>
                       <li className="text-xs text-rose-700 flex items-center gap-2">
                         <span className="w-1.5 h-1.5 rounded-full bg-rose-500 flex-shrink-0" />
-                        Teacher earnings -{fmtMoney(selectedTeacher?.ratePerClass)}
+                        Teacher earnings -{fmt(selectedTeacher?.ratePerClass)}
                       </li>
                       <li className="text-xs text-rose-700 flex items-center gap-2">
                         <span className="w-1.5 h-1.5 rounded-full bg-rose-500 flex-shrink-0" />

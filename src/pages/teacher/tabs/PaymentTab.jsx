@@ -24,11 +24,12 @@ import {
   Banknote,
 } from "lucide-react";
 import api from "../../../api";
+import { useCurrencySymbol } from "../../../hooks/useCurrencySymbol";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-function fmtMoney(n) {
-  if (n == null) return "$0.00";
-  return `$${Number(n).toFixed(2)}`;
+function fmtMoney(n, sym = '$') {
+  if (n == null) return `${sym}0.00`;
+  return `${sym}${Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 function fmtDate(d) {
   if (!d) return "—";
@@ -112,6 +113,7 @@ function StatCard({ icon: Icon, label, value, sub, accent, isDarkMode }) {
 
 // ─── Mini bar chart (CSS only, no recharts needed) ────────────────────────────
 function EarningsChart({ transactions, isDarkMode }) {
+  const sym = useCurrencySymbol();
   const monthlyData = useMemo(() => {
     const map = {};
     transactions.forEach((tx) => {
@@ -156,14 +158,14 @@ function EarningsChart({ transactions, isDarkMode }) {
               <div className="w-full flex flex-col justify-end gap-0.5" style={{ height: "88px" }}>
                 {d.pending > 0 && (
                   <div
-                    title={`Pending: ${fmtMoney(d.pending)}`}
+                    title={`Pending: ${fmtMoney(d.pending, sym)}`}
                     className="w-full rounded-t bg-amber-400/80 transition-all"
                     style={{ height: `${pendingH}%`, minHeight: "4px" }}
                   />
                 )}
                 {d.paid > 0 && (
                   <div
-                    title={`Paid: ${fmtMoney(d.paid)}`}
+                    title={`Paid: ${fmtMoney(d.paid, sym)}`}
                     className="w-full rounded-b bg-emerald-400/80 transition-all"
                     style={{ height: `${paidH}%`, minHeight: "4px" }}
                   />
@@ -213,6 +215,7 @@ function StatusBadge({ status, isDarkMode }) {
 
 // ─── Expandable transaction row ───────────────────────────────────────────────
 function TxRow({ tx, isDarkMode }) {
+  const sym = useCurrencySymbol();
   const [open, setOpen] = useState(false);
 
   const tdCls = `px-4 py-3.5 text-sm border-t ${isDarkMode ? "border-gray-700 text-gray-300" : "border-gray-100 text-gray-700"}`;
@@ -263,7 +266,7 @@ function TxRow({ tx, isDarkMode }) {
             }`}
           >
             {tx.type === "deduction" ? "-" : "+"}
-            {fmtMoney(tx.amount)}
+            {fmtMoney(tx.amount, sym)}
           </span>
         </td>
 
@@ -331,6 +334,7 @@ function Detail({ label, value, isDarkMode }) {
 
 // ─── Hero pending card ────────────────────────────────────────────────────────
 function PendingHero({ amount, count, isDarkMode }) {
+  const sym = useCurrencySymbol();
   return (
     <div className={`rounded-2xl p-6 ${
       isDarkMode
@@ -343,7 +347,7 @@ function PendingHero({ amount, count, isDarkMode }) {
             💰 Current Pending Balance
           </p>
           <p className={`text-4xl font-bold tracking-tight ${isDarkMode ? "text-amber-300" : "text-amber-800"}`}>
-            {fmtMoney(amount)}
+            {fmtMoney(amount, sym)}
           </p>
           <p className={`text-sm mt-2 ${isDarkMode ? "text-amber-500" : "text-amber-600"}`}>
             {count} class{count !== 1 ? "es" : ""} awaiting payment
@@ -530,6 +534,7 @@ function BankDetailsCard({ teacher, isDarkMode }) {
 
 // ─── Main export ──────────────────────────────────────────────────────────────
 export default function PaymentTab({ teacher, isDarkMode }) {
+  const sym = useCurrencySymbol();
   const [transactions, setTransactions] = useState([]);
   const [summary, setSummary] = useState({
     totalPending: 0,
@@ -672,7 +677,7 @@ useEffect(() => {
           <StatCard
             icon={Award}
             label="Rate Per Class"
-            value={fmtMoney(teacher?.ratePerClass)}
+            value={fmtMoney(teacher?.ratePerClass, sym)}
             sub="Your hourly rate"
             accent="purple"
             isDarkMode={isDarkMode}
@@ -680,7 +685,7 @@ useEffect(() => {
           <StatCard
             icon={CheckCircle}
             label="Total Paid Out"
-            value={fmtMoney(allTimePaid)}
+            value={fmtMoney(allTimePaid, sym)}
             sub={`${summary.paidCount} payments received`}
             accent="emerald"
             isDarkMode={isDarkMode}
@@ -696,7 +701,7 @@ useEffect(() => {
           <StatCard
             icon={TrendingUp}
             label="Total Earned"
-            value={fmtMoney(summary.totalEarned)}
+            value={fmtMoney(summary.totalEarned, sym)}
             sub="Pending + paid combined"
             accent="amber"
             isDarkMode={isDarkMode}
@@ -800,7 +805,7 @@ useEffect(() => {
             <span className="font-semibold">
               Subtotal:{" "}
               <span className={isDarkMode ? "text-emerald-400" : "text-emerald-600"}>
-                {fmtMoney(filtered.reduce((s, t) => s + t.amount, 0))}
+                {fmtMoney(filtered.reduce((s, t) => s + t.amount, 0), sym)}
               </span>
             </span>
           </div>
@@ -814,7 +819,7 @@ useEffect(() => {
         <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
         <span>
           Each completed class automatically adds your rate (
-          <strong>{fmtMoney(teacher?.ratePerClass)}</strong>) to your pending balance. 
+          <strong>{fmtMoney(teacher?.ratePerClass, sym)}</strong>) to your pending balance. 
           Admin marks transactions as <strong>Paid</strong> once the transfer is sent. 
           Click any row to see full payment details.
         </span>

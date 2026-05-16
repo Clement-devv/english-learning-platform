@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { DollarSign, Save, RefreshCw, BookOpen, Calculator } from "lucide-react";
 import api from "../../../api";
+import { invalidateCurrencyCache } from "../../../hooks/useCurrencySymbol";
 
 const CURRENCIES = [
   { code: "USD", symbol: "$",  label: "USD — US Dollar"        },
@@ -81,6 +82,7 @@ export default function ClassPricingTab({ isDarkMode }) {
         notes,
       });
       setMsg({ type: "success", text: "Pricing saved successfully!" });
+      invalidateCurrencyCache();
     } catch {
       setMsg({ type: "error", text: "Failed to save pricing" });
     } finally {

@@ -97,9 +97,15 @@ export async function completeClass(db, bookingId, markedBy = "system", options 
 
   // ══════════════════════════════════════════════════════
   // STEP 1 — Atomic optimistic lock
+  // Admin override can claim missed/pending classes too;
+  // normal flow only claims "accepted".
   // ══════════════════════════════════════════════════════
+  const claimableStatuses = skipAttendanceCheck
+    ? ["accepted", "missed", "pending", "pending_confirmation"]
+    : ["accepted"];
+
   const claimedBooking = await Booking.findOneAndUpdate(
-    { _id: bookingId, status: "accepted" },
+    { _id: bookingId, status: { $in: claimableStatuses } },
     { $set: { status: "processing" } },
     { new: false }
   )
@@ -116,8 +122,13 @@ export async function completeClass(db, bookingId, markedBy = "system", options 
 
     if (!existing) throw new Error(`Booking ${bookingId} not found`);
 
-    const isTerminal = ["completed", "missed", "processing"].includes(existing.status);
-    if (isTerminal) {
+    // For admin override, only "completed" and "processing" are truly terminal.
+    // For normal flow, "missed" is also terminal.
+    const terminalStatuses = skipAttendanceCheck
+      ? ["completed", "processing"]
+      : ["completed", "missed", "processing"];
+
+    if (terminalStatuses.includes(existing.status)) {
       return {
         alreadyProcessed: true,
         completed: existing.status === "completed",
@@ -178,6 +189,7 @@ export async function completeClass(db, bookingId, markedBy = "system", options 
     const now       = new Date();
     const teacherId = claimedBooking.teacherId._id;
     const studentId = claimedBooking.studentId._id;
+    const isTrial   = !!claimedBooking.isTrial;
 
     // Write 1: Finalize booking
     await Booking.updateOne(
@@ -185,37 +197,47 @@ export async function completeClass(db, bookingId, markedBy = "system", options 
       { $set: { status: "completed", completedAt: now, markedBy, adminRejected: false } }
     );
 
-    // Write 2: Deduct 1 credit from student (floor at 0)
+    // Write 2: Deduct 1 credit from student (skipped for trial lessons)
     const student = await Student.findById(studentId);
     if (!student) throw new Error(`Student ${studentId} not found`);
-    const newClassCount = Math.max(0, (student.classCredits || 0) - 1);
-    student.classCredits = newClassCount;
-    if (newClassCount === 0) student.active = false;
-    await student.save();
+    let newClassCount = student.classCredits || 0;
+    if (!isTrial) {
+      newClassCount = Math.max(0, newClassCount - 1);
+      student.classCredits = newClassCount;
+      if (newClassCount === 0) student.active = false;
+      await student.save();
+    }
 
-    // Write 3: Add teacher earnings — float-safe
+    // Write 3: Add teacher earnings — float-safe (skipped for trial lessons)
     const teacher = await Teacher.findById(teacherId);
     if (!teacher) throw new Error(`Teacher ${teacherId} not found`);
-    const ratePerClass        = toMoney(teacher.ratePerClass);
-    const newLessonsCompleted = (teacher.lessonsCompleted || 0) + 1;
-    const newEarned           = toMoney((teacher.earned   || 0) + ratePerClass);
-    teacher.lessonsCompleted  = newLessonsCompleted;
-    teacher.earned            = newEarned;
-    await teacher.save();
+    let ratePerClass        = 0;
+    let newLessonsCompleted = teacher.lessonsCompleted || 0;
+    let newEarned           = toMoney(teacher.earned   || 0);
+    if (!isTrial) {
+      ratePerClass        = toMoney(teacher.ratePerClass);
+      newLessonsCompleted = (teacher.lessonsCompleted || 0) + 1;
+      newEarned           = toMoney((teacher.earned   || 0) + ratePerClass);
+      teacher.lessonsCompleted = newLessonsCompleted;
+      teacher.earned           = newEarned;
+      await teacher.save();
+    }
 
-    // Write 4: Create PaymentTransaction
-    await PaymentTransaction.create({
-      bookingId:   claimedBooking._id,
-      teacherId,
-      studentId,
-      amount:      ratePerClass,
-      status:      "pending",
-      type:        "class_completion",
-      classTitle:  claimedBooking.classTitle,
-      studentName: `${claimedBooking.studentId.firstName} ${claimedBooking.studentId.lastName}`,
-      completedAt: now,
-      description: `Completed by ${markedBy} — ${claimedBooking.classTitle}`,
-    });
+    // Write 4: Create PaymentTransaction (skipped for trial lessons)
+    if (!isTrial) {
+      await PaymentTransaction.create({
+        bookingId:   claimedBooking._id,
+        teacherId,
+        studentId,
+        amount:      ratePerClass,
+        status:      "pending",
+        type:        "class_completion",
+        classTitle:  claimedBooking.classTitle,
+        studentName: `${claimedBooking.studentId.firstName} ${claimedBooking.studentId.lastName}`,
+        completedAt: now,
+        description: `Completed by ${markedBy} — ${claimedBooking.classTitle}`,
+      });
+    }
 
     // Write 5: Update ClassroomSession
     if (session) {
@@ -252,13 +274,15 @@ export async function completeClass(db, bookingId, markedBy = "system", options 
     };
 
   } catch (err) {
-    // Release processing lock so the booking can be retried
+    // Release processing lock so the booking can be retried.
+    // Restore to the original status (before we claimed it as "processing").
+    const originalStatus = claimedBooking?.status || "accepted";
     try {
       await Booking.updateOne(
         { _id: bookingId, status: "processing" },
-        { $set: { status: "accepted" } }
+        { $set: { status: originalStatus } }
       );
-      logger.warn(`[ClassCompletion] Error on ${bookingId}, reset to "accepted". Error: ${err.message}`);
+      logger.warn(`[ClassCompletion] Error on ${bookingId}, reset to "${originalStatus}". Error: ${err.message}`);
     } catch (resetErr) {
       logger.error(
         `CRITICAL: Could not reset booking ${bookingId} after error!`,

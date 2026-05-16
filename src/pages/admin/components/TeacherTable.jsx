@@ -1,5 +1,6 @@
 // src/pages/admin/components/TeacherTable.jsx
 import React, { useState } from "react";
+import { useCurrencySymbol } from "../../../hooks/useCurrencySymbol";
 
 export default function TeacherTable({
   teachers,
@@ -12,6 +13,7 @@ export default function TeacherTable({
   onCopyPassword,
   onResetPassword,
 }) {
+  const sym = useCurrencySymbol();
   const [continentFilter, setContinentFilter] = useState("All");
 
   const filteredTeachers =
@@ -47,9 +49,9 @@ export default function TeacherTable({
             <th className="border p-2">First</th>
             <th className="border p-2">Last</th>
             <th className="border p-2">Email</th>
-            <th className="border p-2">Rate ($)</th>
+            <th className="border p-2">Rate ({sym})</th>
             <th className="border p-2">Lessons</th>
-            <th className="border p-2">Earned ($)</th>
+            <th className="border p-2">Earned ({sym})</th>
             <th className="border p-2">Continent</th>
             <th className="border p-2">Password</th>
             <th className="border p-2">Actions</th>
@@ -70,7 +72,7 @@ export default function TeacherTable({
                 <td className="border p-2">{t.email}</td>
                 <td className="border p-2 text-center">{t.ratePerClass}</td>
                 <td className="border p-2 text-center">{t.lessonsCompleted || 0}</td>
-                <td className="border p-2 text-center">{(t.earned || 0).toFixed(2)}</td>
+                <td className="border p-2 text-center">{sym}{(t.earned || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                 <td className="border p-2 text-center">{t.continent || "—"}</td>
 
                 {/* Password column */}
@@ -162,7 +164,7 @@ export default function TeacherTable({
       {/* Total salary footer */}
       {filteredTeachers.length > 0 && (
         <div className="mt-3 text-right pr-2 text-gray-700 font-semibold">
-          Total Salaries: ${totalSalary.toFixed(2)}
+          Total Salaries: {sym}{totalSalary.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </div>
       )}
     </div>

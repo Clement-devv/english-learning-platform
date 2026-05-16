@@ -187,7 +187,9 @@ router.get("/bookings", verifyToken, verifyAdmin, async (req, res) => {
 
     let statusFilter;
     if (type === "mark") {
-      statusFilter = { status: "accepted" };
+      // All classes that aren't yet successfully completed: missed = attendance not met,
+      // accepted/pending = scheduled but not processed yet
+      statusFilter = { status: { $in: ["pending", "accepted", "pending_confirmation", "missed"] } };
     } else if (type === "unmark") {
       statusFilter = { status: "completed", adminRejected: { $ne: true } };
     } else {
@@ -304,29 +306,31 @@ router.post("/unmark", verifyToken, verifyAdmin, async (req, res) => {
     booking.adminRejectedReason = reason || "";
     await booking.save();
 
-    // Restore student class credit
+    // Restore student class credit (skipped for trial — no credit was ever deducted)
     const student = await getStudent(req.db).findById(booking.studentId._id);
-    if (student) {
+    if (student && !booking.isTrial) {
       student.classCredits = (student.classCredits || 0) + 1;
       student.active = true;
       await student.save();
     }
 
-    // Deduct teacher earnings (float-safe)
+    // Deduct teacher earnings (float-safe; skipped for trial — no earnings were ever added)
     const teacher = await getTeacher(req.db).findById(booking.teacherId._id);
     let ratePerClass = 0;
-    if (teacher) {
+    if (teacher && !booking.isTrial) {
       ratePerClass = Math.round((parseFloat(teacher.ratePerClass) || 0) * 100) / 100;
       teacher.lessonsCompleted = Math.max(0, (teacher.lessonsCompleted || 0) - 1);
       teacher.earned = Math.max(0, Math.round(((teacher.earned || 0) - ratePerClass) * 100) / 100);
       await teacher.save();
     }
 
-    // Cancel the PaymentTransaction for this booking
-    await getPaymentTransaction(req.db).updateMany(
-      { bookingId: booking._id, status: "pending" },
-      { $set: { status: "cancelled", notes: `Admin rejected: ${reason || "No reason given"}` } }
-    );
+    // Cancel the PaymentTransaction for this booking (skipped for trial — none was created)
+    if (!booking.isTrial) {
+      await getPaymentTransaction(req.db).updateMany(
+        { bookingId: booking._id, status: "pending" },
+        { $set: { status: "cancelled", notes: `Admin rejected: ${reason || "No reason given"}` } }
+      );
+    }
 
     // Send emails non-blocking
     const db = req.db;

@@ -5,6 +5,7 @@ import { tenantMiddleware }           from "../middleware/tenantMiddleware.js";
 import { bookingSchema }              from "../schemas/bookingSchema.js";
 import { teacherSchema }              from "../schemas/teacherSchema.js";
 import { studentSchema }              from "../schemas/studentSchema.js";
+import { paymentSchema }              from "../schemas/paymentSchema.js";
 import { paymentTransactionSchema }   from "../schemas/paymentTransactionSchema.js";
 import { quizAttemptSchema }          from "../schemas/quizAttemptSchema.js";
 import { parsePagination }            from "../utils/pagination.js";
@@ -17,6 +18,7 @@ router.use(tenantMiddleware);
 const getBooking            = (db) => db.models.Booking            || db.model("Booking",            bookingSchema);
 const getTeacher            = (db) => db.models.Teacher            || db.model("Teacher",            teacherSchema);
 const getStudent            = (db) => db.models.Student            || db.model("Student",            studentSchema);
+const getPayment            = (db) => db.models.Payment            || db.model("Payment",            paymentSchema);
 const getPaymentTransaction = (db) => db.models.PaymentTransaction || db.model("PaymentTransaction", paymentTransactionSchema);
 const getQuizAttempt        = (db) => db.models.QuizAttempt        || db.model("QuizAttempt",        quizAttemptSchema);
 
@@ -30,10 +32,10 @@ router.get("/overview", verifyToken, verifyAdmin, async (req, res) => {
     if (endDate)   dateFilter.$lte = new Date(endDate);
     const bookingFilter = Object.keys(dateFilter).length > 0 ? { scheduledTime: dateFilter } : {};
 
-    const Teacher            = getTeacher(req.db);
-    const Student            = getStudent(req.db);
-    const Booking            = getBooking(req.db);
-    const PaymentTransaction = getPaymentTransaction(req.db);
+    const Teacher = getTeacher(req.db);
+    const Student = getStudent(req.db);
+    const Booking = getBooking(req.db);
+    const Payment = getPayment(req.db);
 
     const [
       totalTeachers,
@@ -41,8 +43,7 @@ router.get("/overview", verifyToken, verifyAdmin, async (req, res) => {
       totalStudents,
       activeStudents,
       bookingStats,
-      revenueStats,
-      pendingPayments,
+      studentRevenueStats,
     ] = await Promise.all([
       Teacher.countDocuments(),
       Teacher.countDocuments({ active: true }),
@@ -52,21 +53,17 @@ router.get("/overview", verifyToken, verifyAdmin, async (req, res) => {
         { $match: bookingFilter },
         { $group: { _id: "$status", count: { $sum: 1 } } },
       ]),
-      PaymentTransaction.aggregate([
-        { $group: { _id: "$status", total: { $sum: "$amount" } } },
-      ]),
-      Teacher.aggregate([
-        { $match: { earned: { $gt: 0 } } },
-        { $group: { _id: null, totalPending: { $sum: "$earned" }, teachersWithPending: { $sum: 1 } } },
+      // Revenue = what students actually paid (completed student payments)
+      Payment.aggregate([
+        { $match: { status: "completed" } },
+        { $group: { _id: null, total: { $sum: "$amount" } } },
       ]),
     ]);
 
     const bookingsByStatus = { pending: 0, accepted: 0, completed: 0, rejected: 0, cancelled: 0 };
     bookingStats.forEach(s => { bookingsByStatus[s._id] = s.count; });
 
-    const revenue = { paid: 0, pending: 0 };
-    revenueStats.forEach(s => { revenue[s._id] = s.total; });
-    if (pendingPayments.length > 0) revenue.pending += pendingPayments[0].totalPending || 0;
+    const totalRevenue = studentRevenueStats[0]?.total || 0;
 
     res.json({
       success: true,
@@ -80,10 +77,10 @@ router.get("/overview", verifyToken, verifyAdmin, async (req, res) => {
           byStatus: bookingsByStatus,
         },
         revenue: {
-          total: revenue.paid + revenue.pending,
-          paid:  revenue.paid,
-          pending: revenue.pending,
-          teachersWithPending: pendingPayments[0]?.teachersWithPending || 0,
+          total:   totalRevenue,
+          paid:    totalRevenue,
+          pending: 0,
+          teachersWithPending: 0,
         },
       },
     });
@@ -230,27 +227,43 @@ router.get("/revenue-breakdown", verifyToken, verifyAdmin, async (req, res) => {
     if (endDate)   dateFilter.$lte = new Date(endDate);
 
     const PaymentTransaction = getPaymentTransaction(req.db);
-    const matchStage = Object.keys(dateFilter).length > 0 ? [{ $match: { completedAt: dateFilter } }] : [];
+    const Payment            = getPayment(req.db);
 
-    const [revenueByTeacher, summary] = await Promise.all([
+    const txMatchStage      = Object.keys(dateFilter).length > 0 ? [{ $match: { completedAt: dateFilter } }] : [];
+    const paymentMatchStage = Object.keys(dateFilter).length > 0 ? [{ $match: { date: dateFilter, status: "completed" } }] : [{ $match: { status: "completed" } }];
+
+    const [revenueByTeacher, teacherSalarySummary, studentRevenueSummary] = await Promise.all([
       PaymentTransaction.aggregate([
-        ...matchStage,
+        ...txMatchStage,
         { $group: { _id: "$teacherId", totalEarned: { $sum: "$amount" }, paidAmount: { $sum: { $cond: [{ $eq: ["$status", "paid"] }, "$amount", 0] } }, pendingAmount: { $sum: { $cond: [{ $eq: ["$status", "pending"] }, "$amount", 0] } }, classCount: { $sum: 1 } } },
         { $lookup: { from: "teachers", localField: "_id", foreignField: "_id", as: "teacher" } },
         { $unwind: "$teacher" },
         { $project: { teacherName: { $concat: ["$teacher.firstName", " ", "$teacher.lastName"] }, totalEarned: 1, paidAmount: 1, pendingAmount: 1, classCount: 1 } },
         { $sort: { totalEarned: -1 } },
       ]),
+      // Teacher salary totals (paid out vs still pending)
       PaymentTransaction.aggregate([
-        ...matchStage,
-        { $group: { _id: null, totalRevenue: { $sum: "$amount" }, totalPaid: { $sum: { $cond: [{ $eq: ["$status", "paid"] }, "$amount", 0] } }, totalPending: { $sum: { $cond: [{ $eq: ["$status", "pending"] }, "$amount", 0] } }, transactionCount: { $sum: 1 } } },
+        ...txMatchStage,
+        { $group: { _id: null, totalPaid: { $sum: { $cond: [{ $eq: ["$status", "paid"] }, "$amount", 0] } }, totalPending: { $sum: { $cond: [{ $eq: ["$status", "pending"] }, "$amount", 0] } }, transactionCount: { $sum: 1 } } },
+      ]),
+      // Total revenue = what students actually paid
+      Payment.aggregate([
+        ...paymentMatchStage,
+        { $group: { _id: null, totalRevenue: { $sum: "$amount" } } },
       ]),
     ]);
+
+    const teacherSalary = teacherSalarySummary[0] || { totalPaid: 0, totalPending: 0, transactionCount: 0 };
 
     res.json({
       success: true,
       data: {
-        summary: summary[0] || { totalRevenue: 0, totalPaid: 0, totalPending: 0, transactionCount: 0 },
+        summary: {
+          totalRevenue:     studentRevenueSummary[0]?.totalRevenue || 0,
+          totalPaid:        teacherSalary.totalPaid,
+          totalPending:     teacherSalary.totalPending,
+          transactionCount: teacherSalary.transactionCount,
+        },
         byTeacher: revenueByTeacher,
       },
     });

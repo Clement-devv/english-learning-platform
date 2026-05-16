@@ -63,6 +63,7 @@ router.get("/:id", verifyToken, validateObjectId("id"), async (req, res) => {
 router.post("/", verifyToken, async (req, res) => {
   try {
     const { scheduledTime, duration, createdBy = "admin" } = req.body;
+    const isTrial = !!req.body.isTrial;
 
     // Validate and coerce — toStr/toObjectId throw { statusCode: 400 } on bad input,
     // which the global errorHandler maps to a clean 400 JSON response.
@@ -83,7 +84,7 @@ router.post("/", verifyToken, async (req, res) => {
     ]);
     if (!teacher) return notFound(res, "Teacher not found");
     if (!student) return notFound(res, "Student not found");
-    if (student.classCredits <= 0)
+    if (!isTrial && student.classCredits <= 0)
       return res.status(400).json({ success: false, message: `Student ${student.firstName} ${student.lastName} has no classes remaining` });
 
     const initialStatus = createdBy === "admin" ? "pending" : "accepted";
@@ -94,6 +95,7 @@ router.post("/", verifyToken, async (req, res) => {
       topic: topic || "", scheduledTime: new Date(scheduledTime),
       duration: duration || 60, notes: notes || "",
       status: initialStatus, createdBy,
+      isTrial,
       createdByUserId: req.user.id,
       createdByUserModel: createdBy === "admin" ? "Admin" : "Teacher",
       teacherTimezone: teacher.timezone || "",

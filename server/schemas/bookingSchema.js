@@ -37,6 +37,7 @@ export const bookingSchema = new mongoose.Schema({
   cancelledAt:        Date,
   teacherTimezone:    { type: String, default: '' },
   studentTimezone:    { type: String, default: '' },
+  isTrial:            { type: Boolean, default: false },
 }, { timestamps: true });
 
 bookingSchema.index({ teacherId: 1, status: 1 });

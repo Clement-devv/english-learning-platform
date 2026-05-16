@@ -7,6 +7,7 @@ import {
   History, Send, Clock, Video, Award, ChevronDown, FileDown, Star,
 } from "lucide-react";
 import { downloadTeacherCard } from "../../../utils/teacherPdf";
+import { useCurrencySymbol } from "../../../hooks/useCurrencySymbol";
 
 function getInitials(firstName = "", lastName = "") {
   return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
@@ -108,12 +109,13 @@ export default function TeacherCard({
   const [profileExpanded, setProfileExpanded] = useState(false);
   const menuRef = useRef(null);
 
+  const sym = useCurrencySymbol();
   const fullName    = `${teacher.firstName || ""} ${teacher.lastName || ""}`.trim();
   const displayName = teacher.displayName?.trim() || "";
   const initials    = getInitials(teacher.firstName, teacher.lastName);
   const avatarGradient = getAvatarColor(fullName);
   const isActive = teacher.active;
-  const earned = (teacher.earned || 0).toFixed(2);
+  const earned = (teacher.earned || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -366,7 +368,7 @@ export default function TeacherCard({
         <div className="grid grid-cols-3 gap-2 mb-4">
           <StatPill
             label="Rate"
-            value={`$${teacher.ratePerClass || 0}`}
+            value={`${sym}${teacher.ratePerClass || 0}`}
             color="blue"
             isDarkMode={isDarkMode}
           />
@@ -378,7 +380,7 @@ export default function TeacherCard({
           />
           <StatPill
             label="Earned"
-            value={`$${earned}`}
+            value={`${sym}${earned}`}
             color="green"
             isDarkMode={isDarkMode}
           />

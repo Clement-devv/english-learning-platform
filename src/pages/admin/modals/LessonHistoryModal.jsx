@@ -21,9 +21,10 @@ export default function LessonHistoryModal({ isOpen, onClose, history = [] }) {
     const doc = new jsPDF();
     doc.text("Lesson History", 14, 15);
     doc.autoTable({
-      head: [["Date", "Student", "Teacher"]],
+      head: [["Date", "Class", "Student", "Teacher"]],
       body: filtered.map((l) => [
         new Date(l.date).toLocaleDateString(),
+        l.classTitle || "—",
         l.student || "Unknown",
         l.teacher || "Unknown",
       ]),
@@ -63,6 +64,7 @@ export default function LessonHistoryModal({ isOpen, onClose, history = [] }) {
             <thead className="bg-gray-100">
               <tr>
                 <th className="border p-2">Date</th>
+                <th className="border p-2">Class</th>
                 <th className="border p-2">Student</th>
                 <th className="border p-2">Teacher</th>
               </tr>
@@ -71,16 +73,17 @@ export default function LessonHistoryModal({ isOpen, onClose, history = [] }) {
               {filtered.length > 0 ? (
                 filtered.map((row, i) => (
                   <tr key={i} className="hover:bg-gray-50">
-                    <td className="border p-2">
+                    <td className="border p-2 whitespace-nowrap">
                       {new Date(row.date).toLocaleDateString()}
                     </td>
+                    <td className="border p-2">{row.classTitle || "—"}</td>
                     <td className="border p-2">{row.student || "Unknown"}</td>
                     <td className="border p-2">{row.teacher || "Unknown"}</td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan="3" className="text-center p-4 text-gray-500">
+                  <td colSpan="4" className="text-center p-4 text-gray-500">
                     No lesson records found
                   </td>
                 </tr>

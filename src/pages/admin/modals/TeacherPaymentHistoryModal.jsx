@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import { X, DollarSign, Clock, CheckCircle, FileText, Download } from "lucide-react";
 import api from "../../../api";
+import { useCurrencySymbol, fmtMoney } from "../../../hooks/useCurrencySymbol";
 
 function StatusBadge({ status }) {
   if (status === "paid") {
@@ -26,6 +27,7 @@ function StatusBadge({ status }) {
 }
 
 export default function TeacherPaymentHistoryModal({ teacher, onClose, isDarkMode }) {
+  const sym = useCurrencySymbol();
   const [transactions, setTransactions] = useState([]);
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -68,7 +70,7 @@ export default function TeacherPaymentHistoryModal({ teacher, onClose, isDarkMod
         fmt(tx.completedAt),
         tx.classTitle || "—",
         tx.studentName || "—",
-        `$${tx.amount.toFixed(2)}`,
+        fmtMoney(tx.amount, sym),
         tx.status,
         tx.paymentMethod || "—",
         tx.paidAt ? fmt(tx.paidAt) : "—",
@@ -120,17 +122,17 @@ export default function TeacherPaymentHistoryModal({ teacher, onClose, isDarkMod
           <div className={`grid grid-cols-3 gap-3 px-6 py-4 border-b ${isDarkMode ? "border-gray-700" : "border-gray-100"}`}>
             <div className={`rounded-xl p-3 ${cardBg}`}>
               <p className={`text-xs font-medium ${textSecondary}`}>Total Pending</p>
-              <p className="text-lg font-bold text-amber-500">${summary.totalPending.toFixed(2)}</p>
+              <p className="text-lg font-bold text-amber-500">{fmtMoney(summary.totalPending, sym)}</p>
               <p className={`text-xs ${textSecondary}`}>{summary.pendingCount} transaction{summary.pendingCount !== 1 ? "s" : ""}</p>
             </div>
             <div className={`rounded-xl p-3 ${cardBg}`}>
               <p className={`text-xs font-medium ${textSecondary}`}>Total Paid</p>
-              <p className="text-lg font-bold text-emerald-500">${summary.totalPaid.toFixed(2)}</p>
+              <p className="text-lg font-bold text-emerald-500">{fmtMoney(summary.totalPaid, sym)}</p>
               <p className={`text-xs ${textSecondary}`}>{summary.paidCount} transaction{summary.paidCount !== 1 ? "s" : ""}</p>
             </div>
             <div className={`rounded-xl p-3 ${cardBg}`}>
               <p className={`text-xs font-medium ${textSecondary}`}>Total Earned</p>
-              <p className={`text-lg font-bold ${isDarkMode ? "text-blue-300" : "text-blue-600"}`}>${summary.totalEarned.toFixed(2)}</p>
+              <p className={`text-lg font-bold ${isDarkMode ? "text-blue-300" : "text-blue-600"}`}>{fmtMoney(summary.totalEarned, sym)}</p>
               <p className={`text-xs ${textSecondary}`}>{transactions.length} total</p>
             </div>
           </div>
@@ -205,7 +207,7 @@ export default function TeacherPaymentHistoryModal({ teacher, onClose, isDarkMod
                       {tx.studentName || <span className="opacity-40">—</span>}
                     </td>
                     <td className={`px-3 py-3 text-right font-semibold ${tx.status === "paid" ? "text-emerald-500" : "text-amber-500"}`}>
-                      ${tx.amount.toFixed(2)}
+                      {fmtMoney(tx.amount, sym)}
                     </td>
                     <td className="px-3 py-3">
                       <StatusBadge status={tx.status} />

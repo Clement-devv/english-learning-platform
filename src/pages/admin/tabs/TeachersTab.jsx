@@ -15,6 +15,7 @@ import {
   Download,
 } from "lucide-react";
 import api from "../../../api";
+import { useCurrencySymbol, fmtMoney } from "../../../hooks/useCurrencySymbol";
 import { restoreTeacher } from "../../../services/teacherService";
 import { downloadTeacherRoster } from "../../../utils/teacherPdf";
 import TeacherCard from "../components/TeacherCard";
@@ -89,8 +90,9 @@ function DeleteConfirmModal({ teacher, onConfirm, onCancel, isDarkMode }) {
 
 // ─── Pay confirmation modal (single teacher) ─────────────────────────────────
 function PayConfirmModal({ teacher, onConfirm, onCancel, isDarkMode }) {
+  const sym = useCurrencySymbol();
   if (!teacher) return null;
-  const amount = (teacher.earned || 0).toFixed(2);
+  const amount = (teacher.earned || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
       <div
@@ -126,7 +128,7 @@ function PayConfirmModal({ teacher, onConfirm, onCancel, isDarkMode }) {
               Amount to pay
             </span>
             <span className={`text-xl font-bold ${isDarkMode ? "text-emerald-300" : "text-emerald-600"}`}>
-              ${amount}
+              {sym}{amount}
             </span>
           </div>
         </div>
@@ -156,8 +158,9 @@ function PayConfirmModal({ teacher, onConfirm, onCancel, isDarkMode }) {
 
 // ─── Pay all confirmation modal ───────────────────────────────────────────────
 function PayAllConfirmModal({ teachers, onConfirm, onCancel, isDarkMode }) {
+  const sym = useCurrencySymbol();
   if (!teachers) return null;
-  const total = teachers.reduce((sum, t) => sum + (t.earned || 0), 0).toFixed(2);
+  const total = teachers.reduce((sum, t) => sum + (t.earned || 0), 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
       <div
@@ -186,7 +189,7 @@ function PayAllConfirmModal({ teachers, onConfirm, onCancel, isDarkMode }) {
                 {t.displayName?.trim() || `${t.firstName} ${t.lastName}`}
               </span>
               <span className={`text-sm font-bold ${isDarkMode ? "text-emerald-300" : "text-emerald-600"}`}>
-                ${(t.earned || 0).toFixed(2)}
+                {sym}{(t.earned || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             </div>
           ))}
@@ -197,7 +200,7 @@ function PayAllConfirmModal({ teachers, onConfirm, onCancel, isDarkMode }) {
             Total payout
           </span>
           <span className={`text-xl font-bold ${isDarkMode ? "text-emerald-300" : "text-emerald-600"}`}>
-            ${total}
+            {sym}{total}
           </span>
         </div>
 
@@ -216,7 +219,7 @@ function PayAllConfirmModal({ teachers, onConfirm, onCancel, isDarkMode }) {
             onClick={onConfirm}
             className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-emerald-600 hover:bg-emerald-700 text-white transition-all"
           >
-            Pay All ${total}
+            Pay All {sym}{total}
           </button>
         </div>
       </div>
@@ -280,6 +283,7 @@ function SummaryCard({ icon: Icon, label, value, sub, color, isDarkMode }) {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function TeachersTab({ onNotify, isDarkMode = false }) {
+  const sym = useCurrencySymbol();
   const [teachers, setTeachers] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editIndex, setEditIndex] = useState(null);
@@ -468,7 +472,7 @@ export default function TeachersTab({ onNotify, isDarkMode = false }) {
     try {
       const res = await api.put(`/teachers/${payTarget._id}`, { earned: 0 });
       setTeachers((prev) => prev.map((t) => (t._id === payTarget._id ? res.data : t)));
-      showToast(`$${amount.toFixed(2)} paid to ${payTarget.firstName}!`);
+      showToast(`${fmtMoney(amount, sym)} paid to ${payTarget.firstName}!`);
     } catch (err) {
       console.error("Pay teacher error:", err);
       showToast("Could not process payment.", "error");
@@ -750,7 +754,7 @@ export default function TeachersTab({ onNotify, isDarkMode = false }) {
               Pending Payout
             </p>
             <p className={`text-xl font-bold ${isDarkMode ? "text-purple-300" : "text-purple-700"}`}>
-              ${totalEarned.toFixed(2)}
+              {sym}{totalEarned.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </p>
             {unpaidTeachers.length > 0 && (
               <button
