@@ -17,6 +17,7 @@ export const parentSchema = new Schema({
   inviteExpires:        { type: Date },
   resetPasswordToken:   { type: String },
   resetPasswordExpires: { type: Date },
+  resetPasswordCenter:  { type: String },
   lastPasswordChange:   { type: Date },
   sessions:  [sessionSchema],
   lastLogin: { type: Date },

@@ -25,6 +25,7 @@ export const studentSchema = new mongoose.Schema({
   inviteExpires: { type: Date },
   resetPasswordToken: String,
   resetPasswordExpires: Date,
+  resetPasswordCenter: String,
   lastPasswordChange: Date,
   sessions: [sessionSchema],
   lastLogin: Date,

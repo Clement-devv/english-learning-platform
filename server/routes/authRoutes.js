@@ -5,12 +5,15 @@ import crypto from "crypto";
 import redisClient from "../config/redis.js";
 
 import { config, JWT_STANDARD_CLAIMS } from "../config/config.js";
+import { getCenterSecret } from "../utils/jwtUtils.js";
 import { loginLimiter, passwordResetLimiter, trackFailedLogin, isAccountLocked, clearFailedAttempts } from "../middleware/rateLimiter.js";
 import { validatePasswordStrength } from "../utils/passwordUtils.js";
 import { createSession, cleanExpiredSessions, pruneSessionsToLimit } from "../utils/sessionManager.js";
 import { SESSION_EXPIRY_DAYS } from "../config/constants.js";
 import { sendForgotPasswordEmail, sendStudentForgotPasswordEmail, sendAdminForgotPasswordEmail } from "../utils/emailService.js";
 import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
+import { addToLocalBlacklist } from "../middleware/authMiddleware.js";
+import { decrypt, hashBackupCode } from "../utils/fieldEncryption.js";
 import { adminSchema } from "../schemas/adminSchema.js";
 import { teacherSchema } from "../schemas/teacherSchema.js";
 import { studentSchema } from "../schemas/studentSchema.js";
@@ -95,7 +98,7 @@ const createLoginHandler = ({
         // Sign a short-lived token so the role is server-determined, not client-supplied
         const pendingToken = jwt.sign(
           { ...JWT_STANDARD_CLAIMS, tempUserId: user._id.toString(), role, centerId: req.center.slug },
-          config.jwtSecret,
+          getCenterSecret(req.center.slug),
           { expiresIn: "5m" }
         );
         return res.status(202).json({
@@ -109,12 +112,12 @@ const createLoginHandler = ({
       let isValid = false;
       if (twoFactorToken) {
         const { verifyTwoFactorToken } = await import("../utils/twoFactorAuth.js");
-        isValid = verifyTwoFactorToken(twoFactorToken, user.twoFactorSecret);
+        isValid = verifyTwoFactorToken(twoFactorToken, decrypt(user.twoFactorSecret));
       } else if (backupCode) {
-        const normalizedCode = backupCode.toUpperCase().trim();
+        const hashedInput = hashBackupCode(backupCode);
         const updated = await Model.findOneAndUpdate(
-          { _id: user._id, twoFactorBackupCodes: normalizedCode },
-          { $pull: { twoFactorBackupCodes: normalizedCode } },
+          { _id: user._id, twoFactorBackupCodes: hashedInput },
+          { $pull: { twoFactorBackupCodes: hashedInput } },
           { new: false }
         );
         isValid = !!updated;
@@ -133,7 +136,7 @@ const createLoginHandler = ({
       centerId: req.center.slug,
       ...(buildJwtExtra ? buildJwtExtra(user) : {}),
     };
-    const token = jwt.sign(jwtPayload, config.jwtSecret, { expiresIn: config.jwtExpiry });
+    const token = jwt.sign(jwtPayload, getCenterSecret(req.center.slug), { expiresIn: config.jwtExpiry });
 
     const session = createSession(req, token);
     user.sessions = cleanExpiredSessions(user.sessions || []);
@@ -159,7 +162,7 @@ const verifyToken = async (req, res, next) => {
       return unauthorized(res, "No token provided");
     }
 
-    const decoded = jwt.verify(token, config.jwtSecret);
+    const decoded = jwt.verify(token, getCenterSecret(req.center.slug), { algorithms: ['HS256'] });
     const Teacher = getTeacherModel(req.db);
     const teacher = await Teacher.findById(decoded.id).select("-password");
 
@@ -192,7 +195,7 @@ router.post("/verify-2fa-login", tenantMiddleware, loginLimiter, async (req, res
     // Decode the server-signed pending token — role and userId are never taken from the client
     let pending;
     try {
-      pending = jwt.verify(pendingToken, config.jwtSecret);
+      pending = jwt.verify(pendingToken, getCenterSecret(req.center.slug), { algorithms: ['HS256'] });
     } catch (_) {
       return unauthorized(res, "2FA session expired. Please log in again.");
     }
@@ -226,12 +229,12 @@ router.post("/verify-2fa-login", tenantMiddleware, loginLimiter, async (req, res
 
     if (twoFactorToken) {
       const { verifyTwoFactorToken } = await import("../utils/twoFactorAuth.js");
-      isValid = verifyTwoFactorToken(twoFactorToken, user.twoFactorSecret);
+      isValid = verifyTwoFactorToken(twoFactorToken, decrypt(user.twoFactorSecret));
     } else if (backupCode) {
-      const normalizedCode = backupCode.toUpperCase().trim();
+      const hashedInput = hashBackupCode(backupCode);
       const updated = await UserModel.findOneAndUpdate(
-        { _id: user._id, twoFactorBackupCodes: normalizedCode },
-        { $pull: { twoFactorBackupCodes: normalizedCode } },
+        { _id: user._id, twoFactorBackupCodes: hashedInput },
+        { $pull: { twoFactorBackupCodes: hashedInput } },
         { new: false }
       );
       isValid = !!updated;
@@ -243,7 +246,7 @@ router.post("/verify-2fa-login", tenantMiddleware, loginLimiter, async (req, res
 
     const token = jwt.sign(
       { ...JWT_STANDARD_CLAIMS, id: user._id, email: user.email, role, centerId: req.center.slug },
-      config.jwtSecret,
+      getCenterSecret(req.center.slug),
       { expiresIn: config.jwtExpiry }
     );
 
@@ -365,8 +368,9 @@ router.post("/teacher/forgot-password", tenantMiddleware, passwordResetLimiter, 
     const resetToken = crypto.randomBytes(32).toString("hex");
     const hashedToken = crypto.createHash("sha256").update(resetToken).digest("hex");
 
-    teacher.resetPasswordToken = hashedToken;
+    teacher.resetPasswordToken   = hashedToken;
     teacher.resetPasswordExpires = Date.now() + 3600000;
+    teacher.resetPasswordCenter  = req.center.slug;
     await teacher.save();
 
     const emailResult = await sendForgotPasswordEmail(
@@ -417,10 +421,15 @@ router.post("/teacher/reset-password/:token", tenantMiddleware, passwordResetLim
       return badRequest(res, "Invalid or expired reset token. Please request a new one.");
     }
 
-    teacher.password = await bcrypt.hash(newPassword, config.bcryptRounds);
-    teacher.lastPasswordChange = new Date();
-    teacher.resetPasswordToken = undefined;
+    if (teacher.resetPasswordCenter !== req.center.slug) {
+      return badRequest(res, "Invalid or expired reset token. Please request a new one.");
+    }
+
+    teacher.password             = await bcrypt.hash(newPassword, config.bcryptRounds);
+    teacher.lastPasswordChange   = new Date();
+    teacher.resetPasswordToken   = undefined;
     teacher.resetPasswordExpires = undefined;
+    teacher.resetPasswordCenter  = undefined;
     await teacher.save();
 
     res.json({ success: true, message: "Password reset successfully. You can now login with your new password." });
@@ -461,7 +470,7 @@ router.get("/student/verify", tenantMiddleware, async (req, res) => {
       return unauthorized(res, "No token provided");
     }
 
-    const decoded = jwt.verify(token, config.jwtSecret);
+    const decoded = jwt.verify(token, getCenterSecret(req.center.slug), { algorithms: ['HS256'] });
     const Student = getStudentModel(req.db);
     const student = await Student.findById(decoded.id).select("-password");
 
@@ -484,7 +493,7 @@ router.post("/student/change-password", tenantMiddleware, async (req, res) => {
       return unauthorized(res, "No token provided");
     }
 
-    const decoded = jwt.verify(token, config.jwtSecret);
+    const decoded = jwt.verify(token, getCenterSecret(req.center.slug), { algorithms: ['HS256'] });
     const { currentPassword, newPassword } = req.body;
 
     if (!currentPassword || !newPassword) {
@@ -538,8 +547,9 @@ router.post("/student/forgot-password", tenantMiddleware, passwordResetLimiter, 
     const resetToken = crypto.randomBytes(32).toString("hex");
     const hashedToken = crypto.createHash("sha256").update(resetToken).digest("hex");
 
-    student.resetPasswordToken = hashedToken;
+    student.resetPasswordToken   = hashedToken;
     student.resetPasswordExpires = Date.now() + 3600000;
+    student.resetPasswordCenter  = req.center.slug;
     await student.save();
 
     const emailResult = await sendStudentForgotPasswordEmail(
@@ -590,10 +600,15 @@ router.post("/student/reset-password/:token", tenantMiddleware, passwordResetLim
       return badRequest(res, "Invalid or expired reset token. Please request a new one.");
     }
 
-    student.password = await bcrypt.hash(newPassword, config.bcryptRounds);
-    student.lastPasswordChange = new Date();
-    student.resetPasswordToken = undefined;
+    if (student.resetPasswordCenter !== req.center.slug) {
+      return badRequest(res, "Invalid or expired reset token. Please request a new one.");
+    }
+
+    student.password             = await bcrypt.hash(newPassword, config.bcryptRounds);
+    student.lastPasswordChange   = new Date();
+    student.resetPasswordToken   = undefined;
     student.resetPasswordExpires = undefined;
+    student.resetPasswordCenter  = undefined;
     await student.save();
 
     res.json({ success: true, message: "Password reset successfully. You can now login with your new password." });
@@ -636,7 +651,7 @@ router.get("/admin/verify", tenantMiddleware, async (req, res) => {
       return unauthorized(res, "No token provided");
     }
 
-    const decoded = jwt.verify(token, config.jwtSecret);
+    const decoded = jwt.verify(token, getCenterSecret(req.center.slug), { algorithms: ['HS256'] });
 
     if (decoded.role !== "admin") {
       return forbidden(res, "Admin access required");
@@ -676,7 +691,7 @@ router.post("/admin/change-password", tenantMiddleware, async (req, res) => {
       return unauthorized(res, "No token provided");
     }
 
-    const decoded = jwt.verify(token, config.jwtSecret);
+    const decoded = jwt.verify(token, getCenterSecret(req.center.slug), { algorithms: ['HS256'] });
     const { currentPassword, newPassword } = req.body;
 
     if (!currentPassword || !newPassword) {
@@ -730,6 +745,7 @@ router.post("/admin/forgot-password", tenantMiddleware, passwordResetLimiter, as
 
     admin.resetPasswordToken   = hashedToken;
     admin.resetPasswordExpires = Date.now() + 3600000; // 1 hour
+    admin.resetPasswordCenter  = req.center.slug;
     await admin.save();
 
     const emailResult = await sendAdminForgotPasswordEmail(admin.email, admin.firstName || admin.username, resetToken, req.center, req.center?.centerName || "");
@@ -769,10 +785,15 @@ router.post("/admin/reset-password/:token", tenantMiddleware, passwordResetLimit
       return badRequest(res, "Invalid or expired reset link. Please request a new one.");
     }
 
+    if (admin.resetPasswordCenter !== req.center.slug) {
+      return badRequest(res, "Invalid or expired reset link. Please request a new one.");
+    }
+
     admin.password             = await bcrypt.hash(newPassword, config.bcryptRounds);
     admin.lastPasswordChange   = new Date();
     admin.resetPasswordToken   = undefined;
     admin.resetPasswordExpires = undefined;
+    admin.resetPasswordCenter  = undefined;
     await admin.save();
 
     res.json({ success: true, message: "Password reset successfully. You can now log in with your new password." });
@@ -792,7 +813,7 @@ router.get("/sessions", tenantMiddleware, async (req, res) => {
       return unauthorized(res, "No token provided");
     }
 
-    const decoded = jwt.verify(token, config.jwtSecret);
+    const decoded = jwt.verify(token, getCenterSecret(req.center.slug), { algorithms: ['HS256'] });
 
     let user;
     if (decoded.role === "teacher") {
@@ -881,7 +902,7 @@ router.post("/refresh", tenantMiddleware, async (req, res) => {
     // Issue a fresh access token
     const newToken = jwt.sign(
       { ...JWT_STANDARD_CLAIMS, id: user._id, email: user.email, role, centerId: req.center.slug },
-      config.jwtSecret,
+      getCenterSecret(req.center.slug),
       { expiresIn: config.jwtExpiry }
     );
 
@@ -911,7 +932,7 @@ router.post("/logout-session", tenantMiddleware, async (req, res) => {
       return badRequest(res, "Session token required");
     }
 
-    const decoded = jwt.verify(token, config.jwtSecret);
+    const decoded = jwt.verify(token, getCenterSecret(req.center.slug), { algorithms: ['HS256'] });
 
     let user;
     if (decoded.role === "teacher") {
@@ -930,17 +951,19 @@ router.post("/logout-session", tenantMiddleware, async (req, res) => {
     if (session) {
       session.isActive = false;
 
-      // Blacklist the JWT in Redis so it's immediately rejected across all instances.
-      // TTL matches the remaining lifetime of the token so Redis auto-expires it.
-      if (redisClient && session.jwtToken) {
-        try {
-          const decoded = jwt.decode(session.jwtToken);
-          const ttl = decoded?.exp ? decoded.exp - Math.floor(Date.now() / 1000) : 900;
-          if (ttl > 0) {
-            const sig = session.jwtToken.split('.')[2];
-            await redisClient.setex(`bl:${sig}`, ttl, '1');
-          }
-        } catch (_) {}
+      // Blacklist in-memory immediately (covers Redis outages), then Redis for cross-instance.
+      if (session.jwtToken) {
+        addToLocalBlacklist(session.jwtToken);
+        if (redisClient) {
+          try {
+            const decoded = jwt.decode(session.jwtToken);
+            const ttl = decoded?.exp ? decoded.exp - Math.floor(Date.now() / 1000) : 900;
+            if (ttl > 0) {
+              const sig = session.jwtToken.split('.')[2];
+              await redisClient.setex(`bl:${sig}`, ttl, '1');
+            }
+          } catch (_) {}
+        }
       }
 
       await user.save();
@@ -963,7 +986,7 @@ router.post("/logout-all-devices", tenantMiddleware, async (req, res) => {
       return unauthorized(res, "No token provided");
     }
 
-    const decoded = jwt.verify(token, config.jwtSecret);
+    const decoded = jwt.verify(token, getCenterSecret(req.center.slug), { algorithms: ['HS256'] });
 
     let user;
     if (decoded.role === "teacher") {
@@ -978,21 +1001,21 @@ router.post("/logout-all-devices", tenantMiddleware, async (req, res) => {
       return notFound(res, "User not found");
     }
 
-    // Blacklist all OTHER sessions' JWTs in Redis (the current token stays valid).
+    // Blacklist all OTHER sessions — in-memory immediately, then Redis for cross-instance.
+    const otherSessions = user.sessions.filter(s => s.jwtToken && s.jwtToken !== token && s.isActive);
+    otherSessions.forEach(s => addToLocalBlacklist(s.jwtToken));
     if (redisClient) {
       await Promise.allSettled(
-        user.sessions
-          .filter(s => s.jwtToken && s.jwtToken !== token && s.isActive)
-          .map(async (s) => {
-            try {
-              const decoded = jwt.decode(s.jwtToken);
-              const ttl = decoded?.exp ? decoded.exp - Math.floor(Date.now() / 1000) : 900;
-              if (ttl > 0) {
-                const sig = s.jwtToken.split('.')[2];
-                await redisClient.setex(`bl:${sig}`, ttl, '1');
-              }
-            } catch (_) {}
-          })
+        otherSessions.map(async (s) => {
+          try {
+            const decoded = jwt.decode(s.jwtToken);
+            const ttl = decoded?.exp ? decoded.exp - Math.floor(Date.now() / 1000) : 900;
+            if (ttl > 0) {
+              const sig = s.jwtToken.split('.')[2];
+              await redisClient.setex(`bl:${sig}`, ttl, '1');
+            }
+          } catch (_) {}
+        })
       );
     }
 

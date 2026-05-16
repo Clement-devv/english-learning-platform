@@ -8,9 +8,11 @@ import Center from '../models/master/Center.js';
 import AgoraUsage   from '../models/master/AgoraUsage.js';
 import AgoraSession from '../models/master/AgoraSession.js';
 import { verifySuperAdmin } from '../middleware/superAdminMiddleware.js';
-import { loginLimiter } from '../middleware/rateLimiter.js';
+import { loginLimiter, strictLimiter, apiLimiter, emailLimiter } from '../middleware/rateLimiter.js';
 import { getDb } from '../config/dbManager.js';
+import redisClient from '../config/redis.js';
 import { config, JWT_STANDARD_CLAIMS } from '../config/config.js';
+import { getCenterSecret } from '../utils/jwtUtils.js';
 import { sendEmail, sendCenterDeletionWarningEmail } from '../utils/emailService.js';
 import { verifyDomainDns, isValidDomain, normalizeDomain } from '../utils/domainVerifier.js';
 import { pruneSessionsToLimit } from '../utils/sessionManager.js';
@@ -38,6 +40,11 @@ import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, s
 const emailOtpStore = new Map();
 
 const router = express.Router();
+
+// Base rate limit on every super admin route — prevents enumeration and DoS
+// regardless of whether the token is valid. Specific endpoints add stricter
+// limits on top of this (see individual route definitions below).
+router.use(apiLimiter);
 
 // POST /api/super-admin/login
 router.post('/login', loginLimiter, validateSuperAdminLogin, async (req, res) => {
@@ -124,7 +131,7 @@ router.get('/centers/pending', verifySuperAdmin, async (req, res) => {
 });
 
 // PATCH /api/super-admin/centers/:id/approve
-router.patch('/centers/:id/approve', verifySuperAdmin, validateParamMongoId('id'), async (req, res) => {
+router.patch('/centers/:id/approve', verifySuperAdmin, strictLimiter, validateParamMongoId('id'), async (req, res) => {
   try {
     const center = await Center.findById(req.params.id).select('+pendingPasswordHash');
     if (!center) {
@@ -188,7 +195,7 @@ router.patch('/centers/:id/approve', verifySuperAdmin, validateParamMongoId('id'
 });
 
 // PATCH /api/super-admin/centers/:id/reject
-router.patch('/centers/:id/reject', verifySuperAdmin, validateCenterAction, async (req, res) => {
+router.patch('/centers/:id/reject', verifySuperAdmin, strictLimiter, validateCenterAction, async (req, res) => {
   try {
     const { rejectReason } = req.body;
     const center = await Center.findById(req.params.id).select('+pendingPasswordHash');
@@ -232,7 +239,7 @@ router.patch('/centers/:id/reject', verifySuperAdmin, validateCenterAction, asyn
 });
 
 // PATCH /api/super-admin/centers/:id/suspend
-router.patch('/centers/:id/suspend', verifySuperAdmin, validateCenterAction, async (req, res) => {
+router.patch('/centers/:id/suspend', verifySuperAdmin, strictLimiter, validateCenterAction, async (req, res) => {
   try {
     const center = await Center.findByIdAndUpdate(
       req.params.id,
@@ -254,7 +261,7 @@ router.patch('/centers/:id/suspend', verifySuperAdmin, validateCenterAction, asy
 });
 
 // PATCH /api/super-admin/centers/:id/activate
-router.patch('/centers/:id/activate', verifySuperAdmin, validateParamMongoId('id'), async (req, res) => {
+router.patch('/centers/:id/activate', verifySuperAdmin, strictLimiter, validateParamMongoId('id'), async (req, res) => {
   try {
     const center = await Center.findByIdAndUpdate(
       req.params.id,
@@ -342,8 +349,8 @@ router.get('/centers/health', verifySuperAdmin, async (req, res) => {
   }
 });
 
-// POST /api/super-admin/impersonate/:slug — returns temp 1hr admin token
-router.post('/impersonate/:slug', verifySuperAdmin, validateSlugParam, async (req, res) => {
+// POST /api/super-admin/impersonate/:slug — returns a 10-minute admin token
+router.post('/impersonate/:slug', verifySuperAdmin, loginLimiter, validateSlugParam, async (req, res) => {
   try {
     const center = await Center.findOne({ slug: req.params.slug, status: 'active' });
     if (!center) {
@@ -359,13 +366,28 @@ router.post('/impersonate/:slug', verifySuperAdmin, validateSlugParam, async (re
         isImpersonation: true,
         impersonatedBy: req.superAdmin._id.toString(),
       },
-      config.jwtSecret,
-      { expiresIn: '30m' }
+      getCenterSecret(center.slug),
+      { expiresIn: '10m' }
     );
 
+    // Whitelist the token in Redis so it can be revoked before natural expiry.
+    // One active impersonation per center at a time — issuing a new one replaces the old.
+    const sig = token.split('.')[2];
+    if (redisClient) {
+      try {
+        await redisClient.setex(`impers:${center.slug}`, 600, sig);
+      } catch (e) {
+        logger.warn('Could not register impersonation token in Redis:', { error: e?.message });
+      }
+    }
+
     await writeAuditLog({
-      action: 'CENTER_IMPERSONATED', superAdmin: req.superAdmin,
-      targetId: center._id.toString(), targetName: center.centerName, ip: req.ip,
+      action: 'IMPERSONATION_STARTED',
+      superAdmin: req.superAdmin,
+      targetId: center._id.toString(),
+      targetName: center.centerName,
+      details: { userAgent: req.headers['user-agent'], tokenSig: sig },
+      ip: req.ip,
     });
 
     res.json({ success: true, token, center: { centerName: center.centerName, slug: center.slug } });
@@ -375,8 +397,34 @@ router.post('/impersonate/:slug', verifySuperAdmin, validateSlugParam, async (re
   }
 });
 
+// DELETE /api/super-admin/impersonate/:slug — revoke an active impersonation session early
+router.delete('/impersonate/:slug', verifySuperAdmin, strictLimiter, validateSlugParam, async (req, res) => {
+  try {
+    if (redisClient) {
+      try {
+        await redisClient.del(`impers:${req.params.slug}`);
+      } catch (e) {
+        logger.warn('Could not delete impersonation key from Redis:', { error: e?.message });
+      }
+    }
+
+    await writeAuditLog({
+      action: 'IMPERSONATION_REVOKED',
+      superAdmin: req.superAdmin,
+      targetName: req.params.slug,
+      details: { userAgent: req.headers['user-agent'] },
+      ip: req.ip,
+    });
+
+    res.json({ success: true, message: 'Impersonation session revoked' });
+  } catch (err) {
+    logger.error('❌ Revoke impersonation error:', { error: err?.message });
+    serverError(res);
+  }
+});
+
 // PATCH /api/super-admin/centers/:id/plan
-router.patch('/centers/:id/plan', verifySuperAdmin, validateCenterPlan, async (req, res) => {
+router.patch('/centers/:id/plan', verifySuperAdmin, strictLimiter, validateCenterPlan, async (req, res) => {
   try {
     const { plan } = req.body;
     if (!['free', 'basic', 'pro', 'enterprise'].includes(plan)) {
@@ -867,7 +915,7 @@ router.patch('/centers/:id/admin-login-theme', verifySuperAdmin, validateParamMo
 });
 
 // POST /api/super-admin/send-otp — email OTP to verify admin email before center creation
-router.post('/send-otp', verifySuperAdmin, validateOtpSend, async (req, res) => {
+router.post('/send-otp', verifySuperAdmin, emailLimiter, validateOtpSend, async (req, res) => {
   try {
     const { adminEmail } = req.body;
     if (!adminEmail?.trim()) {
@@ -940,7 +988,7 @@ router.get('/centers/domains', verifySuperAdmin, async (req, res) => {
 });
 
 // PATCH /api/super-admin/centers/:id/verify-domain — run DNS check and mark verified
-router.patch('/centers/:id/verify-domain', verifySuperAdmin, validateParamMongoId('id'), async (req, res) => {
+router.patch('/centers/:id/verify-domain', verifySuperAdmin, strictLimiter, validateParamMongoId('id'), async (req, res) => {
   try {
     const center = await Center.findById(req.params.id);
     if (!center) return notFound(res, 'Center not found');
@@ -979,7 +1027,7 @@ router.patch('/centers/:id/verify-domain', verifySuperAdmin, validateParamMongoI
 });
 
 // PATCH /api/super-admin/centers/:id/remove-domain — remove custom domain
-router.patch('/centers/:id/remove-domain', verifySuperAdmin, validateParamMongoId('id'), async (req, res) => {
+router.patch('/centers/:id/remove-domain', verifySuperAdmin, strictLimiter, validateParamMongoId('id'), async (req, res) => {
   try {
     const center = await Center.findById(req.params.id);
     if (!center) return notFound(res, 'Center not found');
@@ -1025,7 +1073,7 @@ router.get('/centers/deleted', verifySuperAdmin, async (req, res) => {
 });
 
 // PATCH /api/super-admin/centers/:id/soft-delete — mark for deletion in 7 days + email admin
-router.patch('/centers/:id/soft-delete', verifySuperAdmin, validateCenterAction, async (req, res) => {
+router.patch('/centers/:id/soft-delete', verifySuperAdmin, strictLimiter, validateCenterAction, async (req, res) => {
   try {
     const center = await Center.findById(req.params.id);
     if (!center) return notFound(res, 'Center not found');
@@ -1064,7 +1112,7 @@ router.patch('/centers/:id/soft-delete', verifySuperAdmin, validateCenterAction,
 });
 
 // PATCH /api/super-admin/centers/:id/restore — bring a soft-deleted center back to active
-router.patch('/centers/:id/restore', verifySuperAdmin, validateParamMongoId('id'), async (req, res) => {
+router.patch('/centers/:id/restore', verifySuperAdmin, strictLimiter, validateParamMongoId('id'), async (req, res) => {
   try {
     const center = await Center.findById(req.params.id);
     if (!center) return notFound(res, 'Center not found');
@@ -1227,7 +1275,7 @@ router.get('/usage/:centerId', verifySuperAdmin, async (req, res) => {
 // One-time idempotent migration: converts AgoraUsage (legacy /log endpoint) records
 // into AgoraSession records so they appear in the usage dashboard.
 // Safe to run multiple times — already-migrated records are skipped.
-router.post('/migrate-legacy-usage', verifySuperAdmin, async (req, res) => {
+router.post('/migrate-legacy-usage', verifySuperAdmin, strictLimiter, async (req, res) => {
   try {
     const legacyRecords = await AgoraUsage.find({}).lean();
     let migrated = 0, skipped = 0;
@@ -1263,7 +1311,7 @@ router.post('/migrate-legacy-usage', verifySuperAdmin, async (req, res) => {
 });
 
 // PATCH /api/super-admin/centers/:id/limits — update seat limits (-1 = unlimited)
-router.patch('/centers/:id/limits', verifySuperAdmin, validateCenterLimits, async (req, res) => {
+router.patch('/centers/:id/limits', verifySuperAdmin, strictLimiter, validateCenterLimits, async (req, res) => {
   try {
     const { maxTeachers, maxStudents } = req.body;
     const update = {};
@@ -1298,7 +1346,7 @@ router.patch('/centers/:id/limits', verifySuperAdmin, validateCenterLimits, asyn
 });
 
 // POST /api/super-admin/broadcast — email all active centers, or a specific one
-router.post('/broadcast', verifySuperAdmin, validateBroadcast, async (req, res) => {
+router.post('/broadcast', verifySuperAdmin, emailLimiter, validateBroadcast, async (req, res) => {
   try {
     const { subject, message, centerId } = req.body;
     if (!subject?.trim() || !message?.trim())
@@ -1374,7 +1422,7 @@ router.get('/chat-credits', verifySuperAdmin, async (req, res) => {
 });
 
 // ── POST /api/super-admin/chat-credits/:centerId  — allocate credits ──────────
-router.post('/chat-credits/:centerId', verifySuperAdmin, validateChatCredits, async (req, res) => {
+router.post('/chat-credits/:centerId', verifySuperAdmin, strictLimiter, validateChatCredits, async (req, res) => {
   try {
     const { amount, note } = req.body;
     if (!amount || typeof amount !== 'number' || amount < 1 || amount > 100000) {

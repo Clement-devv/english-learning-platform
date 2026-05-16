@@ -17,9 +17,11 @@ export const tenantMiddleware = async (req, res, next) => {
     const host = req.headers.host || '';
 
     // 1. Try custom domain first (e.g. app.greenfieldacademy.com)
+    // domainVerified must be true — unverified registrations must not resolve as tenants
     const byCustomDomain = await Center.findOne({
       customDomain: host,
       status: 'active',
+      domainVerified: true,
     });
 
     if (byCustomDomain) {

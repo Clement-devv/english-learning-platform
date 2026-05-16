@@ -3,6 +3,7 @@ import express from "express";
 import jwt     from "jsonwebtoken";
 import crypto  from "crypto";
 import { config, JWT_STANDARD_CLAIMS } from "../config/config.js";
+import { getCenterSecret } from "../utils/jwtUtils.js";
 import { loginLimiter, passwordResetLimiter } from "../middleware/rateLimiter.js";
 import { sendSubAdminInviteEmail, sendSubAdminWelcomeEmail, sendSubAdminForgotPasswordEmail } from "../utils/emailService.js";
 import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
@@ -59,7 +60,7 @@ router.post("/login", loginLimiter, async (req, res) => {
         teacherScope: teacherScope.map(String),
         permissions: subAdmin.permissions,
       },
-      config.jwtSecret,
+      getCenterSecret(req.center.slug),
       { expiresIn: "7d" }
     );
 
@@ -165,6 +166,7 @@ router.post("/forgot-password", passwordResetLimiter, async (req, res) => {
 
     subAdmin.resetPasswordToken   = hashedToken;
     subAdmin.resetPasswordExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+    subAdmin.resetPasswordCenter  = req.center.slug;
     await subAdmin.save();
 
     const emailResult = await sendSubAdminForgotPasswordEmail(subAdmin, rawToken, req.center, req.center?.centerName || "");
@@ -198,9 +200,14 @@ router.post("/reset-password/:token", passwordResetLimiter, async (req, res) => 
 
     if (!subAdmin) return badRequest(res, "Reset link is invalid or has expired. Please request a new one.");
 
+    if (subAdmin.resetPasswordCenter !== req.center.slug) {
+      return badRequest(res, "Reset link is invalid or has expired. Please request a new one.");
+    }
+
     subAdmin.password             = password; // hashed by pre-save hook
     subAdmin.resetPasswordToken   = null;
     subAdmin.resetPasswordExpires = null;
+    subAdmin.resetPasswordCenter  = null;
     await subAdmin.save();
 
     res.json({ success: true, message: "Password reset successfully. You can now log in." });

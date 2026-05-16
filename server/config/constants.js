@@ -2,8 +2,8 @@
 // Import from here instead of scattering literals in route/util files.
 
 // ── Auth & Sessions ───────────────────────────────────────────────────────────
-export const MAX_LOGIN_ATTEMPTS  = 10;
-export const ACCOUNT_LOCK_MS     = 60 * 60 * 1000;   // 1 hour
+export const MAX_LOGIN_ATTEMPTS  = 5;
+export const ACCOUNT_LOCK_MS     = 15 * 60 * 1000;   // 15 minutes
 export const SESSION_LIMIT       = 5;                  // max concurrent sessions per user
 export const SESSION_EXPIRY_DAYS = 30;                 // sessions inactive longer than this are purged
 

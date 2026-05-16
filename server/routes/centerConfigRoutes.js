@@ -18,6 +18,10 @@ const __dirname  = path.dirname(__filename);
 const BRANDING_DIR = path.join(__dirname, '..', 'uploads', 'branding');
 if (!fs.existsSync(BRANDING_DIR)) fs.mkdirSync(BRANDING_DIR, { recursive: true });
 
+// SVG is deliberately excluded — it can embed <script> tags and cause stored XSS.
+const ALLOWED_BRANDING_MIMES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
+const ALLOWED_BRANDING_EXTS  = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif']);
+
 const brandingStorage = multer.diskStorage({
   destination: (req, _file, cb) => {
     const dir = path.join(BRANDING_DIR, req.center.slug);
@@ -32,10 +36,14 @@ const brandingStorage = multer.diskStorage({
 
 const brandingUpload = multer({
   storage: brandingStorage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB (backgrounds can be larger)
+  limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
-    if (/^image\//.test(file.mimetype)) cb(null, true);
-    else cb(new Error('Only image files are allowed'));
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (ALLOWED_BRANDING_MIMES.has(file.mimetype) && ALLOWED_BRANDING_EXTS.has(ext)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only JPG, PNG, WebP, or GIF images are allowed'));
+    }
   },
 });
 

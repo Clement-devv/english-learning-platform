@@ -1,12 +1,6 @@
+// Sentry is initialized in instrument.js via `node --import ./instrument.js`.
+// We still import it here so we can call setupExpressErrorHandler() below.
 import * as Sentry from "@sentry/node";
-
-Sentry.init({
-  dsn: process.env.SENTRY_DSN,
-  environment: process.env.NODE_ENV || "development",
-  tracesSampleRate: 0.1,
-  enabled: !!process.env.SENTRY_DSN,
-});
-
 import logger from "./utils/logger.js";
 import express from "express";
 import mongoose from "mongoose";
@@ -58,6 +52,17 @@ import { SESSION_CLEANUP_INTERVAL_MS } from "./config/constants.js";
 const app = express();
 const httpServer = http.createServer(app);
 
+// ── Server-level timeouts ─────────────────────────────────────────────────────
+// setTimeout: close TCP sockets idle for 30 s — defends against slowloris
+//   (client that opens a connection but never finishes sending the request).
+// keepAliveTimeout: keep-alive window. Set above Caddy/nginx defaults (75 s)
+//   so Node doesn't close a reused connection before the proxy can reuse it.
+// headersTimeout: must exceed keepAliveTimeout to avoid a race where the
+//   socket keep-alive fires while headers are still being processed.
+httpServer.setTimeout(30_000);
+httpServer.keepAliveTimeout = 65_000;
+httpServer.headersTimeout   = 66_000;
+
 // Initialize Socket.IO (async — sets up Redis adapter when REDIS_URL is set)
 const io = await initializeSocket(httpServer);
 
@@ -98,15 +103,28 @@ app.use(cors({
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'x-center-slug'],
-  maxAge: 86400
+  maxAge: 3600
 }));
 
 // Make io available to routes if needed
 app.set('io', io);
 
+// Security middleware for publicly-served upload directories.
+// nosniff prevents browser MIME sniffing; the strict CSP blocks any script execution
+// if a dangerous file somehow reaches disk. Blocked extensions are a backstop layer.
+const BLOCKED_UPLOAD_EXTS = new Set(['.svg', '.html', '.htm', '.xml', '.js', '.mjs', '.php', '.sh']);
+const serveUploadSecure = (req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Content-Security-Policy', "default-src 'none'");
+  if (BLOCKED_UPLOAD_EXTS.has(path.extname(req.path).toLowerCase())) {
+    return res.status(403).json({ success: false, message: 'File type not allowed' });
+  }
+  next();
+};
+
 // Public uploads — branding assets and teacher photos are needed before / outside auth
-app.use('/uploads/branding', express.static(path.join(__dirname, 'uploads', 'branding')));
-app.use('/uploads/teachers', express.static(path.join(__dirname, 'uploads', 'teachers')));
+app.use('/uploads/branding', serveUploadSecure, express.static(path.join(__dirname, 'uploads', 'branding')));
+app.use('/uploads/teachers', serveUploadSecure, express.static(path.join(__dirname, 'uploads', 'teachers')));
 
 // Block direct static access to private upload directories.
 // Clients must go through the authenticated API routes instead:
@@ -130,6 +148,29 @@ app.use(compression({
     return compression.filter(req, res);
   },
 }));
+
+// ── Application-level request timeout ────────────────────────────────────────
+// Fires a 503 if any route handler hasn't sent a response within 30 seconds.
+// This is distinct from the TCP socket timeout above: it catches handlers that
+// hang (e.g. a stalled DB query) even when the connection itself stays active.
+// The timer is cleared on 'finish' (normal response) and 'close' (client abort).
+// Streaming routes (recordings, SSE) must call req.clearRequestTimeout() or
+// call res.setTimeout(0) to disable per-response.
+const REQUEST_TIMEOUT_MS = 30_000;
+app.use((req, res, next) => {
+  let timer = setTimeout(() => {
+    if (!res.headersSent) {
+      logger.warn('Request timeout', { method: req.method, path: req.path });
+      res.status(503).json({ success: false, message: 'Request timeout' });
+    }
+  }, REQUEST_TIMEOUT_MS);
+  const clear = () => clearTimeout(timer);
+  res.on('finish', clear);
+  res.on('close', clear);
+  // Routes that make slow external calls (e.g. OpenAI) can call this to opt out.
+  req.clearRequestTimeout = clear;
+  next();
+});
 
 // Health checks — no rate limit, no auth, no tenant middleware
 app.use("/api/health", healthRoutes);
@@ -293,8 +334,8 @@ app.get('/manifest.json', async (req, res) => {
     const host = (req.headers.host || '').split(':')[0];
     let center = null;
 
-    // Try custom domain first
-    center = await Center.findOne({ customDomain: host, status: 'active' }).lean();
+    // Try custom domain first — domainVerified must be true (mirrors tenantMiddleware)
+    center = await Center.findOne({ customDomain: host, status: 'active', domainVerified: true }).lean();
 
     // Try subdomain (abc.clemify.com → slug = abc)
     if (!center) {
@@ -366,6 +407,13 @@ app.get('/manifest.json', async (req, res) => {
     return res.sendFile(path.join(frontendPath, 'manifest.json'));
   }
 });
+
+// Serve remaining frontend public assets (icons, fonts, robots.txt, etc.)
+// express.static only serves files that physically exist in dist — anything
+// that doesn't match falls through to the SPA fallback below.
+// The /assets mount at the top of this file is a fast-path for JS/CSS chunks;
+// this catch-all handles everything else from Vite's public/ directory.
+app.use(express.static(frontendPath));
 
 // SPA fallback — all unmatched routes serve index.html
 app.get('/{*path}', (req, res) => {

@@ -33,6 +33,11 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
 
 // ── Multer config for teacher photos ─────────────────────────────────────────
+// Both MIME type and extension must match — extension alone is trivially spoofed.
+// SVG excluded: it can carry embedded scripts.
+const ALLOWED_PHOTO_MIMES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const ALLOWED_PHOTO_EXTS  = new Set(['.jpg', '.jpeg', '.png', '.webp']);
+
 const photoStorage = multer.diskStorage({
   destination: (req, file, cb) => {
     const dir = path.join(__dirname, "../uploads/teachers");
@@ -46,11 +51,14 @@ const photoStorage = multer.diskStorage({
 });
 const photoUpload = multer({
   storage: photoStorage,
-  limits: { fileSize: 3 * 1024 * 1024 }, // 3 MB max
-  fileFilter: (req, file, cb) => {
-    const allowed = [".jpg", ".jpeg", ".png", ".webp"];
-    if (allowed.includes(path.extname(file.originalname).toLowerCase())) cb(null, true);
-    else cb(new Error("Only JPG, PNG, or WebP images are allowed"));
+  limits: { fileSize: 3 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (ALLOWED_PHOTO_EXTS.has(ext) && ALLOWED_PHOTO_MIMES.has(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only JPG, PNG, or WebP images are allowed"));
+    }
   },
 });
 

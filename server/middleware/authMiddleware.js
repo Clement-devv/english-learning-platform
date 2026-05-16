@@ -2,15 +2,50 @@
 // middleware/authMiddleware.js
 import jwt from "jsonwebtoken";
 import { config } from "../config/config.js";
+import { getCenterSecret } from "../utils/jwtUtils.js";
 import { adminSchema }    from "../schemas/adminSchema.js";
 import { teacherSchema }  from "../schemas/teacherSchema.js";
 import { studentSchema }  from "../schemas/studentSchema.js";
 import { subAdminSchema } from "../schemas/subAdminSchema.js";
 import redisClient from "../config/redis.js";
 
-// The JWT signature (last segment) is unique per token — use it as the blacklist key.
-// This avoids storing the full token and is safe to expose in Redis.
-const blacklistKey = (token) => `bl:${token.split('.')[2]}`;
+// ─── In-memory blacklist fallback ─────────────────────────────────────────────
+// Keyed by token signature → Unix expiry timestamp (seconds).
+// Checked on every request so logout works even when Redis is down.
+// Entries self-expire; the interval below clears them to prevent unbounded growth.
+const localBlacklist = new Map();
+
+setInterval(() => {
+  const now = Math.floor(Date.now() / 1000);
+  for (const [sig, exp] of localBlacklist) {
+    if (now >= exp) localBlacklist.delete(sig);
+  }
+}, 60_000).unref(); // unref so this timer doesn't prevent process exit
+
+export function addToLocalBlacklist(token) {
+  try {
+    const sig = token.split('.')[2];
+    const payload = jwt.decode(token);
+    const exp = payload?.exp ?? Math.floor(Date.now() / 1000) + 900;
+    if (exp > Math.floor(Date.now() / 1000)) {
+      localBlacklist.set(sig, exp);
+    }
+  } catch (_) {}
+}
+
+// ─── Impersonation whitelist check ───────────────────────────────────────────
+// Returns true if the token is still whitelisted in Redis (not revoked).
+// Falls back to true when Redis is unavailable — the 10m expiry is the safety net.
+async function isImpersonationActive(authHeader, centerId) {
+  if (!redisClient) return true;
+  try {
+    const sig = authHeader?.split(' ')[1]?.split('.')[2];
+    const stored = await redisClient.get(`impers:${centerId}`);
+    return stored === sig;
+  } catch (_) {
+    return true; // Redis unavailable — rely on short token lifetime
+  }
+}
 
 // ─── Model helpers ────────────────────────────────────────────────────────────
 // All center routes run tenantMiddleware first, which sets req.db.
@@ -32,17 +67,25 @@ export const verifyToken = async (req, res, next) => {
       return res.status(401).json({ success: false, message: "No token provided" });
     }
 
-    const decoded = jwt.verify(token, config.jwtSecret);
+    const decoded = jwt.verify(token, getCenterSecret(req.center.slug), { algorithms: ['HS256'] });
 
-    // Check cross-instance revocation list — populated on logout when Redis is available.
+    // Check in-memory blacklist first — catches revoked tokens even during Redis outages.
+    const sig = token.split('.')[2];
+    const localExp = localBlacklist.get(sig);
+    if (localExp && Math.floor(Date.now() / 1000) < localExp) {
+      return res.status(401).json({ success: false, message: "Session has been revoked. Please log in again." });
+    }
+
+    // Check Redis for cross-instance revocation (tokens revoked on other server instances).
     if (redisClient) {
       try {
-        const revoked = await redisClient.get(blacklistKey(token));
+        const revoked = await redisClient.get(`bl:${sig}`);
         if (revoked) {
           return res.status(401).json({ success: false, message: "Session has been revoked. Please log in again." });
         }
       } catch (_) {
-        // Redis unavailable — fail open (don't block requests, blacklist is best-effort)
+        // Redis unavailable — in-memory blacklist above already covers recently-revoked tokens.
+        // Tokens revoked on other instances during this outage won't be caught until Redis recovers.
       }
     }
 
@@ -109,8 +152,11 @@ export const verifyAdmin = async (req, res, next) => {
     if (req.user.centerId !== req.center.slug) {
       return res.status(403).json({ message: "Token not valid for this center" });
     }
-    // Impersonation tokens skip the DB lookup
+    // Impersonation tokens — check Redis whitelist so revoked sessions are rejected immediately
     if (req.user.isImpersonation) {
+      if (!await isImpersonationActive(req.headers.authorization, req.user.centerId)) {
+        return res.status(401).json({ message: "Impersonation session has been revoked" });
+      }
       req.admin = { _id: null, role: "admin", active: true, isImpersonation: true };
       return next();
     }
@@ -187,8 +233,11 @@ export const verifyAdminOrTeacher = async (req, res, next) => {
       return res.status(403).json({ message: "Token not valid for this center" });
     }
     if (req.user.role === "admin") {
-      // Impersonation tokens skip the DB lookup
+      // Impersonation tokens — check Redis whitelist so revoked sessions are rejected immediately
       if (req.user.isImpersonation) {
+        if (!await isImpersonationActive(req.headers.authorization, req.user.centerId)) {
+          return res.status(401).json({ message: "Impersonation session has been revoked" });
+        }
         req.admin = { _id: null, role: "admin", active: true, isImpersonation: true };
         return next();
       }

@@ -9,6 +9,7 @@ import {
   verifyTwoFactorToken,
   generateBackupCodes,
 } from '../utils/twoFactorAuth.js';
+import { encrypt, decrypt, hashBackupCode } from '../utils/fieldEncryption.js';
 import { logger } from '../utils/logger.js';
 import { teacherSchema } from '../schemas/teacherSchema.js';
 import { studentSchema } from '../schemas/studentSchema.js';
@@ -66,8 +67,8 @@ router.post('/setup', verifyToken, async (req, res) => {
     // Generate new secret and QR code
     const { secret, qrCode } = await generateTwoFactorSecret(email);
 
-    // Store secret temporarily (not enabled yet)
-    user.twoFactorSecret = secret;
+    // Store secret encrypted (not enabled yet)
+    user.twoFactorSecret = encrypt(secret);
     user.twoFactorVerified = false;
     await user.save();
 
@@ -116,7 +117,7 @@ router.post('/verify', [
       });
     }
 
-    const isValid = verifyTwoFactorToken(token, user.twoFactorSecret);
+    const isValid = verifyTwoFactorToken(token, decrypt(user.twoFactorSecret));
 
     if (!isValid) {
       logger.warn('2FA_VERIFICATION_FAILED', { userId: id, role });
@@ -126,11 +127,11 @@ router.post('/verify', [
       });
     }
 
-    const backupCodes = generateBackupCodes();
+    const backupCodes = generateBackupCodes(); // plaintext — shown to user once, then discarded
 
     user.twoFactorEnabled = true;
     user.twoFactorVerified = true;
-    user.twoFactorBackupCodes = backupCodes;
+    user.twoFactorBackupCodes = backupCodes.map(hashBackupCode); // hashed for storage
     await user.save();
 
     logger.info('2FA_ENABLED', { userId: id, role });
@@ -282,8 +283,8 @@ router.post('/regenerate-backup-codes', [
       });
     }
 
-    const backupCodes = generateBackupCodes();
-    user.twoFactorBackupCodes = backupCodes;
+    const backupCodes = generateBackupCodes(); // plaintext — shown to user once, then discarded
+    user.twoFactorBackupCodes = backupCodes.map(hashBackupCode); // hashed for storage
     await user.save();
 
     logger.info('2FA_BACKUP_CODES_REGENERATED', { userId: id, role });

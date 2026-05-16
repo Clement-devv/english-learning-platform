@@ -314,6 +314,10 @@ router.post("/analyze", verifyToken, audioUpload.single("audio"), async (req, re
     return res.status(402).json({ success: false, reason: "no_credits", message: "No pronunciation credits remaining. Ask your admin to top up." });
   }
 
+  // OpenAI calls (Whisper + IPA) can take longer than the global 30 s request
+  // timeout. Opt out so the connection isn't severed mid-analysis.
+  req.clearRequestTimeout?.();
+
   try {
     // 1. Whisper transcription
     const transcription = await openai.audio.transcriptions.create({

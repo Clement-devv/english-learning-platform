@@ -2,6 +2,7 @@
 import { Server } from 'socket.io';
 import jwt from 'jsonwebtoken';
 import { config } from './config/config.js';
+import { getCenterSecret } from './utils/jwtUtils.js';
 import Center from './models/master/Center.js';
 import logger from "./utils/logger.js";
 import { getDb } from './config/dbManager.js';
@@ -129,7 +130,11 @@ export async function initializeSocket(httpServer) {
       return next(new Error('Authentication required'));
     }
     try {
-      const decoded = jwt.verify(token, config.jwtSecret);
+      // Decode header only (no trust) to extract centerId for secret derivation.
+      // jwt.verify below then proves the centerId claim is authentic.
+      const unverified = jwt.decode(token);
+      if (!unverified?.centerId) return next(new Error('Invalid token'));
+      const decoded = jwt.verify(token, getCenterSecret(unverified.centerId), { algorithms: ['HS256'] });
       socket.userId = decoded.id;
       socket.userRole = decoded.role;     // role from JWT — not trusted from client
       socket.centerId = decoded.centerId; // center slug the token was issued for

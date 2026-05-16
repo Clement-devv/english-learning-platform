@@ -16,4 +16,4 @@ COPY --from=frontend /app/dist ../dist/
 RUN mkdir -p logs uploads/content uploads/recordings uploads/branding uploads/teachers uploads/homework && \
     chmod -R 777 logs uploads
 EXPOSE 5000
-CMD ["node", "index.js"]
+CMD ["node", "--import", "./instrument.js", "index.js"]

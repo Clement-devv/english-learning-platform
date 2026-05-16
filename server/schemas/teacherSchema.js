@@ -34,6 +34,7 @@ export const teacherSchema = new mongoose.Schema({
   earned: { type: Number, default: 0 },
   resetPasswordToken: String,
   resetPasswordExpires: Date,
+  resetPasswordCenter: String,
   lastPasswordChange: Date,
   sessions: [sessionSchema],
   lastLogin: Date,

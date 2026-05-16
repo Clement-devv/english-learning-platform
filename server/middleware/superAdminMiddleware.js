@@ -9,7 +9,7 @@ export const verifySuperAdmin = async (req, res, next) => {
       return res.status(401).json({ success: false, message: 'No token provided' });
     }
 
-    const decoded = jwt.verify(token, config.jwtSecret);
+    const decoded = jwt.verify(token, config.jwtSecret, { algorithms: ['HS256'] });
 
     if (decoded.role !== 'superadmin') {
       return res.status(403).json({ success: false, message: 'Super admin access required' });

@@ -12,6 +12,7 @@ export const adminSchema = new mongoose.Schema({
   lastPasswordChange: Date,
   resetPasswordToken: String,
   resetPasswordExpires: Date,
+  resetPasswordCenter: String,
   sessions: [sessionSchema],
   lastLogin: Date,
   twoFactorEnabled: { type: Boolean, default: false },

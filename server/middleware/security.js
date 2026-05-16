@@ -6,23 +6,41 @@
 // set elsewhere (e.g. refresh tokens) MUST use SameSite=Strict + Secure + HttpOnly.
 import helmet from "helmet";
 import { sanitize as mongoSanitizeValue } from "express-mongo-sanitize";
+import sanitizeHtml from "sanitize-html";
 
-// Inline XSS sanitizer — replaces the abandoned xss-clean package.
-// Strips <script> blocks, event-handler attributes, and dangerous URI schemes
-// without encoding benign HTML (which would corrupt stored content).
-const XSS_PATTERNS = [
-  /<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi,
-  /on\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]*)/gi,
-  /javascript\s*:/gi,
-  /vbscript\s*:/gi,
-  /data\s*:\s*text\/html/gi,
-];
+// Allowlist-based XSS sanitizer using a real HTML parser (htmlparser2 via
+// sanitize-html). Regex blacklists can be bypassed with encoding tricks,
+// nested tags, or Unicode variants — a parser-based allowlist cannot.
+//
+// Only formatting tags needed for rich text (lesson notes, chat messages) are
+// permitted. Scripts, iframes, event-handler attributes, and dangerous URI
+// schemes are stripped entirely by the library.
+const SANITIZE_OPTIONS = {
+  allowedTags: [
+    'b', 'i', 'em', 'strong', 'u', 's',
+    'p', 'br', 'ul', 'ol', 'li',
+    'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+    'blockquote', 'code', 'pre', 'span',
+    'a',
+  ],
+  allowedAttributes: {
+    'a':    ['href', 'title', 'target', 'rel'],
+    'span': ['style'],
+    '*':    ['class'],
+  },
+  allowedSchemes:        ['http', 'https', 'mailto'],
+  allowProtocolRelative: false,
+  // script/style inner text is discarded, not passed through
+  nonTextTags: ['script', 'style', 'textarea', 'noscript'],
+};
 
 function xssClean(value) {
   if (typeof value === 'string') {
-    return XSS_PATTERNS.reduce((str, pattern) => str.replace(pattern, ''), value);
+    // Strip null bytes before parsing — they can trick HTML parsers into
+    // misreading tag names (e.g. <scr\x00ipt> → <script> after null removal).
+    return sanitizeHtml(value.replace(/\x00/g, ''), SANITIZE_OPTIONS);
   }
-  if (Array.isArray(value)) return value.map(xssClean);
+  if (Array.isArray(value))      return value.map(xssClean);
   if (value && typeof value === 'object') {
     return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, xssClean(v)]));
   }
@@ -69,6 +87,11 @@ export const securityHeaders = helmet({
         // Google Translate API
         "https://translate.googleapis.com",
         "https://translate-pa.googleapis.com",
+        // Sentry error reporting — CSP wildcards only match ONE subdomain level,
+        // so *.sentry.io does NOT cover o123.ingest.us.sentry.io (three levels).
+        // Both patterns below are needed: old-style and new US-regional ingest.
+        "https://*.ingest.sentry.io",
+        "https://*.ingest.us.sentry.io",
       ],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
       objectSrc: ["'none'"],
@@ -119,9 +142,10 @@ export const noSqlInjectionProtection = (req, res, next) => {
 /**
  * Prevent XSS attacks.
  *
- * xss-clean does `req.query = cleaned` directly, which throws on Express 5 +
- * Node 24 because req.query is a prototype getter. We use the underlying
- * xss cleaner directly and apply it safely via Object.defineProperty.
+ * Runs req.body, req.params, and req.query through the allowlist-based
+ * sanitize-html cleaner above. req.query is applied via Object.defineProperty
+ * because Express 5 + Node 24 makes it a prototype getter that rejects direct
+ * assignment.
  */
 export const xssProtection = (req, res, next) => {
   if (req.body) req.body = xssClean(req.body);
