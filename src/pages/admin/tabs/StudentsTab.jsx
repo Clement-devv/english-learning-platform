@@ -565,7 +565,7 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
           </button>
 
           <button
-            onClick={() => downloadStudentRoster(filteredStudents)}
+            onClick={() => downloadStudentRoster(filteredStudents).catch(console.error)}
             title="Download visible students as PDF"
             className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-all ${
               isDarkMode

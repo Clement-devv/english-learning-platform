@@ -16,6 +16,7 @@ import { getCenterSecret } from '../utils/jwtUtils.js';
 import { sendEmail, sendCenterDeletionWarningEmail } from '../utils/emailService.js';
 import { verifyDomainDns, isValidDomain, normalizeDomain } from '../utils/domainVerifier.js';
 import { pruneSessionsToLimit } from '../utils/sessionManager.js';
+import { invalidateCache } from '../utils/cache.js';
 import {
   validate,
   validateSuperAdminLogin,
@@ -166,6 +167,8 @@ router.patch('/centers/:id/approve', verifySuperAdmin, strictLimiter, validatePa
     center.approvedBy = req.superAdmin._id.toString();
     await center.save();
 
+    await invalidateCache(`tenant:slug:${center.slug}`);
+
     await writeAuditLog({
       action: 'CENTER_APPROVED', superAdmin: req.superAdmin,
       targetId: center._id.toString(), targetName: center.centerName, ip: req.ip,
@@ -248,6 +251,8 @@ router.patch('/centers/:id/suspend', verifySuperAdmin, strictLimiter, validateCe
     );
     if (!center) return notFound(res, 'Center not found');
 
+    await invalidateCache(`tenant:slug:${center.slug}`);
+
     await writeAuditLog({
       action: 'CENTER_SUSPENDED', superAdmin: req.superAdmin,
       targetId: center._id.toString(), targetName: center.centerName, ip: req.ip,
@@ -269,6 +274,8 @@ router.patch('/centers/:id/activate', verifySuperAdmin, strictLimiter, validateP
       { new: true }
     );
     if (!center) return notFound(res, 'Center not found');
+
+    await invalidateCache(`tenant:slug:${center.slug}`);
 
     await writeAuditLog({
       action: 'CENTER_ACTIVATED', superAdmin: req.superAdmin,
@@ -1013,6 +1020,10 @@ router.patch('/centers/:id/verify-domain', verifySuperAdmin, strictLimiter, vali
       domainVerifiedBy: req.superAdmin._id.toString(),
     });
 
+    // Bust CORS + tenant caches so the domain is immediately allowed
+    // without waiting for the cached denied result to expire.
+    await invalidateCache(`cors:${center.customDomain}`, `tenant:domain:${center.customDomain}`);
+
     await writeAuditLog({
       action: 'DOMAIN_VERIFIED', superAdmin: req.superAdmin,
       targetId: center._id.toString(), targetName: center.centerName,
@@ -1042,6 +1053,10 @@ router.patch('/centers/:id/remove-domain', verifySuperAdmin, strictLimiter, vali
         domainInstructions: '',
       },
     });
+
+    // Bust CORS + tenant caches so the domain is immediately denied
+    // without waiting for the cached allowed result to expire.
+    if (center.customDomain) await invalidateCache(`cors:${center.customDomain}`, `tenant:domain:${center.customDomain}`);
 
     await writeAuditLog({
       action: 'DOMAIN_REMOVED', superAdmin: req.superAdmin,
@@ -1091,6 +1106,8 @@ router.patch('/centers/:id/soft-delete', verifySuperAdmin, strictLimiter, valida
       deletedBy:           req.superAdmin._id.toString(),
     });
 
+    await invalidateCache(`tenant:slug:${center.slug}`);
+
     // Send warning email to center admin — non-blocking
     try {
       await sendCenterDeletionWarningEmail(center, scheduledDeletionAt, config.emailFrom);
@@ -1124,6 +1141,8 @@ router.patch('/centers/:id/restore', verifySuperAdmin, strictLimiter, validatePa
       status:              'active',
       $unset: { deletedAt: '', scheduledDeletionAt: '', deletedBy: '' },
     });
+
+    await invalidateCache(`tenant:slug:${center.slug}`);
 
     // Notify center admin that their account has been restored
     try {

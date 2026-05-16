@@ -1,6 +1,4 @@
 // src/utils/studentPdf.js
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function fmt(dateStr) {
@@ -56,7 +54,9 @@ function drawFooter(doc, centerName) {
 
 // ── ROSTER PDF ─────────────────────────────────────────────────────────────────
 // Downloads a full table of all provided students.
-export function downloadStudentRoster(students, centerName) {
+export async function downloadStudentRoster(students, centerName) {
+  const { default: jsPDF } = await import("jspdf");
+  const { default: autoTable } = await import("jspdf-autotable");
   const name = centerName || document.title || "English Learning Center";
   const doc  = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
   const W    = doc.internal.pageSize.getWidth();
@@ -165,7 +165,9 @@ export function downloadStudentRoster(students, centerName) {
 
 // ── SINGLE STUDENT PDF ─────────────────────────────────────────────────────────
 // Downloads a profile sheet for one student.
-export function downloadStudentCard(student, centerName) {
+export async function downloadStudentCard(student, centerName) {
+  const { default: jsPDF } = await import("jspdf");
+  const { default: autoTable } = await import("jspdf-autotable");
   const name = centerName || document.title || "English Learning Center";
   const doc  = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const W    = doc.internal.pageSize.getWidth();

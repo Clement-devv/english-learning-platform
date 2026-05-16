@@ -96,7 +96,7 @@ router.get("/:id", verifyToken, async (req, res) => {
     const teacher = await cachedQuery(cacheKey, 60, () =>
       getTeacher(req.db)
         .findById(req.params.id)
-        .select("-password -inviteToken -twoFactorSecret -twoFactorBackupCodes")
+        .select("-password -inviteToken -twoFactorSecret -twoFactorBackupCodes -sessions")
         .lean()
     );
     if (!teacher) return notFound(res, "Teacher not found");
@@ -112,7 +112,7 @@ router.get("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
     const { limit, skip } = parsePagination(req.query);
     const teachers = await getTeacher(req.db)
       .find()
-      .select("-password -inviteToken -twoFactorSecret -twoFactorBackupCodes")
+      .select("-password -inviteToken -twoFactorSecret -twoFactorBackupCodes -sessions")
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
@@ -438,7 +438,7 @@ router.put("/:id", verifyToken, verifyAdmin, async (req, res) => {
 
     const teacher = await getTeacher(req.db)
       .findByIdAndUpdate(req.params.id, updateData, { new: true, runValidators: true })
-      .select("-password -inviteToken");
+      .select("-password -inviteToken -sessions");
     if (!teacher) return notFound(res, "Teacher not found");
 
     await invalidateCache(teacherCacheKey(req.center?.slug, req.params.id));

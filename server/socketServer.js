@@ -66,23 +66,38 @@ async function isAllowedOrigin(origin) {
   return false;
 }
 
-// Per-socket rate limiter — tracks event counts in a rolling 1-second window.
-// Sockets that exceed the limit are disconnected to prevent payload flooding.
-const SOCKET_RATE_LIMIT = 60;  // max events per second per socket
+// Per-user rate limiter — tracks event counts in a rolling 1-second window.
+// Keyed by userId+centerId so multi-tab users share one counter.
+// Uses Redis when available (cross-process safe for PM2 cluster); falls back
+// to an in-memory Map per worker when Redis is unavailable.
+const SOCKET_RATE_LIMIT = 60;  // max events per second per user
 const SOCKET_RATE_WINDOW = 1000; // ms
 
-function makeRateLimiter() {
-  const counts = new Map(); // socketId → { count, resetAt }
-  return function checkRate(socketId) {
-    const now = Date.now();
-    const entry = counts.get(socketId);
-    if (!entry || now >= entry.resetAt) {
-      counts.set(socketId, { count: 1, resetAt: now + SOCKET_RATE_WINDOW });
-      return true;
+// In-memory fallback: socketId → { count, resetAt }
+const _memCounts = new Map();
+function _checkRateMemory(socketId) {
+  const now = Date.now();
+  const entry = _memCounts.get(socketId);
+  if (!entry || now >= entry.resetAt) {
+    _memCounts.set(socketId, { count: 1, resetAt: now + SOCKET_RATE_WINDOW });
+    return true;
+  }
+  entry.count += 1;
+  return entry.count <= SOCKET_RATE_LIMIT;
+}
+
+async function checkSocketRate(socket) {
+  if (redisClient) {
+    try {
+      const key = `socket_rate:${socket.centerId}:${socket.userId}`;
+      const count = await redisClient.incr(key);
+      if (count === 1) await redisClient.pexpire(key, SOCKET_RATE_WINDOW);
+      return count <= SOCKET_RATE_LIMIT;
+    } catch {
+      // Redis error — fall through to memory fallback
     }
-    entry.count += 1;
-    return entry.count <= SOCKET_RATE_LIMIT;
-  };
+  }
+  return _checkRateMemory(socket.id);
 }
 
 export async function initializeSocket(httpServer) {
@@ -120,8 +135,6 @@ export async function initializeSocket(httpServer) {
     logger.warn('⚠️ REDIS_URL not set — Socket.IO using in-memory adapter. Clustering will NOT work correctly without Redis.');
   }
 
-  const checkRate = makeRateLimiter();
-
   // ── JWT authentication for every socket connection ───────────────────────
   // Client must pass the auth token in handshake: io(URL, { auth: { token } })
   io.use((socket, next) => {
@@ -158,9 +171,10 @@ export async function initializeSocket(httpServer) {
   io.on('connection', (socket) => {
     logger.info('🔌 Socket connected:', socket.id, `(${socket.centerId})`);
 
-    // Throttle all incoming events — disconnect sockets that flood the server
-    socket.onAny(() => {
-      if (!checkRate(socket.id)) {
+    // Throttle all incoming events — disconnect sockets that flood the server.
+    // Keyed by userId so multi-tab users share one counter across all workers.
+    socket.onAny(async () => {
+      if (!await checkSocketRate(socket)) {
         logger.warn(`⚠️  Socket rate limit exceeded: ${socket.id} (${socket.centerId}) — disconnecting`);
         socket.disconnect(true);
       }

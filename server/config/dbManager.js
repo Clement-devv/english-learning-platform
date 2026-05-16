@@ -4,8 +4,8 @@ import logger from "../utils/logger.js";
 const connections = {};
 
 const mongooseOptions = {
-  maxPoolSize: 20,
-  minPoolSize: 5,
+  maxPoolSize: 10,
+  minPoolSize: 2,
   serverSelectionTimeoutMS: 5000,
   socketTimeoutMS: 45000,
   connectTimeoutMS: 10000,

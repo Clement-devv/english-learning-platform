@@ -123,7 +123,8 @@ router.get("/teacher/:teacherId/students", verifyToken, verifyAdmin, async (req,
 
     const assignments = await getAssignment(req.db).find({ teacherId })
       .populate("studentId", "firstName lastName email classCredits active")
-      .sort({ assignedDate: -1 });
+      .sort({ assignedDate: -1 })
+      .lean();
 
     const students = assignments
       .filter((a) => a.studentId)
@@ -152,7 +153,8 @@ router.get("/student/:studentId/teachers", verifyToken, verifyAdmin, async (req,
 
     const assignments = await getAssignment(req.db).find({ studentId })
       .populate("teacherId", "firstName lastName email ratePerClass lessonsCompleted earned active")
-      .sort({ assignedDate: -1 });
+      .sort({ assignedDate: -1 })
+      .lean();
 
     const teachers = assignments
       .filter((a) => a.teacherId)
@@ -199,7 +201,8 @@ router.get("/bookings", verifyToken, verifyAdmin, async (req, res) => {
     const bookings = await getBooking(req.db).find({ teacherId, studentId, ...statusFilter })
       .populate("teacherId", "firstName lastName ratePerClass")
       .populate("studentId", "firstName lastName")
-      .sort({ scheduledTime: -1 });
+      .sort({ scheduledTime: -1 })
+      .lean();
 
     res.json({ success: true, bookings });
   } catch (err) {

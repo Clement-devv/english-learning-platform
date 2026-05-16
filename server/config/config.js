@@ -81,7 +81,7 @@ export const config = {
   // Security
   jwtSecret: process.env.JWT_SECRET,
   jwtExpiry: process.env.JWT_EXPIRY || '15m',
-  bcryptRounds: parseInt(process.env.BCRYPT_ROUNDS) || 12,
+  bcryptRounds: Math.max(parseInt(process.env.BCRYPT_ROUNDS) || 12, 10),
   encryptionKey: process.env.ENCRYPTION_KEY,
   
   // Password requirements

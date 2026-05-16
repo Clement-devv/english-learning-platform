@@ -48,6 +48,7 @@ import { errorHandler, notFoundHandler, registerProcessHandlers } from "./middle
 import healthRoutes from "./routes/healthRoutes.js";
 import { sweepExpiredSessionsFromDb } from "./utils/sessionManager.js";
 import { SESSION_CLEANUP_INTERVAL_MS } from "./config/constants.js";
+import redisClient from "./config/redis.js";
 
 const app = express();
 const httpServer = http.createServer(app);
@@ -81,6 +82,40 @@ app.use(noSqlInjectionProtection);
 app.use(xssProtection);
 app.use(parameterPollutionProtection);
 
+// ── CORS domain cache ─────────────────────────────────────────────────────────
+// Custom-domain lookups are cached in Redis so we don't hit MongoDB on every
+// preflight. Allowed domains cache for 10 min; denied ones for 2 min (shorter
+// so a newly-verified domain propagates quickly). Both cases are cached —
+// without negative caching, unknown hostnames still cause a DB hit each time.
+const CORS_ALLOWED_TTL = 600;  // 10 minutes
+const CORS_DENIED_TTL  = 120;  // 2 minutes
+
+async function isCorsAllowed(hostname) {
+  const key = `cors:${hostname}`;
+
+  if (redisClient) {
+    try {
+      const cached = await redisClient.get(key);
+      if (cached !== null) return cached === '1';
+    } catch (_) { /* Redis unavailable — fall through to DB */ }
+  }
+
+  const match = await Center.findOne(
+    { customDomain: hostname, domainVerified: true, status: 'active' },
+    { _id: 1 }   // projection — we only need existence, not the full doc
+  ).lean();
+
+  const allowed = !!match;
+
+  if (redisClient) {
+    try {
+      await redisClient.setex(key, allowed ? CORS_ALLOWED_TTL : CORS_DENIED_TTL, allowed ? '1' : '0');
+    } catch (_) { /* cache write failure is non-fatal */ }
+  }
+
+  return allowed;
+}
+
 // CORS Configuration — allows static origins + verified custom domains
 app.use(cors({
   origin: async (origin, callback) => {
@@ -93,9 +128,8 @@ app.use(cors({
       // Allow any center subdomain under clemify.com
       if (hostname.endsWith('.clemify.com')) return callback(null, true);
 
-      // Allow verified custom domains
-      const match = await Center.findOne({ customDomain: hostname, domainVerified: true });
-      if (match) return callback(null, true);
+      // Allow verified custom domains — result is cached in Redis
+      if (await isCorsAllowed(hostname)) return callback(null, true);
     } catch (_) { /* invalid URL — fall through */ }
 
     callback(new Error('Not allowed by CORS'));

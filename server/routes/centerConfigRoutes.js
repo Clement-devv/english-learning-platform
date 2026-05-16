@@ -11,6 +11,7 @@ import { sendDomainInstructionsEmail } from '../utils/emailService.js';
 import { config } from '../config/config.js';
 import logger from "../utils/logger.js";
 import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
+import { invalidateCache } from '../utils/cache.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
@@ -82,6 +83,8 @@ router.patch('/branding', tenantMiddleware, verifyToken, verifyAdmin, async (req
       'branding.loginBgOverlay':  loginBgOverlay  !== undefined ? loginBgOverlay  : req.center.branding.loginBgOverlay,
     });
 
+    await invalidateCache(`tenant:slug:${req.center.slug}`);
+
     res.json({ success: true, message: 'Branding updated' });
   } catch (err) {
     logger.error('❌ Branding update error:', { error: err?.message });
@@ -114,6 +117,14 @@ router.post('/domain', tenantMiddleware, verifyToken, verifyAdmin, async (req, r
       domainRequestedAt: new Date(),
       domainInstructions: { type: 'A', name: '@', value: serverIp },
     });
+
+    // Bust CORS + tenant caches for old and new domain so the change takes
+    // effect immediately rather than waiting for the TTL to expire.
+    const busts = [`cors:${normalized}`, `tenant:slug:${req.center.slug}`, `tenant:domain:${normalized}`];
+    if (req.center.customDomain && req.center.customDomain !== normalized) {
+      busts.push(`cors:${req.center.customDomain}`, `tenant:domain:${req.center.customDomain}`);
+    }
+    await invalidateCache(...busts);
 
     try {
       await sendDomainInstructionsEmail(
@@ -214,6 +225,7 @@ router.patch('/certificate-template', tenantMiddleware, verifyToken, verifyAdmin
     }
 
     await Center.findByIdAndUpdate(req.center._id, { $set: update });
+    await invalidateCache(`tenant:slug:${req.center.slug}`);
     res.json({ success: true, message: 'Certificate template updated' });
   } catch (err) {
     logger.error('❌ Certificate template update error:', { error: err?.message });

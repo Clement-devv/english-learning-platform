@@ -323,7 +323,7 @@ export default function StudentCard({
                   label="Download PDF"
                   color="indigo"
                   isDarkMode={isDarkMode}
-                  onClick={() => { downloadStudentCard(student); setMenuOpen(false); }}
+                  onClick={() => { downloadStudentCard(student).catch(console.error); setMenuOpen(false); }}
                 />
 
                 {student.status === "pending" && (

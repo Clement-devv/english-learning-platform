@@ -1,6 +1,4 @@
 import React, { useState } from "react";
-import jsPDF from "jspdf";
-import "jspdf-autotable";
 
 export default function PaymentHistoryModal({ isOpen, onClose, history }) {
   const [fromDate, setFromDate] = useState("");
@@ -18,7 +16,9 @@ export default function PaymentHistoryModal({ isOpen, onClose, history }) {
     return true;
   });
 
-  const handlePrint = () => {
+  const handlePrint = async () => {
+    const { default: jsPDF } = await import("jspdf");
+    await import("jspdf-autotable");
     const doc = new jsPDF();
     doc.text("Payment History", 14, 15);
     doc.autoTable({

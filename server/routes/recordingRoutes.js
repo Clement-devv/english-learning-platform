@@ -152,7 +152,8 @@ router.get("/", verifyToken, async (req, res) => {
       .populate("bookingId", "classTitle scheduledTime")
       .populate("teacherId", "firstName lastName")
       .populate("studentId", "firstName lastName")
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
 
     res.json({ success: true, recordings });
   } catch (err) {
@@ -169,7 +170,8 @@ router.get("/teacher/:teacherId", verifyToken, async (req, res) => {
       .populate("bookingId", "classTitle scheduledTime")
       .populate("teacherId", "firstName lastName")
       .populate("studentId", "firstName lastName")
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
 
     res.json({ success: true, recordings });
   } catch (err) {
@@ -270,7 +272,7 @@ export function startRecordingCleanup(db) {
       const expired = await Recording.find({ autoDeleteAt: { $lte: new Date() } });
       if (expired.length === 0) return;
       logger.info(`Auto-deleting ${expired.length} expired recording(s)...`);
-      for (const rec of expired) await purgeRecording(rec);
+      await Promise.all(expired.map(rec => purgeRecording(rec)));
       logger.info(`Deleted ${expired.length} recording(s)`);
     } catch (err) {
       logger.error("Recording cleanup error:", { error: err?.message });

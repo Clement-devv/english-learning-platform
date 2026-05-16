@@ -694,7 +694,7 @@ export default function TeachersTab({ onNotify, isDarkMode = false }) {
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <button
-            onClick={() => downloadTeacherRoster(filteredTeachers)}
+            onClick={() => downloadTeacherRoster(filteredTeachers).catch(console.error)}
             title="Download visible teachers as PDF"
             className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-all ${
               isDarkMode

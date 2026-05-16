@@ -315,7 +315,7 @@ export default function TeacherCard({
                   label="Download PDF"
                   color="indigo"
                   isDarkMode={isDarkMode}
-                  onClick={() => { downloadTeacherCard(teacher); setMenuOpen(false); }}
+                  onClick={() => { downloadTeacherCard(teacher).catch(console.error); setMenuOpen(false); }}
                 />
 
                 {/* Divider */}

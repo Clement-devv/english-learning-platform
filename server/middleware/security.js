@@ -52,6 +52,7 @@ function xssClean(value) {
  * Protects against common web vulnerabilities
  */
 export const securityHeaders = helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
   permissionsPolicy: {
     features: {
       camera:         ["'self'"],

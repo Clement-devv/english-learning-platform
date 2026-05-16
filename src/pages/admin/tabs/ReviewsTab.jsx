@@ -375,7 +375,7 @@ export default function ReviewsTab({ isDarkMode }) {
                 acc.push(
                   <button key={n} onClick={() => setPage(n)}
                     style={{
-                      width: 36, height: 36, borderRadius: 8, border: "none",
+                      width: 36, height: 36, borderRadius: 8,
                       background: n === safePage ? "#7c3aed" : card,
                       color: n === safePage ? "#fff" : text,
                       fontWeight: n === safePage ? 900 : 600,
