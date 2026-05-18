@@ -3,12 +3,15 @@ import express from "express";
 import { verifyToken } from "../middleware/authMiddleware.js";
 import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
 import { assignmentSchema } from "../schemas/assignmentSchema.js";
+import { studentSchema } from "../schemas/studentSchema.js";
+import { assignStudentId } from "../utils/studentIdGenerator.js";
 import logger from "../utils/logger.js";
 
 const router = express.Router();
 router.use(tenantMiddleware);
 
 const getAssignment = (db) => db.models.Assignment || db.model("Assignment", assignmentSchema);
+const getStudent    = (db) => db.models.Student    || db.model("Student",    studentSchema);
 
 /**
  * GET /api/teacher-assignments/my-teachers
@@ -45,9 +48,18 @@ router.get("/:teacherId/students", verifyToken, async (req, res) => {
     const assignments = await getAssignment(req.db).find({ teacherId })
       .populate({
         path: "studentId",
-        select: "firstName lastName email classCredits active age dateOfBirth rank lastPaymentDate"
+        select: "firstName lastName email classCredits active age dateOfBirth rank lastPaymentDate studentId"
       })
       .sort({ assignedDate: -1 });
+
+    // Backfill missing student IDs (lazy migration for existing students).
+    // Sequential to avoid concurrent ID collisions within the same request.
+    const Student = getStudent(req.db);
+    for (const a of assignments) {
+      if (a.studentId && !a.studentId.studentId) {
+        a.studentId.studentId = await assignStudentId(Student, a.studentId._id);
+      }
+    }
 
     const students = assignments.map(assignment => ({
       assignmentId: assignment._id,

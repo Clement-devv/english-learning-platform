@@ -24,7 +24,7 @@ router.get("/", async (req, res) => {
     const assignments = await getAssignment(req.db)
       .find()
       .populate("teacherId", "firstName lastName email")
-      .populate("studentId", "firstName lastName email")
+      .populate("studentId", "firstName lastName email studentId")
       .sort({ assignedDate: -1 })
       .skip(skip)
       .limit(limit)
@@ -58,7 +58,7 @@ router.post("/", async (req, res) => {
 
     const populated = await Assignment.findById(assignment._id)
       .populate("teacherId", "firstName lastName email")
-      .populate("studentId", "firstName lastName email");
+      .populate("studentId", "firstName lastName email studentId");
 
     // Auto-create group chat
     try {

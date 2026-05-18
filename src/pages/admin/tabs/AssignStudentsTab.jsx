@@ -3,7 +3,7 @@ import { Users, UserCheck, Search, Trash2, Plus, ChevronDown, ChevronRight, X, L
 import { getAssignments, createAssignment, deleteAssignment } from "../../../services/assignmentService";
 
 // ── Searchable dropdown combobox ─────────────────────────────────────────────
-function SearchableSelect({ options, value, onChange, placeholder, isDarkMode, getLabel, getId }) {
+function SearchableSelect({ options, value, onChange, placeholder, isDarkMode, getLabel, getId, renderOption }) {
   const [open, setOpen]       = useState(false);
   const [query, setQuery]     = useState("");
   const containerRef          = useRef(null);
@@ -130,7 +130,9 @@ function SearchableSelect({ options, value, onChange, placeholder, isDarkMode, g
                     <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${avatarCls}`}>
                       {label[0]?.toUpperCase() ?? "?"}
                     </div>
-                    <span className={isSelected ? "font-medium" : ""}>{label}</span>
+                    {renderOption ? renderOption(o, isSelected) : (
+                      <span className={isSelected ? "font-medium" : ""}>{label}</span>
+                    )}
                   </div>
                 );
               })
@@ -358,6 +360,14 @@ export default function AssignStudentsTab({ teachers = [], students = [], onNoti
                 isDarkMode={isDarkMode}
                 getId={(o) => o._id}
                 getLabel={(o) => `${o.firstName} ${o.lastName}`}
+                renderOption={(o, isSelected) => (
+                  <div className="min-w-0">
+                    <p className={`text-sm leading-tight ${isSelected ? "font-semibold" : "font-medium"}`}>{o.firstName} {o.lastName}</p>
+                    {o.studentId && (
+                      <p className={`text-[10px] font-mono font-semibold ${isDarkMode ? "text-indigo-400" : "text-indigo-500"}`}>{o.studentId}</p>
+                    )}
+                  </div>
+                )}
               />
             </div>
 
@@ -511,7 +521,12 @@ export default function AssignStudentsTab({ teachers = [], students = [], onNoti
                             <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${isDarkMode ? "bg-emerald-900/50 text-emerald-300" : "bg-emerald-100 text-emerald-600"}`}>
                               {(a.studentId?.firstName?.[0] ?? "?").toUpperCase()}
                             </div>
-                            <span className="flex-1 font-medium">{a.studentId?.firstName} {a.studentId?.lastName}</span>
+                            <div className="flex-1 min-w-0">
+                              <span className="font-medium">{a.studentId?.firstName} {a.studentId?.lastName}</span>
+                              {a.studentId?.studentId && (
+                                <p className={`text-[10px] font-mono font-semibold ${isDarkMode ? "text-indigo-400" : "text-indigo-500"}`}>{a.studentId.studentId}</p>
+                              )}
+                            </div>
                             <span className={`text-xs ${t.muted}`}>
                               {a.assignedDate ? new Date(a.assignedDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "—"}
                             </span>
@@ -551,9 +566,12 @@ export default function AssignStudentsTab({ teachers = [], students = [], onNoti
                             ${isDarkMode ? "bg-emerald-900/50 text-emerald-300" : "bg-emerald-100 text-emerald-600"}`}>
                             {(a.studentId?.firstName?.[0] ?? "?").toUpperCase()}
                           </div>
-                          <span className="font-medium truncate">
-                            {a.studentId?.firstName} {a.studentId?.lastName}
-                          </span>
+                          <div className="min-w-0">
+                            <span className="font-medium">{a.studentId?.firstName} {a.studentId?.lastName}</span>
+                            {a.studentId?.studentId && (
+                              <p className={`text-[10px] font-mono font-semibold ${isDarkMode ? "text-indigo-400" : "text-indigo-500"}`}>{a.studentId.studentId}</p>
+                            )}
+                          </div>
                         </div>
                       </td>
                       <td className="px-5 py-3">

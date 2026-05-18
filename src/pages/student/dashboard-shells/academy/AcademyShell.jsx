@@ -389,6 +389,9 @@ export default function AcademyShell() {
             {!isMobile && (
             <div style={{ lineHeight:1.2 }}>
               <div style={{ fontSize:"14px", fontWeight:600, color:P.text }}>{d.student.name || "Student"}</div>
+              {d.student.studentId && (
+                <div style={{ fontSize:"11px", fontFamily:"monospace", fontWeight:700, color:P.textMuted, letterSpacing:"0.03em" }}>{d.student.studentId}</div>
+              )}
               <div style={{ fontSize:"12px", color:P.textMuted }}>Student</div>
             </div>
             )}

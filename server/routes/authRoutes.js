@@ -451,6 +451,7 @@ router.post("/student/login", tenantMiddleware, loginLimiter, createLoginHandler
   buildResponse: (student) => ({
     student: {
       id: student._id,
+      studentId: student.studentId,
       email: student.email,
       firstName: student.firstName,
       lastName: student.lastName,

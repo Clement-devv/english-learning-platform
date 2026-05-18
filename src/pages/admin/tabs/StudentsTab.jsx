@@ -474,7 +474,7 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
       : students;
 
   const filteredStudents = sourceList.filter((s) =>
-    `${s.firstName} ${s.lastName} ${s.email}`
+    `${s.firstName} ${s.lastName} ${s.email} ${s.studentId || ""}`
       .toLowerCase()
       .includes(searchQuery.toLowerCase())
   );

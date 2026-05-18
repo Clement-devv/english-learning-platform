@@ -385,6 +385,9 @@ export default function CRMShell() {
           </div>
           <div style={{ minWidth:0 }}>
             <div style={{ fontSize:13, fontWeight:800, color:"#fff", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{d.student.firstName}</div>
+            {d.student.studentId && (
+              <div style={{ fontSize:10, fontWeight:700, fontFamily:"monospace", color:"rgba(255,255,255,0.5)", letterSpacing:"0.03em" }}>{d.student.studentId}</div>
+            )}
             <div style={{ fontSize:11, fontWeight:600, color:"rgba(255,255,255,0.6)" }}>{d.progress.completedLessons} classes done</div>
           </div>
           {d.progress.streakDays > 0 && (

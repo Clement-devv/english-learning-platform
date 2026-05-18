@@ -219,6 +219,13 @@ export default function StudentCard({
                   </span>
                 )}
               </div>
+              {student.studentId && (
+                <p className={`text-[10px] font-mono font-semibold mt-0.5 ${
+                  isDarkMode ? "text-indigo-400" : "text-indigo-500"
+                }`}>
+                  {student.studentId}
+                </p>
+              )}
               <p
                 className={`text-xs truncate flex items-center gap-1 mt-0.5 ${
                   isDarkMode ? "text-gray-400" : "text-gray-500"

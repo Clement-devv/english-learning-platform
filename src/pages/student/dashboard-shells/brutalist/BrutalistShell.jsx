@@ -333,6 +333,9 @@ export default function BrutalistShell() {
                 <div style={{ background: B.card, padding: '16px 20px' }}>
                   <div style={{ fontSize: '10px', color: B.dim, letterSpacing: '.12em', marginBottom: '6px' }}>// OPERATOR BRIEF</div>
                   <div style={{ fontSize: '18px', fontWeight: 700, color: B.text, letterSpacing: '.02em', marginBottom: '4px' }}>{(d.student.name || d.student.firstName).toUpperCase()}</div>
+                  {d.student.studentId && (
+                    <div style={{ fontSize: '10px', fontFamily: 'monospace', fontWeight: 700, color: B.red, letterSpacing: '.08em', marginBottom: '4px' }}>{d.student.studentId}</div>
+                  )}
                   <div style={{ fontSize: '11px', color: B.dim, letterSpacing: '.04em' }}>
                     SESSIONS REMAINING: <span style={{ color: B.red }}>{d.progress.classesRemaining}</span>
                   </div>

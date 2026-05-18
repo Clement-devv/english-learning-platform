@@ -328,6 +328,9 @@ export default function SunshineShell() {
           </div>
           <div style={{ minWidth: 0 }}>
             <div style={{ fontSize: 13, fontWeight: 800, color: col.heading, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.student.firstName}</div>
+            {d.student.studentId && (
+              <div style={{ fontSize: 10, fontWeight: 700, fontFamily: "monospace", letterSpacing: "0.03em", color: col.muted }}>{d.student.studentId}</div>
+            )}
             <div style={{ fontSize: 11, fontWeight: 600, color: col.muted }}>{t('sidebar.classesDone', { count: d.progress.completedLessons })}</div>
           </div>
         </div>

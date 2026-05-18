@@ -147,6 +147,12 @@ async function buildCertificatePdf(cert, student, center) {
     doc.fontSize(36).font('Helvetica-BoldOblique').fillColor(primary)
       .text(studentName, 0, 158, { align: 'center', width: W });
 
+    // Student ID (shown small, below name)
+    if (student.studentId) {
+      doc.fontSize(9).font('Helvetica').fillColor('#94a3b8')
+        .text(student.studentId, 0, 200, { align: 'center', width: W });
+    }
+
     // Name underline
     const nameY = 204;
     doc.moveTo(W / 2 - 140, nameY).lineTo(W / 2 + 140, nameY).lineWidth(1.5).strokeColor(primary).stroke();
@@ -250,7 +256,7 @@ router.get('/:id/pdf', verifyToken, validateObjectId('id'), async (req, res) => 
     const isOwner = req.user.role === 'student' && cert.studentId.toString() === req.user.id;
     if (!isOwner && req.user.role !== 'admin') return forbidden(res, 'Not authorized');
 
-    const student = await getStudent(req.db).findById(cert.studentId).select('firstName lastName').lean();
+    const student = await getStudent(req.db).findById(cert.studentId).select('firstName lastName studentId').lean();
     const center  = req.center; // set by tenantMiddleware
 
     const pdfBuffer = await buildCertificatePdf(cert, student || { firstName: 'Student', lastName: '' }, center);

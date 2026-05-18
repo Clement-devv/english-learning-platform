@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "node --import ./instrument.js index.js",
-    "dev": "tsx --import ./instrument.js watch index.js",
+    "dev": "tsx watch index.js",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",

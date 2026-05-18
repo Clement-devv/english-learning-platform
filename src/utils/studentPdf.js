@@ -109,6 +109,7 @@ export async function downloadStudentRoster(students, centerName) {
   // Table
   const rows = students.map((s, i) => [
     i + 1,
+    s.studentId || "—",
     `${s.firstName || ""} ${s.lastName || ""}`.trim() || "—",
     s.email || "—",
     s.phone || "—",
@@ -117,13 +118,12 @@ export async function downloadStudentRoster(students, centerName) {
     s.age ? `${s.age}y` : "—",
     s.classCredits ?? 0,
     fmt(s.lastPaymentDate),
-    fmt(s.dateOfBirth),
     statusLabel(s),
   ]);
 
   autoTable(doc, {
     startY: 44,
-    head: [["#", "Full Name", "Email", "Phone", "Country", "Level", "Age", "Classes", "Last Payment", "Date of Birth", "Status"]],
+    head: [["#", "ID", "Full Name", "Email", "Phone", "Country", "Level", "Age", "Classes", "Last Payment", "Status"]],
     body: rows,
     theme: "striped",
     headStyles: {
@@ -226,6 +226,7 @@ export async function downloadStudentCard(student, centerName) {
 
   // ── Details table ──
   const rows = [
+    ["Student ID",         student.studentId  || "—"],
     ["First Name",         student.firstName  || "—"],
     ["Surname",            student.lastName    || "—"],
     ["Email Address",      student.email      || "—"],

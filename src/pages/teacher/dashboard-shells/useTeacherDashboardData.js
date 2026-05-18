@@ -414,6 +414,7 @@ export function useTeacherDashboardData() {
         age:          item.student.age || null,
         dateOfBirth:  item.student.dateOfBirth || null,
         rank:         item.student.rank || '',
+        studentId:    item.student.studentId || null,
         assignmentId: item.assignmentId,
         assignedDate: item.assignedDate,
       })));
@@ -504,6 +505,7 @@ export function useTeacherDashboardData() {
         age:          item.student.age || null,
         dateOfBirth:  item.student.dateOfBirth || null,
         rank:         item.student.rank || '',
+        studentId:    item.student.studentId || null,
         assignmentId: item.assignmentId,
         assignedDate: item.assignedDate,
       })));

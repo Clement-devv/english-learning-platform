@@ -25,6 +25,7 @@ import { paymentSchema }  from "../schemas/paymentSchema.js";
 import { parsePagination } from "../utils/pagination.js";
 import logger from "../utils/logger.js";
 import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
+import { assignStudentId, generateStudentId } from '../utils/studentIdGenerator.js';
 
 const router = express.Router();
 router.use(tenantMiddleware);
@@ -38,13 +39,22 @@ const getPayment  = (db) => db.models.Payment  || db.model("Payment",  paymentSc
 router.get("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
   try {
     const { limit, skip } = parsePagination(req.query);
-    const students = await getStudent(req.db)
+    const Student = getStudent(req.db);
+    const students = await Student
       .find()
-      .select("firstName lastName email active classCredits age lastPaymentDate showTempPassword status createdAt phone country rank dateOfBirth scheduledDeletionAt")
+      .select("studentId firstName lastName email active classCredits age lastPaymentDate showTempPassword status createdAt phone country rank dateOfBirth scheduledDeletionAt")
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
       .lean();
+
+    // Backfill IDs for existing students who predate this feature.
+    // Sequential (not Promise.all) to avoid concurrent ID collisions.
+    const missing = students.filter(s => !s.studentId);
+    for (const s of missing) {
+      s.studentId = await assignStudentId(Student, s._id);
+    }
+
     res.json(students);
   } catch (err) {
     logger.error(err);
@@ -76,7 +86,7 @@ router.get("/:id", verifyToken, async (req, res) => {
       return forbidden(res, "You can only view your own data");
     const student = await getStudent(req.db)
       .findById(req.params.id)
-      .select("firstName lastName email active classCredits age lastPaymentDate showTempPassword status twoFactorEnabled createdAt")
+      .select("studentId firstName lastName email active classCredits age lastPaymentDate showTempPassword status twoFactorEnabled createdAt")
       .lean();
     if (!student) return notFound(res, "Student not found");
     res.json(student);
@@ -118,15 +128,25 @@ router.post("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
     const inviteToken   = crypto.randomBytes(32).toString("hex");
     const inviteExpires = new Date(Date.now() + 48 * 60 * 60 * 1000);
 
-    const student = await Student.create({
-      firstName, lastName, email: normalizedEmail, age,
-      classCredits: 0,
-      phone: phone || "", country: country || "",
-      dateOfBirth: dateOfBirth || null,
-      rank: rank || "",
-      status: "pending", active: false,
-      inviteToken, inviteExpires,
-    });
+    // Retry student creation on the rare E11000 duplicate studentId collision
+    let student;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      try {
+        student = await Student.create({
+          studentId: await generateStudentId(Student),
+          firstName, lastName, email: normalizedEmail, age,
+          classCredits: 0,
+          phone: phone || "", country: country || "",
+          dateOfBirth: dateOfBirth || null,
+          rank: rank || "",
+          status: "pending", active: false,
+          inviteToken, inviteExpires,
+        });
+        break;
+      } catch (e) {
+        if (e.code !== 11000 || attempt === 4) throw e;
+      }
+    }
 
     const { baseUrl, needsSlug } = getCenterBaseUrl(req.center);
     const setupUrl = `${baseUrl}/student/setup?token=${inviteToken}${needsSlug ? `&center=${req.center.slug}` : ""}`;
@@ -219,6 +239,11 @@ router.post("/setup-account", strictLimiter, async (req, res) => {
     student.active        = true;
     student.inviteToken   = undefined;
     student.inviteExpires = undefined;
+
+    // Assign studentId if not already set (handles students created before this feature)
+    if (!student.studentId) {
+      student.studentId = await assignStudentId(Student, student._id);
+    }
 
     // Auto-generate unique referral code
     for (let i = 0; i < 10; i++) {

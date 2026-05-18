@@ -644,6 +644,9 @@ export default function PlayfulShell() {
               </div>
               <div>
                 <div style={{fontSize:15,fontWeight:800,color:"#fff"}}>{d.student.name}</div>
+                {d.student.studentId && (
+                  <div style={{fontSize:10,fontFamily:"monospace",fontWeight:700,color:"rgba(255,255,255,0.7)",letterSpacing:"0.05em"}}>{d.student.studentId}</div>
+                )}
                 <div style={{fontSize:12,color:"rgba(255,255,255,0.8)"}}>{d.student.email||"Student"}</div>
               </div>
             </div>

@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import { sessionSchema } from './shared/sessionSchema.js';
 
 export const studentSchema = new mongoose.Schema({
+  studentId: { type: String, unique: true, sparse: true },
   firstName: { type: String, required: true },
   lastName: { type: String, required: true },
   email: { type: String, required: true, unique: true },

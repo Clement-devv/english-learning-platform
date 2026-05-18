@@ -154,6 +154,7 @@ export function useDashboardData() {
         email: p.email,
         classCredits: p.classCredits || p.noOfClasses || 0,
         level: "Intermediate",
+        studentId: p.studentId || "",
       };
     }
     return { name: "Student", firstName: "Student", lastName: "", level: "Intermediate" };

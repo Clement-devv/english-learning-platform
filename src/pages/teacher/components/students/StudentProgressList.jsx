@@ -52,17 +52,22 @@ function StudentDetailModal({ student, isDarkMode, onClose }) {
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className={`${modalBg} rounded-2xl shadow-2xl w-full max-w-md overflow-hidden`}>
         {/* Header */}
-        <div className={`relative flex items-center gap-4 px-6 py-5 ${dm ? "bg-purple-900/40" : "bg-purple-50"}`}>
+        <div className={`relative flex items-center gap-4 px-6 py-5 ${dm ? "bg-orange-900/30" : "bg-orange-50"}`}>
           <div className={`w-14 h-14 rounded-full flex items-center justify-center text-xl font-bold flex-shrink-0 ${
-            dm ? "bg-purple-700 text-purple-100" : "bg-purple-600 text-white"
+            dm ? "bg-orange-700 text-orange-100" : "bg-orange-500 text-white"
           }`}>
             {initials}
           </div>
           <div className="flex-1 min-w-0">
             <h2 className={`text-lg font-bold truncate ${text}`}>{student.name}</h2>
+            {student.studentId && (
+              <p className={`text-[11px] font-mono font-semibold ${dm ? "text-orange-400" : "text-orange-500"}`}>
+                {student.studentId}
+              </p>
+            )}
             {student.rank && (
               <span className={`inline-block mt-0.5 px-2 py-0.5 rounded-full text-xs font-semibold ${
-                dm ? "bg-purple-800 text-purple-200" : "bg-purple-100 text-purple-700"
+                dm ? "bg-orange-800 text-orange-200" : "bg-orange-100 text-orange-700"
               }`}>
                 {student.rank}
               </span>
@@ -98,7 +103,7 @@ function StudentDetailModal({ student, isDarkMode, onClose }) {
         <div className="px-6 pb-5 pt-3">
           <button
             onClick={onClose}
-            className="w-full py-2.5 bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold rounded-xl transition-colors"
+            className="w-full py-2.5 bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold rounded-xl transition-colors"
           >
             Close
           </button>
@@ -119,7 +124,7 @@ export default function StudentProgressList({ students, isDarkMode }) {
   // ── colours ──────────────────────────────────────────────────────────────
   const pageBg    = dm ? "bg-gray-800"   : "bg-white";
   const cardBg    = dm ? "bg-gray-750 bg-gray-700" : "bg-white";
-  const cardBorder= dm ? "border-gray-600 hover:border-purple-500" : "border-gray-200 hover:border-purple-300";
+  const cardBorder= dm ? "border-gray-600 hover:border-orange-500" : "border-gray-200 hover:border-orange-300";
   const text      = dm ? "text-gray-100" : "text-gray-800";
   const subText   = dm ? "text-gray-400" : "text-gray-500";
   const inputCls  = dm
@@ -154,7 +159,7 @@ export default function StudentProgressList({ students, isDarkMode }) {
               placeholder="Search students…"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className={`w-full pl-9 pr-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-purple-400 focus:outline-none ${inputCls}`}
+              className={`w-full pl-9 pr-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-orange-400 focus:outline-none ${inputCls}`}
             />
           </div>
           <p className={`text-sm whitespace-nowrap ${subText}`}>
@@ -171,7 +176,7 @@ export default function StudentProgressList({ students, isDarkMode }) {
             {searchQuery ? "No students match your search." : "No students assigned yet."}
           </p>
           {searchQuery && (
-            <button onClick={() => setSearchQuery("")} className="mt-2 text-sm text-purple-500 hover:underline">
+            <button onClick={() => setSearchQuery("")} className="mt-2 text-sm text-orange-500 hover:underline">
               Clear search
             </button>
           )}
@@ -195,12 +200,17 @@ export default function StudentProgressList({ students, isDarkMode }) {
                 {/* Avatar + name */}
                 <div className="flex items-center gap-3">
                   <div className={`w-11 h-11 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0 ${
-                    dm ? "bg-purple-800 text-purple-200" : "bg-purple-100 text-purple-700"
+                    dm ? "bg-orange-900 text-orange-200" : "bg-orange-100 text-orange-700"
                   }`}>
                     {initials}
                   </div>
                   <div className="min-w-0">
                     <p className={`font-semibold text-sm truncate ${text}`}>{student.name}</p>
+                    {student.studentId && (
+                      <p className={`text-[10px] font-mono font-semibold ${dm ? "text-orange-400" : "text-orange-500"}`}>
+                        {student.studentId}
+                      </p>
+                    )}
                     <span className={`inline-block text-xs px-1.5 py-0.5 rounded-full font-medium ${
                       student.active
                         ? dm ? "bg-emerald-900 text-emerald-300" : "bg-emerald-100 text-emerald-700"
@@ -230,7 +240,7 @@ export default function StudentProgressList({ students, isDarkMode }) {
                 {/* View button */}
                 <button
                   onClick={(e) => { e.stopPropagation(); setSelected(student); }}
-                  className="mt-auto w-full py-1.5 text-xs font-semibold rounded-lg bg-purple-600 hover:bg-purple-700 text-white transition-colors"
+                  className="mt-auto w-full py-1.5 text-xs font-semibold rounded-lg bg-orange-500 hover:bg-orange-600 text-white transition-colors"
                 >
                   View Details
                 </button>
@@ -264,7 +274,7 @@ export default function StudentProgressList({ students, isDarkMode }) {
                     onClick={() => setCurrentPage(page)}
                     className={`w-9 h-9 rounded-lg text-sm font-medium transition-colors ${
                       currentPage === page
-                        ? "bg-purple-600 text-white"
+                        ? "bg-orange-500 text-white"
                         : dm
                         ? "border border-gray-600 hover:bg-gray-700 text-gray-300"
                         : "border border-gray-300 hover:bg-gray-50 text-gray-700"
