@@ -47,26 +47,17 @@ export default function RecordingsTab({ isDarkMode }) {
   const openVideo = async (rec) => {
     setLoadingId(rec._id);
     try {
-      // Ask the server for a direct streamable URL (works for S3 presigned URLs).
-      // Falls back to blob if the server streams the file directly.
-      const resp = await api.get(`/recordings/${rec._id}/stream`, { responseType: 'blob', maxRedirects: 0 }).catch(async (err) => {
-        // axios throws on 3xx when maxRedirects:0 — extract the redirect URL
-        if (err.response?.status === 302 || err.response?.status === 301) {
-          return { _redirectUrl: err.response.headers.location };
-        }
-        throw err;
-      });
-
+      const resp = await api.get(`/recordings/${rec._id}/stream`, { responseType: 'blob' });
+      const ct   = resp.headers?.['content-type'] || '';
       let src;
-      if (resp._redirectUrl) {
-        // S3 presigned URL — use directly, browser streams natively
-        src = resp._redirectUrl;
+      if (ct.includes('application/json')) {
+        // S3: server returned { url } — use presigned URL directly as video src
+        const json = JSON.parse(await resp.data.text());
+        src = json.url;
       } else {
-        // Local disk blob
-        const blob = new Blob([resp.data], { type: resp.headers?.['content-type'] || 'video/webm' });
-        src = URL.createObjectURL(blob);
+        // Local disk: server streamed the binary
+        src = URL.createObjectURL(new Blob([resp.data], { type: ct || 'video/webm' }));
       }
-
       setVideoSrc(src);
       setPlaying(rec);
     } catch (e) {
@@ -77,7 +68,6 @@ export default function RecordingsTab({ isDarkMode }) {
   };
 
   const closeVideo = () => {
-    // Revoke blob URLs to free memory, but not S3 presigned URLs
     if (videoSrc && videoSrc.startsWith("blob:")) URL.revokeObjectURL(videoSrc);
     setPlaying(null);
     setVideoSrc(null);

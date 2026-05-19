@@ -145,7 +145,7 @@ router.post("/upload", verifyToken, wrapUpload(upload.single("recording")), asyn
         fs.unlink(req.file.path, () => {});
       }
     }
-    serverError(res, err.message);
+    serverError(res, err.message, err);
   }
 });
 
@@ -222,11 +222,12 @@ router.get("/:id/stream", verifyToken, async (req, res) => {
         return forbidden(res, "Access denied");
     }
 
-    // ── S3: redirect to a 1-hour presigned URL ────────────────────────────────
+    // ── S3: return presigned URL as JSON so the browser uses it directly ─────
+    // (A redirect causes a cross-origin preflight to S3 which CORS can't satisfy)
     if (useS3) {
       const { getPresignedUrl } = await import('../utils/s3.js');
       const url = await getPresignedUrl(rec.filename, 3600);
-      return res.redirect(302, url);
+      return res.json({ url });
     }
 
     // ── Local disk: range-request streaming ───────────────────────────────────
@@ -278,17 +279,16 @@ router.get("/:id/download", verifyToken, async (req, res) => {
     const filename = `recording-${rec._id}${rec.mimeType === "video/mp4" ? ".mp4" : ".webm"}`;
 
     if (useS3) {
-      const { getPresignedUrl } = await import('../utils/s3.js');
+      const { s3 } = await import('../utils/s3.js');
       const { GetObjectCommand } = await import('@aws-sdk/client-s3');
       const { getSignedUrl } = await import('@aws-sdk/s3-request-presigner');
-      const { s3 } = await import('../utils/s3.js');
       const cmd = new GetObjectCommand({
         Bucket: process.env.S3_BUCKET,
         Key: rec.filename,
         ResponseContentDisposition: `attachment; filename="${filename}"`,
       });
       const url = await getSignedUrl(s3, cmd, { expiresIn: 300 });
-      return res.redirect(302, url);
+      return res.json({ url });
     }
 
     const filePath = path.join(RECORDINGS_DIR, rec.filename);

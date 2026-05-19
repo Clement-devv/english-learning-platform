@@ -9,7 +9,7 @@ export default function RecordingsTab({ teachers = [], isDarkMode }) {
   const [recordings,      setRecordings]      = useState([]);
   const [loadingRecs,     setLoadingRecs]      = useState(false);
   const [playing,         setPlaying]          = useState(null);
-  const [blobUrls,        setBlobUrls]         = useState({});
+  const [videoUrls,       setVideoUrls]        = useState({});
   const [search,          setSearch]           = useState("");
 
   const col = {
@@ -49,11 +49,18 @@ export default function RecordingsTab({ teachers = [], isDarkMode }) {
   };
 
   const loadVideo = async (rec) => {
-    if (blobUrls[rec._id]) { setPlaying(rec); return; }
+    if (videoUrls[rec._id]) { setPlaying(rec); return; }
     try {
       const resp = await api.get(`/recordings/${rec._id}/stream`, { responseType: 'blob' });
-      const blob = new Blob([resp.data]);
-      setBlobUrls(prev => ({ ...prev, [rec._id]: URL.createObjectURL(blob) }));
+      const ct   = resp.headers?.['content-type'] || '';
+      let url;
+      if (ct.includes('application/json')) {
+        const json = JSON.parse(await resp.data.text());
+        url = json.url;
+      } else {
+        url = URL.createObjectURL(new Blob([resp.data]));
+      }
+      setVideoUrls(prev => ({ ...prev, [rec._id]: url }));
       setPlaying(rec);
     } catch (e) { console.error("Failed to load video:", e); }
   };
@@ -61,12 +68,18 @@ export default function RecordingsTab({ teachers = [], isDarkMode }) {
   const downloadVideo = async (rec) => {
     try {
       const resp = await api.get(`/recordings/${rec._id}/download`, { responseType: 'blob' });
-      const ext  = rec.mimeType === "video/mp4" ? ".mp4" : ".webm";
-      const name = (rec.title || rec.bookingId?.classTitle || "recording").replace(/[^a-z0-9\s-]/gi, "").trim() + ext;
-      const url  = URL.createObjectURL(new Blob([resp.data]));
-      const a    = document.createElement("a");
-      a.href = url; a.download = name; a.click();
-      URL.revokeObjectURL(url);
+      const ct   = resp.headers?.['content-type'] || '';
+      if (ct.includes('application/json')) {
+        const json = JSON.parse(await resp.data.text());
+        window.open(json.url, '_blank');
+      } else {
+        const ext  = rec.mimeType === "video/mp4" ? ".mp4" : ".webm";
+        const name = (rec.title || rec.bookingId?.classTitle || "recording").replace(/[^a-z0-9\s-]/gi, "").trim() + ext;
+        const url  = URL.createObjectURL(new Blob([resp.data]));
+        const a    = document.createElement("a");
+        a.href = url; a.download = name; a.click();
+        URL.revokeObjectURL(url);
+      }
     } catch (e) { console.error("Download failed:", e); }
   };
 
@@ -91,7 +104,7 @@ export default function RecordingsTab({ teachers = [], isDarkMode }) {
       </div>
 
       <div style={{ background: "#000", borderRadius: "16px", overflow: "hidden", aspectRatio: "16/9" }}>
-        <video src={blobUrls[playing._id]} controls autoPlay style={{ width: "100%", height: "100%", display: "block" }} />
+        <video src={videoUrls[playing._id]} controls autoPlay style={{ width: "100%", height: "100%", display: "block" }} />
       </div>
 
       <div style={{ background: col.card, border: `1px solid ${col.border}`, borderRadius: "14px", padding: "14px 18px", display: "flex", gap: "20px", flexWrap: "wrap" }}>

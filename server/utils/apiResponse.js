@@ -1,6 +1,7 @@
 // Standardised response helpers.
 // All responses follow: { success: bool, ...data } or { success: bool, message: string }
 // Use these in new/updated routes instead of inline res.status().json() calls.
+import * as Sentry from "@sentry/node";
 
 /**
  * 200 OK — success response with optional data payload.
@@ -60,8 +61,14 @@ export const conflict    = (res, message)                 => res.status(409).jso
 
 /**
  * 500 Internal Server Error — unexpected server-side failure.
+ * Pass the original Error object as the third argument so Sentry receives the
+ * full stack trace. Without it Sentry never sees caught errors.
  * @param {import('express').Response} res
  * @param {string} [message='Server error']
+ * @param {Error} [err] - Original error for Sentry capture
  * @returns {void}
  */
-export const serverError = (res, message = 'Server error')=> res.status(500).json({ success: false, message });
+export const serverError = (res, message = 'Server error', err) => {
+  if (err instanceof Error) Sentry.captureException(err);
+  res.status(500).json({ success: false, message });
+};

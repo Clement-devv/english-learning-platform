@@ -216,6 +216,10 @@ app.post("/api/v1/csp-report", express.json({ type: "application/csp-report", li
   if (config.nodeEnv === "production") {
     const report = req.body?.["csp-report"] || req.body;
     logger.warn("CSP violation", { report });
+    Sentry.captureMessage("CSP violation", {
+      level: "warning",
+      extra: { report },
+    });
   }
   res.status(204).end();
 });
