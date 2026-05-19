@@ -24,7 +24,7 @@ import {
 
 export default function AgoraClassroom({ classData, userRole, onLeave, googleMeetLink }) {
   const navigate    = useNavigate();
-  const bookingId   = classData?.bookingId || classData?.id;
+  const bookingId   = classData?.bookingId || classData?._id || classData?.id;
   const userName    = localStorage.getItem("name") || "User";
   const userId      = localStorage.getItem("userId") || "";
   const channelName = `class-${bookingId}`;

@@ -1,5 +1,8 @@
 // server/routes/bookingRoutes.js
 import express from "express";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 import { verifyToken, verifyAdmin, verifyAdminOrTeacher } from "../middleware/authMiddleware.js";
 import {
   sendBookingRequestToTeacher, sendBookingAcceptedToStudent,
@@ -18,6 +21,19 @@ import { validateObjectId } from '../middleware/validateObjectId.js';
 import { parsePagination } from '../utils/pagination.js';
 import { toStr, toObjectId } from '../utils/inputSanitizer.js';
 import { sendPush } from '../utils/webPushService.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname  = path.dirname(__filename);
+
+// Silently remove the session PDF for a booking — never throws.
+function deleteSessionPdf(bookingId) {
+  try {
+    const filePath = path.join(__dirname, "..", "uploads", "content", `${bookingId}.pdf`);
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+  } catch (e) {
+    logger.error("PDF cleanup failed:", { bookingId, error: e?.message });
+  }
+}
 
 const router = express.Router();
 router.use(tenantMiddleware);
@@ -248,6 +264,9 @@ router.patch("/:id/complete", verifyToken, validateObjectId("id"), async (req, r
     booking.adminRejected = false;
     booking.completedAt   = new Date();
     await booking.save();
+
+    // Remove the session PDF — no longer needed after class ends
+    deleteSessionPdf(booking._id.toString());
 
     const Student = getStudent(req.db);
     const student = await Student.findById(booking.studentId._id);

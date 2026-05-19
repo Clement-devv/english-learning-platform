@@ -12,6 +12,7 @@ import { config } from '../config/config.js';
 import logger from "../utils/logger.js";
 import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
 import { invalidateCache } from '../utils/cache.js';
+import { s3Enabled, uploadToS3, deleteFromS3, s3PublicUrl, isLegacyPath, keyFromValue } from "../utils/s3.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
@@ -23,20 +24,8 @@ if (!fs.existsSync(BRANDING_DIR)) fs.mkdirSync(BRANDING_DIR, { recursive: true }
 const ALLOWED_BRANDING_MIMES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
 const ALLOWED_BRANDING_EXTS  = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif']);
 
-const brandingStorage = multer.diskStorage({
-  destination: (req, _file, cb) => {
-    const dir = path.join(BRANDING_DIR, req.center.slug);
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    cb(null, dir);
-  },
-  filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase() || '.png';
-    cb(null, `${file.fieldname}-${Date.now()}${ext}`);
-  },
-});
-
 const brandingUpload = multer({
-  storage: brandingStorage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase();
@@ -175,19 +164,36 @@ router.post(
     try {
       if (!req.file) return badRequest(res, 'No file uploaded');
 
-      const field = req.query.type === 'favicon' ? 'favicon' : req.query.type === 'loginBackground' ? 'loginBackground' : 'logo';
-      const fileUrl  = `/uploads/branding/${req.center.slug}/${req.file.filename}`;
-
-      // Delete old file if it exists and is a local upload
+      const field    = req.query.type === 'favicon' ? 'favicon' : req.query.type === 'loginBackground' ? 'loginBackground' : 'logo';
       const oldValue = req.center.branding?.[field];
-      if (oldValue?.startsWith('/uploads/')) {
-        const oldPath = path.join(__dirname, '..', oldValue);
-        if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+
+      // Delete old file
+      if (oldValue) {
+        if (s3Enabled() && !isLegacyPath(oldValue)) {
+          await deleteFromS3(keyFromValue(oldValue));
+        } else if (isLegacyPath(oldValue)) {
+          const oldPath = path.join(__dirname, '..', oldValue);
+          if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+        }
       }
 
-      await Center.findByIdAndUpdate(req.center._id, {
-        [`branding.${field}`]: fileUrl,
-      });
+      let fileUrl;
+      if (s3Enabled()) {
+        const ext = path.extname(req.file.originalname).toLowerCase() || '.png';
+        const key = `centers/${req.center.slug}/branding/${field}-${Date.now()}${ext}`;
+        await uploadToS3(req.file.buffer, key, req.file.mimetype);
+        fileUrl = s3PublicUrl(key);
+      } else {
+        const dir = path.join(BRANDING_DIR, req.center.slug);
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+        const ext      = path.extname(req.file.originalname).toLowerCase() || '.png';
+        const filename = `${field}-${Date.now()}${ext}`;
+        fs.writeFileSync(path.join(dir, filename), req.file.buffer);
+        fileUrl = `/uploads/branding/${req.center.slug}/${filename}`;
+      }
+
+      await Center.findByIdAndUpdate(req.center._id, { [`branding.${field}`]: fileUrl });
+      await invalidateCache(`tenant:slug:${req.center.slug}`);
 
       res.json({ success: true, url: fileUrl });
     } catch (err) {

@@ -9,7 +9,7 @@ import {
   CheckCircle, Clock, XCircle, AlertCircle,
   RefreshCw, Loader2,
   DollarSign, Film, BarChart2, Star, RotateCcw,
-  ChevronRight, ChevronLeft,
+  ChevronRight, ChevronLeft, Play, Download, X,
 } from "lucide-react";
 import { getCachedCenter } from "../../utils/branding";
 import { dashboardColors } from "../../utils/dashboardColors";
@@ -982,6 +982,8 @@ export function TeacherRecordingsView({ teacher, isDarkMode, onBack }) {
   const [loading,    setLoading]    = useState(true);
   const [error,      setError]      = useState("");
   const [search,     setSearch]     = useState("");
+  const [playing,    setPlaying]    = useState(null);
+  const [blobUrls,   setBlobUrls]   = useState({});
   const c = dashboardColors(isDarkMode);
 
   const load = useCallback(async () => {
@@ -1002,8 +1004,59 @@ export function TeacherRecordingsView({ teacher, isDarkMode, onBack }) {
 
   const totalMins = recordings.reduce((s, r) => s + (r.duration ? Math.round(r.duration / 60) : 0), 0);
 
+  const loadVideo = async (r) => {
+    if (blobUrls[r._id]) { setPlaying(r); return; }
+    try {
+      const token = localStorage.getItem("token");
+      const base  = window.location.hostname === "localhost" ? "http://localhost:5000" : "";
+      const resp  = await fetch(`${base}/api/v1/sub-admin-scope/recordings/${r._id}/stream`, { headers: { Authorization: `Bearer ${token}` } });
+      if (!resp.ok) throw new Error("Failed");
+      const blob = await resp.blob();
+      setBlobUrls(prev => ({ ...prev, [r._id]: URL.createObjectURL(blob) }));
+      setPlaying(r);
+    } catch { alert("Failed to load video"); }
+  };
+
+  const downloadVideo = async (r) => {
+    try {
+      const token = localStorage.getItem("token");
+      const base  = window.location.hostname === "localhost" ? "http://localhost:5000" : "";
+      const resp  = await fetch(`${base}/api/v1/sub-admin-scope/recordings/${r._id}/download`, { headers: { Authorization: `Bearer ${token}` } });
+      if (!resp.ok) throw new Error("Failed");
+      const ext  = r.mimeType === "video/mp4" ? ".mp4" : ".webm";
+      const name = (r.title || "recording").replace(/[^a-z0-9\s-]/gi, "").trim() + ext;
+      const url  = URL.createObjectURL(await resp.blob());
+      const a    = document.createElement("a");
+      a.href = url; a.download = name; a.click();
+      URL.revokeObjectURL(url);
+    } catch { alert("Download failed"); }
+  };
+
   if (loading) return <Spinner />;
   if (error)   return <ErrorState msg={error} onRetry={load} />;
+
+  // ── Player view ──────────────────────────────────────────────────────────────
+  if (playing) return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+        <button onClick={() => setPlaying(null)} style={{ background: "none", border: "none", color: c.muted, cursor: "pointer", display: "flex", alignItems: "center", gap: "6px", fontSize: "13px", fontWeight: 700 }}>
+          <X size={15} /> Close
+        </button>
+        <p style={{ margin: 0, fontSize: "16px", fontWeight: 800, color: c.heading, flex: 1 }}>{playing.title || "Class Recording"}</p>
+        <button onClick={() => downloadVideo(playing)} style={{ display: "flex", alignItems: "center", gap: "6px", padding: "7px 13px", borderRadius: "10px", border: `1px solid ${c.border}`, background: c.card, color: c.heading, cursor: "pointer", fontSize: "12px", fontWeight: 700 }}>
+          <Download size={13} /> Download
+        </button>
+      </div>
+      <div style={{ background: "#000", borderRadius: "14px", overflow: "hidden", aspectRatio: "16/9" }}>
+        <video src={blobUrls[playing._id]} controls autoPlay style={{ width: "100%", height: "100%", display: "block" }} />
+      </div>
+      <div style={{ fontSize: "12px", color: c.muted }}>
+        {playing.studentId && <span>👤 {playing.studentId.firstName} {playing.studentId.lastName} · </span>}
+        {playing.duration ? <span>⏱ {Math.round(playing.duration / 60)}m · </span> : null}
+        {playing.createdAt && <span>{new Date(playing.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>}
+      </div>
+    </div>
+  );
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
@@ -1040,16 +1093,22 @@ export function TeacherRecordingsView({ teacher, isDarkMode, onBack }) {
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <p style={{ margin: 0, fontSize: "14px", fontWeight: "700", color: c.heading, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.title || "Class Recording"}</p>
-                <p style={{ margin: "2px 0 0", fontSize: "12px", color: c.muted }}>Student: {r.studentId?.firstName} {r.studentId?.lastName}</p>
+                <p style={{ margin: "2px 0 0", fontSize: "12px", color: c.muted }}>
+                  {r.studentId?.firstName} {r.studentId?.lastName}
+                  {r.duration ? ` · ${Math.round(r.duration / 60)}m` : ""}
+                </p>
               </div>
               <p style={{ margin: 0, fontSize: "11.5px", color: c.muted, flexShrink: 0 }}>
                 {r.createdAt ? new Date(r.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : ""}
               </p>
-              {r.duration && (
-                <span style={{ fontSize: "11.5px", padding: "3px 9px", borderRadius: "20px", background: isDarkMode ? "#1e2235" : "#f0f4ff", color: c.muted, fontWeight: "600", flexShrink: 0 }}>
-                  {Math.round(r.duration / 60)}m
-                </span>
-              )}
+              <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
+                <button onClick={() => loadVideo(r)} style={{ display: "flex", alignItems: "center", gap: "5px", padding: "7px 13px", borderRadius: "9px", background: "linear-gradient(135deg,#6366f1,#8b5cf6)", color: "#fff", border: "none", cursor: "pointer", fontSize: "12px", fontWeight: 700 }}>
+                  <Play size={12} fill="white" /> Watch
+                </button>
+                <button onClick={() => downloadVideo(r)} style={{ display: "flex", alignItems: "center", gap: "5px", padding: "7px 10px", borderRadius: "9px", background: c.card, color: c.heading, border: `1px solid ${c.border}`, cursor: "pointer", fontSize: "12px", fontWeight: 700 }}>
+                  <Download size={12} />
+                </button>
+              </div>
             </div>
           ))}
         </div>

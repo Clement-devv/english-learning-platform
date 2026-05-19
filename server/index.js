@@ -215,7 +215,7 @@ app.use("/api/health", healthRoutes);
 app.post("/api/v1/csp-report", express.json({ type: "application/csp-report", limit: "10kb" }), (req, res) => {
   if (config.nodeEnv === "production") {
     const report = req.body?.["csp-report"] || req.body;
-    logger.warn("CSP violation:", JSON.stringify(report));
+    logger.warn("CSP violation", { report });
   }
   res.status(204).end();
 });
@@ -466,6 +466,7 @@ verifyEmailConfig()
       logger.info("Email service configured");
     } else {
       logger.warn("Email service not configured - notifications disabled");
+      Sentry.captureMessage("Email service not configured — RESEND_API_KEY missing or invalid", "warning");
     }
   })
   .catch(err => {

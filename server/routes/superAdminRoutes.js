@@ -37,8 +37,39 @@ import { bookingSchema }  from '../schemas/bookingSchema.js';
 import logger from "../utils/logger.js";
 import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
 
-// In-memory OTP store: key = adminEmail, value = { code, expiresAt }
-const emailOtpStore = new Map();
+// OTP store — Redis-backed on production (shared across workers/restarts),
+// in-memory Map fallback for local dev without Redis.
+const OTP_TTL_SECONDS = 10 * 60; // 10 minutes
+const otpMemoryStore  = new Map();
+
+async function storeOtp(email, code) {
+  const key = `otp:center:${email.toLowerCase()}`;
+  if (redisClient) {
+    await redisClient.set(key, code, 'EX', OTP_TTL_SECONDS);
+  } else {
+    otpMemoryStore.set(email.toLowerCase(), { code, expiresAt: Date.now() + OTP_TTL_SECONDS * 1000 });
+  }
+}
+
+async function getOtp(email) {
+  const key = `otp:center:${email.toLowerCase()}`;
+  if (redisClient) {
+    return await redisClient.get(key); // returns code string or null
+  }
+  const entry = otpMemoryStore.get(email.toLowerCase());
+  if (!entry) return null;
+  if (Date.now() > entry.expiresAt) { otpMemoryStore.delete(email.toLowerCase()); return null; }
+  return entry.code;
+}
+
+async function deleteOtp(email) {
+  const key = `otp:center:${email.toLowerCase()}`;
+  if (redisClient) {
+    await redisClient.del(key);
+  } else {
+    otpMemoryStore.delete(email.toLowerCase());
+  }
+}
 
 const router = express.Router();
 
@@ -930,7 +961,7 @@ router.post('/send-otp', verifySuperAdmin, emailLimiter, validateOtpSend, async 
     }
 
     const code = String(crypto.randomInt(100000, 1000000));
-    emailOtpStore.set(adminEmail.toLowerCase(), { code, expiresAt: Date.now() + 10 * 60 * 1000 });
+    await storeOtp(adminEmail, code);
 
     await sendEmail({
       to: adminEmail,
@@ -960,19 +991,15 @@ router.post('/verify-otp', verifySuperAdmin, validateOtpVerify, async (req, res)
       return badRequest(res, 'adminEmail and code are required');
     }
 
-    const entry = emailOtpStore.get(adminEmail.toLowerCase());
-    if (!entry) {
+    const stored = await getOtp(adminEmail);
+    if (!stored) {
       return badRequest(res, 'No OTP found for this email. Please request a new code.');
     }
-    if (Date.now() > entry.expiresAt) {
-      emailOtpStore.delete(adminEmail.toLowerCase());
-      return badRequest(res, 'OTP has expired. Please request a new code.');
-    }
-    if (entry.code !== String(code).trim()) {
+    if (stored !== String(code).trim()) {
       return badRequest(res, 'Incorrect code. Please try again.');
     }
 
-    emailOtpStore.delete(adminEmail.toLowerCase());
+    await deleteOtp(adminEmail);
     res.json({ success: true, message: 'Email verified' });
   } catch (err) {
     logger.error('❌ Verify OTP error:', { error: err?.message });

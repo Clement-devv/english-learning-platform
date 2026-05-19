@@ -35,26 +35,25 @@ let useS3 = false;
 
 if (process.env.S3_BUCKET) {
   try {
-    const { S3Client } = await import('@aws-sdk/client-s3');
+    const { s3 } = await import('../utils/s3.js');
     const { default: multerS3 } = await import('multer-s3');
-
-    const s3 = new S3Client({ region: process.env.AWS_REGION || 'us-east-1' });
     useS3 = true;
 
     storage = multerS3({
       s3,
       bucket: process.env.S3_BUCKET,
       contentType: multerS3.AUTO_CONTENT_TYPE,
-      key: (_req, file, cb) => {
+      key: (req, file, cb) => {
         const ext  = ALLOWED_VIDEO_TYPES[file.mimetype] || '.webm';
-        const name = `recordings/rec_${Date.now()}_${Math.random().toString(36).slice(2)}${ext}`;
+        const slug = req.center?.slug || 'unknown';
+        const name = `centers/${slug}/recordings/rec_${Date.now()}_${Math.random().toString(36).slice(2)}${ext}`;
         cb(null, name);
       },
     });
 
     logger.info(`✅ Recording storage: S3 bucket "${process.env.S3_BUCKET}"`);
   } catch (err) {
-    logger.warn('⚠️ S3_BUCKET set but S3 packages missing — falling back to local disk. Run: npm install @aws-sdk/client-s3 multer-s3', { error: err?.message });
+    logger.warn('⚠️ S3_BUCKET set but S3 packages missing — falling back to local disk.', { error: err?.message });
   }
 }
 
@@ -75,8 +74,10 @@ const upload = multer({
   storage,
   limits: { fileSize: 2 * 1024 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
-    if (ALLOWED_VIDEO_TYPES[file.mimetype]) return cb(null, true);
-    cb(new Error("Only video files are allowed"));
+    const baseType = file.mimetype.split(";")[0].trim();
+    logger.info(`Recording fileFilter: originalname="${file.originalname}" mimetype="${file.mimetype}" baseType="${baseType}"`);
+    if (baseType.startsWith("video/") || ALLOWED_VIDEO_TYPES[baseType]) return cb(null, true);
+    cb(new Error(`Only video files are allowed (received: ${baseType})`));
   },
 });
 
@@ -89,9 +90,8 @@ const getBooking   = (db) => db.models.Booking   || db.model("Booking",   bookin
 async function purgeRecording(rec) {
   if (useS3 && rec.filename) {
     try {
-      const { S3Client, DeleteObjectCommand } = await import('@aws-sdk/client-s3');
-      const s3 = new S3Client({ region: process.env.AWS_REGION || 'us-east-1' });
-      await s3.send(new DeleteObjectCommand({ Bucket: process.env.S3_BUCKET, Key: rec.filename }));
+      const { deleteFromS3 } = await import('../utils/s3.js');
+      await deleteFromS3(rec.filename);
     } catch (err) {
       logger.warn(`Failed to delete S3 object "${rec.filename}":`, { error: err?.message });
     }
@@ -120,20 +120,31 @@ router.post("/upload", verifyToken, wrapUpload(upload.single("recording")), asyn
     const autoDeleteAt = new Date();
     autoDeleteAt.setDate(autoDeleteAt.getDate() + AUTO_DELETE_DAYS);
 
+    // multer-s3 sets req.file.key; multer disk sets req.file.filename
+    const filename = req.file.key || req.file.filename;
+    if (!filename) return serverError(res, "File storage error — no filename assigned");
+
     const rec = await getRecording(req.db).create({
       bookingId, teacherId, studentId,
       title:    title?.trim() || "",
-      filename: req.file.filename,
+      filename,
       duration: parseFloat(duration) || 0,
-      fileSize: req.file.size,
-      mimeType: req.file.mimetype,
+      fileSize: req.file.size || 0,
+      mimeType: (req.file.mimetype || "video/webm").split(";")[0].trim(),
       autoDeleteAt,
     });
 
     res.status(201).json({ success: true, recording: rec });
   } catch (err) {
     logger.error("Recording upload error:", { error: err?.message });
-    if (req.file) fs.unlink(req.file.path, () => {});
+    if (req.file) {
+      if (useS3 && req.file.key) {
+        const { deleteFromS3 } = await import('../utils/s3.js');
+        deleteFromS3(req.file.key).catch(() => {});
+      } else if (req.file.path) {
+        fs.unlink(req.file.path, () => {});
+      }
+    }
     serverError(res, err.message);
   }
 });
@@ -211,6 +222,14 @@ router.get("/:id/stream", verifyToken, async (req, res) => {
         return forbidden(res, "Access denied");
     }
 
+    // ── S3: redirect to a 1-hour presigned URL ────────────────────────────────
+    if (useS3) {
+      const { getPresignedUrl } = await import('../utils/s3.js');
+      const url = await getPresignedUrl(rec.filename, 3600);
+      return res.redirect(302, url);
+    }
+
+    // ── Local disk: range-request streaming ───────────────────────────────────
     const filePath = path.join(RECORDINGS_DIR, rec.filename);
     if (!fs.existsSync(filePath))
       return notFound(res, "File not found on disk");
@@ -241,6 +260,45 @@ router.get("/:id/stream", verifyToken, async (req, res) => {
     }
   } catch (err) {
     logger.error("Recording stream error:", { error: err?.message });
+    serverError(res, err.message);
+  }
+});
+
+// GET /api/recordings/:id/download — admin or the owning teacher
+router.get("/:id/download", verifyToken, async (req, res) => {
+  try {
+    const { role, id: userId } = req.user;
+    if (role !== "admin" && role !== "teacher") return forbidden(res, "Access denied");
+
+    const rec = await getRecording(req.db).findById(req.params.id);
+    if (!rec) return notFound(res, "Recording not found");
+    if (role === "teacher" && rec.teacherId.toString() !== userId)
+      return forbidden(res, "Access denied");
+
+    const filename = `recording-${rec._id}${rec.mimeType === "video/mp4" ? ".mp4" : ".webm"}`;
+
+    if (useS3) {
+      const { getPresignedUrl } = await import('../utils/s3.js');
+      const { GetObjectCommand } = await import('@aws-sdk/client-s3');
+      const { getSignedUrl } = await import('@aws-sdk/s3-request-presigner');
+      const { s3 } = await import('../utils/s3.js');
+      const cmd = new GetObjectCommand({
+        Bucket: process.env.S3_BUCKET,
+        Key: rec.filename,
+        ResponseContentDisposition: `attachment; filename="${filename}"`,
+      });
+      const url = await getSignedUrl(s3, cmd, { expiresIn: 300 });
+      return res.redirect(302, url);
+    }
+
+    const filePath = path.join(RECORDINGS_DIR, rec.filename);
+    if (!fs.existsSync(filePath)) return notFound(res, "File not found");
+
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.setHeader("Content-Type", rec.mimeType || "video/webm");
+    fs.createReadStream(filePath).pipe(res);
+  } catch (err) {
+    logger.error("Recording download error:", { error: err?.message });
     serverError(res, err.message);
   }
 });

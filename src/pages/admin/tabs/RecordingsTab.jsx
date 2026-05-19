@@ -1,6 +1,6 @@
 // src/pages/admin/tabs/RecordingsTab.jsx
 import { useState, useEffect } from "react";
-import { Play, X, Clock, Calendar, Video, ChevronRight, ArrowLeft } from "lucide-react";
+import { Play, X, Clock, Calendar, Video, ChevronRight, ArrowLeft, Download } from "lucide-react";
 import api from "../../../api";
 
 
@@ -58,6 +58,18 @@ export default function RecordingsTab({ teachers = [], isDarkMode }) {
     } catch (e) { console.error("Failed to load video:", e); }
   };
 
+  const downloadVideo = async (rec) => {
+    try {
+      const resp = await api.get(`/recordings/${rec._id}/download`, { responseType: 'blob' });
+      const ext  = rec.mimeType === "video/mp4" ? ".mp4" : ".webm";
+      const name = (rec.title || rec.bookingId?.classTitle || "recording").replace(/[^a-z0-9\s-]/gi, "").trim() + ext;
+      const url  = URL.createObjectURL(new Blob([resp.data]));
+      const a    = document.createElement("a");
+      a.href = url; a.download = name; a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) { console.error("Download failed:", e); }
+  };
+
   const filteredTeachers = teachers.filter(t =>
     `${t.displayName || ""} ${t.firstName} ${t.lastName}`.toLowerCase().includes(search.toLowerCase())
   );
@@ -72,6 +84,10 @@ export default function RecordingsTab({ teachers = [], isDarkMode }) {
         <h2 style={{ margin: 0, fontSize: "18px", fontWeight: 900, color: col.text, flex: 1 }}>
           {playing.title || playing.bookingId?.classTitle || "Class Recording"}
         </h2>
+        <button onClick={() => downloadVideo(playing)}
+          style={{ padding: "8px 14px", borderRadius: "10px", background: col.input, color: col.text, border: `1px solid ${col.border}`, cursor: "pointer", fontSize: "12px", fontWeight: 800, display: "flex", alignItems: "center", gap: "6px" }}>
+          <Download size={13} /> Download
+        </button>
       </div>
 
       <div style={{ background: "#000", borderRadius: "16px", overflow: "hidden", aspectRatio: "16/9" }}>
@@ -149,10 +165,16 @@ export default function RecordingsTab({ teachers = [], isDarkMode }) {
               </div>
             </div>
 
-            <button onClick={() => loadVideo(rec)}
-              style={{ padding: "8px 16px", borderRadius: "10px", background: "linear-gradient(135deg,#6366f1,#8b5cf6)", color: "#fff", border: "none", cursor: "pointer", fontSize: "12px", fontWeight: 800, display: "flex", alignItems: "center", gap: "5px", flexShrink: 0 }}>
-              <Play size={13} fill="white" /> Watch
-            </button>
+            <div style={{ display: "flex", gap: "8px", flexShrink: 0 }}>
+              <button onClick={() => loadVideo(rec)}
+                style={{ padding: "8px 16px", borderRadius: "10px", background: "linear-gradient(135deg,#6366f1,#8b5cf6)", color: "#fff", border: "none", cursor: "pointer", fontSize: "12px", fontWeight: 800, display: "flex", alignItems: "center", gap: "5px" }}>
+                <Play size={13} fill="white" /> Watch
+              </button>
+              <button onClick={() => downloadVideo(rec)}
+                style={{ padding: "8px 12px", borderRadius: "10px", background: col.input, color: col.text, border: `1px solid ${col.border}`, cursor: "pointer", fontSize: "12px", fontWeight: 800, display: "flex", alignItems: "center", gap: "5px" }}>
+                <Download size={13} /> Download
+              </button>
+            </div>
           </div>
         ))}
       </div>

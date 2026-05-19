@@ -4,6 +4,9 @@ import { verifyToken, verifyAdmin } from "../middleware/authMiddleware.js";
 import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
 import { paymentTransactionSchema } from "../schemas/paymentTransactionSchema.js";
 import { teacherSchema }            from "../schemas/teacherSchema.js";
+import { bookingSchema }            from "../schemas/bookingSchema.js";
+import { studentSchema }            from "../schemas/studentSchema.js";
+import { adminSchema }              from "../schemas/adminSchema.js";
 import { parsePagination }          from "../utils/pagination.js";
 import logger from "../utils/logger.js";
 import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
@@ -13,7 +16,15 @@ router.use(tenantMiddleware);
 
 const getPaymentTransaction = (db) =>
   db.models.PaymentTransaction || db.model("PaymentTransaction", paymentTransactionSchema);
-const getTeacher = (db) => db.models.Teacher || db.model("Teacher", teacherSchema);
+const getTeacher  = (db) => db.models.Teacher  || db.model("Teacher",  teacherSchema);
+const getBooking  = (db) => db.models.Booking  || db.model("Booking",  bookingSchema);
+const getStudent  = (db) => db.models.Student  || db.model("Student",  studentSchema);
+const getAdmin    = (db) => db.models.Admin    || db.model("Admin",    adminSchema);
+
+// Ensure all ref models are registered on the connection before any populate call.
+const ensurePopulateModels = (db) => {
+  getBooking(db); getStudent(db); getAdmin(db); getTeacher(db);
+};
 
 /**
  * GET /api/payments/teacher/:teacherId
@@ -21,6 +32,7 @@ const getTeacher = (db) => db.models.Teacher || db.model("Teacher", teacherSchem
  */
 router.get("/teacher/:teacherId", verifyToken, async (req, res) => {
   try {
+    ensurePopulateModels(req.db);
     const { teacherId } = req.params;
     const { status } = req.query;
 
@@ -75,6 +87,7 @@ router.get("/teacher/:teacherId", verifyToken, async (req, res) => {
  */
 router.get("/all", verifyToken, verifyAdmin, async (req, res) => {
   try {
+    ensurePopulateModels(req.db);
     const { status, teacherId } = req.query;
 
     const filter = {};
@@ -119,6 +132,7 @@ router.get("/all", verifyToken, verifyAdmin, async (req, res) => {
  */
 router.patch("/:id/pay", verifyToken, verifyAdmin, async (req, res) => {
   try {
+    ensurePopulateModels(req.db);
     const { paymentMethod, notes } = req.body;
 
     const transaction = await getPaymentTransaction(req.db).findById(req.params.id)

@@ -38,7 +38,7 @@ export default function Classroom({ classData, userRole: propUserRole, onLeave, 
   const finalClassData = classData || stateData.classData || savedState.classData;
   const userRole       = propUserRole || stateData.userRole || savedState.userRole || localStorage.getItem("role");
   const isGroupClass   = !!finalClassData?.isGroupClass;
-  const bookingId      = finalClassData?.bookingId || finalClassData?.id;
+  const bookingId      = finalClassData?.bookingId || finalClassData?._id || finalClassData?.id;
 
   const { isDarkMode } = useDarkMode();
   const dm = isDarkMode;

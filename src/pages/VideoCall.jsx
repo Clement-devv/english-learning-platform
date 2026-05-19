@@ -135,6 +135,7 @@ export default function VideoCall({
 
   const {
     isRecording, uploadingRecording, recSeconds,
+    recordingError, setRecordingError,
     startRecording, stopRecording, formatRecTime,
   } = useRecording(bookingId);
 
@@ -1082,6 +1083,15 @@ export default function VideoCall({
             <button onClick={() => { setAudioBlocked(false); resumeAudio(remoteUsers); }}
               className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 active:scale-95 text-white text-xs font-semibold rounded-lg transition-all flex-shrink-0">
               Enable Audio
+            </button>
+          </div>
+        )}
+        {recordingError && (
+          <div className="bg-red-950/80 border-t border-red-800/50 px-4 py-2 flex items-center justify-between gap-3 flex-shrink-0 backdrop-blur-sm">
+            <div className="text-red-300 text-xs font-medium">{recordingError}</div>
+            <button onClick={() => setRecordingError(null)}
+              className="px-3 py-1.5 bg-red-700 hover:bg-red-600 active:scale-95 text-white text-xs font-semibold rounded-lg transition-all flex-shrink-0">
+              Dismiss
             </button>
           </div>
         )}

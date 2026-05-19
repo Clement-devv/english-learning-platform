@@ -9,7 +9,7 @@ export const recordingSchema = new mongoose.Schema({
   duration:         { type: Number, default: 0 },
   fileSize:         { type: Number, default: 0 },
   mimeType:         { type: String, default: 'video/webm' },
-  visibleToStudent: { type: Boolean, default: true },
+  visibleToStudent: { type: Boolean, default: false },
   autoDeleteAt:     { type: Date },
 }, { timestamps: true });
 

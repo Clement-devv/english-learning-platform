@@ -1,21 +1,23 @@
 // src/pages/student/tabs/RecordingsTab.jsx
-import { useState, useEffect, useRef } from "react";
-import { Play, X, Clock, Calendar, Video } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Play, X, Clock, Calendar, Video, Loader2 } from "lucide-react";
 import api from "../../../api";
-
 
 export default function RecordingsTab({ isDarkMode }) {
   const [recordings, setRecordings] = useState([]);
   const [loading,    setLoading]    = useState(true);
-  const [playing,    setPlaying]    = useState(null); // recording object
-  const videoRef = useRef(null);
+  const [playing,    setPlaying]    = useState(null);
+  const [videoSrc,   setVideoSrc]   = useState(null);
+  const [loadingId,  setLoadingId]  = useState(null); // which card is loading
 
   const col = {
-    bg:     isDarkMode ? "#0f1117" : "#fff8f0",
-    card:   isDarkMode ? "#1a1d2e" : "#ffffff",
-    border: isDarkMode ? "#2a2d40" : "#ffe8cc",
-    text:   isDarkMode ? "#e8eaf6" : "#1a1d2e",
-    muted:  isDarkMode ? "#8b91b8" : "#6b7280",
+    bg:      isDarkMode ? "#0f1117" : "#fff8f0",
+    card:    isDarkMode ? "#1a1d2e" : "#ffffff",
+    border:  isDarkMode ? "#2a2d40" : "#ffe8cc",
+    text:    isDarkMode ? "#e8eaf6" : "#1a1d2e",
+    muted:   isDarkMode ? "#8b91b8" : "#6b7280",
+    accent:  "#6366f1",
+    inputBg: isDarkMode ? "#1e2235" : "#f3f4f6",
   };
 
   useEffect(() => {
@@ -42,57 +44,81 @@ export default function RecordingsTab({ isDarkMode }) {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
-  // Create an object URL so we can stream with auth headers
-  const [blobUrls, setBlobUrls] = useState({});
-
-  const loadVideo = async (rec) => {
-    if (blobUrls[rec._id]) { setPlaying(rec); return; }
+  const openVideo = async (rec) => {
+    setLoadingId(rec._id);
     try {
-      const resp = await api.get(`/recordings/${rec._id}/stream`, { responseType: 'blob' });
-      const blob = new Blob([resp.data], { type: resp.headers['content-type'] || 'video/webm' });
-      const url  = URL.createObjectURL(blob);
-      setBlobUrls(prev => ({ ...prev, [rec._id]: url }));
+      // Ask the server for a direct streamable URL (works for S3 presigned URLs).
+      // Falls back to blob if the server streams the file directly.
+      const resp = await api.get(`/recordings/${rec._id}/stream`, { responseType: 'blob', maxRedirects: 0 }).catch(async (err) => {
+        // axios throws on 3xx when maxRedirects:0 — extract the redirect URL
+        if (err.response?.status === 302 || err.response?.status === 301) {
+          return { _redirectUrl: err.response.headers.location };
+        }
+        throw err;
+      });
+
+      let src;
+      if (resp._redirectUrl) {
+        // S3 presigned URL — use directly, browser streams natively
+        src = resp._redirectUrl;
+      } else {
+        // Local disk blob
+        const blob = new Blob([resp.data], { type: resp.headers?.['content-type'] || 'video/webm' });
+        src = URL.createObjectURL(blob);
+      }
+
+      setVideoSrc(src);
       setPlaying(rec);
     } catch (e) {
       console.error("Failed to load video:", e);
+    } finally {
+      setLoadingId(null);
     }
   };
 
-  // ── Player modal ──────────────────────────────────────────────────────────
+  const closeVideo = () => {
+    // Revoke blob URLs to free memory, but not S3 presigned URLs
+    if (videoSrc && videoSrc.startsWith("blob:")) URL.revokeObjectURL(videoSrc);
+    setPlaying(null);
+    setVideoSrc(null);
+  };
+
+  // ── Player view ──────────────────────────────────────────────────────────────
   if (playing) return (
     <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+
+      {/* Header */}
       <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-        <button onClick={() => setPlaying(null)} style={{ background: "none", border: "none", color: col.muted, cursor: "pointer", display: "flex", alignItems: "center", gap: "6px", fontSize: "14px", fontWeight: 700 }}>
-          <X size={16} /> Close
+        <button onClick={closeVideo} style={{ background: "none", border: "none", color: col.muted, cursor: "pointer", display: "flex", alignItems: "center", gap: "6px", fontSize: "14px", fontWeight: 700, padding: 0 }}>
+          <X size={16} /> Back
         </button>
-        <h2 style={{ margin: 0, fontSize: "18px", fontWeight: 900, color: col.text, flex: 1 }}>
+        <h2 style={{ margin: 0, fontSize: "17px", fontWeight: 900, color: col.text, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {playing.title || playing.bookingId?.classTitle || "Class Recording"}
         </h2>
       </div>
 
-      <div style={{ background: "#000", borderRadius: "16px", overflow: "hidden", aspectRatio: "16/9", width: "100%" }}>
+      {/* Video player */}
+      <div style={{ background: "#000", borderRadius: "16px", overflow: "hidden", aspectRatio: "16/9", width: "100%", position: "relative" }}>
         <video
-          ref={videoRef}
-          src={blobUrls[playing._id]}
+          src={videoSrc}
           controls
           autoPlay
           style={{ width: "100%", height: "100%", display: "block" }}
         />
       </div>
 
-      <div style={{ background: col.card, border: `1px solid ${col.border}`, borderRadius: "14px", padding: "14px 18px", display: "flex", gap: "20px", flexWrap: "wrap" }}>
-        <span style={{ fontSize: "13px", color: col.muted }}>
-          <Calendar size={13} style={{ display: "inline", marginRight: "5px" }} />
-          {formatDate(playing.createdAt)}
+      {/* Metadata strip */}
+      <div style={{ background: col.card, border: `1px solid ${col.border}`, borderRadius: "14px", padding: "14px 18px", display: "flex", gap: "18px", flexWrap: "wrap", alignItems: "center" }}>
+        <span style={{ fontSize: "13px", color: col.muted, display: "flex", alignItems: "center", gap: "5px" }}>
+          <Calendar size={13} /> {formatDate(playing.createdAt)}
         </span>
-        <span style={{ fontSize: "13px", color: col.muted }}>
-          <Clock size={13} style={{ display: "inline", marginRight: "5px" }} />
-          {formatDuration(playing.duration)}
-        </span>
-        {playing.fileSize > 0 && (
-          <span style={{ fontSize: "13px", color: col.muted }}>
-            💾 {formatSize(playing.fileSize)}
+        {playing.duration > 0 && (
+          <span style={{ fontSize: "13px", color: col.muted, display: "flex", alignItems: "center", gap: "5px" }}>
+            <Clock size={13} /> {formatDuration(playing.duration)}
           </span>
+        )}
+        {playing.fileSize > 0 && (
+          <span style={{ fontSize: "13px", color: col.muted }}>💾 {formatSize(playing.fileSize)}</span>
         )}
         {playing.teacherId && (
           <span style={{ fontSize: "13px", color: col.muted }}>
@@ -100,10 +126,31 @@ export default function RecordingsTab({ isDarkMode }) {
           </span>
         )}
       </div>
+
+      {/* Other recordings quick-switch */}
+      {recordings.length > 1 && (
+        <div>
+          <p style={{ margin: "0 0 8px", fontSize: "12px", fontWeight: 700, color: col.muted, textTransform: "uppercase", letterSpacing: "0.05em" }}>Other recordings</p>
+          <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+            {recordings.filter(r => r._id !== playing._id).map(rec => (
+              <button key={rec._id} onClick={() => openVideo(rec)} disabled={loadingId === rec._id}
+                style={{ display: "flex", alignItems: "center", gap: "12px", padding: "10px 14px", background: col.card, border: `1px solid ${col.border}`, borderRadius: "12px", cursor: "pointer", textAlign: "left", width: "100%", opacity: loadingId === rec._id ? 0.6 : 1 }}>
+                <div style={{ width: "36px", height: "24px", borderRadius: "6px", background: "linear-gradient(135deg,#6366f1,#8b5cf6)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  {loadingId === rec._id ? <Loader2 size={12} color="white" style={{ animation: "spin 1s linear infinite" }} /> : <Play size={10} fill="white" color="white" />}
+                </div>
+                <span style={{ fontSize: "13px", fontWeight: 700, color: col.text, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {rec.title || rec.bookingId?.classTitle || "Class Recording"}
+                </span>
+                <span style={{ fontSize: "11px", color: col.muted, flexShrink: 0 }}>{formatDate(rec.createdAt)}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 
-  // ── List view ─────────────────────────────────────────────────────────────
+  // ── List view ─────────────────────────────────────────────────────────────────
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
       <div>
@@ -117,50 +164,61 @@ export default function RecordingsTab({ isDarkMode }) {
         <div style={{ background: col.card, border: `2px dashed ${col.border}`, borderRadius: "18px", padding: "48px 24px", textAlign: "center" }}>
           <div style={{ fontSize: "56px", marginBottom: "14px" }}>🎬</div>
           <p style={{ margin: 0, fontSize: "16px", fontWeight: 800, color: col.text }}>No recordings yet</p>
-          <p style={{ margin: "6px 0 0", fontSize: "13px", color: col.muted }}>Your teacher can record classes and they'll appear here.</p>
+          <p style={{ margin: "6px 0 0", fontSize: "13px", color: col.muted }}>Your teacher will share class recordings here.</p>
         </div>
       )}
 
       <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-        {recordings.map(rec => (
-          <div key={rec._id} style={{ background: col.card, border: `1px solid ${col.border}`, borderRadius: "16px", padding: "16px 20px", display: "flex", alignItems: "center", gap: "16px" }}>
+        {recordings.map(rec => {
+          const isLoading = loadingId === rec._id;
+          return (
+            <div key={rec._id} style={{ background: col.card, border: `1px solid ${col.border}`, borderRadius: "16px", padding: "16px 20px", display: "flex", alignItems: "center", gap: "16px" }}>
 
-            {/* Thumbnail placeholder */}
-            <div style={{ width: "72px", height: "48px", borderRadius: "10px", background: "linear-gradient(135deg,#6366f1,#8b5cf6)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-              <Video size={22} color="white" />
-            </div>
-
-            {/* Info */}
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <p style={{ margin: "0 0 4px", fontSize: "15px", fontWeight: 800, color: col.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {rec.title || rec.bookingId?.classTitle || "Class Recording"}
-              </p>
-              <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
-                <span style={{ fontSize: "12px", color: col.muted }}>
-                  <Calendar size={11} style={{ display: "inline", marginRight: "4px" }} />
-                  {formatDate(rec.createdAt)}
-                </span>
-                {rec.duration > 0 && (
-                  <span style={{ fontSize: "12px", color: col.muted }}>
-                    <Clock size={11} style={{ display: "inline", marginRight: "4px" }} />
-                    {formatDuration(rec.duration)}
-                  </span>
-                )}
-                {rec.teacherId && (
-                  <span style={{ fontSize: "12px", color: col.muted }}>
-                    👨‍🏫 {rec.teacherId.firstName} {rec.teacherId.lastName}
-                  </span>
-                )}
+              {/* Thumbnail */}
+              <div style={{ width: "72px", height: "48px", borderRadius: "10px", background: "linear-gradient(135deg,#6366f1,#8b5cf6)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                {isLoading
+                  ? <Loader2 size={20} color="white" style={{ animation: "spin 1s linear infinite" }} />
+                  : <Video size={22} color="white" />
+                }
               </div>
-            </div>
 
-            {/* Play button */}
-            <button onClick={() => loadVideo(rec)} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "10px 18px", borderRadius: "12px", background: "linear-gradient(135deg,#6366f1,#8b5cf6)", color: "#fff", border: "none", cursor: "pointer", fontSize: "13px", fontWeight: 800, flexShrink: 0 }}>
-              <Play size={14} fill="white" /> Watch
-            </button>
-          </div>
-        ))}
+              {/* Info */}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ margin: "0 0 4px", fontSize: "15px", fontWeight: 800, color: col.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {rec.title || rec.bookingId?.classTitle || "Class Recording"}
+                </p>
+                <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", alignItems: "center" }}>
+                  <span style={{ fontSize: "12px", color: col.muted, display: "flex", alignItems: "center", gap: "3px" }}>
+                    <Calendar size={11} /> {formatDate(rec.createdAt)}
+                  </span>
+                  {rec.duration > 0 && (
+                    <span style={{ fontSize: "12px", color: col.muted, display: "flex", alignItems: "center", gap: "3px" }}>
+                      <Clock size={11} /> {formatDuration(rec.duration)}
+                    </span>
+                  )}
+                  {rec.teacherId && (
+                    <span style={{ fontSize: "12px", color: col.muted }}>
+                      👨‍🏫 {rec.teacherId.firstName} {rec.teacherId.lastName}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Watch button */}
+              <button onClick={() => openVideo(rec)} disabled={isLoading}
+                style={{ display: "flex", alignItems: "center", gap: "8px", padding: "10px 18px", borderRadius: "12px", background: isLoading ? col.inputBg : "linear-gradient(135deg,#6366f1,#8b5cf6)", color: isLoading ? col.muted : "#fff", border: "none", cursor: isLoading ? "not-allowed" : "pointer", fontSize: "13px", fontWeight: 800, flexShrink: 0, minWidth: "88px", justifyContent: "center", transition: "opacity 0.2s" }}>
+                {isLoading
+                  ? <><Loader2 size={13} style={{ animation: "spin 1s linear infinite" }} /> Loading</>
+                  : <><Play size={14} fill="white" /> Watch</>
+                }
+              </button>
+            </div>
+          );
+        })}
       </div>
+
+      {/* Spinner keyframe */}
+      <style>{`@keyframes spin { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }`}</style>
     </div>
   );
 }

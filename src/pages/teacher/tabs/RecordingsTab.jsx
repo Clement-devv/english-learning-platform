@@ -1,6 +1,6 @@
 // src/pages/teacher/tabs/RecordingsTab.jsx
 import { useState, useEffect } from "react";
-import { Trash2, Eye, EyeOff, Play, X, Clock, Calendar, Video } from "lucide-react";
+import { Trash2, Eye, EyeOff, Play, X, Clock, Calendar, Video, Download } from "lucide-react";
 import api from "../../../api";
 
 
@@ -83,6 +83,19 @@ export default function RecordingsTab({ isDarkMode }) {
     } catch { showToast("Failed to load video"); }
   };
 
+  // ── Download video ─────────────────────────────────────────────────────────
+  const downloadVideo = async (rec) => {
+    try {
+      const resp = await api.get(`/recordings/${rec._id}/download`, { responseType: 'blob' });
+      const ext  = rec.mimeType === "video/mp4" ? ".mp4" : ".webm";
+      const name = (rec.title || rec.bookingId?.classTitle || "recording").replace(/[^a-z0-9\s-]/gi, "").trim() + ext;
+      const url  = URL.createObjectURL(new Blob([resp.data]));
+      const a    = document.createElement("a");
+      a.href = url; a.download = name; a.click();
+      URL.revokeObjectURL(url);
+    } catch { showToast("Download failed"); }
+  };
+
   // ── Player ─────────────────────────────────────────────────────────────────
   if (playing) return (
     <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
@@ -122,6 +135,9 @@ export default function RecordingsTab({ isDarkMode }) {
           <button onClick={() => toggleVisibility(playing)} style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 14px", borderRadius: "10px", border: `1px solid ${col.border}`, background: "none", color: playing.visibleToStudent ? "#10b981" : col.muted, cursor: "pointer", fontSize: "13px", fontWeight: 700 }}>
             {playing.visibleToStudent ? <Eye size={14} /> : <EyeOff size={14} />}
             {playing.visibleToStudent ? "Visible to student" : "Hidden from student"}
+          </button>
+          <button onClick={() => downloadVideo(playing)} style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 14px", borderRadius: "10px", border: `1px solid ${col.border}`, background: "none", color: col.text, cursor: "pointer", fontSize: "13px", fontWeight: 700 }}>
+            <Download size={14} /> Download
           </button>
           <button onClick={() => handleDelete(playing)} style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 14px", borderRadius: "10px", border: "none", background: "rgba(239,68,68,0.1)", color: "#ef4444", cursor: "pointer", fontSize: "13px", fontWeight: 700 }}>
             <Trash2 size={14} /> Delete
@@ -196,6 +212,10 @@ export default function RecordingsTab({ isDarkMode }) {
                 <button onClick={() => loadVideo(rec)} title="Watch recording"
                   style={{ padding: "8px 14px", borderRadius: "10px", background: "linear-gradient(135deg,#6366f1,#8b5cf6)", color: "#fff", border: "none", cursor: "pointer", fontSize: "12px", fontWeight: 800, display: "flex", alignItems: "center", gap: "5px" }}>
                   <Play size={13} fill="white" /> Watch
+                </button>
+                <button onClick={() => downloadVideo(rec)} title="Download recording"
+                  style={{ padding: "8px", borderRadius: "10px", border: `1px solid ${col.border}`, background: "none", color: col.text, cursor: "pointer" }}>
+                  <Download size={15} />
                 </button>
                 <button onClick={() => handleDelete(rec)} title="Delete recording"
                   style={{ padding: "8px", borderRadius: "10px", border: "none", background: "rgba(239,68,68,0.1)", color: "#ef4444", cursor: "pointer" }}>

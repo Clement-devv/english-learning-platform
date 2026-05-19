@@ -26,6 +26,7 @@ import { parsePagination } from "../utils/pagination.js";
 import logger from "../utils/logger.js";
 import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
 import { cachedQuery, invalidateCache } from '../utils/cache.js';
+import { s3Enabled, uploadToS3, deleteFromS3, s3PublicUrl, isLegacyPath, keyFromValue } from "../utils/s3.js";
 
 const teacherCacheKey = (slug, id) => `teacher:${slug}:${id}`;
 
@@ -38,19 +39,8 @@ const __dirname  = path.dirname(__filename);
 const ALLOWED_PHOTO_MIMES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const ALLOWED_PHOTO_EXTS  = new Set(['.jpg', '.jpeg', '.png', '.webp']);
 
-const photoStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const dir = path.join(__dirname, "../uploads/teachers");
-    fs.mkdirSync(dir, { recursive: true });
-    cb(null, dir);
-  },
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase();
-    cb(null, `photo-${req.params.id}-${Date.now()}${ext}`);
-  },
-});
 const photoUpload = multer({
-  storage: photoStorage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 3 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase();
@@ -143,15 +133,30 @@ router.post("/:id/photo", verifyToken, requireOwnerOrAdmin, (req, res, next) => 
     const teacher = await Teacher.findById(req.params.id);
     if (!teacher) return notFound(res, "Teacher not found");
 
-    // Delete old photo file if it exists.
-    // path.basename() prevents path traversal: only the filename is used,
-    // not any directory components that may have been stored.
+    // Delete old photo
     if (teacher.photo) {
-      const old = path.join(__dirname, "../uploads/teachers", path.basename(teacher.photo));
-      fs.unlink(old, () => {});
+      if (s3Enabled() && !isLegacyPath(teacher.photo)) {
+        await deleteFromS3(keyFromValue(teacher.photo));
+      } else if (isLegacyPath(teacher.photo)) {
+        fs.unlink(path.join(__dirname, "../uploads/teachers", path.basename(teacher.photo)), () => {});
+      }
     }
 
-    const photoUrl = `/uploads/teachers/${req.file.filename}`;
+    let photoUrl;
+    if (s3Enabled()) {
+      const ext = path.extname(req.file.originalname).toLowerCase();
+      const key = `centers/${req.center.slug}/teachers/photo-${req.params.id}-${Date.now()}${ext}`;
+      await uploadToS3(req.file.buffer, key, req.file.mimetype);
+      photoUrl = s3PublicUrl(key);
+    } else {
+      const dir = path.join(__dirname, "../uploads/teachers");
+      fs.mkdirSync(dir, { recursive: true });
+      const ext      = path.extname(req.file.originalname).toLowerCase();
+      const filename = `photo-${req.params.id}-${Date.now()}${ext}`;
+      fs.writeFileSync(path.join(dir, filename), req.file.buffer);
+      photoUrl = `/uploads/teachers/${filename}`;
+    }
+
     teacher.photo = photoUrl;
     await teacher.save();
     await invalidateCache(teacherCacheKey(req.center?.slug, req.params.id));
@@ -169,8 +174,11 @@ router.delete("/:id/photo", verifyToken, requireOwnerOrAdmin, async (req, res) =
     const teacher = await Teacher.findById(req.params.id);
     if (!teacher) return notFound(res, "Teacher not found");
     if (teacher.photo) {
-      const filePath = path.join(__dirname, "../uploads/teachers", path.basename(teacher.photo));
-      fs.unlink(filePath, () => {});
+      if (s3Enabled() && !isLegacyPath(teacher.photo)) {
+        await deleteFromS3(keyFromValue(teacher.photo));
+      } else if (isLegacyPath(teacher.photo)) {
+        fs.unlink(path.join(__dirname, "../uploads/teachers", path.basename(teacher.photo)), () => {});
+      }
       teacher.photo = "";
       await teacher.save();
       await invalidateCache(teacherCacheKey(req.center?.slug, req.params.id));
