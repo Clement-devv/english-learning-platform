@@ -31,10 +31,11 @@ export const directMessageSchema = new mongoose.Schema({
   lastActivityAt: { type: Date, default: Date.now },
 }, { timestamps: true });
 
-directMessageSchema.index({ teacherId: 1 }, { unique: true, sparse: true });
+// teacher-admin: one DM per teacher (scoped to type so sub-admin-teacher docs don't conflict).
+// Old single-field teacherId_1 index must be dropped — migrateSubAdminIndex() handles this.
+directMessageSchema.index({ teacherId: 1, type: 1 }, { unique: true, sparse: true });
 directMessageSchema.index({ studentId: 1 }, { unique: true, sparse: true });
-// Compound index covers both sub-admin-admin (teacherId=null) and sub-admin-teacher (teacherId=X).
-// NOTE: The old single-field `subAdminId_1` unique index must be dropped from MongoDB once before
-// deploying this change: db.directmessages.dropIndex('subAdminId_1')
+// Compound index covers sub-admin-admin (teacherId=null) and sub-admin-teacher (teacherId=X).
+// Old single-field subAdminId_1 index must be dropped — migrateSubAdminIndex() handles this.
 directMessageSchema.index({ subAdminId: 1, teacherId: 1 }, { unique: true, sparse: true });
 directMessageSchema.index({ lastActivityAt: -1 });

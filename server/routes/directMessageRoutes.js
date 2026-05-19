@@ -22,16 +22,29 @@ const getAdmin         = (db) => db.models.Admin         || db.model("Admin",   
 const getSubAdmin      = (db) => db.models.SubAdmin      || db.model("SubAdmin",      subAdminSchema);
 const getBooking       = (db) => db.models.Booking       || db.model("Booking",       bookingSchema);
 
-// Drops the old single-field subAdminId unique index so sub-admin can have multiple DMs.
-// Safe to call repeatedly — silently ignores "index not found" errors.
+// One-time migration per DB per server process:
+//  1. Drop old single-field teacherId_1 unique index  → allows sub-admin-teacher DMs for teachers
+//     that already have a teacher-admin DM (same teacherId, different type).
+//  2. Drop old single-field subAdminId_1 unique index → allows sub-admin to have multiple DMs.
+//  3. Ensure new compound indexes exist (Mongoose autoIndex may not run in production).
+// Safe to call repeatedly — silently ignores "index not found" / "already exists" errors.
 const migratedDbs = new Set();
 async function migrateSubAdminIndex(db) {
   if (migratedDbs.has(db.name)) return;
   migratedDbs.add(db.name);
+  const col = getDirectMessage(db).collection;
+  const drops = ['subAdminId_1', 'teacherId_1'];
+  for (const idx of drops) {
+    try {
+      await col.dropIndex(idx);
+      logger.info(`[DM] Dropped legacy index ${idx} on ${db.name}`);
+    } catch { /* index already gone — fine */ }
+  }
+  // Ensure new compound indexes exist
   try {
-    await getDirectMessage(db).collection.dropIndex('subAdminId_1');
-    logger.info(`[DM] Dropped legacy subAdminId_1 index on ${db.name}`);
-  } catch { /* index already gone — fine */ }
+    await col.createIndex({ teacherId: 1, type: 1 }, { unique: true, sparse: true, background: true });
+    await col.createIndex({ subAdminId: 1, teacherId: 1 }, { unique: true, sparse: true, background: true });
+  } catch { /* already exist — fine */ }
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -99,7 +112,13 @@ router.get("/", verifyToken, async (req, res) => {
               chatName: `${saName} ↔ ${t.firstName} ${t.lastName}`,
             })),
             { ordered: false }
-          ).catch(() => {}); // ignore duplicate key errors on race condition
+          ).catch(err => {
+            // BulkWriteError with code 11000 = duplicate key (race condition) — safe to ignore.
+            // Any other error is unexpected and should be logged.
+            if (err?.code !== 11000 && err?.name !== 'BulkWriteError') {
+              logger.warn('[DM] insertMany sub-admin-teacher failed:', { error: err?.message });
+            }
+          });
         }
 
         // Auto-attach sub-admin to student-admin DMs for students of assigned teachers
@@ -168,6 +187,12 @@ router.post("/start-teacher/:teacherId", verifyToken, async (req, res) => {
     if (role !== "sub-admin") return forbidden(res, "Sub-admins only");
 
     const { teacherId } = req.params;
+
+    // Verify teacher is within this sub-admin's assigned scope
+    const sa = await getSubAdmin(req.db).findById(userId).select("assignedTeachers").lean();
+    const inScope = sa?.assignedTeachers?.some(tid => tid.toString() === teacherId);
+    if (!inScope) return forbidden(res, "Teacher is not in your assigned scope");
+
     const [sender, teacher] = await Promise.all([
       getSenderInfo(userId, "sub-admin", req.db),
       getTeacher(req.db).findById(teacherId).select("firstName lastName").lean(),

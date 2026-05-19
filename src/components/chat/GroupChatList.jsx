@@ -1,14 +1,16 @@
 // src/components/chat/GroupChatList.jsx
 import React, { useState, useEffect, useCallback } from "react";
-import { Search, MessageCircle, CheckCheck, Shield, Plus } from "lucide-react";
+import { Search, MessageCircle, CheckCheck, Plus, Trash2 } from "lucide-react";
 import api from "../../api";
 
 export default function GroupChatList({ userRole, onSelectChat, selectedChatId, isDark, onUnreadCount }) {
-  const [groupChats,  setGroupChats]  = useState([]);
-  const [dms,         setDms]         = useState([]);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [loading,     setLoading]     = useState(true);
-  const [startingDm,  setStartingDm]  = useState(false);
+  const [groupChats,      setGroupChats]      = useState([]);
+  const [dms,             setDms]             = useState([]);
+  const [searchQuery,     setSearchQuery]     = useState("");
+  const [loading,         setLoading]         = useState(true);
+  const [startingDm,      setStartingDm]      = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const [deleting,        setDeleting]        = useState(false);
 
   const C = {
     bg:         isDark ? "#13151c" : "#f8f9ff",
@@ -75,6 +77,22 @@ export default function GroupChatList({ userRole, onSelectChat, selectedChatId, 
       console.error("Start DM error:", e);
     } finally {
       setStartingDm(false);
+    }
+  };
+
+  const handleDeleteChat = async (chatId) => {
+    if (deleting) return;
+    setDeleting(true);
+    try {
+      await api.delete(`/group-chats/${chatId}`);
+      setGroupChats(prev => prev.filter(c => c._id !== chatId));
+      setConfirmDeleteId(null);
+      // If the deleted chat was selected, deselect it
+      if (selectedChatId === chatId) onSelectChat(null);
+    } catch (e) {
+      console.error("Delete group chat error:", e);
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -160,6 +178,8 @@ export default function GroupChatList({ userRole, onSelectChat, selectedChatId, 
   const filteredGroups = groupChats.filter(c =>
     c?.chatName?.toLowerCase().includes(searchQuery.toLowerCase())
   );
+  const activeGroups   = filteredGroups.filter(c => c.isActive !== false);
+  const inactiveGroups = filteredGroups.filter(c => c.isActive === false);
 
   // For DM search: match against derived name
   const filteredDms = dms.filter(dm => {
@@ -292,12 +312,12 @@ export default function GroupChatList({ userRole, onSelectChat, selectedChatId, 
               {/* Group Chats */}
               <SectionLabel label="Group Chats" color={C.sectionTxt} style={{ marginTop: 8 }} />
 
-              {filteredGroups.length === 0 ? (
+              {activeGroups.length === 0 ? (
                 <p style={{ padding: "12px 20px", fontSize: "12px", color: C.sub, margin: 0 }}>
                   {searchQuery ? "No results found" : "No group chats yet"}
                 </p>
               ) : (
-                filteredGroups.map(chat => (
+                activeGroups.map(chat => (
                   <ChatRow
                     key={chat._id}
                     chat={{ ...chat, _chatType: "group" }}
@@ -311,6 +331,30 @@ export default function GroupChatList({ userRole, onSelectChat, selectedChatId, 
                     initials={getInitials(chat.chatName || "")}
                   />
                 ))
+              )}
+
+              {/* Archived / Inactive chats — admin only */}
+              {userRole === "admin" && inactiveGroups.length > 0 && (
+                <>
+                  <SectionLabel label="Archived Chats" color={C.sectionTxt} style={{ marginTop: 8 }} />
+                  {inactiveGroups.map(chat => (
+                    <InactiveChatRow
+                      key={chat._id}
+                      chat={{ ...chat, _chatType: "group" }}
+                      isSelected={selectedChatId === chat._id}
+                      isDark={isDark}
+                      C={C}
+                      onSelect={onSelectChat}
+                      formatTime={formatTime}
+                      initials={getInitials(chat.chatName || "")}
+                      isConfirming={confirmDeleteId === chat._id}
+                      isDeleting={deleting && confirmDeleteId === chat._id}
+                      onRequestDelete={() => setConfirmDeleteId(chat._id)}
+                      onConfirmDelete={() => handleDeleteChat(chat._id)}
+                      onCancelDelete={() => setConfirmDeleteId(null)}
+                    />
+                  ))}
+                </>
               )}
             </>
           )}
@@ -498,6 +542,116 @@ function ChatRow({ chat, isSelected, unread, isDark, C, onSelect, formatTime, av
         </div>
       </div>
     </button>
+  );
+}
+
+// Inactive (archived) group chat row — admin only, shows delete controls
+function InactiveChatRow({ chat, isSelected, isDark, C, onSelect, formatTime, initials,
+  isConfirming, isDeleting, onRequestDelete, onConfirmDelete, onCancelDelete }) {
+  const name    = chat.chatName || "Unnamed";
+  const lastMsg = chat.lastMessage;
+
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", gap: "0",
+      borderLeft: `3px solid ${isSelected ? C.accent : "transparent"}`,
+      background: isSelected ? C.active : "transparent",
+      opacity: 0.75,
+    }}>
+      <button
+        onClick={() => onSelect(chat)}
+        style={{
+          flex: 1, display: "flex", alignItems: "center", gap: "12px",
+          padding: "10px 10px 10px 16px",
+          background: "transparent", border: "none", cursor: "pointer", textAlign: "left",
+        }}
+        onMouseEnter={e => !isSelected && (e.currentTarget.style.background = C.hover)}
+        onMouseLeave={e => !isSelected && (e.currentTarget.style.background = "transparent")}
+      >
+        {/* Avatar — greyed out */}
+        <div style={{
+          width: "46px", height: "46px", borderRadius: "14px",
+          background: isDark ? "#2a2d40" : "#d1d5db", flexShrink: 0,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: "14px", fontWeight: "700", color: isDark ? "#6b72a0" : "#9ca3af",
+        }}>
+          {initials}
+        </div>
+
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "3px" }}>
+            <span style={{
+              fontSize: "13.5px", fontWeight: "600",
+              color: C.sub, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+              textDecoration: "line-through",
+            }}>{name}</span>
+            <span style={{
+              fontSize: "9px", fontWeight: "800", flexShrink: 0,
+              padding: "1px 5px", borderRadius: "5px",
+              color: isDark ? "#f87171" : "#dc2626",
+              background: isDark ? "rgba(239,68,68,0.15)" : "rgba(220,38,38,0.08)",
+              letterSpacing: "0.04em", textTransform: "uppercase",
+            }}>
+              Removed
+            </span>
+          </div>
+          <p style={{
+            margin: 0, fontSize: "12px", color: C.sub,
+            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+          }}>
+            {lastMsg
+              ? `${lastMsg.senderName?.split(" ")[0]}: ${lastMsg.text}`
+              : <em style={{ opacity: 0.5 }}>No messages</em>
+            }
+          </p>
+        </div>
+      </button>
+
+      {/* Delete controls */}
+      <div style={{ padding: "0 12px 0 4px", flexShrink: 0, display: "flex", alignItems: "center", gap: "6px" }}>
+        {isConfirming ? (
+          <>
+            <button
+              onClick={onConfirmDelete}
+              disabled={isDeleting}
+              style={{
+                padding: "5px 10px", borderRadius: "8px", border: "none",
+                background: "#dc2626", color: "#fff",
+                fontSize: "11px", fontWeight: "800", cursor: isDeleting ? "wait" : "pointer",
+                display: "flex", alignItems: "center", gap: "4px",
+              }}
+            >
+              {isDeleting ? "…" : "Delete"}
+            </button>
+            <button
+              onClick={onCancelDelete}
+              disabled={isDeleting}
+              style={{
+                padding: "5px 8px", borderRadius: "8px",
+                border: `1px solid ${C.border}`, background: "transparent",
+                color: C.sub, fontSize: "11px", fontWeight: "700", cursor: "pointer",
+              }}
+            >
+              Cancel
+            </button>
+          </>
+        ) : (
+          <button
+            onClick={onRequestDelete}
+            title="Delete chat permanently"
+            style={{
+              width: "30px", height: "30px", borderRadius: "8px", border: "none",
+              background: isDark ? "rgba(239,68,68,0.12)" : "rgba(220,38,38,0.08)",
+              color: isDark ? "#f87171" : "#dc2626",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              cursor: "pointer",
+            }}
+          >
+            <Trash2 size={14} />
+          </button>
+        )}
+      </div>
+    </div>
   );
 }
 
