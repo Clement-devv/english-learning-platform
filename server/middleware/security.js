@@ -64,7 +64,7 @@ export const securityHeaders = helmet({
     directives: {
       defaultSrc: ["'self'"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://www.gstatic.com"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "https://translate.google.com", "https://translate.googleapis.com", "https://translate-pa.googleapis.com"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'wasm-unsafe-eval'", "https://translate.google.com", "https://translate.googleapis.com", "https://translate-pa.googleapis.com"],
       imgSrc: ["'self'", "https:", "data:"],
       connectSrc: [
         "'self'",
@@ -93,10 +93,13 @@ export const securityHeaders = helmet({
         // Both patterns below are needed: old-style and new US-regional ingest.
         "https://*.ingest.sentry.io",
         "https://*.ingest.us.sentry.io",
+        // AWS S3 — presigned URLs for recording playback and download
+        "https://*.amazonaws.com",
+        "https://*.s3.amazonaws.com",
       ],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
       objectSrc: ["'none'"],
-      mediaSrc: ["'self'", "blob:"],
+      mediaSrc: ["'self'", "blob:", "https://*.amazonaws.com"],
       frameSrc: ["'none'"],
       workerSrc: ["'self'", "blob:"],
       upgradeInsecureRequests: [],
