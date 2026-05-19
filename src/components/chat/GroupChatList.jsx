@@ -96,7 +96,6 @@ export default function GroupChatList({ userRole, onSelectChat, selectedChatId, 
 
   // Derive display info for a DM — proper names + role badges
   const getDmInfo = (dm) => {
-    // Admin sees who sent the DM
     if (userRole === "admin") {
       if (dm.type === "teacher-admin" && dm.teacherId) {
         const name = `${dm.teacherId.firstName} ${dm.teacherId.lastName}`;
@@ -110,19 +109,43 @@ export default function GroupChatList({ userRole, onSelectChat, selectedChatId, 
           avatarBg: "linear-gradient(135deg,#047857,#10b981)",
           badgeColor: isDark ? "#a7f3d0" : "#047857", badgeBg: isDark ? "rgba(4,120,87,0.25)" : "rgba(4,120,87,0.10)" };
       }
-      if (dm.type === "sub-admin-admin" && dm.subAdminId) {
+      if ((dm.type === "sub-admin-admin" || dm.type === "sub-admin-teacher") && dm.subAdminId) {
         const name = `${dm.subAdminId.firstName} ${dm.subAdminId.lastName}`;
         return { name, initials: getInitials(name), roleBadge: "Sub-Admin",
           avatarBg: "linear-gradient(135deg,#b45309,#f59e0b)",
           badgeColor: isDark ? "#fde68a" : "#b45309", badgeBg: isDark ? "rgba(180,83,9,0.25)" : "rgba(180,83,9,0.10)" };
       }
     }
-    // Sub-admin sees "Admin" as the other party
+
     if (userRole === "sub-admin") {
+      // Sub-admin ↔ teacher: show teacher name
+      if (dm.type === "sub-admin-teacher" && dm.teacherId) {
+        const name = `${dm.teacherId.firstName} ${dm.teacherId.lastName}`;
+        return { name, initials: getInitials(name), roleBadge: "Teacher",
+          avatarBg: "linear-gradient(135deg,#1d4ed8,#0891b2)",
+          badgeColor: isDark ? "#bfdbfe" : "#1d4ed8", badgeBg: isDark ? "rgba(29,78,216,0.25)" : "rgba(29,78,216,0.10)" };
+      }
+      // Sub-admin in student-admin chat: show student name
+      if (dm.type === "student-admin" && dm.studentId) {
+        const name = `${dm.studentId.firstName} ${dm.studentId.lastName}`;
+        return { name, initials: getInitials(name), roleBadge: "Student",
+          avatarBg: "linear-gradient(135deg,#047857,#10b981)",
+          badgeColor: isDark ? "#a7f3d0" : "#047857", badgeBg: isDark ? "rgba(4,120,87,0.25)" : "rgba(4,120,87,0.10)" };
+      }
+      // Sub-admin ↔ admin: show "Admin"
       return { name: "Admin", initials: "AD", roleBadge: "Admin",
         avatarBg: "linear-gradient(135deg,#7c3aed,#a855f7)",
         badgeColor: isDark ? "#e9d5ff" : "#7c3aed", badgeBg: isDark ? "rgba(124,58,237,0.25)" : "rgba(124,58,237,0.10)" };
     }
+
+    // Teacher viewing sub-admin-teacher DM: show sub-admin name
+    if (userRole === "teacher" && dm.type === "sub-admin-teacher" && dm.subAdminId) {
+      const name = `${dm.subAdminId.firstName} ${dm.subAdminId.lastName}`;
+      return { name, initials: getInitials(name), roleBadge: "Sub-Admin",
+        avatarBg: "linear-gradient(135deg,#b45309,#f59e0b)",
+        badgeColor: isDark ? "#fde68a" : "#b45309", badgeBg: isDark ? "rgba(180,83,9,0.25)" : "rgba(180,83,9,0.10)" };
+    }
+
     const name = dm.chatName || "Admin";
     return { name, initials: getInitials(name), roleBadge: null,
       avatarBg: "linear-gradient(135deg,#7c3aed,#a855f7)", badgeColor: null, badgeBg: null };

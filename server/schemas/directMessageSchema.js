@@ -12,7 +12,7 @@ const messageSchema = new mongoose.Schema({
 });
 
 export const directMessageSchema = new mongoose.Schema({
-  type: { type: String, enum: ['teacher-admin', 'student-admin', 'sub-admin-admin'], required: true },
+  type: { type: String, enum: ['teacher-admin', 'student-admin', 'sub-admin-admin', 'sub-admin-teacher'], required: true },
   teacherId:  { type: mongoose.Schema.Types.ObjectId, ref: 'Teacher' },
   studentId:  { type: mongoose.Schema.Types.ObjectId, ref: 'Student' },
   subAdminId: { type: mongoose.Schema.Types.ObjectId, ref: 'SubAdmin' },
@@ -31,7 +31,10 @@ export const directMessageSchema = new mongoose.Schema({
   lastActivityAt: { type: Date, default: Date.now },
 }, { timestamps: true });
 
-directMessageSchema.index({ teacherId:  1 }, { unique: true, sparse: true });
-directMessageSchema.index({ studentId:  1 }, { unique: true, sparse: true });
-directMessageSchema.index({ subAdminId: 1 }, { unique: true, sparse: true });
+directMessageSchema.index({ teacherId: 1 }, { unique: true, sparse: true });
+directMessageSchema.index({ studentId: 1 }, { unique: true, sparse: true });
+// Compound index covers both sub-admin-admin (teacherId=null) and sub-admin-teacher (teacherId=X).
+// NOTE: The old single-field `subAdminId_1` unique index must be dropped from MongoDB once before
+// deploying this change: db.directmessages.dropIndex('subAdminId_1')
+directMessageSchema.index({ subAdminId: 1, teacherId: 1 }, { unique: true, sparse: true });
 directMessageSchema.index({ lastActivityAt: -1 });
