@@ -2,6 +2,7 @@
 // Central Express error handler — must be registered AFTER all routes.
 // Also exports process-level handlers for uncaught exceptions/rejections.
 
+import * as Sentry from "@sentry/node";
 import logger from "../utils/logger.js";
 
 const isDev = process.env.NODE_ENV === "development";
@@ -87,6 +88,7 @@ export function errorHandler(err, req, res, next) { // eslint-disable-line no-un
   if (status >= 500) {
     logger.error(logLine);
     if (isDev && err.stack) logger.error(err.stack);
+    Sentry.captureException(err, { extra: { method: req.method, url: req.originalUrl, status } });
   } else {
     logger.warn(logLine);
   }
@@ -109,7 +111,7 @@ export function registerProcessHandlers() {
   process.on("uncaughtException", (err) => {
     logger.error("💥 Uncaught Exception:", { error: err?.message });
     if (isDev) logger.error(err.stack);
-    // Delegate to the graceful shutdown path via SIGTERM
+    Sentry.captureException(err);
     process.kill(process.pid, "SIGTERM");
   });
 
@@ -117,5 +119,10 @@ export function registerProcessHandlers() {
     const message = reason instanceof Error ? reason.message : String(reason);
     logger.error("💥 Unhandled Promise Rejection:", message);
     if (isDev && reason instanceof Error) logger.error(reason.stack);
+    if (reason instanceof Error) {
+      Sentry.captureException(reason);
+    } else {
+      Sentry.captureMessage(String(reason), "error");
+    }
   });
 }

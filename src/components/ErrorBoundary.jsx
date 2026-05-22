@@ -5,6 +5,7 @@
 //                       Use key={activeTab} so it auto-resets when the user switches tabs.
 
 import { Component } from "react";
+import * as Sentry from "@sentry/react";
 
 // Detects "Failed to fetch dynamically imported module" and similar
 // chunk-load errors that happen when the network drops during a lazy import.
@@ -31,9 +32,9 @@ export default class ErrorBoundary extends Component {
   }
 
   componentDidCatch(error, info) {
-    // Only log real app errors, not network blips
     if (!isChunkLoadError(error)) {
       console.error("[ErrorBoundary]", error, info.componentStack);
+      Sentry.captureException(error, { extra: { componentStack: info.componentStack } });
     }
   }
 
@@ -192,6 +193,7 @@ export class TabErrorBoundary extends Component {
 
   componentDidCatch(error, info) {
     console.error("[TabErrorBoundary]", error, info.componentStack);
+    Sentry.captureException(error, { extra: { componentStack: info.componentStack } });
   }
 
   handleReset() {
