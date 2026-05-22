@@ -87,6 +87,7 @@ export default function CentersTab({
   };
 
   return (
+    <>
     <div className={styles.card}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
         <h2 className={styles.sectionTitle}><Building2 size={16} color="#f59e0b" /> All Centers</h2>
@@ -237,7 +238,6 @@ export default function CentersTab({
       )}
     </div>
 
-    <>
     {/* ── Emergency Email Override Modal ──────────────────────────────────── */}
     {overrideCenter && (
       <div
@@ -403,6 +403,7 @@ export default function CentersTab({
     </>
   );
 }
+
 
 function WebsiteCell({ center, onEdit }) {
   const lp        = center.landingPage;
