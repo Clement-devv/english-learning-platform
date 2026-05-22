@@ -11,12 +11,19 @@ jobs:
   test:
     name: Test
     runs-on: ubuntu-latest
+
+    services:
+      mongodb:
+        image: mongo:7
+        ports:
+          - 27017:27017
+
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Install frontend dependencies
@@ -38,6 +45,6 @@ jobs:
           ENCRYPTION_KEY: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
           EMAIL_USER: test@example.com
           EMAIL_PASSWORD: testpassword
-          MONGO_URI: mongodb://localhost/test
-          MASTER_DB_URI: mongodb://localhost/test-master
-          DB_BASE_URI: mongodb://localhost
+          MONGO_URI: mongodb://localhost:27017/test
+          MASTER_DB_URI: mongodb://localhost:27017/test-master
+          DB_BASE_URI: mongodb://localhost:27017
