@@ -237,6 +237,7 @@ export default function CentersTab({
       )}
     </div>
 
+    <>
     {/* ── Emergency Email Override Modal ──────────────────────────────────── */}
     {overrideCenter && (
       <div
@@ -399,6 +400,7 @@ export default function CentersTab({
         </div>
       </div>
     )}
+    </>
   );
 }
 
