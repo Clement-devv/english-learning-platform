@@ -6,6 +6,7 @@ export default function SettingsSidebar({
   isOpen,
   onClose,
   onChangePassword,
+  onChangeEmail,
   onManageSessions,
   onManage2FA,
   userInfo = null,
@@ -23,6 +24,13 @@ export default function SettingsSidebar({
       description: 'Update your account password',
       onClick: () => { onChangePassword(); onClose(); },
     },
+    ...(onChangeEmail ? [{
+      id: 'email',
+      label: 'Change Email',
+      icon: Mail,
+      description: 'Update your login email address',
+      onClick: () => { onChangeEmail(); onClose(); },
+    }] : []),
     {
       id: 'sessions',
       label: 'Active Sessions',

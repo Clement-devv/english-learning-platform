@@ -17,7 +17,9 @@ import SuperAdminLogin     from "./pages/super-admin/SuperAdminLogin";
 import AdminLogin          from "./pages/admin/AdminLogin";
 import ParentLogin         from "./pages/parent/ParentLogin";
 import ParentSetup         from "./pages/parent/ParentSetup";
-import AdminResetPassword  from "./pages/admin/AdminResetPassword";
+import AdminResetPassword       from "./pages/admin/AdminResetPassword";
+import EmailChangeVerify        from "./pages/admin/EmailChangeVerify";
+import EmailChangeCancelConfirm from "./pages/admin/EmailChangeCancelConfirm";
 import SubAdminLogin       from "./pages/sub-admin/SubAdminLogin";
 import TeacherLogin        from "./pages/teacher/TeacherLogin";
 import StudentLogin        from "./pages/student/StudentLogin";
@@ -151,8 +153,10 @@ function App() {
             <Route path="/super-admin/login"     element={<SuperAdminLogin />} />
             <Route path="/super-admin/dashboard" element={<AuthGuard role="super-admin"><SuperAdminDashboard /></AuthGuard>} />
 
-            <Route path="/admin/login"                      element={<AdminLogin />} />
-            <Route path="/admin/reset-password/:token"     element={<AdminResetPassword />} />
+            <Route path="/admin/login"                          element={<AdminLogin />} />
+            <Route path="/admin/reset-password/:token"         element={<AdminResetPassword />} />
+            <Route path="/admin/email-change/verify/:token"    element={<EmailChangeVerify />} />
+            <Route path="/admin/email-change/cancel/:token"    element={<EmailChangeCancelConfirm />} />
             <Route path="/admin" element={<AuthGuard role="admin"><AdminDashboard /></AuthGuard>} />
 
             <Route path="/sub-admin/login"                  element={<SubAdminLogin />} />

@@ -196,6 +196,13 @@ router.patch('/centers/:id/approve', verifySuperAdmin, strictLimiter, validatePa
     center.status     = 'active';
     center.approvedAt = new Date();
     center.approvedBy = req.superAdmin._id.toString();
+
+    // One-time recovery code — never overwritten so admin can quote it for manual support
+    if (!center.recoveryCode) {
+      const raw = crypto.randomBytes(8).toString('hex').toUpperCase();
+      center.recoveryCode = raw.match(/.{4}/g).join('-'); // e.g. ABCD-1234-EF56-7890
+    }
+
     await center.save();
 
     await invalidateCache(`tenant:slug:${center.slug}`);
@@ -1828,6 +1835,78 @@ router.patch('/centers/:id/landing-page/publish', verifySuperAdmin, validatePara
   } catch (err) {
     logger.error('Error toggling landing page publish:', { error: err?.message });
     serverError(res);
+  }
+});
+
+// ── PATCH /centers/:id/override-email ────────────────────────────────────────
+// Emergency: super admin forces the admin login email for a center.
+// Requires a documented reason. Notifies both old and new addresses.
+router.patch('/centers/:id/override-email', verifySuperAdmin, strictLimiter, validateParamMongoId('id'), async (req, res) => {
+  try {
+    const { newEmail, reason } = req.body;
+
+    if (!newEmail || typeof newEmail !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail)) {
+      return badRequest(res, 'A valid newEmail is required');
+    }
+    if (!reason || typeof reason !== 'string' || reason.trim().length < 10) {
+      return badRequest(res, 'A reason of at least 10 characters is required');
+    }
+
+    const normalizedNew = newEmail.toLowerCase().trim();
+    const center = await Center.findById(req.params.id);
+    if (!center) return notFound(res, 'Center not found');
+
+    // Block if already in use by another center
+    const conflict = await Center.findOne({ adminEmail: normalizedNew, _id: { $ne: center._id } });
+    if (conflict) {
+      return res.status(409).json({ success: false, message: 'This email is already in use by another center' });
+    }
+
+    const previousEmail = center.adminEmail;
+    center.adminEmail = normalizedNew;
+    center.pendingEmailChange = {}; // clear any in-progress change
+    await center.save();
+
+    // Update Admin doc in the center's tenant DB + clear all sessions
+    try {
+      const { adminSchema: aSchema } = await import('../schemas/adminSchema.js');
+      const db    = await getDb(center.slug);
+      const Admin = db.models.Admin || db.model('Admin', aSchema);
+      const admin = await Admin.findOne({ role: 'admin' });
+      if (admin) {
+        admin.email    = normalizedNew;
+        admin.username = normalizedNew.split('@')[0];
+        admin.sessions = [];
+        await admin.save();
+      }
+    } catch (e) {
+      logger.warn('Could not update admin tenant doc during override:', { error: e?.message });
+    }
+
+    // Notify both addresses
+    const { sendOverrideNotification } = await import('../emails/adminEmailChangeEmails.js');
+    const notifyTargets = [...new Set([previousEmail, normalizedNew])];
+    await Promise.allSettled(
+      notifyTargets.map(to => sendOverrideNotification(center, previousEmail, normalizedNew, reason.trim(), to))
+    );
+
+    await writeAuditLog({
+      action:     'ADMIN_EMAIL_OVERRIDDEN',
+      superAdmin: req.superAdmin,
+      targetId:   center._id.toString(),
+      targetName: center.centerName,
+      details:    { previousEmail, newEmail: normalizedNew, reason: reason.trim() },
+      ip:         req.ip,
+    });
+
+    return ok(res, {
+      message: 'Admin email overridden successfully',
+      previousEmail,
+      newEmail: normalizedNew,
+    });
+  } catch (err) {
+    logger.error('❌ Override email error:', { error: err?.message });
+    serverError(res, 'Failed to override email', err);
   }
 });
 

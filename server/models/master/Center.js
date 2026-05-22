@@ -175,6 +175,24 @@ const centerSchema = new mongoose.Schema({
     publishedAt: { type: Date,   default: null },
   },
 
+  // ── Admin email change flow ───────────────────────────────────────────────
+  // previousEmail kept for reversal; token/cancelToken stored as SHA-256 hashes
+  // so raw tokens never touch the DB. select:false prevents accidental leaks.
+  pendingEmailChange: {
+    previousEmail:   { type: String, default: null },
+    newEmail:        { type: String, default: null, lowercase: true },
+    token:           { type: String, default: null, select: false },
+    expiresAt:       { type: Date,   default: null },
+    requestedAt:     { type: Date,   default: null },
+    requestIp:       { type: String, default: null },
+    cancelToken:     { type: String, default: null, select: false },
+    cancelExpiresAt: { type: Date,   default: null },
+  },
+
+  // ── Recovery code — set once on approval, never changes ──────────────────
+  // Quoted by the admin when requesting manual recovery from the super admin.
+  recoveryCode: { type: String, default: null },
+
   // ── AI Chat Credit Budget (allocated by super admin) ──────────────────────
   chatCredits: {
     balance:        { type: Number, default: 0, min: 0 },
@@ -200,5 +218,7 @@ const centerSchema = new mongoose.Schema({
   },
 
 }, { timestamps: true });
+
+centerSchema.index({ 'pendingEmailChange.token': 1 }, { sparse: true });
 
 export default mongoose.model('Center', centerSchema);

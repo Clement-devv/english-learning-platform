@@ -26,6 +26,7 @@ import { getStudents }            from '../../../../services/studentService';
 import LanguageSwitcher           from '../../../../components/LanguageSwitcher';
 import { useTranslation }         from 'react-i18next';
 import ChangePassword             from '../../../../components/admin/auth/ChangePassword';
+import ChangeEmail               from '../../../../components/admin/auth/ChangeEmail';
 
 // Tab components — lazy loaded
 const OverviewTab        = lazy(() => import('../../tabs/OverviewTab'));
@@ -180,6 +181,7 @@ export default function SunshineShell() {
   const [showSettingsModal,    setShowSettingsModal]    = useState(false);
   const [showSessionMgmt,      setShowSessionMgmt]      = useState(false);
   const [showChangePassword,   setShowChangePassword]   = useState(false);
+  const [showChangeEmail,      setShowChangeEmail]      = useState(false);
   const [notifications,   setNotifications]   = useState([]);
   const [toast,           setToast]           = useState('');
 
@@ -797,6 +799,7 @@ export default function SunshineShell() {
         isOpen={showSettingsSidebar}
         onClose={() => setShowSettingsSidebar(false)}
         onChangePassword={() => { setShowSettingsSidebar(false); setShowChangePassword(true); }}
+        onChangeEmail={() => { setShowSettingsSidebar(false); setShowChangeEmail(true); }}
         onManageSessions={() => { setShowSettingsSidebar(false); setShowSessionMgmt(true); }}
         onManage2FA={() => { setShowSettingsSidebar(false); setShowSettingsModal(true); }}
         userInfo={{
@@ -813,6 +816,12 @@ export default function SunshineShell() {
         <ChangePassword
           onClose={() => setShowChangePassword(false)}
           onSuccess={(msg) => { setShowChangePassword(false); setToast(msg); setTimeout(() => setToast(''), 3000); }}
+        />
+      )}
+      {showChangeEmail && (
+        <ChangeEmail
+          onClose={() => setShowChangeEmail(false)}
+          onSuccess={(msg) => { setShowChangeEmail(false); setToast(msg); setTimeout(() => setToast(''), 4000); }}
         />
       )}
     </div>

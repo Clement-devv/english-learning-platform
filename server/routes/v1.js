@@ -51,6 +51,7 @@ import groupClassRoutes          from "./groupClassRoutes.js";
 import certificateRoutes         from "./certificateRoutes.js";
 import parentRoutes              from "./parentRoutes.js";
 import publicRoutes              from "./publicRoutes.js";
+import adminEmailChangeRoutes    from "./adminEmailChangeRoutes.js";
 
 const router = Router();
 
@@ -100,5 +101,6 @@ router.use("/group-classes",        groupClassRoutes);
 router.use("/certificates",         certificateRoutes);
 router.use("/parents",              parentRoutes);
 router.use("/public",               publicRoutes);
+router.use("/admin/email-change",   adminEmailChangeRoutes);
 
 export default router;

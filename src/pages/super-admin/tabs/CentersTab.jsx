@@ -1,5 +1,8 @@
-import { Building2, RefreshCw, Palette, ToggleRight, SlidersHorizontal, LogIn, Trash2, Globe, Users } from 'lucide-react';
+import { useState } from 'react';
+import { Building2, RefreshCw, Palette, ToggleRight, SlidersHorizontal, LogIn, Trash2, Globe, Users, KeyRound, Copy, Check } from 'lucide-react';
 import styles from '../SuperAdmin.module.css';
+
+const API_BASE = (import.meta.env.VITE_API_URL || 'http://localhost:5000') + '/api/v1';
 
 export default function CentersTab({
   centers, loading, loadData, setShowModal,
@@ -12,6 +15,77 @@ export default function CentersTab({
   statusColor, statusIcon,
   onEditWebsite,
 }) {
+  const [overrideCenter,  setOverrideCenter]  = useState(null);
+  const [overrideEmail,   setOverrideEmail]   = useState('');
+  const [overrideReason,  setOverrideReason]  = useState('');
+  const [overrideStep,    setOverrideStep]     = useState('form'); // 'form' | 'confirm'
+  const [overrideLoading, setOverrideLoading] = useState(false);
+  const [overrideMsg,     setOverrideMsg]      = useState(null);  // { type: 'success'|'error', text }
+  const [copiedCode,      setCopiedCode]       = useState(false);
+
+  const openOverride = (center) => {
+    setOverrideCenter(center);
+    setOverrideEmail('');
+    setOverrideReason('');
+    setOverrideStep('form');
+    setOverrideMsg(null);
+  };
+
+  const closeOverride = () => {
+    if (overrideLoading) return;
+    setOverrideCenter(null);
+    setOverrideMsg(null);
+  };
+
+  const submitOverride = async () => {
+    setOverrideLoading(true);
+    setOverrideMsg(null);
+    try {
+      const token = localStorage.getItem('superAdminToken');
+      const res   = await fetch(`${API_BASE}/super-admin/centers/${overrideCenter._id}/override-email`, {
+        method:  'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body:    JSON.stringify({ newEmail: overrideEmail, reason: overrideReason }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setOverrideMsg({ type: 'success', text: `Email updated to ${data.newEmail}. Both addresses have been notified.` });
+        setOverrideStep('form');
+        loadData(); // refresh centers list
+      } else {
+        setOverrideMsg({ type: 'error', text: data.message || 'Override failed' });
+        setOverrideStep('form');
+      }
+    } catch (e) {
+      setOverrideMsg({ type: 'error', text: 'Network error — please try again' });
+      setOverrideStep('form');
+    } finally {
+      setOverrideLoading(false);
+    }
+  };
+
+  const copyRecoveryCode = () => {
+    if (!overrideCenter?.recoveryCode) return;
+    navigator.clipboard.writeText(overrideCenter.recoveryCode).then(() => {
+      setCopiedCode(true);
+      setTimeout(() => setCopiedCode(false), 2000);
+    }).catch(() => {
+      // Clipboard API unavailable (non-HTTPS or denied) — select the text as fallback
+      try {
+        const el = document.createElement('textarea');
+        el.value = overrideCenter.recoveryCode;
+        el.style.position = 'fixed';
+        el.style.opacity = '0';
+        document.body.appendChild(el);
+        el.select();
+        document.execCommand('copy');
+        document.body.removeChild(el);
+        setCopiedCode(true);
+        setTimeout(() => setCopiedCode(false), 2000);
+      } catch { /* execCommand also failed — user can copy manually */ }
+    });
+  };
+
   return (
     <div className={styles.card}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
@@ -143,6 +217,13 @@ export default function CentersTab({
                           <LogIn size={12} /> {impersonating === c._id ? '…' : 'Enter'}
                         </button>
                       )}
+                      <button
+                        onClick={() => openOverride(c)}
+                        title="Emergency: override admin login email"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '5px 12px', borderRadius: 7, fontSize: 12, fontWeight: 600, background: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.2)', color: '#f87171', cursor: 'pointer', fontFamily: 'inherit' }}
+                      >
+                        <KeyRound size={12} /> Email
+                      </button>
                       <button onClick={() => setDeleteTarget(c)} className={styles.deleteBtn} title="Schedule deletion">
                         <Trash2 size={12} />
                       </button>
@@ -155,6 +236,169 @@ export default function CentersTab({
         </div>
       )}
     </div>
+
+    {/* ── Emergency Email Override Modal ──────────────────────────────────── */}
+    {overrideCenter && (
+      <div
+        onClick={closeOverride}
+        style={{
+          position: 'fixed', inset: 0, zIndex: 9999,
+          background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(3px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px',
+        }}
+      >
+        <div
+          onClick={e => e.stopPropagation()}
+          style={{
+            background: '#1a1d2e', border: '1px solid #2a2d40', borderRadius: '18px',
+            padding: '28px 30px', maxWidth: '480px', width: '100%',
+            boxShadow: '0 24px 64px rgba(0,0,0,0.5)',
+          }}
+        >
+          {/* Header */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+            <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'rgba(220,38,38,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <KeyRound size={17} color="#f87171" />
+            </div>
+            <div>
+              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 800, color: '#f1f5f9' }}>
+                Emergency Email Override
+              </h3>
+              <p style={{ margin: 0, fontSize: '12px', color: '#6b7280' }}>
+                {overrideCenter.centerName}
+              </p>
+            </div>
+          </div>
+
+          {/* Recovery Code */}
+          {overrideCenter.recoveryCode && (
+            <div style={{ background: '#0f1117', border: '1px solid #2a2d40', borderRadius: '10px', padding: '10px 14px', marginBottom: '18px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span style={{ fontSize: '11px', color: '#6b7280', flexShrink: 0 }}>Recovery code</span>
+              <span style={{ fontFamily: 'monospace', fontSize: '14px', fontWeight: 700, color: '#a5b4fc', flex: 1, letterSpacing: '0.06em' }}>
+                {overrideCenter.recoveryCode}
+              </span>
+              <button
+                onClick={copyRecoveryCode}
+                title="Copy recovery code"
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: copiedCode ? '#34d399' : '#6b7280', display: 'flex', padding: '2px' }}
+              >
+                {copiedCode ? <Check size={14} /> : <Copy size={14} />}
+              </button>
+            </div>
+          )}
+
+          {/* Current email */}
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#6b7280', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              Current email
+            </label>
+            <div style={{ padding: '10px 12px', background: '#0f1117', border: '1px solid #2a2d40', borderRadius: '8px', fontSize: '13px', color: '#94a3b8' }}>
+              {overrideCenter.adminEmail}
+            </div>
+          </div>
+
+          {overrideStep === 'form' && (
+            <>
+              {overrideMsg && (
+                <div style={{ padding: '10px 14px', borderRadius: '8px', marginBottom: '16px', fontSize: '13px', fontWeight: 600, background: overrideMsg.type === 'success' ? 'rgba(16,185,129,0.12)' : 'rgba(239,68,68,0.12)', color: overrideMsg.type === 'success' ? '#34d399' : '#f87171', border: `1px solid ${overrideMsg.type === 'success' ? 'rgba(52,211,153,0.3)' : 'rgba(248,113,113,0.3)'}` }}>
+                  {overrideMsg.text}
+                </div>
+              )}
+
+              <div style={{ marginBottom: '14px' }}>
+                <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#6b7280', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  New email *
+                </label>
+                <input
+                  type="email"
+                  value={overrideEmail}
+                  onChange={e => setOverrideEmail(e.target.value)}
+                  placeholder="new@email.com"
+                  style={{ width: '100%', padding: '10px 12px', background: '#0f1117', border: '1px solid #2a2d40', borderRadius: '8px', color: '#e8eaf6', fontSize: '13px', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }}
+                />
+              </div>
+
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#6b7280', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Reason (required, min 10 chars) *
+                </label>
+                <textarea
+                  value={overrideReason}
+                  onChange={e => setOverrideReason(e.target.value)}
+                  placeholder="e.g. Admin reported account compromise — verified via recovery code XXXX"
+                  rows={3}
+                  style={{ width: '100%', padding: '10px 12px', background: '#0f1117', border: '1px solid #2a2d40', borderRadius: '8px', color: '#e8eaf6', fontSize: '13px', fontFamily: 'inherit', outline: 'none', resize: 'vertical', boxSizing: 'border-box' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button
+                  onClick={closeOverride}
+                  style={{ flex: 1, padding: '11px', borderRadius: '10px', border: '1px solid #2a2d40', background: 'transparent', color: '#6b7280', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    if (!overrideEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(overrideEmail)) {
+                      setOverrideMsg({ type: 'error', text: 'Please enter a valid new email' });
+                      return;
+                    }
+                    if (!overrideReason || overrideReason.trim().length < 10) {
+                      setOverrideMsg({ type: 'error', text: 'Please enter a reason (min 10 characters)' });
+                      return;
+                    }
+                    setOverrideMsg(null);
+                    setOverrideStep('confirm');
+                  }}
+                  style={{ flex: 2, padding: '11px', borderRadius: '10px', border: 'none', background: 'linear-gradient(135deg,#dc2626,#b91c1c)', color: '#fff', fontSize: '13px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}
+                >
+                  Override Email →
+                </button>
+              </div>
+            </>
+          )}
+
+          {overrideStep === 'confirm' && (
+            <>
+              <div style={{ background: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.25)', borderRadius: '10px', padding: '14px 16px', marginBottom: '20px' }}>
+                <p style={{ margin: '0 0 8px', fontSize: '13px', color: '#f1f5f9', fontWeight: 700 }}>
+                  Confirm override for <em>{overrideCenter.centerName}</em>
+                </p>
+                <p style={{ margin: '0 0 4px', fontSize: '12px', color: '#94a3b8' }}>
+                  <strong>From:</strong> {overrideCenter.adminEmail}
+                </p>
+                <p style={{ margin: '0 0 4px', fontSize: '12px', color: '#94a3b8' }}>
+                  <strong>To:</strong> {overrideEmail}
+                </p>
+                <p style={{ margin: 0, fontSize: '12px', color: '#94a3b8' }}>
+                  <strong>Reason:</strong> {overrideReason}
+                </p>
+              </div>
+              <p style={{ margin: '0 0 18px', fontSize: '12px', color: '#6b7280', lineHeight: 1.6 }}>
+                All active admin sessions will be signed out. Both email addresses will receive a notification. This action is audit-logged.
+              </p>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button
+                  onClick={() => { setOverrideStep('form'); setOverrideMsg(null); }}
+                  disabled={overrideLoading}
+                  style={{ flex: 1, padding: '11px', borderRadius: '10px', border: '1px solid #2a2d40', background: 'transparent', color: '#6b7280', fontSize: '13px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}
+                >
+                  Back
+                </button>
+                <button
+                  onClick={submitOverride}
+                  disabled={overrideLoading}
+                  style={{ flex: 2, padding: '11px', borderRadius: '10px', border: 'none', background: overrideLoading ? '#374151' : 'linear-gradient(135deg,#dc2626,#b91c1c)', color: '#fff', fontSize: '13px', fontWeight: 800, cursor: overrideLoading ? 'wait' : 'pointer', fontFamily: 'inherit' }}
+                >
+                  {overrideLoading ? 'Overriding…' : 'Yes, Override Email'}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    )}
   );
 }
 
