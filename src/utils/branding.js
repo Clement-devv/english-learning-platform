@@ -23,6 +23,7 @@ export const DEFAULT_BRANDING = {
   shadowStyle:    'soft',
   spacing:        'comfortable',
   theme:          null,
+  classroomTheme: null,
 };
 
 /**

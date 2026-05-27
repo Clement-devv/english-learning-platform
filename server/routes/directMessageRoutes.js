@@ -86,6 +86,14 @@ router.get("/", verifyToken, async (req, res) => {
     const { id: userId, role } = req.user;
     let filter = {};
 
+    // Ensure every model that may be reached via .populate(...) below is
+    // registered on this center's connection.  Without this, the FIRST request
+    // after a server restart from a student/teacher/admin would 500 because
+    // Mongoose can't resolve `ref: 'SubAdmin'` until something registers it.
+    getTeacher(req.db);
+    getStudent(req.db);
+    getSubAdmin(req.db);
+
     if (role === "teacher")      filter.teacherId  = userId;
     else if (role === "student") filter.studentId  = userId;
     else if (role === "sub-admin") {
@@ -144,6 +152,7 @@ router.get("/", verifyToken, async (req, res) => {
 
     res.json({ success: true, dms });
   } catch (err) {
+    logger.error('GET /direct-messages failed:', { error: err?.message, stack: err?.stack, role: req.user?.role });
     serverError(res, err.message);
   }
 });

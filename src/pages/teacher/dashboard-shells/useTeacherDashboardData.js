@@ -61,6 +61,7 @@ export function useTeacherDashboardData() {
   const [classes,           setClasses]           = useState([]);
   const [completedClasses,  setCompletedClasses]  = useState([]);
   const [googleMeetLink,    setGoogleMeetLink]     = useState('');
+  const [zoomLink,          setZoomLink]           = useState('');
 
   // ── Badge counts ───────────────────────────────────────────────────────────
   const [homeworkToGrade,   setHomeworkToGrade]   = useState(0);
@@ -117,6 +118,12 @@ export function useTeacherDashboardData() {
           new Notification(`💬 Message from ${senderName}`, { body: message, icon: '/favicon.ico' });
         }
       });
+      socket.on('new-group-message', ({ senderName }) => {
+        setUnreadMessages(prev => prev + 1);
+        if ('Notification' in window && Notification.permission === 'granted') {
+          new Notification(`💬 Group message from ${senderName || 'Someone'}`, { icon: '/favicon.ico' });
+        }
+      });
     }, 0);
 
     return () => {
@@ -137,12 +144,18 @@ export function useTeacherDashboardData() {
     return () => document.removeEventListener('visibilitychange', onVisible);
   }, []);
 
-  // ── Unread messages count — fetch on mount, reset when messages tab opened ─
+  // ── Unread messages count — fetch on mount (DMs + group chats) ─────────────
+  // Both fetches run in parallel so the badge is accurate on first paint even
+  // when the user was offline and messages arrived while they were logged out.
   useEffect(() => {
-    api.get('/direct-messages').then(({ data }) => {
-      const total = (data.dms || []).reduce((sum, dm) => sum + (dm.unreadCount?.teacher || 0), 0);
-      setUnreadMessages(total);
-    }).catch(() => {});
+    Promise.all([
+      api.get('/direct-messages').catch(() => ({ data: {} })),
+      api.get('/group-chats').catch(() => ({ data: {} })),
+    ]).then(([{ data: dmData }, { data: gcData }]) => {
+      const dmTotal = (dmData.dms   || []).reduce((sum, dm)   => sum + (dm.unreadCount?.teacher  || 0), 0);
+      const gcTotal = (gcData.chats || []).reduce((sum, chat) => sum + (chat.unreadCount?.teacher || 0), 0);
+      setUnreadMessages(dmTotal + gcTotal);
+    });
   }, []);
 
   useEffect(() => {
@@ -187,8 +200,12 @@ export function useTeacherDashboardData() {
     } else if (location.state?.classMissed) {
       setActiveTab(location.state.activeTab || 'completed-classes');
       navigate(location.pathname, { replace: true, state: {} });
+    } else if (location.state?.activeTab) {
+      // Direct tab navigation (e.g. from classroom "Manage links in Profile" link)
+      setActiveTab(location.state.activeTab);
+      navigate(location.pathname, { replace: true, state: {} });
     }
-  }, [location.state?.classCompleted, location.state?.classMissed]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [location.state?.classCompleted, location.state?.classMissed, location.state?.activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Homework polling ───────────────────────────────────────────────────────
   useEffect(() => {
@@ -469,6 +486,7 @@ export function useTeacherDashboardData() {
       const teacherData = authUser || {};
       const teacherId = teacherData._id || teacherData.id;
       setGoogleMeetLink(teacherData.googleMeetLink || '');
+      setZoomLink(teacherData.zoomLink || '');
       if (!teacherId) throw new Error('No teacher ID found');
       teacherIdRef.current = teacherId; // make available to heartbeat helpers
 
@@ -477,6 +495,7 @@ export function useTeacherDashboardData() {
       const { data: apiTeacherData } = await api.get(`/teachers/${teacherId}`);
       setTeacherInfo(apiTeacherData);
       setGoogleMeetLink(apiTeacherData.googleMeetLink || '');
+      setZoomLink(apiTeacherData.zoomLink || '');
       // Sync refreshed profile back into the global auth context + storage
       setAuthUser(apiTeacherData);
 
@@ -758,6 +777,7 @@ export function useTeacherDashboardData() {
           duration:              classItem.duration,
           scheduledTime:         classItem.scheduledTime,
           teacherGoogleMeetLink: googleMeetLink,
+          teacherZoomLink:       zoomLink,
         },
         userRole: 'teacher',
       },
@@ -773,7 +793,12 @@ export function useTeacherDashboardData() {
     const token        = sessionStorage.getItem('teacherToken') || localStorage.getItem('teacherToken');
     const sessionToken = sessionStorage.getItem('teacherSessionToken') || localStorage.getItem('teacherSessionToken');
     if (token && sessionToken) {
-      api.post('/auth/logout-session', { sessionToken }).catch(() => {});
+      // Pass the Authorization header explicitly so the async request interceptor
+      // doesn't try to read from sessionStorage — which will already be cleared
+      // by the synchronous removeItem calls below (race condition fix).
+      api.post('/auth/logout-session', { sessionToken }, {
+        headers: { Authorization: `Bearer ${token}` },
+      }).catch(() => {});
     }
     ['teacherToken', 'teacherSessionToken', 'teacherInfo'].forEach(k => {
       sessionStorage.removeItem(k);
@@ -808,6 +833,7 @@ export function useTeacherDashboardData() {
     // Data
     students, bookings, classes, liveClasses, upcomingClasses, completedClasses,
     googleMeetLink, setGoogleMeetLink,
+    zoomLink, setZoomLink,
     // Computed
     pendingBookings, completedCount, homeworkToGrade, quizAttempted,
     // Push & messages

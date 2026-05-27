@@ -31,6 +31,10 @@ export function useSubAdminLoginLogic() {
       if (res.data.success) {
         sessionStorage.setItem('subAdminToken', res.data.token);
         sessionStorage.setItem('subAdminInfo', JSON.stringify(res.data.subAdmin));
+        // Required for /auth/logout-session to revoke this JWT server-side.
+        if (res.data.sessionToken) {
+          sessionStorage.setItem('subAdminSessionToken', res.data.sessionToken);
+        }
         login('sub-admin', res.data.subAdmin, res.data.token);
         navigate('/sub-admin/dashboard');
       } else {

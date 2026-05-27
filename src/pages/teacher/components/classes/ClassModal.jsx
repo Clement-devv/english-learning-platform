@@ -4,7 +4,20 @@ import { X, Users, Calendar, Clock, BookOpen, Plus } from 'lucide-react';
 
 const F = "'Nunito','Inter',sans-serif";
 
-export default function ClassModal({ isOpen, onClose, onSave, students, isDarkMode }) {
+// Default theme matches the legacy purple look so the modal still renders
+// correctly when a shell forgets to pass one.  Override by passing `theme`.
+const DEFAULT_THEME = {
+  accent:         '#6366f1',
+  accentGradient: 'linear-gradient(135deg,#6366f1,#4f46e5)',
+  softBg:         '#eef2ff',
+  softBorder:     '#c7d2fe',
+  softText:       '#4338ca',
+  softBgDark:     'rgba(99,102,241,0.18)',
+  softBorderDark: 'rgba(99,102,241,0.3)',
+  softTextDark:   '#a5b4fc',
+};
+
+export default function ClassModal({ isOpen, onClose, onSave, students, isDarkMode, theme = DEFAULT_THEME }) {
   const [title,            setTitle]            = useState('');
   const [topic,            setTopic]            = useState('');
   const [time,             setTime]             = useState('');
@@ -12,6 +25,9 @@ export default function ClassModal({ isOpen, onClose, onSave, students, isDarkMo
   const [selectedStudents, setSelectedStudents] = useState([]);
 
   if (!isOpen) return null;
+
+  // Merge passed theme over defaults so callers can override only what they need.
+  const T = { ...DEFAULT_THEME, ...theme };
 
   const col = {
     bg:       isDarkMode ? '#0f1117' : '#ffffff',
@@ -22,10 +38,10 @@ export default function ClassModal({ isOpen, onClose, onSave, students, isDarkMo
     body:     isDarkMode ? '#c8cce0' : '#475569',
     muted:    isDarkMode ? '#6b7090' : '#94a3b8',
     input:    isDarkMode ? '#0f1117' : '#f8faff',
-    accent:   '#6366f1',
-    accentBg: isDarkMode ? 'rgba(99,102,241,0.12)' : '#eef2ff',
-    selBg:    isDarkMode ? 'rgba(99,102,241,0.18)' : '#eef2ff',
-    selBorder:isDarkMode ? 'rgba(99,102,241,0.5)'  : '#6366f1',
+    accent:   T.accent,
+    accentBg: isDarkMode ? T.softBgDark : T.softBg,
+    selBg:    isDarkMode ? T.softBgDark : T.softBg,
+    selBorder:isDarkMode ? T.softBorderDark : T.accent,
     rowHover: isDarkMode ? 'rgba(255,255,255,0.04)' : '#f8faff',
     overlay:  'rgba(0,0,0,0.55)',
   };
@@ -72,7 +88,7 @@ export default function ClassModal({ isOpen, onClose, onSave, students, isDarkMo
         style={{ background: col.card, border: `1.5px solid ${col.border}`, borderRadius: 24, width: '100%', maxWidth: 600, maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 24px 64px rgba(0,0,0,0.25)' }}>
 
         {/* Header */}
-        <div style={{ background: 'linear-gradient(135deg,#6366f1,#4f46e5)', padding: '22px 24px', borderRadius: '24px 24px 0 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ background: T.accentGradient, padding: '22px 24px', borderRadius: '24px 24px 0 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <Plus size={22} color="#fff"/>
             <h2 style={{ margin: 0, fontSize: 20, fontWeight: 900, color: '#fff' }}>Create New Class</h2>
@@ -87,7 +103,7 @@ export default function ClassModal({ isOpen, onClose, onSave, students, isDarkMo
 
           {/* Title */}
           <div>
-            <label style={lbl}><BookOpen size={13} color="#6366f1"/> Class Title *</label>
+            <label style={lbl}><BookOpen size={13} color={T.accent}/> Class Title *</label>
             <input value={title} onChange={e => setTitle(e.target.value)}
               placeholder="e.g., Advanced Grammar Session" style={inp}/>
           </div>
@@ -120,7 +136,7 @@ export default function ClassModal({ isOpen, onClose, onSave, students, isDarkMo
 
           {/* Students */}
           <div>
-            <label style={lbl}><Users size={13} color="#6366f1"/> Select Students * ({selectedStudents.length} selected)</label>
+            <label style={lbl}><Users size={13} color={T.accent}/> Select Students * ({selectedStudents.length} selected)</label>
             {students && students.length > 0 ? (
               <div style={{ border: `1.5px solid ${col.border}`, borderRadius: 14, padding: 10, maxHeight: 220, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {students.map(student => {
@@ -128,7 +144,7 @@ export default function ClassModal({ isOpen, onClose, onSave, students, isDarkMo
                   return (
                     <label key={student.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 10, cursor: 'pointer', background: isSelected ? col.selBg : 'transparent', border: `1.5px solid ${isSelected ? col.selBorder : 'transparent'}`, transition: 'background .12s' }}>
                       <input type="checkbox" checked={isSelected} onChange={() => handleStudentToggle(student)}
-                        style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#6366f1' }}/>
+                        style={{ width: 16, height: 16, cursor: 'pointer', accentColor: T.accent }}/>
                       <div style={{ flex: 1 }}>
                         <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: col.heading }}>{student.name}</p>
                         <p style={{ margin: 0, fontSize: 11, color: col.muted }}>{student.email}</p>
@@ -149,8 +165,8 @@ export default function ClassModal({ isOpen, onClose, onSave, students, isDarkMo
           </div>
 
           {/* Tip */}
-          <div style={{ background: col.accentBg, border: `1.5px solid ${isDarkMode?'rgba(99,102,241,0.3)':'#c7d2fe'}`, borderRadius: 12, padding: '12px 14px' }}>
-            <p style={{ margin: 0, fontSize: 12, color: isDarkMode ? '#a5b4fc' : '#4338ca', fontWeight: 600 }}>
+          <div style={{ background: col.accentBg, border: `1.5px solid ${isDarkMode ? T.softBorderDark : T.softBorder}`, borderRadius: 12, padding: '12px 14px' }}>
+            <p style={{ margin: 0, fontSize: 12, color: isDarkMode ? T.softTextDark : T.softText, fontWeight: 600 }}>
               <strong>Tip:</strong> You can select multiple students for a group class. All selected students will be scheduled for the same class time.
             </p>
           </div>
@@ -163,7 +179,7 @@ export default function ClassModal({ isOpen, onClose, onSave, students, isDarkMo
             Cancel
           </button>
           <button onClick={handleSubmit}
-            style={{ background: 'linear-gradient(135deg,#6366f1,#4f46e5)', border: 'none', borderRadius: 12, padding: '10px 20px', fontSize: 13, fontWeight: 800, color: '#fff', cursor: 'pointer', fontFamily: F, display: 'flex', alignItems: 'center', gap: 6 }}>
+            style={{ background: T.accentGradient, border: 'none', borderRadius: 12, padding: '10px 20px', fontSize: 13, fontWeight: 800, color: '#fff', cursor: 'pointer', fontFamily: F, display: 'flex', alignItems: 'center', gap: 6 }}>
             <Plus size={15}/> Create Class
           </button>
         </div>

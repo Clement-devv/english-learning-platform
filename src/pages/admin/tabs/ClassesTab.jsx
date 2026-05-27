@@ -151,6 +151,7 @@ function LiveClassCard({ booking, session, onJoinAgora, onJoinMeet, dm }) {
   const teacherName = `${booking.teacherId?.firstName ?? ""} ${booking.teacherId?.lastName ?? ""}`.trim() || "—";
   const studentName = `${booking.studentId?.firstName ?? ""} ${booking.studentId?.lastName ?? ""}`.trim() || "—";
   const meetLink    = booking.teacherId?.googleMeetLink;
+  const zoomLink    = booking.teacherId?.zoomLink;
 
   const teacherStatus = getPresenceStatus(session, "teacher");
   const studentStatus = getPresenceStatus(session, "student");
@@ -216,22 +217,31 @@ function LiveClassCard({ booking, session, onJoinAgora, onJoinMeet, dm }) {
         <LiveTimer booking={booking} />
       </div>
 
-      {/* Join buttons — always render both */}
-      <div className={`px-5 pb-5 pt-2 grid gap-2 ${meetLink ? "grid-cols-2" : "grid-cols-1"}`}>
+      {/* Join buttons */}
+      <div className={`px-5 pb-5 pt-2 grid gap-2 ${(meetLink || zoomLink) ? (meetLink && zoomLink ? "grid-cols-3" : "grid-cols-2") : "grid-cols-1"}`}>
         {meetLink && (
           <button
             onClick={() => onJoinMeet(meetLink)}
             className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold transition"
           >
             <ExternalLink size={14} />
-            Google Meet
+            Meet
           </button>
         )}
-        {!meetLink && (
+        {zoomLink && (
+          <button
+            onClick={() => window.open(zoomLink, "_blank", "noopener,noreferrer")}
+            className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#2D8CFF] hover:bg-[#1a7de8] text-white text-sm font-semibold transition"
+          >
+            <ExternalLink size={14} />
+            Zoom
+          </button>
+        )}
+        {!meetLink && !zoomLink && (
           <div className={`flex items-center justify-center gap-2 py-2.5 rounded-xl border text-xs font-medium
             ${dm ? "border-[#2a2f45] text-slate-500" : "border-slate-200 text-slate-400"}`}>
             <ExternalLink size={13} />
-            No Meet link set
+            No Meet/Zoom link set
           </div>
         )}
         <button
@@ -239,7 +249,7 @@ function LiveClassCard({ booking, session, onJoinAgora, onJoinMeet, dm }) {
           className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold transition"
         >
           <Video size={14} />
-          Join via Agora
+          Agora
         </button>
       </div>
     </div>

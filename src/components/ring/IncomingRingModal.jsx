@@ -1,8 +1,15 @@
 // src/components/ring/IncomingRingModal.jsx
 // Full-screen overlay shown when someone rings you.
 // Animated phone icon, caller info, Answer / Decline buttons.
+//
+// Auth guard: the RingProvider lives at the App root and stays mounted across
+// login/logout, and the socket disconnect on logout is async — so an in-flight
+// ring packet can still call setIncoming() in the tiny window before the close
+// completes.  Returning null when no user is logged in prevents private caller
+// info from painting on the login screen of a shared device.
 
 import { useEffect, useState } from "react";
+import { useAuth } from "../../context/AuthContext.jsx";
 import { useRing } from "../../context/RingContext";
 
 const ROLE_EMOJI = {
@@ -20,6 +27,7 @@ const ROLE_LABEL = {
 };
 
 export default function IncomingRingModal() {
+  const { role } = useAuth();
   const { incoming, answerRing, declineRing } = useRing();
   const [secondsLeft, setSecondsLeft] = useState(30);
 
@@ -36,7 +44,7 @@ export default function IncomingRingModal() {
     return () => clearInterval(id);
   }, [incoming]);
 
-  if (!incoming) return null;
+  if (!role || !incoming) return null;
 
   const { ringId, callerName, callerRole } = incoming;
   const emoji = ROLE_EMOJI[callerRole] || "👤";
@@ -96,17 +104,44 @@ export default function IncomingRingModal() {
             {secondsLeft}s
           </div>
 
-          {/* Animated phone / avatar */}
-          <div style={{
-            width: "88px", height: "88px",
-            borderRadius: "50%",
-            background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            margin: "0 auto 20px",
-            fontSize: "38px",
-            animation: "ring-pulse 1.4s ease-in-out infinite",
-          }}>
-            {emoji}
+          {/* Animated avatar with SVG countdown arc */}
+          <div style={{ position: "relative", width: "108px", height: "108px", margin: "0 auto 20px" }}>
+            {/* SVG progress arc — drains from full (green) to empty (red) over 30 s */}
+            <svg
+              viewBox="0 0 108 108"
+              style={{
+                position: "absolute", inset: 0,
+                width: "108px", height: "108px",
+                transform: "rotate(-90deg)",
+                overflow: "visible",
+              }}
+            >
+              {/* Track */}
+              <circle cx="54" cy="54" r="50" fill="none" stroke="#e2e8f0" strokeWidth="4" />
+              {/* Progress */}
+              <circle
+                cx="54" cy="54" r="50"
+                fill="none"
+                stroke={secondsLeft <= 10 ? "#ef4444" : secondsLeft <= 20 ? "#f59e0b" : "#22c55e"}
+                strokeWidth="4"
+                strokeLinecap="round"
+                strokeDasharray="314"
+                strokeDashoffset={314 * (1 - secondsLeft / 30)}
+                style={{ transition: "stroke-dashoffset 1s linear, stroke 0.5s ease" }}
+              />
+            </svg>
+            {/* Avatar */}
+            <div style={{
+              position: "absolute", top: "10px", left: "10px",
+              width: "88px", height: "88px",
+              borderRadius: "50%",
+              background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: "38px",
+              animation: "ring-pulse 1.4s ease-in-out infinite",
+            }}>
+              {emoji}
+            </div>
           </div>
 
           {/* Phone shake icon */}
@@ -149,14 +184,36 @@ export default function IncomingRingModal() {
           </p>
 
           {/* Action buttons */}
-          <div style={{ display: "flex", gap: "16px", justifyContent: "center" }}>
+          <div style={{ display: "flex", gap: "14px", justifyContent: "center" }}>
+
+            {/* Decline */}
+            <button
+              onClick={() => declineRing(ringId)}
+              style={{
+                display: "flex", alignItems: "center", gap: "8px",
+                padding: "14px 28px",
+                borderRadius: "50px",
+                background: "linear-gradient(135deg,#ef4444,#dc2626)",
+                border: "none",
+                cursor: "pointer",
+                fontSize: "15px", fontWeight: "800",
+                color: "#fff",
+                boxShadow: "0 8px 24px rgba(239,68,68,0.35)",
+                transition: "all 0.15s",
+                fontFamily: "inherit",
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.transform = "scale(1.04)"; e.currentTarget.style.boxShadow = "0 12px 32px rgba(239,68,68,0.5)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.boxShadow = "0 8px 24px rgba(239,68,68,0.35)"; }}
+            >
+              📵 Decline
+            </button>
 
             {/* Pick up */}
             <button
               onClick={() => answerRing(ringId)}
               style={{
-                display: "flex", alignItems: "center", gap: "10px",
-                padding: "14px 32px",
+                display: "flex", alignItems: "center", gap: "8px",
+                padding: "14px 28px",
                 borderRadius: "50px",
                 background: "linear-gradient(135deg,#22c55e,#16a34a)",
                 border: "none",
@@ -174,15 +231,8 @@ export default function IncomingRingModal() {
             </button>
           </div>
 
-          {/* Subtle decline link */}
-          <p style={{ marginTop: "16px", fontSize: "11px", color: "#cbd5e1" }}>
-            Auto-dismisses in {secondsLeft}s ·{" "}
-            <span
-              onClick={() => declineRing(ringId)}
-              style={{ cursor: "pointer", textDecoration: "underline", color: "#94a3b8" }}
-            >
-              decline
-            </span>
+          <p style={{ marginTop: "14px", fontSize: "11px", color: "#cbd5e1" }}>
+            Auto-dismisses in {secondsLeft}s
           </p>
         </div>
       </div>

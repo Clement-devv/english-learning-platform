@@ -95,6 +95,8 @@ export default function VideoCall({
   mode = "video",
   userRole = "student",
   bookingId = null,
+  commandsRef = null,           // parent can call commandsRef.current.stopRecording()
+  onRecordingStateChange = null, // fires when isRecording or uploadingRecording changes
 }) {
   const client = useRef(null);
 
@@ -118,6 +120,7 @@ export default function VideoCall({
   const [selectedMicId,   setSelectedMicId]   = useState(null);
   const [showMicPicker,   setShowMicPicker]   = useState(false);
   const [isMobile,        setIsMobile]        = useState(() => window.innerWidth < 768);
+  const [pendingLeave,    setPendingLeave]    = useState(false); // waiting for recording upload before leaving
 
   useEffect(() => {
     const handler = () => setIsMobile(window.innerWidth < 768);
@@ -138,6 +141,41 @@ export default function VideoCall({
     recordingError, setRecordingError,
     startRecording, stopRecording, formatRecTime,
   } = useRecording(bookingId);
+
+  // ── Recording safety bridge ───────────────────────────────────────────────
+
+  // Expose stopRecording to parent imperatively (e.g. AgoraClassroom Leave Early)
+  useEffect(() => {
+    if (commandsRef) commandsRef.current = { stopRecording };
+  }, [stopRecording, commandsRef]);
+
+  // Notify parent whenever recording state changes so it can drive its leave modal
+  useEffect(() => {
+    onRecordingStateChange?.({ isRecording, uploadingRecording });
+  }, [isRecording, uploadingRecording]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Block browser tab close / refresh while recording or uploading
+  useEffect(() => {
+    if (!isRecording && !uploadingRecording) return;
+    const handler = (e) => { e.preventDefault(); e.returnValue = ""; };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [isRecording, uploadingRecording]);
+
+  // Once the upload finishes, execute a deferred leave that was requested during recording
+  useEffect(() => {
+    if (!uploadingRecording && pendingLeave) {
+      setPendingLeave(false);
+      leaveCall();
+    }
+  }, [uploadingRecording]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Safe hang-up: stops recording first → waits for upload → then leaves
+  const handleHangUp = () => {
+    if (isRecording)       { stopRecording(); setPendingLeave(true); return; }
+    if (uploadingRecording) { setPendingLeave(true); return; }
+    leaveCall();
+  };
 
   // Virtual background
   const vbProcessorRef = useRef(null);
@@ -1222,8 +1260,8 @@ export default function VideoCall({
           </CtrlBtn>
 
           {/* ── Hang up ── */}
-          <CtrlBtn onClick={leaveCall} label="Leave" hangup>
-            <PhoneOff className="w-5 h-5" />
+          <CtrlBtn onClick={handleHangUp} label={pendingLeave ? "Saving…" : "Leave"} hangup disabled={pendingLeave}>
+            {pendingLeave ? <Loader className="w-5 h-5 animate-spin" /> : <PhoneOff className="w-5 h-5" />}
           </CtrlBtn>
 
         </div>

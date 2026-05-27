@@ -215,6 +215,25 @@ export default function SunshineShell() {
     })();
   }, []);
 
+  // ── Unread messages count — fetch on mount (DMs + group chats) ─────────────
+  // Runs once after login so the badge is accurate even for messages that
+  // arrived while the admin was offline / logged out.
+  useEffect(() => {
+    Promise.all([
+      api.get('/direct-messages').catch(() => ({ data: {} })),
+      api.get('/group-chats').catch(() => ({ data: {} })),
+    ]).then(([{ data: dmData }, { data: gcData }]) => {
+      const dmTotal = (dmData.dms   || []).reduce((sum, dm)   => sum + (dm.unreadCount?.admin  || 0), 0);
+      const gcTotal = (gcData.chats || []).reduce((sum, chat) => sum + (chat.unreadCount?.admin || 0), 0);
+      setUnreadMessages(dmTotal + gcTotal);
+    });
+  }, []);
+
+  // Clear the badge when the user navigates to the messages tab (sidebar click)
+  useEffect(() => {
+    if (activeTab === 'messages') setUnreadMessages(0);
+  }, [activeTab]);
+
   const refreshNotif = useCallback(async () => {
     // Skip if the token is missing entirely — avoids a guaranteed 401 when
     // sessionStorage was cleared (tab restore after browser restart, etc.)
@@ -489,6 +508,22 @@ export default function SunshineShell() {
             {PAGE_LABEL[activeTab] || 'Overview'}
           </h1>
 
+          {/* ── Notification chips ── */}
+          {unreadMessages > 0 && (
+            <button onClick={() => { setActiveTab('messages'); setUnreadMessages(0); }} title="Go to messages"
+              style={{ display: 'flex', alignItems: 'center', gap: 6, background: isDarkMode ? 'rgba(139,92,246,0.15)' : '#f5f3ff', border: `2px solid ${isDarkMode ? 'rgba(139,92,246,0.3)' : '#ddd6fe'}`, borderRadius: 999, padding: '5px 14px', cursor: 'pointer', fontFamily: F }}>
+              <span style={{ fontSize: 13 }}>💬</span>
+              <span style={{ fontSize: 13, fontWeight: 800, color: isDarkMode ? '#a78bfa' : '#7c3aed' }}>{unreadMessages} new</span>
+            </button>
+          )}
+          {missedCallCount > 0 && (
+            <button onClick={clearMissedCalls} title="Clear missed calls"
+              style={{ display: 'flex', alignItems: 'center', gap: 6, background: isDarkMode ? 'rgba(239,68,68,0.12)' : '#fff5f5', border: `2px solid ${isDarkMode ? 'rgba(239,68,68,0.3)' : '#fecaca'}`, borderRadius: 999, padding: '5px 14px', cursor: 'pointer', fontFamily: F }}>
+              <span style={{ fontSize: 13 }}>📞</span>
+              <span style={{ fontSize: 13, fontWeight: 800, color: '#ef4444' }}>{missedCallCount} missed</span>
+            </button>
+          )}
+
           {/* Notification bell */}
           <button onClick={() => setActiveTab('notifications')}
             style={{ position: 'relative', background: 'none', border: 'none', cursor: 'pointer', color: col.muted, padding: 6, borderRadius: 10, display: 'flex', alignItems: 'center' }}>
@@ -497,14 +532,6 @@ export default function SunshineShell() {
               <span style={{ position: 'absolute', top: 2, right: 2, width: 8, height: 8, borderRadius: '50%', background: '#ef4444' }} />
             )}
           </button>
-
-          {/* Messages pill */}
-          {unreadMessages > 0 && (
-            <div onClick={() => setActiveTab('messages')} style={{ background: isDarkMode ? 'rgba(249,115,22,0.1)' : '#fff7ed', border: `2px solid ${isDarkMode ? 'rgba(249,115,22,0.25)' : '#fed7aa'}`, borderRadius: 999, padding: '5px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ fontSize: 13 }}>💬</span>
-              <span style={{ fontSize: 13, fontWeight: 800, color: col.accent }}>{unreadMessages} new</span>
-            </div>
-          )}
 
           {/* Avatar */}
           <div onClick={() => setShowSettingsSidebar(true)}

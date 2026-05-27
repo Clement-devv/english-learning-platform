@@ -31,8 +31,10 @@ export default function MissedCalls({ isDark }) {
     setLoading(true);
     try {
       const r = await api.get("/ring/missed-calls");
-      setIncoming(r.data.incoming || []);
-      setOutgoing(r.data.outgoing || []);
+      // Response shape (from apiResponse.ok which spreads): { success, incoming, outgoing }
+      // — fields live at the top level, NOT under a nested `data` key.
+      setIncoming(r.data?.incoming || []);
+      setOutgoing(r.data?.outgoing || []);
     } catch { /* silently fail */ }
     finally { setLoading(false); }
   }, []);
@@ -44,6 +46,7 @@ export default function MissedCalls({ isDark }) {
     try {
       await api.delete("/ring/missed-calls");
       setIncoming([]);
+      setOutgoing([]);
     } catch { /* ignore */ }
     finally { setClearing(false); }
   };
@@ -158,7 +161,7 @@ export function MissedCallsBadge() {
 
   useEffect(() => {
     api.get("/ring/missed-calls")
-      .then(r => setCount((r.data.incoming || []).length))
+      .then(r => setCount((r.data?.incoming || []).length))
       .catch(() => {});
   }, []);
 

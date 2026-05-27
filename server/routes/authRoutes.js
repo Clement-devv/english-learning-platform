@@ -4,7 +4,7 @@ import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import redisClient from "../config/redis.js";
 
-import { config, JWT_STANDARD_CLAIMS } from "../config/config.js";
+import { config, JWT_STANDARD_CLAIMS, JWT_VERIFY_OPTIONS } from "../config/config.js";
 import { getCenterSecret } from "../utils/jwtUtils.js";
 import { loginLimiter, passwordResetLimiter, trackFailedLogin, isAccountLocked, clearFailedAttempts } from "../middleware/rateLimiter.js";
 import { validatePasswordStrength } from "../utils/passwordUtils.js";
@@ -17,6 +17,8 @@ import { decrypt, hashBackupCode } from "../utils/fieldEncryption.js";
 import { adminSchema } from "../schemas/adminSchema.js";
 import { teacherSchema } from "../schemas/teacherSchema.js";
 import { studentSchema } from "../schemas/studentSchema.js";
+import { subAdminSchema } from "../schemas/subAdminSchema.js";
+import { parentSchema } from "../schemas/parentSchema.js";
 import logger from "../utils/logger.js";
 import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
 
@@ -24,9 +26,26 @@ const router = express.Router();
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-const getAdminModel   = (db) => db.models.Admin   || db.model("Admin",   adminSchema);
-const getTeacherModel = (db) => db.models.Teacher || db.model("Teacher", teacherSchema);
-const getStudentModel = (db) => db.models.Student || db.model("Student", studentSchema);
+const getAdminModel    = (db) => db.models.Admin    || db.model("Admin",    adminSchema);
+const getTeacherModel  = (db) => db.models.Teacher  || db.model("Teacher",  teacherSchema);
+const getStudentModel  = (db) => db.models.Student  || db.model("Student",  studentSchema);
+const getSubAdminModel = (db) => db.models.SubAdmin || db.model("SubAdmin", subAdminSchema);
+const getParentModel   = (db) => db.models.Parent   || db.model("Parent",   parentSchema);
+
+/**
+ * Resolve the appropriate user model + document for any center-scoped role.
+ * Used by /logout-session and /logout-all-devices so the same endpoint can
+ * revoke sessions for teacher, student, admin, sub-admin, and parent without
+ * duplicate role branches everywhere.
+ */
+const getUserDocForRole = async (db, role, userId) => {
+  if (role === "teacher")   return getTeacherModel(db).findById(userId);
+  if (role === "student")   return getStudentModel(db).findById(userId);
+  if (role === "admin")     return getAdminModel(db).findById(userId);
+  if (role === "sub-admin") return getSubAdminModel(db).findById(userId);
+  if (role === "parent")    return getParentModel(db).findById(userId);
+  return null;
+};
 
 /**
  * Factory that builds a login route handler, eliminating the near-identical
@@ -162,7 +181,7 @@ const verifyToken = async (req, res, next) => {
       return unauthorized(res, "No token provided");
     }
 
-    const decoded = jwt.verify(token, getCenterSecret(req.center.slug), { algorithms: ['HS256'] });
+    const decoded = jwt.verify(token, getCenterSecret(req.center.slug), JWT_VERIFY_OPTIONS);
     const Teacher = getTeacherModel(req.db);
     const teacher = await Teacher.findById(decoded.id).select("-password");
 
@@ -195,7 +214,7 @@ router.post("/verify-2fa-login", tenantMiddleware, loginLimiter, async (req, res
     // Decode the server-signed pending token — role and userId are never taken from the client
     let pending;
     try {
-      pending = jwt.verify(pendingToken, getCenterSecret(req.center.slug), { algorithms: ['HS256'] });
+      pending = jwt.verify(pendingToken, getCenterSecret(req.center.slug), JWT_VERIFY_OPTIONS);
     } catch (_) {
       return unauthorized(res, "2FA session expired. Please log in again.");
     }
@@ -471,7 +490,7 @@ router.get("/student/verify", tenantMiddleware, async (req, res) => {
       return unauthorized(res, "No token provided");
     }
 
-    const decoded = jwt.verify(token, getCenterSecret(req.center.slug), { algorithms: ['HS256'] });
+    const decoded = jwt.verify(token, getCenterSecret(req.center.slug), JWT_VERIFY_OPTIONS);
     const Student = getStudentModel(req.db);
     const student = await Student.findById(decoded.id).select("-password");
 
@@ -494,7 +513,7 @@ router.post("/student/change-password", tenantMiddleware, async (req, res) => {
       return unauthorized(res, "No token provided");
     }
 
-    const decoded = jwt.verify(token, getCenterSecret(req.center.slug), { algorithms: ['HS256'] });
+    const decoded = jwt.verify(token, getCenterSecret(req.center.slug), JWT_VERIFY_OPTIONS);
     const { currentPassword, newPassword } = req.body;
 
     if (!currentPassword || !newPassword) {
@@ -652,7 +671,7 @@ router.get("/admin/verify", tenantMiddleware, async (req, res) => {
       return unauthorized(res, "No token provided");
     }
 
-    const decoded = jwt.verify(token, getCenterSecret(req.center.slug), { algorithms: ['HS256'] });
+    const decoded = jwt.verify(token, getCenterSecret(req.center.slug), JWT_VERIFY_OPTIONS);
 
     if (decoded.role !== "admin") {
       return forbidden(res, "Admin access required");
@@ -692,7 +711,7 @@ router.post("/admin/change-password", tenantMiddleware, async (req, res) => {
       return unauthorized(res, "No token provided");
     }
 
-    const decoded = jwt.verify(token, getCenterSecret(req.center.slug), { algorithms: ['HS256'] });
+    const decoded = jwt.verify(token, getCenterSecret(req.center.slug), JWT_VERIFY_OPTIONS);
     const { currentPassword, newPassword } = req.body;
 
     if (!currentPassword || !newPassword) {
@@ -814,16 +833,11 @@ router.get("/sessions", tenantMiddleware, async (req, res) => {
       return unauthorized(res, "No token provided");
     }
 
-    const decoded = jwt.verify(token, getCenterSecret(req.center.slug), { algorithms: ['HS256'] });
+    const decoded = jwt.verify(token, getCenterSecret(req.center.slug), JWT_VERIFY_OPTIONS);
 
-    let user;
-    if (decoded.role === "teacher") {
-      user = await getTeacherModel(req.db).findById(decoded.id).select("sessions lastLogin");
-    } else if (decoded.role === "student") {
-      user = await getStudentModel(req.db).findById(decoded.id).select("sessions lastLogin");
-    } else if (decoded.role === "admin") {
-      user = await getAdminModel(req.db).findById(decoded.id).select("sessions lastLogin");
-    }
+    // getUserDocForRole returns a query when chained or a doc when awaited;
+    // we want all fields here so we can also report device/IP info per session.
+    const user = await getUserDocForRole(req.db, decoded.role, decoded.id);
 
     if (!user) {
       return notFound(res, "User not found");
@@ -933,16 +947,9 @@ router.post("/logout-session", tenantMiddleware, async (req, res) => {
       return badRequest(res, "Session token required");
     }
 
-    const decoded = jwt.verify(token, getCenterSecret(req.center.slug), { algorithms: ['HS256'] });
+    const decoded = jwt.verify(token, getCenterSecret(req.center.slug), JWT_VERIFY_OPTIONS);
 
-    let user;
-    if (decoded.role === "teacher") {
-      user = await getTeacherModel(req.db).findById(decoded.id);
-    } else if (decoded.role === "student") {
-      user = await getStudentModel(req.db).findById(decoded.id);
-    } else if (decoded.role === "admin") {
-      user = await getAdminModel(req.db).findById(decoded.id);
-    }
+    const user = await getUserDocForRole(req.db, decoded.role, decoded.id);
 
     if (!user) {
       return notFound(res, "User not found");
@@ -987,16 +994,9 @@ router.post("/logout-all-devices", tenantMiddleware, async (req, res) => {
       return unauthorized(res, "No token provided");
     }
 
-    const decoded = jwt.verify(token, getCenterSecret(req.center.slug), { algorithms: ['HS256'] });
+    const decoded = jwt.verify(token, getCenterSecret(req.center.slug), JWT_VERIFY_OPTIONS);
 
-    let user;
-    if (decoded.role === "teacher") {
-      user = await getTeacherModel(req.db).findById(decoded.id);
-    } else if (decoded.role === "student") {
-      user = await getStudentModel(req.db).findById(decoded.id);
-    } else if (decoded.role === "admin") {
-      user = await getAdminModel(req.db).findById(decoded.id);
-    }
+    const user = await getUserDocForRole(req.db, decoded.role, decoded.id);
 
     if (!user) {
       return notFound(res, "User not found");

@@ -9,6 +9,7 @@ import { sendSubAdminInviteEmail, sendSubAdminWelcomeEmail, sendSubAdminForgotPa
 import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
 import { subAdminSchema }   from "../schemas/subAdminSchema.js";
 import { teacherSchema }    from "../schemas/teacherSchema.js";
+import { createSession, cleanExpiredSessions, pruneSessionsToLimit } from "../utils/sessionManager.js";
 import logger from "../utils/logger.js";
 import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
 
@@ -64,12 +65,19 @@ router.post("/login", loginLimiter, async (req, res) => {
       { expiresIn: "7d" }
     );
 
+    // Record a per-device session — required for logout-session / logout-all-devices
+    // to revoke this specific JWT server-side via the in-memory + Redis blacklist.
+    const session = createSession(req, token);
+    subAdmin.sessions = cleanExpiredSessions(subAdmin.sessions || []);
+    subAdmin.sessions.push(session);
+    subAdmin.sessions = pruneSessionsToLimit(subAdmin.sessions);
     subAdmin.lastLogin = new Date();
     await subAdmin.save();
 
     res.json({
       success: true,
       token,
+      sessionToken: session.token,
       subAdmin: {
         id: subAdmin._id,
         firstName: subAdmin.firstName,

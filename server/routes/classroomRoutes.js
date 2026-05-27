@@ -256,11 +256,13 @@ router.post("/auto-complete", verifyToken, async (req, res) => {
 });
 
 // GET /api/classroom/session/:bookingId
+// First-visit lookup — returns `session: null` (200) when none exists yet
+// instead of 404.  The client checks `data.session?.videoProvider`, so null
+// is the natural "not picked yet" signal, and the browser console stays clean.
 router.get("/session/:bookingId", verifyToken, async (req, res) => {
   try {
     const session = await getClassroomSession(req.db).findOne({ bookingId: req.params.bookingId });
-    if (!session) return notFound(res, "Session not found");
-    res.json({ session });
+    res.json({ session: session || null });
   } catch (err) {
     serverError(res, "Error getting session");
   }
@@ -270,7 +272,7 @@ router.get("/session/:bookingId", verifyToken, async (req, res) => {
 router.patch("/session/:bookingId/video-provider", verifyToken, async (req, res) => {
   try {
     const { videoProvider } = req.body;
-    if (!["agora", "googlemeet"].includes(videoProvider))
+    if (!["agora", "googlemeet", "zoom"].includes(videoProvider))
       return badRequest(res, "Invalid videoProvider");
 
     const session = await getClassroomSession(req.db).findOneAndUpdate(

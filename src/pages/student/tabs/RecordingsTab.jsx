@@ -47,16 +47,15 @@ export default function RecordingsTab({ isDarkMode }) {
   const openVideo = async (rec) => {
     setLoadingId(rec._id);
     try {
-      const resp = await api.get(`/recordings/${rec._id}/stream`, { responseType: 'blob' });
-      const ct   = resp.headers?.['content-type'] || '';
       let src;
-      if (ct.includes('application/json')) {
-        // S3: server returned { url } — use presigned URL directly as video src
-        const json = JSON.parse(await resp.data.text());
-        src = json.url;
+      const { data } = await api.get(`/recordings/${rec._id}/stream`);
+      if (data?.url) {
+        // S3: presigned URL — browser streams directly from S3, server carries zero load
+        src = data.url;
       } else {
-        // Local disk: server streamed the binary
-        src = URL.createObjectURL(new Blob([resp.data], { type: ct || 'video/webm' }));
+        // Local disk fallback: re-fetch as binary blob
+        const { data: blob } = await api.get(`/recordings/${rec._id}/stream`, { responseType: 'blob' });
+        src = URL.createObjectURL(blob);
       }
       setVideoSrc(src);
       setPlaying(rec);

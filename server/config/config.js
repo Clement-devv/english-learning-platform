@@ -141,3 +141,13 @@ export const JWT_STANDARD_CLAIMS = {
   iss: 'english-learning-platform',
   aud: 'elp-api',
 };
+
+// Verification options applied to EVERY jwt.verify call. Pinning the algorithm
+// blocks alg-confusion/alg:none attacks; enforcing issuer + audience means the
+// iss/aud claims embedded by JWT_STANDARD_CLAIMS are actually validated, not
+// just decorative. All tokens this platform issues include these claims.
+export const JWT_VERIFY_OPTIONS = {
+  algorithms: ['HS256'],
+  issuer: JWT_STANDARD_CLAIMS.iss,
+  audience: JWT_STANDARD_CLAIMS.aud,
+};

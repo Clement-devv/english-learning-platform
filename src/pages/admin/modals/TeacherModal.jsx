@@ -16,7 +16,7 @@ const CONTINENTS = ["Africa", "Americas", "Asia", "Europe", "Oceania"];
 const EMPTY = {
   firstName: "", lastName: "", email: "", phone: "", country: "",
   continent: "", ratePerClass: "", yearsOfExperience: "",
-  googleMeetLink: "", timezone: "", bio: "", displayName: "",
+  googleMeetLink: "", zoomLink: "", timezone: "", bio: "", displayName: "",
   specializations: [], certifications: [], password: "",
 };
 
@@ -91,6 +91,7 @@ export default function TeacherModal({ isOpen, onClose, onSave, initialData }) {
         ratePerClass:      initialData.ratePerClass ?? "",
         yearsOfExperience: initialData.yearsOfExperience ?? "",
         googleMeetLink:    initialData.googleMeetLink || "",
+        zoomLink:          initialData.zoomLink || "",
         timezone:          initialData.timezone || "",
         bio:               initialData.bio || "",
         displayName:       initialData.displayName || "",
@@ -121,6 +122,7 @@ export default function TeacherModal({ isOpen, onClose, onSave, initialData }) {
       ratePerClass:      parseFloat(form.ratePerClass) || 0,
       yearsOfExperience: parseInt(form.yearsOfExperience) || 0,
       googleMeetLink:    form.googleMeetLink.trim(),
+      zoomLink:          form.zoomLink.trim(),
       timezone:          form.timezone,
       bio:               form.bio.trim(),
       displayName:       form.displayName.trim(),
@@ -210,20 +212,23 @@ export default function TeacherModal({ isOpen, onClose, onSave, initialData }) {
                 <input value={form.yearsOfExperience} onChange={set("yearsOfExperience")} type="number" min="0" max="50" className={inputCls} placeholder="e.g. 3" />
               </Field>
             </div>
+            <Field label="Timezone">
+              <div className="relative">
+                <select value={form.timezone} onChange={set("timezone")} className={inputCls + " appearance-none pr-8"}>
+                  <option value="">Select timezone</option>
+                  {TIMEZONE_OPTIONS.map((tz) => (
+                    <option key={tz.value} value={tz.value}>{tz.label}</option>
+                  ))}
+                </select>
+                <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+              </div>
+            </Field>
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Timezone">
-                <div className="relative">
-                  <select value={form.timezone} onChange={set("timezone")} className={inputCls + " appearance-none pr-8"}>
-                    <option value="">Select timezone</option>
-                    {TIMEZONE_OPTIONS.map((tz) => (
-                      <option key={tz.value} value={tz.value}>{tz.label}</option>
-                    ))}
-                  </select>
-                  <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                </div>
-              </Field>
-              <Field label="Google Meet / Zoom Link">
+              <Field label="Google Meet Link">
                 <input value={form.googleMeetLink} onChange={set("googleMeetLink")} type="url" className={inputCls} placeholder="https://meet.google.com/..." />
+              </Field>
+              <Field label="Zoom Link">
+                <input value={form.zoomLink} onChange={set("zoomLink")} type="url" className={inputCls} placeholder="https://zoom.us/j/123456789" />
               </Field>
             </div>
           </Section>

@@ -1,7 +1,7 @@
 // @ts-check
 // middleware/authMiddleware.js
 import jwt from "jsonwebtoken";
-import { config } from "../config/config.js";
+import { config, JWT_VERIFY_OPTIONS } from "../config/config.js";
 import { getCenterSecret } from "../utils/jwtUtils.js";
 import { adminSchema }    from "../schemas/adminSchema.js";
 import { teacherSchema }  from "../schemas/teacherSchema.js";
@@ -31,6 +31,32 @@ export function addToLocalBlacklist(token) {
       localBlacklist.set(sig, exp);
     }
   } catch (_) {}
+}
+
+/**
+ * Check whether a JWT has been revoked.  Used by middlewares that don't go
+ * through verifyToken (parent, super-admin) so logout still revokes their
+ * tokens.  Checks the in-memory map first (instant) then Redis for revocations
+ * issued on other server instances.
+ *
+ * @param {string} token  Raw JWT (the Bearer value).
+ * @returns {Promise<boolean>} true if revoked.
+ */
+export async function isTokenBlacklisted(token) {
+  if (!token) return false;
+  const sig = token.split('.')[2];
+  if (!sig) return false;
+  const localExp = localBlacklist.get(sig);
+  if (localExp && Math.floor(Date.now() / 1000) < localExp) return true;
+  if (redisClient) {
+    try {
+      const revoked = await redisClient.get(`bl:${sig}`);
+      if (revoked) return true;
+    } catch (_) {
+      // Redis unavailable — fall back to in-memory result above.
+    }
+  }
+  return false;
 }
 
 // ─── Impersonation whitelist check ───────────────────────────────────────────
@@ -67,7 +93,7 @@ export const verifyToken = async (req, res, next) => {
       return res.status(401).json({ success: false, message: "No token provided" });
     }
 
-    const decoded = jwt.verify(token, getCenterSecret(req.center.slug), { algorithms: ['HS256'] });
+    const decoded = jwt.verify(token, getCenterSecret(req.center.slug), JWT_VERIFY_OPTIONS);
 
     // Check in-memory blacklist first — catches revoked tokens even during Redis outages.
     const sig = token.split('.')[2];

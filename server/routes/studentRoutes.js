@@ -26,6 +26,7 @@ import { parsePagination } from "../utils/pagination.js";
 import logger from "../utils/logger.js";
 import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
 import { assignStudentId, generateStudentId } from '../utils/studentIdGenerator.js';
+import { generateSecurePassword } from '../utils/passwordUtils.js';
 
 const router = express.Router();
 router.use(tenantMiddleware);
@@ -407,7 +408,7 @@ router.post("/:id/reset-password", verifyToken, verifyAdminOrTeacher, strictLimi
     const student = await Student.findById(req.params.id);
     if (!student) return notFound(res, "Student not found");
 
-    const newPass          = Math.random().toString(36).slice(-8);
+    const newPass          = generateSecurePassword(12);
     student.password       = await bcrypt.hash(newPass, config.bcryptRounds);
     student.showTempPassword   = true;
     student.lastPasswordChange = new Date();

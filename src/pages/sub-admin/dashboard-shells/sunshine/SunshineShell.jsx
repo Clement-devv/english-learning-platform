@@ -13,7 +13,6 @@ import { useAuth }          from '../../../../context/AuthContext.jsx';
 import { useDarkMode }      from '../../../../hooks/useDarkMode';
 import { TabErrorBoundary } from '../../../../components/ErrorBoundary';
 import { getCachedCenter }  from '../../../../utils/branding';
-import { clearAuth }        from '../../../../utils/authStorage.js';
 import {
   OverviewPanel, TeachersPanel, StudentsPanel, LiveClassesPanel,
   ClassesPanel, PaymentsPanel, RecordingsPanel, ReportsPanel,
@@ -50,7 +49,10 @@ export default function SunshineShell() {
   const [activeTab, setActiveTab] = useState('overview');
 
   const handleLogout = () => {
-    clearAuth('sub-admin');
+    // authLogout() handles BOTH the server-side /auth/logout-session call AND
+    // storage clearing via clearAuth() internally.  Calling clearAuth() first
+    // would wipe the sessionToken before authLogout() can read it, so the
+    // server-side revocation would be skipped.
     authLogout();
     navigate('/sub-admin/login', { replace: true });
   };

@@ -15,6 +15,7 @@ import {
 } from "recharts";
 import { useBranding } from "../../../../context/BrandingContext";
 import { useDashboardData, BADGE_DEFINITIONS } from "../useDashboardData";
+import { useRing }                              from "../../../../context/RingContext";
 import ChangePassword    from "../../../../components/student/auth/ChangePassword";
 import SessionManagement from "../../../../components/SessionManagement";
 import SettingsModal     from "../../../../components/SettingsModal";
@@ -177,6 +178,7 @@ function PlayfulBadgesPanel({ badges, progress, completedClasses, shareAchieveme
 export default function PlayfulShell() {
   const { branding, center } = useBranding();
   const d = useDashboardData();
+  const { missedCallCount, clearMissedCalls } = useRing();
   const P = d.isDarkMode ? { ...LIGHT, ...DARK } : LIGHT;
   const tipStyle = { background:P.card, border:`1px solid ${P.border}`, borderRadius:12, fontSize:13, fontFamily:"Poppins,sans-serif", color:P.text };
 
@@ -342,6 +344,22 @@ export default function PlayfulShell() {
             style={{width:36,height:36,borderRadius:12,border:`1px solid ${P.border}`,background:P.inputBg,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:P.textSub}}>
             {d.isDarkMode ? <Sun size={15}/> : <Moon size={15}/>}
           </button>
+
+          {/* ── Notification chips — desktop only ── */}
+          {!isMobile && d.unreadMessages > 0 && (
+            <button onClick={()=>{ d.setActiveTab("messages"); d.setUnreadMessages(0); }} title="Go to messages"
+              style={{display:"flex",alignItems:"center",gap:5,background:d.isDarkMode?"rgba(139,92,246,0.15)":"#f5f3ff",border:`1.5px solid ${d.isDarkMode?"rgba(139,92,246,0.3)":"#ddd6fe"}`,borderRadius:999,padding:"5px 13px",cursor:"pointer",fontFamily:"Poppins,sans-serif"}}>
+              <span style={{fontSize:13}}>💬</span>
+              <span style={{fontSize:12,fontWeight:700,color:d.isDarkMode?"#a78bfa":"#7c3aed"}}>{d.unreadMessages} new</span>
+            </button>
+          )}
+          {!isMobile && missedCallCount > 0 && (
+            <button onClick={clearMissedCalls} title="Clear missed calls"
+              style={{display:"flex",alignItems:"center",gap:5,background:d.isDarkMode?"rgba(239,68,68,0.12)":"#fff5f5",border:`1.5px solid ${d.isDarkMode?"rgba(239,68,68,0.3)":"#fecaca"}`,borderRadius:999,padding:"5px 13px",cursor:"pointer",fontFamily:"Poppins,sans-serif"}}>
+              <span style={{fontSize:13}}>📞</span>
+              <span style={{fontSize:12,fontWeight:700,color:"#ef4444"}}>{missedCallCount} missed</span>
+            </button>
+          )}
 
           {/* Bell */}
           <button style={{position:"relative",background:"none",border:"none",cursor:"pointer",color:P.textSub,padding:6,display:"flex"}}>
@@ -576,7 +594,7 @@ export default function PlayfulShell() {
           {d.activeTab==="conversation"&&<div style={{background:P.card,borderRadius:20,padding:24,border:`1px solid ${P.border}`}}><ConversationTab studentInfo={d.student} isDarkMode={d.isDarkMode}/></div>}
 
           {/* ════ MESSAGES ════ */}
-          {d.activeTab==="messages"&&<div style={{background:P.card,borderRadius:20,border:`1px solid ${P.border}`,overflow:"hidden"}}><MessagesTab userRole="student"/></div>}
+          {d.activeTab==="messages"&&<div style={{background:P.card,borderRadius:20,border:`1px solid ${P.border}`,overflow:"hidden"}}><MessagesTab userRole="student" onUnreadCount={d.setUnreadMessages}/></div>}
 
           {/* ════ COMPLETED ════ */}
           {d.activeTab==="completed-classes"&&<div style={{background:P.card,borderRadius:20,padding:24,border:`1px solid ${P.border}`}}><StudentCompletedTab studentId={d.student.id} isDarkMode={d.isDarkMode}/></div>}

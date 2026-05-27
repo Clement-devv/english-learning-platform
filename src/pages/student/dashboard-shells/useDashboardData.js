@@ -226,12 +226,18 @@ export function useDashboardData() {
     return () => document.removeEventListener('visibilitychange', onVisible);
   }, []);
 
-  // ── Unread messages — fetch count on mount and reset when tab opened ───────
+  // ── Unread messages — fetch count on mount (DMs + group chats) ─────────────
+  // Both fetches run in parallel so the badge is accurate on first paint even
+  // when the user was offline and messages arrived while they were logged out.
   useEffect(() => {
-    api.get("/direct-messages").then(({ data }) => {
-      const total = (data.dms || []).reduce((sum, dm) => sum + (dm.unreadCount?.student || 0), 0);
-      setUnreadMessages(total);
-    }).catch(() => {});
+    Promise.all([
+      api.get("/direct-messages").catch(() => ({ data: {} })),
+      api.get("/group-chats").catch(() => ({ data: {} })),
+    ]).then(([{ data: dmData }, { data: gcData }]) => {
+      const dmTotal = (dmData.dms   || []).reduce((sum, dm)   => sum + (dm.unreadCount?.student   || 0), 0);
+      const gcTotal = (gcData.chats || []).reduce((sum, chat) => sum + (chat.unreadCount?.student  || 0), 0);
+      setUnreadMessages(dmTotal + gcTotal);
+    });
   }, []);
 
   useEffect(() => {
@@ -322,7 +328,12 @@ export function useDashboardData() {
     const token        = sessionStorage.getItem('studentToken') || localStorage.getItem('studentToken');
     const sessionToken = sessionStorage.getItem('studentSessionToken') || localStorage.getItem('studentSessionToken');
     if (token && sessionToken) {
-      api.post('/auth/logout-session', { sessionToken }).catch(() => {});
+      // Pass Authorization explicitly — the async request interceptor runs AFTER
+      // the synchronous removeItem calls below, so it would find empty storage
+      // and send no header, causing a 401 (race condition fix).
+      api.post('/auth/logout-session', { sessionToken }, {
+        headers: { Authorization: `Bearer ${token}` },
+      }).catch(() => {});
     }
     // Wipe both storage tiers so the back button can't restore the session
     ['studentToken', 'studentSessionToken', 'studentInfo'].forEach(k => {
@@ -469,6 +480,12 @@ export function useDashboardData() {
         setUnreadMessages(prev => prev + 1);
         if ("Notification" in window && Notification.permission === "granted") {
           new Notification(`💬 Message from ${senderName}`, { body: message, icon: "/favicon.ico" });
+        }
+      });
+      socket.on("new-group-message", ({ senderName }) => {
+        setUnreadMessages(prev => prev + 1);
+        if ("Notification" in window && Notification.permission === "granted") {
+          new Notification(`💬 Group message from ${senderName || "Someone"}`, { icon: "/favicon.ico" });
         }
       });
       socket.on("booking-update", ({ title, message, type }) => {

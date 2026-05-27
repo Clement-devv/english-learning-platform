@@ -5,6 +5,12 @@ const sessionSchema = new mongoose.Schema({
   token:      { type: String, required: true },
   loginTime:  { type: Date, default: Date.now },
   isActive:   { type: Boolean, default: true },
+  // The signed JWT issued for this session — needed by the logout endpoints
+  // so the raw token can be added to the blacklist that verifySuperAdmin
+  // checks on every request.
+  jwtToken:   { type: String, default: null },
+  deviceInfo: { browser: String, os: String, device: String },
+  ipAddress:  String,
 });
 
 const superAdminSchema = new mongoose.Schema({

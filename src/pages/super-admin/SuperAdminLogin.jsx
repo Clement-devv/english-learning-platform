@@ -30,6 +30,11 @@ export default function SuperAdminLogin() {
       if (response.data.success) {
         localStorage.setItem('superAdminToken', response.data.token);
         localStorage.setItem('superAdminInfo', JSON.stringify(response.data.superAdmin));
+        // Required for /super-admin/logout-session to revoke this JWT.
+        // Stored in localStorage (super-admin is localOnly per ROLE_CONFIG).
+        if (response.data.sessionToken) {
+          localStorage.setItem('superAdminSessionToken', response.data.sessionToken);
+        }
         login('super-admin', response.data.superAdmin, response.data.token);
         navigate('/super-admin/dashboard');
       }

@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { useBranding }              from '../../../../context/BrandingContext';
 import { useTeacherDashboardData }  from '../useTeacherDashboardData';
+import { useRing }                  from '../../../../context/RingContext';
 import TeacherTabContent            from '../TeacherTabContent';
 import { TabErrorBoundary }         from '../../../../components/ErrorBoundary';
 import Classroom                    from '../../../Classroom';
@@ -125,6 +126,7 @@ const PAGE_TITLE = {
 export default function PlayfulShell() {
   const { branding, center } = useBranding();
   const d = useTeacherDashboardData();
+  const { missedCallCount, clearMissedCalls } = useRing();
   const P = d.isDarkMode ? { ...LIGHT, ...DARK_OVERRIDES } : LIGHT;
   const F = "'Poppins','Inter',sans-serif";
 
@@ -307,6 +309,22 @@ export default function PlayfulShell() {
 
           <div style={{ flex: 1 }} />
 
+          {/* ── Notification chips — desktop only ── */}
+          {!isMobile && d.unreadMessages > 0 && (
+            <button onClick={() => { d.setActiveTab('messages'); d.setUnreadMessages(0); }} title="Go to messages"
+              style={{ display: 'flex', alignItems: 'center', gap: 6, background: P.inputBg, border: `1px solid ${P.border}`, borderRadius: 999, padding: '5px 14px', cursor: 'pointer', fontFamily: F }}>
+              <span style={{ fontSize: 13 }}>💬</span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: P.indigo }}>{d.unreadMessages} new</span>
+            </button>
+          )}
+          {!isMobile && missedCallCount > 0 && (
+            <button onClick={clearMissedCalls} title="Clear missed calls"
+              style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 999, padding: '5px 14px', cursor: 'pointer', fontFamily: F }}>
+              <span style={{ fontSize: 13 }}>📞</span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: P.red }}>{missedCallCount} missed</span>
+            </button>
+          )}
+
           {/* Pending bookings — desktop only */}
           {!isMobile && d.pendingBookings > 0 && (
             <div onClick={() => d.setActiveTab('bookings')} style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 999, padding: '5px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -486,23 +504,31 @@ export default function PlayfulShell() {
                   </div>
                 )}
 
-                {/* Google Meet quick-setup */}
+                {/* Class video links — Google Meet + Zoom in one collapsible */}
                 {d.teacherInfo?._id && (
                   <div className="pft-card" style={{ background: P.card, borderRadius: 20, overflow: 'hidden', border: `1px solid ${P.border}` }}>
                     <button onClick={() => d.setShowGoogleMeetSettings(!d.showGoogleMeetSettings)}
                       style={{ width: '100%', padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 12, background: 'transparent', border: 'none', cursor: 'pointer', fontFamily: F }}>
-                      <div style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg,#059669,#10b981)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                        <Video size={16} color="white" />
+                      <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+                        <div style={{ width: 30, height: 30, borderRadius: 9, background: 'linear-gradient(135deg,#059669,#10b981)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <Video size={13} color="white" />
+                        </div>
+                        <div style={{ width: 30, height: 30, borderRadius: 9, background: 'linear-gradient(135deg,#2563eb,#3b82f6)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginLeft: -8, border: `2px solid ${P.card}` }}>
+                          <Video size={13} color="white" />
+                        </div>
                       </div>
                       <div style={{ textAlign: 'left', flex: 1 }}>
-                        <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: P.text }}>Google Meet</p>
-                        <p style={{ margin: 0, fontSize: 11, color: P.textMuted }}>{d.googleMeetLink ? 'Configured ✓' : 'Click to set up'}</p>
+                        <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: P.text }}>Class Video Links</p>
+                        <p style={{ margin: 0, fontSize: 11, color: P.textMuted }}>
+                          {`Meet: ${d.googleMeetLink ? '✓' : '—'}  ·  Zoom: ${d.zoomLink ? '✓' : '—'}`}
+                        </p>
                       </div>
                       <ChevronRight size={14} color={P.textMuted} style={{ transform: d.showGoogleMeetSettings ? 'rotate(90deg)' : 'none', transition: 'transform .2s' }} />
                     </button>
                     {d.showGoogleMeetSettings && (
-                      <div style={{ padding: '0 18px 16px', borderTop: `1px solid ${P.border}` }}>
-                        <GoogleMeetSettings teacherId={d.teacherInfo._id} initialLink={d.googleMeetLink || ''} onUpdate={d.setGoogleMeetLink} isDarkMode={d.isDarkMode} />
+                      <div style={{ padding: '0 18px 16px', borderTop: `1px solid ${P.border}`, display: 'flex', flexDirection: 'column', gap: 14 }}>
+                        <GoogleMeetSettings platform="google-meet" teacherId={d.teacherInfo._id} initialLink={d.googleMeetLink || ''} onUpdate={d.setGoogleMeetLink} isDarkMode={d.isDarkMode} />
+                        <GoogleMeetSettings platform="zoom" teacherId={d.teacherInfo._id} initialLink={d.zoomLink || ''} onUpdate={d.setZoomLink} isDarkMode={d.isDarkMode} />
                       </div>
                     )}
                   </div>
@@ -518,6 +544,7 @@ export default function PlayfulShell() {
                 d={d}
                 wrapStyle={{ background: P.card, borderRadius: 20, padding: 24, border: `1px solid ${P.border}` }}
                 msgStyle={{ background: P.card, borderRadius: 20, border: `1px solid ${P.border}`, overflow: 'hidden' }}
+                onUnreadCount={d.setUnreadMessages}
               />
             </TabErrorBoundary>
           )}
@@ -583,6 +610,16 @@ export default function PlayfulShell() {
         onSave={d.handleAddClass}
         students={d.students}
         isDarkMode={d.isDarkMode}
+        theme={{
+          accent:         '#FF6B9D',
+          accentGradient: 'linear-gradient(135deg,#FF6B9D,#FF6B6B)',
+          softBg:         '#fff1f5',
+          softBorder:     '#fbcfe0',
+          softText:       '#9f1239',
+          softBgDark:     'rgba(255,107,157,0.18)',
+          softBorderDark: 'rgba(255,107,157,0.4)',
+          softTextDark:   '#fbcfe0',
+        }}
       />
 
       {(d.showRecurringForm || showRecurringLocal) && (

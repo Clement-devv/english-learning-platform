@@ -9,7 +9,7 @@
 //      to the correct classroom once the teacher has chosen.
 //
 // All attendance tracking, timer logic, and presence detection live inside
-// AgoraClassroom / GoogleMeetClassroom via the useClassroomCore hook.
+// AgoraClassroom / GoogleMeetClassroom / ZoomClassroom via the useClassroomCore hook.
 
 import React, { useState, useEffect, useRef, lazy, Suspense } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -23,6 +23,7 @@ import { Video, Loader, XCircle } from "lucide-react";
 // of the initial bundle for users who never enter a classroom.
 const AgoraClassroom       = lazy(() => import("./classroom/AgoraClassroom"));
 const GoogleMeetClassroom  = lazy(() => import("./classroom/GoogleMeetClassroom"));
+const ZoomClassroom        = lazy(() => import("./classroom/ZoomClassroom"));
 const GroupAgoraClassroom  = lazy(() => import("./classroom/GroupAgoraClassroom"));
 
 export default function Classroom({ classData, userRole: propUserRole, onLeave, teacherGoogleMeetLink }) {
@@ -46,27 +47,63 @@ export default function Classroom({ classData, userRole: propUserRole, onLeave, 
   const centerFeatures    = getCachedCenter()?.features || {};
   const agoraEnabled      = centerFeatures.agora       !== false;
   const googleMeetEnabled = centerFeatures.googleMeet  !== false;
+  const zoomEnabled       = centerFeatures.zoom        !== false;
 
   const [activeVideoProvider, setActiveVideoProvider] = useState(null);
   const [resolvedMeetLink,    setResolvedMeetLink]     = useState(
     teacherGoogleMeetLink || finalClassData?.teacherGoogleMeetLink || ""
   );
+  const [resolvedZoomLink, setResolvedZoomLink] = useState(
+    finalClassData?.teacherZoomLink || ""
+  );
   const [meetLinkLoading, setMeetLinkLoading] = useState(false);
+
+  // Quick-setup: teacher can paste links right in the selector without navigating away
+  const [meetDraft,        setMeetDraft]        = useState("");
+  const [zoomDraft,        setZoomDraft]        = useState("");
+  const [savingMeetLink,   setSavingMeetLink]   = useState(false);
+  const [savingZoomLink,   setSavingZoomLink]   = useState(false);
+  const [meetSaveError,    setMeetSaveError]    = useState("");
+  const [zoomSaveError,    setZoomSaveError]    = useState("");
+
+  const teacherId = (() => {
+    try {
+      const info = JSON.parse(
+        sessionStorage.getItem("teacherInfo") || localStorage.getItem("teacherInfo") || "{}"
+      );
+      return info._id || info.id || "";
+    } catch { return ""; }
+  })();
+
+  const saveQuickLink = async (field, value, setSaving, setError, onSuccess) => {
+    if (!value.trim()) return;
+    setSaving(true);
+    setError("");
+    try {
+      await api.patch(`/teachers/${teacherId}/profile`, { [field]: value.trim() });
+      onSuccess(value.trim());
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to save link");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   // joinConfirmedRef — true once our attendance POST has returned 200.
   // chooseProvider waits on this before patching videoProvider so the session
   // document is guaranteed to exist (avoids 404 on findOneAndUpdate).
   const joinConfirmedRef = useRef(false);
 
-  // ── Fetch Google Meet link if not passed in props ─────────────────────────
+  // ── Fetch Google Meet and Zoom links if not passed in props ──────────────
   useEffect(() => {
     if (isGroupClass) return;
-    if (!resolvedMeetLink && bookingId) {
+    if ((!resolvedMeetLink || !resolvedZoomLink) && bookingId) {
       setMeetLinkLoading(true);
       api.get(`/bookings/${bookingId}`)
         .then(({ data }) => {
-          const link = data.booking?.teacherId?.googleMeetLink || "";
-          setResolvedMeetLink(link);
+          const teacher = data.booking?.teacherId || {};
+          if (!resolvedMeetLink) setResolvedMeetLink(teacher.googleMeetLink || "");
+          if (!resolvedZoomLink) setResolvedZoomLink(teacher.zoomLink || "");
         })
         .catch(() => {})
         .finally(() => setMeetLinkLoading(false));
@@ -211,6 +248,19 @@ export default function Classroom({ classData, userRole: propUserRole, onLeave, 
     );
   }
 
+  if (activeVideoProvider === "zoom") {
+    return (
+      <Suspense fallback={<ClassroomLoader label="Loading Zoom classroom…" />}>
+        <ZoomClassroom
+          classData={finalClassData}
+          userRole={userRole}
+          onLeave={onLeave}
+          zoomLink={resolvedZoomLink}
+        />
+      </Suspense>
+    );
+  }
+
   // ── Platform selection (teacher) or waiting screen (student) ──────────────
   return (
     <div className={`min-h-screen flex items-center justify-center p-8 ${dm ? "bg-gray-900" : "bg-gradient-to-br from-purple-50 to-blue-50"}`}>
@@ -218,10 +268,10 @@ export default function Classroom({ classData, userRole: propUserRole, onLeave, 
       {userRole === "teacher" ? (
 
         /* ── Teacher: pick a platform ── */
-        <div className="max-w-2xl w-full">
+        <div className="max-w-3xl w-full">
           <h2 className={`text-3xl font-bold text-center mb-3 ${dm ? "text-gray-100" : "text-gray-800"}`}>Choose Video Platform</h2>
           <p className={`text-center mb-8 ${dm ? "text-gray-400" : "text-gray-600"}`}>Select which platform to use for this class</p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className={`grid gap-6 ${[googleMeetEnabled, zoomEnabled, agoraEnabled].filter(Boolean).length === 3 ? "grid-cols-1 md:grid-cols-3" : "grid-cols-1 md:grid-cols-2"}`}>
 
             {/* Google Meet */}
             {googleMeetEnabled && (
@@ -262,15 +312,98 @@ export default function Classroom({ classData, userRole: propUserRole, onLeave, 
                   </div>
                 </button>
 
-                {/* Help text when link is missing */}
+                {/* Quick-setup when Meet link is missing */}
                 {!meetLinkLoading && !resolvedMeetLink && (
-                  <div className={`flex items-start gap-2 border rounded-xl px-4 py-3 text-sm ${dm ? "bg-amber-900/30 border-amber-800 text-amber-300" : "bg-amber-50 border-amber-200 text-amber-800"}`}>
-                    <span className="text-base leading-none mt-0.5">⚠️</span>
-                    <span>
-                      No Google Meet link saved on your profile. Go to your{" "}
-                      <strong>Profile → Meet Link</strong> and add your personal meeting link,
-                      then come back to start this class.
+                  <div className={`border rounded-xl px-4 py-3 text-sm ${dm ? "bg-gray-800/80 border-gray-700" : "bg-white border-gray-200"}`}>
+                    <p className={`font-semibold mb-2 flex items-center gap-1.5 ${dm ? "text-amber-300" : "text-amber-700"}`}>
+                      ⚠️ No Google Meet link — add it here to use Meet:
+                    </p>
+                    <div className="flex gap-2">
+                      <input
+                        value={meetDraft}
+                        onChange={e => { setMeetDraft(e.target.value); setMeetSaveError(""); }}
+                        type="url"
+                        placeholder="https://meet.google.com/xxx-xxxx-xxx"
+                        className={`flex-1 px-3 py-2 rounded-lg text-sm border outline-none ${dm ? "bg-gray-900 border-gray-600 text-gray-100 placeholder-gray-500" : "bg-gray-50 border-gray-300 text-gray-800 placeholder-gray-400"}`}
+                        onKeyDown={e => e.key === "Enter" && saveQuickLink("googleMeetLink", meetDraft, setSavingMeetLink, setMeetSaveError, (v) => { setResolvedMeetLink(v); setMeetDraft(""); })}
+                      />
+                      <button
+                        onClick={() => saveQuickLink("googleMeetLink", meetDraft, setSavingMeetLink, setMeetSaveError, (v) => { setResolvedMeetLink(v); setMeetDraft(""); })}
+                        disabled={!meetDraft.trim() || savingMeetLink}
+                        className="px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-bold transition-all whitespace-nowrap"
+                      >
+                        {savingMeetLink ? "Saving…" : "Save"}
+                      </button>
+                    </div>
+                    {meetSaveError && <p className="text-red-500 text-xs mt-1.5">{meetSaveError}</p>}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Zoom */}
+            {zoomEnabled && (
+              <div className="flex flex-col gap-3">
+                <button
+                  onClick={() => {
+                    if (!resolvedZoomLink) return;
+                    window.open(resolvedZoomLink, "_blank");
+                    chooseProvider("zoom");
+                  }}
+                  disabled={!resolvedZoomLink || meetLinkLoading}
+                  className={`p-8 rounded-2xl border-4 transition-all text-left ${
+                    meetLinkLoading
+                      ? dm ? "bg-gray-800 border-gray-700 cursor-wait opacity-70" : "bg-gray-50 border-gray-200 cursor-wait opacity-70"
+                      : resolvedZoomLink
+                      ? dm ? "bg-gray-800 border-blue-700 hover:border-blue-500 hover:shadow-xl cursor-pointer" : "bg-white border-blue-300 hover:border-blue-500 hover:shadow-xl cursor-pointer"
+                      : dm ? "bg-gray-800 border-gray-700 cursor-not-allowed opacity-60" : "bg-gray-100 border-gray-300 cursor-not-allowed opacity-60"
+                  }`}
+                >
+                  <div className="flex flex-col items-center">
+                    <div className={`w-20 h-20 rounded-full flex items-center justify-center mb-4 ${resolvedZoomLink ? "bg-[#2D8CFF]" : "bg-gray-500"}`}>
+                      {meetLinkLoading
+                        ? <Loader className="w-10 h-10 text-white animate-spin" />
+                        : <span className="text-white text-3xl font-black leading-none" style={{ fontFamily: "Arial,sans-serif" }}>Z</span>
+                      }
+                    </div>
+                    <h3 className={`text-xl font-bold mb-2 ${dm ? "text-gray-100" : "text-gray-800"}`}>Zoom</h3>
+                    <p className={`text-sm text-center mb-3 ${dm ? "text-gray-400" : "text-gray-600"}`}>Opens in a new tab</p>
+                    <span className={`px-4 py-1 rounded-full text-xs font-medium ${
+                      meetLinkLoading
+                        ? dm ? "bg-gray-700 text-gray-400" : "bg-gray-200 text-gray-500"
+                        : resolvedZoomLink
+                        ? dm ? "bg-blue-900/50 text-blue-400" : "bg-blue-100 text-blue-700"
+                        : dm ? "bg-amber-900/50 text-amber-400" : "bg-amber-100 text-amber-700"
+                    }`}>
+                      {meetLinkLoading ? "Checking…" : resolvedZoomLink ? "Available" : "Link not set"}
                     </span>
+                  </div>
+                </button>
+
+                {/* Quick-setup when Zoom link is missing */}
+                {!meetLinkLoading && !resolvedZoomLink && (
+                  <div className={`border rounded-xl px-4 py-3 text-sm ${dm ? "bg-gray-800/80 border-gray-700" : "bg-white border-gray-200"}`}>
+                    <p className={`font-semibold mb-2 flex items-center gap-1.5 ${dm ? "text-amber-300" : "text-amber-700"}`}>
+                      ⚠️ No Zoom link — add it here to use Zoom:
+                    </p>
+                    <div className="flex gap-2">
+                      <input
+                        value={zoomDraft}
+                        onChange={e => { setZoomDraft(e.target.value); setZoomSaveError(""); }}
+                        type="url"
+                        placeholder="https://zoom.us/j/123456789"
+                        className={`flex-1 px-3 py-2 rounded-lg text-sm border outline-none ${dm ? "bg-gray-900 border-gray-600 text-gray-100 placeholder-gray-500" : "bg-gray-50 border-gray-300 text-gray-800 placeholder-gray-400"}`}
+                        onKeyDown={e => e.key === "Enter" && saveQuickLink("zoomLink", zoomDraft, setSavingZoomLink, setZoomSaveError, (v) => { setResolvedZoomLink(v); setZoomDraft(""); })}
+                      />
+                      <button
+                        onClick={() => saveQuickLink("zoomLink", zoomDraft, setSavingZoomLink, setZoomSaveError, (v) => { setResolvedZoomLink(v); setZoomDraft(""); })}
+                        disabled={!zoomDraft.trim() || savingZoomLink}
+                        className="px-4 py-2 rounded-lg bg-[#2D8CFF] hover:bg-[#1a7de8] disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-bold transition-all whitespace-nowrap"
+                      >
+                        {savingZoomLink ? "Saving…" : "Save"}
+                      </button>
+                    </div>
+                    {zoomSaveError && <p className="text-red-500 text-xs mt-1.5">{zoomSaveError}</p>}
                   </div>
                 )}
               </div>
@@ -280,21 +413,27 @@ export default function Classroom({ classData, userRole: propUserRole, onLeave, 
             {agoraEnabled && (
               <button
                 onClick={() => chooseProvider("agora")}
-                className={`p-8 rounded-2xl border-4 hover:shadow-xl transition-all cursor-pointer ${dm ? "bg-gray-800 border-blue-700 hover:border-blue-500" : "bg-white border-blue-300 hover:border-blue-500"}`}
+                className={`p-8 rounded-2xl border-4 hover:shadow-xl transition-all cursor-pointer ${dm ? "bg-gray-800 border-purple-700 hover:border-purple-500" : "bg-white border-purple-300 hover:border-purple-500"}`}
               >
                 <div className="flex flex-col items-center">
-                  <div className="w-20 h-20 bg-blue-500 rounded-full flex items-center justify-center mb-4">
+                  <div className="w-20 h-20 bg-purple-600 rounded-full flex items-center justify-center mb-4">
                     <Video className="w-10 h-10 text-white" />
                   </div>
                   <h3 className={`text-xl font-bold mb-2 ${dm ? "text-gray-100" : "text-gray-800"}`}>Agora Video</h3>
                   <p className={`text-sm text-center mb-3 ${dm ? "text-gray-400" : "text-gray-600"}`}>Embedded in browser</p>
-                  <span className={`px-4 py-1 rounded-full text-xs font-medium ${dm ? "bg-blue-900/50 text-blue-400" : "bg-blue-100 text-blue-700"}`}>Available</span>
+                  <span className={`px-4 py-1 rounded-full text-xs font-medium ${dm ? "bg-purple-900/50 text-purple-400" : "bg-purple-100 text-purple-700"}`}>Available</span>
                 </div>
               </button>
             )}
           </div>
           <p className={`text-center text-xs mt-6 ${dm ? "text-gray-500" : "text-gray-400"}`}>
-            Google Meet uses your personal subscription. Agora is built into the platform.
+            Google Meet and Zoom use your personal subscriptions. Agora is built into the platform.{" "}
+            <button
+              onClick={() => navigate("/teacher/dashboard", { state: { activeTab: "profile" } })}
+              className={`underline underline-offset-2 transition-colors ${dm ? "text-gray-400 hover:text-gray-200" : "text-gray-500 hover:text-gray-700"}`}
+            >
+              Manage links in Profile
+            </button>
           </p>
         </div>
 

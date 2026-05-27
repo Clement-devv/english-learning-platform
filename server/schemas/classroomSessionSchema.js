@@ -17,7 +17,7 @@ export const classroomSessionSchema = new mongoose.Schema({
     enum: ['waiting', 'active', 'completed', 'ended-early', 'incomplete', 'missed'],
     default: 'waiting',
   },
-  videoProvider:   { type: String, enum: ['agora', 'googlemeet', null], default: null },
+  videoProvider:   { type: String, enum: ['agora', 'googlemeet', 'zoom', null], default: null },
   contentPage:     { type: Number, default: 1   }, // current PDF page teacher is viewing
   contentScale:    { type: Number, default: 1.3 }, // current PDF zoom level
   contentAnnotation: {                             // latest annotation canvas for current page

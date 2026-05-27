@@ -325,6 +325,22 @@ export default function SunshineShell() {
             {PAGE_LABEL[d.activeTab] || t('teacher.nav.dashboard')}
           </h1>
 
+          {/* ── Notification chips — desktop only ── */}
+          {!isMobile && d.unreadMessages > 0 && (
+            <button onClick={() => { d.setActiveTab('messages'); d.setUnreadMessages(0); }} title="Go to messages"
+              style={{ display: 'flex', alignItems: 'center', gap: 6, background: d.isDarkMode ? 'rgba(139,92,246,0.15)' : '#f5f3ff', border: `2px solid ${d.isDarkMode ? 'rgba(139,92,246,0.3)' : '#ddd6fe'}`, borderRadius: 999, padding: '5px 14px', cursor: 'pointer', fontFamily: F }}>
+              <span style={{ fontSize: 14 }}>💬</span>
+              <span style={{ fontSize: 13, fontWeight: 800, color: d.isDarkMode ? '#a78bfa' : '#7c3aed' }}>{d.unreadMessages} new</span>
+            </button>
+          )}
+          {!isMobile && missedCallCount > 0 && (
+            <button onClick={clearMissedCalls} title="Clear missed calls"
+              style={{ display: 'flex', alignItems: 'center', gap: 6, background: d.isDarkMode ? 'rgba(239,68,68,0.12)' : '#fff5f5', border: `2px solid ${d.isDarkMode ? 'rgba(239,68,68,0.3)' : '#fecaca'}`, borderRadius: 999, padding: '5px 14px', cursor: 'pointer', fontFamily: F }}>
+              <span style={{ fontSize: 14 }}>📞</span>
+              <span style={{ fontSize: 13, fontWeight: 800, color: '#ef4444' }}>{missedCallCount} missed</span>
+            </button>
+          )}
+
           {/* Student count pill — desktop only */}
           {!isMobile && (
             <div style={{ background: d.isDarkMode ? 'rgba(249,115,22,0.12)' : '#fff7ed', border: `2px solid ${d.isDarkMode ? 'rgba(249,115,22,0.25)' : '#fed7aa'}`, borderRadius: 999, padding: '5px 14px', display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -429,18 +445,26 @@ export default function SunshineShell() {
                 ))}
               </div>
 
-              {/* Google Meet collapsible */}
+              {/* Class video links — Google Meet + Zoom in one collapsible */}
               {d.teacherInfo?._id && (
                 <div className="ts-card" style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: 24, overflow: 'hidden' }}>
                   <button onClick={() => d.setShowGoogleMeetSettings(!d.showGoogleMeetSettings)}
                     style={{ width: '100%', padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'transparent', border: 'none', cursor: 'pointer', fontFamily: F }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                      <div style={{ width: 38, height: 38, borderRadius: 12, background: 'linear-gradient(135deg,#059669,#10b981)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <Video size={16} color="white" />
+                      {/* Stacked icons: green Meet + blue Zoom */}
+                      <div style={{ display: 'flex', alignItems: 'center' }}>
+                        <div style={{ width: 32, height: 32, borderRadius: 10, background: 'linear-gradient(135deg,#059669,#10b981)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 6px rgba(0,0,0,0.12)' }}>
+                          <Video size={14} color="white" />
+                        </div>
+                        <div style={{ width: 32, height: 32, borderRadius: 10, background: 'linear-gradient(135deg,#2563eb,#3b82f6)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginLeft: -10, boxShadow: '0 2px 6px rgba(0,0,0,0.12)', border: `2px solid ${col.card}` }}>
+                          <Video size={14} color="white" />
+                        </div>
                       </div>
                       <div style={{ textAlign: 'left' }}>
-                        <p style={{ margin: 0, fontSize: 13, fontWeight: 800, color: col.heading }}>Google Meet Link</p>
-                        <p style={{ margin: 0, fontSize: 12, color: col.muted }}>{d.googleMeetLink ? 'Link configured ✓' : 'Click to configure'}</p>
+                        <p style={{ margin: 0, fontSize: 13, fontWeight: 800, color: col.heading }}>Class Video Links</p>
+                        <p style={{ margin: 0, fontSize: 12, color: col.muted }}>
+                          {`Meet: ${d.googleMeetLink ? '✓' : '—'}  ·  Zoom: ${d.zoomLink ? '✓' : '—'}`}
+                        </p>
                       </div>
                     </div>
                     <div style={{ transform: d.showGoogleMeetSettings ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>
@@ -450,11 +474,19 @@ export default function SunshineShell() {
                     </div>
                   </button>
                   {d.showGoogleMeetSettings && (
-                    <div style={{ padding: '16px 20px 20px', borderTop: `2px solid ${col.border}` }}>
+                    <div style={{ padding: '16px 20px 20px', borderTop: `2px solid ${col.border}`, display: 'flex', flexDirection: 'column', gap: 16 }}>
                       <GoogleMeetSettings
+                        platform="google-meet"
                         teacherId={d.teacherInfo._id}
                         initialLink={d.googleMeetLink || ''}
                         onUpdate={d.setGoogleMeetLink}
+                        isDarkMode={d.isDarkMode}
+                      />
+                      <GoogleMeetSettings
+                        platform="zoom"
+                        teacherId={d.teacherInfo._id}
+                        initialLink={d.zoomLink || ''}
+                        onUpdate={d.setZoomLink}
                         isDarkMode={d.isDarkMode}
                       />
                     </div>
@@ -575,6 +607,7 @@ export default function SunshineShell() {
                 d={d}
                 wrapStyle={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: 24, padding: 24 }}
                 msgStyle={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: 24, overflow: 'hidden' }}
+                onUnreadCount={d.setUnreadMessages}
               />
             </TabErrorBoundary>
           )}
@@ -588,6 +621,16 @@ export default function SunshineShell() {
         onSave={d.handleAddClass}
         students={d.students}
         isDarkMode={d.isDarkMode}
+        theme={{
+          accent:         '#f97316',
+          accentGradient: 'linear-gradient(135deg,#f97316,#fbbf24)',
+          softBg:         '#fff7ed',
+          softBorder:     '#fed7aa',
+          softText:       '#9a3412',
+          softBgDark:     'rgba(249,115,22,0.18)',
+          softBorderDark: 'rgba(249,115,22,0.4)',
+          softTextDark:   '#fed7aa',
+        }}
       />
 
       {(d.showRecurringForm || showRecurringLocal) && (
@@ -657,7 +700,9 @@ export default function SunshineShell() {
             { key: 'messages',  Icon: MessageCircle, label: t('teacher.nav.messages')  },
           ].map(({ key, Icon, label }) => {
             const isActive = d.activeTab === key;
-            const badge = key === 'messages' && d.unreadMessages > 0 ? d.unreadMessages : 0;
+            const badge = key === 'messages' ? (d.unreadMessages || 0)
+                        : key === 'dashboard' ? missedCallCount
+                        : 0;
             return (
               <button key={key} onClick={() => d.setActiveTab(key)}
                 style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: F, color: isActive ? col.accent : col.muted, position: 'relative', height: 62, paddingBottom: 6 }}>

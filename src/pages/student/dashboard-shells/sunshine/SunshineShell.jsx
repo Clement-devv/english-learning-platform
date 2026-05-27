@@ -349,7 +349,6 @@ export default function SunshineShell() {
                 const badge = item.key === "homework" && d.homeworkPending > 0 ? d.homeworkPending
                             : item.key === "quiz"     && d.quizPending > 0     ? d.quizPending
                             : item.key === "badges"   ? (d.badges.length > 0 ? d.badges.length : null)
-                            : item.key === "completed-classes" ? (d.completedClasses.length > 0 ? d.completedClasses.length : null)
                             : item.key === "messages" && missedCallCount > 0   ? missedCallCount
                             : null;
                 return (
@@ -432,6 +431,22 @@ export default function SunshineShell() {
               <span style={{ fontSize: 16 }}>🔥</span>
               <span style={{ fontSize: 13, fontWeight: 800, color: col.accent }}>{d.progress.streakDays} day streak</span>
             </div>
+          )}
+
+          {/* ── Notification chips — desktop only ── */}
+          {!isMobile && d.unreadMessages > 0 && (
+            <button onClick={() => { d.setActiveTab("messages"); d.setUnreadMessages(0); }} title="Go to messages"
+              style={{ display: "flex", alignItems: "center", gap: 6, background: d.isDarkMode ? "rgba(139,92,246,0.15)" : "#f5f3ff", border: `2px solid ${d.isDarkMode ? "rgba(139,92,246,0.3)" : "#ddd6fe"}`, borderRadius: 999, padding: "5px 14px", cursor: "pointer", fontFamily: F }}>
+              <span style={{ fontSize: 13 }}>💬</span>
+              <span style={{ fontSize: 13, fontWeight: 800, color: d.isDarkMode ? "#a78bfa" : "#7c3aed" }}>{d.unreadMessages} new</span>
+            </button>
+          )}
+          {!isMobile && missedCallCount > 0 && (
+            <button onClick={clearMissedCalls} title="Clear missed calls"
+              style={{ display: "flex", alignItems: "center", gap: 6, background: d.isDarkMode ? "rgba(239,68,68,0.12)" : "#fff5f5", border: `2px solid ${d.isDarkMode ? "rgba(239,68,68,0.3)" : "#fecaca"}`, borderRadius: 999, padding: "5px 14px", cursor: "pointer", fontFamily: F }}>
+              <span style={{ fontSize: 13 }}>📞</span>
+              <span style={{ fontSize: 13, fontWeight: 800, color: "#ef4444" }}>{missedCallCount} missed</span>
+            </button>
           )}
 
           {/* Notification bell */}
@@ -669,7 +684,7 @@ export default function SunshineShell() {
           )}
 
           {/* ══ MESSAGES ══ */}
-          {d.activeTab === "messages" && <div style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: "24px", overflow: "hidden" }}><MessagesTab userRole="student" /></div>}
+          {d.activeTab === "messages" && <div style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: "24px", overflow: "hidden" }}><MessagesTab userRole="student" onUnreadCount={d.setUnreadMessages} /></div>}
 
           {/* ══ COMPLETED ══ */}
           {d.activeTab === "completed-classes" && (

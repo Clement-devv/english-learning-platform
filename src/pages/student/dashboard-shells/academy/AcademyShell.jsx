@@ -16,6 +16,7 @@ import {
 } from "recharts";
 import { useBranding } from "../../../../context/BrandingContext";
 import { useDashboardData, BADGE_DEFINITIONS } from "../useDashboardData";
+import { useRing }                              from "../../../../context/RingContext";
 import ChangePassword from "../../../../components/student/auth/ChangePassword";
 import SessionManagement from "../../../../components/SessionManagement";
 import SettingsModal from "../../../../components/SettingsModal";
@@ -208,6 +209,7 @@ function AcademyBadgesPanel({ badges, progress, completedClasses, shareAchieveme
 export default function AcademyShell() {
   const { branding, center } = useBranding();
   const d = useDashboardData();
+  const { missedCallCount, clearMissedCalls } = useRing();
 
   // ── Computed palette based on dark mode ──────────────────────────────────────
   const P = d.isDarkMode ? { ...LIGHT, ...DARK_OVER } : LIGHT;
@@ -372,6 +374,22 @@ export default function AcademyShell() {
             style={{ width:"36px", height:"36px", borderRadius:"10px", border:`1px solid ${P.border}`, background:P.inputBg, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", color:P.textSub, flexShrink:0 }}>
             {d.isDarkMode ? <Sun size={16} /> : <Moon size={16} />}
           </button>
+
+          {/* ── Notification chips — desktop only ── */}
+          {!isMobile && d.unreadMessages > 0 && (
+            <button onClick={() => { d.setActiveTab("messages"); d.setUnreadMessages(0); }} title="Go to messages"
+              style={{ display:"flex", alignItems:"center", gap:"5px", background: d.isDarkMode?"rgba(139,92,246,0.15)":"#f5f3ff", border:`1.5px solid ${d.isDarkMode?"rgba(139,92,246,0.3)":"#ddd6fe"}`, borderRadius:"999px", padding:"5px 13px", cursor:"pointer" }}>
+              <span style={{ fontSize:"13px" }}>💬</span>
+              <span style={{ fontSize:"12px", fontWeight:800, color: d.isDarkMode?"#a78bfa":"#7c3aed" }}>{d.unreadMessages} new</span>
+            </button>
+          )}
+          {!isMobile && missedCallCount > 0 && (
+            <button onClick={clearMissedCalls} title="Clear missed calls"
+              style={{ display:"flex", alignItems:"center", gap:"5px", background: d.isDarkMode?"rgba(239,68,68,0.12)":"#fff5f5", border:`1.5px solid ${d.isDarkMode?"rgba(239,68,68,0.3)":"#fecaca"}`, borderRadius:"999px", padding:"5px 13px", cursor:"pointer" }}>
+              <span style={{ fontSize:"13px" }}>📞</span>
+              <span style={{ fontSize:"12px", fontWeight:800, color:"#ef4444" }}>{missedCallCount} missed</span>
+            </button>
+          )}
 
           {/* Bell */}
           <button style={{ position:"relative", background:"none", border:"none", cursor:"pointer", color:P.textSub, display:"flex", alignItems:"center", padding:"6px" }}>
@@ -649,7 +667,7 @@ export default function AcademyShell() {
 
                   {wallTab === "messages" && (
                     <div style={{ height:"320px", overflow:"hidden" }}>
-                      <MessagesTab userRole="student" compact />
+                      <MessagesTab userRole="student" compact onUnreadCount={d.setUnreadMessages} />
                     </div>
                   )}
                 </div>
@@ -718,7 +736,7 @@ export default function AcademyShell() {
           {/* ═══ MESSAGES ═══ */}
           {d.activeTab === "messages" && (
             <div style={{ background:P.card, borderRadius:"16px", border:`1px solid ${P.border}`, overflow:"hidden" }}>
-              <MessagesTab userRole="student" />
+              <MessagesTab userRole="student" onUnreadCount={d.setUnreadMessages} />
             </div>
           )}
 

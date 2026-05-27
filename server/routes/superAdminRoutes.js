@@ -8,14 +8,15 @@ import Center from '../models/master/Center.js';
 import AgoraUsage   from '../models/master/AgoraUsage.js';
 import AgoraSession from '../models/master/AgoraSession.js';
 import { verifySuperAdmin } from '../middleware/superAdminMiddleware.js';
-import { loginLimiter, strictLimiter, apiLimiter, emailLimiter } from '../middleware/rateLimiter.js';
+import { loginLimiter, strictLimiter, apiLimiter, emailLimiter, trackFailedLogin, isAccountLocked, clearFailedAttempts } from '../middleware/rateLimiter.js';
 import { getDb } from '../config/dbManager.js';
 import redisClient from '../config/redis.js';
 import { config, JWT_STANDARD_CLAIMS } from '../config/config.js';
 import { getCenterSecret } from '../utils/jwtUtils.js';
 import { sendEmail, sendCenterDeletionWarningEmail } from '../utils/emailService.js';
 import { verifyDomainDns, isValidDomain, normalizeDomain } from '../utils/domainVerifier.js';
-import { pruneSessionsToLimit } from '../utils/sessionManager.js';
+import { createSession, pruneSessionsToLimit } from '../utils/sessionManager.js';
+import { addToLocalBlacklist } from '../middleware/authMiddleware.js';
 import { invalidateCache } from '../utils/cache.js';
 import {
   validate,
@@ -87,15 +88,30 @@ router.post('/login', loginLimiter, validateSuperAdminLogin, async (req, res) =>
       return badRequest(res, 'Email and password are required');
     }
 
+    // DB-backed lockout — scoped to "superadmin" so it never collides with a
+    // center admin who happens to share the same email address.
+    const lockScope = 'superadmin';
+    const lockStatus = await isAccountLocked(email, lockScope);
+    if (lockStatus.isLocked) {
+      return res.status(423).json({
+        success: false,
+        message: `Account locked due to too many failed attempts. Try again in ${lockStatus.remainingTime} minute(s).`,
+      });
+    }
+
     const superAdmin = await SuperAdmin.findOne({ email });
     if (!superAdmin || !superAdmin.active) {
+      await trackFailedLogin(email, lockScope);
       return unauthorized(res, 'Invalid credentials');
     }
 
     const isPasswordValid = await bcrypt.compare(password, superAdmin.password);
     if (!isPasswordValid) {
+      await trackFailedLogin(email, lockScope);
       return unauthorized(res, 'Invalid credentials');
     }
+
+    await clearFailedAttempts(email, lockScope);
 
     const token = jwt.sign(
       { ...JWT_STANDARD_CLAIMS, id: superAdmin._id, role: 'superadmin', email: superAdmin.email },
@@ -103,7 +119,11 @@ router.post('/login', loginLimiter, validateSuperAdminLogin, async (req, res) =>
       { expiresIn: process.env.JWT_SA_EXPIRY || '8h' }
     );
 
-    superAdmin.sessions.push({ token, isActive: true, loginTime: new Date() });
+    // Record a per-device session — required for /super-admin/logout-session
+    // and /super-admin/logout-all-devices to revoke this specific JWT via
+    // the blacklist that verifySuperAdmin now checks.
+    const session = createSession(req, token);
+    superAdmin.sessions.push(session);
     superAdmin.sessions = pruneSessionsToLimit(superAdmin.sessions);
     superAdmin.lastLogin = new Date();
     await superAdmin.save();
@@ -113,6 +133,7 @@ router.post('/login', loginLimiter, validateSuperAdminLogin, async (req, res) =>
     res.json({
       success: true,
       token,
+      sessionToken: session.token,
       superAdmin: {
         id: superAdmin._id,
         firstName: superAdmin.firstName,
@@ -123,6 +144,89 @@ router.post('/login', loginLimiter, validateSuperAdminLogin, async (req, res) =>
     });
   } catch (err) {
     logger.error('❌ Super admin login error:', { error: err?.message });
+    serverError(res);
+  }
+});
+
+// POST /api/super-admin/logout-session
+// Revokes the current device's super-admin JWT.  Marks the session inactive
+// and adds the raw JWT to the in-memory + Redis blacklist that
+// verifySuperAdmin checks on every request.
+router.post('/logout-session', verifySuperAdmin, async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1];
+    const { sessionToken } = req.body;
+    if (!sessionToken) {
+      return res.status(400).json({ success: false, message: 'Session token required' });
+    }
+
+    const superAdmin = req.superAdmin;
+    const session = superAdmin.sessions.find(s => s.token === sessionToken);
+    if (!session) {
+      return res.status(404).json({ success: false, message: 'Session not found' });
+    }
+
+    session.isActive = false;
+
+    // Blacklist the JWT — in-memory first (covers Redis outages), then Redis.
+    const jwtToRevoke = session.jwtToken || token;
+    if (jwtToRevoke) {
+      addToLocalBlacklist(jwtToRevoke);
+      if (redisClient) {
+        try {
+          const decoded = jwt.decode(jwtToRevoke);
+          const ttl = decoded?.exp ? decoded.exp - Math.floor(Date.now() / 1000) : 900;
+          if (ttl > 0) {
+            const sig = jwtToRevoke.split('.')[2];
+            await redisClient.setex(`bl:${sig}`, ttl, '1');
+          }
+        } catch (_) {}
+      }
+    }
+
+    await superAdmin.save();
+    res.json({ success: true, message: 'Logged out successfully' });
+  } catch (err) {
+    logger.error('Super-admin logout-session error:', { error: err?.message });
+    serverError(res);
+  }
+});
+
+// POST /api/super-admin/logout-all-devices
+// Revokes every other active super-admin session (keeps the current one alive).
+router.post('/logout-all-devices', verifySuperAdmin, async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1];
+    const superAdmin = req.superAdmin;
+
+    const otherSessions = (superAdmin.sessions || []).filter(
+      s => s.jwtToken && s.jwtToken !== token && s.isActive
+    );
+    otherSessions.forEach(s => addToLocalBlacklist(s.jwtToken));
+    if (redisClient) {
+      await Promise.allSettled(
+        otherSessions.map(async (s) => {
+          try {
+            const decoded = jwt.decode(s.jwtToken);
+            const ttl = decoded?.exp ? decoded.exp - Math.floor(Date.now() / 1000) : 900;
+            if (ttl > 0) {
+              const sig = s.jwtToken.split('.')[2];
+              await redisClient.setex(`bl:${sig}`, ttl, '1');
+            }
+          } catch (_) {}
+        })
+      );
+    }
+
+    superAdmin.sessions = (superAdmin.sessions || []).map(s => {
+      if (s.jwtToken !== token) s.isActive = false;
+      return s;
+    });
+    await superAdmin.save();
+
+    res.json({ success: true, message: 'Logged out from all other devices' });
+  } catch (err) {
+    logger.error('Super-admin logout-all-devices error:', { error: err?.message });
     serverError(res);
   }
 });
@@ -955,6 +1059,39 @@ router.patch('/centers/:id/admin-login-theme', verifySuperAdmin, validateParamMo
     res.json({ success: true, message: adminLoginTheme ? `Admin login theme "${adminLoginTheme}" assigned to ${center.centerName}` : 'Admin login theme unassigned' });
   } catch (err) {
     logger.error('❌ Admin login theme assign error:', { error: err?.message });
+    serverError(res);
+  }
+});
+
+// PATCH /api/super-admin/centers/:id/classroom-theme — assign classroom theme (non-exclusive)
+router.patch('/centers/:id/classroom-theme', verifySuperAdmin, validateParamMongoId('id'), async (req, res) => {
+  try {
+    const { classroomTheme } = req.body;   // null to unassign
+    const center = await Center.findById(req.params.id);
+    if (!center) return notFound(res, 'Center not found');
+
+    await Center.findByIdAndUpdate(req.params.id, { 'branding.classroomTheme': classroomTheme || null });
+
+    // Bust the tenant cache so the next branding fetch returns the new theme immediately
+    await invalidateCache(`tenant:slug:${center.slug}`);
+    if (center.customDomain && center.domainVerified) {
+      await invalidateCache(`tenant:domain:${center.customDomain}`);
+    }
+
+    await writeAuditLog({
+      action: 'CLASSROOM_THEME_ASSIGNED', superAdmin: req.superAdmin,
+      targetId: center._id.toString(), targetName: center.centerName,
+      details: { classroomTheme: classroomTheme || null }, ip: req.ip,
+    });
+
+    res.json({
+      success: true,
+      message: classroomTheme
+        ? `Classroom theme "${classroomTheme}" assigned to ${center.centerName}`
+        : 'Classroom theme unassigned (using default)',
+    });
+  } catch (err) {
+    logger.error('❌ Classroom theme assign error:', { error: err?.message });
     serverError(res);
   }
 });

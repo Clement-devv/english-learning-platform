@@ -25,6 +25,12 @@ export function useParentLoginLogic() {
       if (res.data.success !== false) {
         sessionStorage.setItem('parentToken', res.data.token);
         sessionStorage.setItem('parentInfo', JSON.stringify(res.data.parent));
+        // sessionToken is required for /auth/logout-session to revoke this JWT
+        // server-side.  Without it, logout only clears browser storage and the
+        // token stays valid for its full lifetime.
+        if (res.data.sessionToken) {
+          sessionStorage.setItem('parentSessionToken', res.data.sessionToken);
+        }
         login('parent', res.data.parent, res.data.token);
         navigate('/parent/dashboard');
       } else if (res.data.requires2FA) {
@@ -46,6 +52,9 @@ export function useParentLoginLogic() {
       if (res.data.success) {
         sessionStorage.setItem('parentToken', res.data.token);
         sessionStorage.setItem('parentInfo', JSON.stringify(res.data.user));
+        if (res.data.sessionToken) {
+          sessionStorage.setItem('parentSessionToken', res.data.sessionToken);
+        }
         login('parent', res.data.user, res.data.token);
         navigate('/parent/dashboard');
       }

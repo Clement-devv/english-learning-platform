@@ -1,7 +1,7 @@
 // server/socketServer.js - WITH PDF VISIBILITY CONTROL
 import { Server } from 'socket.io';
 import jwt from 'jsonwebtoken';
-import { config } from './config/config.js';
+import { config, JWT_VERIFY_OPTIONS } from './config/config.js';
 import { getCenterSecret } from './utils/jwtUtils.js';
 import Center from './models/master/Center.js';
 import logger from "./utils/logger.js";
@@ -51,6 +51,25 @@ async function sendRingPush(centerId, targetUserId, targetRole, callerName) {
     });
   } catch (err) {
     logger.warn('sendRingPush error:', { error: err?.message });
+  }
+}
+
+// Look up a target user's ringEnabled preference and display name for the ring-call handler.
+// Fails open (returns ringEnabled:true) so a DB error never silently blocks calls.
+async function getTargetInfo(centerId, targetUserId, targetRole) {
+  try {
+    const db = await getDb(centerId);
+    let Model;
+    if (targetRole === 'student')                    Model = db.models.Student || db.model('Student', studentSchema);
+    else if (targetRole === 'teacher')               Model = db.models.Teacher || db.model('Teacher', teacherSchema);
+    else if (targetRole === 'admin' || targetRole === 'subAdmin') Model = db.models.Admin   || db.model('Admin',   adminSchema);
+    else return { ringEnabled: true, targetName: '' };
+    const doc = await Model.findById(targetUserId).select('firstName lastName ringEnabled').lean();
+    if (!doc) return { ringEnabled: true, targetName: '' };
+    const name = `${doc.firstName || ''} ${doc.lastName || ''}`.trim();
+    return { ringEnabled: doc.ringEnabled !== false, targetName: name };
+  } catch {
+    return { ringEnabled: true, targetName: '' }; // fail open — don't silently block calls
   }
 }
 
@@ -147,7 +166,7 @@ export async function initializeSocket(httpServer) {
       // jwt.verify below then proves the centerId claim is authentic.
       const unverified = jwt.decode(token);
       if (!unverified?.centerId) return next(new Error('Invalid token'));
-      const decoded = jwt.verify(token, getCenterSecret(unverified.centerId), { algorithms: ['HS256'] });
+      const decoded = jwt.verify(token, getCenterSecret(unverified.centerId), JWT_VERIFY_OPTIONS);
       socket.userId = decoded.id;
       socket.userRole = decoded.role;     // role from JWT — not trusted from client
       socket.centerId = decoded.centerId; // center slug the token was issued for
@@ -453,15 +472,29 @@ export async function initializeSocket(httpServer) {
     });
 
     // ── Ring / attention-call ─────────────────────────────────────────────────
-    // Caller emits ring-call → server forwards incoming-ring to target's user-room.
+    // Caller emits ring-call → server checks target's ringEnabled preference,
+    // then forwards incoming-ring to target's user-room.
     // The ring plays client-side audio and auto-cancels after RING_TIMEOUT_MS.
-    socket.on('ring-call', ({ targetUserId, targetRole, callerName }) => {
+    socket.on('ring-call', async ({ targetUserId, targetRole, callerName }) => {
       try {
         if (!targetUserId || !callerName) return;
 
         const callerRoom = `user-room:${socket.centerId}:${socket.userId}`;
         const targetRoom = `user-room:${socket.centerId}:${targetUserId}`;
         const ringId = `${socket.centerId}:${socket.userId}:${targetUserId}:${Date.now()}`;
+
+        // Check target's ring preference + resolve display name for DB logs
+        let targetName = '';
+        if (targetRole) {
+          const info = await getTargetInfo(socket.centerId, targetUserId, targetRole);
+          targetName = info.targetName;
+          if (!info.ringEnabled) {
+            // Auto-decline immediately — don't bother the target or play ringtone
+            socket.emit('ring-declined', { ringId, reason: 'muted' });
+            logger.info(`🔕 Ring ${ringId} auto-declined — target has calls muted`);
+            return;
+          }
+        }
 
         // Cancel any previous ring this caller already has in flight
         for (const [id, ring] of activeRings) {
@@ -480,24 +513,20 @@ export async function initializeSocket(httpServer) {
             io.to(callerRoom).emit('ring-timeout', { ringId });
             logger.info(`⏰ Ring ${ringId} timed out`);
             saveRingLog(r.centerId, {
-              callerId: r.callerId,
-              callerRole: r.callerRole,
+              callerId: r.callerId,   callerRole: r.callerRole,
               callerName: r.callerName,
-              targetId: r.targetUserId,
-              targetRole: r.targetRole,
+              targetId: r.targetUserId, targetRole: r.targetRole,
+              targetName: r.targetName,
               outcome: "missed",
             });
           }
         }, RING_TIMEOUT_MS);
 
         activeRings.set(ringId, {
-          callerId: socket.userId,
-          callerRole: socket.userRole,
-          callerName,
-          callerRoom,
-          targetUserId,
-          targetRole: targetRole || null,
-          targetRoom,
+          callerId: socket.userId,  callerRole: socket.userRole,
+          callerName,               callerRoom,
+          targetUserId,             targetRole: targetRole || null,
+          targetName,               targetRoom,
           centerId: socket.centerId,
           timeout,
         });
@@ -531,7 +560,7 @@ export async function initializeSocket(httpServer) {
       } catch (err) { logger.error('ring-cancel error:', { error: err?.message }); }
     });
 
-    // Target answers — notify the caller so they can open the class / chat
+    // Target answers — notify the caller + log the outcome
     socket.on('ring-answered', ({ ringId }) => {
       try {
         const ring = activeRings.get(ringId);
@@ -540,10 +569,17 @@ export async function initializeSocket(httpServer) {
         activeRings.delete(ringId);
         io.to(ring.callerRoom).emit('ring-answered', { ringId, by: socket.userId });
         logger.info(`✅ Ring ${ringId} answered by ${socket.userId}`);
+        saveRingLog(ring.centerId, {
+          callerId: ring.callerId,   callerRole: ring.callerRole,
+          callerName: ring.callerName,
+          targetId: ring.targetUserId, targetRole: socket.userRole,
+          targetName: ring.targetName,
+          outcome: "answered",
+        });
       } catch (err) { logger.error('ring-answered error:', { error: err?.message }); }
     });
 
-    // Target declines — notify the caller
+    // Target declines — notify the caller + log the outcome
     socket.on('ring-declined', ({ ringId }) => {
       try {
         const ring = activeRings.get(ringId);
@@ -553,11 +589,10 @@ export async function initializeSocket(httpServer) {
         io.to(ring.callerRoom).emit('ring-declined', { ringId, by: socket.userId });
         logger.info(`🚫 Ring ${ringId} declined by ${socket.userId}`);
         saveRingLog(ring.centerId, {
-          callerId: ring.callerId,
-          callerRole: ring.callerRole,
+          callerId: ring.callerId,   callerRole: ring.callerRole,
           callerName: ring.callerName,
-          targetId: ring.targetUserId,
-          targetRole: socket.userRole,
+          targetId: ring.targetUserId, targetRole: socket.userRole,
+          targetName: ring.targetName,
           outcome: "declined",
         });
       } catch (err) { logger.error('ring-declined error:', { error: err?.message }); }
@@ -741,6 +776,37 @@ export async function initializeSocket(httpServer) {
       catch (err) { logger.error('chat-message error:', { error: err?.message }); }
     });
 
+    // ── Chat-message rooms (typing indicators + real-time delivery) ─────────
+    socket.on('join-chat-room', ({ chatId }) => {
+      try {
+        if (!chatId) return;
+        socket.join(`chat-msg:${socket.centerId}:${chatId}`);
+      } catch (err) { logger.error('join-chat-room error:', { error: err?.message }); }
+    });
+
+    socket.on('leave-chat-room', ({ chatId }) => {
+      try {
+        if (!chatId) return;
+        socket.leave(`chat-msg:${socket.centerId}:${chatId}`);
+      } catch (err) { logger.error('leave-chat-room error:', { error: err?.message }); }
+    });
+
+    socket.on('typing-start', ({ chatId, senderName }) => {
+      try {
+        if (!chatId) return;
+        socket.to(`chat-msg:${socket.centerId}:${chatId}`)
+          .emit('user-typing', { chatId, name: senderName || '', role: socket.userRole });
+      } catch (err) { logger.error('typing-start error:', { error: err?.message }); }
+    });
+
+    socket.on('typing-stop', ({ chatId }) => {
+      try {
+        if (!chatId) return;
+        socket.to(`chat-msg:${socket.centerId}:${chatId}`)
+          .emit('user-stopped-typing', { chatId });
+      } catch (err) { logger.error('typing-stop error:', { error: err?.message }); }
+    });
+
     // Handle disconnect — clean up whiteboard session and reaction rooms
     socket.on('disconnect', () => {
       try {
@@ -780,17 +846,33 @@ export async function initializeSocket(httpServer) {
           });
         }
 
-        // Clean up any in-flight rings involving this socket
+        // Clean up any in-flight rings involving this socket and log outcomes
         for (const [ringId, ring] of activeRings) {
           if (ring.centerId !== socket.centerId) continue;
           if (ring.callerId === socket.userId) {
+            // Caller went offline — cancel the ring for the target
             clearTimeout(ring.timeout);
             io.to(ring.targetRoom).emit('ring-cancelled', { ringId, reason: 'offline' });
             activeRings.delete(ringId);
+            saveRingLog(ring.centerId, {
+              callerId: ring.callerId,   callerRole: ring.callerRole,
+              callerName: ring.callerName,
+              targetId: ring.targetUserId, targetRole: ring.targetRole,
+              targetName: ring.targetName,
+              outcome: "missed",
+            });
           } else if (ring.targetUserId === socket.userId) {
+            // Target went offline — notify caller as a decline
             clearTimeout(ring.timeout);
             io.to(ring.callerRoom).emit('ring-declined', { ringId, reason: 'offline' });
             activeRings.delete(ringId);
+            saveRingLog(ring.centerId, {
+              callerId: ring.callerId,   callerRole: ring.callerRole,
+              callerName: ring.callerName,
+              targetId: ring.targetUserId, targetRole: ring.targetRole,
+              targetName: ring.targetName,
+              outcome: "missed",
+            });
           }
         }
       } catch (err) {

@@ -4,6 +4,7 @@
 
 import express from "express";
 import mongoose from "mongoose";
+import multer from "multer";
 import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
 import { verifyToken } from "../middleware/authMiddleware.js";
 import { validateObjectId } from "../middleware/validateObjectId.js";
@@ -14,6 +15,23 @@ import { bookingSchema } from "../schemas/bookingSchema.js";
 import { ringLogSchema } from "../schemas/ringLogSchema.js";
 import logger from "../utils/logger.js";
 import { ok, badRequest, notFound, serverError } from "../utils/apiResponse.js";
+import { s3Enabled, uploadToS3, deleteFromS3, s3PublicUrl } from "../utils/s3.js";
+
+// ── Multer — hold audio in memory, validate MIME type, cap at 10 MB ──────────
+const AUDIO_TYPES = new Set([
+  "audio/mpeg", "audio/mp3", "audio/wav", "audio/wave", "audio/ogg",
+  "audio/aac", "audio/mp4", "audio/x-m4a", "audio/flac", "audio/webm",
+  "audio/x-wav", "audio/x-flac",
+]);
+
+const ringtoneUpload = multer({
+  storage: multer.memoryStorage(),
+  limits:  { fileSize: 10 * 1024 * 1024 }, // 10 MB max
+  fileFilter: (_req, file, cb) => {
+    if (AUDIO_TYPES.has(file.mimetype)) cb(null, true);
+    else cb(Object.assign(new Error("Unsupported audio format"), { code: "INVALID_TYPE" }));
+  },
+});
 
 const router = express.Router();
 router.use(tenantMiddleware);
@@ -237,6 +255,59 @@ router.get("/contacts", verifyToken, async (req, res) => {
   } catch (err) {
     logger.error("ring/contacts GET error:", { error: err?.message });
     serverError(res, "Failed to fetch ring contacts");
+  }
+});
+
+// ── POST /ring/ringtone ───────────────────────────────────────────────────────
+// Upload a custom ringtone audio file.  Stores it at a predictable S3 key
+// so re-uploading automatically replaces the previous file — no delete needed.
+//
+// S3 key pattern: centers/<slug>/ringtones/<userId>
+// The bucket must allow public GET on this prefix (or swap to presigned URLs).
+// Returns: { url }  — the public HTTPS URL the client should store locally.
+router.post("/ringtone", verifyToken, (req, res, next) => {
+  ringtoneUpload.single("file")(req, res, (err) => {
+    if (!err) return next();
+    if (err.code === "INVALID_TYPE")      return badRequest(res, "Unsupported audio format. Accepted: mp3, wav, ogg, aac, m4a, flac, webm");
+    if (err.code === "LIMIT_FILE_SIZE")   return badRequest(res, "Audio file must be 10 MB or smaller");
+    return serverError(res, err.message || "Upload failed");
+  });
+}, async (req, res) => {
+  try {
+    if (!s3Enabled()) {
+      return res.status(503).json({ success: false, message: "S3 is not configured on this server — custom ringtones are unavailable" });
+    }
+    if (!req.file) return badRequest(res, "No audio file provided");
+
+    const slug   = req.center.slug;
+    const userId = (req.user.id || req.user._id).toString();
+    const key    = `centers/${slug}/ringtones/${userId}`;
+
+    await uploadToS3(req.file.buffer, key, req.file.mimetype);
+    const url = s3PublicUrl(key);
+
+    logger.info(`🎵 Custom ringtone uploaded: user=${userId} center=${slug} size=${req.file.size}B`);
+    ok(res, { url });
+  } catch (err) {
+    logger.error("ring/ringtone POST error:", { error: err?.message });
+    serverError(res, "Failed to upload ringtone");
+  }
+});
+
+// ── DELETE /ring/ringtone ─────────────────────────────────────────────────────
+// Remove the caller's custom ringtone from S3.
+// The key is derived server-side from the auth token — no body needed.
+router.delete("/ringtone", verifyToken, async (req, res) => {
+  try {
+    if (!s3Enabled()) return ok(res, { cleared: true }); // no-op when S3 is off
+    const slug   = req.center.slug;
+    const userId = (req.user.id || req.user._id).toString();
+    await deleteFromS3(`centers/${slug}/ringtones/${userId}`);
+    logger.info(`🗑️  Custom ringtone deleted: user=${userId} center=${slug}`);
+    ok(res, { cleared: true });
+  } catch (err) {
+    logger.error("ring/ringtone DELETE error:", { error: err?.message });
+    serverError(res, "Failed to delete ringtone");
   }
 });
 

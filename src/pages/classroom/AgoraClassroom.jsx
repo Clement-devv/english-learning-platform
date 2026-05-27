@@ -36,6 +36,14 @@ export default function AgoraClassroom({ classData, userRole, onLeave, googleMee
     return () => window.removeEventListener("resize", handler);
   }, []);
 
+  // Block browser tab close / refresh while VideoCall is recording or uploading
+  useEffect(() => {
+    if (!vcIsRecording && !vcUploading) return;
+    const handler = (e) => { e.preventDefault(); e.returnValue = ""; };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [vcIsRecording, vcUploading]);
+
   const { isDarkMode } = useDarkMode();
   const dm = isDarkMode;
 
@@ -69,11 +77,14 @@ export default function AgoraClassroom({ classData, userRole, onLeave, googleMee
   const [tabSyncNotice,   setTabSyncNotice]    = useState(""); // student: "Teacher switched to Content"
   const [blinkTab,        setBlinkTab]         = useState(null); // student: which tab is pinging
   const [notifyOpen,      setNotifyOpen]       = useState(false); // teacher: notify dropdown open
+  const [vcIsRecording,   setVcIsRecording]    = useState(false); // VideoCall recording active
+  const [vcUploading,     setVcUploading]      = useState(false); // VideoCall recording uploading
   const extendRef     = useRef(null);
   const platformRef   = useRef(null);
   const notifyRef     = useRef(null);
-  const classroomSockRef = useRef(null);
-  const tabSyncTimerRef  = useRef(null);
+  const classroomSockRef    = useRef(null);
+  const tabSyncTimerRef     = useRef(null);
+  const videoCallCommandsRef = useRef(null); // exposes stopRecording from VideoCall
 
   // ── Socket: classroom tab sync ────────────────────────────────────────────
   useEffect(() => {
@@ -524,7 +535,11 @@ export default function AgoraClassroom({ classData, userRole, onLeave, googleMee
             )}
 
             {/* Leave — always visible */}
-            <button onClick={() => setShowLeaveModal(true)}
+            <button
+              onClick={() => {
+                if (vcIsRecording) videoCallCommandsRef.current?.stopRecording(); // auto-stop → triggers upload
+                setShowLeaveModal(true);
+              }}
               className={`inline-flex items-center gap-1.5 rounded-lg font-medium bg-red-600 hover:bg-red-500 active:bg-red-700 active:scale-95 text-white shadow-sm transition-all duration-150 ${isMobile ? "w-9 h-9 justify-center" : "px-3 py-1.5 text-xs"}`}
               title="Leave class">
               <Power className="w-3.5 h-3.5 flex-shrink-0" />
@@ -679,6 +694,11 @@ export default function AgoraClassroom({ classData, userRole, onLeave, googleMee
             mode={activeTab === "video" ? "video" : activeTab === "content" ? "sidebar" : "video"}
             userRole={userRole}
             bookingId={bookingId}
+            commandsRef={videoCallCommandsRef}
+            onRecordingStateChange={({ isRecording, uploadingRecording }) => {
+              setVcIsRecording(isRecording);
+              setVcUploading(uploadingRecording);
+            }}
           />
           {activeTab === "video" && userRole === "teacher" && (
             <div className="absolute top-4 left-4 px-4 py-2 bg-white/90 backdrop-blur rounded-lg shadow-lg text-sm font-medium z-50 text-blue-700">
@@ -715,22 +735,38 @@ export default function AgoraClassroom({ classData, userRole, onLeave, googleMee
           <div className={`rounded-2xl p-6 max-w-sm w-full text-center border ${
             dm ? "bg-gray-900 border-gray-700" : "bg-white border-gray-100"
           }`} style={{ boxShadow: "0 24px 80px rgba(0,0,0,0.3)" }}>
-            <div className={`w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-4 ${dm ? "bg-amber-900/40" : "bg-amber-50"}`}>
-              <AlertTriangle className="w-6 h-6 text-amber-500" />
-            </div>
-            <h2 className={`text-base font-semibold mb-1.5 ${dm ? "text-gray-100" : "text-gray-900"}`}>Leave Early?</h2>
-            <p className={`mb-5 text-sm leading-relaxed ${dm ? "text-gray-400" : "text-gray-500"}`}>
-              The class will be marked as incomplete if attendance requirements aren't met.
-            </p>
+            {vcUploading ? (
+              <>
+                <Loader className={`w-12 h-12 animate-spin mx-auto mb-4 ${dm ? "text-purple-400" : "text-purple-500"}`} />
+                <h2 className={`text-base font-semibold mb-1.5 ${dm ? "text-gray-100" : "text-gray-900"}`}>Saving Recording…</h2>
+                <p className={`mb-5 text-sm leading-relaxed ${dm ? "text-gray-400" : "text-gray-500"}`}>
+                  Please wait — your recording is being saved. The Leave button will unlock when it's done.
+                </p>
+              </>
+            ) : (
+              <>
+                <div className={`w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-4 ${dm ? "bg-amber-900/40" : "bg-amber-50"}`}>
+                  <AlertTriangle className="w-6 h-6 text-amber-500" />
+                </div>
+                <h2 className={`text-base font-semibold mb-1.5 ${dm ? "text-gray-100" : "text-gray-900"}`}>Leave Early?</h2>
+                <p className={`mb-5 text-sm leading-relaxed ${dm ? "text-gray-400" : "text-gray-500"}`}>
+                  The class will be marked as incomplete if attendance requirements aren't met.
+                </p>
+              </>
+            )}
             <div className="flex gap-2">
-              <button onClick={() => setShowLeaveModal(false)}
-                className={`flex-1 inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg text-sm font-medium border transition-all duration-150 active:scale-95 ${
+              <button
+                onClick={() => setShowLeaveModal(false)}
+                disabled={vcUploading}
+                className={`flex-1 inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg text-sm font-medium border transition-all duration-150 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed ${
                   dm ? "border-gray-700 text-gray-300 hover:bg-gray-800" : "border-gray-200 text-gray-700 hover:bg-gray-50"
                 }`}>
                 <X className="w-3.5 h-3.5" /> Stay
               </button>
-              <button onClick={() => { clearClassroomState(); handleLeaveEarly(); }}
-                className="flex-1 inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg text-sm font-medium bg-red-600 hover:bg-red-500 active:bg-red-700 active:scale-95 text-white transition-all duration-150 shadow-sm">
+              <button
+                onClick={() => { clearClassroomState(); handleLeaveEarly(); }}
+                disabled={vcUploading}
+                className="flex-1 inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg text-sm font-medium bg-red-600 hover:bg-red-500 active:bg-red-700 active:scale-95 text-white transition-all duration-150 shadow-sm disabled:opacity-40 disabled:cursor-not-allowed">
                 <Power className="w-3.5 h-3.5" /> Leave
               </button>
             </div>

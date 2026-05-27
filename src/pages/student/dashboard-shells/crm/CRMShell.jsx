@@ -35,6 +35,7 @@ import SessionManagement   from "../../../../components/SessionManagement";
 import SettingsModal       from "../../../../components/SettingsModal";
 import { useBranding }     from "../../../../context/BrandingContext";
 import { useDashboardData, BADGE_DEFINITIONS } from "../useDashboardData";
+import { useRing }                              from "../../../../context/RingContext";
 
 // ── Palette ────────────────────────────────────────────────────────────────────
 const LIGHT = {
@@ -281,6 +282,7 @@ function BadgesTab({ badges, progress, completedClasses, shareAchievement, P }) 
 export default function CRMShell() {
   const { branding, center } = useBranding();
   const d = useDashboardData();
+  const { missedCallCount, clearMissedCalls } = useRing();
   const [showSettings, setShowSettings] = useState(false);
   const [show2FA,       setShow2FA]       = useState(false);
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
@@ -474,6 +476,22 @@ export default function CRMShell() {
               <span style={{ fontSize:13, fontWeight:800, color:ACC.orange }}>{d.progress.streakDays} day streak</span>
             </div>
           )}
+          {/* ── Notification chips — desktop only ── */}
+          {!isMobile && d.unreadMessages > 0 && (
+            <button onClick={() => { d.setActiveTab("messages"); d.setUnreadMessages(0); }} title="Go to messages"
+              style={{ display:"flex", alignItems:"center", gap:5, background: d.isDarkMode?"rgba(139,92,246,0.15)":"#f5f3ff", border:`1.5px solid ${d.isDarkMode?"rgba(139,92,246,0.3)":"#ddd6fe"}`, borderRadius:999, padding:"5px 13px", cursor:"pointer", fontFamily:"inherit" }}>
+              <span style={{ fontSize:13 }}>💬</span>
+              <span style={{ fontSize:12, fontWeight:800, color: d.isDarkMode?"#a78bfa":"#7c3aed" }}>{d.unreadMessages} new</span>
+            </button>
+          )}
+          {!isMobile && missedCallCount > 0 && (
+            <button onClick={clearMissedCalls} title="Clear missed calls"
+              style={{ display:"flex", alignItems:"center", gap:5, background: d.isDarkMode?"rgba(239,68,68,0.12)":"#fff5f5", border:`1.5px solid ${d.isDarkMode?"rgba(239,68,68,0.3)":"#fecaca"}`, borderRadius:999, padding:"5px 13px", cursor:"pointer", fontFamily:"inherit" }}>
+              <span style={{ fontSize:13 }}>📞</span>
+              <span style={{ fontSize:12, fontWeight:800, color:"#ef4444" }}>{missedCallCount} missed</span>
+            </button>
+          )}
+
           <button style={{ position:"relative", background:"none", border:"none", cursor:"pointer", display:"flex", padding:6 }}>
             <Bell size={20} color={P.textMuted} />
             {d.notifications.filter(n=>!n.read).length > 0 && (
@@ -629,7 +647,7 @@ export default function CRMShell() {
           {d.activeTab==="flashcards"        && <FlashcardsTab isDarkMode={d.isDarkMode}/>}
           {d.activeTab==="pronunciation"     && <div style={{background:P.card,border:`1px solid ${P.border}`,borderRadius:20,padding:24}}><PronunciationTab isDarkMode={d.isDarkMode}/></div>}
           {d.activeTab==="conversation"      && <div style={{background:P.card,border:`1px solid ${P.border}`,borderRadius:20,padding:24}}><ConversationTab studentInfo={d.student} isDarkMode={d.isDarkMode}/></div>}
-          {d.activeTab==="messages"          && <div style={{background:P.card,border:`1px solid ${P.border}`,borderRadius:20,overflow:"hidden"}}><MessagesTab userRole="student"/></div>}
+          {d.activeTab==="messages"          && <div style={{background:P.card,border:`1px solid ${P.border}`,borderRadius:20,overflow:"hidden"}}><MessagesTab userRole="student" onUnreadCount={d.setUnreadMessages}/></div>}
           {d.activeTab==="completed-classes" && <div style={{background:P.card,border:`1px solid ${P.border}`,borderRadius:20,padding:24}}><h2 style={{margin:"0 0 20px",fontSize:20,fontWeight:900,color:P.text}}>✅ Completed Classes</h2><StudentCompletedTab studentId={d.student.id} isDarkMode={d.isDarkMode}/></div>}
           {d.activeTab==="schedule"          && <div style={{background:P.card,border:`1px solid ${P.border}`,borderRadius:20,padding:24}}><StudentScheduleTab studentId={d.student.id} isDarkMode={d.isDarkMode}/></div>}
           {d.activeTab==="recordings"        && <div style={{background:P.card,border:`1px solid ${P.border}`,borderRadius:20,padding:24}}><RecordingsTab isDarkMode={d.isDarkMode}/></div>}

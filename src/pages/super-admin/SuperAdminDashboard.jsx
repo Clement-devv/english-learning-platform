@@ -18,6 +18,7 @@ import { DASHBOARD_THEMES } from '../../data/dashboardThemes';
 import { TEACHER_DASHBOARD_THEMES } from '../../data/teacherDashboardThemes';
 import { ADMIN_DASHBOARD_THEMES }       from '../../data/adminDashboardThemes';
 import { SUBADMIN_DASHBOARD_THEMES }   from '../../data/subAdminDashboardThemes';
+import { CLASSROOM_THEMES }            from '../../data/classroomThemes';
 import CentersTab  from './tabs/CentersTab';
 import DomainsTab  from './tabs/DomainsTab';
 import HealthTab   from './tabs/HealthTab';
@@ -470,6 +471,64 @@ export default function SuperAdminDashboard() {
     }
   };
 
+  // ── Classroom theme assignment (non-exclusive, per-center) ───────────────────
+  const [classroomThemeModal,    setClassroomThemeModal]    = useState(null);  // center object
+  const [assigningClassroomTheme,setAssigningClassroomTheme]= useState(null);  // themeId being saved
+  const [classroomThemeMsg,      setClassroomThemeMsg]      = useState('');
+
+  const handleOpenClassroomThemeModal = (center) => {
+    setClassroomThemeModal(center);
+    setClassroomThemeMsg('');
+  };
+
+  const handleAssignClassroomTheme = async (themeId) => {
+    if (!classroomThemeModal) return;
+    setAssigningClassroomTheme(themeId);
+    setClassroomThemeMsg('');
+    try {
+      const res  = await fetch(`${API_BASE}/super-admin/centers/${classroomThemeModal._id}/classroom-theme`, {
+        method: 'PATCH',
+        headers: { ...authHeaders, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ classroomTheme: themeId }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message);
+      setClassroomThemeModal(c => c ? { ...c, branding: { ...c.branding, classroomTheme: themeId } } : c);
+      setCenters(cs => cs.map(c =>
+        c._id === classroomThemeModal._id ? { ...c, branding: { ...c.branding, classroomTheme: themeId } } : c
+      ));
+      setClassroomThemeMsg(data.message);
+    } catch (err) {
+      setClassroomThemeMsg(err.message || 'Failed to assign theme');
+    } finally {
+      setAssigningClassroomTheme(null);
+    }
+  };
+
+  const handleUnassignClassroomTheme = async () => {
+    if (!classroomThemeModal) return;
+    setAssigningClassroomTheme('__unassign__');
+    setClassroomThemeMsg('');
+    try {
+      const res  = await fetch(`${API_BASE}/super-admin/centers/${classroomThemeModal._id}/classroom-theme`, {
+        method: 'PATCH',
+        headers: { ...authHeaders, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ classroomTheme: null }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message);
+      setClassroomThemeModal(c => c ? { ...c, branding: { ...c.branding, classroomTheme: null } } : c);
+      setCenters(cs => cs.map(c =>
+        c._id === classroomThemeModal._id ? { ...c, branding: { ...c.branding, classroomTheme: null } } : c
+      ));
+      setClassroomThemeMsg('Classroom theme reset to default');
+    } catch (err) {
+      setClassroomThemeMsg(err.message || 'Failed to unassign');
+    } finally {
+      setAssigningClassroomTheme(null);
+    }
+  };
+
   // ── Login theme assignment ─────────────────────────────────────────────────
   const [loginThemeModal,      setLoginThemeModal]      = useState(null);  // center object
   const [loginThemeAssignments,setLoginThemeAssignments]= useState({});    // { themeId: { id, name, slug } }
@@ -763,8 +822,9 @@ export default function SuperAdminDashboard() {
   useEffect(() => { localStorage.setItem('saAdminDark', String(darkMode)); }, [darkMode]);
 
   const handleLogout = () => {
-    localStorage.removeItem('superAdminToken');
-    localStorage.removeItem('superAdminInfo');
+    // authLogout() handles BOTH the server-side /super-admin/logout-session
+    // call AND local storage clearing.  Removing the token first would skip
+    // the server-side revocation — the JWT would remain valid for 8h.
     authLogout();
     navigate('/super-admin/login', { replace: true });
   };
@@ -1257,6 +1317,7 @@ export default function SuperAdminDashboard() {
                 handleOpenTeacherThemeModal={handleOpenTeacherThemeModal}
                 handleOpenAdminLoginThemeModal={handleOpenAdminLoginThemeModal}
                 handleOpenDashThemeModal={handleOpenDashThemeModal}
+                handleOpenClassroomThemeModal={handleOpenClassroomThemeModal}
                 setFeaturesCenter={setFeaturesCenter}
                 setLimitsModal={setLimitsModal} setLimitsUnlimT={setLimitsUnlimT} setLimitsUnlimS={setLimitsUnlimS}
                 setLimitsTeachers={setLimitsTeachers} setLimitsStudents={setLimitsStudents} setLimitsMsg={setLimitsMsg}
@@ -1978,6 +2039,13 @@ export default function SuperAdminDashboard() {
             description: 'Allow teachers to set a Google Meet link for external video calls.',
             icon:        Globe,
             color:       '#10b981',
+          },
+          {
+            key:         'zoom',
+            label:       'Zoom',
+            description: 'Allow teachers to set a Zoom meeting link for external video calls.',
+            icon:        Video,
+            color:       '#2D8CFF',
           },
           {
             key:         'recording',
@@ -2714,6 +2782,199 @@ export default function SuperAdminDashboard() {
                     style={{ padding: '7px 16px', borderRadius: '8px', border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.08)', color: '#ef4444', fontSize: '12px', fontWeight: '700', cursor: 'pointer', fontFamily: 'inherit' }}
                   >
                     {assigningLoginTheme === '__unassign__' ? 'Removing…' : 'Unassign'}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Classroom Theme Assignment Modal ── */}
+      {classroomThemeModal && (
+        <div style={s.overlay} onClick={(e) => e.target === e.currentTarget && setClassroomThemeModal(null)}>
+          <div style={{ ...s.modal, maxWidth: '760px' }}>
+            <div style={s.modalHeader}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Video size={18} color="#6366f1" />
+                <span style={s.modalTitle}>Classroom Theme</span>
+                <span style={{ fontSize: '13px', color: '#6b7280' }}>for {classroomThemeModal.centerName}</span>
+              </div>
+              <button onClick={() => setClassroomThemeModal(null)} style={s.closeBtn}><X size={18} /></button>
+            </div>
+
+            <div style={{ padding: '20px 24px 28px' }}>
+              <p style={{ ...s.stepDesc, marginBottom: '6px' }}>
+                Choose the <strong>Google Meet classroom design</strong> for this center.
+                Themes are <strong>not exclusive</strong> — multiple centers can share a theme.
+                The default (unset) shows a dark professional design.
+              </p>
+              {classroomThemeMsg && (
+                <div style={{
+                  padding: '8px 14px', borderRadius: '10px', fontSize: '13px', fontWeight: '600', marginBottom: '14px',
+                  background: classroomThemeMsg.toLowerCase().includes('failed') ? 'rgba(239,68,68,.12)' : 'rgba(34,197,94,.12)',
+                  color:      classroomThemeMsg.toLowerCase().includes('failed') ? '#ef4444' : '#22c55e',
+                  border:    `1px solid ${classroomThemeMsg.toLowerCase().includes('failed') ? 'rgba(239,68,68,.2)' : 'rgba(34,197,94,.2)'}`,
+                }}>
+                  {classroomThemeMsg}
+                </div>
+              )}
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '16px', marginTop: '8px' }}>
+
+                {/* Default / unset card */}
+                {(() => {
+                  const isActive    = !classroomThemeModal.branding?.classroomTheme;
+                  const isAssigning = assigningClassroomTheme === '__unassign__';
+                  return (
+                    <div style={{
+                      borderRadius: '16px',
+                      border: isActive ? '2px solid #6366f1' : '2px solid rgba(255,255,255,0.08)',
+                      background: isActive ? 'rgba(99,102,241,0.1)' : 'rgba(255,255,255,0.03)',
+                      overflow: 'hidden',
+                      transition: 'border-color .15s, background .15s',
+                    }}>
+                      <div style={{
+                        height: '110px',
+                        background: 'linear-gradient(160deg,#111827,#030712)',
+                        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6,
+                        position: 'relative',
+                      }}>
+                        <span style={{ fontSize: '36px' }}>🖥️</span>
+                        {/* Mini panel preview */}
+                        <div style={{ display: 'flex', gap: 4 }}>
+                          {['#1f2937','#1f2937'].map((bg,i) => (
+                            <div key={i} style={{ width: 44, height: 28, borderRadius: 6, background: bg, border: '1px solid rgba(52,211,153,0.4)' }} />
+                          ))}
+                        </div>
+                      </div>
+                      <div style={{ padding: '10px 14px 6px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '3px' }}>
+                          <span style={{ fontSize: '13px', fontWeight: '700', color: '#f1f5f9' }}>Default</span>
+                          {isActive && <CheckCircle size={14} color="#6366f1" />}
+                        </div>
+                        <p style={{ margin: '0 0 8px', fontSize: '10px', color: '#6b7280', lineHeight: '1.4' }}>
+                          Dark professional design · emerald green accents
+                        </p>
+                      </div>
+                      <div style={{ padding: '4px 14px 14px' }}>
+                        <button
+                          onClick={() => !isActive && !isAssigning && handleUnassignClassroomTheme()}
+                          disabled={isActive || isAssigning}
+                          style={{
+                            width: '100%', padding: '7px 0', borderRadius: '8px', border: 'none',
+                            background: isActive ? 'rgba(99,102,241,0.2)' : '#6366f1',
+                            color: isActive ? '#6366f1' : 'white',
+                            fontSize: '12px', fontWeight: '700', cursor: isActive ? 'default' : 'pointer',
+                            fontFamily: 'inherit', opacity: isAssigning ? 0.6 : 1,
+                          }}
+                        >
+                          {isAssigning ? 'Setting…' : isActive ? '✓ Active' : 'Use Default'}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {CLASSROOM_THEMES.map(theme => {
+                  const isActive    = classroomThemeModal.branding?.classroomTheme === theme.id;
+                  const isAssigning = assigningClassroomTheme === theme.id;
+
+                  // Mini theme preview content based on theme id
+                  const previewContent = theme.id === 'sunshine' ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        {['⭐','🌟'].map((e,i) => <span key={i} style={{ fontSize: 16 }}>{e}</span>)}
+                      </div>
+                      <div style={{ display: 'flex', gap: 4 }}>
+                        {['rgba(255,255,255,0.6)','rgba(255,255,255,0.4)'].map((bg,i) => (
+                          <div key={i} style={{ width: 44, height: 28, borderRadius: 8, background: bg, border: '3px solid #fbbf24', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}>
+                            {i === 0 ? '👩‍🏫' : '👦'}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        {['🚀','🪐'].map((e,i) => <span key={i} style={{ fontSize: 16 }}>{e}</span>)}
+                      </div>
+                      <div style={{ display: 'flex', gap: 4 }}>
+                        {['rgba(168,85,247,0.15)','rgba(45,212,191,0.15)'].map((bg,i) => (
+                          <div key={i} style={{ width: 44, height: 28, borderRadius: 8, background: bg, border: `2px solid ${i === 0 ? '#a855f7' : '#2dd4bf'}55`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}>
+                            {i === 0 ? '👩‍🚀' : '👨‍🚀'}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+
+                  return (
+                    <div key={theme.id} style={{
+                      borderRadius: '16px',
+                      border: isActive ? `2px solid ${theme.preview.bgStart}` : '2px solid rgba(255,255,255,0.08)',
+                      background: isActive ? `${theme.preview.bgStart}18` : 'rgba(255,255,255,0.03)',
+                      overflow: 'hidden',
+                      transition: 'border-color .15s, background .15s',
+                    }}>
+                      {/* Preview */}
+                      <div style={{
+                        height: '110px',
+                        background: `linear-gradient(135deg, ${theme.preview.bgStart}, ${theme.preview.bgEnd})`,
+                        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6,
+                        position: 'relative',
+                      }}>
+                        <span style={{ fontSize: '34px', position: 'absolute', top: 8, right: 10, opacity: 0.5 }}>{theme.emoji}</span>
+                        {previewContent}
+                      </div>
+
+                      {/* Info */}
+                      <div style={{ padding: '10px 14px 6px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '3px' }}>
+                          <span style={{ fontSize: '13px', fontWeight: '700', color: '#f1f5f9' }}>{theme.emoji} {theme.name}</span>
+                          {isActive && <CheckCircle size={14} color={theme.preview.bgStart} />}
+                        </div>
+                        <p style={{ margin: '0 0 8px', fontSize: '10px', color: '#6b7280', lineHeight: '1.4' }}>
+                          {theme.description}
+                        </p>
+                      </div>
+
+                      {/* Action */}
+                      <div style={{ padding: '4px 14px 14px' }}>
+                        <button
+                          onClick={() => !isAssigning && !isActive && handleAssignClassroomTheme(theme.id)}
+                          disabled={isAssigning || isActive}
+                          style={{
+                            width: '100%', padding: '7px 0', borderRadius: '8px', border: 'none',
+                            background: isActive
+                              ? `${theme.preview.bgStart}30`
+                              : `linear-gradient(135deg, ${theme.preview.bgStart}, ${theme.preview.bgEnd})`,
+                            color: isActive ? theme.preview.bgStart : 'white',
+                            fontSize: '12px', fontWeight: '700',
+                            cursor: isAssigning || isActive ? 'default' : 'pointer',
+                            fontFamily: 'inherit', opacity: isAssigning ? 0.6 : 1,
+                          }}
+                        >
+                          {isAssigning ? 'Assigning…' : isActive ? '✓ Assigned' : 'Assign Theme'}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Unassign row — shown when a named theme is active */}
+              {classroomThemeModal.branding?.classroomTheme && (
+                <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '13px', color: '#6b7280' }}>
+                    Remove theme → falls back to the dark default design
+                  </span>
+                  <button
+                    onClick={handleUnassignClassroomTheme}
+                    disabled={assigningClassroomTheme === '__unassign__'}
+                    style={{ padding: '7px 16px', borderRadius: '8px', border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.08)', color: '#ef4444', fontSize: '12px', fontWeight: '700', cursor: 'pointer', fontFamily: 'inherit' }}
+                  >
+                    {assigningClassroomTheme === '__unassign__' ? 'Removing…' : 'Reset to Default'}
                   </button>
                 </div>
               )}

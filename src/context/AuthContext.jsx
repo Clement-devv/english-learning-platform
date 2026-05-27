@@ -70,7 +70,17 @@ export function AuthProvider({ children }) {
         const sessionToken = sessionStorage.getItem(cfg.sessionTokenKey) || localStorage.getItem(cfg.sessionTokenKey);
         const currentToken = getStoredToken(role);
         if (sessionToken && currentToken) {
-          api.post('/auth/logout-session', { sessionToken }).catch(() => {});
+          // Route to the per-role logout endpoint.  Teacher/student/admin/
+          // sub-admin/parent share /auth/logout-session (center-scoped via
+          // tenantMiddleware); super-admin uses /super-admin/logout-session
+          // because it lives in the master DB.
+          const endpoint = cfg.logoutEndpoint || '/auth/logout-session';
+          // Explicitly set the Authorization header so the async request interceptor
+          // doesn't try to read it from sessionStorage — clearAuth() below wipes
+          // storage synchronously before the interceptor's microtask runs.
+          api.post(endpoint, { sessionToken }, {
+            headers: { Authorization: `Bearer ${currentToken}` },
+          }).catch(() => {});
         }
       }
       clearAuth(role);

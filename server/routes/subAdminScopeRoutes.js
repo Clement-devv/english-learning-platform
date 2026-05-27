@@ -186,7 +186,7 @@ router.get("/bookings", verifyToken, requireSubAdmin, async (req, res) => {
     if (status) filter.status = status;
 
     const bookings = await getBooking(req.db).find(filter)
-      .populate("teacherId", "firstName lastName email continent googleMeetLink")
+      .populate("teacherId", "firstName lastName email continent googleMeetLink zoomLink")
       .populate("studentId", "firstName lastName email")
       .sort({ scheduledTime: -1 });
 

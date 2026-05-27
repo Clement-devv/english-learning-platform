@@ -55,10 +55,11 @@ export function useRecording(bookingId) {
   const startRecording = useCallback(async () => {
     try {
       // 1. Capture the browser tab (video + tab audio output = student's voice)
+      //    No preferCurrentTab — we want the full picker so the user can select
+      //    the Google Meet tab (which opens in a separate tab).
       const tabStream = await navigator.mediaDevices.getDisplayMedia({
         video: { frameRate: 15 },
         audio: true,
-        preferCurrentTab: true,
       });
       tabStreamRef.current = tabStream;
       chunksRef.current    = [];

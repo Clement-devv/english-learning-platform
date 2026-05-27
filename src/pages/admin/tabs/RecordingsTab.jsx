@@ -51,14 +51,15 @@ export default function RecordingsTab({ teachers = [], isDarkMode }) {
   const loadVideo = async (rec) => {
     if (videoUrls[rec._id]) { setPlaying(rec); return; }
     try {
-      const resp = await api.get(`/recordings/${rec._id}/stream`, { responseType: 'blob' });
-      const ct   = resp.headers?.['content-type'] || '';
       let url;
-      if (ct.includes('application/json')) {
-        const json = JSON.parse(await resp.data.text());
-        url = json.url;
+      const { data } = await api.get(`/recordings/${rec._id}/stream`);
+      if (data?.url) {
+        // S3: presigned URL — browser streams directly from S3, server carries zero load
+        url = data.url;
       } else {
-        url = URL.createObjectURL(new Blob([resp.data]));
+        // Local disk fallback: re-fetch as binary blob
+        const { data: blob } = await api.get(`/recordings/${rec._id}/stream`, { responseType: 'blob' });
+        url = URL.createObjectURL(blob);
       }
       setVideoUrls(prev => ({ ...prev, [rec._id]: url }));
       setPlaying(rec);
@@ -67,15 +68,16 @@ export default function RecordingsTab({ teachers = [], isDarkMode }) {
 
   const downloadVideo = async (rec) => {
     try {
-      const resp = await api.get(`/recordings/${rec._id}/download`, { responseType: 'blob' });
-      const ct   = resp.headers?.['content-type'] || '';
-      if (ct.includes('application/json')) {
-        const json = JSON.parse(await resp.data.text());
-        window.open(json.url, '_blank');
+      const { data } = await api.get(`/recordings/${rec._id}/download`);
+      if (data?.url) {
+        // S3: presigned download URL — browser downloads directly from S3
+        window.open(data.url, '_blank');
       } else {
+        // Local disk fallback: fetch as blob and trigger download
+        const { data: blob } = await api.get(`/recordings/${rec._id}/download`, { responseType: 'blob' });
         const ext  = rec.mimeType === "video/mp4" ? ".mp4" : ".webm";
         const name = (rec.title || rec.bookingId?.classTitle || "recording").replace(/[^a-z0-9\s-]/gi, "").trim() + ext;
-        const url  = URL.createObjectURL(new Blob([resp.data]));
+        const url  = URL.createObjectURL(new Blob([blob]));
         const a    = document.createElement("a");
         a.href = url; a.download = name; a.click();
         URL.revokeObjectURL(url);

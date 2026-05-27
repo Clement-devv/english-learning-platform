@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Building2, RefreshCw, Palette, ToggleRight, SlidersHorizontal, LogIn, Trash2, Globe, Users, KeyRound, Copy, Check } from 'lucide-react';
+import { Building2, RefreshCw, Palette, ToggleRight, SlidersHorizontal, LogIn, Trash2, Globe, Users, KeyRound, Copy, Check, Video } from 'lucide-react';
 import styles from '../SuperAdmin.module.css';
 
 const API_BASE = (import.meta.env.VITE_API_URL || 'http://localhost:5000') + '/api/v1';
@@ -9,6 +9,7 @@ export default function CentersTab({
   handleApprove, handleReject, handleSuspend, handleEnterAsAdmin, impersonating,
   setDeleteTarget, setPlanModal, setPlanSelected, setPlanMsg,
   setThemeCenter, handleOpenLoginThemeModal, handleOpenTeacherThemeModal, handleOpenAdminLoginThemeModal, handleOpenDashThemeModal,
+  handleOpenClassroomThemeModal,
   setFeaturesCenter,
   setLimitsModal, setLimitsUnlimT, setLimitsUnlimS, setLimitsTeachers, setLimitsStudents, setLimitsMsg,
   setPartnershipModal,
@@ -183,6 +184,13 @@ export default function CentersTab({
                         title="Assign exclusive student dashboard theme"
                       >
                         <Palette size={12} /> Dashboard
+                      </button>
+                      <button
+                        onClick={() => handleOpenClassroomThemeModal?.(c)}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '5px 12px', borderRadius: 7, fontSize: 12, fontWeight: 600, background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.25)', color: '#818cf8', cursor: 'pointer', fontFamily: 'inherit' }}
+                        title="Assign classroom video tab theme"
+                      >
+                        <Video size={12} /> Classroom
                       </button>
                       <button onClick={() => setFeaturesCenter(c)} className={styles.featuresBtn} title="Toggle features">
                         <ToggleRight size={12} /> Features

@@ -1,9 +1,10 @@
 // src/components/chat/MessagesTab.jsx
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import GroupChatList from "./GroupChatList";
 import ChatWindow from "./ChatWindow";
 import RingTab from "../ring/RingTab";
 import { useDarkMode } from "../../hooks/useDarkMode";
+import { useRing } from "../../context/RingContext";
 import { MessageSquare, Phone } from "lucide-react";
 
 const TABS = [
@@ -15,6 +16,15 @@ export default function MessagesTab({ userRole, onUnreadCount }) {
   const [selectedChat, setSelectedChat] = useState(null);
   const [activeTab,    setActiveTab]    = useState("messages");
   const { isDarkMode } = useDarkMode();
+  const { markMessagesSeen } = useRing();
+
+  // Dismiss the dashboard-level unread-messages banner whenever the user opens
+  // the Messages tab — same pattern as RingTab calling clearMissedCalls().
+  // Per-chat unread counts on the server are untouched until the user opens
+  // an individual chat.
+  useEffect(() => {
+    if (activeTab === "messages") markMessagesSeen();
+  }, [activeTab, markMessagesSeen]);
 
   const handleSelectChat = (chat) => setSelectedChat(chat);
   const handleCloseChat  = () => setSelectedChat(null);

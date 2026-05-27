@@ -6,15 +6,23 @@ import {
 } from "lucide-react";
 import EmojiPicker from "emoji-picker-react";
 import api from "../../api";
+import { useRing } from "../../context/RingContext.jsx";
 
 export default function ChatWindow({ chat, chatType = "group", userRole, onClose, isDark }) {
+  const {
+    lastChatEvent,
+    joinChatRoom, leaveChatRoom,
+    emitTyping, emitStopTyping,
+    typingEvent,
+  } = useRing();
+
   const [messages,    setMessages]    = useState([]);
   const [newMsg,      setNewMsg]      = useState("");
   const [loading,     setLoading]     = useState(false);
   const [sending,     setSending]     = useState(false);
   const [newMsgCount, setNewMsgCount] = useState(0);
   const [showEmoji,   setShowEmoji]   = useState(false);
-
+  const [typingUser,  setTypingUser]  = useState(null); // { name, role }
 
   const scrollBoxRef    = useRef(null);
   const bottomRef       = useRef(null);
@@ -24,8 +32,29 @@ export default function ChatWindow({ chat, chatType = "group", userRole, onClose
   const isInitialLoad   = useRef(true);
   const prevMsgLen      = useRef(0);
   const mountedRef      = useRef(true);
+  const typingClearRef  = useRef(null); // auto-clear typing indicator
+  const emitStopTimerRef = useRef(null); // debounce typing-stop emit
 
   const apiBase = chatType === "dm" ? "/direct-messages" : "/group-chats";
+
+  // ── API calls — declared before effects so deps arrays can reference them ──
+  const fetchMessages = useCallback(async (showLoader = false) => {
+    if (!chat?._id) return;
+    try {
+      if (showLoader) setLoading(true);
+      const res  = await api.get(`${apiBase}/${chat._id}/messages`);
+      const msgs = res.data?.messages || (Array.isArray(res.data) ? res.data : []);
+      if (mountedRef.current) setMessages(msgs);
+    } catch (e) {
+      console.error("Fetch messages error:", e);
+    } finally {
+      if (mountedRef.current && showLoader) setLoading(false);
+    }
+  }, [chat?._id, apiBase]);
+
+  const markAsRead = useCallback(async () => {
+    try { await api.patch(`${apiBase}/${chat?._id}/mark-read`); } catch {}
+  }, [chat?._id, apiBase]);
 
   // Reset state when chat changes
   useEffect(() => {
@@ -46,7 +75,45 @@ export default function ChatWindow({ chat, chatType = "group", userRole, onClose
     markAsRead();
     const id = setInterval(() => fetchMessages(false), 5000);
     return () => clearInterval(id);
-  }, [chat?._id]);
+  }, [chat?._id, fetchMessages, markAsRead]);
+
+  // Join the per-chat socket room for typing indicators; leave on unmount / chat change
+  useEffect(() => {
+    if (!chat?._id) return;
+    const id = chat._id.toString();
+    joinChatRoom(id);
+    setTypingUser(null);
+    return () => {
+      leaveChatRoom(id);
+      clearTimeout(emitStopTimerRef.current);
+    };
+  }, [chat?._id, joinChatRoom, leaveChatRoom]);
+
+  // Re-fetch immediately when a new message arrives in THIS chat
+  useEffect(() => {
+    if (!lastChatEvent || !chat?._id) return;
+    if (lastChatEvent.chatId === chat._id.toString()) {
+      fetchMessages(false);
+      markAsRead();
+    }
+  }, [lastChatEvent, chat?._id, fetchMessages, markAsRead]);
+
+  // Show / hide typing indicator
+  useEffect(() => {
+    if (!chat?._id) return;
+    if (!typingEvent || typingEvent.chatId !== chat._id.toString()) {
+      // Typing stopped OR event is for a different chat
+      if (!typingEvent) {
+        clearTimeout(typingClearRef.current);
+        setTypingUser(null);
+      }
+      return;
+    }
+    setTypingUser({ name: typingEvent.name, role: typingEvent.role });
+    clearTimeout(typingClearRef.current);
+    // Auto-clear after 4 s in case the stop event is missed
+    typingClearRef.current = setTimeout(() => setTypingUser(null), 4000);
+  }, [typingEvent, chat?._id]);
 
   // ── Scroll logic ──────────────────────────────────────────────────────────
   const scrollToBottom = useCallback((behavior = "smooth") => {
@@ -90,28 +157,13 @@ export default function ChatWindow({ chat, chatType = "group", userRole, onClose
     prevMsgLen.current = messages.length;
   }, [messages, userRole, scrollToBottom]);
 
-  // ── API calls ─────────────────────────────────────────────────────────────
-  const fetchMessages = async (showLoader = false) => {
-    if (!chat?._id) return;
-    try {
-      if (showLoader) setLoading(true);
-      const res  = await api.get(`${apiBase}/${chat._id}/messages`);
-      const msgs = res.data?.messages || (Array.isArray(res.data) ? res.data : []);
-      if (mountedRef.current) setMessages(msgs);
-    } catch (e) {
-      console.error("Fetch messages error:", e);
-    } finally {
-      if (mountedRef.current && showLoader) setLoading(false);
-    }
-  };
-
-  const markAsRead = async () => {
-    try { await api.patch(`${apiBase}/${chat._id}/mark-read`); } catch {}
-  };
-
+  // ── Send handler ─────────────────────────────────────────────────────────
   const handleSend = async (e) => {
     e?.preventDefault();
     if (!newMsg.trim() || sending) return;
+    // Stop typing indicator before sending
+    clearTimeout(emitStopTimerRef.current);
+    if (chat?._id) emitStopTyping(chat._id.toString());
     try {
       setSending(true);
       const res = await api.post(`${apiBase}/${chat._id}/messages`, { message: newMsg.trim() });
@@ -371,6 +423,28 @@ export default function ChatWindow({ chat, chatType = "group", userRole, onClose
         <div ref={bottomRef} />
       </div>
 
+      {/* ── Typing indicator ── */}
+      {typingUser && (
+        <div style={{
+          padding: "2px 20px 6px",
+          display: "flex", alignItems: "center", gap: "8px",
+          flexShrink: 0,
+        }}>
+          <div style={{ display: "flex", gap: "3px", alignItems: "center" }}>
+            {[0, 1, 2].map(i => (
+              <div key={i} style={{
+                width: "5px", height: "5px", borderRadius: "50%",
+                background: C.accent,
+                animation: `msg-typing-dot 1.2s ease-in-out ${i * 0.2}s infinite`,
+              }} />
+            ))}
+          </div>
+          <span style={{ fontSize: "11.5px", color: C.sub, fontStyle: "italic" }}>
+            {typingUser.name || typingUser.role || "Someone"} is typing…
+          </span>
+        </div>
+      )}
+
       {/* ── New messages badge (WhatsApp scroll-down button) ── */}
       {newMsgCount > 0 && (
         <div style={{ position: "relative", flexShrink: 0 }}>
@@ -445,7 +519,17 @@ export default function ChatWindow({ chat, chatType = "group", userRole, onClose
               ref={textareaRef}
               className="msg-textarea"
               value={newMsg}
-              onChange={e => setNewMsg(e.target.value)}
+              onChange={e => {
+                setNewMsg(e.target.value);
+                // Emit typing event (debounced stop after 2.5 s of silence)
+                if (chat?._id && e.target.value.trim()) {
+                  const cid   = chat._id.toString();
+                  const tname = userRole.charAt(0).toUpperCase() + userRole.slice(1);
+                  emitTyping(cid, tname);
+                  clearTimeout(emitStopTimerRef.current);
+                  emitStopTimerRef.current = setTimeout(() => emitStopTyping(cid), 2500);
+                }
+              }}
               onKeyDown={handleKeyDown}
               placeholder="Type a message…"
               disabled={sending}
@@ -527,6 +611,7 @@ export default function ChatWindow({ chat, chatType = "group", userRole, onClose
         .msg-pulse { animation: msg-pulse-anim 1.6s ease-in-out infinite; }
         @keyframes msg-pulse-anim { 0%,100%{opacity:0.5} 50%{opacity:1} }
         @keyframes msg-spin { to { transform: rotate(360deg); } }
+        @keyframes msg-typing-dot { 0%,80%,100%{transform:scale(0.55);opacity:0.35} 40%{transform:scale(1);opacity:1} }
         .msg-textarea::placeholder { color: ${C.sub}; opacity: 1; }
         .msg-textarea { color: ${C.text} !important; }
       `}</style>

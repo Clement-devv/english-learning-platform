@@ -27,23 +27,29 @@ export const ROLE_CONFIG = {
     verifyPath:      '/auth/admin/verify',
   },
   'sub-admin': {
-    tokenKey:   'subAdminToken',
-    infoKey:    'subAdminInfo',
-    loginPath:  '/sub-admin/login',
-    clientSide: true, // verified via JWT exp decode — no network request
+    tokenKey:        'subAdminToken',
+    sessionTokenKey: 'subAdminSessionToken',
+    infoKey:         'subAdminInfo',
+    loginPath:       '/sub-admin/login',
+    clientSide:      true, // verified via JWT exp decode — no network request
+    logoutEndpoint:  '/auth/logout-session', // unified center-scoped endpoint
   },
   'super-admin': {
-    tokenKey:  'superAdminToken',
-    infoKey:   'superAdminInfo',
-    loginPath: '/super-admin/login',
-    verifyPath: '/super-admin/stats',
-    localOnly:  true, // token stored in localStorage only (not sessionStorage)
+    tokenKey:        'superAdminToken',
+    sessionTokenKey: 'superAdminSessionToken',
+    infoKey:         'superAdminInfo',
+    loginPath:       '/super-admin/login',
+    verifyPath:      '/super-admin/stats',
+    localOnly:       true, // token stored in localStorage only (not sessionStorage)
+    logoutEndpoint:  '/super-admin/logout-session', // master-scoped endpoint
   },
   parent: {
-    tokenKey:  'parentToken',
-    infoKey:   'parentInfo',
-    loginPath: '/parent/login',
-    verifyPath: '/parents/verify',
+    tokenKey:        'parentToken',
+    sessionTokenKey: 'parentSessionToken',
+    infoKey:         'parentInfo',
+    loginPath:       '/parent/login',
+    verifyPath:      '/parents/verify',
+    logoutEndpoint:  '/auth/logout-session',
   },
 };
 
@@ -128,4 +134,8 @@ export function clearAuth(role) {
     sessionStorage.removeItem(cfg.sessionTokenKey);
     localStorage.removeItem(cfg.sessionTokenKey);
   }
+  // Reset the missed-call and unread-message "last seen" timestamps so the
+  // next user signing in on this browser sees their own alerts from scratch.
+  localStorage.removeItem('ring_missed_last_seen_at');
+  localStorage.removeItem('chat_messages_last_seen_at');
 }

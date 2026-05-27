@@ -105,6 +105,7 @@ export default function ProfileTab({ teacherInfo, isDarkMode, onUpdate }) {
         phone:             teacherInfo.phone           || "",
         timezone:          teacherInfo.timezone        || "",
         googleMeetLink:    teacherInfo.googleMeetLink  || "",
+        zoomLink:          teacherInfo.zoomLink        || "",
         bio:               teacherInfo.bio             || "",
         yearsOfExperience: teacherInfo.yearsOfExperience ?? "",
         specializations:   teacherInfo.specializations || [],
@@ -172,6 +173,7 @@ export default function ProfileTab({ teacherInfo, isDarkMode, onUpdate }) {
         phone:             form.phone.trim(),
         timezone:          form.timezone,
         googleMeetLink:    form.googleMeetLink.trim(),
+        zoomLink:          form.zoomLink.trim(),
         bio:               form.bio.trim(),
         yearsOfExperience: parseInt(form.yearsOfExperience) || 0,
         specializations:   form.specializations,
@@ -414,8 +416,12 @@ export default function ProfileTab({ teacherInfo, isDarkMode, onUpdate }) {
               </div>
             </div>
             <div>
-              <label style={{ display: "block", fontSize: 11.5, fontWeight: 600, color: c.muted, marginBottom: 5, textTransform: "uppercase", letterSpacing: "0.07em" }}>Google Meet / Zoom Link</label>
-              <input value={form.googleMeetLink} onChange={set("googleMeetLink")} type="url" placeholder="https://meet.google.com/..." style={inputStyle} />
+              <label style={{ display: "block", fontSize: 11.5, fontWeight: 600, color: c.muted, marginBottom: 5, textTransform: "uppercase", letterSpacing: "0.07em" }}>Google Meet Link</label>
+              <input value={form.googleMeetLink} onChange={set("googleMeetLink")} type="url" placeholder="https://meet.google.com/xxx-xxxx-xxx" style={inputStyle} />
+            </div>
+            <div>
+              <label style={{ display: "block", fontSize: 11.5, fontWeight: 600, color: c.muted, marginBottom: 5, textTransform: "uppercase", letterSpacing: "0.07em" }}>Zoom Link</label>
+              <input value={form.zoomLink} onChange={set("zoomLink")} type="url" placeholder="https://zoom.us/j/123456789" style={inputStyle} />
             </div>
           </div>
         ) : (
@@ -425,7 +431,8 @@ export default function ProfileTab({ teacherInfo, isDarkMode, onUpdate }) {
             <InfoRow label="Timezone"
               value={TIMEZONE_OPTIONS.find(t => t.value === teacherInfo.timezone)?.label || teacherInfo.timezone}
               c={c} />
-            <InfoRow label="Google Meet / Zoom"  value={teacherInfo.googleMeetLink}      c={c} />
+            <InfoRow label="Google Meet"  value={teacherInfo.googleMeetLink} c={c} />
+            <InfoRow label="Zoom Link"    value={teacherInfo.zoomLink}       c={c} />
           </div>
         )}
       </Section>

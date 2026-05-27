@@ -12,6 +12,8 @@ import api from "../../api";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { useRing } from "../../context/RingContext";
 import MissedCalls from "./MissedCalls";
+import { RINGTONES, CUSTOM_RINGTONE_ID, makeCustomRingtone } from "./ringtones.js";
+import { saveCustomToneUrl, saveCustomToneIDB, loadCustomTone, clearCustomTone } from "./ringStorage.js";
 
 const ROLE_COLOR = {
   teacher:  { grad: "linear-gradient(135deg,#1d4ed8,#0891b2)", badge: "#1d4ed8", light: "#dbeafe" },
@@ -30,7 +32,8 @@ function getInitials(name = "") {
 export default function RingTab({ isDark }) {
   const { user, role }                                               = useAuth();
   const { ringUser, cancelRing, callerEvent, consumeCallerEvent,
-          missedCallCount, clearMissedCalls, socketConnected }       = useRing();
+          missedCallCount, clearMissedCalls, socketConnected,
+          ringtoneId, setRingtoneId }                                = useRing();
 
   const [contacts,    setContacts]    = useState([]);
   const [loading,     setLoading]     = useState(true);
@@ -39,7 +42,108 @@ export default function RingTab({ isDark }) {
   const [callStatus,  setCallStatus]  = useState({}); // userId → "calling"|"answered"|"declined"|"missed"
   const [ringEnabled, setRingEnabled] = useState(true);
   const [toggling,    setToggling]    = useState(false);
-  const ringTimerRef  = useRef(null);
+  const [previewingId,   setPreviewingId]   = useState(null);  // id of tone currently being previewed
+  const [tonesOpen,      setTonesOpen]      = useState(false);  // ringtone picker collapsed by default
+  const [uploading,      setUploading]      = useState(false);  // upload in progress
+  const [uploadError,    setUploadError]    = useState(null);   // inline error message
+  const [customFileName, setCustomFileName] = useState(
+    () => localStorage.getItem("ring_tone_file_name") || null
+  );
+  const ringTimerRef   = useRef(null);
+  const previewRef     = useRef(null); // { stop } for the preview audio
+  const fileInputRef   = useRef(null);
+
+  // Stop any in-progress preview when component unmounts
+  useEffect(() => () => {
+    previewRef.current?.stop();
+    previewRef.current = null;
+  }, []);
+
+  const stopPreview = useCallback(() => {
+    previewRef.current?.stop();
+    previewRef.current = null;
+    setPreviewingId(null);
+  }, []);
+
+  // Preview a synthetic tone
+  const handlePreview = useCallback((tone) => {
+    if (previewingId === tone.id) { stopPreview(); return; }
+    stopPreview();
+    previewRef.current = tone.make();
+    setPreviewingId(tone.id);
+    setTimeout(stopPreview, 4000);
+  }, [previewingId, stopPreview]);
+
+  // Preview the custom tone — fetches the audio from the stored S3 URL
+  // (first fetch hits S3, subsequent calls are served from browser cache)
+  const handlePreviewCustom = useCallback(async () => {
+    if (previewingId === CUSTOM_RINGTONE_ID) { stopPreview(); return; }
+    stopPreview();
+    try {
+      const buf = await loadCustomTone();
+      if (!buf) return;
+      previewRef.current = makeCustomRingtone(buf);
+      setPreviewingId(CUSTOM_RINGTONE_ID);
+      setTimeout(stopPreview, 4000);
+    } catch { /* fail silently */ }
+  }, [previewingId, stopPreview]);
+
+  // Handle file selection — try S3 first, fall back to IndexedDB silently
+  const handleCustomFileChange = useCallback(async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = ""; // allow re-selecting the same file later
+    setUploading(true);
+    setUploadError(null);
+
+    // Read file bytes once — used for IDB fallback AND local preview
+    const localBuf = await file.arrayBuffer();
+
+    try {
+      // ── Try S3 upload ──────────────────────────────────────────────────────
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await api.post("/ring/ringtone", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      if (!res.data.success) throw new Error(res.data.message || "Upload failed");
+      saveCustomToneUrl(res.data.url, file.name);
+
+    } catch (err) {
+      const status = err?.response?.status;
+
+      if (status === 503) {
+        // S3 not configured on this server — save to IndexedDB silently.
+        // Works perfectly in local dev; production should always have S3 set.
+        await saveCustomToneIDB(localBuf.slice(0), file.name);
+      } else {
+        // Genuine error (network failure, bad file type, etc.) — show inline
+        const msg = err?.response?.data?.message || err.message || "Upload failed";
+        setUploadError(msg);
+        setUploading(false);
+        return;
+      }
+    }
+
+    setCustomFileName(file.name);
+    setRingtoneId(CUSTOM_RINGTONE_ID);
+    // Auto-preview using the already-read local buffer — no extra network call
+    stopPreview();
+    previewRef.current = makeCustomRingtone(localBuf.slice(0));
+    setPreviewingId(CUSTOM_RINGTONE_ID);
+    setTimeout(stopPreview, 4000);
+    setUploading(false);
+  }, [setRingtoneId, stopPreview]);
+
+  // Remove the custom ringtone from S3 and clear local state
+  const handleClearCustom = useCallback(async () => {
+    stopPreview();
+    // Fire-and-forget — UI clears immediately regardless of network outcome
+    api.delete("/ring/ringtone").catch(() => {});
+    clearCustomTone();
+    setCustomFileName(null);
+    if (ringtoneId === CUSTOM_RINGTONE_ID) setRingtoneId("chime");
+  }, [ringtoneId, setRingtoneId, stopPreview]);
 
   const C = {
     bg:      isDark ? "#13151c" : "#f8f9ff",
@@ -88,24 +192,29 @@ export default function RingTab({ isDark }) {
   useEffect(() => {
     if (!callerEvent) return;
     clearTimeout(ringTimerRef.current);
-    const { type, by } = callerEvent;
+    const { type, by, reason } = callerEvent;
+    // 'by' is undefined when the server auto-declines before forwarding (muted / offline)
+    const targetId = by != null ? by.toString() : ringingId;
 
     setRingingId(null);
-    if (by) {
-      const byStr = by.toString();
-      setCallStatus(prev => ({ ...prev, [byStr]: type })); // "answered" | "declined"
+    if (targetId) {
+      const newStatus = type === "answered" ? "answered"
+                      : reason === "muted"   ? "muted"
+                      : reason === "offline" ? "offline"
+                      : "declined";
+      setCallStatus(prev => ({ ...prev, [targetId]: newStatus }));
       setTimeout(() => setCallStatus(prev => {
         const next = { ...prev };
-        if (next[byStr] === type) delete next[byStr];
+        if (next[targetId] === newStatus) delete next[targetId];
         return next;
       }), type === "answered" ? 5000 : 3000);
     }
     consumeCallerEvent();
-  }, [callerEvent, consumeCallerEvent]);
+  }, [callerEvent, consumeCallerEvent, ringingId]);
 
   // ── Ring a contact ────────────────────────────────────────────────────────
   const handleRing = useCallback((contact) => {
-    if (ringingId) return;
+    if (ringingId || contact.ringEnabled === false) return;
     const callerName = user
       ? `${user.firstName || ""} ${user.lastName || ""}`.trim() || "Someone"
       : "Someone";
@@ -159,6 +268,19 @@ export default function RingTab({ isDark }) {
 
   const groupOrder = ["teacher", "student", "admin", "subAdmin"];
   const groupLabel = { teacher: "Teachers", student: "Students", admin: "Admin", subAdmin: "Sub-Admins" };
+
+  // ── Computed values used in JSX (avoids IIFEs which confuse the Babel parser) ──
+  const _activeTone       = RINGTONES.find(r => r.id === ringtoneId);
+  const selectedToneLabel = ringtoneId === CUSTOM_RINGTONE_ID
+    ? (customFileName
+        ? `📁 ${customFileName.length > 18 ? customFileName.slice(0, 16) + "…" : customFileName}`
+        : "📁 Custom")
+    : (_activeTone ? `${_activeTone.emoji} ${_activeTone.label}` : "");
+
+  // Custom chip state — pre-computed so they can be used inline without an IIFE
+  const customIsSelected   = ringtoneId   === CUSTOM_RINGTONE_ID;
+  const customIsPreviewing = previewingId === CUSTOM_RINGTONE_ID;
+  const customHasFile      = !!customFileName;
 
   return (
     <div style={{
@@ -268,6 +390,227 @@ export default function RingTab({ isDark }) {
           </div>
         </div>
 
+        {/* ── Ringtone picker (collapsible) ── */}
+        <div style={{
+          marginBottom: "12px",
+          borderRadius: "12px",
+          border: `1px solid ${C.border}`,
+          overflow: "hidden",
+        }}>
+          {/* Toggle header */}
+          <button
+            onClick={() => setTonesOpen(o => !o)}
+            style={{
+              width: "100%",
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+              padding: "9px 12px",
+              background: tonesOpen
+                ? (isDark ? "rgba(99,102,241,0.1)" : "rgba(99,102,241,0.05)")
+                : (isDark ? "rgba(255,255,255,0.03)" : "#fafbff"),
+              border: "none", cursor: "pointer",
+              transition: "background 0.15s",
+              fontFamily: "inherit",
+            }}
+          >
+            {/* Left: label */}
+            <div style={{ display: "flex", alignItems: "center", gap: "7px" }}>
+              <span style={{ fontSize: "13px" }}>🎵</span>
+              <span style={{ fontSize: "11.5px", fontWeight: "800",
+                textTransform: "uppercase", letterSpacing: "0.07em", color: C.sub }}>
+                Ringtone
+              </span>
+            </div>
+            {/* Right: current selection + chevron */}
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <span style={{ fontSize: "11.5px", fontWeight: "700", color: C.accent }}>
+                {selectedToneLabel}
+              </span>
+              <span style={{
+                fontSize: "10px", color: C.sub,
+                display: "inline-block",
+                transform: tonesOpen ? "rotate(180deg)" : "rotate(0deg)",
+                transition: "transform 0.2s ease",
+              }}>
+                ▼
+              </span>
+            </div>
+          </button>
+
+          {/* Collapsible body */}
+          {tonesOpen && (
+            <div style={{
+              padding: "10px 12px 12px",
+              borderTop: `1px solid ${C.border}`,
+              background: isDark ? "rgba(255,255,255,0.015)" : "#fff",
+            }}>
+          <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+            {/* ── Synthetic tones ── */}
+            {RINGTONES.map(tone => {
+              const isSelected   = ringtoneId === tone.id;
+              const isPreviewing = previewingId === tone.id;
+              return (
+                <button
+                  key={tone.id}
+                  onClick={() => setRingtoneId(tone.id)}
+                  style={{
+                    display: "flex", alignItems: "center", gap: "5px",
+                    padding: "5px 10px", borderRadius: "20px",
+                    border: isSelected
+                      ? `2px solid ${C.accent}`
+                      : `2px solid ${isDark ? "rgba(255,255,255,0.1)" : "#e2e8f0"}`,
+                    background: isSelected
+                      ? (isDark ? "rgba(99,102,241,0.18)" : "rgba(99,102,241,0.08)")
+                      : (isDark ? "rgba(255,255,255,0.04)" : "#f8fafc"),
+                    cursor: "pointer",
+                    fontSize: "11.5px", fontWeight: isSelected ? "800" : "600",
+                    color: isSelected ? C.accent : C.sub,
+                    transition: "all 0.15s", fontFamily: "inherit",
+                  }}
+                >
+                  <span style={{ fontSize: "13px" }}>{tone.emoji}</span>
+                  {tone.label}
+                  <span
+                    role="button"
+                    onClick={(e) => { e.stopPropagation(); handlePreview(tone); }}
+                    title={isPreviewing ? "Stop preview" : "Preview"}
+                    style={{
+                      marginLeft: "3px", fontSize: "10px",
+                      background: isPreviewing ? "#ef4444" : (isDark ? "rgba(255,255,255,0.12)" : "#e2e8f0"),
+                      color: isPreviewing ? "#fff" : C.sub,
+                      borderRadius: "50%", width: "16px", height: "16px",
+                      display: "inline-flex", alignItems: "center", justifyContent: "center",
+                      flexShrink: 0, cursor: "pointer", transition: "background 0.15s",
+                    }}
+                  >
+                    {isPreviewing ? "■" : "▶"}
+                  </span>
+                </button>
+              );
+            })}
+
+            {/* ── Custom (device file) chip ── */}
+            <button
+              onClick={() => {
+                if (uploading) return;
+                if (customHasFile) {
+                  setRingtoneId(CUSTOM_RINGTONE_ID);
+                } else {
+                  fileInputRef.current?.click();
+                }
+              }}
+              disabled={uploading}
+              style={{
+                display: "flex", alignItems: "center", gap: "5px",
+                padding: "5px 10px", borderRadius: "20px",
+                border: customIsSelected
+                  ? `2px solid ${C.accent}`
+                  : `2px solid ${isDark ? "rgba(255,255,255,0.1)" : "#e2e8f0"}`,
+                background: customIsSelected
+                  ? (isDark ? "rgba(99,102,241,0.18)" : "rgba(99,102,241,0.08)")
+                  : (isDark ? "rgba(255,255,255,0.04)" : "#f8fafc"),
+                cursor: "pointer",
+                fontSize: "11.5px", fontWeight: customIsSelected ? "800" : "600",
+                color: customIsSelected ? C.accent : C.sub,
+                transition: "all 0.15s", fontFamily: "inherit",
+                maxWidth: "160px",
+              }}
+              title={customHasFile ? customFileName : "Pick an audio file from your device"}
+            >
+              <span style={{ fontSize: "13px" }}>📁</span>
+              <span style={{
+                overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                maxWidth: "80px",
+              }}>
+                {customHasFile ? customFileName : "Custom"}
+              </span>
+              {customHasFile && (
+                <span
+                  role="button"
+                  onClick={(e) => { e.stopPropagation(); handlePreviewCustom(); }}
+                  title={customIsPreviewing ? "Stop preview" : "Preview"}
+                  style={{
+                    marginLeft: "2px", fontSize: "10px",
+                    background: customIsPreviewing ? "#ef4444" : (isDark ? "rgba(255,255,255,0.12)" : "#e2e8f0"),
+                    color: customIsPreviewing ? "#fff" : C.sub,
+                    borderRadius: "50%", width: "16px", height: "16px",
+                    display: "inline-flex", alignItems: "center", justifyContent: "center",
+                    flexShrink: 0, cursor: "pointer", transition: "background 0.15s",
+                  }}
+                >
+                  {customIsPreviewing ? "■" : "▶"}
+                </span>
+              )}
+            </button>
+          </div>
+
+          {/* Single always-rendered hidden file input — lives outside conditional
+              blocks so fileInputRef is always valid regardless of which tone
+              is selected.                                                     */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="audio/*"
+            style={{ display: "none" }}
+            onChange={handleCustomFileChange}
+          />
+
+          {/* ── File controls (shown when Custom is selected) ── */}
+          {ringtoneId === CUSTOM_RINGTONE_ID && (
+            <div style={{
+              marginTop: "8px",
+              display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap",
+            }}>
+              <button
+                onClick={() => { if (!uploading) { setUploadError(null); fileInputRef.current?.click(); } }}
+                disabled={uploading}
+                style={{
+                  display: "flex", alignItems: "center", gap: "5px",
+                  padding: "5px 12px", borderRadius: "8px", border: "none",
+                  background: isDark ? "rgba(99,102,241,0.2)" : "rgba(99,102,241,0.1)",
+                  color: C.accent, cursor: uploading ? "wait" : "pointer",
+                  fontSize: "11.5px", fontWeight: "700", fontFamily: "inherit",
+                  opacity: uploading ? 0.7 : 1, transition: "opacity 0.2s",
+                }}
+              >
+                {uploading
+                  ? <><span style={{ animation: "ring-spin 0.8s linear infinite", display: "inline-block" }}>⏳</span> Uploading…</>
+                  : (customFileName ? "🔄 Change file" : "📂 Choose audio file")
+                }
+              </button>
+              {customFileName && !uploading && (
+                <button
+                  onClick={handleClearCustom}
+                  title="Remove custom tone"
+                  style={{
+                    display: "flex", alignItems: "center", gap: "4px",
+                    padding: "5px 10px", borderRadius: "8px", border: "none",
+                    background: isDark ? "rgba(239,68,68,0.12)" : "#fef2f2",
+                    color: "#ef4444", cursor: "pointer",
+                    fontSize: "11.5px", fontWeight: "700", fontFamily: "inherit",
+                  }}
+                >
+                  ✕ Remove
+                </button>
+              )}
+              <span style={{ fontSize: "11px", color: C.sub }}>
+                MP3, WAV, OGG, AAC · saved to cloud ☁️
+              </span>
+              {uploadError && (
+                <span style={{
+                  fontSize: "11px", color: "#ef4444", fontWeight: "600",
+                  display: "flex", alignItems: "center", gap: "4px",
+                  marginTop: "2px", width: "100%",
+                }}>
+                  ⚠️ {uploadError}
+                </span>
+              )}
+            </div>
+          )}
+
+            </div>
+          )}
+        </div>
+
         {/* Search */}
         <div style={{ position: "relative" }}>
           <Search size={13} style={{
@@ -319,6 +662,7 @@ export default function RingTab({ isDark }) {
                 const rc       = ROLE_COLOR[contact.role] || ROLE_COLOR.student;
                 const isRing   = ringingId === contact.id;
                 const status   = callStatus[contact.id];
+                const isMuted  = contact.ringEnabled === false;
 
                 return (
                   <div
@@ -331,6 +675,7 @@ export default function RingTab({ isDark }) {
                       background: isRing
                         ? (isDark ? "rgba(99,102,241,0.12)" : "rgba(99,102,241,0.06)")
                         : "transparent",
+                      opacity: isMuted ? 0.65 : 1,
                     }}
                   >
                     {/* Avatar */}
@@ -352,7 +697,7 @@ export default function RingTab({ isDark }) {
                       }}>
                         {contact.name}
                       </p>
-                      <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "3px" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "3px", flexWrap: "wrap" }}>
                         <span style={{
                           fontSize: "10px", fontWeight: "700", color: rc.badge,
                           background: isDark ? `${rc.badge}25` : rc.light,
@@ -360,6 +705,16 @@ export default function RingTab({ isDark }) {
                         }}>
                           {contact.role}
                         </span>
+                        {isMuted && (
+                          <span style={{
+                            fontSize: "10px", fontWeight: "700", color: "#ef4444",
+                            background: isDark ? "rgba(239,68,68,0.12)" : "#fef2f2",
+                            padding: "1px 7px", borderRadius: "6px",
+                            display: "inline-flex", alignItems: "center", gap: "2px",
+                          }}>
+                            🔕 Muted
+                          </span>
+                        )}
                         {status === "calling" && (
                           <span style={{ fontSize: "10px", color: C.accent, fontWeight: "600" }}>
                             Ringing…
@@ -373,6 +728,16 @@ export default function RingTab({ isDark }) {
                         {status === "declined" && (
                           <span style={{ fontSize: "10px", color: "#ef4444", fontWeight: "600" }}>
                             Declined
+                          </span>
+                        )}
+                        {status === "muted" && (
+                          <span style={{ fontSize: "10px", color: "#ef4444", fontWeight: "600" }}>
+                            🔕 Calls muted
+                          </span>
+                        )}
+                        {status === "offline" && (
+                          <span style={{ fontSize: "10px", color: "#94a3b8", fontWeight: "600" }}>
+                            📴 Offline
                           </span>
                         )}
                         {status === "missed" && (
@@ -410,24 +775,24 @@ export default function RingTab({ isDark }) {
                     ) : (
                       <button
                         onClick={() => handleRing(contact)}
-                        disabled={!!ringingId || socketConnected === false}
+                        disabled={!!ringingId || socketConnected === false || isMuted}
                         style={{
                           width: "40px", height: "40px", borderRadius: "50%",
-                          background: (ringingId || socketConnected === false)
+                          background: (ringingId || socketConnected === false || isMuted)
                             ? (isDark ? "#1e2235" : "#f1f5f9")
                             : "linear-gradient(135deg,#6366f1,#8b5cf6)",
                           border: "none",
-                          cursor: (ringingId || socketConnected === false) ? "not-allowed" : "pointer",
+                          cursor: (ringingId || socketConnected === false || isMuted) ? "not-allowed" : "pointer",
                           flexShrink: 0,
                           display: "flex", alignItems: "center", justifyContent: "center",
-                          opacity: (ringingId || socketConnected === false) ? 0.35 : 1,
+                          opacity: (ringingId || socketConnected === false || isMuted) ? 0.35 : 1,
                           transition: "all 0.15s",
-                          boxShadow: (ringingId || socketConnected === false) ? "none" : "0 4px 14px rgba(99,102,241,0.4)",
-                          color: "#fff",
+                          boxShadow: (ringingId || socketConnected === false || isMuted) ? "none" : "0 4px 14px rgba(99,102,241,0.4)",
+                          color: "#fff", fontSize: "16px",
                         }}
-                        title={socketConnected === false ? "Session expired — please log out and back in" : `Ring ${contact.name}`}
+                        title={isMuted ? "This user has calls muted" : socketConnected === false ? "Session expired — please log out and back in" : `Ring ${contact.name}`}
                       >
-                        <Phone size={16} />
+                        {isMuted ? "🔕" : <Phone size={16} />}
                       </button>
                     )}
                   </div>

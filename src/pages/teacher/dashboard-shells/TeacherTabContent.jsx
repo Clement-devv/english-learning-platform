@@ -26,7 +26,7 @@ import { Calendar, Users } from 'lucide-react';
  * headStyle  – CSS object for page headings inside the wrapper
  * mutedStyle – CSS object for page sub-headings
  */
-export default function TeacherTabContent({ d, wrapStyle = {}, msgStyle = {}, headStyle = {}, mutedStyle = {} }) {
+export default function TeacherTabContent({ d, wrapStyle = {}, msgStyle = {}, headStyle = {}, mutedStyle = {}, onUnreadCount }) {
   const { activeTab, isDarkMode } = d;
 
   // ── SCHEDULE ──────────────────────────────────────────────────────────────
@@ -114,7 +114,7 @@ export default function TeacherTabContent({ d, wrapStyle = {}, msgStyle = {}, he
   if (activeTab === 'messages') {
     return (
       <div style={msgStyle}>
-        <MessagesTab userRole="teacher" />
+        <MessagesTab userRole="teacher" onUnreadCount={onUnreadCount} />
       </div>
     );
   }
@@ -193,6 +193,9 @@ export default function TeacherTabContent({ d, wrapStyle = {}, msgStyle = {}, he
             const merged = { ...d.teacherInfo, ...updated };
             d.setTeacherInfo(merged);
             localStorage.setItem('teacherInfo', JSON.stringify(merged));
+            // Keep classroom link states in sync so the next Join Class uses the new links
+            if (updated.googleMeetLink !== undefined) d.setGoogleMeetLink(updated.googleMeetLink || '');
+            if (updated.zoomLink       !== undefined) d.setZoomLink(updated.zoomLink || '');
           }}
         />
       </div>

@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
+import { sessionSchema } from './shared/sessionSchema.js';
 
 export const subAdminSchema = new mongoose.Schema(
   {
@@ -41,6 +42,11 @@ export const subAdminSchema = new mongoose.Schema(
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin', required: true },
     lastLogin:  { type: Date, default: null },
     notes:      { type: String, default: '' },
+    // Per-device session tracking — required for /logout-session and
+    // /logout-all-devices to revoke specific JWTs server-side.  Without this
+    // field, clicking "Log out" only wiped browser storage; the JWT remained
+    // valid on the server for up to 7 days.
+    sessions:   [sessionSchema],
   },
   { timestamps: true }
 );

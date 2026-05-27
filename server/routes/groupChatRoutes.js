@@ -29,6 +29,13 @@ router.get("/", verifyToken, async (req, res) => {
     const { limit, skip } = parsePagination(req.query, 50, 100);
     let filter = {};
 
+    // Ensure populated models are registered on this center's connection
+    // before .populate() runs.  Without this the first request after a
+    // server restart from a user whose role doesn't touch these models
+    // would 500 with "Schema hasn't been registered".
+    getTeacher(req.db);
+    getStudent(req.db);
+
     if (role === "admin") {
       filter = {};
     } else if (role === "teacher") {
@@ -181,8 +188,10 @@ router.post("/:chatId/messages", verifyToken, validateObjectId("chatId"), async 
       return forbidden(res, "Access denied");
     }
 
+    // senderRole enum in the schema is ['admin','teacher','student'] — sub-admin maps to 'admin'
+    const senderRole = role === "sub-admin" ? "admin" : role;
     chat.messages.push({
-      senderId, senderModel, senderName, senderRole: role,
+      senderId, senderModel, senderName, senderRole,
       message: message.trim(), messageType: "text", isRead: false, readBy: [],
     });
     chat.lastMessage    = { text: message.trim(), senderId, senderName, timestamp: new Date() };
@@ -209,6 +218,30 @@ router.post("/:chatId/messages", verifyToken, validateObjectId("chatId"), async 
     await chat.save();
     const savedMessage = chat.messages[chat.messages.length - 1];
 
+    // ── Real-time notification to chat participants ────────────────────────
+    try {
+      const io   = req.app.get('io');
+      const slug = req.center?.slug;
+      if (io && slug) {
+        const payload = {
+          chatId:     chatId,
+          message:    message.trim().slice(0, 120),
+          senderName, senderRole: role,
+        };
+        // Notify non-sender role rooms (picked up by RingContext on each device)
+        if (role !== 'teacher')
+          io.to(`teacher-room:${slug}:${chat.teacherId}`).emit('new-group-message', payload);
+        if (role !== 'student')
+          io.to(`student-room:${slug}:${chat.studentId}`).emit('new-group-message', payload);
+        if (role !== 'admin' && role !== 'sub-admin')
+          io.to(`admin-broadcast:${slug}`).emit('new-group-message', payload);
+        // Also push into the per-chat room for any open ChatWindow instances
+        io.to(`chat-msg:${slug}:${chatId}`).emit('new-group-message', payload);
+      }
+    } catch (e) {
+      logger.warn('Group chat real-time notify error:', { error: e?.message });
+    }
+
     res.json({ success: true, message: "Message sent successfully", data: savedMessage });
   } catch (error) {
     logger.error("Error sending message:", { error: error?.message });
@@ -222,29 +255,29 @@ router.patch("/:chatId/mark-read", verifyToken, validateObjectId("chatId"), asyn
     const { chatId } = req.params;
     const { id: userId, role } = req.user;
 
-    const chat = await getGroupChat(req.db).findById(chatId);
+    // Fetch only the fields needed for the access check (lean = plain JS object, no save())
+    const chat = await getGroupChat(req.db).findById(chatId, "teacherId studentId").lean();
     if (!chat) return notFound(res, "Chat not found");
 
     const mrScope = req.user.teacherScope?.map(String) || [];
     if (role !== "admin" &&
-        chat.teacherId.toString() !== userId &&
-        chat.studentId.toString() !== userId &&
-        !(role === "sub-admin" && mrScope.includes(chat.teacherId.toString()))) {
+        chat.teacherId?.toString() !== userId &&
+        chat.studentId?.toString() !== userId &&
+        !(role === "sub-admin" && mrScope.includes(chat.teacherId?.toString()))) {
       return forbidden(res, "Access denied");
     }
 
-    chat.messages.forEach((msg) => {
-      if (!msg.readBy.some(r => r.userId.toString() === userId)) {
-        msg.readBy.push({ userId, readAt: new Date() });
-      }
-    });
+    // Map role → the correct unreadCount sub-field
+    const countField = { admin: "admin", teacher: "teacher", student: "student", "sub-admin": "subAdmin" }[role] ?? "student";
 
-    if (role === "admin")          chat.unreadCount.admin    = 0;
-    else if (role === "teacher")   chat.unreadCount.teacher  = 0;
-    else if (role === "student")   chat.unreadCount.student  = 0;
-    else if (role === "sub-admin") chat.unreadCount.subAdmin = 0;
+    // Single atomic MongoDB update — bypasses Mongoose validation entirely so
+    // no legacy-data enum mismatch can cause a 500.  We only touch unreadCount;
+    // the readBy per-message array is not used in the UI so we skip it here.
+    await getGroupChat(req.db).updateOne(
+      { _id: chatId },
+      { $set: { [`unreadCount.${countField}`]: 0 } }
+    );
 
-    await chat.save();
     res.json({ success: true, message: "Messages marked as read" });
   } catch (error) {
     logger.error("Error marking messages as read:", { error: error?.message });

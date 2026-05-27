@@ -1,15 +1,21 @@
 // src/pages/teacher/tabs/RecordingsTab.jsx
-import { useState, useEffect } from "react";
-import { Trash2, Eye, EyeOff, Play, X, Clock, Calendar, Video, Download } from "lucide-react";
+// Three-tier flow (mirrors admin RecordingsTab):
+//   1. Student list  — recordings grouped by student, with search
+//   2. Recordings    — only the selected student's recordings
+//   3. Video player  — full controls + toggle/download/delete
+import { useState, useEffect, useMemo } from "react";
+import { Trash2, Eye, EyeOff, Play, X, Clock, Calendar, Video, Download, ChevronRight, ArrowLeft, Search } from "lucide-react";
 import api from "../../../api";
 
 
 export default function RecordingsTab({ isDarkMode }) {
-  const [recordings, setRecordings] = useState([]);
-  const [loading,    setLoading]    = useState(true);
-  const [playing,    setPlaying]    = useState(null);
-  const [videoUrls,  setVideoUrls]  = useState({});
-  const [toast,      setToast]      = useState("");
+  const [recordings,      setRecordings]      = useState([]);
+  const [loading,         setLoading]         = useState(true);
+  const [playing,         setPlaying]         = useState(null);
+  const [videoUrls,       setVideoUrls]       = useState({});
+  const [toast,           setToast]           = useState("");
+  const [selectedStudent, setSelectedStudent] = useState(null); // { id, name, email, count }
+  const [search,          setSearch]          = useState("");
 
   const col = {
     card:   isDarkMode ? "#1a1d2e" : "#ffffff",
@@ -17,6 +23,8 @@ export default function RecordingsTab({ isDarkMode }) {
     text:   isDarkMode ? "#e8eaf6" : "#1a1d2e",
     muted:  isDarkMode ? "#8b91b8" : "#6b7280",
     input:  isDarkMode ? "#1e2235" : "#f3f4f6",
+    hover:  isDarkMode ? "rgba(255,255,255,0.04)" : "rgba(99,102,241,0.04)",
+    accent: "#6366f1",
   };
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(""), 3000); };
@@ -49,6 +57,39 @@ export default function RecordingsTab({ isDarkMode }) {
     return days;
   };
 
+  // ── Group recordings by student (client-side) ─────────────────────────────
+  // Recordings without a studentId are bucketed under an "Unassigned" group
+  // so older / group-class recordings remain reachable.
+  const students = useMemo(() => {
+    const map = new Map();
+    for (const rec of recordings) {
+      const s = rec.studentId;
+      const id = s?._id || s?.id || "__unassigned__";
+      const name = s ? `${s.firstName || ""} ${s.lastName || ""}`.trim() || "Unknown" : "Unassigned";
+      const email = s?.email || "";
+      if (!map.has(id)) map.set(id, { id, name, email, count: 0, latest: 0 });
+      const entry = map.get(id);
+      entry.count += 1;
+      const t = new Date(rec.createdAt).getTime();
+      if (t > entry.latest) entry.latest = t;
+    }
+    // Most recent activity first
+    return Array.from(map.values()).sort((a, b) => b.latest - a.latest);
+  }, [recordings]);
+
+  const filteredStudents = students.filter(s =>
+    s.name.toLowerCase().includes(search.toLowerCase()) ||
+    s.email.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const studentRecordings = useMemo(() => {
+    if (!selectedStudent) return [];
+    return recordings.filter(rec => {
+      const id = rec.studentId?._id || rec.studentId?.id || "__unassigned__";
+      return id === selectedStudent.id;
+    });
+  }, [recordings, selectedStudent]);
+
   // ── Toggle visibility ──────────────────────────────────────────────────────
   const toggleVisibility = async (rec) => {
     try {
@@ -75,16 +116,13 @@ export default function RecordingsTab({ isDarkMode }) {
   const loadVideo = async (rec) => {
     if (videoUrls[rec._id]) { setPlaying(rec); return; }
     try {
-      const resp = await api.get(`/recordings/${rec._id}/stream`, { responseType: 'blob' });
-      const ct   = resp.headers?.['content-type'] || '';
       let url;
-      if (ct.includes('application/json')) {
-        // S3: server returned { url } — use presigned URL directly as video src
-        const json = JSON.parse(await resp.data.text());
-        url = json.url;
+      const { data } = await api.get(`/recordings/${rec._id}/stream`);
+      if (data?.url) {
+        url = data.url;
       } else {
-        // Local disk: server streamed the binary
-        url = URL.createObjectURL(new Blob([resp.data]));
+        const { data: blob } = await api.get(`/recordings/${rec._id}/stream`, { responseType: 'blob' });
+        url = URL.createObjectURL(blob);
       }
       setVideoUrls(prev => ({ ...prev, [rec._id]: url }));
       setPlaying(rec);
@@ -94,17 +132,14 @@ export default function RecordingsTab({ isDarkMode }) {
   // ── Download video ─────────────────────────────────────────────────────────
   const downloadVideo = async (rec) => {
     try {
-      const resp = await api.get(`/recordings/${rec._id}/download`, { responseType: 'blob' });
-      const ct   = resp.headers?.['content-type'] || '';
-      if (ct.includes('application/json')) {
-        // S3: open presigned URL directly — browser handles the download
-        const json = JSON.parse(await resp.data.text());
-        window.open(json.url, '_blank');
+      const { data } = await api.get(`/recordings/${rec._id}/download`);
+      if (data?.url) {
+        window.open(data.url, '_blank');
       } else {
-        // Local disk: create blob URL and trigger download
+        const { data: blob } = await api.get(`/recordings/${rec._id}/download`, { responseType: 'blob' });
         const ext  = rec.mimeType === "video/mp4" ? ".mp4" : ".webm";
         const name = (rec.title || rec.bookingId?.classTitle || "recording").replace(/[^a-z0-9\s-]/gi, "").trim() + ext;
-        const url  = URL.createObjectURL(new Blob([resp.data]));
+        const url  = URL.createObjectURL(new Blob([blob]));
         const a    = document.createElement("a");
         a.href = url; a.download = name; a.click();
         URL.revokeObjectURL(url);
@@ -163,15 +198,124 @@ export default function RecordingsTab({ isDarkMode }) {
     </div>
   );
 
-  // ── List ───────────────────────────────────────────────────────────────────
+  // ── Recordings list for a single student ──────────────────────────────────
+  if (selectedStudent) return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+        <button onClick={() => setSelectedStudent(null)}
+          style={{ background: "none", border: "none", color: col.muted, cursor: "pointer", fontSize: "14px", fontWeight: 700, display: "flex", alignItems: "center", gap: "6px" }}>
+          <ArrowLeft size={16} /> All Students
+        </button>
+        <div style={{ flex: 1 }}>
+          <h2 style={{ margin: 0, fontSize: "20px", fontWeight: 900, color: col.text }}>
+            {selectedStudent.name}
+          </h2>
+          <p style={{ margin: "2px 0 0", fontSize: "13px", color: col.muted }}>
+            {studentRecordings.length} recording{studentRecordings.length !== 1 ? "s" : ""}
+          </p>
+        </div>
+      </div>
+
+      {studentRecordings.length === 0 ? (
+        <div style={{ background: col.card, border: `2px dashed ${col.border}`, borderRadius: "18px", padding: "48px 24px", textAlign: "center" }}>
+          <div style={{ fontSize: "48px", marginBottom: "12px" }}>🎬</div>
+          <p style={{ margin: 0, fontWeight: 800, color: col.text }}>No recordings yet</p>
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+          {studentRecordings.map(rec => {
+            const days = daysUntilDelete(rec.autoDeleteAt);
+            const expiringSoon = days !== null && days <= 7;
+            return (
+              <div key={rec._id} style={{ background: col.card, border: `1px solid ${expiringSoon ? "#f97316" : col.border}`, borderRadius: "16px", padding: "14px 18px", display: "flex", alignItems: "center", gap: "14px" }}>
+
+                {/* Thumbnail */}
+                <div style={{ width: "68px", height: "46px", borderRadius: "10px", background: "linear-gradient(135deg,#6366f1,#8b5cf6)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  <Video size={20} color="white" />
+                </div>
+
+                {/* Info */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ margin: "0 0 4px", fontSize: "14px", fontWeight: 800, color: col.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {rec.title || rec.bookingId?.classTitle || "Class Recording"}
+                  </p>
+                  <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
+                    <span style={{ fontSize: "12px", color: col.muted }}>{formatDate(rec.createdAt)}</span>
+                    {rec.duration > 0 && <span style={{ fontSize: "12px", color: col.muted }}>{formatDuration(rec.duration)}</span>}
+
+                    {/* Visibility badge */}
+                    <span style={{ fontSize: "11px", fontWeight: 800, padding: "2px 8px", borderRadius: "20px", background: rec.visibleToStudent ? "rgba(16,185,129,0.12)" : "rgba(107,114,128,0.12)", color: rec.visibleToStudent ? "#10b981" : col.muted }}>
+                      {rec.visibleToStudent ? "👁 Visible" : "🚫 Hidden"}
+                    </span>
+
+                    {/* Expiry warning */}
+                    {expiringSoon && (
+                      <span style={{ fontSize: "11px", fontWeight: 800, padding: "2px 8px", borderRadius: "20px", background: "rgba(249,115,22,0.12)", color: "#f97316" }}>
+                        ⏳ Deletes in {days}d
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
+                  <button onClick={() => toggleVisibility(rec)} title={rec.visibleToStudent ? "Hide from student" : "Show to student"}
+                    style={{ padding: "8px", borderRadius: "10px", border: `1px solid ${col.border}`, background: "none", color: rec.visibleToStudent ? "#10b981" : col.muted, cursor: "pointer" }}>
+                    {rec.visibleToStudent ? <Eye size={15} /> : <EyeOff size={15} />}
+                  </button>
+                  <button onClick={() => loadVideo(rec)} title="Watch recording"
+                    style={{ padding: "8px 14px", borderRadius: "10px", background: "linear-gradient(135deg,#6366f1,#8b5cf6)", color: "#fff", border: "none", cursor: "pointer", fontSize: "12px", fontWeight: 800, display: "flex", alignItems: "center", gap: "5px" }}>
+                    <Play size={13} fill="white" /> Watch
+                  </button>
+                  <button onClick={() => downloadVideo(rec)} title="Download recording"
+                    style={{ padding: "8px", borderRadius: "10px", border: `1px solid ${col.border}`, background: "none", color: col.text, cursor: "pointer" }}>
+                    <Download size={15} />
+                  </button>
+                  <button onClick={() => handleDelete(rec)} title="Delete recording"
+                    style={{ padding: "8px", borderRadius: "10px", border: "none", background: "rgba(239,68,68,0.1)", color: "#ef4444", cursor: "pointer" }}>
+                    <Trash2 size={15} />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {toast && (
+        <div style={{ position: "fixed", bottom: "24px", right: "24px", padding: "12px 20px", background: "#1a1d2e", color: "#fff", borderRadius: "12px", fontWeight: 700, zIndex: 9999, border: "1px solid #2a2d40" }}>
+          {toast}
+        </div>
+      )}
+    </div>
+  );
+
+  // ── Student list (default view) ───────────────────────────────────────────
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
       <div>
         <h2 style={{ margin: "0 0 4px", fontSize: "22px", fontWeight: 900, color: col.text }}>🎬 Class Recordings</h2>
         <p style={{ margin: 0, fontSize: "13px", color: col.muted }}>
-          {loading ? "Loading…" : `${recordings.length} recording${recordings.length !== 1 ? "s" : ""} · Auto-deleted after 30 days`}
+          {loading
+            ? "Loading…"
+            : `Select a student to view their recordings · Auto-deleted after 30 days`}
         </p>
       </div>
+
+      {/* Search */}
+      {students.length > 0 && (
+        <div style={{ position: "relative" }}>
+          <Search size={15} color={col.muted}
+            style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
+          <input
+            type="text"
+            placeholder="Search students…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            style={{ width: "100%", boxSizing: "border-box", padding: "10px 14px 10px 38px", borderRadius: "12px", border: `1px solid ${col.border}`, background: col.input, color: col.text, fontSize: "14px", fontFamily: "inherit", outline: "none" }}
+          />
+        </div>
+      )}
 
       {!loading && recordings.length === 0 && (
         <div style={{ background: col.card, border: `2px dashed ${col.border}`, borderRadius: "18px", padding: "48px 24px", textAlign: "center" }}>
@@ -183,62 +327,40 @@ export default function RecordingsTab({ isDarkMode }) {
         </div>
       )}
 
-      <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-        {recordings.map(rec => {
-          const days = daysUntilDelete(rec.autoDeleteAt);
-          const expiringSoon = days !== null && days <= 7;
+      {!loading && recordings.length > 0 && filteredStudents.length === 0 && (
+        <p style={{ color: col.muted, fontSize: "14px" }}>No students match your search.</p>
+      )}
+
+      <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+        {filteredStudents.map(s => {
+          const initials = s.name === "Unassigned"
+            ? "—"
+            : s.name.split(" ").map(p => p[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
           return (
-            <div key={rec._id} style={{ background: col.card, border: `1px solid ${expiringSoon ? "#f97316" : col.border}`, borderRadius: "16px", padding: "14px 18px", display: "flex", alignItems: "center", gap: "14px" }}>
-
-              {/* Thumbnail */}
-              <div style={{ width: "68px", height: "46px", borderRadius: "10px", background: "linear-gradient(135deg,#6366f1,#8b5cf6)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                <Video size={20} color="white" />
+            <button key={s.id} onClick={() => setSelectedStudent(s)}
+              style={{ display: "flex", alignItems: "center", gap: "14px", padding: "14px 18px", background: col.card, border: `1px solid ${col.border}`, borderRadius: "14px", cursor: "pointer", textAlign: "left", width: "100%", fontFamily: "inherit" }}
+              onMouseEnter={e => e.currentTarget.style.background = col.hover}
+              onMouseLeave={e => e.currentTarget.style.background = col.card}
+            >
+              {/* Avatar */}
+              <div style={{ width: "44px", height: "44px", borderRadius: "12px", background: "linear-gradient(135deg,#6366f1,#8b5cf6)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <span style={{ fontSize: "16px", fontWeight: 900, color: "#fff" }}>{initials}</span>
               </div>
-
-              {/* Info */}
               <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ margin: "0 0 4px", fontSize: "14px", fontWeight: 800, color: col.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {rec.title || rec.bookingId?.classTitle || "Class Recording"}
+                <p style={{ margin: 0, fontSize: "15px", fontWeight: 800, color: col.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {s.name}
                 </p>
-                <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
-                  <span style={{ fontSize: "12px", color: col.muted }}>{formatDate(rec.createdAt)}</span>
-                  {rec.duration > 0 && <span style={{ fontSize: "12px", color: col.muted }}>{formatDuration(rec.duration)}</span>}
-                  {rec.studentId && <span style={{ fontSize: "12px", color: col.muted }}>👤 {rec.studentId.firstName} {rec.studentId.lastName}</span>}
-
-                  {/* Visibility badge */}
-                  <span style={{ fontSize: "11px", fontWeight: 800, padding: "2px 8px", borderRadius: "20px", background: rec.visibleToStudent ? "rgba(16,185,129,0.12)" : "rgba(107,114,128,0.12)", color: rec.visibleToStudent ? "#10b981" : col.muted }}>
-                    {rec.visibleToStudent ? "👁 Visible" : "🚫 Hidden"}
-                  </span>
-
-                  {/* Expiry warning */}
-                  {expiringSoon && (
-                    <span style={{ fontSize: "11px", fontWeight: 800, padding: "2px 8px", borderRadius: "20px", background: "rgba(249,115,22,0.12)", color: "#f97316" }}>
-                      ⏳ Deletes in {days}d
-                    </span>
-                  )}
-                </div>
+                <p style={{ margin: "2px 0 0", fontSize: "12px", color: col.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {s.email || `${s.count} recording${s.count !== 1 ? "s" : ""}`}
+                </p>
               </div>
-
-              {/* Actions */}
-              <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
-                <button onClick={() => toggleVisibility(rec)} title={rec.visibleToStudent ? "Hide from student" : "Show to student"}
-                  style={{ padding: "8px", borderRadius: "10px", border: `1px solid ${col.border}`, background: "none", color: rec.visibleToStudent ? "#10b981" : col.muted, cursor: "pointer" }}>
-                  {rec.visibleToStudent ? <Eye size={15} /> : <EyeOff size={15} />}
-                </button>
-                <button onClick={() => loadVideo(rec)} title="Watch recording"
-                  style={{ padding: "8px 14px", borderRadius: "10px", background: "linear-gradient(135deg,#6366f1,#8b5cf6)", color: "#fff", border: "none", cursor: "pointer", fontSize: "12px", fontWeight: 800, display: "flex", alignItems: "center", gap: "5px" }}>
-                  <Play size={13} fill="white" /> Watch
-                </button>
-                <button onClick={() => downloadVideo(rec)} title="Download recording"
-                  style={{ padding: "8px", borderRadius: "10px", border: `1px solid ${col.border}`, background: "none", color: col.text, cursor: "pointer" }}>
-                  <Download size={15} />
-                </button>
-                <button onClick={() => handleDelete(rec)} title="Delete recording"
-                  style={{ padding: "8px", borderRadius: "10px", border: "none", background: "rgba(239,68,68,0.1)", color: "#ef4444", cursor: "pointer" }}>
-                  <Trash2 size={15} />
-                </button>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px", flexShrink: 0 }}>
+                <span style={{ fontSize: "12px", fontWeight: 800, color: col.muted, background: col.input, padding: "4px 10px", borderRadius: "20px" }}>
+                  {s.count}
+                </span>
+                <ChevronRight size={18} color={col.muted} />
               </div>
-            </div>
+            </button>
           );
         })}
       </div>

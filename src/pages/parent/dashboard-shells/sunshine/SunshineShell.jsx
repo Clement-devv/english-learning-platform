@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { Calendar, BookOpen, Award, LayoutDashboard, LogOut, RefreshCw, Loader2, Users, CheckCircle2, ClipboardList } from 'lucide-react';
 import api from '../../../../api';
 import LanguageSwitcher from '../../../../components/LanguageSwitcher';
+import { useAuth } from '../../../../context/AuthContext.jsx';
 
 const F = "'Nunito','Inter',sans-serif";
 const ACCENT  = 'linear-gradient(135deg,#f97316,#f43f5e)';
@@ -259,6 +260,7 @@ const NAV = [
 
 export default function SunshineShell() {
   const navigate = useNavigate();
+  const { logout: authLogout } = useAuth();
 
   const [parent,      setParent]      = useState(null);
   const [children,    setChildren]    = useState([]);
@@ -318,11 +320,11 @@ export default function SunshineShell() {
   }, [selectedId, activeTab]);
 
   const handleLogout = () => {
-    ['parentToken', 'parentInfo'].forEach(k => {
-      sessionStorage.removeItem(k);
-      localStorage.removeItem(k);
-    });
-    localStorage.removeItem('pwa-last-role');
+    // authLogout() handles BOTH the server-side /auth/logout-session call AND
+    // local storage clearing.  Doing the removeItem calls here first would
+    // wipe the sessionToken before the server call could read it, leaving the
+    // JWT valid on the server until its lifetime expired.
+    authLogout();
     navigate('/parent/login', { replace: true });
   };
 

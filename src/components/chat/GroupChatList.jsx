@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Search, MessageCircle, CheckCheck, Plus, Trash2 } from "lucide-react";
 import api from "../../api";
+import { useRing } from "../../context/RingContext.jsx";
 
 export default function GroupChatList({ userRole, onSelectChat, selectedChatId, isDark, onUnreadCount }) {
   const [groupChats,      setGroupChats]      = useState([]);
@@ -11,6 +12,8 @@ export default function GroupChatList({ userRole, onSelectChat, selectedChatId, 
   const [startingDm,      setStartingDm]      = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [deleting,        setDeleting]        = useState(false);
+
+  const { lastChatEvent } = useRing();
 
   const C = {
     bg:         isDark ? "#13151c" : "#f8f9ff",
@@ -51,6 +54,12 @@ export default function GroupChatList({ userRole, onSelectChat, selectedChatId, 
     const id = setInterval(fetchAll, 10000);
     return () => clearInterval(id);
   }, [fetchAll]);
+
+  // Re-fetch immediately whenever a new chat message arrives (any chat)
+  useEffect(() => {
+    if (!lastChatEvent) return;
+    fetchAll();
+  }, [lastChatEvent, fetchAll]);
 
   // Map userRole to the unreadCount key used in DB
   const unreadKey = userRole === "sub-admin" ? "subAdmin" : userRole;

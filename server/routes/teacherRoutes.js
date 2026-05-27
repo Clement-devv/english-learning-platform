@@ -229,13 +229,32 @@ router.patch("/:id/google-meet", verifyToken, requireOwnerOrAdmin, async (req, r
     const teacher = await getTeacher(req.db).findByIdAndUpdate(
       req.params.id,
       { googleMeetLink: googleMeetLink || "" },
-      { new: true, select: "firstName lastName googleMeetLink" }
+      { new: true, select: "firstName lastName googleMeetLink zoomLink" }
     );
     if (!teacher) return notFound(res, "Teacher not found");
     res.json({ message: "Google Meet link updated", googleMeetLink: teacher.googleMeetLink });
   } catch (err) {
     logger.error("Error updating Google Meet link:", { error: err?.message });
     serverError(res, "Error updating Google Meet link");
+  }
+});
+
+// ─── PATCH zoom ───────────────────────────────────────────────────────────────
+// Mirror of /google-meet so teachers can update their Zoom link from the same
+// dashboard card.  Validates ownership via requireOwnerOrAdmin.
+router.patch("/:id/zoom", verifyToken, requireOwnerOrAdmin, async (req, res) => {
+  try {
+    const { zoomLink } = req.body;
+    const teacher = await getTeacher(req.db).findByIdAndUpdate(
+      req.params.id,
+      { zoomLink: zoomLink || "" },
+      { new: true, select: "firstName lastName googleMeetLink zoomLink" }
+    );
+    if (!teacher) return notFound(res, "Teacher not found");
+    res.json({ message: "Zoom link updated", zoomLink: teacher.zoomLink });
+  } catch (err) {
+    logger.error("Error updating Zoom link:", { error: err?.message });
+    serverError(res, "Error updating Zoom link");
   }
 });
 
@@ -410,7 +429,7 @@ router.post("/:id/resend-invite", verifyToken, verifyAdmin, async (req, res) => 
 // Only safe fields — firstName/lastName/country/continent are admin-only (PUT below)
 router.patch("/:id/profile", verifyToken, requireOwnerOrAdmin, async (req, res) => {
   try {
-    const ALLOWED = ["displayName", "phone", "bio", "timezone", "googleMeetLink",
+    const ALLOWED = ["displayName", "phone", "bio", "timezone", "googleMeetLink", "zoomLink",
                      "yearsOfExperience", "specializations", "certifications",
                      "bankName", "accountNumber", "accountName"];
     const updates = {};

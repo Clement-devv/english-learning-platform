@@ -10,9 +10,9 @@ import { homeworkSchema }    from '../schemas/homeworkSchema.js';
 import { certificateSchema } from '../schemas/certificateSchema.js';
 
 import { tenantMiddleware }              from '../middleware/tenantMiddleware.js';
-import { verifyToken, verifyAdmin }      from '../middleware/authMiddleware.js';
+import { verifyToken, verifyAdmin, isTokenBlacklisted } from '../middleware/authMiddleware.js';
 import { loginLimiter, passwordResetLimiter } from '../middleware/rateLimiter.js';
-import { config, JWT_STANDARD_CLAIMS }  from '../config/config.js';
+import { config, JWT_STANDARD_CLAIMS, JWT_VERIFY_OPTIONS }  from '../config/config.js';
 import { getCenterSecret } from '../utils/jwtUtils.js';
 import { createSession, cleanExpiredSessions, pruneSessionsToLimit } from '../utils/sessionManager.js';
 import { validatePasswordStrength }     from '../utils/passwordUtils.js';
@@ -34,9 +34,17 @@ const verifyParent = async (req, res, next) => {
   try {
     const token = req.headers.authorization?.split(' ')[1];
     if (!token) return unauthorized(res, 'No token provided');
-    const decoded = jwt.verify(token, getCenterSecret(req.center.slug), { algorithms: ['HS256'] });
+    const decoded = jwt.verify(token, getCenterSecret(req.center.slug), JWT_VERIFY_OPTIONS);
     if (decoded.role !== 'parent') return forbidden(res, 'Parent access required');
     if (decoded.centerId !== req.center.slug) return forbidden(res, 'Token not valid for this center');
+
+    // Blacklist check — ensures /logout-session and /logout-all-devices actually
+    // revoke the JWT.  Without this, this middleware would happily accept a
+    // logged-out token until its 7d / config.jwtExpiry lifetime expires.
+    if (await isTokenBlacklisted(token)) {
+      return unauthorized(res, 'Session has been revoked. Please log in again.');
+    }
+
     const Parent = getParent(req.db);
     const parent = await Parent.findById(decoded.id).select('-password');
     if (!parent || !parent.active) return unauthorized(res, 'Invalid token or inactive account');
@@ -98,7 +106,10 @@ router.get('/verify', tenantMiddleware, async (req, res) => {
   try {
     const token = req.headers.authorization?.split(' ')[1];
     if (!token) return unauthorized(res, 'No token provided');
-    const decoded = jwt.verify(token, getCenterSecret(req.center.slug), { algorithms: ['HS256'] });
+    const decoded = jwt.verify(token, getCenterSecret(req.center.slug), JWT_VERIFY_OPTIONS);
+    if (await isTokenBlacklisted(token)) {
+      return unauthorized(res, 'Session has been revoked. Please log in again.');
+    }
     const Parent  = getParent(req.db);
     const parent  = await Parent.findById(decoded.id).select('-password');
     if (!parent || !parent.active) return unauthorized(res, 'Invalid token or inactive account');

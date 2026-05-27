@@ -57,7 +57,7 @@ router.get("/:id", verifyToken, validateObjectId("id"), async (req, res) => {
     getTeacher(req.db);
     getStudent(req.db);
     const booking = await getBooking(req.db).findById(req.params.id)
-      .populate("teacherId", "firstName lastName email continent googleMeetLink")
+      .populate("teacherId", "firstName lastName email continent googleMeetLink zoomLink")
       .populate("studentId", "firstName lastName email classCredits");
     if (!booking) return notFound(res, "Booking not found");
 
@@ -253,7 +253,7 @@ router.patch("/:id/complete", verifyToken, validateObjectId("id"), async (req, r
     getStudent(req.db);
     const Booking = getBooking(req.db);
     const booking = await Booking.findById(req.params.id)
-      .populate("teacherId", "firstName lastName email ratePerClass lessonsCompleted earned googleMeetLink")
+      .populate("teacherId", "firstName lastName email ratePerClass lessonsCompleted earned googleMeetLink zoomLink")
       .populate("studentId", "firstName lastName email classCredits");
     if (!booking) return notFound(res, "Booking not found");
     if (booking.status !== "accepted")
@@ -349,7 +349,7 @@ router.get("/", verifyToken, verifyAdmin, async (req, res) => {
     const filter = status ? { status } : {};
     const [bookings, total] = await Promise.all([
       getBooking(req.db).find(filter)
-        .populate("teacherId", "firstName lastName email googleMeetLink")
+        .populate("teacherId", "firstName lastName email googleMeetLink zoomLink")
         .populate("studentId", "firstName lastName email")
         .sort({ scheduledTime: -1 }).skip(skip).limit(limit).lean(),
       getBooking(req.db).countDocuments(filter),
@@ -404,7 +404,7 @@ router.get("/student/:studentId", verifyToken, async (req, res) => {
     else if (status) filter.status = status;
 
     const bookings = await getBooking(req.db).find(filter)
-      .populate("teacherId", "firstName lastName email continent googleMeetLink")
+      .populate("teacherId", "firstName lastName email continent googleMeetLink zoomLink")
       .sort({ scheduledTime: 1 }).skip(skip).limit(limit).lean();
     res.json(bookings);
   } catch (err) {

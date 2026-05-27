@@ -11,6 +11,8 @@ import AuthGuard          from "./components/AuthGuard";
 import PWAInstallPrompt   from "./components/PWAInstallPrompt";
 import { RingProvider }   from "./context/RingContext";
 import IncomingRingModal  from "./components/ring/IncomingRingModal";
+import MissedCallAlert    from "./components/ring/MissedCallAlert";
+import MessageAlert       from "./components/chat/MessageAlert";
 
 // Login pages — small, load fast, keep static
 import SuperAdminLogin     from "./pages/super-admin/SuperAdminLogin";
@@ -146,6 +148,8 @@ function App() {
         <ActiveClassBanner />
         <PWAInstallPrompt />
         <IncomingRingModal />
+        <MissedCallAlert />
+        <MessageAlert />
         <Suspense fallback={<PageLoader />}>
           <Routes>
             <Route path="/" element={<HomeRoute />} />

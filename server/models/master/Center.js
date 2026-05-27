@@ -38,6 +38,7 @@ const centerSchema = new mongoose.Schema({
     teacherDashboardTheme: { type: String, default: null },  // exclusive — super admin assigns (teacher)
     adminDashboardTheme:      { type: String, default: null },  // exclusive — super admin assigns (admin)
     subAdminDashboardTheme:   { type: String, default: null },  // exclusive — super admin assigns (sub-admin)
+    classroomTheme:           { type: String, default: null },  // non-exclusive — super admin assigns Google Meet classroom design
     borderRadius:    { type: String, default: '8px' },
     shadowStyle:     { type: String, default: 'soft' },
     spacing:         { type: String, default: 'comfortable' },
@@ -68,6 +69,7 @@ const centerSchema = new mongoose.Schema({
   features: {
     agora:         { type: Boolean, default: true },
     googleMeet:    { type: Boolean, default: true },
+    zoom:          { type: Boolean, default: true },
     recording:     { type: Boolean, default: true },
     pronunciation: { type: Boolean, default: true },
   },

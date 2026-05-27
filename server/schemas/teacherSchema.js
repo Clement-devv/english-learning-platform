@@ -16,6 +16,7 @@ export const teacherSchema = new mongoose.Schema({
   phone: { type: String, default: '' },
   country: { type: String, default: '' },
   googleMeetLink: { type: String, default: '' },
+  zoomLink:       { type: String, default: '' },
   timezone: { type: String, default: '' },
   bio: { type: String, default: '' },
   yearsOfExperience: { type: Number, default: 0 },

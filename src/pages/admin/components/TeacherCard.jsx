@@ -476,7 +476,18 @@ export default function TeacherCard({
                 rel="noopener noreferrer"
                 className={`inline-flex items-center gap-1.5 text-xs font-medium hover:underline ${isDarkMode ? "text-cyan-400" : "text-cyan-600"}`}
               >
-                <Video className="w-3 h-3" /> Meet / Zoom Link
+                <Video className="w-3 h-3" /> Meet Link
+              </a>
+            )}
+            {/* Zoom link */}
+            {teacher.zoomLink && (
+              <a
+                href={teacher.zoomLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`inline-flex items-center gap-1.5 text-xs font-medium hover:underline ${isDarkMode ? "text-blue-400" : "text-blue-600"}`}
+              >
+                <span style={{ fontWeight: 900, fontSize: 11, fontFamily: "Arial,sans-serif" }}>Z</span> Zoom Link
               </a>
             )}
           </div>

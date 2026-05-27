@@ -4,7 +4,10 @@
       "Bash(ls \"c:/Users/speak/OneDrive/Documents/English learning platform/\"*.env*)",
       "Bash(ls \"c:/Users/speak/OneDrive/Documents/English learning platform/\".env*)",
       "Bash(ls \"c:/Users/speak/OneDrive/Documents/English learning platform/server/\".env*)",
-      "Bash(curl -s -X OPTIONS http://localhost:5000/api/v1/super-admin/stats -H \"Origin: http://localhost:5173\" -w \"\\\\nHTTP_STATUS:%{http_code}\")"
+      "Bash(curl -s -X OPTIONS http://localhost:5000/api/v1/super-admin/stats -H \"Origin: http://localhost:5173\" -w \"\\\\nHTTP_STATUS:%{http_code}\")",
+      "Bash(npm install *)",
+      "Bash(node --check server/routes/directMessageRoutes.js)",
+      "Bash(node --check server/routes/groupChatRoutes.js)"
     ]
   }
 }

@@ -6,8 +6,16 @@ import LoginAttempt from "../models/master/LoginAttempt.js";
 import redisClient from "../config/redis.js";
 import { MAX_LOGIN_ATTEMPTS, ACCOUNT_LOCK_MS } from "../config/constants.js";
 
+// Build a Redis-backed store so rate-limit counters are shared across all PM2
+// cluster workers. Without this each worker keeps its own in-memory counter,
+// multiplying effective limits by the number of CPU cores. Falls back to the
+// default memory store when Redis isn't configured (single-process dev).
 const makeStore = (prefix) => {
-  return undefined;
+  if (!redisClient) return undefined;
+  return new RedisStore({
+    sendCommand: (...args) => redisClient.call(...args),
+    prefix: `rl:${prefix}:`,
+  });
 };
 
 // Spread helper — only adds { store } when Redis is available so we don't
