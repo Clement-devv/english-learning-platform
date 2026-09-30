@@ -14,7 +14,22 @@ export function useParentLoginLogic() {
   const [pendingToken, setPendingToken] = useState(null);
   const [focusedField, setFocusedField] = useState(null);
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { login, requireTerms } = useAuth();
+
+  const DASHBOARD = '/parent/dashboard';
+
+  /** Shared: finish login or gate on T&C */
+  const _completeLogin = (userInfo, authToken, sessionToken) => {
+    if (!userInfo.hasAcceptedTerms) {
+      requireTerms('parent', userInfo, authToken, sessionToken, DASHBOARD);
+      return;
+    }
+    sessionStorage.setItem('parentToken', authToken);
+    sessionStorage.setItem('parentInfo',  JSON.stringify(userInfo));
+    if (sessionToken) sessionStorage.setItem('parentSessionToken', sessionToken);
+    login('parent', userInfo, authToken);
+    navigate(DASHBOARD);
+  };
 
   const handleInitialLogin = async (e) => {
     e.preventDefault();
@@ -23,16 +38,7 @@ export function useParentLoginLogic() {
     try {
       const res = await api.post('/parents/login', { email: email.trim().toLowerCase(), password });
       if (res.data.success !== false) {
-        sessionStorage.setItem('parentToken', res.data.token);
-        sessionStorage.setItem('parentInfo', JSON.stringify(res.data.parent));
-        // sessionToken is required for /auth/logout-session to revoke this JWT
-        // server-side.  Without it, logout only clears browser storage and the
-        // token stays valid for its full lifetime.
-        if (res.data.sessionToken) {
-          sessionStorage.setItem('parentSessionToken', res.data.sessionToken);
-        }
-        login('parent', res.data.parent, res.data.token);
-        navigate('/parent/dashboard');
+        _completeLogin(res.data.parent, res.data.token, res.data.sessionToken);
       } else if (res.data.requires2FA) {
         setRequires2FA(true);
         setPendingToken(res.data.pendingToken);
@@ -50,13 +56,7 @@ export function useParentLoginLogic() {
     try {
       const res = await api.post('/auth/verify-2fa-login', { pendingToken, twoFactorToken, backupCode });
       if (res.data.success) {
-        sessionStorage.setItem('parentToken', res.data.token);
-        sessionStorage.setItem('parentInfo', JSON.stringify(res.data.user));
-        if (res.data.sessionToken) {
-          sessionStorage.setItem('parentSessionToken', res.data.sessionToken);
-        }
-        login('parent', res.data.user, res.data.token);
-        navigate('/parent/dashboard');
+        _completeLogin(res.data.user, res.data.token, res.data.sessionToken);
       }
     } catch (err) {
       setError(err.response?.data?.message || 'Invalid 2FA code');

@@ -208,8 +208,13 @@ export const parameterPollutionProtection = (req, res, next) => {
  * Prevents DoS attacks via large payloads
  */
 export const requestLimits = {
-  json: { limit: '2mb' },
-  urlencoded: { extended: true, limit: '10kb', parameterLimit: 50 }
+  // 50 kb covers the largest legitimate JSON payloads (rich-text notes, quiz
+  // questions, etc.). File uploads never go through the JSON body parser — they
+  // use multipart/form-data handled by multer, so this limit doesn't affect them.
+  // The previous 2 mb limit was unnecessarily generous and allowed a single
+  // request to consume 2 MB of server memory before any route logic ran.
+  json: { limit: '50kb' },
+  urlencoded: { extended: true, limit: '10kb', parameterLimit: 50 },
 };
 
 /**
@@ -221,25 +226,79 @@ export const disablePoweredBy = (req, res, next) => {
   next();
 };
 
+// Maximum allowed length for any individual string field in a request.
+// Requests containing a string longer than this are rejected with 400.
+// 10,000 chars covers the largest legitimate inputs (rich-text lesson notes,
+// chat messages). File content never comes through JSON — it uses multipart.
+const MAX_STRING_LENGTH = 10_000;
+
+// Maximum number of items allowed in any array inside a JSON body.
+const MAX_ARRAY_LENGTH = 500;
+
+// Maximum nesting depth for a JSON body object. Deeply-nested payloads can
+// cause stack overflows in recursive code and are never legitimate here.
+const MAX_DEPTH = 10;
+
 /**
- * Request sanitization
- * Additional layer of input cleaning
+ * Walk a value and return true if any string exceeds MAX_STRING_LENGTH,
+ * any array exceeds MAX_ARRAY_LENGTH, or the object tree exceeds MAX_DEPTH.
+ */
+function isOversized(value, depth = 0) {
+  if (depth > MAX_DEPTH) return true;
+  if (typeof value === 'string') return value.length > MAX_STRING_LENGTH;
+  if (Array.isArray(value)) {
+    if (value.length > MAX_ARRAY_LENGTH) return true;
+    return value.some(v => isOversized(v, depth + 1));
+  }
+  if (value && typeof value === 'object') {
+    return Object.values(value).some(v => isOversized(v, depth + 1));
+  }
+  return false;
+}
+
+/**
+ * Recursively trim all string values in an object/array.
+ * Returns a new value — does not mutate in place.
+ */
+function trimStrings(value) {
+  if (typeof value === 'string') return value.trim();
+  if (Array.isArray(value))      return value.map(trimStrings);
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, trimStrings(v)]));
+  }
+  return value;
+}
+
+/**
+ * Sanitize request inputs:
+ *   1. Reject 400 if any string field > 10 000 chars, array > 500 items,
+ *      or object depth > 10 — catches oversized / malformed payloads before
+ *      they reach route handlers or the database.
+ *   2. Trim leading/trailing whitespace from all string fields.
+ *
+ * Uses Object.defineProperty for req.query to be compatible with Express 5 +
+ * Node 24, where req.query is a prototype getter that rejects direct assignment.
  */
 export const sanitizeRequest = (req, res, next) => {
-  // Trim all string inputs
-  const sanitizeObject = (obj) => {
-    for (const key in obj) {
-      if (typeof obj[key] === 'string') {
-        obj[key] = obj[key].trim();
-      } else if (typeof obj[key] === 'object' && obj[key] !== null) {
-        sanitizeObject(obj[key]);
-      }
-    }
-  };
+  // Check body first — it's the most likely attack surface
+  if (req.body && isOversized(req.body)) {
+    return res.status(400).json({
+      success: false,
+      message: 'Request contains an oversized field. Maximum 10 000 characters per field.',
+    });
+  }
 
-  if (req.body) sanitizeObject(req.body);
-  if (req.query) sanitizeObject(req.query);
-  if (req.params) sanitizeObject(req.params);
+  if (req.body)   req.body   = trimStrings(req.body);
+  if (req.params) req.params = trimStrings(req.params);
+
+  if (req.query) {
+    Object.defineProperty(req, 'query', {
+      value:        trimStrings(req.query),
+      writable:     true,
+      configurable: true,
+      enumerable:   true,
+    });
+  }
 
   next();
 };

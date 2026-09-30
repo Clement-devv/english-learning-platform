@@ -362,7 +362,7 @@ export default function TeachersTab({ onNotify, isDarkMode = false }) {
       }
     } catch (err) {
       console.error("Save teacher error:", err);
-      showToast("Could not save teacher. Please try again.", "error");
+      showToast(err.response?.data?.message || "Could not save teacher. Please try again.", "error");
     } finally {
       setEditIndex(null);
       setIsModalOpen(false);

@@ -146,18 +146,32 @@ function LiveTimer({ booking }) {
   );
 }
 
+// ── Platform label helpers ────────────────────────────────────────────────────
+const PLATFORM_LABEL = { zoom: "Zoom", googlemeet: "Google Meet", agora: "Agora" };
+const PLATFORM_COLOR = {
+  zoom:       { bg: dm => dm ? "bg-blue-900/40 text-blue-300 border-blue-800/40"       : "bg-blue-100 text-blue-700 border-blue-200" },
+  googlemeet: { bg: dm => dm ? "bg-emerald-900/40 text-emerald-300 border-emerald-800/40" : "bg-emerald-100 text-emerald-700 border-emerald-200" },
+  agora:      { bg: dm => dm ? "bg-violet-900/40 text-violet-300 border-violet-800/40"   : "bg-violet-100 text-violet-700 border-violet-200" },
+};
+
 // ── Single live class card ────────────────────────────────────────────────────
 function LiveClassCard({ booking, session, onJoinAgora, onJoinMeet, dm }) {
-  const teacherName = `${booking.teacherId?.firstName ?? ""} ${booking.teacherId?.lastName ?? ""}`.trim() || "—";
-  const studentName = `${booking.studentId?.firstName ?? ""} ${booking.studentId?.lastName ?? ""}`.trim() || "—";
-  const meetLink    = booking.teacherId?.googleMeetLink;
-  const zoomLink    = booking.teacherId?.zoomLink;
+  const teacherName    = `${booking.teacherId?.firstName ?? ""} ${booking.teacherId?.lastName ?? ""}`.trim() || "—";
+  const studentName    = `${booking.studentId?.firstName ?? ""} ${booking.studentId?.lastName ?? ""}`.trim() || "—";
+  const meetLink       = booking.teacherId?.googleMeetLink;
+  const zoomLink       = booking.teacherId?.zoomLink;
+  const activeProvider = session?.videoProvider; // 'zoom' | 'googlemeet' | 'agora' | undefined
 
   const teacherStatus = getPresenceStatus(session, "teacher");
   const studentStatus = getPresenceStatus(session, "student");
   const teacherIn = teacherStatus !== "not_joined";
   const studentIn = studentStatus !== "not_joined";
   const both      = teacherIn && studentIn;
+
+  // Whether each platform button should be highlighted as the active one
+  const zoomActive = activeProvider === "zoom";
+  const meetActive = activeProvider === "googlemeet";
+  const agoraActive = activeProvider === "agora";
 
   return (
     <div className={`rounded-xl border overflow-hidden flex flex-col ${dm ? "bg-[#1a1d27] border-[#1e2235]" : "bg-white border-slate-200"}`}>
@@ -178,7 +192,16 @@ function LiveClassCard({ booking, session, onJoinAgora, onJoinMeet, dm }) {
             {both ? "Both present" : session ? "Waiting…" : "Not opened"}
           </span>
         </div>
-        <span className={`text-xs ${dm ? "text-slate-500" : "text-slate-400"}`}>{booking.duration} min</span>
+        <div className="flex items-center gap-2">
+          {/* Active platform badge */}
+          {activeProvider && (
+            <span className={`text-xs px-2 py-0.5 rounded-full font-semibold border
+              ${PLATFORM_COLOR[activeProvider]?.bg(dm) ?? ""}`}>
+              {PLATFORM_LABEL[activeProvider]}
+            </span>
+          )}
+          <span className={`text-xs ${dm ? "text-slate-500" : "text-slate-400"}`}>{booking.duration} min</span>
+        </div>
       </div>
 
       <div className="p-5 space-y-4 flex-1">
@@ -218,39 +241,57 @@ function LiveClassCard({ booking, session, onJoinAgora, onJoinMeet, dm }) {
       </div>
 
       {/* Join buttons */}
-      <div className={`px-5 pb-5 pt-2 grid gap-2 ${(meetLink || zoomLink) ? (meetLink && zoomLink ? "grid-cols-3" : "grid-cols-2") : "grid-cols-1"}`}>
+      <div className="px-5 pb-5 pt-2 flex flex-col gap-2">
+
+        {/* Zoom row — show whenever teacher has a Zoom link OR is actively using Zoom */}
+        {(zoomLink || zoomActive) && (
+          <button
+            onClick={() => zoomLink
+              ? window.open(zoomLink, "_blank", "noopener,noreferrer")
+              : undefined
+            }
+            disabled={!zoomLink}
+            title={!zoomLink ? "Teacher is on Zoom but hasn't saved a Zoom link to their profile yet" : "Join Zoom meeting"}
+            className={`flex items-center justify-center gap-2 py-2.5 rounded-xl text-white text-sm font-semibold transition
+              ${zoomLink
+                ? "bg-[#2D8CFF] hover:bg-[#1a7de8] cursor-pointer"
+                : dm ? "bg-slate-700 text-slate-400 cursor-not-allowed" : "bg-slate-200 text-slate-400 cursor-not-allowed"}
+              ${zoomActive ? "ring-2 ring-offset-1 ring-[#2D8CFF]" : ""}`}
+          >
+            <ExternalLink size={14} />
+            {zoomActive ? "Join Zoom (Active)" : "Join Zoom"}
+            {!zoomLink && <span className="text-xs opacity-75 ml-1">— no link saved</span>}
+          </button>
+        )}
+
+        {/* Meet row */}
         {meetLink && (
           <button
             onClick={() => onJoinMeet(meetLink)}
-            className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold transition"
+            className={`flex items-center justify-center gap-2 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold transition
+              ${meetActive ? "ring-2 ring-offset-1 ring-emerald-400" : ""}`}
           >
             <ExternalLink size={14} />
-            Meet
+            {meetActive ? "Join Meet (Active)" : "Join Meet"}
           </button>
         )}
-        {zoomLink && (
-          <button
-            onClick={() => window.open(zoomLink, "_blank", "noopener,noreferrer")}
-            className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#2D8CFF] hover:bg-[#1a7de8] text-white text-sm font-semibold transition"
-          >
-            <ExternalLink size={14} />
-            Zoom
-          </button>
-        )}
-        {!meetLink && !zoomLink && (
-          <div className={`flex items-center justify-center gap-2 py-2.5 rounded-xl border text-xs font-medium
-            ${dm ? "border-[#2a2f45] text-slate-500" : "border-slate-200 text-slate-400"}`}>
-            <ExternalLink size={13} />
-            No Meet/Zoom link set
-          </div>
-        )}
+
+        {/* Agora spectate row */}
         <button
           onClick={() => onJoinAgora(booking)}
-          className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold transition"
+          className={`flex items-center justify-center gap-2 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold transition
+            ${agoraActive ? "ring-2 ring-offset-1 ring-violet-400" : ""}`}
         >
           <Video size={14} />
-          Agora
+          {agoraActive ? "Join Agora (Active)" : "Spectate via Agora"}
         </button>
+
+        {/* Fallback when no external links and provider not yet chosen */}
+        {!zoomLink && !meetLink && !zoomActive && !meetActive && !activeProvider && (
+          <p className={`text-center text-xs mt-1 ${dm ? "text-slate-500" : "text-slate-400"}`}>
+            No Meet/Zoom link set on teacher profile
+          </p>
+        )}
       </div>
     </div>
   );
@@ -688,8 +729,9 @@ export default function ClassesTab({ isDarkMode }) {
         ${dm ? "bg-blue-900/20 border-blue-800/30 text-blue-300" : "bg-blue-50 border-blue-100 text-blue-700"}`}>
         <AlertCircle size={14} className="flex-shrink-0 mt-0.5" />
         <span>
-          <strong>Monitoring mode:</strong> Joining via Agora makes you visible to the teacher and student.
-          Google Meet uses the teacher's personal link — the teacher must have a Meet link configured in their profile.
+          <strong>Monitoring mode:</strong> The active platform badge shows what the teacher chose for this class.
+          The active button is highlighted with a ring. Zoom and Meet open the teacher's saved link in a new tab.
+          Agora spectate makes you visible to both teacher and student (5-minute limit).
         </span>
       </div>
     </div>

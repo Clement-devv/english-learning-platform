@@ -14,6 +14,18 @@ export const createStudent = async (student) => {
   return res.data;
 };
 
+// 👉 Create a managed student (admin-managed, no login, no email)
+export const createManagedStudent = async (student) => {
+  const res = await api.post(`${API_URL}/managed`, student);
+  return res.data;
+};
+
+// 👉 Convert a managed student into a real account (sends the invite email)
+export const convertManagedStudent = async (id, email) => {
+  const res = await api.post(`${API_URL}/${id}/convert`, { email });
+  return res.data;
+};
+
 // 👉 Update student
 export const updateStudent = async (id, student) => {
   const res = await api.put(`${API_URL}/${id}`, student);

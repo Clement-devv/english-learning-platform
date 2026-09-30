@@ -5,6 +5,8 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext.jsx';
 import api from '../../../api';
 
+const DASHBOARD = '/student/dashboard';
+
 export function useLoginLogic() {
   const [email,        setEmail]        = useState('');
   const [password,     setPassword]     = useState('');
@@ -15,7 +17,20 @@ export function useLoginLogic() {
   const [pendingToken, setPendingToken] = useState(null);
   const [focusedField, setFocusedField] = useState(null);
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { login, requireTerms } = useAuth();
+
+  /** Shared: finish login or gate on T&C */
+  const _completeLogin = (userInfo, authToken, sessionToken) => {
+    if (!userInfo.hasAcceptedTerms) {
+      requireTerms('student', userInfo, authToken, sessionToken, DASHBOARD);
+      return;
+    }
+    sessionStorage.setItem('studentToken',        authToken);
+    sessionStorage.setItem('studentSessionToken', sessionToken);
+    sessionStorage.setItem('studentInfo',         JSON.stringify(userInfo));
+    login('student', userInfo, authToken);
+    navigate(DASHBOARD);
+  };
 
   const handleInitialLogin = async (e) => {
     e.preventDefault();
@@ -24,11 +39,7 @@ export function useLoginLogic() {
     try {
       const response = await api.post('/auth/student/login', { email: email.trim(), password });
       if (response.data.success) {
-        sessionStorage.setItem('studentToken',        response.data.token);
-        sessionStorage.setItem('studentSessionToken', response.data.sessionToken);
-        sessionStorage.setItem('studentInfo',         JSON.stringify(response.data.student));
-        login('student', response.data.student, response.data.token);
-        navigate('/student/dashboard');
+        _completeLogin(response.data.student, response.data.token, response.data.sessionToken);
       } else if (response.data.requires2FA) {
         setRequires2FA(true);
         setPendingToken(response.data.pendingToken);
@@ -48,11 +59,7 @@ export function useLoginLogic() {
         pendingToken, twoFactorToken, backupCode,
       });
       if (response.data.success) {
-        sessionStorage.setItem('studentToken',        response.data.token);
-        sessionStorage.setItem('studentSessionToken', response.data.sessionToken);
-        sessionStorage.setItem('studentInfo',         JSON.stringify(response.data.user));
-        login('student', response.data.user, response.data.token);
-        navigate('/student/dashboard');
+        _completeLogin(response.data.user, response.data.token, response.data.sessionToken);
       }
     } catch (err) {
       setError(err.response?.data?.message || 'Invalid 2FA code');

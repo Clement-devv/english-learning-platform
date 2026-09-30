@@ -13,6 +13,10 @@ import { RingProvider }   from "./context/RingContext";
 import IncomingRingModal  from "./components/ring/IncomingRingModal";
 import MissedCallAlert    from "./components/ring/MissedCallAlert";
 import MessageAlert       from "./components/chat/MessageAlert";
+import TermsModal                from "./components/TermsModal";
+import WelcomeCard              from "./components/WelcomeCard";
+import RecordingUploadBanner    from "./components/RecordingUploadBanner";
+import { UploadQueueProvider }  from "./context/UploadQueueContext";
 
 // Login pages — small, load fast, keep static
 import SuperAdminLogin     from "./pages/super-admin/SuperAdminLogin";
@@ -142,11 +146,15 @@ function App() {
     <AuthProvider>
     <BrandingProvider>
       <Router>
+      <UploadQueueProvider>
       <RingProvider>
       <div className="min-h-screen">
         <ImpersonationBanner />
         <ActiveClassBanner />
         <PWAInstallPrompt />
+        <TermsModal />
+        <WelcomeCard />
+        <RecordingUploadBanner />
         <IncomingRingModal />
         <MissedCallAlert />
         <MessageAlert />
@@ -194,6 +202,7 @@ function App() {
         </Suspense>
       </div>
       </RingProvider>
+      </UploadQueueProvider>
     </Router>
     </BrandingProvider>
     </AuthProvider>

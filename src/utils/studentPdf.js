@@ -111,7 +111,7 @@ export async function downloadStudentRoster(students, centerName) {
     i + 1,
     s.studentId || "—",
     `${s.firstName || ""} ${s.lastName || ""}`.trim() || "—",
-    s.email || "—",
+    s.isManaged ? "No login (managed)" : (s.email || "—"),
     s.phone || "—",
     s.country || "—",
     s.rank || "—",
@@ -198,7 +198,7 @@ export async function downloadStudentCard(student, centerName) {
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
-  doc.text(student.email || "", 40, 21);
+  doc.text(student.isManaged ? "Managed student (no login)" : (student.email || ""), 40, 21);
   doc.text(name, 40, 28);
 
   // Generated date (top right)
@@ -229,7 +229,7 @@ export async function downloadStudentCard(student, centerName) {
     ["Student ID",         student.studentId  || "—"],
     ["First Name",         student.firstName  || "—"],
     ["Surname",            student.lastName    || "—"],
-    ["Email Address",      student.email      || "—"],
+    ["Email Address",      student.isManaged ? "No login (managed)" : (student.email || "—")],
     ["Phone Number",       student.phone      || "—"],
     ["Country",            student.country    || "—"],
     ["Level / Rank",       student.rank       || "—"],

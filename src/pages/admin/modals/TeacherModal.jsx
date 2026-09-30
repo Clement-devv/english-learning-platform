@@ -77,6 +77,7 @@ function CheckGroup({ options, selected, onChange }) {
 
 export default function TeacherModal({ isOpen, onClose, onSave, initialData }) {
   const [form, setForm] = useState(EMPTY);
+  const [saving, setSaving] = useState(false);
   const isEdit = !!initialData;
 
   useEffect(() => {
@@ -109,9 +110,13 @@ export default function TeacherModal({ isOpen, onClose, onSave, initialData }) {
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
   const setVal = (key) => (val) => setForm((f) => ({ ...f, [key]: val }));
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    onSave({
+    // Creating waits on the invite email, so block repeat clicks from re-posting
+    if (saving) return;
+    setSaving(true);
+    try {
+      await onSave({
       id:                initialData?.id || initialData?._id,
       firstName:         form.firstName.trim(),
       lastName:          form.lastName.trim(),
@@ -129,7 +134,10 @@ export default function TeacherModal({ isOpen, onClose, onSave, initialData }) {
       specializations:   form.specializations,
       certifications:    form.certifications,
       password:          form.password.trim() || undefined,
-    });
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -307,10 +315,12 @@ export default function TeacherModal({ isOpen, onClose, onSave, initialData }) {
               Cancel
             </button>
             <button
-              type="button" onClick={handleSubmit}
-              className="px-5 py-2 text-sm font-medium bg-brand-primary text-white rounded-lg hover:opacity-90 transition"
+              type="button" onClick={handleSubmit} disabled={saving}
+              className="px-5 py-2 text-sm font-medium bg-brand-primary text-white rounded-lg hover:opacity-90 transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isEdit ? "Save Changes" : "Create & Send Invite"}
+              {saving
+                ? (isEdit ? "Saving…" : "Sending invite…")
+                : (isEdit ? "Save Changes" : "Create & Send Invite")}
             </button>
           </div>
         </div>

@@ -19,6 +19,7 @@ import { validatePasswordStrength }     from '../utils/passwordUtils.js';
 import { sendParentInviteEmail }        from '../utils/emailService.js';
 import logger from '../utils/logger.js';
 import { badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
+import { loginRules, forgotPasswordRules, resetPasswordRules, validate } from '../middleware/validate.js';
 
 const router = express.Router();
 
@@ -60,7 +61,7 @@ const verifyParent = async (req, res, next) => {
 // ────────────────────────────────────────────────────────────────────────────
 
 // POST /parents/login
-router.post('/login', tenantMiddleware, loginLimiter, async (req, res) => {
+router.post('/login', tenantMiddleware, loginLimiter, loginRules, validate, async (req, res) => {
   try {
     const { email, password } = req.body;
     if (!email || !password) return badRequest(res, 'Email and password are required');
@@ -93,6 +94,7 @@ router.post('/login', tenantMiddleware, loginLimiter, async (req, res) => {
       parent: {
         id: parent._id, email: parent.email,
         firstName: parent.firstName, lastName: parent.lastName,
+        hasAcceptedTerms: parent.hasAcceptedTerms,
       },
     });
   } catch (err) {
@@ -153,7 +155,7 @@ router.post('/setup/:token', tenantMiddleware, async (req, res) => {
 });
 
 // POST /parents/forgot-password
-router.post('/forgot-password', tenantMiddleware, passwordResetLimiter, async (req, res) => {
+router.post('/forgot-password', tenantMiddleware, passwordResetLimiter, forgotPasswordRules, validate, async (req, res) => {
   try {
     const { email } = req.body;
     if (!email) return badRequest(res, 'Email is required');
@@ -194,7 +196,7 @@ router.post('/forgot-password', tenantMiddleware, passwordResetLimiter, async (r
 });
 
 // POST /parents/reset-password/:token
-router.post('/reset-password/:token', tenantMiddleware, passwordResetLimiter, async (req, res) => {
+router.post('/reset-password/:token', tenantMiddleware, passwordResetLimiter, resetPasswordRules, validate, async (req, res) => {
   try {
     const { password } = req.body;
     if (!password) return badRequest(res, 'New password is required');

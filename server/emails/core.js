@@ -2,6 +2,7 @@ import { Resend } from "resend";
 import nodemailer from "nodemailer";
 import { config } from "../config/config.js";
 import logger from "../utils/logger.js";
+import { isManagedEmail } from "../utils/managedStudent.js";
 
 /**
  * Resolve the correct base URL for email links sent to a center's users.
@@ -14,8 +15,12 @@ export const getCenterBaseUrl = (center) => {
     return { baseUrl: `https://${center.customDomain}`, needsSlug: false };
   }
   const slug = typeof center === "string" ? center : center?.slug;
+  const rootDomain = config.frontendUrl.replace(/^https?:\/\//, "").split("/")[0];
+  // Local dev: no center subdomains exist, so link straight to the local frontend
+  if (/^(localhost|127\.0\.0\.1)(:|$)/.test(rootDomain)) {
+    return { baseUrl: config.frontendUrl, needsSlug: false };
+  }
   if (slug) {
-    const rootDomain = config.frontendUrl.replace(/^https?:\/\//, "").split("/")[0];
     return { baseUrl: `https://${slug}.${rootDomain}`, needsSlug: false };
   }
   return { baseUrl: config.frontendUrl, needsSlug: false };
@@ -63,7 +68,13 @@ export const verifyEmailConfig = async () => {
 
 // ── sendEmail ─────────────────────────────────────────────────────────────────
 export const sendEmail = async (mailOptions) => {
-  const { centerName, to, subject, html, text, replyTo } = mailOptions;
+  const { centerName, subject, html, text, replyTo } = mailOptions;
+
+  // Managed students have placeholder addresses — drop them so every email
+  // flow (bookings, reminders, homework…) works unchanged for managed accounts.
+  const recipients = (Array.isArray(mailOptions.to) ? mailOptions.to : [mailOptions.to]).filter(r => !isManagedEmail(r));
+  if (recipients.length === 0) return { success: true, skipped: true };
+  const to = Array.isArray(mailOptions.to) ? recipients : recipients[0];
   const from = `${centerName || config.appName} <${process.env.EMAIL_FROM || config.emailFrom || config.emailUser}>`;
 
   if (useResend) {

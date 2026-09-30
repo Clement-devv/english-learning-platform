@@ -21,6 +21,14 @@ import { subAdminSchema } from "../schemas/subAdminSchema.js";
 import { parentSchema } from "../schemas/parentSchema.js";
 import logger from "../utils/logger.js";
 import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
+import {
+  loginRules,
+  changePasswordRules,
+  forgotPasswordRules,
+  resetPasswordRules,
+  verify2faRules,
+  validate,
+} from '../middleware/validate.js';
 
 const router = express.Router();
 
@@ -199,7 +207,7 @@ const verifyToken = async (req, res, next) => {
 
 // ─── 2FA verify (called after initial login when 2FA is required) ─────────────
 
-router.post("/verify-2fa-login", tenantMiddleware, loginLimiter, async (req, res) => {
+router.post("/verify-2fa-login", tenantMiddleware, loginLimiter, verify2faRules, validate, async (req, res) => {
   try {
     const { pendingToken, twoFactorToken, backupCode } = req.body;
 
@@ -284,6 +292,7 @@ router.post("/verify-2fa-login", tenantMiddleware, loginLimiter, async (req, res
       role,
       twoFactorEnabled: user.twoFactorEnabled,
       active: user.active,
+      hasAcceptedTerms: user.hasAcceptedTerms,
     };
 
     if (role === "admin") {
@@ -304,7 +313,7 @@ router.post("/verify-2fa-login", tenantMiddleware, loginLimiter, async (req, res
 
 // ─── Teacher Login ────────────────────────────────────────────────────────────
 
-router.post("/teacher/login", tenantMiddleware, loginLimiter, createLoginHandler({
+router.post("/teacher/login", tenantMiddleware, loginLimiter, loginRules, validate, createLoginHandler({
   role: "teacher",
   getModel: getTeacherModel,
   getIdentifier: (req) => req.body.email?.trim().toLowerCase(),
@@ -325,6 +334,7 @@ router.post("/teacher/login", tenantMiddleware, loginLimiter, createLoginHandler
       ratePerClass: teacher.ratePerClass,
       active: teacher.active,
       twoFactorEnabled: teacher.twoFactorEnabled,
+      hasAcceptedTerms: teacher.hasAcceptedTerms,
     },
   }),
   invalidCredMsg: "Invalid email or password",
@@ -336,7 +346,7 @@ router.get("/verify", tenantMiddleware, verifyToken, (req, res) => {
 });
 
 // Teacher change password
-router.post("/teacher/change-password", tenantMiddleware, verifyToken, async (req, res) => {
+router.post("/teacher/change-password", tenantMiddleware, verifyToken, changePasswordRules, validate, async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
 
@@ -370,7 +380,7 @@ router.post("/teacher/change-password", tenantMiddleware, verifyToken, async (re
 });
 
 // Teacher forgot password
-router.post("/teacher/forgot-password", tenantMiddleware, passwordResetLimiter, async (req, res) => {
+router.post("/teacher/forgot-password", tenantMiddleware, passwordResetLimiter, forgotPasswordRules, validate, async (req, res) => {
   try {
     const { email } = req.body;
 
@@ -414,7 +424,7 @@ router.post("/teacher/forgot-password", tenantMiddleware, passwordResetLimiter, 
 });
 
 // Teacher reset password
-router.post("/teacher/reset-password/:token", tenantMiddleware, passwordResetLimiter, async (req, res) => {
+router.post("/teacher/reset-password/:token", tenantMiddleware, passwordResetLimiter, resetPasswordRules, validate, async (req, res) => {
   try {
     const { newPassword } = req.body;
     const resetToken = req.params.token;
@@ -462,11 +472,16 @@ router.post("/teacher/reset-password/:token", tenantMiddleware, passwordResetLim
 
 // ─── Student Login ────────────────────────────────────────────────────────────
 
-router.post("/student/login", tenantMiddleware, loginLimiter, createLoginHandler({
+router.post("/student/login", tenantMiddleware, loginLimiter, loginRules, validate, createLoginHandler({
   role: "student",
   getModel: getStudentModel,
   getIdentifier: (req) => req.body.email?.trim().toLowerCase(),
   buildFindQuery: (email) => ({ email }),
+  // Managed students never log in. Converted students have no password until they
+  // finish the invite setup — stop here rather than bcrypt-comparing against undefined.
+  extraChecks: (student) => (student.isManaged || !student.password
+    ? { status: 401, message: "Invalid email or password" }
+    : null),
   buildResponse: (student) => ({
     student: {
       id: student._id,
@@ -476,6 +491,7 @@ router.post("/student/login", tenantMiddleware, loginLimiter, createLoginHandler
       lastName: student.lastName,
       active: student.active,
       twoFactorEnabled: student.twoFactorEnabled,
+      hasAcceptedTerms: student.hasAcceptedTerms,
     },
   }),
   invalidCredMsg: "Invalid email or password",
@@ -505,7 +521,7 @@ router.get("/student/verify", tenantMiddleware, async (req, res) => {
 });
 
 // Student change password
-router.post("/student/change-password", tenantMiddleware, async (req, res) => {
+router.post("/student/change-password", tenantMiddleware, changePasswordRules, validate, async (req, res) => {
   try {
     const token = req.headers.authorization?.split(" ")[1];
 
@@ -550,7 +566,7 @@ router.post("/student/change-password", tenantMiddleware, async (req, res) => {
 });
 
 // Student forgot password
-router.post("/student/forgot-password", tenantMiddleware, passwordResetLimiter, async (req, res) => {
+router.post("/student/forgot-password", tenantMiddleware, passwordResetLimiter, forgotPasswordRules, validate, async (req, res) => {
   try {
     const { email } = req.body;
 
@@ -561,7 +577,7 @@ router.post("/student/forgot-password", tenantMiddleware, passwordResetLimiter, 
     const Student = getStudentModel(req.db);
     const student = await Student.findOne({ email });
 
-    if (!student || !student.active)
+    if (!student || !student.active || student.isManaged)
       return res.json({ success: true, message: "If that email is registered, a reset link has been sent." });
 
     const resetToken = crypto.randomBytes(32).toString("hex");
@@ -594,7 +610,7 @@ router.post("/student/forgot-password", tenantMiddleware, passwordResetLimiter, 
 });
 
 // Student reset password
-router.post("/student/reset-password/:token", tenantMiddleware, passwordResetLimiter, async (req, res) => {
+router.post("/student/reset-password/:token", tenantMiddleware, passwordResetLimiter, resetPasswordRules, validate, async (req, res) => {
   try {
     const { newPassword } = req.body;
     const resetToken = req.params.token;
@@ -642,7 +658,7 @@ router.post("/student/reset-password/:token", tenantMiddleware, passwordResetLim
 
 // ─── Admin Login ──────────────────────────────────────────────────────────────
 
-router.post("/admin/login", tenantMiddleware, loginLimiter, createLoginHandler({
+router.post("/admin/login", tenantMiddleware, loginLimiter, loginRules, validate, createLoginHandler({
   role: "admin",
   getModel: getAdminModel,
   getIdentifier: (req) => req.body.username?.trim().toLowerCase(),
@@ -657,6 +673,7 @@ router.post("/admin/login", tenantMiddleware, loginLimiter, createLoginHandler({
       lastName: admin.lastName,
       role: "admin",
       twoFactorEnabled: admin.twoFactorEnabled,
+      hasAcceptedTerms: admin.hasAcceptedTerms,
     },
   }),
   invalidCredMsg: "Invalid credentials",
@@ -703,7 +720,7 @@ router.get("/admin/verify", tenantMiddleware, async (req, res) => {
 });
 
 // Admin change password
-router.post("/admin/change-password", tenantMiddleware, async (req, res) => {
+router.post("/admin/change-password", tenantMiddleware, changePasswordRules, validate, async (req, res) => {
   try {
     const token = req.headers.authorization?.split(" ")[1];
 
@@ -749,7 +766,7 @@ router.post("/admin/change-password", tenantMiddleware, async (req, res) => {
 
 
 // Admin forgot password
-router.post("/admin/forgot-password", tenantMiddleware, passwordResetLimiter, async (req, res) => {
+router.post("/admin/forgot-password", tenantMiddleware, passwordResetLimiter, forgotPasswordRules, validate, async (req, res) => {
   try {
     const { email } = req.body;
     if (!email) return badRequest(res, "Email is required");
@@ -783,7 +800,7 @@ router.post("/admin/forgot-password", tenantMiddleware, passwordResetLimiter, as
 });
 
 // Admin reset password
-router.post("/admin/reset-password/:token", tenantMiddleware, passwordResetLimiter, async (req, res) => {
+router.post("/admin/reset-password/:token", tenantMiddleware, passwordResetLimiter, resetPasswordRules, validate, async (req, res) => {
   try {
     const { newPassword } = req.body;
     const resetToken = req.params.token;
@@ -820,6 +837,59 @@ router.post("/admin/reset-password/:token", tenantMiddleware, passwordResetLimit
   } catch (err) {
     logger.error("Admin reset password error:", { error: err?.message });
     serverError(res, "Server error while resetting password");
+  }
+});
+
+// ─── Accept Terms & Conditions ───────────────────────────────────────────────
+// POST /auth/accept-terms
+// Called once per user after they read and click "I Accept" on the T&C modal.
+// Works for teacher, student, and admin — resolved via JWT role claim.
+
+router.post("/accept-terms", tenantMiddleware, async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split(" ")[1];
+    if (!token) return unauthorized(res, "No token provided");
+
+    let decoded;
+    try {
+      decoded = jwt.verify(token, getCenterSecret(req.center.slug), JWT_VERIFY_OPTIONS);
+    } catch (_) {
+      return unauthorized(res, "Invalid or expired token");
+    }
+
+    const { id: userId, role } = decoded;
+
+    let UserModel;
+    switch (role) {
+      case "admin":     UserModel = getAdminModel(req.db);    break;
+      case "teacher":   UserModel = getTeacherModel(req.db);  break;
+      case "student":   UserModel = getStudentModel(req.db);  break;
+      case "sub-admin": UserModel = getSubAdminModel(req.db); break;
+      case "parent":    UserModel = getParentModel(req.db);   break;
+      default: return badRequest(res, "Terms acceptance not applicable for this role");
+    }
+
+    const user = await UserModel.findById(userId);
+    // sub-admin uses a `status` field; all other roles use `active` boolean
+    const isActive = role === "sub-admin"
+      ? user?.status === "active"
+      : !!user?.active;
+    if (!user || !isActive) return unauthorized(res, "User not found or inactive");
+
+    if (user.hasAcceptedTerms) {
+      return res.json({ success: true, message: "Terms already accepted" });
+    }
+
+    user.hasAcceptedTerms = true;
+    user.termsAcceptedAt  = new Date();
+    await user.save();
+
+    logger.info(`Terms accepted: ${role} ${userId} in center ${req.center.slug}`);
+    res.json({ success: true, message: "Terms accepted successfully" });
+
+  } catch (err) {
+    logger.error("Accept terms error:", { error: err?.message });
+    serverError(res, "Server error while recording terms acceptance");
   }
 });
 

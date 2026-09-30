@@ -149,6 +149,17 @@ function SearchableSelect({ options, value, onChange, placeholder, isDarkMode, g
   );
 }
 
+// Marks admin-managed, no-login students
+function ManagedTag({ isDarkMode }) {
+  return (
+    <span className={`ml-1.5 align-middle inline-flex px-1.5 py-px rounded text-[9px] font-semibold uppercase tracking-wide ${
+      isDarkMode ? "bg-amber-900/40 text-amber-300" : "bg-amber-100 text-amber-700"
+    }`}>
+      Managed
+    </span>
+  );
+}
+
 export default function AssignStudentsTab({ teachers = [], students = [], onNotify, isDarkMode }) {
   const [teacherId, setTeacherId]   = useState("");
   const [studentId, setStudentId]   = useState("");
@@ -362,7 +373,7 @@ export default function AssignStudentsTab({ teachers = [], students = [], onNoti
                 getLabel={(o) => `${o.firstName} ${o.lastName}`}
                 renderOption={(o, isSelected) => (
                   <div className="min-w-0">
-                    <p className={`text-sm leading-tight ${isSelected ? "font-semibold" : "font-medium"}`}>{o.firstName} {o.lastName}</p>
+                    <p className={`text-sm leading-tight ${isSelected ? "font-semibold" : "font-medium"}`}>{o.firstName} {o.lastName}{o.isManaged && <ManagedTag isDarkMode={isDarkMode} />}</p>
                     {o.studentId && (
                       <p className={`text-[10px] font-mono font-semibold ${isDarkMode ? "text-indigo-400" : "text-indigo-500"}`}>{o.studentId}</p>
                     )}
@@ -522,7 +533,7 @@ export default function AssignStudentsTab({ teachers = [], students = [], onNoti
                               {(a.studentId?.firstName?.[0] ?? "?").toUpperCase()}
                             </div>
                             <div className="flex-1 min-w-0">
-                              <span className="font-medium">{a.studentId?.firstName} {a.studentId?.lastName}</span>
+                              <span className="font-medium">{a.studentId?.firstName} {a.studentId?.lastName}</span>{a.studentId?.isManaged && <ManagedTag isDarkMode={isDarkMode} />}
                               {a.studentId?.studentId && (
                                 <p className={`text-[10px] font-mono font-semibold ${isDarkMode ? "text-indigo-400" : "text-indigo-500"}`}>{a.studentId.studentId}</p>
                               )}
@@ -567,7 +578,7 @@ export default function AssignStudentsTab({ teachers = [], students = [], onNoti
                             {(a.studentId?.firstName?.[0] ?? "?").toUpperCase()}
                           </div>
                           <div className="min-w-0">
-                            <span className="font-medium">{a.studentId?.firstName} {a.studentId?.lastName}</span>
+                            <span className="font-medium">{a.studentId?.firstName} {a.studentId?.lastName}</span>{a.studentId?.isManaged && <ManagedTag isDarkMode={isDarkMode} />}
                             {a.studentId?.studentId && (
                               <p className={`text-[10px] font-mono font-semibold ${isDarkMode ? "text-indigo-400" : "text-indigo-500"}`}>{a.studentId.studentId}</p>
                             )}

@@ -1,4 +1,5 @@
 import { getUserTimezone, dualTime, tzCity } from '../../../../utils/timezone';
+import ManagedBadge from '../../../../components/ManagedBadge';
 
 const F = "'Nunito','Inter',sans-serif";
 
@@ -27,6 +28,7 @@ export default function BookingCard({ booking, onAccept, onReject, isDarkMode, i
           <h4 style={{ margin: 0, fontSize: 14, fontWeight: 800, color: col.heading }}>
             {booking.name || booking.studentName}
           </h4>
+          {booking.isManaged && <ManagedBadge isDarkMode={isDarkMode} />}
           {booking.isAdminBooking && (
             <span style={{ fontSize: 11, fontWeight: 700, background: isDarkMode ? 'rgba(139,92,246,0.15)' : '#f3e8ff', color: '#7c3aed', borderRadius: 999, padding: '2px 8px' }}>
               Admin Request

@@ -6,6 +6,8 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext.jsx';
 import api from '../../../api';
 
+const DASHBOARD = '/teacher/dashboard';
+
 export function useTeacherLoginLogic() {
   const [email, setEmail]               = useState('');
   const [password, setPassword]         = useState('');
@@ -16,7 +18,20 @@ export function useTeacherLoginLogic() {
   const [pendingToken, setPendingToken] = useState(null);
   const [focusedField, setFocusedField] = useState(null);
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { login, requireTerms } = useAuth();
+
+  /** Shared: finish login or gate on T&C */
+  const _completeLogin = (userInfo, authToken, sessionToken) => {
+    if (!userInfo.hasAcceptedTerms) {
+      requireTerms('teacher', userInfo, authToken, sessionToken, DASHBOARD);
+      return;
+    }
+    sessionStorage.setItem('teacherToken',        authToken);
+    sessionStorage.setItem('teacherSessionToken', sessionToken);
+    sessionStorage.setItem('teacherInfo',         JSON.stringify(userInfo));
+    login('teacher', userInfo, authToken);
+    navigate(DASHBOARD);
+  };
 
   const handleInitialLogin = async (e) => {
     e.preventDefault();
@@ -28,11 +43,7 @@ export function useTeacherLoginLogic() {
         password,
       });
       if (response.data.success) {
-        sessionStorage.setItem('teacherToken', response.data.token);
-        sessionStorage.setItem('teacherSessionToken', response.data.sessionToken);
-        sessionStorage.setItem('teacherInfo', JSON.stringify(response.data.teacher));
-        login('teacher', response.data.teacher, response.data.token);
-        navigate('/teacher/dashboard');
+        _completeLogin(response.data.teacher, response.data.token, response.data.sessionToken);
       } else if (response.data.requires2FA) {
         setRequires2FA(true);
         setPendingToken(response.data.pendingToken);
@@ -52,11 +63,7 @@ export function useTeacherLoginLogic() {
         pendingToken, twoFactorToken, backupCode,
       });
       if (response.data.success) {
-        sessionStorage.setItem('teacherToken', response.data.token);
-        sessionStorage.setItem('teacherSessionToken', response.data.sessionToken);
-        sessionStorage.setItem('teacherInfo', JSON.stringify(response.data.user));
-        login('teacher', response.data.user, response.data.token);
-        navigate('/teacher/dashboard');
+        _completeLogin(response.data.user, response.data.token, response.data.sessionToken);
       }
     } catch (err) {
       setError(err.response?.data?.message || 'Invalid 2FA code');

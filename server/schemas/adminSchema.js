@@ -21,6 +21,10 @@ export const adminSchema = new mongoose.Schema({
   twoFactorVerified: { type: Boolean, default: false },
   pushSubscription: { type: Object, default: null },
   ringEnabled: { type: Boolean, default: true },
+
+  // ── Terms & Conditions ───────────────────────────────────────────────────────
+  hasAcceptedTerms: { type: Boolean, default: false },
+  termsAcceptedAt:  { type: Date,    default: null  },
 }, { timestamps: true });
 
 // Forgot-password token lookup

@@ -25,6 +25,7 @@ import {
   Award,
   Calendar,
   FileDown,
+  KeyRound,
 } from "lucide-react";
 import { downloadStudentCard } from "../../../utils/studentPdf";
 
@@ -138,6 +139,7 @@ export default function StudentCard({
   onResetPassword,
   onCopyPassword,
   onResendInvite,
+  onConvert,
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -218,6 +220,16 @@ export default function StudentCard({
                     ⏳ Pending Setup
                   </span>
                 )}
+                {student.isManaged && (
+                  <span
+                    title="Admin-managed student with no login"
+                    className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold border flex-shrink-0 ${
+                      isDarkMode ? "bg-amber-900/40 text-amber-300 border-amber-700/50" : "bg-amber-50 text-amber-700 border-amber-300"
+                    }`}
+                  >
+                    Managed
+                  </span>
+                )}
               </div>
               {student.studentId && (
                 <p className={`text-[10px] font-mono font-semibold mt-0.5 ${
@@ -231,8 +243,14 @@ export default function StudentCard({
                   isDarkMode ? "text-gray-400" : "text-gray-500"
                 }`}
               >
-                <Mail className="w-3 h-3 flex-shrink-0" />
-                {student.email}
+                {student.isManaged ? (
+                  <span className="italic">No login · managed by admin</span>
+                ) : (
+                  <>
+                    <Mail className="w-3 h-3 flex-shrink-0" />
+                    {student.email}
+                  </>
+                )}
               </p>
             </div>
           </div>
@@ -308,14 +326,16 @@ export default function StudentCard({
                   isDarkMode={isDarkMode}
                   onClick={() => { onUnmarkLesson(); setMenuOpen(false); }}
                 />
-                <DropdownItem
-                  icon={RotateCcw}
-                  label="Reset Password"
-                  color="amber"
-                  isDarkMode={isDarkMode}
-                  onClick={() => { onResetPassword(); setMenuOpen(false); }}
-                />
-                {student.tempPassword && (
+                {!student.isManaged && (
+                  <DropdownItem
+                    icon={RotateCcw}
+                    label="Reset Password"
+                    color="amber"
+                    isDarkMode={isDarkMode}
+                    onClick={() => { onResetPassword(); setMenuOpen(false); }}
+                  />
+                )}
+                {student.tempPassword && !student.isManaged && (
                   <DropdownItem
                     icon={Copy}
                     label="Copy Password"
@@ -333,13 +353,23 @@ export default function StudentCard({
                   onClick={() => { downloadStudentCard(student).catch(console.error); setMenuOpen(false); }}
                 />
 
-                {student.status === "pending" && (
+                {student.status === "pending" && !student.isManaged && (
                   <DropdownItem
                     icon={Mail}
                     label="Resend Invite"
                     color="blue"
                     isDarkMode={isDarkMode}
                     onClick={() => { onResendInvite(); setMenuOpen(false); }}
+                  />
+                )}
+
+                {student.isManaged && onConvert && (
+                  <DropdownItem
+                    icon={KeyRound}
+                    label="Give Login Access"
+                    color="blue"
+                    isDarkMode={isDarkMode}
+                    onClick={() => { onConvert(); setMenuOpen(false); }}
                   />
                 )}
 

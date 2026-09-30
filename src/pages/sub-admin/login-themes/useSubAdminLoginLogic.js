@@ -16,11 +16,26 @@ export function useSubAdminLoginLogic() {
   const [forgotLoading, setForgotLoading] = useState(false);
   const [forgotError,   setForgotError]   = useState('');
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { login, requireTerms } = useAuth();
 
   useEffect(() => {
     if (sessionStorage.getItem('subAdminToken')) navigate('/sub-admin/dashboard');
   }, []);
+
+  const DASHBOARD = '/sub-admin/dashboard';
+
+  /** Shared: finish login or gate on T&C */
+  const _completeLogin = (userInfo, authToken, sessionToken) => {
+    if (!userInfo.hasAcceptedTerms) {
+      requireTerms('sub-admin', userInfo, authToken, sessionToken, DASHBOARD);
+      return;
+    }
+    sessionStorage.setItem('subAdminToken',        authToken);
+    sessionStorage.setItem('subAdminInfo',         JSON.stringify(userInfo));
+    if (sessionToken) sessionStorage.setItem('subAdminSessionToken', sessionToken);
+    login('sub-admin', userInfo, authToken);
+    navigate(DASHBOARD);
+  };
 
   const handleInitialLogin = async (e) => {
     e.preventDefault();
@@ -29,14 +44,7 @@ export function useSubAdminLoginLogic() {
     try {
       const res = await api.post('/sub-admin-auth/login', { email: username.trim(), password });
       if (res.data.success) {
-        sessionStorage.setItem('subAdminToken', res.data.token);
-        sessionStorage.setItem('subAdminInfo', JSON.stringify(res.data.subAdmin));
-        // Required for /auth/logout-session to revoke this JWT server-side.
-        if (res.data.sessionToken) {
-          sessionStorage.setItem('subAdminSessionToken', res.data.sessionToken);
-        }
-        login('sub-admin', res.data.subAdmin, res.data.token);
-        navigate('/sub-admin/dashboard');
+        _completeLogin(res.data.subAdmin, res.data.token, res.data.sessionToken);
       } else {
         setError(res.data.message || 'Login failed. Please check your credentials.');
       }

@@ -4,6 +4,8 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext.jsx';
 import api from '../../../api';
 
+const DASHBOARD = '/admin';
+
 export function useAdminLoginLogic() {
   const [username,      setUsername]      = useState('');
   const [password,      setPassword]      = useState('');
@@ -18,7 +20,20 @@ export function useAdminLoginLogic() {
   const [forgotLoading, setForgotLoading] = useState(false);
   const [forgotError,   setForgotError]   = useState('');
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { login, requireTerms } = useAuth();
+
+  /** Shared: finish login or gate on T&C */
+  const _completeLogin = (userInfo, authToken, sessionToken) => {
+    if (!userInfo.hasAcceptedTerms) {
+      requireTerms('admin', userInfo, authToken, sessionToken, DASHBOARD);
+      return;
+    }
+    sessionStorage.setItem('adminToken',        authToken);
+    sessionStorage.setItem('adminSessionToken', sessionToken);
+    sessionStorage.setItem('adminInfo',         JSON.stringify(userInfo));
+    login('admin', userInfo, authToken);
+    navigate(DASHBOARD);
+  };
 
   const handleInitialLogin = async (e) => {
     e.preventDefault();
@@ -27,11 +42,7 @@ export function useAdminLoginLogic() {
     try {
       const res = await api.post('/auth/admin/login', { username: username.trim(), password });
       if (res.data.success) {
-        sessionStorage.setItem('adminToken', res.data.token);
-        sessionStorage.setItem('adminSessionToken', res.data.sessionToken);
-        sessionStorage.setItem('adminInfo', JSON.stringify(res.data.admin));
-        login('admin', res.data.admin, res.data.token);
-        navigate('/admin');
+        _completeLogin(res.data.admin, res.data.token, res.data.sessionToken);
       } else if (res.data.requires2FA) {
         setRequires2FA(true);
         setPendingToken(res.data.pendingToken);
@@ -49,11 +60,7 @@ export function useAdminLoginLogic() {
     try {
       const res = await api.post('/auth/verify-2fa-login', { pendingToken, twoFactorToken, backupCode });
       if (res.data.success) {
-        sessionStorage.setItem('adminToken', res.data.token);
-        sessionStorage.setItem('adminSessionToken', res.data.sessionToken);
-        sessionStorage.setItem('adminInfo', JSON.stringify(res.data.user));
-        login('admin', res.data.user, res.data.token);
-        navigate('/admin');
+        _completeLogin(res.data.user, res.data.token, res.data.sessionToken);
       }
     } catch (err) {
       setError(err.response?.data?.message || 'Invalid 2FA code');

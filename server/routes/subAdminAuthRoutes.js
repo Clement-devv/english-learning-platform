@@ -12,6 +12,7 @@ import { teacherSchema }    from "../schemas/teacherSchema.js";
 import { createSession, cleanExpiredSessions, pruneSessionsToLimit } from "../utils/sessionManager.js";
 import logger from "../utils/logger.js";
 import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
+import { loginRules, forgotPasswordRules, resetPasswordRules, changePasswordRules, validate } from '../middleware/validate.js';
 
 const router = express.Router();
 router.use(tenantMiddleware);
@@ -20,7 +21,7 @@ const getSubAdmin = (db) => db.models.SubAdmin || db.model("SubAdmin", subAdminS
 const getTeacher  = (db) => db.models.Teacher  || db.model("Teacher",  teacherSchema);
 
 // POST /api/sub-admin-auth/login
-router.post("/login", loginLimiter, async (req, res) => {
+router.post("/login", loginLimiter, loginRules, validate, async (req, res) => {
   try {
     const { email, password } = req.body;
     if (!email || !password)
@@ -87,6 +88,7 @@ router.post("/login", loginLimiter, async (req, res) => {
         region: subAdmin.region,
         permissions: subAdmin.permissions,
         teacherScope: teacherScope.map(String),
+        hasAcceptedTerms: subAdmin.hasAcceptedTerms,
       },
     });
   } catch (err) {
@@ -154,7 +156,7 @@ router.post("/setup-account", passwordResetLimiter, async (req, res) => {
 });
 
 // POST /api/sub-admin-auth/forgot-password
-router.post("/forgot-password", passwordResetLimiter, async (req, res) => {
+router.post("/forgot-password", passwordResetLimiter, forgotPasswordRules, validate, async (req, res) => {
   try {
     const { email } = req.body;
     if (!email) return badRequest(res, "Email is required");
@@ -191,7 +193,7 @@ router.post("/forgot-password", passwordResetLimiter, async (req, res) => {
 });
 
 // POST /api/sub-admin-auth/reset-password/:token
-router.post("/reset-password/:token", passwordResetLimiter, async (req, res) => {
+router.post("/reset-password/:token", passwordResetLimiter, resetPasswordRules, validate, async (req, res) => {
   try {
     const { password, confirmPassword } = req.body;
     if (!password || !confirmPassword) return badRequest(res, "All fields are required");

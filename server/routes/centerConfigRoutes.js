@@ -12,6 +12,7 @@ import { config } from '../config/config.js';
 import logger from "../utils/logger.js";
 import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
 import { invalidateCache } from '../utils/cache.js';
+import { getStudentModes } from '../utils/planFeatures.js';
 import { s3Enabled, uploadToS3, deleteFromS3, s3PublicUrl, isLegacyPath, keyFromValue } from "../utils/s3.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -45,7 +46,10 @@ router.get('/config', tenantMiddleware, async (req, res) => {
     const { centerName, slug, branding, certificateTemplate, plan, features, customDomain, domainVerified } = req.center;
     res.json({
       success: true,
-      center:  { centerName, slug, plan, features, certificateTemplate, customDomain, domainVerified },
+      center:  {
+        centerName, slug, plan, features, certificateTemplate, customDomain, domainVerified,
+        studentModes: getStudentModes(plan),
+      },
       branding,
     });
   } catch (err) {

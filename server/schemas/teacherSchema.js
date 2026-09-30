@@ -54,6 +54,10 @@ export const teacherSchema = new mongoose.Schema({
 
   // ── Ring / attention-call preference ────────────────────────────────────────
   ringEnabled: { type: Boolean, default: true },  // false = do not ring this teacher
+
+  // ── Terms & Conditions ───────────────────────────────────────────────────────
+  hasAcceptedTerms: { type: Boolean, default: false },
+  termsAcceptedAt:  { type: Date,    default: null  },
 }, { timestamps: true, toJSON: { getters: true }, toObject: { getters: true } });
 
 // Lookup by status (admin lists active/pending/suspended teachers)

@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import api from "../../../api";
 import { getUserTimezone, tzAbbr, tzCity } from "../../../utils/timezone";
+import ManagedBadge from "../../../components/ManagedBadge";
 
 // ── Calendar constants ────────────────────────────────────────────────────────
 const HOUR_START   = 6;
@@ -670,7 +671,7 @@ export default function ScheduleTab({
                     <option value="">— No student assigned —</option>
                     {students.map(s => (
                       <option key={s._id} value={s._id}>
-                        {s.firstName} {s.lastName || ""} {s.classCredits > 0 ? `(${s.classCredits} classes left)` : "(inactive)"}
+                        {s.firstName} {s.lastName || ""}{s.isManaged ? " · Managed" : ""} {s.classCredits > 0 ? `(${s.classCredits} classes left)` : "(inactive)"}
                       </option>
                     ))}
                   </select>
@@ -685,8 +686,13 @@ export default function ScheduleTab({
                         <span style={{ color:"#fff", fontWeight:"800", fontSize:"13px" }}>{s.firstName[0]}</span>
                       </div>
                       <div>
-                        <p style={{ margin:0, fontSize:"13px", fontWeight:"700", color:c.heading }}>{s.firstName} {s.lastName||""}</p>
-                        <p style={{ margin:0, fontSize:"11px", color:"#0ea5e9" }}>{s.classCredits || 0} classes remaining</p>
+                        <p style={{ margin:0, fontSize:"13px", fontWeight:"700", color:c.heading }}>
+                          {s.firstName} {s.lastName||""}
+                          {s.isManaged && <ManagedBadge isDarkMode={isDarkMode} style={{ marginLeft:6 }}/>}
+                        </p>
+                        <p style={{ margin:0, fontSize:"11px", color:"#0ea5e9" }}>
+                          {s.classCredits || 0} classes remaining{s.isManaged ? " · no login, won't get app notifications" : ""}
+                        </p>
                       </div>
                     </div>
                   );

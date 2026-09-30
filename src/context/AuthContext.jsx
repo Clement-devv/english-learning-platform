@@ -29,6 +29,11 @@ export function AuthProvider({ children }) {
   const [user,  setUserState] = useState(() => getStoredUser(detectActiveRole()));
   const [token, setToken] = useState(() => getStoredToken(detectActiveRole()));
 
+  // ── Terms & Conditions gate ──────────────────────────────────────────────────
+  // Set by requireTerms(); cleared by resolveTerms() after the user accepts.
+  // { role, userInfo, authToken, sessionToken, storageKey, navigateTo }
+  const [pendingTerms, setPendingTerms] = useState(null);
+
   /**
    * Call immediately after a successful login API response.
    * Stores the token/info (the login page does the actual write),
@@ -57,6 +62,42 @@ export function AuthProvider({ children }) {
       return merged;
     });
   }, [role]);
+
+  /**
+   * Called by login hooks when the server returns hasAcceptedTerms: false.
+   * Stores the pending auth data so TermsModal can complete the login once
+   * the user clicks "I Accept".
+   *
+   * @param {string} newRole
+   * @param {object} userInfo
+   * @param {string} authToken
+   * @param {string} sessionToken
+   * @param {string} navigateTo  - path to navigate after acceptance (e.g. '/teacher/dashboard')
+   */
+  const requireTerms = useCallback((newRole, userInfo, authToken, sessionToken, navigateTo) => {
+    setPendingTerms({ role: newRole, userInfo, authToken, sessionToken, navigateTo });
+  }, []);
+
+  /**
+   * Called by TermsModal after a successful POST /auth/accept-terms.
+   * Completes the login flow that was paused at requireTerms().
+   */
+  const resolveTerms = useCallback(() => {
+    if (!pendingTerms) return;
+    const { role: newRole, userInfo, authToken, sessionToken, navigateTo } = pendingTerms;
+    const cfg = ROLE_CONFIG[newRole];
+    if (cfg) {
+      sessionStorage.setItem(cfg.tokenKey, authToken);
+      if (sessionToken) sessionStorage.setItem(cfg.sessionTokenKey, sessionToken);
+      sessionStorage.setItem(cfg.infoKey, JSON.stringify({ ...userInfo, hasAcceptedTerms: true }));
+    }
+    setRole(newRole);
+    setUserState({ ...userInfo, hasAcceptedTerms: true });
+    setToken(authToken);
+    localStorage.setItem('pwa-last-role', newRole);
+    setPendingTerms(null);
+    return navigateTo;
+  }, [pendingTerms]);
 
   /**
    * Clear all auth storage for the current role and reset context state.
@@ -89,10 +130,11 @@ export function AuthProvider({ children }) {
     setRole(null);
     setUserState(null);
     setToken(null);
+    setPendingTerms(null);   // always clear the T&C gate on logout
   }, [role]);
 
   return (
-    <AuthContext.Provider value={{ user, role, token, login, logout, setUser }}>
+    <AuthContext.Provider value={{ user, role, token, login, logout, setUser, pendingTerms, requireTerms, resolveTerms }}>
       {children}
     </AuthContext.Provider>
   );
@@ -107,6 +149,7 @@ export function AuthProvider({ children }) {
 const AUTH_FALLBACK = {
   user: null, role: null, token: null,
   login: () => {}, logout: () => {}, setUser: () => {},
+  pendingTerms: null, requireTerms: () => {}, resolveTerms: () => {},
 };
 
 export function useAuth() {

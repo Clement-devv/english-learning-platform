@@ -29,6 +29,7 @@ import DeletedTab  from './tabs/DeletedTab';
 import CreditsTab             from './tabs/CreditsTab';
 import CertificateTemplatesTab from './tabs/CertificateTemplatesTab';
 import LandingPagesTab         from './tabs/LandingPagesTab';
+import { studentModesLabel }   from '../../utils/planFeatures';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api/v1';
 
@@ -1418,11 +1419,11 @@ export default function SuperAdminDashboard() {
               <p style={{ margin: '0 0 10px', fontSize: 12, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Select plan</p>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 20 }}>
                 {[
-                  { key: 'free',       label: 'Free',       desc: 'Basic access',          color: '#6b7280' },
-                  { key: 'basic',      label: 'Basic',      desc: 'Standard features',     color: '#818cf8' },
-                  { key: 'pro',        label: 'Pro',        desc: 'Advanced features',     color: '#34d399' },
-                  { key: 'enterprise', label: 'Enterprise', desc: 'Unlimited everything',  color: '#f59e0b' },
-                ].map(p => (
+                  { key: 'free',       label: 'Free',       color: '#6b7280' },
+                  { key: 'basic',      label: 'Basic',      color: '#818cf8' },
+                  { key: 'pro',        label: 'Pro',        color: '#34d399' },
+                  { key: 'enterprise', label: 'Enterprise', color: '#f59e0b' },
+                ].map(p => ({ ...p, desc: studentModesLabel(p.key) })).map(p => (
                   <button
                     key={p.key}
                     onClick={() => setPlanSelected(p.key)}
@@ -1438,6 +1439,13 @@ export default function SuperAdminDashboard() {
                   </button>
                 ))}
               </div>
+
+              {planSelected !== planModal.plan && (
+                <p style={{ margin: '0 0 14px', fontSize: 12, color: '#9ca3af', lineHeight: 1.5 }}>
+                  Takes effect immediately. Students the center already has keep working;
+                  the plan only controls which type the admin can add.
+                </p>
+              )}
 
               {planMsg && (
                 <p style={{ margin: '0 0 14px', fontSize: 13, fontWeight: 700, color: planMsg.startsWith('✅') ? '#34d399' : '#f87171' }}>{planMsg}</p>
@@ -3358,6 +3366,9 @@ export default function SuperAdminDashboard() {
                         <option key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</option>
                       ))}
                     </select>
+                    <p style={{ margin: '5px 0 0', fontSize: 11, color: '#818cf8' }}>
+                      Students: {studentModesLabel(form.plan)}
+                    </p>
                   </div>
                   <div style={s.field}>
                     <label style={s.label}>Timezone</label>

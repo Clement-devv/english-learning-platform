@@ -4,6 +4,7 @@ import {
   Search, ChevronLeft, ChevronRight, TrendingUp,
   User, X, Calendar, Award, BookOpen, Clock,
 } from "lucide-react";
+import ManagedBadge from "../../../../components/ManagedBadge";
 
 function formatDob(raw) {
   if (!raw) return null;
@@ -60,6 +61,12 @@ function StudentDetailModal({ student, isDarkMode, onClose }) {
           </div>
           <div className="flex-1 min-w-0">
             <h2 className={`text-lg font-bold truncate ${text}`}>{student.name}</h2>
+            {student.isManaged && (
+              <p className={`text-xs mt-0.5 ${subText}`}>
+                <ManagedBadge isDarkMode={dm} style={{ marginRight: 6 }} />
+                No login: book classes for this student yourself
+              </p>
+            )}
             {student.studentId && (
               <p className={`text-[11px] font-mono font-semibold ${dm ? "text-orange-400" : "text-orange-500"}`}>
                 {student.studentId}
@@ -205,7 +212,10 @@ export default function StudentProgressList({ students, isDarkMode }) {
                     {initials}
                   </div>
                   <div className="min-w-0">
-                    <p className={`font-semibold text-sm truncate ${text}`}>{student.name}</p>
+                    <p className={`font-semibold text-sm truncate ${text}`}>
+                      {student.name}
+                      {student.isManaged && <ManagedBadge isDarkMode={dm} style={{ marginLeft: 6 }} />}
+                    </p>
                     {student.studentId && (
                       <p className={`text-[10px] font-mono font-semibold ${dm ? "text-orange-400" : "text-orange-500"}`}>
                         {student.studentId}

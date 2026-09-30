@@ -21,6 +21,10 @@ export const parentSchema = new Schema({
   lastPasswordChange:   { type: Date },
   sessions:  [sessionSchema],
   lastLogin: { type: Date },
+
+  // ── Terms & Conditions ───────────────────────────────────────────────────
+  hasAcceptedTerms: { type: Boolean, default: false },
+  termsAcceptedAt:  { type: Date,    default: null  },
 }, { timestamps: true });
 
 parentSchema.index({ status: 1 });

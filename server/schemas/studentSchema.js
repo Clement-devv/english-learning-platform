@@ -4,8 +4,15 @@ import { sessionSchema } from './shared/sessionSchema.js';
 export const studentSchema = new mongoose.Schema({
   studentId: { type: String, unique: true, sparse: true },
   firstName: { type: String, required: true },
-  lastName: { type: String, required: true },
+  // Managed students may be created with a single name
+  lastName: { type: String, required: function () { return !this.isManaged; }, default: '' },
+  // Managed students get a generated placeholder (see utils/managedStudent.js) — never a real inbox
   email: { type: String, required: true, unique: true },
+
+  // ── Managed (admin-managed, no-login) student ─────────────────────────────────
+  // Behaves like a normal student (assignments, bookings, lessons, credits) but
+  // has no password and can never log in. Used by centers that don't onboard students.
+  isManaged: { type: Boolean, default: false },
   password: { type: String, required: false },
   active: { type: Boolean, default: false },
   classCredits: { type: Number, default: 0 },
@@ -53,10 +60,16 @@ export const studentSchema = new mongoose.Schema({
 
   // ── Ring / attention-call preference ────────────────────────────────────────
   ringEnabled: { type: Boolean, default: true },  // false = do not ring this student
+
+  // ── Terms & Conditions ───────────────────────────────────────────────────────
+  hasAcceptedTerms: { type: Boolean, default: false },
+  termsAcceptedAt:  { type: Date,    default: null  },
 }, { timestamps: true });
 
 // Lookup by status (admin lists active/pending/suspended students)
 studentSchema.index({ status: 1 });
+// Admin real/managed tab filter
+studentSchema.index({ isManaged: 1 });
 // Analytics overview: countDocuments({ active: true, classCredits: { $gt: 0 } })
 studentSchema.index({ active: 1, classCredits: 1 });
 // Forgot-password token lookup (sparse — most docs have no token)

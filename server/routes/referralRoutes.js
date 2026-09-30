@@ -15,6 +15,7 @@ import { studentSchema }  from "../schemas/studentSchema.js";
 import { teacherSchema }  from "../schemas/teacherSchema.js";
 import { subAdminSchema } from "../schemas/subAdminSchema.js";
 import logger from "../utils/logger.js";
+import { planBlocksStudentMode } from "../utils/planFeatures.js";
 import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
 
 const router = express.Router();
@@ -136,6 +137,10 @@ router.get("/", verifyToken, verifyAdmin, async (req, res) => {
 // ── POST /api/referrals/:id/approve  —  admin approves → creates student + credits referrer ──
 router.post("/:id/approve", verifyToken, verifyAdmin, async (req, res) => {
   try {
+    // Approving a referral creates a real (log-in) student account
+    const planError = planBlocksStudentMode(req.center, "real");
+    if (planError) return forbidden(res, planError);
+
     const Student  = getStudent(req.db);
     const Referral = getReferral(req.db);
 

@@ -48,7 +48,7 @@ router.get("/:teacherId/students", verifyToken, async (req, res) => {
     const assignments = await getAssignment(req.db).find({ teacherId })
       .populate({
         path: "studentId",
-        select: "firstName lastName email classCredits active age dateOfBirth rank lastPaymentDate studentId"
+        select: "firstName lastName email classCredits active age dateOfBirth rank lastPaymentDate studentId isManaged"
       })
       .sort({ assignedDate: -1 });
 

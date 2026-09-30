@@ -1,10 +1,23 @@
 import { useState, useRef, useCallback, useEffect } from "react";
+import { useUploadQueue } from "../context/UploadQueueContext.jsx";
 
 export function useRecording(bookingId) {
-  const [isRecording,        setIsRecording]        = useState(false);
-  const [uploadingRecording, setUploadingRecording] = useState(false);
-  const [recSeconds,         setRecSeconds]         = useState(0);
-  const [recordingError,     setRecordingError]     = useState(null);
+  const [isRecording,    setIsRecording]    = useState(false);
+  const [recSeconds,     setRecSeconds]     = useState(0);
+  const [recordingError, setRecordingError] = useState(null);
+  const [memoryWarning,  setMemoryWarning]  = useState(false); // true when starting a new rec while one is uploading
+
+  const { addToQueue, hasActiveUploads } = useUploadQueue();
+
+  // Keep uploadingRecording as a derived alias so existing classroom UI
+  // that reads it still compiles — it now reflects the global queue instead
+  // of a local state.
+  const uploadingRecording = hasActiveUploads;
+
+  // Ref so startRecording can read the latest value without being recreated
+  // every time an upload starts/finishes (avoids stale closure).
+  const hasActiveUploadsRef = useRef(false);
+  useEffect(() => { hasActiveUploadsRef.current = hasActiveUploads; }, [hasActiveUploads]);
 
   const mediaRecorderRef = useRef(null);
   const chunksRef        = useRef([]);
@@ -16,7 +29,7 @@ export function useRecording(bookingId) {
 
   useEffect(() => { recSecondsRef.current = recSeconds; }, [recSeconds]);
 
-  const handleRecordingStop = useCallback(async (mimeType) => {
+  const handleRecordingStop = useCallback((mimeType) => {
     // Strip codec params — some browsers fall back to text/plain when codecs are present
     const blobType = mimeType.split(";")[0].trim() || "video/webm";
     const blob = new Blob(chunksRef.current, { type: blobType });
@@ -33,26 +46,18 @@ export function useRecording(bookingId) {
       return;
     }
 
-    try {
-      setRecordingError(null);
-      setUploadingRecording(true);
-      const ext  = blobType.includes("mp4") ? ".mp4" : ".webm";
-      const form = new FormData();
-      form.append("recording", blob, `recording${ext}`);
-      form.append("bookingId", bookingId);
-      form.append("duration",  String(recSecondsRef.current));
-      const { default: api } = await import("../api");
-      await api.post("/recordings/upload", form);
-    } catch (err) {
-      const serverMsg = err?.response?.data?.message || err?.message || "Unknown error";
-      console.error("Recording upload error:", serverMsg, err);
-      setRecordingError(`Recording upload failed: ${serverMsg}`);
-    } finally {
-      setUploadingRecording(false);
-    }
-  }, [bookingId]);
+    setRecordingError(null);
+    const ext = blobType.includes("mp4") ? ".mp4" : ".webm";
+    // Hand off to the global queue — upload runs in background regardless of
+    // which page the teacher navigates to next.
+    addToQueue(blob, bookingId, recSecondsRef.current, ext);
+  }, [bookingId, addToQueue]);
 
   const startRecording = useCallback(async () => {
+    // Warn if a previous recording is still uploading — two large blobs in
+    // memory simultaneously increases the risk of a tab crash on low-RAM devices.
+    // Use ref to get the latest value without recreating this callback.
+    if (hasActiveUploadsRef.current) setMemoryWarning(true);
     try {
       // 1. Capture the browser tab (video + tab audio output = student's voice)
       //    No preferCurrentTab — we want the full picker so the user can select
@@ -159,7 +164,9 @@ export function useRecording(bookingId) {
     uploadingRecording,
     recSeconds,
     recordingError,
+    memoryWarning,
     setRecordingError,
+    setMemoryWarning,
     startRecording,
     stopRecording,
     formatRecTime,

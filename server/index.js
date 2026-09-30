@@ -2,6 +2,8 @@
 // We still import it here so we can call setupExpressErrorHandler() below.
 import * as Sentry from "@sentry/node";
 import logger from "./utils/logger.js";
+import swaggerUi from "swagger-ui-express";
+import { swaggerSpec } from "./docs/swagger.js";
 import express from "express";
 import mongoose from "mongoose";
 import cors from "cors";
@@ -26,6 +28,7 @@ import {
   noSqlInjectionProtection,
   xssProtection,
   parameterPollutionProtection,
+  sanitizeRequest,
   requestLimits
 } from "./middleware/security.js";
 
@@ -81,6 +84,7 @@ app.use(securityHeaders);
 app.use(noSqlInjectionProtection);
 app.use(xssProtection);
 app.use(parameterPollutionProtection);
+app.use(sanitizeRequest);
 
 // ── CORS domain cache ─────────────────────────────────────────────────────────
 // Custom-domain lookups are cached in Redis so we don't hit MongoDB on every
@@ -208,6 +212,16 @@ app.use((req, res, next) => {
 
 // Health checks — no rate limit, no auth, no tenant middleware
 app.use("/api/health", healthRoutes);
+
+// API documentation — Swagger UI
+// Available at /api/docs in all environments
+app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+  customSiteTitle: "ELP API Docs",
+  customCss: ".swagger-ui .topbar { background: linear-gradient(135deg, #0369a1, #0ea5e9); } .swagger-ui .topbar-wrapper img { display: none; } .swagger-ui .topbar-wrapper::before { content: 'English Learning Platform API'; color: #fff; font-size: 18px; font-weight: 700; }",
+  swaggerOptions: { persistAuthorization: true },
+}));
+// Raw JSON spec (useful for importing into Postman)
+app.get("/api/docs.json", (_req, res) => res.json(swaggerSpec));
 
 // CSP violation reports — browsers POST here when a Content-Security-Policy is violated.
 // No auth required (reports come from the browser, before any JS runs).

@@ -47,6 +47,10 @@ export const subAdminSchema = new mongoose.Schema(
     // field, clicking "Log out" only wiped browser storage; the JWT remained
     // valid on the server for up to 7 days.
     sessions:   [sessionSchema],
+
+    // ── Terms & Conditions ─────────────────────────────────────────────────
+    hasAcceptedTerms: { type: Boolean, default: false },
+    termsAcceptedAt:  { type: Date,    default: null  },
   },
   { timestamps: true }
 );

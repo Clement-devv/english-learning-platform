@@ -582,6 +582,10 @@ router.patch('/centers/:id/plan', verifySuperAdmin, strictLimiter, validateCente
     const center = await Center.findByIdAndUpdate(req.params.id, { plan }, { new: true });
     if (!center) return notFound(res, 'Center not found');
 
+    // Plan controls which student types the center can create — apply it now, not after the tenant cache TTL
+    await invalidateCache(`tenant:slug:${center.slug}`);
+    if (center.customDomain) await invalidateCache(`tenant:domain:${center.customDomain}`);
+
     await writeAuditLog({
       action: 'CENTER_PLAN_UPDATED', superAdmin: req.superAdmin,
       targetId: center._id.toString(), targetName: center.centerName,
