@@ -11,6 +11,12 @@ import { useDarkMode } from '../../../hooks/useDarkMode';
 import { getUserTimezone } from '../../../utils/timezone';
 import { pushSupported, enablePush, disablePush, getPushStatus } from '../../../utils/pushNotifications';
 import { getAssignedStudents } from '../../../services/teacherStudentService';
+
+// A pending parent dispute on a completed class (managed student): drives the red heartbeat warning
+const parentDisputeOf = (b) =>
+  b.parentCheck?.status === "denied" && b.disputeStatus === "pending"
+    ? { deadline: b.parentCheck.disputeDeadline, comment: b.parentCheck.comment || "" }
+    : null;
 import {
   getTeacherBookings,
   acceptBooking,
@@ -59,7 +65,16 @@ export function useTeacherDashboardData() {
   const [students,          setStudents]          = useState([]);
   const [bookings,          setBookings]          = useState([]);
   const [classes,           setClasses]           = useState([]);
-  const [completedClasses,  setCompletedClasses]  = useState([]);
+  // The Completed tab pages its own history from the server; the dashboard only
+  // needs the total (stat cards) and a key to tell the tab to reload.
+  const [completedCount,    setCompletedCount]    = useState(0);
+  const [completedReloadKey, setCompletedReloadKey] = useState(0);
+  const loadCompletedCount = useCallback(async (teacherId) => {
+    try {
+      const { data } = await api.get(`/bookings/teacher/${teacherId}/history`, { params: { limit: 1 } });
+      setCompletedCount(data.counts?.completed ?? 0);
+    } catch { /* silent */ }
+  }, []);
   const [googleMeetLink,    setGoogleMeetLink]     = useState('');
   const [zoomLink,          setZoomLink]           = useState('');
 
@@ -211,8 +226,8 @@ export function useTeacherDashboardData() {
   useEffect(() => {
     const check = async () => {
       try {
-        const { data } = await api.get('/homework/my');
-        const toGrade = (data.homework || []).filter(h => h.status === 'submitted').length;
+        const { data } = await api.get('/homework/my', { params: { limit: 1 } }); // counts only
+        const toGrade = data.counts?.submitted ?? 0;
         setHomeworkToGrade(toGrade);
         if (prevHomeworkRef.current !== null && toGrade > prevHomeworkRef.current) {
           const diff = toGrade - prevHomeworkRef.current;
@@ -235,8 +250,8 @@ export function useTeacherDashboardData() {
   useEffect(() => {
     const check = async () => {
       try {
-        const { data } = await api.get('/quiz/my');
-        const attempted = (data.quizzes || []).filter(q => q.status === 'attempted').length;
+        const { data } = await api.get('/quiz/my', { params: { limit: 1 } }); // counts only
+        const attempted = data.counts?.attempted ?? 0;
         setQuizAttempted(attempted);
         if (prevQuizRef.current !== null && attempted > prevQuizRef.current) {
           const diff = attempted - prevQuizRef.current;
@@ -353,64 +368,10 @@ export function useTeacherDashboardData() {
     const teacherId = teacherIdRef.current;
     if (!teacherId) return;
     try {
-      const completedData = await getTeacherBookings(teacherId, 'completed');
-      const missedData    = completedData.filter(b => b.status === 'missed');
-      const trueCompleted = completedData.filter(b => b.status === 'completed');
-
-      const completedMap = new Map();
-      trueCompleted.forEach(booking => {
-        const scheduledDate = new Date(booking.scheduledTime);
-        const groupKey = `${booking.scheduledTime}_${booking.classTitle}`;
-        if (completedMap.has(groupKey)) {
-          const entry = completedMap.get(groupKey);
-          entry.students.push(`${booking.studentId.firstName} ${booking.studentId.lastName}`);
-          if (booking.adminRejected) entry.adminRejected = true;
-        } else {
-          completedMap.set(groupKey, {
-            id: booking._id, title: booking.classTitle,
-            topic: booking.topic || 'Completed Lesson',
-            fullDateTime: new Date(booking.scheduledTime).toLocaleString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true }),
-            scheduledTime: booking.scheduledTime,
-            scheduledDate,
-            students: [`${booking.studentId.firstName} ${booking.studentId.lastName}`],
-            duration: booking.duration, status: 'completed',
-            officiallyCompleted: true,
-            adminRejected: booking.adminRejected || false,
-            adminRejectedReason: booking.adminRejectedReason || '',
-            adminRejectedAt: booking.adminRejectedAt || null,
-            disputeRaised: booking.disputeRaised || false,
-          });
-        }
-      });
-
-      const missedMap = new Map();
-      missedData.forEach(booking => {
-        const scheduledDate = new Date(booking.scheduledTime);
-        const groupKey = `${booking.scheduledTime}_${booking.classTitle}`;
-        if (missedMap.has(groupKey)) {
-          missedMap.get(groupKey).students.push(`${booking.studentId.firstName} ${booking.studentId.lastName}`);
-        } else {
-          missedMap.set(groupKey, {
-            id: booking._id, title: booking.classTitle,
-            topic: booking.topic || 'Missed Lesson',
-            fullDateTime: scheduledDate.toLocaleString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true }),
-            scheduledTime: booking.scheduledTime, scheduledDate,
-            students: [`${booking.studentId.firstName} ${booking.studentId.lastName}`],
-            duration: booking.duration, status: 'missed', isMissed: true,
-            missedReason: booking.missedReason || '',
-            adminRejected: booking.adminRejected || false,
-            adminRejectedReason: booking.adminRejectedReason || '',
-            disputeRaised: booking.disputeRaised || false,
-          });
-        }
-      });
-
-      setCompletedClasses([
-        ...Array.from(completedMap.values()),
-        ...Array.from(missedMap.values()),
-      ]);
+      await loadCompletedCount(teacherId);
+      setCompletedReloadKey(k => k + 1);
     } catch { /* silent */ }
-  }, []);
+  }, [loadCompletedCount]);
 
   // Re-fetch assigned students so new assignments appear automatically.
   const refreshStudents = useCallback(async () => {
@@ -501,15 +462,12 @@ export function useTeacherDashboardData() {
       // Sync refreshed profile back into the global auth context + storage
       setAuthUser(apiTeacherData);
 
-      const [studentsData, pendingData, acceptedData, completedData] = await Promise.all([
+      const [studentsData, pendingData, acceptedData] = await Promise.all([
         getAssignedStudents(teacherId),
         getTeacherBookings(teacherId, 'pending'),
         getTeacherBookings(teacherId, 'accepted'),
-        getTeacherBookings(teacherId, 'completed'),
+        loadCompletedCount(teacherId),
       ]);
-
-      const missedData    = completedData.filter(b => b.status === 'missed');
-      const trueCompleted = completedData.filter(b => b.status === 'completed');
 
       // Students
       setStudents(studentsData.map(item => ({
@@ -593,68 +551,7 @@ export function useTeacherDashboardData() {
       classesMap.forEach(cls => (cls.status === 'completed' ? finishedArr : activeArr).push(cls));
       setClasses(activeArr);
 
-      // Completed classes — bookings officially marked status='completed' by the system
-      const completedMap = new Map();
-      trueCompleted.forEach(booking => {
-        const scheduledDate = new Date(booking.scheduledTime);
-        const groupKey = `${booking.scheduledTime}_${booking.classTitle}`;
-        if (completedMap.has(groupKey)) {
-          const entry = completedMap.get(groupKey);
-          entry.students.push(`${booking.studentId.firstName} ${booking.studentId.lastName}`);
-          // If ANY booking in the group was admin-rejected, mark the whole slot as rejected
-          if (booking.adminRejected) entry.adminRejected = true;
-        } else {
-          completedMap.set(groupKey, {
-            id:                  booking._id,
-            title:               booking.classTitle,
-            topic:               booking.topic || 'Completed Lesson',
-            fullDateTime:        scheduledDate.toLocaleString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true }),
-            scheduledTime:       booking.scheduledTime,
-            scheduledDate,
-            students:            [`${booking.studentId.firstName} ${booking.studentId.lastName}`],
-            duration:            booking.duration,
-            status:              'completed',
-            officiallyCompleted: true,   // marked by server, not just past scheduled time
-            adminRejected:       booking.adminRejected || false,
-            adminRejectedReason: booking.adminRejectedReason || '',
-            adminRejectedAt:     booking.adminRejectedAt || null,
-            disputeRaised:       booking.disputeRaised || false,
-          });
-        }
-      });
-
-      // Missed classes
-      const missedMap = new Map();
-      missedData.forEach(booking => {
-        const scheduledDate = new Date(booking.scheduledTime);
-        const groupKey = `${booking.scheduledTime}_${booking.classTitle}`;
-        if (missedMap.has(groupKey)) {
-          missedMap.get(groupKey).students.push(`${booking.studentId.firstName} ${booking.studentId.lastName}`);
-        } else {
-          missedMap.set(groupKey, {
-            id:                  booking._id,
-            title:               booking.classTitle,
-            topic:               booking.topic || 'Missed Lesson',
-            fullDateTime:        scheduledDate.toLocaleString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true }),
-            scheduledTime:       booking.scheduledTime,
-            scheduledDate,
-            students:            [`${booking.studentId.firstName} ${booking.studentId.lastName}`],
-            duration:            booking.duration,
-            status:              'missed',
-            isMissed:            true,
-            missedReason:        booking.missedReason || '',
-            adminRejected:       booking.adminRejected || false,
-            adminRejectedReason: booking.adminRejectedReason || '',
-            disputeRaised:       booking.disputeRaised || false,
-          });
-        }
-      });
-
-      setCompletedClasses([
-        ...finishedArr,
-        ...Array.from(completedMap.values()),
-        ...Array.from(missedMap.values()),
-      ]);
+      setCompletedReloadKey(k => k + 1);
     } catch (err) {
       console.error('Failed to load teacher data:', err);
       showToast('Failed to load data from server', 'error');
@@ -822,9 +719,6 @@ export function useTeacherDashboardData() {
   // Only count classes officially marked 'completed' by the server AND not
   // admin-rejected — i.e. the admin approved the class and the teacher was paid.
   // Excludes: missed classes, stale accepted bookings, admin-rejected completions.
-  const completedCount = completedClasses.filter(
-    c => c.officiallyCompleted && !c.adminRejected
-  ).length;
 
   return {
     // State
@@ -835,7 +729,7 @@ export function useTeacherDashboardData() {
     sidebarOpen, setSidebarOpen,
     isDarkMode,  toggleDarkMode,
     // Data
-    students, bookings, classes, liveClasses, upcomingClasses, completedClasses,
+    students, bookings, classes, liveClasses, upcomingClasses, completedReloadKey,
     googleMeetLink, setGoogleMeetLink,
     zoomLink, setZoomLink,
     // Computed

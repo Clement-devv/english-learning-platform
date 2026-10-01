@@ -4,6 +4,7 @@
 import { useState, useEffect } from "react";
 import { RefreshCw } from "lucide-react";
 import api from "../../../api";
+import Pagination from "../../../components/Pagination";
 
 const fmt = (d) =>
   d ? new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—";
@@ -33,6 +34,7 @@ export default function ReviewsTab({ teacherInfo, isDarkMode }) {
   const [data,    setData]    = useState(null);  // { reviews, stats }
   const [loading, setLoading] = useState(true);
   const [filter,  setFilter]  = useState(0);    // 0 = all stars
+  const [page,    setPage]    = useState(1);
 
   const bg    = isDarkMode ? "#0f172a" : "#f8fafc";
   const card  = isDarkMode ? "#1e293b" : "#ffffff";
@@ -44,8 +46,10 @@ export default function ReviewsTab({ teacherInfo, isDarkMode }) {
     if (!teacherInfo?._id) return;
     setLoading(true);
     try {
-      const res = await api.get(`/reviews/teacher/${teacherInfo._id}`);
+      // One page; the star filter is applied on the server, stats cover everything
+      const res = await api.get(`/reviews/teacher/${teacherInfo._id}`, { params: { page, limit: 10, rating: filter || undefined } });
       setData(res.data);
+      if (res.data.pagination && res.data.pagination.page !== page) setPage(res.data.pagination.page);
     } catch (e) {
       console.error("Reviews load error:", e.message);
     } finally {
@@ -53,12 +57,14 @@ export default function ReviewsTab({ teacherInfo, isDarkMode }) {
     }
   }
 
-  useEffect(() => { load(); }, [teacherInfo?._id]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); }, [teacherInfo?._id, page, filter]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setPage(1); }, [filter]);
 
   const reviews = data?.reviews ?? [];
   const stats   = data?.stats   ?? { total: 0, avgRating: null, dist: [0,0,0,0,0] };
 
-  const displayed = filter === 0 ? reviews : reviews.filter(r => r.rating === filter);
+  const displayed = reviews; // already filtered + paged by the server
+  const pager     = data?.pagination ?? { total: 0, totalPages: 1, limit: 10 };
 
   const distColors = ["#ef4444","#f97316","#eab308","#84cc16","#16a34a"];
 
@@ -166,6 +172,8 @@ export default function ReviewsTab({ teacherInfo, isDarkMode }) {
               </div>
             ))
           )}
+          <Pagination page={page} totalPages={pager.totalPages} total={pager.total} pageSize={pager.limit}
+            onPage={(p) => { setPage(p); window.scrollTo({ top: 0, behavior: "smooth" }); }} isDarkMode={isDarkMode} />
         </>
       )}
     </div>

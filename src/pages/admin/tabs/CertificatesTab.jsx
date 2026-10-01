@@ -39,7 +39,7 @@ export default function CertificatesTab({ isDarkMode }) {
     try {
       const [cRes, sRes] = await Promise.all([
         api.get('/certificates'),
-        api.get('/students'),
+        api.get('/students', { params: { limit: 5000 } }),
       ]);
       setCerts(cRes.data.certificates || []);
       setStudents(sRes.data?.students || sRes.data || []);

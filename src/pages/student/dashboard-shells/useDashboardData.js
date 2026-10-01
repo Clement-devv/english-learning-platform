@@ -163,7 +163,8 @@ export function useDashboardData() {
   // ── Data state ─────────────────────────────────────────────────────────────
   const [activeClasses,    setActiveClasses]    = useState([]);
   const [upcomingClasses,  setUpcomingClasses]  = useState([]);
-  const [completedClasses, setCompletedClasses] = useState([]);
+  const [completedClasses, setCompletedClasses] = useState([]); // newest 50 — enough for streak / weekly / charts
+  const [completedTotal,   setCompletedTotal]   = useState(0);  // true all-time total (badges, progress)
   const [progress, setProgress] = useState({
     completedLessons: 0, totalLessons: 0, streakDays: 0,
     weeklyGoal: 5, weeklyCompleted: 0, classesRemaining: 0,
@@ -248,8 +249,8 @@ export function useDashboardData() {
   useEffect(() => {
     const checkHomework = async () => {
       try {
-        const { data } = await api.get("/homework/assigned");
-        const pending = (data.homework || []).filter(h => h.status === "assigned").length;
+        const { data } = await api.get("/homework/assigned", { params: { limit: 1 } }); // counts only
+        const pending = data.counts?.assigned ?? 0;
         setHomeworkPending(pending);
         if (prevHomeworkRef.current !== null && pending > prevHomeworkRef.current) {
           const diff = pending - prevHomeworkRef.current;
@@ -269,8 +270,8 @@ export function useDashboardData() {
   useEffect(() => {
     const checkQuizzes = async () => {
       try {
-        const { data } = await api.get("/quiz/assigned");
-        const pending = (data.quizzes || []).filter(q => q.status === "assigned").length;
+        const { data } = await api.get("/quiz/assigned", { params: { limit: 1 } }); // counts only
+        const pending = data.counts?.assigned ?? 0;
         setQuizPending(pending);
         if (prevQuizRef.current !== null && pending > prevQuizRef.current) {
           const diff = pending - prevQuizRef.current;
@@ -354,10 +355,11 @@ export function useDashboardData() {
 
       api.patch(`/students/${studentId}/timezone`, { timezone: getUserTimezone() }).catch(() => {});
 
-      const [accepted, completed, pendingConf] = await Promise.all([
+      const [accepted, completed, pendingConf, history] = await Promise.all([
         getStudentBookings(studentId, "accepted"),
         getStudentBookings(studentId, "completed"),
         getStudentBookings(studentId, "pending_confirmation"),
+        api.get(`/bookings/student/${studentId}/history`, { params: { limit: 1 } }).then(r => r.data).catch(() => null),
       ]);
       rawAcceptedRef.current = accepted;
 
@@ -430,7 +432,9 @@ export function useDashboardData() {
         classesRemaining = authUser?.classCredits || 0;
       }
 
-      const completedCount = completedList.length;
+      // The list above is capped; the history endpoint counts every completed class
+      const completedCount = history?.counts?.completed ?? completedList.length;
+      setCompletedTotal(completedCount);
       setProgress({
         completedLessons: completedCount, totalLessons: completedCount + classesRemaining,
         classesRemaining, streakDays, weeklyGoal: 5, weeklyCompleted,
@@ -597,18 +601,18 @@ export function useDashboardData() {
     });
 
   const checkForCelebrationAndBadges = () => {
-    const earned = checkEarnedBadges(completedClasses.length, progress.streakDays, progress.weeklyCompleted, completedClasses);
+    const earned = checkEarnedBadges(completedTotal, progress.streakDays, progress.weeklyCompleted, completedClasses);
     const newOnes = earned.filter(b => !badges.some(x => x.id === b.id));
     if (newOnes.length) { setNewBadge(newOnes[newOnes.length - 1]); triggerCelebration(newOnes[newOnes.length - 1].name, newOnes[newOnes.length - 1].icon); }
     setBadges(earned);
-    const n = completedClasses.length;
+    const n = completedTotal;
     if (progress.streakDays === 5)  triggerCelebration("🔥 Amazing! 5-Day Streak!", "🔥");
     else if (progress.streakDays === 10) triggerCelebration("⚡ 10-Day Streak Master!", "⚡");
     else if (n === 25) triggerCelebration("🎓 25 Classes Done!", "🎓");
     else if (n === 50) triggerCelebration("🏆 50 Classes!", "🏆");
   };
 
-  useEffect(() => { checkForCelebrationAndBadges(); }, [completedClasses, progress.streakDays]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { checkForCelebrationAndBadges(); }, [completedClasses, completedTotal, progress.streakDays]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const STREAK_MILESTONES = [3, 7, 14, 30, 50, 100];
   const handleStreakLoaded = (currentStreak) => {

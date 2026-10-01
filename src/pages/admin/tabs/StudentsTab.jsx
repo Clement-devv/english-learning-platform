@@ -307,10 +307,10 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
     (async () => {
       setLoading(true);
       try {
-        const [studentsData, paymentsData, lessonsData, centerConfig] = await Promise.all([
+        // Payment/lesson history is loaded when a history modal opens (below),
+        // for just that student — not the whole center up front.
+        const [studentsData, centerConfig] = await Promise.all([
           getStudents(),
-          getAllPayments(),
-          getAllLessons(),
           // UI hint only — the server enforces the plan, so fall back to showing both
           api.get("/center/config").then((r) => r.data).catch(() => null),
         ]);
@@ -318,24 +318,6 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
         setStudents(studentsData);
         setStudentModes(centerConfig?.center?.studentModes || { real: true, managed: true });
 
-        const formattedPayments = paymentsData
-          .filter((p) => p.studentId !== null)
-          .map((p) => ({
-            ...p,
-            studentId: p.studentId._id,
-            student: `${p.studentId.firstName} ${p.studentId.lastName}`,
-            amountDisplay: `₦${p.amount}`,
-          }));
-        setPaymentHistory(formattedPayments);
-
-        const formattedLessons = lessonsData
-          .filter((l) => l.studentId !== null)
-          .map((l) => ({
-            ...l,
-            studentId: l.studentId._id,
-            student: `${l.studentId.firstName} ${l.studentId.lastName}`,
-          }));
-        setLessonHistory(formattedLessons);
       } catch (err) {
         console.error("❌ Load students error:", err);
         showToast("Could not load students. Please refresh.", "error");
@@ -534,6 +516,33 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
       showToast("Could not record payment.", "error");
     }
   };
+
+  // ── History for the modals (one student, or the whole center's latest) ───────
+  const HISTORY_LIMIT = 2000;
+  useEffect(() => {
+    if (!isPaymentModalOpen) return;
+    setPaymentHistory([]);
+    getAllPayments({ limit: HISTORY_LIMIT, ...(selectedStudent ? { studentId: selectedStudent } : {}) })
+      .then((rows) => setPaymentHistory((rows || []).filter((p) => p.studentId).map((p) => ({
+        ...p,
+        studentId: p.studentId._id,
+        student: `${p.studentId.firstName} ${p.studentId.lastName}`,
+        amountDisplay: `₦${p.amount}`,
+      }))))
+      .catch(() => showToast("Could not load payment history", "error"));
+  }, [isPaymentModalOpen, selectedStudent]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!isLessonModalOpen) return;
+    setLessonHistory([]);
+    getAllLessons({ limit: HISTORY_LIMIT, ...(selectedStudent ? { studentId: selectedStudent } : {}) })
+      .then((rows) => setLessonHistory((rows || []).filter((l) => l.studentId).map((l) => ({
+        ...l,
+        studentId: l.studentId._id,
+        student: `${l.studentId.firstName} ${l.studentId.lastName}`,
+      }))))
+      .catch(() => showToast("Could not load lesson history", "error"));
+  }, [isLessonModalOpen, selectedStudent]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── View modals ─────────────────────────────────────────────────────────────
   const handleViewPayment = (id) => {

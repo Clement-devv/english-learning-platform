@@ -4,8 +4,13 @@ import {
   Plus, BookOpen, Clock, CheckCircle2, Star, Trash2,
   ChevronDown, ChevronUp, Paperclip, Upload, X, Send,
   AlertCircle, RefreshCw, FileText, Image, File, Mic,
+  Download,
 } from "lucide-react";
 import AudioRecorder from "../../../components/AudioRecorder";
+import ManagedBadge from "../../../components/ManagedBadge";
+import ShareLinkPanel from "../../../components/ShareLinkPanel";
+import Pagination from "../../../components/Pagination";
+import { downloadGradedHomeworkPdf } from "../../../utils/homeworkPdf";
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
@@ -20,8 +25,12 @@ const ALLOWED_TYPES = [
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 const MAX_FILES     = 5;
 
+// Center brand colour (set by utils/branding.js) — never hard-code a theme colour here
+const BRAND  = "var(--brand-primary, #2563eb)";
+const brandA = (a) => `rgba(var(--brand-primary-rgb, 37, 99, 235), ${a})`;
+
 const STATUS_CONFIG = {
-  assigned:  { label: "Assigned",  color: "#6366f1", bg: "#eef2ff" },
+  assigned:  { label: "Assigned",  color: BRAND, bg: brandA(0.1) },
   submitted: { label: "Submitted", color: "#f59e0b", bg: "#fffbeb" },
   graded:    { label: "Graded",    color: "#10b981", bg: "#ecfdf5" },
 };
@@ -93,8 +102,8 @@ function FilePicker({ files, setFiles, label = "Attach files" }) {
           onClick={() => inputRef.current?.click()}
           style={{
             display: "inline-flex", alignItems: "center", gap: 6,
-            padding: "6px 14px", borderRadius: 8, border: "1.5px dashed #a5b4fc",
-            background: "#f5f3ff", color: "#6366f1", fontSize: 13, fontWeight: 600,
+            padding: "6px 14px", borderRadius: 8, border: `1.5px dashed ${brandA(0.45)}`,
+            background: brandA(0.06), color: BRAND, fontSize: 13, fontWeight: 600,
             cursor: "pointer",
           }}>
           <Paperclip size={14} /> {label}
@@ -160,30 +169,35 @@ export default function HomeworkTab({ teacherInfo, students, isDarkMode }) {
     setTimeout(() => setToast(null), 3500);
   };
 
-  const fetchHomework = async () => {
-    try {
-      setLoading(true);
-      const { data } = await api.get("/homework/my");
-      setHomeworkList(data.homework || []);
-    } catch {
-      showToast("Failed to load homework", "error");
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Paged on the server (20 per page) — counts per status come back with every page
+  const [page,      setPage]      = useState(1);
+  const [pager,     setPager]     = useState({ total: 0, totalPages: 1, limit: 20 });
+  const [counts,    setCounts]    = useState({ all: 0, assigned: 0, submitted: 0, graded: 0 });
+  const [reloadKey, setReloadKey] = useState(0);
+  const changeFilter = (f) => { setFilter(f); setPage(1); };
+  const fetchHomework = () => setReloadKey(k => k + 1);
 
-  useEffect(() => { fetchHomework(); }, []);
+  useEffect(() => {
+    let stale = false;
+    (async () => {
+      try {
+        setLoading(true);
+        const { data } = await api.get("/homework/my", { params: { status: filter === "all" ? undefined : filter, page } });
+        if (stale) return;
+        setHomeworkList(data.homework || []);
+        if (data.counts) setCounts(data.counts);
+        if (data.pagination) { setPager(data.pagination); if (data.pagination.page !== page) setPage(data.pagination.page); }
+      } catch {
+        if (!stale) showToast("Failed to load homework", "error");
+      } finally {
+        if (!stale) setLoading(false);
+      }
+    })();
+    return () => { stale = true; };
+  }, [page, filter, reloadKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const filtered = homeworkList.filter(hw =>
-    filter === "all" ? true : hw.status === filter
-  );
+  const filtered = homeworkList; // already filtered + paged by the server
 
-  const counts = {
-    all:       homeworkList.length,
-    assigned:  homeworkList.filter(h => h.status === "assigned").length,
-    submitted: homeworkList.filter(h => h.status === "submitted").length,
-    graded:    homeworkList.filter(h => h.status === "graded").length,
-  };
 
   // ── Create homework ─────────────────────────────────────────────────────────
   const handleCreate = async (e) => {
@@ -202,6 +216,7 @@ export default function HomeworkTab({ teacherInfo, students, isDarkMode }) {
       formFiles.forEach(f => fd.append("files", f));
 
       const { data: created } = await api.post("/homework", fd, { headers: { "Content-Type": "multipart/form-data" } });
+      const forManaged = !!created.homework?.shareToken;
 
       // Upload instruction voice note if recorded
       if (formInstructionAudio?.blob) {
@@ -213,12 +228,14 @@ export default function HomeworkTab({ teacherInfo, students, isDarkMode }) {
         });
       }
 
-      showToast("Homework assigned!");
+      showToast(forManaged ? "Homework created — copy the link below and send it to the parent" : "Homework assigned!");
       setShowForm(false);
       setForm({ studentId: "", title: "", description: "", dueDate: "" });
       setFormFiles([]);
       setFormInstructionAudio(null);
-      fetchHomework();
+      await fetchHomework();
+      // Open the new card so the teacher sees the share link straight away
+      if (forManaged) { changeFilter("all"); setExpandedId(created.homework._id); }
     } catch (err) {
       showToast(err?.response?.data?.message || "Failed to assign homework", "error");
     } finally {
@@ -269,9 +286,42 @@ export default function HomeworkTab({ teacherInfo, students, isDarkMode }) {
       await api.delete(`/homework/${hwId}`);
       showToast("Deleted");
       setHomeworkList(prev => prev.filter(h => h._id !== hwId));
+      fetchHomework();
     } catch {
       showToast("Failed to delete", "error");
     }
+  };
+
+  // ── Share link: create / delete ─────────────────────────────────────────────
+  const replaceHw = (updated) =>
+    setHomeworkList(prev => prev.map(h => (h._id === updated._id ? { ...h, ...updated, studentId: h.studentId } : h)));
+
+  const handleCreateLink = async (hwId) => {
+    try {
+      const { data } = await api.post(`/homework/${hwId}/share-link`);
+      replaceHw(data.homework);
+      showToast("New link created");
+    } catch (err) {
+      showToast(err?.response?.data?.message || "Could not create link", "error");
+    }
+  };
+
+  const handleDeleteLink = async (hwId) => {
+    try {
+      await api.delete(`/homework/${hwId}/share-link`);
+      setHomeworkList(prev => prev.map(h => (h._id === hwId ? { ...h, shareToken: null, shareLink: undefined } : h)));
+      showToast("Link deleted — it no longer works");
+    } catch (err) {
+      showToast(err?.response?.data?.message || "Could not delete link", "error");
+    }
+  };
+
+  const [pdfBusy, setPdfBusy] = useState(null);
+  const handleDownloadPdf = async (hw) => {
+    setPdfBusy(hw._id);
+    try { await downloadGradedHomeworkPdf(hw, teacherInfo); }
+    catch (err) { console.error("PDF error:", err); showToast("Could not create PDF", "error"); }
+    finally { setPdfBusy(null); }
   };
 
   const fileUrl = (type, fileId) =>
@@ -319,7 +369,7 @@ export default function HomeworkTab({ teacherInfo, students, isDarkMode }) {
             <RefreshCw size={14} /> Refresh
           </button>
           <button onClick={() => setShowForm(v => !v)}
-            style={{ padding: "8px 18px", borderRadius: 10, border: "none", background: "linear-gradient(135deg,#6366f1,#8b5cf6)", color: "#fff", cursor: "pointer", fontWeight: 700, fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}>
+            style={{ padding: "8px 18px", borderRadius: 10, border: "none", background: BRAND, color: "#fff", cursor: "pointer", fontWeight: 700, fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}>
             <Plus size={15} /> Assign Homework
           </button>
         </div>
@@ -328,13 +378,13 @@ export default function HomeworkTab({ teacherInfo, students, isDarkMode }) {
       {/* Stats row */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12 }}>
         {[
-          { key: "all",       label: "Total",     icon: BookOpen,     color: "#6366f1" },
+          { key: "all",       label: "Total",     icon: BookOpen,     color: BRAND },
           { key: "assigned",  label: "Pending",   icon: Clock,        color: "#f59e0b" },
           { key: "submitted", label: "To Review",  icon: AlertCircle,  color: "#3b82f6" },
           { key: "graded",    label: "Graded",    icon: CheckCircle2, color: "#10b981" },
         ].map(({ key, label, icon: Icon, color }) => (
           <div key={key}
-            onClick={() => setFilter(key)}
+            onClick={() => changeFilter(key)}
             style={{
               background: c.card, border: `2px solid ${filter === key ? color : c.border}`,
               borderRadius: 14, padding: "14px 18px", cursor: "pointer",
@@ -351,7 +401,7 @@ export default function HomeworkTab({ teacherInfo, students, isDarkMode }) {
 
       {/* Create form */}
       {showForm && (
-        <div style={{ background: c.card, border: `2px solid #6366f1`, borderRadius: 16, padding: 24 }}>
+        <div style={{ background: c.card, border: `2px solid ${BRAND}`, borderRadius: 16, padding: 24 }}>
           <h3 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 800, color: c.heading }}>
             Assign New Homework
           </h3>
@@ -369,10 +419,15 @@ export default function HomeworkTab({ teacherInfo, students, isDarkMode }) {
                   <option value="">Select student…</option>
                   {(students || []).map(s => (
                     <option key={s._id || s.id} value={s._id || s.id}>
-                      {s.firstName} {s.lastName}
+                      {s.firstName} {s.lastName}{s.isManaged ? " · Managed (link)" : ""}
                     </option>
                   ))}
                 </select>
+                {(students || []).find(s => (s._id || s.id) === form.studentId)?.isManaged && (
+                  <p style={{ margin: "6px 0 0", fontSize: 11, color: BRAND, fontWeight: 600 }}>
+                    This student has no login — you'll get a link to send to the parent.
+                  </p>
+                )}
               </div>
               <div>
                 <label style={{ fontSize: 12, fontWeight: 700, color: c.body, display: "block", marginBottom: 6 }}>
@@ -422,12 +477,14 @@ export default function HomeworkTab({ teacherInfo, students, isDarkMode }) {
               </label>
               <AudioRecorder
                 isDarkMode={isDarkMode}
+                label={null}
+                recordLabel="Record instructions"
                 onRecorded={(blob, duration) =>
                   setFormInstructionAudio(blob ? { blob, duration } : null)
                 }
               />
               {formInstructionAudio?.blob && (
-                <p style={{ margin: "6px 0 0", fontSize: 12, color: "#6366f1", fontWeight: 600 }}>
+                <p style={{ margin: "6px 0 0", fontSize: 12, color: BRAND, fontWeight: 600 }}>
                   ✓ Voice note recorded — will be attached to instructions
                 </p>
               )}
@@ -441,7 +498,7 @@ export default function HomeworkTab({ teacherInfo, students, isDarkMode }) {
                 Cancel
               </button>
               <button type="submit" disabled={submitting}
-                style={{ padding: "9px 24px", borderRadius: 10, border: "none", background: "linear-gradient(135deg,#6366f1,#8b5cf6)", color: "#fff", fontSize: 13, fontWeight: 700, cursor: submitting ? "not-allowed" : "pointer", opacity: submitting ? 0.7 : 1, display: "flex", alignItems: "center", gap: 6 }}>
+                style={{ padding: "9px 24px", borderRadius: 10, border: "none", background: BRAND, color: "#fff", fontSize: 13, fontWeight: 700, cursor: submitting ? "not-allowed" : "pointer", opacity: submitting ? 0.7 : 1, display: "flex", alignItems: "center", gap: 6 }}>
                 <Send size={13} /> {submitting ? "Assigning…" : "Assign"}
               </button>
             </div>
@@ -452,13 +509,13 @@ export default function HomeworkTab({ teacherInfo, students, isDarkMode }) {
       {/* Filter tabs */}
       <div style={{ display: "flex", gap: 6 }}>
         {["all", "assigned", "submitted", "graded"].map(f => (
-          <button key={f} onClick={() => setFilter(f)}
+          <button key={f} onClick={() => changeFilter(f)}
             style={{
               padding: "6px 16px", borderRadius: 20, border: "none", fontSize: 13, fontWeight: 600,
               cursor: "pointer", transition: "all 0.15s",
-              background: filter === f ? "#6366f1" : c.card,
+              background: filter === f ? BRAND : c.card,
               color:      filter === f ? "#fff"    : c.body,
-              boxShadow:  filter === f ? "0 2px 8px #6366f140" : "none",
+              boxShadow:  filter === f ? `0 2px 8px ${brandA(0.25)}` : "none",
             }}>
             {f.charAt(0).toUpperCase() + f.slice(1)} {filter !== f && `(${counts[f]})`}
           </button>
@@ -475,7 +532,7 @@ export default function HomeworkTab({ teacherInfo, students, isDarkMode }) {
         <div style={{ textAlign: "center", padding: "48px 24px", background: c.card, borderRadius: "16px", border: `1px solid ${c.border}` }}>
           <div style={{
             width: "64px", height: "64px", borderRadius: "20px",
-            background: isDarkMode ? "#1e1730" : "#f5f0ff",
+            background: isDarkMode ? brandA(0.15) : brandA(0.08),
             display: "flex", alignItems: "center", justifyContent: "center",
             margin: "0 auto 16px",
           }}>
@@ -498,7 +555,7 @@ export default function HomeworkTab({ teacherInfo, students, isDarkMode }) {
 
             return (
               <div key={hw._id} style={{
-                background: c.card, border: `2px solid ${isExpanded ? "#6366f1" : c.border}`,
+                background: c.card, border: `2px solid ${isExpanded ? BRAND : c.border}`,
                 borderRadius: 14, overflow: "hidden", transition: "border-color 0.15s",
               }}>
                 {/* Card header */}
@@ -506,7 +563,7 @@ export default function HomeworkTab({ teacherInfo, students, isDarkMode }) {
                   onClick={() => setExpandedId(isExpanded ? null : hw._id)}
                   style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", cursor: "pointer" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 0 }}>
-                    <div style={{ width: 38, height: 38, borderRadius: "50%", background: "linear-gradient(135deg,#6366f1,#8b5cf6)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <div style={{ width: 38, height: 38, borderRadius: "50%", background: BRAND, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                       <BookOpen size={18} color="#fff" />
                     </div>
                     <div style={{ minWidth: 0 }}>
@@ -514,7 +571,9 @@ export default function HomeworkTab({ teacherInfo, students, isDarkMode }) {
                         {hw.title}
                       </div>
                       <div style={{ fontSize: 12, color: c.body, marginTop: 2 }}>
-                        {student?.firstName} {student?.lastName || student?.lastName} ·{" "}
+                        {student?.firstName} {student?.lastName}
+                        {student?.isManaged && <ManagedBadge isDarkMode={isDarkMode} style={{ marginLeft: 6 }} />}
+                        {" "}·{" "}
                         <span style={{ color: overdue ? "#ef4444" : c.body }}>
                           Due {formatDate(hw.dueDate)}{overdue ? " — Overdue" : ""}
                         </span>
@@ -536,6 +595,18 @@ export default function HomeworkTab({ teacherInfo, students, isDarkMode }) {
                 {/* Expanded detail */}
                 {isExpanded && (
                   <div style={{ borderTop: `1px solid ${c.border}`, padding: "16px 18px", display: "flex", flexDirection: "column", gap: 14 }}>
+
+                    {/* Share link — managed students only, until graded */}
+                    {student?.isManaged && hw.status !== "graded" && (
+                      <ShareLinkPanel
+                        item={hw}
+                        kind="homework"
+                        isDarkMode={isDarkMode}
+                        onCreate={() => handleCreateLink(hw._id)}
+                        onDelete={() => handleDeleteLink(hw._id)}
+                        notify={showToast}
+                      />
+                    )}
 
                     {/* Description */}
                     {hw.description && (
@@ -570,11 +641,18 @@ export default function HomeworkTab({ teacherInfo, students, isDarkMode }) {
                       <div style={{ background: isDarkMode ? "#0f172a" : "#f8fafc", borderRadius: 12, padding: 14, border: `1px solid ${c.border}` }}>
                         <div style={{ fontSize: 12, fontWeight: 700, color: c.body, marginBottom: 8 }}>
                           STUDENT SUBMISSION · {formatDate(hw.submission?.submittedAt)}
+                          {hw.submission?.via === "link" && " · via link"}
                         </div>
                         {hw.submission?.text && (
                           <p style={{ margin: "0 0 10px", fontSize: 13, color: c.heading, whiteSpace: "pre-wrap" }}>
                             {hw.submission.text}
                           </p>
+                        )}
+                        {hw.submission?.audio?.fileId && (
+                          <div style={{ marginBottom: 10 }}>
+                            <AudioFeedbackPlayer fileId={hw.submission.audio.fileId} duration={hw.submission.audio.duration}
+                              type="submission-audio" label="Student's voice answer" />
+                          </div>
                         )}
                         {hw.submission?.attachments?.length > 0 && (
                           <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
@@ -649,6 +727,10 @@ export default function HomeworkTab({ teacherInfo, students, isDarkMode }) {
                         {hw.grade?.audioFeedback?.fileId && (
                           <AudioFeedbackPlayer fileId={hw.grade.audioFeedback.fileId} duration={hw.grade.audioFeedback.duration} />
                         )}
+                        <button type="button" onClick={() => handleDownloadPdf(hw)} disabled={pdfBusy === hw._id}
+                          style={{ marginTop: 10, display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 8, border: "1px solid #6ee7b7", background: "#fff", color: "#065f46", fontWeight: 700, fontSize: 12, cursor: pdfBusy === hw._id ? "not-allowed" : "pointer", fontFamily: "inherit" }}>
+                          <Download size={13} /> {pdfBusy === hw._id ? "Creating PDF…" : "Download PDF for parent"}
+                        </button>
                       </div>
                     )}
                   </div>
@@ -658,12 +740,17 @@ export default function HomeworkTab({ teacherInfo, students, isDarkMode }) {
           })}
         </div>
       )}
+
+      {!loading && (
+        <Pagination page={page} totalPages={pager.totalPages} total={pager.total} pageSize={pager.limit}
+          onPage={(p) => { setPage(p); setExpandedId(null); window.scrollTo({ top: 0, behavior: "smooth" }); }} isDarkMode={isDarkMode} />
+      )}
     </div>
   );
 }
 
 // ── Audio feedback player (used in graded section) ────────────────────────────
-function AudioFeedbackPlayer({ fileId, duration }) {
+function AudioFeedbackPlayer({ fileId, duration, type = "audio-feedback", label = "Voice Feedback" }) {
   const [blobUrl,  setBlobUrl]  = useState(null);
   const [loading,  setLoading]  = useState(false);
   const [playing,  setPlaying]  = useState(false);
@@ -677,7 +764,7 @@ function AudioFeedbackPlayer({ fileId, duration }) {
     setLoading(true);
     try {
       const { default: api } = await import("../../../api");
-      const { data } = await api.get(`/homework/file/audio-feedback/${fileId}`, { responseType: "blob" });
+      const { data } = await api.get(`/homework/file/${type}/${fileId}`, { responseType: "blob" });
       const url = URL.createObjectURL(data);
       setBlobUrl(url);
       setTimeout(() => { audioRef.current?.play(); setPlaying(true); }, 50);
@@ -692,14 +779,14 @@ function AudioFeedbackPlayer({ fileId, duration }) {
   };
 
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", background: "rgba(22,163,74,0.1)", borderRadius: 8, marginTop: 6 }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", background: brandA(0.08), borderRadius: 8, marginTop: 6 }}>
       {blobUrl && <audio ref={audioRef} src={blobUrl} onEnded={() => setPlaying(false)} style={{ display: "none" }} />}
-      <button onClick={load} disabled={loading}
-        style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 7, border: "none", background: "#16a34a", color: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "inherit" }}>
+      <button type="button" onClick={load} disabled={loading}
+        style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 7, border: "none", background: BRAND, color: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "inherit" }}>
         <Mic size={12} />
-        {loading ? "Loading…" : playing ? "⏸ Pause" : "▶ Voice Feedback"}
+        {loading ? "Loading…" : playing ? "⏸ Pause" : `▶ ${label}`}
       </button>
-      {duration > 0 && <span style={{ fontSize: 11, color: "#065f46", fontWeight: 700 }}>{formatTime(duration)}</span>}
+      {duration > 0 && <span style={{ fontSize: 11, color: BRAND, fontWeight: 700 }}>{formatTime(duration)}</span>}
     </div>
   );
 }

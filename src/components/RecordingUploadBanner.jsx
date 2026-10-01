@@ -13,13 +13,29 @@ function formatBytes(blob) {
   return mb >= 1 ? `${mb.toFixed(1)} MB` : `${(blob.size / 1024).toFixed(0)} KB`;
 }
 
+const mmss = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.round(s % 60)).padStart(2, '0')}`;
+
+function partLabel(item) {
+  if (!item.sessionId) return 'recording';
+  const start = item.startOffset || 0;
+  return `part ${item.partNumber} (${mmss(start)}–${mmss(start + (item.duration || 0))})`;
+}
+
 function UploadItem({ item, onRetry, onDismiss }) {
   const { id, blob, progress, status, errorMsg } = item;
-  const size = formatBytes(blob);
+  const size  = formatBytes(blob);
+  const label = partLabel(item);
 
   const isUploading = status === 'uploading';
+  const isQueued    = status === 'queued';
+  const isRetrying  = status === 'retrying';
   const isDone      = status === 'done';
   const isFailed    = status === 'failed';
+
+  const handleDismiss = () => {
+    if (!isDone && !confirm(`This ${label} has not been saved yet. Discard it? It cannot be recovered.`)) return;
+    onDismiss(id);
+  };
 
   return (
     <div style={styles.item}>
@@ -32,16 +48,19 @@ function UploadItem({ item, onRetry, onDismiss }) {
       }}>
         {isDone   && <CheckCircle2 size={16} color="#059669" strokeWidth={2.5} />}
         {isFailed && <AlertCircle  size={16} color="#dc2626" strokeWidth={2.5} />}
-        {isUploading && <Video     size={16} color="#0284c7" strokeWidth={2} />}
+        {isRetrying && <RefreshCw  size={16} color="#b45309" strokeWidth={2.5} />}
+        {(isUploading || isQueued) && <Video size={16} color="#0284c7" strokeWidth={2} />}
       </div>
 
       {/* Content */}
       <div style={styles.itemBody}>
         <div style={styles.itemRow}>
           <span style={styles.itemLabel}>
-            {isDone      ? 'Recording saved'
-             : isFailed  ? 'Upload failed'
-             : 'Uploading recording'}
+            {isDone       ? `Saved ${label}`
+             : isFailed   ? `Could not save ${label}`
+             : isRetrying ? `Retrying ${label}…`
+             : isQueued   ? `Waiting to upload ${label}`
+             : `Uploading ${label}`}
           </span>
           <span style={styles.itemSize}>{size}</span>
         </div>
@@ -53,6 +72,12 @@ function UploadItem({ item, onRetry, onDismiss }) {
             </div>
             <span style={styles.pct}>{progress}%</span>
           </>
+        )}
+
+        {isRetrying && (
+          <span style={styles.retryingMsg}>
+            {errorMsg ? `${errorMsg} — ` : ''}trying again automatically (attempt {item.attempts + 1})
+          </span>
         )}
 
         {isFailed && (
@@ -70,9 +95,9 @@ function UploadItem({ item, onRetry, onDismiss }) {
         )}
       </div>
 
-      {/* Dismiss button (only on done/failed) */}
+      {/* Dismiss button (not while the part is actively uploading) */}
       {!isUploading && (
-        <button style={styles.dismissBtn} onClick={() => onDismiss(id)} aria-label="Dismiss">
+        <button style={styles.dismissBtn} onClick={handleDismiss} aria-label="Dismiss">
           <X size={12} strokeWidth={2.5} />
         </button>
       )}
@@ -81,17 +106,17 @@ function UploadItem({ item, onRetry, onDismiss }) {
 }
 
 export default function RecordingUploadBanner() {
-  const { queue, retryUpload, dismissItem } = useUploadQueue();
+  const { queue, retryUpload, retryAll, dismissItem } = useUploadQueue();
   const [collapsed, setCollapsed] = useState(false);
 
   if (!queue.length) return null;
 
-  const uploadingCount = queue.filter(q => q.status === 'uploading').length;
+  const uploadingCount = queue.filter(q => ['queued', 'uploading', 'retrying'].includes(q.status)).length;
   const failedCount    = queue.filter(q => q.status === 'failed').length;
 
   const headerLabel =
-    uploadingCount > 0 ? `Uploading ${uploadingCount} recording${uploadingCount > 1 ? 's' : ''}…`
-    : failedCount  > 0 ? `${failedCount} upload${failedCount > 1 ? 's' : ''} failed`
+    uploadingCount > 0 ? `Saving ${uploadingCount} recording part${uploadingCount > 1 ? 's' : ''}…`
+    : failedCount  > 0 ? `${failedCount} part${failedCount > 1 ? 's' : ''} not saved`
     : 'Recordings saved';
 
   const headerColor =
@@ -132,10 +157,20 @@ export default function RecordingUploadBanner() {
           </div>
         )}
 
-        {/* Do-not-close warning */}
-        {!collapsed && uploadingCount > 0 && (
+        {/* Retry every failed part at once */}
+        {!collapsed && failedCount > 1 && (
+          <button style={styles.retryAllBtn} onClick={retryAll}>
+            <RefreshCw size={12} strokeWidth={2.5} />
+            Retry all {failedCount} parts
+          </button>
+        )}
+
+        {/* Keep-open hint */}
+        {!collapsed && (uploadingCount > 0 || failedCount > 0) && (
           <div style={styles.warning}>
-            ⚠️ Don't close this tab — uploads will be lost.
+            {uploadingCount > 0
+              ? "⚠️ Keep this tab open while saving. If it closes, unsaved parts can be retried when you come back."
+              : "Unsaved parts are kept on this computer until you retry or discard them."}
           </div>
         )}
       </div>
@@ -185,6 +220,8 @@ const styles = {
     display:       'flex',
     flexDirection: 'column',
     gap:           0,
+    maxHeight:     320,
+    overflowY:     'auto',
   },
   item: {
     display:       'flex',
@@ -272,6 +309,26 @@ const styles = {
     fontSize:   11,
     color:      '#059669',
     fontWeight: 600,
+  },
+  retryingMsg: {
+    fontSize: 11,
+    color:    '#b45309',
+  },
+  retryAllBtn: {
+    display:        'flex',
+    alignItems:     'center',
+    justifyContent: 'center',
+    gap:            6,
+    width:          '100%',
+    padding:        '9px 14px',
+    border:         'none',
+    borderTop:      '1px solid #fecaca',
+    background:     '#fef2f2',
+    color:          '#dc2626',
+    fontSize:       12,
+    fontWeight:     700,
+    cursor:         'pointer',
+    fontFamily:     'inherit',
   },
   dismissBtn: {
     background:     'none',

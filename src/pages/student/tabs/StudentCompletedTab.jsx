@@ -1,5 +1,5 @@
 // src/pages/student/tabs/StudentCompletedTab.jsx
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { getUserTimezone, dualTime, tzCity } from "../../../utils/timezone";
 import {
   CheckCircle, XCircle, AlertCircle, Search,
@@ -83,75 +83,52 @@ export default function StudentCompletedTab({ studentId, isDarkMode }) {
     ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
     : "border-gray-300 text-gray-900 placeholder-gray-400";
 
-  // ── Fetch ──────────────────────────────────────────────────────────────────
-  const load = async (silent = false) => {
-    if (!studentId) return;
-    silent ? setRefreshing(true) : setLoading(true);
-    try {
-      // ?status=completed returns BOTH "completed" and "missed" from the backend
-      const { data } = await api.get(`/bookings/student/${studentId}?status=completed`);
-      const normalised = (Array.isArray(data) ? data : []).map((b) => ({
-        id:                  b._id,
-        status:              b.status,            // "completed" | "missed"
-        title:               b.classTitle,
-        topic:               b.topic || "",
-        teacher:             b.teacherId
-          ? (b.teacherId.displayName?.trim() || `${b.teacherId.firstName} ${b.teacherId.lastName}`)
-          : "—",
-        scheduledTime:       b.scheduledTime,
-        completedAt:         b.completedAt,
-        duration:            b.duration || 60,
-        adminRejected:       b.adminRejected       || false,
-        adminRejectedReason: b.adminRejectedReason || "",
-        adminRejectedAt:     b.adminRejectedAt,
-        missedReason:        b.missedReason        || "",
-        teacherTimezone:     b.teacherTimezone     || "",
-      }));
-      setClasses(normalised);
-    } catch (err) {
-      console.error("StudentCompletedTab load error:", err);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
-
-  useEffect(() => { load(); }, [studentId]); // eslint-disable-line
-
-  // ── Split into two buckets ─────────────────────────────────────────────────
-  // Completed  = status "completed" AND not adminRejected
-  // Not completed = status "missed" OR adminRejected
-  const completedList    = useMemo(() => classes.filter((c) => c.status === "completed" && !c.adminRejected), [classes]);
-  const notCompletedList = useMemo(() => classes.filter((c) => c.status === "missed" || c.adminRejected),     [classes]);
-
-  const activeList = tab === "completed" ? completedList : notCompletedList;
-
-  // ── Search + date filter ───────────────────────────────────────────────────
-  const filtered = useMemo(() => {
-    let list = activeList;
-    if (search) {
-      const q = search.toLowerCase();
-      list = list.filter(
-        (c) => c.title.toLowerCase().includes(q) ||
-               c.topic.toLowerCase().includes(q) ||
-               c.teacher.toLowerCase().includes(q)
-      );
-    }
-    if (startDate && endDate) {
-      const s = new Date(startDate);
-      const e = new Date(endDate);
-      e.setHours(23, 59, 59, 999);
-      list = list.filter((c) => { const d = new Date(c.scheduledTime); return d >= s && d <= e; });
-    }
-    return list.sort((a, b) => new Date(b.scheduledTime) - new Date(a.scheduledTime));
-  }, [activeList, search, startDate, endDate]);
-
+  // ── Fetch one page from the server (server/routes/classHistoryRoutes.js) ──
+  // Tab, search, dates and paging are applied on the server, so nothing is cut
+  // off however many classes the student has taken.
+  const [counts,     setCounts]     = useState({ completed: 0, notCompleted: 0 });
+  const [pager,      setPager]      = useState({ total: 0, totalPages: 1 });
+  const [reloadKey,  setReloadKey]  = useState(0);
+  const [debouncedQ, setDebouncedQ] = useState("");
+  useEffect(() => { const t = setTimeout(() => setDebouncedQ(search.trim()), 300); return () => clearTimeout(t); }, [search]);
   // Reset page when filters or tab changes
-  useMemo(() => { setCurrentPage(1); }, [search, startDate, endDate, tab]);
+  useEffect(() => { setCurrentPage(1); }, [debouncedQ, startDate, endDate, tab]);
 
-  const totalPages = Math.ceil(filtered.length / itemsPerPage);
+  const load = () => { setRefreshing(true); setReloadKey((k) => k + 1); };
+
+  useEffect(() => {
+    if (!studentId) return;
+    let stale = false;
+    api.get(`/bookings/student/${studentId}/history`, { params: {
+      view: tab, page: currentPage, limit: itemsPerPage,
+      q:    debouncedQ || undefined,
+      from: startDate ? new Date(`${startDate}T00:00:00`).toISOString() : undefined,
+      to:   endDate   ? new Date(`${endDate}T23:59:59.999`).toISOString() : undefined,
+    } })
+      .then(({ data }) => {
+        if (stale) return;
+        setClasses((data.classes || []).map((b) => ({
+          ...b,
+          topic:               b.topic || "",
+          teacher:             b.teacher || "—",
+          duration:            b.duration || 60,
+          adminRejected:       b.adminRejected       || false,
+          adminRejectedReason: b.adminRejectedReason || "",
+          missedReason:        b.missedReason        || "",
+          teacherTimezone:     b.teacherTimezone     || "",
+        })));
+        setCounts(data.counts || { completed: 0, notCompleted: 0 });
+        setPager(data.pagination || { total: 0, totalPages: 1 });
+        if (data.pagination && data.pagination.page !== currentPage) setCurrentPage(data.pagination.page);
+      })
+      .catch((err) => console.error("StudentCompletedTab load error:", err))
+      .finally(() => { if (!stale) { setLoading(false); setRefreshing(false); } });
+    return () => { stale = true; };
+  }, [studentId, tab, currentPage, debouncedQ, startDate, endDate, reloadKey]);
+
+  const totalPages = pager.totalPages || 1;
   const startIdx   = (currentPage - 1) * itemsPerPage;
-  const current    = filtered.slice(startIdx, startIdx + itemsPerPage);
+  const current    = classes;
 
   if (loading) {
     return (
@@ -171,11 +148,11 @@ export default function StudentCompletedTab({ studentId, isDarkMode }) {
           <div>
             <h2 className={`text-xl font-bold ${textPrimary}`}>My Classes</h2>
             <p className={`text-sm mt-0.5 ${textSub}`}>
-              {completedList.length} completed · {notCompletedList.length} not completed
+              {counts.completed} completed · {counts.notCompleted} not completed
             </p>
           </div>
           <button
-            onClick={() => load(true)}
+            onClick={load}
             disabled={refreshing}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border transition-all ${
               isDarkMode ? "border-gray-600 text-gray-300 hover:bg-gray-700" : "border-gray-200 text-gray-600 hover:bg-gray-100"
@@ -201,7 +178,7 @@ export default function StudentCompletedTab({ studentId, isDarkMode }) {
             <span className={`px-1.5 py-0.5 rounded-full text-xs font-bold ${
               tab === "completed" ? "bg-white/20 text-white" : isDarkMode ? "bg-gray-700 text-gray-300" : "bg-gray-200 text-gray-600"
             }`}>
-              {completedList.length}
+              {counts.completed}
             </span>
           </button>
           <button
@@ -217,7 +194,7 @@ export default function StudentCompletedTab({ studentId, isDarkMode }) {
             <span className={`px-1.5 py-0.5 rounded-full text-xs font-bold ${
               tab === "not_completed" ? "bg-white/20 text-white" : isDarkMode ? "bg-gray-700 text-gray-300" : "bg-gray-200 text-gray-600"
             }`}>
-              {notCompletedList.length}
+              {counts.notCompleted}
             </span>
           </button>
         </div>
@@ -248,7 +225,7 @@ export default function StudentCompletedTab({ studentId, isDarkMode }) {
       </div>
 
       {/* Context note for not-completed tab */}
-      {tab === "not_completed" && notCompletedList.length > 0 && (
+      {tab === "not_completed" && counts.notCompleted > 0 && (
         <div className={`flex items-start gap-2 px-4 py-3 rounded-xl text-xs ${
           isDarkMode ? "bg-amber-900/20 border border-amber-700/30 text-amber-400" : "bg-amber-50 border border-amber-200 text-amber-700"
         }`}>

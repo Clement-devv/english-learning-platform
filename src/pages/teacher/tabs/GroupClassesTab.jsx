@@ -3,6 +3,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Users, Plus, X, ChevronDown, ChevronUp, Video, RefreshCw, Loader2, Lock, Globe, Search, UserMinus } from 'lucide-react';
 import api from '../../../api';
+import Pagination from '../../../components/Pagination';
+
+const GC_PAGE = 20;
 import Classroom from '../../Classroom';
 import DateTimePicker from '../../../components/DateTimePicker';
 import { formatDateInTZ, getUserTimezone, tzAbbr } from '../../../utils/timezone';
@@ -56,6 +59,8 @@ export default function GroupClassesTab({ isDarkMode }) {
   const [loading,      setLoading]      = useState(true);
   const [msg,          setMsg]          = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [gcPage,  setGcPage]  = useState(1);
+  const [gcTotal, setGcTotal] = useState(0);
   const [expanded,     setExpanded]     = useState({});
 
   const [showCreate, setShowCreate] = useState(false);
@@ -76,15 +81,17 @@ export default function GroupClassesTab({ isDarkMode }) {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const params = statusFilter ? `?status=${statusFilter}` : '';
+      // One page at a time (server returns the total)
+      const params = `?skip=${(gcPage - 1) * GC_PAGE}&limit=${GC_PAGE}${statusFilter ? `&status=${statusFilter}` : ''}`;
       const res = await api.get(`/group-classes${params}`);
       setClasses(res.data.classes || []);
+      setGcTotal(res.data.total ?? 0);
     } catch {
       flash('Failed to load classes');
     } finally {
       setLoading(false);
     }
-  }, [statusFilter]);
+  }, [statusFilter, gcPage]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -212,9 +219,9 @@ export default function GroupClassesTab({ isDarkMode }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
         <div style={{ flex: 1 }}>
           <h2 style={{ margin: 0, fontSize: 20, fontWeight: 900, color: col.heading }}>My Group Classes</h2>
-          <p style={{ margin: '2px 0 0', fontSize: 13, color: col.muted }}>{classes.length} class{classes.length !== 1 ? 'es' : ''}</p>
+          <p style={{ margin: '2px 0 0', fontSize: 13, color: col.muted }}>{gcTotal} class{gcTotal !== 1 ? 'es' : ''}</p>
         </div>
-        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={{ ...inp, width: 140 }}>
+        <select value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setGcPage(1); }} style={{ ...inp, width: 140 }}>
           <option value="">All statuses</option>
           {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
         </select>
@@ -330,6 +337,10 @@ export default function GroupClassesTab({ isDarkMode }) {
             </div>
           );
         })
+      )}
+      {!loading && (
+        <Pagination page={gcPage} totalPages={Math.max(1, Math.ceil(gcTotal / GC_PAGE))} total={gcTotal} pageSize={GC_PAGE}
+          onPage={(p) => { setGcPage(p); window.scrollTo({ top: 0, behavior: 'smooth' }); }} isDarkMode={isDarkMode} />
       )}
 
       {/* ── Create Modal ── */}

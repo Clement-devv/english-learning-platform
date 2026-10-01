@@ -9,6 +9,7 @@ import { studentSchema }              from "../schemas/studentSchema.js";
 import { teacherSchema }              from "../schemas/teacherSchema.js";
 import { paymentTransactionSchema }   from "../schemas/paymentTransactionSchema.js";
 import logger from "../utils/logger.js";
+import { issueShareLink } from "../utils/shareLink.js";
 import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
 
 const router = express.Router();
@@ -21,12 +22,48 @@ const getStudent            = (db) => db.models.Student            || db.model("
 const getTeacher            = (db) => db.models.Teacher            || db.model("Teacher",            teacherSchema);
 const getPaymentTransaction = (db) => db.models.PaymentTransaction || db.model("PaymentTransaction", paymentTransactionSchema);
 
+// ── Access control ────────────────────────────────────────────────────────────
+// Every classroom route acts on one booking. Only that booking's teacher or
+// student may use it (admins/sub-admins may read). The caller's role always
+// comes from the token — never from the request body.
+const ADMIN_ROLES = ["admin", "sub-admin"];
+
+// populate("teacherId"/"studentId") needs the models registered on this center's
+// connection first — otherwise the first request after a restart fails with
+// "Schema hasn't been registered for model Teacher".
+const registerModels = (db) => { getStudent(db); getTeacher(db); };
+router.use((req, _res, next) => { if (req.db) registerModels(req.db); next(); });
+
+async function authorizeClass(req, res, bookingId, { teacherOnly = false, allowAdmin = false } = {}) {
+  if (!bookingId || !/^[a-f\d]{24}$/i.test(String(bookingId))) { badRequest(res, "Valid bookingId is required"); return null; }
+  const booking = await getBooking(req.db).findById(bookingId).select("teacherId studentId status duration").lean();
+  if (!booking) { notFound(res, "Booking not found"); return null; }
+
+  const { role, id } = req.user;
+  const isTeacher = role === "teacher" && String(booking.teacherId) === id;
+  const isStudent = role === "student" && String(booking.studentId) === id;
+  const isAdmin   = allowAdmin && ADMIN_ROLES.includes(role);
+
+  if (teacherOnly ? !isTeacher : !(isTeacher || isStudent || isAdmin)) {
+    forbidden(res, "You are not part of this class");
+    return null;
+  }
+  return { booking, role: isTeacher ? "teacher" : isStudent ? "student" : role };
+}
+
 // POST /api/classroom/attendance
 router.post("/attendance", verifyToken, async (req, res) => {
   try {
-    const { bookingId, userRole, action, timestamp, activeTime } = req.body;
-    if (!bookingId || !userRole || !action)
-      return badRequest(res, "bookingId, userRole, and action are required");
+    const { bookingId, action, timestamp, activeTime } = req.body;
+    if (!bookingId || !action)
+      return badRequest(res, "bookingId and action are required");
+
+    const access = await authorizeClass(req, res, bookingId);
+    if (!access) return;
+    if (!["teacher", "student"].includes(access.role)) return forbidden(res, "Only the class teacher or student can record attendance");
+    // Role comes from the token, not the body — nobody can report attendance as the other side
+    if (req.body.userRole && req.body.userRole !== access.role) return forbidden(res, "Role mismatch");
+    const userRole = access.role;
 
     const ClassroomSession = getClassroomSession(req.db);
 
@@ -92,7 +129,12 @@ router.post("/attendance", verifyToken, async (req, res) => {
       if (userRole === "teacher" && activeTime != null) session.teacherActiveTime = activeTime;
       else if (userRole === "student" && activeTime != null) session.studentActiveTime = activeTime;
 
-      if (session.teacherActiveTime > 0 && session.studentActiveTime > 0) {
+      if (session.managedAttendance) {
+        // Managed student has no device: the teacher's client only counts time while
+        // the teacher has the student marked present. Cap at time since first confirmed.
+        const sinceJoin = session.studentJoinedAt ? Math.floor((Date.now() - session.studentJoinedAt.getTime()) / 1000) : 0;
+        session.bothActiveTime = Math.max(0, Math.min(session.teacherActiveTime, sinceJoin));
+      } else if (session.teacherActiveTime > 0 && session.studentActiveTime > 0) {
         session.bothActiveTime = Math.min(session.teacherActiveTime, session.studentActiveTime);
       }
 
@@ -107,17 +149,73 @@ router.post("/attendance", verifyToken, async (req, res) => {
   }
 });
 
+// POST /api/classroom/managed-presence  { bookingId, present: boolean }
+// Managed students (no login) can't join the classroom themselves, so the class
+// teacher confirms it: "Student joined" / "Student left". Acts exactly like the
+// student's own join/leave, so the normal completion rules apply afterwards.
+router.post("/managed-presence", verifyToken, async (req, res) => {
+  try {
+    const { bookingId, present } = req.body;
+    if (!bookingId || typeof present !== "boolean") return badRequest(res, "bookingId and present (boolean) are required");
+    if (req.user.role !== "teacher") return forbidden(res, "Only the class teacher can confirm attendance");
+
+    const booking = await getBooking(req.db).findById(bookingId).populate("studentId", "isManaged");
+    if (!booking) return notFound(res, "Booking not found");
+    if (booking.teacherId.toString() !== req.user.id) return forbidden(res, "This is not your class");
+    if (!booking.studentId?.isManaged) return badRequest(res, "This student joins the classroom themselves");
+    if (!["accepted", "pending"].includes(booking.status)) return badRequest(res, `This class is already ${booking.status}`);
+
+    const ClassroomSession = getClassroomSession(req.db);
+    let session = await ClassroomSession.findOne({ bookingId });
+    if (!session) return badRequest(res, "Join the classroom first");
+    if (["completed", "incomplete", "missed"].includes(session.status)) return badRequest(res, "This class has already ended");
+    if (!session.teacherJoinedAt) return badRequest(res, "Join the classroom first");
+
+    const now = new Date();
+    const set = { managedAttendance: true };
+    if (present) {
+      if (!session.studentJoinedAt) set.studentJoinedAt = now;
+      set.studentLeftAt = null;
+    } else {
+      set.studentLeftAt = now;
+    }
+    session = await ClassroomSession.findOneAndUpdate(
+      { bookingId },
+      { $set: set, $push: { presenceLog: { present, at: now, by: req.user.id } } },
+      { new: true },
+    );
+
+    // Same rule as a real join: the class clock starts once both are in
+    if (present && session.teacherJoinedAt && !session.classStartedAt) {
+      session = await ClassroomSession.findOneAndUpdate(
+        { bookingId, classStartedAt: null },
+        { $set: { classStartedAt: now, status: "active" } },
+        { new: true },
+      ) || await ClassroomSession.findOne({ bookingId });
+    }
+
+    res.json({ success: true, session });
+  } catch (err) {
+    logger.error("Managed presence error:", { error: err?.message });
+    serverError(res, "Error updating attendance");
+  }
+});
+
 // POST /api/classroom/auto-complete
 router.post("/auto-complete", verifyToken, async (req, res) => {
   try {
-    const { bookingId, clientBothActiveTime, callerRole } = req.body;
+    const { bookingId, clientBothActiveTime } = req.body;
     if (!bookingId) return badRequest(res, "bookingId is required");
+
+    const access = await authorizeClass(req, res, bookingId);
+    if (!access) return;
+    const callerRole = access.role;
 
     const ClassroomSession = getClassroomSession(req.db);
 
     const booking = await getBooking(req.db).findById(bookingId)
       .populate("teacherId", "firstName lastName email ratePerClass lessonsCompleted earned")
-      .populate("studentId", "firstName lastName email classCredits active");
+      .populate("studentId", "firstName lastName email classCredits active isManaged");
 
     if (!booking) return notFound(res, "Booking not found");
 
@@ -157,12 +255,23 @@ router.post("/auto-complete", verifyToken, async (req, res) => {
     const callerIsTeacher = callerRole === "teacher";
     const callerIsStudent = callerRole === "student";
 
+    // Managed student (no login): only the teacher's "Student joined" confirmation
+    // counts as the student joining — never client-side evidence alone.
+    const isManaged = !!booking.studentId?.isManaged;
+
     const teacherJoined = sessionTeacherJoined || serverConfirmedBothJoined || clientEvidenceBothPresent || callerIsTeacher;
-    const studentJoined = sessionStudentJoined || serverConfirmedBothJoined || clientEvidenceBothPresent || callerIsStudent;
+    const studentJoined = isManaged
+      ? sessionStudentJoined
+      : sessionStudentJoined || serverConfirmedBothJoined || clientEvidenceBothPresent || callerIsStudent;
     const bothJoined    = teacherJoined && studentJoined;
 
     const serverBothActiveTime = session?.bothActiveTime || 0;
     let bothActiveTime = Math.max(serverBothActiveTime, clientBothActiveTime || 0);
+    if (isManaged) {
+      // Can't have been together longer than since the teacher confirmed the student joined
+      const sinceJoin = session?.studentJoinedAt ? Math.floor((Date.now() - session.studentJoinedAt.getTime()) / 1000) : 0;
+      bothActiveTime = Math.min(bothActiveTime, sinceJoin);
+    }
 
     if (bothActiveTime === 0 && serverConfirmedBothJoined && session?.classStartedAt) {
       const maxDuration = (booking.duration || 60) * 60;
@@ -179,6 +288,12 @@ router.post("/auto-complete", verifyToken, async (req, res) => {
       booking.completedAt = new Date();
       booking.markedBy = "system";
       booking.adminRejected = false;
+      booking.attendanceConfirmedBy = isManaged ? "teacher" : "student";
+      if (isManaged) {
+        // Only the teacher saw the student — ready a link so the admin can ask the parent
+        issueShareLink(booking);
+        booking.parentCheck = { status: "waiting" };
+      }
       await booking.save();
 
       const student = await getStudent(req.db).findById(booking.studentId._id);
@@ -204,7 +319,7 @@ router.post("/auto-complete", verifyToken, async (req, res) => {
         amount: earned, status: "pending", type: "class_completion",
         classTitle: booking.classTitle, completedAt: new Date(),
         studentName: `${booking.studentId.firstName || ""} ${booking.studentId.lastName || ""}`.trim(),
-        description: `Auto-completed: ${booking.classTitle} (system)`,
+        description: `Auto-completed: ${booking.classTitle} (${isManaged ? "attendance confirmed by teacher" : "system"})`,
       });
 
       if (session) {
@@ -226,7 +341,9 @@ router.post("/auto-complete", verifyToken, async (req, res) => {
     let missedReason = "";
     if (!teacherJoined && !studentJoined) missedReason = "Neither teacher nor student joined the class";
     else if (!teacherJoined) missedReason = "Teacher did not join the class";
-    else if (!studentJoined) missedReason = "Student did not join the class";
+    else if (!studentJoined) missedReason = isManaged
+      ? "Teacher did not confirm that the student joined (managed student)"
+      : "Student did not join the class";
     else {
       const shortBy = Math.ceil((requiredTime - bothActiveTime) / 60);
       missedReason = `Attendance requirement not met — both parties needed ${Math.ceil(requiredTime / 60)} min together, were together for ${Math.floor(bothActiveTime / 60)} min (short by ${shortBy} min)`;
@@ -261,6 +378,7 @@ router.post("/auto-complete", verifyToken, async (req, res) => {
 // is the natural "not picked yet" signal, and the browser console stays clean.
 router.get("/session/:bookingId", verifyToken, async (req, res) => {
   try {
+    if (!(await authorizeClass(req, res, req.params.bookingId, { allowAdmin: true }))) return;
     const session = await getClassroomSession(req.db).findOne({ bookingId: req.params.bookingId });
     res.json({ session: session || null });
   } catch (err) {
@@ -271,6 +389,7 @@ router.get("/session/:bookingId", verifyToken, async (req, res) => {
 // PATCH /api/classroom/session/:bookingId/video-provider
 router.patch("/session/:bookingId/video-provider", verifyToken, async (req, res) => {
   try {
+    if (!(await authorizeClass(req, res, req.params.bookingId, { teacherOnly: true }))) return;
     const { videoProvider } = req.body;
     if (!["agora", "googlemeet", "zoom"].includes(videoProvider))
       return badRequest(res, "Invalid videoProvider");
@@ -290,6 +409,7 @@ router.patch("/session/:bookingId/video-provider", verifyToken, async (req, res)
 // PATCH /api/classroom/session/:bookingId/content-state  (teacher only)
 router.patch("/session/:bookingId/content-state", verifyToken, async (req, res) => {
   try {
+    if (!(await authorizeClass(req, res, req.params.bookingId, { teacherOnly: true }))) return;
     const { page, scale, annotation, annotationPage } = req.body;
     const update = {};
     if (page  != null) update.contentPage  = page;
@@ -318,6 +438,7 @@ router.patch("/session/:bookingId/content-state", verifyToken, async (req, res) 
 // GET /api/classroom/session/:bookingId/content-state  (student polls this)
 router.get("/session/:bookingId/content-state", verifyToken, async (req, res) => {
   try {
+    if (!(await authorizeClass(req, res, req.params.bookingId))) return;
     const session = await getClassroomSession(req.db)
       .findOne({ bookingId: req.params.bookingId })
       .select("contentPage contentScale contentAnnotation");
@@ -335,6 +456,8 @@ router.get("/session/:bookingId/content-state", verifyToken, async (req, res) =>
 // PATCH /api/classroom/session/:bookingId/extend-time
 router.patch("/session/:bookingId/extend-time", verifyToken, async (req, res) => {
   try {
+    const access = await authorizeClass(req, res, req.params.bookingId);
+    if (!access) return;
     const { minutes } = req.body;
     if (!minutes || minutes < 1 || minutes > 60)
       return badRequest(res, "minutes must be between 1 and 60");
@@ -347,7 +470,7 @@ router.patch("/session/:bookingId/extend-time", verifyToken, async (req, res) =>
 
     const addSeconds = minutes * 60;
     session.extendedTime = (session.extendedTime || 0) + addSeconds;
-    session.timeExtensions.push({ minutes, extendedBy: req.user.role, extendedAt: new Date() });
+    session.timeExtensions.push({ minutes, extendedBy: access.role, extendedAt: new Date() });
     await session.save();
 
     res.json({ session, addedSeconds: addSeconds });
@@ -360,6 +483,7 @@ router.patch("/session/:bookingId/extend-time", verifyToken, async (req, res) =>
 // GET /api/classroom/check-completion/:bookingId
 router.get("/check-completion/:bookingId", verifyToken, async (req, res) => {
   try {
+    if (!(await authorizeClass(req, res, req.params.bookingId, { allowAdmin: true }))) return;
     const session = await getClassroomSession(req.db).findOne({ bookingId: req.params.bookingId });
     if (!session) return notFound(res, "Session not found");
 
@@ -384,6 +508,8 @@ router.post("/end-early", verifyToken, async (req, res) => {
       teacherActiveTime, studentActiveTime, bothActiveTime, requiredTime,
       endedAt, endedBy,
     } = req.body;
+
+    if (!(await authorizeClass(req, res, bookingId))) return;
 
     const booking = await getBooking(req.db).findById(bookingId)
       .populate("teacherId", "firstName lastName")

@@ -3,6 +3,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Users, Plus, X, ChevronDown, ChevronUp, RefreshCw, Loader2 } from 'lucide-react';
 import api from '../../../api';
+import Pagination from '../../../components/Pagination';
+
+const GC_PAGE = 20;
 import { formatDateInTZ, getUserTimezone, tzAbbr } from '../../../utils/timezone';
 
 const F = "'Nunito','Inter',sans-serif";
@@ -63,6 +66,8 @@ export default function GroupClassesTab({ isDarkMode }) {
   const [loading,    setLoading]    = useState(true);
   const [msg,        setMsg]        = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [gcPage,  setGcPage]  = useState(1);
+  const [gcTotal, setGcTotal] = useState(0);
   const [expanded,   setExpanded]   = useState({});
 
   // create modal
@@ -84,13 +89,15 @@ export default function GroupClassesTab({ isDarkMode }) {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const params = statusFilter ? `?status=${statusFilter}` : '';
+      // One page at a time (server returns the total)
+      const params = `?skip=${(gcPage - 1) * GC_PAGE}&limit=${GC_PAGE}${statusFilter ? `&status=${statusFilter}` : ''}`;
       const [gcRes, tRes, sRes] = await Promise.all([
         api.get(`/group-classes${params}`),
-        api.get('/teachers'),
-        api.get('/students'),
+        api.get('/teachers', { params: { limit: 5000 } }),
+        api.get('/students', { params: { limit: 5000 } }),
       ]);
       setClasses(gcRes.data.classes || []);
+      setGcTotal(gcRes.data.total ?? 0);
       setTeachers(tRes.data?.teachers || tRes.data || []);
       setStudents(sRes.data?.students || sRes.data || []);
     } catch (e) {
@@ -98,7 +105,7 @@ export default function GroupClassesTab({ isDarkMode }) {
     } finally {
       setLoading(false);
     }
-  }, [statusFilter]);
+  }, [statusFilter, gcPage]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -210,9 +217,9 @@ export default function GroupClassesTab({ isDarkMode }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
         <div style={{ flex: 1 }}>
           <h2 style={{ margin: 0, fontSize: 20, fontWeight: 900, color: col.heading }}>Group Classes</h2>
-          <p style={{ margin: '2px 0 0', fontSize: 13, color: col.muted }}>{classes.length} class{classes.length !== 1 ? 'es' : ''}</p>
+          <p style={{ margin: '2px 0 0', fontSize: 13, color: col.muted }}>{gcTotal} class{gcTotal !== 1 ? 'es' : ''}</p>
         </div>
-        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={{ ...inp, width: 140 }}>
+        <select value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setGcPage(1); }} style={{ ...inp, width: 140 }}>
           <option value="">All statuses</option>
           {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
         </select>
@@ -327,6 +334,10 @@ export default function GroupClassesTab({ isDarkMode }) {
             </div>
           );
         })
+      )}
+      {!loading && (
+        <Pagination page={gcPage} totalPages={Math.max(1, Math.ceil(gcTotal / GC_PAGE))} total={gcTotal} pageSize={GC_PAGE}
+          onPage={(p) => { setGcPage(p); window.scrollTo({ top: 0, behavior: 'smooth' }); }} isDarkMode={isDarkMode} />
       )}
 
       {/* ── Create Modal ── */}

@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import ListenButton from "../../../components/ListenButton";
 import StreakToast from "../components/StreakToast";
+import Pagination from "../../../components/Pagination";
 
 const LS_KEY = (quizId) => `quiz_start_${quizId}`;
 
@@ -504,27 +505,37 @@ export default function StudentQuizTab({ studentInfo, isDarkMode }) {
     setTimeout(() => setToast(null), 3500);
   };
 
-  const fetchQuizzes = async () => {
-    try {
-      setLoading(true);
-      const { data } = await api.get("/quiz/assigned");
-      setQuizzes(data.quizzes || []);
-    } catch {
-      showToast("Failed to load quizzes", "error");
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Paged on the server (20 per page) — counts per status come back with every page
+  const [page,      setPage]      = useState(1);
+  const [pager,     setPager]     = useState({ total: 0, totalPages: 1, limit: 20 });
+  const [counts,    setCounts]    = useState({ all: 0, assigned: 0, attempted: 0 });
+  const [reloadKey, setReloadKey] = useState(0);
+  const [stats,     setStats]     = useState({ nextQuiz: null, avgScore: null }); // across all pages
+  const changeFilter = (f) => { setFilter(f); setPage(1); };
+  const fetchQuizzes = () => setReloadKey(k => k + 1);
 
-  useEffect(() => { fetchQuizzes(); }, []);
+  useEffect(() => {
+    let stale = false;
+    (async () => {
+      try {
+        setLoading(true);
+        const { data } = await api.get("/quiz/assigned", { params: { status: filter === "all" ? undefined : filter, page } });
+        if (stale) return;
+        setQuizzes(data.quizzes || []);
+        if (data.counts) setCounts(data.counts);
+        if (data.stats) setStats(data.stats);
+        if (data.pagination) { setPager(data.pagination); if (data.pagination.page !== page) setPage(data.pagination.page); }
+      } catch {
+        if (!stale) showToast("Failed to load quizzes", "error");
+      } finally {
+        if (!stale) setLoading(false);
+      }
+    })();
+    return () => { stale = true; };
+  }, [page, filter, reloadKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const counts = {
-    all:       quizzes.length,
-    assigned:  quizzes.filter(q => q.status === "assigned").length,
-    attempted: quizzes.filter(q => q.status === "attempted").length,
-  };
 
-  const filtered = quizzes.filter(q => filter === "all" || q.status === filter);
+  const filtered = quizzes; // already filtered + paged by the server
 
   const handleStartQuiz = (quiz) => {
     if (quiz.status === "attempted") return;
@@ -576,10 +587,7 @@ export default function StudentQuizTab({ studentInfo, isDarkMode }) {
   }
 
   // ── Quiz list ──────────────────────────────────────────────────────────────
-  const nextQuiz = quizzes.find(q => q.status === "assigned");
-  const avgScore = quizzes.filter(q => q.status === "attempted" && q.attempt?.percentage != null).length > 0
-    ? Math.round(quizzes.filter(q => q.status === "attempted" && q.attempt?.percentage != null).reduce((s, q) => s + q.attempt.percentage, 0) / quizzes.filter(q => q.status === "attempted" && q.attempt?.percentage != null).length)
-    : null;
+  const { nextQuiz, avgScore } = stats;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20, fontFamily: "'Nunito', sans-serif" }}>
@@ -654,7 +662,7 @@ export default function StudentQuizTab({ studentInfo, isDarkMode }) {
           { key: "attempted", label: "Completed",    emoji: "🏆", color: "#059669", bg: "#ecfdf5" },
           { key: "_avg",      label: "Avg score",    emoji: "⭐", color: "#be185d", bg: "#fce7f3" },
         ].map(({ key, label, emoji, color, bg }) => (
-          <div key={key} onClick={() => key !== "_avg" && setFilter(key)}
+          <div key={key} onClick={() => key !== "_avg" && changeFilter(key)}
             style={{ background: col.card, border: `2px solid ${filter === key ? color : col.border}`, borderRadius: 18, padding: "14px 16px", cursor: key !== "_avg" ? "pointer" : "default", display: "flex", alignItems: "center", gap: 12, transition: "all 0.2s", boxShadow: filter === key ? `0 4px 16px ${color}25` : "none" }}>
             <div style={{ width: 40, height: 40, borderRadius: 12, background: filter === key ? bg : (isDarkMode ? "rgba(255,255,255,0.05)" : "#f9f9f9"), display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>{emoji}</div>
             <div style={{ flex: 1, minWidth: 0 }}>
@@ -676,7 +684,7 @@ export default function StudentQuizTab({ studentInfo, isDarkMode }) {
         ].map(f => {
           const isActive = filter === f.k;
           return (
-            <button key={f.k} onClick={() => setFilter(f.k)}
+            <button key={f.k} onClick={() => changeFilter(f.k)}
               style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 10, border: "none", cursor: "pointer", fontFamily: "inherit", fontSize: 12.5, fontWeight: 800, background: isActive ? `linear-gradient(135deg,${accent},#fb923c)` : "transparent", color: isActive ? "#fff" : col.body, boxShadow: isActive ? `0 4px 12px ${accent}55` : "none", transition: "all 0.15s" }}>
               {f.l}
               <span style={{ padding: "1px 7px", borderRadius: 999, fontSize: 10.5, fontWeight: 900, background: isActive ? "rgba(255,255,255,0.28)" : (isDarkMode ? "rgba(255,255,255,0.1)" : "#fff3e6"), color: isActive ? "#fff" : col.muted }}>{counts[f.k]}</span>
@@ -816,6 +824,11 @@ export default function StudentQuizTab({ studentInfo, isDarkMode }) {
             );
           })}
         </div>
+      )}
+
+      {!loading && (
+        <Pagination page={page} totalPages={pager.totalPages} total={pager.total} pageSize={pager.limit}
+          onPage={(p) => { setPage(p); setExpandedId(null); window.scrollTo({ top: 0, behavior: "smooth" }); }} isDarkMode={isDarkMode} />
       )}
     </div>
   );

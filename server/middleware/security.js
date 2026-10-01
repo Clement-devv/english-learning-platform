@@ -93,6 +93,8 @@ export const securityHeaders = helmet({
         // Both patterns below are needed: old-style and new US-regional ingest.
         "https://*.ingest.sentry.io",
         "https://*.ingest.us.sentry.io",
+        // jsDelivr — font files (Mali, Be Vietnam Pro) for the graded-homework PDF
+        "https://cdn.jsdelivr.net",
         // AWS S3 — presigned URLs for recording playback and download
         "https://*.amazonaws.com",
         "https://*.s3.amazonaws.com",

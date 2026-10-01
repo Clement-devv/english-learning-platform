@@ -16,15 +16,17 @@ import ContentViewer from "../ContentViewer";
 import WhiteboardTab from "../WhiteboardTab";
 import api from "../../api";
 import { useClassroomCore } from "./useClassroomCore";
+import ManagedAttendanceBar from "./ManagedAttendanceBar";
 import {
   FileText, PenTool, Clock, Users,
-  CheckCircle2, XCircle, Loader, Power, AlertTriangle,
-  CheckCircle, X, RefreshCw, Circle, Square,
+  XCircle, Loader, AlertTriangle,
+  CheckCircle, X, RefreshCw, Circle, Square, PhoneOff,
 } from "lucide-react";
 import { useRecording } from "../../hooks/useRecording";
 import { getCachedBranding } from "../../utils/branding";
 import SunshineVideoTab from "./themes/SunshineVideoTab";
 import ExplorerVideoTab from "./themes/ExplorerVideoTab";
+import CtrlBtn from "./CtrlBtn";
 
 // Zoom logo mark (Z letter in Zoom's brand blue)
 function ZoomIcon({ size = 16, color = "#fff" }) {
@@ -36,18 +38,18 @@ function ZoomIcon({ size = 16, color = "#fff" }) {
   );
 }
 
-export default function ZoomClassroom({ classData, userRole, onLeave, zoomLink }) {
+export default function ZoomClassroom({ classData, userRole, onLeave, zoomLink, managedStudent = false }) {
   const navigate    = useNavigate();
   const bookingId   = classData?.bookingId || classData?.id;
   const channelName = `class-${bookingId}`;
   const userName    = localStorage.getItem("name") || "User";
   const userId      = localStorage.getItem("userId") || "";
 
-  const core = useClassroomCore({ bookingId, userRole, duration: classData?.duration });
+  const core = useClassroomCore({ bookingId, userRole, duration: classData?.duration, managedStudent: managedStudent && userRole === "teacher" });
 
   const {
     isTeacherPresent, isStudentPresent,
-    timeElapsed, bothActiveTime, isTimerRunning, classStarted,
+    bothActiveTime, classStarted,
     timeRemaining, completionPct, requiredTime,
     autoCompleting, completionResult,
     showLeaveModal, setShowLeaveModal,
@@ -95,7 +97,7 @@ export default function ZoomClassroom({ classData, userRole, onLeave, zoomLink }
   if (autoCompleting || completionResult) {
     const isCompleted = completionResult?.completed && !completionResult?.missed;
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-sky-50 p-4">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-pink-50 via-rose-50 to-fuchsia-50 p-4">
         <div className="bg-white rounded-3xl shadow-2xl p-10 max-w-md w-full text-center">
           {autoCompleting ? (
             <>
@@ -238,268 +240,143 @@ export default function ZoomClassroom({ classData, userRole, onLeave, zoomLink }
   }
 
   // ── Main classroom UI ──────────────────────────────────────────────────────
-  return (
-    <div className="h-screen flex flex-col bg-gradient-to-br from-blue-50 via-sky-50 to-indigo-50">
+  const presentCount = (isTeacherPresent ? 1 : 0) + (isStudentPresent ? 1 : 0);
+  const lowTime      = timeRemaining < 120;
 
-      {/* HEADER */}
-      <div className="bg-white shadow-md border-b-2 border-blue-200 px-6 py-3 flex-shrink-0">
-        <div className="flex items-center justify-between mb-2">
-          <div>
-            <h1 className="text-lg font-bold text-gray-800">{classData?.title || "Class"}</h1>
-            <p className="text-xs text-gray-500">{classData?.topic || ""}</p>
+  return (
+    <div className="h-screen flex flex-col bg-gradient-to-br from-pink-50 via-rose-50 to-fuchsia-50">
+      <style>{`
+        @keyframes meetBounce { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-6px) } }
+        @keyframes soundWave  { 0%,100% { transform: scaleY(0.25); opacity: .5 } 50% { transform: scaleY(1); opacity: 1 } }
+      `}</style>
+
+      {/* ── TOP BAR: title · status · timer · who's here ── */}
+      <div className="flex-shrink-0 flex items-center justify-between gap-3 px-4 sm:px-6 py-3">
+        <div className="min-w-0 flex items-center gap-3">
+          <div className="w-9 h-9 rounded-2xl bg-gradient-to-br from-pink-400 to-rose-500 flex items-center justify-center text-lg shadow-md shadow-pink-300/50 flex-shrink-0">
+            🎀
           </div>
-          <div className="flex items-center gap-2">
-            <button onClick={handleRefresh}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-full font-semibold text-sm transition-all">
-              <RefreshCw className="w-4 h-4" /> Refresh
-            </button>
-            <button
-              onClick={() => {
-                if (isRecording) stopRecording();
-                setShowLeaveModal(true);
-              }}
-              className="flex items-center gap-2 px-4 py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded-full font-semibold text-sm transition-all">
-              <Power className="w-4 h-4" /> Leave Early
-            </button>
+          <div className="min-w-0">
+            <h1 className="text-base font-extrabold text-gray-800 truncate leading-tight">{classData?.title || "Class"}</h1>
+            <span className={`inline-flex items-center gap-1.5 text-[11px] font-bold ${classStarted ? "text-rose-600" : "text-gray-400"}`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${classStarted ? "bg-rose-500 animate-pulse" : "bg-gray-300"}`} />
+              {classStarted ? "Live" : `Waiting for ${isTeacherPresent ? "student" : "teacher"}…`}
+            </span>
           </div>
         </div>
 
-        <div className="flex items-center justify-between">
-          {/* Timer */}
-          <div className="flex flex-col gap-0.5">
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-1.5">
-                <Clock className="w-4 h-4 text-blue-600" />
-                <span className={`text-xl font-bold ${timeRemaining < 60 ? "text-red-600 animate-pulse" : "text-blue-700"}`}>
-                  {formatTime(timeRemaining)}
-                </span>
-              </div>
-              <span className="text-xs text-gray-400">elapsed: {formatTime(timeElapsed)}</span>
-            </div>
-            <div className="flex items-center gap-2 text-xs">
-              <div className={`w-2 h-2 rounded-full ${isTimerRunning ? "bg-blue-500 animate-pulse" : "bg-gray-300"}`} />
-              <span className="text-gray-500 font-medium">
-                {classStarted ? "In Progress" : "Waiting for both to open classroom..."}
-              </span>
-              {classStarted && (
-                <span className="text-gray-400">
-                  · Together: {formatTime(bothActiveTime)} / {formatTime(requiredTime)} ({completionPct}%)
-                </span>
-              )}
-            </div>
-            <div className="w-48 h-1.5 bg-gray-200 rounded-full mt-1">
-              <div className={`h-full rounded-full transition-all duration-1000 ${completionPct >= 100 ? "bg-blue-600" : "bg-blue-500"}`}
-                style={{ width: `${completionPct}%` }} />
-            </div>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white shadow-sm ${lowTime ? "text-rose-600 animate-pulse" : "text-pink-600"}`}>
+            <Clock className="w-4 h-4" />
+            <span className="text-sm font-extrabold tabular-nums">{formatTime(timeRemaining)}</span>
           </div>
-
-          {/* Tabs */}
-          <div className="flex items-center gap-2 bg-gradient-to-r from-blue-100 to-sky-100 rounded-full p-1">
-            {["video", "content", "whiteboard"].map((tab) => (
-              <button key={tab} onClick={() => setActiveTab(tab)}
-                className={`flex items-center gap-1.5 px-4 py-2 rounded-full font-bold text-sm transition-all ${
-                  activeTab === tab ? "bg-white shadow-md scale-105 text-blue-600" : "text-blue-400 hover:text-blue-600"
-                }`}>
-                {tab === "video"      && <ZoomIcon size={14} color={activeTab === tab ? "#2D8CFF" : "#93c5fd"} />}
-                {tab === "content"    && <FileText className="w-3.5 h-3.5" />}
-                {tab === "whiteboard" && <PenTool  className="w-3.5 h-3.5" />}
-                {tab.charAt(0).toUpperCase() + tab.slice(1)}
-              </button>
-            ))}
-          </div>
-
-          {/* Presence */}
-          <div className="flex flex-col items-end gap-1">
-            <div className="flex items-center gap-1.5">
-              <Users className="w-4 h-4 text-blue-600" />
-              <span className="text-sm font-bold text-blue-700">
-                {(isTeacherPresent ? 1 : 0) + (isStudentPresent ? 1 : 0)}/2
-              </span>
-            </div>
-            <div className="flex items-center gap-3 text-xs">
-              <div className="flex items-center gap-1">
-                {isTeacherPresent ? <CheckCircle2 className="w-3 h-3 text-blue-500" /> : <XCircle className="w-3 h-3 text-gray-300" />}
-                <span className="text-gray-500">Teacher</span>
-              </div>
-              <div className="flex items-center gap-1">
-                {isStudentPresent ? <CheckCircle2 className="w-3 h-3 text-blue-500" /> : <XCircle className="w-3 h-3 text-gray-300" />}
-                <span className="text-gray-500">Student</span>
-              </div>
-            </div>
+          <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white shadow-sm text-pink-600" title="Teacher · Student">
+            <Users className="w-4 h-4" />
+            <span className="text-sm font-extrabold">{presentCount}/2</span>
           </div>
         </div>
       </div>
 
-      {/* WAITING BANNER */}
-      {!classStarted && (
-        <div className="bg-amber-50 border-b border-amber-200 px-6 py-2 flex items-center justify-center gap-2 text-sm text-amber-700">
-          <Loader className="w-4 h-4 animate-spin" />
-          Waiting for {isTeacherPresent ? "student" : "teacher"} to open their classroom page...
+      {/* MANAGED STUDENT: teacher confirms attendance */}
+      {core.managedStudent && (
+        <div className="flex-shrink-0 mx-4 sm:mx-6 mb-2 rounded-2xl overflow-hidden shadow-sm">
+          <ManagedAttendanceBar core={core} />
         </div>
       )}
 
-      {/* MAIN CONTENT */}
-      <div className="flex-1 overflow-hidden relative">
+      {/* ── MAIN AREA ── */}
+      <div className="flex-1 min-h-0 overflow-hidden relative">
 
-        {/* Video tab — themed live class view */}
         {activeTab === "video" && (() => {
-          // Shared props for all themed video tab components
+          // Centers with a themed classroom keep their themed view
           const tabProps = {
             classData, userRole, userName,
             classStarted, isTeacherPresent, isStudentPresent,
             timeRemaining, bothActiveTime, requiredTime, completionPct,
             formatTime,
-            // Themes receive googleMeetLink prop but we pass zoomLink here —
-            // theme components display it as their "open meeting" link
-            googleMeetLink: zoomLink,
+            googleMeetLink: zoomLink, // themes call it googleMeetLink
             platform: "zoom",
             isRecording, uploadingRecording, recSeconds, recordingError,
             setRecordingError, startRecording, stopRecording, formatRecTime,
           };
-
           if (classroomTheme === "sunshine") return <SunshineVideoTab {...tabProps} />;
           if (classroomTheme === "explorer") return <ExplorerVideoTab  {...tabProps} />;
 
-          // ── Default: dark professional design (Zoom blue accent) ──────────────
+          // ── Default: simple, bright pink view ──
           return (
-            <div className="h-full flex flex-col bg-gray-950 relative overflow-hidden">
-              <style>{`
-                @keyframes zoomSoundWave {
-                  0%, 100% { transform: scaleY(0.25); opacity: 0.5; }
-                  50%       { transform: scaleY(1);    opacity: 1;   }
-                }
-              `}</style>
-
-              {/* ── Top bar: LIVE badge · title · timer ── */}
-              <div className="flex items-center justify-between px-5 py-3 flex-shrink-0 border-b border-white/5">
-                {classStarted ? (
-                  <div className="flex items-center gap-1.5 bg-red-600/90 px-3 py-1 rounded-full">
-                    <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
-                    <span className="text-white text-xs font-bold tracking-widest">LIVE</span>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-1.5 bg-gray-700/80 px-3 py-1 rounded-full">
-                    <span className="w-2 h-2 rounded-full bg-gray-400" />
-                    <span className="text-gray-300 text-xs font-bold tracking-wider">WAITING</span>
-                  </div>
-                )}
-                <div className="text-center">
-                  <p className="text-white/80 text-sm font-semibold leading-tight">{classData?.title || "Class"}</p>
-                  {classData?.topic && <p className="text-white/30 text-xs">{classData.topic}</p>}
-                </div>
-                <div className="text-right">
-                  <p className={`text-lg font-bold tabular-nums leading-tight ${timeRemaining < 120 ? "text-red-400 animate-pulse" : "text-white"}`}>
-                    {formatTime(timeRemaining)}
-                  </p>
-                  <p className="text-white/30 text-[10px]">remaining</p>
-                </div>
-              </div>
-
-              {/* ── Simulated video panels ── */}
-              <div className="flex-1 flex gap-3 p-4 min-h-0">
+            <div className="h-full overflow-y-auto px-4 sm:px-6 pb-4 flex flex-col items-center justify-center gap-4">
+              {/* People */}
+              <div className="w-full max-w-3xl grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {[
-                  { label: "Teacher", isPresent: isTeacherPresent, isYou: userRole === "teacher" },
-                  { label: "Student", isPresent: isStudentPresent, isYou: userRole === "student" },
-                ].map(({ label, isPresent, isYou }) => (
+                  { label: "Teacher", emoji: "👩‍🏫", isPresent: isTeacherPresent, isYou: userRole === "teacher" },
+                  { label: "Student", emoji: "🧒",   isPresent: isStudentPresent, isYou: userRole === "student" },
+                ].map(({ label, emoji, isPresent, isYou }, i) => (
                   <div key={label}
-                    className={`flex-1 relative rounded-2xl flex flex-col items-center justify-center transition-all duration-700 ${
-                      isPresent ? "bg-gray-800 shadow-xl" : "bg-gray-900 border border-white/5"
-                    }`}
-                    style={isPresent ? { boxShadow: "0 0 0 1.5px rgba(45,140,255,0.4), 0 20px 60px rgba(0,0,0,0.5)" } : {}}
-                  >
-                    <div className={`absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold backdrop-blur-sm ${
-                      isPresent ? "bg-blue-500/20 text-blue-400" : "bg-gray-800/80 text-gray-500"
+                    className={`relative rounded-3xl bg-white p-6 flex flex-col items-center text-center transition-all duration-500 ${
+                      isPresent ? "shadow-lg shadow-pink-200/70 ring-2 ring-pink-300" : "shadow-sm ring-1 ring-pink-100"
                     }`}>
-                      <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${isPresent ? "bg-blue-400 animate-pulse" : "bg-gray-600"}`} />
+                    <span className={`absolute top-3 left-3 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold ${
+                      isPresent ? "bg-emerald-50 text-emerald-600" : "bg-gray-100 text-gray-400"
+                    }`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${isPresent ? "bg-emerald-500 animate-pulse" : "bg-gray-300"}`} />
                       {isPresent ? "In Zoom" : "Waiting"}
-                    </div>
+                    </span>
                     {isYou && (
-                      <div className="absolute top-3 right-3 px-2 py-0.5 bg-white/10 backdrop-blur-sm rounded-full text-[10px] text-white/50 font-semibold">You</div>
+                      <span className="absolute top-3 right-3 px-2 py-0.5 rounded-full bg-pink-100 text-pink-600 text-[10px] font-bold">You</span>
                     )}
-                    <div className={`w-20 h-20 rounded-full flex items-center justify-center mb-3 text-3xl font-black select-none transition-all duration-500 ${
-                      isPresent ? "bg-gradient-to-br from-blue-500 to-indigo-600" : "bg-gray-800 border-2 border-dashed border-gray-700"
-                    }`}
-                      style={isPresent ? { boxShadow: "0 0 30px rgba(45,140,255,0.35)" } : {}}>
-                      {isPresent ? (isYou ? userName.charAt(0).toUpperCase() : label.charAt(0)) : "?"}
+
+                    <div
+                      className={`mt-4 w-20 h-20 rounded-full flex items-center justify-center text-4xl select-none ${
+                        isPresent ? "bg-gradient-to-br from-pink-200 to-rose-300" : "bg-pink-50 border-2 border-dashed border-pink-200 grayscale opacity-60"
+                      }`}
+                      style={isPresent ? { animation: `meetBounce 2.4s ease-in-out ${i * 0.4}s infinite` } : {}}
+                    >
+                      {emoji}
                     </div>
-                    <p className={`text-sm font-bold mb-0.5 ${isPresent ? "text-white" : "text-gray-600"}`}>{isYou ? userName : label}</p>
-                    <p className="text-xs text-gray-600 mb-4">{isPresent ? "Live in Zoom" : "Not joined yet"}</p>
-                    <div className="flex items-end justify-center gap-[3px]" style={{ height: "20px" }}>
-                      {[...Array(7)].map((_, i) => (
-                        <div key={i} className={`w-[3px] rounded-full origin-bottom ${isPresent && classStarted ? "bg-blue-400" : "bg-gray-700"}`}
+                    <p className={`mt-3 text-sm font-extrabold ${isPresent ? "text-gray-800" : "text-gray-400"}`}>{isYou ? userName : label}</p>
+                    <p className="text-xs text-gray-400">{isPresent ? "Live in Zoom" : "Not joined yet"}</p>
+
+                    <div className="mt-3 flex items-end justify-center gap-[3px]" style={{ height: 16 }}>
+                      {[...Array(7)].map((_, k) => (
+                        <div key={k} className={`w-[3px] rounded-full origin-bottom ${isPresent && classStarted ? "bg-pink-400" : "bg-pink-100"}`}
                           style={{
-                            height: "16px",
-                            transform: isPresent && classStarted ? undefined : "scaleY(0.2)",
-                            animation: isPresent && classStarted ? `zoomSoundWave ${0.55 + i * 0.09}s ease-in-out ${i * 0.07}s infinite` : "none",
+                            height: 14,
+                            transform: isPresent && classStarted ? undefined : "scaleY(0.25)",
+                            animation: isPresent && classStarted ? `soundWave ${0.55 + k * 0.09}s ease-in-out ${k * 0.07}s infinite` : "none",
                           }} />
                       ))}
                     </div>
-                    {!isPresent && <div className="absolute inset-0 rounded-2xl bg-gray-950/40" />}
                   </div>
                 ))}
               </div>
 
-              {/* ── Bottom HUD ── */}
-              <div className="flex-shrink-0 px-4 pb-4 flex flex-col gap-2">
-                <div className="bg-gray-800/70 backdrop-blur-sm rounded-2xl px-4 py-3 border border-white/5">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-gray-400 text-[11px] font-semibold uppercase tracking-wider">Attendance</span>
-                    <span className={`text-sm font-bold tabular-nums ${completionPct >= 100 ? "text-blue-400" : "text-white"}`}>{completionPct}%</span>
-                  </div>
-                  <div className="w-full h-1.5 bg-gray-700 rounded-full overflow-hidden mb-2.5">
-                    <div className={`h-full rounded-full transition-all duration-1000 ${completionPct >= 100 ? "bg-blue-500" : "bg-blue-500"}`} style={{ width: `${completionPct}%` }} />
-                  </div>
-                  <div className="grid grid-cols-3 text-center text-xs">
-                    <div><p className="text-gray-600">Together</p><p className="text-white font-bold tabular-nums">{formatTime(bothActiveTime)}</p></div>
-                    <div><p className="text-gray-600">Required</p><p className="text-white font-bold tabular-nums">{formatTime(requiredTime)}</p></div>
-                    <div>
-                      <p className="text-gray-600">Remaining</p>
-                      <p className={`font-bold tabular-nums ${timeRemaining < 120 ? "text-red-400 animate-pulse" : "text-white"}`}>{formatTime(timeRemaining)}</p>
-                    </div>
-                  </div>
+              {/* Attendance — one slim line */}
+              <div className="w-full max-w-3xl rounded-2xl bg-white/80 px-4 py-3 shadow-sm ring-1 ring-pink-100">
+                <div className="flex items-center justify-between text-xs mb-1.5">
+                  <span className="font-bold text-gray-500">
+                    Time together <span className="text-gray-800 tabular-nums">{formatTime(bothActiveTime)}</span>
+                    <span className="text-gray-400"> / {formatTime(requiredTime)}</span>
+                  </span>
+                  <span className={`font-extrabold tabular-nums ${completionPct >= 100 ? "text-emerald-600" : "text-pink-600"}`}>{completionPct}%</span>
                 </div>
-                {!classStarted ? (
-                  <div className="flex items-center justify-center gap-2 text-[11px] text-amber-400 bg-amber-500/10 rounded-xl px-4 py-2 border border-amber-500/20">
-                    <Loader className="w-3 h-3 animate-spin flex-shrink-0" /> Waiting for both parties to open their classroom pages…
-                  </div>
-                ) : completionPct >= 100 ? (
-                  <div className="flex items-center justify-center gap-2 text-[11px] text-blue-400 bg-blue-500/10 rounded-xl px-4 py-2 border border-blue-500/20">
-                    <CheckCircle className="w-3 h-3 flex-shrink-0" /> Attendance requirement met — you can leave safely.
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-center gap-2 text-[11px] text-gray-500 bg-white/5 rounded-xl px-4 py-2 border border-white/5">
-                    <AlertTriangle className="w-3 h-3 flex-shrink-0 text-amber-500" /> Keep this tab open — closing it stops attendance tracking.
-                  </div>
-                )}
-                <div className="flex gap-2">
-                  {zoomLink && (
-                    <button onClick={() => window.open(zoomLink, "_blank")}
-                      className="flex-1 px-4 py-2.5 bg-[#2D8CFF] hover:bg-[#1a7de8] active:bg-[#0d6fd4] text-white rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2">
-                      <ZoomIcon size={16} /> Open Zoom
-                    </button>
+                <div className="h-2 rounded-full bg-pink-100 overflow-hidden">
+                  <div className={`h-full rounded-full transition-all duration-1000 ${completionPct >= 100 ? "bg-emerald-400" : "bg-gradient-to-r from-pink-400 to-rose-500"}`}
+                    style={{ width: `${completionPct}%` }} />
+                </div>
+                <p className="mt-1.5 text-[11px] text-gray-400 flex items-center gap-1.5">
+                  {!classStarted ? (
+                    <><Loader className="w-3 h-3 animate-spin" /> Waiting for both of you to open this page…</>
+                  ) : completionPct >= 100 ? (
+                    <><CheckCircle className="w-3 h-3 text-emerald-500" /> All done — you can leave safely.</>
+                  ) : (
+                    <><AlertTriangle className="w-3 h-3 text-amber-500" /> Keep this tab open so attendance keeps counting.</>
                   )}
-                  <button onClick={isRecording ? stopRecording : startRecording} disabled={uploadingRecording}
-                    className={`flex-1 px-4 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
-                      uploadingRecording ? "bg-gray-800 text-gray-500 cursor-not-allowed"
-                      : isRecording ? "bg-red-600 hover:bg-red-500 text-white ring-1 ring-red-500/50"
-                      : "bg-gray-800 hover:bg-gray-700 text-gray-300"
-                    }`}>
-                    {uploadingRecording ? (<><Loader className="w-4 h-4 animate-spin" /> Saving…</>)
-                      : isRecording ? (<><Square className="w-3.5 h-3.5 fill-current" /> Stop Rec <span className="font-mono text-xs bg-red-700/80 px-1.5 py-0.5 rounded-md">{formatRecTime(recSeconds)}</span></>)
-                      : (<><Circle className="w-3.5 h-3.5" /> Record</>)}
-                  </button>
-                </div>
-                {recordingError && (
-                  <div className="flex items-start gap-2 bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2 text-xs text-red-400">
-                    <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
-                    <span>{recordingError}</span>
-                    <button onClick={() => setRecordingError(null)} className="ml-auto flex-shrink-0"><X className="w-3 h-3" /></button>
-                  </div>
-                )}
-                {userRole === "teacher" && !zoomLink && (
-                  <p className="text-[11px] text-gray-600 text-center">Add a Zoom link to your profile to enable the Open button.</p>
-                )}
+                </p>
               </div>
+
+              {userRole === "teacher" && !zoomLink && (
+                <p className="text-[11px] text-gray-400 text-center">Add a Zoom link to your profile to enable the Zoom button.</p>
+              )}
             </div>
           );
         })()}
@@ -519,13 +396,66 @@ export default function ZoomClassroom({ classData, userRole, onLeave, zoomLink }
         )}
       </div>
 
+      {/* Recording error — floats above the control bar */}
+      {recordingError && (
+        <div className="flex-shrink-0 mx-auto mb-2 max-w-lg flex items-start gap-2 rounded-2xl bg-white px-3 py-2 text-xs text-rose-600 shadow-md ring-1 ring-rose-200">
+          <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+          <span>{recordingError}</span>
+          <button onClick={() => setRecordingError(null)} className="ml-auto flex-shrink-0" aria-label="Dismiss"><X className="w-3 h-3" /></button>
+        </div>
+      )}
+
+      {/* ── CONTROL BAR (Meet-style small round buttons) ── */}
+      <div className="flex-shrink-0 flex justify-center px-3 pb-4 pt-1">
+        <div className="flex items-center gap-2 rounded-full bg-white px-3 py-2 shadow-lg shadow-pink-200/60 ring-1 ring-pink-100">
+          <CtrlBtn label="Class" active={activeTab === "video"} onClick={() => setActiveTab("video")}>
+            <Users className="w-5 h-5" />
+          </CtrlBtn>
+          <CtrlBtn label="Content" active={activeTab === "content"} onClick={() => setActiveTab("content")}>
+            <FileText className="w-5 h-5" />
+          </CtrlBtn>
+          <CtrlBtn label="Whiteboard" active={activeTab === "whiteboard"} onClick={() => setActiveTab("whiteboard")}>
+            <PenTool className="w-5 h-5" />
+          </CtrlBtn>
+
+          <div className="w-px h-6 bg-pink-100 mx-1" />
+
+          {zoomLink && (
+            <CtrlBtn label="Open Zoom" tone="blue" onClick={() => window.open(zoomLink, "_blank")}>
+              <ZoomIcon size={20} />
+            </CtrlBtn>
+          )}
+          <CtrlBtn
+            label={uploadingRecording ? "Saving recording…" : isRecording ? "Stop recording" : "Record"}
+            tone={isRecording ? "red" : "default"}
+            wide={isRecording}
+            disabled={uploadingRecording}
+            onClick={isRecording ? stopRecording : startRecording}
+          >
+            {uploadingRecording ? <Loader className="w-5 h-5 animate-spin" />
+              : isRecording ? (<><Square className="w-3.5 h-3.5 fill-current" /><span className="text-xs font-bold tabular-nums">{formatRecTime(recSeconds)}</span></>)
+              : <Circle className="w-5 h-5" />}
+          </CtrlBtn>
+          <CtrlBtn label="Refresh" onClick={handleRefresh}>
+            <RefreshCw className="w-5 h-5" />
+          </CtrlBtn>
+
+          <CtrlBtn label="Leave class" tone="red" wide onClick={() => {
+            if (isRecording) stopRecording(); // auto-stop → triggers upload before leaving
+            setShowLeaveModal(true);
+          }}>
+            <PhoneOff className="w-5 h-5" />
+          </CtrlBtn>
+        </div>
+      </div>
+
       {/* LEAVE MODAL */}
       {showLeaveModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-sm w-full text-center">
             {uploadingRecording ? (
               <>
-                <Loader className="w-16 h-16 text-blue-500 animate-spin mx-auto mb-4" />
+                <Loader className="w-16 h-16 text-pink-500 animate-spin mx-auto mb-4" />
                 <h2 className="text-xl font-bold text-gray-800 mb-2">Saving Recording…</h2>
                 <p className="text-gray-500 mb-6 text-sm">
                   Please wait — your recording is being saved. The Leave button will unlock when it's done.
@@ -544,13 +474,13 @@ export default function ZoomClassroom({ classData, userRole, onLeave, zoomLink }
               <button
                 onClick={() => setShowLeaveModal(false)}
                 disabled={uploadingRecording}
-                className="flex-1 px-4 py-3 bg-gray-100 hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed text-gray-700 rounded-full font-bold transition-all">
+                className="flex-1 px-4 py-3 bg-pink-50 hover:bg-pink-100 disabled:opacity-40 disabled:cursor-not-allowed text-gray-700 rounded-full font-bold transition-all">
                 <X className="w-4 h-4 inline mr-1" /> Stay
               </button>
               <button
                 onClick={handleLeaveEarly}
                 disabled={uploadingRecording}
-                className="flex-1 px-4 py-3 bg-red-500 hover:bg-red-600 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-full font-bold transition-all">
+                className="flex-1 px-4 py-3 bg-rose-600 hover:bg-rose-500 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-full font-bold transition-all">
                 Leave
               </button>
             </div>

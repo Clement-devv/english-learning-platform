@@ -49,11 +49,18 @@ export default function ReviewsTab({ isDarkMode }) {
     setTimeout(() => setToast(null), 3000);
   }
 
+  // One page from the server — filters and sort are applied there
   async function load() {
     setLoading(true);
     try {
-      const res = await api.get("/reviews");
+      const res = await api.get("/reviews", { params: {
+        page, limit: PAGE_SIZE, sort: sortBy,
+        teacherId: filterTeacher || undefined,
+        flagged:   filterFlag ? "true" : undefined,
+        rating:    filterRating || undefined,
+      } });
       setData(res.data);
+      if (res.data.pagination && res.data.pagination.page !== page) setPage(res.data.pagination.page);
     } catch (e) {
       console.error(e);
     } finally {
@@ -61,7 +68,7 @@ export default function ReviewsTab({ isDarkMode }) {
     }
   }
 
-  useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); }, [page, filterTeacher, filterFlag, filterRating, sortBy]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Reset to page 1 whenever filters or sort changes
   useEffect(() => { setPage(1); }, [filterTeacher, filterFlag, filterRating, sortBy]);
@@ -93,33 +100,16 @@ export default function ReviewsTab({ isDarkMode }) {
     }
   }
 
-  // Filter + sort
-  const filtered = useMemo(() => {
-    let list = data.reviews || [];
-    if (filterTeacher) list = list.filter(r => r.teacherId?._id === filterTeacher || r.teacherId === filterTeacher);
-    if (filterFlag)    list = list.filter(r => r.flagged);
-    if (filterRating)  list = list.filter(r => r.rating === filterRating);
-
-    switch (sortBy) {
-      case "oldest":   return [...list].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
-      case "highest":  return [...list].sort((a, b) => b.rating - a.rating);
-      case "lowest":   return [...list].sort((a, b) => a.rating - b.rating);
-      case "flagged":  return [...list].sort((a, b) => (b.flagged ? 1 : 0) - (a.flagged ? 1 : 0));
-      default:         return [...list].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-    }
-  }, [data.reviews, filterTeacher, filterFlag, filterRating, sortBy]);
-
-  const totalPages  = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  // Server already filtered, sorted and paged
+  const pageItems   = data.reviews || [];
+  const filtered    = { length: data.pagination?.total ?? pageItems.length }; // count for "Showing"
+  const totalPages  = data.pagination?.totalPages || 1;
   const safePage    = Math.min(page, totalPages);
-  const pageItems   = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
-  // Summary stats across ALL reviews (not filtered)
-  const allReviews  = data.reviews || [];
-  const totalCount  = allReviews.length;
-  const flaggedCount = allReviews.filter(r => r.flagged).length;
-  const overallAvg  = totalCount
-    ? (allReviews.reduce((s, r) => s + r.rating, 0) / totalCount).toFixed(1)
-    : null;
+  // Summary stats across ALL reviews (not filtered) — computed by the server
+  const totalCount   = data.totals?.total ?? 0;
+  const flaggedCount = data.totals?.flagged ?? 0;
+  const overallAvg   = data.totals?.avgRating != null ? data.totals.avgRating.toFixed(1) : null;
 
   const inputStyle = {
     padding: "7px 10px", borderRadius: 8, fontSize: 13,

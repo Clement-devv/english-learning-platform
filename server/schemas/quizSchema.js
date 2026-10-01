@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { shareLinkSchemaDef } from '../utils/shareLink.js';
 
 const { Schema } = mongoose;
 
@@ -19,7 +20,16 @@ export const quizSchema = new Schema({
   dueDate:      { type: Date, required: true },
   questions:    { type: [questionSchema], required: true },
   status: { type: String, enum: ['assigned', 'attempted'], default: 'assigned' },
+
+  // ── Share link (managed students only) — see utils/shareLink.js ───────────
+  shareLink: shareLinkSchemaDef,
+  // When the student pressed "Start" on the share link. Set once by the server,
+  // so reloading the page can't restart the timer.
+  linkStartedAt: { type: Date, default: null },
 }, { timestamps: true });
 
 quizSchema.index({ teacherId: 1, createdAt: -1 });
 quizSchema.index({ studentId: 1, status: 1 });
+quizSchema.index({ teacherId: 1, status: 1, createdAt: -1 }); // teacher list filtered by status (paged)
+// Share-link lookup (sparse — only managed students' quizzes have a link)
+quizSchema.index({ 'shareLink.tokenHash': 1 }, { unique: true, sparse: true });

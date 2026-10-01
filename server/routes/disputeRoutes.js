@@ -8,6 +8,7 @@ import { teacherSchema }            from "../schemas/teacherSchema.js";
 import { paymentTransactionSchema } from "../schemas/paymentTransactionSchema.js";
 import logger from "../utils/logger.js";
 import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
+import { reverseCompletedClass } from "../utils/classReversal.js";
 
 const router = express.Router();
 router.use(tenantMiddleware);
@@ -16,6 +17,10 @@ const getBooking            = (db) => db.models.Booking            || db.model("
 const getStudent            = (db) => db.models.Student            || db.model("Student",            studentSchema);
 const getTeacher            = (db) => db.models.Teacher            || db.model("Teacher",            teacherSchema);
 const getPaymentTransaction = (db) => db.models.PaymentTransaction || db.model("PaymentTransaction", paymentTransactionSchema);
+
+// populate("teacherId"/"studentId") needs the models registered on this center's
+// connection first — otherwise the first request after a restart fails.
+router.use((req, _res, next) => { if (req.db) { getStudent(req.db); getTeacher(req.db); } next(); });
 
 /**
  * POST /api/disputes/booking/:bookingId
@@ -140,7 +145,19 @@ router.patch("/:bookingId/resolve", verifyToken, verifyAdmin, async (req, res) =
       return badRequest(res, "No pending dispute found for this booking");
     }
 
-    if (resolution === "approve_teacher") {
+    if (booking.loggedByTeacher && booking.status === "pending_confirmation") {
+      // Teacher-logged class still awaiting payment approval: nothing has been charged.
+      // Teacher wins → the dispute is closed; the class still needs approval in "Logged classes".
+      // Student/parent wins → the class is rejected.
+      if (resolution === "approve_teacher") {
+        booking.disputeStatus = "resolved_teacher";
+      } else {
+        booking.disputeStatus = "resolved_student";
+        booking.status = "rejected";
+        booking.rejectionReason = "Logged class not approved: absence confirmed by admin";
+        booking.set("offline.approval", { status: "rejected", decidedAt: new Date(), decidedBy: req.user.id, note: adminNotes || "Dispute upheld" });
+      }
+    } else if (resolution === "approve_teacher") {
       // Teacher wins — mark as completed and process payment/deduction if not already done
       const wasMissed = booking.status === "missed";
 
@@ -187,7 +204,13 @@ router.patch("/:bookingId/resolve", verifyToken, verifyAdmin, async (req, res) =
 
       // Only refund student class if it was already deducted (adminRejected = completed then rejected)
       // Missed classes never deducted student's class, so no refund needed
-      if (booking.adminRejected) {
+      if (booking.status === "completed" && !booking.adminRejected) {
+        // Dispute on a class that still counts as completed (e.g. a parent says their
+        // managed child didn't attend): fully reverse it — credit back, teacher pay deducted.
+        await reverseCompletedClass(req.db, booking, {
+          reason: `Dispute upheld: ${booking.disputeReason || "student did not attend"}`, adminId: req.user.id,
+        });
+      } else if (booking.adminRejected) {
         const student = await getStudent(req.db).findById(booking.studentId._id);
         if (student) {
           student.classCredits = (student.classCredits || 0) + 1;
@@ -200,10 +223,16 @@ router.patch("/:bookingId/resolve", verifyToken, verifyAdmin, async (req, res) =
     booking.disputeResolution = resolution;
     booking.disputeAdminNotes = adminNotes || "";
     booking.disputeResolvedAt = new Date();
+    // Settled either way → the parent-check link (if any) stops working immediately
+    booking.set("shareLink", undefined);
     await booking.save();
 
     const msg =
-      resolution === "approve_teacher"
+      booking.loggedByTeacher && booking.status === "pending_confirmation"
+        ? "Dispute closed in favour of the teacher. The class still needs payment approval in Logged classes."
+        : booking.loggedByTeacher && booking.status === "rejected" && resolution === "approve_student"
+        ? "Dispute upheld — the logged class was rejected. Nothing was charged or paid."
+        : resolution === "approve_teacher"
         ? "Dispute resolved in favour of teacher. Class marked as completed."
         : "Dispute resolved in favour of student. Student class refunded.";
 

@@ -15,6 +15,7 @@ import { paymentTransactionSchema } from "../schemas/paymentTransactionSchema.js
 import { parentSchema }             from "../schemas/parentSchema.js";
 import logger from "../utils/logger.js";
 import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
+import { reverseCompletedClass } from "../utils/classReversal.js";
 
 const router = express.Router();
 router.use(tenantMiddleware);
@@ -302,38 +303,11 @@ router.post("/unmark", verifyToken, verifyAdmin, async (req, res) => {
       });
     }
 
-    // Flag booking as admin-rejected
-    booking.adminRejected = true;
-    booking.adminRejectedAt = new Date();
-    booking.adminRejectedBy = req.user.id;
-    booking.adminRejectedReason = reason || "";
-    await booking.save();
-
-    // Restore student class credit (skipped for trial — no credit was ever deducted)
-    const student = await getStudent(req.db).findById(booking.studentId._id);
-    if (student && !booking.isTrial) {
-      student.classCredits = (student.classCredits || 0) + 1;
-      student.active = true;
-      await student.save();
-    }
-
-    // Deduct teacher earnings (float-safe; skipped for trial — no earnings were ever added)
-    const teacher = await getTeacher(req.db).findById(booking.teacherId._id);
-    let ratePerClass = 0;
-    if (teacher && !booking.isTrial) {
-      ratePerClass = Math.round((parseFloat(teacher.ratePerClass) || 0) * 100) / 100;
-      teacher.lessonsCompleted = Math.max(0, (teacher.lessonsCompleted || 0) - 1);
-      teacher.earned = Math.max(0, Math.round(((teacher.earned || 0) - ratePerClass) * 100) / 100);
-      await teacher.save();
-    }
-
-    // Cancel the PaymentTransaction for this booking (skipped for trial — none was created)
-    if (!booking.isTrial) {
-      await getPaymentTransaction(req.db).updateMany(
-        { bookingId: booking._id, status: "pending" },
-        { $set: { status: "cancelled", notes: `Admin rejected: ${reason || "No reason given"}` } }
-      );
-    }
+    // Flag as admin-rejected, restore the student credit, deduct teacher earnings,
+    // cancel the pending payment (shared with dispute resolution)
+    const { student, teacher, ratePerClass } = await reverseCompletedClass(req.db, booking, {
+      reason: reason || "", adminId: req.user.id,
+    });
 
     // Send emails non-blocking
     const db = req.db;

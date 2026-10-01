@@ -420,6 +420,8 @@ router.get("/recordings/:id/stream", verifyToken, requireSubAdmin, async (req, r
     if (!teacherIds.map(String).includes(rec.teacherId.toString()))
       return forbidden(res, "Recording not in your scope");
 
+    if (rec.source === "external") return res.json({ url: rec.externalUrl, external: true });
+
     const { useS3, RECORDINGS_DIR } = await import('./recordingRoutes.js').then(m => ({ useS3: false, RECORDINGS_DIR: null })).catch(() => ({ useS3: false, RECORDINGS_DIR: null }));
     const s3Mod = await import('../utils/s3.js');
     if (s3Mod.s3Enabled()) {
@@ -460,6 +462,8 @@ router.get("/recordings/:id/download", verifyToken, requireSubAdmin, async (req,
     if (!rec) return notFound(res, "Recording not found");
     if (!teacherIds.map(String).includes(rec.teacherId.toString()))
       return forbidden(res, "Recording not in your scope");
+
+    if (rec.source === "external") return res.json({ url: rec.externalUrl, external: true });
 
     const filename = `recording-${rec._id}${rec.mimeType === "video/mp4" ? ".mp4" : ".webm"}`;
     const s3Mod = await import('../utils/s3.js');

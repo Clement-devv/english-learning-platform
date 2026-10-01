@@ -19,6 +19,12 @@ import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, s
 import { validateObjectId, wrapUpload } from '../middleware/validateObjectId.js';
 import { toStr, toObjectId, toInt, toArray } from '../utils/inputSanitizer.js';
 import { sendPush } from '../utils/webPushService.js';
+import { loginLimiter } from '../middleware/rateLimiter.js';
+import { readPaging, pageMeta, statusCounts, oid, todoFirstIds, inOrder } from "../utils/paging.js";
+import {
+  issueShareLink, withShareInfo, resolveShareLink, checkUnlock, linkExpiresAt,
+  signLinkAccess, verifyLinkAccess, ACCESS_HEADER,
+} from '../utils/shareLink.js';
 
 // Multer — memory storage (no disk writes, PDF buffer passed straight to pdf-parse)
 const upload = multer({
@@ -40,6 +46,8 @@ const getTeacher     = (db) => db.models.Teacher     || db.model("Teacher",     
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 // Strip correctIndex from questions before sending to student
+const QUIZ_STATUSES = ["assigned", "attempted"];
+
 function sanitiseForStudent(quiz) {
   const obj = quiz.toObject ? quiz.toObject() : { ...quiz };
   obj.questions = (obj.questions || []).map(({ correctIndex, explanation, ...rest }) => rest);
@@ -71,6 +79,238 @@ function validateQuestions(questions) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Public share-link routes — /api/v1/quiz/link/:token/...  (managed students)
+// No login: the unguessable token is the key; the name check issues a short-
+// lived access token (X-Share-Access). See utils/shareLink.js.
+//
+// Timing is server-side: POST /start stamps linkStartedAt once, so reloading
+// can't restart the clock. Questions are only sent after start, and correct
+// answers only after submit. Never returns 401 (the app's auth interceptor
+// would redirect to a login page).
+// ─────────────────────────────────────────────────────────────────────────────
+const QUIZ_LINK_UNAVAILABLE = "This quiz link is invalid or has been removed. Please ask the teacher for a new link.";
+const SUBMIT_GRACE_MS = 30 * 1000;        // network/clock slack before an attempt counts as over time
+const LINK_GRACE_MS   = 2 * 60 * 1000;    // an in-progress quiz can still be submitted just after the link expires
+
+const quizEndsAt = (quiz) => quiz.linkStartedAt
+  ? new Date(quiz.linkStartedAt.getTime() + quiz.timeLimit * 60 * 1000)
+  : null;
+
+async function findQuizByLink(req, res) {
+  getStudent(req.db); getTeacher(req.db); // register models for populate
+  const r = await resolveShareLink(getQuiz(req.db), req.params.token, req.center, {
+    // A quiz already under way can still be finished right after the due date ends
+    graceUntil: (q) => (q.linkStartedAt && q.status !== "attempted")
+      ? new Date(quizEndsAt(q).getTime() + LINK_GRACE_MS) : null,
+  });
+  if (r.status === "invalid") { notFound(res, QUIZ_LINK_UNAVAILABLE); return null; }
+  if (r.status === "expired") {
+    res.status(410).json({ success: false, expired: true, message: "This quiz link has expired — the due date has passed." });
+    return null;
+  }
+  return { quiz: r.doc, tokenHash: r.tokenHash, expiresAt: r.expiresAt };
+}
+
+async function requireQuizLinkAccess(req, res) {
+  const found = await findQuizByLink(req, res);
+  if (!found) return null;
+  if (!verifyLinkAccess(req.center.slug, "quiz", req.get(ACCESS_HEADER), found.quiz._id, found.tokenHash)) {
+    forbidden(res, "Please confirm your name to open this quiz.");
+    return null;
+  }
+  return found;
+}
+
+// What the student sees. Questions only once started; answers only once submitted.
+function quizLinkView(quiz, attempt, expiresAt, centerName) {
+  const status = attempt ? "done" : quiz.linkStartedAt ? "in_progress" : "ready";
+  const questions = quiz.questions.map(q => q.toObject ? q.toObject() : q);
+  return {
+    title:         quiz.title,
+    instructions:  quiz.instructions,
+    timeLimit:     quiz.timeLimit,
+    dueDate:       quiz.dueDate,
+    expiresAt,
+    questionCount: questions.length,
+    studentName:   quiz.studentId.firstName,
+    teacherName:   quiz.teacherId.displayName?.trim() || quiz.teacherId.firstName,
+    centerName:    centerName || "",
+    status,
+    startedAt:     quiz.linkStartedAt,
+    endsAt:        quizEndsAt(quiz),
+    serverNow:     new Date(),
+    questions: status === "in_progress"
+      ? questions.map(({ question, options }) => ({ question, options }))
+      : status === "done"
+        ? questions.map(({ question, options, correctIndex, explanation }) => ({ question, options, correctIndex, explanation }))
+        : undefined,
+    result: attempt ? {
+      score: attempt.score, totalQuestions: attempt.totalQuestions, percentage: attempt.percentage,
+      answers: attempt.answers, timeTaken: attempt.timeTaken, submittedAt: attempt.submittedAt, overTime: attempt.overTime,
+    } : null,
+  };
+}
+
+const findAttempt = (req, quiz) => getQuizAttempt(req.db).findOne({ quizId: quiz._id }).lean();
+
+// POST /link/:token/unlock  { studentName, teacherName }
+router.post("/link/:token/unlock", loginLimiter, async (req, res) => {
+  try {
+    const found = await findQuizByLink(req, res);
+    if (!found) return;
+    const { quiz, tokenHash, expiresAt } = found;
+
+    const check = await checkUnlock(getQuiz(req.db), quiz,
+      toStr(req.body.studentName, "studentName", { maxLen: 100 }),
+      toStr(req.body.teacherName, "teacherName", { maxLen: 100 }));
+    if (!check.ok) return res.status(check.status).json({ success: false, message: check.message });
+
+    res.json({
+      success: true,
+      accessToken: signLinkAccess(req.center.slug, "quiz", quiz._id, tokenHash, expiresAt),
+      quiz: quizLinkView(quiz, await findAttempt(req, quiz), expiresAt, req.center?.centerName),
+    });
+  } catch (err) {
+    if (err.statusCode === 400) return badRequest(res, err.message);
+    logger.error("Quiz link unlock error:", { error: err?.message });
+    serverError(res);
+  }
+});
+
+// GET /link/:token  (X-Share-Access)
+router.get("/link/:token", async (req, res) => {
+  try {
+    const found = await requireQuizLinkAccess(req, res);
+    if (!found) return;
+    res.json({ success: true, quiz: quizLinkView(found.quiz, await findAttempt(req, found.quiz), found.expiresAt, req.center?.centerName) });
+  } catch (err) {
+    logger.error("Quiz link view error:", { error: err?.message });
+    serverError(res);
+  }
+});
+
+// POST /link/:token/start  (X-Share-Access) — starts the clock (once)
+router.post("/link/:token/start", async (req, res) => {
+  try {
+    const found = await requireQuizLinkAccess(req, res);
+    if (!found) return;
+    const { quiz } = found;
+    if (quiz.status === "attempted") return badRequest(res, "This quiz has already been finished.");
+
+    if (!quiz.linkStartedAt) {
+      // Atomic: only the first start wins, so two tabs can't get two clocks
+      await getQuiz(req.db).updateOne({ _id: quiz._id, linkStartedAt: null }, { $set: { linkStartedAt: new Date() } });
+      quiz.linkStartedAt = (await getQuiz(req.db).findById(quiz._id).select("linkStartedAt").lean()).linkStartedAt;
+    }
+    res.json({ success: true, quiz: quizLinkView(quiz, null, found.expiresAt, req.center?.centerName) });
+  } catch (err) {
+    logger.error("Quiz link start error:", { error: err?.message });
+    serverError(res);
+  }
+});
+
+// POST /link/:token/submit  (X-Share-Access)  { answers: number[] }  (-1 = skipped)
+router.post("/link/:token/submit", async (req, res) => {
+  try {
+    const found = await requireQuizLinkAccess(req, res);
+    if (!found) return;
+    const { quiz, expiresAt } = found;
+    if (quiz.status === "attempted") return badRequest(res, "This quiz has already been finished.");
+    if (!quiz.linkStartedAt) return badRequest(res, "Please press Start before answering.");
+
+    const { answers } = req.body;
+    if (!Array.isArray(answers) || answers.length !== quiz.questions.length)
+      return badRequest(res, "Answers don't match the questions — please reload the page.");
+    const clean = answers.map((a, i) => {
+      const n = Number.isInteger(a) ? a : parseInt(a, 10);
+      return Number.isInteger(n) && n >= 0 && n < quiz.questions[i].options.length ? n : -1;
+    });
+
+    // Scored on the server only
+    const score = clean.reduce((s, a, i) => s + (a === quiz.questions[i].correctIndex ? 1 : 0), 0);
+    const totalQuestions = quiz.questions.length;
+    const elapsedMs = Date.now() - quiz.linkStartedAt.getTime();
+
+    let attempt;
+    try {
+      attempt = await getQuizAttempt(req.db).create({
+        quizId: quiz._id, studentId: quiz.studentId._id, teacherId: quiz.teacherId._id,
+        answers: clean, score, totalQuestions,
+        percentage:  Math.round((score / totalQuestions) * 100),
+        startedAt:   quiz.linkStartedAt,
+        submittedAt: new Date(),
+        timeTaken:   Math.round(elapsedMs / 1000),
+        via:         "link",
+        overTime:    elapsedMs > quiz.timeLimit * 60 * 1000 + SUBMIT_GRACE_MS,
+      });
+    } catch (e) {
+      if (e.code === 11000) return res.status(409).json({ success: false, message: "This quiz has already been finished." });
+      throw e;
+    }
+
+    await getQuiz(req.db).updateOne({ _id: quiz._id }, { $set: { status: "attempted" } });
+    quiz.status = "attempted";
+
+    Promise.all([getTeacher(req.db).findById(quiz.teacherId._id), getStudent(req.db).findById(quiz.studentId._id)])
+      .then(([teacherDoc, studentDoc]) => {
+        if (teacherDoc && studentDoc) sendQuizCompleted(teacherDoc, studentDoc, quiz, attempt, req.center?.centerName || "", req.center)
+          .catch(e => logger.warn("sendQuizCompleted failed:", { error: e?.message }));
+      }).catch(() => {});
+
+    res.json({ success: true, quiz: quizLinkView(quiz, attempt, expiresAt, req.center?.centerName) });
+  } catch (err) {
+    logger.error("Quiz link submit error:", { error: err?.message });
+    serverError(res);
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/quiz/:id/share-link   — create or replace the link (teacher)
+// DELETE /api/quiz/:id/share-link — remove it (link stops working at once)
+// ─────────────────────────────────────────────────────────────────────────────
+async function loadOwnQuiz(req, res) {
+  if (req.user.role !== "teacher") { forbidden(res, "Teachers only"); return null; }
+  getStudent(req.db);
+  const quiz = await getQuiz(req.db).findById(req.params.id)
+    .select("+shareLink.tokenEnc")
+    .populate("studentId", "firstName lastName email isManaged");
+  if (!quiz) { notFound(res, "Quiz not found"); return null; }
+  if (quiz.teacherId.toString() !== req.user.id) { forbidden(res, "Access denied"); return null; }
+  return quiz;
+}
+
+router.post("/:id/share-link", verifyToken, validateObjectId("id"), async (req, res) => {
+  try {
+    const quiz = await loadOwnQuiz(req, res);
+    if (!quiz) return;
+    if (!quiz.studentId?.isManaged)
+      return badRequest(res, "Share links are only for managed students — this student uses the app.");
+    if (quiz.status === "attempted") return badRequest(res, "This quiz has already been finished.");
+    if (Date.now() > linkExpiresAt(quiz.dueDate, req.center?.timezone).getTime())
+      return badRequest(res, "The due date has passed, so a new link would already be expired.");
+
+    issueShareLink(quiz);
+    await quiz.save();
+    res.json({ success: true, quiz: withShareInfo(quiz, req.center) });
+  } catch (err) {
+    logger.error("Create quiz share link error:", { error: err?.message });
+    serverError(res);
+  }
+});
+
+router.delete("/:id/share-link", verifyToken, validateObjectId("id"), async (req, res) => {
+  try {
+    const quiz = await loadOwnQuiz(req, res);
+    if (!quiz) return;
+    await getQuiz(req.db).updateOne({ _id: quiz._id }, { $unset: { shareLink: 1 } });
+    res.json({ success: true, message: "Link deleted — it no longer works." });
+  } catch (err) {
+    logger.error("Delete quiz share link error:", { error: err?.message });
+    serverError(res);
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // POST /api/quiz  — teacher creates a quiz
 // ─────────────────────────────────────────────────────────────────────────────
 router.post("/", verifyToken, async (req, res) => {
@@ -94,7 +334,7 @@ router.post("/", verifyToken, async (req, res) => {
     const student = await getStudent(req.db).findById(studentId);
     if (!student) return notFound(res, "Student not found");
 
-    const quiz = await getQuiz(req.db).create({
+    const quiz = new (getQuiz(req.db))({
       teacherId:    req.user.id,
       studentId,
       title:        title.slice(0, 200),
@@ -109,6 +349,9 @@ router.post("/", verifyToken, async (req, res) => {
         explanation:  toStr(q.explanation, "explanation").slice(0, 500),
       })),
     });
+    // Managed students have no login — they get the quiz through a share link
+    if (student.isManaged) issueShareLink(quiz);
+    await quiz.save();
 
     // Email student about new quiz (non-blocking)
     getStudent(req.db).findById(studentId).then(studentDoc => {
@@ -134,7 +377,7 @@ router.post("/", verifyToken, async (req, res) => {
       }).catch(() => {});
     } catch (_) {}
 
-    res.status(201).json({ success: true, quiz });
+    res.status(201).json({ success: true, quiz: withShareInfo(quiz, req.center) });
   } catch (err) {
     logger.error("Create quiz error:", { error: err?.message });
     serverError(res, err.message);
@@ -148,9 +391,18 @@ router.get("/my", verifyToken, async (req, res) => {
   try {
     if (req.user.role !== "teacher") return forbidden(res, "Teachers only");
 
-    const quizzes = await getQuiz(req.db).find({ teacherId: req.user.id })
-      .populate("studentId", "firstName lastName email")
-      .sort({ createdAt: -1 });
+    // ?status=assigned|attempted  ?page  ?limit — counts always included (badges poll with ?limit=1)
+    const Quiz = getQuiz(req.db);
+    const status = QUIZ_STATUSES.includes(req.query.status) ? req.query.status : null;
+    const counts = await statusCounts(Quiz, { teacherId: oid(req.user.id) }, QUIZ_STATUSES);
+    const { page: want, limit } = readPaging(req.query);
+    const pagination = pageMeta(want, limit, status ? counts[status] : counts.all);
+    const quizzes = await Quiz.find({ teacherId: req.user.id, ...(status ? { status } : {}) })
+      .select("+shareLink.tokenEnc")
+      .populate("studentId", "firstName lastName email isManaged")
+      .sort({ createdAt: -1, _id: -1 })
+      .skip((pagination.page - 1) * limit)
+      .limit(limit);
 
     // Attach attempt data to each quiz
     const quizIds    = quizzes.map(q => q._id);
@@ -159,11 +411,11 @@ router.get("/my", verifyToken, async (req, res) => {
     attempts.forEach(a => { attemptMap[a.quizId.toString()] = a; });
 
     const result = quizzes.map(q => ({
-      ...q.toObject(),
+      ...withShareInfo(q, req.center),
       attempt: attemptMap[q._id.toString()] || null,
     }));
 
-    res.json({ success: true, quizzes: result });
+    res.json({ success: true, quizzes: result, pagination, counts });
   } catch (err) {
     serverError(res, err.message);
   }
@@ -176,9 +428,25 @@ router.get("/assigned", verifyToken, async (req, res) => {
   try {
     if (req.user.role !== "student") return forbidden(res, "Students only");
 
-    const quizzes = await getQuiz(req.db).find({ studentId: req.user.id })
-      .populate("teacherId", "firstName lastName")
-      .sort({ dueDate: 1 });
+    const Quiz = getQuiz(req.db);
+    const status = QUIZ_STATUSES.includes(req.query.status) ? req.query.status : null;
+    const mine = { studentId: oid(req.user.id) };
+    const counts = await statusCounts(Quiz, mine, QUIZ_STATUSES);
+    const { page: want, limit } = readPaging(req.query);
+    const pagination = pageMeta(want, limit, status ? counts[status] : counts.all);
+    // To-do first (soonest due), then the rest (most recent first)
+    const ids = await todoFirstIds(Quiz, { ...mine, ...(status ? { status } : {}) }, "assigned", pagination);
+    const quizzes = inOrder(await Quiz.find({ _id: { $in: ids } }).populate("teacherId", "firstName lastName"), ids);
+
+    // Header stats across ALL the student's quizzes, not just this page
+    const [next, avg] = await Promise.all([
+      Quiz.findOne({ ...mine, status: "assigned" }).sort({ dueDate: 1, _id: 1 }).populate("teacherId", "firstName lastName"),
+      getQuizAttempt(req.db).aggregate([
+        { $match: { ...mine, percentage: { $ne: null } } },
+        { $group: { _id: null, avg: { $avg: "$percentage" } } },
+      ]),
+    ]);
+    const stats = { nextQuiz: next ? sanitiseForStudent(next) : null, avgScore: avg[0] ? Math.round(avg[0].avg) : null };
 
     // Attach attempt if it exists (so student can see their score)
     const quizIds  = quizzes.map(q => q._id);
@@ -201,7 +469,7 @@ router.get("/assigned", verifyToken, async (req, res) => {
       return safe;
     });
 
-    res.json({ success: true, quizzes: result });
+    res.json({ success: true, quizzes: result, pagination, counts, stats });
   } catch (err) {
     serverError(res, err.message);
   }

@@ -11,6 +11,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import api from "../../../api";
+import Pagination from "../../../components/Pagination";
 import { useCurrencySymbol, fmtMoney } from "../../../hooks/useCurrencySymbol";
 
 // ─── Pay-all confirmation modal ───────────────────────────────────────────────
@@ -83,6 +84,8 @@ export default function PaymentsTab({ isDarkMode }) {
   const sym = useCurrencySymbol();
   const [teachers, setTeachers] = useState([]);
   const [transactions, setTransactions] = useState([]);
+  const [txPage,  setTxPage]  = useState(1);
+  const [txPager, setTxPager] = useState({ total: 0, totalPages: 1, limit: 25 });
   const [teacherSummary, setTeacherSummary] = useState([]);
   const [totals, setTotals] = useState({
     totalPending: 0,
@@ -100,7 +103,7 @@ export default function PaymentsTab({ isDarkMode }) {
 
   useEffect(() => {
     loadPaymentData();
-  }, []);
+  }, [txPage]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadPaymentData = async () => {
     try {
@@ -111,9 +114,14 @@ export default function PaymentsTab({ isDarkMode }) {
       setTeacherSummary(summaryRes.data.teachers);
       setTotals(summaryRes.data.totals);
 
-      // Load all transactions
-      const txRes = await api.get("/payment-transactions/all");
+      // One page of transactions (newest first)
+      const txRes = await api.get("/payment-transactions/all", { params: { page: txPage, limit: 25 } });
       setTransactions(txRes.data.transactions);
+      if (txRes.data.pagination) {
+        setTxPager(txRes.data.pagination);
+        // e.g. the last item on the last page went away — step back
+        if (txRes.data.transactions.length === 0 && txPage > 1) setTxPage(Math.max(1, txRes.data.pagination.totalPages));
+      }
 
     } catch (err) {
       console.error("Error loading payment data:", err);
@@ -599,6 +607,8 @@ export default function PaymentsTab({ isDarkMode }) {
               </table>
             </div>
           </div>
+          <Pagination page={txPage} totalPages={txPager.totalPages} total={txPager.total} pageSize={txPager.limit}
+            onPage={(p) => { setTxPage(p); window.scrollTo({ top: 0, behavior: "smooth" }); }} isDarkMode={isDarkMode} />
         </div>
       )}
     </div>

@@ -3,8 +3,9 @@ import api from "../api"; // Use api instance instead of axios
 const API_URL = "/students"; // Remove base URL, api already has it
 
 // 👉 Get all students
+// Whole directory (screens filter/page it) — the API defaults to 50 otherwise
 export const getStudents = async () => {
-  const res = await api.get(API_URL);
+  const res = await api.get(API_URL, { params: { limit: 5000 } });
   return res.data;
 };
 
@@ -81,13 +82,13 @@ export const getStudentPayments = async (id) => {
 };
 
 // 👉 Get all payments (global)
-export const getAllPayments = async () => {
-  const res = await api.get("/payments");
+export const getAllPayments = async (params = {}) => {
+  const res = await api.get("/payments", { params });
   return res.data;
 };
 
 // 👉 Get all lessons (global)
-export const getAllLessons = async () => {
-  const res = await api.get("/lessons");
+export const getAllLessons = async (params = {}) => {
+  const res = await api.get("/lessons", { params });
   return res.data;
 };

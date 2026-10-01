@@ -3,12 +3,20 @@ import api from "../../../api";
 import {
   Plus, Trash2, ChevronDown, ChevronUp, RefreshCw,
   Clock, CheckCircle2, BookOpen, Send, Shuffle,
-  X, Check, Save, FolderOpen, Star, Sparkles, Loader,
+  X, Check, Save, FolderOpen, Star, Sparkles, Loader, Download,
 } from "lucide-react";
+import ManagedBadge from "../../../components/ManagedBadge";
+import ShareLinkPanel from "../../../components/ShareLinkPanel";
+import Pagination from "../../../components/Pagination";
+import { downloadQuizResultPdf } from "../../../utils/quizPdf";
+
+// Center brand colour (set by utils/branding.js) — never hard-code a theme colour here
+const BRAND  = "var(--brand-primary, #2563eb)";
+const brandA = (a) => `rgba(var(--brand-primary-rgb, 37, 99, 235), ${a})`;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const STATUS_CONFIG = {
-  assigned:  { label: "Not Attempted", color: "#7c3aed", bg: "#f5f3ff" },
+  assigned:  { label: "Not Attempted", color: BRAND, bg: brandA(0.1) },
   attempted: { label: "Attempted",     color: "#059669", bg: "#ecfdf5" },
 };
 
@@ -66,7 +74,7 @@ function QuestionBuilder({ questions, setQuestions, isDarkMode }) {
       {questions.map((q, qi) => (
         <div key={qi} style={{ background: bg, border: `1.5px solid ${bdr}`, borderRadius: 14, padding: 16 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-            <span style={{ background: "#7c3aed", color: "#fff", borderRadius: "50%", width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 800, flexShrink: 0 }}>
+            <span style={{ background: BRAND, color: "#fff", borderRadius: "50%", width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 800, flexShrink: 0 }}>
               {qi + 1}
             </span>
             <input value={q.question} onChange={e => updateQ(qi, "question", e.target.value)}
@@ -99,7 +107,7 @@ function QuestionBuilder({ questions, setQuestions, isDarkMode }) {
             ))}
             {q.options.length < 4 && (
               <button type="button" onClick={() => addOption(qi)}
-                style={{ alignSelf: "flex-start", padding: "4px 12px", borderRadius: 8, border: "1.5px dashed #a5b4fc", background: isDarkMode ? "#1e1b4b" : "#f5f3ff", color: "#7c3aed", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                style={{ alignSelf: "flex-start", padding: "4px 12px", borderRadius: 8, border: `1.5px dashed ${brandA(0.45)}`, background: isDarkMode ? brandA(0.15) : brandA(0.07), color: BRAND, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                 + Add option
               </button>
             )}
@@ -111,7 +119,7 @@ function QuestionBuilder({ questions, setQuestions, isDarkMode }) {
       ))}
 
       <button type="button" onClick={addQuestion} disabled={questions.length >= 50}
-        style={{ padding: 10, borderRadius: 12, border: "2px dashed #a5b4fc", background: isDarkMode ? "#1e1b4b" : "#f5f3ff", color: "#7c3aed", fontWeight: 700, fontSize: 13, cursor: questions.length >= 50 ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+        style={{ padding: 10, borderRadius: 12, border: `2px dashed ${brandA(0.45)}`, background: isDarkMode ? brandA(0.15) : brandA(0.07), color: BRAND, fontWeight: 700, fontSize: 13, cursor: questions.length >= 50 ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
         <Plus size={15} /> Add Question {questions.length > 0 && `(${questions.length}/50)`}
       </button>
     </div>
@@ -189,9 +197,9 @@ function TemplatePicker({ templates, onLoad, onClose, isDarkMode }) {
         </div>
 
         {/* Shuffle toggle */}
-        <label style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderRadius: 10, border: `1.5px solid ${doShuffle ? "#7c3aed" : bdr}`, background: doShuffle ? (isDarkMode ? "#1e1b4b" : "#f5f3ff") : "transparent", cursor: "pointer", userSelect: "none" }}>
-          <input type="checkbox" checked={doShuffle} onChange={e => setDoShuffle(e.target.checked)} style={{ accentColor: "#7c3aed", width: 16, height: 16 }} />
-          <Shuffle size={15} color="#7c3aed" />
+        <label style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderRadius: 10, border: `1.5px solid ${doShuffle ? BRAND : bdr}`, background: doShuffle ? (isDarkMode ? brandA(0.15) : brandA(0.07)) : "transparent", cursor: "pointer", userSelect: "none" }}>
+          <input type="checkbox" checked={doShuffle} onChange={e => setDoShuffle(e.target.checked)} style={{ accentColor: "var(--brand-primary, #2563eb)", width: 16, height: 16 }} />
+          <Shuffle size={15} color={BRAND} />
           <span style={{ fontWeight: 700, fontSize: 13, color: txt }}>Shuffle question order when loading</span>
         </label>
 
@@ -242,7 +250,7 @@ function SaveTemplateModal({ onSave, onClose, isDarkMode, defaultName }) {
           <button onClick={onClose} style={{ padding: "9px 20px", borderRadius: 10, border: `1.5px solid ${bdr}`, background: "transparent", color: "#64748b", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>Cancel</button>
           <button onClick={() => name.trim() && onSave(name.trim())}
             disabled={!name.trim()}
-            style={{ padding: "9px 24px", borderRadius: 10, border: "none", background: "linear-gradient(135deg,#7c3aed,#8b5cf6)", color: "#fff", fontWeight: 700, fontSize: 13, cursor: name.trim() ? "pointer" : "not-allowed", opacity: name.trim() ? 1 : 0.5 }}>
+            style={{ padding: "9px 24px", borderRadius: 10, border: "none", background: BRAND, color: "#fff", fontWeight: 700, fontSize: 13, cursor: name.trim() ? "pointer" : "not-allowed", opacity: name.trim() ? 1 : 0.5 }}>
             Save Template
           </button>
         </div>
@@ -287,11 +295,11 @@ function TemplatesPanel({ templates, onLoad, onDelete, isDarkMode, c }) {
               </div>
               <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
                 <button onClick={() => onLoad(t, false)}
-                  style={{ padding: "6px 14px", borderRadius: 8, border: "none", background: "linear-gradient(135deg,#7c3aed,#8b5cf6)", color: "#fff", fontWeight: 700, fontSize: 12, cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}>
+                  style={{ padding: "6px 14px", borderRadius: 8, border: "none", background: BRAND, color: "#fff", fontWeight: 700, fontSize: 12, cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}>
                   <FolderOpen size={13} /> Use
                 </button>
                 <button onClick={() => onLoad(t, true)}
-                  style={{ padding: "6px 12px", borderRadius: 8, border: `1.5px solid ${c.border}`, background: "transparent", color: "#7c3aed", fontWeight: 700, fontSize: 12, cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}>
+                  style={{ padding: "6px 12px", borderRadius: 8, border: `1.5px solid ${c.border}`, background: "transparent", color: BRAND, fontWeight: 700, fontSize: 12, cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}>
                   <Shuffle size={13} /> Shuffled
                 </button>
                 <button onClick={() => onDelete(t._id)}
@@ -346,15 +354,32 @@ export default function QuizTab({ teacherInfo, students, isDarkMode }) {
     setTimeout(() => setToast(null), 3500);
   };
 
-  const fetchQuizzes = async () => {
-    try {
-      setLoading(true);
-      const { data } = await api.get("/quiz/my");
-      setQuizzes(data.quizzes || []);
-    } catch { showToast("Failed to load quizzes", "error"); }
-    finally { setLoading(false); }
-  };
+  // Paged on the server (20 per page) — counts per status come back with every page
+  const [page,      setPage]      = useState(1);
+  const [pager,     setPager]     = useState({ total: 0, totalPages: 1, limit: 20 });
+  const [counts,    setCounts]    = useState({ all: 0, assigned: 0, attempted: 0 });
+  const [reloadKey, setReloadKey] = useState(0);
+  const changeFilter = (f) => { setFilter(f); setPage(1); };
+  const fetchQuizzes = () => setReloadKey(k => k + 1);
 
+  useEffect(() => {
+    let stale = false;
+    (async () => {
+      try {
+        setLoading(true);
+        const { data } = await api.get("/quiz/my", { params: { status: filter === "all" ? undefined : filter, page } });
+        if (stale) return;
+        setQuizzes(data.quizzes || []);
+        if (data.counts) setCounts(data.counts);
+        if (data.pagination) { setPager(data.pagination); if (data.pagination.page !== page) setPage(data.pagination.page); }
+      } catch {
+        if (!stale) showToast("Failed to load quizzes", "error");
+      } finally {
+        if (!stale) setLoading(false);
+      }
+    })();
+    return () => { stale = true; };
+  }, [page, filter, reloadKey]); // eslint-disable-line react-hooks/exhaustive-deps
   const fetchTemplates = async () => {
     try {
       const { data } = await api.get("/quiz-templates");
@@ -362,14 +387,9 @@ export default function QuizTab({ teacherInfo, students, isDarkMode }) {
     } catch { /* silent */ }
   };
 
-  useEffect(() => { fetchQuizzes(); fetchTemplates(); }, []);
+  useEffect(() => { fetchTemplates(); }, []);
 
-  const counts = {
-    all:       quizzes.length,
-    assigned:  quizzes.filter(q => q.status === "assigned").length,
-    attempted: quizzes.filter(q => q.status === "attempted").length,
-  };
-  const filtered = quizzes.filter(q => filter === "all" || q.status === filter);
+  const filtered = quizzes; // already filtered + paged by the server
 
   // ── Load template into form ────────────────────────────────────────────────
   const handleLoadTemplate = (tmpl, doShuffle) => {
@@ -498,7 +518,7 @@ export default function QuizTab({ teacherInfo, students, isDarkMode }) {
     if (invalid) { showToast("All questions and options must have text", "error"); return; }
     try {
       setSubmitting(true);
-      await api.post("/quiz", {
+      const { data: created } = await api.post("/quiz", {
         studentId:    form.studentId,
         title:        form.title.trim(),
         instructions: form.instructions.trim(),
@@ -506,11 +526,14 @@ export default function QuizTab({ teacherInfo, students, isDarkMode }) {
         dueDate:      form.dueDate,
         questions,
       });
-      showToast("Quiz assigned!");
+      const forManaged = !!created.quiz?.shareToken;
+      showToast(forManaged ? "Quiz created — copy the link below and send it to the parent" : "Quiz assigned!");
       setShowForm(false);
       setForm({ studentId: "", title: "", instructions: "", timeLimit: "15", dueDate: "" });
       setQuestions([blankQuestion()]);
-      fetchQuizzes();
+      await fetchQuizzes();
+      // Open the new card so the teacher sees the share link straight away
+      if (forManaged) { changeFilter("all"); setExpandedId(created.quiz._id); }
     } catch (err) {
       showToast(err?.response?.data?.message || "Failed to create quiz", "error");
     } finally { setSubmitting(false); }
@@ -522,7 +545,32 @@ export default function QuizTab({ teacherInfo, students, isDarkMode }) {
       await api.delete(`/quiz/${id}`);
       showToast("Quiz deleted");
       setQuizzes(prev => prev.filter(q => q._id !== id));
+      fetchQuizzes();
     } catch (err) { showToast(err?.response?.data?.message || "Failed to delete", "error"); }
+  };
+
+  // ── Share link: create / delete ─────────────────────────────────────────────
+  const handleCreateLink = async (id) => {
+    try {
+      const { data } = await api.post(`/quiz/${id}/share-link`);
+      setQuizzes(prev => prev.map(q => (q._id === id ? { ...q, shareToken: data.quiz.shareToken, shareLink: data.quiz.shareLink } : q)));
+      showToast("New link created");
+    } catch (err) { showToast(err?.response?.data?.message || "Could not create link", "error"); }
+  };
+  const handleDeleteLink = async (id) => {
+    try {
+      await api.delete(`/quiz/${id}/share-link`);
+      setQuizzes(prev => prev.map(q => (q._id === id ? { ...q, shareToken: null, shareLink: undefined } : q)));
+      showToast("Link deleted — it no longer works");
+    } catch (err) { showToast(err?.response?.data?.message || "Could not delete link", "error"); }
+  };
+
+  const [pdfBusy, setPdfBusy] = useState(null);
+  const handleDownloadPdf = async (quiz) => {
+    setPdfBusy(quiz._id);
+    try { await downloadQuizResultPdf(quiz, teacherInfo); }
+    catch (err) { console.error("Quiz PDF error:", err); showToast("Could not create PDF", "error"); }
+    finally { setPdfBusy(null); }
   };
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -556,11 +604,11 @@ export default function QuizTab({ teacherInfo, students, isDarkMode }) {
             <RefreshCw size={14} /> Refresh
           </button>
           <button onClick={() => setShowTemplates(v => !v)}
-            style={{ padding: "8px 14px", borderRadius: 10, border: `1.5px solid ${templates.length > 0 ? "#7c3aed" : c.border}`, background: templates.length > 0 ? (isDarkMode ? "#1e1b4b" : "#f5f3ff") : c.card, color: templates.length > 0 ? "#7c3aed" : c.body, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 600 }}>
+            style={{ padding: "8px 14px", borderRadius: 10, border: `1.5px solid ${templates.length > 0 ? BRAND : c.border}`, background: templates.length > 0 ? (isDarkMode ? brandA(0.15) : brandA(0.07)) : c.card, color: templates.length > 0 ? BRAND : c.body, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 600 }}>
             <FolderOpen size={14} /> Templates {templates.length > 0 && `(${templates.length})`}
           </button>
           <button onClick={() => setShowForm(v => !v)}
-            style={{ padding: "8px 18px", borderRadius: 10, border: "none", background: "linear-gradient(135deg,#7c3aed,#8b5cf6)", color: "#fff", cursor: "pointer", fontWeight: 700, fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}>
+            style={{ padding: "8px 18px", borderRadius: 10, border: "none", background: BRAND, color: "#fff", cursor: "pointer", fontWeight: 700, fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}>
             <Plus size={15} /> Create Quiz
           </button>
         </div>
@@ -569,11 +617,11 @@ export default function QuizTab({ teacherInfo, students, isDarkMode }) {
       {/* Stats */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12 }}>
         {[
-          { key: "all",       label: "Total",     icon: BookOpen,     color: "#7c3aed" },
+          { key: "all",       label: "Total",     icon: BookOpen,     color: BRAND },
           { key: "assigned",  label: "Pending",   icon: Clock,        color: "#f59e0b" },
           { key: "attempted", label: "Completed", icon: CheckCircle2, color: "#10b981" },
         ].map(({ key, label, icon: Icon, color }) => (
-          <div key={key} onClick={() => setFilter(key)}
+          <div key={key} onClick={() => changeFilter(key)}
             style={{ background: c.card, border: `2px solid ${filter === key ? color : c.border}`, borderRadius: 14, padding: "14px 18px", cursor: "pointer" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
               <Icon size={16} color={color} />
@@ -597,14 +645,14 @@ export default function QuizTab({ teacherInfo, students, isDarkMode }) {
 
       {/* Create form */}
       {showForm && (
-        <div style={{ background: c.card, border: "2px solid #7c3aed", borderRadius: 16, padding: 24 }}>
+        <div style={{ background: c.card, border: `2px solid ${BRAND}`, borderRadius: 16, padding: 24 }}>
           {/* Form header with template actions */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18, flexWrap: "wrap", gap: 10 }}>
             <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: c.heading }}>Create New Quiz</h3>
             <div style={{ display: "flex", gap: 8 }}>
               {/* Load from template */}
               <button type="button" onClick={() => setShowPicker(true)}
-                style={{ padding: "7px 14px", borderRadius: 9, border: "1.5px solid #7c3aed", background: isDarkMode ? "#1e1b4b" : "#f5f3ff", color: "#7c3aed", fontWeight: 700, fontSize: 12, cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}>
+                style={{ padding: "7px 14px", borderRadius: 9, border: `1.5px solid ${BRAND}`, background: isDarkMode ? brandA(0.15) : brandA(0.07), color: BRAND, fontWeight: 700, fontSize: 12, cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}>
                 <FolderOpen size={13} /> Load Template
               </button>
               {/* Shuffle current */}
@@ -767,7 +815,7 @@ export default function QuizTab({ teacherInfo, students, isDarkMode }) {
                       disabled={aiLoading || (!aiNotes.trim() && !aiPdfFile)}
                       style={{
                         padding: "9px 22px", borderRadius: 10, border: "none",
-                        background: aiLoading || (!aiNotes.trim() && !aiPdfFile) ? "#e5e7eb" : "linear-gradient(135deg,#7c3aed,#a855f7)",
+                        background: aiLoading || (!aiNotes.trim() && !aiPdfFile) ? "#e5e7eb" : BRAND,
                         color: aiLoading || (!aiNotes.trim() && !aiPdfFile) ? "#9ca3af" : "#fff",
                         fontWeight: 700, fontSize: 13,
                         cursor: aiLoading || (!aiNotes.trim() && !aiPdfFile) ? "not-allowed" : "pointer",
@@ -795,9 +843,14 @@ export default function QuizTab({ teacherInfo, students, isDarkMode }) {
                   style={{ width: "100%", padding: "9px 12px", borderRadius: 10, border: `1.5px solid ${c.inputBorder}`, background: c.input, color: c.heading, fontSize: 13 }}>
                   <option value="">Select student…</option>
                   {(students || []).map(s => (
-                    <option key={s._id || s.id} value={s._id || s.id}>{s.firstName} {s.lastName}</option>
+                    <option key={s._id || s.id} value={s._id || s.id}>{s.firstName} {s.lastName}{s.isManaged ? " · Managed (link)" : ""}</option>
                   ))}
                 </select>
+                {(students || []).find(s => (s._id || s.id) === form.studentId)?.isManaged && (
+                  <p style={{ margin: "6px 0 0", fontSize: 11, color: BRAND, fontWeight: 600 }}>
+                    This student has no login — you'll get a link to send to the parent.
+                  </p>
+                )}
               </div>
               <div>
                 <label style={{ fontSize: 12, fontWeight: 700, color: c.body, display: "block", marginBottom: 6 }}>Due Date *</label>
@@ -822,8 +875,8 @@ export default function QuizTab({ teacherInfo, students, isDarkMode }) {
                 <div style={{ position: "relative" }}>
                   <input type="number" value={form.timeLimit} onChange={e => setForm(f => ({ ...f, timeLimit: e.target.value }))}
                     min="1" max="300" required
-                    style={{ width: "100%", padding: "9px 40px 9px 12px", borderRadius: 10, border: "1.5px solid #7c3aed", background: c.input, color: c.heading, fontSize: 14, fontWeight: 700, boxSizing: "border-box" }} />
-                  <span style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", fontSize: 11, color: "#7c3aed", fontWeight: 700, pointerEvents: "none" }}>min</span>
+                    style={{ width: "100%", padding: "9px 40px 9px 12px", borderRadius: 10, border: `1.5px solid ${BRAND}`, background: c.input, color: c.heading, fontSize: 14, fontWeight: 700, boxSizing: "border-box" }} />
+                  <span style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", fontSize: 11, color: BRAND, fontWeight: 700, pointerEvents: "none" }}>min</span>
                 </div>
               </div>
             </div>
@@ -858,7 +911,7 @@ export default function QuizTab({ teacherInfo, students, isDarkMode }) {
                 Cancel
               </button>
               <button type="submit" disabled={submitting}
-                style={{ padding: "9px 24px", borderRadius: 10, border: "none", background: "linear-gradient(135deg,#7c3aed,#8b5cf6)", color: "#fff", fontSize: 13, fontWeight: 700, cursor: submitting ? "not-allowed" : "pointer", opacity: submitting ? 0.7 : 1, display: "flex", alignItems: "center", gap: 6 }}>
+                style={{ padding: "9px 24px", borderRadius: 10, border: "none", background: BRAND, color: "#fff", fontSize: 13, fontWeight: 700, cursor: submitting ? "not-allowed" : "pointer", opacity: submitting ? 0.7 : 1, display: "flex", alignItems: "center", gap: 6 }}>
                 <Send size={13} /> {submitting ? "Publishing…" : `Publish Quiz (${questions.length} Q)`}
               </button>
             </div>
@@ -869,8 +922,8 @@ export default function QuizTab({ teacherInfo, students, isDarkMode }) {
       {/* Filter tabs */}
       <div style={{ display: "flex", gap: 6 }}>
         {["all", "assigned", "attempted"].map(f => (
-          <button key={f} onClick={() => setFilter(f)}
-            style={{ padding: "6px 16px", borderRadius: 20, border: "none", fontSize: 13, fontWeight: 600, cursor: "pointer", background: filter === f ? "#7c3aed" : c.card, color: filter === f ? "#fff" : c.body, boxShadow: filter === f ? "0 2px 8px #7c3aed40" : "none" }}>
+          <button key={f} onClick={() => changeFilter(f)}
+            style={{ padding: "6px 16px", borderRadius: 20, border: "none", fontSize: 13, fontWeight: 600, cursor: "pointer", background: filter === f ? BRAND : c.card, color: filter === f ? "#fff" : c.body, boxShadow: filter === f ? `0 2px 8px ${brandA(0.25)}` : "none" }}>
             {f.charAt(0).toUpperCase() + f.slice(1)} {filter !== f && `(${counts[f]})`}
           </button>
         ))}
@@ -896,17 +949,19 @@ export default function QuizTab({ teacherInfo, students, isDarkMode }) {
             const student    = quiz.studentId;
             const cfg        = STATUS_CONFIG[quiz.status] || STATUS_CONFIG.assigned;
             return (
-              <div key={quiz._id} style={{ background: c.card, border: `2px solid ${isExpanded ? "#7c3aed" : c.border}`, borderRadius: 14, overflow: "hidden" }}>
+              <div key={quiz._id} style={{ background: c.card, border: `2px solid ${isExpanded ? BRAND : c.border}`, borderRadius: 14, overflow: "hidden" }}>
                 <div onClick={() => setExpandedId(isExpanded ? null : quiz._id)}
                   style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", cursor: "pointer" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 0 }}>
-                    <div style={{ width: 40, height: 40, borderRadius: "50%", background: quiz.status === "attempted" ? "linear-gradient(135deg,#10b981,#059669)" : "linear-gradient(135deg,#7c3aed,#8b5cf6)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>
+                    <div style={{ width: 40, height: 40, borderRadius: "50%", background: quiz.status === "attempted" ? "linear-gradient(135deg,#10b981,#059669)" : BRAND, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>
                       {quiz.status === "attempted" ? "✅" : "📝"}
                     </div>
                     <div style={{ minWidth: 0 }}>
                       <div style={{ fontWeight: 700, fontSize: 14, color: c.heading, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{quiz.title}</div>
                       <div style={{ fontSize: 12, color: c.body, marginTop: 2 }}>
-                        {student?.firstName} {student?.lastName || student?.lastName} · {quiz.questions.length} Qs · ⏱ {quiz.timeLimit} min · Due {formatDate(quiz.dueDate)}
+                        {student?.firstName} {student?.lastName}
+                        {student?.isManaged && <ManagedBadge isDarkMode={isDarkMode} style={{ marginLeft: 6 }} />}
+                        {" "}· {quiz.questions.length} Qs · ⏱ {quiz.timeLimit} min · Due {formatDate(quiz.dueDate)}
                       </div>
                     </div>
                   </div>
@@ -928,9 +983,26 @@ export default function QuizTab({ teacherInfo, students, isDarkMode }) {
                 </div>
 
                 {isExpanded && (
-                  <div style={{ borderTop: `1px solid ${c.border}`, padding: "16px 18px" }}>
+                  <div style={{ borderTop: `1px solid ${c.border}`, padding: "16px 18px", display: "flex", flexDirection: "column", gap: 14 }}>
+                    {/* Share link — managed students only, until the quiz is taken */}
+                    {student?.isManaged && quiz.status !== "attempted" && (
+                      <ShareLinkPanel item={quiz} kind="quiz" isDarkMode={isDarkMode}
+                        onCreate={() => handleCreateLink(quiz._id)} onDelete={() => handleDeleteLink(quiz._id)} notify={showToast} />
+                    )}
                     {quiz.status === "attempted" && quiz.attempt ? (
-                      <ResultViewer quiz={quiz} attempt={quiz.attempt} c={c} />
+                      <div>
+                        {quiz.attempt.via === "link" && (
+                          <p style={{ margin: "0 0 10px", fontSize: 12, color: c.body }}>
+                            Taken via link{quiz.attempt.overTime ? " · " : ""}
+                            {quiz.attempt.overTime && <strong style={{ color: "#dc2626" }}>finished after the time limit</strong>}
+                          </p>
+                        )}
+                        <ResultViewer quiz={quiz} attempt={quiz.attempt} c={c} />
+                        <button type="button" onClick={() => handleDownloadPdf(quiz)} disabled={pdfBusy === quiz._id}
+                          style={{ marginTop: 12, display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 8, border: `1px solid ${brandA(0.4)}`, background: isDarkMode ? "transparent" : "#fff", color: BRAND, fontWeight: 700, fontSize: 12, cursor: pdfBusy === quiz._id ? "not-allowed" : "pointer", fontFamily: "inherit" }}>
+                          <Download size={13} /> {pdfBusy === quiz._id ? "Creating PDF…" : "Download PDF for parent"}
+                        </button>
+                      </div>
                     ) : (
                       <div>
                         {quiz.instructions && (
@@ -956,6 +1028,11 @@ export default function QuizTab({ teacherInfo, students, isDarkMode }) {
             );
           })}
         </div>
+      )}
+
+      {!loading && (
+        <Pagination page={page} totalPages={pager.totalPages} total={pager.total} pageSize={pager.limit}
+          onPage={(p) => { setPage(p); setExpandedId(null); window.scrollTo({ top: 0, behavior: "smooth" }); }} isDarkMode={isDarkMode} />
       )}
     </div>
   );

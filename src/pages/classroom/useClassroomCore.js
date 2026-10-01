@@ -12,7 +12,9 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import api from "../../api";
 
-export function useClassroomCore({ bookingId, userRole, duration }) {
+// managedStudent: the student has no login (managed account) — the teacher confirms
+// their presence with setManagedStudentPresence() instead of the student joining.
+export function useClassroomCore({ bookingId, userRole, duration, managedStudent = false }) {
 
   // ── Presence ──────────────────────────────────────────────────────────────
   const [isTeacherPresent, setIsTeacherPresent] = useState(userRole === "teacher");
@@ -430,6 +432,33 @@ export function useClassroomCore({ bookingId, userRole, duration }) {
     minimizedRef.current = true;
   }, []);
 
+  // ── Managed student: teacher confirms presence ("Student joined" / "left") ──
+  const [managedPresenceBusy, setManagedPresenceBusy] = useState(false);
+  const [managedJoinedAt, setManagedJoinedAt] = useState(null);
+  const setManagedStudentPresence = useCallback(async (present) => {
+    if (!managedStudent || userRole !== "teacher") return;
+    setManagedPresenceBusy(true);
+    try {
+      const { data } = await api.post("/classroom/managed-presence", { bookingId, present });
+      const s = data.session;
+      studentPresentRef.current = present;
+      setIsStudentPresent(present);
+      if (s?.studentJoinedAt) setManagedJoinedAt(s.studentJoinedAt);
+      if (present) initTimerFromSession(s);   // starts the class clock the first time
+      sendHeartbeat();                         // push the current together-time right away
+    } finally {
+      setManagedPresenceBusy(false);
+    }
+  }, [bookingId, managedStudent, userRole, initTimerFromSession, sendHeartbeat]);
+
+  // After a refresh, restore when the teacher first confirmed the student
+  useEffect(() => {
+    if (!managedStudent || !bookingId) return;
+    api.get(`/classroom/session/${bookingId}`)
+      .then(({ data }) => { if (data?.session?.studentJoinedAt) setManagedJoinedAt(data.session.studentJoinedAt); })
+      .catch(() => {});
+  }, [managedStudent, bookingId]);
+
   // ── handleExtendTime ──────────────────────────────────────────────────────
   const handleExtendTime = useCallback(async (minutes) => {
     try {
@@ -474,6 +503,9 @@ export function useClassroomCore({ bookingId, userRole, duration }) {
 
     // Platform
     sessionVideoProvider,
+
+    // Managed student attendance (teacher-confirmed)
+    managedStudent, setManagedStudentPresence, managedPresenceBusy, managedJoinedAt,
 
     // Formatters
     formatTime, formatMinutes,

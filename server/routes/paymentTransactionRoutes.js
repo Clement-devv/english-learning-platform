@@ -1,5 +1,6 @@
 // server/routes/paymentTransactionRoutes.js - PAYMENT MANAGEMENT ROUTES
 import express from "express";
+import mongoose from "mongoose";
 import { verifyToken, verifyAdmin } from "../middleware/authMiddleware.js";
 import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
 import { paymentTransactionSchema } from "../schemas/paymentTransactionSchema.js";
@@ -36,14 +37,27 @@ router.get("/teacher/:teacherId", verifyToken, async (req, res) => {
     const { teacherId } = req.params;
     const { status } = req.query;
 
-    if (req.user.role === "teacher" && req.user.id !== teacherId) {
+    // Only the teacher themself or an admin (students must not see a teacher's earnings)
+    const isSelf = req.user.role === "teacher" && req.user.id === teacherId;
+    if (!isSelf && req.user.role !== "admin") {
       return forbidden(res, "You can only view your own payments");
     }
+    if (!mongoose.isValidObjectId(teacherId)) return forbidden(res, "Invalid teacher");
 
     const filter = { teacherId };
-    if (status) filter.status = status;
+    if (typeof status === "string" && ["pending", "paid", "cancelled"].includes(status)) filter.status = status;
+    // ?q= search class title / student name
+    const term = typeof req.query.q === "string" ? req.query.q.trim().slice(0, 100) : "";
+    if (term) {
+      const rx = new RegExp(term.replace(/[.*+?^$(){}|[\]\\]/g, "\\$&"), "i");
+      filter.$or = [{ classTitle: rx }, { studentName: rx }];
+    }
 
-    const { limit, skip } = parsePagination(req.query);
+    // ?page= (1-based) for the teacher Payments table; ?skip= still works
+    let { limit, skip } = parsePagination(req.query);
+    const page = Math.max(parseInt(req.query.page, 10) || 0, 0);
+    if (page) skip = (page - 1) * limit;
+    const total = await getPaymentTransaction(req.db).countDocuments(filter);
     const transactions = await getPaymentTransaction(req.db).find(filter)
       .populate("bookingId", "classTitle scheduledTime duration studentId")
       .populate({ path: "studentId", select: "firstName lastName" })
@@ -63,18 +77,44 @@ router.get("/teacher/:teacherId", verifyToken, async (req, res) => {
       }
     });
 
+    // Totals across ALL of the teacher's transactions — the list above is capped
     const summary = {
       totalPending: 0, totalPaid: 0, totalEarned: 0,
       pendingCount: 0, paidCount: 0
     };
-
-    transactions.forEach(tx => {
-      if (tx.status === "pending") { summary.totalPending += tx.amount; summary.pendingCount++; }
-      else if (tx.status === "paid") { summary.totalPaid += tx.amount; summary.paidCount++; }
-      summary.totalEarned += tx.amount;
+    const tid = new mongoose.Types.ObjectId(String(teacherId));
+    const sixMonthsAgo = new Date(); sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6, 1); sixMonthsAgo.setHours(0, 0, 0, 0);
+    const tz = /^[A-Za-z_]+(\/[A-Za-z0-9_+-]+)*$/.test(String(req.query.tz || "")) ? String(req.query.tz) : "UTC";
+    const [rows, monthlyRows] = await Promise.all([
+      getPaymentTransaction(req.db).aggregate([
+        { $match: { teacherId: tid } },
+        { $group: { _id: "$status", amount: { $sum: "$amount" }, n: { $sum: 1 } } },
+      ]),
+      // Chart: last 6 months of pending/paid, by month in the teacher's timezone
+      getPaymentTransaction(req.db).aggregate([
+        { $match: { teacherId: tid, status: { $in: ["pending", "paid"] }, completedAt: { $gte: sixMonthsAgo } } },
+        { $group: {
+          _id: { $dateToString: { format: "%Y-%m", date: "$completedAt", timezone: tz } },
+          pending: { $sum: { $cond: [{ $eq: ["$status", "pending"] }, "$amount", 0] } },
+          paid:    { $sum: { $cond: [{ $eq: ["$status", "paid"] }, "$amount", 0] } },
+        } },
+        { $sort: { _id: 1 } },
+      ]).catch(() => []), // e.g. an unknown timezone name
+    ]);
+    summary.cancelledCount = 0; summary.totalCount = 0;
+    rows.forEach(r => {
+      if (r._id === "pending") { summary.totalPending = r.amount; summary.pendingCount = r.n; }
+      else if (r._id === "paid") { summary.totalPaid = r.amount; summary.paidCount = r.n; }
+      else if (r._id === "cancelled") summary.cancelledCount = r.n;
+      summary.totalEarned += r.amount;
+      summary.totalCount += r.n;
     });
+    const monthly = monthlyRows.slice(-6).map(m => ({ key: m._id, pending: m.pending, paid: m.paid }));
 
-    res.json({ transactions, summary });
+    res.json({
+      transactions, summary, monthly,
+      pagination: { page: page || Math.floor(skip / limit) + 1, limit, total, totalPages: Math.max(1, Math.ceil(total / limit)) },
+    });
   } catch (err) {
     logger.error("Error fetching teacher payments:", { error: err?.message });
     serverError(res, "Error fetching payment transactions");
@@ -94,7 +134,11 @@ router.get("/all", verifyToken, verifyAdmin, async (req, res) => {
     if (status) filter.status = status;
     if (teacherId) filter.teacherId = teacherId;
 
-    const { limit, skip } = parsePagination(req.query);
+    // ?page= (1-based) for the admin transactions table; ?skip= still works
+    let { limit, skip } = parsePagination(req.query);
+    const page = Math.max(parseInt(req.query.page, 10) || 0, 0);
+    if (page) skip = (page - 1) * limit;
+    const total = await getPaymentTransaction(req.db).countDocuments(filter);
     const transactions = await getPaymentTransaction(req.db).find(filter)
       .populate("teacherId", "firstName lastName email ratePerClass")
       .populate("bookingId", "classTitle scheduledTime duration")
@@ -119,7 +163,11 @@ router.get("/all", verifyToken, verifyAdmin, async (req, res) => {
       else if (tx.status === "paid") { teacherSummary[tid].totalPaid += tx.amount; teacherSummary[tid].paidCount++; }
     });
 
-    res.json({ transactions, teacherSummary: Object.values(teacherSummary) });
+    res.json({
+      transactions,
+      teacherSummary: Object.values(teacherSummary), // this page only — totals come from /summary
+      pagination: { page: page || Math.floor(skip / limit) + 1, limit, total, totalPages: Math.max(1, Math.ceil(total / limit)) },
+    });
   } catch (err) {
     logger.error("Error fetching all payments:", { error: err?.message });
     serverError(res, "Error fetching payment transactions");

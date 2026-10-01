@@ -18,6 +18,14 @@ export const classroomSessionSchema = new mongoose.Schema({
     default: 'waiting',
   },
   videoProvider:   { type: String, enum: ['agora', 'googlemeet', 'zoom', null], default: null },
+  // Managed students (no login) can't join the app — the teacher toggles
+  // "Student joined" in the classroom. presenceLog is the audit trail of those taps.
+  managedAttendance: { type: Boolean, default: false },
+  presenceLog: [{
+    present: { type: Boolean },
+    at:      { type: Date },
+    by:      { type: mongoose.Schema.Types.ObjectId, ref: 'Teacher' },
+  }],
   contentPage:     { type: Number, default: 1   }, // current PDF page teacher is viewing
   contentScale:    { type: Number, default: 1.3 }, // current PDF zoom level
   contentAnnotation: {                             // latest annotation canvas for current page

@@ -13,6 +13,9 @@ export const quizAttemptSchema = new Schema({
   startedAt:      { type: Date },
   submittedAt:    { type: Date, default: Date.now },
   timeTaken:      { type: Number },
+  via:            { type: String, enum: ['app', 'link'], default: 'app' },
+  // Share-link attempts are timed by the server; true if submitted after the limit (+30s grace)
+  overTime:       { type: Boolean, default: false },
 }, { timestamps: true });
 
 quizAttemptSchema.index({ quizId: 1, studentId: 1 }, { unique: true });
