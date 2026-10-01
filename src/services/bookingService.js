@@ -32,8 +32,8 @@ export const getStudentBookings = async (studentId, status = null) => {
 /**
  * Get all bookings (Admin only)
  */
-export const getAllBookings = async () => {
-  const res = await api.get("/bookings");
+export const getAllBookings = async (params = {}) => {
+  const res = await api.get("/bookings", { params });
   return res.data;
 };
 

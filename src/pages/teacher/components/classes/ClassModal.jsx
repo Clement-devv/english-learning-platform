@@ -1,6 +1,7 @@
 // src/pages/teacher/components/classes/ClassModal.jsx
 import { useState } from 'react';
 import { X, Users, Calendar, Clock, BookOpen, Plus } from 'lucide-react';
+import ManagedBadge from '../../../../components/ManagedBadge';
 
 const F = "'Nunito','Inter',sans-serif";
 
@@ -145,9 +146,14 @@ export default function ClassModal({ isOpen, onClose, onSave, students, isDarkMo
                     <label key={student.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 10, cursor: 'pointer', background: isSelected ? col.selBg : 'transparent', border: `1.5px solid ${isSelected ? col.selBorder : 'transparent'}`, transition: 'background .12s' }}>
                       <input type="checkbox" checked={isSelected} onChange={() => handleStudentToggle(student)}
                         style={{ width: 16, height: 16, cursor: 'pointer', accentColor: T.accent }}/>
-                      <div style={{ flex: 1 }}>
-                        <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: col.heading }}>{student.name}</p>
-                        <p style={{ margin: 0, fontSize: 11, color: col.muted }}>{student.email}</p>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: col.heading, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                          {student.name}
+                          {student.isManaged && <ManagedBadge isDarkMode={isDarkMode} />}
+                        </p>
+                        <p style={{ margin: 0, fontSize: 11, color: col.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {student.isManaged ? 'No login · you confirm attendance in the classroom' : student.email}
+                        </p>
                       </div>
                       {isSelected && (
                         <span style={{ fontSize: 11, fontWeight: 800, color: col.accent, background: col.accentBg, borderRadius: 999, padding: '2px 8px' }}>Selected</span>
@@ -163,6 +169,16 @@ export default function ClassModal({ isOpen, onClose, onSave, students, isDarkMo
               </div>
             )}
           </div>
+
+          {/* Managed students: how attendance works */}
+          {selectedStudents.some(s => s.isManaged) && (
+            <div style={{ background: isDarkMode ? 'rgba(245,158,11,0.12)' : '#fffbeb', border: `1.5px solid ${isDarkMode ? 'rgba(245,158,11,0.35)' : '#fde68a'}`, borderRadius: 12, padding: '12px 14px' }}>
+              <p style={{ margin: 0, fontSize: 12, color: isDarkMode ? '#fcd34d' : '#92400e', fontWeight: 600, lineHeight: 1.5 }}>
+                <strong>Managed student:</strong> they don't use the app, so in the classroom press
+                <strong> "Student joined"</strong> when they arrive on the call. The class is then completed by the normal attendance rules.
+              </p>
+            </div>
+          )}
 
           {/* Tip */}
           <div style={{ background: col.accentBg, border: `1.5px solid ${isDarkMode ? T.softBorderDark : T.softBorder}`, borderRadius: 12, padding: '12px 14px' }}>

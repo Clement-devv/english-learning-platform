@@ -1,5 +1,5 @@
 // src/pages/teacher/components/classes/CompletedClasses.jsx
-import React, { useState, useMemo } from "react";
+import React, { useState } from "react";
 import { getUserTimezone, formatDateInTZ, tzAbbr } from "../../../../utils/timezone";
 import {
   Search,
@@ -14,10 +14,26 @@ import {
   XCircle,
   MessageSquare,
   X,
+  Plus,
+  Link2,
 } from "lucide-react";
 import api from "../../../../api";
+import DisputePulse, { DISPUTE_GLOW_CLASS, AWAITING_GLOW_CLASS } from "../../../../components/DisputePulse";
+import LogClassModal from "./LogClassModal";
 
-export default function CompletedClassesTab({ classes, teacherInfo, isDarkMode }) {
+const PLATFORM_LABEL = { googlemeet: "Google Meet", zoom: "Zoom", other: "Other" };
+
+export default function CompletedClassesTab({ teacherInfo, isDarkMode, students = [], onRefresh, reloadKey = 0 }) {
+  // Classes this teacher logged outside the app that aren't completed yet
+  // (awaiting admin approval, or not approved) — server/routes/offlineClassRoutes.js
+  const [logged, setLogged]   = useState([]);
+  const [logOpen, setLogOpen] = useState(false);
+  const loadLogged = React.useCallback(() => {
+    api.get("/offline-classes/mine").then(({ data }) => setLogged(data.classes || [])).catch(() => {});
+  }, []);
+  React.useEffect(() => { loadLogged(); }, [loadLogged]);
+  const awaiting   = logged.filter(b => b.offline?.approval?.status !== "rejected");
+  const notApproved = logged.filter(b => b.offline?.approval?.status === "rejected");
   const myTZ   = getUserTimezone();
   const myAbbr = tzAbbr(myTZ);
   const fmtScheduled = (raw) =>
@@ -52,49 +68,54 @@ export default function CompletedClassesTab({ classes, teacherInfo, isDarkMode }
     ? "bg-gray-700 border-gray-600 text-gray-100 placeholder-gray-400"
     : "border-gray-300 text-gray-900";
 
-  // ── Filter + search ───────────────────────────────────────────────────────
-  const filteredClasses = useMemo(() => {
-    let filtered = classes;
+  // ── Server-paged history (server/routes/classHistoryRoutes.js) ─────────────
+  // Filters, search, group-class grouping and paging all happen on the server,
+  // so a long history is never cut off.
+  const [classes, setClasses]   = useState([]);
+  const [listLoading, setListLoading] = useState(true);
+  const [pager, setPager]       = useState({ total: 0, totalPages: 1 });
+  const [counts, setCounts]     = useState({ all: 0, completed: 0, notCompleted: 0 });
+  const [debouncedQ, setDebouncedQ] = useState("");
+  React.useEffect(() => { const t = setTimeout(() => setDebouncedQ(searchQuery.trim()), 300); return () => clearTimeout(t); }, [searchQuery]);
+  React.useEffect(() => { setCurrentPage(1); }, [debouncedQ, startDate, endDate, statusFilter]);
 
-    if (statusFilter === "completed") {
-      filtered = filtered.filter((c) => !c.isMissed && !c.adminRejected);
-    } else if (statusFilter === "not_completed") {
-      filtered = filtered.filter((c) => c.isMissed || c.adminRejected);
-    }
+  const teacherId = teacherInfo?._id || teacherInfo?.id;
+  const historyParams = (extra = {}) => ({
+    view: statusFilter,
+    q: debouncedQ || undefined,
+    from: startDate ? new Date(`${startDate}T00:00:00`).toISOString() : undefined,
+    to:   endDate   ? new Date(`${endDate}T23:59:59.999`).toISOString() : undefined,
+    ...extra,
+  });
+  const toRow = (c) => ({
+    ...c,
+    topic: c.topic || (c.isMissed ? "Missed Lesson" : "Completed Lesson"),
+    status: c.isMissed ? "missed" : "completed",
+    scheduledDate: new Date(c.scheduledTime),
+  });
 
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        (cls) =>
-          cls.title?.toLowerCase().includes(q) ||
-          cls.topic?.toLowerCase().includes(q) ||
-          cls.students?.some((s) => s.toLowerCase().includes(q))
-      );
-    }
+  React.useEffect(() => {
+    if (!teacherId) return;
+    let stale = false;
+    setListLoading(true);
+    api.get(`/bookings/teacher/${teacherId}/history`, { params: historyParams({ page: currentPage, limit: itemsPerPage }) })
+      .then(({ data }) => {
+        if (stale) return;
+        setClasses((data.classes || []).map(toRow));
+        setCounts(data.counts || { all: 0, completed: 0, notCompleted: 0 });
+        setPager(data.pagination || { total: 0, totalPages: 1 });
+        if (data.pagination && data.pagination.page !== currentPage) setCurrentPage(data.pagination.page);
+      })
+      .catch(() => {})
+      .finally(() => { if (!stale) setListLoading(false); });
+    return () => { stale = true; };
+  }, [teacherId, currentPage, debouncedQ, startDate, endDate, statusFilter, reloadKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    if (startDate && endDate) {
-      const start = new Date(startDate);
-      const end = new Date(endDate);
-      end.setHours(23, 59, 59, 999);
-      filtered = filtered.filter((cls) => {
-        const d = new Date(cls.scheduledTime);
-        return d >= start && d <= end;
-      });
-    }
-
-    return filtered.sort((a, b) => new Date(b.scheduledTime) - new Date(a.scheduledTime));
-  }, [classes, searchQuery, startDate, endDate, statusFilter]);
-
-  // Counts for tabs
-  const completedCount    = classes.filter((c) => !c.isMissed && !c.adminRejected).length;
-  const notCompletedCount = classes.filter((c) => c.isMissed || c.adminRejected).length;
-
-  // Pagination
-  const totalPages = Math.ceil(filteredClasses.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const currentClasses = filteredClasses.slice(startIndex, startIndex + itemsPerPage);
-
-  React.useEffect(() => { setCurrentPage(1); }, [searchQuery, startDate, endDate, statusFilter]);
+  const completedCount    = counts.completed;
+  const notCompletedCount = counts.notCompleted;
+  const totalPages     = pager.totalPages || 1;
+  const startIndex     = (currentPage - 1) * itemsPerPage;
+  const currentClasses = classes;
 
   // ── PDF Export ────────────────────────────────────────────────────────────
   const generatePDF = async () => {
@@ -106,6 +127,8 @@ export default function CompletedClassesTab({ classes, teacherInfo, isDarkMode }
       const { default: jsPDF } = await import("jspdf");
       const { default: autoTable } = await import("jspdf-autotable");
 
+      const { data: all } = await api.get(`/bookings/teacher/${teacherId}/history`, { params: historyParams({ export: "1" }) });
+      const filteredClasses = (all.classes || []).map(toRow);
       const doc = new jsPDF();
       doc.setFontSize(18);
       doc.text("Completed Classes Report", 14, 20);
@@ -175,6 +198,14 @@ export default function CompletedClassesTab({ classes, teacherInfo, isDarkMode }
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-4">
+      <LogClassModal
+        isOpen={logOpen}
+        onClose={() => setLogOpen(false)}
+        onLogged={() => { loadLogged(); onRefresh?.(); }}
+        students={students}
+        isDarkMode={isDarkMode}
+      />
+
       {/* Header card */}
       <div className={`${bg} rounded-xl shadow-md p-5`}>
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
@@ -186,10 +217,20 @@ export default function CompletedClassesTab({ classes, teacherInfo, isDarkMode }
           </div>
           <div className="flex gap-2 flex-wrap">
             <button
+              type="button"
+              onClick={() => setLogOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white transition-opacity hover:opacity-90"
+              style={{ background: "var(--brand-primary, #2563eb)" }}
+              title="For a class that happened outside the app (site down, Meet/Zoom directly…)"
+            >
+              <Plus className="w-4 h-4" />
+              Log a class
+            </button>
+            <button
               onClick={generatePDF}
-              disabled={isGenerating || filteredClasses.length === 0}
+              disabled={isGenerating || pager.total === 0}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors ${
-                isGenerating || filteredClasses.length === 0
+                isGenerating || pager.total === 0
                   ? "bg-gray-400 cursor-not-allowed"
                   : "bg-purple-600 hover:bg-purple-700"
               }`}
@@ -200,6 +241,52 @@ export default function CompletedClassesTab({ classes, teacherInfo, isDarkMode }
           </div>
         </div>
 
+        {(awaiting.length > 0 || notApproved.length > 0) && (
+          <div className="mb-4 space-y-2">
+            {awaiting.map(b => {
+              const pc = b.parentCheck?.status;
+              const disputed = pc === "denied" && b.disputeStatus === "pending";
+              return (
+                <div key={b._id}
+                  className={`p-4 rounded-xl border ${disputed ? DISPUTE_GLOW_CLASS : AWAITING_GLOW_CLASS} ${isDarkMode ? "bg-amber-950/20 border-amber-900" : "bg-amber-50 border-amber-200"}`}>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className={`font-semibold ${text}`}>{b.classTitle}</h3>
+                    {disputed
+                      ? <DisputePulse deadline={b.parentCheck?.disputeDeadline} label={b.studentId?.isManaged ? "Parent disputed" : "Student disputed"} />
+                      : <DisputePulse tone="amber" compact label="Awaiting admin approval" />}
+                  </div>
+                  <div className={`flex flex-wrap items-center gap-4 mt-1.5 text-sm ${subText}`}>
+                    <span className="flex items-center gap-1"><Calendar className="w-4 h-4" />{fmtScheduled(b.scheduledTime)}</span>
+                    <span className="flex items-center gap-1"><Clock className="w-4 h-4" />{b.duration} min</span>
+                    <span className="flex items-center gap-1"><User className="w-4 h-4" />{b.studentId?.firstName} {b.studentId?.lastName}</span>
+                    <span>via {PLATFORM_LABEL[b.offline?.platform] || "—"}</span>
+                  </div>
+                  <p className={`mt-2 text-xs ${subText}`}>
+                    Logged outside the app. <strong>Your pay is added once your admin approves it.</strong>{" "}
+                    {pc === "confirmed" && (b.studentId?.isManaged ? "The parent confirmed it. " : "The student confirmed it. ")}
+                    {pc === "waiting" && (b.studentId?.isManaged ? "Waiting for the parent to confirm. " : "Waiting for the student to confirm. ")}
+                    {pc === "no_reply" && "No reply from the family — counted as attended. "}
+                    {disputed && <span className="text-red-600 font-semibold">They say the class didn't happen — your admin will decide. </span>}
+                    Add a recording in Recordings → <Link2 className="w-3 h-3 inline" /> Add link to help.
+                  </p>
+                </div>
+              );
+            })}
+            {notApproved.map(b => (
+              <div key={b._id} className={`p-4 rounded-xl border ${isDarkMode ? "bg-gray-900 border-gray-700" : "bg-gray-50 border-gray-200"}`}>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className={`font-semibold ${text}`}>{b.classTitle}</h3>
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-700 border border-red-200">
+                    <XCircle className="w-3 h-3" /> Not approved
+                  </span>
+                </div>
+                <p className={`mt-1 text-sm ${subText}`}>{fmtScheduled(b.scheduledTime)} · {b.studentId?.firstName} {b.studentId?.lastName}</p>
+                {b.offline?.approval?.note && <p className="mt-1.5 text-xs text-red-600"><strong>Reason:</strong> {b.offline.approval.note}</p>}
+              </div>
+            ))}
+          </div>
+        )}
+
         {exportError && (
           <p className="text-sm text-red-600 mb-3 flex items-center gap-1">
             <AlertCircle className="w-4 h-4" /> {exportError}
@@ -209,7 +296,7 @@ export default function CompletedClassesTab({ classes, teacherInfo, isDarkMode }
         {/* Status filter tabs */}
         <div className={`flex gap-1 p-1 rounded-lg mb-4 w-fit ${isDarkMode ? "bg-gray-700" : "bg-gray-100"}`}>
           {[
-            { key: "all", label: `All (${classes.length})` },
+            { key: "all", label: `All (${counts.all})` },
             { key: "completed", label: `Completed (${completedCount})` },
             { key: "not_completed", label: `Not Completed (${notCompletedCount})` },
           ].map(({ key, label }) => (
@@ -258,12 +345,14 @@ export default function CompletedClassesTab({ classes, teacherInfo, isDarkMode }
         </div>
 
         <p className={`text-xs mt-2 ${subText}`}>
-          Showing {filteredClasses.length === 0 ? 0 : startIndex + 1}–{Math.min(startIndex + itemsPerPage, filteredClasses.length)} of {filteredClasses.length} classes
+          Showing {pager.total === 0 ? 0 : startIndex + 1}–{Math.min(startIndex + itemsPerPage, pager.total)} of {pager.total} classes
         </p>
       </div>
 
       {/* Class list */}
-      {currentClasses.length === 0 ? (
+      {listLoading && currentClasses.length === 0 ? (
+        <div className={`${bg} rounded-xl shadow-md p-12 text-center ${subText}`}>Loading classes…</div>
+      ) : currentClasses.length === 0 ? (
         <div className={`${bg} rounded-xl shadow-md p-12 text-center`}>
           <CheckCircle className={`w-12 h-12 mx-auto mb-3 opacity-25 ${subText}`} />
           <p className={`${subText} text-lg`}>
@@ -285,8 +374,11 @@ export default function CompletedClassesTab({ classes, teacherInfo, isDarkMode }
           {currentClasses.map((cls, idx) => {
             const isNotCompleted = cls.isMissed || cls.adminRejected;
             const alreadyDisputed = cls.disputeRaised || localDisputed[cls.id];
+            // A parent said their managed child didn't attend — admin is reviewing
+            const parentDispute = !isNotCompleted && cls.parentDispute;
             return (
-              <div key={cls.id || idx} className={`p-5 ${hoverRow} transition-colors`}>
+              <div key={cls.id || idx}
+                className={`p-5 ${hoverRow} transition-colors ${parentDispute ? `${DISPUTE_GLOW_CLASS} rounded-xl relative ${isDarkMode ? "bg-red-950/30" : "bg-red-50"}` : ""}`}>
                 <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
                   <div className="flex gap-3 flex-1">
                     {/* Index badge */}
@@ -315,7 +407,8 @@ export default function CompletedClassesTab({ classes, teacherInfo, isDarkMode }
                             Completed
                           </span>
                         )}
-                        {alreadyDisputed && (
+                        {parentDispute && <DisputePulse deadline={cls.parentDispute.deadline} />}
+                        {alreadyDisputed && !parentDispute && (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-700 border border-amber-200">
                             <MessageSquare className="w-3 h-3" />
                             Dispute Submitted
@@ -346,6 +439,16 @@ export default function CompletedClassesTab({ classes, teacherInfo, isDarkMode }
                           </span>
                         )}
                       </div>
+
+                      {parentDispute && (
+                        <p className="mt-2 text-xs text-red-700 bg-white/70 border border-red-200 px-3 py-2 rounded-lg leading-relaxed">
+                          <strong>The parent says the student didn't attend this class.</strong>
+                          {cls.parentDispute.comment ? <> Note: “{cls.parentDispute.comment}”.</> : null}
+                          {" "}The admin is reviewing it — the class still counts for now. If it isn't settled by{" "}
+                          <strong>{new Date(cls.parentDispute.deadline).toLocaleString()}</strong>, the class is returned to the student and the pay for it is deducted.
+                          Contact your admin if you can show the student was there.
+                        </p>
+                      )}
 
                       {/* Missed / rejection reason */}
                       {isNotCompleted && cls.missedReason && (

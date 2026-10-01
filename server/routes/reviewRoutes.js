@@ -1,10 +1,12 @@
 // server/routes/reviewRoutes.js
 
 import express from "express";
+import mongoose from "mongoose";
 import { verifyToken, verifyStudent, verifyAdmin } from "../middleware/authMiddleware.js";
 import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
 import { reviewSchema }  from "../schemas/reviewSchema.js";
 import { bookingSchema } from "../schemas/bookingSchema.js";
+import { teacherSchema } from "../schemas/teacherSchema.js";
 import logger from "../utils/logger.js";
 import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
 
@@ -13,6 +15,7 @@ router.use(tenantMiddleware);
 
 const getReview  = (db) => db.models.Review  || db.model("Review",  reviewSchema);
 const getBooking = (db) => db.models.Booking || db.model("Booking", bookingSchema);
+const getTeacher = (db) => db.models.Teacher || db.model("Teacher", teacherSchema);
 
 // ── POST /api/reviews  —  student submits a review ───────────────────────────
 router.post("/", verifyToken, verifyStudent, async (req, res) => {
@@ -158,19 +161,35 @@ router.get("/teacher/:teacherId", verifyToken, async (req, res) => {
       return res.status(403).json({ error: "Forbidden" });
     }
 
-    const reviews = await getReview(req.db).find({ teacherId: req.params.teacherId, flagged: false })
-      .sort({ createdAt: -1 })
+    if (!mongoose.isValidObjectId(req.params.teacherId)) return badRequest(res, "Invalid teacher");
+    const Review = getReview(req.db);
+    const base = { teacherId: new mongoose.Types.ObjectId(String(req.params.teacherId)), flagged: false };
+
+    // Stats always cover ALL of the teacher's (unflagged) reviews
+    const distRows = await Review.aggregate([{ $match: base }, { $group: { _id: "$rating", n: { $sum: 1 } } }]);
+    const dist = [0, 0, 0, 0, 0];
+    let total = 0, sum = 0;
+    distRows.forEach(r => { if (r._id >= 1 && r._id <= 5) { dist[r._id - 1] = r.n; total += r.n; sum += r._id * r.n; } });
+    const avgRating = total ? Math.round((sum / total) * 10) / 10 : null;
+
+    // ?rating=1..5 filter, ?page=&limit= one page (no ?page → newest 500, as before but bounded)
+    const filter = { ...base };
+    const rating = parseInt(req.query.rating, 10);
+    if (rating >= 1 && rating <= 5) filter.rating = rating;
+    const paged = req.query.page !== undefined;
+    const limit = paged ? Math.min(Math.max(parseInt(req.query.limit, 10) || 10, 1), 50) : 500;
+    const matching = rating >= 1 && rating <= 5 ? dist[rating - 1] : total;
+    const totalPages = Math.max(1, Math.ceil(matching / limit));
+    const page = paged ? Math.min(Math.max(parseInt(req.query.page, 10) || 1, 1), totalPages) : 1;
+
+    const reviews = await Review.find(filter)
+      .sort({ createdAt: -1, _id: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit)
       .populate("studentId", "firstName lastName")
       .populate("bookingId", "classTitle scheduledTime");
 
-    const total  = reviews.length;
-    const avgRating = total
-      ? Math.round((reviews.reduce((s, r) => s + r.rating, 0) / total) * 10) / 10
-      : null;
-    const dist = [0, 0, 0, 0, 0];
-    reviews.forEach(r => dist[r.rating - 1]++);
-
-    res.json({ reviews, stats: { total, avgRating, dist } });
+    res.json({ reviews, stats: { total, avgRating, dist }, pagination: { page, limit, total: matching, totalPages } });
   } catch (err) {
     serverError(res, err.message);
   }
@@ -211,38 +230,60 @@ router.get("/stats", verifyToken, verifyAdmin, async (req, res) => {
 // ── GET /api/reviews  —  admin: all reviews with optional filters ─────────────
 router.get("/", verifyToken, verifyAdmin, async (req, res) => {
   try {
+    const Review = getReview(req.db);
     const filter = {};
-    if (req.query.teacherId) filter.teacherId = req.query.teacherId;
+    if (req.query.teacherId) {
+      if (!mongoose.isValidObjectId(req.query.teacherId)) return badRequest(res, "Invalid teacher");
+      filter.teacherId = new mongoose.Types.ObjectId(String(req.query.teacherId));
+    }
     if (req.query.flagged === "true") filter.flagged = true;
-    if (req.query.rating)   filter.rating = Number(req.query.rating);
+    const rating = parseInt(req.query.rating, 10);
+    if (rating >= 1 && rating <= 5) filter.rating = rating;
 
-    const reviews = await getReview(req.db).find(filter)
-      .sort({ createdAt: -1 })
+    // Per-teacher stats and overall totals always cover ALL reviews
+    const [teacherRows, totalsRow] = await Promise.all([
+      Review.aggregate([
+        { $group: { _id: "$teacherId", total: { $sum: 1 }, sum: { $sum: "$rating" }, flagged: { $sum: { $cond: ["$flagged", 1, 0] } } } },
+        { $lookup: { from: getTeacher(req.db).collection.name, localField: "_id", foreignField: "_id", as: "t",
+                     pipeline: [{ $project: { firstName: 1, lastName: 1 } }] } },
+        { $match: { "t.0": { $exists: true } } },
+        { $sort: { total: -1 } },
+      ]),
+      Review.aggregate([{ $group: { _id: null, total: { $sum: 1 }, flagged: { $sum: { $cond: ["$flagged", 1, 0] } }, avg: { $avg: "$rating" } } }]),
+    ]);
+    const teacherStats = teacherRows.map(t => ({
+      _id: String(t._id),
+      name: `${t.t[0].firstName} ${t.t[0].lastName}`,
+      total: t.total, sum: t.sum, flagged: t.flagged,
+      avgRating: t.total ? Math.round((t.sum / t.total) * 10) / 10 : null,
+    }));
+    const tr = totalsRow[0] || { total: 0, flagged: 0, avg: null };
+    const totals = { total: tr.total, flagged: tr.flagged, avgRating: tr.avg == null ? null : Math.round(tr.avg * 10) / 10 };
+
+    // ?page= & ?sort=newest|oldest|highest|lowest|flagged — one page of reviews
+    const SORTS = {
+      newest:  { createdAt: -1, _id: -1 },
+      oldest:  { createdAt: 1, _id: 1 },
+      highest: { rating: -1, createdAt: -1 },
+      lowest:  { rating: 1, createdAt: -1 },
+      flagged: { flagged: -1, createdAt: -1 },
+    };
+    const sort = SORTS[req.query.sort] || SORTS.newest;
+    const paged = req.query.page !== undefined;
+    const limit = paged ? Math.min(Math.max(parseInt(req.query.limit, 10) || 8, 1), 50) : 500;
+    const total = await Review.countDocuments(filter);
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+    const page = paged ? Math.min(Math.max(parseInt(req.query.page, 10) || 1, 1), totalPages) : 1;
+
+    const reviews = await Review.find(filter)
+      .sort(sort)
+      .skip((page - 1) * limit)
+      .limit(limit)
       .populate("studentId", "firstName lastName")
       .populate("teacherId", "firstName lastName")
       .populate("bookingId", "classTitle scheduledTime");
 
-    const teacherMap = {};
-    for (const r of reviews) {
-      const tid = r.teacherId?._id?.toString();
-      if (!tid) continue;
-      if (!teacherMap[tid]) {
-        teacherMap[tid] = {
-          _id: tid,
-          name: `${r.teacherId.firstName} ${r.teacherId.lastName}`,
-          total: 0, sum: 0, flagged: 0,
-        };
-      }
-      teacherMap[tid].total++;
-      teacherMap[tid].sum += r.rating;
-      if (r.flagged) teacherMap[tid].flagged++;
-    }
-    const teacherStats = Object.values(teacherMap).map(t => ({
-      ...t,
-      avgRating: t.total ? Math.round((t.sum / t.total) * 10) / 10 : null,
-    }));
-
-    res.json({ reviews, teacherStats });
+    res.json({ reviews, teacherStats, totals, pagination: { page, limit, total, totalPages } });
   } catch (err) {
     serverError(res, err.message);
   }

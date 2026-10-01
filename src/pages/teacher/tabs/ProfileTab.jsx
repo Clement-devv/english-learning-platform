@@ -91,7 +91,7 @@ export default function ProfileTab({ teacherInfo, isDarkMode, onUpdate }) {
     if (!teacherInfo?._id && !teacherInfo?.id) return;
     const tid = teacherInfo._id || teacherInfo.id;
     setReviewsLoading(true);
-    api.get(`/reviews/teacher/${tid}`)
+    api.get(`/reviews/teacher/${tid}`, { params: { page: 1, limit: 5 } })
       .then((res) => { setReviews(res.data.reviews || []); setReviewStats(res.data.stats || null); })
       .catch(() => {})
       .finally(() => setReviewsLoading(false));
@@ -592,9 +592,9 @@ export default function ProfileTab({ teacherInfo, isDarkMode, onUpdate }) {
                       )}
                     </div>
                   ))}
-                  {reviews.length > 5 && (
+                  {(reviewStats?.total ?? 0) > 5 && (
                     <p style={{ fontSize: 12, color: c.muted, fontStyle: "italic", margin: 0 }}>
-                      …and {reviews.length - 5} more review{reviews.length - 5 !== 1 ? "s" : ""}
+                      …and {reviewStats.total - 5} more review{reviewStats.total - 5 !== 1 ? "s" : ""}
                     </p>
                   )}
                 </div>

@@ -22,7 +22,7 @@ import { studentSchema }  from "../schemas/studentSchema.js";
 import { teacherSchema }  from "../schemas/teacherSchema.js";
 import { subAdminSchema } from "../schemas/subAdminSchema.js";
 import { paymentSchema }  from "../schemas/paymentSchema.js";
-import { parsePagination } from "../utils/pagination.js";
+import { parsePagination, DIRECTORY_MAX } from "../utils/pagination.js";
 import logger from "../utils/logger.js";
 import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
 import { assignStudentId, generateStudentId } from '../utils/studentIdGenerator.js';
@@ -67,7 +67,9 @@ const MANAGED_NO_LOGIN_MSG = "Managed students have no login — this action is 
 // ─── GET all students ─────────────────────────────────────────────────────────
 router.get("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
   try {
-    const { limit, skip } = parsePagination(req.query);
+    // Directory list: screens filter + page it locally, so allow the whole center
+    // (default stays 50 for callers that don't ask)
+    const { limit, skip } = parsePagination(req.query, 50, DIRECTORY_MAX);
     const Student = getStudent(req.db);
     // ?type=managed | real — omitted returns both (assign/booking pickers need everyone)
     const filter = req.query.type === "managed" ? { isManaged: true }

@@ -5,6 +5,9 @@
  * @param {number} maxLimit - maximum allowed page size (default: 500)
  * @returns {{ limit: number, skip: number }}
  */
+/** Largest "whole directory" list (students / teachers) one request may return. */
+export const DIRECTORY_MAX = 5000;
+
 export function parsePagination(query, defaultLimit = 50, maxLimit = 500) {
   const rawLimit = parseInt(query.limit, 10);
   const rawSkip  = parseInt(query.skip,  10);

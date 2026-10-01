@@ -1,893 +1,397 @@
 // src/pages/teacher/tabs/ScheduleTab.jsx
-import { useState, useEffect, useRef, useCallback } from "react";
-import {
-  ChevronLeft, ChevronRight, Plus, X, Trash2,
-  Clock, User, BookOpen, Calendar, Check, Repeat,
-  AlertCircle, Loader, GraduationCap,
-} from "lucide-react";
+// Teacher schedule: weekly working hours (→ free time students can book), time
+// off, and booked classes — one calendar, in the teacher's own clock.
+// Server: server/routes/teacherAvailabilityRoutes.js (calendar, time off),
+//         PUT /teachers/:id/working-hours.
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Plus, X, Trash2, Clock, Check, AlertCircle, Repeat, Globe, ChevronDown, ChevronUp, Copy, CalendarClock } from "lucide-react";
 import api from "../../../api";
-import { getUserTimezone, tzAbbr, tzCity } from "../../../utils/timezone";
+import WeekCalendar, { Legend } from "../../../components/schedule/WeekCalendar";
 import ManagedBadge from "../../../components/ManagedBadge";
+import { TIMEZONE_OPTIONS } from "../../../utils/timezone";
+import {
+  getMonday, addDays, localYmd, localHHMM, fmtRange, fmtDay, fmtHHMM, fmtTime, viewerTz, tzName, tzDiffText, WEEKDAYS_SUN0,
+} from "../../../utils/scheduleView";
 
-// ── Calendar constants ────────────────────────────────────────────────────────
-const HOUR_START   = 6;
-const HOUR_END     = 22;
-const HOUR_HEIGHT  = 80;   // px per hour
-const TOTAL_HOURS  = HOUR_END - HOUR_START;
-const DAY_LABELS   = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-const DURATIONS    = [25, 30, 45, 60, 90, 120];
+const BRAND = "var(--brand-primary, #7c3aed)";
+const DAY_ORDER = [1, 2, 3, 4, 5, 6, 0]; // Mon → Sun
+const HALF_HOURS = Array.from({ length: 49 }, (_, i) => `${String(Math.floor(i / 2)).padStart(2, "0")}:${i % 2 ? "30" : "00"}`); // 00:00 … 24:00
 
-// Build all 15-min-increment time options between HOUR_START and HOUR_END
-const TIME_OPTIONS = (() => {
-  const opts = [];
-  for (let h = HOUR_START; h <= HOUR_END; h++) {
-    for (let m = 0; m < 60; m += 15) {
-      if (h === HOUR_END && m > 0) break;
-      opts.push(`${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}`);
-    }
-  }
-  return opts;
-})();
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-function getMonday(date) {
-  const d = new Date(date);
-  const day = d.getDay();
-  d.setDate(d.getDate() - day + (day === 0 ? -6 : 1));
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
-function getWeekDays(start) {
-  return Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(start);
-    d.setDate(start.getDate() + i);
-    return d;
-  });
-}
-function isSameDay(a, b) {
-  return a.getFullYear() === b.getFullYear() &&
-         a.getMonth()    === b.getMonth()    &&
-         a.getDate()     === b.getDate();
-}
-function fmt12(t) {
-  const [h, m] = t.split(":").map(Number);
-  const ampm = h >= 12 ? "PM" : "AM";
-  const h12  = h === 0 ? 12 : h > 12 ? h - 12 : h;
-  return `${h12}:${String(m).padStart(2,"0")} ${ampm}`;
-}
-function addMins(timeStr, mins) {
-  const [h, m] = timeStr.split(":").map(Number);
-  const total  = h * 60 + m + mins;
-  const nh     = Math.min(Math.floor(total / 60), HOUR_END);
-  const nm     = nh === HOUR_END ? 0 : total % 60;
-  return `${String(nh).padStart(2,"0")}:${String(nm).padStart(2,"0")}`;
-}
-function diffMins(start, end) {
-  const [sh, sm] = start.split(":").map(Number);
-  const [eh, em] = end.split(":").map(Number);
-  return (eh * 60 + em) - (sh * 60 + sm);
-}
-function eventPos(startTime, endTime) {
-  const [sh, sm] = startTime.split(":").map(Number);
-  const top    = (sh - HOUR_START + sm / 60) * HOUR_HEIGHT;
-  const height = Math.max(diffMins(startTime, endTime) / 60 * HOUR_HEIGHT, 28);
-  return { top, height };
-}
-function bookingTimes(b) {
-  const s = new Date(b.scheduledTime);
-  const e = new Date(s.getTime() + (b.duration || 60) * 60000);
-  return {
-    startTime: `${String(s.getHours()).padStart(2,"0")}:${String(s.getMinutes()).padStart(2,"0")}`,
-    endTime:   `${String(e.getHours()).padStart(2,"0")}:${String(e.getMinutes()).padStart(2,"0")}`,
-  };
-}
-// Snap a raw minute value to nearest 15
-function snapTo15(rawMinute) { return Math.round(rawMinute / 15) * 15; }
-
-// ── Palette ───────────────────────────────────────────────────────────────────
 function pal(dark) {
   return {
-    bg:       dark ? "#0f1117" : "#f4f6fb",
-    card:     dark ? "#1a1d27" : "#ffffff",
-    border:   dark ? "#1e2235" : "#e8ecf4",
-    heading:  dark ? "#e2e8f0" : "#1e293b",
-    text:     dark ? "#94a3b8" : "#475569",
-    muted:    dark ? "#4b5563" : "#94a3b8",
-    line:     dark ? "#1e2235" : "#f1f5f9",
-    input:    dark ? "#141620" : "#f8faff",
-    colHover: dark ? "rgba(255,255,255,0.015)" : "rgba(124,58,237,0.025)",
+    card: dark ? "#111827" : "#ffffff", border: dark ? "#1f2937" : "#e5e7eb", soft: dark ? "#0b1220" : "#f8fafc",
+    heading: dark ? "#f1f5f9" : "#0f172a", text: dark ? "#cbd5e1" : "#475569", muted: dark ? "#64748b" : "#94a3b8",
+    input: dark ? "#0b1220" : "#ffffff",
   };
 }
 
-// ── Shared select style ───────────────────────────────────────────────────────
-function selStyle(c, accent = c.border) {
-  return {
-    width: "100%", padding: "10px 12px",
-    background: c.input, border: `1.5px solid ${accent}`,
-    borderRadius: "10px", color: c.heading,
-    fontSize: "13.5px", fontWeight: "600",
-    outline: "none", fontFamily: "inherit", cursor: "pointer",
-    appearance: "none", WebkitAppearance: "none",
-  };
+/** "Mon–Fri 2:00 PM–8:00 PM · Sat 9:00 AM–12:00 PM" */
+function summarise(hours) {
+  if (!hours?.length) return "";
+  const key = (d) => hours.filter(r => r.day === d).map(r => `${r.start}-${r.end}`).join(",");
+  const parts = [];
+  let i = 0;
+  while (i < DAY_ORDER.length) {
+    const k = key(DAY_ORDER[i]);
+    if (!k) { i++; continue; }
+    let j = i;
+    while (j + 1 < DAY_ORDER.length && key(DAY_ORDER[j + 1]) === k) j++;
+    const name = (d) => WEEKDAYS_SUN0[d].slice(0, 3);
+    const days = i === j ? name(DAY_ORDER[i]) : `${name(DAY_ORDER[i])}–${name(DAY_ORDER[j])}`;
+    const ranges = hours.filter(r => r.day === DAY_ORDER[i]).map(r => `${fmtHHMM(r.start)}–${fmtHHMM(r.end)}`).join(", ");
+    parts.push(`${days} ${ranges}`);
+    i = j + 1;
+  }
+  return parts.join(" · ");
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-export default function ScheduleTab({
-  teacherInfo,
-  isDarkMode,
-  classes   = [],   // accepted bookings
-  bookings  = [],   // pending bookings
-  students  = [],
-}) {
-  const c  = pal(isDarkMode);
-  const myTZ     = getUserTimezone();
-  const myAbbr   = tzAbbr(myTZ);
-  const myCity   = tzCity(myTZ);
-
-  const [weekStart,    setWeekStart]    = useState(() => getMonday(new Date()));
-  const [scheduleVisible, setScheduleVisible] = useState(
-    teacherInfo?.showScheduleToStudents !== false // default true
-  );
-  const [togglingVis, setTogglingVis] = useState(false);
-  const [availability, setAvailability] = useState([]);
-  const [loading,      setLoading]      = useState(false);
-
-  // Add-slot modal state
-  const DEFAULT_FORM = { startTime: "09:00", endTime: "10:00", selectedDuration: 60, studentId: "", isRecurring: false, note: "" };
-  const [addModal,  setAddModal]  = useState(null); // { date }
-  const [addForm,   setAddForm]   = useState(DEFAULT_FORM);
-  const [saving,    setSaving]    = useState(false);
-
-  // Detail panel
-  const [detail, setDetail] = useState(null);
-
-  // Toast
-  const [toast, setToast] = useState(null);
-
-  const scrollRef = useRef(null);
-
-  // Scroll to 8 AM on mount
-  useEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollTop = (8 - HOUR_START) * HOUR_HEIGHT - 16;
-  }, []);
-
+export default function ScheduleTab({ teacherInfo, isDarkMode, students = [] }) {
+  const c = pal(isDarkMode);
+  const myTz = viewerTz();
   const teacherId = teacherInfo?._id || teacherInfo?.id;
 
-  useEffect(() => { fetchAvailability(); }, [weekStart, teacherId]); // eslint-disable-line
+  const [weekStart, setWeekStart] = useState(() => getMonday());
+  const [cal, setCal] = useState({ free: [], blocks: [], hasHours: false, workingHours: [], timezone: "" });
+  const [loading, setLoading] = useState(false);
+  const [toast, setToast] = useState(null);
+  const [visible, setVisible] = useState(teacherInfo?.showScheduleToStudents !== false);
+  const [togglingVis, setTogglingVis] = useState(false);
 
-  const fetchAvailability = async () => {
+  // Working-hours editor
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [draft, setDraft] = useState([]);
+  const [draftTz, setDraftTz] = useState("");
+  const [savingHours, setSavingHours] = useState(false);
+
+  // Time-off modal + detail modal
+  const [offModal, setOffModal] = useState(null); // { date: "YYYY-MM-DD", start, end, recurring, studentId, note }
+  const [savingOff, setSavingOff] = useState(false);
+  const [detail, setDetail] = useState(null);
+
+  const showToast = (msg, type = "success") => { setToast({ msg, type }); setTimeout(() => setToast(null), 3500); };
+
+  const load = useCallback(async () => {
     if (!teacherId) return;
     setLoading(true);
     try {
-      const end = new Date(weekStart); end.setDate(weekStart.getDate() + 7);
-      const { data } = await api.get(
-        `/teacher-availability/${teacherId}?startDate=${weekStart.toISOString()}&endDate=${end.toISOString()}`
-      );
-      setAvailability(data.availability || []);
+      const { data } = await api.get(`/teacher-availability/${teacherId}/calendar`, {
+        params: { from: weekStart.toISOString(), to: addDays(weekStart, 7).toISOString() },
+      });
+      setCal(data);
     } catch (err) {
       showToast(err?.response?.data?.message || "Failed to load schedule", "error");
     } finally { setLoading(false); }
+  }, [teacherId, weekStart]);
+  useEffect(() => { load(); }, [load]);
+
+  // Open the editor straight away for teachers who haven't set hours yet
+  const [autoOpened, setAutoOpened] = useState(false);
+  useEffect(() => {
+    if (!loading && !autoOpened && cal && cal.timezone !== "" && !cal.hasHours) { openEditor(); setAutoOpened(true); }
+  }, [loading, cal]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const openEditor = () => {
+    setDraft((cal.workingHours || []).map(r => ({ ...r })));
+    const tz = cal.timezone && cal.timezone !== "UTC" ? cal.timezone : (teacherInfo?.timezone || myTz);
+    setDraftTz(tz);
+    setEditorOpen(true);
   };
 
-  const showToast = (msg, type = "success") => {
-    setToast({ msg, type });
-    setTimeout(() => setToast(null), 3000);
+  // ── Working hours ─────────────────────────────────────────────────────────
+  const dayRanges = (d) => draft.filter(r => r.day === d);
+  const setDay = (d, ranges) => setDraft(prev => [...prev.filter(r => r.day !== d), ...ranges.map(r => ({ ...r, day: d }))]);
+  const addRange = (d) => {
+    const ranges = dayRanges(d);
+    const last = ranges[ranges.length - 1];
+    const start = last ? (last.end >= "22:00" ? "22:00" : last.end) : "09:00";
+    const end = HALF_HOURS.find(t => t > start && (parseInt(t) - parseInt(start)) >= 2) || "24:00";
+    setDay(d, [...ranges, { start, end }]);
+  };
+  const copyMonToWeekdays = () => {
+    const mon = dayRanges(1);
+    setDraft(prev => [...prev.filter(r => r.day === 0 || r.day === 6 || r.day === 1), ...[2, 3, 4, 5].flatMap(d => mon.map(r => ({ ...r, day: d })))]);
+  };
+  const saveHours = async () => {
+    for (const d of DAY_ORDER) {
+      const rs = dayRanges(d).sort((a, b) => a.start.localeCompare(b.start));
+      for (let i = 0; i < rs.length; i++) {
+        if (rs[i].end <= rs[i].start) return showToast(`${WEEKDAYS_SUN0[d]}: a range ends before it starts`, "error");
+        if (i && rs[i].start < rs[i - 1].end) return showToast(`${WEEKDAYS_SUN0[d]}: two ranges overlap`, "error");
+      }
+    }
+    setSavingHours(true);
+    try {
+      await api.put(`/teachers/${teacherId}/working-hours`, { workingHours: draft, timezone: draftTz });
+      showToast("Working hours saved — students can now book your free time");
+      setEditorOpen(false);
+      load();
+    } catch (err) {
+      showToast(err?.response?.data?.message || "Could not save working hours", "error");
+    } finally { setSavingHours(false); }
   };
 
-  // ── Navigation ────────────────────────────────────────────────────────────
-  const goWeek = d => setWeekStart(ws => { const n = new Date(ws); n.setDate(ws.getDate() + d * 7); return n; });
-  const goToday = () => setWeekStart(getMonday(new Date()));
+  // ── Visibility ────────────────────────────────────────────────────────────
+  const toggleVisibility = async () => {
+    if (togglingVis) return;
+    setTogglingVis(true);
+    try {
+      await api.patch(`/teachers/${teacherId}/schedule-visibility`, { showScheduleToStudents: !visible });
+      setVisible(v => !v);
+      showToast(!visible ? "Students can now see and book your free time" : "Your schedule is hidden from students");
+    } catch { showToast("Failed to update visibility", "error"); }
+    finally { setTogglingVis(false); }
+  };
 
-  const weekDays = getWeekDays(weekStart);
-  const today    = new Date();
-  const weekEnd  = new Date(weekStart); weekEnd.setDate(weekStart.getDate() + 6);
-  const weekLabel = `${weekStart.toLocaleDateString("en-US",{month:"short",day:"numeric"})} – ${weekEnd.toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}`;
-
-  // ── Events for a day ──────────────────────────────────────────────────────
-  const getEventsForDay = useCallback((date) => {
-    const jsDay  = date.getDay();
-    const DONE = ["completed", "cancelled", "rejected", "missed"];
-    const now  = Date.now();
-    const dayBookings = [...classes, ...bookings].filter(b => {
-      if (DONE.includes(b.status)) return false;
-      if (!isSameDay(new Date(b.scheduledTime), date)) return false;
-      // Hide if the class end time has already passed (stale "accepted" bookings)
-      const endMs = new Date(b.scheduledTime).getTime() + (b.duration || 60) * 60000;
-      return endMs > now;
-    });
-    const dayAvail    = availability.filter(a => a.isRecurring ? a.dayOfWeek === jsDay : isSameDay(new Date(a.date), date));
-    return { dayBookings, dayAvail };
-  }, [classes, bookings, availability]);
-
-  // ── Stats ─────────────────────────────────────────────────────────────────
-  const allThisWeek    = [...classes, ...bookings].filter(b => { const d = new Date(b.scheduledTime); return d >= weekStart && d < weekEnd; });
-  const confirmedCount = allThisWeek.filter(b => b.status === "accepted").length;
-  const pendingCount   = allThisWeek.filter(b => b.status === "pending").length;
-  const occupiedCount  = availability.length;
-
-  // ── Cell click — snap to nearest 15 min within the hour cell ─────────────
-  const handleCellClick = (e, date, hour) => {
-    e.stopPropagation();
-    const rect      = e.currentTarget.getBoundingClientRect();
-    const relY      = e.clientY - rect.top;
-    const rawMinute = (relY / HOUR_HEIGHT) * 60;
-    const minute    = Math.min(snapTo15(rawMinute), 45);
-    const hStr = String(hour).padStart(2,"0");
-    const mStr = String(minute).padStart(2,"0");
-    const startTime = `${hStr}:${mStr}`;
-    const endTime   = addMins(startTime, 60);
-    setAddForm({ ...DEFAULT_FORM, startTime, endTime, selectedDuration: 60 });
-    setAddModal({ date });
+  // ── Time off ──────────────────────────────────────────────────────────────
+  const openOff = (at = new Date(Date.now() + 3600000)) => {
+    const start = new Date(at); start.setMinutes(start.getMinutes() < 30 ? 0 : 30, 0, 0);
+    const end = new Date(start.getTime() + 3600000);
+    setOffModal({ date: localYmd(start), start: localHHMM(start), end: end.getDate() !== start.getDate() ? "24:00" : localHHMM(end), recurring: false, studentId: "", note: "" });
     setDetail(null);
   };
-
-  // When start time changes, maintain the selected duration
-  const handleStartChange = (val) => {
-    const endTime = addMins(val, addForm.selectedDuration);
-    setAddForm(f => ({ ...f, startTime: val, endTime }));
-  };
-
-  // When duration button is clicked
-  const handleDuration = (mins) => {
-    const endTime = addMins(addForm.startTime, mins);
-    setAddForm(f => ({ ...f, selectedDuration: mins, endTime }));
-  };
-
-  // When end time is changed manually, clear duration highlight
-  const handleEndChange = (val) => {
-    const d = diffMins(addForm.startTime, val);
-    setAddForm(f => ({ ...f, endTime: val, selectedDuration: DURATIONS.includes(d) ? d : null }));
-  };
-
-  const addFormErr = addForm.startTime >= addForm.endTime;
-
-  // ── Conflict detection ────────────────────────────────────────────────────
-  const checkConflict = useCallback((date, startTime, endTime) => {
-    const jsDay = date.getDay();
-    for (const a of availability) {
-      const sameDay = a.isRecurring
-        ? a.dayOfWeek === jsDay
-        : isSameDay(new Date(a.date), date);
-      if (!sameDay) continue;
-      if (startTime < a.endTime && endTime > a.startTime) {
-        return `Conflicts with occupied slot ${fmt12(a.startTime)}–${fmt12(a.endTime)}`;
-      }
-    }
-    for (const b of [...classes, ...bookings]) {
-      if (!isSameDay(new Date(b.scheduledTime), date)) continue;
-      const { startTime: bS, endTime: bE } = bookingTimes(b);
-      if (startTime < bE && endTime > bS) {
-        return `Conflicts with ${b.status === "accepted" ? "confirmed" : "pending"} class ${fmt12(bS)}–${fmt12(bE)}`;
-      }
-    }
-    return null;
-  }, [availability, classes, bookings]);
-
-  // ── Save ──────────────────────────────────────────────────────────────────
-  const handleSave = async () => {
-    if (!teacherId || !addModal || addFormErr) return;
-    const conflict = checkConflict(addModal.date, addForm.startTime, addForm.endTime);
-    if (conflict) { showToast(conflict, "error"); return; }
-    setSaving(true);
+  const saveOff = async () => {
+    if (offModal.end <= offModal.start) return showToast("End time must be after start time", "error");
+    setSavingOff(true);
     try {
+      const [y, m, d] = offModal.date.split("-").map(Number);
       await api.post("/teacher-availability", {
-        teacherId:   teacherId,
-        studentId:   addForm.studentId || null,
-        date:        addModal.date.toISOString(),
-        dayOfWeek:   addModal.date.getDay(),
-        startTime:   addForm.startTime,
-        endTime:     addForm.endTime,
-        isRecurring: addForm.isRecurring,
-        note:        addForm.note,
-        timezone:    myTZ,
+        localDate: offModal.date,
+        dayOfWeek: new Date(y, m - 1, d).getDay(),
+        startTime: offModal.start, endTime: offModal.end,
+        isRecurring: offModal.recurring, studentId: offModal.studentId || null, note: offModal.note,
+        timezone: myTz, // the times typed are on this device's clock
       });
-      setAddModal(null);
-      showToast("Schedule slot added!");
-      fetchAvailability();
+      setOffModal(null);
+      showToast(offModal.studentId ? "Time reserved" : "Time off added");
+      load();
     } catch (err) {
-      const msg = err?.response?.data?.message;
-      showToast(msg || "Failed to save slot", "error");
-    }
-    finally  { setSaving(false); }
+      showToast(err?.response?.data?.message || "Could not save", "error");
+    } finally { setSavingOff(false); }
+  };
+  const removeOff = async (slotId) => {
+    try { await api.delete(`/teacher-availability/${slotId}`); showToast("Removed"); setDetail(null); load(); }
+    catch { showToast("Failed to remove", "error"); }
   };
 
-  // ── Delete availability ───────────────────────────────────────────────────
-  const handleDelete = async (id) => {
-    try {
-      await api.delete(`/teacher-availability/${id}`);
-      showToast("Slot removed");
-      fetchAvailability();
-      setDetail(null);
-    } catch { showToast("Failed to remove", "error"); }
-  };
+  // ── Calendar data ─────────────────────────────────────────────────────────
+  const items = useMemo(() => (cal.blocks || []).map(b => ({
+    ...b,
+    title: b.kind === "off" ? (b.note || "Time off") : b.kind === "reserved" ? `Reserved · ${b.studentName}` : b.title,
+    sub: ["booked", "pending", "done"].includes(b.kind) ? b.studentName : b.kind === "reserved" ? b.note : "",
+    onClick: () => setDetail(b),
+  })), [cal.blocks]);
 
-  // ── Toggle schedule visibility ───────────────────────────────────────────
-  const toggleVisibility = async () => {
-    if (!teacherId || togglingVis) return;
-    setTogglingVis(true);
-    const next = !scheduleVisible;
-    try {
-      await api.patch(`/teachers/${teacherId}/schedule-visibility`, {
-        showScheduleToStudents: next,
-      });
-      setScheduleVisible(next);
-      showToast(next ? "Schedule now visible to students" : "Schedule hidden from students");
-    } catch {
-      showToast("Failed to update visibility", "error");
-    } finally {
-      setTogglingVis(false);
-    }
-  };
+  const freeMins = (cal.free || []).reduce((s, f) => s + (new Date(f.end) - new Date(f.start)) / 60000, 0);
+  const stat = (k) => (cal.blocks || []).filter(b => b.kind === k).length;
+  // Only worth a warning when the clocks actually differ right now
+  const tzGap = cal.timezone && cal.timezone !== "UTC" ? tzDiffText(cal.timezone, myTz) : "";
+  const tzMismatch = tzGap && tzGap !== "same time as you";
 
-  // ── Look up student ───────────────────────────────────────────────────────
-  const findStudent = useCallback((id) => {
-    if (!id) return null;
-    return students.find(s => String(s._id) === String(id?._id || id));
-  }, [students]);
+  const sel = { padding: "8px 10px", borderRadius: 8, border: `1px solid ${c.border}`, background: c.input, color: c.heading, fontSize: 13, fontFamily: "inherit" };
+  const btn = (primary) => ({ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
+    border: primary ? "none" : `1px solid ${c.border}`, background: primary ? BRAND : "transparent", color: primary ? "#fff" : c.heading });
 
-  const bookingStudentName = useCallback((b) => {
-    const id = b.studentId?._id || b.studentId;
-    const s  = findStudent(id);
-    if (s) return `${s.firstName} ${s.lastName || ""}`.trim();
-    if (b.studentId?.firstName) return `${b.studentId.firstName} ${b.studentId.lastName||""}`.trim();
-    return "Student";
-  }, [findStudent]);
-
-  // ─────────────────────────────────────────────────────────────────────────
   return (
-    <div style={{ display:"flex", flexDirection:"column", gap:"20px", fontFamily:"var(--font-body)" }}>
-
-      {/* ── Global styles ── */}
-      <style>{`
-        @keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
-        @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
-        .sched-scroll::-webkit-scrollbar{width:5px}
-        .sched-scroll::-webkit-scrollbar-thumb{background:${isDarkMode?"#1e2235":"#e0e4f4"};border-radius:4px}
-        .time-cell:hover{background:${c.colHover}!important;cursor:pointer}
-        .avail-tile{transition:filter .15s,transform .15s,box-shadow .15s}
-        .avail-tile:hover{filter:brightness(1.1);transform:translateY(-1px)!important;box-shadow:0 6px 18px rgba(124,58,237,0.35)!important}
-        .booking-tile{transition:filter .15s,transform .15s}
-        .booking-tile:hover{filter:brightness(1.08);transform:translateY(-1px)}
-        .dur-btn{transition:all .15s;cursor:pointer}
-        .dur-btn:hover{transform:translateY(-1px)}
-        select option{background:${isDarkMode?"#1a1d27":"#fff"};color:${c.heading}}
-      `}</style>
-
-      {/* ── Toast ── */}
+    <div style={{ display: "flex", flexDirection: "column", gap: 16, fontFamily: "var(--font-body)" }}>
       {toast && (
-        <div style={{
-          position:"fixed", top:"20px", right:"20px", zIndex:9999,
-          background: toast.type==="error" ? "linear-gradient(135deg,#ef4444,#dc2626)" : "linear-gradient(135deg,#7c3aed,#6d28d9)",
-          color:"#fff", borderRadius:"12px", padding:"12px 20px",
-          fontSize:"13.5px", fontWeight:"600",
-          boxShadow:"0 8px 32px rgba(0,0,0,0.2)",
-          display:"flex", alignItems:"center", gap:"8px",
-          animation:"fadeIn 0.25s ease",
-        }}>
-          {toast.type==="error" ? <AlertCircle size={15}/> : <Check size={15}/>} {toast.msg}
+        <div role="status" style={{ position: "fixed", top: 20, right: 20, zIndex: 9999, padding: "12px 18px", borderRadius: 12, fontSize: 13.5, fontWeight: 600, color: "#fff",
+          background: toast.type === "error" ? "#dc2626" : "#059669", boxShadow: "0 8px 32px rgba(0,0,0,0.2)", display: "flex", alignItems: "center", gap: 8 }}>
+          {toast.type === "error" ? <AlertCircle size={15} /> : <Check size={15} />} {toast.msg}
         </div>
       )}
 
-      {/* ── Page header ── */}
-      <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", flexWrap:"wrap", gap:"12px" }}>
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <div>
-          <h1 style={{ margin:0, fontSize:"22px", fontWeight:"800", color:c.heading }}>My Schedule</h1>
-          <p style={{ margin:"4px 0 0", fontSize:"13px", color:c.text, display:"flex", alignItems:"center", gap:"7px", flexWrap:"wrap" }}>
-            Mark your occupied time slots — students will book around these
-            <span style={{ background:isDarkMode?"rgba(14,165,233,0.15)":"#e0f2fe", color:"#0284c7", borderRadius:"6px", padding:"2px 8px", fontSize:"11px", fontWeight:"700" }}>
-              🌍 {myCity} · {myAbbr}
-            </span>
+          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: c.heading }}>My Schedule</h1>
+          <p style={{ margin: "4px 0 0", fontSize: 13, color: c.text, display: "flex", alignItems: "center", gap: 6 }}>
+            <Globe size={13} /> All times are in your time: <strong>{tzName(myTz)}</strong>
           </p>
         </div>
-
-        {/* Visibility toggle */}
-        <div
-          onClick={toggleVisibility}
-          title={scheduleVisible ? "Click to hide schedule from students" : "Click to show schedule to students"}
-          style={{
-            display:"flex", alignItems:"center", gap:"10px",
-            padding:"8px 14px",
-            background: scheduleVisible
-              ? (isDarkMode ? "rgba(16,185,129,0.12)" : "#f0fdf4")
-              : (isDarkMode ? "rgba(239,68,68,0.1)"  : "#fef2f2"),
-            border: `1.5px solid ${scheduleVisible ? "#10b981" : "#ef4444"}`,
-            borderRadius:"12px", cursor: togglingVis ? "wait" : "pointer",
-            transition:"all 0.2s",
-          }}
-        >
-          {/* Toggle pill */}
-          <div style={{
-            width:"36px", height:"20px", borderRadius:"10px",
-            background: scheduleVisible ? "#10b981" : "#ef4444",
-            position:"relative", transition:"background 0.2s", flexShrink:0,
-          }}>
-            <div style={{
-              width:"14px", height:"14px", borderRadius:"50%", background:"#fff",
-              position:"absolute", top:"3px",
-              left: scheduleVisible ? "19px" : "3px",
-              transition:"left 0.2s", boxShadow:"0 1px 3px rgba(0,0,0,0.2)",
-            }}/>
-          </div>
-          <div>
-            <p style={{ margin:0, fontSize:"12px", fontWeight:"800", color: scheduleVisible ? "#059669" : "#dc2626" }}>
-              {togglingVis ? "Updating…" : scheduleVisible ? "Visible to students" : "Hidden from students"}
-            </p>
-            <p style={{ margin:0, fontSize:"10px", color:c.muted }}>
-              {scheduleVisible ? "Students can see your schedule" : "Students cannot see your schedule"}
-            </p>
-          </div>
-        </div>
-
-        {/* Stats pills */}
-        <div style={{ display:"flex", gap:"8px", flexWrap:"wrap" }}>
-          {[
-            { label:"Confirmed", count:confirmedCount, color:"#7c3aed", bg:isDarkMode?"rgba(124,58,237,0.15)":"#f5f3ff" },
-            { label:"Pending",   count:pendingCount,   color:"#d97706", bg:isDarkMode?"rgba(217,119,6,0.15)":"#fffbeb"  },
-            { label:"Occupied",  count:occupiedCount,  color:"#0ea5e9", bg:isDarkMode?"rgba(14,165,233,0.15)":"#f0f9ff" },
-          ].map(({ label, count, color, bg }) => (
-            <div key={label} style={{ background:bg, border:`1px solid ${color}30`, borderRadius:"10px", padding:"6px 14px", display:"flex", alignItems:"center", gap:"6px" }}>
-              <span style={{ width:"7px", height:"7px", borderRadius:"50%", background:color }} />
-              <span style={{ fontSize:"13px", fontWeight:"700", color }}>{count}</span>
-              <span style={{ fontSize:"12px", color:c.text }}>{label}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* ── Week navigator ── */}
-      <div style={{ background:c.card, border:`1px solid ${c.border}`, borderRadius:"16px", padding:"14px 20px", display:"flex", alignItems:"center", justifyContent:"space-between", boxShadow:isDarkMode?"none":"0 2px 12px rgba(0,0,0,0.05)" }}>
-        <button onClick={()=>goWeek(-1)} style={{ background:isDarkMode?"#1e2235":"#f8faff", border:`1px solid ${c.border}`, borderRadius:"10px", padding:"8px 12px", cursor:"pointer", color:c.heading, display:"flex", alignItems:"center" }}>
-          <ChevronLeft size={18}/>
-        </button>
-        <div style={{ textAlign:"center" }}>
-          <p style={{ margin:0, fontSize:"16px", fontWeight:"800", color:c.heading }}>{weekLabel}</p>
-          {loading && <div style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:"5px", marginTop:"3px" }}><Loader size={11} style={{ animation:"spin 1s linear infinite", color:"#7c3aed" }}/><span style={{ fontSize:"11px", color:"#7c3aed" }}>Loading…</span></div>}
-        </div>
-        <div style={{ display:"flex", gap:"8px" }}>
-          <button onClick={goToday} style={{ background:isDarkMode?"#1e2235":"#f8faff", border:`1px solid ${c.border}`, borderRadius:"10px", padding:"8px 16px", cursor:"pointer", fontSize:"13px", fontWeight:"700", color:c.heading }}>Today</button>
-          <button onClick={()=>goWeek(1)} style={{ background:isDarkMode?"#1e2235":"#f8faff", border:`1px solid ${c.border}`, borderRadius:"10px", padding:"8px 12px", cursor:"pointer", color:c.heading, display:"flex", alignItems:"center" }}>
-            <ChevronRight size={18}/>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          <button type="button" onClick={toggleVisibility} disabled={togglingVis}
+            style={{ ...btn(false), borderColor: visible ? "#10b981" : "#ef4444", color: visible ? "#059669" : "#dc2626" }}>
+            <span style={{ width: 8, height: 8, borderRadius: "50%", background: visible ? "#10b981" : "#ef4444" }} />
+            {visible ? "Students can book you" : "Hidden from students"}
+          </button>
+          <button type="button" onClick={() => openOff()} style={btn(false)}><Plus size={14} /> Time off</button>
+          <button type="button" onClick={editorOpen ? () => setEditorOpen(false) : openEditor} style={btn(true)}>
+            <CalendarClock size={14} /> Working hours {editorOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
           </button>
         </div>
       </div>
 
-      {/* ── Legend ── */}
-      <div style={{ display:"flex", gap:"20px", flexWrap:"wrap", alignItems:"center" }}>
-        {[
-          { color:"#7c3aed", radius:"3px", label:"Confirmed class" },
-          { color:"#d97706", radius:"3px", label:"Pending request" },
-          { color:"#0ea5e9", radius:"3px", label:"Occupied" },
-        ].map(({ color, radius, label }) => (
-          <div key={label} style={{ display:"flex", alignItems:"center", gap:"7px" }}>
-            <span style={{ width:"10px", height:"10px", borderRadius:radius, background:color }}/>
-            <span style={{ fontSize:"12px", color:c.text }}>{label}</span>
-          </div>
-        ))}
-        <span style={{ marginLeft:"auto", fontSize:"12px", color:c.muted, display:"flex", alignItems:"center", gap:"5px" }}>
-          <Plus size={11} color={c.muted}/> Click any empty time cell to mark it as occupied
-        </span>
-      </div>
-
-      {/* ── Calendar ── */}
-      <div style={{ background:c.card, border:`1px solid ${c.border}`, borderRadius:"20px", overflow:"hidden", boxShadow:isDarkMode?"none":"0 4px 24px rgba(0,0,0,0.07)" }}>
-
-        {/* Day headers */}
-        <div style={{ display:"grid", gridTemplateColumns:"64px repeat(7,1fr)", borderBottom:`2px solid ${c.border}`, background:isDarkMode?"#141620":"#fafbff", position:"sticky", top:0, zIndex:10 }}>
-          <div style={{ borderRight:`1px solid ${c.border}` }}/>
-          {weekDays.map((day, i) => {
-            const isToday   = isSameDay(day, today);
-            const isWeekend = i >= 5;
-            return (
-              <div key={i} style={{ padding:"14px 8px", textAlign:"center", borderRight:i<6?`1px solid ${c.border}`:"none", background:isToday?(isDarkMode?"rgba(124,58,237,0.12)":"rgba(124,58,237,0.05)"):isWeekend?(isDarkMode?"rgba(255,255,255,0.01)":"rgba(0,0,0,0.01)"):"transparent" }}>
-                <p style={{ margin:0, fontSize:"11px", fontWeight:"700", color:isToday?"#7c3aed":c.muted, textTransform:"uppercase", letterSpacing:"0.07em" }}>{DAY_LABELS[i]}</p>
-                <div style={{ width:"36px", height:"36px", borderRadius:"50%", margin:"4px auto 0", display:"flex", alignItems:"center", justifyContent:"center", background:isToday?"linear-gradient(135deg,#7c3aed,#6d28d9)":"transparent", boxShadow:isToday?"0 4px 12px rgba(124,58,237,0.4)":"none" }}>
-                  <span style={{ fontSize:"18px", fontWeight:"800", color:isToday?"#fff":isWeekend?c.text:c.heading, lineHeight:1 }}>{day.getDate()}</span>
-                </div>
-              </div>
-            );
-          })}
+      {tzMismatch && (
+        <div style={{ padding: "10px 14px", borderRadius: 12, background: isDarkMode ? "rgba(245,158,11,0.12)" : "#fffbeb", border: "1px solid #fcd34d", fontSize: 13, color: isDarkMode ? "#fcd34d" : "#92400e" }}>
+          Your working hours are set in <strong>{tzName(cal.timezone)}</strong>, but this device is in <strong>{tzName(myTz)}</strong>.
+          ({tzName(cal.timezone).split(" (")[0]} is {tzGap.replace(" you", " this device")}.) The calendar shows this device's time, so your hours appear shifted. If you've moved, change the timezone in Working hours.
         </div>
+      )}
 
-        {/* Scrollable time grid */}
-        <div ref={scrollRef} className="sched-scroll" style={{ overflowY:"auto", maxHeight:"580px" }}>
-          <div style={{ display:"grid", gridTemplateColumns:"64px repeat(7,1fr)", position:"relative", height:`${TOTAL_HOURS * HOUR_HEIGHT}px` }}>
-
-            {/* Time labels */}
-            <div style={{ borderRight:`1px solid ${c.border}`, position:"relative", zIndex:2 }}>
-              {Array.from({ length:TOTAL_HOURS }, (_,i) => {
-                const hour = HOUR_START + i;
-                const ampm = hour >= 12 ? "PM" : "AM";
-                const h12  = hour===12?12:hour>12?hour-12:hour;
-                return (
-                  <div key={i} style={{ position:"absolute", top:`${i*HOUR_HEIGHT}px`, width:"100%", height:`${HOUR_HEIGHT}px`, display:"flex", alignItems:"flex-start", paddingTop:"7px", paddingRight:"10px", justifyContent:"flex-end", borderBottom:`1px solid ${c.line}` }}>
-                    <span style={{ fontSize:"11px", fontWeight:"700", color:c.muted, letterSpacing:"0.04em" }}>{h12}<span style={{ fontSize:"9px" }}>{ampm}</span></span>
-                  </div>
-                );
-              })}
+      {/* Working hours */}
+      {!editorOpen ? (
+        <div style={{ padding: "12px 16px", borderRadius: 12, background: c.card, border: `1px solid ${c.border}`, fontSize: 13, color: c.text, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <Clock size={15} color={BRAND} />
+          {cal.hasHours
+            ? <span><strong style={{ color: c.heading }}>Working hours:</strong> {summarise(cal.workingHours)} <span style={{ color: c.muted }}>({tzName(cal.timezone)})</span></span>
+            : <span><strong style={{ color: c.heading }}>No working hours yet.</strong> Students can request any time and you approve each one. Set your hours so they see exactly when you're free.</span>}
+        </div>
+      ) : (
+        <div style={{ padding: 16, borderRadius: 14, background: c.card, border: `1.5px solid ${BRAND}`, display: "flex", flexDirection: "column", gap: 12 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+            <div>
+              <div style={{ fontSize: 15, fontWeight: 800, color: c.heading }}>When do you teach each week?</div>
+              <div style={{ fontSize: 12.5, color: c.text }}>Students see these hours as free time (minus classes and time off), shown in their own timezone.</div>
             </div>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, color: c.text }}>
+              Hours are in
+              <select value={draftTz} onChange={e => setDraftTz(e.target.value)} style={{ ...sel, maxWidth: 260 }}>
+                {!TIMEZONE_OPTIONS.some(o => o.value === draftTz) && draftTz && <option value={draftTz}>{tzName(draftTz)}</option>}
+                {TIMEZONE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </label>
+          </div>
 
-            {/* 7 day columns */}
-            {weekDays.map((day, di) => {
-              const { dayBookings, dayAvail } = getEventsForDay(day);
-              const isPast    = day < new Date(today.getFullYear(), today.getMonth(), today.getDate());
-              const isToday   = isSameDay(day, today);
-              const isWeekend = di >= 5;
-
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {DAY_ORDER.map(d => {
+              const ranges = dayRanges(d);
+              const on = ranges.length > 0;
               return (
-                <div key={di} style={{ position:"relative", borderRight:di<6?`1px solid ${c.border}`:"none", background:isToday?(isDarkMode?"rgba(124,58,237,0.025)":"rgba(124,58,237,0.015)"):isWeekend?(isDarkMode?"rgba(255,255,255,0.004)":"rgba(0,0,0,0.007)"):"transparent" }}>
-
-                  {/* Hour-click cells */}
-                  {Array.from({ length:TOTAL_HOURS }, (_,hi) => (
-                    <div key={hi} className={isPast?"":"time-cell"} onClick={isPast?undefined:(e)=>handleCellClick(e,day,HOUR_START+hi)}
-                      style={{ position:"absolute", top:`${hi*HOUR_HEIGHT}px`, width:"100%", height:`${HOUR_HEIGHT}px`, borderBottom:`1px solid ${c.line}`, transition:"background 0.12s", opacity:isPast?0.45:1, cursor:isPast?"default":"pointer" }}
-                    >
-                      {/* Half-hour hairline */}
-                      <div style={{ position:"absolute", top:"50%", left:"6px", right:"6px", height:"1px", background:isDarkMode?"rgba(255,255,255,0.04)":"rgba(0,0,0,0.04)", pointerEvents:"none" }}/>
-                    </div>
-                  ))}
-
-                  {/* Current-time indicator */}
-                  {isToday && (() => {
-                    const now = new Date();
-                    const mins = (now.getHours() - HOUR_START)*60 + now.getMinutes();
-                    if (mins < 0 || mins > TOTAL_HOURS*60) return null;
-                    return (
-                      <div style={{ position:"absolute", top:`${(mins/60)*HOUR_HEIGHT}px`, left:0, right:0, zIndex:5, pointerEvents:"none" }}>
-                        <div style={{ height:"2px", background:"#ef4444", boxShadow:"0 0 6px rgba(239,68,68,0.5)", position:"relative" }}>
-                          <div style={{ width:"8px", height:"8px", borderRadius:"50%", background:"#ef4444", position:"absolute", left:"-4px", top:"-3px" }}/>
-                        </div>
-                      </div>
-                    );
-                  })()}
-
-                  {/* ── Occupied (teacher availability) tiles ── */}
-                  {dayAvail.map(avail => {
-                    const { top, height } = eventPos(avail.startTime, avail.endTime);
-                    const student = findStudent(avail.studentId);
-                    const hasStudent = !!student;
-                    return (
-                      <div key={avail._id} className="avail-tile"
-                        onClick={e => { e.stopPropagation(); setDetail({ type:"avail", data:avail }); setAddModal(null); }}
-                        style={{ position:"absolute", top:`${top+2}px`, left:"3px", right:"3px", height:`${height-4}px`,
-                          background: hasStudent
-                            ? "linear-gradient(135deg,#0ea5e9,#0284c7)"
-                            : "linear-gradient(135deg,#0ea5e9,#0369a1)",
-                          borderRadius:"9px", padding:"5px 8px",
-                          cursor:"pointer", zIndex:3, overflow:"hidden",
-                          boxShadow:"0 3px 10px rgba(14,165,233,0.3)",
-                          border:"1px solid rgba(14,165,233,0.3)",
-                        }}>
-                        {/* Badge row */}
-                        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:"2px" }}>
-                          <div style={{ display:"inline-flex", alignItems:"center", gap:"3px", background:"rgba(255,255,255,0.2)", borderRadius:"4px", padding:"1px 5px" }}>
-                            <span style={{ fontSize:"9px", fontWeight:"800", color:"#fff", textTransform:"uppercase", letterSpacing:"0.06em" }}>Occupied</span>
-                          </div>
-                          {avail.isRecurring && (
-                            <Repeat size={9} color="rgba(255,255,255,0.7)"/>
-                          )}
-                        </div>
-                        {/* Time — always visible */}
-                        <p style={{ margin:0, fontSize:"10px", fontWeight:"700", color:"#fff", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
-                          {fmt12(avail.startTime)} – {fmt12(avail.endTime)}
-                        </p>
-                        {/* Student name — only when there's room */}
-                        {hasStudent && height > 52 && (
-                          <p style={{ margin:"2px 0 0", fontSize:"11px", fontWeight:"800", color:"rgba(255,255,255,0.9)", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
-                            {student.firstName} {student.lastName || ""}
-                          </p>
-                        )}
-                      </div>
-                    );
-                  })}
-
-                  {/* ── Booking tiles ── */}
-                  {dayBookings.map(booking => {
-                    const { startTime, endTime } = bookingTimes(booking);
-                    const { top, height } = eventPos(startTime, endTime);
-                    const isAccepted = booking.status === "accepted";
-                    const name = bookingStudentName(booking);
-                    return (
-                      <div key={booking._id} className="booking-tile"
-                        onClick={e => { e.stopPropagation(); setDetail({ type:"booking", data:booking }); setAddModal(null); }}
-                        style={{ position:"absolute", top:`${top+2}px`, left:"3px", right:"3px", height:`${height-4}px`,
-                          background: isAccepted ? "linear-gradient(135deg,#7c3aed,#6d28d9)" : "linear-gradient(135deg,#d97706,#b45309)",
-                          borderRadius:"9px", padding:"6px 8px",
-                          cursor:"pointer", zIndex:4, overflow:"hidden",
-                          boxShadow: isAccepted ? "0 3px 12px rgba(124,58,237,0.35)" : "0 3px 12px rgba(217,119,6,0.3)",
-                          border:`1px solid ${isAccepted?"rgba(109,40,217,0.4)":"rgba(180,83,9,0.4)"}`,
-                        }}>
-                        <p style={{ margin:0, fontSize:"11px", fontWeight:"800", color:"#fff", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
-                          {booking.classTitle || "Class"}
-                        </p>
-                        {height > 34 && (
-                          <p style={{ margin:"2px 0 0", fontSize:"10px", color:"rgba(255,255,255,0.9)", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", display:"flex", alignItems:"center", gap:"3px" }}>
-                            <GraduationCap size={9}/> {name}
-                          </p>
-                        )}
-                        {height > 52 && (
-                          <p style={{ margin:"2px 0 0", fontSize:"10px", color:"rgba(255,255,255,0.7)" }}>
-                            {fmt12(startTime)} – {fmt12(endTime)}
-                          </p>
-                        )}
-                        {!isAccepted && height > 66 && (
-                          <div style={{ display:"inline-flex", background:"rgba(255,255,255,0.2)", borderRadius:"4px", padding:"1px 5px", marginTop:"2px" }}>
-                            <span style={{ fontSize:"9px", fontWeight:"800", color:"#fff" }}>PENDING</span>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
+                <div key={d} style={{ display: "grid", gridTemplateColumns: "130px 1fr", gap: 10, alignItems: "center", padding: "8px 10px", borderRadius: 10, background: on ? c.soft : "transparent" }}>
+                  <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13.5, fontWeight: 700, color: on ? c.heading : c.muted, cursor: "pointer" }}>
+                    <input type="checkbox" checked={on} onChange={() => (on ? setDay(d, []) : setDay(d, [{ start: "09:00", end: "17:00" }]))} />
+                    {WEEKDAYS_SUN0[d]}
+                  </label>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                    {!on && <span style={{ fontSize: 12.5, color: c.muted }}>Not teaching</span>}
+                    {ranges.map((r, i) => (
+                      <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                        <select aria-label={`${WEEKDAYS_SUN0[d]} start`} value={r.start} onChange={e => setDay(d, ranges.map((x, j) => j === i ? { ...x, start: e.target.value } : x))} style={sel}>
+                          {HALF_HOURS.slice(0, -1).map(t => <option key={t} value={t}>{fmtHHMM(t)}</option>)}
+                        </select>
+                        <span style={{ color: c.muted }}>–</span>
+                        <select aria-label={`${WEEKDAYS_SUN0[d]} end`} value={r.end} onChange={e => setDay(d, ranges.map((x, j) => j === i ? { ...x, end: e.target.value } : x))} style={sel}>
+                          {HALF_HOURS.slice(1).map(t => <option key={t} value={t}>{fmtHHMM(t)}</option>)}
+                        </select>
+                        <button type="button" aria-label="Remove range" onClick={() => setDay(d, ranges.filter((_, j) => j !== i))} style={{ ...btn(false), padding: 6 }}><X size={13} /></button>
+                      </span>
+                    ))}
+                    {on && ranges.length < 5 && <button type="button" onClick={() => addRange(d)} style={{ ...btn(false), padding: "5px 10px", fontSize: 12 }}><Plus size={12} /> Add hours</button>}
+                  </div>
                 </div>
               );
             })}
           </div>
+
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "space-between" }}>
+            <button type="button" onClick={copyMonToWeekdays} disabled={!dayRanges(1).length} style={{ ...btn(false), opacity: dayRanges(1).length ? 1 : 0.5 }}>
+              <Copy size={13} /> Copy Monday to Tue–Fri
+            </button>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button type="button" onClick={() => setEditorOpen(false)} style={btn(false)}>Cancel</button>
+              <button type="button" onClick={saveHours} disabled={savingHours} style={btn(true)}>{savingHours ? "Saving…" : <><Check size={14} /> Save hours</>}</button>
+            </div>
+          </div>
         </div>
+      )}
+
+      {/* Stats + legend */}
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {[
+            ["Free this week", cal.hasHours ? `${Math.round(freeMins / 60 * 10) / 10}h` : "—", "#059669"],
+            ["Booked", stat("booked"), BRAND],
+            ["Pending", stat("pending"), "#d97706"],
+          ].map(([l, v, col]) => (
+            <span key={l} style={{ padding: "6px 12px", borderRadius: 10, border: `1px solid ${c.border}`, background: c.card, fontSize: 12.5, color: c.text }}>
+              <strong style={{ color: col, fontSize: 14 }}>{v}</strong> {l}
+            </span>
+          ))}
+        </div>
+        <Legend kinds={["free", "booked", "pending", "off", "reserved"]} isDarkMode={isDarkMode} />
       </div>
 
-      {/* ── Empty schedule hint ── */}
-      {!loading && availability.length === 0 && (
-        <div style={{ background:isDarkMode?"rgba(14,165,233,0.08)":"#f0f9ff", border:`1.5px dashed ${isDarkMode?"rgba(14,165,233,0.3)":"#bae6fd"}`, borderRadius:"16px", padding:"20px 24px", display:"flex", alignItems:"center", gap:"16px" }}>
-          <div style={{ width:"44px", height:"44px", borderRadius:"14px", background:"linear-gradient(135deg,#0ea5e9,#0284c7)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-            <Calendar size={20} color="#fff" />
-          </div>
-          <div>
-            <p style={{ margin:"0 0 3px", fontSize:"14px", fontWeight:"800", color:c.heading }}>No occupied slots set for this week</p>
-            <p style={{ margin:0, fontSize:"12px", color:c.text }}>
-              Click on any time cell in the calendar above to add a slot students can book.
-              Recurring slots will appear every week automatically.
-            </p>
-          </div>
-        </div>
-      )}
+      <WeekCalendar
+        weekStart={weekStart} onWeekChange={(w) => setWeekStart(w || getMonday())}
+        free={cal.free} items={items} loading={loading} isDarkMode={isDarkMode}
+        onEmptyClick={(at) => openOff(at)}
+        emptyText="Nothing scheduled"
+      />
+      <p style={{ margin: 0, fontSize: 12, color: c.muted }}>Tip: click an empty time to add time off or reserve it for a student.</p>
 
-      {/* ═══════════════════════ ADD SLOT MODAL ═══════════════════════ */}
-      {addModal && (
-        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.5)", zIndex:999, display:"flex", alignItems:"center", justifyContent:"center", padding:"16px" }} onClick={() => setAddModal(null)}>
-          <div onClick={e=>e.stopPropagation()} style={{ background:c.card, border:`1px solid ${c.border}`, borderRadius:"22px", width:"100%", maxWidth:"430px", boxShadow:"0 24px 64px rgba(0,0,0,0.25)", overflow:"hidden", animation:"fadeIn 0.2s ease" }}>
-
-            {/* Modal header */}
-            <div style={{ background:"linear-gradient(135deg,#0ea5e9,#0284c7)", padding:"20px 24px", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-              <div>
-                <p style={{ margin:0, fontSize:"11px", fontWeight:"700", color:"rgba(255,255,255,0.8)", textTransform:"uppercase", letterSpacing:"0.07em" }}>Mark as Occupied</p>
-                <p style={{ margin:"3px 0 0", fontSize:"17px", fontWeight:"800", color:"#fff" }}>
-                  {addModal.date.toLocaleDateString("en-US",{ weekday:"long", month:"long", day:"numeric" })}
-                </p>
-              </div>
-              <button onClick={() => setAddModal(null)} style={{ background:"rgba(255,255,255,0.2)", border:"none", borderRadius:"9px", padding:"7px", cursor:"pointer", color:"#fff", display:"flex", alignItems:"center" }}>
-                <X size={16}/>
-              </button>
+      {/* ── Time-off modal ── */}
+      {offModal && (
+        <div onClick={() => setOffModal(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 999, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+          <div onClick={e => e.stopPropagation()} role="dialog" aria-label="Add time off" style={{ background: c.card, borderRadius: 18, width: "100%", maxWidth: 440, padding: 20, display: "flex", flexDirection: "column", gap: 14, border: `1px solid ${c.border}` }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ fontSize: 17, fontWeight: 800, color: c.heading }}>{offModal.studentId ? "Reserve time" : "Add time off"}</div>
+              <button type="button" aria-label="Close" onClick={() => setOffModal(null)} style={{ ...btn(false), padding: 6 }}><X size={15} /></button>
             </div>
-
-            <div style={{ padding:"22px 24px", display:"flex", flexDirection:"column", gap:"18px" }}>
-
-              {/* ── Student selector ── */}
-              <div>
-                <label style={{ display:"block", fontSize:"11px", fontWeight:"700", color:c.muted, marginBottom:"7px", textTransform:"uppercase", letterSpacing:"0.05em" }}>
-                  Assign Student <span style={{ color:c.muted, fontWeight:"500", textTransform:"none", letterSpacing:"normal", fontSize:"11px" }}>(optional)</span>
-                </label>
-                <div style={{ position:"relative" }}>
-                  <GraduationCap size={15} color="#0ea5e9" style={{ position:"absolute", left:"11px", top:"50%", transform:"translateY(-50%)", pointerEvents:"none" }}/>
-                  <select value={addForm.studentId} onChange={e => setAddForm(f=>({...f, studentId:e.target.value}))} style={{ ...selStyle(c), paddingLeft:"32px" }}>
-                    <option value="">— No student assigned —</option>
-                    {students.map(s => (
-                      <option key={s._id} value={s._id}>
-                        {s.firstName} {s.lastName || ""}{s.isManaged ? " · Managed" : ""} {s.classCredits > 0 ? `(${s.classCredits} classes left)` : "(inactive)"}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronRight size={14} color={c.muted} style={{ position:"absolute", right:"12px", top:"50%", transform:"translateY(-50%) rotate(90deg)", pointerEvents:"none" }}/>
-                </div>
-                {addForm.studentId && (() => {
-                  const s = findStudent(addForm.studentId);
-                  if (!s) return null;
-                  return (
-                    <div style={{ marginTop:"8px", padding:"10px 12px", background:isDarkMode?"rgba(14,165,233,0.1)":"#f0f9ff", borderRadius:"10px", border:"1px solid rgba(14,165,233,0.2)", display:"flex", alignItems:"center", gap:"9px" }}>
-                      <div style={{ width:"32px", height:"32px", borderRadius:"50%", background:"linear-gradient(135deg,#0ea5e9,#0284c7)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-                        <span style={{ color:"#fff", fontWeight:"800", fontSize:"13px" }}>{s.firstName[0]}</span>
-                      </div>
-                      <div>
-                        <p style={{ margin:0, fontSize:"13px", fontWeight:"700", color:c.heading }}>
-                          {s.firstName} {s.lastName||""}
-                          {s.isManaged && <ManagedBadge isDarkMode={isDarkMode} style={{ marginLeft:6 }}/>}
-                        </p>
-                        <p style={{ margin:0, fontSize:"11px", color:"#0ea5e9" }}>
-                          {s.classCredits || 0} classes remaining{s.isManaged ? " · no login, won't get app notifications" : ""}
-                        </p>
-                      </div>
-                    </div>
-                  );
-                })()}
-              </div>
-
-              {/* ── Time selectors ── */}
-              <div>
-                <label style={{ display:"block", fontSize:"11px", fontWeight:"700", color:c.muted, marginBottom:"7px", textTransform:"uppercase", letterSpacing:"0.05em" }}>Time</label>
-                <div style={{ display:"grid", gridTemplateColumns:"1fr auto 1fr", gap:"8px", alignItems:"center" }}>
-                  {/* Start */}
-                  <div style={{ position:"relative" }}>
-                    <select value={addForm.startTime} onChange={e=>handleStartChange(e.target.value)} style={selStyle(c)}>
-                      {TIME_OPTIONS.map(t => <option key={t} value={t}>{fmt12(t)}</option>)}
-                    </select>
-                    <ChevronRight size={14} color={c.muted} style={{ position:"absolute", right:"10px", top:"50%", transform:"translateY(-50%) rotate(90deg)", pointerEvents:"none" }}/>
-                  </div>
-                  <span style={{ fontSize:"13px", color:c.muted, fontWeight:"600", textAlign:"center" }}>→</span>
-                  {/* End */}
-                  <div style={{ position:"relative" }}>
-                    <select value={addForm.endTime} onChange={e=>handleEndChange(e.target.value)} style={selStyle(c, addFormErr?"#ef4444":c.border)}>
-                      {TIME_OPTIONS.filter(t => t > addForm.startTime).map(t => <option key={t} value={t}>{fmt12(t)}</option>)}
-                    </select>
-                    <ChevronRight size={14} color={c.muted} style={{ position:"absolute", right:"10px", top:"50%", transform:"translateY(-50%) rotate(90deg)", pointerEvents:"none" }}/>
-                  </div>
-                </div>
-                {addFormErr && <p style={{ color:"#ef4444", fontSize:"12px", marginTop:"5px", margin:"5px 0 0" }}>End time must be after start time.</p>}
-              </div>
-
-              {/* ── Duration quick-select ── */}
-              <div>
-                <label style={{ display:"block", fontSize:"11px", fontWeight:"700", color:c.muted, marginBottom:"7px", textTransform:"uppercase", letterSpacing:"0.05em" }}>Duration</label>
-                <div style={{ display:"flex", gap:"7px", flexWrap:"wrap" }}>
-                  {DURATIONS.map(d => {
-                    const active = addForm.selectedDuration === d;
-                    const hrs  = Math.floor(d/60);
-                    const mins = d % 60;
-                    const label = hrs > 0 ? (mins > 0 ? `${hrs}h ${mins}m` : `${hrs}h`) : `${d}m`;
-                    return (
-                      <button key={d} className="dur-btn" onClick={() => handleDuration(d)}
-                        style={{ padding:"7px 13px", borderRadius:"9px", border:`1.5px solid ${active?"#0ea5e9":c.border}`, background:active?(isDarkMode?"rgba(14,165,233,0.15)":"#f0f9ff"):"transparent", color:active?"#0ea5e9":c.text, fontSize:"13px", fontWeight:"700", cursor:"pointer", fontFamily:"inherit" }}>
-                        {label}
-                      </button>
-                    );
-                  })}
-                </div>
-                {/* Live duration preview */}
-                {!addFormErr && (
-                  <div style={{ marginTop:"8px", display:"flex", alignItems:"center", gap:"5px" }}>
-                    <Clock size={12} color="#0ea5e9"/>
-                    <span style={{ fontSize:"12px", color:"#0ea5e9", fontWeight:"600" }}>
-                      {diffMins(addForm.startTime, addForm.endTime)} min · {fmt12(addForm.startTime)} – {fmt12(addForm.endTime)}
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              {/* ── Recurring toggle ── */}
-              <div onClick={() => setAddForm(f=>({...f, isRecurring:!f.isRecurring}))}
-                style={{ display:"flex", alignItems:"center", gap:"12px", cursor:"pointer", padding:"12px 14px", background:isDarkMode?"#141620":"#f8faff", borderRadius:"12px", border:`1px solid ${addForm.isRecurring?"#0ea5e9":c.border}`, transition:"border-color 0.2s" }}>
-                <div style={{ width:"40px", height:"22px", borderRadius:"11px", background:addForm.isRecurring?"linear-gradient(135deg,#0ea5e9,#0284c7)":(isDarkMode?"#1e2235":"#e2e8f0"), position:"relative", transition:"background 0.2s", flexShrink:0 }}>
-                  <div style={{ width:"16px", height:"16px", borderRadius:"50%", background:"#fff", position:"absolute", top:"3px", left:addForm.isRecurring?"21px":"3px", transition:"left 0.2s", boxShadow:"0 1px 4px rgba(0,0,0,0.2)" }}/>
-                </div>
-                <div style={{ flex:1 }}>
-                  <p style={{ margin:0, fontSize:"13px", fontWeight:"700", color:c.heading }}>Repeat every week</p>
-                  <p style={{ margin:0, fontSize:"11px", color:c.text }}>Every {addModal.date.toLocaleDateString("en-US",{weekday:"long"})}</p>
-                </div>
-                {addForm.isRecurring && <Repeat size={15} color="#0ea5e9"/>}
-              </div>
-
-              {/* ── Note ── */}
-              <div>
-                <label style={{ display:"block", fontSize:"11px", fontWeight:"700", color:c.muted, marginBottom:"7px", textTransform:"uppercase", letterSpacing:"0.05em" }}>
-                  Note <span style={{ color:c.muted, fontWeight:"500", textTransform:"none", fontSize:"11px" }}>(optional)</span>
-                </label>
-                <input type="text" placeholder="e.g. Grammar revision, phonics…" value={addForm.note} onChange={e=>setAddForm(f=>({...f,note:e.target.value}))}
-                  style={{ width:"100%", padding:"10px 12px", background:c.input, border:`1.5px solid ${c.border}`, borderRadius:"10px", color:c.heading, fontSize:"13.5px", outline:"none", fontFamily:"inherit", boxSizing:"border-box" }}/>
-              </div>
-
-              {/* ── Actions ── */}
-              <div style={{ display:"flex", gap:"10px" }}>
-                <button onClick={() => setAddModal(null)} style={{ flex:1, padding:"12px", borderRadius:"12px", background:isDarkMode?"#1e2235":"#f1f5f9", border:"none", cursor:"pointer", fontWeight:"700", fontSize:"13.5px", color:c.heading, fontFamily:"inherit" }}>
-                  Cancel
-                </button>
-                <button onClick={handleSave} disabled={saving || addFormErr}
-                  style={{ flex:2, padding:"12px", borderRadius:"12px", background:(saving||addFormErr)?"#9ca3af":"linear-gradient(135deg,#0ea5e9,#0284c7)", border:"none", cursor:(saving||addFormErr)?"not-allowed":"pointer", fontWeight:"700", fontSize:"13.5px", color:"#fff", fontFamily:"inherit", display:"flex", alignItems:"center", justifyContent:"center", gap:"7px" }}>
-                  {saving ? <Loader size={14} style={{ animation:"spin 1s linear infinite" }}/> : <Check size={14}/>}
-                  {saving ? "Saving…" : "Mark as Occupied"}
-                </button>
-              </div>
+            <label style={{ fontSize: 12, fontWeight: 700, color: c.muted }}>Date
+              <input type="date" value={offModal.date} min={localYmd(new Date())} onChange={e => setOffModal(m => ({ ...m, date: e.target.value }))} style={{ ...sel, width: "100%", marginTop: 4, boxSizing: "border-box" }} />
+            </label>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", gap: 8, alignItems: "end" }}>
+              <label style={{ fontSize: 12, fontWeight: 700, color: c.muted }}>From
+                <select value={offModal.start} onChange={e => setOffModal(m => ({ ...m, start: e.target.value }))} style={{ ...sel, width: "100%", marginTop: 4 }}>
+                  {HALF_HOURS.slice(0, -1).map(t => <option key={t} value={t}>{fmtHHMM(t)}</option>)}
+                </select>
+              </label>
+              <span style={{ paddingBottom: 8, color: c.muted }}>–</span>
+              <label style={{ fontSize: 12, fontWeight: 700, color: c.muted }}>To
+                <select value={offModal.end} onChange={e => setOffModal(m => ({ ...m, end: e.target.value }))} style={{ ...sel, width: "100%", marginTop: 4, borderColor: offModal.end <= offModal.start ? "#ef4444" : c.border }}>
+                  {HALF_HOURS.slice(1).map(t => <option key={t} value={t}>{fmtHHMM(t)}</option>)}
+                </select>
+              </label>
+            </div>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: c.heading, cursor: "pointer" }}>
+              <input type="checkbox" checked={offModal.recurring} onChange={e => setOffModal(m => ({ ...m, recurring: e.target.checked }))} />
+              <Repeat size={13} /> Every {WEEKDAYS_SUN0[new Date(offModal.date + "T12:00:00").getDay()]}
+            </label>
+            <label style={{ fontSize: 12, fontWeight: 700, color: c.muted }}>Reserve for a student <span style={{ fontWeight: 500 }}>(optional — others can't book it)</span>
+              <select value={offModal.studentId} onChange={e => setOffModal(m => ({ ...m, studentId: e.target.value }))} style={{ ...sel, width: "100%", marginTop: 4 }}>
+                <option value="">— Just time off —</option>
+                {students.map(s => <option key={s._id} value={s._id}>{s.firstName} {s.lastName || ""}{s.isManaged ? " · Managed" : ""}</option>)}
+              </select>
+            </label>
+            <input placeholder="Note (optional), e.g. Doctor's appointment" value={offModal.note} maxLength={300} onChange={e => setOffModal(m => ({ ...m, note: e.target.value }))} style={{ ...sel, width: "100%", boxSizing: "border-box" }} />
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <button type="button" onClick={() => setOffModal(null)} style={btn(false)}>Cancel</button>
+              <button type="button" onClick={saveOff} disabled={savingOff || offModal.end <= offModal.start} style={btn(true)}>{savingOff ? "Saving…" : "Save"}</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ═══════════════════════ DETAIL PANEL ═══════════════════════ */}
+      {/* ── Detail modal ── */}
       {detail && (
-        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.45)", zIndex:999, display:"flex", alignItems:"center", justifyContent:"center", padding:"16px" }} onClick={()=>setDetail(null)}>
-          <div onClick={e=>e.stopPropagation()} style={{ background:c.card, border:`1px solid ${c.border}`, borderRadius:"22px", width:"100%", maxWidth:"400px", boxShadow:"0 24px 64px rgba(0,0,0,0.25)", overflow:"hidden", animation:"fadeIn 0.2s ease" }}>
-
-            {detail.type === "avail" ? (() => {
-              const avail   = detail.data;
-              const student = findStudent(avail.studentId);
-              return (
-                <>
-                  <div style={{ background:"linear-gradient(135deg,#0ea5e9,#0284c7)", padding:"22px 24px", display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
-                    <div>
-                      <div style={{ display:"inline-flex", alignItems:"center", gap:"4px", background:"rgba(255,255,255,0.2)", borderRadius:"6px", padding:"2px 8px", marginBottom:"7px" }}>
-                        <span style={{ fontSize:"10px", fontWeight:"800", color:"#fff", textTransform:"uppercase", letterSpacing:"0.07em" }}>Occupied</span>
-                      </div>
-                      <p style={{ margin:0, fontSize:"19px", fontWeight:"800", color:"#fff" }}>{fmt12(avail.startTime)} – {fmt12(avail.endTime)}</p>
-                      <p style={{ margin:"3px 0 0", fontSize:"12px", color:"rgba(255,255,255,0.8)" }}>{diffMins(avail.startTime, avail.endTime)} minutes</p>
-                    </div>
-                    <button onClick={()=>setDetail(null)} style={{ background:"rgba(255,255,255,0.2)", border:"none", borderRadius:"8px", padding:"6px", cursor:"pointer", color:"#fff", display:"flex" }}><X size={16}/></button>
-                  </div>
-
-                  <div style={{ padding:"22px 24px", display:"flex", flexDirection:"column", gap:"14px" }}>
-                    {/* Student */}
-                    {student ? (
-                      <div style={{ display:"flex", alignItems:"center", gap:"12px", padding:"12px 14px", background:isDarkMode?"rgba(14,165,233,0.08)":"#f0f9ff", borderRadius:"12px", border:"1px solid rgba(14,165,233,0.2)" }}>
-                        <div style={{ width:"40px", height:"40px", borderRadius:"50%", background:"linear-gradient(135deg,#0ea5e9,#0284c7)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-                          <span style={{ color:"#fff", fontWeight:"800", fontSize:"16px" }}>{student.firstName[0]}</span>
-                        </div>
-                        <div>
-                          <p style={{ margin:0, fontSize:"15px", fontWeight:"800", color:c.heading }}>{student.firstName} {student.lastName||""}</p>
-                          <p style={{ margin:0, fontSize:"12px", color:"#0ea5e9" }}>{student.classCredits||0} classes remaining</p>
-                        </div>
-                      </div>
-                    ) : (
-                      <div style={{ display:"flex", alignItems:"center", gap:"10px", color:c.muted }}>
-                        <User size={15}/><span style={{ fontSize:"13px" }}>No student assigned</span>
-                      </div>
-                    )}
-
-                    {/* Date & time info */}
-                    {[
-                      { icon:Calendar, label:"Date",      val: avail.isRecurring ? `Every ${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][avail.dayOfWeek]}` : new Date(avail.date).toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"}) },
-                      { icon:Clock,    label:"Time",      val: `${fmt12(avail.startTime)} – ${fmt12(avail.endTime)}` },
-                      { icon:Clock,    label:"Duration",  val: `${diffMins(avail.startTime, avail.endTime)} minutes` },
-                      ...(avail.timezone ? [{ icon:Clock, label:"Timezone", val: `${tzCity(avail.timezone)} (${tzAbbr(avail.timezone)})` }] : []),
-                      ...(avail.note ? [{ icon:BookOpen, label:"Note", val:avail.note }] : []),
-                    ].map(({ icon:Icon, label, val }) => (
-                      <div key={label} style={{ display:"flex", alignItems:"flex-start", gap:"11px" }}>
-                        <div style={{ width:"30px", height:"30px", borderRadius:"8px", background:isDarkMode?"rgba(14,165,233,0.12)":"#f0f9ff", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}><Icon size={13} color="#0ea5e9"/></div>
-                        <div>
-                          <p style={{ margin:0, fontSize:"10px", fontWeight:"700", color:c.muted, textTransform:"uppercase", letterSpacing:"0.05em" }}>{label}</p>
-                          <p style={{ margin:"2px 0 0", fontSize:"13px", fontWeight:"600", color:c.heading }}>{val}</p>
-                        </div>
-                      </div>
-                    ))}
-
-                    <button onClick={() => handleDelete(avail._id)}
-                      style={{ padding:"11px", background:isDarkMode?"rgba(239,68,68,0.1)":"#fef2f2", border:`1.5px solid ${isDarkMode?"rgba(239,68,68,0.25)":"#fecaca"}`, borderRadius:"11px", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:"8px", color:"#ef4444", fontSize:"13.5px", fontWeight:"700", fontFamily:"inherit" }}>
-                      <Trash2 size={14}/> Remove This Slot
-                    </button>
-                  </div>
-                </>
-              );
-            })() : (() => {
-              const b      = detail.data;
-              const { startTime, endTime } = bookingTimes(b);
-              const isAcc  = b.status === "accepted";
-              const name   = bookingStudentName(b);
-              return (
-                <>
-                  <div style={{ background: isAcc ? "linear-gradient(135deg,#7c3aed,#6d28d9)" : "linear-gradient(135deg,#d97706,#b45309)", padding:"22px 24px", display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
-                    <div>
-                      <div style={{ display:"inline-flex", background:"rgba(255,255,255,0.2)", borderRadius:"6px", padding:"2px 8px", marginBottom:"7px" }}>
-                        <span style={{ fontSize:"10px", fontWeight:"800", color:"#fff", textTransform:"uppercase", letterSpacing:"0.07em" }}>{b.status}</span>
-                      </div>
-                      <p style={{ margin:0, fontSize:"18px", fontWeight:"800", color:"#fff" }}>{b.classTitle || "Class"}</p>
-                    </div>
-                    <button onClick={()=>setDetail(null)} style={{ background:"rgba(255,255,255,0.2)", border:"none", borderRadius:"8px", padding:"6px", cursor:"pointer", color:"#fff", display:"flex" }}><X size={16}/></button>
-                  </div>
-                  <div style={{ padding:"22px 24px", display:"flex", flexDirection:"column", gap:"14px" }}>
-                    {[
-                      { icon:User,     label:"Student",  val:name },
-                      { icon:Calendar, label:"Date",     val:new Date(b.scheduledTime).toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric",year:"numeric"}) },
-                      { icon:Clock,    label:"Your time (teacher)", val:`${fmt12(startTime)} – ${fmt12(endTime)} ${myAbbr}` },
-                      ...( b.studentTimezone && b.studentTimezone !== myTZ ? [{ icon:Clock, label:`Student time (${tzCity(b.studentTimezone)})`, val:`${new Intl.DateTimeFormat("en-US",{hour:"numeric",minute:"2-digit",hour12:true,timeZone:b.studentTimezone}).format(new Date(b.scheduledTime))} ${tzAbbr(b.studentTimezone)}` }] : []),
-                      { icon:Clock,    label:"Duration", val:`${b.duration||60} minutes` },
-                      ...(b.topic ? [{ icon:BookOpen, label:"Topic", val:b.topic }] : []),
-                    ].map(({ icon:Icon, label, val }) => (
-                      <div key={label} style={{ display:"flex", alignItems:"flex-start", gap:"11px" }}>
-                        <div style={{ width:"30px", height:"30px", borderRadius:"8px", background:isDarkMode?"rgba(124,58,237,0.12)":"#f5f3ff", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}><Icon size={13} color="#7c3aed"/></div>
-                        <div>
-                          <p style={{ margin:0, fontSize:"10px", fontWeight:"700", color:c.muted, textTransform:"uppercase", letterSpacing:"0.05em" }}>{label}</p>
-                          <p style={{ margin:"2px 0 0", fontSize:"13px", fontWeight:"600", color:c.heading }}>{val}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              );
-            })()}
+        <div onClick={() => setDetail(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 999, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+          <div onClick={e => e.stopPropagation()} role="dialog" style={{ background: c.card, borderRadius: 18, width: "100%", maxWidth: 400, padding: 20, display: "flex", flexDirection: "column", gap: 10, border: `1px solid ${c.border}` }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: ".06em", color: c.muted }}>
+                  {{ booked: "Booked class", pending: "Pending request", done: "Completed class", off: "Time off", reserved: "Reserved" }[detail.kind]}
+                </div>
+                <div style={{ fontSize: 18, fontWeight: 800, color: c.heading }}>{detail.kind === "off" ? (detail.note || "Time off") : detail.title || detail.studentName}</div>
+              </div>
+              <button type="button" aria-label="Close" onClick={() => setDetail(null)} style={{ ...btn(false), padding: 6 }}><X size={15} /></button>
+            </div>
+            <div style={{ fontSize: 14, color: c.heading }}>{fmtDay(detail.start)} · <strong>{fmtRange(detail.start, detail.end)}</strong> <span style={{ color: c.muted }}>your time</span></div>
+            {detail.studentName && (
+              <div style={{ fontSize: 13.5, color: c.text, display: "flex", alignItems: "center", gap: 6 }}>
+                Student: <strong style={{ color: c.heading }}>{detail.studentName}</strong> {detail.isManaged && <ManagedBadge isDarkMode={isDarkMode} />}
+              </div>
+            )}
+            {detail.studentTimezone && detail.studentTimezone !== myTz && (
+              <div style={{ fontSize: 13, color: c.text }}>Student's time: <strong>{fmtTime(detail.start, detail.studentTimezone)}</strong> ({tzName(detail.studentTimezone)})</div>
+            )}
+            {detail.topic && <div style={{ fontSize: 13, color: c.text }}>Topic: {detail.topic}</div>}
+            {detail.recurring && <div style={{ fontSize: 12.5, color: c.muted, display: "flex", alignItems: "center", gap: 5 }}><Repeat size={12} /> Repeats every week</div>}
+            {detail.kind === "reserved" && detail.note && <div style={{ fontSize: 13, color: c.text }}>Note: {detail.note}</div>}
+            {detail.slotId && (
+              <button type="button" onClick={() => removeOff(detail.slotId)} style={{ ...btn(false), justifyContent: "center", color: "#dc2626", borderColor: "#fecaca", marginTop: 6 }}>
+                <Trash2 size={14} /> {detail.recurring ? "Remove (every week)" : "Remove"}
+              </button>
+            )}
           </div>
         </div>
       )}

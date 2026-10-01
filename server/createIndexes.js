@@ -80,6 +80,7 @@ async function createIndexes() {
     console.log("📝 recordings...");
     await db.collection("recordings").createIndex({ studentId: 1, createdAt: -1 });
     await db.collection("recordings").createIndex({ teacherId: 1, createdAt: -1 });
+    await db.collection("recordings").createIndex({ sessionId: 1, partNumber: 1 });
     console.log("   ✅ recordings done");
 
     // ── Summary ───────────────────────────────────────────────────────────────

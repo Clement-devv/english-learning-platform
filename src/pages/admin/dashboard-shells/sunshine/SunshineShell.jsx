@@ -10,6 +10,7 @@ import {
   BookOpen, Shield, CalendarDays, FileText, Star, Palette, Globe,
   Settings, LogOut, CheckCircle2, ClipboardList, Award,
   Megaphone, Send, X, CheckCircle,
+  ShieldCheck, ClipboardCheck,
 } from 'lucide-react';
 import { useNavigate }            from 'react-router-dom';
 import { useAuth }                from '../../../../context/AuthContext.jsx';
@@ -37,6 +38,8 @@ const ApplicationsTab    = lazy(() => import('../../tabs/ApplicationsTab'));
 const NotificationsTab   = lazy(() => import('../../tabs/NotificationsTab'));
 const AssignStudentsTab  = lazy(() => import('../../tabs/AssignStudentsTab'));
 const BookingsTab        = lazy(() => import('../../tabs/BookingsTab'));
+const ParentChecksTab    = lazy(() => import('../../tabs/ParentChecksTab'));
+const LoggedClassesTab   = lazy(() => import('../../tabs/LoggedClassesTab'));
 const MessagesTab        = lazy(() => import('../../../../components/chat/MessagesTab'));
 const PaymentsTab        = lazy(() => import('../../tabs/PaymentTab'));
 const DisputeReview      = lazy(() => import('../../../../components/admin/DisputeReview'));
@@ -109,6 +112,8 @@ const makeNavGroups = (t) => [
       { key: 'classes',       label: t('admin.nav.allClasses'),      lucide: BookOpen     },
       { key: 'group-classes', label: t('admin.nav.groupClasses'),    lucide: Users        },
       { key: 'bookings',      label: t('admin.nav.bookings'),        lucide: ClipboardList},
+      { key: 'parent-checks', label: t('admin.nav.parentChecks'),    lucide: ShieldCheck  },
+      { key: 'logged-classes', label: t('admin.nav.loggedClasses'), lucide: ClipboardCheck },
       { key: 'recordings',    label: t('admin.nav.recordings'),      lucide: Video        },
       { key: 'certificates',  label: t('admin.nav.certificates'),    lucide: Award        },
       { key: 'reports',       label: t('admin.nav.progressReports'), lucide: FileText     },
@@ -355,6 +360,8 @@ export default function SunshineShell() {
       case 'chat-credits':          return <ChatCreditsTab isDarkMode={isDarkMode} />;
       case 'pronunciation-credits': return <PronunciationCreditsTab isDarkMode={isDarkMode} />;
       case 'disputes':          return <DisputeReview isDarkMode={isDarkMode} />;
+      case 'parent-checks':     return <ParentChecksTab isDarkMode={isDarkMode} />;
+      case 'logged-classes':    return <LoggedClassesTab isDarkMode={isDarkMode} />;
       case 'recordings':        return <RecordingsTab teachers={teachers} isDarkMode={isDarkMode} />;
       case 'reports':           return <ReportsTab students={students} isDarkMode={isDarkMode} />;
       case 'reviews':           return <ReviewsTab isDarkMode={isDarkMode} />;

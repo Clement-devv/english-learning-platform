@@ -14,6 +14,8 @@ import { bookingSchema }            from "../schemas/bookingSchema.js";
 import { teacherSchema }            from "../schemas/teacherSchema.js";
 import { studentSchema }            from "../schemas/studentSchema.js";
 import { paymentTransactionSchema } from "../schemas/paymentTransactionSchema.js";
+import { teacherAvailabilitySchema } from "../schemas/teacherAvailabilitySchema.js";
+import { freeIntervals, teacherTz, bookingInterval, BUSY_STATUSES } from "../utils/schedule.js";
 import logger from "../utils/logger.js";
 import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
 import { checkAndAwardCertificates } from './certificateRoutes.js';
@@ -21,6 +23,8 @@ import { validateObjectId } from '../middleware/validateObjectId.js';
 import { parsePagination } from '../utils/pagination.js';
 import { toStr, toObjectId } from '../utils/inputSanitizer.js';
 import { sendPush } from '../utils/webPushService.js';
+import { disputeDeadlineFrom, DISPUTE_DAYS } from '../utils/parentCheck.js';
+import { sendEmail, getCenterBaseUrl } from '../utils/emailService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
@@ -42,6 +46,7 @@ const getBooking            = (db) => db.models.Booking            || db.model("
 const getTeacher            = (db) => db.models.Teacher            || db.model("Teacher",            teacherSchema);
 const getStudent            = (db) => db.models.Student            || db.model("Student",            studentSchema);
 const getPaymentTransaction = (db) => db.models.PaymentTransaction || db.model("PaymentTransaction", paymentTransactionSchema);
+const getTeacherAvailability = (db) => db.models.TeacherAvailability || db.model("TeacherAvailability", teacherAvailabilitySchema);
 
 const canCreateBooking = (req, createdBy) => {
   const { role, id } = req.user;
@@ -151,6 +156,79 @@ router.post("/", verifyToken, async (req, res) => {
   } catch (err) {
     logger.error("Error creating booking:", { error: err?.message });
     serverError(res, "Error creating booking");
+  }
+});
+
+// ─── Student confirms / disputes a teacher-logged class ──────────────────────
+// A teacher logged a class held outside the app (offlineClassRoutes.js). Real
+// students answer in their dashboard (components/student/ClassConfirmation.jsx);
+// managed students' parents answer via a link (parentCheckRoutes.js). Same states:
+//   confirm → parentCheck "confirmed"
+//   dispute → parentCheck "denied" + dispute with a 3-day deadline (DISPUTE_DAYS)
+// No answer by autoConfirmAt → counts as attended (utils/parentCheck.js sweep).
+async function loadOwnLoggedClass(req, res) {
+  if (req.user.role !== "student") { forbidden(res, "Students only"); return null; }
+  const booking = await getBooking(req.db).findById(req.params.id).select("studentId loggedByTeacher status parentCheck");
+  if (!booking || String(booking.studentId) !== req.user.id || !booking.loggedByTeacher) { notFound(res, "Class not found"); return null; }
+  if (booking.parentCheck?.status !== "waiting") { badRequest(res, "You've already answered for this class"); return null; }
+  return booking;
+}
+
+router.patch("/:id/student-confirm", verifyToken, validateObjectId("id"), async (req, res) => {
+  try {
+    if (!(await loadOwnLoggedClass(req, res))) return;
+    const updated = await getBooking(req.db).findOneAndUpdate(
+      { _id: req.params.id, "parentCheck.status": "waiting" },
+      { $set: { "parentCheck.status": "confirmed", "parentCheck.respondedAt": new Date() } },
+      { new: true },
+    );
+    if (!updated) return badRequest(res, "You've already answered for this class");
+    res.json({ success: true, message: "Thanks for confirming!" });
+  } catch (err) {
+    logger.error("Student confirm error:", { error: err?.message });
+    serverError(res);
+  }
+});
+
+router.patch("/:id/dispute", verifyToken, validateObjectId("id"), async (req, res) => {
+  try {
+    const booking = await loadOwnLoggedClass(req, res);
+    if (!booking) return;
+    const reason = toStr(req.body?.reason, "reason", { required: true, maxLen: 500 });
+    const now = new Date();
+    getStudent(req.db); getTeacher(req.db);
+    const updated = await getBooking(req.db).findOneAndUpdate(
+      { _id: booking._id, "parentCheck.status": "waiting", adminRejected: { $ne: true } },
+      { $set: {
+        "parentCheck.status": "denied", "parentCheck.respondedAt": now, "parentCheck.comment": reason,
+        "parentCheck.disputeDeadline": disputeDeadlineFrom(now),
+        disputeRaised: true, disputeStatus: "pending", disputedAt: now,
+        disputeReason: `Student says this class didn't happen: "${reason}"`,
+        disputedBy: "Student",
+      } },
+      { new: true },
+    ).populate("studentId", "firstName lastName").populate("teacherId", "firstName lastName");
+    if (!updated) return badRequest(res, "You've already answered for this class");
+
+    const adminEmail = req.center?.adminEmail;
+    if (adminEmail) {
+      const { baseUrl } = getCenterBaseUrl(req.center);
+      const esc = (v) => String(v ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+      sendEmail({
+        centerName: req.center?.centerName, to: adminEmail,
+        subject: `Student disputes a class logged by their teacher`,
+        html: `<p>${esc(updated.studentId.firstName)} ${esc(updated.studentId.lastName)} says this class didn't happen:</p>
+<ul><li><strong>Class:</strong> ${esc(updated.classTitle)} — ${esc(new Date(updated.scheduledTime).toUTCString())}</li>
+<li><strong>Teacher:</strong> ${esc(updated.teacherId.firstName)} ${esc(updated.teacherId.lastName)}</li>
+<li><strong>Reason:</strong> ${esc(reason)}</li></ul>
+<p>Please review it within ${DISPUTE_DAYS} days in <a href="${baseUrl}/admin/dashboard">Disputes</a>, or it will be rejected automatically.</p>`,
+      }).catch(e => logger.warn("Student dispute email failed:", { error: e?.message }));
+    }
+    res.json({ success: true, message: "Dispute sent — your school will review it." });
+  } catch (err) {
+    if (err.statusCode === 400) return badRequest(res, err.message);
+    logger.error("Student dispute error:", { error: err?.message });
+    serverError(res);
   }
 });
 
@@ -345,16 +423,22 @@ router.get("/", verifyToken, verifyAdmin, async (req, res) => {
     getTeacher(req.db);
     getStudent(req.db);
     const { status } = req.query;
-    const { limit, skip } = parsePagination(req.query, 100, 500);
-    const filter = status ? { status } : {};
-    const [bookings, total] = await Promise.all([
+    // ?active=1 — accepted classes that are live now or still to come, soonest first
+    // (admin Classes tab). Classes run at most 3h, so 4h back covers every live one.
+    const active = req.query.active === "1";
+    const { limit, skip } = parsePagination(req.query, active ? 500 : 100, 500);
+    const filter = active
+      ? { status: "accepted", scheduledTime: { $gte: new Date(Date.now() - 4 * 3600000) } }
+      : (typeof status === "string" && status ? { status } : {});
+    const [bookings, total, acceptedTotal] = await Promise.all([
       getBooking(req.db).find(filter)
         .populate("teacherId", "firstName lastName email googleMeetLink zoomLink")
         .populate("studentId", "firstName lastName email isManaged")
-        .sort({ scheduledTime: -1 }).skip(skip).limit(limit).lean(),
+        .sort({ scheduledTime: active ? 1 : -1 }).skip(skip).limit(limit).lean(),
       getBooking(req.db).countDocuments(filter),
+      active ? getBooking(req.db).countDocuments({ status: "accepted" }) : undefined,
     ]);
-    res.json({ success: true, bookings, total, limit, skip });
+    res.json({ success: true, bookings, total, limit, skip, ...(active ? { acceptedTotal } : {}) });
   } catch (err) {
     logger.error("Error fetching bookings:", { error: err?.message });
     serverError(res, "Error fetching bookings");
@@ -401,11 +485,16 @@ router.get("/student/:studentId", verifyToken, async (req, res) => {
     const filter = { studentId };
     if (req.user.role === "teacher") filter.teacherId = req.user.id;
     if (status === "completed") filter.status = { $in: ["completed", "missed"] };
+    else if (status === "pending_confirmation") {
+      // Teacher-logged classes still waiting for this student's answer (ClassConfirmation)
+      Object.assign(filter, { status, loggedByTeacher: true, "parentCheck.status": "waiting" });
+    }
     else if (status) filter.status = status;
 
     const bookings = await getBooking(req.db).find(filter)
       .populate("teacherId", "firstName lastName email continent googleMeetLink zoomLink")
-      .sort({ scheduledTime: 1 }).skip(skip).limit(limit).lean();
+      // Past classes newest first (otherwise the cap keeps the OLDEST ones); upcoming soonest first
+      .sort({ scheduledTime: status === "completed" ? -1 : 1 }).skip(skip).limit(limit).lean();
     res.json(bookings);
   } catch (err) {
     logger.error("Error fetching student bookings:", { error: err?.message });
@@ -452,23 +541,42 @@ router.post("/student-request", verifyToken, async (req, res) => {
     if (!teacherId)     return badRequest(res, "teacherId is required");
 
     const [teacher, student] = await Promise.all([
-      getTeacher(req.db).findById(teacherId).select("firstName lastName email timezone active status"),
+      getTeacher(req.db).findById(teacherId).select("firstName lastName email timezone active status workingHours workingHoursTz"),
       getStudent(req.db).findById(req.user.id).select("firstName lastName email classCredits timezone"),
     ]);
     if (!teacher || !teacher.active || teacher.status !== "active")
       return notFound(res, "Teacher not found or unavailable");
     if (!student) return notFound(res, "Student not found");
 
-    // Conflict check — don't allow double-booking same teacher at same time
     const slotStart = new Date(scheduledTime);
-    const slotEnd   = new Date(slotStart.getTime() + ((duration || 60) * 60000));
-    const clashingBooking = await getBooking(req.db).findOne({
+    const mins = Number(duration) || 60;
+    if (isNaN(slotStart)) return badRequest(res, "scheduledTime is invalid");
+    if (mins < 15 || mins > 180) return badRequest(res, "Duration must be 15–180 minutes");
+    if (slotStart.getTime() <= Date.now()) return badRequest(res, "Please pick a time in the future");
+    const slotEnd = new Date(slotStart.getTime() + mins * 60000);
+
+    // Conflict check — don't double-book the teacher (classes run at most 3h,
+    // so anything that could overlap starts within 4h before this one)
+    const nearby = await getBooking(req.db).find({
       teacherId,
-      scheduledTime: { $lt: slotEnd, $gte: new Date(slotStart.getTime() - ((duration || 60) * 60000)) },
-      status: { $in: ["pending", "accepted"] },
-    });
-    if (clashingBooking)
+      scheduledTime: { $lt: slotEnd, $gte: new Date(slotStart.getTime() - 4 * 3600000) },
+      status: { $in: BUSY_STATUSES },
+    }).lean();
+    if (nearby.some(b => bookingInterval(b).end > slotStart.getTime()))
       return res.status(409).json({ success: false, message: "That time slot is already requested or booked" });
+
+    // When the teacher has set working hours, the class must sit inside their
+    // free time (working hours − time off − other classes). No hours set →
+    // any time can be requested; the teacher approves or declines.
+    if ((teacher.workingHours || []).length) {
+      const blocks = await getTeacherAvailability(req.db).find({ teacherId }).lean();
+      const free = freeIntervals({
+        teacher, tz: teacherTz(teacher, blocks), blocks, bookings: nearby,
+        from: new Date(slotStart.getTime() - 86400000), to: new Date(slotEnd.getTime() + 86400000),
+      });
+      if (!free.some(f => f.start <= slotStart.getTime() && f.end >= slotEnd.getTime()))
+        return res.status(409).json({ success: false, message: "That time isn't free in the teacher's schedule — please pick one of the green times" });
+    }
 
     const Booking = getBooking(req.db);
     const booking  = await Booking.create({
@@ -478,7 +586,7 @@ router.post("/student-request", verifyToken, async (req, res) => {
       topic:              toStr(topic,  "topic",  { maxLen: 500 }) || "",
       notes:              toStr(notes,  "notes",  { maxLen: 2000 }) || "",
       scheduledTime:      slotStart,
-      duration:           duration || 60,
+      duration:           mins,
       status:             "pending",
       createdBy:          "student",
       createdByUserId:    req.user.id,

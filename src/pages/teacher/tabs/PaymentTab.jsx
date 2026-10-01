@@ -24,6 +24,7 @@ import {
   Banknote,
 } from "lucide-react";
 import api from "../../../api";
+import Pagination from "../../../components/Pagination";
 import { useCurrencySymbol } from "../../../hooks/useCurrencySymbol";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -112,20 +113,12 @@ function StatCard({ icon: Icon, label, value, sub, accent, isDarkMode }) {
 }
 
 // ─── Mini bar chart (CSS only, no recharts needed) ────────────────────────────
-function EarningsChart({ transactions, isDarkMode }) {
+function EarningsChart({ monthly = [], isDarkMode }) {
   const sym = useCurrencySymbol();
-  const monthlyData = useMemo(() => {
-    const map = {};
-    transactions.forEach((tx) => {
-      const k = monthKey(tx.completedAt);
-      if (!map[k]) map[k] = { pending: 0, paid: 0 };
-      if (tx.status === "pending") map[k].pending += tx.amount;
-      if (tx.status === "paid") map[k].paid += tx.amount;
-    });
-    // Last 6 months
-    const keys = Object.keys(map).sort().slice(-6);
-    return keys.map((k) => ({ key: k, label: monthLabel(k), ...map[k] }));
-  }, [transactions]);
+  const monthlyData = useMemo(
+    () => monthly.map((m) => ({ ...m, label: monthLabel(m.key) })),
+    [monthly]
+  );
 
   if (monthlyData.length === 0) return null;
 
@@ -548,68 +541,56 @@ export default function PaymentTab({ teacher, isDarkMode }) {
   const [filter, setFilter] = useState("all"); // all | pending | paid | cancelled
   const [search, setSearch] = useState("");
 
-  const load = async (silent = false) => {
-    if (!teacher?._id) return;
+  // Paged on the server; filter + search are applied there too
+  const [page, setPage]       = useState(1);
+  const [pager, setPager]     = useState({ total: 0, totalPages: 1, limit: 20 });
+  const [monthly, setMonthly] = useState([]);
+  const [reloadKey, setReloadKey] = useState(0);
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  useEffect(() => { const t = setTimeout(() => setDebouncedSearch(search.trim()), 300); return () => clearTimeout(t); }, [search]);
+  useEffect(() => { setPage(1); }, [filter, debouncedSearch]);
+
+  const load = (silent = false) => {
     if (silent) setRefreshing(true);
-    else setLoading(true);
-    try {
-      const { data } = await api.get(`/payment-transactions/teacher/${teacher._id}`);
-      setTransactions(data.transactions || []);
-      setSummary(
-        data.summary || {
-          totalPending: 0,
-          totalPaid: 0,
-          totalEarned: 0,
-          pendingCount: 0,
-          paidCount: 0,
-        }
-      );
-    } catch (err) {
-      console.error("PaymentTab load error:", err);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
+    setReloadKey((k) => k + 1);
   };
 
- 
-useEffect(() => {
-  load();
-}, [teacher?._id]);
-
-
-useEffect(() => {
-  load();
+  useEffect(() => {
+    if (!teacher?._id) return;
+    let stale = false;
+    api.get(`/payment-transactions/teacher/${teacher._id}`, { params: {
+      page, limit: 20,
+      status: filter === "all" ? undefined : filter,
+      q: debouncedSearch || undefined,
+      tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    } })
+      .then(({ data }) => {
+        if (stale) return;
+        setTransactions(data.transactions || []);
+        setSummary(data.summary || { totalPending: 0, totalPaid: 0, totalEarned: 0, pendingCount: 0, paidCount: 0 });
+        setMonthly(data.monthly || []);
+        if (data.pagination) {
+          setPager(data.pagination);
+          if (data.transactions?.length === 0 && page > 1) setPage(Math.max(1, data.pagination.totalPages));
+        }
+      })
+      .catch((err) => console.error("PaymentTab load error:", err))
+      .finally(() => { if (!stale) { setLoading(false); setRefreshing(false); } });
+    return () => { stale = true; };
+  }, [teacher?._id, page, filter, debouncedSearch, reloadKey]);
 
   // Refresh when user returns to this browser tab (e.g. after Google Meet)
-  const handleVisibility = () => {
-    if (document.visibilityState === "visible") {
-      load(true); // silent refresh
-    }
-  };
+  useEffect(() => {
+    const handleVisibility = () => { if (document.visibilityState === "visible") load(true); };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => document.removeEventListener("visibilitychange", handleVisibility);
+  }, []);
 
-  document.addEventListener("visibilitychange", handleVisibility);
-  return () => document.removeEventListener("visibilitychange", handleVisibility);
-}, [teacher?._id]);
-  
-
-  // ── Filtered transactions ──
-  const filtered = useMemo(() => {
-    return transactions.filter((tx) => {
-      const matchesFilter = filter === "all" || tx.status === filter;
-      const q = search.toLowerCase();
-      const matchesSearch =
-        !q ||
-        (tx.classTitle || "").toLowerCase().includes(q) ||
-        (tx.studentName || "").toLowerCase().includes(q);
-      return matchesFilter && matchesSearch;
-    });
-  }, [transactions, filter, search]);
+  // ── This page (already filtered by the server) ──
+  const filtered = transactions;
 
   // ── Total all-time ──
-  const allTimePaid = transactions
-    .filter((t) => t.status === "paid")
-    .reduce((s, t) => s + t.amount, 0);
+  const allTimePaid = summary.totalPaid || 0;
 
   // ── UI tokens ──
   const pageBg = isDarkMode ? "bg-gray-900" : "bg-gray-50";
@@ -624,10 +605,10 @@ useEffect(() => {
   }`;
 
   const filterTabs = [
-    { key: "all", label: "All", count: transactions.length },
+    { key: "all", label: "All", count: summary.totalCount ?? pager.total },
     { key: "pending", label: "Pending", count: summary.pendingCount },
     { key: "paid", label: "Paid", count: summary.paidCount },
-    { key: "cancelled", label: "Cancelled", count: transactions.filter((t) => t.status === "cancelled").length },
+    { key: "cancelled", label: "Cancelled", count: summary.cancelledCount ?? 0 },
   ];
 
   if (loading) {
@@ -713,8 +694,8 @@ useEffect(() => {
       <BankDetailsCard teacher={teacher} isDarkMode={isDarkMode} />
 
       {/* ── Monthly earnings chart ── */}
-      {transactions.length > 0 && (
-        <EarningsChart transactions={transactions} isDarkMode={isDarkMode} />
+      {(summary.totalCount ?? 0) > 0 && (
+        <EarningsChart monthly={monthly} isDarkMode={isDarkMode} />
       )}
 
       {/* ── Transaction table ── */}
@@ -781,7 +762,7 @@ useEffect(() => {
                 <tr>
                   <td colSpan={6} className={`text-center py-16 text-sm ${textSecondary}`}>
                     <DollarSign className="w-10 h-10 mx-auto mb-3 opacity-20" />
-                    {transactions.length === 0
+                    {(summary.totalCount ?? 0) === 0
                       ? "No earnings yet. Complete a class to see your salary here."
                       : "No transactions match your search."}
                   </td>
@@ -799,17 +780,21 @@ useEffect(() => {
         {filtered.length > 0 && (
           <div className={`flex items-center justify-between px-4 py-3 border-t text-xs ${isDarkMode ? "border-gray-700 text-gray-400" : "border-gray-100 text-gray-500"}`}>
             <span>
-              {filtered.length} record{filtered.length !== 1 ? "s" : ""}
+              {pager.total} record{pager.total !== 1 ? "s" : ""}
               {search && ` matching "${search}"`}
             </span>
             <span className="font-semibold">
-              Subtotal:{" "}
+              This page:{" "}
               <span className={isDarkMode ? "text-emerald-400" : "text-emerald-600"}>
                 {fmtMoney(filtered.reduce((s, t) => s + t.amount, 0), sym)}
               </span>
             </span>
           </div>
         )}
+        <div className="px-4">
+          <Pagination page={page} totalPages={pager.totalPages} total={pager.total} pageSize={pager.limit}
+            onPage={setPage} isDarkMode={isDarkMode} />
+        </div>
       </div>
 
       {/* ── Info note ── */}

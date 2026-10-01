@@ -43,6 +43,9 @@ const ForgotPassword      = lazy(() => import("./pages/teacher/ForgotPassword"))
 const ResetPassword       = lazy(() => import("./pages/teacher/ResetPassword"));
 const StudentDashboard    = lazy(() => import("./pages/student/StudentDashboard"));
 const StudentSetup        = lazy(() => import("./pages/student/StudentSetup"));
+const HomeworkLinkPage    = lazy(() => import("./pages/homework-link/HomeworkLinkPage"));
+const QuizLinkPage        = lazy(() => import("./pages/quiz-link/QuizLinkPage"));
+const AttendanceCheckPage = lazy(() => import("./pages/attendance-check/AttendanceCheckPage"));
 const StudentForgotPassword = lazy(() => import("./pages/student/ForgotPassword"));
 const StudentResetPassword  = lazy(() => import("./pages/student/ResetPassword"));
 const Classroom           = lazy(() => import("./pages/Classroom"));
@@ -196,6 +199,10 @@ function App() {
             <Route path="/parent/dashboard"         element={<AuthGuard role="parent"><ParentDashboard /></AuthGuard>} />
 
             <Route path="/join" element={<Join />} />
+            {/* Public homework share link (managed students — no login) */}
+            <Route path="/hw/:token" element={<HomeworkLinkPage />} />
+            <Route path="/q/:token" element={<QuizLinkPage />} />
+            <Route path="/ac/:token" element={<AttendanceCheckPage />} />
 
             <Route path="*" element={<Navigate to="/admin/login" replace />} />
           </Routes>

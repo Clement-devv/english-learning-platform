@@ -8,6 +8,7 @@ import {
 import { useGrammarCheck } from "../../../hooks/useGrammarCheck";
 import ListenButton from "../../../components/ListenButton";
 import StreakToast from "../components/StreakToast";
+import Pagination from "../../../components/Pagination";
 
 const ALLOWED_TYPES = [
   "application/pdf",
@@ -186,19 +187,32 @@ export default function StudentHomeworkTab({ studentInfo, isDarkMode }) {
     setTimeout(() => setToast(null), 3500);
   };
 
-  const fetchHomework = async () => {
-    try {
-      setLoading(true);
-      const { data } = await api.get("/homework/assigned");
-      setHomeworkList(data.homework || []);
-    } catch {
-      showToast("Failed to load homework", "error");
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Paged on the server (20 per page) — counts per status come back with every page
+  const [page,      setPage]      = useState(1);
+  const [pager,     setPager]     = useState({ total: 0, totalPages: 1, limit: 20 });
+  const [counts,    setCounts]    = useState({ all: 0, assigned: 0, submitted: 0, graded: 0 });
+  const [reloadKey, setReloadKey] = useState(0);
+  const changeFilter = (f) => { setFilter(f); setPage(1); };
+  const fetchHomework = () => setReloadKey(k => k + 1);
 
-  useEffect(() => { fetchHomework(); }, []);
+  useEffect(() => {
+    let stale = false;
+    (async () => {
+      try {
+        setLoading(true);
+        const { data } = await api.get("/homework/assigned", { params: { status: filter === "all" ? undefined : filter, page } });
+        if (stale) return;
+        setHomeworkList(data.homework || []);
+        if (data.counts) setCounts(data.counts);
+        if (data.pagination) { setPager(data.pagination); if (data.pagination.page !== page) setPage(data.pagination.page); }
+      } catch {
+        if (!stale) showToast("Failed to load homework", "error");
+      } finally {
+        if (!stale) setLoading(false);
+      }
+    })();
+    return () => { stale = true; };
+  }, [page, filter, reloadKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const getSubForm = (hwId) => subForms[hwId] || { text: "", files: [] };
 
@@ -210,16 +224,8 @@ export default function StudentHomeworkTab({ studentInfo, isDarkMode }) {
     });
   };
 
-  const filtered = homeworkList.filter(hw =>
-    filter === "all" ? true : hw.status === filter
-  );
+  const filtered = homeworkList; // already filtered + paged by the server
 
-  const counts = {
-    all:       homeworkList.length,
-    assigned:  homeworkList.filter(h => h.status === "assigned").length,
-    submitted: homeworkList.filter(h => h.status === "submitted").length,
-    graded:    homeworkList.filter(h => h.status === "graded").length,
-  };
 
   const handleSubmit = async (hwId) => {
     const sf = getSubForm(hwId);
@@ -305,7 +311,7 @@ export default function StudentHomeworkTab({ studentInfo, isDarkMode }) {
       {/* Stats strip */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12 }}>
         {statsItems.map(({ key, label, emoji, color, bg }) => (
-          <div key={key} onClick={() => setFilter(key)}
+          <div key={key} onClick={() => changeFilter(key)}
             style={{
               background: col.card, border: `2px solid ${filter === key ? color : col.border}`,
               borderRadius: 18, padding: "14px 16px", cursor: "pointer",
@@ -331,7 +337,7 @@ export default function StudentHomeworkTab({ studentInfo, isDarkMode }) {
         ].map(f => {
           const isActive = filter === f.k;
           return (
-            <button key={f.k} onClick={() => setFilter(f.k)}
+            <button key={f.k} onClick={() => changeFilter(f.k)}
               style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 10, border: "none", cursor: "pointer", fontFamily: "inherit", fontSize: 12.5, fontWeight: 800, background: isActive ? `linear-gradient(135deg,${accent},#fb923c)` : "transparent", color: isActive ? "#fff" : col.body, boxShadow: isActive ? `0 4px 12px ${accent}55` : "none", transition: "all 0.15s" }}>
               {f.l}
               <span style={{ padding: "1px 7px", borderRadius: 999, fontSize: 10.5, fontWeight: 900, background: isActive ? "rgba(255,255,255,0.28)" : (isDarkMode ? "rgba(255,255,255,0.1)" : "#fff3e6"), color: isActive ? "#fff" : col.muted }}>{f.count}</span>
@@ -659,6 +665,11 @@ export default function StudentHomeworkTab({ studentInfo, isDarkMode }) {
             );
           })}
         </div>
+      )}
+
+      {!loading && (
+        <Pagination page={page} totalPages={pager.totalPages} total={pager.total} pageSize={pager.limit}
+          onPage={(p) => { setPage(p); setExpandedId(null); window.scrollTo({ top: 0, behavior: "smooth" }); }} isDarkMode={isDarkMode} />
       )}
     </div>
   );

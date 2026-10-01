@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { getCachedCenter } from "../../utils/branding";
 import { dashboardColors } from "../../utils/dashboardColors";
+import { isExternal, linkSource, openExternal } from "../../utils/recordingSessions.js";
 import api from "../../api";
 import MessagesTab from "../../components/chat/MessagesTab";
 
@@ -1096,18 +1097,28 @@ export function TeacherRecordingsView({ teacher, isDarkMode, onBack }) {
                 <p style={{ margin: "2px 0 0", fontSize: "12px", color: c.muted }}>
                   {r.studentId?.firstName} {r.studentId?.lastName}
                   {r.duration ? ` · ${Math.round(r.duration / 60)}m` : ""}
+                  {isExternal(r) && <span style={{ color: "#0284c7", fontWeight: 700 }}> · 🔗 External {linkSource(r.externalUrl)} link</span>}
+                  {isExternal(r) && r.note ? ` · ${r.note}` : ""}
                 </p>
               </div>
               <p style={{ margin: 0, fontSize: "11.5px", color: c.muted, flexShrink: 0 }}>
                 {r.createdAt ? new Date(r.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : ""}
               </p>
               <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
-                <button onClick={() => loadVideo(r)} style={{ display: "flex", alignItems: "center", gap: "5px", padding: "7px 13px", borderRadius: "9px", background: "linear-gradient(135deg,#6366f1,#8b5cf6)", color: "#fff", border: "none", cursor: "pointer", fontSize: "12px", fontWeight: 700 }}>
-                  <Play size={12} fill="white" /> Watch
-                </button>
-                <button onClick={() => downloadVideo(r)} style={{ display: "flex", alignItems: "center", gap: "5px", padding: "7px 10px", borderRadius: "9px", background: c.card, color: c.heading, border: `1px solid ${c.border}`, cursor: "pointer", fontSize: "12px", fontWeight: 700 }}>
-                  <Download size={12} />
-                </button>
+                {isExternal(r) ? (
+                  <button onClick={() => openExternal(r.externalUrl)} title={r.externalUrl} style={{ display: "flex", alignItems: "center", gap: "5px", padding: "7px 13px", borderRadius: "9px", background: "linear-gradient(135deg,#0ea5e9,#6366f1)", color: "#fff", border: "none", cursor: "pointer", fontSize: "12px", fontWeight: 700 }}>
+                    🔗 Open link
+                  </button>
+                ) : (
+                  <>
+                    <button onClick={() => loadVideo(r)} style={{ display: "flex", alignItems: "center", gap: "5px", padding: "7px 13px", borderRadius: "9px", background: "linear-gradient(135deg,#6366f1,#8b5cf6)", color: "#fff", border: "none", cursor: "pointer", fontSize: "12px", fontWeight: 700 }}>
+                      <Play size={12} fill="white" /> Watch
+                    </button>
+                    <button onClick={() => downloadVideo(r)} style={{ display: "flex", alignItems: "center", gap: "5px", padding: "7px 10px", borderRadius: "9px", background: c.card, color: c.heading, border: `1px solid ${c.border}`, cursor: "pointer", fontSize: "12px", fontWeight: 700 }}>
+                      <Download size={12} />
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           ))}

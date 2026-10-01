@@ -43,6 +43,8 @@ import { startReminderScheduler } from "./utils/reminderScheduler.js";
 import { startRecordingCleanup } from "./routes/recordingRoutes.js";
 import { startProgressReportScheduler } from "./utils/progressReportScheduler.js";
 import { startMissedClassScheduler } from "./utils/missedClassScheduler.js";
+import { startParentCheckScheduler } from "./utils/parentCheck.js";
+import { linkPreviewHandler } from "./utils/linkPreview.js";
 import v1Router from "./routes/v1.js";
 import Center from "./models/master/Center.js";
 import SuperAdmin from "./models/master/SuperAdmin.js";
@@ -140,7 +142,8 @@ app.use(cors({
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-center-slug'],
+  // x-share-access: short-lived token for public homework/quiz share links (utils/shareLink.js)
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-center-slug', 'x-share-access'],
   maxAge: 3600
 }));
 
@@ -267,7 +270,7 @@ mongoose
     // In PM2 cluster mode all other workers skip this block entirely.
     if (isFirstWorker) {
       try {
-        const activeCenters = await Center.find({ status: "active" }).select("slug");
+        const activeCenters = await Center.find({ status: "active" }).select("slug timezone");
         logger.info(`🏢 Found ${activeCenters.length} active center(s) — starting per-center schedulers`);
         for (const center of activeCenters) {
           const db = await getDb(center.slug);
@@ -275,6 +278,7 @@ mongoose
           startRecordingCleanup(db);
           startProgressReportScheduler(db);
           startMissedClassScheduler(db);
+          startParentCheckScheduler(db, center);
         }
 
         // Hourly background sweep: remove expired/inactive sessions from all
@@ -459,6 +463,10 @@ app.get('/manifest.json', async (req, res) => {
     return res.sendFile(path.join(frontendPath, 'manifest.json'));
   }
 });
+
+// Share links (homework / quiz / parent class check): same SPA page, but with
+// Open Graph tags so WhatsApp, Facebook, Zalo… show a rich preview card.
+app.get(["/hw/:token", "/q/:token", "/ac/:token"], linkPreviewHandler(frontendPath));
 
 // Serve remaining frontend public assets (icons, fonts, robots.txt, etc.)
 // express.static only serves files that physically exist in dist — anything

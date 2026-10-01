@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import { AlertTriangle, CheckCircle, XCircle, Clock, RefreshCw, ChevronDown, ChevronUp } from "lucide-react";
 import api from "../../api";
+import DisputePulse, { DISPUTE_GLOW_CLASS } from "../DisputePulse";
 
 const STATUS_COLORS = {
   pending:      { bg: "#fff7ed", border: "#fed7aa", text: "#c2410c", label: "Pending" },
@@ -154,8 +155,12 @@ export default function DisputeReview({ isDarkMode }) {
               const isOpen = expandedDispute === d._id;
               const isActioning = resolvingId === d._id;
               const classType = d.adminRejected ? "Admin Rejected" : d.status === "missed" ? "Missed" : d.status;
+              // Parent said their managed child didn't attend a completed class — the class
+              // still counts until settled; auto-resolves for the parent at the deadline.
+              const parentDispute = d.parentCheck?.status === "denied";
               return (
-                <div key={d._id} style={{ background: col.card, border: `2px solid #fcd34d`, borderRadius: "14px", overflow: "hidden" }}>
+                <div key={d._id} className={parentDispute ? DISPUTE_GLOW_CLASS : undefined}
+                  style={{ background: col.card, border: `2px solid ${parentDispute ? "#dc2626" : "#fcd34d"}`, borderRadius: "14px", overflow: "hidden" }}>
                   {/* Summary row */}
                   <div
                     onClick={() => setExpandedDispute(isOpen ? null : d._id)}
@@ -173,9 +178,13 @@ export default function DisputeReview({ isDarkMode }) {
                         {d.studentId ? `${d.studentId.firstName} ${d.studentId.lastName}` : "?"}
                       </p>
                     </div>
-                    <span style={{ flexShrink: 0, padding: "3px 10px", borderRadius: "20px", fontSize: "11px", fontWeight: "800", background: "#fef3c7", border: "1px solid #fcd34d", color: "#92400e" }}>
-                      {classType}
-                    </span>
+                    {parentDispute ? (
+                      <DisputePulse deadline={d.parentCheck?.disputeDeadline} style={{ flexShrink: 0 }} />
+                    ) : (
+                      <span style={{ flexShrink: 0, padding: "3px 10px", borderRadius: "20px", fontSize: "11px", fontWeight: "800", background: "#fef3c7", border: "1px solid #fcd34d", color: "#92400e" }}>
+                        {classType}
+                      </span>
+                    )}
                     <div style={{ flexShrink: 0, fontSize: "12px", color: col.muted }}>
                       {d.disputedAt ? new Date(d.disputedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—"}
                     </div>
@@ -209,8 +218,19 @@ export default function DisputeReview({ isDarkMode }) {
 
                       {/* What resolution means */}
                       <div style={{ background: isDarkMode ? "#141620" : "#f9fafb", borderRadius: "8px", padding: "10px 12px", marginBottom: "12px", fontSize: "12px", color: col.muted, lineHeight: 1.7 }}>
-                        <strong style={{ color: col.heading }}>Approve Teacher</strong> — class marked complete; teacher gets paid; student loses 1 class credit.<br />
-                        <strong style={{ color: col.heading }}>Approve Student</strong> — class stays rejected/missed; {d.adminRejected ? "student's class credit is restored." : "no change to student credits."}
+                        {parentDispute ? (
+                          <>
+                            The teacher confirmed this managed student joined; the parent says they didn't. The class still counts as completed.<br />
+                            <strong style={{ color: col.heading }}>Approve Teacher</strong> — class stands; teacher keeps the pay.<br />
+                            <strong style={{ color: col.heading }}>Approve Student</strong> — class returned to the student; teacher's pay for it is deducted.<br />
+                            <strong style={{ color: "#b91c1c" }}>Not settled by {d.parentCheck?.disputeDeadline ? new Date(d.parentCheck.disputeDeadline).toLocaleString() : "the deadline"}</strong> — it's resolved for the parent automatically.
+                          </>
+                        ) : (
+                          <>
+                            <strong style={{ color: col.heading }}>Approve Teacher</strong> — class marked complete; teacher gets paid; student loses 1 class credit.<br />
+                            <strong style={{ color: col.heading }}>Approve Student</strong> — class stays rejected/missed; {d.adminRejected ? "student's class credit is restored." : "no change to student credits."}
+                          </>
+                        )}
                       </div>
 
                       {/* Resolve actions */}

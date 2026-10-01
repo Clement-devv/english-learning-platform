@@ -72,9 +72,11 @@ export default function TeacherTabContent({ d, wrapStyle = {}, msgStyle = {}, he
     return (
       <div style={wrapStyle}>
         <CompletedClassesTab
-          classes={d.completedClasses}
+          reloadKey={d.completedReloadKey}
           teacherInfo={d.teacherInfo}
           isDarkMode={isDarkMode}
+          students={d.students}
+          onRefresh={d.fetchTeacherData}
         />
       </div>
     );

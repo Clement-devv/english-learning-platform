@@ -1,7 +1,8 @@
 import api from "../api";
 
+// Whole directory (screens filter/page it) — the API defaults to 50 otherwise
 export const getTeachers = async () => {
-  const res = await api.get("/teachers");
+  const res = await api.get("/teachers", { params: { limit: 5000 } });
   return res.data;
 };
 

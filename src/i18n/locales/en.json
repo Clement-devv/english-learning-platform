@@ -192,6 +192,8 @@
       "chatCredits":          "Chat Credits",
       "pronunciationCredits": "Pronunciation Credits",
       "disputes":             "Disputes",
+      "parentChecks":         "Parent checks",
+      "loggedClasses":        "Logged classes",
       "branding":             "Branding",
       "customDomain":         "Custom Domain",
       "certTemplate":         "Certificate Template"

@@ -60,7 +60,7 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
 
   const fetchTeachers = async () => {
     try {
-      const res = await api.get("/teachers");
+      const res = await api.get("/teachers", { params: { limit: 5000 } });
       setAllTeachers(Array.isArray(res.data) ? res.data : []);
     } catch (e) {
       console.error("Failed to fetch teachers:", e);

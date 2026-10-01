@@ -18,7 +18,7 @@ router.get("/", verifyToken, verifyAdmin, async (req, res) => {
     const Notification = getNotification(req.db);
     const notifications = await Notification.find(filter)
       .sort({ createdAt: -1 })
-      .limit(Number(limit));
+      .limit(Math.min(Math.max(parseInt(limit, 10) || 100, 1), 200));
 
     const unreadCount = await Notification.countDocuments({ read: false });
 

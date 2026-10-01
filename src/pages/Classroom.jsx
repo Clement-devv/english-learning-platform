@@ -94,21 +94,24 @@ export default function Classroom({ classData, userRole: propUserRole, onLeave, 
   // document is guaranteed to exist (avoids 404 on findOneAndUpdate).
   const joinConfirmedRef = useRef(false);
 
-  // ── Fetch Google Meet and Zoom links if not passed in props ──────────────
+  // ── Load the booking: Meet/Zoom links + whether the student is managed ────
+  // Managed students (no login) never open the classroom — the teacher confirms
+  // their attendance, and in-app (Agora) video can't reach them.
+  const [managedStudent, setManagedStudent] = useState(false);
   useEffect(() => {
-    if (isGroupClass) return;
-    if ((!resolvedMeetLink || !resolvedZoomLink) && bookingId) {
-      setMeetLinkLoading(true);
-      api.get(`/bookings/${bookingId}`)
-        .then(({ data }) => {
-          const teacher = data.booking?.teacherId || {};
-          if (!resolvedMeetLink) setResolvedMeetLink(teacher.googleMeetLink || "");
-          if (!resolvedZoomLink) setResolvedZoomLink(teacher.zoomLink || "");
-        })
-        .catch(() => {})
-        .finally(() => setMeetLinkLoading(false));
-    }
-  }, [bookingId]);
+    if (isGroupClass || !bookingId) return;
+    const needLinks = !resolvedMeetLink || !resolvedZoomLink;
+    if (needLinks) setMeetLinkLoading(true);
+    api.get(`/bookings/${bookingId}`)
+      .then(({ data }) => {
+        const teacher = data.booking?.teacherId || {};
+        if (!resolvedMeetLink) setResolvedMeetLink(teacher.googleMeetLink || "");
+        if (!resolvedZoomLink) setResolvedZoomLink(teacher.zoomLink || "");
+        setManagedStudent(!!data.booking?.studentId?.isManaged);
+      })
+      .catch(() => {})
+      .finally(() => { if (needLinks) setMeetLinkLoading(false); });
+  }, [bookingId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Persist classData so page refresh doesn't break the classroom ────────
   useEffect(() => {
@@ -229,6 +232,7 @@ export default function Classroom({ classData, userRole: propUserRole, onLeave, 
           classData={finalClassData}
           userRole={userRole}
           onLeave={onLeave}
+          managedStudent={managedStudent}
           googleMeetLink={resolvedMeetLink}
         />
       </Suspense>
@@ -242,6 +246,7 @@ export default function Classroom({ classData, userRole: propUserRole, onLeave, 
           classData={finalClassData}
           userRole={userRole}
           onLeave={onLeave}
+          managedStudent={managedStudent}
           googleMeetLink={resolvedMeetLink}
         />
       </Suspense>
@@ -255,6 +260,7 @@ export default function Classroom({ classData, userRole: propUserRole, onLeave, 
           classData={finalClassData}
           userRole={userRole}
           onLeave={onLeave}
+          managedStudent={managedStudent}
           zoomLink={resolvedZoomLink}
         />
       </Suspense>
@@ -271,7 +277,12 @@ export default function Classroom({ classData, userRole: propUserRole, onLeave, 
         <div className="max-w-3xl w-full">
           <h2 className={`text-3xl font-bold text-center mb-3 ${dm ? "text-gray-100" : "text-gray-800"}`}>Choose Video Platform</h2>
           <p className={`text-center mb-8 ${dm ? "text-gray-400" : "text-gray-600"}`}>Select which platform to use for this class</p>
-          <div className={`grid gap-6 ${[googleMeetEnabled, zoomEnabled, agoraEnabled].filter(Boolean).length === 3 ? "grid-cols-1 md:grid-cols-3" : "grid-cols-1 md:grid-cols-2"}`}>
+          {managedStudent && (
+            <p className={`text-center -mt-4 mb-8 text-sm font-semibold ${dm ? "text-amber-300" : "text-amber-700"}`}>
+              This is a managed student (no app login). Use Google Meet or Zoom, then tap “Student joined” when they arrive.
+            </p>
+          )}
+          <div className={`grid gap-6 ${[googleMeetEnabled, zoomEnabled, agoraEnabled && !managedStudent].filter(Boolean).length === 3 ? "grid-cols-1 md:grid-cols-3" : "grid-cols-1 md:grid-cols-2"}`}>
 
             {/* Google Meet */}
             {googleMeetEnabled && (
@@ -410,7 +421,8 @@ export default function Classroom({ classData, userRole: propUserRole, onLeave, 
             )}
 
             {/* Agora */}
-            {agoraEnabled && (
+            {/* In-app video needs the student to log in — not possible for managed students */}
+            {agoraEnabled && !managedStudent && (
               <button
                 onClick={() => chooseProvider("agora")}
                 className={`p-8 rounded-2xl border-4 hover:shadow-xl transition-all cursor-pointer ${dm ? "bg-gray-800 border-purple-700 hover:border-purple-500" : "bg-white border-purple-300 hover:border-purple-500"}`}

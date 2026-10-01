@@ -15,6 +15,7 @@ import ContentViewer from "../ContentViewer";
 import WhiteboardTab from "../WhiteboardTab";
 import api from "../../api";
 import { useClassroomCore } from "./useClassroomCore";
+import ManagedAttendanceBar from "./ManagedAttendanceBar";
 import { useDarkMode } from "../../hooks/useDarkMode";
 import {
   Video, FileText, PenTool, Clock, Users,
@@ -22,7 +23,7 @@ import {
   CheckCircle, X, RefreshCw, PlusCircle,
 } from "lucide-react";
 
-export default function AgoraClassroom({ classData, userRole, onLeave, googleMeetLink }) {
+export default function AgoraClassroom({ classData, userRole, onLeave, googleMeetLink, managedStudent = false }) {
   const navigate    = useNavigate();
   const bookingId   = classData?.bookingId || classData?._id || classData?.id;
   const userName    = localStorage.getItem("name") || "User";
@@ -47,7 +48,7 @@ export default function AgoraClassroom({ classData, userRole, onLeave, googleMee
   const { isDarkMode } = useDarkMode();
   const dm = isDarkMode;
 
-  const core = useClassroomCore({ bookingId, userRole, duration: classData?.duration });
+  const core = useClassroomCore({ bookingId, userRole, duration: classData?.duration, managedStudent: managedStudent && userRole === "teacher" });
 
   const {
     isTeacherPresent, setIsTeacherPresent,
@@ -645,8 +646,11 @@ export default function AgoraClassroom({ classData, userRole, onLeave, googleMee
         </div>
       </div>
 
+      {/* MANAGED STUDENT: teacher confirms attendance (replaces the waiting banner) */}
+      <ManagedAttendanceBar core={core} />
+
       {/* WAITING BANNER */}
-      {!classStarted && (
+      {!classStarted && !core.managedStudent && (
         <div className={`border-b px-6 py-1.5 flex items-center justify-center gap-2 text-xs font-medium ${
           dm ? "bg-amber-950/50 border-amber-900/60 text-amber-400" : "bg-amber-50 border-amber-100 text-amber-700"
         }`}>

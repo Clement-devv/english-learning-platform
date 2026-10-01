@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { shareLinkSchemaDef } from '../utils/shareLink.js';
 
 const { Schema } = mongoose;
 
@@ -24,7 +25,23 @@ export const homeworkSchema = new Schema({
     text:        { type: String, maxlength: 5000, default: '' },
     attachments: [attachmentSchema],
     submittedAt: Date,
+    via:         { type: String, enum: ['app', 'link'], default: 'app' },
+    // Optional voice answer (recorded on the share-link page)
+    audio: {
+      fileId:   { type: String, default: null },
+      duration: { type: Number, default: 0 },
+      size:     { type: Number, default: 0 },
+      mimeType: { type: String, default: '' },
+    },
   },
+
+  // ── Share link (managed students only) ────────────────────────────────────
+  // Teacher sends the link to the parent (WhatsApp, Facebook…). The raw token is
+  // never stored: tokenHash (sha256) is used for lookup, tokenEnc (AES-GCM) lets
+  // the owning teacher copy the link again. Removing shareLink revokes it.
+  // Expires at the end of the due date (see utils/shareLink.js).
+  shareLink: shareLinkSchemaDef,
+
   grade: {
     score:    { type: Number, min: 0, max: 100, default: null },
     feedback: { type: String, maxlength: 2000, default: '' },
@@ -48,5 +65,7 @@ homeworkSchema.index({ teacherId: 1, createdAt: -1 });
 homeworkSchema.index({ studentId: 1, status: 1 });
 // Due-date sweep (reminder scheduler + student overdue view)
 homeworkSchema.index({ dueDate: 1, status: 1 });
+// Share-link lookup (sparse — only managed students' homework has a link)
+homeworkSchema.index({ 'shareLink.tokenHash': 1 }, { unique: true, sparse: true });
 // Teacher grading queue: submitted homework sorted by date
 homeworkSchema.index({ teacherId: 1, status: 1, createdAt: -1 });

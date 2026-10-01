@@ -504,6 +504,7 @@ export default function ClassesTab({ isDarkMode }) {
   const dm = isDarkMode;
 
   const [bookings,     setBookings]     = useState([]);
+  const [acceptedTotal, setAcceptedTotal] = useState(0);
   const [sessions,     setSessions]     = useState({});
   const [loading,      setLoading]      = useState(true);
   const [lastRefresh,  setLastRefresh]  = useState(null);
@@ -546,9 +547,12 @@ export default function ClassesTab({ isDarkMode }) {
   const fetchBookings = useCallback(async () => {
     setError("");
     try {
-      const data = await getAllBookings();
+      // Live + upcoming accepted classes only (soonest first) — a plain "newest 100"
+      // list put far-future bookings first and could push live classes out.
+      const data = await getAllBookings({ active: 1 });
       const list = Array.isArray(data) ? data : (data.bookings || []);
       setBookings(list);
+      setAcceptedTotal(data.acceptedTotal ?? list.length);
       setLastRefresh(new Date());
 
       const live = list.filter(isLiveNow);
@@ -640,7 +644,7 @@ export default function ClassesTab({ isDarkMode }) {
             cls: dm ? "bg-red-900/30 text-red-400" : "bg-red-100 text-red-600" },
           { icon: Calendar,     label: "Upcoming (Accepted)", value: upcomingClasses.length,
             cls: dm ? "bg-sky-900/30 text-sky-400" : "bg-sky-100 text-sky-600" },
-          { icon: CheckCircle2, label: "Total Accepted",      value: bookings.filter(b => b.status === "accepted").length,
+          { icon: CheckCircle2, label: "Total Accepted",      value: acceptedTotal,
             cls: dm ? "bg-violet-900/30 text-violet-400" : "bg-violet-100 text-violet-600" },
         ].map(({ icon: Icon, label, value, cls }) => (
           <div key={label} className={`rounded-xl border p-4 flex items-center gap-4 ${th.statCard}`}>

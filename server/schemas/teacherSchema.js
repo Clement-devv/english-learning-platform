@@ -23,6 +23,14 @@ export const teacherSchema = new mongoose.Schema({
   specializations: { type: [String], default: [] },
   certifications: { type: [String], default: [] },
   showScheduleToStudents: { type: Boolean, default: true },
+  // Weekly teaching hours, wall-clock in `workingHoursTz` (saved with the hours —
+  // NOT `timezone`, which follows whatever device the teacher last used). Free time =
+  // these hours − time off − booked classes (server/utils/schedule.js).
+  workingHours: {
+    type: [{ day: { type: Number, min: 0, max: 6 }, start: String, end: String, _id: false }],
+    default: [],
+  },
+  workingHoursTz: { type: String, default: "" },
   status: {
     type: String,
     enum: ['pending', 'active', 'suspended'],

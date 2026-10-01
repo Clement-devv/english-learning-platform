@@ -322,7 +322,7 @@ export default function TeachersTab({ onNotify, isDarkMode = false }) {
       setLoading(true);
       try {
         const [teachersRes, statsRes] = await Promise.all([
-          api.get("/teachers"),
+          api.get("/teachers", { params: { limit: 5000 } }),
           api.get("/reviews/stats").catch(() => ({ data: [] })),
         ]);
         const ratingMap = {};

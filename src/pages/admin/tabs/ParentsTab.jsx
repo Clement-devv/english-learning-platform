@@ -39,7 +39,7 @@ export default function ParentsTab({ isDarkMode }) {
     try {
       const [pRes, sRes] = await Promise.all([
         api.get('/parents'),
-        api.get('/students'),
+        api.get('/students', { params: { limit: 5000 } }),
       ]);
       setParents(pRes.data.parents || []);
       setStudents(sRes.data?.students || sRes.data || []);

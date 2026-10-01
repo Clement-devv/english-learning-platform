@@ -22,10 +22,11 @@ import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
 import { teacherSchema }  from "../schemas/teacherSchema.js";
 import { studentSchema }  from "../schemas/studentSchema.js";
 import { subAdminSchema } from "../schemas/subAdminSchema.js";
-import { parsePagination } from "../utils/pagination.js";
+import { parsePagination, DIRECTORY_MAX } from "../utils/pagination.js";
 import logger from "../utils/logger.js";
 import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
 import { cachedQuery, invalidateCache } from '../utils/cache.js';
+import { normaliseWorkingHours, isValidTz } from "../utils/schedule.js";
 import { s3Enabled, uploadToS3, deleteFromS3, s3PublicUrl, isLegacyPath, keyFromValue } from "../utils/s3.js";
 
 const teacherCacheKey = (slug, id) => `teacher:${slug}:${id}`;
@@ -99,7 +100,8 @@ router.get("/:id", verifyToken, async (req, res) => {
 // ─── GET all teachers ─────────────────────────────────────────────────────────
 router.get("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
   try {
-    const { limit, skip } = parsePagination(req.query);
+    // Directory list (see studentRoutes) — allow the whole center when asked
+    const { limit, skip } = parsePagination(req.query, 50, DIRECTORY_MAX);
     const teachers = await getTeacher(req.db)
       .find()
       .select("-password -inviteToken -twoFactorSecret -twoFactorBackupCodes -sessions")
@@ -204,6 +206,29 @@ router.patch("/:id/schedule-visibility", verifyToken, requireOwnerOrAdmin, async
     res.json({ showScheduleToStudents: teacher.showScheduleToStudents });
   } catch (err) {
     serverError(res, "Error updating schedule visibility");
+  }
+});
+
+// ─── PUT working-hours ────────────────────────────────────────────────────────
+// Body: { workingHours: [{ day 0-6, start "HH:MM", end "HH:MM" }], timezone }
+// The hours are wall-clock in `timezone`, saved alongside them (workingHoursTz) so a
+// teacher logging in from a device in another timezone doesn't shift their hours.
+router.put("/:id/working-hours", verifyToken, requireOwnerOrAdmin, async (req, res) => {
+  try {
+    const { value, error } = normaliseWorkingHours(req.body.workingHours);
+    if (error) return badRequest(res, error);
+    const timezone = req.body.timezone;
+    if (!isValidTz(timezone)) return badRequest(res, "Please choose a valid timezone");
+    const teacher = await getTeacher(req.db).findByIdAndUpdate(
+      req.params.id,
+      { workingHours: value, workingHoursTz: timezone },
+      { new: true, select: "workingHours workingHoursTz" }
+    );
+    if (!teacher) return notFound(res, "Teacher not found");
+    await invalidateCache(teacherCacheKey(req.center?.slug, req.params.id)).catch(() => {});
+    res.json({ success: true, workingHours: teacher.workingHours, timezone: teacher.workingHoursTz, message: "Working hours saved" });
+  } catch (err) {
+    serverError(res, "Error saving working hours");
   }
 });
 
