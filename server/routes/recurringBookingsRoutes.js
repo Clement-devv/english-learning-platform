@@ -367,13 +367,15 @@ router.post("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
  * GET /api/recurring-bookings
  * Get all recurring patterns
  */
-router.get("/", verifyToken, async (req, res) => {
+router.get("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
   try {
     const isTeacher = req.user.role === 'teacher';
 
     let query = {};
     if (isTeacher) query.teacherId = req.user.id;
 
+    // Register populated models on this connection before populate
+    getTeacher(req.db); getStudent(req.db); getBooking(req.db);
     const patterns = await getRecurringPattern(req.db).find(query)
       .populate("teacherId", "firstName lastName email")
       .populate("studentId", "firstName lastName email")
@@ -393,6 +395,7 @@ router.get("/", verifyToken, async (req, res) => {
  */
 router.get("/:id", verifyToken, async (req, res) => {
   try {
+    getTeacher(req.db); getStudent(req.db); getBooking(req.db);
     const pattern = await getRecurringPattern(req.db).findById(req.params.id)
       .populate("teacherId", "firstName lastName email")
       .populate("studentId", "firstName lastName email")

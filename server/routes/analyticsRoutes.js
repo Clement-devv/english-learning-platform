@@ -11,6 +11,7 @@ import { quizAttemptSchema }          from "../schemas/quizAttemptSchema.js";
 import { parsePagination }            from "../utils/pagination.js";
 import logger from "../utils/logger.js";
 import { serverError } from '../utils/apiResponse.js';
+import { getAnalyticsAccess, requireAnalyticsUnlock } from "../middleware/analyticsPinMiddleware.js";
 
 const router = express.Router();
 router.use(tenantMiddleware);
@@ -22,7 +23,35 @@ const getPayment            = (db) => db.models.Payment            || db.model("
 const getPaymentTransaction = (db) => db.models.PaymentTransaction || db.model("PaymentTransaction", paymentTransactionSchema);
 const getQuizAttempt        = (db) => db.models.QuizAttempt        || db.model("QuizAttempt",        quizAttemptSchema);
 
+// Revenue = completed student payments. Teacher pay comes from
+// PaymentTransaction (one per completed class): "paid" has been paid out,
+// "pending" is still owed.
+async function getRevenueSummary(db) {
+  const [studentRevenue, teacherPay] = await Promise.all([
+    getPayment(db).aggregate([
+      { $match: { status: "completed" } },
+      { $group: { _id: null, total: { $sum: "$amount" } } },
+    ]),
+    getPaymentTransaction(db).aggregate([
+      { $match: { status: { $in: ["paid", "pending"] } } },
+      { $group: { _id: "$teacherId", paid: { $sum: { $cond: [{ $eq: ["$status", "paid"] }, "$amount", 0] } }, pending: { $sum: { $cond: [{ $eq: ["$status", "pending"] }, "$amount", 0] } } } },
+    ]),
+  ]);
+  const total          = studentRevenue[0]?.total || 0;
+  const teacherPaid    = teacherPay.reduce((s, t) => s + t.paid, 0);
+  const teacherPending = teacherPay.reduce((s, t) => s + t.pending, 0);
+  return {
+    total,
+    teacherPaid,
+    teacherPending,
+    teachersWithPending: teacherPay.filter(t => t.pending > 0).length,
+    net: total - teacherPaid - teacherPending,
+  };
+}
+
 // GET /api/analytics/overview
+// Counts are always returned; the revenue block is null until the admin's
+// analytics PIN (if set) has been entered.
 router.get("/overview", verifyToken, verifyAdmin, async (req, res) => {
   try {
     const { startDate, endDate } = req.query;
@@ -35,7 +64,8 @@ router.get("/overview", verifyToken, verifyAdmin, async (req, res) => {
     const Teacher = getTeacher(req.db);
     const Student = getStudent(req.db);
     const Booking = getBooking(req.db);
-    const Payment = getPayment(req.db);
+
+    const { unlocked } = await getAnalyticsAccess(req);
 
     const [
       totalTeachers,
@@ -43,7 +73,7 @@ router.get("/overview", verifyToken, verifyAdmin, async (req, res) => {
       totalStudents,
       activeStudents,
       bookingStats,
-      studentRevenueStats,
+      revenue,
     ] = await Promise.all([
       Teacher.countDocuments(),
       Teacher.countDocuments({ active: true }),
@@ -53,17 +83,11 @@ router.get("/overview", verifyToken, verifyAdmin, async (req, res) => {
         { $match: bookingFilter },
         { $group: { _id: "$status", count: { $sum: 1 } } },
       ]),
-      // Revenue = what students actually paid (completed student payments)
-      Payment.aggregate([
-        { $match: { status: "completed" } },
-        { $group: { _id: null, total: { $sum: "$amount" } } },
-      ]),
+      unlocked ? getRevenueSummary(req.db) : null,
     ]);
 
-    const bookingsByStatus = { pending: 0, accepted: 0, completed: 0, rejected: 0, cancelled: 0 };
+    const bookingsByStatus = { pending: 0, accepted: 0, completed: 0, missed: 0, rejected: 0, cancelled: 0 };
     bookingStats.forEach(s => { bookingsByStatus[s._id] = s.count; });
-
-    const totalRevenue = studentRevenueStats[0]?.total || 0;
 
     res.json({
       success: true,
@@ -76,12 +100,8 @@ router.get("/overview", verifyToken, verifyAdmin, async (req, res) => {
           total: Object.values(bookingsByStatus).reduce((a, b) => a + b, 0),
           byStatus: bookingsByStatus,
         },
-        revenue: {
-          total:   totalRevenue,
-          paid:    totalRevenue,
-          pending: 0,
-          teachersWithPending: 0,
-        },
+        revenue,
+        revenueLocked: !unlocked,
       },
     });
   } catch (err) {
@@ -91,7 +111,7 @@ router.get("/overview", verifyToken, verifyAdmin, async (req, res) => {
 });
 
 // GET /api/analytics/bookings-timeline
-router.get("/bookings-timeline", verifyToken, verifyAdmin, async (req, res) => {
+router.get("/bookings-timeline", verifyToken, verifyAdmin, requireAnalyticsUnlock, async (req, res) => {
   try {
     const { period = "week", startDate, endDate } = req.query;
 
@@ -122,7 +142,7 @@ router.get("/bookings-timeline", verifyToken, verifyAdmin, async (req, res) => {
 });
 
 // GET /api/analytics/teacher-performance
-router.get("/teacher-performance", verifyToken, verifyAdmin, async (req, res) => {
+router.get("/teacher-performance", verifyToken, verifyAdmin, requireAnalyticsUnlock, async (req, res) => {
   try {
     const { limit = 10 } = req.query;
 
@@ -141,9 +161,24 @@ router.get("/teacher-performance", verifyToken, verifyAdmin, async (req, res) =>
         },
       },
       {
+        // Lifetime earnings from pay records — Teacher.earned is only the
+        // unpaid balance (it resets to 0 when a payout is made).
+        $lookup: {
+          from: "paymenttransactions",
+          let: { tid: "$_id" },
+          pipeline: [
+            { $match: { $expr: { $and: [{ $eq: ["$teacherId", "$$tid"] }, { $ne: ["$status", "cancelled"] }] } } },
+            { $group: { _id: null, total: { $sum: "$amount" } } },
+          ],
+          as: "earnings",
+        },
+      },
+      {
         $project: {
           firstName: 1, lastName: 1, email: 1, continent: 1,
-          ratePerClass: 1, earned: 1, lessonsCompleted: 1,
+          ratePerClass: 1, lessonsCompleted: 1,
+          unpaidBalance: "$earned",
+          earned: { $ifNull: [{ $arrayElemAt: ["$earnings.total", 0] }, 0] },
           totalBookings:    { $size: "$bookings" },
           completedBookings: { $size: { $filter: { input: "$bookings", as: "b", cond: { $eq: ["$$b.status", "completed"] } } } },
           pendingBookings:   { $size: { $filter: { input: "$bookings", as: "b", cond: { $eq: ["$$b.status", "pending"] } } } },
@@ -162,7 +197,7 @@ router.get("/teacher-performance", verifyToken, verifyAdmin, async (req, res) =>
           },
         },
       },
-      { $sort: { lessonsCompleted: -1 } },
+      { $sort: { completedBookings: -1, earned: -1 } },
       { $limit: parsePagination({ limit }).limit },
     ]);
 
@@ -174,7 +209,7 @@ router.get("/teacher-performance", verifyToken, verifyAdmin, async (req, res) =>
 });
 
 // GET /api/analytics/student-engagement
-router.get("/student-engagement", verifyToken, verifyAdmin, async (req, res) => {
+router.get("/student-engagement", verifyToken, verifyAdmin, requireAnalyticsUnlock, async (req, res) => {
   try {
     const { limit = 10 } = req.query;
 
@@ -197,7 +232,7 @@ router.get("/student-engagement", verifyToken, verifyAdmin, async (req, res) => 
           firstName: 1, lastName: 1, email: 1, classCredits: 1,
           totalBookings:    { $size: "$bookings" },
           completedClasses: { $size: { $filter: { input: "$bookings", as: "b", cond: { $eq: ["$$b.status", "completed"] } } } },
-          upcomingClasses:  { $size: { $filter: { input: "$bookings", as: "b", cond: { $eq: ["$$b.status", "accepted"] } } } },
+          upcomingClasses:  { $size: { $filter: { input: "$bookings", as: "b", cond: { $and: [{ $eq: ["$$b.status", "accepted"] }, { $gte: ["$$b.scheduledTime", "$$NOW"] }] } } } },
           lastBooking: { $max: { $map: { input: "$bookings", as: "b", in: "$$b.scheduledTime" } } },
         },
       },
@@ -218,7 +253,7 @@ router.get("/student-engagement", verifyToken, verifyAdmin, async (req, res) => 
 });
 
 // GET /api/analytics/revenue-breakdown
-router.get("/revenue-breakdown", verifyToken, verifyAdmin, async (req, res) => {
+router.get("/revenue-breakdown", verifyToken, verifyAdmin, requireAnalyticsUnlock, async (req, res) => {
   try {
     const { startDate, endDate } = req.query;
 
@@ -229,7 +264,8 @@ router.get("/revenue-breakdown", verifyToken, verifyAdmin, async (req, res) => {
     const PaymentTransaction = getPaymentTransaction(req.db);
     const Payment            = getPayment(req.db);
 
-    const txMatchStage      = Object.keys(dateFilter).length > 0 ? [{ $match: { completedAt: dateFilter } }] : [];
+    // Cancelled pay records were never owed — exclude them from earnings and class counts
+    const txMatchStage      = [{ $match: { status: { $ne: "cancelled" }, ...(Object.keys(dateFilter).length > 0 ? { completedAt: dateFilter } : {}) } }];
     const paymentMatchStage = Object.keys(dateFilter).length > 0 ? [{ $match: { date: dateFilter, status: "completed" } }] : [{ $match: { status: "completed" } }];
 
     const [revenueByTeacher, teacherSalarySummary, studentRevenueSummary] = await Promise.all([
@@ -274,11 +310,17 @@ router.get("/revenue-breakdown", verifyToken, verifyAdmin, async (req, res) => {
 });
 
 // GET /api/analytics/popular-times
-router.get("/popular-times", verifyToken, verifyAdmin, async (req, res) => {
+router.get("/popular-times", verifyToken, verifyAdmin, requireAnalyticsUnlock, async (req, res) => {
   try {
+    // Bucket by the admin's local timezone (IANA name), defaulting to UTC
+    let timezone = "UTC";
+    if (typeof req.query.tz === "string") {
+      try { Intl.DateTimeFormat("en-US", { timeZone: req.query.tz }); timezone = req.query.tz; } catch { /* invalid tz — keep UTC */ }
+    }
+
     const popularTimes = await getBooking(req.db).aggregate([
       { $match: { status: { $in: ["accepted", "completed"] } } },
-      { $project: { dayOfWeek: { $dayOfWeek: "$scheduledTime" }, hour: { $hour: "$scheduledTime" } } },
+      { $project: { dayOfWeek: { $dayOfWeek: { date: "$scheduledTime", timezone } }, hour: { $hour: { date: "$scheduledTime", timezone } } } },
       { $group: { _id: { day: "$dayOfWeek", hour: "$hour" }, count: { $sum: 1 } } },
       { $sort: { count: -1 } },
       { $limit: 20 },
@@ -300,7 +342,7 @@ router.get("/popular-times", verifyToken, verifyAdmin, async (req, res) => {
 });
 
 // GET /api/analytics/booking-acceptance-rate
-router.get("/booking-acceptance-rate", verifyToken, verifyAdmin, async (req, res) => {
+router.get("/booking-acceptance-rate", verifyToken, verifyAdmin, requireAnalyticsUnlock, async (req, res) => {
   try {
     const acceptanceRate = await getBooking(req.db).aggregate([
       {

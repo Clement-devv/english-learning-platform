@@ -140,7 +140,7 @@ app.use(cors({
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-center-slug'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-center-slug', 'x-analytics-unlock'],
   maxAge: 3600
 }));
 

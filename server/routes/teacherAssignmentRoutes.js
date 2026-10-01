@@ -1,9 +1,10 @@
 // server/routes/teacherAssignmentRoutes.js
 import express from "express";
-import { verifyToken } from "../middleware/authMiddleware.js";
+import { verifyToken, verifyAdminOrTeacher } from "../middleware/authMiddleware.js";
 import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
 import { assignmentSchema } from "../schemas/assignmentSchema.js";
 import { studentSchema } from "../schemas/studentSchema.js";
+import { teacherSchema } from "../schemas/teacherSchema.js";
 import { assignStudentId } from "../utils/studentIdGenerator.js";
 import logger from "../utils/logger.js";
 
@@ -12,6 +13,15 @@ router.use(tenantMiddleware);
 
 const getAssignment = (db) => db.models.Assignment || db.model("Assignment", assignmentSchema);
 const getStudent    = (db) => db.models.Student    || db.model("Student",    studentSchema);
+const getTeacher    = (db) => db.models.Teacher    || db.model("Teacher",    teacherSchema);
+
+// Admins may view any teacher; teachers only themselves. Runs after verifyAdminOrTeacher.
+const selfOrAdmin = (req, res, next) => {
+  if (req.user.role === "teacher" && req.user.id !== req.params.teacherId) {
+    return res.status(403).json({ success: false, message: "You can only view your own students" });
+  }
+  next();
+};
 
 /**
  * GET /api/teacher-assignments/my-teachers
@@ -41,10 +51,11 @@ router.get("/my-teachers", verifyToken, async (req, res) => {
  * GET /api/teachers/:teacherId/students
  * Get all students assigned to a specific teacher
  */
-router.get("/:teacherId/students", verifyToken, async (req, res) => {
+router.get("/:teacherId/students", verifyToken, verifyAdminOrTeacher, selfOrAdmin, async (req, res) => {
   try {
     const { teacherId } = req.params;
 
+    getStudent(req.db); // register before populate
     const assignments = await getAssignment(req.db).find({ teacherId })
       .populate({
         path: "studentId",
@@ -85,10 +96,11 @@ router.get("/:teacherId/students", verifyToken, async (req, res) => {
  * GET /api/teachers/:teacherId/assignments
  * Get all assignments for a specific teacher with full details
  */
-router.get("/:teacherId/assignments", verifyToken, async (req, res) => {
+router.get("/:teacherId/assignments", verifyToken, verifyAdminOrTeacher, selfOrAdmin, async (req, res) => {
   try {
     const { teacherId } = req.params;
 
+    getStudent(req.db); getTeacher(req.db); // register before populate
     const assignments = await getAssignment(req.db).find({ teacherId })
       .populate("studentId", "firstName lastName email classCredits active")
       .populate("teacherId", "firstName lastName email continent")

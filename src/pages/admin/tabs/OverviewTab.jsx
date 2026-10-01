@@ -3,10 +3,14 @@ import React, { useState, useEffect } from "react";
 import {
   Users, Video, Calendar, DollarSign, TrendingUp,
   CheckCircle, Clock, XCircle, AlertCircle, RefreshCw,
-  BookOpen, Activity, ArrowUpRight, Loader2
+  BookOpen, Activity, ArrowUpRight, Loader2, Eye, EyeOff, Wallet
 } from "lucide-react";
 import api from "../../../api";
 import { useCurrencySymbol } from "../../../hooks/useCurrencySymbol";
+import AnalyticsPinPrompt from "../../../components/admin/analytics/AnalyticsPinPrompt";
+import { clearAnalyticsUnlock } from "../../../utils/analyticsPin";
+
+const MASK = "••••••";
 
 export default function OverviewTab({ isDarkMode }) {
   const [overview, setOverview] = useState(null);
@@ -14,6 +18,10 @@ export default function OverviewTab({ isDarkMode }) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
+  // Revenue is hidden by default; revealing it needs the analytics PIN (if set)
+  const [revealed, setRevealed] = useState(false);
+  const [showPinPrompt, setShowPinPrompt] = useState(false);
+  const [revealing, setRevealing] = useState(false);
 
   const c = palette(isDarkMode);
   const sym = useCurrencySymbol();
@@ -25,10 +33,11 @@ export default function OverviewTab({ isDarkMode }) {
 
       const [overviewRes, bookingsRes] = await Promise.all([
         api.get("/analytics/overview"),
-        api.get("/bookings?limit=6&sort=desc"),
+        api.get("/bookings?limit=6&sort=recent"),
       ]);
 
       setOverview(overviewRes.data.data);
+      if (!overviewRes.data.data?.revenue) setRevealed(false);
 
       // Handle different response shapes for bookings
       const bookings = bookingsRes.data?.bookings
@@ -46,6 +55,31 @@ export default function OverviewTab({ isDarkMode }) {
   };
 
   useEffect(() => { fetchData(); }, []);
+
+  // Re-fetch only the overview (now with revenue) and show it
+  const loadRevenue = async () => {
+    setRevealing(true);
+    try {
+      const res = await api.get("/analytics/overview");
+      setOverview(res.data.data);
+      if (res.data.data?.revenue) {
+        setRevealed(true);
+      } else {
+        clearAnalyticsUnlock();   // token expired or PIN changed
+        setShowPinPrompt(true);
+      }
+    } catch {
+      setError("Failed to load revenue.");
+    } finally {
+      setRevealing(false);
+    }
+  };
+
+  const toggleRevenue = () => {
+    if (revealed) return setRevealed(false);
+    if (overview?.revenue) return setRevealed(true);   // already unlocked (or no PIN set)
+    setShowPinPrompt(true);
+  };
 
   // ── helpers ──────────────────────────────────────────────────────────────
   const fmt = (n) => (n === undefined || n === null ? "—" : Number(n).toLocaleString());
@@ -65,6 +99,8 @@ export default function OverviewTab({ isDarkMode }) {
     pending:   { color: "#f59e0b", bg: isDarkMode ? "rgba(245,158,11,0.12)" : "#fef9c3", label: "Pending" },
     accepted:  { color: "#3b82f6", bg: isDarkMode ? "rgba(59,130,246,0.12)" : "#dbeafe", label: "Accepted" },
     completed: { color: "#10b981", bg: isDarkMode ? "rgba(16,185,129,0.12)" : "#d1fae5", label: "Completed" },
+    missed:    { color: "#a855f7", bg: isDarkMode ? "rgba(168,85,247,0.12)" : "#f3e8ff", label: "Missed" },
+    pending_confirmation: { color: "#0ea5e9", bg: isDarkMode ? "rgba(14,165,233,0.12)" : "#e0f2fe", label: "Awaiting Confirmation" },
     rejected:  { color: "#ef4444", bg: isDarkMode ? "rgba(239,68,68,0.12)" : "#fee2e2",  label: "Rejected" },
     cancelled: { color: "#6b7280", bg: isDarkMode ? "rgba(107,114,128,0.12)" : "#f3f4f6", label: "Cancelled" },
   };
@@ -119,6 +155,25 @@ export default function OverviewTab({ isDarkMode }) {
   }
 
   const ov = overview;
+  const showRevenue = revealed && !!ov?.revenue;
+
+  const eyeButton = (
+    <button
+      type="button"
+      onClick={toggleRevenue}
+      disabled={revealing}
+      aria-label={showRevenue ? "Hide revenue" : "Show revenue"}
+      aria-pressed={showRevenue}
+      title={showRevenue ? "Hide revenue" : "Show revenue"}
+      style={{
+        border: "none", background: "transparent", cursor: "pointer", padding: 4, borderRadius: 8,
+        display: "inline-flex", alignItems: "center", color: c.text, flexShrink: 0,
+      }}
+    >
+      {revealing ? <Loader2 size={16} style={{ animation: "ov-spin 0.8s linear infinite" }} />
+        : showRevenue ? <Eye size={16} /> : <EyeOff size={16} />}
+    </button>
+  );
 
   // ── stat cards data ───────────────────────────────────────────────────────
   const statCards = [
@@ -149,8 +204,9 @@ export default function OverviewTab({ isDarkMode }) {
     {
       icon: DollarSign,
       label: "Total Revenue",
-      value: fmtMoney(ov?.revenue?.total),
-      sub: `${fmtMoney(ov?.revenue?.pending)} pending`,
+      value: showRevenue ? fmtMoney(ov.revenue.total) : MASK,
+      sub: showRevenue ? `${fmtMoney(ov.revenue.teacherPending)} owed to teachers` : "Hidden",
+      action: eyeButton,
       accent: "#f59e0b",
       lightBg: isDarkMode ? "rgba(245,158,11,0.1)" : "#fffbeb",
     },
@@ -199,7 +255,7 @@ export default function OverviewTab({ isDarkMode }) {
 
       {/* ── Stat Cards ── */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "16px" }}>
-        {statCards.map(({ icon: Icon, label, value, sub, accent, lightBg }) => (
+        {statCards.map(({ icon: Icon, label, value, sub, accent, lightBg, action }) => (
           <div key={label} style={{
             background: c.card,
             border: `1px solid ${c.border}`,
@@ -220,10 +276,13 @@ export default function OverviewTab({ isDarkMode }) {
             }}>
               <Icon size={20} color={accent} />
             </div>
-            <div>
-              <p style={{ margin: "0 0 4px", fontSize: "12px", fontWeight: "600", color: c.muted, textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                {label}
-              </p>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6, margin: "0 0 4px" }}>
+                <p style={{ margin: 0, fontSize: "12px", fontWeight: "600", color: c.muted, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                  {label}
+                </p>
+                {action}
+              </div>
               <p style={{ margin: "0 0 4px", fontSize: "26px", fontWeight: "800", color: c.heading, letterSpacing: "-0.5px", lineHeight: 1 }}>
                 {value}
               </p>
@@ -291,17 +350,32 @@ export default function OverviewTab({ isDarkMode }) {
         <div style={{ background: c.card, border: `1px solid ${c.border}`, borderRadius: "16px", padding: "20px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "18px" }}>
             <TrendingUp size={16} color="#6b82f0" />
-            <h2 style={{ margin: 0, fontSize: "15px", fontWeight: "700", color: c.heading }}>
+            <h2 style={{ margin: 0, fontSize: "15px", fontWeight: "700", color: c.heading, flex: 1 }}>
               Revenue Breakdown
             </h2>
+            {eyeButton}
           </div>
 
-          {ov?.revenue ? (
+          {!showRevenue ? (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "10px", padding: "28px 0" }}>
+              <EyeOff size={26} color={c.muted} />
+              <p style={{ margin: 0, fontSize: "13px", color: c.text, textAlign: "center" }}>
+                Revenue is hidden for privacy.
+              </p>
+              <button type="button" onClick={toggleRevenue} disabled={revealing} style={{
+                border: `1px solid ${c.border}`, background: isDarkMode ? "#0f1117" : "#f8faff", color: "#6b82f0",
+                borderRadius: "10px", padding: "7px 14px", fontSize: "12.5px", fontWeight: "700", cursor: "pointer",
+              }}>
+                {ov?.revenue ? "Show revenue" : "Enter PIN to view"}
+              </button>
+            </div>
+          ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
               {[
-                { label: "Paid Out", value: fmtMoney(ov.revenue.paid), color: "#10b981", icon: CheckCircle },
-                { label: "Pending", value: fmtMoney(ov.revenue.pending), color: "#f59e0b", icon: Clock },
-                { label: "Total", value: fmtMoney(ov.revenue.total), color: "#6b82f0", icon: DollarSign },
+                { label: "Student Payments", value: fmtMoney(ov.revenue.total), color: "#6b82f0", icon: DollarSign },
+                { label: "Paid to Teachers", value: fmtMoney(ov.revenue.teacherPaid), color: "#10b981", icon: CheckCircle },
+                { label: "Owed to Teachers", value: fmtMoney(ov.revenue.teacherPending), color: "#f59e0b", icon: Clock },
+                { label: "Net (after teacher pay)", value: fmtMoney(ov.revenue.net), color: ov.revenue.net < 0 ? "#ef4444" : "#0ea5e9", icon: Wallet },
               ].map(({ label, value, color, icon: Icon }) => (
                 <div key={label} style={{
                   display: "flex", alignItems: "center", justifyContent: "space-between",
@@ -323,8 +397,6 @@ export default function OverviewTab({ isDarkMode }) {
                 </p>
               )}
             </div>
-          ) : (
-            <p style={{ fontSize: "13px", color: c.muted, textAlign: "center", padding: "20px 0" }}>No revenue data yet</p>
           )}
         </div>
       </div>
@@ -417,7 +489,7 @@ export default function OverviewTab({ isDarkMode }) {
       {/* ── Quick summary row ── */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "12px" }}>
         {[
-          { label: "Pending Applications", value: fmt(ov?.bookings?.byStatus?.pending), icon: Clock, color: "#f59e0b" },
+          { label: "Pending Bookings", value: fmt(ov?.bookings?.byStatus?.pending), icon: Clock, color: "#f59e0b" },
           { label: "Accepted Bookings", value: fmt(ov?.bookings?.byStatus?.accepted), icon: CheckCircle, color: "#3b82f6" },
           { label: "Completed Classes", value: fmt(ov?.bookings?.byStatus?.completed), icon: CheckCircle, color: "#10b981" },
           { label: "Cancelled / Rejected", value: fmt((ov?.bookings?.byStatus?.cancelled || 0) + (ov?.bookings?.byStatus?.rejected || 0)), icon: XCircle, color: "#ef4444" },
@@ -435,6 +507,15 @@ export default function OverviewTab({ isDarkMode }) {
           </div>
         ))}
       </div>
+
+      {showPinPrompt && (
+        <AnalyticsPinPrompt
+          isDarkMode={isDarkMode}
+          title="Revenue is hidden"
+          onCancel={() => setShowPinPrompt(false)}
+          onUnlocked={() => { setShowPinPrompt(false); loadRevenue(); }}
+        />
+      )}
 
       <style>{`
         @keyframes ov-spin { to { transform: rotate(360deg); } }

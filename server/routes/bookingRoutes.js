@@ -344,14 +344,16 @@ router.get("/", verifyToken, verifyAdmin, async (req, res) => {
   try {
     getTeacher(req.db);
     getStudent(req.db);
-    const { status } = req.query;
+    const { status, sort } = req.query;
     const { limit, skip } = parsePagination(req.query, 100, 500);
     const filter = status ? { status } : {};
+    // sort=recent → newest-created first (dashboard "Recent Bookings"); default is by class time
+    const order = sort === "recent" ? { createdAt: -1 } : { scheduledTime: -1 };
     const [bookings, total] = await Promise.all([
       getBooking(req.db).find(filter)
         .populate("teacherId", "firstName lastName email googleMeetLink zoomLink")
         .populate("studentId", "firstName lastName email isManaged")
-        .sort({ scheduledTime: -1 }).skip(skip).limit(limit).lean(),
+        .sort(order).skip(skip).limit(limit).lean(),
       getBooking(req.db).countDocuments(filter),
     ]);
     res.json({ success: true, bookings, total, limit, skip });
@@ -369,13 +371,25 @@ router.get("/teacher/:teacherId", verifyToken, async (req, res) => {
     if (req.user.role === "teacher" && req.user.id !== teacherId)
       return forbidden(res, "You can only view your own bookings");
 
-    getStudent(req.db);
     const { limit, skip } = parsePagination(req.query, 50, 200);
     const filter = { teacherId };
     if (status === "completed") filter.status = { $in: ["completed", "missed"] };
     else if (status?.includes(",")) filter.status = { $in: status.split(",") };
     else if (status) filter.status = status;
 
+    // Students only need busy times for the booking calendar — never expose
+    // other students' identities, notes, or booking details.
+    if (req.user.role === "student") {
+      const rows = await getBooking(req.db).find(filter)
+        .select("_id scheduledTime duration status studentId classTitle")
+        .sort({ scheduledTime: -1 }).skip(skip).limit(limit).lean();
+      return res.json(rows.map(({ studentId, classTitle, ...b }) => {
+        const isMine = String(studentId) === String(req.user.id);
+        return isMine ? { ...b, isMine, studentId, classTitle } : { ...b, isMine };
+      }));
+    }
+
+    getStudent(req.db);
     const bookings = await getBooking(req.db).find(filter)
       .populate("studentId", "firstName lastName email classCredits isManaged")
       .sort({ scheduledTime: -1 }).skip(skip).limit(limit).lean();

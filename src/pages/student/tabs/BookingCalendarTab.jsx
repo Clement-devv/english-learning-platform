@@ -580,7 +580,7 @@ export default function BookingCalendarTab({ isDarkMode, studentInfo }) {
                       {/* Booking tiles */}
                       {dayBookings.map(b => {
                         const { top, height } = bookingEventPos(b);
-                        const isMe = String(b.studentId?._id || b.studentId) === String(studentInfo?._id || studentInfo?.id);
+                        const isMe = b.isMine ?? String(b.studentId?._id || b.studentId) === String(studentInfo?._id || studentInfo?.id);
                         return (
                           <div key={b._id}
                             style={{

@@ -22,6 +22,14 @@ export const adminSchema = new mongoose.Schema({
   pushSubscription: { type: Object, default: null },
   ringEnabled: { type: Boolean, default: true },
 
+  // ── Analytics PIN ────────────────────────────────────────────────────────────
+  // Optional 4-digit PIN that gates revenue/analytics data. analyticsPinSetAt
+  // is embedded in unlock tokens so changing/removing the PIN revokes them.
+  analyticsPinHash:           { type: String, default: null, select: false },
+  analyticsPinSetAt:          { type: Date,   default: null },
+  analyticsPinFailedAttempts: { type: Number, default: 0 },
+  analyticsPinLockedUntil:    { type: Date,   default: null },
+
   // ── Terms & Conditions ───────────────────────────────────────────────────────
   hasAcceptedTerms: { type: Boolean, default: false },
   termsAcceptedAt:  { type: Date,    default: null  },

@@ -13,6 +13,7 @@
 
 import { createContext, useCallback, useContext, useState } from 'react';
 import api from '../api.js';
+import { clearAnalyticsUnlock } from '../utils/analyticsPin';
 import {
   detectActiveRole,
   getStoredUser,
@@ -127,6 +128,7 @@ export function AuthProvider({ children }) {
       clearAuth(role);
     }
     localStorage.removeItem('pwa-last-role');
+    clearAnalyticsUnlock();  // analytics PIN must be re-entered after every login
     setRole(null);
     setUserState(null);
     setToken(null);

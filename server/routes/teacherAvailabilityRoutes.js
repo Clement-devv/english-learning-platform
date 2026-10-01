@@ -1,5 +1,5 @@
 import express from "express";
-import { verifyToken } from "../middleware/authMiddleware.js";
+import { verifyToken, verifyAdminOrTeacher } from "../middleware/authMiddleware.js";
 import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
 import { teacherAvailabilitySchema } from "../schemas/teacherAvailabilitySchema.js";
 import { bookingSchema }             from "../schemas/bookingSchema.js";
@@ -48,7 +48,10 @@ router.get("/:teacherId", verifyToken, async (req, res) => {
       query = base;
     }
 
-    const availability = await getTeacherAvailability(req.db).find(query).sort({ date: 1, startTime: 1 });
+    // Students only see when the teacher is occupied — not which student the
+    // slot is for or the teacher's private note.
+    const projection = req.user.role === "student" ? "-studentId -note" : "";
+    const availability = await getTeacherAvailability(req.db).find(query).select(projection).sort({ date: 1, startTime: 1 });
     res.json({ availability });
   } catch (err) {
     logger.error("Error fetching availability:", { error: err?.message });
@@ -57,12 +60,15 @@ router.get("/:teacherId", verifyToken, async (req, res) => {
 });
 
 // POST /api/teacher-availability
-router.post("/", verifyToken, async (req, res) => {
+router.post("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
   try {
     const { teacherId, date, dayOfWeek, startTime, endTime, isRecurring, note, timezone } = req.body;
 
     if (!teacherId || !startTime || !endTime) {
       return badRequest(res, "teacherId, startTime, and endTime are required");
+    }
+    if (req.user.role === "teacher" && String(teacherId) !== req.user.id) {
+      return forbidden(res, "You can only manage your own availability");
     }
     if (startTime >= endTime) {
       return badRequest(res, "endTime must be after startTime");
@@ -139,9 +145,11 @@ router.post("/", verifyToken, async (req, res) => {
 });
 
 // DELETE /api/teacher-availability/:id
-router.delete("/:id", verifyToken, async (req, res) => {
+router.delete("/:id", verifyToken, verifyAdminOrTeacher, async (req, res) => {
   try {
-    const avail = await getTeacherAvailability(req.db).findByIdAndDelete(req.params.id);
+    const filter = { _id: req.params.id };
+    if (req.user.role === "teacher") filter.teacherId = req.user.id;
+    const avail = await getTeacherAvailability(req.db).findOneAndDelete(filter);
     if (!avail) return notFound(res, "Not found");
     res.json({ message: "Availability removed" });
   } catch (err) {

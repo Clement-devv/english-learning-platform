@@ -27,6 +27,7 @@ import LanguageSwitcher           from '../../../../components/LanguageSwitcher'
 import { useTranslation }         from 'react-i18next';
 import ChangePassword             from '../../../../components/admin/auth/ChangePassword';
 import ChangeEmail               from '../../../../components/admin/auth/ChangeEmail';
+import AnalyticsPinSettings      from '../../../../components/admin/auth/AnalyticsPinSettings';
 
 // Tab components — lazy loaded
 const OverviewTab        = lazy(() => import('../../tabs/OverviewTab'));
@@ -182,6 +183,9 @@ export default function SunshineShell() {
   const [showSessionMgmt,      setShowSessionMgmt]      = useState(false);
   const [showChangePassword,   setShowChangePassword]   = useState(false);
   const [showChangeEmail,      setShowChangeEmail]      = useState(false);
+  const [showAnalyticsPin,     setShowAnalyticsPin]     = useState(false);
+  // Bumped when the PIN changes so Overview/Analytics re-check their lock state
+  const [analyticsPinVersion,  setAnalyticsPinVersion]  = useState(0);
   const [notifications,   setNotifications]   = useState([]);
   const [toast,           setToast]           = useState('');
 
@@ -336,8 +340,8 @@ export default function SunshineShell() {
 
   const tabContent = useMemo(() => {
     switch (activeTab) {
-      case 'overview':          return <OverviewTab isDarkMode={isDarkMode} />;
-      case 'analytics':         return <AnalyticsDashboard isDarkMode={isDarkMode} />;
+      case 'overview':          return <OverviewTab key={analyticsPinVersion} isDarkMode={isDarkMode} />;
+      case 'analytics':         return <AnalyticsDashboard key={analyticsPinVersion} isDarkMode={isDarkMode} />;
       case 'teachers':          return <TeachersTab onNotify={handleNotify} isDarkMode={isDarkMode} />;
       case 'teacher-schedules': return <TeacherScheduleTab teachers={activeTeachers} isDarkMode={isDarkMode} />;
       case 'students':          return <StudentsTab onNotify={handleNotify} isDarkMode={isDarkMode} />;
@@ -363,10 +367,10 @@ export default function SunshineShell() {
       case 'branding':          return <BrandingTab isDarkMode={isDarkMode} />;
       case 'domain':            return <DomainTab isDarkMode={isDarkMode} />;
       case 'cert-template':     return <CertificateTemplateSettingsTab isDarkMode={isDarkMode} />;
-      default:                  return <OverviewTab isDarkMode={isDarkMode} />;
+      default:                  return <OverviewTab key={analyticsPinVersion} isDarkMode={isDarkMode} />;
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, isDarkMode, loading, teachers, students]);
+  }, [activeTab, isDarkMode, loading, teachers, students, analyticsPinVersion]);
 
   const STATS = [
     { label: 'Teachers',  value: teachers.length,       icon: Video,         g: 'linear-gradient(135deg,#f97316,#fbbf24)' },
@@ -829,6 +833,7 @@ export default function SunshineShell() {
         onChangeEmail={() => { setShowSettingsSidebar(false); setShowChangeEmail(true); }}
         onManageSessions={() => { setShowSettingsSidebar(false); setShowSessionMgmt(true); }}
         onManage2FA={() => { setShowSettingsSidebar(false); setShowSettingsModal(true); }}
+        onManageAnalyticsPin={() => { setShowSettingsSidebar(false); setShowAnalyticsPin(true); }}
         userInfo={{
           firstName: adminInfo?.firstName || 'Admin',
           lastName:  adminInfo?.lastName  || 'User',
@@ -843,6 +848,16 @@ export default function SunshineShell() {
         <ChangePassword
           onClose={() => setShowChangePassword(false)}
           onSuccess={(msg) => { setShowChangePassword(false); setToast(msg); setTimeout(() => setToast(''), 3000); }}
+        />
+      )}
+      {showAnalyticsPin && (
+        <AnalyticsPinSettings
+          onClose={() => setShowAnalyticsPin(false)}
+          onSuccess={(msg) => {
+            setShowAnalyticsPin(false);
+            setAnalyticsPinVersion(v => v + 1);
+            setToast(msg); setTimeout(() => setToast(''), 3000);
+          }}
         />
       )}
       {showChangeEmail && (

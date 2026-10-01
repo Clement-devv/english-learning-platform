@@ -9,12 +9,18 @@ import {
   Clock,
   BarChart3,
   PieChart,
-  RefreshCw
+  RefreshCw,
+  Lock,
+  ShieldCheck
 } from "lucide-react";
 import api from "../../api";
 import { useCurrencySymbol, fmtMoney } from "../../hooks/useCurrencySymbol";
+import AnalyticsPinPrompt from "../admin/analytics/AnalyticsPinPrompt";
+import { clearAnalyticsUnlock } from "../../utils/analyticsPin";
 
 export default function AnalyticsDashboard({ isDarkMode }) {
+  // PIN gate: null = checking, otherwise { pinSet, unlocked }
+  const [pinState, setPinState] = useState(null);
   const [loading, setLoading] = useState(true);
   const [overview, setOverview] = useState(null);
   const [timeline, setTimeline] = useState([]);
@@ -38,9 +44,15 @@ export default function AnalyticsDashboard({ isDarkMode }) {
   const rowHover = dm ? "hover:bg-gray-700/50"      : "hover:bg-gray-50";
   const inlineBg = dm ? "bg-gray-700"               : "bg-gray-50";
 
+  const lock = () => {
+    clearAnalyticsUnlock();
+    setPinState(s => ({ ...s, unlocked: false }));
+  };
+
   const fetchAnalytics = async () => {
     try {
       setLoading(true);
+      const tz = encodeURIComponent(Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC");
       const [
         overviewRes, timelineRes, teachersRes,
         studentsRes, revenueRes, timesRes, acceptanceRes
@@ -50,7 +62,7 @@ export default function AnalyticsDashboard({ isDarkMode }) {
         api.get("/analytics/teacher-performance?limit=5"),
         api.get("/analytics/student-engagement?limit=5"),
         api.get("/analytics/revenue-breakdown"),
-        api.get("/analytics/popular-times"),
+        api.get(`/analytics/popular-times?tz=${tz}`),
         api.get("/analytics/booking-acceptance-rate")
       ]);
       setOverview(overviewRes.data.data);
@@ -61,13 +73,23 @@ export default function AnalyticsDashboard({ isDarkMode }) {
       setPopularTimes(timesRes.data.data);
       setAcceptanceRate(acceptanceRes.data.data);
     } catch (error) {
-      console.error("Error fetching analytics:", error);
+      if (error.response?.data?.code === "ANALYTICS_LOCKED") {
+        lock();   // unlock expired or PIN changed elsewhere
+      } else {
+        console.error("Error fetching analytics:", error);
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { fetchAnalytics(); }, [period]);
+  useEffect(() => {
+    api.get("/admin/analytics-pin/status")
+      .then(res => setPinState(res.data.data))
+      .catch(() => setPinState({ pinSet: false, unlocked: true }));   // server still enforces the PIN
+  }, []);
+
+  useEffect(() => { if (pinState?.unlocked) fetchAnalytics(); }, [period, pinState?.unlocked]);
 
   // ── sub-components ──────────────────────────────────────────────────────────
   const StatCard = ({ icon: Icon, title, value, subtitle, color = "purple" }) => {
@@ -106,7 +128,15 @@ export default function AnalyticsDashboard({ isDarkMode }) {
     );
   };
 
-  if (loading) {
+  if (pinState && !pinState.unlocked) {
+    return (
+      <div className={`${pageBg} rounded-xl`}>
+        <AnalyticsPinPrompt inline isDarkMode={dm} onUnlocked={() => setPinState(s => ({ ...s, unlocked: true }))} />
+      </div>
+    );
+  }
+
+  if (!pinState || loading) {
     return (
       <div className={`flex items-center justify-center h-96 ${pageBg} rounded-xl`}>
         <div className="flex flex-col items-center gap-4">
@@ -134,21 +164,40 @@ export default function AnalyticsDashboard({ isDarkMode }) {
           <h1 className={`text-3xl font-bold ${heading}`}>Analytics Dashboard</h1>
           <p className={`mt-1 ${subText}`}>Platform performance and insights</p>
         </div>
-        <button
-          onClick={fetchAnalytics}
-          className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg flex items-center gap-2 text-sm font-medium transition-colors"
-        >
-          <RefreshCw className="w-4 h-4" />
-          Refresh
-        </button>
+        <div className="flex items-center gap-2">
+          {pinState.pinSet && (
+            <button
+              onClick={lock}
+              aria-label="Lock analytics"
+              className={`px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-colors ${dm ? "bg-gray-700 hover:bg-gray-600 text-gray-200" : "bg-gray-100 hover:bg-gray-200 text-gray-700"}`}
+            >
+              <Lock className="w-4 h-4" />
+              Lock
+            </button>
+          )}
+          <button
+            onClick={fetchAnalytics}
+            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg flex items-center gap-2 text-sm font-medium transition-colors"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Refresh
+          </button>
+        </div>
       </div>
+
+      {!pinState.pinSet && (
+        <div className={`flex items-center gap-2 text-sm rounded-lg px-4 py-3 ${dm ? "bg-gray-800 text-gray-300 border border-gray-700" : "bg-orange-50 text-orange-800 border border-orange-100"}`}>
+          <ShieldCheck className="w-4 h-4 flex-shrink-0" />
+          Tip: protect revenue and analytics with a 4-digit PIN in Settings → Analytics PIN.
+        </div>
+      )}
 
       {/* Overview Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard icon={Users}     title="Active Teachers" value={overview.users.teachers.active} subtitle={`${overview.users.teachers.total} total`}                           color="blue"   />
         <StatCard icon={Users}     title="Active Students" value={overview.users.students.active} subtitle={`${overview.users.students.total} total`}                           color="green"  />
         <StatCard icon={Calendar}  title="Total Bookings"  value={overview.bookings.total}         subtitle={`${overview.bookings.byStatus.completed} completed`}                color="purple" />
-        <StatCard icon={DollarSign} title="Total Revenue"  value={fmtMoney(overview.revenue.total, sym)} subtitle={`${fmtMoney(overview.revenue.pending, sym)} pending`}         color="orange" />
+        <StatCard icon={DollarSign} title="Total Revenue"  value={fmtMoney(overview.revenue?.total, sym)} subtitle={`${fmtMoney(overview.revenue?.teacherPending, sym)} owed to teachers`} color="orange" />
       </div>
 
       {/* Booking Status Breakdown */}
@@ -189,8 +238,8 @@ export default function AnalyticsDashboard({ isDarkMode }) {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
             {[
               { label: "Total Revenue", value: revenue.summary.totalRevenue,  c: dm ? "bg-green-900/30 text-green-300"  : "bg-green-50 text-green-600"  },
-              { label: "Paid Out",      value: revenue.summary.totalPaid,     c: dm ? "bg-blue-900/30 text-blue-300"    : "bg-blue-50 text-blue-600"    },
-              { label: "Pending",       value: revenue.summary.totalPending,  c: dm ? "bg-yellow-900/30 text-yellow-300": "bg-yellow-50 text-yellow-600" },
+              { label: "Paid to Teachers",  value: revenue.summary.totalPaid,    c: dm ? "bg-blue-900/30 text-blue-300"    : "bg-blue-50 text-blue-600"    },
+              { label: "Owed to Teachers",  value: revenue.summary.totalPending, c: dm ? "bg-yellow-900/30 text-yellow-300": "bg-yellow-50 text-yellow-600" },
             ].map(({ label, value, c }) => (
               <div key={label} className={`text-center p-4 rounded-lg ${c}`}>
                 <p className={`text-sm mb-1 ${subText}`}>{label}</p>
@@ -214,7 +263,7 @@ export default function AnalyticsDashboard({ isDarkMode }) {
                 </div>
                 <div className="text-right">
                   <p className={`font-bold ${heading}`}>{fmtMoney(teacher.totalEarned, sym)}</p>
-                  <p className="text-sm text-yellow-500">{fmtMoney(teacher.pendingAmount, sym)} pending</p>
+                  <p className="text-sm text-yellow-500">{fmtMoney(teacher.pendingAmount, sym)} owed</p>
                 </div>
               </div>
             ))}
@@ -239,8 +288,8 @@ export default function AnalyticsDashboard({ isDarkMode }) {
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="font-bold text-purple-500">{teacher.lessonsCompleted} classes</p>
-                  <p className={`text-sm ${mutedText}`}>{fmtMoney(teacher.earned, sym)} earned</p>
+                  <p className="font-bold text-purple-500">{teacher.completedBookings} classes</p>
+                  <p className={`text-sm ${mutedText}`}>{fmtMoney(teacher.earned, sym)} earned (all time)</p>
                 </div>
               </div>
               <div className={`flex items-center gap-4 text-sm mb-2 ${subText}`}>

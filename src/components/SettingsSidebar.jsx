@@ -1,6 +1,6 @@
 // src/components/SettingsSidebar.jsx
 import React, { useState } from 'react';
-import { Settings, X, Key, Shield, Monitor, ChevronRight, Lock, User, Mail, Globe } from 'lucide-react';
+import { Settings, X, Key, KeyRound, Shield, Monitor, ChevronRight, Lock, User, Mail, Globe } from 'lucide-react';
 
 export default function SettingsSidebar({
   isOpen,
@@ -9,6 +9,7 @@ export default function SettingsSidebar({
   onChangeEmail,
   onManageSessions,
   onManage2FA,
+  onManageAnalyticsPin = null,
   userInfo = null,
   isMobile = false,
   forcedMode = null,
@@ -45,6 +46,13 @@ export default function SettingsSidebar({
       description: 'Secure your account with 2FA',
       onClick: () => { onManage2FA(); onClose(); },
     },
+    ...(onManageAnalyticsPin ? [{
+      id: 'analytics-pin',
+      label: 'Analytics PIN',
+      icon: KeyRound,
+      description: 'Require a 4-digit PIN to view revenue & analytics',
+      onClick: () => { onManageAnalyticsPin(); onClose(); },
+    }] : []),
   ];
 
   // Show view toggle on any small-screen device (phone/tablet) regardless of current mode

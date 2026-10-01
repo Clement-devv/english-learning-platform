@@ -1,5 +1,6 @@
 import axios from "axios";
 import { getCachedCenter } from "./utils/branding";
+import { getAnalyticsUnlock, needsAnalyticsUnlock, ANALYTICS_UNLOCK_HEADER } from "./utils/analyticsPin";
 
 const _apiUrl = import.meta.env.VITE_API_URL;
 if (!_apiUrl && import.meta.env.PROD) {
@@ -110,6 +111,12 @@ api.interceptors.request.use(
     })();
     const slug = impersonationSlug || devSlug || subdomainSlug || getCachedCenter()?.slug;
     if (slug) config.headers["x-center-slug"] = slug;
+
+    // Admin analytics PIN: attach the session unlock token to analytics calls
+    if (needsAnalyticsUnlock(config.url)) {
+      const unlock = getAnalyticsUnlock();
+      if (unlock) config.headers[ANALYTICS_UNLOCK_HEADER] = unlock;
+    }
 
     return config;
   },

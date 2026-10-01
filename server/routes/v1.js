@@ -52,6 +52,7 @@ import certificateRoutes         from "./certificateRoutes.js";
 import parentRoutes              from "./parentRoutes.js";
 import publicRoutes              from "./publicRoutes.js";
 import adminEmailChangeRoutes    from "./adminEmailChangeRoutes.js";
+import analyticsPinRoutes        from "./analyticsPinRoutes.js";
 
 const router = Router();
 
@@ -102,5 +103,6 @@ router.use("/certificates",         certificateRoutes);
 router.use("/parents",              parentRoutes);
 router.use("/public",               publicRoutes);
 router.use("/admin/email-change",   adminEmailChangeRoutes);
+router.use("/admin/analytics-pin",  analyticsPinRoutes);
 
 export default router;
