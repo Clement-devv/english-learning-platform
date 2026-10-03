@@ -3,6 +3,7 @@
 // Used by AuthGuard (verification) and AuthContext (state).
 // Never import localStorage/sessionStorage auth keys from anywhere else.
 
+import { clearDataCache } from "../lib/queryClient";
 /** Per-role storage and routing config */
 export const ROLE_CONFIG = {
   teacher: {
@@ -124,6 +125,7 @@ export function saveUserInfo(role, info) {
  * @param {string} role
  */
 export function clearAuth(role) {
+  clearDataCache(); // never show one account's cached screens to the next
   const cfg = ROLE_CONFIG[role];
   if (!cfg) return;
   sessionStorage.removeItem(cfg.tokenKey);

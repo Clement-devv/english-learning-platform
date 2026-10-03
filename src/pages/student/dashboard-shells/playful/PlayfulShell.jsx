@@ -9,6 +9,8 @@ import {
   MoreHorizontal, Bell, Search, LogOut, Settings, ChevronRight,
   Shield, KeyRound, Copy, Sun, Moon, Play, Award,
 } from "lucide-react";
+import LanguageSwitcher from "../../../../components/LanguageSwitcher";
+import LeaderboardTab   from "../../tabs/LeaderboardTab";
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip as RechartsTip, ResponsiveContainer, PieChart, Pie, Cell,
@@ -22,7 +24,9 @@ import SettingsModal     from "../../../../components/SettingsModal";
 import Classroom         from "../../../Classroom";
 import MessagesTab       from "../../../../components/chat/MessagesTab";
 import ClassConfirmation from "../../../../components/student/ClassConfirmation";
+import PendingConfirmationBanners from "../PendingConfirmationBanners";
 import StudentCompletedTab from "../../tabs/StudentCompletedTab";
+import BookingCalendarTab from "../../tabs/BookingCalendarTab";
 import StudentScheduleTab  from "../../tabs/StudentScheduleTab";
 import StudentHomeworkTab  from "../../tabs/HomeworkTab";
 import StudentQuizTab      from "../../tabs/QuizTab";
@@ -36,6 +40,7 @@ import StreakWidget        from "../../components/StreakWidget";
 import ActiveClasses       from "../../components/ActiveClasses";
 import UpcomingClasses     from "../../components/UpcomingClasses";
 import ProgressCard        from "../../components/ProgressCard";
+import DashboardAlertsBar from "../../../../components/DashboardAlertsBar";
 
 // ── Palette ────────────────────────────────────────────────────────────────────
 const LIGHT = {
@@ -79,17 +84,17 @@ const NAV = [
   { id:"study",     Icon:BookOpen,       label:"Study",    tabs:["homework","quiz","flashcards"],    dot:"#4D96FF" },
   { id:"practice",  Icon:Mic2,           label:"Practice", tabs:["pronunciation","conversation"],    dot:"#FFD93D" },
   { id:"messages",  Icon:MessageSquare,  label:"Messages", tabs:["messages"],                        dot:"#4ADE80" },
-  { id:"classes",   Icon:CalendarDays,   label:"Classes",  tabs:["completed-classes","schedule"],    dot:"#06B6D4" },
+  { id:"classes",   Icon:CalendarDays,   label:"Classes",  tabs:["completed-classes","schedule","book-class"],    dot:"#06B6D4" },
   { id:"progress",  Icon:BarChart2,      label:"Progress", tabs:["charts","badges"],                 dot:"#FF8E53" },
-  { id:"more",      Icon:MoreHorizontal, label:"More",     tabs:["recordings","reviews","referral"], dot:"#818CF8" },
+  { id:"more",      Icon:MoreHorizontal, label:"More",     tabs:["recordings","reviews","referral","leaderboard"], dot:"#818CF8" },
 ];
 
 const SUB_TABS = {
   study:    [{ key:"homework",label:"Homework" }, { key:"quiz",label:"Quizzes" }, { key:"flashcards",label:"Flashcards" }],
   practice: [{ key:"pronunciation",label:"Speak" }, { key:"conversation",label:"AI Chat" }],
-  classes:  [{ key:"completed-classes",label:"Completed" }, { key:"schedule",label:"Schedule" }],
+  classes:  [{ key:"completed-classes",label:"Completed" }, { key:"schedule",label:"Schedule" }, { key:"book-class",label:"Book a Class" }],
   progress: [{ key:"charts",label:"Charts" }, { key:"badges",label:"Badges" }],
-  more:     [{ key:"recordings",label:"Recordings" }, { key:"reviews",label:"Reviews" }, { key:"referral",label:"Invite" }],
+  more:     [{ key:"recordings",label:"Recordings" }, { key:"reviews",label:"Reviews" }, { key:"referral",label:"Invite" }, { key:"leaderboard",label:"Leaderboard" }],
 };
 
 // ── Lesson category tiles ──────────────────────────────────────────────────────
@@ -109,7 +114,7 @@ const PAGE_TITLE = {
   pronunciation:"Speaking",conversation:"AI Chat",messages:"Messages",
   "completed-classes":"Completed Classes",schedule:"Schedule",
   charts:"Progress",badges:"Badges",recordings:"Recordings",
-  reviews:"Reviews",referral:"Invite Friends",
+  reviews:"Reviews",referral:"Invite Friends",leaderboard:"Leaderboard",
 };
 
 // ── Badges panel ───────────────────────────────────────────────────────────────
@@ -339,6 +344,8 @@ export default function PlayfulShell() {
           </div>
           )}
 
+          <LanguageSwitcher compact col={{ border: P.border, body: P.text }} />
+
           {/* Dark mode */}
           <button onClick={()=>d.setIsDarkMode(v=>!v)}
             style={{width:36,height:36,borderRadius:12,border:`1px solid ${P.border}`,background:P.inputBg,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:P.textSub}}>
@@ -383,6 +390,9 @@ export default function PlayfulShell() {
 
         {/* ── SCROLL AREA ── */}
         <main style={{flex:1,overflowY:"auto",padding: isMobile ? "16px 14px 80px" : 24}}>
+          {/* Missed calls & new messages while away */}
+          <DashboardAlertsBar isDark={d.isDarkMode} onOpenMessages={() => d.setActiveTab("messages")} />
+          <PendingConfirmationBanners d={d} />
 
           {/* ════════════════ DASHBOARD HOME ════════════════ */}
           {d.activeTab==="dashboard" && (
@@ -601,6 +611,8 @@ export default function PlayfulShell() {
 
           {/* ════ SCHEDULE ════ */}
           {d.activeTab==="schedule"&&<div style={{background:P.card,borderRadius:20,padding:24,border:`1px solid ${P.border}`}}><StudentScheduleTab studentId={d.student.id} isDarkMode={d.isDarkMode}/></div>}
+          {/* ════ BOOK A CLASS ════ */}
+          {d.activeTab==="book-class"&&<div style={{background:P.card,borderRadius:20,padding:24,border:`1px solid ${P.border}`}}><BookingCalendarTab isDarkMode={d.isDarkMode} studentInfo={d.student}/></div>}
 
           {/* ════ CHARTS ════ */}
           {d.activeTab==="charts"&&(
@@ -643,6 +655,7 @@ export default function PlayfulShell() {
 
           {/* ════ REFERRAL ════ */}
           {d.activeTab==="referral"&&<ReferralTab isDarkMode={d.isDarkMode}/>}
+          {d.activeTab==="leaderboard"&&<LeaderboardTab isDarkMode={d.isDarkMode}/>}
         </main>
       </div>
 
@@ -748,7 +761,7 @@ export default function PlayfulShell() {
               {NAV.filter(n => !['dashboard','messages','classes'].includes(n.id)).flatMap(n => n.tabs).map(tab => {
                 const navItem = NAV.find(n => n.tabs.includes(tab));
                 const isActive = d.activeTab === tab;
-                const label = {homework:'Homework',quiz:'Quizzes',flashcards:'Flashcards',pronunciation:'Speaking',conversation:'AI Chat','completed-classes':'Completed',charts:'Charts',badges:'Badges',recordings:'Recordings',reviews:'Reviews',referral:'Invite'}[tab] || tab;
+                const label = {homework:'Homework',quiz:'Quizzes',flashcards:'Flashcards',pronunciation:'Speaking',conversation:'AI Chat','completed-classes':'Completed',charts:'Charts',badges:'Badges',recordings:'Recordings',reviews:'Reviews',referral:'Invite',leaderboard:'Leaderboard'}[tab] || tab;
                 if (!navItem) return null;
                 const Icon = navItem.Icon;
                 return (

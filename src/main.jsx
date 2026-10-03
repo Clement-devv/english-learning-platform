@@ -7,22 +7,13 @@ import './i18n/i18n.js';
 import { fetchBranding, applyBranding, setCachedBranding } from './utils/branding.js';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 
-Sentry.init({
-  dsn: import.meta.env.VITE_SENTRY_DSN,
-  environment: import.meta.env.MODE,
-  integrations: [
-    Sentry.browserTracingIntegration(),
-    Sentry.replayIntegration({ maskAllText: false, blockAllMedia: false }),
-  ],
-  tracesSampleRate: 0.1,
-  replaysSessionSampleRate: 0.05,
-  replaysOnErrorSampleRate: 1.0,
-  enabled: !!import.meta.env.VITE_SENTRY_DSN,
-});
-
-// ── Handle impersonation URL params ──────────────────────────────────────────
-// Super admin "Enter as Admin" opens a new tab with ?imp_token=xxx&imp_center=slug
-const _imp = new URLSearchParams(window.location.search);
+// ── Handle impersonation hand-off ────────────────────────────────────────────
+// Super admin "Enter as Admin" opens a new tab with #imp_token=xxx&imp_center=slug.
+// The token travels in the URL *fragment*, which browsers never send to a server
+// (so it can't land in proxy/server logs or a Referer header). This runs BEFORE
+// Sentry.init so the URL is already clean when Sentry records the page load.
+// (?imp_token= is still read so a tab opened by an older dashboard keeps working.)
+const _imp = new URLSearchParams(window.location.hash.slice(1) || window.location.search);
 const _impToken  = _imp.get('imp_token');
 const _impCenter = _imp.get('imp_center');
 const _impName   = _imp.get('imp_name');
@@ -40,6 +31,41 @@ if (_impToken && _impCenter) {
   window.history.replaceState({}, '', '/admin');
 }
 // ─────────────────────────────────────────────────────────────────────────────
+
+// Blank out credentials if a URL carrying one is ever captured (errors,
+// navigation breadcrumbs, request spans).
+const SECRET_PARAM_RE = /([?&#](?:imp_token|token|sessionToken|access_token|resetToken)=)[^&#\s]*/gi;
+const scrubUrl = (u) => (typeof u === 'string' ? u.replace(SECRET_PARAM_RE, '$1[redacted]') : u);
+
+Sentry.init({
+  dsn: import.meta.env.VITE_SENTRY_DSN,
+  environment: import.meta.env.MODE,
+  integrations: [
+    Sentry.browserTracingIntegration(),
+    // Replays record what's on screen. Students' names, messages and grades are
+    // personal data (often of minors), so all text, inputs and media are masked.
+    Sentry.replayIntegration({ maskAllText: true, maskAllInputs: true, blockAllMedia: true }),
+  ],
+  tracesSampleRate: 0.1,
+  replaysSessionSampleRate: 0.05,
+  replaysOnErrorSampleRate: 1.0,
+  enabled: !!import.meta.env.VITE_SENTRY_DSN,
+  beforeSend(event) {
+    if (event.request?.url) event.request.url = scrubUrl(event.request.url);
+    return event;
+  },
+  beforeSendTransaction(event) {
+    if (event.request?.url) event.request.url = scrubUrl(event.request.url);
+    if (typeof event.transaction === 'string') event.transaction = scrubUrl(event.transaction);
+    return event;
+  },
+  beforeBreadcrumb(crumb) {
+    if (crumb?.data) {
+      for (const k of ['url', 'from', 'to']) if (crumb.data[k]) crumb.data[k] = scrubUrl(crumb.data[k]);
+    }
+    return crumb;
+  },
+});
 
 // PWA launch shortcut — when the installed app opens to `/`, skip the landing
 // page and go directly to the user's role route. AuthGuard handles the

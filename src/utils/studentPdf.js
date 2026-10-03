@@ -209,11 +209,11 @@ export async function downloadStudentCard(student, centerName) {
   const badgeW = 38;
   const badgeX = W - 14 - badgeW;
   doc.setFillColor(...sc.bg);
-  doc.roundedRect(badgeX, 38, badgeW, 8, 2, 2, "F");
+  doc.roundedRect(badgeX, 37, badgeW, 7, 2, 2, "F"); // ends above the section underline
   doc.setTextColor(...sc.text);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(8);
-  doc.text(sl, badgeX + badgeW / 2, 43.5, { align: "center" });
+  doc.text(sl, badgeX + badgeW / 2, 41.8, { align: "center" });
 
   // ── Section title ──
   doc.setFontSize(8);
@@ -280,14 +280,14 @@ export async function downloadStudentCard(student, centerName) {
   doc.setFillColor(248, 250, 252);
   doc.setDrawColor(...MUTED);
   doc.setLineWidth(0.3);
-  doc.roundedRect(14, endY, W - 28, 16, 2, 2, "FD");
+  doc.roundedRect(14, endY, W - 28, 22, 2, 2, "FD"); // tall enough for the title + 2 lines
   doc.setFontSize(7.5);
   doc.setTextColor(100, 116, 139);
   doc.setFont("helvetica", "bold");
   doc.text("ADMIN NOTE", 20, endY + 6);
   doc.setFont("helvetica", "normal");
   doc.text("This document is an official offline record generated from the student management system.", 20, endY + 12);
-  doc.text("Keep in a secure location. Do not share without authorisation.", 20, endY + 16.5);
+  doc.text("Keep in a secure location. Do not share without authorisation.", 20, endY + 17);
 
   drawFooter(doc, name);
 

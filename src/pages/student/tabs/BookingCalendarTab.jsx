@@ -6,6 +6,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { ChevronLeft, X, Loader, Calendar, AlertCircle, Globe, Clock } from 'lucide-react';
 import api from '../../../api';
+import { useOnDataChanged } from '../../../hooks/useLiveData';
 import WeekCalendar, { Legend } from '../../../components/schedule/WeekCalendar';
 import {
   getMonday, addDays, localYmd, localHHMM, fmtTime, fmtRange, fmtDay, viewerTz, tzName,
@@ -65,6 +66,7 @@ export default function BookingCalendarTab({ isDarkMode }) {
     } finally { setLoading(false); }
   }, [selectedTeacher, weekStart]);
   useEffect(() => { loadWeek(); }, [loadWeek]);
+  useOnDataChanged(['schedule', 'bookings'], loadWeek); // live: free time changes as others book
 
   // ── What's bookable ────────────────────────────────────────────────────────
   const blocks = useMemo(() => cal.blocks || [], [cal.blocks]);

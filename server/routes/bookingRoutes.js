@@ -22,7 +22,7 @@ import { checkAndAwardCertificates } from './certificateRoutes.js';
 import { validateObjectId } from '../middleware/validateObjectId.js';
 import { parsePagination } from '../utils/pagination.js';
 import { toStr, toObjectId } from '../utils/inputSanitizer.js';
-import { sendPush } from '../utils/webPushService.js';
+import { pushToUser, pushToAllAdmins } from '../utils/webPushService.js';
 import { disputeDeadlineFrom, DISPUTE_DAYS } from '../utils/parentCheck.js';
 import { sendEmail, getCenterBaseUrl } from '../utils/emailService.js';
 
@@ -143,9 +143,7 @@ router.post("/", verifyToken, async (req, res) => {
           bookingId: booking._id,
         });
       }
-      if (student.pushSubscription?.endpoint) {
-        sendPush(student.pushSubscription, { title: '📅 New Class Scheduled!', body: `"${classTitle}" has been booked for you`, icon: '/icons/icon.svg', data: { url: '/student/dashboard' } }).catch(() => {});
-      }
+      pushToUser(req.db, 'student', student._id, { title: '📅 New Class Scheduled!', body: `"${classTitle}" has been booked for you`, icon: '/icons/icon.svg', data: { url: '/student/dashboard' } });
     } catch (_) {}
 
     res.status(201).json({
@@ -265,10 +263,7 @@ router.patch("/:id/accept", verifyToken, validateObjectId("id"), async (req, res
         message: `Your class "${booking.classTitle}" has been confirmed`,
         bookingId: booking._id,
       });
-      getStudent(req.db).findById(booking.studentId._id).select('pushSubscription').then(s => {
-        if (s?.pushSubscription?.endpoint)
-          sendPush(s.pushSubscription, { title: '✅ Class Confirmed!', body: `"${booking.classTitle}" is confirmed`, icon: '/icons/icon.svg', data: { url: '/student/dashboard' } }).catch(() => {});
-      }).catch(() => {});
+      pushToUser(req.db, 'student', booking.studentId._id, { title: '✅ Class Confirmed!', body: `"${booking.classTitle}" is confirmed`, icon: '/icons/icon.svg', data: { url: '/student/dashboard' } });
     } catch (_) {}
 
     res.json({ success: true, message: "Booking accepted successfully", booking });
@@ -311,10 +306,7 @@ router.patch("/:id/reject", verifyToken, validateObjectId("id"), async (req, res
         message: `Your booking "${booking.classTitle}" was not accepted`,
         bookingId: booking._id,
       });
-      getStudent(req.db).findById(booking.studentId._id).select('pushSubscription').then(s => {
-        if (s?.pushSubscription?.endpoint)
-          sendPush(s.pushSubscription, { title: '❌ Booking Declined', body: `"${booking.classTitle}" was not accepted`, icon: '/icons/icon.svg', data: { url: '/student/dashboard' } }).catch(() => {});
-      }).catch(() => {});
+      pushToUser(req.db, 'student', booking.studentId._id, { title: '❌ Booking Declined', body: `"${booking.classTitle}" was not accepted`, icon: '/icons/icon.svg', data: { url: '/student/dashboard' } });
     } catch (_) {}
 
     res.json({ success: true, message: "Booking rejected", booking });
@@ -325,7 +317,10 @@ router.patch("/:id/reject", verifyToken, validateObjectId("id"), async (req, res
 });
 
 // ─── PATCH complete ───────────────────────────────────────────────────────────
-router.patch("/:id/complete", verifyToken, validateObjectId("id"), async (req, res) => {
+// Admin-only manual completion (classes normally complete through the
+// classroom attendance flow). Previously any signed-in user could call this
+// and trigger teacher pay + a credit deduction for any class.
+router.patch("/:id/complete", verifyToken, verifyAdmin, validateObjectId("id"), async (req, res) => {
   try {
     getTeacher(req.db);
     getStudent(req.db);
@@ -385,10 +380,7 @@ router.patch("/:id/complete", verifyToken, validateObjectId("id"), async (req, r
         message: `Your class "${booking.classTitle}" has been marked as completed`,
         bookingId: booking._id,
       });
-      getStudent(req.db).findById(booking.studentId._id).select('pushSubscription').then(s => {
-        if (s?.pushSubscription?.endpoint)
-          sendPush(s.pushSubscription, { title: '🎉 Class Completed!', body: `"${booking.classTitle}" is done — great work!`, icon: '/icons/icon.svg', data: { url: '/student/dashboard' } }).catch(() => {});
-      }).catch(() => {});
+      pushToUser(req.db, 'student', booking.studentId._id, { title: '🎉 Class Completed!', body: `"${booking.classTitle}" is done — great work!`, icon: '/icons/icon.svg', data: { url: '/student/dashboard' } });
       // Notify student of any new certificates
       for (const cert of newCerts) {
         io.to(`student-room:${req.center.slug}:${booking.studentId._id}`).emit('certificate-awarded', {
@@ -452,8 +444,12 @@ router.get("/teacher/:teacherId", verifyToken, async (req, res) => {
   try {
     const { teacherId } = req.params;
     const { status } = req.query;
-    if (req.user.role === "teacher" && req.user.id !== teacherId)
+    // Allow-list: admin, the teacher themself, or a student (busy times only, below)
+    const { role } = req.user;
+    if (role === "teacher" && req.user.id !== teacherId)
       return forbidden(res, "You can only view your own bookings");
+    if (!["admin", "teacher", "student"].includes(role))
+      return forbidden(res, "Not authorized to view these bookings");
 
     const { limit, skip } = parsePagination(req.query, 50, 200);
     const filter = { teacherId };
@@ -490,8 +486,11 @@ router.get("/student/:studentId", verifyToken, async (req, res) => {
     const { studentId } = req.params;
     const { status } = req.query;
 
+    // Allow-list: admin, the student themself, or a teacher (filtered to their own classes below)
     if (req.user.role === "student" && req.user.id !== studentId)
       return forbidden(res, "You can only view your own bookings");
+    if (!["admin", "teacher", "student"].includes(req.user.role))
+      return forbidden(res, "Not authorized to view these bookings");
 
     // Teachers may only view bookings where they are the assigned teacher
     getTeacher(req.db);
@@ -523,6 +522,16 @@ router.patch("/:id/cancel", verifyToken, validateObjectId("id"), async (req, res
     const Booking = getBooking(req.db);
     const booking = await Booking.findById(req.params.id);
     if (!booking) return notFound(res, "Booking not found");
+
+    // Only an admin or someone in this class may cancel it
+    const { role, id: userId } = req.user;
+    const isParticipant =
+      (role === "teacher" && String(booking.teacherId) === String(userId)) ||
+      (role === "student" && String(booking.studentId) === String(userId));
+    if (role !== "admin" && !isParticipant) return forbidden(res, "You can only cancel your own classes");
+    if (["completed", "cancelled"].includes(booking.status)) {
+      return badRequest(res, `This class is already ${booking.status}`);
+    }
 
     booking.status      = "cancelled";
     booking.cancelledAt = new Date();

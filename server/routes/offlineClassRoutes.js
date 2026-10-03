@@ -32,6 +32,7 @@ import logger from "../utils/logger.js";
 
 const PAGE_SIZE = 20;
 import { badRequest, forbidden, notFound, conflict, serverError } from "../utils/apiResponse.js";
+import { outcomeChangePush } from "../utils/classOutcome.js";
 
 const router = express.Router();
 router.use(tenantMiddleware);
@@ -258,7 +259,12 @@ router.post("/:id/approve", verifyToken, verifyAdmin, validateObjectId("id"), as
       disputeStatus: "resolved_teacher", disputeResolution: "approve_teacher",
       disputeAdminNotes: note || "Approved by admin with the class", disputeResolvedAt: now,
     });
-    await Booking.updateOne({ _id: claimed._id }, { $set: set, ...(parentNoOpen ? { $unset: { shareLink: 1 } } : {}) });
+    await Booking.updateOne({ _id: claimed._id }, {
+      $set: set,
+      ...(parentNoOpen ? { $unset: { shareLink: 1 } } : {}),
+      // Approved later than the class itself → shows in that day's report
+      ...outcomeChangePush({ to: "completed", source: "admin", reason: `Teacher-logged class approved${note ? `: ${note}` : ""}` }),
+    });
 
     res.json({ success: true, message: `Approved — teacher paid ${earned}`, earned });
   } catch (err) {

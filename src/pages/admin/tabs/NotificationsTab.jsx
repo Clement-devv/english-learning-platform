@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Bell, CheckCheck, Filter, RefreshCw, BookOpen, RotateCcw, Shield } from "lucide-react";
 import api from "../../../api";
+import { useOnDataChanged } from "../../../hooks/useLiveData";
 
 const TYPE_META = {
   class_marked: {
@@ -52,9 +53,14 @@ export default function NotificationsTab({ isDarkMode, onUnreadCount }) {
   const dark = isDarkMode;
   const token = sessionStorage.getItem("adminToken") || localStorage.getItem("adminToken");
 
+  // Live: refresh quietly (no spinner) when the server says this data changed
+  const quietRef = useRef(false);
+  useOnDataChanged(["notifications"], () => { quietRef.current = true; fetchNotifications(); });
+
   const fetchNotifications = useCallback(async () => {
     try {
-      setLoading(true);
+      if (!quietRef.current) setLoading(true);
+    quietRef.current = false;
       const res  = await api.get("/notifications?limit=200");
       const data = res.data;
       if (data.success) {

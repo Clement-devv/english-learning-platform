@@ -3,12 +3,14 @@
 // login session) before revenue and analytics data are returned.
 import express from "express";
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 import { verifyToken, verifyAdmin } from "../middleware/authMiddleware.js";
 import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
 import { getAnalyticsAccess, signAnalyticsUnlock, ANALYTICS_UNLOCK_TTL } from "../middleware/analyticsPinMiddleware.js";
 import { adminSchema } from "../schemas/adminSchema.js";
 import { config } from "../config/config.js";
 import logger from "../utils/logger.js";
+import { sendAnalyticsPinCodeEmail, sendAnalyticsPinChangedEmail } from "../utils/emailService.js";
 import { badRequest, notFound, serverError } from "../utils/apiResponse.js";
 
 const router = express.Router();
@@ -54,44 +56,116 @@ router.get("/status", async (req, res) => {
   }
 });
 
-// PUT /api/v1/admin/analytics-pin — set or change the PIN
-router.put("/", rejectImpersonation, async (req, res) => {
+// ── Changing the PIN needs the password AND a code sent to the account email ──
+// Step 1  POST /request-change  { action: "set"|"remove", pin?, currentPassword }
+//         → checks the password, emails a 6-digit code (valid 15 min)
+// Step 2  POST /confirm-change  { code }
+//         → applies the change and emails a "PIN was changed" alert
+// Someone who only knows the password cannot change, reset or remove the PIN.
+
+const CODE_TTL_MS     = 15 * 60 * 1000;
+const RESEND_AFTER_MS = 60 * 1000;
+const MAX_CODE_TRIES  = 5;
+
+const maskEmail = (e = "") => {
+  const [u, d] = String(e).split("@");
+  if (!d) return "your email";
+  return `${u.slice(0, 2)}${"*".repeat(Math.max(1, u.length - 2))}@${d}`;
+};
+
+// POST /api/v1/admin/analytics-pin/request-change
+router.post("/request-change", rejectImpersonation, async (req, res) => {
   try {
-    const { pin } = req.body;
-    if (typeof pin !== "string" || !PIN_RE.test(pin)) return badRequest(res, "PIN must be exactly 4 digits");
+    const { action, pin } = req.body;
+    if (!["set", "remove"].includes(action)) return badRequest(res, "Invalid action");
+    if (action === "set" && (typeof pin !== "string" || !PIN_RE.test(pin))) return badRequest(res, "PIN must be exactly 4 digits");
 
     const admin = await loadAdminWithPassword(req, res);
     if (!admin) return;
+    if (action === "remove" && !admin.analyticsPinHash) return badRequest(res, "No analytics PIN is set");
+    if (!admin.email) return badRequest(res, "Your account has no email address to send the code to");
 
-    admin.analyticsPinHash           = await bcrypt.hash(pin, config.bcryptRounds);
-    admin.analyticsPinSetAt          = new Date();   // revokes existing unlock tokens
-    admin.analyticsPinFailedAttempts = 0;
-    admin.analyticsPinLockedUntil    = null;
-    await admin.save();
+    const pending = (await getAdmin(req.db).findById(admin._id).select("+analyticsPinPending").lean())?.analyticsPinPending;
+    if (pending?.sentAt && Date.now() - new Date(pending.sentAt).getTime() < RESEND_AFTER_MS) {
+      return res.status(429).json({ success: false, message: "A code was just sent. Please wait a minute before asking for another." });
+    }
 
-    res.json({ success: true, message: "Analytics PIN saved" });
+    const code = String(crypto.randomInt(0, 1_000_000)).padStart(6, "0");
+    const now  = new Date();
+    await getAdmin(req.db).updateOne({ _id: admin._id }, {
+      analyticsPinPending: {
+        action,
+        pinHash:   action === "set" ? await bcrypt.hash(pin, config.bcryptRounds) : null,
+        codeHash:  await bcrypt.hash(code, 10),
+        expiresAt: new Date(now.getTime() + CODE_TTL_MS),
+        sentAt:    now,
+        attempts:  0,
+      },
+    });
+
+    await sendAnalyticsPinCodeEmail({
+      email: admin.email, name: admin.firstName, code, action,
+      centerName: req.center?.centerName || "", minutes: CODE_TTL_MS / 60000,
+    });
+
+    res.json({ success: true, data: { sentTo: maskEmail(admin.email), expiresIn: CODE_TTL_MS / 1000 } });
   } catch (err) {
-    logger.error("Analytics PIN set error:", { error: err?.message });
-    serverError(res, "Error saving analytics PIN");
+    logger.error("Analytics PIN request-change error:", { error: err?.message });
+    serverError(res, "Could not send the confirmation code");
   }
 });
 
-// DELETE /api/v1/admin/analytics-pin — remove the PIN
-router.delete("/", rejectImpersonation, async (req, res) => {
+// POST /api/v1/admin/analytics-pin/confirm-change
+router.post("/confirm-change", rejectImpersonation, async (req, res) => {
   try {
-    const admin = await loadAdminWithPassword(req, res);
-    if (!admin) return;
+    const code = String(req.body?.code || "").trim();
+    if (!/^\d{6}$/.test(code)) return badRequest(res, "Enter the 6-digit code from the email");
 
-    admin.analyticsPinHash           = null;
-    admin.analyticsPinSetAt          = null;
+    const Admin = getAdmin(req.db);
+    // Reserve an attempt atomically so parallel guesses cannot bypass the limit
+    const admin = await Admin.findOneAndUpdate(
+      { _id: req.user.id, "analyticsPinPending.expiresAt": { $gt: new Date() } },
+      { $inc: { "analyticsPinPending.attempts": 1 } },
+      { new: true },
+    ).select("+analyticsPinPending +analyticsPinHash");
+
+    if (!admin?.analyticsPinPending) {
+      return badRequest(res, "This code has expired or was already used. Please start again.");
+    }
+    const pending = admin.analyticsPinPending;
+    if (pending.attempts > MAX_CODE_TRIES) {
+      await Admin.updateOne({ _id: admin._id }, { analyticsPinPending: null });
+      return res.status(429).json({ success: false, message: "Too many wrong codes. Please start again." });
+    }
+    if (!await bcrypt.compare(code, pending.codeHash)) {
+      const left = MAX_CODE_TRIES - pending.attempts;
+      return badRequest(res, left > 0 ? `Incorrect code. ${left} attempt${left > 1 ? "s" : ""} left.` : "Incorrect code. Please start again.");
+    }
+
+    const action = pending.action;
+    const hadPin = !!admin.analyticsPinHash;
+    if (action === "set") {
+      admin.analyticsPinHash  = pending.pinHash;
+      admin.analyticsPinSetAt = new Date();   // revokes existing unlock tokens
+    } else {
+      admin.analyticsPinHash  = null;
+      admin.analyticsPinSetAt = null;
+    }
     admin.analyticsPinFailedAttempts = 0;
     admin.analyticsPinLockedUntil    = null;
+    admin.analyticsPinPending        = null;
     await admin.save();
 
-    res.json({ success: true, message: "Analytics PIN removed" });
+    logger.info(`🔑 Analytics PIN ${action === "remove" ? "removed" : hadPin ? "changed" : "set"} (email-confirmed)`, { adminId: req.user.id, center: req.center.slug });
+    sendAnalyticsPinChangedEmail({
+      email: admin.email, name: admin.firstName, action, hadPin,
+      centerName: req.center?.centerName || "",
+    }).catch(err => logger.warn("PIN changed alert email failed:", { error: err?.message }));
+
+    res.json({ success: true, data: { action }, message: action === "remove" ? "Analytics PIN removed" : "Analytics PIN saved" });
   } catch (err) {
-    logger.error("Analytics PIN remove error:", { error: err?.message });
-    serverError(res, "Error removing analytics PIN");
+    logger.error("Analytics PIN confirm-change error:", { error: err?.message });
+    serverError(res, "Error confirming the PIN change");
   }
 });
 

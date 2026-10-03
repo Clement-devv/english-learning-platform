@@ -24,6 +24,7 @@ import { studentSchema }  from "../schemas/studentSchema.js";
 import { subAdminSchema } from "../schemas/subAdminSchema.js";
 import { parsePagination, DIRECTORY_MAX } from "../utils/pagination.js";
 import logger from "../utils/logger.js";
+import { sharedSnapshot } from "../utils/sharedSnapshot.js";
 import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
 import { cachedQuery, invalidateCache } from '../utils/cache.js';
 import { normaliseWorkingHours, isValidTz } from "../utils/schedule.js";
@@ -81,34 +82,55 @@ router.get("/for-booking", verifyToken, async (req, res) => {
 });
 
 // ─── GET single teacher ───────────────────────────────────────────────────────
+// Fields anyone signed in to the center may see (students, parents…)
+const PUBLIC_TEACHER_FIELDS = [
+  "_id", "firstName", "lastName", "displayName", "photo", "bio", "yearsOfExperience",
+  "specializations", "certifications", "country", "continent", "timezone",
+  "workingHours", "workingHoursTz", "showScheduleToStudents",
+  "googleMeetLink", "zoomLink", "active", "status", "lessonsCompleted",
+];
+// Sub-admins manage teachers: also contact details (not pay or bank data)
+const STAFF_TEACHER_FIELDS = [...PUBLIC_TEACHER_FIELDS, "email", "phone", "lastLogin", "createdAt"];
+
+const pick = (obj, keys) => Object.fromEntries(keys.filter(k => obj[k] !== undefined).map(k => [k, obj[k]]));
+
 router.get("/:id", verifyToken, async (req, res) => {
   try {
     const cacheKey = teacherCacheKey(req.center?.slug, req.params.id);
     const teacher = await cachedQuery(cacheKey, 60, () =>
       getTeacher(req.db)
         .findById(req.params.id)
-        .select("-password -inviteToken -twoFactorSecret -twoFactorBackupCodes -sessions")
+        .select("-password -inviteToken -twoFactorSecret -twoFactorBackupCodes -sessions -knownDevices -pushSubscription -resetPasswordToken -resetPasswordExpires -resetPasswordCenter")
         .lean()
     );
     if (!teacher) return notFound(res, "Teacher not found");
-    res.json(teacher);
+
+    // Full record (pay, bank details…) only for admins and the teacher themself
+    const { role, id } = req.user;
+    if (role === "admin" || (role === "teacher" && String(id) === String(teacher._id))) {
+      return res.json(teacher);
+    }
+    res.json(pick(teacher, role === "sub-admin" ? STAFF_TEACHER_FIELDS : PUBLIC_TEACHER_FIELDS));
   } catch (err) {
     serverError(res, "Error fetching teacher data");
   }
 });
 
 // ─── GET all teachers ─────────────────────────────────────────────────────────
-router.get("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
+// Same list for every admin/teacher → one shared snapshot per center (utils/sharedSnapshot.js)
+router.get("/", verifyToken, verifyAdminOrTeacher, sharedSnapshot("teachers-directory"), async (req, res) => {
   try {
     // Directory list (see studentRoutes) — allow the whole center when asked
     const { limit, skip } = parsePagination(req.query, 50, DIRECTORY_MAX);
     const teachers = await getTeacher(req.db)
       .find()
-      .select("-password -inviteToken -twoFactorSecret -twoFactorBackupCodes -sessions")
+      .select("-password -inviteToken -twoFactorSecret -twoFactorBackupCodes -sessions -knownDevices -pushSubscription -resetPasswordToken -resetPasswordExpires -resetPasswordCenter")
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
       .lean();
+    // Teachers see each other's public profile only — never pay or bank details
+    if (req.user.role !== "admin") return res.json(teachers.map(t => pick(t, PUBLIC_TEACHER_FIELDS)));
     res.json(teachers);
   } catch (err) {
     serverError(res, err.message);
@@ -384,11 +406,14 @@ router.get("/verify-invite/:token", async (req, res) => {
 });
 
 // ─── POST setup-account ───────────────────────────────────────────────────────
-router.post("/setup-account", async (req, res) => {
+router.post("/setup-account", strictLimiter, async (req, res) => {
   try {
     const { token, password, confirmPassword } = req.body;
     if (!token || !password || !confirmPassword)
       return badRequest(res, "All fields are required");
+    // Strings only — an object like { "$ne": null } would match any pending invite
+    if (typeof token !== "string" || typeof password !== "string")
+      return badRequest(res, "Invalid request");
     if (password !== confirmPassword)
       return badRequest(res, "Passwords do not match");
     if (password.length < 8)

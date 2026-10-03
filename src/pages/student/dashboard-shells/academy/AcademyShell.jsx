@@ -9,6 +9,8 @@ import {
   Bell, Search, LogOut, Settings, ChevronRight, ChevronLeft,
   Shield, KeyRound, Copy, MoreHorizontal, Sun, Moon,
 } from "lucide-react";
+import LanguageSwitcher from "../../../../components/LanguageSwitcher";
+import LeaderboardTab   from "../../tabs/LeaderboardTab";
 import {
   PieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer,
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -23,7 +25,9 @@ import SettingsModal from "../../../../components/SettingsModal";
 import Classroom from "../../../Classroom";
 import MessagesTab from "../../../../components/chat/MessagesTab";
 import ClassConfirmation from "../../../../components/student/ClassConfirmation";
+import PendingConfirmationBanners from "../PendingConfirmationBanners";
 import StudentCompletedTab from "../../tabs/StudentCompletedTab";
+import BookingCalendarTab from "../../tabs/BookingCalendarTab";
 import StudentScheduleTab from "../../tabs/StudentScheduleTab";
 import StudentHomeworkTab from "../../tabs/HomeworkTab";
 import StudentQuizTab from "../../tabs/QuizTab";
@@ -37,6 +41,7 @@ import StreakWidget from "../../components/StreakWidget";
 import ActiveClasses from "../../components/ActiveClasses";
 import UpcomingClasses from "../../components/UpcomingClasses";
 import ProgressCard from "../../components/ProgressCard";
+import DashboardAlertsBar from "../../../../components/DashboardAlertsBar";
 
 // ── Light palette (base) ───────────────────────────────────────────────────────
 const LIGHT = {
@@ -80,17 +85,17 @@ const NAV = [
   { id:"study",     Icon:BookOpen,       label:"Study",      tabs:["homework","quiz","flashcards"]     },
   { id:"practice",  Icon:Mic2,           label:"Practice",   tabs:["pronunciation","conversation"]     },
   { id:"messages",  Icon:MessageSquare,  label:"Messages",   tabs:["messages"]                         },
-  { id:"classes",   Icon:CalendarDays,   label:"Classes",    tabs:["completed-classes","schedule"]     },
+  { id:"classes",   Icon:CalendarDays,   label:"Classes",    tabs:["completed-classes","schedule","book-class"]     },
   { id:"progress",  Icon:BarChart2,      label:"Progress",   tabs:["charts","badges"]                  },
-  { id:"more",      Icon:MoreHorizontal, label:"More",       tabs:["recordings","reviews","referral"]  },
+  { id:"more",      Icon:MoreHorizontal, label:"More",       tabs:["recordings","reviews","referral","leaderboard"]  },
 ];
 
 const SUB_TABS = {
   study:    [{ key:"homework",label:"Homework" }, { key:"quiz",label:"Quizzes" }, { key:"flashcards",label:"Flashcards" }],
   practice: [{ key:"pronunciation",label:"Speak" }, { key:"conversation",label:"AI Chat" }],
-  classes:  [{ key:"completed-classes",label:"Completed" }, { key:"schedule",label:"Schedule" }],
+  classes:  [{ key:"completed-classes",label:"Completed" }, { key:"schedule",label:"Schedule" }, { key:"book-class",label:"Book a Class" }],
   progress: [{ key:"charts",label:"Charts" }, { key:"badges",label:"Badges" }],
-  more:     [{ key:"recordings",label:"Recordings" }, { key:"reviews",label:"Reviews" }, { key:"referral",label:"Invite" }],
+  more:     [{ key:"recordings",label:"Recordings" }, { key:"reviews",label:"Reviews" }, { key:"referral",label:"Invite" }, { key:"leaderboard",label:"Leaderboard" }],
 };
 
 // ── Page titles ────────────────────────────────────────────────────────────────
@@ -109,6 +114,7 @@ const PAGE_TITLES = {
   recordings:        "Recordings",
   reviews:           "Reviews",
   referral:          "Invite Friends",
+  leaderboard:       "Leaderboard",
 };
 
 // ── Grade colour helpers ───────────────────────────────────────────────────────
@@ -368,6 +374,8 @@ export default function AcademyShell() {
           </div>
           )}
 
+          <LanguageSwitcher compact col={{ border: P.border, body: P.text }} />
+
           {/* Dark mode toggle */}
           <button onClick={() => d.setIsDarkMode(v => !v)}
             title={d.isDarkMode ? "Light mode" : "Dark mode"}
@@ -418,6 +426,9 @@ export default function AcademyShell() {
 
         {/* ── SCROLL AREA ── */}
         <main style={{ flex:1, overflowY:"auto", padding: isMobile ? "16px 14px 80px" : "24px" }}>
+          {/* Missed calls & new messages while away */}
+          <DashboardAlertsBar isDark={d.isDarkMode} onOpenMessages={() => d.setActiveTab("messages")} />
+          <PendingConfirmationBanners d={d} />
 
           {/* ═══ DASHBOARD ═══ */}
           {d.activeTab === "dashboard" && (
@@ -754,6 +765,13 @@ export default function AcademyShell() {
             </div>
           )}
 
+          {/* ═══ BOOK A CLASS ═══ */}
+          {d.activeTab === "book-class" && (
+            <div style={{ background:P.card, borderRadius:"16px", padding:"24px", border:`1px solid ${P.border}` }}>
+              <BookingCalendarTab isDarkMode={d.isDarkMode} studentInfo={d.student} />
+            </div>
+          )}
+
           {/* ═══ CHARTS ═══ */}
           {d.activeTab === "charts" && (
             <div style={{ display:"flex", flexDirection:"column", gap:"16px" }}>
@@ -803,6 +821,7 @@ export default function AcademyShell() {
 
           {/* ═══ REFERRAL ═══ */}
           {d.activeTab === "referral" && <ReferralTab isDarkMode={d.isDarkMode} />}
+          {d.activeTab === "leaderboard" && <LeaderboardTab isDarkMode={d.isDarkMode} />}
         </main>
       </div>
 

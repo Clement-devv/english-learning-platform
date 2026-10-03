@@ -2,9 +2,10 @@
 // Approval queue for classes teachers logged outside the app (site down, held on
 // Meet/Zoom directly…). Nothing is charged or paid until approved here.
 // Server: server/routes/offlineClassRoutes.js
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { ClipboardCheck, ExternalLink, Check, X, RefreshCw, AlertTriangle } from "lucide-react";
 import api from "../../../api";
+import { useOnDataChanged } from "../../../hooks/useLiveData";
 import ManagedBadge from "../../../components/ManagedBadge";
 import DisputePulse, { DISPUTE_GLOW_CLASS, AWAITING_GLOW_CLASS } from "../../../components/DisputePulse";
 import Pagination from "../../../components/Pagination";
@@ -44,8 +45,13 @@ export default function LoggedClassesTab({ isDarkMode }) {
     : { card: "#ffffff", border: "#e2e8f0", heading: "#1e293b", body: "#64748b", soft: "#f8fafc" };
   const notify = (msg, type = "success") => { setToast({ msg, type }); setTimeout(() => setToast(null), 4000); };
 
+  // Live: refresh quietly (no spinner) when the server says this data changed
+  const quietRef = useRef(false);
+  useOnDataChanged(["offline-classes","bookings"], () => { quietRef.current = true; load(); });
+
   const load = async (p = page, f = filter) => {
-    setLoading(true);
+    if (!quietRef.current) setLoading(true);
+    quietRef.current = false;
     try {
       const { data } = await api.get(`/offline-classes?status=${f}&page=${p}`);
       setList(data.classes || []);

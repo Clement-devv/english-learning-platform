@@ -6,6 +6,7 @@ import fs from "fs";
 import { fileURLToPath } from "url";
 import { verifyToken, verifyAdminOrTeacher } from "../middleware/authMiddleware.js";
 import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
+import { canAccessClass } from "../utils/classAccess.js";
 import logger from "../utils/logger.js";
 import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
 import { s3Enabled, uploadToS3, deleteFromS3, getPresignedUrl, s3ObjectExists } from "../utils/s3.js";
@@ -41,6 +42,7 @@ router.post("/upload", tenantMiddleware, verifyToken, verifyAdminOrTeacher, uplo
     const bookingId = req.query.bookingId || req.body.bookingId;
     if (!bookingId) return badRequest(res, "bookingId required");
     if (!/^[a-zA-Z0-9_-]{1,100}$/.test(bookingId)) return badRequest(res, "Invalid bookingId format");
+    if (!(await canAccessClass(req, "class", bookingId))) return forbidden(res, "You are not part of this class");
 
     if (s3Enabled()) {
       const key = s3Key(req.center.slug, bookingId);
@@ -62,6 +64,7 @@ router.post("/upload", tenantMiddleware, verifyToken, verifyAdminOrTeacher, uplo
 router.get("/info/:bookingId", tenantMiddleware, verifyToken, async (req, res) => {
   const { bookingId } = req.params;
   if (!/^[a-zA-Z0-9_-]{1,100}$/.test(bookingId)) return badRequest(res, "Invalid bookingId");
+  if (!(await canAccessClass(req, "class", bookingId))) return forbidden(res, "You are not part of this class");
 
   if (s3Enabled()) {
     const exists = await s3ObjectExists(s3Key(req.center.slug, bookingId));
@@ -78,6 +81,7 @@ router.get("/info/:bookingId", tenantMiddleware, verifyToken, async (req, res) =
 router.get("/file/:bookingId", tenantMiddleware, verifyToken, async (req, res) => {
   const { bookingId } = req.params;
   if (!/^[a-zA-Z0-9_-]{1,100}$/.test(bookingId)) return badRequest(res, "Invalid bookingId");
+  if (!(await canAccessClass(req, "class", bookingId))) return forbidden(res, "You are not part of this class");
 
   if (s3Enabled()) {
     const key = s3Key(req.center.slug, bookingId);
@@ -99,6 +103,7 @@ router.get("/file/:bookingId", tenantMiddleware, verifyToken, async (req, res) =
 router.delete("/:bookingId", tenantMiddleware, verifyToken, verifyAdminOrTeacher, async (req, res) => {
   const { bookingId } = req.params;
   if (!/^[a-zA-Z0-9_-]{1,100}$/.test(bookingId)) return badRequest(res, "Invalid bookingId");
+  if (!(await canAccessClass(req, "class", bookingId))) return forbidden(res, "You are not part of this class");
 
   if (s3Enabled()) {
     await deleteFromS3(s3Key(req.center.slug, bookingId));

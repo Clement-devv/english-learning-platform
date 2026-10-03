@@ -10,10 +10,14 @@ import api from "../../../api";
 import { getUserTimezone } from "../../../utils/timezone";
 import { pushSupported, enablePush, disablePush, getPushStatus } from "../../../utils/pushNotifications";
 import { getStudentBookings } from "../../../services/bookingService";
+import { useLiveRefresh, refreshStale } from "../../../hooks/useLiveData";
 
 // Heartbeat intervals
-const TICK_MS      = 30_000;  // base tick — client-side class status runs every tick
-const TICK_REFRESH = 2;       // every 60s — API: credits, fresh accepted list, confirmations
+// Data refresh is event-driven (hooks/useLiveData.js): the server pushes
+// "data-changed" after any write that affects this student — classes, credits,
+// homework, quizzes update within ~1s; also on returning to the tab, switching
+// dashboard tab (if older than 30s) and a 5-minute safety refresh.
+const TICK_MS      = 30_000;  // client-side class status only (no API)
 
 // Classify a single accepted booking into active/upcoming buckets (matches fetchStudentData logic)
 function classifyBooking(booking, now = Date.now()) {
@@ -196,21 +200,13 @@ export function useDashboardData() {
     localStorage.setItem("darkMode", isDarkMode);
   }, [isDarkMode]);
 
-  // ── Push notifications — auto-subscribe on first login ────────────────────
+  // ── Push status for THIS device (asking is done by DeviceNotificationPrompt) ─
   useEffect(() => {
     if (!pushSupported()) return;
     setNotificationPermission(Notification.permission);
-    getPushStatus().then(async subscribed => {
-      if (subscribed) {
-        setNotificationsEnabled(true);
-        localStorage.setItem("notificationsEnabled", "true");
-      } else if (Notification.permission !== "denied") {
-        // Auto-request permission and subscribe — user doesn't need to opt-in manually
-        const { ok } = await enablePush();
-        setNotificationsEnabled(ok);
-        setNotificationPermission(ok ? "granted" : Notification.permission);
-        localStorage.setItem("notificationsEnabled", ok ? "true" : "false");
-      }
+    getPushStatus().then(subscribed => {
+      setNotificationsEnabled(subscribed);
+      localStorage.setItem("notificationsEnabled", subscribed ? "true" : "false");
     });
   }, []);
 
@@ -245,9 +241,8 @@ export function useDashboardData() {
     if (activeTab === "messages") setUnreadMessages(0);
   }, [activeTab]);
 
-  // ── Homework count polling ─────────────────────────────────────────────────
-  useEffect(() => {
-    const checkHomework = async () => {
+  // ── Homework badge ─────────────────────────────────────────────────────────
+  const checkHomework = useCallback(async () => {
       try {
         const { data } = await api.get("/homework/assigned", { params: { limit: 1 } }); // counts only
         const pending = data.counts?.assigned ?? 0;
@@ -260,15 +255,11 @@ export function useDashboardData() {
         }
         prevHomeworkRef.current = pending;
       } catch { /* silent */ }
-    };
-    checkHomework();
-    const interval = setInterval(checkHomework, 90 * 1000);
-    return () => clearInterval(interval);
   }, []);
+  useEffect(() => { checkHomework(); }, [checkHomework]);
 
-  // ── Quiz count polling ─────────────────────────────────────────────────────
-  useEffect(() => {
-    const checkQuizzes = async () => {
+  // ── Quiz badge ─────────────────────────────────────────────────────────────
+  const checkQuizzes = useCallback(async () => {
       try {
         const { data } = await api.get("/quiz/assigned", { params: { limit: 1 } }); // counts only
         const pending = data.counts?.assigned ?? 0;
@@ -281,11 +272,8 @@ export function useDashboardData() {
         }
         prevQuizRef.current = pending;
       } catch { /* silent */ }
-    };
-    checkQuizzes();
-    const interval = setInterval(checkQuizzes, 90 * 1000);
-    return () => clearInterval(interval);
   }, []);
+  useEffect(() => { checkQuizzes(); }, [checkQuizzes]);
 
   // ── Helpers ────────────────────────────────────────────────────────────────
   const showToast = (message, type = "success") => {
@@ -347,13 +335,14 @@ export function useDashboardData() {
   };
 
   // ── Fetch data ─────────────────────────────────────────────────────────────
-  const fetchStudentData = async () => {
+  // quiet: background refresh (live push) — no spinner, no repeated timezone sync
+  const fetchStudentData = async ({ quiet = false } = {}) => {
     try {
-      setLoading(true);
+      if (!quiet) setLoading(true);
       const studentId = student.id;
       if (!studentId) { showToast("Please login again.", "error"); handleLogout(); return; }
 
-      api.patch(`/students/${studentId}/timezone`, { timezone: getUserTimezone() }).catch(() => {});
+      if (!quiet) api.patch(`/students/${studentId}/timezone`, { timezone: getUserTimezone() }).catch(() => {});
 
       const [accepted, completed, pendingConf, history] = await Promise.all([
         getStudentBookings(studentId, "accepted"),
@@ -445,15 +434,19 @@ export function useDashboardData() {
         if (cls.status === "starting-soon")
           notifs.push({ id: `class-${cls.id}`, type: "class", message: `${cls.title} starts soon!`, time: cls.time, read: false });
       });
-      if (notifs.length) setNotifications(prev => [...notifs, ...prev]);
+      // Background refreshes run this again — don't add the same notice twice
+      if (notifs.length) setNotifications(prev => [...notifs.filter(n => !prev.some(p => p.id === n.id)), ...prev]);
       setLoading(false);
+      setDataReady(true);
     } catch (err) {
       console.error("Failed to fetch student data:", err);
-      showToast("Failed to load your classes", "error");
+      if (!quiet) showToast("Failed to load your classes", "error");
       setLoading(false);
+      setDataReady(true);
     }
   };
 
+  const [dataReady, setDataReady] = useState(false);
   useEffect(() => { fetchStudentData(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── fetchStudentDataRef — keeps socket handler pointing at latest fn ───────
@@ -495,7 +488,7 @@ export function useDashboardData() {
       socket.on("booking-update", ({ title, message, type }) => {
         showToast(message, type === "rejected" ? "error" : "success");
         if ("Notification" in window && Notification.permission === "granted") new Notification(title, { body: message, icon: "/favicon.ico" });
-        fetchStudentDataRef.current?.();
+        fetchStudentDataRef.current?.({ quiet: true });
       });
       socket.on("homework-assigned", ({ title, message }) => {
         showToast(message, "success");
@@ -530,6 +523,7 @@ export function useDashboardData() {
         getStudentBookings(studentId, "pending_confirmation"),
       ]);
       rawAcceptedRef.current = acceptedRaw;
+      reclassify();
       const classesRemaining = freshStudent?.classCredits || 0;
       setProgress(prev => ({ ...prev, classesRemaining, totalLessons: prev.completedLessons + classesRemaining }));
       setPendingConfirmations(prev => {
@@ -551,22 +545,29 @@ export function useDashboardData() {
     } catch { /* silent */ }
   }, [student.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Heartbeat tick counter ─────────────────────────────────────────────────
+  // ── Live refresh (replaces the 60s / 90s polling) ─────────────────────────
+  const liveId = student.id || "me";
+  const live = { enabled: dataReady };
+  const quietFull = useCallback(() => fetchStudentDataRef.current?.({ quiet: true }), []);
+  useLiveRefresh(["classes",  "student", liveId], quietFull, live);                      // bookings / classes changed
+  useLiveRefresh(["credits",  "student", liveId], refreshCreditsAndConfirmations, live); // payments, credits
+  useLiveRefresh(["homework", "student", liveId, "count"], checkHomework, live);
+  useLiveRefresh(["quizzes",  "student", liveId, "count"], checkQuizzes, live);
   useEffect(() => {
-    const tickRef = { current: 0 };
-    const id = setInterval(() => {
-      if (document.visibilityState === "hidden") return;
-      tickRef.current += 1;
-      if (tickRef.current % TICK_REFRESH === 0) refreshCreditsAndConfirmations();
-    }, TICK_MS);
-    return () => clearInterval(id);
-  }, [refreshCreditsAndConfirmations]);
+    if (!dataReady) return;
+    ["classes", "credits", "homework", "quizzes"].forEach(r => refreshStale([r, "student", liveId]));
+  }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Client-side class-status ticker (zero API calls) ──────────────────────
   useEffect(() => {
-    const id = setInterval(() => {
+    const id = setInterval(() => reclassify(), TICK_MS);
+    return () => clearInterval(id);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function reclassify() {
+    {
       const raw = rawAcceptedRef.current;
-      if (!raw.length) return;
+      if (!raw.length) { setActiveClasses(prev => (prev.length ? [] : prev)); setUpcomingClasses(prev => (prev.length ? [] : prev)); return; }
       const now = Date.now();
       const active = [], upcoming = [];
       raw.forEach(booking => {
@@ -578,10 +579,9 @@ export function useDashboardData() {
         const changed = active.length !== prev.length || active.some((a, i) => a.status !== prev[i]?.status);
         return changed ? active : prev;
       });
-      setUpcomingClasses(prev => (upcoming.length !== prev.length ? upcoming : prev));
-    }, TICK_MS);
-    return () => clearInterval(id);
-  }, []);
+      setUpcomingClasses(prev => (upcoming.length !== prev.length || upcoming.some((u, i) => u.id !== prev[i]?.id) ? upcoming : prev));
+    }
+  }
 
   // ── Badges ─────────────────────────────────────────────────────────────────
   const triggerCelebration = (msg, emoji) => {

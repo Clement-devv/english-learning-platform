@@ -61,6 +61,17 @@ router.get("/", async (_req, res) => {
   const toMB      = (b) => Math.round(b / 1024 / 1024);
   const healthy   = dbStatus === "connected";
 
+  // This endpoint is public. In production, report only up/down — Node
+  // version, memory and CPU details help an attacker pick exploits and time
+  // resource-exhaustion attacks. Full diagnostics stay available in dev.
+  if (process.env.NODE_ENV === "production") {
+    return res.status(healthy ? 200 : 503).json({
+      status: healthy ? "healthy" : "degraded",
+      db: { status: dbStatus },
+      timestamp: new Date().toISOString(),
+    });
+  }
+
   res.status(healthy ? 200 : 503).json({
     status:   healthy ? "healthy" : "degraded",
     uptime:   `${Math.floor(process.uptime())}s`,

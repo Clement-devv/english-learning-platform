@@ -24,6 +24,7 @@ async function createIndexes() {
     await db.collection("teachers").createIndex({ email: 1 }, { unique: true });
     await db.collection("teachers").createIndex({ active: 1 });
     await db.collection("teachers").createIndex({ continent: 1 });
+    await db.collection("teachers").createIndex({ teacherCode: 1 }, { unique: true, sparse: true });
     console.log("   ✅ teachers done");
 
     // ── Bookings ─────────────────────────────────────────────────────────────

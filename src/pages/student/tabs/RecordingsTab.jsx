@@ -2,6 +2,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { Play, X, Clock, Calendar, Video, Loader2 } from "lucide-react";
 import api from "../../../api";
+import { useOnDataChanged } from "../../../hooks/useLiveData";
 import Pagination from "../../../components/Pagination";
 import { groupRecordingSessions, partLabel, isExternal, openExternal } from "../../../utils/recordingSessions.js";
 
@@ -28,6 +29,8 @@ export default function RecordingsTab({ isDarkMode }) {
   // Paged by class on the server (10 classes per page)
   const [page,  setPage]  = useState(1);
   const [pager, setPager] = useState({ total: 0, totalPages: 1, limit: 10 });
+  const [reloadKey, setReloadKey] = useState(0);
+  useOnDataChanged(["recordings"], () => setReloadKey(k => k + 1)); // live: teacher shares a recording
   useEffect(() => {
     let stale = false;
     setLoading(true);
@@ -36,7 +39,7 @@ export default function RecordingsTab({ isDarkMode }) {
       .catch(() => {})
       .finally(() => { if (!stale) setLoading(false); });
     return () => { stale = true; };
-  }, [page]);
+  }, [page, reloadKey]);
 
   const formatDuration = (secs) => {
     if (!secs) return "--";

@@ -2,6 +2,7 @@
 import express from "express";
 import { verifyToken, verifyAdmin } from "../middleware/authMiddleware.js";
 import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
+import { requireAnalyticsUnlock } from "../middleware/analyticsPinMiddleware.js";
 import { paymentSchema }  from "../schemas/paymentSchema.js";
 import { studentSchema }  from "../schemas/studentSchema.js";
 import { parsePagination } from "../utils/pagination.js";
@@ -15,7 +16,7 @@ router.use(tenantMiddleware);
 const getPayment = (db) => db.models.Payment || db.model("Payment", paymentSchema);
 
 // Get all payments — admin only
-router.get("/", verifyToken, verifyAdmin, async (req, res) => {
+router.get("/", verifyToken, verifyAdmin, requireAnalyticsUnlock, async (req, res) => {
   try {
     // ?studentId= one student's payments (admin Students → payment history)
     const { limit, skip } = parsePagination(req.query, 50, 2000);

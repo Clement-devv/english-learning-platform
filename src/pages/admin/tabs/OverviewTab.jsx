@@ -8,6 +8,7 @@ import {
 import api from "../../../api";
 import { useCurrencySymbol } from "../../../hooks/useCurrencySymbol";
 import AnalyticsPinPrompt from "../../../components/admin/analytics/AnalyticsPinPrompt";
+import { useOnDataChanged } from "../../../hooks/useLiveData";
 import { clearAnalyticsUnlock } from "../../../utils/analyticsPin";
 
 const MASK = "••••••";
@@ -55,6 +56,9 @@ export default function OverviewTab({ isDarkMode }) {
   };
 
   useEffect(() => { fetchData(); }, []);
+  // Live: the server sends "analytics" a few seconds after anything changes; the
+  // numbers come from one shared snapshot, so every admin refreshing is cheap.
+  useOnDataChanged(["analytics"], () => fetchData(true));
 
   // Re-fetch only the overview (now with revenue) and show it
   const loadRevenue = async () => {

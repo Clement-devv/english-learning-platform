@@ -27,6 +27,8 @@ import PaymentHistoryModal from "../modals/PaymentHistoryModal";
 import ManualPaymentModal from "../modals/ManualPaymentModal";
 import LessonHistoryModal from "../modals/LessonHistoryModal";
 import LessonMarkModal from "../modals/LessonMarkModal";
+import AnalyticsPinPrompt from "../../../components/admin/analytics/AnalyticsPinPrompt";
+import { isAnalyticsLocked } from "../../../utils/analyticsPin";
 
 import {
   getStudents,
@@ -276,6 +278,7 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
 
   // History data
   const [paymentHistory, setPaymentHistory] = useState([]);
+  const [historyPinPrompt, setHistoryPinPrompt] = useState(false);
   const [lessonHistory, setLessonHistory] = useState([]);
 
   // Account type — real (invited, logs in) vs managed (admin-run, no login)
@@ -529,7 +532,15 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
         student: `${p.studentId.firstName} ${p.studentId.lastName}`,
         amountDisplay: `₦${p.amount}`,
       }))))
-      .catch(() => showToast("Could not load payment history", "error"));
+      .catch((err) => {
+        if (isAnalyticsLocked(err)) {
+          // Payment history is revenue data — ask for the analytics PIN, then reopen
+          setIsPaymentModalOpen(false);
+          setHistoryPinPrompt(true);
+        } else {
+          showToast("Could not load payment history", "error");
+        }
+      });
   }, [isPaymentModalOpen, selectedStudent]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -1066,6 +1077,15 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
             : paymentHistory
         }
       />
+
+      {historyPinPrompt && (
+        <AnalyticsPinPrompt
+          isDarkMode={isDarkMode}
+          title="Payment history is locked"
+          onCancel={() => setHistoryPinPrompt(false)}
+          onUnlocked={() => { setHistoryPinPrompt(false); setIsPaymentModalOpen(true); }}
+        />
+      )}
 
       <LessonHistoryModal
         isOpen={isLessonModalOpen}

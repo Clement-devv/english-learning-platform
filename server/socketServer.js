@@ -10,11 +10,26 @@ import { ringLogSchema } from './schemas/ringLogSchema.js';
 import { studentSchema } from './schemas/studentSchema.js';
 import { teacherSchema } from './schemas/teacherSchema.js';
 import { adminSchema } from './schemas/adminSchema.js';
-import { sendPush } from './utils/webPushService.js';
+import { subAdminSchema } from './schemas/subAdminSchema.js';
+import { pushToUser } from './utils/webPushService.js';
+import { isTokenBlacklisted } from './middleware/authMiddleware.js';
 import redisClient from './config/redis.js';
+import {
+  verifyChannel, verifyChat, joinedChannel, joinedChat,
+  adminOnlyRoom, subAdminTeacherRoom,
+} from './utils/socketAccess.js';
 
 function getRingLog(db) {
   return db.models.RingLog || db.model("RingLog", ringLogSchema);
+}
+
+// Model holding a ring target's profile. Sub-admin tokens carry "sub-admin".
+function getRingUserModel(db, role) {
+  if (role === 'student') return db.models.Student || db.model('Student', studentSchema);
+  if (role === 'teacher') return db.models.Teacher || db.model('Teacher', teacherSchema);
+  if (role === 'admin')   return db.models.Admin   || db.model('Admin',   adminSchema);
+  if (role === 'sub-admin' || role === 'subAdmin') return db.models.SubAdmin || db.model('SubAdmin', subAdminSchema);
+  return null;
 }
 
 async function saveRingLog(centerId, data) {
@@ -32,17 +47,7 @@ async function saveRingLog(centerId, data) {
 async function sendRingPush(centerId, targetUserId, targetRole, callerName) {
   try {
     const db = await getDb(centerId);
-    let Model;
-    if (targetRole === 'student') Model = db.models.Student || db.model('Student', studentSchema);
-    else if (targetRole === 'teacher') Model = db.models.Teacher || db.model('Teacher', teacherSchema);
-    else if (targetRole === 'admin' || targetRole === 'subAdmin')
-      Model = db.models.Admin || db.model('Admin', adminSchema);
-    else return;
-
-    const doc = await Model.findById(targetUserId).select('pushSubscription').lean();
-    if (!doc?.pushSubscription?.endpoint) return;
-
-    await sendPush(doc.pushSubscription, {
+    await pushToUser(db, targetRole, targetUserId, {
       title: `📞 ${callerName} is ringing you`,
       body: 'Open the app to answer',
       icon: '/icons/icon.svg',
@@ -59,11 +64,8 @@ async function sendRingPush(centerId, targetUserId, targetRole, callerName) {
 async function getTargetInfo(centerId, targetUserId, targetRole) {
   try {
     const db = await getDb(centerId);
-    let Model;
-    if (targetRole === 'student')                    Model = db.models.Student || db.model('Student', studentSchema);
-    else if (targetRole === 'teacher')               Model = db.models.Teacher || db.model('Teacher', teacherSchema);
-    else if (targetRole === 'admin' || targetRole === 'subAdmin') Model = db.models.Admin   || db.model('Admin',   adminSchema);
-    else return { ringEnabled: true, targetName: '' };
+    const Model = getRingUserModel(db, targetRole);
+    if (!Model) return { ringEnabled: true, targetName: '' };
     const doc = await Model.findById(targetUserId).select('firstName lastName ringEnabled').lean();
     if (!doc) return { ringEnabled: true, targetName: '' };
     const name = `${doc.firstName || ''} ${doc.lastName || ''}`.trim();
@@ -156,10 +158,14 @@ export async function initializeSocket(httpServer) {
 
   // ── JWT authentication for every socket connection ───────────────────────
   // Client must pass the auth token in handshake: io(URL, { auth: { token } })
-  io.use((socket, next) => {
+  io.use(async (socket, next) => {
     const token = socket.handshake.auth?.token;
     if (!token) {
       return next(new Error('Authentication required'));
+    }
+    // A signed-out device must not reconnect with its still-unexpired token
+    if (await isTokenBlacklisted(token)) {
+      return next(new Error('Session revoked'));
     }
     try {
       // Decode header only (no trust) to extract centerId for secret derivation.
@@ -170,6 +176,14 @@ export async function initializeSocket(httpServer) {
       socket.userId = decoded.id;
       socket.userRole = decoded.role;     // role from JWT — not trusted from client
       socket.centerId = decoded.centerId; // center slug the token was issued for
+      // Verified identity for room-membership checks (utils/socketAccess.js)
+      socket.authUser = {
+        id: String(decoded.id), role: decoded.role,
+        teacherScope: Array.isArray(decoded.teacherScope) ? decoded.teacherScope.map(String) : [],
+      };
+      // Device session id — lets a remote "log out this device" find and drop
+      // exactly this device's connection (socket.data is visible cluster-wide)
+      socket.data.sid = decoded.sid || null;
       next();
     } catch {
       next(new Error('Invalid or expired token'));
@@ -188,7 +202,7 @@ export async function initializeSocket(httpServer) {
   const RING_TIMEOUT_MS = 30_000; // auto-cancel after 30 seconds
 
   io.on('connection', (socket) => {
-    logger.info('🔌 Socket connected:', socket.id, `(${socket.centerId})`);
+    logger.debug('🔌 Socket connected:', socket.id, `(${socket.centerId})`);
 
     // Throttle all incoming events — disconnect sockets that flood the server.
     // Keyed by userId so multi-tab users share one counter across all workers.
@@ -199,9 +213,31 @@ export async function initializeSocket(httpServer) {
       }
     });
 
+    // ── Room guards ───────────────────────────────────────────────────────────
+    // Any client can emit to any room name, so every class/chat event is dropped
+    // unless this socket's join for that class/chat was approved
+    // (utils/socketAccess.js). Joins themselves run the real membership check.
+    const onChannel = (event, handler) => socket.on(event, async (data = {}) => {
+      if (!(await joinedChannel(socket, data?.channelName))) return;
+      handler(data);
+    });
+    const onGroup = (event, handler) => socket.on(event, async (data = {}) => {
+      if (!(await joinedChannel(socket, `group-${data?.groupClassId}`))) return;
+      handler(data);
+    });
+    const onChat = (event, handler) => socket.on(event, async (data = {}) => {
+      if (!(await joinedChat(socket, data?.chatId))) return;
+      handler(data);
+    });
+    const denyJoin = (what, id) => {
+      logger.warn(`🚫 Socket join refused: ${what} ${id} (${socket.userRole} ${socket.userId}, ${socket.centerId})`);
+      socket.emit('error', { message: 'You are not part of this class or chat' });
+    };
+
     // Join whiteboard room
-    socket.on('join-whiteboard', ({ channelName, userName }) => {
+    socket.on('join-whiteboard', async ({ channelName, userName } = {}) => {
       try {
+        if (!(await verifyChannel(socket, channelName))) return denyJoin('whiteboard', channelName);
         const room = tenantRoom(socket, channelName);
         socket.join(room);
         socket.userName = userName;
@@ -267,7 +303,7 @@ export async function initializeSocket(httpServer) {
     });
 
     // Handle drawing events
-    socket.on('drawing', (data) => {
+    onChannel('drawing', (data) => {
       try {
         const room = tenantRoom(socket, data.channelName);
         const session = whiteboardSessions.get(room);
@@ -285,7 +321,7 @@ export async function initializeSocket(httpServer) {
     });
 
     // Persist canvas snapshot so rejoining users (tab-switch) see current drawing
-    socket.on('save-canvas-state', ({ channelName, dataUrl }) => {
+    onChannel('save-canvas-state', ({ channelName, dataUrl }) => {
       try {
         const room = tenantRoom(socket, channelName);
         const session = whiteboardSessions.get(room);
@@ -296,7 +332,7 @@ export async function initializeSocket(httpServer) {
     });
 
     // Handle canvas clear
-    socket.on('clear-canvas', (data) => {
+    onChannel('clear-canvas', (data) => {
       try {
         const room = tenantRoom(socket, data.channelName);
         const session = whiteboardSessions.get(room);
@@ -315,7 +351,7 @@ export async function initializeSocket(httpServer) {
     });
 
     // Handle lock toggle (teacher only)
-    socket.on('toggle-lock', ({ channelName, locked }) => {
+    onChannel('toggle-lock', ({ channelName, locked }) => {
       try {
         if (socket.userRole !== 'teacher') {
           socket.emit('error', { message: 'Only teachers can lock/unlock' });
@@ -335,7 +371,7 @@ export async function initializeSocket(httpServer) {
     });
 
     // Handle PDF sharing (teacher only)
-    socket.on('share-pdf', ({ channelName, pdfData, fileName, sharedBy, visibleToStudents }) => {
+    onChannel('share-pdf', ({ channelName, pdfData, fileName, sharedBy, visibleToStudents }) => {
       try {
         if (socket.userRole !== 'teacher') {
           socket.emit('error', { message: 'Only teachers can share PDFs' });
@@ -363,7 +399,7 @@ export async function initializeSocket(httpServer) {
     });
 
     // Handle PDF visibility toggle (teacher only)
-    socket.on('toggle-pdf-visibility', ({ channelName, visible }) => {
+    onChannel('toggle-pdf-visibility', ({ channelName, visible }) => {
       try {
         if (socket.userRole !== 'teacher') {
           socket.emit('error', { message: 'Only teachers can control PDF visibility' });
@@ -383,7 +419,7 @@ export async function initializeSocket(httpServer) {
     });
 
     // Handle PDF removal (teacher only)
-    socket.on('remove-pdf', ({ channelName }) => {
+    onChannel('remove-pdf', ({ channelName }) => {
       try {
         if (socket.userRole !== 'teacher') {
           socket.emit('error', { message: 'Only teachers can remove PDFs' });
@@ -435,7 +471,7 @@ export async function initializeSocket(httpServer) {
         if (socket.userRole !== 'student') return;
         const room = `student-room:${socket.centerId}:${socket.userId}`;
         socket.join(room);
-        logger.info(`📡 Student ${socket.userId} joined personal room (${socket.centerId})`);
+        logger.debug(`📡 Student ${socket.userId} joined personal room (${socket.centerId})`);
       } catch (err) { logger.error('join-student-room error:', { error: err?.message }); }
     });
 
@@ -445,7 +481,7 @@ export async function initializeSocket(httpServer) {
         if (socket.userRole !== 'teacher') return;
         const room = `teacher-room:${socket.centerId}:${socket.userId}`;
         socket.join(room);
-        logger.info(`👨‍🏫 Teacher ${socket.userId} joined personal room (${socket.centerId})`);
+        logger.debug(`👨‍🏫 Teacher ${socket.userId} joined personal room (${socket.centerId})`);
       } catch (err) { logger.error('join-teacher-room error:', { error: err?.message }); }
     });
 
@@ -455,9 +491,16 @@ export async function initializeSocket(httpServer) {
         if (!['admin', 'sub-admin'].includes(socket.userRole)) return;
         const broadcast = `admin-broadcast:${socket.centerId}`;
         const personal  = `admin-room:${socket.centerId}:${socket.userId}`;
-        socket.join(broadcast);
+        socket.join(broadcast); // content-free signals only (data-changed)
         socket.join(personal);
-        logger.info(`👔 Admin ${socket.userId} joined admin rooms (${socket.centerId})`);
+        // Content (message previews, class presence): admins see the whole center;
+        // a sub-admin only what concerns the teachers in their scope.
+        if (socket.userRole === 'admin') {
+          socket.join(adminOnlyRoom(socket.centerId));
+        } else {
+          for (const t of socket.authUser.teacherScope) socket.join(subAdminTeacherRoom(socket.centerId, t));
+        }
+        logger.debug(`👔 Admin ${socket.userId} joined admin rooms (${socket.centerId})`);
       } catch (err) { logger.error('join-admin-room error:', { error: err?.message }); }
     });
 
@@ -467,7 +510,7 @@ export async function initializeSocket(httpServer) {
         const room = `user-room:${socket.centerId}:${socket.userId}`;
         socket.join(room);
         socket.userRoomName = room;
-        logger.info(`🔔 User ${socket.userId} (${socket.userRole}) joined user-room`);
+        logger.debug(`🔔 User ${socket.userId} (${socket.userRole}) joined user-room`);
       } catch (err) { logger.error('join-user-room error:', { error: err?.message }); }
     });
 
@@ -568,6 +611,8 @@ export async function initializeSocket(httpServer) {
         clearTimeout(ring.timeout);
         activeRings.delete(ringId);
         io.to(ring.callerRoom).emit('ring-answered', { ringId, by: socket.userId });
+        // Silence the same user's other open tabs/devices
+        socket.to(ring.targetRoom).emit('ring-cancelled', { ringId });
         logger.info(`✅ Ring ${ringId} answered by ${socket.userId}`);
         saveRingLog(ring.centerId, {
           callerId: ring.callerId,   callerRole: ring.callerRole,
@@ -587,6 +632,8 @@ export async function initializeSocket(httpServer) {
         clearTimeout(ring.timeout);
         activeRings.delete(ringId);
         io.to(ring.callerRoom).emit('ring-declined', { ringId, by: socket.userId });
+        // Silence the same user's other open tabs/devices
+        socket.to(ring.targetRoom).emit('ring-cancelled', { ringId });
         logger.info(`🚫 Ring ${ringId} declined by ${socket.userId}`);
         saveRingLog(ring.centerId, {
           callerId: ring.callerId,   callerRole: ring.callerRole,
@@ -600,22 +647,22 @@ export async function initializeSocket(httpServer) {
 
     // ── PDF content sync (teacher → student) ────────────────────────────────
 
-    socket.on('pdf-stroke-start', (data) => {
+    onChannel('pdf-stroke-start', (data) => {
       try { socket.to(tenantRoom(socket, data.channelName)).emit('pdf-stroke-start', data); }
       catch (err) { logger.error('pdf-stroke-start error:', { error: err?.message }); }
     });
 
-    socket.on('pdf-stroke-move', (data) => {
+    onChannel('pdf-stroke-move', (data) => {
       try { socket.to(tenantRoom(socket, data.channelName)).emit('pdf-stroke-move', data); }
       catch (err) { logger.error('pdf-stroke-move error:', { error: err?.message }); }
     });
 
-    socket.on('pdf-stroke-end', (data) => {
+    onChannel('pdf-stroke-end', (data) => {
       try { socket.to(tenantRoom(socket, data.channelName)).emit('pdf-stroke-end', data); }
       catch (err) { logger.error('pdf-stroke-end error:', { error: err?.message }); }
     });
 
-    socket.on('pdf-page-sync', (data) => {
+    onChannel('pdf-page-sync', (data) => {
       try {
         const room = tenantRoom(socket, data.channelName);
         const session = whiteboardSessions.get(room);
@@ -624,7 +671,7 @@ export async function initializeSocket(httpServer) {
       } catch (err) { logger.error('pdf-page-sync error:', { error: err?.message }); }
     });
 
-    socket.on('pdf-zoom-sync', (data) => {
+    onChannel('pdf-zoom-sync', (data) => {
       try {
         const room = tenantRoom(socket, data.channelName);
         const session = whiteboardSessions.get(room);
@@ -633,7 +680,7 @@ export async function initializeSocket(httpServer) {
       } catch (err) { logger.error('pdf-zoom-sync error:', { error: err?.message }); }
     });
 
-    socket.on('pdf-uploaded', (data) => {
+    onChannel('pdf-uploaded', (data) => {
       try {
         const room = tenantRoom(socket, data.channelName);
         const session = whiteboardSessions.get(room);
@@ -644,27 +691,28 @@ export async function initializeSocket(httpServer) {
       } catch (err) { logger.error('pdf-uploaded error:', { error: err?.message }); }
     });
 
-    socket.on('pdf-clear-sync', (data) => {
+    onChannel('pdf-clear-sync', (data) => {
       try { socket.to(tenantRoom(socket, data.channelName)).emit('pdf-clear-sync', data); }
       catch (err) { logger.error('pdf-clear-sync error:', { error: err?.message }); }
     });
 
     // Whiteboard canvas state sync (used for undo + join catch-up)
-    socket.on('wb-sync', (data) => {
+    onChannel('wb-sync', (data) => {
       try { socket.to(tenantRoom(socket, data.channelName)).emit('wb-sync', data); }
       catch (err) { logger.error('wb-sync error:', { error: err?.message }); }
     });
 
     // ── Classroom tab sync ────────────────────────────────────────────────────
     // Teacher emits classroom-tab-change → all students in the same session follow.
-    socket.on('join-classroom-room', ({ channelName }) => {
+    socket.on('join-classroom-room', async ({ channelName } = {}) => {
       try {
+        if (!(await verifyChannel(socket, channelName))) return denyJoin('classroom', channelName);
         const room = `classroom-${tenantRoom(socket, channelName)}`;
         socket.join(room);
       } catch (err) { logger.error('join-classroom-room error:', { error: err?.message }); }
     });
 
-    socket.on('classroom-tab-change', ({ channelName, tab }) => {
+    onChannel('classroom-tab-change', ({ channelName, tab }) => {
       try {
         if (socket.userRole !== 'teacher') return; // only teacher can push tabs
         const room = `classroom-${tenantRoom(socket, channelName)}`;
@@ -673,7 +721,7 @@ export async function initializeSocket(httpServer) {
     });
 
     // Teacher manually pings a tab — student's tab button starts blinking
-    socket.on('classroom-tab-notify', ({ channelName, tab }) => {
+    onChannel('classroom-tab-notify', ({ channelName, tab }) => {
       try {
         if (socket.userRole !== 'teacher') return;
         const room = `classroom-${tenantRoom(socket, channelName)}`;
@@ -682,8 +730,9 @@ export async function initializeSocket(httpServer) {
     });
 
     // ── Group class signaling ─────────────────────────────────────────────────
-    socket.on('join-group-room', ({ groupClassId }) => {
+    socket.on('join-group-room', async ({ groupClassId } = {}) => {
       try {
+        if (!(await verifyChannel(socket, `group-${groupClassId}`))) return denyJoin('group class', groupClassId);
         const room = `group-${tenantRoom(socket, groupClassId)}`;
         socket.join(room);
         socket.groupClassId = groupClassId;
@@ -695,7 +744,7 @@ export async function initializeSocket(httpServer) {
       } catch (err) { logger.error('join-group-room error:', { error: err?.message }); }
     });
 
-    socket.on('group-hand-raise', ({ groupClassId }) => {
+    onGroup('group-hand-raise', ({ groupClassId }) => {
       try {
         const room = `group-${tenantRoom(socket, groupClassId)}`;
         socket.to(room).emit('group-hand-raise', {
@@ -705,7 +754,7 @@ export async function initializeSocket(httpServer) {
       } catch (err) { logger.error('group-hand-raise error:', { error: err?.message }); }
     });
 
-    socket.on('group-hand-lower', ({ groupClassId }) => {
+    onGroup('group-hand-lower', ({ groupClassId }) => {
       try {
         const room = `group-${tenantRoom(socket, groupClassId)}`;
         socket.to(room).emit('group-hand-lower', {
@@ -715,7 +764,7 @@ export async function initializeSocket(httpServer) {
       } catch (err) { logger.error('group-hand-lower error:', { error: err?.message }); }
     });
 
-    socket.on('group-promote', ({ groupClassId, targetUserId }) => {
+    onGroup('group-promote', ({ groupClassId, targetUserId }) => {
       try {
         if (socket.userRole !== 'teacher') return;
         const room = `group-${tenantRoom(socket, groupClassId)}`;
@@ -723,7 +772,7 @@ export async function initializeSocket(httpServer) {
       } catch (err) { logger.error('group-promote error:', { error: err?.message }); }
     });
 
-    socket.on('group-demote', ({ groupClassId, targetUserId }) => {
+    onGroup('group-demote', ({ groupClassId, targetUserId }) => {
       try {
         if (socket.userRole !== 'teacher') return;
         const room = `group-${tenantRoom(socket, groupClassId)}`;
@@ -731,7 +780,7 @@ export async function initializeSocket(httpServer) {
       } catch (err) { logger.error('group-demote error:', { error: err?.message }); }
     });
 
-    socket.on('group-end-class', ({ groupClassId }) => {
+    onGroup('group-end-class', ({ groupClassId }) => {
       try {
         if (socket.userRole !== 'teacher') return;
         const room = `group-${tenantRoom(socket, groupClassId)}`;
@@ -739,7 +788,7 @@ export async function initializeSocket(httpServer) {
       } catch (err) { logger.error('group-end-class error:', { error: err?.message }); }
     });
 
-    socket.on('group-kick', ({ groupClassId, targetUserId }) => {
+    onGroup('group-kick', ({ groupClassId, targetUserId }) => {
       try {
         if (socket.userRole !== 'teacher') return;
         const room = `group-${tenantRoom(socket, groupClassId)}`;
@@ -748,8 +797,9 @@ export async function initializeSocket(httpServer) {
     });
 
     // ── Emoji reactions (video call) ─────────────────────────────────────────
-    socket.on('join-reactions', ({ channelName }) => {
+    socket.on('join-reactions', async ({ channelName } = {}) => {
       try {
+        if (!(await verifyChannel(socket, channelName))) return denyJoin('reactions', channelName);
         const room = `reactions-${tenantRoom(socket, channelName)}`;
         socket.join(room);
         if (!socket.reactionChannels) socket.reactionChannels = new Set();
@@ -757,29 +807,31 @@ export async function initializeSocket(httpServer) {
       } catch (err) { logger.error('join-reactions error:', { error: err?.message }); }
     });
 
-    socket.on('emoji-reaction', (data) => {
+    onChannel('emoji-reaction', (data) => {
       try { socket.to(`reactions-${tenantRoom(socket, data.channelName)}`).emit('emoji-reaction', data); }
       catch (err) { logger.error('emoji-reaction error:', { error: err?.message }); }
     });
 
     // ── Live chat (video call) ────────────────────────────────────────────────
-    socket.on('join-chat', ({ channelName }) => {
+    socket.on('join-chat', async ({ channelName } = {}) => {
       try {
+        if (!(await verifyChannel(socket, channelName))) return denyJoin('call chat', channelName);
         const room = `chat-${tenantRoom(socket, channelName)}`;
         socket.join(room);
-        logger.info(`💬 Socket joined chat room: ${room}`);
+        logger.debug(`💬 Socket joined chat room: ${room}`);
       } catch (err) { logger.error('join-chat error:', { error: err?.message }); }
     });
 
-    socket.on('chat-message', (data) => {
+    onChannel('chat-message', (data) => {
       try { socket.to(`chat-${tenantRoom(socket, data.channelName)}`).emit('chat-message', data); }
       catch (err) { logger.error('chat-message error:', { error: err?.message }); }
     });
 
     // ── Chat-message rooms (typing indicators + real-time delivery) ─────────
-    socket.on('join-chat-room', ({ chatId }) => {
+    socket.on('join-chat-room', async ({ chatId } = {}) => {
       try {
         if (!chatId) return;
+        if (!(await verifyChat(socket, chatId))) return denyJoin('chat', chatId);
         socket.join(`chat-msg:${socket.centerId}:${chatId}`);
       } catch (err) { logger.error('join-chat-room error:', { error: err?.message }); }
     });
@@ -791,7 +843,7 @@ export async function initializeSocket(httpServer) {
       } catch (err) { logger.error('leave-chat-room error:', { error: err?.message }); }
     });
 
-    socket.on('typing-start', ({ chatId, senderName }) => {
+    onChat('typing-start', ({ chatId, senderName }) => {
       try {
         if (!chatId) return;
         socket.to(`chat-msg:${socket.centerId}:${chatId}`)
@@ -799,7 +851,7 @@ export async function initializeSocket(httpServer) {
       } catch (err) { logger.error('typing-start error:', { error: err?.message }); }
     });
 
-    socket.on('typing-stop', ({ chatId }) => {
+    onChat('typing-stop', ({ chatId }) => {
       try {
         if (!chatId) return;
         socket.to(`chat-msg:${socket.centerId}:${chatId}`)
@@ -810,7 +862,7 @@ export async function initializeSocket(httpServer) {
     // Handle disconnect — clean up whiteboard session and reaction rooms
     socket.on('disconnect', () => {
       try {
-        logger.info('🔌 Socket disconnected:', socket.id);
+        logger.debug('🔌 Socket disconnected:', socket.id);
 
         if (socket.roomName && socket.userId) {
           if (whiteboardSessions.has(socket.roomName)) {
@@ -846,7 +898,21 @@ export async function initializeSocket(httpServer) {
           });
         }
 
-        // Clean up any in-flight rings involving this socket and log outcomes
+        // Clean up any in-flight rings involving this user and log outcomes —
+        // but only once their LAST tab/device is gone. Closing one of several
+        // tabs must not cancel a ring or tell the caller "offline".
+        const hasRing = [...activeRings.values()].some(r =>
+          r.centerId === socket.centerId && (r.callerId === socket.userId || r.targetUserId === socket.userId));
+        if (!hasRing) return;
+        const userRoom = `user-room:${socket.centerId}:${socket.userId}`;
+        io.in(userRoom).fetchSockets()
+          .then(remaining => { if (remaining.length === 0) cleanUpRings(); })
+          .catch(() => cleanUpRings());
+      } catch (err) {
+        logger.error('disconnect cleanup error:', { error: err?.message });
+      }
+
+      function cleanUpRings() {
         for (const [ringId, ring] of activeRings) {
           if (ring.centerId !== socket.centerId) continue;
           if (ring.callerId === socket.userId) {
@@ -875,8 +941,6 @@ export async function initializeSocket(httpServer) {
             });
           }
         }
-      } catch (err) {
-        logger.error('disconnect cleanup error:', { error: err?.message });
       }
     });
   });

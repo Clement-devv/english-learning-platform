@@ -29,6 +29,7 @@ import {
   xssProtection,
   parameterPollutionProtection,
   sanitizeRequest,
+  sanitizeBody,
   requestLimits
 } from "./middleware/security.js";
 
@@ -42,6 +43,7 @@ import { verifyEmailConfig } from "./utils/emailService.js";
 import { startReminderScheduler } from "./utils/reminderScheduler.js";
 import { startRecordingCleanup } from "./routes/recordingRoutes.js";
 import { startProgressReportScheduler } from "./utils/progressReportScheduler.js";
+import { startDailyClassReportScheduler } from "./utils/dailyClassReportScheduler.js";
 import { startMissedClassScheduler } from "./utils/missedClassScheduler.js";
 import { startParentCheckScheduler } from "./utils/parentCheck.js";
 import { linkPreviewHandler } from "./utils/linkPreview.js";
@@ -49,11 +51,18 @@ import v1Router from "./routes/v1.js";
 import Center from "./models/master/Center.js";
 import SuperAdmin from "./models/master/SuperAdmin.js";
 import { getDb, closeAllConnections } from "./config/dbManager.js";
+import { teacherSchema } from "./schemas/teacherSchema.js";
+import { backfillTeacherCodes } from "./utils/teacherCode.js";
 import { errorHandler, notFoundHandler, registerProcessHandlers } from "./middleware/errorHandler.js";
 import healthRoutes from "./routes/healthRoutes.js";
 import { sweepExpiredSessionsFromDb } from "./utils/sessionManager.js";
 import { SESSION_CLEANUP_INTERVAL_MS } from "./config/constants.js";
 import redisClient from "./config/redis.js";
+import { applyLivePlugins, applyPresencePlugin, setLiveIO } from "./utils/liveUpdates.js";
+
+// "data-changed" pushes — must be attached before any center model is compiled
+applyLivePlugins();
+applyPresencePlugin();
 
 const app = express();
 const httpServer = http.createServer(app);
@@ -71,6 +80,7 @@ httpServer.headersTimeout   = 66_000;
 
 // Initialize Socket.IO (async — sets up Redis adapter when REDIS_URL is set)
 const io = await initializeSocket(httpServer);
+setLiveIO(io);
 
 // Trust proxy if behind reverse proxy
 if (config.trustProxy) {
@@ -82,6 +92,10 @@ if (config.trustProxy) {
 app.use('/assets', express.static(path.join(frontendPath, 'assets')));
 
 // Security Middleware
+// NOTE: these run before the body parser, so they only see headers + query
+// string. JSON bodies are NoSQL-sanitized by sanitizeBody after express.json()
+// below. Bodies are deliberately NOT passed through xssProtection/trimming —
+// that would alter passwords containing & < or spaces and break those logins.
 app.use(securityHeaders);
 app.use(noSqlInjectionProtection);
 app.use(xssProtection);
@@ -144,7 +158,8 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   // x-share-access: short-lived token for public homework/quiz share links (utils/shareLink.js)
   // x-analytics-unlock: session token from the admin analytics PIN (middleware/analyticsPinMiddleware.js)
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-center-slug', 'x-share-access', 'x-analytics-unlock'],
+  // x-device-id / x-device-key: sent on login to bind the session to this browser
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-center-slug', 'x-share-access', 'x-analytics-unlock', 'x-device-id', 'x-device-key'],
   maxAge: 3600
 }));
 
@@ -180,6 +195,7 @@ app.use('/uploads/homework', (_req, res) => res.status(403).json({ message: 'Acc
 // Body parser with size limits
 app.use(express.json(requestLimits.json));
 app.use(express.urlencoded(requestLimits.urlencoded));
+app.use(sanitizeBody); // strip $-operators now that req.body exists
 
 app.use(compression({
   level: 6,           // compression level 1-9 (6 = good balance of speed vs size)
@@ -218,14 +234,17 @@ app.use((req, res, next) => {
 app.use("/api/health", healthRoutes);
 
 // API documentation — Swagger UI
-// Available at /api/docs in all environments
-app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
-  customSiteTitle: "ELP API Docs",
-  customCss: ".swagger-ui .topbar { background: linear-gradient(135deg, #0369a1, #0ea5e9); } .swagger-ui .topbar-wrapper img { display: none; } .swagger-ui .topbar-wrapper::before { content: 'English Learning Platform API'; color: #fff; font-size: 18px; font-weight: 700; }",
-  swaggerOptions: { persistAuthorization: true },
-}));
-// Raw JSON spec (useful for importing into Postman)
-app.get("/api/docs.json", (_req, res) => res.json(swaggerSpec));
+// Off in production: a public, complete map of every endpoint makes it easier
+// to find weak spots. Set ENABLE_API_DOCS=true to expose it there on purpose.
+if (config.nodeEnv !== "production" || process.env.ENABLE_API_DOCS === "true") {
+  app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+    customSiteTitle: "ELP API Docs",
+    customCss: ".swagger-ui .topbar { background: linear-gradient(135deg, #0369a1, #0ea5e9); } .swagger-ui .topbar-wrapper img { display: none; } .swagger-ui .topbar-wrapper::before { content: 'English Learning Platform API'; color: #fff; font-size: 18px; font-weight: 700; }",
+    swaggerOptions: { persistAuthorization: true },
+  }));
+  // Raw JSON spec (useful for importing into Postman)
+  app.get("/api/docs.json", (_req, res) => res.json(swaggerSpec));
+}
 
 // CSP violation reports — browsers POST here when a Content-Security-Policy is violated.
 // No auth required (reports come from the browser, before any JS runs).
@@ -280,6 +299,9 @@ mongoose
           startProgressReportScheduler(db);
           startMissedClassScheduler(db);
           startParentCheckScheduler(db, center);
+          // Give teachers created before ID numbers existed a TCH-xxxxx code (once; no-op after)
+          backfillTeacherCodes(db.models.Teacher || db.model("Teacher", teacherSchema)).catch(err => logger.warn("teacher code backfill failed", { center: center.slug, error: err?.message }));
+          startDailyClassReportScheduler(db, center);
         }
 
         // Hourly background sweep: remove expired/inactive sessions from all

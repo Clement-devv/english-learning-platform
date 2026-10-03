@@ -11,6 +11,7 @@ import { useDarkMode } from '../../../hooks/useDarkMode';
 import { getUserTimezone } from '../../../utils/timezone';
 import { pushSupported, enablePush, disablePush, getPushStatus } from '../../../utils/pushNotifications';
 import { getAssignedStudents } from '../../../services/teacherStudentService';
+import { useLiveRefresh, refreshStale } from '../../../hooks/useLiveData';
 
 // A pending parent dispute on a completed class (managed student): drives the red heartbeat warning
 const parentDisputeOf = (b) =>
@@ -27,17 +28,12 @@ import {
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || '';
 
-// Heartbeat schedule (all intervals are multiples of TICK_MS):
-//   Every 30s  — pending bookings (critical: teacher needs to respond fast)
-//   Every 30s  — class status recomputation (client-side, no API)
-//   Every 60s  — accepted/active classes (cancellations, new live classes)
-//   Every 3min — completed classes (admin approvals, payment status)
-//   Every 5min — students list (new assignments, credit changes)
-const TICK_MS      = 30_000;
-const TICK_PENDING  = 1;   // every 1 tick  = 30s
-const TICK_ACTIVE   = 2;   // every 2 ticks = 60s
-const TICK_COMPLETED= 6;   // every 6 ticks = 3min
-const TICK_STUDENTS = 10;  // every 10 ticks = 5min
+// Data refresh is event-driven (hooks/useLiveData.js): the server pushes
+// "data-changed" after any write that affects this teacher, so pending requests,
+// classes, students and badge counts update within ~1s — plus on returning to the
+// browser tab, on switching dashboard tab (if older than 30s), and a 5-minute
+// safety refresh. TICK_MS only drives the client-side "LIVE" status (no API).
+const TICK_MS = 30_000;
 
 function classStatus(scheduledTime) {
   const diff = new Date(scheduledTime) - Date.now();
@@ -102,17 +98,10 @@ export function useTeacherDashboardData() {
   const [isModalOpen,            setIsModalOpen]            = useState(false);
   const [confirmModal,           setConfirmModal]           = useState({ open: false, type: null, classId: null });
 
-  // ── Push bootstrap — auto-subscribe on first login ─────────────────────────
+  // ── Push status for THIS device (asking is done by DeviceNotificationPrompt) ─
   useEffect(() => {
     if (!pushSupported()) return;
-    getPushStatus().then(async subscribed => {
-      if (subscribed) {
-        setPushEnabled(true);
-      } else if (Notification.permission !== 'denied') {
-        const { ok } = await enablePush();
-        setPushEnabled(ok);
-      }
-    });
+    getPushStatus().then(setPushEnabled);
   }, []);
 
   // ── Socket connection — real-time messages and booking events ──────────────
@@ -222,9 +211,8 @@ export function useTeacherDashboardData() {
     }
   }, [location.state?.classCompleted, location.state?.classMissed, location.state?.activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Homework polling ───────────────────────────────────────────────────────
-  useEffect(() => {
-    const check = async () => {
+  // ── Homework badge ─────────────────────────────────────────────────────────
+  const checkHomework = useCallback(async () => {
       try {
         const { data } = await api.get('/homework/my', { params: { limit: 1 } }); // counts only
         const toGrade = data.counts?.submitted ?? 0;
@@ -240,15 +228,11 @@ export function useTeacherDashboardData() {
         }
         prevHomeworkRef.current = toGrade;
       } catch { /* silent */ }
-    };
-    check();
-    const id = setInterval(check, 90_000);
-    return () => clearInterval(id);
   }, []);
+  useEffect(() => { checkHomework(); }, [checkHomework]);
 
-  // ── Quiz polling ───────────────────────────────────────────────────────────
-  useEffect(() => {
-    const check = async () => {
+  // ── Quiz badge ─────────────────────────────────────────────────────────────
+  const checkQuizzes = useCallback(async () => {
       try {
         const { data } = await api.get('/quiz/my', { params: { limit: 1 } }); // counts only
         const attempted = data.counts?.attempted ?? 0;
@@ -264,11 +248,8 @@ export function useTeacherDashboardData() {
         }
         prevQuizRef.current = attempted;
       } catch { /* silent */ }
-    };
-    check();
-    const id = setInterval(check, 90_000);
-    return () => clearInterval(id);
   }, []);
+  useEffect(() => { checkQuizzes(); }, [checkQuizzes]);
 
   // ── Toast ──────────────────────────────────────────────────────────────────
   const showToast = (message, type = 'success') => {
@@ -401,30 +382,25 @@ export function useTeacherDashboardData() {
     } catch { /* silent */ }
   }, []);
 
-  // ── Heartbeat: smart tick counter ─────────────────────────────────────────
-  // Runs every TICK_MS. Skips when the browser tab is hidden (saves battery/network).
-  // Different data refreshes at different intervals via the tick counter.
+  // ── Live refresh (replaces the old 30s–5min polling) ──────────────────────
+  // Each loader runs when the server says that resource changed, when the
+  // teacher comes back to the browser tab, or on the 5-minute safety refresh.
+  const liveId = authUser?._id || authUser?.id || 'me';
+  const [dataReady, setDataReady] = useState(false);
+  const live = { enabled: dataReady };
+  useLiveRefresh(['bookings', 'teacher', liveId, 'pending'],   refreshPending,   live);
+  useLiveRefresh(['classes',  'teacher', liveId, 'accepted'],  refreshActive,    live);
+  useLiveRefresh(['classes',  'teacher', liveId, 'completed'], refreshCompleted, live);
+  useLiveRefresh(['students', 'teacher', liveId],              refreshStudents,  live);
+  useLiveRefresh(['homework', 'teacher', liveId, 'count'],     checkHomework,    live);
+  useLiveRefresh(['quizzes',  'teacher', liveId, 'count'],     checkQuizzes,     live);
+
+  // Switching dashboard tab shows cached data at once and refreshes anything
+  // older than 30s in the background — no more stale screens until reload.
   useEffect(() => {
-    const tickRef = { current: 0 };
-    const id = setInterval(() => {
-      if (document.visibilityState === 'hidden') return;
-      tickRef.current += 1;
-      const tick = tickRef.current;
-
-      // Every 30s — most critical: new booking requests
-      if (tick % TICK_PENDING === 0) refreshPending();
-
-      // Every 60s — active/live class list
-      if (tick % TICK_ACTIVE === 0) refreshActive();
-
-      // Every 3min — completed classes & payment status
-      if (tick % TICK_COMPLETED === 0) refreshCompleted();
-
-      // Every 5min — student list (new assignments)
-      if (tick % TICK_STUDENTS === 0) refreshStudents();
-    }, TICK_MS);
-    return () => clearInterval(id);
-  }, [refreshPending, refreshActive, refreshCompleted, refreshStudents]);
+    if (!dataReady) return;
+    ['bookings', 'classes', 'students', 'homework', 'quizzes'].forEach(r => refreshStale([r, 'teacher', liveId]));
+  }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Class-status ticker (client-side, no API) ─────────────────────────────
   // Re-derives scheduled/live/upcoming-soon/completed purely from the current
@@ -557,6 +533,7 @@ export function useTeacherDashboardData() {
       showToast('Failed to load data from server', 'error');
     } finally {
       setLoading(false);
+      setDataReady(true);
     }
   };
 

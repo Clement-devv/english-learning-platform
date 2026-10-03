@@ -1,9 +1,10 @@
 // src/pages/admin/tabs/ReviewsTab.jsx
 // Admin: all reviews across all teachers, per-teacher averages, flag/delete controls.
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Flag, Trash2, RefreshCw, AlertTriangle, ChevronLeft, ChevronRight } from "lucide-react";
 import api from "../../../api";
+import { useOnDataChanged } from "../../../hooks/useLiveData";
 
 const PAGE_SIZE = 8;
 
@@ -50,8 +51,13 @@ export default function ReviewsTab({ isDarkMode }) {
   }
 
   // One page from the server — filters and sort are applied there
+  // Live: refresh quietly (no spinner) when the server says this data changed
+  const quietRef = useRef(false);
+  useOnDataChanged(["reviews"], () => { quietRef.current = true; load(); });
+
   async function load() {
-    setLoading(true);
+    if (!quietRef.current) setLoading(true);
+    quietRef.current = false;
     try {
       const res = await api.get("/reviews", { params: {
         page, limit: PAGE_SIZE, sort: sortBy,

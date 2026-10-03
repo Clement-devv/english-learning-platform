@@ -77,6 +77,11 @@ export const sendEmail = async (mailOptions) => {
   const to = Array.isArray(mailOptions.to) ? recipients : recipients[0];
   const from = `${centerName || config.appName} <${process.env.EMAIL_FROM || config.emailFrom || config.emailUser}>`;
 
+  // Attachments (PDF reports, records…) — previously dropped here, so emails
+  // arrived without their PDF. Shape: [{ filename, content: Buffer|string, contentType? }]
+  const attachments = (Array.isArray(mailOptions.attachments) ? mailOptions.attachments : [])
+    .filter(a => a?.filename && a?.content);
+
   if (useResend) {
     try {
       const { data, error } = await resendClient.emails.send({
@@ -86,6 +91,13 @@ export const sendEmail = async (mailOptions) => {
         html,
         ...(text   && { text }),
         ...(replyTo && { replyTo }),
+        ...(attachments.length && {
+          attachments: attachments.map(a => ({
+            filename:    a.filename,
+            content:     Buffer.isBuffer(a.content) ? a.content.toString("base64") : a.content,
+            ...(a.contentType && { contentType: a.contentType }),
+          })),
+        }),
       });
       if (error) {
         logger.error("❌ Resend send failed:", { error: error.message });
@@ -100,7 +112,10 @@ export const sendEmail = async (mailOptions) => {
   }
 
   try {
-    const info = await smtpTransporter.sendMail({ from, to, subject, html, text, replyTo });
+    const info = await smtpTransporter.sendMail({
+      from, to, subject, html, text, replyTo,
+      ...(attachments.length && { attachments }),
+    });
     logger.info("📧 Email sent via SMTP:", info.messageId);
     return { success: true, messageId: info.messageId };
   } catch (error) {

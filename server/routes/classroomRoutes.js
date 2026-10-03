@@ -11,6 +11,8 @@ import { paymentTransactionSchema }   from "../schemas/paymentTransactionSchema.
 import logger from "../utils/logger.js";
 import { issueShareLink } from "../utils/shareLink.js";
 import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
+import { recordOutcomeChange } from "../utils/classOutcome.js";
+import { payForCompletedClass } from "../utils/classPayment.js";
 
 const router = express.Router();
 router.use(tenantMiddleware);
@@ -27,6 +29,9 @@ const getPaymentTransaction = (db) => db.models.PaymentTransaction || db.model("
 // student may use it (admins/sub-admins may read). The caller's role always
 // comes from the token — never from the request body.
 const ADMIN_ROLES = ["admin", "sub-admin"];
+
+// Booking statuses /auto-complete may settle (see the handler for why)
+const AUTO_COMPLETABLE = ["accepted", "pending", "missed"];
 
 // populate("teacherId"/"studentId") needs the models registered on this center's
 // connection first — otherwise the first request after a restart fails with
@@ -242,8 +247,11 @@ router.post("/auto-complete", verifyToken, async (req, res) => {
       });
     }
 
-    const blockedStatuses = ["rejected", "cancelled"];
-    if (blockedStatuses.includes(booking.status))
+    // Only a scheduled class can be settled here. "missed" stays open so the
+    // re-check after a time extension can still complete it. Everything else —
+    // teacher-logged classes awaiting admin approval (pending_confirmation),
+    // admin-rejected, cancelled… — has its own flow and must never pay out here.
+    if (!AUTO_COMPLETABLE.includes(booking.status) || booking.adminRejected)
       return res.status(400).json({ message: `Cannot auto-complete booking with status: ${booking.status}` });
 
     const session = await ClassroomSession.findOne({ bookingId });
@@ -251,32 +259,40 @@ router.post("/auto-complete", verifyToken, async (req, res) => {
     const sessionTeacherJoined    = !!(session?.teacherJoinedAt);
     const sessionStudentJoined    = !!(session?.studentJoinedAt);
     const serverConfirmedBothJoined = !!(session?.classStartedAt);
-    const clientEvidenceBothPresent = (clientBothActiveTime || 0) > 0;
     const callerIsTeacher = callerRole === "teacher";
     const callerIsStudent = callerRole === "student";
 
     // Managed student (no login): only the teacher's "Student joined" confirmation
-    // counts as the student joining — never client-side evidence alone.
+    // counts as the student joining.
     const isManaged = !!booking.studentId?.isManaged;
 
-    const teacherJoined = sessionTeacherJoined || serverConfirmedBothJoined || clientEvidenceBothPresent || callerIsTeacher;
+    // Presence comes from the server's join records. The caller may vouch for
+    // themselves only — client-reported time is never proof the OTHER side came.
+    const teacherJoined = sessionTeacherJoined || serverConfirmedBothJoined || callerIsTeacher;
     const studentJoined = isManaged
       ? sessionStudentJoined
-      : sessionStudentJoined || serverConfirmedBothJoined || clientEvidenceBothPresent || callerIsStudent;
+      : sessionStudentJoined || serverConfirmedBothJoined || callerIsStudent;
     const bothJoined    = teacherJoined && studentJoined;
 
-    const serverBothActiveTime = session?.bothActiveTime || 0;
-    let bothActiveTime = Math.max(serverBothActiveTime, clientBothActiveTime || 0);
-    if (isManaged) {
-      // Can't have been together longer than since the teacher confirmed the student joined
-      const sinceJoin = session?.studentJoinedAt ? Math.floor((Date.now() - session.studentJoinedAt.getTime()) / 1000) : 0;
-      bothActiveTime = Math.min(bothActiveTime, sinceJoin);
+    // Time together can't exceed the overlap the server saw: from the moment both
+    // were in (classStartedAt) until the first of them left (or now), and never
+    // more than the booked length plus extensions. This caps clientBothActiveTime,
+    // which the caller controls.
+    const maxDuration = (booking.duration || 60) * 60 + (session?.extendedTime || 0);
+    let overlapBound = 0;
+    if (session?.classStartedAt) {
+      const startMs = new Date(session.classStartedAt).getTime();
+      const leftAt  = (d) => (d && new Date(d).getTime() > startMs ? new Date(d).getTime() : Date.now());
+      const endMs   = Math.min(leftAt(session.teacherLeftAt), leftAt(session.studentLeftAt), Date.now());
+      overlapBound  = Math.min(Math.max(0, Math.floor((endMs - startMs) / 1000)), maxDuration);
     }
 
-    if (bothActiveTime === 0 && serverConfirmedBothJoined && session?.classStartedAt) {
-      const maxDuration = (booking.duration || 60) * 60;
-      const elapsed = Math.floor((Date.now() - new Date(session.classStartedAt)) / 1000);
-      bothActiveTime = Math.min(elapsed, maxDuration);
+    const serverBothActiveTime = session?.bothActiveTime || 0;
+    const clientTime = Number.isFinite(Number(clientBothActiveTime)) ? Math.max(0, Number(clientBothActiveTime)) : 0;
+    let bothActiveTime = Math.min(Math.max(serverBothActiveTime, clientTime), overlapBound);
+
+    if (bothActiveTime === 0 && serverConfirmedBothJoined) {
+      bothActiveTime = overlapBound;
     }
 
     const requiredTime     = session?.requiredTime || Math.floor((booking.duration || 60) * 60 * 0.83);
@@ -284,41 +300,32 @@ router.post("/auto-complete", verifyToken, async (req, res) => {
 
     // Case 1: CLASS COMPLETED
     if (bothJoined && meetsRequirement) {
-      booking.status = "completed";
-      booking.completedAt = new Date();
-      booking.markedBy = "system";
-      booking.adminRejected = false;
-      booking.attendanceConfirmedBy = isManaged ? "teacher" : "student";
+      // Claim the booking atomically — two simultaneous calls (teacher + student,
+      // or a retry) must not both pay. Only the request that flips the status pays.
+      const claimed = await getBooking(req.db).findOneAndUpdate(
+        { _id: booking._id, status: { $in: AUTO_COMPLETABLE }, adminRejected: { $ne: true } },
+        { $set: {
+          status: "completed", completedAt: new Date(), markedBy: "system", adminRejected: false,
+          attendanceConfirmedBy: isManaged ? "teacher" : "student",
+        } },
+        { new: true },
+      );
+      if (!claimed) {
+        const now = await getBooking(req.db).findById(booking._id).select("status").lean();
+        const done = now?.status === "completed";
+        return res.json({ alreadyProcessed: true, completed: done, missed: now?.status === "missed",
+          message: done ? "Class already completed" : "This class was already settled" });
+      }
+
       if (isManaged) {
         // Only the teacher saw the student — ready a link so the admin can ask the parent
-        issueShareLink(booking);
-        booking.parentCheck = { status: "waiting" };
-      }
-      await booking.save();
-
-      const student = await getStudent(req.db).findById(booking.studentId._id);
-      if (student && student.classCredits > 0) {
-        student.classCredits -= 1;
-        if (student.classCredits === 0) student.active = false;
-        await student.save();
+        issueShareLink(claimed);
+        claimed.parentCheck = { status: "waiting" };
+        await claimed.save();
       }
 
-      const teacher = await getTeacher(req.db).findById(booking.teacherId._id);
-      let earned = 0;
-      if (teacher) {
-        earned = parseFloat(teacher.ratePerClass || 0);
-        teacher.lessonsCompleted = (teacher.lessonsCompleted || 0) + 1;
-        teacher.earned = (teacher.earned || 0) + earned;
-        await teacher.save();
-      }
-
-      await getPaymentTransaction(req.db).create({
-        bookingId: booking._id,
-        teacherId: booking.teacherId._id,
-        studentId: booking.studentId._id,
-        amount: earned, status: "pending", type: "class_completion",
-        classTitle: booking.classTitle, completedAt: new Date(),
-        studentName: `${booking.studentId.firstName || ""} ${booking.studentId.lastName || ""}`.trim(),
+      // Same charge/pay rules as every other completion path (trial classes are free)
+      const { student, earned } = await payForCompletedClass(req.db, claimed, {
         description: `Auto-completed: ${booking.classTitle} (${isManaged ? "attendance confirmed by teacher" : "system"})`,
       });
 
@@ -349,11 +356,15 @@ router.post("/auto-complete", verifyToken, async (req, res) => {
       missedReason = `Attendance requirement not met — both parties needed ${Math.ceil(requiredTime / 60)} min together, were together for ${Math.floor(bothActiveTime / 60)} min (short by ${shortBy} min)`;
     }
 
-    booking.status = "missed";
-    booking.completedAt = new Date();
-    booking.markedBy = "system";
-    booking.missedReason = missedReason;
-    await booking.save();
+    // Conditional so a parallel request that just completed the class isn't overwritten
+    const markedMissed = await getBooking(req.db).findOneAndUpdate(
+      { _id: booking._id, status: { $in: AUTO_COMPLETABLE }, adminRejected: { $ne: true } },
+      { $set: { status: "missed", completedAt: new Date(), markedBy: "system", missedReason } },
+      { new: true },
+    );
+    if (!markedMissed) {
+      return res.json({ alreadyProcessed: true, message: "This class was already settled" });
+    }
 
     if (session) {
       session.status = "incomplete";
@@ -592,6 +603,7 @@ router.patch("/admin-complete/:bookingId", verifyToken, async (req, res) => {
     booking.completedAt = new Date();
     booking.markedBy = "admin";
     booking.adminRejected = false;
+    recordOutcomeChange(booking, { to: "completed", source: "admin", reason: adminNotes || "Marked completed by admin" });
     await booking.save();
 
     const student = await getStudent(req.db).findById(booking.studentId._id);

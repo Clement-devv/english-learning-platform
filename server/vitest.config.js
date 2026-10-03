@@ -8,5 +8,8 @@ export default defineConfig({
     environment: 'node',
     setupFiles: ['./tests/setup.js'],
     testTimeout: 30000,
+    // Each file starts its own in-memory MongoDB in beforeAll; with several
+    // files running in parallel that can take longer than the 10 s default.
+    hookTimeout: 120000,
   },
 })

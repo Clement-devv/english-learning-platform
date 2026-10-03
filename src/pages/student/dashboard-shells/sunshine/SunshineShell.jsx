@@ -46,6 +46,7 @@ import ReferralTab         from "../../tabs/ReferralTab";
 import LeaderboardTab      from "../../tabs/LeaderboardTab";
 import StreakWidget        from "../../components/StreakWidget";
 import { useDashboardData, BADGE_DEFINITIONS } from "../useDashboardData";
+import DashboardAlertsBar from "../../../../components/DashboardAlertsBar";
 
 // ── Sidebar nav groups ────────────────────────────────────────────────────────
 const NAV_GROUPS = [
@@ -467,6 +468,8 @@ export default function SunshineShell() {
 
         {/* ── SCROLL AREA ── */}
         <main style={{ flex: 1, overflowY: "auto", padding: isMobile ? `16px 14px calc(80px + env(safe-area-inset-bottom, 0px))` : 24 }}>
+          {/* Missed calls & new messages while away */}
+          <DashboardAlertsBar isDark={d.isDarkMode} onOpenMessages={() => d.setActiveTab("messages")} />
 
           {/* Pending confirmation banner */}
           {d.pendingConfirmations.length > 0 && d.pendingConfirmations.map(conf => (

@@ -29,6 +29,7 @@ import LiveClasses                  from '../../components/dashboard/LiveClasses
 import UpcomingClasses              from '../../components/dashboard/UpcomingClasses';
 import LanguageSwitcher             from '../../../../components/LanguageSwitcher';
 import { useTranslation }           from 'react-i18next';
+import DashboardAlertsBar from "../../../../components/DashboardAlertsBar";
 
 // ── Palette ────────────────────────────────────────────────────────────────────
 const palette = (dark) => ({
@@ -374,6 +375,8 @@ export default function SunshineShell() {
 
         {/* ── SCROLL AREA ── */}
         <main style={{ flex: 1, overflowY: 'auto', padding: isMobile ? `16px 14px calc(80px + env(safe-area-inset-bottom, 0px))` : 24 }}>
+          {/* Missed calls & new messages while away */}
+          <DashboardAlertsBar isDark={d.isDarkMode} onOpenMessages={() => d.setActiveTab("messages")} />
 
           {/* Toast */}
           {d.toast && (

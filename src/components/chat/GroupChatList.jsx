@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Search, MessageCircle, CheckCheck, Plus, Trash2 } from "lucide-react";
 import api from "../../api";
+import { otherPersonCode, codeChipStyle } from "./personCode";
 import { useRing } from "../../context/RingContext.jsx";
 
 export default function GroupChatList({ userRole, onSelectChat, selectedChatId, isDark, onUnreadCount }) {
@@ -12,8 +13,15 @@ export default function GroupChatList({ userRole, onSelectChat, selectedChatId, 
   const [startingDm,      setStartingDm]      = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [deleting,        setDeleting]        = useState(false);
+  const [filter,          setFilter]          = useState("all"); // all | teachers | students | groups | staff
+  // Admin: start a private chat with any teacher / student
+  const [pickerOpen,      setPickerOpen]      = useState(false);
+  const [pickerQuery,     setPickerQuery]     = useState("");
+  const [pickerList,      setPickerList]      = useState([]);
+  const [pickerLoading,   setPickerLoading]   = useState(false);
+  const [pickerError,     setPickerError]     = useState("");
 
-  const { lastChatEvent } = useRing();
+  const { lastChatEvent, socketConnected } = useRing();
 
   const C = {
     bg:         isDark ? "#13151c" : "#f8f9ff",
@@ -42,18 +50,26 @@ export default function GroupChatList({ userRole, onSelectChat, selectedChatId, 
         const data = dmRes.value.data?.dms || [];
         setDms(Array.isArray(data) ? data : []);
       }
-    } catch (e) {
-      console.error("GroupChatList fetch error:", e);
     } finally {
       setLoading(false);
     }
   }, []);
 
+  useEffect(() => { fetchAll(); }, [fetchAll]);
+
+  // Safety-net polling — new messages normally arrive over the live connection
+  // (lastChatEvent below). Slow while it is up, never while the tab is hidden.
   useEffect(() => {
-    fetchAll();
-    const id = setInterval(fetchAll, 10000);
-    return () => clearInterval(id);
-  }, [fetchAll]);
+    const id = setInterval(() => {
+      if (!document.hidden) fetchAll();
+    }, socketConnected ? 60_000 : 15_000);
+    const onVisible = () => { if (!document.hidden) fetchAll(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [fetchAll, socketConnected]);
 
   // Re-fetch immediately whenever a new chat message arrives (any chat)
   useEffect(() => {
@@ -84,6 +100,44 @@ export default function GroupChatList({ userRole, onSelectChat, selectedChatId, 
       }
     } catch (e) {
       console.error("Start DM error:", e);
+    } finally {
+      setStartingDm(false);
+    }
+  };
+
+  // ── Admin "New message" picker ─────────────────────────────────────────────
+  useEffect(() => {
+    if (!pickerOpen) return;
+    const t = setTimeout(async () => {
+      setPickerLoading(true);
+      setPickerError("");
+      try {
+        const res = await api.get("/direct-messages/contacts", { params: { q: pickerQuery || undefined } });
+        setPickerList(res.data?.contacts || []);
+      } catch {
+        setPickerError("Could not load people");
+      } finally {
+        setPickerLoading(false);
+      }
+    }, 250); // debounce typing
+    return () => clearTimeout(t);
+  }, [pickerOpen, pickerQuery]);
+
+  const startChatWith = async (contact) => {
+    if (startingDm) return;
+    setStartingDm(true);
+    setPickerError("");
+    try {
+      const res = await api.post("/direct-messages/admin-start", { targetRole: contact.role, targetId: contact.id });
+      if (res.data.success) {
+        await fetchAll();
+        setPickerOpen(false);
+        setPickerQuery("");
+        setFilter("all");
+        onSelectChat({ ...res.data.dm, _chatType: "dm" });
+      }
+    } catch (e) {
+      setPickerError(e?.response?.data?.message || "Could not open the chat");
     } finally {
       setStartingDm(false);
     }
@@ -122,7 +176,8 @@ export default function GroupChatList({ userRole, onSelectChat, selectedChatId, 
   };
 
   // Derive display info for a DM — proper names + role badges
-  const getDmInfo = (dm) => {
+  const getDmInfo = (dm) => ({ ...getDmInfoBase(dm), code: otherPersonCode(dm, userRole) });
+  const getDmInfoBase = (dm) => {
     if (userRole === "admin") {
       if (dm.type === "teacher-admin" && dm.teacherId) {
         const name = `${dm.teacherId.firstName} ${dm.teacherId.lastName}`;
@@ -191,10 +246,38 @@ export default function GroupChatList({ userRole, onSelectChat, selectedChatId, 
   const inactiveGroups = filteredGroups.filter(c => c.isActive === false);
 
   // For DM search: match against derived name
-  const filteredDms = dms.filter(dm => {
+  const searchedDms = dms.filter(dm => {
     const info = getDmInfo(dm);
-    return info.name.toLowerCase().includes(searchQuery.toLowerCase());
+    const q = searchQuery.toLowerCase();
+    return info.name.toLowerCase().includes(q) || (info.code || "").toLowerCase().includes(q);
   });
+
+  // ── Filter tabs: All / Teachers / Students / Groups / Staff ──────────────
+  const dmCategory = (dm) => {
+    const badge = getDmInfo(dm).roleBadge;
+    if (badge === "Teacher") return "teachers";
+    if (badge === "Student") return "students";
+    return "staff"; // admin / sub-admin conversations
+  };
+  const unreadOf = (c) => c?.unreadCount?.[unreadKey] || 0;
+  const tabDefs = [
+    { key: "all",      label: "All",      count: dms.length + groupChats.length,
+      unread: dms.reduce((s, d) => s + unreadOf(d), 0) + groupChats.reduce((s, c) => s + unreadOf(c), 0) },
+    { key: "teachers", label: "Teachers", count: dms.filter(d => dmCategory(d) === "teachers").length,
+      unread: dms.filter(d => dmCategory(d) === "teachers").reduce((s, d) => s + unreadOf(d), 0) },
+    { key: "students", label: "Students", count: dms.filter(d => dmCategory(d) === "students").length,
+      unread: dms.filter(d => dmCategory(d) === "students").reduce((s, d) => s + unreadOf(d), 0) },
+    { key: "groups",   label: "Groups",   count: groupChats.filter(c => c.isActive !== false).length,
+      unread: groupChats.reduce((s, c) => s + unreadOf(c), 0) },
+    { key: "staff",    label: userRole === "admin" ? "Sub-admins" : "Staff", count: dms.filter(d => dmCategory(d) === "staff").length,
+      unread: dms.filter(d => dmCategory(d) === "staff").reduce((s, d) => s + unreadOf(d), 0) },
+  ].filter(t => t.key === "all" || t.count > 0);
+  // If the selected tab disappears (e.g. last item removed), fall back to All
+  const activeFilter = tabDefs.some(t => t.key === filter) ? filter : "all";
+
+  const showDms    = activeFilter !== "groups";
+  const showGroups = activeFilter === "all" || activeFilter === "groups";
+  const filteredDms = activeFilter === "all" ? searchedDms : searchedDms.filter(d => dmCategory(d) === activeFilter);
 
   return (
     <>
@@ -203,7 +286,9 @@ export default function GroupChatList({ userRole, onSelectChat, selectedChatId, 
         .gc-search:focus { outline: none; box-shadow: 0 0 0 2px rgba(99,102,241,0.3); }
       `}</style>
 
-      <div style={{ display: "flex", flexDirection: "column", height: "100%", background: C.bg }}>
+      {/* flex:1 + minHeight:0 (not height:100%) so only the list below scrolls,
+          not the whole Messages page */}
+      <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0, background: C.bg, position: "relative" }}>
 
         {/* Header */}
         <div style={{ padding: "20px 16px 14px", borderBottom: `1px solid ${C.border}` }}>
@@ -218,6 +303,18 @@ export default function GroupChatList({ userRole, onSelectChat, selectedChatId, 
                 </span>
               )}
             </div>
+            {userRole === "admin" && (
+              <button onClick={() => { setPickerOpen(o => !o); setPickerError(""); }}
+                title="Start a private chat with a teacher or student"
+                style={{
+                  marginLeft: "auto", marginRight: "8px", display: "flex", alignItems: "center", gap: "5px",
+                  padding: "8px 11px", borderRadius: "11px", border: "none", cursor: "pointer",
+                  background: pickerOpen ? C.accent : (isDark ? "rgba(99,102,241,0.18)" : "rgba(99,102,241,0.10)"),
+                  color: pickerOpen ? "#fff" : C.accent, fontSize: "12px", fontWeight: "800", fontFamily: "inherit",
+                }}>
+                <Plus size={14} /> New
+              </button>
+            )}
             <div style={{
               width: "38px", height: "38px", borderRadius: "12px",
               background: isDark ? "rgba(99,102,241,0.18)" : "rgba(99,102,241,0.10)",
@@ -260,18 +357,97 @@ export default function GroupChatList({ userRole, onSelectChat, selectedChatId, 
               }}
             />
           </div>
+
+          {/* Filter tabs */}
+          {tabDefs.length > 1 && (
+            <div role="tablist" aria-label="Filter conversations" className="gc-tabs"
+              style={{ display: "flex", gap: "6px", marginTop: "12px", overflowX: "auto", paddingBottom: "2px" }}>
+              {tabDefs.map(t => {
+                const on = activeFilter === t.key;
+                return (
+                  <button key={t.key} role="tab" aria-selected={on} onClick={() => setFilter(t.key)}
+                    style={{
+                      flexShrink: 0, display: "flex", alignItems: "center", gap: "5px",
+                      padding: "5px 11px", borderRadius: "999px", cursor: "pointer", fontFamily: "inherit",
+                      fontSize: "12px", fontWeight: on ? "800" : "600",
+                      border: `1px solid ${on ? C.accent : C.border}`,
+                      background: on ? C.accent : "transparent",
+                      color: on ? "#fff" : C.sub,
+                    }}>
+                    {t.label}
+                    {t.unread > 0 && (
+                      <span style={{
+                        minWidth: "16px", height: "16px", borderRadius: "8px", padding: "0 4px",
+                        fontSize: "10px", fontWeight: "800", display: "flex", alignItems: "center", justifyContent: "center",
+                        background: on ? "rgba(255,255,255,0.25)" : "#ef4444", color: "#fff",
+                      }}>{t.unread > 99 ? "99+" : t.unread}</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
 
-        {/* List */}
-        <div style={{ flex: 1, overflowY: "auto", padding: "6px 0" }}>
+        {/* Admin: pick someone to message */}
+        {pickerOpen && (
+          <div style={{ borderBottom: `1px solid ${C.border}`, padding: "10px 16px 12px", background: isDark ? "rgba(99,102,241,0.06)" : "rgba(99,102,241,0.03)" }}>
+            <p style={{ margin: "0 0 8px", fontSize: "12px", fontWeight: "800", color: C.text }}>New private message</p>
+            <input
+              className="gc-search"
+              type="text"
+              autoFocus
+              placeholder="Search teachers or students…"
+              value={pickerQuery}
+              onChange={e => setPickerQuery(e.target.value)}
+              style={{
+                width: "100%", padding: "8px 12px", boxSizing: "border-box",
+                background: C.inputBg, border: `1px solid ${C.border}`, borderRadius: "10px",
+                fontSize: "13px", color: C.inputTxt, fontFamily: "inherit",
+              }}
+            />
+            {pickerError && <p style={{ margin: "8px 0 0", fontSize: "12px", color: "#ef4444" }}>{pickerError}</p>}
+            <div style={{ maxHeight: "220px", overflowY: "auto", overscrollBehavior: "contain", marginTop: "8px" }}>
+              {pickerLoading ? (
+                <p style={{ margin: "6px 0", fontSize: "12px", color: C.sub }}>Loading…</p>
+              ) : pickerList.length === 0 ? (
+                <p style={{ margin: "6px 0", fontSize: "12px", color: C.sub }}>No one found</p>
+              ) : pickerList.map(p => (
+                <button key={`${p.role}-${p.id}`} onClick={() => startChatWith(p)} disabled={startingDm}
+                  style={{
+                    width: "100%", display: "flex", alignItems: "center", gap: "10px", padding: "7px 6px",
+                    border: "none", background: "transparent", cursor: startingDm ? "wait" : "pointer",
+                    textAlign: "left", borderRadius: "8px", fontFamily: "inherit",
+                  }}
+                  onMouseEnter={e => (e.currentTarget.style.background = C.hover)}
+                  onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+                  <div style={{
+                    width: "30px", height: "30px", borderRadius: "9px", flexShrink: 0,
+                    background: p.role === "teacher" ? "linear-gradient(135deg,#1d4ed8,#0891b2)" : "linear-gradient(135deg,#047857,#10b981)",
+                    display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: "11px", fontWeight: "700",
+                  }}>{getInitials(p.name)}</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ margin: 0, fontSize: "13px", fontWeight: "700", color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</p>
+                    <p style={{ margin: 0, fontSize: "11px", color: C.sub, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {p.role === "teacher" ? "Teacher" : "Student"}{p.code ? ` · ${p.code}` : ""}{p.email ? ` · ${p.email}` : ""}
+                    </p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* List — scrolls on its own (mouse wheel stays inside the contact list) */}
+        <div className="msg-scrollbar" style={{ flex: 1, minHeight: 0, overflowY: "auto", overscrollBehavior: "contain", padding: "6px 0" }}>
           {loading ? (
             <Skeleton C={C} />
           ) : (
             <>
               {/* Direct Messages */}
-              <SectionLabel label="Direct Messages" color={C.sectionTxt} />
+              {showDms && <SectionLabel label="Direct Messages" color={C.sectionTxt} />}
 
-              {filteredDms.length > 0 ? (
+              {!showDms ? null : filteredDms.length > 0 ? (
                 filteredDms.map(dm => {
                   const info = getDmInfo(dm);
                   return (
@@ -314,14 +490,14 @@ export default function GroupChatList({ userRole, onSelectChat, selectedChatId, 
                 </div>
               ) : (
                 <p style={{ padding: "12px 20px", fontSize: "12px", color: C.sub, margin: 0 }}>
-                  No direct messages yet
+                  {searchQuery ? "No results found" : <>No direct messages yet{userRole === "admin" ? <> — tap <strong>New</strong> to start one</> : ""}</>}
                 </p>
               )}
 
               {/* Group Chats */}
-              <SectionLabel label="Group Chats" color={C.sectionTxt} style={{ marginTop: 8 }} />
+              {showGroups && <SectionLabel label="Group Chats" color={C.sectionTxt} style={{ marginTop: 8 }} />}
 
-              {activeGroups.length === 0 ? (
+              {!showGroups ? null : activeGroups.length === 0 ? (
                 <p style={{ padding: "12px 20px", fontSize: "12px", color: C.sub, margin: 0 }}>
                   {searchQuery ? "No results found" : "No group chats yet"}
                 </p>
@@ -343,7 +519,7 @@ export default function GroupChatList({ userRole, onSelectChat, selectedChatId, 
               )}
 
               {/* Archived / Inactive chats — admin only */}
-              {userRole === "admin" && inactiveGroups.length > 0 && (
+              {userRole === "admin" && showGroups && inactiveGroups.length > 0 && (
                 <>
                   <SectionLabel label="Archived Chats" color={C.sectionTxt} style={{ marginTop: 8 }} />
                   {inactiveGroups.map(chat => (
@@ -433,6 +609,7 @@ function DmRow({ chat, isSelected, unread, isDark, C, onSelect, formatTime, info
             }}>
               {info.name}
             </span>
+            {info.code && <span style={codeChipStyle(isDark)} title="ID number">{info.code}</span>}
             {info.roleBadge && (
               <span style={{
                 fontSize: "10px", fontWeight: "700", flexShrink: 0,

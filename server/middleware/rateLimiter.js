@@ -101,14 +101,35 @@ export const getRemainingAttempts = async (identifier, centerSlug = null) => {
 // =========================================
 // HELPER: Development bypass & User tracking
 // =========================================
+// Never key on anything the client chooses (e.g. req.body.email): a fresh value
+// per request would give the caller a fresh bucket every time. Authenticated
+// requests use the user id; everything else uses the IP (real client IP in
+// production — TRUST_PROXY=true behind Caddy, see docker-compose.yml).
 const createKeyGenerator = (useUser = true) => (req) => {
-  // In development, track by IP (localhost bypassed later)
-  // In production, track by user ID if authenticated
   if (useUser && req.user?.id) {
-    return req.user.id;
+    return `u:${req.user.id}`;
   }
-  return req.body?.email || req.body?.username || req.ip;
+  return `ip:${req.ip}`;
 };
+
+/**
+ * The account a login / reset / email request is about, normalised so
+ * "A@x.com " and "a@x.com" share a bucket. null when absent or not a string.
+ */
+const accountOf = (req) => {
+  const v = req.body?.email ?? req.body?.username;
+  return typeof v === "string" && v.trim() ? v.trim().toLowerCase().slice(0, 254) : null;
+};
+const centerScope = (req) => req.center?.slug || "platform";
+
+/**
+ * Two buckets per sensitive endpoint:
+ *   • per account — protects one person from a targeted guess/flood
+ *   • per IP      — stops one client from spraying many accounts (rotating
+ *                   the email to get a fresh account bucket each time)
+ * Returned as an array; Express flattens arrays of middleware in route args.
+ */
+const twoLayer = (ipLimiter, accountLimiter) => [ipLimiter, accountLimiter];
 
 // Only bypass for real loopback IPs — never trust the Host header (spoofable).
 // Works in both dev and production so a misconfigured NODE_ENV can't open limits.
@@ -118,72 +139,92 @@ const shouldSkip = (req) => LOOPBACK_IPS.has(req.ip);
 // =========================================
 // 1. LOGIN LIMITER (Keep your existing strict security)
 // =========================================
-export const loginLimiter = rateLimit({
+const loginLimitHandler = (scope) => (req, res) => {
+  logger.security('RATE_LIMIT_EXCEEDED', {
+    type: 'login', scope,
+    identifier: accountOf(req),
+    ip: req.ip,
+    userAgent: req.headers['user-agent']
+  });
+  res.status(429).json({
+    success: false,
+    message: "Too many login attempts from this IP address or email. Please try again after 15 minutes.",
+    retryAfter: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+    lockDuration: '15 minutes'
+  });
+};
+
+// Failed attempts per account (scoped by center so one center can't lock
+// the same email out of another).
+const loginAccountLimiter = rateLimit({
   ...withStore("login"),
-  windowMs: 15 * 60 * 1000, // 15 minutes
+  windowMs: 15 * 60 * 1000,
   max: 20,
+  skipSuccessfulRequests: true,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) => shouldSkip(req) || !accountOf(req),
+  validate: { keyGeneratorIpFallback: false },
+  keyGenerator: (req) => `acct:${centerScope(req)}:${accountOf(req)}`,
+  handler: loginLimitHandler('account'),
+});
+
+// Failed attempts per IP, across all accounts. Looser than per-account because
+// a whole school computer lab can share one public IP.
+const loginIpLimiter = rateLimit({
+  ...withStore("login-ip"),
+  windowMs: 15 * 60 * 1000,
+  max: 100,
   skipSuccessfulRequests: true,
   standardHeaders: true,
   legacyHeaders: false,
   skip: shouldSkip,
   validate: { keyGeneratorIpFallback: false },
-
-  // Scope key by center so lockouts in one center don't affect another
-  keyGenerator: (req) => {
-    const base = req.body?.email || req.body?.username || req.ip;
-    const slug = req.center?.slug || '';
-    return slug ? `${base}:${slug}` : base;
-  },
-
-  // Custom handler with detailed message
-  handler: (req, res) => {
-    const identifier = req.body?.email || req.body?.username || req.ip;
-    
-    logger.security('RATE_LIMIT_EXCEEDED', {
-      type: 'login',
-      identifier,
-      ip: req.ip,
-      userAgent: req.headers['user-agent']
-    });
-    
-    res.status(429).json({
-      success: false,
-      message: "Too many login attempts from this IP address or email. Please try again after 15 minutes.",
-      retryAfter: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
-      lockDuration: '15 minutes'
-    });
-  }
+  keyGenerator: (req) => `ip:${req.ip}`,
+  handler: loginLimitHandler('ip'),
 });
+
+export const loginLimiter = twoLayer(loginIpLimiter, loginAccountLimiter);
 
 // =========================================
 // 2. PASSWORD RESET LIMITER (Keep your strict security)
 // =========================================
-export const passwordResetLimiter = rateLimit({
+const passwordResetHandler = (scope) => (req, res) => {
+  logger.security('RATE_LIMIT_EXCEEDED', {
+    type: 'password_reset', scope,
+    email: accountOf(req),
+    ip: req.ip
+  });
+  res.status(429).json({
+    success: false,
+    message: "Too many password reset requests. Please try again after 1 hour.",
+    retryAfter: new Date(Date.now() + 60 * 60 * 1000).toISOString()
+  });
+};
+
+const passwordResetAccountLimiter = rateLimit({
   ...withStore("pwd-reset"),
   windowMs: 60 * 60 * 1000,
   max: 5,
-  skipFailedRequests: false,
+  skip: (req) => shouldSkip(req) || !accountOf(req),
+  validate: { keyGeneratorIpFallback: false },
+  keyGenerator: (req) => `acct:${centerScope(req)}:${accountOf(req)}`,
+  handler: passwordResetHandler('account'),
+});
+
+// Also used by reset-password/:token and setup-account, which have no email —
+// for those the IP bucket is the only limit.
+const passwordResetIpLimiter = rateLimit({
+  ...withStore("pwd-reset-ip"),
+  windowMs: 60 * 60 * 1000,
+  max: 20,
   skip: shouldSkip,
   validate: { keyGeneratorIpFallback: false },
-
-  keyGenerator: (req) => {
-    return req.body?.email || req.ip;
-  },
-
-  handler: (req, res) => {
-    logger.security('RATE_LIMIT_EXCEEDED', {
-      type: 'password_reset',
-      email: req.body?.email,
-      ip: req.ip
-    });
-    
-    res.status(429).json({
-      success: false,
-      message: "Too many password reset requests. Please try again after 1 hour.",
-      retryAfter: new Date(Date.now() + 60 * 60 * 1000).toISOString()
-    });
-  }
+  keyGenerator: (req) => `ip:${req.ip}`,
+  handler: passwordResetHandler('ip'),
 });
+
+export const passwordResetLimiter = twoLayer(passwordResetIpLimiter, passwordResetAccountLimiter);
 
 // =========================================
 // 3. GENERAL API LIMITER (✅ MASSIVELY INCREASED for 500+ users)
@@ -317,29 +358,59 @@ export const uploadLimiter = rateLimit({
 // =========================================
 // 8. EMAIL SENDING LIMITER (Keep your existing)
 // =========================================
-export const emailLimiter = rateLimit({
+const emailLimitHandler = (scope) => (req, res) => {
+  logger.security('RATE_LIMIT_EXCEEDED', {
+    type: 'email', scope,
+    recipient: accountOf(req),
+    ip: req.ip
+  });
+  res.status(429).json({
+    success: false,
+    message: "Too many email requests. Please try again after 1 hour."
+  });
+};
+
+const emailAccountLimiter = rateLimit({
   ...withStore("email"),
   windowMs: 60 * 60 * 1000,
   max: 10,
+  skip: (req) => shouldSkip(req) || !accountOf(req),
+  validate: { keyGeneratorIpFallback: false },
+  keyGenerator: (req) => `acct:${accountOf(req)}`,
+  handler: emailLimitHandler('recipient'),
+});
+
+const emailIpLimiter = rateLimit({
+  ...withStore("email-ip"),
+  windowMs: 60 * 60 * 1000,
+  max: 30,
   skip: shouldSkip,
   validate: { keyGeneratorIpFallback: false },
+  keyGenerator: (req) => `ip:${req.ip}`,
+  handler: emailLimitHandler('ip'),
+});
 
-  keyGenerator: (req) => {
-    return req.body?.email || req.ip;
-  },
+export const emailLimiter = twoLayer(emailIpLimiter, emailAccountLimiter);
 
+// =========================================
+// 9. PUBLIC CONTACT FORM LIMITER
+// =========================================
+// The company contact form emails a real inbox and needs no login, so it gets
+// its own small per-IP budget (the general API limit is 5000 / 15 min).
+export const contactFormLimiter = rateLimit({
+  ...withStore("contact"),
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  skip: shouldSkip,
+  validate: { keyGeneratorIpFallback: false },
+  keyGenerator: (req) => `ip:${req.ip}`,
   handler: (req, res) => {
-    logger.security('RATE_LIMIT_EXCEEDED', {
-      type: 'email',
-      recipient: req.body?.email,
-      ip: req.ip
-    });
-    
+    logger.security('RATE_LIMIT_EXCEEDED', { type: 'contact_form', ip: req.ip });
     res.status(429).json({
       success: false,
-      message: "Too many email requests. Please try again after 1 hour."
+      message: "Too many messages sent. Please try again in an hour.",
     });
-  }
+  },
 });
 
 // No manual cleanup needed — MongoDB TTL index on LoginAttempt.firstAttemptAt
@@ -357,6 +428,7 @@ export default {
   strictLimiter,
   uploadLimiter,
   emailLimiter,
+  contactFormLimiter,
   trackFailedLogin,
   isAccountLocked,
   clearFailedAttempts,

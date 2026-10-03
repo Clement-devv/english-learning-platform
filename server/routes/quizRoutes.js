@@ -18,7 +18,7 @@ import logger from "../utils/logger.js";
 import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
 import { validateObjectId, wrapUpload } from '../middleware/validateObjectId.js';
 import { toStr, toObjectId, toInt, toArray } from '../utils/inputSanitizer.js';
-import { sendPush } from '../utils/webPushService.js';
+import { pushToUser, pushToAllAdmins } from '../utils/webPushService.js';
 import { loginLimiter } from '../middleware/rateLimiter.js';
 import { readPaging, pageMeta, statusCounts, oid, todoFirstIds, inOrder } from "../utils/paging.js";
 import {
@@ -371,10 +371,7 @@ router.post("/", verifyToken, async (req, res) => {
         quizId: quiz._id,
         dueDate,
       });
-      getStudent(req.db).findById(studentId).select('pushSubscription').then(s => {
-        if (s?.pushSubscription?.endpoint)
-          sendPush(s.pushSubscription, { title: '📝 New Quiz!', body: `Your teacher assigned: "${title.slice(0, 60)}"`, icon: '/icons/icon.svg', data: { url: '/student/dashboard?tab=quiz' } }).catch(() => {});
-      }).catch(() => {});
+      pushToUser(req.db, 'student', studentId, { title: '📝 New Quiz!', body: `Your teacher assigned: "${title.slice(0, 60)}"`, icon: '/icons/icon.svg', data: { url: '/student/dashboard?tab=quiz' } });
     } catch (_) {}
 
     res.status(201).json({ success: true, quiz: withShareInfo(quiz, req.center) });

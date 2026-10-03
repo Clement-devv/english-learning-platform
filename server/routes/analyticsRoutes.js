@@ -12,6 +12,11 @@ import { parsePagination }            from "../utils/pagination.js";
 import logger from "../utils/logger.js";
 import { serverError } from '../utils/apiResponse.js';
 import { getAnalyticsAccess, requireAnalyticsUnlock } from "../middleware/analyticsPinMiddleware.js";
+import { sharedSnapshot } from "../utils/sharedSnapshot.js";
+
+// Admin numbers are served from one shared snapshot per center (utils/sharedSnapshot.js):
+// 50 admins watching = one computation per change window, not 50.
+const pinVariant = async (req) => ((await getAnalyticsAccess(req)).unlocked ? "unlocked" : "locked");
 
 const router = express.Router();
 router.use(tenantMiddleware);
@@ -52,7 +57,7 @@ async function getRevenueSummary(db) {
 // GET /api/analytics/overview
 // Counts are always returned; the revenue block is null until the admin's
 // analytics PIN (if set) has been entered.
-router.get("/overview", verifyToken, verifyAdmin, async (req, res) => {
+router.get("/overview", verifyToken, verifyAdmin, sharedSnapshot("overview", pinVariant), async (req, res) => {
   try {
     const { startDate, endDate } = req.query;
 
@@ -111,7 +116,7 @@ router.get("/overview", verifyToken, verifyAdmin, async (req, res) => {
 });
 
 // GET /api/analytics/bookings-timeline
-router.get("/bookings-timeline", verifyToken, verifyAdmin, requireAnalyticsUnlock, async (req, res) => {
+router.get("/bookings-timeline", verifyToken, verifyAdmin, requireAnalyticsUnlock, sharedSnapshot("bookings-timeline"), async (req, res) => {
   try {
     const { period = "week", startDate, endDate } = req.query;
 
@@ -142,7 +147,7 @@ router.get("/bookings-timeline", verifyToken, verifyAdmin, requireAnalyticsUnloc
 });
 
 // GET /api/analytics/teacher-performance
-router.get("/teacher-performance", verifyToken, verifyAdmin, requireAnalyticsUnlock, async (req, res) => {
+router.get("/teacher-performance", verifyToken, verifyAdmin, requireAnalyticsUnlock, sharedSnapshot("teacher-performance"), async (req, res) => {
   try {
     const { limit = 10 } = req.query;
 
@@ -209,7 +214,7 @@ router.get("/teacher-performance", verifyToken, verifyAdmin, requireAnalyticsUnl
 });
 
 // GET /api/analytics/student-engagement
-router.get("/student-engagement", verifyToken, verifyAdmin, requireAnalyticsUnlock, async (req, res) => {
+router.get("/student-engagement", verifyToken, verifyAdmin, requireAnalyticsUnlock, sharedSnapshot("student-engagement"), async (req, res) => {
   try {
     const { limit = 10 } = req.query;
 
@@ -253,7 +258,7 @@ router.get("/student-engagement", verifyToken, verifyAdmin, requireAnalyticsUnlo
 });
 
 // GET /api/analytics/revenue-breakdown
-router.get("/revenue-breakdown", verifyToken, verifyAdmin, requireAnalyticsUnlock, async (req, res) => {
+router.get("/revenue-breakdown", verifyToken, verifyAdmin, requireAnalyticsUnlock, sharedSnapshot("revenue-breakdown"), async (req, res) => {
   try {
     const { startDate, endDate } = req.query;
 
@@ -310,7 +315,7 @@ router.get("/revenue-breakdown", verifyToken, verifyAdmin, requireAnalyticsUnloc
 });
 
 // GET /api/analytics/popular-times
-router.get("/popular-times", verifyToken, verifyAdmin, requireAnalyticsUnlock, async (req, res) => {
+router.get("/popular-times", verifyToken, verifyAdmin, requireAnalyticsUnlock, sharedSnapshot("popular-times"), async (req, res) => {
   try {
     // Bucket by the admin's local timezone (IANA name), defaulting to UTC
     let timezone = "UTC";
@@ -342,7 +347,7 @@ router.get("/popular-times", verifyToken, verifyAdmin, requireAnalyticsUnlock, a
 });
 
 // GET /api/analytics/booking-acceptance-rate
-router.get("/booking-acceptance-rate", verifyToken, verifyAdmin, requireAnalyticsUnlock, async (req, res) => {
+router.get("/booking-acceptance-rate", verifyToken, verifyAdmin, requireAnalyticsUnlock, sharedSnapshot("booking-acceptance-rate"), async (req, res) => {
   try {
     const acceptanceRate = await getBooking(req.db).aggregate([
       {

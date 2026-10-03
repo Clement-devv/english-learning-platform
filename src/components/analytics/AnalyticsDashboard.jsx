@@ -16,6 +16,7 @@ import {
 import api from "../../api";
 import { useCurrencySymbol, fmtMoney } from "../../hooks/useCurrencySymbol";
 import AnalyticsPinPrompt from "../admin/analytics/AnalyticsPinPrompt";
+import { useOnDataChanged } from "../../hooks/useLiveData";
 import { clearAnalyticsUnlock } from "../../utils/analyticsPin";
 
 export default function AnalyticsDashboard({ isDarkMode }) {
@@ -49,9 +50,9 @@ export default function AnalyticsDashboard({ isDarkMode }) {
     setPinState(s => ({ ...s, unlocked: false }));
   };
 
-  const fetchAnalytics = async () => {
+  const fetchAnalytics = async (quiet = false) => {
     try {
-      setLoading(true);
+      if (quiet !== true) setLoading(true);
       const tz = encodeURIComponent(Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC");
       const [
         overviewRes, timelineRes, teachersRes,
@@ -82,6 +83,9 @@ export default function AnalyticsDashboard({ isDarkMode }) {
       setLoading(false);
     }
   };
+
+  // Live: refresh quietly when the server says the numbers changed (shared snapshot server-side)
+  useOnDataChanged(["analytics"], () => { if (pinState?.unlocked) fetchAnalytics(true); });
 
   useEffect(() => {
     api.get("/admin/analytics-pin/status")

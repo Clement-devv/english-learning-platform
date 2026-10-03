@@ -11,7 +11,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Navigate } from 'react-router-dom';
-import api from '../api';
+import api, { refreshToken } from '../api';
 import { ROLE_CONFIG, readStorage, clearAuth } from '../utils/authStorage.js';
 
 // Classroom accepts any of these roles
@@ -34,6 +34,13 @@ function clientSideValid(token) {
   }
 }
 
+// Client-side roles (sub-admin) use short tokens that are renewed with their
+// device-bound session — try a renewal before treating the login as over.
+async function clientSideValidOrRenewed(token) {
+  if (clientSideValid(token)) return true;
+  return !!(await refreshToken());
+}
+
 export default function AuthGuard({ role, children }) {
   const [status, setStatus] = useState('loading'); // 'loading' | 'ok' | 'denied'
   const loginPathRef         = useRef('/');
@@ -50,7 +57,7 @@ export default function AuthGuard({ role, children }) {
           if (!token) continue;
 
           if (cfg.clientSide) {
-            if (clientSideValid(token)) {
+            if (await clientSideValidOrRenewed(token)) {
               if (!cancelled) setStatus('ok');
               return;
             }
@@ -91,7 +98,7 @@ export default function AuthGuard({ role, children }) {
 
       // Sub-admin: client-side JWT check — no API call needed
       if (cfg.clientSide) {
-        if (!clientSideValid(token)) clearTokens(cfg);
+        if (!(await clientSideValidOrRenewed(token))) clearTokens(cfg);
         else if (!cancelled) { setStatus('ok'); return; }
         if (!cancelled) setStatus('denied');
         return;

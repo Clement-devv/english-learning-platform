@@ -38,7 +38,9 @@ router.get("/", verifyToken, async (req, res) => {
         { status: "open", enrollmentMode: "invite-only", invitedStudents: req.user.id },
       ];
     } else if (req.user.role === "admin" || req.user.role === "sub-admin") {
-      if (qTeacherId) filter.teacherId = qTeacherId;
+      if (typeof qTeacherId === "string") filter.teacherId = qTeacherId;
+    } else {
+      return forbidden(res, "Not authorized to view group classes");
     }
 
     if (status) filter.status = status;
@@ -105,9 +107,11 @@ router.post("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
 // Must be defined before /:id to avoid ObjectId match on "students"
 router.get("/students/search", verifyToken, verifyAdminOrTeacher, async (req, res) => {
   try {
-    const q = (req.query.q || "").trim();
+    // Escape + cap the search text: a raw RegExp from the query string lets a
+    // caller send a catastrophic pattern like (a+)+$ and stall the server (ReDoS).
+    const q = typeof req.query.q === "string" ? req.query.q.trim().slice(0, 100) : "";
     if (!q) return res.json({ success: true, students: [] });
-    const regex = new RegExp(q, "i");
+    const regex = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
     const students = await getStudent(req.db)
       .find({ $or: [{ firstName: regex }, { lastName: regex }, { email: regex }] })
       .select("firstName lastName email _id classCredits")
@@ -183,6 +187,15 @@ router.delete("/:id", verifyToken, verifyAdmin, validateObjectId("id"), async (r
   }
 });
 
+// Staff who may manage a group class's roster: admins, the class's own teacher,
+// and sub-admins whose teacher scope includes that teacher.
+const canManageRoster = (user, gc) => {
+  if (user.role === "admin") return true;
+  if (user.role === "teacher") return String(gc.teacherId) === String(user.id);
+  if (user.role === "sub-admin") return (user.teacherScope || []).map(String).includes(String(gc.teacherId));
+  return false;
+};
+
 // ─── POST /:id/enroll — add a student ────────────────────────────────────────
 // Admin passes { studentId }; student self-enrolls (no body needed beyond auth)
 router.post("/:id/enroll", verifyToken, validateObjectId("id"), async (req, res) => {
@@ -203,6 +216,8 @@ router.post("/:id/enroll", verifyToken, validateObjectId("id"), async (req, res)
       getStudent(req.db).findById(studentId),
     ]);
     if (!gc)      return notFound(res, "Group class not found");
+    if (role !== "student" && !canManageRoster(req.user, gc))
+      return forbidden(res, "You can only enroll students in your own classes");
     if (!student) return notFound(res, "Student not found");
 
     if (gc.status !== "open") return badRequest(res, `Class is ${gc.status} — enrollment is closed`);
@@ -260,7 +275,7 @@ router.delete("/:id/enroll/:studentId", verifyToken, validateObjectId("id"), val
     const { role, id: userId } = req.user;
     const { studentId } = req.params;
 
-    // Student may only remove themselves; admin/teacher can remove anyone
+    // Student may only remove themselves; staff only from classes they manage
     if (role === "student" && userId !== studentId)
       return forbidden(res, "You can only remove your own enrollment");
 
@@ -269,6 +284,8 @@ router.delete("/:id/enroll/:studentId", verifyToken, validateObjectId("id"), val
       getStudent(req.db).findById(studentId),
     ]);
     if (!gc) return notFound(res, "Group class not found");
+    if (role !== "student" && !canManageRoster(req.user, gc))
+      return forbidden(res, "You can only manage enrollments in your own classes");
     if (["completed", "cancelled"].includes(gc.status))
       return badRequest(res, "Cannot remove enrollment from a completed or cancelled class");
 

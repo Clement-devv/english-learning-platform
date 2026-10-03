@@ -208,13 +208,17 @@ router.get('/', verifyToken, async (req, res) => {
     getStudent(req.db);
     const { limit, skip } = parsePagination(req.query, 50, 200);
 
+    // Allow-list: a student sees their own; an admin sees all (optionally filtered).
+    // Parents use /parents/me/child/:id/certificates, which checks the child link.
     let filter = {};
     if (req.user.role === 'student') {
       filter.studentId = req.user.id;
-    } else if (req.query.studentId) {
-      filter.studentId = req.query.studentId;
+    } else if (req.user.role === 'admin') {
+      if (typeof req.query.studentId === 'string') filter.studentId = req.query.studentId;
+    } else {
+      return forbidden(res, 'Not authorized to list certificates');
     }
-    if (req.query.type) filter.type = req.query.type;
+    if (typeof req.query.type === 'string') filter.type = req.query.type;
 
     const [certs, total] = await Promise.all([
       getCert(req.db).find(filter)

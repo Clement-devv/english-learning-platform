@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import api from "../../../api";
+import { useOnDataChanged } from "../../../hooks/useLiveData";
 import {
   Clock, CheckCircle2, RefreshCw, BookOpen,
   AlertTriangle, ChevronDown, ChevronUp, ArrowRight, ArrowLeft, Send,
@@ -513,12 +514,16 @@ export default function StudentQuizTab({ studentInfo, isDarkMode }) {
   const [stats,     setStats]     = useState({ nextQuiz: null, avgScore: null }); // across all pages
   const changeFilter = (f) => { setFilter(f); setPage(1); };
   const fetchQuizzes = () => setReloadKey(k => k + 1);
+  // Live: teacher assigns / grades → refresh quietly (no spinner)
+  const quietRef = useRef(false);
+  useOnDataChanged(["quizzes"], () => { quietRef.current = true; fetchQuizzes(); });
 
   useEffect(() => {
     let stale = false;
     (async () => {
       try {
-        setLoading(true);
+        if (!quietRef.current) setLoading(true);
+        quietRef.current = false;
         const { data } = await api.get("/quiz/assigned", { params: { status: filter === "all" ? undefined : filter, page } });
         if (stale) return;
         setQuizzes(data.quizzes || []);

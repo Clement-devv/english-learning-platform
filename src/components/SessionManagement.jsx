@@ -1,7 +1,22 @@
 // src/components/SessionManagement.jsx
 import { useState, useEffect } from 'react';
-import { Monitor, Smartphone, Tablet, Laptop, MapPin, Clock, AlertCircle, X } from 'lucide-react';
+import { Monitor, Smartphone, Tablet, Laptop, MapPin, Clock, AlertCircle, X, Bell, BellOff, ShieldCheck, ShieldAlert } from 'lucide-react';
 import api from '../api'; // Use shared api instance — automatically adds x-center-slug + auth token
+import {
+  pushSupported, pushPermission, getPushStatus, enablePush, disablePush,
+  getTipsEnabled, setTipsEnabled,
+} from '../utils/pushNotifications';
+
+// Small accessible on/off switch
+function Switch({ checked, onChange, disabled, label }) {
+  return (
+    <button type="button" role="switch" aria-checked={checked} aria-label={label} disabled={disabled}
+      onClick={() => onChange(!checked)}
+      className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors disabled:opacity-50 ${checked ? 'bg-indigo-600' : 'bg-gray-300 dark:bg-gray-600'}`}>
+      <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${checked ? 'translate-x-5' : 'translate-x-0.5'}`} />
+    </button>
+  );
+}
 
 export default function SessionManagement({ isOpen, onClose }) {
   const [sessions, setSessions]             = useState([]);
@@ -9,10 +24,38 @@ export default function SessionManagement({ isOpen, onClose }) {
   const [loading, setLoading]               = useState(false);
   const [error, setError]                   = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  // This device: notifications + weekly reminder
+  const [pushOn,   setPushOn]   = useState(false);
+  const [pushBusy, setPushBusy] = useState(false);
+  const [tipsOn,   setTipsOn]   = useState(true);
+  const supported = pushSupported();
+  const blocked   = supported && pushPermission() === 'denied';
 
   useEffect(() => {
-    if (isOpen) fetchSessions();
-  }, [isOpen]);
+    if (!isOpen) return;
+    fetchSessions();
+    setTipsOn(getTipsEnabled());
+    if (supported) getPushStatus().then(setPushOn);
+  }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const togglePush = async (next) => {
+    setPushBusy(true);
+    setError('');
+    if (next) {
+      const { ok, reason } = await enablePush();
+      setPushOn(ok);
+      if (!ok) setError(reason === 'denied'
+        ? 'Notifications are blocked for this site. Allow them in your browser\x27s site settings (🔒 next to the address), then try again.'
+        : 'Could not turn on notifications right now.');
+    } else {
+      await disablePush();
+      setPushOn(false);
+    }
+    setPushBusy(false);
+    fetchSessions(); // refresh the per-device "Notifications on/off" badges
+  };
+
+  const toggleTips = (next) => { setTipsEnabled(next); setTipsOn(next); };
 
   const fetchSessions = async () => {
     setLoading(true);
@@ -24,29 +67,31 @@ export default function SessionManagement({ isOpen, onClose }) {
         setLastLogin(response.data.lastLogin);
       }
     } catch (err) {
-      console.error('Error fetching sessions:', err);
       setError(err.response?.data?.message || 'Failed to fetch sessions');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleLogoutSession = async (sessionToken) => {
+  // Sign out ONE other device. It is disconnected at once, the app erases its
+  // saved data there and returns to the login page; its notifications stop.
+  const handleLogoutSession = async (session) => {
+    const name = [session.deviceInfo?.browser, session.deviceInfo?.os].filter(Boolean).join(' on ') || 'this device';
+    if (!confirm(`Log out ${name}?\n\nIt will be signed out right away, this app's saved data on it will be erased, and it will stop getting notifications.`)) return;
     try {
-      const response = await api.post('/auth/logout-session', { sessionToken });
+      const response = await api.post(`/auth/sessions/${session.id}/revoke`);
       if (response.data.success) {
-        setSuccessMessage('Session logged out successfully');
+        setSuccessMessage('Device logged out and its app data erased');
         fetchSessions();
         setTimeout(() => setSuccessMessage(''), 3000);
       }
     } catch (err) {
-      console.error('Error logging out session:', err);
       setError(err.response?.data?.message || 'Failed to logout session');
     }
   };
 
   const handleLogoutAllDevices = async () => {
-    if (!confirm('Are you sure you want to logout from all other devices? You will remain logged in on this device.')) return;
+    if (!confirm("Log out every other device? They will be signed out right away and this app's saved data on them will be erased. You stay logged in here.")) return;
     try {
       const response = await api.post('/auth/logout-all-devices', {});
       if (response.data.success) {
@@ -55,7 +100,6 @@ export default function SessionManagement({ isOpen, onClose }) {
         setTimeout(() => setSuccessMessage(''), 3000);
       }
     } catch (err) {
-      console.error('Error logging out all devices:', err);
       setError(err.response?.data?.message || 'Failed to logout from all devices');
     }
   };
@@ -92,8 +136,8 @@ export default function SessionManagement({ isOpen, onClose }) {
         {/* Header */}
         <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-6 flex items-center justify-between">
           <div>
-            <h2 className="text-2xl font-bold">Active Sessions</h2>
-            <p className="text-blue-100 text-sm mt-1">Manage your devices and security</p>
+            <h2 className="text-2xl font-bold">Your devices</h2>
+            <p className="text-blue-100 text-sm mt-1">Everywhere you are signed in. Log out any device you don't recognise.</p>
           </div>
           <button onClick={onClose} className="text-white hover:bg-white/20 p-2 rounded-lg transition-colors">
             <X className="w-6 h-6" />
@@ -113,6 +157,31 @@ export default function SessionManagement({ isOpen, onClose }) {
               </div>
             </div>
           )}
+
+          {/* This device */}
+          <div className="border border-indigo-200 dark:border-indigo-800 bg-indigo-50/60 dark:bg-indigo-900/20 rounded-lg p-4 mb-6">
+            <h3 className="font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+              <Bell className="w-4 h-4 text-indigo-600 dark:text-indigo-300" /> This device
+            </h3>
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-medium text-gray-900 dark:text-white">Notifications on this device</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                  {!supported ? 'This browser does not support notifications.'
+                    : blocked ? 'Blocked in this browser — allow them in site settings (🔒 next to the address).'
+                    : 'Class reminders, messages and calls, even when the app is closed. Only this device.'}
+                </p>
+              </div>
+              <Switch label="Notifications on this device" checked={pushOn} disabled={!supported || pushBusy || (blocked && !pushOn)} onChange={togglePush} />
+            </div>
+            <div className="flex items-start justify-between gap-4 mt-4 pt-4 border-t border-indigo-100 dark:border-indigo-800/60">
+              <div>
+                <p className="text-sm font-medium text-gray-900 dark:text-white">Weekly reminder when they're off</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">A small tip, at most once a week, while notifications are off here.</p>
+              </div>
+              <Switch label="Weekly reminder" checked={tipsOn} disabled={!supported} onChange={toggleTips} />
+            </div>
+          </div>
 
           {/* Error */}
           {error && (
@@ -145,7 +214,7 @@ export default function SessionManagement({ isOpen, onClose }) {
                 <div className="space-y-4">
                   {sessions.map((session, index) => (
                     <div
-                      key={session.sessionToken || index}
+                      key={session.id || index}
                       className={`border rounded-lg p-4 ${
                         session.isCurrent
                           ? 'border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-900/20'
@@ -171,9 +240,26 @@ export default function SessionManagement({ isOpen, onClose }) {
                               </h3>
                               {session.isCurrent && (
                                 <span className="bg-green-500 text-white text-xs px-2 py-1 rounded-full font-medium">
-                                  Current Device
+                                  This device
                                 </span>
                               )}
+                            </div>
+                            <div className="flex flex-wrap gap-2 mb-2">
+                              {session.deviceLocked ? (
+                                <span title="Renewing this login needs a key that never leaves this device — a copied session will not work elsewhere"
+                                  className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
+                                  <ShieldCheck className="w-3.5 h-3.5" /> Locked to this device
+                                </span>
+                              ) : (
+                                <span title="Older sign-in (or insecure connection). Logging in again locks it to the device."
+                                  className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+                                  <ShieldAlert className="w-3.5 h-3.5" /> Older sign-in
+                                </span>
+                              )}
+                              <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full ${session.notifications ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300' : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'}`}>
+                                {session.notifications ? <Bell className="w-3.5 h-3.5" /> : <BellOff className="w-3.5 h-3.5" />}
+                                {session.notifications ? 'Notifications on' : 'Notifications off'}
+                              </span>
                             </div>
                             <div className="space-y-1 text-sm text-gray-600 dark:text-gray-400">
                               <div className="flex items-center gap-2">
@@ -209,10 +295,10 @@ export default function SessionManagement({ isOpen, onClose }) {
                         {/* Logout Button */}
                         {!session.isCurrent && (
                           <button
-                            onClick={() => handleLogoutSession(session.sessionToken)}
+                            onClick={() => handleLogoutSession(session)}
                             className="ml-4 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm font-medium"
                           >
-                            Logout
+                            Log out
                           </button>
                         )}
                       </div>
@@ -229,7 +315,7 @@ export default function SessionManagement({ isOpen, onClose }) {
                     className="w-full px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium flex items-center justify-center gap-2"
                   >
                     <AlertCircle className="w-5 h-5" />
-                    Logout from All Other Devices
+                    Log out all other devices
                   </button>
                   <p className="text-xs text-gray-500 dark:text-gray-400 text-center mt-2">
                     You will remain logged in on this device

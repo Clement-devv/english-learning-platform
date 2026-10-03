@@ -144,7 +144,7 @@ export default function AnalyticsPinPrompt({ isDarkMode, onUnlocked, onCancel, i
         </button>
       </form>
       <p style={{ margin: '14px 0 0', fontSize: 12, color: isDarkMode ? '#6b7280' : '#9ca3af' }}>
-        Forgot it? Reset your PIN in Settings → Analytics PIN using your account password.
+        Forgot it? Reset your PIN in Settings → Analytics PIN — you will need your password and a code sent to your email.
       </p>
       <style>{`@keyframes apin-spin { to { transform: rotate(360deg); } }`}</style>
     </div>

@@ -17,6 +17,7 @@ const ROLE_EMOJI = {
   student:  "🎓",
   admin:    "🛡️",
   subAdmin: "🔧",
+  "sub-admin": "🔧",
 };
 
 const ROLE_LABEL = {
@@ -24,6 +25,7 @@ const ROLE_LABEL = {
   student:  "Student",
   admin:    "Admin",
   subAdmin: "Sub-Admin",
+  "sub-admin": "Sub-Admin",
 };
 
 export default function IncomingRingModal() {

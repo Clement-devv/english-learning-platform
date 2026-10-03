@@ -9,6 +9,7 @@ import { paymentTransactionSchema } from "../schemas/paymentTransactionSchema.js
 import logger from "../utils/logger.js";
 import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
 import { reverseCompletedClass } from "../utils/classReversal.js";
+import { recordOutcomeChange } from "../utils/classOutcome.js";
 
 const router = express.Router();
 router.use(tenantMiddleware);
@@ -160,6 +161,13 @@ router.patch("/:bookingId/resolve", verifyToken, verifyAdmin, async (req, res) =
     } else if (resolution === "approve_teacher") {
       // Teacher wins — mark as completed and process payment/deduction if not already done
       const wasMissed = booking.status === "missed";
+      // Not counting as completed before this decision → report it as a change
+      if (wasMissed || booking.adminRejected || booking.status !== "completed") {
+        recordOutcomeChange(booking, {
+          to: "completed", source: "dispute",
+          reason: `Dispute resolved for the teacher${adminNotes ? `: ${adminNotes}` : ""}`,
+        });
+      }
 
       booking.adminRejected = false;
       booking.adminRejectedReason = "";
@@ -208,7 +216,7 @@ router.patch("/:bookingId/resolve", verifyToken, verifyAdmin, async (req, res) =
         // Dispute on a class that still counts as completed (e.g. a parent says their
         // managed child didn't attend): fully reverse it — credit back, teacher pay deducted.
         await reverseCompletedClass(req.db, booking, {
-          reason: `Dispute upheld: ${booking.disputeReason || "student did not attend"}`, adminId: req.user.id,
+          reason: `Dispute upheld: ${booking.disputeReason || "student did not attend"}`, adminId: req.user.id, source: "dispute",
         });
       } else if (booking.adminRejected) {
         const student = await getStudent(req.db).findById(booking.studentId._id);

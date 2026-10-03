@@ -42,7 +42,7 @@ const requireSubAdmin = async (req, res, next) => {
 };
 
 // ── Helper: get teacher IDs in scope ─────────────────────────────────────────
-const getScopedTeacherIds = async (subAdmin, db) => {
+export const getScopedTeacherIds = async (subAdmin, db) => {
   if (subAdmin.assignmentType === "region" && subAdmin.region) {
     const teachers = await getTeacher(db).find({ continent: subAdmin.region }).select("_id");
     return teachers.map((t) => t._id);

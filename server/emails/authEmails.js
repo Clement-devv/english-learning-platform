@@ -714,3 +714,95 @@ export const sendParentInviteEmail = async (parent, setupUrl, centerName = "") =
     `,
   });
 };
+
+// ── New sign-in on a new device ──────────────────────────────────────────────
+const escapeHtml = (s) => String(s ?? "").replace(/[&<>"']/g, c => (
+  { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+const LOGIN_PATHS = {
+  admin: "/admin/login", teacher: "/teacher/login", student: "/student/login",
+  "sub-admin": "/sub-admin/login", parent: "/parent/login",
+};
+
+/**
+ * Tell a user their account was just signed in to from a device it hasn't
+ * been used on before. Everything from the request (browser, OS, IP) is
+ * escaped — the user-agent is attacker-controlled.
+ */
+export const sendNewDeviceSignInEmail = async ({ email, name, role, center, centerName = "", device = {}, ipAddress, when = new Date() }) => {
+  const { baseUrl } = getCenterBaseUrl(center);
+  const loginUrl    = `${baseUrl}${LOGIN_PATHS[role] || "/"}`;
+  const what  = escapeHtml([device.browser, device.os].filter(Boolean).join(" on ") || "Unknown browser");
+  const ip    = escapeHtml(ipAddress && ipAddress !== "Unknown" ? ipAddress : "Not available");
+  const time  = escapeHtml(new Date(when).toUTCString());
+  const where = escapeHtml(centerName || config.appName);
+
+  return sendEmail({
+    centerName,
+    to: email,
+    subject: `New sign-in to your ${centerName || config.appName} account`,
+    html: `
+      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1f2937; max-width: 560px; margin: 0 auto; padding: 24px;">
+        <h2 style="margin: 0 0 12px;">🔐 New sign-in on a new device</h2>
+        <p>Hi ${escapeHtml(name || "there")},</p>
+        <p>Your ${where} account was just signed in to from a device it hasn't been used on before.</p>
+        <table style="border-collapse: collapse; margin: 16px 0; font-size: 14px;">
+          <tr><td style="padding: 4px 16px 4px 0; color: #6b7280;">Device</td><td><strong>${what}</strong></td></tr>
+          <tr><td style="padding: 4px 16px 4px 0; color: #6b7280;">IP address</td><td>${ip}</td></tr>
+          <tr><td style="padding: 4px 16px 4px 0; color: #6b7280;">Time</td><td>${time}</td></tr>
+        </table>
+        <p><strong>Was this you?</strong> Then you don't need to do anything.</p>
+        <div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 12px 16px; border-radius: 4px; margin: 16px 0;">
+          <strong>Not you?</strong> Sign in, open <em>Your devices</em>, log out the device you don't recognise, then change your password straight away.
+        </div>
+        <p><a href="${loginUrl}" style="display: inline-block; padding: 10px 20px; background: #4f46e5; color: #fff; text-decoration: none; border-radius: 8px; font-weight: bold;">Go to sign in</a></p>
+        <p style="color: #9ca3af; font-size: 12px; margin-top: 24px;">You get this email whenever your account is used on a new device. It's an automatic security notice.</p>
+      </div>
+    `,
+  });
+};
+
+// ── Analytics PIN: email confirmation ────────────────────────────────────────
+
+/** 6-digit code that must be entered to set, change, reset or remove the PIN */
+export const sendAnalyticsPinCodeEmail = async ({ email, name, code, action, centerName = "", minutes = 15 }) => {
+  const what = action === "remove" ? "remove your analytics PIN" : "set a new analytics PIN";
+  return sendEmail({
+    centerName,
+    to: email,
+    subject: `Your code to ${action === "remove" ? "remove" : "change"} the analytics PIN`,
+    html: `
+      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1f2937; max-width: 520px; margin: 0 auto; padding: 24px;">
+        <h2 style="margin: 0 0 12px;">🔑 Confirm your analytics PIN change</h2>
+        <p>Hi ${escapeHtml(name || "there")},</p>
+        <p>Someone signed in to your ${escapeHtml(centerName || config.appName)} admin account asked to <strong>${what}</strong>. Enter this code to confirm:</p>
+        <p style="font-size: 32px; font-weight: bold; letter-spacing: 8px; text-align: center; background: #f3f4f6; border-radius: 12px; padding: 16px; margin: 20px 0;">${escapeHtml(code)}</p>
+        <p style="color: #6b7280; font-size: 14px;">The code expires in ${minutes} minutes.</p>
+        <div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 12px 16px; border-radius: 4px; margin: 16px 0;">
+          <strong>Didn't ask for this?</strong> Someone may know your password. Don't share this code — change your password and log out your other devices straight away.
+        </div>
+      </div>
+    `,
+  });
+};
+
+/** Alert after the PIN was set, changed or removed */
+export const sendAnalyticsPinChangedEmail = async ({ email, name, action, hadPin, centerName = "", when = new Date() }) => {
+  const what = action === "remove" ? "removed" : hadPin ? "changed" : "set";
+  return sendEmail({
+    centerName,
+    to: email,
+    subject: `Your analytics PIN was ${what}`,
+    html: `
+      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1f2937; max-width: 520px; margin: 0 auto; padding: 24px;">
+        <h2 style="margin: 0 0 12px;">🔑 Analytics PIN ${what}</h2>
+        <p>Hi ${escapeHtml(name || "there")},</p>
+        <p>The analytics PIN on your ${escapeHtml(centerName || config.appName)} admin account was <strong>${what}</strong> on ${escapeHtml(new Date(when).toUTCString())}.</p>
+        <p>If this was you, you don't need to do anything.</p>
+        <div style="background: #fee2e2; border-left: 4px solid #ef4444; padding: 12px 16px; border-radius: 4px; margin: 16px 0;">
+          <strong>Not you?</strong> Change your password now and log out all other devices.
+        </div>
+      </div>
+    `,
+  });
+};

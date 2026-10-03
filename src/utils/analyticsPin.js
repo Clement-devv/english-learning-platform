@@ -31,6 +31,12 @@ export function clearAnalyticsUnlock() {
   try { sessionStorage.removeItem(KEY); } catch { /* ignore */ }
 }
 
-// Only analytics-related requests carry the unlock token.
+// Only analytics/revenue requests carry the unlock token (the server gates the
+// same routes: analytics, student payments, teacher payroll summary + history).
 export const needsAnalyticsUnlock = (url = "") =>
-  url.startsWith("/analytics") || url.startsWith("/admin/analytics-pin");
+  url.startsWith("/analytics") || url.startsWith("/admin/analytics-pin") ||
+  url.startsWith("/payments") ||
+  url.startsWith("/payment-transactions/all") || url.startsWith("/payment-transactions/summary");
+
+/** true when an API error means "enter the analytics PIN first" */
+export const isAnalyticsLocked = (err) => err?.response?.data?.code === "ANALYTICS_LOCKED";

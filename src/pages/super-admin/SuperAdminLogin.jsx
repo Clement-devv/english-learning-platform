@@ -18,6 +18,22 @@ export default function SuperAdminLogin() {
 
   useEffect(() => { setMounted(true); }, []);
 
+  // Step 2 (emailed sign-in code) — set once the password is accepted
+  const [pendingToken, setPendingToken] = useState(null);
+  const [code,         setCode]         = useState('');
+
+  const finishLogin = (data) => {
+    localStorage.setItem('superAdminToken', data.token);
+    localStorage.setItem('superAdminInfo', JSON.stringify(data.superAdmin));
+    // Required for /super-admin/logout-session to revoke this JWT.
+    // Stored in localStorage (super-admin is localOnly per ROLE_CONFIG).
+    if (data.sessionToken) {
+      localStorage.setItem('superAdminSessionToken', data.sessionToken);
+    }
+    login('super-admin', data.superAdmin, data.token);
+    navigate('/super-admin/dashboard');
+  };
+
   const handleLogin = async (e) => {
     e.preventDefault();
     setError('');
@@ -27,19 +43,34 @@ export default function SuperAdminLogin() {
         email: email.trim(),
         password,
       });
-      if (response.data.success) {
-        localStorage.setItem('superAdminToken', response.data.token);
-        localStorage.setItem('superAdminInfo', JSON.stringify(response.data.superAdmin));
-        // Required for /super-admin/logout-session to revoke this JWT.
-        // Stored in localStorage (super-admin is localOnly per ROLE_CONFIG).
-        if (response.data.sessionToken) {
-          localStorage.setItem('superAdminSessionToken', response.data.sessionToken);
-        }
-        login('super-admin', response.data.superAdmin, response.data.token);
-        navigate('/super-admin/dashboard');
+      if (response.data.requires2FA) {
+        setPendingToken(response.data.pendingToken);
+        setCode('');
+        setPassword('');
+      } else if (response.data.success) {
+        finishLogin(response.data);
       }
     } catch (err) {
       setError(err.response?.data?.message || 'Invalid credentials. Access denied.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyCode = async (e) => {
+    e.preventDefault();
+    if (!/^\d{6}$/.test(code)) return setError('Enter the 6-digit code from the email');
+    setError('');
+    setLoading(true);
+    try {
+      const response = await api.post('/super-admin/login/verify', { pendingToken, code });
+      if (response.data.success) finishLogin(response.data);
+    } catch (err) {
+      const status = err.response?.status;
+      setError(err.response?.data?.message || 'Could not verify the code.');
+      // Expired / too many tries → back to the password step
+      if (status === 401 || status === 429) { setPendingToken(null); setCode(''); }
+      else setCode('');
     } finally {
       setLoading(false);
     }
@@ -94,7 +125,58 @@ export default function SuperAdminLogin() {
             </div>
           )}
 
-          {/* Form */}
+          {/* Step 2 — emailed sign-in code */}
+          {pendingToken ? (
+          <form onSubmit={handleVerifyCode} style={s.form}>
+            <p style={{ margin: 0, fontSize: '13px', color: '#9ca3af', lineHeight: 1.5 }}>
+              We emailed a 6-digit sign-in code to <strong style={{ color: '#e2e8f0' }}>{email.trim()}</strong>. It expires in 10 minutes.
+            </p>
+            <div style={s.fieldGroup}>
+              <label style={s.label} htmlFor="sa-code">Sign-in code</label>
+              <div style={{ ...s.inputWrap, ...(focused === 'code' ? s.inputFocused : {}) }}>
+                <Lock size={16} color={focused === 'code' ? '#f59e0b' : '#374151'} />
+                <input
+                  id="sa-code"
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  maxLength={6}
+                  value={code}
+                  onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  onFocus={() => setFocused('code')}
+                  onBlur={() => setFocused(null)}
+                  placeholder="123456"
+                  required
+                  autoFocus
+                  disabled={loading}
+                  style={{ ...s.input, letterSpacing: '0.4em', fontWeight: 600 }}
+                />
+              </div>
+            </div>
+            <button type="submit" disabled={loading || code.length !== 6} style={s.submitBtn} className="sa-submit">
+              {loading ? (
+                <span style={{ display: 'flex', alignItems: 'center', gap: '10px', justifyContent: 'center' }}>
+                  <span className="sa-spinner" />
+                  Verifying…
+                </span>
+              ) : (
+                <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                  Verify &amp; sign in
+                  <ArrowRight size={17} />
+                </span>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => { setPendingToken(null); setCode(''); setError(''); }}
+              disabled={loading}
+              style={{ background: 'none', border: 'none', color: '#6b7280', fontSize: '12.5px', cursor: 'pointer', fontFamily: 'inherit' }}
+            >
+              Use a different account
+            </button>
+          </form>
+          ) : (
+          /* Step 1 — email + password */
           <form onSubmit={handleLogin} style={s.form}>
 
             {/* Email */}
@@ -163,6 +245,7 @@ export default function SuperAdminLogin() {
               )}
             </button>
           </form>
+          )}
 
           {/* Security badge */}
           <div style={s.securityBadge}>

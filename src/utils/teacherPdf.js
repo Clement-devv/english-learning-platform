@@ -1,6 +1,24 @@
 // src/utils/teacherPdf.js
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+// Teacher records can hold older / hand-edited values (a list saved as text, a
+// number saved as text…). These keep one odd record from breaking the whole PDF.
+function list(v) {
+  if (Array.isArray(v)) return v.filter(Boolean).map(String);
+  if (typeof v === "string") return v.split(",").map(s => s.trim()).filter(Boolean);
+  return [];
+}
+function text(v, fallback = "—") {
+  if (v === null || v === undefined || v === "") return fallback;
+  if (Array.isArray(v)) return list(v).join(", ") || fallback;
+  if (typeof v === "object") return fallback;
+  return String(v);
+}
+function num(v) {
+  const n = parseFloat(v);
+  return Number.isFinite(n) ? n : 0;
+}
+
 function fmt(dateStr) {
   if (!dateStr) return "—";
   return new Date(dateStr).toLocaleDateString("en-GB", {
@@ -82,7 +100,7 @@ export async function downloadTeacherRoster(teachers, centerName) {
   const active   = teachers.filter(t => t.active && !t.scheduledDeletionAt).length;
   const pending  = teachers.filter(t => t.status === "pending").length;
   const disabled = teachers.filter(t => !t.active && !t.scheduledDeletionAt).length;
-  const totalLessons = teachers.reduce((n, t) => n + (t.lessonsCompleted || 0), 0);
+  const totalLessons = teachers.reduce((n, t) => n + num(t.lessonsCompleted), 0);
 
   const pills = [
     { label: "Active",   value: active,        color: [5,   150, 105] },
@@ -107,16 +125,20 @@ export async function downloadTeacherRoster(teachers, centerName) {
   // Table rows
   const rows = teachers.map((t, i) => [
     i + 1,
-    `${t.firstName || ""} ${t.lastName || ""}`.trim() || "—",
-    t.email || "—",
-    t.phone || "—",
-    t.country || "—",
-    t.continent || "—",
-    t.ratePerClass ? `$${t.ratePerClass}` : "—",
-    t.yearsOfExperience ? `${t.yearsOfExperience}y` : "—",
-    t.lessonsCompleted ?? 0,
-    t.earned ? `$${Number(t.earned).toFixed(2)}` : "$0.00",
-    (t.specializations || []).slice(0, 2).join(", ") || "—",
+    `${text(t.firstName, "")} ${text(t.lastName, "")}`.trim() || "—",
+    text(t.email),
+    text(t.phone),
+    text(t.country),
+    text(t.continent),
+    num(t.ratePerClass) ? `$${num(t.ratePerClass)}` : "—",
+    num(t.yearsOfExperience) ? `${num(t.yearsOfExperience)}y` : "—",
+    num(t.lessonsCompleted),
+    `$${num(t.earned).toFixed(2)}`,
+    // First two only, so a long list doesn't stretch the row
+    (() => {
+      const specs = list(t.specializations);
+      return specs.length ? specs.slice(0, 2).join(", ") + (specs.length > 2 ? ", ..." : "") : "—";
+    })(),
     statusLabel(t),
   ]);
 
@@ -173,8 +195,8 @@ export async function downloadTeacherCard(teacher, centerName) {
   const W    = doc.internal.pageSize.getWidth();
   const now  = new Date();
 
-  const fullName = `${teacher.firstName || ""} ${teacher.lastName || ""}`.trim() || "Teacher";
-  const initials = `${(teacher.firstName || " ")[0]}${(teacher.lastName || " ")[0]}`.toUpperCase();
+  const fullName = `${text(teacher.firstName, "")} ${text(teacher.lastName, "")}`.trim() || "Teacher";
+  const initials = `${text(teacher.firstName, " ")[0]}${text(teacher.lastName, " ")[0]}`.toUpperCase().trim() || "T";
   const sl       = statusLabel(teacher);
   const sc       = statusColors(sl);
 
@@ -198,7 +220,7 @@ export async function downloadTeacherCard(teacher, centerName) {
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
-  doc.text(teacher.email || "", 40, 21);
+  doc.text(text(teacher.email, ""), 40, 21);
   doc.text(`${name}  •  Teacher`, 40, 28);
 
   doc.setFontSize(7.5);
@@ -208,11 +230,11 @@ export async function downloadTeacherCard(teacher, centerName) {
   const badgeW = 38;
   const badgeX = W - 14 - badgeW;
   doc.setFillColor(...sc.bg);
-  doc.roundedRect(badgeX, 38, badgeW, 8, 2, 2, "F");
+  doc.roundedRect(badgeX, 37, badgeW, 7, 2, 2, "F"); // ends above the section underline
   doc.setTextColor(...sc.text);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(8);
-  doc.text(sl, badgeX + badgeW / 2, 43.5, { align: "center" });
+  doc.text(sl, badgeX + badgeW / 2, 41.8, { align: "center" });
 
   // ── Section: Personal & Professional ──
   doc.setFontSize(8);
@@ -224,20 +246,20 @@ export async function downloadTeacherCard(teacher, centerName) {
   doc.line(14, 45.5, W - 14, 45.5);
 
   const rows = [
-    ["First Name",          teacher.firstName         || "—"],
-    ["Last Name",           teacher.lastName          || "—"],
-    ["Email Address",       teacher.email             || "—"],
-    ["Phone / WhatsApp",    teacher.phone             || "—"],
-    ["Country",             teacher.country           || "—"],
-    ["Continent",           teacher.continent         || "—"],
-    ["Timezone",            teacher.timezone          || "—"],
-    ["Rate per Class",      teacher.ratePerClass ? `$${teacher.ratePerClass} USD` : "—"],
-    ["Years of Experience", teacher.yearsOfExperience ? `${teacher.yearsOfExperience} years` : "—"],
-    ["Lessons Completed",   String(teacher.lessonsCompleted ?? 0)],
-    ["Total Earned",        teacher.earned ? `$${Number(teacher.earned).toFixed(2)} USD` : "$0.00"],
-    ["Specializations",     (teacher.specializations || []).join(", ") || "—"],
-    ["Certifications",      (teacher.certifications  || []).join(", ") || "—"],
-    ["Meet / Zoom Link",    teacher.googleMeetLink    || "—"],
+    ["First Name",          text(teacher.firstName)],
+    ["Last Name",           text(teacher.lastName)],
+    ["Email Address",       text(teacher.email)],
+    ["Phone / WhatsApp",    text(teacher.phone)],
+    ["Country",             text(teacher.country)],
+    ["Continent",           text(teacher.continent)],
+    ["Timezone",            text(teacher.timezone)],
+    ["Rate per Class",      num(teacher.ratePerClass) ? `$${num(teacher.ratePerClass)} USD` : "—"],
+    ["Years of Experience", num(teacher.yearsOfExperience) ? `${num(teacher.yearsOfExperience)} years` : "—"],
+    ["Lessons Completed",   String(num(teacher.lessonsCompleted))],
+    ["Total Earned",        `$${num(teacher.earned).toFixed(2)} USD`],
+    ["Specializations",     list(teacher.specializations).join(", ") || "—"],
+    ["Certifications",      list(teacher.certifications).join(", ") || "—"],
+    ["Meet / Zoom Link",    text(teacher.googleMeetLink || teacher.zoomLink)],
     ["Account Status",      sl],
     ["Member Since",        fmt(teacher.createdAt)],
   ];
@@ -299,18 +321,18 @@ export async function downloadTeacherCard(teacher, centerName) {
   const noteY = doc.lastAutoTable
     ? doc.lastAutoTable.finalY + (teacher.bio ? 20 + Math.ceil((teacher.bio.length / 80)) * 5 : 8)
     : 260;
-  const safeNoteY = Math.min(noteY, 260); // don't overflow page
+  const safeNoteY = Math.min(noteY, 255); // box (22 high) must end above the footer line
   doc.setFillColor(248, 250, 252);
   doc.setDrawColor(...MUTED);
   doc.setLineWidth(0.3);
-  doc.roundedRect(14, safeNoteY, W - 28, 16, 2, 2, "FD");
+  doc.roundedRect(14, safeNoteY, W - 28, 22, 2, 2, "FD"); // tall enough for the title + 2 lines
   doc.setFontSize(7.5);
   doc.setTextColor(100, 116, 139);
   doc.setFont("helvetica", "bold");
   doc.text("ADMIN NOTE", 20, safeNoteY + 6);
   doc.setFont("helvetica", "normal");
   doc.text("This document is an official offline record generated from the teacher management system.", 20, safeNoteY + 12);
-  doc.text("Keep in a secure location. Do not share without authorisation.", 20, safeNoteY + 16.5);
+  doc.text("Keep in a secure location. Do not share without authorisation.", 20, safeNoteY + 17);
 
   drawFooter(doc, name);
 

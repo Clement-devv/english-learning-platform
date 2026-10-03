@@ -65,17 +65,22 @@ export default function RingFloat() {
     fetchContacts();
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // React to caller-side events: answered / declined / muted / offline
+  // React to caller-side events: answered / declined / muted / offline —
+  // only for a ring placed from THIS panel (the Ring tab handles its own).
+  const ringingRef = useRef(null);
+  useEffect(() => { ringingRef.current = ringing; }, [ringing]);
   useEffect(() => {
     if (!callerEvent) return;
-    clearTimeout(ringTimerRef.current);
-    const { type, reason } = callerEvent;
-    setRinging(null);
-    if (type === "answered")                 showToast("📲 Call answered!");
-    else if (reason === "muted")             showToast("🔕 User has calls muted");
-    else if (reason === "offline")           showToast("📴 User is offline");
-    else if (type === "declined")            showToast("📵 Call declined");
-    else                                     showToast("No answer");
+    if (ringingRef.current) {
+      clearTimeout(ringTimerRef.current);
+      const { type, reason } = callerEvent;
+      setRinging(null);
+      if (type === "answered")                 showToast("📲 Call answered!");
+      else if (reason === "muted")             showToast("🔕 User has calls muted");
+      else if (reason === "offline")           showToast("📴 User is offline");
+      else if (type === "declined")            showToast("📵 Call declined");
+      else                                     showToast("No answer");
+    }
     consumeCallerEvent();
   }, [callerEvent, consumeCallerEvent]);
 

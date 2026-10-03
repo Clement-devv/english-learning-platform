@@ -1,8 +1,9 @@
 // src/pages/admin/tabs/GroupClassesTab.jsx
 // Admin view: create, list, manage enrollments, complete/cancel group classes.
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Users, Plus, X, ChevronDown, ChevronUp, RefreshCw, Loader2 } from 'lucide-react';
 import api from '../../../api';
+import { useOnDataChanged } from "../../../hooks/useLiveData";
 import Pagination from '../../../components/Pagination';
 
 const GC_PAGE = 20;
@@ -86,8 +87,13 @@ export default function GroupClassesTab({ isDarkMode }) {
 
   const flash = (m) => { setMsg(m); setTimeout(() => setMsg(''), 4000); };
 
+  // Live: refresh quietly (no spinner) when the server says this data changed
+  const quietRef = useRef(false);
+  useOnDataChanged(["group-classes"], () => { quietRef.current = true; load(); });
+
   const load = useCallback(async () => {
-    setLoading(true);
+    if (!quietRef.current) setLoading(true);
+    quietRef.current = false;
     try {
       // One page at a time (server returns the total)
       const params = `?skip=${(gcPage - 1) * GC_PAGE}&limit=${GC_PAGE}${statusFilter ? `&status=${statusFilter}` : ''}`;

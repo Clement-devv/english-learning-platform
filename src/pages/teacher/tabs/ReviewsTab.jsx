@@ -4,6 +4,7 @@
 import { useState, useEffect } from "react";
 import { RefreshCw } from "lucide-react";
 import api from "../../../api";
+import { useOnDataChanged } from "../../../hooks/useLiveData";
 import Pagination from "../../../components/Pagination";
 
 const fmt = (d) =>
@@ -42,9 +43,9 @@ export default function ReviewsTab({ teacherInfo, isDarkMode }) {
   const text  = isDarkMode ? "#e2e8f0" : "#1e293b";
   const muted = isDarkMode ? "#94a3b8" : "#64748b";
 
-  async function load() {
+  async function load(quiet = false) {
     if (!teacherInfo?._id) return;
-    setLoading(true);
+    if (!quiet) setLoading(true);
     try {
       // One page; the star filter is applied on the server, stats cover everything
       const res = await api.get(`/reviews/teacher/${teacherInfo._id}`, { params: { page, limit: 10, rating: filter || undefined } });
@@ -58,6 +59,7 @@ export default function ReviewsTab({ teacherInfo, isDarkMode }) {
   }
 
   useEffect(() => { load(); }, [teacherInfo?._id, page, filter]); // eslint-disable-line react-hooks/exhaustive-deps
+  useOnDataChanged(["reviews"], () => load(true)); // live: a student leaves a review
   useEffect(() => { setPage(1); }, [filter]);
 
   const reviews = data?.reviews ?? [];

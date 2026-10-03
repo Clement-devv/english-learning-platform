@@ -24,6 +24,7 @@ import {
   Banknote,
 } from "lucide-react";
 import api from "../../../api";
+import { useOnDataChanged } from "../../../hooks/useLiveData";
 import Pagination from "../../../components/Pagination";
 import { useCurrencySymbol } from "../../../hooks/useCurrencySymbol";
 
@@ -554,6 +555,7 @@ export default function PaymentTab({ teacher, isDarkMode }) {
     if (silent) setRefreshing(true);
     setReloadKey((k) => k + 1);
   };
+  useOnDataChanged(["payments"], () => load(true)); // live: class completed / admin pays
 
   useEffect(() => {
     if (!teacher?._id) return;

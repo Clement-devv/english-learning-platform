@@ -80,7 +80,7 @@ export async function sweepParentChecks(db, center) {
     try {
       const autoNote = `Automatically resolved for the parent — no decision within ${DISPUTE_DAYS} days.`;
       if (claimed.status === "completed") {
-        await reverseCompletedClass(db, claimed, { reason: `Parent reported absence; not reviewed within ${DISPUTE_DAYS} days` });
+        await reverseCompletedClass(db, claimed, { reason: `Parent reported absence; not reviewed within ${DISPUTE_DAYS} days`, source: "parent" });
       } else if (claimed.status === "pending_confirmation") {
         // Teacher-logged class not approved yet: nothing was charged — just reject it
         await Booking.updateOne({ _id }, { $set: {

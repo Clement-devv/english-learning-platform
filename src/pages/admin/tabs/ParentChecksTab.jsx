@@ -5,9 +5,10 @@
 // reverse the class: it opens a dispute and a 3-day countdown (red heartbeat);
 // unsettled by then, it's returned to the student automatically.
 // Server: server/routes/parentCheckRoutes.js, server/utils/parentCheck.js
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { ShieldCheck, Copy, Send, RefreshCw, CheckCircle2, XCircle, Clock, Link2, AlertTriangle } from "lucide-react";
 import api from "../../../api";
+import { useOnDataChanged } from "../../../hooks/useLiveData";
 import { getCachedCenter } from "../../../utils/branding";
 import ManagedBadge from "../../../components/ManagedBadge";
 import DisputePulse, { DISPUTE_GLOW_CLASS } from "../../../components/DisputePulse";
@@ -58,8 +59,13 @@ export default function ParentChecksTab({ isDarkMode }) {
 
   const notify = (msg, type = "success") => { setToast({ msg, type }); setTimeout(() => setToast(null), 3500); };
 
+  // Live: refresh quietly (no spinner) when the server says this data changed
+  const quietRef = useRef(false);
+  useOnDataChanged(["parent-checks","bookings"], () => { quietRef.current = true; load(); });
+
   const load = async (p = page, f = filter) => {
-    setLoading(true);
+    if (!quietRef.current) setLoading(true);
+    quietRef.current = false;
     try {
       const { data } = await api.get(`/parent-checks?view=${f}&page=${p}`);
       setChecks(data.checks || []);

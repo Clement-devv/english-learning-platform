@@ -3,6 +3,7 @@ import express from "express";
 import mongoose from "mongoose";
 import { verifyToken, verifyAdmin } from "../middleware/authMiddleware.js";
 import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
+import { requireAnalyticsUnlock } from "../middleware/analyticsPinMiddleware.js";
 import { paymentTransactionSchema } from "../schemas/paymentTransactionSchema.js";
 import { teacherSchema }            from "../schemas/teacherSchema.js";
 import { bookingSchema }            from "../schemas/bookingSchema.js";
@@ -125,7 +126,7 @@ router.get("/teacher/:teacherId", verifyToken, async (req, res) => {
  * GET /api/payments/all
  * Get all payment transactions (Admin only)
  */
-router.get("/all", verifyToken, verifyAdmin, async (req, res) => {
+router.get("/all", verifyToken, verifyAdmin, requireAnalyticsUnlock, async (req, res) => {
   try {
     ensurePopulateModels(req.db);
     const { status, teacherId } = req.query;
@@ -266,7 +267,7 @@ router.patch("/teacher/:teacherId/pay-all", verifyToken, verifyAdmin, async (req
  * GET /api/payments/summary
  * Get payment summary for all teachers (Admin only)
  */
-router.get("/summary", verifyToken, verifyAdmin, async (req, res) => {
+router.get("/summary", verifyToken, verifyAdmin, requireAnalyticsUnlock, async (req, res) => {
   try {
     // Single aggregation — replaces 1 + 2N queries (was 81 DB round-trips for 40 teachers).
     // Joins teacher fields directly; only fetches {status, amount} from transactions.

@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { getAllBookings } from "../../../services/bookingService";
 import api from "../../../api";
+import { useOnDataChanged, useLiveEvent } from "../../../hooks/useLiveData";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 const isLiveNow = (b) => {
@@ -565,27 +566,46 @@ export default function ClassesTab({ isDarkMode }) {
     }
   }, [fetchSessions]);
 
-  // ── on mount: start two independent intervals ────────────────────────────────
-  // Bookings: every 30s (heavier query)
-  // Sessions: every 4s  (lightweight, only for live class IDs)
+  // ── Live updates (no polling) ───────────────────────────────────────────────
+  // • The class list reloads when the server says bookings changed.
+  // • Presence (who joined, heartbeats, provider) is pushed by the server as a
+  //   tiny "class-presence" summary — no per-class requests from any admin.
+  // • A 30s client-side clock moves classes into "Live now" on time (no API);
+  //   a class that just went live gets its presence fetched once.
+  // • 5-minute safety refresh, and a refresh on returning to the tab.
   useEffect(() => {
     fetchBookings();
+    bookingIntervalRef.current = setInterval(fetchBookings, 5 * 60_000);
+    return () => clearInterval(bookingIntervalRef.current);
+  }, [fetchBookings]);
+  useOnDataChanged(["bookings", "classes"], fetchBookings);
 
-    bookingIntervalRef.current = setInterval(fetchBookings, 30_000);
+  useLiveEvent("class-presence", (p) => {
+    setSessions((prev) => {
+      const old = prev[p.bookingId] || {};
+      const beats = (old.heartbeats || []).filter((h) => !["teacher", "student"].includes(h.userRole));
+      if (p.lastBeat?.teacher) beats.push({ userRole: "teacher", timestamp: p.lastBeat.teacher });
+      if (p.lastBeat?.student) beats.push({ userRole: "student", timestamp: p.lastBeat.student });
+      return { ...prev, [p.bookingId]: { ...old, teacherJoinedAt: p.teacherJoinedAt, studentJoinedAt: p.studentJoinedAt,
+        videoProvider: p.videoProvider, status: p.status, managedAttendance: p.managedAttendance, heartbeats: beats } };
+    });
+  });
 
-    sessionIntervalRef.current = setInterval(() => {
-      if (liveIdsRef.current.length > 0) {
-        fetchSessions(liveIdsRef.current);
-      }
-    }, 4_000);
-
-    return () => {
-      clearInterval(bookingIntervalRef.current);
-      clearInterval(sessionIntervalRef.current);
-    };
-  }, [fetchBookings, fetchSessions]);
+  const [, setClock] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setClock((n) => n + 1), 30_000);
+    return () => clearInterval(id);
+  }, []);
 
   const liveClasses     = bookings.filter(isLiveNow);
+  // A class that has just become live (by the clock) → fetch its presence once
+  const liveKey = liveClasses.map((b) => b._id).join(",");
+  useEffect(() => {
+    const ids = liveKey ? liveKey.split(",") : [];
+    liveIdsRef.current = ids;
+    const missing = ids.filter((id) => !sessions[id]);
+    if (missing.length) fetchSessions(missing);
+  }, [liveKey]); // eslint-disable-line react-hooks/exhaustive-deps
   const upcomingClasses = bookings
     .filter(isUpcoming)
     .sort((a, b) => new Date(a.scheduledTime) - new Date(b.scheduledTime));

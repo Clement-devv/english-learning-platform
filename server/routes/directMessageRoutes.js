@@ -9,8 +9,10 @@ import { adminSchema }            from "../schemas/adminSchema.js";
 import { subAdminSchema }         from "../schemas/subAdminSchema.js";
 import { bookingSchema }          from "../schemas/bookingSchema.js";
 import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
-import { sendPush } from '../utils/webPushService.js';
+import { pushToUser, pushToAllAdmins } from '../utils/webPushService.js';
 import logger from '../utils/logger.js';
+import { deleteOwnMessage } from '../utils/chatMessageDelete.js';
+import { adminContentRooms } from '../utils/socketRooms.js';
 
 const router = express.Router();
 router.use(tenantMiddleware);
@@ -145,8 +147,8 @@ router.get("/", verifyToken, async (req, res) => {
 
     const dms = await getDirectMessage(req.db).find(filter)
       .select("-messages")
-      .populate("teacherId",  "firstName lastName email")
-      .populate("studentId",  "firstName lastName email")
+      .populate("teacherId",  "firstName lastName email teacherCode")
+      .populate("studentId",  "firstName lastName email studentId")
       .populate("subAdminId", "firstName lastName email")
       .sort({ lastActivityAt: -1 });
 
@@ -219,6 +221,111 @@ router.post("/start-teacher/:teacherId", verifyToken, async (req, res) => {
       });
     }
     res.json({ success: true, dm });
+  } catch (err) {
+    serverError(res, err.message);
+  }
+});
+
+// ── GET /api/direct-messages/contacts?q= — admin: people they can message ──
+router.get("/contacts", verifyToken, async (req, res) => {
+  try {
+    if (req.user.role !== "admin") return forbidden(res, "Admins only");
+    const q = String(req.query.q || "").trim().slice(0, 60);
+    const rx = q ? new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i") : null;
+    // Search by name, email or ID number (TCH-12345 / STU-12345)
+    const base = rx ? [{ firstName: rx }, { lastName: rx }, { email: rx }] : null;
+    // "Ana Silva" → first name starts "Ana" AND last name starts "Silva"
+    const words = q.split(/\s+/).filter(Boolean);
+    if (base && words.length >= 2) {
+      const esc = (w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      base.push({ firstName: new RegExp("^" + esc(words[0]), "i"), lastName: new RegExp("^" + esc(words.slice(1).join(" ")), "i") });
+    }
+
+    const [teachers, students] = await Promise.all([
+      getTeacher(req.db).find({ ...(base ? { $or: [...base, { teacherCode: rx }] } : {}), active: { $ne: false } }).select("firstName lastName email teacherCode").sort({ firstName: 1 }).limit(100).lean(),
+      getStudent(req.db).find({ ...(base ? { $or: [...base, { studentId: rx }] } : {}), active: { $ne: false } }).select("firstName lastName email isManaged studentId").sort({ firstName: 1 }).limit(100).lean(),
+    ]);
+    const shape = (u, role) => ({ id: u._id, role, name: `${u.firstName || ""} ${u.lastName || ""}`.trim() || "Unknown",
+      code: (role === "teacher" ? u.teacherCode : u.studentId) || "", email: u.isManaged ? "" : (u.email || "") });
+
+    res.json({ success: true, contacts: [...teachers.map(t => shape(t, "teacher")), ...students.map(s => shape(s, "student"))] });
+  } catch (err) {
+    serverError(res, err.message);
+  }
+});
+
+// ── POST /api/direct-messages/admin-start — admin opens a chat with a teacher/student ──
+// Reuses that person's existing admin thread (one per teacher / student), so a
+// conversation the user started and one the admin started are the same chat.
+router.post("/admin-start", verifyToken, async (req, res) => {
+  try {
+    if (req.user.role !== "admin") return forbidden(res, "Admins only");
+    const { targetRole, targetId } = req.body || {};
+    if (!["teacher", "student"].includes(targetRole)) return badRequest(res, "targetRole must be teacher or student");
+    if (!/^[a-f\d]{24}$/i.test(String(targetId || ""))) return badRequest(res, "Invalid targetId");
+
+    const target = targetRole === "teacher"
+      ? await getTeacher(req.db).findById(targetId).select("firstName lastName").lean()
+      : await getStudent(req.db).findById(targetId).select("firstName lastName").lean();
+    if (!target) return notFound(res, `${targetRole === "teacher" ? "Teacher" : "Student"} not found`);
+
+    const type   = targetRole === "teacher" ? "teacher-admin" : "student-admin";
+    const filter = targetRole === "teacher" ? { type, teacherId: targetId } : { studentId: targetId };
+    const DirectMessage = getDirectMessage(req.db);
+
+    let dm = await DirectMessage.findOne(filter);
+    if (!dm) {
+      try {
+        dm = await DirectMessage.create({
+          type, ...(targetRole === "teacher" ? { teacherId: targetId } : { studentId: targetId }),
+          chatName: `${target.firstName} ${target.lastName} ↔ Admin`,
+        });
+      } catch (e) {
+        if (e?.code !== 11000) throw e;
+        dm = await DirectMessage.findOne(filter); // created at the same moment by the other side
+      }
+    }
+
+    getTeacher(req.db); getStudent(req.db); getSubAdmin(req.db);
+    const populated = await DirectMessage.findById(dm._id).select("-messages")
+      .populate("teacherId", "firstName lastName email teacherCode")
+      .populate("studentId", "firstName lastName email studentId")
+      .populate("subAdminId", "firstName lastName email");
+    res.json({ success: true, dm: populated });
+  } catch (err) {
+    serverError(res, err.message);
+  }
+});
+
+// ── DELETE /api/direct-messages/:id/messages/:messageId — delete own message (30 min) ──
+router.delete("/:id/messages/:messageId", verifyToken, async (req, res) => {
+  try {
+    const { id: userId, role } = req.user;
+    if (!/^[a-f\d]{24}$/i.test(req.params.id) || !/^[a-f\d]{24}$/i.test(req.params.messageId)) {
+      return badRequest(res, "Invalid id");
+    }
+    const dm = await getDirectMessage(req.db).findById(req.params.id);
+    if (!dm) return notFound(res, "DM not found");
+    if (!canAccess(dm, userId, role)) return forbidden(res, "Access denied");
+
+    const result = deleteOwnMessage(dm, req.params.messageId, userId, role);
+    if (!result.ok) return res.status(result.status).json({ success: false, message: result.message });
+    await dm.save();
+
+    // Update every open chat window / chat list for this conversation
+    const io = req.app.get("io");
+    const slug = req.center?.slug;
+    if (io && slug) {
+      const rooms = [`chat-msg:${slug}:${dm._id}`];
+      if (dm.teacherId)  rooms.push(`teacher-room:${slug}:${dm.teacherId}`);
+      if (dm.studentId)  rooms.push(`student-room:${slug}:${dm.studentId}`);
+      if (dm.subAdminId) rooms.push(`admin-room:${slug}:${dm.subAdminId}`);
+      // Admin DMs are the admins' business only (a sub-admin in the DM gets admin-room above)
+      if (dm.type !== "sub-admin-teacher") rooms.push(...adminContentRooms(slug));
+      io.to(rooms).emit("chat-message-deleted", { kind: "dm", chatId: String(dm._id), messageId: req.params.messageId });
+    }
+
+    res.json({ success: true, message: "Message deleted" });
   } catch (err) {
     serverError(res, err.message);
   }
@@ -300,17 +407,11 @@ router.post("/:id/messages", verifyToken, async (req, res) => {
         if (role === 'admin') {
           if (dm.type === 'teacher-admin' && dm.teacherId) {
             io.to(`teacher-room:${slug}:${dm.teacherId}`).emit('new-direct-message', payload);
-            getTeacher(req.db).findById(dm.teacherId).select('pushSubscription').then(t => {
-              if (t?.pushSubscription?.endpoint)
-                sendPush(t.pushSubscription, { title: `💬 Message from Admin`, body: message.trim().slice(0, 100), icon: '/icons/icon.svg', data: { url: '/teacher/dashboard?tab=messages' } }).catch(() => {});
-            }).catch(() => {});
+            pushToUser(req.db, 'teacher', dm.teacherId, { title: `💬 Message from Admin`, body: message.trim().slice(0, 100), icon: '/icons/icon.svg', data: { url: '/teacher/dashboard?tab=messages' } });
           } else if (dm.type === 'student-admin' && dm.studentId) {
             io.to(`student-room:${slug}:${dm.studentId}`).emit('new-direct-message', payload);
             if (dm.subAdminId) io.to(`admin-room:${slug}:${dm.subAdminId}`).emit('new-direct-message', payload);
-            getStudent(req.db).findById(dm.studentId).select('pushSubscription').then(s => {
-              if (s?.pushSubscription?.endpoint)
-                sendPush(s.pushSubscription, { title: `💬 Message from Admin`, body: message.trim().slice(0, 100), icon: '/icons/icon.svg', data: { url: '/student/dashboard?tab=messages' } }).catch(() => {});
-            }).catch(() => {});
+            pushToUser(req.db, 'student', dm.studentId, { title: `💬 Message from Admin`, body: message.trim().slice(0, 100), icon: '/icons/icon.svg', data: { url: '/student/dashboard?tab=messages' } });
           } else if (dm.subAdminId) {
             // sub-admin-admin or sub-admin-teacher (admin sending)
             io.to(`admin-room:${slug}:${dm.subAdminId}`).emit('new-direct-message', payload);
@@ -322,39 +423,26 @@ router.post("/:id/messages", verifyToken, async (req, res) => {
           if (dm.type === 'sub-admin-teacher' && dm.teacherId) {
             // Sub-admin → teacher
             io.to(`teacher-room:${slug}:${dm.teacherId}`).emit('new-direct-message', payload);
-            getTeacher(req.db).findById(dm.teacherId).select('pushSubscription').then(t => {
-              if (t?.pushSubscription?.endpoint)
-                sendPush(t.pushSubscription, { title: `💬 Message from Sub-Admin`, body: message.trim().slice(0, 100), icon: '/icons/icon.svg', data: { url: '/teacher/dashboard?tab=messages' } }).catch(() => {});
-            }).catch(() => {});
+            pushToUser(req.db, 'teacher', dm.teacherId, { title: `💬 Message from Sub-Admin`, body: message.trim().slice(0, 100), icon: '/icons/icon.svg', data: { url: '/teacher/dashboard?tab=messages' } });
           } else if (dm.type === 'student-admin' && dm.studentId) {
             // Sub-admin → student + admin
             io.to(`student-room:${slug}:${dm.studentId}`).emit('new-direct-message', payload);
-            io.to(`admin-broadcast:${slug}`).emit('new-direct-message', payload);
+            io.to(adminContentRooms(slug)).emit('new-direct-message', payload);
           } else {
             // sub-admin-admin → admin
-            io.to(`admin-broadcast:${slug}`).emit('new-direct-message', payload);
+            io.to(adminContentRooms(slug)).emit('new-direct-message', payload);
           }
           // Push admins for sub-admin messages (except sub-admin-teacher which goes to teacher)
           if (dm.type !== 'sub-admin-teacher') {
-            getAdmin(req.db).find({ pushSubscription: { $exists: true, $ne: null } }).select('pushSubscription').lean().then(admins => {
-              admins.forEach(a => {
-                if (a.pushSubscription?.endpoint)
-                  sendPush(a.pushSubscription, { title: `💬 Message from ${sender.name}`, body: message.trim().slice(0, 100), icon: '/icons/icon.svg', data: { url: '/admin/dashboard?tab=messages' } }).catch(() => {});
-              });
-            }).catch(() => {});
+            pushToAllAdmins(req.db, { title: `💬 Message from ${sender.name}`, body: message.trim().slice(0, 100), icon: '/icons/icon.svg', data: { url: '/admin/dashboard?tab=messages' } });
           }
         } else {
           // Student or teacher (non sub-admin-teacher) → admin broadcast
-          io.to(`admin-broadcast:${slug}`).emit('new-direct-message', payload);
+          io.to(adminContentRooms(slug)).emit('new-direct-message', payload);
           if (role === 'student' && dm.subAdminId) {
             io.to(`admin-room:${slug}:${dm.subAdminId}`).emit('new-direct-message', payload);
           }
-          getAdmin(req.db).find({ pushSubscription: { $exists: true, $ne: null } }).select('pushSubscription').lean().then(admins => {
-            admins.forEach(a => {
-              if (a.pushSubscription?.endpoint)
-                sendPush(a.pushSubscription, { title: `💬 Message from ${sender.name}`, body: message.trim().slice(0, 100), icon: '/icons/icon.svg', data: { url: '/admin/dashboard?tab=messages' } }).catch(() => {});
-            });
-          }).catch(() => {});
+          pushToAllAdmins(req.db, { title: `💬 Message from ${sender.name}`, body: message.trim().slice(0, 100), icon: '/icons/icon.svg', data: { url: '/admin/dashboard?tab=messages' } });
         }
       }
     } catch (err) {

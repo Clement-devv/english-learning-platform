@@ -212,7 +212,8 @@ export default function GroupAgoraClassroom({ classData, userRole, onLeave }) {
         const { data } = await api.get(`/agora/token?channel=${channelName}&role=publisher`);
         if (destroyedRef.current) return;
 
-        const { token, uid, appId } = data;
+        // `channel` is the server-issued, center-scoped Agora channel for this class
+        const { token, uid, appId, channel: agoraChannel } = data;
         setMyUid(uid);
 
         const storedName = localStorage.getItem("userName") || (userRole === "teacher" ? "Teacher" : "Student");
@@ -251,7 +252,7 @@ export default function GroupAgoraClassroom({ classData, userRole, onLeave }) {
           setRemoteUsers(prev => prev.filter(u => u.uid !== user.uid));
         });
 
-        await c.join(appId, channelName, token, uid);
+        await c.join(appId, agoraChannel || channelName, token, uid);
         if (destroyedRef.current) return;
         joinedRef.current = true;
 

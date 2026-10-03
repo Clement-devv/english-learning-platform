@@ -146,6 +146,23 @@ export const noSqlInjectionProtection = (req, res, next) => {
 };
 
 /**
+ * Strip MongoDB operators ($ne, $gt, $where…) from the parsed request body.
+ *
+ * Must be mounted AFTER express.json()/urlencoded() — noSqlInjectionProtection
+ * above runs before the body is parsed, so it never sees req.body. Without
+ * this, `{ "token": { "$ne": null } }` reaches findOne() as an operator.
+ * allowDots keeps legitimate dotted keys; only $-prefixed keys are removed.
+ */
+const MONGO_BODY_SANITIZE_OPTS = { replaceWith: '_', allowDots: true };
+
+export const sanitizeBody = (req, res, next) => {
+  if (req.body && typeof req.body === 'object') {
+    req.body = mongoSanitizeValue(req.body, MONGO_BODY_SANITIZE_OPTS);
+  }
+  next();
+};
+
+/**
  * Prevent XSS attacks.
  *
  * Runs req.body, req.params, and req.query through the allowlist-based

@@ -22,6 +22,7 @@ import SessionManagement          from '../../../../components/SessionManagement
 import SettingsSidebar            from '../../../../components/SettingsSidebar';
 import SettingsModal              from '../../../../components/SettingsModal';
 import api                        from '../../../../api';
+import { useOnDataChanged } from "../../../../hooks/useLiveData";
 import { getTeachers }            from '../../../../services/teacherService';
 import { getStudents }            from '../../../../services/studentService';
 import LanguageSwitcher           from '../../../../components/LanguageSwitcher';
@@ -41,6 +42,7 @@ const AssignStudentsTab  = lazy(() => import('../../tabs/AssignStudentsTab'));
 const BookingsTab        = lazy(() => import('../../tabs/BookingsTab'));
 const ParentChecksTab    = lazy(() => import('../../tabs/ParentChecksTab'));
 const LoggedClassesTab   = lazy(() => import('../../tabs/LoggedClassesTab'));
+const ClassReportTab     = lazy(() => import('../../tabs/ClassReportTab'));
 const MessagesTab        = lazy(() => import('../../../../components/chat/MessagesTab'));
 const PaymentsTab        = lazy(() => import('../../tabs/PaymentTab'));
 const DisputeReview      = lazy(() => import('../../../../components/admin/DisputeReview'));
@@ -111,6 +113,7 @@ const makeNavGroups = (t) => [
     label: t('admin.navGroup.classes'),
     items: [
       { key: 'classes',       label: t('admin.nav.allClasses'),      lucide: BookOpen     },
+      { key: 'class-report',  label: t('admin.nav.classReport'),     lucide: ClipboardCheck },
       { key: 'group-classes', label: t('admin.nav.groupClasses'),    lucide: Users        },
       { key: 'bookings',      label: t('admin.nav.bookings'),        lucide: ClipboardList},
       { key: 'parent-checks', label: t('admin.nav.parentChecks'),    lucide: ShieldCheck  },
@@ -261,19 +264,20 @@ export default function SunshineShell() {
     } catch (_) {}
   }, []);
 
-  // ── Heartbeat — single interval, visibility-aware ─────────────────────────
+  // ── Live updates (no polling) ─────────────────────────────────────────────
+  // Notification badge and the teacher/student directory refresh when the server
+  // says they changed (the directory is served from a shared server snapshot),
+  // plus a 5-minute safety refresh while the tab is visible.
   useEffect(() => {
     refreshNotif();
-    const tickRef = { current: 0 };
     const id = setInterval(() => {
       if (document.visibilityState === 'hidden') return;
-      tickRef.current += 1;
-      const tick = tickRef.current;
-      if (tick % TICK_NOTIF  === 0) refreshNotif();
-      if (tick % TICK_PEOPLE === 0) refreshPeople();
-    }, TICK_MS);
+      refreshNotif(); refreshPeople();
+    }, 5 * 60_000);
     return () => clearInterval(id);
   }, [refreshNotif, refreshPeople]);
+  useOnDataChanged(['notifications'], refreshNotif);
+  useOnDataChanged(['teachers', 'students'], refreshPeople);
 
   const handleLogout = () => { authLogout(); navigate('/admin/login', { replace: true }); };
   const handleNotify = (note) => {
@@ -366,6 +370,7 @@ export default function SunshineShell() {
       case 'disputes':          return <DisputeReview isDarkMode={isDarkMode} />;
       case 'parent-checks':     return <ParentChecksTab isDarkMode={isDarkMode} />;
       case 'logged-classes':    return <LoggedClassesTab isDarkMode={isDarkMode} />;
+      case 'class-report':      return <ClassReportTab isDarkMode={isDarkMode} />;
       case 'recordings':        return <RecordingsTab teachers={teachers} isDarkMode={isDarkMode} />;
       case 'reports':           return <ReportsTab students={students} isDarkMode={isDarkMode} />;
       case 'reviews':           return <ReviewsTab isDarkMode={isDarkMode} />;

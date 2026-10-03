@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import bcryptjs from "bcryptjs";
 import dotenv from "dotenv";
 import { adminSchema } from "./schemas/adminSchema.js";
+import { generateSecurePassword } from "./utils/passwordUtils.js";
 
 dotenv.config();
 
@@ -20,8 +21,9 @@ async function resetAdminPassword() {
     }
 
     // Set new password
-    const newPassword = "admin123";
-    const hashedPassword = await bcryptjs.hash(newPassword, 10);
+    // Random one-time password (never a fixed default) — shown once below
+    const newPassword = generateSecurePassword(16);
+    const hashedPassword = await bcryptjs.hash(newPassword, 12);
 
     admin.password = hashedPassword;
     await admin.save();

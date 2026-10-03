@@ -2,6 +2,7 @@
 import express from 'express';
 import pkg from 'agora-access-token';
 import { tenantMiddleware } from '../middleware/tenantMiddleware.js';
+import { canAccessClass, parseChannel, tenantChannel } from '../utils/classAccess.js';
 import { verifyToken } from '../middleware/authMiddleware.js';
 import logger from "../utils/logger.js";
 const { RtcTokenBuilder, RtcRole } = pkg;
@@ -12,7 +13,7 @@ const APP_ID = process.env.AGORA_APP_ID;
 const APP_CERTIFICATE = process.env.AGORA_APP_CERTIFICATE;
 
 // Agora tokens must only be issued to authenticated users belonging to this center.
-router.get('/token', tenantMiddleware, verifyToken, (req, res) => {
+router.get('/token', tenantMiddleware, verifyToken, async (req, res) => {
   try {
     const { channel } = req.query;
 
@@ -25,6 +26,12 @@ router.get('/token', tenantMiddleware, verifyToken, (req, res) => {
       });
     }
 
+    // Only people in this class (or admins / in-scope sub-admins) may join its call
+    const target = parseChannel(channel);
+    if (!target || !(await canAccessClass(req, target.kind, target.id))) {
+      return res.status(403).json({ success: false, message: 'You are not part of this class' });
+    }
+
     if (!APP_ID || !APP_CERTIFICATE) {
       logger.error('❌ Agora credentials missing!');
       return res.status(500).json({
@@ -32,6 +39,9 @@ router.get('/token', tenantMiddleware, verifyToken, (req, res) => {
         message: 'Video calling not configured'
       });
     }
+
+    // Token is issued for the center-scoped channel; clients must join `data.channel`
+    const agoraChannel = tenantChannel(req.center.slug, target.kind === "group" ? `group-${target.id}` : `class-${target.id}`);
 
     const expirationTimeInSeconds = 3600 * 24;
     const currentTimestamp = Math.floor(Date.now() / 1000);
@@ -43,19 +53,19 @@ router.get('/token', tenantMiddleware, verifyToken, (req, res) => {
     const token = RtcTokenBuilder.buildTokenWithUid(
       APP_ID,
       APP_CERTIFICATE,
-      channel,
+      agoraChannel,
       0,
       RtcRole.PUBLISHER,
       privilegeExpiredTs
     );
 
-    logger.info('✅ Token generated for channel:', channel);
+    logger.info('✅ Token generated for channel:', agoraChannel);
 
     res.json({
       success: true,
       token,
       appId: APP_ID,
-      channel,
+      channel: agoraChannel,
       uid: 0,
       expiresAt: new Date(privilegeExpiredTs * 1000).toISOString()
     });

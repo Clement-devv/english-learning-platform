@@ -443,7 +443,8 @@ export default function VideoCall({
       const { data } = await api.get(`/agora/token?channel=${channelName}`);
       if (!data.success) throw new Error(data.message || "Token request failed");
 
-      await client.current.join(data.appId, channelName, data.token, null);
+      // Join the channel the server issued the token for (it is scoped to this center)
+      await client.current.join(data.appId, data.channel || channelName, data.token, null);
       channelJoined = true;
       hasJoinedRef.current = true;
       joinedAtRef.current  = Date.now();

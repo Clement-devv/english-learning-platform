@@ -191,6 +191,8 @@ export default function RingTab({ isDark }) {
   // React to caller-side feedback: ring was answered or declined by the target
   useEffect(() => {
     if (!callerEvent) return;
+    // Only for a ring placed from this tab (the floating button handles its own)
+    if (!ringingId) { consumeCallerEvent(); return; }
     clearTimeout(ringTimerRef.current);
     const { type, by, reason } = callerEvent;
     // 'by' is undefined when the server auto-declines before forwarding (muted / offline)

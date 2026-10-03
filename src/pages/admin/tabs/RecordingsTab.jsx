@@ -9,6 +9,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { Play, X, Clock, Calendar, Video, ChevronRight, ArrowLeft, Download, ExternalLink, ChevronDown, ChevronUp, Search } from "lucide-react";
 import api from "../../../api";
+import { useOnDataChanged } from "../../../hooks/useLiveData";
 import Pagination from "../../../components/Pagination";
 import { groupRecordingSessions, groupByDay, partLabel, isExternal, linkSource, openExternal } from "../../../utils/recordingSessions.js";
 
@@ -44,6 +45,7 @@ export default function RecordingsTab({ teachers = [], isDarkMode }) {
   const [pager, setPager] = useState({ total: 0, totalPages: 1, limit: 10 });
   const [listKey, setListKey] = useState(0);
   const reloadAll = () => setListKey(k => k + 1);
+  useOnDataChanged(["recordings"], reloadAll); // live
   const [studentList, setStudentList] = useState([]);   // per-student summary for the teacher
   const teacherIdOf = (t) => t?._id || t?.id;
 

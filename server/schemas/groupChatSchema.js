@@ -11,6 +11,9 @@ const messageSchema = new mongoose.Schema({
   fileName:   String,
   isRead:     { type: Boolean, default: false },
   readBy: [{ userId: mongoose.Schema.Types.ObjectId, userModel: String, readAt: Date }],
+  // Sender removed it within the delete window — text replaced, placeholder shown
+  deleted:    { type: Boolean, default: false },
+  deletedAt:  Date,
   createdAt:  { type: Date, default: Date.now },
 });
 

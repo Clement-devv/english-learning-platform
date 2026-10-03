@@ -7,6 +7,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { Trash2, Eye, EyeOff, Play, X, Clock, Calendar, Video, Download, ChevronRight, ArrowLeft, Search, ChevronDown, ChevronUp, Link2, ExternalLink, Pencil } from "lucide-react";
 import api from "../../../api";
+import { useOnDataChanged } from "../../../hooks/useLiveData";
 import { groupRecordingSessions, groupByDay, partLabel, isExternal, linkSource, openExternal } from "../../../utils/recordingSessions.js";
 import ExternalRecordingModal from "../../../components/ExternalRecordingModal.jsx";
 import Pagination from "../../../components/Pagination";
@@ -69,6 +70,7 @@ export default function RecordingsTab({ isDarkMode }) {
   const [pager, setPager] = useState({ total: 0, totalPages: 1, limit: 10 });
   const [listKey, setListKey] = useState(0);
   const reloadAll = () => setListKey(k => k + 1);
+  useOnDataChanged(["recordings"], reloadAll); // live: uploads finish, links added
   const [studentList, setStudentList] = useState([]);   // per-student summary
   const [loadingRecs, setLoadingRecs] = useState(false);
 

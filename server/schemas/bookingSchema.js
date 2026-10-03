@@ -58,6 +58,16 @@ export const bookingSchema = new mongoose.Schema({
   disputeResolution:  { type: String, default: '' },
   disputeAdminNotes:  { type: String, default: '' },
   disputeResolvedAt:  Date,
+  // Every time the class's outcome changed AFTER it was first decided
+  // (completed → not completed, or the reverse). The daily admin report lists
+  // these under the day they happened, with the original class date.
+  outcomeChanges: [{
+    _id:    false,
+    at:     { type: Date, default: Date.now },
+    to:     { type: String, enum: ['completed', 'not_completed'], required: true },
+    source: { type: String, enum: ['admin', 'dispute', 'parent', 'system'], default: 'system' },
+    reason: { type: String, maxlength: 500, default: '' },
+  }],
   acceptedAt:         Date,
   completedAt:        Date,
   cancelledAt:        Date,

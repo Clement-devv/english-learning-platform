@@ -11,6 +11,9 @@ import logger from "../utils/logger.js";
 import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
 import { validateObjectId } from '../middleware/validateObjectId.js';
 import { parsePagination } from '../utils/pagination.js';
+import { deleteOwnMessage } from '../utils/chatMessageDelete.js';
+import { pushToUser } from '../utils/webPushService.js';
+import { adminContentRooms } from '../utils/socketRooms.js';
 
 const router = express.Router();
 router.use(tenantMiddleware);
@@ -228,15 +231,26 @@ router.post("/:chatId/messages", verifyToken, validateObjectId("chatId"), async 
           message:    message.trim().slice(0, 120),
           senderName, senderRole: role,
         };
-        // Notify non-sender role rooms (picked up by RingContext on each device)
-        if (role !== 'teacher')
-          io.to(`teacher-room:${slug}:${chat.teacherId}`).emit('new-group-message', payload);
-        if (role !== 'student')
-          io.to(`student-room:${slug}:${chat.studentId}`).emit('new-group-message', payload);
-        if (role !== 'admin' && role !== 'sub-admin')
-          io.to(`admin-broadcast:${slug}`).emit('new-group-message', payload);
-        // Also push into the per-chat room for any open ChatWindow instances
-        io.to(`chat-msg:${slug}:${chatId}`).emit('new-group-message', payload);
+        // Non-sender role rooms (picked up by RingContext on each device) plus
+        // the per-chat room for any open ChatWindow. One emit to all rooms so a
+        // socket that is in several of them receives the event only once.
+        const rooms = [`chat-msg:${slug}:${chatId}`];
+        if (role !== 'teacher')                       rooms.push(`teacher-room:${slug}:${chat.teacherId}`);
+        if (role !== 'student')                       rooms.push(`student-room:${slug}:${chat.studentId}`);
+        // Admins + only the sub-admins whose scope covers this chat's teacher
+        if (role !== 'admin' && role !== 'sub-admin') rooms.push(...adminContentRooms(slug, chat.teacherId));
+        io.to(rooms).emit('new-group-message', payload);
+
+        // Phone / desktop notification for the teacher and student in this chat
+        // (only their signed-in devices that allowed notifications)
+        const note = (url) => ({
+          title: `💬 ${senderName} · ${chat.chatName || 'Group chat'}`,
+          body:  message.trim().slice(0, 100),
+          icon:  '/icons/icon.svg',
+          data:  { url },
+        });
+        if (role !== 'teacher') pushToUser(req.db, 'teacher', chat.teacherId, note('/teacher/dashboard?tab=messages'));
+        if (role !== 'student') pushToUser(req.db, 'student', chat.studentId, note('/student/dashboard?tab=messages'));
       }
     } catch (e) {
       logger.warn('Group chat real-time notify error:', { error: e?.message });
@@ -282,6 +296,47 @@ router.patch("/:chatId/mark-read", verifyToken, validateObjectId("chatId"), asyn
   } catch (error) {
     logger.error("Error marking messages as read:", { error: error?.message });
     res.status(500).json({ success: false, message: "Failed to mark messages as read", error: error.message });
+  }
+});
+
+// DELETE /api/group-chats/:chatId/messages/:messageId — sender deletes their own
+// message within 30 minutes of sending ("This message was deleted" remains)
+router.delete("/:chatId/messages/:messageId", verifyToken, validateObjectId("chatId"), validateObjectId("messageId"), async (req, res) => {
+  try {
+    const { chatId, messageId } = req.params;
+    const { id: userId, role } = req.user;
+
+    const chat = await getGroupChat(req.db).findById(chatId);
+    if (!chat) return notFound(res, "Chat not found");
+
+    const scope = req.user.teacherScope?.map(String) || [];
+    if (role !== "admin" &&
+        chat.teacherId.toString() !== userId &&
+        chat.studentId.toString() !== userId &&
+        !(role === "sub-admin" && scope.includes(chat.teacherId.toString()))) {
+      return forbidden(res, "Access denied");
+    }
+
+    const result = deleteOwnMessage(chat, messageId, userId, role);
+    if (!result.ok) return res.status(result.status).json({ success: false, message: result.message });
+    await chat.save();
+
+    // Update every open chat window / chat list for this conversation
+    const io = req.app.get('io');
+    const slug = req.center?.slug;
+    if (io && slug) {
+      io.to([
+        `chat-msg:${slug}:${chatId}`,
+        `teacher-room:${slug}:${chat.teacherId}`,
+        `student-room:${slug}:${chat.studentId}`,
+        ...adminContentRooms(slug, chat.teacherId),
+      ]).emit('chat-message-deleted', { kind: 'group', chatId, messageId });
+    }
+
+    res.json({ success: true, message: "Message deleted" });
+  } catch (error) {
+    logger.error("Error deleting message:", { error: error?.message });
+    serverError(res, "Failed to delete message");
   }
 });
 

@@ -11,7 +11,7 @@ import { verifySuperAdmin } from '../middleware/superAdminMiddleware.js';
 import { loginLimiter, strictLimiter, apiLimiter, emailLimiter, trackFailedLogin, isAccountLocked, clearFailedAttempts } from '../middleware/rateLimiter.js';
 import { getDb } from '../config/dbManager.js';
 import redisClient from '../config/redis.js';
-import { config, JWT_STANDARD_CLAIMS } from '../config/config.js';
+import { config, JWT_STANDARD_CLAIMS, JWT_VERIFY_OPTIONS } from '../config/config.js';
 import { getCenterSecret } from '../utils/jwtUtils.js';
 import { sendEmail, sendCenterDeletionWarningEmail } from '../utils/emailService.js';
 import { verifyDomainDns, isValidDomain, normalizeDomain } from '../utils/domainVerifier.js';
@@ -79,6 +79,55 @@ const router = express.Router();
 // limits on top of this (see individual route definitions below).
 router.use(apiLimiter);
 
+// ── Super-admin sign-in: password, then a code sent to the account email ─────
+// The super admin controls every center, so a password alone is not enough.
+//   1. POST /login          { email, password } → emails a 6-digit code and
+//                            returns a short-lived pendingToken (not a login token)
+//   2. POST /login/verify   { pendingToken, code } → issues the session token
+// SUPERADMIN_EMAIL_2FA=false turns step 2 off (emergency use only, e.g. while
+// email delivery is broken).
+const SA_CODE_TTL_MS    = 10 * 60 * 1000;
+const SA_CODE_MAX_TRIES = 5;
+const SA_RESEND_MS      = 60 * 1000;
+const superAdmin2faEnabled = () => process.env.SUPERADMIN_EMAIL_2FA !== 'false';
+
+// Own signing key, so a pending token can never pass verifySuperAdmin
+const saPendingSecret = () => crypto.createHmac('sha256', config.jwtSecret).update('superadmin-login-2fa').digest('hex');
+
+async function issueSuperAdminSession(req, res, superAdmin) {
+  const token = jwt.sign(
+    { ...JWT_STANDARD_CLAIMS, id: superAdmin._id, role: 'superadmin', email: superAdmin.email },
+    config.jwtSecret,
+    { expiresIn: process.env.JWT_SA_EXPIRY || '8h' }
+  );
+
+  // Record a per-device session — required for /super-admin/logout-session
+  // and /super-admin/logout-all-devices to revoke this specific JWT via
+  // the blacklist that verifySuperAdmin now checks.
+  const session = createSession(req, token);
+  superAdmin.sessions.push(session);
+  superAdmin.sessions = pruneSessionsToLimit(superAdmin.sessions);
+  superAdmin.lastLogin = new Date();
+  await superAdmin.save();
+
+  await writeAuditLog({ action: 'SUPERADMIN_LOGIN', superAdmin, ip: req.ip });
+
+  res.json({
+    success: true,
+    token,
+    sessionToken: session.token,
+    superAdmin: {
+      id: superAdmin._id,
+      firstName: superAdmin.firstName,
+      lastName: superAdmin.lastName,
+      email: superAdmin.email,
+      role: 'superadmin',
+    },
+  });
+}
+
+const escHtml = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
 // POST /api/super-admin/login
 router.post('/login', loginLimiter, validateSuperAdminLogin, async (req, res) => {
   try {
@@ -113,37 +162,98 @@ router.post('/login', loginLimiter, validateSuperAdminLogin, async (req, res) =>
 
     await clearFailedAttempts(email, lockScope);
 
-    const token = jwt.sign(
-      { ...JWT_STANDARD_CLAIMS, id: superAdmin._id, role: 'superadmin', email: superAdmin.email },
-      config.jwtSecret,
-      { expiresIn: process.env.JWT_SA_EXPIRY || '8h' }
+    if (!superAdmin2faEnabled()) return issueSuperAdminSession(req, res, superAdmin);
+
+    // Step 2: email a one-time code. Reuse a code sent under a minute ago
+    // instead of mailing a new one on every double-click.
+    const pendingToken = jwt.sign(
+      { ...JWT_STANDARD_CLAIMS, typ: 'sa-2fa', id: String(superAdmin._id) },
+      saPendingSecret(),
+      { algorithm: 'HS256', expiresIn: Math.floor(SA_CODE_TTL_MS / 1000) },
     );
+    const current = (await SuperAdmin.findById(superAdmin._id).select('+loginCode').lean())?.loginCode;
+    const recentlySent = current?.sentAt && Date.now() - new Date(current.sentAt).getTime() < SA_RESEND_MS
+      && new Date(current.expiresAt) > new Date();
+    if (!recentlySent) {
+      const code = String(crypto.randomInt(0, 1_000_000)).padStart(6, '0');
+      await SuperAdmin.updateOne({ _id: superAdmin._id }, { $set: { loginCode: {
+        codeHash: await bcrypt.hash(code, 10),
+        expiresAt: new Date(Date.now() + SA_CODE_TTL_MS),
+        sentAt: new Date(),
+        attempts: 0,
+      } } });
+      const mail = await sendEmail({
+        to: superAdmin.email,
+        subject: `${config.appName} — your super admin sign-in code`,
+        html: `
+          <p>Hello ${escHtml(superAdmin.firstName)},</p>
+          <p>Your sign-in code is:</p>
+          <h2 style="letter-spacing:6px;color:#d97706;">${code}</h2>
+          <p>It expires in <strong>10 minutes</strong>.</p>
+          <p>If you did not just try to sign in, someone knows your password — change it now.</p>
+        `,
+      });
+      if (mail && mail.success === false) {
+        logger.error('Super admin sign-in code email failed', { error: mail.error });
+        return serverError(res, 'Could not send the sign-in code. Please try again shortly.');
+      }
+    }
 
-    // Record a per-device session — required for /super-admin/logout-session
-    // and /super-admin/logout-all-devices to revoke this specific JWT via
-    // the blacklist that verifySuperAdmin now checks.
-    const session = createSession(req, token);
-    superAdmin.sessions.push(session);
-    superAdmin.sessions = pruneSessionsToLimit(superAdmin.sessions);
-    superAdmin.lastLogin = new Date();
-    await superAdmin.save();
-
-    await writeAuditLog({ action: 'SUPERADMIN_LOGIN', superAdmin, ip: req.ip });
-
-    res.json({
-      success: true,
-      token,
-      sessionToken: session.token,
-      superAdmin: {
-        id: superAdmin._id,
-        firstName: superAdmin.firstName,
-        lastName: superAdmin.lastName,
-        email: superAdmin.email,
-        role: 'superadmin',
-      },
+    res.status(202).json({
+      success: false,
+      requires2FA: true,
+      pendingToken,
+      message: 'Enter the 6-digit code we emailed you',
     });
   } catch (err) {
     logger.error('❌ Super admin login error:', { error: err?.message });
+    serverError(res);
+  }
+});
+
+// POST /api/super-admin/login/verify  { pendingToken, code }
+router.post('/login/verify', loginLimiter, async (req, res) => {
+  try {
+    const { pendingToken } = req.body || {};
+    const code = typeof req.body?.code === 'string' ? req.body.code.trim() : '';
+    if (typeof pendingToken !== 'string' || !/^\d{6}$/.test(code)) {
+      return badRequest(res, 'Enter the 6-digit code from the email');
+    }
+
+    let pending;
+    try {
+      pending = jwt.verify(pendingToken, saPendingSecret(), { ...JWT_VERIFY_OPTIONS });
+    } catch {
+      return unauthorized(res, 'Your sign-in expired. Please enter your password again.');
+    }
+    if (pending.typ !== 'sa-2fa' || !mongoose.isValidObjectId(pending.id)) {
+      return unauthorized(res, 'Your sign-in expired. Please enter your password again.');
+    }
+
+    // Reserve an attempt atomically so parallel guesses can't exceed the limit
+    const withCode = await SuperAdmin.findOneAndUpdate(
+      { _id: pending.id, active: true, 'loginCode.expiresAt': { $gt: new Date() } },
+      { $inc: { 'loginCode.attempts': 1 } },
+      { new: true },
+    ).select('+loginCode');
+    if (!withCode?.loginCode?.codeHash) {
+      return unauthorized(res, 'This code has expired. Please enter your password again.');
+    }
+    if (withCode.loginCode.attempts > SA_CODE_MAX_TRIES) {
+      await SuperAdmin.updateOne({ _id: withCode._id }, { $unset: { loginCode: 1 } });
+      return res.status(429).json({ success: false, message: 'Too many wrong codes. Please enter your password again.' });
+    }
+    if (!(await bcrypt.compare(code, withCode.loginCode.codeHash))) {
+      const left = SA_CODE_MAX_TRIES - withCode.loginCode.attempts;
+      return badRequest(res, left > 0 ? `Incorrect code. ${left} attempt${left > 1 ? 's' : ''} left.` : 'Incorrect code. Please enter your password again.');
+    }
+
+    // One-time: consume the code, then sign in
+    await SuperAdmin.updateOne({ _id: withCode._id }, { $unset: { loginCode: 1 } });
+    const superAdmin = await SuperAdmin.findById(withCode._id);
+    return issueSuperAdminSession(req, res, superAdmin);
+  } catch (err) {
+    logger.error('❌ Super admin login verify error:', { error: err?.message });
     serverError(res);
   }
 });

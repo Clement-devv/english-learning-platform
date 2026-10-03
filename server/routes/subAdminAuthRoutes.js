@@ -9,7 +9,8 @@ import { sendSubAdminInviteEmail, sendSubAdminWelcomeEmail, sendSubAdminForgotPa
 import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
 import { subAdminSchema }   from "../schemas/subAdminSchema.js";
 import { teacherSchema }    from "../schemas/teacherSchema.js";
-import { createSession, cleanExpiredSessions, pruneSessionsToLimit } from "../utils/sessionManager.js";
+import { startSession, alertNewDevice, endSessionsAfterPasswordChange, notifySessionsRevoked } from "../utils/sessionManager.js";
+import { buildRoleClaims, signAccessToken } from "../utils/sessionClaims.js";
 import logger from "../utils/logger.js";
 import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
 import { loginRules, forgotPasswordRules, resetPasswordRules, changePasswordRules, validate } from '../middleware/validate.js';
@@ -44,36 +45,16 @@ router.post("/login", loginLimiter, loginRules, validate, async (req, res) => {
     if (!isMatch)
       return unauthorized(res, "Invalid credentials");
 
-    let teacherScope = subAdmin.assignedTeachers.map((t) => t._id);
-    if (subAdmin.assignmentType === "region" && subAdmin.region) {
-      const regionTeachers = await getTeacher(req.db).find({ continent: subAdmin.region }).select("_id");
-      teacherScope = regionTeachers.map((t) => t._id);
-    }
-
-    const token = jwt.sign(
-      {
-        ...JWT_STANDARD_CLAIMS,
-        id: subAdmin._id,
-        email: subAdmin.email,
-        role: "sub-admin",
-        centerId: req.center.slug,
-        assignmentType: subAdmin.assignmentType,
-        region: subAdmin.region,
-        teacherScope: teacherScope.map(String),
-        permissions: subAdmin.permissions,
-      },
-      getCenterSecret(req.center.slug),
-      { expiresIn: "7d" }
-    );
-
-    // Record a per-device session — required for logout-session / logout-all-devices
-    // to revoke this specific JWT server-side via the in-memory + Redis blacklist.
-    const session = createSession(req, token);
-    subAdmin.sessions = cleanExpiredSessions(subAdmin.sessions || []);
-    subAdmin.sessions.push(session);
-    subAdmin.sessions = pruneSessionsToLimit(subAdmin.sessions);
+    // Short-lived token + device-bound session renewal, same as every other
+    // role (previously a 7-day token that could not be renewed or tied to a
+    // device). Claims are rebuilt on every renewal so scope changes apply.
+    const extra = await buildRoleClaims("sub-admin", subAdmin, req.db);
+    const teacherScope = extra.teacherScope;
+    const { token, session, isNewDevice } = startSession(req, subAdmin, (sid) =>
+      signAccessToken({ role: "sub-admin", user: subAdmin, centerSlug: req.center.slug, sid, extra }));
     subAdmin.lastLogin = new Date();
     await subAdmin.save();
+    alertNewDevice({ req, user: subAdmin, role: "sub-admin", session, isNewDevice });
 
     res.json({
       success: true,
@@ -126,6 +107,9 @@ router.post("/setup-account", passwordResetLimiter, async (req, res) => {
 
     if (!token || !password || !confirmPassword)
       return badRequest(res, "All fields are required");
+    // Strings only — an object like { "$ne": null } would match any pending invite
+    if (typeof token !== "string" || typeof password !== "string")
+      return badRequest(res, "Invalid request");
     if (password !== confirmPassword)
       return badRequest(res, "Passwords do not match");
     if (password.length < 8)
@@ -218,7 +202,10 @@ router.post("/reset-password/:token", passwordResetLimiter, resetPasswordRules, 
     subAdmin.resetPasswordToken   = null;
     subAdmin.resetPasswordExpires = null;
     subAdmin.resetPasswordCenter  = null;
+    // Password was reset from an email link — sign out every device
+    const endedSessions = await endSessionsAfterPasswordChange(subAdmin, req);
     await subAdmin.save();
+    notifySessionsRevoked(req.app.get("io"), req.center.slug, subAdmin._id, endedSessions);
 
     res.json({ success: true, message: "Password reset successfully. You can now log in." });
   } catch (err) {

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import api from "../../../api";
+import { useOnDataChanged } from "../../../hooks/useLiveData";
 import {
   Plus, BookOpen, Clock, CheckCircle2, Star, Trash2,
   ChevronDown, ChevronUp, Paperclip, Upload, X, Send,
@@ -176,12 +177,16 @@ export default function HomeworkTab({ teacherInfo, students, isDarkMode }) {
   const [reloadKey, setReloadKey] = useState(0);
   const changeFilter = (f) => { setFilter(f); setPage(1); };
   const fetchHomework = () => setReloadKey(k => k + 1);
+  // Live: a student submits / attempts → this page refreshes quietly (no spinner)
+  const quietRef = useRef(false);
+  useOnDataChanged(["homework"], () => { quietRef.current = true; fetchHomework(); });
 
   useEffect(() => {
     let stale = false;
     (async () => {
       try {
-        setLoading(true);
+        if (!quietRef.current) setLoading(true);
+        quietRef.current = false;
         const { data } = await api.get("/homework/my", { params: { status: filter === "all" ? undefined : filter, page } });
         if (stale) return;
         setHomeworkList(data.homework || []);

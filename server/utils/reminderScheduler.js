@@ -23,7 +23,7 @@ import {
   sendAccountDeletionFinalReminderEmail,
   sendTeacherAccountDeletionFinalReminderEmail,
 } from "./emailService.js";
-import { sendPush } from "./webPushService.js";
+import { pushToUser } from "./webPushService.js";
 import logger from "../utils/logger.js";
 
 const getBooking     = (db) => db.models.Booking     || db.model("Booking",     bookingSchema);
@@ -89,12 +89,7 @@ async function checkClassReminders(db, centerSlug) {
         sendClassTimedReminder(teacher, booking, "teacher", mins, "", centerSlug).catch(e =>
           logger.error(`Reminder email failed (${teacherKey}):`, e.message)
         );
-        getTeacher(db).findById(teacher._id).select("pushSubscription").then(t => {
-          if (t?.pushSubscription) {
-            sendPush(t.pushSubscription, { ...pushPayload, data: { url: "/teacher/dashboard" } })
-              .catch(e => logger.error(`Push failed (teacher ${teacher.email}):`, e.message));
-          }
-        }).catch(e => logger.error(`Push subscription fetch failed:`, { error: e?.message }));
+        pushToUser(db, "teacher", teacher._id, { ...pushPayload, data: { url: "/teacher/dashboard" } });
         logger.info(`📧 Class reminder sent → teacher ${teacher.email} (${mins} min)`);
       }
 
@@ -104,12 +99,7 @@ async function checkClassReminders(db, centerSlug) {
         sendClassTimedReminder(student, booking, "student", mins, "", centerSlug).catch(e =>
           logger.error(`Reminder email failed (${studentKey}):`, e.message)
         );
-        getStudent(db).findById(student._id).select("pushSubscription").then(s => {
-          if (s?.pushSubscription) {
-            sendPush(s.pushSubscription, pushPayload)
-              .catch(e => logger.error(`Push failed (student ${student.email}):`, e.message));
-          }
-        }).catch(e => logger.error(`Push subscription fetch failed:`, { error: e?.message }));
+        pushToUser(db, "student", student._id, pushPayload);
         logger.info(`📧 Class reminder sent → student ${student.email} (${mins} min)`);
       }
     }

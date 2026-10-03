@@ -5,6 +5,7 @@
 import { studentSchema } from "../schemas/studentSchema.js";
 import { teacherSchema } from "../schemas/teacherSchema.js";
 import { paymentTransactionSchema } from "../schemas/paymentTransactionSchema.js";
+import { recordOutcomeChange } from "./classOutcome.js";
 
 const getStudent            = (db) => db.models.Student            || db.model("Student",            studentSchema);
 const getTeacher            = (db) => db.models.Teacher            || db.model("Teacher",            teacherSchema);
@@ -14,11 +15,13 @@ const getPaymentTransaction = (db) => db.models.PaymentTransaction || db.model("
  * `booking` must be a completed, not-yet-rejected Booking document.
  * Marks it adminRejected and saves it. Returns { student, teacher, ratePerClass }.
  */
-export async function reverseCompletedClass(db, booking, { reason = "", adminId = null } = {}) {
+export async function reverseCompletedClass(db, booking, { reason = "", adminId = null, source } = {}) {
   booking.adminRejected       = true;
   booking.adminRejectedAt     = new Date();
   booking.adminRejectedBy     = adminId;
   booking.adminRejectedReason = reason;
+  // Shown in the daily completed-classes report as "completed → not completed"
+  recordOutcomeChange(booking, { to: "not_completed", source: source || (adminId ? "admin" : "system"), reason });
   await booking.save();
 
   const studentId = booking.studentId?._id || booking.studentId;

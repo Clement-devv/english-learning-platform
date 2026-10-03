@@ -26,6 +26,7 @@ import GoogleMeetSettings           from '../../../../components/GoogleMeetSetti
 import LiveClasses                  from '../../components/dashboard/LiveClasses';
 import LanguageSwitcher             from '../../../../components/LanguageSwitcher';
 import UpcomingClasses              from '../../components/dashboard/UpcomingClasses';
+import DashboardAlertsBar from "../../../../components/DashboardAlertsBar";
 
 // ── Palette ────────────────────────────────────────────────────────────────────
 const LIGHT = {
@@ -81,7 +82,7 @@ const SECTION_TABS = {
   bookings:  ['bookings'],
   content:   ['homework', 'quiz', 'vocab'],
   messages:  ['messages'],
-  more:      ['payment', 'recordings', 'reviews', 'profile'],
+  more:      ['payment', 'recordings', 'reviews', 'rating-dashboard', 'profile'],
 };
 
 // Sub-tabs shown in the top bar per section
@@ -100,6 +101,7 @@ const SUB_TABS = {
     { key: 'payment',    label: 'Payment'    },
     { key: 'recordings', label: 'Recordings' },
     { key: 'reviews',    label: 'Reviews'    },
+    { key: 'rating-dashboard', label: 'Rating Insights' },
     { key: 'profile',    label: 'Profile'    },
   ],
 };
@@ -120,7 +122,7 @@ const PAGE_TITLE = {
   dashboard: 'Home', classes: 'My Classes', 'completed-classes': 'Completed Classes',
   schedule: 'Schedule', students: 'Students', bookings: 'Bookings', messages: 'Messages',
   payment: 'Payment', homework: 'Homework', quiz: 'Quizzes', vocab: 'Vocabulary',
-  recordings: 'Recordings', reviews: 'Reviews', profile: 'Profile',
+  recordings: 'Recordings', reviews: 'Reviews', profile: 'Profile', 'rating-dashboard': 'Rating Insights',
 };
 
 export default function PlayfulShell() {
@@ -360,6 +362,8 @@ export default function PlayfulShell() {
 
         {/* ── SCROLL AREA ── */}
         <main style={{ flex: 1, overflowY: 'auto', padding: isMobile ? `16px 14px calc(80px + env(safe-area-inset-bottom, 0px))` : 24 }}>
+          {/* Missed calls & new messages while away */}
+          <DashboardAlertsBar isDark={d.isDarkMode} onOpenMessages={() => d.setActiveTab("messages")} />
 
           {/* Toast */}
           {d.toast && (
@@ -653,7 +657,7 @@ export default function PlayfulShell() {
       )}
 
       {d.showSessionManagement && (
-        <SessionManagement onClose={() => d.setShowSessionManagement(false)} userType="teacher" />
+        <SessionManagement isOpen onClose={() => d.setShowSessionManagement(false)} userType="teacher" />
       )}
 
       {d.showSettingsModal && (
@@ -710,7 +714,7 @@ export default function PlayfulShell() {
             <div style={{ width: 36, height: 4, background: P.border, borderRadius: 999, margin: '0 auto 16px' }} />
             <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               {NAV.filter(n => !['dashboard','classes','students','messages'].includes(n.id)).map(({ id, Icon, label, tab, dot }) => {
-                const isActive = d.activeTab === tab || (id === 'content' && ['homework','quiz','vocab'].includes(d.activeTab)) || (id === 'more' && ['payment','recordings','reviews','profile'].includes(d.activeTab));
+                const isActive = d.activeTab === tab || (id === 'content' && ['homework','quiz','vocab'].includes(d.activeTab)) || (id === 'more' && ['payment','recordings','reviews','rating-dashboard','profile'].includes(d.activeTab));
                 return (
                   <button key={id} onClick={() => { d.setActiveTab(tab); setShowMobileMenu(false); }}
                     style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', borderRadius: 14, border: 'none', background: isActive ? `${dot}18` : 'transparent', color: isActive ? dot : P.text, cursor: 'pointer', fontFamily: F, width: '100%' }}>

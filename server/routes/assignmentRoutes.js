@@ -1,6 +1,7 @@
 // server/routes/assignmentRoutes.js
 import express from "express";
 import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
+import { verifyToken, verifyAdmin } from "../middleware/authMiddleware.js";
 import { assignmentSchema } from "../schemas/assignmentSchema.js";
 import { groupChatSchema }  from "../schemas/groupChatSchema.js";
 import { teacherSchema }    from "../schemas/teacherSchema.js";
@@ -10,7 +11,9 @@ import logger from "../utils/logger.js";
 import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
 
 const router = express.Router();
-router.use(tenantMiddleware);
+// Admin-only: assigning students to teachers (used by the admin Assign Students tab).
+// Previously these routes had no authentication at all.
+router.use(tenantMiddleware, verifyToken, verifyAdmin);
 
 const getAssignment = (db) => db.models.Assignment || db.model("Assignment", assignmentSchema);
 const getGroupChat  = (db) => db.models.GroupChat  || db.model("GroupChat",  groupChatSchema);

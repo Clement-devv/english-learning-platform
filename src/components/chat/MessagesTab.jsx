@@ -12,19 +12,24 @@ const TABS = [
   { key: "ring",     label: "Ring",     icon: Phone },
 ];
 
-export default function MessagesTab({ userRole, onUnreadCount }) {
+// compact: a small preview embedded on a dashboard home page — it must not mark
+// messages as seen (that would hide the "new messages" alerts the moment the
+// dashboard loads).
+export default function MessagesTab({ userRole, onUnreadCount, compact = false }) {
   const [selectedChat, setSelectedChat] = useState(null);
   const [activeTab,    setActiveTab]    = useState("messages");
   const { isDarkMode } = useDarkMode();
-  const { markMessagesSeen } = useRing();
+  const { markMessagesSeen, lastChatEvent } = useRing();
 
   // Dismiss the dashboard-level unread-messages banner whenever the user opens
   // the Messages tab — same pattern as RingTab calling clearMissedCalls().
+  // Also on every new message while they are here: they can already see it in
+  // the list, so the floating "new messages" banner must not pop up over it.
   // Per-chat unread counts on the server are untouched until the user opens
   // an individual chat.
   useEffect(() => {
-    if (activeTab === "messages") markMessagesSeen();
-  }, [activeTab, markMessagesSeen]);
+    if (activeTab === "messages" && !compact) markMessagesSeen();
+  }, [activeTab, lastChatEvent, markMessagesSeen, compact]);
 
   const handleSelectChat = (chat) => setSelectedChat(chat);
   const handleCloseChat  = () => setSelectedChat(null);
@@ -64,6 +69,7 @@ export default function MessagesTab({ userRole, onUnreadCount }) {
             flexShrink: 0,
             display: "flex",
             flexDirection: "column",
+            minHeight: 0, // lets the contact list scroll inside the sidebar
             borderRight: `1px solid ${C.border}`,
             background: C.sidebar,
           }}

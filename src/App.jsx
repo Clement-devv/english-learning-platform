@@ -10,9 +10,13 @@ import ActiveClassBanner  from "./components/ActiveClassBanner";
 import AuthGuard          from "./components/AuthGuard";
 import PWAInstallPrompt   from "./components/PWAInstallPrompt";
 import { RingProvider }   from "./context/RingContext";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { queryClient } from "./lib/queryClient";
 import IncomingRingModal  from "./components/ring/IncomingRingModal";
 import MissedCallAlert    from "./components/ring/MissedCallAlert";
 import MessageAlert       from "./components/chat/MessageAlert";
+import DeviceNotificationPrompt from "./components/DeviceNotificationPrompt";
+import SignedOutNotice          from "./components/SignedOutNotice";
 import TermsModal                from "./components/TermsModal";
 import WelcomeCard              from "./components/WelcomeCard";
 import RecordingUploadBanner    from "./components/RecordingUploadBanner";
@@ -146,6 +150,7 @@ function HomeRoute() {
 
 function App() {
   return (
+    <QueryClientProvider client={queryClient}>
     <AuthProvider>
     <BrandingProvider>
       <Router>
@@ -161,6 +166,8 @@ function App() {
         <IncomingRingModal />
         <MissedCallAlert />
         <MessageAlert />
+        <DeviceNotificationPrompt />
+        <SignedOutNotice />
         <Suspense fallback={<PageLoader />}>
           <Routes>
             <Route path="/" element={<HomeRoute />} />
@@ -213,6 +220,7 @@ function App() {
     </Router>
     </BrandingProvider>
     </AuthProvider>
+    </QueryClientProvider>
   );
 }
 

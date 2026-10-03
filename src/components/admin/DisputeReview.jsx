@@ -1,7 +1,8 @@
 // src/components/admin/DisputeReview.jsx
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { AlertTriangle, CheckCircle, XCircle, Clock, RefreshCw, ChevronDown, ChevronUp } from "lucide-react";
 import api from "../../api";
+import { useOnDataChanged } from "../../hooks/useLiveData";
 import DisputePulse, { DISPUTE_GLOW_CLASS } from "../DisputePulse";
 
 const STATUS_COLORS = {
@@ -58,8 +59,13 @@ export default function DisputeReview({ isDarkMode }) {
     finally { setLoading(false); }
   };
 
+  // Live: refresh quietly (no spinner) when the server says this data changed
+  const quietRef = useRef(false);
+  useOnDataChanged(["disputes","bookings"], () => { quietRef.current = true; loadDisputes(); });
+
   const loadDisputes = async () => {
-    setDisputeLoading(true);
+    if (!quietRef.current) setDisputeLoading(true);
+    quietRef.current = false;
     try {
       const { data } = await api.get("/disputes");
       setTeacherDisputes(data.disputes || []);

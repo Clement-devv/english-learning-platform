@@ -6,6 +6,7 @@ import express from 'express';
 import { tenantMiddleware } from '../middleware/tenantMiddleware.js';
 import { sendEmail }        from '../emails/core.js';
 import logger from '../utils/logger.js';
+import { contactFormLimiter } from '../middleware/rateLimiter.js';
 import { notFound, serverError } from '../utils/apiResponse.js';
 
 const router = express.Router();
@@ -57,9 +58,25 @@ router.get('/landing-page', tenantMiddleware, async (req, res) => {
 // POST /api/v1/public/contact
 // Receives the Clemify company landing page contact form and emails clem.emmy01@gmail.com.
 // No tenantMiddleware — this is a platform-level endpoint, not center-specific.
-router.post('/contact', async (req, res) => {
+// Plain-text field: strings only, trimmed, length-capped, no line breaks (used in the subject)
+const field = (v, max, { multiline = false } = {}) => {
+  if (typeof v !== 'string') return '';
+  const s = v.trim().slice(0, max);
+  return multiline ? s : s.replace(/[\r\n]+/g, ' ');
+};
+// Everything the visitor typed is HTML-escaped before it goes into the email body
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) =>
+  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+router.post('/contact', contactFormLimiter, async (req, res) => {
   try {
-    const { name, organization, email, phone, service, message } = req.body || {};
+    const body = req.body || {};
+    const name         = field(body.name, 100);
+    const organization = field(body.organization, 150);
+    const email        = field(body.email, 254);
+    const phone        = field(body.phone, 40);
+    const service      = field(body.service, 50);
+    const message      = field(body.message, 5000, { multiline: true });
 
     if (!name || !email || !message) {
       return res.status(400).json({ success: false, message: 'Name, email, and message are required.' });
@@ -83,15 +100,15 @@ router.post('/contact', async (req, res) => {
       html: `
         <h2 style="font-family:sans-serif;color:#1e293b">New Contact Request</h2>
         <table style="font-family:sans-serif;font-size:14px;border-collapse:collapse;width:100%;max-width:560px">
-          <tr><td style="padding:8px 0;color:#64748b;width:160px">Name</td><td style="padding:8px 0">${name}</td></tr>
-          <tr><td style="padding:8px 0;color:#64748b">Organization</td><td style="padding:8px 0">${organization || '—'}</td></tr>
-          <tr><td style="padding:8px 0;color:#64748b">Email</td><td style="padding:8px 0"><a href="mailto:${email}">${email}</a></td></tr>
-          <tr><td style="padding:8px 0;color:#64748b">Phone</td><td style="padding:8px 0">${phone || '—'}</td></tr>
-          <tr><td style="padding:8px 0;color:#64748b">Interested in</td><td style="padding:8px 0">${serviceLabel}</td></tr>
+          <tr><td style="padding:8px 0;color:#64748b;width:160px">Name</td><td style="padding:8px 0">${esc(name)}</td></tr>
+          <tr><td style="padding:8px 0;color:#64748b">Organization</td><td style="padding:8px 0">${esc(organization) || '—'}</td></tr>
+          <tr><td style="padding:8px 0;color:#64748b">Email</td><td style="padding:8px 0"><a href="mailto:${esc(encodeURIComponent(email).replace(/%40/g, '@'))}">${esc(email)}</a></td></tr>
+          <tr><td style="padding:8px 0;color:#64748b">Phone</td><td style="padding:8px 0">${esc(phone) || '—'}</td></tr>
+          <tr><td style="padding:8px 0;color:#64748b">Interested in</td><td style="padding:8px 0">${esc(serviceLabel)}</td></tr>
         </table>
         <hr style="margin:20px 0;border:none;border-top:1px solid #e2e8f0"/>
         <p style="font-family:sans-serif;font-size:14px;color:#64748b;margin-bottom:6px">Message:</p>
-        <p style="font-family:sans-serif;font-size:14px;color:#1e293b;white-space:pre-wrap">${message}</p>
+        <p style="font-family:sans-serif;font-size:14px;color:#1e293b;white-space:pre-wrap">${esc(message)}</p>
       `,
     });
 

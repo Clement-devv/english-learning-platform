@@ -25,7 +25,7 @@ import logger from "../utils/logger.js";
 import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
 import { toStr, toObjectId } from '../utils/inputSanitizer.js';
 import { wrapUpload } from '../middleware/validateObjectId.js';
-import { sendPush } from '../utils/webPushService.js';
+import { pushToUser, pushToAllAdmins } from '../utils/webPushService.js';
 import { s3Enabled, uploadToS3, deleteFromS3, getPresignedUrl } from "../utils/s3.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -444,10 +444,7 @@ router.post("/", verifyToken, uploadLimiter, wrapUpload(uploadAssignment.array("
         homeworkId: hw._id,
         dueDate,
       });
-      getStudent(req.db).findById(studentId).select('pushSubscription').then(s => {
-        if (s?.pushSubscription?.endpoint)
-          sendPush(s.pushSubscription, { title: '📚 New Homework!', body: `Your teacher assigned: "${titleClean}"`, icon: '/icons/icon.svg', data: { url: '/student/dashboard?tab=homework' } }).catch(() => {});
-      }).catch(() => {});
+      pushToUser(req.db, 'student', studentId, { title: '📚 New Homework!', body: `Your teacher assigned: "${titleClean}"`, icon: '/icons/icon.svg', data: { url: '/student/dashboard?tab=homework' } });
     } catch (_) {}
 
     res.status(201).json({ success: true, homework: withShareInfo(hw, req.center) });

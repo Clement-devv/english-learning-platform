@@ -1,12 +1,17 @@
 // src/components/chat/ChatWindow.jsx
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import { otherPersonCode, codeChipStyle } from "./personCode";
 import {
   Send, ArrowLeft, Users, Loader2,
-  Smile, MoreVertical, CheckCheck, ChevronDown, Lock, X,
+  Smile, MoreVertical, CheckCheck, ChevronDown, Lock, X, Trash2,
 } from "lucide-react";
 import EmojiPicker from "emoji-picker-react";
 import api from "../../api";
 import { useRing } from "../../context/RingContext.jsx";
+import { useAuth } from "../../context/AuthContext.jsx";
+
+// Senders can delete their own message for everyone within this window
+const DELETE_WINDOW_MS = 30 * 60 * 1000;
 
 export default function ChatWindow({ chat, chatType = "group", userRole, onClose, isDark }) {
   const {
@@ -14,6 +19,7 @@ export default function ChatWindow({ chat, chatType = "group", userRole, onClose
     joinChatRoom, leaveChatRoom,
     emitTyping, emitStopTyping,
     typingEvent,
+    socketConnected,
   } = useRing();
 
   const [messages,    setMessages]    = useState([]);
@@ -23,6 +29,15 @@ export default function ChatWindow({ chat, chatType = "group", userRole, onClose
   const [newMsgCount, setNewMsgCount] = useState(0);
   const [showEmoji,   setShowEmoji]   = useState(false);
   const [typingUser,  setTypingUser]  = useState(null); // { name, role }
+  const [deletingId,  setDeletingId]  = useState(null);
+  const [, setClock]                  = useState(0);     // re-render so delete buttons expire
+  const { user } = useAuth();
+  const myId = String(user?.id || user?._id || "");
+
+  useEffect(() => {
+    const t = setInterval(() => setClock(c => c + 1), 30_000);
+    return () => clearInterval(t);
+  }, []);
 
   const scrollBoxRef    = useRef(null);
   const bottomRef       = useRef(null);
@@ -34,19 +49,27 @@ export default function ChatWindow({ chat, chatType = "group", userRole, onClose
   const mountedRef      = useRef(true);
   const typingClearRef  = useRef(null); // auto-clear typing indicator
   const emitStopTimerRef = useRef(null); // debounce typing-stop emit
+  const fetchFailedRef  = useRef(false); // log a failing fetch once, not every poll
+  const goneRef         = useRef(false); // chat deleted / no access — stop polling
 
   const apiBase = chatType === "dm" ? "/direct-messages" : "/group-chats";
 
   // ── API calls — declared before effects so deps arrays can reference them ──
   const fetchMessages = useCallback(async (showLoader = false) => {
-    if (!chat?._id) return;
+    if (!chat?._id || goneRef.current) return;
     try {
       if (showLoader) setLoading(true);
       const res  = await api.get(`${apiBase}/${chat._id}/messages`);
       const msgs = res.data?.messages || (Array.isArray(res.data) ? res.data : []);
       if (mountedRef.current) setMessages(msgs);
+      fetchFailedRef.current = false;
     } catch (e) {
-      console.error("Fetch messages error:", e);
+      const status = e?.response?.status;
+      if (status === 403 || status === 404) goneRef.current = true;
+      if (!fetchFailedRef.current) {
+        fetchFailedRef.current = true;
+        console.warn("Could not load messages:", e?.response?.data?.message || e?.message);
+      }
     } finally {
       if (mountedRef.current && showLoader) setLoading(false);
     }
@@ -60,6 +83,8 @@ export default function ChatWindow({ chat, chatType = "group", userRole, onClose
   useEffect(() => {
     isInitialLoad.current = true;
     prevMsgLen.current    = 0;
+    fetchFailedRef.current = false;
+    goneRef.current       = false;
     setNewMsgCount(0);
     setMessages([]);
   }, [chat?._id]);
@@ -69,13 +94,29 @@ export default function ChatWindow({ chat, chatType = "group", userRole, onClose
     return () => { mountedRef.current = false; };
   }, []);
 
+  // Initial load
   useEffect(() => {
     if (!chat?._id) return;
     fetchMessages(true);
     markAsRead();
-    const id = setInterval(() => fetchMessages(false), 5000);
-    return () => clearInterval(id);
   }, [chat?._id, fetchMessages, markAsRead]);
+
+  // Safety-net polling. New messages normally arrive instantly over the live
+  // connection (lastChatEvent below), so poll slowly while it is up, faster
+  // only when it is down, and never while the tab is in the background.
+  useEffect(() => {
+    if (!chat?._id) return;
+    const every = socketConnected ? 30_000 : 8_000;
+    const id = setInterval(() => {
+      if (!document.hidden) fetchMessages(false);
+    }, every);
+    const onVisible = () => { if (!document.hidden) fetchMessages(false); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [chat?._id, fetchMessages, socketConnected]);
 
   // Join the per-chat socket room for typing indicators; leave on unmount / chat change
   useEffect(() => {
@@ -168,7 +209,9 @@ export default function ChatWindow({ chat, chatType = "group", userRole, onClose
       setSending(true);
       const res = await api.post(`${apiBase}/${chat._id}/messages`, { message: newMsg.trim() });
       if (res.data.success && mountedRef.current) {
-        setMessages(prev => [...prev, res.data.data]);
+        const sent = res.data.data;
+        // A refresh may already have brought this message in — don't show it twice
+        setMessages(prev => sent?._id && prev.some(m => m._id === sent._id) ? prev : [...prev, sent]);
         setNewMsg("");
         if (textareaRef.current) {
           textareaRef.current.style.height = "auto";
@@ -176,9 +219,31 @@ export default function ChatWindow({ chat, chatType = "group", userRole, onClose
         }
       }
     } catch (e) {
-      console.error("Send error:", e);
+      console.warn("Message not sent:", e?.response?.data?.message || e?.message);
     } finally {
       if (mountedRef.current) setSending(false);
+    }
+  };
+
+  // ── Delete own message (within 30 min) ───────────────────────────────────
+  const canDelete = (msg) =>
+    !msg.deleted && msg._id && msg.senderRole === userRole &&
+    (!myId || String(msg.senderId) === myId) &&
+    Date.now() - new Date(msg.createdAt).getTime() < DELETE_WINDOW_MS;
+
+  const handleDeleteMessage = async (msg) => {
+    if (!confirm("Delete this message for everyone?")) return;
+    setDeletingId(msg._id);
+    try {
+      await api.delete(`${apiBase}/${chat._id}/messages/${msg._id}`);
+      if (mountedRef.current) {
+        setMessages(prev => prev.map(m => m._id === msg._id
+          ? { ...m, deleted: true, message: "This message was deleted" } : m));
+      }
+    } catch (e) {
+      alert(e?.response?.data?.message || "Could not delete the message");
+    } finally {
+      if (mountedRef.current) setDeletingId(null);
     }
   };
 
@@ -249,6 +314,11 @@ export default function ChatWindow({ chat, chatType = "group", userRole, onClose
       display: "flex", flexDirection: "column", height: "100%",
       background: C.bg, fontFamily: "var(--font-body)",
     }}>
+      <style>{`
+        .msg-bubble-wrap .msg-del { opacity: 0; transition: opacity .15s; }
+        .msg-bubble-wrap:hover .msg-del, .msg-del:focus-visible { opacity: 1; }
+        @media (hover: none) { .msg-bubble-wrap .msg-del { opacity: .6; } }
+      `}</style>
 
       {/* ── Header ── */}
       <div style={{
@@ -279,6 +349,9 @@ export default function ChatWindow({ chat, chatType = "group", userRole, onClose
               overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
             }}>
               {chat.chatName || "Chat"}
+              {otherPersonCode(chat, userRole) && (
+                <span style={{ ...codeChipStyle(isDark), marginLeft: 8, verticalAlign: "middle" }} title="ID number">{otherPersonCode(chat, userRole)}</span>
+              )}
             </h3>
             <div style={{ display: "flex", alignItems: "center", gap: "5px", marginTop: "2px" }}>
               <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: "#22c55e", flexShrink: 0 }} />
@@ -369,6 +442,14 @@ export default function ChatWindow({ chat, chatType = "group", userRole, onClose
                       </div>
                     )}
 
+                    {canDelete(msg) && (
+                      <button className="msg-del" onClick={() => handleDeleteMessage(msg)} disabled={deletingId === msg._id}
+                        title="Delete for everyone (within 30 minutes of sending)" aria-label="Delete message"
+                        style={{ alignSelf: "center", background: "none", border: "none", cursor: "pointer", padding: "6px", borderRadius: "8px", color: C.sub, display: "flex" }}>
+                        {deletingId === msg._id ? <Loader2 size={14} style={{ animation: "msg-spin 1s linear infinite" }} /> : <Trash2 size={14} />}
+                      </button>
+                    )}
+
                     <div style={{
                       display: "flex", flexDirection: "column", maxWidth: "66%",
                       alignItems: isOwn ? "flex-end" : "flex-start",
@@ -401,8 +482,9 @@ export default function ChatWindow({ chat, chatType = "group", userRole, onClose
                           : isDark ? "0 2px 8px rgba(0,0,0,0.3)" : "0 2px 8px rgba(0,0,0,0.06)",
                         border: !isOwn ? `1px solid ${C.border}` : "none",
                       }} className="msg-bubble">
-                        <p style={{ margin: 0, fontSize: "13.5px", whiteSpace: "pre-wrap", wordBreak: "break-word", lineHeight: "1.55" }}>
-                          {msg.message}
+                        <p style={{ margin: 0, fontSize: "13.5px", whiteSpace: "pre-wrap", wordBreak: "break-word", lineHeight: "1.55",
+                          ...(msg.deleted ? { fontStyle: "italic", opacity: 0.7 } : {}) }}>
+                          {msg.deleted ? "🚫 This message was deleted" : msg.message}
                         </p>
                         <div style={{
                           display: "flex", justifyContent: "flex-end", alignItems: "center",

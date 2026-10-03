@@ -1,6 +1,8 @@
 import mongoose from 'mongoose';
+import { hideSecrets } from './shared/hideSecrets.js';
 import { encryptField, decryptField } from '../utils/encryption.js';
-import { sessionSchema } from './shared/sessionSchema.js';
+import { sessionSchema, knownDeviceSchema, alertsSeenDef } from './shared/sessionSchema.js';
+import { generateTeacherCode } from '../utils/teacherCode.js';
 
 export const teacherSchema = new mongoose.Schema({
   firstName: String,
@@ -23,6 +25,8 @@ export const teacherSchema = new mongoose.Schema({
   specializations: { type: [String], default: [] },
   certifications: { type: [String], default: [] },
   showScheduleToStudents: { type: Boolean, default: true },
+  // Human-friendly ID number (TCH-12345) — names repeat, IDs don't. utils/teacherCode.js
+  teacherCode: { type: String, unique: true, sparse: true },
   // Weekly teaching hours, wall-clock in `workingHoursTz` (saved with the hours —
   // NOT `timezone`, which follows whatever device the teacher last used). Free time =
   // these hours − time off − booked classes (server/utils/schedule.js).
@@ -46,6 +50,8 @@ export const teacherSchema = new mongoose.Schema({
   resetPasswordCenter: String,
   lastPasswordChange: Date,
   sessions: [sessionSchema],
+  knownDevices: { type: [knownDeviceSchema], default: [] },
+  alertsSeenAt: alertsSeenDef,
   lastLogin: Date,
   twoFactorEnabled: { type: Boolean, default: false },
   twoFactorSecret: String,
@@ -70,6 +76,11 @@ export const teacherSchema = new mongoose.Schema({
 
 // Lookup by status (admin lists active/pending/suspended teachers)
 teacherSchema.index({ status: 1 });
+
+// Every new teacher gets an ID number, whichever route creates them
+teacherSchema.pre('save', async function () {
+  if (this.isNew && !this.teacherCode) this.teacherCode = await generateTeacherCode(this.constructor);
+});
 // Sub-admin region scope filter (MT-3): find teachers by continent
 teacherSchema.index({ continent: 1 });
 // Analytics overview: countDocuments({ active: true })
@@ -82,3 +93,6 @@ teacherSchema.index({ resetPasswordToken: 1 }, { sparse: true });
 teacherSchema.index({ scheduledDeletionAt: 1 }, { sparse: true });
 // Invite setup link lookup
 teacherSchema.index({ inviteToken: 1 }, { sparse: true });
+
+// Never serialize password hash, session tokens, invite/reset tokens or 2FA secrets
+hideSecrets(teacherSchema);

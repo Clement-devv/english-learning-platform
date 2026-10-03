@@ -252,6 +252,14 @@ router.post("/upload", verifyToken, wrapUpload(upload.single("recording")), asyn
 
     const { bookingId, duration, title } = req.body;
     if (!bookingId) { await discardUploadedFile(req.file); return badRequest(res, "bookingId is required"); }
+    // Only the class's own teacher may attach a recording to it — otherwise a
+    // teacher could push videos onto another teacher's student. (Recording is
+    // only offered in 1:1 classes, so bookingId is always a Booking.)
+    if (!mongoose.isValidObjectId(bookingId) ||
+        !(await getBooking(req.db).exists({ _id: bookingId, teacherId }))) {
+      await discardUploadedFile(req.file);
+      return forbidden(res, "You can only upload recordings for your own classes");
+    }
 
     const sessionId   = req.body.sessionId ? String(req.body.sessionId) : null;
     const partNumber  = parseInt(req.body.partNumber, 10) || 1;
@@ -474,12 +482,13 @@ router.get("/:id/stream", verifyToken, async (req, res) => {
     const rec = await getRecording(req.db).findById(req.params.id);
     if (!rec) return notFound(res, "Recording not found");
 
-    if (role === "teacher" && rec.teacherId.toString() !== userId)
-      return forbidden(res, "Access denied");
-    if (role === "student") {
-      if (rec.studentId?.toString() !== userId || !rec.visibleToStudent)
-        return forbidden(res, "Access denied");
-    }
+    // Allow-list: admin, the recording's teacher, or its student once shared.
+    // (Sub-admins use /sub-admin-scope/recordings; parents have no access.)
+    const allowed =
+      role === "admin" ||
+      (role === "teacher" && rec.teacherId.toString() === userId) ||
+      (role === "student" && rec.studentId?.toString() === userId && rec.visibleToStudent);
+    if (!allowed) return forbidden(res, "Access denied");
 
     // Recorded elsewhere — hand back the saved link
     if (rec.source === "external") return res.json({ url: rec.externalUrl, external: true });
@@ -635,10 +644,9 @@ router.delete("/:id", verifyToken, async (req, res) => {
     const rec = await getRecording(req.db).findById(req.params.id);
     if (!rec) return notFound(res, "Not found");
 
-    if (role === "student")
-      return forbidden(res, "Students cannot delete recordings");
-    if (role === "teacher" && rec.teacherId.toString() !== userId)
-      return forbidden(res, "Access denied");
+    // Allow-list: only an admin or the recording's own teacher may delete
+    const allowed = role === "admin" || (role === "teacher" && rec.teacherId.toString() === userId);
+    if (!allowed) return forbidden(res, "Access denied");
 
     await purgeRecording(rec);
     res.json({ success: true, message: "Recording deleted" });

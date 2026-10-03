@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
-import { sessionSchema } from './shared/sessionSchema.js';
+import { hideSecrets } from './shared/hideSecrets.js';
+import { sessionSchema, knownDeviceSchema, alertsSeenDef } from './shared/sessionSchema.js';
 
 const { Schema, Types: { ObjectId } } = mongoose;
 
@@ -20,6 +21,8 @@ export const parentSchema = new Schema({
   resetPasswordCenter:  { type: String },
   lastPasswordChange:   { type: Date },
   sessions:  [sessionSchema],
+  knownDevices: { type: [knownDeviceSchema], default: [] },
+  alertsSeenAt: alertsSeenDef,
   lastLogin: { type: Date },
 
   // ── Terms & Conditions ───────────────────────────────────────────────────
@@ -30,3 +33,6 @@ export const parentSchema = new Schema({
 parentSchema.index({ status: 1 });
 parentSchema.index({ inviteToken: 1 }, { sparse: true });
 parentSchema.index({ resetPasswordToken: 1 }, { sparse: true });
+
+// Never serialize password hash, session tokens, invite/reset tokens or 2FA secrets
+hideSecrets(parentSchema);

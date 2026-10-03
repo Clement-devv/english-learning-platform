@@ -5,6 +5,7 @@
 import { useState, useEffect } from "react";
 import { Star, CheckCircle, Send, RefreshCw } from "lucide-react";
 import api from "../../../api";
+import { useOnDataChanged } from "../../../hooks/useLiveData";
 
 const fmt = (d) =>
   d ? new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—";
@@ -142,10 +143,10 @@ export default function ReviewsTab({ isDarkMode }) {
   const text  = isDarkMode ? "#e2e8f0" : "#1e293b";
   const muted = isDarkMode ? "#94a3b8" : "#64748b";
 
-  async function load() {
+  async function load(quiet = false) {
     const studentId = getStudentId();
     if (!studentId) { setLoading(false); return; }
-    setLoading(true);
+    if (!quiet) setLoading(true);
     try {
       const [bookingsRes, reviewsRes] = await Promise.all([
         api.get(`/bookings/student/${studentId}?status=completed`),
@@ -169,6 +170,7 @@ export default function ReviewsTab({ isDarkMode }) {
   }
 
   useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useOnDataChanged(["reviews", "classes"], () => load(true)); // live: newly completed classes to review
 
   function handleSubmitted(bookingId) {
     setPending(p => p.filter(b => b._id !== bookingId));

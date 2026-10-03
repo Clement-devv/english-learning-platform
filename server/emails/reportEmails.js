@@ -148,3 +148,89 @@ export const sendNewTeacherRecordEmail = async (adminEmail, teacher, pdfBuffer, 
     }],
   });
 };
+
+// ── Daily completed-classes report for admins ────────────────────────────────
+const escHtml = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+/**
+ * @param {object} p
+ * @param {string|string[]} p.to
+ * @param {object} p.report      from buildDailyClassReport
+ * @param {Buffer} p.pdfBuffer
+ * @param {string} [p.centerName]
+ */
+export const sendDailyClassReportEmail = async ({ to, report, pdfBuffer, centerName = "" }) => {
+  const c = report.counts;
+  const changed = c.changedToCompleted + c.changedToNotCompleted;
+  const row = (label, value, color) =>
+    `<tr><td style="padding:8px 12px;color:#475569;">${label}</td><td style="padding:8px 12px;font-weight:700;color:${color};">${value}</td></tr>`;
+
+  return sendEmail({
+    centerName,
+    to,
+    subject: `Daily class report — ${report.dateLabel}: ${c.completed} completed, ${c.notCompleted} not completed`,
+    html: `
+      <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#1f2937;">
+        <h2 style="margin:0 0 4px;">📋 Daily class report</h2>
+        <p style="margin:0 0 16px;color:#64748b;">${escHtml(report.dateLabel)} · 12:00 AM – 11:59 PM (${escHtml(report.tz)})</p>
+        <table style="border-collapse:collapse;width:100%;background:#f8fafc;border-radius:8px;">
+          ${row("Completed classes", c.completed, "#059669")}
+          ${row("Not completed", c.notCompleted, "#dc2626")}
+          ${row("Teachers", c.teachers, "#4f46e5")}
+          ${changed ? row("Earlier classes that changed today", changed, "#b45309") : ""}
+        </table>
+        ${c.changedToNotCompleted ? `<p style="margin:16px 0 0;padding:10px 14px;border-left:4px solid #dc2626;background:#fef2f2;color:#991b1b;">
+          <strong>${c.changedToNotCompleted}</strong> earlier completed class${c.changedToNotCompleted > 1 ? "es were" : " was"} turned <strong>not completed</strong> today (shown in red in the report).</p>` : ""}
+        ${c.changedToCompleted ? `<p style="margin:12px 0 0;padding:10px 14px;border-left:4px solid #059669;background:#ecfdf5;color:#065f46;">
+          <strong>${c.changedToCompleted}</strong> earlier class${c.changedToCompleted > 1 ? "es were" : " was"} turned <strong>completed</strong> today after a review (shown in green).</p>` : ""}
+        <p style="margin:18px 0 0;color:#64748b;font-size:13px;">The full report, grouped by teacher, is attached as a PDF. You can also see it any time in the admin dashboard under <strong>Class Report</strong>.</p>
+      </div>
+    `,
+    attachments: [{
+      filename:    `Class_Report_${report.date}.pdf`,
+      content:     pdfBuffer,
+      contentType: "application/pdf",
+    }],
+  });
+};
+
+/**
+ * A teacher's own daily class report (only their classes).
+ * @param {object} p
+ * @param {string} p.to           teacher email
+ * @param {string} p.teacherName
+ * @param {object} p.report       from reportForTeacher()
+ * @param {Buffer} p.pdfBuffer
+ * @param {string} [p.centerName]
+ */
+export const sendTeacherDailyClassReportEmail = async ({ to, teacherName, report, pdfBuffer, centerName = "" }) => {
+  const c = report.counts;
+  const row = (label, value, color) =>
+    `<tr><td style="padding:8px 12px;color:#475569;">${label}</td><td style="padding:8px 12px;font-weight:700;color:${color};">${value}</td></tr>`;
+
+  return sendEmail({
+    centerName,
+    to,
+    subject: `Your classes on ${report.dateLabel}: ${c.completed} completed${c.notCompleted ? `, ${c.notCompleted} not completed` : ""}`,
+    html: `
+      <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#1f2937;">
+        <h2 style="margin:0 0 4px;">📋 Your daily class summary</h2>
+        <p style="margin:0 0 16px;color:#64748b;">Hi ${escHtml(teacherName || "there")} — here are your classes for ${escHtml(report.dateLabel)} (${escHtml(report.tz)}).</p>
+        <table style="border-collapse:collapse;width:100%;background:#f8fafc;border-radius:8px;">
+          ${row("Completed", c.completed, "#059669")}
+          ${row("Not completed", c.notCompleted, "#dc2626")}
+        </table>
+        ${c.changedToNotCompleted ? `<p style="margin:16px 0 0;padding:10px 14px;border-left:4px solid #dc2626;background:#fef2f2;color:#991b1b;">
+          <strong>${c.changedToNotCompleted}</strong> of your earlier classes ${c.changedToNotCompleted > 1 ? "were" : "was"} changed to <strong>not completed</strong> today. See the red notes in the report.</p>` : ""}
+        ${c.changedToCompleted ? `<p style="margin:12px 0 0;padding:10px 14px;border-left:4px solid #059669;background:#ecfdf5;color:#065f46;">
+          <strong>${c.changedToCompleted}</strong> of your earlier classes ${c.changedToCompleted > 1 ? "were" : "was"} changed to <strong>completed</strong> today after a review.</p>` : ""}
+        <p style="margin:18px 0 0;color:#64748b;font-size:13px;">Your full report is attached as a PDF. If something looks wrong, please contact your school admin.</p>
+      </div>
+    `,
+    attachments: [{
+      filename:    `My_Classes_${report.date}.pdf`,
+      content:     pdfBuffer,
+      contentType: "application/pdf",
+    }],
+  });
+};

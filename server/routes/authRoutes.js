@@ -8,11 +8,14 @@ import { config, JWT_STANDARD_CLAIMS, JWT_VERIFY_OPTIONS } from "../config/confi
 import { getCenterSecret } from "../utils/jwtUtils.js";
 import { loginLimiter, passwordResetLimiter, trackFailedLogin, isAccountLocked, clearFailedAttempts } from "../middleware/rateLimiter.js";
 import { validatePasswordStrength } from "../utils/passwordUtils.js";
-import { createSession, cleanExpiredSessions, pruneSessionsToLimit } from "../utils/sessionManager.js";
+import { startSession, verifyDeviceProof, endSession, notifySessionsRevoked, alertNewDevice, endSessionsAfterPasswordChange } from "../utils/sessionManager.js";
+import { buildRoleClaims, signAccessToken } from "../utils/sessionClaims.js";
+import { getUserModelForRole, isAccountUsable, normaliseRole } from "../utils/roleModels.js";
+import mongoose from "mongoose";
 import { SESSION_EXPIRY_DAYS } from "../config/constants.js";
 import { sendForgotPasswordEmail, sendStudentForgotPasswordEmail, sendAdminForgotPasswordEmail } from "../utils/emailService.js";
 import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
-import { addToLocalBlacklist } from "../middleware/authMiddleware.js";
+import { isTokenBlacklisted } from "../middleware/authMiddleware.js";
 import { decrypt, hashBackupCode } from "../utils/fieldEncryption.js";
 import { adminSchema } from "../schemas/adminSchema.js";
 import { teacherSchema } from "../schemas/teacherSchema.js";
@@ -47,12 +50,8 @@ const getParentModel   = (db) => db.models.Parent   || db.model("Parent",   pare
  * duplicate role branches everywhere.
  */
 const getUserDocForRole = async (db, role, userId) => {
-  if (role === "teacher")   return getTeacherModel(db).findById(userId);
-  if (role === "student")   return getStudentModel(db).findById(userId);
-  if (role === "admin")     return getAdminModel(db).findById(userId);
-  if (role === "sub-admin") return getSubAdminModel(db).findById(userId);
-  if (role === "parent")    return getParentModel(db).findById(userId);
-  return null;
+  const Model = getUserModelForRole(db, role);
+  return Model ? Model.findById(userId) : null;
 };
 
 /**
@@ -155,22 +154,12 @@ const createLoginHandler = ({
       }
     }
 
-    const jwtPayload = {
-      ...JWT_STANDARD_CLAIMS,
-      id: user._id,
-      email: user.email,
-      role,
-      centerId: req.center.slug,
-      ...(buildJwtExtra ? buildJwtExtra(user) : {}),
-    };
-    const token = jwt.sign(jwtPayload, getCenterSecret(req.center.slug), { expiresIn: config.jwtExpiry });
-
-    const session = createSession(req, token);
-    user.sessions = cleanExpiredSessions(user.sessions || []);
-    user.sessions.push(session);
-    user.sessions = pruneSessionsToLimit(user.sessions);
+    const extra = buildJwtExtra ? buildJwtExtra(user) : {};
+    const { token, session, isNewDevice } = startSession(req, user, (sid) =>
+      signAccessToken({ role, user, centerSlug: req.center.slug, sid, extra }));
     user.lastLogin = new Date();
     await user.save();
+    alertNewDevice({ req, user, role, session, isNewDevice });
 
     res.json({ success: true, token, sessionToken: session.token, ...buildResponse(user) });
 
@@ -271,18 +260,13 @@ router.post("/verify-2fa-login", tenantMiddleware, loginLimiter, verify2faRules,
       return unauthorized(res, "Invalid 2FA code or backup code");
     }
 
-    const token = jwt.sign(
-      { ...JWT_STANDARD_CLAIMS, id: user._id, email: user.email, role, centerId: req.center.slug },
-      getCenterSecret(req.center.slug),
-      { expiresIn: config.jwtExpiry }
-    );
-
-    const session = createSession(req, token);
-    user.sessions = cleanExpiredSessions(user.sessions || []);
-    user.sessions.push(session);
-    user.sessions = pruneSessionsToLimit(user.sessions);
+    // Same claims a password login would issue (e.g. admin username)
+    const extra = await buildRoleClaims(role, user, req.db);
+    const { token, session, isNewDevice } = startSession(req, user, (sid) =>
+      signAccessToken({ role, user, centerSlug: req.center.slug, sid, extra }));
     user.lastLogin = new Date();
     await user.save();
+    alertNewDevice({ req, user, role, session, isNewDevice });
 
     const userData = {
       id: user._id,
@@ -369,7 +353,10 @@ router.post("/teacher/change-password", tenantMiddleware, verifyToken, changePas
 
     teacher.password = await bcrypt.hash(newPassword, config.bcryptRounds);
     teacher.lastPasswordChange = new Date();
+    // Sign out every other device — a stolen session must not survive a password change
+    const endedSessions = await endSessionsAfterPasswordChange(teacher, req, { keepCurrent: true });
     await teacher.save();
+    notifySessionsRevoked(req.app.get("io"), req.center.slug, teacher._id, endedSessions);
 
     res.json({ success: true, message: "Password changed successfully" });
 
@@ -459,7 +446,10 @@ router.post("/teacher/reset-password/:token", tenantMiddleware, passwordResetLim
     teacher.resetPasswordToken   = undefined;
     teacher.resetPasswordExpires = undefined;
     teacher.resetPasswordCenter  = undefined;
+    // Password was reset from an email link — sign out every device
+    const endedSessions = await endSessionsAfterPasswordChange(teacher, req);
     await teacher.save();
+    notifySessionsRevoked(req.app.get("io"), req.center.slug, teacher._id, endedSessions);
 
     res.json({ success: true, message: "Password reset successfully. You can now login with your new password." });
 
@@ -555,7 +545,10 @@ router.post("/student/change-password", tenantMiddleware, changePasswordRules, v
 
     student.password = await bcrypt.hash(newPassword, config.bcryptRounds);
     student.lastPasswordChange = new Date();
+    // Sign out every other device — a stolen session must not survive a password change
+    const endedSessions = await endSessionsAfterPasswordChange(student, req, { keepCurrent: true });
     await student.save();
+    notifySessionsRevoked(req.app.get("io"), req.center.slug, student._id, endedSessions);
 
     res.json({ success: true, message: "Password changed successfully" });
 
@@ -645,7 +638,10 @@ router.post("/student/reset-password/:token", tenantMiddleware, passwordResetLim
     student.resetPasswordToken   = undefined;
     student.resetPasswordExpires = undefined;
     student.resetPasswordCenter  = undefined;
+    // Password was reset from an email link — sign out every device
+    const endedSessions = await endSessionsAfterPasswordChange(student, req);
     await student.save();
+    notifySessionsRevoked(req.app.get("io"), req.center.slug, student._id, endedSessions);
 
     res.json({ success: true, message: "Password reset successfully. You can now login with your new password." });
 
@@ -754,7 +750,10 @@ router.post("/admin/change-password", tenantMiddleware, changePasswordRules, val
 
     admin.password = await bcrypt.hash(newPassword, config.bcryptRounds);
     admin.lastPasswordChange = new Date();
+    // Sign out every other device — a stolen session must not survive a password change
+    const endedSessions = await endSessionsAfterPasswordChange(admin, req, { keepCurrent: true });
     await admin.save();
+    notifySessionsRevoked(req.app.get("io"), req.center.slug, admin._id, endedSessions);
 
     res.json({ success: true, message: "Password changed successfully" });
 
@@ -831,7 +830,10 @@ router.post("/admin/reset-password/:token", tenantMiddleware, passwordResetLimit
     admin.resetPasswordToken   = undefined;
     admin.resetPasswordExpires = undefined;
     admin.resetPasswordCenter  = undefined;
+    // Password was reset from an email link — sign out every device
+    const endedSessions = await endSessionsAfterPasswordChange(admin, req);
     await admin.save();
+    notifySessionsRevoked(req.app.get("io"), req.center.slug, admin._id, endedSessions);
 
     res.json({ success: true, message: "Password reset successfully. You can now log in with your new password." });
   } catch (err) {
@@ -894,39 +896,57 @@ router.post("/accept-terms", tenantMiddleware, async (req, res) => {
 });
 
 // ─── Session management ───────────────────────────────────────────────────────
+// Every center role (admin, teacher, student, sub-admin, parent) keeps one
+// session per signed-in device. The device list never exposes session tokens
+// (those are the renewal secrets) — devices are addressed by their session id.
 
+/** Verify the bearer token (signature + revocation) and load its user. */
+async function authFromBearer(req) {
+  const token = req.headers.authorization?.split(" ")[1];
+  if (!token) return { error: "No token provided" };
+  let decoded;
+  try {
+    decoded = jwt.verify(token, getCenterSecret(req.center.slug), JWT_VERIFY_OPTIONS);
+  } catch {
+    return { error: "Invalid or expired token" };
+  }
+  if (decoded.centerId !== req.center.slug) return { error: "Token not valid for this center" };
+  if (await isTokenBlacklisted(token)) return { error: "Session has been revoked. Please log in again.", code: "SESSION_REVOKED" };
+  const user = await getUserDocForRole(req.db, decoded.role, decoded.id);
+  if (!user) return { error: "User not found" };
+  return { token, decoded, user };
+}
+
+/** The session this request's token belongs to */
+const currentSessionOf = (user, decoded, token) =>
+  (decoded.sid && user.sessions.find(s => String(s._id) === String(decoded.sid))) ||
+  user.sessions.find(s => s.jwtToken === token) ||
+  null;
+
+// GET /auth/sessions — this account's signed-in devices
 router.get("/sessions", tenantMiddleware, async (req, res) => {
   try {
-    const token = req.headers.authorization?.split(" ")[1];
+    const auth = await authFromBearer(req);
+    if (auth.error) return res.status(401).json({ success: false, message: auth.error, code: auth.code });
+    const { user, decoded, token } = auth;
+    const current = currentSessionOf(user, decoded, token);
 
-    if (!token) {
-      return unauthorized(res, "No token provided");
-    }
-
-    const decoded = jwt.verify(token, getCenterSecret(req.center.slug), JWT_VERIFY_OPTIONS);
-
-    // getUserDocForRole returns a query when chained or a doc when awaited;
-    // we want all fields here so we can also report device/IP info per session.
-    const user = await getUserDocForRole(req.db, decoded.role, decoded.id);
-
-    if (!user) {
-      return notFound(res, "User not found");
-    }
-
-    const activeSessions = user.sessions
+    const sessions = user.sessions
       .filter(s => s.isActive)
+      .sort((a, b) => new Date(b.lastActivity || b.loginTime) - new Date(a.lastActivity || a.loginTime))
       .map(s => ({
-        sessionToken: s.token,
-        deviceInfo: s.deviceInfo,
-        ipAddress: s.ipAddress,
-        location: s.location,
-        loginTime: s.loginTime,
-        lastActivity: s.lastActivity,
-        isCurrent: s.jwtToken === token,
+        id:            String(s._id),
+        deviceInfo:    s.deviceInfo,
+        ipAddress:     s.ipAddress,
+        location:      s.location,
+        loginTime:     s.loginTime,
+        lastActivity:  s.lastActivity,
+        isCurrent:     !!current && String(s._id) === String(current._id),
+        deviceLocked:  !!s.devicePublicKey,
+        notifications: !!s.pushSubscription?.endpoint,
       }));
 
-    res.json({ success: true, sessions: activeSessions, lastLogin: user.lastLogin });
-
+    res.json({ success: true, sessions, lastLogin: user.lastLogin });
   } catch (err) {
     logger.error("Get sessions error:", { error: err?.message });
     serverError(res);
@@ -935,10 +955,11 @@ router.get("/sessions", tenantMiddleware, async (req, res) => {
 
 // ─── Refresh token ────────────────────────────────────────────────────────────
 // POST /auth/refresh
-// The client sends its expired access token + the sessionToken (refresh token).
+// The client sends its expired access token + the sessionToken (refresh token)
+// + a proof that the request comes from the device the session belongs to.
 // We decode the expired JWT (no signature check) only to learn the role so we
-// can query the right model. The real trust comes from finding the matching
-// sessionToken record in the DB — that is what authorises the new access token.
+// can query the right model. The real trust comes from the matching active
+// session record in the DB and the device proof.
 router.post("/refresh", tenantMiddleware, async (req, res) => {
   try {
     const { sessionToken, expiredToken } = req.body;
@@ -954,42 +975,44 @@ router.post("/refresh", tenantMiddleware, async (req, res) => {
       return unauthorized(res, "Invalid token");
     }
 
-    const { id: userId, role } = decoded;
+    const role = normaliseRole(decoded.role);
+    const UserModel = getUserModelForRole(req.db, role);
+    if (!UserModel) return unauthorized(res, "Invalid token");
 
-    let UserModel;
-    switch (role) {
-      case "admin":   UserModel = getAdminModel(req.db);   break;
-      case "teacher": UserModel = getTeacherModel(req.db); break;
-      case "student": UserModel = getStudentModel(req.db); break;
-      default: return unauthorized(res, "Invalid token");
-    }
-
-    const user = await UserModel.findById(userId);
-    if (!user || !user.active) {
+    const user = await UserModel.findById(decoded.id);
+    if (!isAccountUsable(role, user)) {
       return unauthorized(res, "Account not found or inactive");
     }
 
     // Find the matching session — this is the real auth check
     const session = user.sessions.find(s => s.token === sessionToken && s.isActive);
     if (!session) {
-      return unauthorized(res, "Session expired. Please log in again.");
+      return res.status(401).json({ success: false, message: "Session expired. Please log in again.", code: "SESSION_REVOKED" });
     }
 
     // Check session hasn't been inactive longer than the sliding window
     const lastSeen = session.lastActivity || session.loginTime;
     const inactiveDays = (Date.now() - new Date(lastSeen).getTime()) / (1000 * 60 * 60 * 24);
     if (inactiveDays > SESSION_EXPIRY_DAYS) {
-      session.isActive = false;
+      await endSession(session, "expired");
       await user.save();
       return unauthorized(res, "Session expired. Please log in again.");
     }
 
-    // Issue a fresh access token
-    const newToken = jwt.sign(
-      { ...JWT_STANDARD_CLAIMS, id: user._id, email: user.email, role, centerId: req.center.slug },
-      getCenterSecret(req.center.slug),
-      { expiresIn: config.jwtExpiry }
-    );
+    // The renewal must come from the device this session was created on.
+    // A session token copied to another computer fails here and is ended.
+    const proof = verifyDeviceProof(session, req, sessionToken);
+    if (!proof.ok) {
+      logger.warn(`🔐 Session renewal from another device rejected (${role} ${user._id}, ${proof.reason})`);
+      await endSession(session, "device-mismatch");
+      await user.save();
+      notifySessionsRevoked(req.app.get("io"), req.center.slug, user._id, [session._id]);
+      return res.status(401).json({ success: false, message: "This session belongs to another device. Please log in again.", code: "SESSION_REVOKED" });
+    }
+
+    // Issue a fresh access token with up-to-date role claims
+    const extra    = await buildRoleClaims(role, user, req.db);
+    const newToken = signAccessToken({ role, user, centerSlug: req.center.slug, sid: String(session._id), extra });
 
     // Update session activity + store new JWT reference
     session.lastActivity = new Date();
@@ -1004,51 +1027,24 @@ router.post("/refresh", tenantMiddleware, async (req, res) => {
   }
 });
 
+// POST /auth/logout-session — sign out THIS device (body: its own sessionToken)
 router.post("/logout-session", tenantMiddleware, async (req, res) => {
   try {
-    const token = req.headers.authorization?.split(" ")[1];
     const { sessionToken } = req.body;
-
-    if (!token) {
-      return unauthorized(res, "No token provided");
-    }
-
     if (!sessionToken) {
       return badRequest(res, "Session token required");
     }
 
-    const decoded = jwt.verify(token, getCenterSecret(req.center.slug), JWT_VERIFY_OPTIONS);
-
-    const user = await getUserDocForRole(req.db, decoded.role, decoded.id);
-
-    if (!user) {
-      return notFound(res, "User not found");
-    }
+    const auth = await authFromBearer(req);
+    if (auth.error) return res.status(401).json({ success: false, message: auth.error, code: auth.code });
+    const { user } = auth;
 
     const session = user.sessions.find(s => s.token === sessionToken);
-    if (session) {
-      session.isActive = false;
+    if (!session) return notFound(res, "Session not found");
 
-      // Blacklist in-memory immediately (covers Redis outages), then Redis for cross-instance.
-      if (session.jwtToken) {
-        addToLocalBlacklist(session.jwtToken);
-        if (redisClient) {
-          try {
-            const decoded = jwt.decode(session.jwtToken);
-            const ttl = decoded?.exp ? decoded.exp - Math.floor(Date.now() / 1000) : 900;
-            if (ttl > 0) {
-              const sig = session.jwtToken.split('.')[2];
-              await redisClient.setex(`bl:${sig}`, ttl, '1');
-            }
-          } catch (_) {}
-        }
-      }
-
-      await user.save();
-      res.json({ success: true, message: "Session logged out successfully" });
-    } else {
-      notFound(res, "Session not found");
-    }
+    await endSession(session, "logout");
+    await user.save();
+    res.json({ success: true, message: "Session logged out successfully" });
 
   } catch (err) {
     logger.error("Logout session error:", { error: err?.message });
@@ -1056,48 +1052,48 @@ router.post("/logout-session", tenantMiddleware, async (req, res) => {
   }
 });
 
+// POST /auth/sessions/:id/revoke — sign out ONE other device remotely.
+// The device is disconnected at once, wipes the app's data and returns to the
+// login page; its notifications stop.
+router.post("/sessions/:id/revoke", tenantMiddleware, async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return badRequest(res, "Invalid device");
+
+    const auth = await authFromBearer(req);
+    if (auth.error) return res.status(401).json({ success: false, message: auth.error, code: auth.code });
+    const { user, decoded, token } = auth;
+
+    const session = user.sessions.find(s => String(s._id) === req.params.id && s.isActive);
+    if (!session) return notFound(res, "Device not found or already signed out");
+
+    const current = currentSessionOf(user, decoded, token);
+    if (current && String(current._id) === String(session._id)) {
+      return badRequest(res, "Use Log out to sign out of this device");
+    }
+
+    await endSession(session, "remote");
+    await user.save();
+    notifySessionsRevoked(req.app.get("io"), req.center.slug, user._id, [session._id]);
+
+    res.json({ success: true, message: "Device signed out" });
+  } catch (err) {
+    logger.error("Revoke session error:", { error: err?.message });
+    serverError(res);
+  }
+});
+
+// POST /auth/logout-all-devices — sign out every device except this one
 router.post("/logout-all-devices", tenantMiddleware, async (req, res) => {
   try {
-    const token = req.headers.authorization?.split(" ")[1];
+    const auth = await authFromBearer(req);
+    if (auth.error) return res.status(401).json({ success: false, message: auth.error, code: auth.code });
+    const { user, decoded, token } = auth;
+    const current = currentSessionOf(user, decoded, token);
 
-    if (!token) {
-      return unauthorized(res, "No token provided");
-    }
-
-    const decoded = jwt.verify(token, getCenterSecret(req.center.slug), JWT_VERIFY_OPTIONS);
-
-    const user = await getUserDocForRole(req.db, decoded.role, decoded.id);
-
-    if (!user) {
-      return notFound(res, "User not found");
-    }
-
-    // Blacklist all OTHER sessions — in-memory immediately, then Redis for cross-instance.
-    const otherSessions = user.sessions.filter(s => s.jwtToken && s.jwtToken !== token && s.isActive);
-    otherSessions.forEach(s => addToLocalBlacklist(s.jwtToken));
-    if (redisClient) {
-      await Promise.allSettled(
-        otherSessions.map(async (s) => {
-          try {
-            const decoded = jwt.decode(s.jwtToken);
-            const ttl = decoded?.exp ? decoded.exp - Math.floor(Date.now() / 1000) : 900;
-            if (ttl > 0) {
-              const sig = s.jwtToken.split('.')[2];
-              await redisClient.setex(`bl:${sig}`, ttl, '1');
-            }
-          } catch (_) {}
-        })
-      );
-    }
-
-    user.sessions = user.sessions.map(session => {
-      if (session.jwtToken !== token) {
-        session.isActive = false;
-      }
-      return session;
-    });
-
+    const others = user.sessions.filter(s => s.isActive && (!current || String(s._id) !== String(current._id)));
+    for (const s of others) await endSession(s, "all-devices");
     await user.save();
+    notifySessionsRevoked(req.app.get("io"), req.center.slug, user._id, others.map(s => s._id));
 
     res.json({ success: true, message: "Logged out from all other devices" });
 

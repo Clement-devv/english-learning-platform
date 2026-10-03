@@ -4,6 +4,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, Search, Globe, X, Repeat, Clock, Loader } from "lucide-react";
 import api from "../../../api";
+import { useOnDataChanged } from "../../../hooks/useLiveData";
 import { tzAbbr, tzCity } from "../../../utils/timezone";
 import WeekCalendar, { Legend } from "../../../components/schedule/WeekCalendar";
 import ManagedBadge from "../../../components/ManagedBadge";
@@ -128,6 +129,8 @@ export default function TeacherScheduleTab({ teachers = [], isDarkMode }) {
     setSelected(t);
   };
 
+  const [reloadKey, setReloadKey] = useState(0);
+  useOnDataChanged(["schedule", "bookings"], () => setReloadKey(k => k + 1)); // live
   useEffect(() => {
     if (!selected?._id) return;
     let stale = false;
@@ -137,7 +140,7 @@ export default function TeacherScheduleTab({ teachers = [], isDarkMode }) {
       .catch(() => {})
       .finally(() => { if (!stale) setLoading(false); });
     return () => { stale = true; };
-  }, [selected, weekStart]);
+  }, [selected, weekStart, reloadKey]);
 
   const items = useMemo(() => (cal.blocks || []).map(b => ({
     ...b,

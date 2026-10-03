@@ -14,7 +14,8 @@ import { verifyToken, verifyAdmin, isTokenBlacklisted } from '../middleware/auth
 import { loginLimiter, passwordResetLimiter } from '../middleware/rateLimiter.js';
 import { config, JWT_STANDARD_CLAIMS, JWT_VERIFY_OPTIONS }  from '../config/config.js';
 import { getCenterSecret } from '../utils/jwtUtils.js';
-import { createSession, cleanExpiredSessions, pruneSessionsToLimit } from '../utils/sessionManager.js';
+import { startSession, alertNewDevice, endSessionsAfterPasswordChange, notifySessionsRevoked } from '../utils/sessionManager.js';
+import { signAccessToken } from '../utils/sessionClaims.js';
 import { validatePasswordStrength }     from '../utils/passwordUtils.js';
 import { sendParentInviteEmail }        from '../utils/emailService.js';
 import logger from '../utils/logger.js';
@@ -76,18 +77,11 @@ router.post('/login', tenantMiddleware, loginLimiter, loginRules, validate, asyn
     const valid = await bcrypt.compare(password, parent.password);
     if (!valid) return res.status(401).json({ message: 'Invalid email or password' });
 
-    const token = jwt.sign(
-      { ...JWT_STANDARD_CLAIMS, id: parent._id, email: parent.email, role: 'parent', centerId: req.center.slug },
-      getCenterSecret(req.center.slug),
-      { expiresIn: config.jwtExpiry }
-    );
-
-    const session = createSession(req, token);
-    parent.sessions = cleanExpiredSessions(parent.sessions || []);
-    parent.sessions.push(session);
-    parent.sessions = pruneSessionsToLimit(parent.sessions);
+    const { token, session, isNewDevice } = startSession(req, parent, (sid) =>
+      signAccessToken({ role: 'parent', user: parent, centerSlug: req.center.slug, sid }));
     parent.lastLogin = new Date();
     await parent.save();
+    alertNewDevice({ req, user: parent, role: "parent", session, isNewDevice });
 
     res.json({
       success: true, token, sessionToken: session.token,
@@ -222,7 +216,10 @@ router.post('/reset-password/:token', tenantMiddleware, passwordResetLimiter, re
     parent.resetPasswordToken   = undefined;
     parent.resetPasswordExpires = undefined;
     parent.resetPasswordCenter  = undefined;
+    // Password was reset from an email link — sign out every device
+    const endedSessions = await endSessionsAfterPasswordChange(parent, req);
     await parent.save();
+    notifySessionsRevoked(req.app.get('io'), req.center.slug, parent._id, endedSessions);
 
     res.json({ success: true, message: 'Password reset successfully. You can now log in.' });
   } catch (err) {

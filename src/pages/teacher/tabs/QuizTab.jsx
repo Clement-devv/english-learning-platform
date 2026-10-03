@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import api from "../../../api";
+import { useOnDataChanged } from "../../../hooks/useLiveData";
 import {
   Plus, Trash2, ChevronDown, ChevronUp, RefreshCw,
   Clock, CheckCircle2, BookOpen, Send, Shuffle,
@@ -361,12 +362,16 @@ export default function QuizTab({ teacherInfo, students, isDarkMode }) {
   const [reloadKey, setReloadKey] = useState(0);
   const changeFilter = (f) => { setFilter(f); setPage(1); };
   const fetchQuizzes = () => setReloadKey(k => k + 1);
+  // Live: a student submits / attempts → this page refreshes quietly (no spinner)
+  const quietRef = useRef(false);
+  useOnDataChanged(["quizzes"], () => { quietRef.current = true; fetchQuizzes(); });
 
   useEffect(() => {
     let stale = false;
     (async () => {
       try {
-        setLoading(true);
+        if (!quietRef.current) setLoading(true);
+        quietRef.current = false;
         const { data } = await api.get("/quiz/my", { params: { status: filter === "all" ? undefined : filter, page } });
         if (stale) return;
         setQuizzes(data.quizzes || []);

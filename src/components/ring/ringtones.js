@@ -5,18 +5,76 @@
 // All tones work entirely in-browser (no audio files required) via the
 // Web Audio API, so they play even when no microphone permission is granted.
 
+// ── Shared audio context ─────────────────────────────────────────────────────
+// Browsers block audio until the user has clicked or typed on the page, and
+// creating an AudioContext before that prints "The AudioContext was not
+// allowed to start" in the console. So we keep ONE context for the whole app,
+// create it only after a user gesture, and reuse it for every ring/preview.
+
+let sharedCtx = null;
+const gestureWaiters = new Set();
+
+function userHasInteracted() {
+  // userActivation is supported in all current browsers; fall back to
+  // "we already unlocked a context" where it isn't.
+  if (typeof navigator !== "undefined" && navigator.userActivation) return navigator.userActivation.hasBeenActive;
+  return !!sharedCtx;
+}
+
+function getCtx() {
+  if (sharedCtx && sharedCtx.state !== "closed") return sharedCtx;
+  try {
+    sharedCtx = new (window.AudioContext || window.webkitAudioContext)();
+  } catch {
+    sharedCtx = null; // Web Audio not supported
+  }
+  return sharedCtx;
+}
+
+if (typeof window !== "undefined") {
+  const unlock = () => {
+    // Not every event counts as a user gesture — Ctrl/Shift/Alt/Esc keys and
+    // touch-start don't. Touching audio then would trigger the very warning
+    // we're avoiding, so wait for one the browser actually accepts.
+    if (navigator.userActivation && !navigator.userActivation.hasBeenActive) return;
+    const ctx = getCtx();
+    if (ctx?.state === "suspended") ctx.resume().catch(() => {});
+    gestureWaiters.forEach(fn => fn());
+    gestureWaiters.clear();
+  };
+  // Keep listening (cheap) so a context suspended by the OS is resumed again
+  for (const type of ["pointerdown", "pointerup", "keydown", "touchend", "click"]) {
+    window.addEventListener(type, unlock, true);
+  }
+}
+
+/** Run fn with a ready AudioContext — now if allowed, else on the first gesture. */
+function withAudio(fn) {
+  if (userHasInteracted()) {
+    const ctx = getCtx();
+    if (!ctx) return () => {};
+    ctx.resume().catch(() => {});
+    fn(ctx);
+    return () => {};
+  }
+  const waiter = () => { const ctx = getCtx(); if (ctx) fn(ctx); };
+  gestureWaiters.add(waiter);
+  return () => gestureWaiters.delete(waiter); // cancel if stopped before a gesture
+}
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 /**
  * Schedule a single sine-wave note on the given AudioContext.
  * Applies a fast attack and exponential decay so it sounds like a chime.
+ * `dest` is the tone's own output node, so stop() can silence it at once.
  */
-function note(ctx, freq, startTime, duration, volume = 0.28) {
+function note(ctx, freq, startTime, duration, volume = 0.28, dest = ctx.destination) {
   const osc  = ctx.createOscillator();
   const gain = ctx.createGain();
   osc.type = "sine";
   osc.connect(gain);
-  gain.connect(ctx.destination);
+  gain.connect(dest);
   osc.frequency.setValueAtTime(freq, startTime);
   gain.gain.setValueAtTime(0, startTime);
   gain.gain.linearRampToValueAtTime(volume, startTime + 0.02);
@@ -27,40 +85,35 @@ function note(ctx, freq, startTime, duration, volume = 0.28) {
 
 /**
  * Create a looping ringtone.
- * patternFn(ctx, currentTime) — schedules audio events for one repetition.
+ * patternFn(ctx, currentTime, out) — schedules audio events for one repetition
+ *   into `out` (this tone's output node).
  * repeatMs — how long (ms) to wait before calling patternFn again.
  * Returns { stop }.
  */
 function loop(patternFn, repeatMs) {
   let stopped = false;
-  let ctx;
-  try {
-    ctx = new (window.AudioContext || window.webkitAudioContext)();
-  } catch {
-    return { stop: () => {} }; // Web Audio not supported — fail silently
-  }
+  let out = null;
+  let timer = null;
 
-  function tick() {
-    if (stopped || !ctx) return;
-    patternFn(ctx, ctx.currentTime);
-    setTimeout(tick, repeatMs);
-  }
-
-  // Chrome suspends new AudioContexts until a user gesture has occurred on the
-  // page (autoplay policy). Calling resume() — which only needs a *prior* gesture,
-  // not an immediate one — unblocks the context so the ringtone plays on the first
-  // incoming call even though the event arrives via a socket (not a click).
-  ctx.resume().then(() => {
-    if (!stopped) tick();
-  }).catch(() => {
-    // Very old browsers where resume() isn't a Promise — try directly anyway
-    if (!stopped) tick();
+  const cancelWait = withAudio((ctx) => {
+    if (stopped) return;
+    out = ctx.createGain();
+    out.connect(ctx.destination);
+    const tick = () => {
+      if (stopped) return;
+      patternFn(ctx, ctx.currentTime, out);
+      timer = setTimeout(tick, repeatMs);
+    };
+    tick();
   });
 
   return {
     stop() {
       stopped = true;
-      try { ctx?.close(); } catch { /* ignore */ }
+      cancelWait();
+      clearTimeout(timer);
+      // Disconnecting the output silences notes already scheduled
+      try { out?.disconnect(); } catch { /* ignore */ }
     },
   };
 }
@@ -72,28 +125,28 @@ export const RINGTONES = [
     id:    "chime",
     label: "Triple Chime",
     emoji: "🎵",
-    make:  () => loop((ctx, t) => {
-      note(ctx, 523, t,        0.18);       // C5
-      note(ctx, 659, t + 0.2,  0.18);       // E5
-      note(ctx, 784, t + 0.4,  0.18);       // G5
+    make:  () => loop((ctx, t, out) => {
+      note(ctx, 523, t,        0.18, 0.28, out); // C5
+      note(ctx, 659, t + 0.2,  0.18, 0.28, out); // E5
+      note(ctx, 784, t + 0.4,  0.18, 0.28, out); // G5
     }, 1800),
   },
   {
     id:    "pulse",
     label: "Pulse",
     emoji: "📳",
-    make:  () => loop((ctx, t) => {
-      note(ctx, 880, t,        0.07, 0.22); // three quick hi-beeps
-      note(ctx, 880, t + 0.12, 0.07, 0.22);
-      note(ctx, 880, t + 0.24, 0.07, 0.22);
+    make:  () => loop((ctx, t, out) => {
+      note(ctx, 880, t,        0.07, 0.22, out); // three quick hi-beeps
+      note(ctx, 880, t + 0.12, 0.07, 0.22, out);
+      note(ctx, 880, t + 0.24, 0.07, 0.22, out);
     }, 1300),
   },
   {
     id:    "bell",
     label: "Bell",
     emoji: "🔔",
-    make:  () => loop((ctx, t) => {
-      note(ctx, 440, t, 0.9, 0.22);         // single resonant low bell
+    make:  () => loop((ctx, t, out) => {
+      note(ctx, 440, t, 0.9, 0.22, out);         // single resonant low bell
     }, 2800),
   },
   {
@@ -101,12 +154,12 @@ export const RINGTONES = [
     label: "Classic",
     emoji: "☎️",
     // Traditional landline ring: 480 Hz + 425 Hz simultaneously
-    make:  () => loop((ctx, t) => {
+    make:  () => loop((ctx, t, out) => {
       [480, 425].forEach(freq => {
         const osc  = ctx.createOscillator();
         const gain = ctx.createGain();
         osc.connect(gain);
-        gain.connect(ctx.destination);
+        gain.connect(out);
         osc.frequency.value = freq;
         gain.gain.setValueAtTime(0.15, t);
         gain.gain.setValueAtTime(0.15, t + 0.9);
@@ -120,11 +173,11 @@ export const RINGTONES = [
     id:    "marimba",
     label: "Marimba",
     emoji: "🎶",
-    make:  () => loop((ctx, t) => {
-      note(ctx, 784, t,        0.22, 0.26); // G5
-      note(ctx, 659, t + 0.2,  0.18, 0.22); // E5
-      note(ctx, 523, t + 0.37, 0.18, 0.20); // C5
-      note(ctx, 659, t + 0.52, 0.25, 0.24); // E5
+    make:  () => loop((ctx, t, out) => {
+      note(ctx, 784, t,        0.22, 0.26, out); // G5
+      note(ctx, 659, t + 0.2,  0.18, 0.22, out); // E5
+      note(ctx, 523, t + 0.37, 0.18, 0.20, out); // C5
+      note(ctx, 659, t + 0.52, 0.25, 0.24, out); // E5
     }, 2100),
   },
 ];
@@ -151,17 +204,10 @@ export function makeCustomRingtone(arrayBuffer) {
 
   let stopped    = false;
   let sourceNode = null;
-  let ctx;
 
-  try {
-    ctx = new (window.AudioContext || window.webkitAudioContext)();
-  } catch {
-    return { stop: () => {} };
-  }
-
-  // Resume the context first (handles Chrome's autoplay policy), then decode.
+  // Uses the shared context once the page is allowed to play audio.
   // decodeAudioData is async — use .slice(0) so the original buffer isn't detached.
-  const startPlayback = () => {
+  const cancelWait = withAudio((ctx) => {
     if (stopped) return;
     ctx.decodeAudioData(arrayBuffer.slice(0), (decoded) => {
       if (stopped) return;
@@ -174,15 +220,14 @@ export function makeCustomRingtone(arrayBuffer) {
     }, () => {
       // Decode failed (unsupported format, corrupted file, etc.) — fail silently
     });
-  };
-
-  ctx.resume().then(startPlayback).catch(startPlayback);
+  });
 
   return {
     stop() {
       stopped = true;
-      try { sourceNode?.stop(); } catch { /* already stopped */ }
-      try { ctx?.close();       } catch { /* ignore */         }
+      cancelWait();
+      try { sourceNode?.stop(); }       catch { /* already stopped */ }
+      try { sourceNode?.disconnect(); } catch { /* ignore */ }
     },
   };
 }

@@ -9,6 +9,9 @@ import {
   Bell, LogOut, Settings, Star, ChevronRight, Shield, KeyRound,
   Sun, Moon, Gift, Video, Brain, Flame, CheckSquare, Clock,
 } from "lucide-react";
+import { Award } from "lucide-react";
+import LanguageSwitcher from "../../../../components/LanguageSwitcher";
+import LeaderboardTab   from "../../tabs/LeaderboardTab";
 import {
   PieChart, Pie, Cell,
   BarChart, Bar, LineChart, Line,
@@ -19,6 +22,7 @@ import MessagesTab from "../../../../components/chat/MessagesTab";
 import ClassConfirmation from "../../../../components/student/ClassConfirmation";
 import StudentCompletedTab from "../../tabs/StudentCompletedTab";
 import StudentScheduleTab  from "../../tabs/StudentScheduleTab";
+import BookingCalendarTab  from "../../tabs/BookingCalendarTab";
 import StudentHomeworkTab  from "../../tabs/HomeworkTab";
 import StudentQuizTab      from "../../tabs/QuizTab";
 import PronunciationTab    from "../../tabs/PronunciationTab";
@@ -36,6 +40,7 @@ import SettingsModal       from "../../../../components/SettingsModal";
 import { useBranding }     from "../../../../context/BrandingContext";
 import { useDashboardData, BADGE_DEFINITIONS } from "../useDashboardData";
 import { useRing }                              from "../../../../context/RingContext";
+import DashboardAlertsBar from "../../../../components/DashboardAlertsBar";
 
 // ── Palette ────────────────────────────────────────────────────────────────────
 const LIGHT = {
@@ -108,6 +113,7 @@ const NAV_GROUPS = [
       { key:"messages",          Icon:MessageSquare, label:"Messages"  },
       { key:"completed-classes", Icon:CheckSquare,   label:"Completed" },
       { key:"schedule",          Icon:CalendarDays,  label:"Schedule"  },
+      { key:"book-class",        Icon:CalendarDays,  label:"Book a Class" },
     ],
   },
   {
@@ -123,6 +129,7 @@ const NAV_GROUPS = [
       { key:"recordings", Icon:Video,         label:"Recordings" },
       { key:"reviews",    Icon:Star,          label:"Reviews"    },
       { key:"referral",   Icon:Gift,          label:"Invite"     },
+      { key:"leaderboard", Icon:Award,        label:"Leaderboard" },
     ],
   },
 ];
@@ -132,7 +139,7 @@ const PAGE_TITLES = {
   flashcards:"Flashcards", pronunciation:"Speaking", conversation:"AI Chat",
   messages:"Messages", "completed-classes":"Completed Classes",
   schedule:"Schedule", charts:"Progress", badges:"Badges",
-  recordings:"Recordings", reviews:"Reviews", referral:"Invite Friends",
+  recordings:"Recordings", reviews:"Reviews", referral:"Invite Friends", leaderboard:"Leaderboard",
 };
 
 // ── Floating island SVG card ───────────────────────────────────────────────────
@@ -498,6 +505,7 @@ export default function CRMShell() {
               <span style={{ position:"absolute", top:4, right:4, width:8, height:8, background:"#ef4444", borderRadius:"50%" }}/>
             )}
           </button>
+          <LanguageSwitcher compact col={{ border: P.border, body: P.text }} />
           <button className="ia-btn" onClick={()=>d.notificationsEnabled?d.disableNotifications():d.enableNotifications()}
             style={{ width:36, height:36, borderRadius:10, border:`1px solid ${P.border}`, background:d.notificationsEnabled?`${ACC.green}20`:P.card, cursor:"pointer", fontSize:17, display:"flex", alignItems:"center", justifyContent:"center" }}>
             🔔
@@ -506,6 +514,8 @@ export default function CRMShell() {
 
         {/* Scroll area */}
         <main style={{ flex:1, overflowY:"auto", padding: isMobile ? "16px 14px 80px" : 24 }}>
+          {/* Missed calls & new messages while away */}
+          <DashboardAlertsBar isDark={d.isDarkMode} onOpenMessages={() => d.setActiveTab("messages")} />
 
           {/* Pending confirmation banners */}
           {d.pendingConfirmations.map(conf => (
@@ -650,9 +660,11 @@ export default function CRMShell() {
           {d.activeTab==="messages"          && <div style={{background:P.card,border:`1px solid ${P.border}`,borderRadius:20,overflow:"hidden"}}><MessagesTab userRole="student" onUnreadCount={d.setUnreadMessages}/></div>}
           {d.activeTab==="completed-classes" && <div style={{background:P.card,border:`1px solid ${P.border}`,borderRadius:20,padding:24}}><h2 style={{margin:"0 0 20px",fontSize:20,fontWeight:900,color:P.text}}>✅ Completed Classes</h2><StudentCompletedTab studentId={d.student.id} isDarkMode={d.isDarkMode}/></div>}
           {d.activeTab==="schedule"          && <div style={{background:P.card,border:`1px solid ${P.border}`,borderRadius:20,padding:24}}><StudentScheduleTab studentId={d.student.id} isDarkMode={d.isDarkMode}/></div>}
+          {d.activeTab==="book-class"        && <div style={{background:P.card,border:`1px solid ${P.border}`,borderRadius:20,padding:24}}><BookingCalendarTab isDarkMode={d.isDarkMode} studentInfo={d.student}/></div>}
           {d.activeTab==="recordings"        && <div style={{background:P.card,border:`1px solid ${P.border}`,borderRadius:20,padding:24}}><RecordingsTab isDarkMode={d.isDarkMode}/></div>}
           {d.activeTab==="reviews"           && <ReviewsTab isDarkMode={d.isDarkMode}/>}
           {d.activeTab==="referral"          && <ReferralTab isDarkMode={d.isDarkMode}/>}
+          {d.activeTab==="leaderboard"       && <LeaderboardTab isDarkMode={d.isDarkMode}/>}
           {d.activeTab==="badges"            && <BadgesTab badges={d.badges} progress={d.progress} completedClasses={d.completedClasses} shareAchievement={d.shareAchievement} P={P}/>}
 
           {/* ═══ CHARTS ═══ */}

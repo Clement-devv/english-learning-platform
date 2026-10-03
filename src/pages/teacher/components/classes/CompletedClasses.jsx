@@ -18,6 +18,7 @@ import {
   Link2,
 } from "lucide-react";
 import api from "../../../../api";
+import { useOnDataChanged } from "../../../../hooks/useLiveData";
 import DisputePulse, { DISPUTE_GLOW_CLASS, AWAITING_GLOW_CLASS } from "../../../../components/DisputePulse";
 import LogClassModal from "./LogClassModal";
 
@@ -32,6 +33,7 @@ export default function CompletedClassesTab({ teacherInfo, isDarkMode, students 
     api.get("/offline-classes/mine").then(({ data }) => setLogged(data.classes || [])).catch(() => {});
   }, []);
   React.useEffect(() => { loadLogged(); }, [loadLogged]);
+  useOnDataChanged(["offline-classes", "bookings"], loadLogged); // live: admin approves / parent answers
   const awaiting   = logged.filter(b => b.offline?.approval?.status !== "rejected");
   const notApproved = logged.filter(b => b.offline?.approval?.status === "rejected");
   const myTZ   = getUserTimezone();

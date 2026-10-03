@@ -11,6 +11,27 @@ export default defineConfig({
     dedupe: ['react', 'react-dom', 'react-dom/client'],
   },
 
+  // Dev server: pre-bundle these at startup. Vite's import scan misses them
+  // (they're only reached through lazily loaded tabs), so it used to find them
+  // mid-session, re-bundle, and serve them with a NEW React copy while the page
+  // still ran the old one → "Cannot read properties of null (reading 'useState')"
+  // in the admin Overview (AnimatedStatCard / AnimatedButton use framer-motion).
+  //
+  // So pre-bundle EVERY package the app imports — not just the two that bit us
+  // first. If you add a new package used only inside a lazy tab, add it here too,
+  // or restart the dev server with `npx vite --force` after installing it.
+  optimizeDeps: {
+    include: [
+      'react', 'react-dom/client', 'react-dom/server', 'react-router-dom',
+      '@tanstack/react-query', 'axios', 'socket.io-client', 'lucide-react',
+      'i18next', 'react-i18next', '@sentry/react',
+      'framer-motion', 'recharts', 'react-confetti', 'emoji-picker-react',
+      'three', '@react-three/fiber', '@react-three/drei',
+      'jspdf', 'jspdf-autotable', 'pdfjs-dist',
+      'agora-rtc-sdk-ng', 'agora-extension-virtual-background',
+    ],
+  },
+
   test: {
     globals: true,
     environment: 'jsdom',

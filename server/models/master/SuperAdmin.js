@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { hideSecrets } from '../../schemas/shared/hideSecrets.js';
 import bcrypt from 'bcryptjs';
 
 const sessionSchema = new mongoose.Schema({
@@ -24,6 +25,20 @@ const superAdminSchema = new mongoose.Schema({
   lastLogin: Date,
   twoFactorEnabled: { type: Boolean, default: false },
   twoFactorSecret:  String,
+  // Email sign-in code (second login step). Only the bcrypt hash is stored.
+  loginCode: {
+    type: {
+      codeHash:  String,
+      expiresAt: Date,
+      sentAt:    Date,
+      attempts:  { type: Number, default: 0 },
+    },
+    select: false,
+    default: undefined,
+  },
 }, { timestamps: true });
+
+// Never serialize password hash or session tokens
+hideSecrets(superAdminSchema);
 
 export default mongoose.model('SuperAdmin', superAdminSchema);

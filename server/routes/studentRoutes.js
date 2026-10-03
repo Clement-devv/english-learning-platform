@@ -1,6 +1,7 @@
 // server/routes/studentRoutes.js
 import express from "express";
 import bcrypt  from "bcryptjs";
+import mongoose from "mongoose";
 import crypto  from "crypto";
 import {
   sendPasswordResetEmail,
@@ -22,13 +23,16 @@ import { studentSchema }  from "../schemas/studentSchema.js";
 import { teacherSchema }  from "../schemas/teacherSchema.js";
 import { subAdminSchema } from "../schemas/subAdminSchema.js";
 import { paymentSchema }  from "../schemas/paymentSchema.js";
+import { assignmentSchema } from "../schemas/assignmentSchema.js";
 import { parsePagination, DIRECTORY_MAX } from "../utils/pagination.js";
 import logger from "../utils/logger.js";
+import { sharedSnapshot } from "../utils/sharedSnapshot.js";
 import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
 import { assignStudentId, generateStudentId } from '../utils/studentIdGenerator.js';
 import { generateSecurePassword } from '../utils/passwordUtils.js';
 import { makeManagedEmail, isManagedEmail } from '../utils/managedStudent.js';
 import { planBlocksStudentMode } from '../utils/planFeatures.js';
+import { endSessionsAfterPasswordChange, notifySessionsRevoked } from '../utils/sessionManager.js';
 
 const router = express.Router();
 router.use(tenantMiddleware);
@@ -37,6 +41,7 @@ const getStudent  = (db) => db.models.Student  || db.model("Student",  studentSc
 const getTeacher  = (db) => db.models.Teacher  || db.model("Teacher",  teacherSchema);
 const getSubAdmin = (db) => db.models.SubAdmin || db.model("SubAdmin", subAdminSchema);
 const getPayment  = (db) => db.models.Payment  || db.model("Payment",  paymentSchema);
+const getAssignment = (db) => db.models.Assignment || db.model("Assignment", assignmentSchema);
 
 // Returns an error message if the center's student seat limit is reached (-1 = unlimited).
 // Managed students count toward the limit — they receive classes like any student.
@@ -65,7 +70,8 @@ const findEmailConflict = async (db, email) => {
 const MANAGED_NO_LOGIN_MSG = "Managed students have no login — this action is not available.";
 
 // ─── GET all students ─────────────────────────────────────────────────────────
-router.get("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
+// Same list for every admin/teacher → one shared snapshot per center (utils/sharedSnapshot.js)
+router.get("/", verifyToken, verifyAdminOrTeacher, sharedSnapshot("students-directory"), async (req, res) => {
   try {
     // Directory list: screens filter + page it locally, so allow the whole center
     // (default stays 50 for callers that don't ask)
@@ -117,8 +123,14 @@ router.get("/streak", verifyToken, async (req, res) => {
 // ─── GET single student ───────────────────────────────────────────────────────
 router.get("/:id", verifyToken, async (req, res) => {
   try {
-    if (req.user.role === "student" && req.user.id !== req.params.id)
-      return forbidden(res, "You can only view your own data");
+    // Allow-list: admin, the student themself, or a teacher assigned to them
+    const { role, id: userId } = req.user;
+    const allowed =
+      role === "admin" ||
+      (role === "student" && userId === req.params.id) ||
+      (role === "teacher" && mongoose.isValidObjectId(req.params.id) &&
+        await getAssignment(req.db).exists({ teacherId: userId, studentId: req.params.id }));
+    if (!allowed) return forbidden(res, "You can only view your own data");
     const student = await getStudent(req.db)
       .findById(req.params.id)
       .select("studentId firstName lastName email active classCredits age lastPaymentDate showTempPassword status twoFactorEnabled createdAt isManaged")
@@ -365,6 +377,9 @@ router.post("/setup-account", strictLimiter, async (req, res) => {
   try {
     const { token, password } = req.body;
     if (!token || !password) return badRequest(res, "Token and password are required");
+    // Strings only — an object like { "$ne": null } would match any pending invite
+    if (typeof token !== "string" || typeof password !== "string")
+      return badRequest(res, "Invalid request");
     if (password.length < 8) return badRequest(res, "Password must be at least 8 characters");
 
     const Student = getStudent(req.db);
@@ -446,6 +461,8 @@ router.post("/:id/resend-invite", verifyToken, verifyAdmin, strictLimiter, async
 // ─── PATCH timezone ───────────────────────────────────────────────────────────
 router.patch("/:id/timezone", verifyToken, async (req, res) => {
   try {
+    const isSelf = req.user.role === "student" && req.user.id === req.params.id;
+    if (req.user.role !== "admin" && !isSelf) return forbidden(res, "You can only update your own timezone");
     const { timezone } = req.body;
     if (!timezone || typeof timezone !== "string")
       return badRequest(res, "timezone required");
@@ -459,7 +476,8 @@ router.patch("/:id/timezone", verifyToken, async (req, res) => {
 });
 
 // ─── PUT update student ───────────────────────────────────────────────────────
-router.put("/:id", verifyToken, verifyAdminOrTeacher, async (req, res) => {
+// Admin only — this can change a student's email, credits and password.
+router.put("/:id", verifyToken, verifyAdmin, async (req, res) => {
   try {
     // isManaged is fixed at creation — never flipped through a generic update
     const { password, isManaged: _isManaged, ...updates } = req.body;
@@ -479,6 +497,12 @@ router.put("/:id", verifyToken, verifyAdminOrTeacher, async (req, res) => {
     if (!student) return notFound(res, "Student not found");
 
     if (password) {
+      // New password set by staff — sign the student out everywhere
+      const endedSessions = await endSessionsAfterPasswordChange(student, req);
+      if (endedSessions.length) {
+        await student.save();
+        notifySessionsRevoked(req.app.get("io"), req.center.slug, student._id, endedSessions);
+      }
       try { await sendPasswordResetEmail(student.email, `${student.firstName} ${student.lastName}`, password, "student", req.center?.centerName || "", req.center); }
       catch (e) { logger.error("Failed to send password reset email:", { error: e?.message }); }
     }
@@ -550,7 +574,9 @@ router.post("/:id/restore", verifyToken, verifyAdmin, async (req, res) => {
 });
 
 // ─── POST reset-password ──────────────────────────────────────────────────────
-router.post("/:id/reset-password", verifyToken, verifyAdminOrTeacher, strictLimiter, async (req, res) => {
+// Admin only — returns the new temporary password to the caller. Students reset
+// their own password via /auth/student/forgot-password (email link).
+router.post("/:id/reset-password", verifyToken, verifyAdmin, strictLimiter, async (req, res) => {
   try {
     const Student = getStudent(req.db);
     const student = await Student.findById(req.params.id);
@@ -561,7 +587,10 @@ router.post("/:id/reset-password", verifyToken, verifyAdminOrTeacher, strictLimi
     student.password       = await bcrypt.hash(newPass, config.bcryptRounds);
     student.showTempPassword   = true;
     student.lastPasswordChange = new Date();
+    // Temporary password issued by staff — sign the student out everywhere
+    const endedSessions = await endSessionsAfterPasswordChange(student, req);
     await student.save();
+    notifySessionsRevoked(req.app.get("io"), req.center.slug, student._id, endedSessions);
 
     try { await sendPasswordResetEmail(student.email, `${student.firstName} ${student.lastName}`, newPass, "student", req.center?.centerName || "", req.center); }
     catch (e) { logger.error("Failed to send password reset email:", { error: e?.message }); }
@@ -602,7 +631,9 @@ router.post("/:id/payment", verifyToken, verifyAdmin, async (req, res) => {
 // ─── GET payments for a student ───────────────────────────────────────────────
 router.get("/:id/payments", verifyToken, async (req, res) => {
   try {
-    if (req.user.role === "student" && req.user.id !== req.params.id)
+    // Allow-list: admin or the student themself (payment history is private)
+    const isSelf = req.user.role === "student" && req.user.id === req.params.id;
+    if (req.user.role !== "admin" && !isSelf)
       return forbidden(res, "You can only view your own payments");
     const payments = await getPayment(req.db).find({ studentId: req.params.id }).sort({ date: -1 });
     res.json(payments);

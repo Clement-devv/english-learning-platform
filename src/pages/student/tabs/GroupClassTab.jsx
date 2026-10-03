@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Users, Video, RefreshCw, Loader2, LogIn } from 'lucide-react';
 import api from '../../../api';
+import { useOnDataChanged } from '../../../hooks/useLiveData';
 import Classroom from '../../Classroom';
 import { formatDateInTZ, getUserTimezone, dualTime } from '../../../utils/timezone';
 
@@ -73,8 +74,8 @@ export default function GroupClassTab({ isDarkMode, studentInfo }) {
 
   const flash = (m) => { setMsg(m); setTimeout(() => setMsg(''), 4000); };
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (quiet) => {
+    if (quiet !== true) setLoading(true);
     try {
       const res = await api.get('/group-classes');
       const all = res.data.classes || [];
@@ -89,6 +90,7 @@ export default function GroupClassTab({ isDarkMode, studentInfo }) {
   }, [studentInfo?.id || studentInfo?._id]);
 
   useEffect(() => { load(); }, [load]);
+  useOnDataChanged(['group-classes'], () => load(true)); // live: seats, invites, status
 
   // Fetch own credit balance
   useEffect(() => {

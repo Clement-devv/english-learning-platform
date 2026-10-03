@@ -7,6 +7,7 @@ import {
   ChevronLeft, ChevronRight, RefreshCw, BookOpen,
 } from "lucide-react";
 import api from "../../../api";
+import { useOnDataChanged } from "../../../hooks/useLiveData";
 
 const fmtDateTime = (d) =>
   d
@@ -95,6 +96,7 @@ export default function StudentCompletedTab({ studentId, isDarkMode }) {
   useEffect(() => { setCurrentPage(1); }, [debouncedQ, startDate, endDate, tab]);
 
   const load = () => { setRefreshing(true); setReloadKey((k) => k + 1); };
+  useOnDataChanged(["classes", "bookings"], load); // live: a class completes / is approved
 
   useEffect(() => {
     if (!studentId) return;

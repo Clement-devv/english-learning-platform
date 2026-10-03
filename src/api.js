@@ -1,6 +1,8 @@
 import axios from "axios";
 import { getCachedCenter } from "./utils/branding";
 import { getAnalyticsUnlock, needsAnalyticsUnlock, ANALYTICS_UNLOCK_HEADER } from "./utils/analyticsPin";
+import { deviceLoginHeaders, signRenewal } from "./utils/deviceKey";
+import { wipeDeviceAndSignOut } from "./utils/deviceWipe";
 
 const _apiUrl = import.meta.env.VITE_API_URL;
 if (!_apiUrl && import.meta.env.PROD) {
@@ -23,31 +25,40 @@ const removeToken = (key) => {
   localStorage.removeItem(key); // wipe any legacy tokens from older app versions
 };
 
+// Every center role signs in with a short-lived token plus a device-bound
+// session token used to renew it.
+const SESSIONS = [
+  { role: "admin",     tokenKey: "adminToken",    sessionKey: "adminSessionToken",    infoKey: "adminInfo",    loginPath: "/admin/login" },
+  { role: "sub-admin", tokenKey: "subAdminToken", sessionKey: "subAdminSessionToken", infoKey: "subAdminInfo", loginPath: "/sub-admin/login" },
+  { role: "teacher",   tokenKey: "teacherToken",  sessionKey: "teacherSessionToken",  infoKey: "teacherInfo",  loginPath: "/teacher/login" },
+  { role: "student",   tokenKey: "studentToken",  sessionKey: "studentSessionToken",  infoKey: "studentInfo",  loginPath: "/student/login" },
+  { role: "parent",    tokenKey: "parentToken",   sessionKey: "parentSessionToken",   infoKey: "parentInfo",   loginPath: "/parent/login" },
+];
+
 // Detect which role is currently logged in and return all relevant keys.
 function getActiveSession() {
-  if (sessionStorage.getItem("adminInfo") && getToken("adminToken")) {
-    return { tokenKey: "adminToken", sessionKey: "adminSessionToken", infoKey: "adminInfo", loginPath: "/admin/login" };
-  }
-  if (sessionStorage.getItem("subAdminInfo") && getToken("subAdminToken")) {
-    // Sub-admins use a long-lived 7-day token with no refresh mechanism
-    return { tokenKey: "subAdminToken", sessionKey: null, infoKey: "subAdminInfo", loginPath: "/sub-admin/login" };
-  }
-  if (sessionStorage.getItem("teacherInfo") && getToken("teacherToken")) {
-    return { tokenKey: "teacherToken", sessionKey: "teacherSessionToken", infoKey: "teacherInfo", loginPath: "/teacher/login" };
-  }
-  if (sessionStorage.getItem("studentInfo") && getToken("studentToken")) {
-    return { tokenKey: "studentToken", sessionKey: "studentSessionToken", infoKey: "studentInfo", loginPath: "/student/login" };
-  }
-  if (sessionStorage.getItem("parentInfo") && getToken("parentToken")) {
-    return { tokenKey: "parentToken", sessionKey: null, infoKey: "parentInfo", loginPath: "/parent/login" };
-  }
-  // Fallback: whichever token exists
-  if (getToken("adminToken")) return { tokenKey: "adminToken", sessionKey: "adminSessionToken", infoKey: "adminInfo", loginPath: "/admin/login" };
-  if (getToken("subAdminToken")) return { tokenKey: "subAdminToken", sessionKey: null, infoKey: "subAdminInfo", loginPath: "/sub-admin/login" };
-  if (getToken("teacherToken")) return { tokenKey: "teacherToken", sessionKey: "teacherSessionToken", infoKey: "teacherInfo", loginPath: "/teacher/login" };
-  if (getToken("studentToken")) return { tokenKey: "studentToken", sessionKey: "studentSessionToken", infoKey: "studentInfo", loginPath: "/student/login" };
-  if (getToken("parentToken")) return { tokenKey: "parentToken", sessionKey: null, infoKey: "parentInfo", loginPath: "/parent/login" };
-  return null;
+  return SESSIONS.find(s => sessionStorage.getItem(s.infoKey) && getToken(s.tokenKey))
+      || SESSIONS.find(s => getToken(s.tokenKey)) // fallback: whichever token exists
+      || null;
+}
+
+// Login requests carry this browser's device key so the session is bound to it
+const LOGIN_URL_RE = /(\/auth\/(admin|teacher|student)\/login|\/auth\/verify-2fa-login|\/sub-admin-auth\/login|\/parents\/login)$/;
+
+// Which center the request is for. Priority:
+//   1. Super admin impersonation session (overrides everything)
+//   2. Dev-only env var (only active during `vite dev`, never in prod builds)
+//   3. Subdomain (mannie-english.clemify.com) — API calls go to clemify.com,
+//      so the server can't detect the center from Host
+//   4. Cached center slug (populated after first branding fetch)
+// In production with custom domains the server reads the Host header instead,
+// so we must NOT hardcode a slug that would override that routing.
+function resolveCenterSlug() {
+  const impersonationSlug = sessionStorage.getItem('impersonationCenterSlug');
+  const devSlug = import.meta.env.DEV ? (import.meta.env.VITE_CENTER_SLUG || null) : null;
+  const h = window.location.hostname;
+  const subdomainSlug = h.endsWith('.clemify.com') ? h.replace(/\.clemify\.com$/, '') : null;
+  return impersonationSlug || devSlug || subdomainSlug || getCachedCenter()?.slug || null;
 }
 
 // Add token + center slug to all requests automatically.
@@ -94,23 +105,13 @@ api.interceptors.request.use(
     }
 
     // Send x-center-slug header so tenantMiddleware can identify the center.
-    // Priority:
-    //   1. Super admin impersonation session (overrides everything)
-    //   2. Dev-only env var (only active during `vite dev`, never in prod builds)
-    //   3. Cached center slug (populated after first branding fetch)
-    // In production with custom domains the server reads the Host header instead,
-    // so we must NOT hardcode a slug that would override that routing.
-    const impersonationSlug = sessionStorage.getItem('impersonationCenterSlug');
-    const devSlug = import.meta.env.DEV ? (import.meta.env.VITE_CENTER_SLUG || null) : null;
-    // On subdomains (mannie-english.clemify.com), API calls go to clemify.com
-    // so the server can't detect the center from Host. Extract slug from subdomain.
-    const subdomainSlug = (() => {
-      const h = window.location.hostname;
-      if (h.endsWith('.clemify.com')) return h.replace(/\.clemify\.com$/, '');
-      return null;
-    })();
-    const slug = impersonationSlug || devSlug || subdomainSlug || getCachedCenter()?.slug;
+    const slug = resolveCenterSlug();
     if (slug) config.headers["x-center-slug"] = slug;
+
+    // Bind new login sessions to this browser's device key
+    if (config.method === "post" && LOGIN_URL_RE.test(config.url || "")) {
+      try { Object.assign(config.headers, await deviceLoginHeaders()); } catch { /* unbound session */ }
+    }
 
     // Admin analytics PIN: attach the session unlock token to analytics calls
     if (needsAnalyticsUnlock(config.url)) {
@@ -159,22 +160,34 @@ function processRefreshQueue(newToken, error) {
 async function attemptRefresh(session) {
   const expiredToken = getToken(session.tokenKey);
   const sessionToken = getToken(session.sessionKey);
-  const impersonationSlug = sessionStorage.getItem('impersonationCenterSlug');
-  const devSlug = import.meta.env.DEV ? (import.meta.env.VITE_CENTER_SLUG || null) : null;
-  const slug = impersonationSlug || devSlug || getCachedCenter()?.slug;
+  // Same center resolution as every other request — previously the subdomain
+  // was missing here, so refreshes failed on *.clemify.com
+  const slug = resolveCenterSlug();
 
   const headers = {};
   if (slug) headers["x-center-slug"] = slug;
 
-  const response = await axios.post(
-    `${BASE_URL}/auth/refresh`,
-    { sessionToken, expiredToken },
-    { headers }
-  );
+  // Prove the renewal comes from the device this session was created on
+  let deviceProof = null;
+  try { deviceProof = await signRenewal(sessionToken); } catch { /* unbound session */ }
 
-  const newToken = response.data.token;
-  sessionStorage.setItem(session.tokenKey, newToken);
-  return newToken;
+  try {
+    const response = await axios.post(
+      `${BASE_URL}/auth/refresh`,
+      { sessionToken, expiredToken, deviceProof },
+      { headers }
+    );
+    const newToken = response.data.token;
+    sessionStorage.setItem(session.tokenKey, newToken);
+    return newToken;
+  } catch (err) {
+    // Signed out from another device, or the session belongs to another
+    // device: erase this app's data here and go to the login page.
+    if (err?.response?.data?.code === "SESSION_REVOKED") {
+      wipeDeviceAndSignOut({ role: session.role, reason: "remote" });
+    }
+    throw err;
+  }
 }
 
 // Reactive fallback: handle any 401 that still slips through (clock skew, tab
@@ -215,6 +228,11 @@ api.interceptors.response.use(
           return api(error.config);
         } catch (_refreshError) {
           processRefreshQueue(null, _refreshError);
+          // Session ended from another device — attemptRefresh is already
+          // erasing this device's data and will redirect when done.
+          if (_refreshError?.response?.data?.code === "SESSION_REVOKED") {
+            return Promise.reject(error);
+          }
           // Refresh failed — clear storage and redirect to login
           removeToken(session.tokenKey);
           removeToken(session.sessionKey);
@@ -268,14 +286,22 @@ api.interceptors.response.use(
 
 // Exported so RingContext (and other non-HTTP clients) can silently refresh
 // the access token without duplicating the refresh logic.
+// Concurrent callers share one in-flight refresh.
+let externalRefresh = null;
 export async function refreshToken() {
   const session = getActiveSession();
   if (!session?.sessionKey || !getToken(session.sessionKey)) return null;
-  try {
-    return await attemptRefresh(session);
-  } catch {
-    return null;
+  if (!externalRefresh) {
+    externalRefresh = attemptRefresh(session)
+      .catch(() => null)
+      .finally(() => { externalRefresh = null; });
   }
+  return externalRefresh;
+}
+
+/** True when the JWT expires within thresholdMs (or can't be read). */
+export function tokenExpiresSoon(token, thresholdMs = 90_000) {
+  return !token || isTokenExpiringSoon(token, thresholdMs);
 }
 
 export default api;

@@ -1159,7 +1159,8 @@ export default function SuperAdminDashboard() {
       const data = await res.json();
       if (!data.success) throw new Error(data.message);
       const exp = Date.now() + 30 * 60 * 1000;
-      const url = `${window.location.origin}?imp_token=${encodeURIComponent(data.token)}&imp_center=${encodeURIComponent(center.slug)}&imp_name=${encodeURIComponent(center.centerName)}&imp_exp=${exp}`;
+      // Fragment (#), not query (?): never sent to the server, so the token stays out of logs
+      const url = `${window.location.origin}/#imp_token=${encodeURIComponent(data.token)}&imp_center=${encodeURIComponent(center.slug)}&imp_name=${encodeURIComponent(center.centerName)}&imp_exp=${exp}`;
       window.open(url, '_blank');
     } catch (err) {
       alert(err.message || 'Failed to start impersonation');

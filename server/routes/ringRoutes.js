@@ -13,6 +13,8 @@ import { teacherSchema } from "../schemas/teacherSchema.js";
 import { adminSchema } from "../schemas/adminSchema.js";
 import { bookingSchema } from "../schemas/bookingSchema.js";
 import { ringLogSchema } from "../schemas/ringLogSchema.js";
+import { subAdminSchema } from "../schemas/subAdminSchema.js";
+import { getScopedTeacherIds } from "./subAdminScopeRoutes.js";
 import logger from "../utils/logger.js";
 import { ok, badRequest, notFound, serverError } from "../utils/apiResponse.js";
 import { s3Enabled, uploadToS3, deleteFromS3, s3PublicUrl } from "../utils/s3.js";
@@ -41,6 +43,10 @@ const getTeacher = (db) => db.models.Teacher || db.model("Teacher", teacherSchem
 const getAdmin   = (db) => db.models.Admin   || db.model("Admin",   adminSchema);
 const getBooking = (db) => db.models.Booking || db.model("Booking", bookingSchema);
 const getRingLog = (db) => db.models.RingLog || db.model("RingLog", ringLogSchema);
+const getSubAdmin = (db) => db.models.SubAdmin || db.model("SubAdmin", subAdminSchema);
+
+// Sub-admin tokens carry role "sub-admin"; older client code sent "subAdmin".
+const isSubAdmin = (role) => role === "sub-admin" || role === "subAdmin";
 
 // Resolve the model + document for the current user by their role.
 async function getCurrentUserDoc(req) {
@@ -52,8 +58,11 @@ async function getCurrentUserDoc(req) {
   if (role === "teacher") {
     return { Model: getTeacher(req.db), doc: await getTeacher(req.db).findById(uid) };
   }
-  if (role === "admin" || role === "subAdmin") {
+  if (role === "admin") {
     return { Model: getAdmin(req.db), doc: await getAdmin(req.db).findById(uid) };
+  }
+  if (isSubAdmin(role)) {
+    return { Model: getSubAdmin(req.db), doc: await getSubAdmin(req.db).findById(uid) };
   }
   return { Model: null, doc: null };
 }
@@ -62,7 +71,8 @@ async function getCurrentUserDoc(req) {
 async function getUserDoc(db, role, userId) {
   if (role === "student") return getStudent(db).findById(userId).select("firstName lastName ringEnabled").lean();
   if (role === "teacher") return getTeacher(db).findById(userId).select("firstName lastName ringEnabled").lean();
-  if (role === "admin" || role === "subAdmin") return getAdmin(db).findById(userId).select("firstName lastName ringEnabled").lean();
+  if (role === "admin")   return getAdmin(db).findById(userId).select("firstName lastName ringEnabled").lean();
+  if (isSubAdmin(role))   return getSubAdmin(db).findById(userId).select("firstName lastName ringEnabled").lean();
   return null;
 }
 
@@ -109,8 +119,8 @@ router.put("/preference", verifyToken, async (req, res) => {
 router.get("/user/:userId", verifyToken, validateObjectId("userId"), async (req, res) => {
   try {
     const { role } = req.query;
-    if (!["student", "teacher", "admin", "subAdmin"].includes(role)) {
-      return badRequest(res, "role query param must be student, teacher, admin, or subAdmin");
+    if (!["student", "teacher", "admin", "subAdmin", "sub-admin"].includes(role)) {
+      return badRequest(res, "role query param must be student, teacher, admin, or sub-admin");
     }
 
     const target = await getUserDoc(req.db, role, req.params.userId);
@@ -167,6 +177,40 @@ router.get("/missed-calls", verifyToken, async (req, res) => {
   } catch (err) {
     logger.error("ring/missed-calls GET error:", { error: err?.message });
     serverError(res, "Failed to fetch missed calls");
+  }
+});
+
+// ── GET /ring/alerts-seen — when this person last cleared their alerts ───────
+// Server time on purpose: missed-call and message timestamps are server
+// times too, so a wrong computer clock can't make cleared alerts reappear.
+router.get("/alerts-seen", verifyToken, async (req, res) => {
+  try {
+    const { doc } = await getCurrentUserDoc(req);
+    if (!doc) return notFound(res, "User not found");
+    ok(res, {
+      calls:     doc.alertsSeenAt?.calls    || null,
+      messages:  doc.alertsSeenAt?.messages || null,
+      serverNow: new Date(),
+    });
+  } catch (err) {
+    logger.error("ring/alerts-seen GET error:", { error: err?.message });
+    serverError(res, "Failed to load alert status");
+  }
+});
+
+// ── POST /ring/alerts-seen { kind: "calls" | "messages" } — clear alerts ─────
+router.post("/alerts-seen", verifyToken, async (req, res) => {
+  try {
+    const kind = req.body?.kind;
+    if (!["calls", "messages"].includes(kind)) return badRequest(res, "kind must be calls or messages");
+    const { Model } = await getCurrentUserDoc(req);
+    if (!Model) return notFound(res, "User not found");
+    const now = new Date();
+    await Model.updateOne({ _id: req.user.id || req.user._id }, { $set: { [`alertsSeenAt.${kind}`]: now } });
+    ok(res, { kind, seenAt: now });
+  } catch (err) {
+    logger.error("ring/alerts-seen POST error:", { error: err?.message });
+    serverError(res, "Failed to update alert status");
   }
 });
 
@@ -238,7 +282,26 @@ router.get("/contacts", verifyToken, async (req, res) => {
       return ok(res, { contacts });
     }
 
-    if (role === "admin" || role === "subAdmin") {
+    if (isSubAdmin(role)) {
+      // Only the teachers this sub-admin manages, plus those teachers' students
+      const subAdmin = await getSubAdmin(req.db).findById(uid).select("assignmentType region assignedTeachers status").lean();
+      if (!subAdmin || subAdmin.status !== "active") return ok(res, { contacts: [] });
+      const teacherIds = await getScopedTeacherIds(subAdmin, req.db);
+      if (!teacherIds?.length) return ok(res, { contacts: [] });
+      const studentIds = await Booking.distinct("studentId", { teacherId: { $in: teacherIds } });
+      const [teachers, students] = await Promise.all([
+        getTeacher(req.db).find({ _id: { $in: teacherIds } }).select("firstName lastName username ringEnabled").lean(),
+        getStudent(req.db).find({ _id: { $in: studentIds } }).select("firstName lastName username ringEnabled").lean(),
+      ]);
+      return ok(res, {
+        contacts: [
+          ...teachers.map(t => toContact(t, "teacher")),
+          ...students.map(s => toContact(s, "student")),
+        ],
+      });
+    }
+
+    if (role === "admin") {
       const [teachers, students] = await Promise.all([
         getTeacher(req.db).find({ active: true }).select("firstName lastName username ringEnabled").lean(),
         getStudent(req.db).find({ active: true }).select("firstName lastName username ringEnabled").lean(),

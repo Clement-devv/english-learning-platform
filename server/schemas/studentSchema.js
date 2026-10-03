@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
-import { sessionSchema } from './shared/sessionSchema.js';
+import { hideSecrets } from './shared/hideSecrets.js';
+import { sessionSchema, knownDeviceSchema, alertsSeenDef } from './shared/sessionSchema.js';
 
 export const studentSchema = new mongoose.Schema({
   studentId: { type: String, unique: true, sparse: true },
@@ -36,6 +37,8 @@ export const studentSchema = new mongoose.Schema({
   resetPasswordCenter: String,
   lastPasswordChange: Date,
   sessions: [sessionSchema],
+  knownDevices: { type: [knownDeviceSchema], default: [] },
+  alertsSeenAt: alertsSeenDef,
   lastLogin: Date,
   twoFactorEnabled: { type: Boolean, default: false },
   twoFactorSecret: String,
@@ -78,3 +81,6 @@ studentSchema.index({ resetPasswordToken: 1 }, { sparse: true });
 studentSchema.index({ scheduledDeletionAt: 1 }, { sparse: true });
 // Invite setup link lookup
 studentSchema.index({ inviteToken: 1 }, { sparse: true });
+
+// Never serialize password hash, session tokens, invite/reset tokens or 2FA secrets
+hideSecrets(studentSchema);

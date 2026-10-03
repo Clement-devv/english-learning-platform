@@ -2,7 +2,8 @@
 // Sunshine Explorer design for the parent portal.
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Calendar, BookOpen, Award, LayoutDashboard, LogOut, RefreshCw, Loader2, Users, CheckCircle2, ClipboardList } from 'lucide-react';
+import { Calendar, BookOpen, Award, LayoutDashboard, LogOut, RefreshCw, Loader2, Users, CheckCircle2, ClipboardList, Smartphone } from 'lucide-react';
+import SessionManagement from '../../../../components/SessionManagement';
 import api from '../../../../api';
 import LanguageSwitcher from '../../../../components/LanguageSwitcher';
 import { useAuth } from '../../../../context/AuthContext.jsx';
@@ -319,6 +320,8 @@ export default function SunshineShell() {
     if (selectedId) fetchTabData(selectedId, activeTab);
   }, [selectedId, activeTab]);
 
+  const [showDevices, setShowDevices] = useState(false);
+
   const handleLogout = () => {
     // authLogout() handles BOTH the server-side /auth/logout-session call AND
     // local storage clearing.  Doing the removeItem calls here first would
@@ -411,6 +414,11 @@ export default function SunshineShell() {
 
         <div style={{ padding: '8px 8px 16px', borderTop: `2px solid ${col.border}` }}>
           <LanguageSwitcher col={col} fontFamily={F} />
+          <button className="p-nav" onClick={() => setShowDevices(true)}
+            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 14, border: 'none', cursor: 'pointer', background: 'transparent', fontFamily: F }}>
+            <Smartphone size={17} color={col.muted} />
+            <span style={{ fontSize: 13, fontWeight: 600, color: col.body }}>My devices</span>
+          </button>
           <button className="p-nav" onClick={handleLogout}
             style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 14, border: 'none', cursor: 'pointer', background: 'transparent', fontFamily: F }}>
             <LogOut size={17} color={col.muted} />
@@ -418,6 +426,7 @@ export default function SunshineShell() {
           </button>
         </div>
       </aside>
+      <SessionManagement isOpen={showDevices} onClose={() => setShowDevices(false)} />
 
       {/* MAIN */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>

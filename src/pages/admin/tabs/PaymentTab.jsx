@@ -1,5 +1,5 @@
 // src/pages/admin/tabs/PaymentsTab.jsx - ADMIN PAYMENT MANAGEMENT
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   DollarSign,
   Users,
@@ -11,8 +11,11 @@ import {
   AlertCircle,
 } from "lucide-react";
 import api from "../../../api";
+import { useOnDataChanged } from "../../../hooks/useLiveData";
 import Pagination from "../../../components/Pagination";
 import { useCurrencySymbol, fmtMoney } from "../../../hooks/useCurrencySymbol";
+import AnalyticsPinPrompt from "../../../components/admin/analytics/AnalyticsPinPrompt";
+import { isAnalyticsLocked } from "../../../utils/analyticsPin";
 
 // ─── Pay-all confirmation modal ───────────────────────────────────────────────
 function PayAllModal({ target, onConfirm, onCancel, isDarkMode }) {
@@ -100,14 +103,20 @@ export default function PaymentsTab({ isDarkMode }) {
   const [paymentNotes, setPaymentNotes] = useState("");
   const [toast, setToast] = useState("");
   const [payAllTarget, setPayAllTarget] = useState(null); // { teacherId, teacherName, pendingAmount, pendingCount, paymentMethod, notes }
+  const [pinLocked, setPinLocked] = useState(false);
 
   useEffect(() => {
     loadPaymentData();
   }, [txPage]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Live: refresh quietly (no spinner) when the server says this data changed
+  const quietRef = useRef(false);
+  useOnDataChanged(["payments"], () => { quietRef.current = true; loadPaymentData(); });
+
   const loadPaymentData = async () => {
     try {
-      setLoading(true);
+      if (!quietRef.current) setLoading(true);
+    quietRef.current = false;
       
       // Load payment summary
       const summaryRes = await api.get("/payment-transactions/summary");
@@ -124,8 +133,12 @@ export default function PaymentsTab({ isDarkMode }) {
       }
 
     } catch (err) {
-      console.error("Error loading payment data:", err);
-      showToast("Error loading payment data");
+      if (isAnalyticsLocked(err)) {
+        setPinLocked(true);   // no PIN entered yet, or the unlock expired / PIN changed
+      } else {
+        console.error("Error loading payment data:", err);
+        showToast("Error loading payment data");
+      }
     } finally {
       setLoading(false);
     }
@@ -213,6 +226,18 @@ export default function PaymentsTab({ isDarkMode }) {
       </span>
     );
   };
+
+  // Payroll and revenue sit behind the admin's analytics PIN (if one is set)
+  if (pinLocked) {
+    return (
+      <AnalyticsPinPrompt
+        inline
+        isDarkMode={isDarkMode}
+        title="Payments are locked"
+        onUnlocked={() => { setPinLocked(false); loadPaymentData(); }}
+      />
+    );
+  }
 
   if (loading) {
     return (

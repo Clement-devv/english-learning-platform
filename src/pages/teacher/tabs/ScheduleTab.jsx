@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Plus, X, Trash2, Clock, Check, AlertCircle, Repeat, Globe, ChevronDown, ChevronUp, Copy, CalendarClock } from "lucide-react";
 import api from "../../../api";
+import { useOnDataChanged } from "../../../hooks/useLiveData";
 import WeekCalendar, { Legend } from "../../../components/schedule/WeekCalendar";
 import ManagedBadge from "../../../components/ManagedBadge";
 import { TIMEZONE_OPTIONS } from "../../../utils/timezone";
@@ -83,6 +84,7 @@ export default function ScheduleTab({ teacherInfo, isDarkMode, students = [] }) 
     } finally { setLoading(false); }
   }, [teacherId, weekStart]);
   useEffect(() => { load(); }, [load]);
+  useOnDataChanged(["schedule", "bookings"], load); // live: bookings, time off, hours
 
   // Open the editor straight away for teachers who haven't set hours yet
   const [autoOpened, setAutoOpened] = useState(false);

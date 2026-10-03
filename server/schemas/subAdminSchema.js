@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
+import { hideSecrets } from './shared/hideSecrets.js';
 import bcrypt from 'bcryptjs';
-import { sessionSchema } from './shared/sessionSchema.js';
+import { sessionSchema, knownDeviceSchema, alertsSeenDef } from './shared/sessionSchema.js';
 
 export const subAdminSchema = new mongoose.Schema(
   {
@@ -33,6 +34,7 @@ export const subAdminSchema = new mongoose.Schema(
       canViewBookings: { type: Boolean, default: true  },
       canViewClasses:  { type: Boolean, default: true  },
     },
+    ringEnabled:          { type: Boolean, default: true },  // false = do not ring this sub-admin
     twoFactorEnabled:     { type: Boolean, default: false },
     twoFactorSecret:      { type: String,  default: null  },
     twoFactorBackupCodes: { type: [String], default: []   },
@@ -47,6 +49,8 @@ export const subAdminSchema = new mongoose.Schema(
     // field, clicking "Log out" only wiped browser storage; the JWT remained
     // valid on the server for up to 7 days.
     sessions:   [sessionSchema],
+    knownDevices: { type: [knownDeviceSchema], default: [] },
+    alertsSeenAt: alertsSeenDef,
 
     // ── Terms & Conditions ─────────────────────────────────────────────────
     hasAcceptedTerms: { type: Boolean, default: false },
@@ -69,3 +73,6 @@ subAdminSchema.methods.comparePassword = async function (candidate) {
 subAdminSchema.virtual('fullName').get(function () {
   return `${this.firstName} ${this.lastName}`;
 });
+
+// Never serialize password hash, session tokens, invite/reset tokens or 2FA secrets
+hideSecrets(subAdminSchema);
