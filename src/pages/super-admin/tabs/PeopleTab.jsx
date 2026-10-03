@@ -1,5 +1,6 @@
 import { Users, GraduationCap, Search } from 'lucide-react';
 import styles from '../SuperAdmin.module.css';
+import { visibleEmail } from "../../../utils/managedStudent.js";
 
 export default function PeopleTab({
   centers, peopleCenter, setPeopleCenter, peopleData, peopleLoading,
@@ -128,7 +129,7 @@ export default function PeopleTab({
                       {rows.map(st => (
                         <tr key={st._id} className={styles.tr}>
                           <td className={styles.td}><span style={{ fontWeight: 600, color: '#f1f5f9' }}>{st.name}</span></td>
-                          <td className={styles.td} style={{ color: '#9ca3af', fontSize: 12 }}>{st.email}</td>
+                          <td className={styles.td} style={{ color: '#9ca3af', fontSize: 12 }}>{visibleEmail(st.email) || "No login (managed)"}</td>
                           <td className={styles.td}><span style={{ background: 'rgba(99,102,241,0.1)', color: '#818cf8', borderRadius: 6, padding: '2px 8px', fontSize: 11, fontWeight: 600 }}>{st.country || '—'}</span></td>
                           <td className={styles.td} style={{ fontWeight: 700, color: st.classes > 0 ? '#34d399' : '#4b5563' }}>{st.classes}</td>
                           <td className={styles.td} style={{ fontSize: 11, color: '#6b7280' }}>{st.joinedAt ? new Date(st.joinedAt).toLocaleDateString('en-GB') : '—'}</td>

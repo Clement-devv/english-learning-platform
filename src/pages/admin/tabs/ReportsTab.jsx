@@ -4,6 +4,7 @@
 import { useState } from "react";
 import { FileText, Send, Eye, ChevronDown } from "lucide-react";
 import api from "../../../api";
+import { visibleEmail } from "../../../utils/managedStudent.js";
 
 // Build query string for period + reference date
 function buildQuery(period, refDate) {
@@ -113,7 +114,7 @@ export default function ReportsTab({ students = [], isDarkMode }) {
             <option value="">— Select a student —</option>
             {students.map(s => (
               <option key={s._id} value={s._id}>
-                {s.firstName} {s.lastName} · {s.email}
+                {s.firstName} {s.lastName} · {visibleEmail(s.email) || "managed"}
               </option>
             ))}
           </select>

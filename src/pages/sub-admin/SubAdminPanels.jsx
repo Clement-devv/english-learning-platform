@@ -16,6 +16,8 @@ import { dashboardColors } from "../../utils/dashboardColors";
 import { isExternal, linkSource, openExternal } from "../../utils/recordingSessions.js";
 import api from "../../api";
 import MessagesTab from "../../components/chat/MessagesTab";
+import { visibleEmail } from "../../utils/managedStudent.js";
+import { useCurrencySymbol, fmtMoney } from "../../hooks/useCurrencySymbol";
 
 // ── Shared helpers ─────────────────────────────────────────────────────────────
 export async function apiFetch(url) {
@@ -179,6 +181,7 @@ export function OverviewPanel({ isDarkMode }) {
 // TEACHERS PANEL
 // ─────────────────────────────────────────────────────────────────────────────
 export function TeachersPanel({ isDarkMode }) {
+  const sym = useCurrencySymbol();
   const [teachers, setTeachers] = useState([]);
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState("");
@@ -227,8 +230,8 @@ export function TeachersPanel({ isDarkMode }) {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "14px" }}>
           {filtered.map((t) => {
             const classesDone = t.lessonsCompleted ?? t.bookingStats?.completed ?? 0;
-            const earned      = Number(t.earned || 0).toFixed(2);
-            const rate        = t.ratePerClass ? `$${t.ratePerClass}` : "—";
+            const earned      = fmtMoney(t.earned || 0, sym);
+            const rate        = t.ratePerClass ? `${sym}${Number(t.ratePerClass).toLocaleString("en-US")}` : "—";
             return (
               <div key={t._id} style={{ background: c.card, border: `1px solid ${c.border}`, borderRadius: "16px", padding: "18px", display: "flex", flexDirection: "column", gap: "14px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
@@ -247,7 +250,7 @@ export function TeachersPanel({ isDarkMode }) {
                   {[
                     { label: "Classes Done", value: classesDone, color: "#6b82f0" },
                     { label: "Rate / Class", value: rate,        color: "#10b981" },
-                    { label: "Pending Pay",  value: `$${earned}`, color: "#f59e0b" },
+                    { label: "Pending Pay",  value: earned, color: "#f59e0b" },
                   ].map(({ label, value, color }) => (
                     <div key={label} style={{ background: isDarkMode ? "#0f1117" : "#f8faff", borderRadius: "10px", padding: "10px 8px", textAlign: "center" }}>
                       <p style={{ margin: 0, fontSize: "15px", fontWeight: "800", color }}>{value}</p>
@@ -348,7 +351,7 @@ export function StudentsPanel({ isDarkMode }) {
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <p style={{ margin: 0, fontSize: "14px", fontWeight: "700", color: c.heading }}>{s.firstName} {s.lastName}</p>
-                    <p style={{ margin: "2px 0 0", fontSize: "12px", color: c.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.email}</p>
+                    <p style={{ margin: "2px 0 0", fontSize: "12px", color: c.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{visibleEmail(s.email) || "No login (managed)"}</p>
                   </div>
                   <span style={{ fontSize: "11px", fontWeight: "700", padding: "3px 9px", borderRadius: "20px", flexShrink: 0, background: s.active ? (isDarkMode ? "rgba(16,185,129,0.12)" : "#d1fae5") : (isDarkMode ? "rgba(107,114,128,0.12)" : "#f3f4f6"), color: s.active ? "#10b981" : "#6b7280" }}>
                     {s.active ? "Active" : "Inactive"}

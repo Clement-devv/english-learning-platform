@@ -11,6 +11,7 @@ import { useOnDataChanged } from "../../../hooks/useLiveData";
 import { groupRecordingSessions, groupByDay, partLabel, isExternal, linkSource, openExternal } from "../../../utils/recordingSessions.js";
 import ExternalRecordingModal from "../../../components/ExternalRecordingModal.jsx";
 import Pagination from "../../../components/Pagination";
+import { visibleEmail } from "../../../utils/managedStudent.js";
 
 
 export default function RecordingsTab({ isDarkMode }) {
@@ -553,7 +554,7 @@ export default function RecordingsTab({ isDarkMode }) {
                   {s.name}
                 </p>
                 <p style={{ margin: "2px 0 0", fontSize: "12px", color: col.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {s.email || `${s.count} recording${s.count !== 1 ? "s" : ""}`}
+                  {visibleEmail(s.email) || `${s.count} recording${s.count !== 1 ? "s" : ""}`}
                 </p>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: "10px", flexShrink: 0 }}>

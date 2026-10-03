@@ -67,6 +67,21 @@ function pruneActivityDates(dates, today) {
     .slice(0, 30);
 }
 
+// ── effectiveStreak ───────────────────────────────────────────────────────────
+/**
+ * The streak as it stands right now. currentStreak is only rewritten on the next
+ * activity, so a streak that was broken days ago still holds its old value —
+ * same rules as recordActivity: alive if the last active day was today or
+ * yesterday, or two days ago with a freeze left to cover the gap.
+ */
+export function effectiveStreak(student, now = new Date()) {
+  if (!student?.currentStreak || !student.lastActivityDate) return 0;
+  const gapDays = Math.round((toMidnightUTC(now) - toMidnightUTC(student.lastActivityDate)) / 86400000);
+  if (gapDays <= 1) return student.currentStreak;
+  if (gapDays === 2 && student.streakFreezes > 0) return student.currentStreak;
+  return 0;
+}
+
 // ── recordActivity ────────────────────────────────────────────────────────────
 /**
  * Call after ANY learning activity (quiz, homework, flashcard, class).

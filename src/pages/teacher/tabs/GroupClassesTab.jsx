@@ -9,6 +9,7 @@ const GC_PAGE = 20;
 import Classroom from '../../Classroom';
 import DateTimePicker from '../../../components/DateTimePicker';
 import { formatDateInTZ, getUserTimezone, tzAbbr } from '../../../utils/timezone';
+import { visibleEmail } from "../../../utils/managedStudent.js";
 
 const F = "'Nunito','Inter',sans-serif";
 const LEVELS   = ['A1','A2','B1','B2','C1','C2','Mixed'];
@@ -459,7 +460,7 @@ export default function GroupClassesTab({ isDarkMode }) {
                     <div key={s._id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderBottom: `1px solid ${col.border}` }}>
                       <div style={{ flex: 1 }}>
                         <div style={{ fontSize: 13, fontWeight: 700, color: col.heading }}>{s.firstName} {s.lastName}</div>
-                        <div style={{ fontSize: 11, color: col.muted }}>{s.email} · {s.classCredits ?? 0} credits</div>
+                        <div style={{ fontSize: 11, color: col.muted }}>{visibleEmail(s.email) || "Managed student"} · {s.classCredits ?? 0} credits</div>
                       </div>
                       {alreadyInvited
                         ? <span style={{ fontSize: 11, color: '#10b981', fontWeight: 700 }}>✓ Invited</span>

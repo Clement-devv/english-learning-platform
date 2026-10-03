@@ -344,11 +344,12 @@ export function useDashboardData() {
 
       if (!quiet) api.patch(`/students/${studentId}/timezone`, { timezone: getUserTimezone() }).catch(() => {});
 
-      const [accepted, completed, pendingConf, history] = await Promise.all([
+      const [accepted, completed, pendingConf, history, streakData] = await Promise.all([
         getStudentBookings(studentId, "accepted"),
         getStudentBookings(studentId, "completed"),
         getStudentBookings(studentId, "pending_confirmation"),
         api.get(`/bookings/student/${studentId}/history`, { params: { limit: 1 } }).then(r => r.data).catch(() => null),
+        api.get("/students/streak").then(r => r.data).catch(() => null),
       ]);
       rawAcceptedRef.current = accepted;
 
@@ -399,7 +400,9 @@ export function useDashboardData() {
       setCompletedClasses(completedList);
 
       const weeklyCompleted = calculateWeeklyCompleted(completedList);
-      const streakDays = calculateStreakDays(completedList);
+      // Same daily-activity streak as the leaderboard and streak badges; the
+      // class-day count is only a fallback if the streak endpoint fails.
+      const streakDays = streakData ? (streakData.currentStreak || 0) : calculateStreakDays(completedList);
 
       let classesRemaining = 0;
       try {

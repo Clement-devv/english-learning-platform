@@ -27,6 +27,7 @@ import { assignmentSchema } from "../schemas/assignmentSchema.js";
 import { parsePagination, DIRECTORY_MAX } from "../utils/pagination.js";
 import logger from "../utils/logger.js";
 import { sharedSnapshot } from "../utils/sharedSnapshot.js";
+import { effectiveStreak } from "../utils/streakService.js";
 import { sendJoinReminder, currentClassFor, maskEmail, ReminderError } from "../utils/joinReminder.js";
 import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
 import { assignStudentId, generateStudentId } from '../utils/studentIdGenerator.js';
@@ -114,7 +115,7 @@ router.get("/streak", verifyToken, async (req, res) => {
       .select("currentStreak longestStreak lastActivityDate streakFreezes weeklyClassStreak longestWeeklyClassStreak lastClassWeek activityDates")
       .lean();
     if (!student) return notFound(res, "Student not found");
-    res.json(student);
+    res.json({ ...student, currentStreak: effectiveStreak(student) });
   } catch (err) {
     logger.error("GET /streak error:", { error: err?.message });
     serverError(res);

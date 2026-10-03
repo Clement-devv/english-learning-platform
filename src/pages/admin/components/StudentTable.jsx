@@ -1,5 +1,6 @@
 // src/pages/admin/components/StudentTable.jsx
 import React from "react";
+import { visibleEmail } from "../../../utils/managedStudent.js";
 
 export default function StudentTable({
   students,
@@ -39,7 +40,7 @@ export default function StudentTable({
               <tr key={s._id} className="hover:bg-gray-50">
                 <td className="border p-2">{s.firstName}</td>
                 <td className="border p-2">{s.lastName}</td>
-                <td className="border p-2">{s.email}</td>
+                <td className="border p-2">{visibleEmail(s.email) || "No login (managed)"}</td>
 
                 {/* Password column */}
                 <td className="border p-2">

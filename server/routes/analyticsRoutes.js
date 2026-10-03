@@ -13,6 +13,7 @@ import logger from "../utils/logger.js";
 import { serverError } from '../utils/apiResponse.js';
 import { getAnalyticsAccess, requireAnalyticsUnlock } from "../middleware/analyticsPinMiddleware.js";
 import { sharedSnapshot } from "../utils/sharedSnapshot.js";
+import { effectiveStreak } from "../utils/streakService.js";
 
 // Admin numbers are served from one shared snapshot per center (utils/sharedSnapshot.js):
 // 50 admins watching = one computation per change window, not 50.
@@ -392,11 +393,17 @@ router.get("/leaderboard", verifyToken, async (req, res) => {
     const QuizAttempt = getQuizAttempt(req.db);
 
     const [streakTop, classesTop, quizTop] = await Promise.all([
-      // Top 10 by current streak
+      // Top 10 by live streak — stored streaks that have since lapsed are dropped
       Student.find({ currentStreak: { $gt: 0 }, status: "active" })
         .sort({ currentStreak: -1 })
-        .limit(10)
-        .select("firstName lastName currentStreak longestStreak"),
+        .limit(50)
+        .select("firstName lastName currentStreak longestStreak lastActivityDate streakFreezes")
+        .lean()
+        .then((list) => list
+          .map(({ lastActivityDate, streakFreezes, ...s }) => ({ ...s, currentStreak: effectiveStreak({ ...s, lastActivityDate, streakFreezes }) }))
+          .filter((s) => s.currentStreak > 0)
+          .sort((a, b) => b.currentStreak - a.currentStreak)
+          .slice(0, 10)),
 
       // Top 10 by completed classes (aggregate from bookings)
       Booking.aggregate([

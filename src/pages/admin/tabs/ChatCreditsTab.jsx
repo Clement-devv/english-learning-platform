@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Search, Zap, Plus, RefreshCw, ShieldCheck, AlertTriangle } from "lucide-react";
 import api from "../../../api";
 import { getStudents } from "../../../services/studentService";
+import { visibleEmail } from "../../../utils/managedStudent.js";
 
 const PRESET_AMOUNTS = [25, 50, 100, 150, 200, 500];
 
@@ -266,7 +267,7 @@ export default function ChatCreditsTab({ isDarkMode }) {
                     </div>
                   </div>
                   <div style={{ fontSize: 13, color: col.body, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {s.email}
+                    {visibleEmail(s.email) || <span style={{ color: col.muted, fontStyle: "italic" }}>No login (managed)</span>}
                   </div>
                   <div style={{ textAlign: "center" }}>
                     <span style={{

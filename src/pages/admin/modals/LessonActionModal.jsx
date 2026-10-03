@@ -28,6 +28,7 @@ import {
   Mail,
 } from "lucide-react";
 import api from "../../../api";
+import { visibleEmail } from "../../../utils/managedStudent.js";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 function fmt(dateStr) {
@@ -339,7 +340,7 @@ export default function LessonActionModal({
                   <SelectRow
                     key={s._id}
                     label={`${s.firstName} ${s.lastName}`}
-                    sub={`${s.email} · ${s.classCredits} class${s.classCredits !== 1 ? "es" : ""} remaining`}
+                    sub={`${visibleEmail(s.email) || "Managed student"} · ${s.classCredits} class${s.classCredits !== 1 ? "es" : ""} remaining`}
                     isDarkMode={isDarkMode}
                     disabled={isMarking && s.classCredits <= 0}
                     onClick={() => { setStudent(s); setStep("class"); }}

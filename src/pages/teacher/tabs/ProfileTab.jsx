@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import api from "../../../api";
 import { TIMEZONE_OPTIONS } from "../../../utils/timezone";
+import { useCurrencySymbol } from "../../../hooks/useCurrencySymbol";
 
 const SPECIALIZATIONS = [
   "General English", "Business English", "Conversation",
@@ -58,6 +59,8 @@ function Chip({ label, color = "brand" }) {
 }
 
 export default function ProfileTab({ teacherInfo, isDarkMode, onUpdate }) {
+  const sym = useCurrencySymbol();
+  const rate = `${sym}${Number(teacherInfo.ratePerClass ?? 0).toLocaleString("en-US")}`;
   const c = {
     bg:          isDarkMode ? "#0f1117" : "#f8f9ff",
     card:        isDarkMode ? "#1a1f2e" : "#ffffff",
@@ -327,7 +330,7 @@ export default function ProfileTab({ teacherInfo, isDarkMode, onUpdate }) {
             {teacherInfo.continent && <Chip label={teacherInfo.continent} />}
             {teacherInfo.timezone && <Chip label={teacherInfo.timezone} />}
             {typeof teacherInfo.ratePerClass === "number" && (
-              <Chip label={`$${teacherInfo.ratePerClass}/class`} color="green" />
+              <Chip label={`${rate}/class`} color="green" />
             )}
           </div>
         </div>
@@ -401,7 +404,7 @@ export default function ProfileTab({ teacherInfo, isDarkMode, onUpdate }) {
               <label style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11.5, fontWeight: 600, color: c.muted, marginBottom: 5, textTransform: "uppercase", letterSpacing: "0.07em" }}>
                 <Lock size={11} /> Rate per Class <span style={{ fontWeight: 400, textTransform: "none", letterSpacing: 0 }}>(admin only)</span>
               </label>
-              <input value={`$${teacherInfo.ratePerClass ?? 0}`} disabled style={lockedStyle} />
+              <input value={rate} disabled style={lockedStyle} />
             </div>
             <div>
               <label style={{ display: "block", fontSize: 11.5, fontWeight: 600, color: c.muted, marginBottom: 5, textTransform: "uppercase", letterSpacing: "0.07em" }}>Timezone</label>
@@ -426,7 +429,7 @@ export default function ProfileTab({ teacherInfo, isDarkMode, onUpdate }) {
           </div>
         ) : (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 18 }}>
-            <InfoRow label="Rate per Class"      value={`$${teacherInfo.ratePerClass ?? 0}`} c={c} />
+            <InfoRow label="Rate per Class"      value={rate} c={c} />
             <InfoRow label="Years of Experience" value={teacherInfo.yearsOfExperience ? `${teacherInfo.yearsOfExperience} yrs` : null} c={c} />
             <InfoRow label="Timezone"
               value={TIMEZONE_OPTIONS.find(t => t.value === teacherInfo.timezone)?.label || teacherInfo.timezone}
@@ -514,7 +517,7 @@ export default function ProfileTab({ teacherInfo, isDarkMode, onUpdate }) {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 18 }}>
             <InfoRow label="Status"             value={teacherInfo.status}    c={c} />
             <InfoRow label="Lessons Completed"  value={teacherInfo.lessonsCompleted?.toString()} c={c} />
-            <InfoRow label="Total Earned"       value={teacherInfo.earned != null ? `$${teacherInfo.earned}` : null} c={c} />
+            <InfoRow label="Total Earned"       value={teacherInfo.earned != null ? `${sym}${Number(teacherInfo.earned).toLocaleString("en-US")}` : null} c={c} />
             <InfoRow label="Last Login"         value={teacherInfo.lastLogin ? new Date(teacherInfo.lastLogin).toLocaleDateString() : null} c={c} />
           </div>
         </Section>

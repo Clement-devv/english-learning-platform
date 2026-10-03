@@ -18,6 +18,7 @@ import { useCurrencySymbol, fmtMoney } from "../../hooks/useCurrencySymbol";
 import AnalyticsPinPrompt from "../admin/analytics/AnalyticsPinPrompt";
 import { useOnDataChanged } from "../../hooks/useLiveData";
 import { clearAnalyticsUnlock } from "../../utils/analyticsPin";
+import { visibleEmail } from "../../utils/managedStudent.js";
 
 export default function AnalyticsDashboard({ isDarkMode }) {
   // PIN gate: null = checking, otherwise { pinSet, unlocked }
@@ -212,20 +213,23 @@ export default function AnalyticsDashboard({ isDarkMode }) {
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           {Object.entries(overview.bookings.byStatus).map(([status, count]) => {
             const colorMap = {
-              pending:   { ring: dm ? "bg-yellow-900/40 text-yellow-300" : "bg-yellow-100 text-yellow-600" },
-              accepted:  { ring: dm ? "bg-green-900/40 text-green-300"   : "bg-green-100 text-green-600"   },
-              completed: { ring: dm ? "bg-blue-900/40 text-blue-300"     : "bg-blue-100 text-blue-600"     },
-              rejected:  { ring: dm ? "bg-red-900/40 text-red-300"       : "bg-red-100 text-red-600"       },
-              cancelled: { ring: dm ? "bg-gray-700 text-gray-400"        : "bg-gray-100 text-gray-600"     },
+              pending:   { label: "Pending",   ring: dm ? "bg-yellow-900/40 text-yellow-300" : "bg-yellow-100 text-yellow-600" },
+              accepted:  { label: "Accepted",  ring: dm ? "bg-green-900/40 text-green-300"   : "bg-green-100 text-green-600"   },
+              completed: { label: "Completed", ring: dm ? "bg-blue-900/40 text-blue-300"     : "bg-blue-100 text-blue-600"     },
+              missed:    { label: "Missed",    ring: dm ? "bg-purple-900/40 text-purple-300" : "bg-purple-100 text-purple-600" },
+              pending_confirmation: { label: "Awaiting Confirmation", ring: dm ? "bg-sky-900/40 text-sky-300" : "bg-sky-100 text-sky-600" },
+              rejected:  { label: "Rejected",  ring: dm ? "bg-red-900/40 text-red-300"       : "bg-red-100 text-red-600"       },
+              cancelled: { label: "Cancelled", ring: dm ? "bg-gray-700 text-gray-400"        : "bg-gray-100 text-gray-600"     },
             };
             const c = colorMap[status] || colorMap.cancelled;
+            const label = colorMap[status]?.label || status.replace(/_/g, " ");
             const percentage = overview.bookings.total ? (count / overview.bookings.total) * 100 : 0;
             return (
               <div key={status} className="text-center">
                 <div className={`w-16 h-16 mx-auto rounded-full flex items-center justify-center mb-2 ${c.ring}`}>
                   <span className="text-2xl font-bold">{count}</span>
                 </div>
-                <p className={`text-sm font-medium capitalize ${heading}`}>{status}</p>
+                <p className={`text-sm font-medium capitalize ${heading}`}>{label}</p>
                 <p className={`text-xs ${mutedText}`}>{percentage.toFixed(1)}%</p>
               </div>
             );
@@ -323,7 +327,7 @@ export default function AnalyticsDashboard({ isDarkMode }) {
                 </div>
                 <div>
                   <p className={`font-semibold ${heading}`}>{student.firstName} {student.lastName}</p>
-                  <p className={`text-xs ${mutedText}`}>{student.email}</p>
+                  <p className={`text-xs ${mutedText}`}>{visibleEmail(student.email) || "No login (managed)"}</p>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-2 text-sm">

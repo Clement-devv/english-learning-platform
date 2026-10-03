@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import api from "../../../api";
 import { useCurrencySymbol, fmtMoney } from "../../../hooks/useCurrencySymbol";
+import { visibleEmail } from "../../../utils/managedStudent.js";
 
 // ─── tiny helpers ────────────────────────────────────────────────────────────
 const fmtDate = (d) =>
@@ -318,7 +319,7 @@ export default function LessonMarkModal({
                             {s.firstName} {s.lastName}
                           </p>
                           <p className={`text-xs mt-0.5 ${textSecondary}`}>
-                            {s.email} · {s.classCredits} class{s.classCredits !== 1 ? "es" : ""} remaining
+                            {visibleEmail(s.email) || "Managed student"} · {s.classCredits} class{s.classCredits !== 1 ? "es" : ""} remaining
                           </p>
                           {isMarkMode && s.classCredits <= 0 && (
                             <span className="inline-block mt-1 text-[10px] px-2 py-0.5 rounded-full bg-red-100 text-red-600">

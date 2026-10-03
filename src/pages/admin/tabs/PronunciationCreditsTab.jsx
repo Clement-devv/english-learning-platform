@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Search, Mic, Plus, RefreshCw, ShieldCheck, AlertTriangle } from "lucide-react";
 import api from "../../../api";
 import { getStudents } from "../../../services/studentService";
+import { visibleEmail } from "../../../utils/managedStudent.js";
 
 const PRESET_AMOUNTS = [25, 50, 100, 150, 200, 500];
 
@@ -220,7 +221,7 @@ export default function PronunciationCreditsTab({ isDarkMode }) {
                     <div style={{ fontWeight: 700, fontSize: 14, color: col.heading }}>{s.firstName} {s.lastName}</div>
                     <div style={{ fontSize: 11, color: col.muted, marginTop: 2 }}>{s.status === "active" ? "✅ Active" : "⏳ Pending"}</div>
                   </div>
-                  <div style={{ fontSize: 13, color: col.body, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.email}</div>
+                  <div style={{ fontSize: 13, color: col.body, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{visibleEmail(s.email) || <span style={{ color: col.muted, fontStyle: "italic" }}>No login (managed)</span>}</div>
                   <div style={{ textAlign: "center" }}>
                     <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 12px", borderRadius: 20, fontSize: 13, fontWeight: 800, color: creditColor, background: creditBg }}>
                       <Mic size={12} />

@@ -184,7 +184,7 @@ async function main() {
     const created = daysFrom(-(i % 6) - 1, 9);
     return {
       _id: oid(), teacherId: t._id, studentId: s._id, title: pick(hwTitles, i), description: "Do your best and have fun! 🌟",
-      dueDate: daysFrom(i === 2 ? 2 : (i % 5) - 1), attachments: [], status,
+      dueDate: daysFrom(i === 2 ? 2 : i === 10 ? 3 : (i % 5) - 1), attachments: [], status,
       ...(status !== "assigned" ? { submission: { text: "Here is my homework, teacher!", attachments: [], submittedAt: daysFrom(-(i % 3), 12), via: "link" } } : {}),
       ...(status === "graded" ? { grade: { score: 70 + (i * 7) % 31, feedback: pick(["Great work!", "Lovely ideas, watch your spelling.", "Excellent effort 👏"], i), gradedAt: daysFrom(-(i % 2), 14) } } : {}),
       ...(() => { const l = link(created); if (i === 2) demoLinks.homework = l.token; return { shareLink: l.shareLink }; })(),
@@ -346,6 +346,80 @@ async function main() {
     ["booking_accepted", teachers[3], `James Nguyen accepted the class "B1 English with James" with An Vo.`, -0.6, {}],
   ].map(([type, t, message, d, meta]) => ({ _id: oid(), type, message, actorName: `${t.firstName} ${t.lastName}`, actorRole: "teacher",
     metadata: { teacherName: `${t.firstName} ${t.lastName}`, ...meta }, read: false, createdAt: new Date(now.getTime() + d * 86400000) })));
+
+  // ── Vocabulary lists & recordings (so every teacher tab has content) ─────
+  const sarahKids = students.filter((s, i) => teacherOf(s, i)._id === teachers[0]._id);
+  await db.collection("vocablists").insertMany([
+    ["Job interview words 💼", [["strength", "Something you are good at", "My biggest strength is teamwork."], ["deadline", "The latest time to finish something", "I always meet my deadlines."], ["experience", "Knowledge from doing something", "I have two years of experience."], ["confident", "Sure of yourself", "She felt confident in the interview."]]],
+    ["Travel & airports ✈️", [["boarding pass", "Ticket to get on a plane", "Please show your boarding pass."], ["luggage", "Bags you travel with", "My luggage is too heavy!"], ["delay", "When something is late", "The flight has a 2-hour delay."]]],
+  ].map(([title, words], i) => ({
+    _id: oid(), title, description: "", teacherId: teachers[0]._id,
+    words: words.map(([word, definition, example]) => ({ _id: oid(), word, definition, example })),
+    assignedTo: sarahKids.slice(0, 3 - i).map((s) => ({ studentId: s._id, assignedAt: daysFrom(-3 - i), dueDate: daysFrom(4) })),
+    createdAt: daysFrom(-6 - i), updatedAt: daysFrom(-3 - i),
+  })));
+  await db.collection("recordings").insertMany(recentDone.filter((b) => String(b.teacherId) === String(teachers[0]._id)).slice(0, 4).map((b, i) => ({
+    _id: oid(), bookingId: b._id, teacherId: b.teacherId, studentId: b.studentId, title: "", source: "external",
+    externalUrl: "https://drive.google.com/file/d/demo-class-recording/view", note: "Class recording", duration: 45 * 60 - i * 120,
+    visibleToStudent: false, createdAt: b.completedAt, updatedAt: b.completedAt,
+  })));
+
+  // ── One real (log-in) student for the student guide: Mai Hoang ───────────
+  // Plans gate only *creating* real students, so this works on the Basic demo.
+  const mai = students[5];
+  const dayList = (n, skip = []) => Array.from({ length: n }, (_, k) => daysFrom(-k)).filter((_, k) => !skip.includes(k));
+  await db.collection("students").updateOne({ _id: mai._id }, { $set: {
+    isManaged: false, email: "mai.hoang@familyenglish.demo", password: pw, referralCode: "MAI2026",
+    currentStreak: 12, longestStreak: 21, lastActivityDate: daysFrom(-1), streakFreezes: 2, weeklyClassStreak: 6, longestWeeklyClassStreak: 6,
+    activityDates: dayList(30, [13, 14, 22]), hasAcceptedTerms: true, termsAcceptedAt: daysFrom(-40),
+  } });
+  await db.collection("students").bulkWrite(students.filter((s) => s !== mai).map((s, i) => ({ updateOne: { filter: { _id: s._id },
+    update: { $set: { currentStreak: [9, 3, 15, 1, 6, 4, 11, 2, 7, 5, 8, 2, 3, 6, 1][i], lastActivityDate: now } } } })));
+  const credit = (credits, used, label) => ({ _id: oid(), studentId: mai._id, credits, totalUsed: used,
+    log: [{ type: "grant", amount: credits + used, note: `Welcome pack — ${label}`, createdAt: daysFrom(-20) }, { type: "spend", amount: used, note: "Practice", createdAt: daysFrom(-1) }],
+    createdAt: daysFrom(-20), updatedAt: now });
+  await db.collection("chatcredits").insertOne(credit(38, 12, "AI chat"));
+  await db.collection("pronunciationcredits").insertOne(credit(22, 8, "speaking"));
+  const maiDone = recentDone.filter((b) => String(b.studentId) === String(mai._id));
+  await db.collection("reviews").insertMany(maiDone.slice(2, 5).map((b, i) => ({
+    _id: oid(), bookingId: b._id, studentId: mai._id, teacherId: b.teacherId, rating: [5, 5, 4][i],
+    comment: ["Sarah makes IELTS fun! I finally understand linking words 🙌", "Great class, lots of speaking practice.", "Good lesson, a bit fast at the end."][i],
+    flagged: false, createdAt: new Date(b.completedAt.getTime() + 3600000), updatedAt: new Date(b.completedAt.getTime() + 3600000),
+  })));
+  await db.collection("referrals").insertMany([["Lan", "Pham", "active", true], ["Huy", "Tran", "pending", false]].map(([f, l, status, cr], i) => ({
+    _id: oid(), referrerId: mai._id, referrerCode: "MAI2026", referredFirstName: f, referredLastName: l,
+    referredEmail: `${f.toLowerCase()}.${l.toLowerCase()}@familyenglish.demo`, referredStudentId: null, status,
+    creditAwarded: cr, creditedAt: cr ? daysFrom(-5) : null, createdAt: daysFrom(-10 + i * 6), updatedAt: daysFrom(-5 + i),
+  })));
+  await db.collection("homeworks").insertOne({
+    _id: oid(), teacherId: teachers[0]._id, studentId: mai._id, title: "IELTS Task 2: Should homework be banned? ✍️",
+    description: "Write 250 words. Give your opinion with two clear reasons and examples.", dueDate: daysFrom(3), attachments: [], status: "assigned",
+    instructionAudio: { fileId: null, duration: 0, size: 0, mimeType: "" }, createdAt: daysFrom(-1), updatedAt: daysFrom(-1),
+  });
+  await db.collection("quizzes").insertOne({
+    _id: oid(), teacherId: teachers[0]._id, studentId: mai._id, title: "Linking words challenge 🔗", instructions: "Choose the best linking word.",
+    timeLimit: 8, dueDate: daysFrom(2), status: "assigned",
+    questions: [
+      { question: "I was tired; ___, I finished my essay.", options: [{ text: "however" }, { text: "because" }, { text: "so" }, { text: "and" }], correctIndex: 0, explanation: "" },
+      { question: "___ the rain, we played football.", options: [{ text: "Although" }, { text: "Despite" }, { text: "Because" }, { text: "Unless" }], correctIndex: 1, explanation: "" },
+    ],
+    createdAt: daysFrom(-1), updatedAt: daysFrom(-1),
+  });
+  await db.collection("recordings").updateMany({ studentId: mai._id }, { $set: { visibleToStudent: true } });
+  {
+    const asg = await db.collection("assignments").findOne({ studentId: mai._id });
+    const t = teachers[0];
+    const m = (fromMai, text, minsAgo) => ({ _id: oid(), senderId: fromMai ? mai._id : t._id, senderModel: fromMai ? "Student" : "Teacher",
+      senderName: fromMai ? "Mai Hoang" : "Sarah Mitchell", senderRole: fromMai ? "student" : "teacher", message: text, messageType: "text",
+      isRead: minsAgo > 30, readBy: [], deleted: false, createdAt: new Date(now.getTime() - minsAgo * 60000) });
+    const messages = [m(true, "Hi teacher! Can I send my IELTS essay early to get feedback? 📝", 180), m(false, "Of course Mai! Upload it in Homework and I'll check it tonight 😊", 170),
+      m(true, "Thank you!! See you at 9 🙌", 165), m(false, "Great job in today's speaking practice, your linking words were 🔥", 20)];
+    const last = messages[messages.length - 1];
+    await db.collection("groupchats").insertOne({ _id: oid(), assignmentId: asg._id, teacherId: t._id, studentId: mai._id, chatName: "Mai Hoang & Sarah Mitchell",
+      messages, lastMessage: { text: last.message, senderId: last.senderId, senderName: last.senderName, timestamp: last.createdAt },
+      unreadCount: { admin: 0, teacher: 0, student: 1, subAdmin: 0 }, isActive: true, lastActivityAt: last.createdAt, createdAt: messages[0].createdAt, updatedAt: last.createdAt });
+  }
+  await master.collection("centers").updateOne({ slug: SLUG }, { $set: { "chatCredits.balance": 500, "chatCredits.totalAllocated": 60, "pronunciationCredits.balance": 300, "pronunciationCredits.totalAllocated": 40 } });
 
   // ── A class starting in a few minutes (shows "Remind to join") ───────────
   const soon = new Date(Date.now() + 8 * 60000);
