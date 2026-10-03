@@ -113,6 +113,8 @@ function toRow(b, tz, change, now) {
     teacherLast:  b.teacherId?.lastName  || "",
     teacherName: fullName(b.teacherId),
     studentName: fullName(b.studentId),
+    studentFirst: b.studentId?.firstName || "",
+    summary:     completed ? (b.classSummary?.text || "") : "",   // teacher's class summary (copy for parent)
     outcome:     completed ? "completed" : "not_completed",
     reason:      completed ? "" : notCompletedReason(b, now),
     note:        completed && b.disputeStatus === "pending" ? "Dispute open — awaiting admin decision" : "",
@@ -166,6 +168,8 @@ function groupClassToRow(gc, tz, now) {
     teacherLast:  gc.teacherId?.lastName  || "",
     teacherName: fullName(gc.teacherId),
     studentName,
+    studentFirst: studentName,
+    summary:     gc.status === "completed" ? (gc.classSummary?.text || "") : "",   // teacher's class summary (copy for parent)
     outcome:     completed ? "completed" : "not_completed",
     reason,
     note,

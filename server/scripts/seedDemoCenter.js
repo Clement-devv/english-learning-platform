@@ -1,20 +1,21 @@
 // server/scripts/seedDemoCenter.js
-// Seeds a self-contained DEMO center ("sunrise") with realistic fake data,
+// Seeds a self-contained DEMO center ("family-english") with realistic fake data,
 // used for screenshots / sales manuals. Local development only.
 //
 //   node scripts/seedDemoCenter.js          — (re)create the demo center
 //   node scripts/seedDemoCenter.js --drop   — remove it completely
 //
-// Demo admin login (local only): username "sunrise-admin", password below.
+// Demo logins (local only): admin username "family-admin", teachers by email — all use the password below.
+// Prints the demo homework / quiz / parent-check link tokens as JSON on the last line.
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import dotenv from "dotenv";
 dotenv.config();
 
-const SLUG = "sunrise";
-const DEMO_ADMIN_USERNAME = "sunrise-admin";
-const DEMO_ADMIN_PASSWORD = "Sunrise-Demo-2026!";
+const SLUG = "family-english";
+const DEMO_ADMIN_USERNAME = "family-admin";
+const DEMO_ADMIN_PASSWORD = "Family-Demo-2026!";
 const TZ = "Asia/Ho_Chi_Minh";
 
 const oid = () => new mongoose.Types.ObjectId();
@@ -30,6 +31,11 @@ const hex = (n) => crypto.randomBytes(n).toString("hex");
 
 async function main() {
   if (process.env.NODE_ENV === "production") throw new Error("Refusing to seed demo data in production");
+  const { createLinkToken, hashLinkToken } = await import("../utils/shareLink.js");
+  const { encrypt } = await import("../utils/fieldEncryption.js");
+  const link = (createdAt) => { const token = createLinkToken();
+    return { token, shareLink: { tokenHash: hashLinkToken(token), tokenEnc: encrypt(token), createdAt, failedAttempts: 0, lockedUntil: null } }; };
+  const demoLinks = {};
   await mongoose.connect(process.env.MONGO_URI);
   const master = mongoose.connection.db;
   const db = mongoose.connection.client.db(SLUG);
@@ -42,10 +48,10 @@ async function main() {
   await master.collection("centers").insertOne({
     ...(template || {}),
     _id: oid(),
-    centerName: "Sunrise English Academy",
+    centerName: "Family English Academy",
     slug: SLUG,
     customDomain: null,
-    adminEmail: "admin@sunrise-english.demo",
+    adminEmail: "admin@familyenglish.demo",
     dbName: `db_${SLUG}`,
     plan: "basic",
     status: "active",
@@ -53,7 +59,7 @@ async function main() {
     country: "Vietnam",
     address: "Ho Chi Minh City",
     timezone: TZ,
-    registeredBy: "admin@sunrise-english.demo",
+    registeredBy: "admin@familyenglish.demo",
     maxTeachers: 10,
     maxStudents: 100,
     recoveryCode: null,
@@ -63,7 +69,7 @@ async function main() {
   const pw = await bcrypt.hash(DEMO_ADMIN_PASSWORD, 12);
   const adminId = oid();
   await db.collection("admins").insertOne({
-    _id: adminId, username: DEMO_ADMIN_USERNAME, firstName: "Linh", lastName: "Nguyen", email: "admin@sunrise-english.demo", password: pw,
+    _id: adminId, username: DEMO_ADMIN_USERNAME, firstName: "Linh", lastName: "Nguyen", email: "admin@familyenglish.demo", password: pw,
     role: "admin", active: true, twoFactorEnabled: false, twoFactorBackupCodes: [], twoFactorVerified: false,
     ringEnabled: true, hasAcceptedTerms: true, termsAcceptedAt: daysFrom(-60), sessions: [], knownDevices: [],
     lastPasswordChange: daysFrom(-60), analyticsPinFailedAttempts: 0, createdAt: daysFrom(-60), updatedAt: now,
@@ -77,9 +83,9 @@ async function main() {
     ["James", "Nguyen", "Vietnam", "Asia", ["General English", "Exam Prep", "Writing"], 8, 250000],
     ["Grace", "Mensah", "Ghana", "Africa", ["Kids English", "Storytelling"], 3, 150000],
   ];
-  const tpw = await bcrypt.hash(hex(16), 12);
+  const tpw = pw;
   const teachers = teacherDefs.map(([firstName, lastName, country, continent, specializations, yrs, rate], i) => ({
-    _id: oid(), firstName, lastName, email: `${firstName.toLowerCase()}@sunrise-english.demo`, password: tpw,
+    _id: oid(), firstName, lastName, email: `${firstName.toLowerCase()}@familyenglish.demo`, password: tpw,
     ratePerClass: rate, continent, country, phone: `+84 9${i}0 555 01${i}${i}`, timezone: TZ,
     googleMeetLink: "https://meet.google.com/abc-defg-hij", zoomLink: "", bio: "", yearsOfExperience: yrs,
     specializations, certifications: ["TESOL"], showScheduleToStudents: true, status: "active", active: true,
@@ -178,10 +184,10 @@ async function main() {
     const created = daysFrom(-(i % 6) - 1, 9);
     return {
       _id: oid(), teacherId: t._id, studentId: s._id, title: pick(hwTitles, i), description: "Do your best and have fun! 🌟",
-      dueDate: daysFrom((i % 5) - 1), attachments: [], status,
+      dueDate: daysFrom(i === 2 ? 2 : (i % 5) - 1), attachments: [], status,
       ...(status !== "assigned" ? { submission: { text: "Here is my homework, teacher!", attachments: [], submittedAt: daysFrom(-(i % 3), 12), via: "link" } } : {}),
       ...(status === "graded" ? { grade: { score: 70 + (i * 7) % 31, feedback: pick(["Great work!", "Lovely ideas, watch your spelling.", "Excellent effort 👏"], i), gradedAt: daysFrom(-(i % 2), 14) } } : {}),
-      shareLink: { tokenHash: hex(32), tokenEnc: null, createdAt: created, failedAttempts: 0, lockedUntil: null },
+      ...(() => { const l = link(created); if (i === 2) demoLinks.homework = l.token; return { shareLink: l.shareLink }; })(),
       instructionAudio: { fileId: null, duration: 0, size: 0, mimeType: "" }, createdAt: created, updatedAt: now,
     };
   });
@@ -194,13 +200,13 @@ async function main() {
     const t = teacherOf(s, i);
     const q = {
       _id: oid(), teacherId: t._id, studentId: s._id, title: pick(quizTitles, i), instructions: "Choose the best answer.",
-      timeLimit: 10, dueDate: daysFrom((i % 4)), status: i % 3 === 2 ? "assigned" : "attempted",
+      timeLimit: 10, dueDate: daysFrom(i === 2 ? 2 : (i % 4)), status: i % 3 === 2 ? "assigned" : "attempted",
       questions: [
         { question: "Yesterday I ___ to the park.", options: [{ text: "go" }, { text: "went" }, { text: "going" }, { text: "goes" }], correctIndex: 1, explanation: "" },
         { question: "The cat is ___ the table.", options: [{ text: "under" }, { text: "at" }, { text: "of" }, { text: "for" }], correctIndex: 0, explanation: "" },
         { question: "She ___ English every day.", options: [{ text: "study" }, { text: "studies" }, { text: "studying" }, { text: "studied" }], correctIndex: 1, explanation: "" },
       ],
-      shareLink: { tokenHash: hex(32), tokenEnc: null, createdAt: daysFrom(-3), failedAttempts: 0, lockedUntil: null },
+      ...(() => { const l = link(daysFrom(-1)); if (i === 2) demoLinks.quiz = l.token; return { shareLink: l.shareLink }; })(),
       createdAt: daysFrom(-3), updatedAt: now,
     };
     quizzes.push(q);
@@ -231,6 +237,8 @@ async function main() {
   // ── Parent checks: latest classes waiting for the family, one disputed ────
   const recentDone = bookings.filter((b) => b.status === "completed").sort((a, b) => b.scheduledTime - a.scheduledTime);
   await db.collection("bookings").updateMany({ _id: { $in: recentDone.slice(0, 6).map((b) => b._id) } }, { $set: { "parentCheck.status": "waiting" } });
+  { const l = link(now); demoLinks.attendance = l.token;
+    await db.collection("bookings").updateOne({ _id: recentDone[0]._id }, { $set: { shareLink: l.shareLink, "parentCheck.sentAt": now } }); }
   await db.collection("bookings").updateOne({ _id: recentDone[6]._id }, { $set: {
     "parentCheck.status": "denied", "parentCheck.comment": "My son said the class ended after 15 minutes.",
     disputeRaised: true, disputeStatus: "pending", disputedBy: "parent", disputeReason: "Class ended early",
@@ -262,7 +270,7 @@ async function main() {
   // ── Parents, certificates ─────────────────────────────────────────────────
   await db.collection("parents").insertMany([["Hung", "Tran", [0]], ["Thu", "Pham", [1]], ["Long", "Le", [2, 12]], ["Yen", "Vo", [3]]]
     .map(([firstName, lastName, kids], i) => ({
-      _id: oid(), firstName, lastName, email: `${firstName.toLowerCase()}.${lastName.toLowerCase()}@sunrise-english.demo`,
+      _id: oid(), firstName, lastName, email: `${firstName.toLowerCase()}.${lastName.toLowerCase()}@familyenglish.demo`,
       password: null, phone: `+84 91 222 33${i}${i}`, active: i !== 3, status: i === 3 ? "pending" : "active",
       children: kids.map((k) => students[k]._id), notes: "", sessions: [], knownDevices: [], hasAcceptedTerms: true,
       createdAt: daysFrom(-30 + i), updatedAt: now,
@@ -278,7 +286,7 @@ async function main() {
   // ── Sub-admin + activity notifications ────────────────────────────────────
   const subAdminId = oid();
   await db.collection("subadmins").insertOne({
-    _id: subAdminId, firstName: "Bich", lastName: "Ngoc", email: "bich.ngoc@sunrise-english.demo", password: null, status: "active",
+    _id: subAdminId, firstName: "Bich", lastName: "Ngoc", email: "bich.ngoc@familyenglish.demo", password: null, status: "active",
     assignmentType: "manual", region: null, assignedTeachers: [teachers[1]._id, teachers[4]._id],
     permissions: { canMarkLessons: true, canViewPayments: false, canSendMessages: true, canViewBookings: true, canViewClasses: true },
     ringEnabled: true, twoFactorEnabled: false, twoFactorBackupCodes: [], sessions: [], knownDevices: [],
@@ -313,7 +321,44 @@ async function main() {
     dm(teachers[3], [["t", "Phuc scored 92% on the reading quiz! 🎉", 1500], ["a", "Amazing, please tell him well done!", 1490]]),
   ]);
 
+  // ── Class summaries (most classes have one; the latest ones still need one) ──
+  const summaries = [
+    "We practised the past simple with a story about a trip to the beach. {n} used went, saw and ate correctly 👏. Still mixing up 'goed' → 'went'. Practise at home: tell a family member about your weekend in 5 sentences.",
+    "Topic: animals & colours. {n} named 12 animals and described them with colours — great confidence today! 🌟 Home practice: draw 3 animals and say one sentence about each.",
+    "IELTS Speaking Part 2 — 'Describe a place you like'. {n} spoke for 1:45 with good linking words. Work on: longer answers and the 'th' sound. Homework: record a 2-minute answer.",
+    "Phonics: short vowels a/e/i. {n} read 20 CVC words with only 2 mistakes 🎉. Please read the word cards together for 5 minutes each evening.",
+    "Prepositions of place (in / on / under / next to). {n} did very well in the hide-and-seek game. Next class: between and behind. Practise: describe your bedroom.",
+  ];
+  const nameOf = Object.fromEntries(students.map((s) => [String(s._id), s.firstName]));
+  const seen = {};
+  const toSummarise = recentDone.filter((b) => (seen[b.teacherId] = (seen[b.teacherId] || 0) + 1) > 2);
+  await db.collection("bookings").bulkWrite(toSummarise.map((b, i) => ({ updateOne: { filter: { _id: b._id }, update: { $set: {
+    classSummary: { text: pick(summaries, i).replace("{n}", nameOf[String(b.studentId)]), updatedAt: new Date(b.completedAt.getTime() + 20 * 60000), by: b.teacherId },
+  } } } })));
+  await db.collection("groupclasses").updateOne({ status: "completed" }, { $set: { classSummary: {
+    text: "Conversation Café ☕ — we talked about favourite foods and ordering in a restaurant. Everyone spoke at least 5 times! Practise: order dinner in English at home tonight 🍜.",
+    updatedAt: daysFrom(-2, 11, 30), by: teachers[2]._id } } });
+
+  // ── Teacher responses to admin bookings → admin notifications ────────────
+  await db.collection("notifications").insertMany([
+    ["booking_accepted", teachers[0], `Sarah Mitchell accepted the class "B2 English with Sarah" with Mai Hoang.`, -0.05, {}],
+    ["booking_rejected", teachers[2], `Emily Carter declined the class "A2 English with Emily" with Thao Vu. Reason: I'm at a teacher training on Saturday morning.`, -0.2, { reason: "I'm at a teacher training on Saturday morning." }],
+    ["booking_accepted", teachers[3], `James Nguyen accepted the class "B1 English with James" with An Vo.`, -0.6, {}],
+  ].map(([type, t, message, d, meta]) => ({ _id: oid(), type, message, actorName: `${t.firstName} ${t.lastName}`, actorRole: "teacher",
+    metadata: { teacherName: `${t.firstName} ${t.lastName}`, ...meta }, read: false, createdAt: new Date(now.getTime() + d * 86400000) })));
+
+  // ── A class starting in a few minutes (shows "Remind to join") ───────────
+  const soon = new Date(Date.now() + 8 * 60000);
+  await db.collection("bookings").insertOne({
+    _id: oid(), teacherId: teachers[0]._id, studentId: students[5]._id, classTitle: "B2 English with Sarah", topic: "Job interview practice",
+    scheduledTime: soon, duration: 45, status: "accepted", notes: "", createdBy: "admin", createdByUserId: adminId, createdByUserModel: "Admin",
+    parentCheck: { status: null, comment: "", history: [] }, teacherTimezone: TZ, studentTimezone: TZ, disputeRaised: false, disputeStatus: null,
+    createdAt: daysFrom(-2), updatedAt: daysFrom(-2),
+  });
+  await db.collection("students").updateOne({ _id: students[5]._id }, { $set: { notifyEmail: "parent.hoang@familyenglish.demo", joinReminderTeacherAllowed: true } });
+
   console.log(`✅ Demo center "${SLUG}" seeded: ${teachers.length} teachers, ${students.length} students, ${bookings.length} bookings`);
+  console.log(JSON.stringify(demoLinks));
 }
 
 main()

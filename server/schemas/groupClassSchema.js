@@ -32,6 +32,12 @@ export const groupClassSchema = new mongoose.Schema({
   cancelledAt:  Date,
   cancelReason: { type: String, default: '' },
   createdBy:    { type: String, enum: ['admin', 'teacher'], default: 'admin' },
+  // Teacher's summary of the class — shared by every enrolled student (routes/classSummaryRoutes.js)
+  classSummary: {
+    text:      { type: String, maxlength: 3000 },
+    updatedAt: Date,
+    by:        { type: mongoose.Schema.Types.ObjectId, ref: 'Teacher' },
+  },
 }, { timestamps: true });
 
 groupClassSchema.index({ teacherId: 1, status: 1 });

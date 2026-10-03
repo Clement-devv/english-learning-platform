@@ -13,6 +13,7 @@
     "groupClasses": "Lớp nhóm",
     "messages": "Tin nhắn",
     "completed": "Đã hoàn thành",
+    "classReports": "Báo cáo buổi học",
     "schedule": "Lịch học",
     "progress": "Tiến độ",
     "charts": "Biểu đồ",
@@ -131,6 +132,7 @@
       "myClasses":     "Lớp học của tôi",
       "groupClasses":  "Lớp nhóm",
       "completed":     "Đã hoàn thành",
+      "classSummaries":     "Tóm tắt buổi học",
       "schedule":      "Lịch dạy",
       "students":      "Học viên",
       "bookings":      "Đặt lịch",
@@ -195,6 +197,7 @@
       "disputes":             "Tranh chấp",
       "parentChecks":         "Xác nhận phụ huynh",
       "loggedClasses":        "Lớp học ghi nhận",
+      "shareLinks":          "Liên kết phụ huynh",
       "branding":             "Thương hiệu",
       "customDomain":         "Tên miền riêng",
       "certTemplate":         "Mẫu chứng chỉ"

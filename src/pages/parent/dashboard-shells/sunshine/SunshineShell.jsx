@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { Calendar, BookOpen, Award, LayoutDashboard, LogOut, RefreshCw, Loader2, Users, CheckCircle2, ClipboardList, Smartphone } from 'lucide-react';
 import SessionManagement from '../../../../components/SessionManagement';
 import api from '../../../../api';
+import ClassReportsList from '../../../../components/ClassReportsList';
 import LanguageSwitcher from '../../../../components/LanguageSwitcher';
 import { useAuth } from '../../../../context/AuthContext.jsx';
 
@@ -255,6 +256,7 @@ function CertificatesTab({ certs, loading }) {
 const NAV = [
   { key: 'overview',     label: 'Overview',     icon: LayoutDashboard },
   { key: 'classes',      label: 'Classes',       icon: Calendar        },
+  { key: 'reports',      label: 'Class reports', icon: ClipboardList   },
   { key: 'homework',     label: 'Homework',      icon: BookOpen        },
   { key: 'certificates', label: 'Certificates',  icon: Award           },
 ];
@@ -346,6 +348,19 @@ export default function SunshineShell() {
       case 'classes':      return <ClassesTab classes={classes} loading={tabLoading} />;
       case 'homework':     return <HomeworkTab homework={homework} loading={tabLoading} />;
       case 'certificates': return <CertificatesTab certs={certs} loading={tabLoading} />;
+      case 'reports': return selectedChild ? (
+        <ClassReportsList
+          key={selectedChild._id}
+          live={false}
+          allowCopy
+          heading={`Class reports — ${selectedChild.firstName || ""}`}
+          intro="What the teacher wrote after each class: what was covered, how your child did, and what to practise at home."
+          emptyText="No class reports yet. The teacher writes one after each class."
+          fetchPage={async (page) => (await api.get(`/parents/me/child/${selectedChild._id}/class-summaries`, {
+            headers: { Authorization: `Bearer ${sessionStorage.getItem('parentToken')}` }, params: { page },
+          })).data}
+        />
+      ) : null;
       default:             return null;
     }
   };

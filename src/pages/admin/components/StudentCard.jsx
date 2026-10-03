@@ -26,6 +26,7 @@ import {
   Calendar,
   FileDown,
   KeyRound,
+  BellRing,
 } from "lucide-react";
 import { downloadStudentCard } from "../../../utils/studentPdf";
 
@@ -140,6 +141,7 @@ export default function StudentCard({
   onCopyPassword,
   onResendInvite,
   onConvert,
+  onNotifications,
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -294,6 +296,15 @@ export default function StudentCard({
                   isDarkMode={isDarkMode}
                   onClick={() => { onViewLessons(); setMenuOpen(false); }}
                 />
+                {onNotifications && (
+                  <DropdownItem
+                    icon={BellRing}
+                    label="Notifications & reminders"
+                    color="blue"
+                    isDarkMode={isDarkMode}
+                    onClick={() => { onNotifications(); setMenuOpen(false); }}
+                  />
+                )}
 
                 <div className={`my-1 h-px ${isDarkMode ? "bg-gray-700" : "bg-gray-100"}`} />
 

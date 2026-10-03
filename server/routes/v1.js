@@ -28,6 +28,8 @@ import subAdminAuthRoutes        from "./subAdminAuthRoutes.js";
 import subAdminScopeRoutes       from "./subAdminScopeRoutes.js";
 import disputeRoutes             from "./disputeRoutes.js";
 import parentCheckRoutes         from "./parentCheckRoutes.js";
+import shareLinkAdminRoutes      from "./shareLinkAdminRoutes.js";
+import classSummaryRoutes        from "./classSummaryRoutes.js";
 import offlineClassRoutes        from "./offlineClassRoutes.js";
 import classHistoryRoutes        from "./classHistoryRoutes.js";
 import contentRoutes             from "./contentRoutes.js";
@@ -84,6 +86,8 @@ router.use("/sub-admin-auth",       subAdminAuthRoutes);
 router.use("/sub-admin-scope",      subAdminScopeRoutes);
 router.use("/disputes",             disputeRoutes);
 router.use("/parent-checks",        parentCheckRoutes);
+router.use("/class-summaries",      classSummaryRoutes); // teacher writes, student/parent/admin read
+router.use("/share-links",          shareLinkAdminRoutes); // admin: copy teachers' homework/quiz parent links
 router.use("/offline-classes",      offlineClassRoutes);
 router.use("/content",              contentRoutes);
 router.use("/teacher-availability", teacherAvailabilityRoutes);

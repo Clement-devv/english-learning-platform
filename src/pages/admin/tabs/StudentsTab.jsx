@@ -26,6 +26,7 @@ import ManagedStudentModal from "../modals/ManagedStudentModal";
 import PaymentHistoryModal from "../modals/PaymentHistoryModal";
 import ManualPaymentModal from "../modals/ManualPaymentModal";
 import LessonHistoryModal from "../modals/LessonHistoryModal";
+import StudentNotifyModal from "../modals/StudentNotifyModal";
 import LessonMarkModal from "../modals/LessonMarkModal";
 import AnalyticsPinPrompt from "../../../components/admin/analytics/AnalyticsPinPrompt";
 import { isAnalyticsLocked } from "../../../utils/analyticsPin";
@@ -274,6 +275,7 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null); // student scheduled for deletion confirm
   const [convertTarget, setConvertTarget] = useState(null); // managed student getting login access
+  const [notifyTarget, setNotifyTarget]   = useState(null); // notification email + join reminders
   const [lessonModal, setLessonModal] = useState(null);
 
   // History data
@@ -1009,6 +1011,7 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
                       onCopyPassword={() => handleCopyPassword(student._id)}
                       onResendInvite={() => handleResendInvite(student._id)}
                       onConvert={modes.real ? () => setConvertTarget(student) : undefined}
+                      onNotifications={() => setNotifyTarget(student)}
                     />
                   </div>
                 </div>
@@ -1085,6 +1088,10 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
           onCancel={() => setHistoryPinPrompt(false)}
           onUnlocked={() => { setHistoryPinPrompt(false); setIsPaymentModalOpen(true); }}
         />
+      )}
+
+      {notifyTarget && (
+        <StudentNotifyModal student={notifyTarget} isDarkMode={isDarkMode} onClose={() => setNotifyTarget(null)} notify={(m) => showToast(m)} />
       )}
 
       <LessonHistoryModal

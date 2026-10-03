@@ -5,6 +5,7 @@ import { useState, useEffect, lazy, Suspense } from "react";
 import { useViewMode } from "../../../../hooks/useViewMode";
 const GroupClassTab        = lazy(() => import('../../tabs/GroupClassTab'));
 const BookingCalendarTab   = lazy(() => import('../../tabs/BookingCalendarTab'));
+const ClassReportsTab      = lazy(() => import('../../tabs/ClassReportsTab'));
 const CertificatesTab      = lazy(() => import('../../tabs/CertificatesTab'));
 import Confetti from "react-confetti";
 import {
@@ -76,6 +77,7 @@ const NAV_GROUPS = [
       { key: "group-classes",     icon: "👥", labelKey: "nav.groupClasses",  lucide: Users         },
       { key: "messages",          icon: "💬", labelKey: "nav.messages",      lucide: MessageCircle },
       { key: "completed-classes", icon: "✅", labelKey: "nav.completed",     lucide: CheckCircle2  },
+      { key: "class-reports",     icon: "📝", labelKey: "nav.classReports",  lucide: CheckCircle2  },
       { key: "schedule",          icon: "📅", labelKey: "nav.schedule",      lucide: CalendarDays  },
     ],
   },
@@ -694,6 +696,13 @@ export default function SunshineShell() {
             <div style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: "24px", padding: "24px" }}>
               <h2 style={{ margin: "0 0 20px", fontSize: "22px", fontWeight: 900, color: col.heading, display: "flex", alignItems: "center", gap: 8 }}><CheckCircle2 size={20} color={col.accent} strokeWidth={2} /> {t('dashboard.completedClasses')}</h2>
               <StudentCompletedTab studentId={d.student.id} isDarkMode={d.isDarkMode} />
+            </div>
+          )}
+
+          {/* ══ CLASS REPORTS ══ */}
+          {d.activeTab === "class-reports" && (
+            <div style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: "24px", padding: "24px" }}>
+              <Suspense fallback={null}><ClassReportsTab isDarkMode={d.isDarkMode} /></Suspense>
             </div>
           )}
 

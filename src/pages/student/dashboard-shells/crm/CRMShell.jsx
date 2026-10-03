@@ -23,6 +23,7 @@ import ClassConfirmation from "../../../../components/student/ClassConfirmation"
 import StudentCompletedTab from "../../tabs/StudentCompletedTab";
 import StudentScheduleTab  from "../../tabs/StudentScheduleTab";
 import BookingCalendarTab  from "../../tabs/BookingCalendarTab";
+import ClassReportsTab     from "../../tabs/ClassReportsTab";
 import StudentHomeworkTab  from "../../tabs/HomeworkTab";
 import StudentQuizTab      from "../../tabs/QuizTab";
 import PronunciationTab    from "../../tabs/PronunciationTab";
@@ -112,6 +113,7 @@ const NAV_GROUPS = [
     items: [
       { key:"messages",          Icon:MessageSquare, label:"Messages"  },
       { key:"completed-classes", Icon:CheckSquare,   label:"Completed" },
+      { key:"class-reports",     Icon:CheckSquare,   label:"Class reports" },
       { key:"schedule",          Icon:CalendarDays,  label:"Schedule"  },
       { key:"book-class",        Icon:CalendarDays,  label:"Book a Class" },
     ],
@@ -137,7 +139,7 @@ const NAV_GROUPS = [
 const PAGE_TITLES = {
   dashboard:"Home", homework:"Homework", quiz:"Quizzes",
   flashcards:"Flashcards", pronunciation:"Speaking", conversation:"AI Chat",
-  messages:"Messages", "completed-classes":"Completed Classes",
+  messages:"Messages", "completed-classes":"Completed Classes", "class-reports":"Class Reports",
   schedule:"Schedule", charts:"Progress", badges:"Badges",
   recordings:"Recordings", reviews:"Reviews", referral:"Invite Friends", leaderboard:"Leaderboard",
 };
@@ -660,6 +662,7 @@ export default function CRMShell() {
           {d.activeTab==="messages"          && <div style={{background:P.card,border:`1px solid ${P.border}`,borderRadius:20,overflow:"hidden"}}><MessagesTab userRole="student" onUnreadCount={d.setUnreadMessages}/></div>}
           {d.activeTab==="completed-classes" && <div style={{background:P.card,border:`1px solid ${P.border}`,borderRadius:20,padding:24}}><h2 style={{margin:"0 0 20px",fontSize:20,fontWeight:900,color:P.text}}>✅ Completed Classes</h2><StudentCompletedTab studentId={d.student.id} isDarkMode={d.isDarkMode}/></div>}
           {d.activeTab==="schedule"          && <div style={{background:P.card,border:`1px solid ${P.border}`,borderRadius:20,padding:24}}><StudentScheduleTab studentId={d.student.id} isDarkMode={d.isDarkMode}/></div>}
+          {d.activeTab==="class-reports"     && <div style={{background:P.card,border:`1px solid ${P.border}`,borderRadius:20,padding:24}}><ClassReportsTab isDarkMode={d.isDarkMode}/></div>}
           {d.activeTab==="book-class"        && <div style={{background:P.card,border:`1px solid ${P.border}`,borderRadius:20,padding:24}}><BookingCalendarTab isDarkMode={d.isDarkMode} studentInfo={d.student}/></div>}
           {d.activeTab==="recordings"        && <div style={{background:P.card,border:`1px solid ${P.border}`,borderRadius:20,padding:24}}><RecordingsTab isDarkMode={d.isDarkMode}/></div>}
           {d.activeTab==="reviews"           && <ReviewsTab isDarkMode={d.isDarkMode}/>}

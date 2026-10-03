@@ -19,6 +19,7 @@ import { signAccessToken } from '../utils/sessionClaims.js';
 import { validatePasswordStrength }     from '../utils/passwordUtils.js';
 import { sendParentInviteEmail }        from '../utils/emailService.js';
 import logger from '../utils/logger.js';
+import { summariesForStudent } from './classSummaryRoutes.js';
 import { badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
 import { loginRules, forgotPasswordRules, resetPasswordRules, validate } from '../middleware/validate.js';
 
@@ -275,6 +276,20 @@ router.get('/me/child/:studentId/classes', tenantMiddleware, verifyParent, async
     res.json({ success: true, bookings });
   } catch (err) {
     logger.error('Parent child classes error:', { error: err?.message });
+    serverError(res, 'Server error');
+  }
+});
+
+// GET /parents/me/child/:studentId/class-summaries?page= — the teacher's summary of each class
+router.get('/me/child/:studentId/class-summaries', tenantMiddleware, verifyParent, async (req, res) => {
+  try {
+    const { studentId } = req.params;
+    if (!req.parent.children.map(String).includes(studentId)) {
+      return forbidden(res, 'Access denied to this student');
+    }
+    res.json({ success: true, ...(await summariesForStudent(req.db, studentId, req.query)) });
+  } catch (err) {
+    logger.error('Parent class summaries error:', { error: err?.message });
     serverError(res, 'Server error');
   }
 });

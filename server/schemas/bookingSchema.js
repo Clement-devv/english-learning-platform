@@ -95,11 +95,20 @@ export const bookingSchema = new mongoose.Schema({
       note:      { type: String, maxlength: 500, default: '' },
     },
   },
+  // Teacher's summary of what happened in the class — shown to the student, the
+  // parent and admins (routes/classSummaryRoutes.js). Group bookings share one.
+  lastJoinReminderAt: Date, // "join your class now" email — rate limited (utils/joinReminder.js)
+  classSummary: {
+    text:      { type: String, maxlength: 3000 },
+    updatedAt: Date,
+    by:        { type: mongoose.Schema.Types.ObjectId, ref: 'Teacher' },
+  },
 }, { timestamps: true });
 
 bookingSchema.index({ teacherId: 1, status: 1 });
 // Admin approval queue for teacher-logged classes
 bookingSchema.index({ loggedByTeacher: 1, "offline.approval.status": 1, scheduledTime: -1 });
+bookingSchema.index({ studentId: 1, status: 1, scheduledTime: -1 }); // class reports (student / parent)
 // Parent-check link lookup (sparse — only teacher-confirmed managed classes)
 bookingSchema.index({ 'shareLink.tokenHash': 1 }, { unique: true, sparse: true });
 bookingSchema.index({ studentId: 1, status: 1 });

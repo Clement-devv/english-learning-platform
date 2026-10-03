@@ -5,8 +5,10 @@
 // (red = completed → not completed, green = not completed → completed).
 // The same report is emailed to admins every day after midnight.
 import { useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, Download, Mail, Loader2, Search, CalendarDays, CheckCircle2, XCircle, RefreshCw } from "lucide-react";
+import { ChevronLeft, ChevronRight, Download, Mail, Loader2, Search, CalendarDays, CheckCircle2, XCircle, RefreshCw, Copy, NotebookText } from "lucide-react";
 import api from "../../../api";
+import { getCachedCenter } from "../../../utils/branding";
+import { useOnDataChanged } from "../../../hooks/useLiveData";
 
 const addDays = (dateStr, n) => {
   const d = new Date(`${dateStr}T12:00:00Z`);
@@ -23,6 +25,27 @@ export default function ClassReportTab({ isDarkMode }) {
   const [search,  setSearch]  = useState("");
   const [busy,    setBusy]    = useState("");      // "pdf" | "email"
   const [toast,   setToast]   = useState("");
+  const [reloadKey, setReloadKey] = useState(0);
+  // Live: a class completes or a teacher saves a summary → refresh this report
+  useOnDataChanged(["bookings", "classes"], () => setReloadKey(k => k + 1));
+  const [openSummary, setOpenSummary] = useState({}); // row id → expanded
+
+  // Ready-to-send message for the parent: class details + the teacher's summary
+  const parentMessage = (r) => {
+    const center = getCachedCenter()?.centerName || "the school";
+    return `Hello! This is ${center}. Here is the class report for ${r.studentFirst || r.studentName}.
+
+`
+      + `Class: ${r.classTitle}
+Date: ${r.classDate} ${r.timeLabel}
+Teacher: ${r.teacherName}
+
+${r.summary}`;
+  };
+  const copySummary = async (r) => {
+    try { await navigator.clipboard.writeText(parentMessage(r)); setToast("Report copied — paste it into WhatsApp, Zalo or Facebook"); setTimeout(() => setToast(""), 3500); }
+    catch { setToast("Could not copy"); setTimeout(() => setToast(""), 3500); }
+  };
 
   const col = {
     card:   isDarkMode ? "#1a1d2e" : "#ffffff",
@@ -38,7 +61,7 @@ export default function ClassReportTab({ isDarkMode }) {
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
+    if (!reloadKey) setLoading(true); // live refreshes stay quiet
     setError("");
     api.get("/admin/class-report", { params: date ? { date } : {} })
       .then(r => {
@@ -50,7 +73,7 @@ export default function ClassReportTab({ isDarkMode }) {
       .catch(e => !cancelled && setError(e?.response?.data?.message || "Could not load the report"))
       .finally(() => !cancelled && setLoading(false));
     return () => { cancelled = true; };
-  }, [date]);
+  }, [date, reloadKey]);
 
   // Search filters rows by teacher, student or class name
   const filterGroups = (groups) => {
@@ -123,6 +146,35 @@ export default function ClassReportTab({ isDarkMode }) {
                       <td style={{ padding: "8px 12px", color: col.muted }}>{r.duration}</td>
                       <td style={{ padding: "8px 12px", color: col.muted }}>{notes}</td>
                     </tr>,
+                    r.outcome === "completed" && (
+                      <tr key={`${r.id}-sum`}>
+                        <td colSpan={6} style={{ padding: "0 12px 10px 15px" }}>
+                          {r.summary ? (
+                            <div style={{ display: "flex", gap: 10, alignItems: "flex-start", background: isDarkMode ? "rgba(99,102,241,0.08)" : "#f5f7ff", border: `1px solid ${col.border}`, borderRadius: 10, padding: "8px 10px" }}>
+                              <NotebookText size={14} color={col.accent} style={{ flexShrink: 0, marginTop: 2 }} />
+                              <div style={{ flex: 1, minWidth: 0, fontSize: 12.5, color: col.text, lineHeight: 1.55, whiteSpace: "pre-wrap",
+                                ...(openSummary[r.id] ? {} : { display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }) }}>
+                                {r.summary}
+                              </div>
+                              <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                                {r.summary.length > 140 && (
+                                  <button type="button" onClick={() => setOpenSummary(o => ({ ...o, [r.id]: !o[r.id] }))}
+                                    style={{ padding: "4px 8px", borderRadius: 8, border: `1px solid ${col.border}`, background: "transparent", color: col.muted, fontSize: 11.5, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+                                    {openSummary[r.id] ? "Less" : "More"}
+                                  </button>
+                                )}
+                                <button type="button" onClick={() => copySummary(r)} title="Copy a ready-to-send message with this summary"
+                                  style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 9px", borderRadius: 8, border: "none", background: col.accent, color: "#fff", fontSize: 11.5, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>
+                                  <Copy size={11} /> Copy for parent
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <span style={{ fontSize: 11.5, color: col.muted, fontStyle: "italic" }}>No class summary from the teacher yet</span>
+                          )}
+                        </td>
+                      </tr>
+                    ),
                     r.change && (
                       <tr key={`${r.id}-chg`} style={{ boxShadow: `inset 3px 0 0 ${mark}` }}>
                         <td colSpan={6} style={{ padding: "0 12px 9px 15px", fontSize: 12, fontWeight: 700, color: mark }}>

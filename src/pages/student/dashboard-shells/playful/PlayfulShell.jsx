@@ -27,6 +27,7 @@ import ClassConfirmation from "../../../../components/student/ClassConfirmation"
 import PendingConfirmationBanners from "../PendingConfirmationBanners";
 import StudentCompletedTab from "../../tabs/StudentCompletedTab";
 import BookingCalendarTab from "../../tabs/BookingCalendarTab";
+import ClassReportsTab from "../../tabs/ClassReportsTab";
 import StudentScheduleTab  from "../../tabs/StudentScheduleTab";
 import StudentHomeworkTab  from "../../tabs/HomeworkTab";
 import StudentQuizTab      from "../../tabs/QuizTab";
@@ -84,7 +85,7 @@ const NAV = [
   { id:"study",     Icon:BookOpen,       label:"Study",    tabs:["homework","quiz","flashcards"],    dot:"#4D96FF" },
   { id:"practice",  Icon:Mic2,           label:"Practice", tabs:["pronunciation","conversation"],    dot:"#FFD93D" },
   { id:"messages",  Icon:MessageSquare,  label:"Messages", tabs:["messages"],                        dot:"#4ADE80" },
-  { id:"classes",   Icon:CalendarDays,   label:"Classes",  tabs:["completed-classes","schedule","book-class"],    dot:"#06B6D4" },
+  { id:"classes",   Icon:CalendarDays,   label:"Classes",  tabs:["completed-classes","schedule","book-class","class-reports"],    dot:"#06B6D4" },
   { id:"progress",  Icon:BarChart2,      label:"Progress", tabs:["charts","badges"],                 dot:"#FF8E53" },
   { id:"more",      Icon:MoreHorizontal, label:"More",     tabs:["recordings","reviews","referral","leaderboard"], dot:"#818CF8" },
 ];
@@ -92,7 +93,7 @@ const NAV = [
 const SUB_TABS = {
   study:    [{ key:"homework",label:"Homework" }, { key:"quiz",label:"Quizzes" }, { key:"flashcards",label:"Flashcards" }],
   practice: [{ key:"pronunciation",label:"Speak" }, { key:"conversation",label:"AI Chat" }],
-  classes:  [{ key:"completed-classes",label:"Completed" }, { key:"schedule",label:"Schedule" }, { key:"book-class",label:"Book a Class" }],
+  classes:  [{ key:"completed-classes",label:"Completed" }, { key:"schedule",label:"Schedule" }, { key:"book-class",label:"Book a Class" }, { key:"class-reports",label:"Reports" }],
   progress: [{ key:"charts",label:"Charts" }, { key:"badges",label:"Badges" }],
   more:     [{ key:"recordings",label:"Recordings" }, { key:"reviews",label:"Reviews" }, { key:"referral",label:"Invite" }, { key:"leaderboard",label:"Leaderboard" }],
 };
@@ -611,6 +612,8 @@ export default function PlayfulShell() {
 
           {/* ════ SCHEDULE ════ */}
           {d.activeTab==="schedule"&&<div style={{background:P.card,borderRadius:20,padding:24,border:`1px solid ${P.border}`}}><StudentScheduleTab studentId={d.student.id} isDarkMode={d.isDarkMode}/></div>}
+          {/* ════ CLASS REPORTS ════ */}
+          {d.activeTab==="class-reports"&&<div style={{background:P.card,borderRadius:20,padding:24,border:`1px solid ${P.border}`}}><ClassReportsTab isDarkMode={d.isDarkMode}/></div>}
           {/* ════ BOOK A CLASS ════ */}
           {d.activeTab==="book-class"&&<div style={{background:P.card,borderRadius:20,padding:24,border:`1px solid ${P.border}`}}><BookingCalendarTab isDarkMode={d.isDarkMode} studentInfo={d.student}/></div>}
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { Bell, CheckCheck, Filter, RefreshCw, BookOpen, RotateCcw, Shield } from "lucide-react";
+import { Bell, CheckCheck, Filter, RefreshCw, BookOpen, RotateCcw, Shield, CalendarCheck, CalendarX, User } from "lucide-react";
 import api from "../../../api";
 import { useOnDataChanged } from "../../../hooks/useLiveData";
 
@@ -17,6 +17,21 @@ const TYPE_META = {
     bgLight: "#fef3c7",
     bgDark:  "rgba(245,158,11,0.12)",
     label:   "Class Unmarked",
+  },
+  // A teacher answered a class the admin booked for them
+  booking_accepted: {
+    icon:    CalendarCheck,
+    color:   "#059669",
+    bgLight: "#d1fae5",
+    bgDark:  "rgba(5,150,105,0.12)",
+    label:   "Class Accepted",
+  },
+  booking_rejected: {
+    icon:    CalendarX,
+    color:   "#dc2626",
+    bgLight: "#fee2e2",
+    bgDark:  "rgba(220,38,38,0.12)",
+    label:   "Class Declined",
   },
 };
 
@@ -290,8 +305,10 @@ export default function NotificationsTab({ isDarkMode, onUnreadCount }) {
                       {meta.label}
                     </span>
                     <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                      <Shield size={11} color={muted} />
-                      <span style={{ fontSize: "12px", color: muted, fontWeight: "600" }}>{n.subAdminName}</span>
+                      {n.subAdminName ? <Shield size={11} color={muted} /> : <User size={11} color={muted} />}
+                      <span style={{ fontSize: "12px", color: muted, fontWeight: "600" }}>
+                        {n.subAdminName || n.actorName}{!n.subAdminName && n.actorRole ? ` · ${n.actorRole[0].toUpperCase()}${n.actorRole.slice(1)}` : ""}
+                      </span>
                     </div>
                   </div>
                   <p style={{ margin: 0, fontSize: "13.5px", color: text, fontWeight: n.read ? "400" : "600", lineHeight: "1.5" }}>

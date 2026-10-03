@@ -3,8 +3,12 @@ import mongoose from 'mongoose';
 export const notificationSchema = new mongoose.Schema({
   type:         { type: String, required: true },
   message:      { type: String, required: true },
-  subAdminId:   { type: mongoose.Schema.Types.ObjectId, ref: 'SubAdmin', required: true },
-  subAdminName: { type: String, required: true },
+  // Who did it. Sub-admin activity sets subAdminId/subAdminName; other people
+  // (e.g. a teacher accepting a class the admin booked) set actorName/actorRole.
+  subAdminId:   { type: mongoose.Schema.Types.ObjectId, ref: 'SubAdmin' },
+  subAdminName: { type: String },
+  actorName:    { type: String },
+  actorRole:    { type: String },
   metadata:     { type: mongoose.Schema.Types.Mixed, default: {} },
   read:         { type: Boolean, default: false },
   createdAt:    { type: Date, default: Date.now },

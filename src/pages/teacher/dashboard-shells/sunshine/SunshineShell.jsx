@@ -7,7 +7,7 @@ import React, { useState, lazy, Suspense } from 'react';
 import { useViewMode } from '../../../../hooks/useViewMode';
 const GroupClassesTab = lazy(() => import('../../tabs/GroupClassesTab'));
 import {
-  Home, Calendar, CheckCircle2, Users, BookOpen, MessageCircle,
+  Home, Calendar, CheckCircle2, Users, BookOpen, MessageCircle, NotebookPen,
   DollarSign, Star, User, CalendarDays, FileText, Layers, ClipboardList,
   Settings, LogOut, Plus, RefreshCw, Video, Bell, BarChart2, PhoneMissed, X, Clock4,
 } from 'lucide-react';
@@ -56,6 +56,7 @@ const makeNavGroups = (t) => [
       { key: 'classes',           icon: '📅', label: t('teacher.nav.myClasses'),    lucide: CalendarDays  },
       { key: 'group-classes',     icon: '👥', label: t('teacher.nav.groupClasses'), lucide: Users         },
       { key: 'completed-classes', icon: '✅', label: t('teacher.nav.completed'),    lucide: CheckCircle2  },
+      { key: 'class-summaries',   icon: '📝', label: t('teacher.nav.classSummaries'), lucide: NotebookPen },
       { key: 'schedule',          icon: '🗓️', label: t('teacher.nav.schedule'),     lucide: Calendar      },
     ],
   },

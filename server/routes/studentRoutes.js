@@ -27,6 +27,7 @@ import { assignmentSchema } from "../schemas/assignmentSchema.js";
 import { parsePagination, DIRECTORY_MAX } from "../utils/pagination.js";
 import logger from "../utils/logger.js";
 import { sharedSnapshot } from "../utils/sharedSnapshot.js";
+import { sendJoinReminder, currentClassFor, maskEmail, ReminderError } from "../utils/joinReminder.js";
 import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
 import { assignStudentId, generateStudentId } from '../utils/studentIdGenerator.js';
 import { generateSecurePassword } from '../utils/passwordUtils.js';
@@ -202,6 +203,64 @@ router.post("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
   } catch (err) {
     logger.error(err);
     serverError(res, "Error creating student");
+  }
+});
+
+// ─── Notification settings (admin) ──────────────────────────────────────────
+// notifyEmail: optional address for notifications only (managed students — never a
+// login). joinReminderTeacherAllowed: may teachers send this student join reminders?
+router.get("/:id/notify-settings", verifyToken, verifyAdmin, async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return badRequest(res, "Invalid student");
+    const s = await getStudent(req.db).findById(req.params.id).select("isManaged email +notifyEmail joinReminderTeacherAllowed firstName lastName").lean();
+    if (!s) return notFound(res, "Student not found");
+    const current = await currentClassFor(req.db, s._id);
+    res.json({ success: true, settings: {
+      isManaged: !!s.isManaged,
+      notifyEmail: s.notifyEmail || "",
+      reminderEmail: s.isManaged ? (s.notifyEmail || "") : (s.email || ""), // where reminders go
+      joinReminderTeacherAllowed: s.joinReminderTeacherAllowed !== false,
+      currentClass: current ? { id: current._id, title: current.classTitle, scheduledTime: current.scheduledTime, duration: current.duration } : null,
+    } });
+  } catch (err) {
+    logger.error("Notify settings read error:", { error: err?.message });
+    serverError(res);
+  }
+});
+
+router.patch("/:id/notify-settings", verifyToken, verifyAdmin, async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return badRequest(res, "Invalid student");
+    const set = {};
+    if (req.body.notifyEmail !== undefined) {
+      const e = String(req.body.notifyEmail || "").trim().toLowerCase();
+      if (e && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) return badRequest(res, "Please enter a valid email address");
+      if (e.length > 200) return badRequest(res, "Email is too long");
+      set.notifyEmail = e;
+    }
+    if (req.body.joinReminderTeacherAllowed !== undefined) set.joinReminderTeacherAllowed = !!req.body.joinReminderTeacherAllowed;
+    if (!Object.keys(set).length) return badRequest(res, "Nothing to update");
+    const s = await getStudent(req.db).findByIdAndUpdate(req.params.id, { $set: set }, { new: true, select: "+notifyEmail joinReminderTeacherAllowed" });
+    if (!s) return notFound(res, "Student not found");
+    res.json({ success: true, message: "Notification settings saved", settings: { notifyEmail: s.notifyEmail || "", joinReminderTeacherAllowed: s.joinReminderTeacherAllowed !== false } });
+  } catch (err) {
+    logger.error("Notify settings save error:", { error: err?.message });
+    serverError(res);
+  }
+});
+
+// Admin: "remind to join" for the class the student should be in right now
+router.post("/:id/join-reminder", verifyToken, verifyAdmin, async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return badRequest(res, "Invalid student");
+    const current = await currentClassFor(req.db, req.params.id);
+    if (!current) return badRequest(res, "This student has no class starting now (reminders work from 30 minutes before a class until it ends)");
+    const r = await sendJoinReminder(req.db, req.center, current._id, { role: "admin", id: req.user.id });
+    res.json({ success: true, message: `Reminder sent to ${r.sentTo} for "${current.classTitle}"`, sentTo: r.sentTo });
+  } catch (err) {
+    if (err instanceof ReminderError) return res.status(err.status).json({ success: false, message: err.message });
+    logger.error("Admin join reminder error:", { error: err?.message });
+    serverError(res, "Could not send the reminder");
   }
 });
 

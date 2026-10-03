@@ -77,7 +77,7 @@ const NAV = [
 // Which tabs belong to each nav section
 const SECTION_TABS = {
   dashboard: ['dashboard'],
-  classes:   ['classes', 'completed-classes', 'schedule'],
+  classes:   ['classes', 'completed-classes', 'class-summaries', 'schedule'],
   students:  ['students'],
   bookings:  ['bookings'],
   content:   ['homework', 'quiz', 'vocab'],
@@ -90,6 +90,7 @@ const SUB_TABS = {
   classes: [
     { key: 'classes',           label: 'Active'    },
     { key: 'completed-classes', label: 'Completed' },
+    { key: 'class-summaries',   label: 'Summaries' },
     { key: 'schedule',          label: 'Schedule'  },
   ],
   content: [
@@ -119,7 +120,7 @@ const TILES = [
 ];
 
 const PAGE_TITLE = {
-  dashboard: 'Home', classes: 'My Classes', 'completed-classes': 'Completed Classes',
+  dashboard: 'Home', classes: 'My Classes', 'completed-classes': 'Completed Classes', 'class-summaries': 'Class Summaries',
   schedule: 'Schedule', students: 'Students', bookings: 'Bookings', messages: 'Messages',
   payment: 'Payment', homework: 'Homework', quiz: 'Quizzes', vocab: 'Vocabulary',
   recordings: 'Recordings', reviews: 'Reviews', profile: 'Profile', 'rating-dashboard': 'Rating Insights',

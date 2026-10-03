@@ -28,6 +28,7 @@ import ClassConfirmation from "../../../../components/student/ClassConfirmation"
 import PendingConfirmationBanners from "../PendingConfirmationBanners";
 import StudentCompletedTab from "../../tabs/StudentCompletedTab";
 import BookingCalendarTab from "../../tabs/BookingCalendarTab";
+import ClassReportsTab from "../../tabs/ClassReportsTab";
 import StudentScheduleTab from "../../tabs/StudentScheduleTab";
 import StudentHomeworkTab from "../../tabs/HomeworkTab";
 import StudentQuizTab from "../../tabs/QuizTab";
@@ -85,7 +86,7 @@ const NAV = [
   { id:"study",     Icon:BookOpen,       label:"Study",      tabs:["homework","quiz","flashcards"]     },
   { id:"practice",  Icon:Mic2,           label:"Practice",   tabs:["pronunciation","conversation"]     },
   { id:"messages",  Icon:MessageSquare,  label:"Messages",   tabs:["messages"]                         },
-  { id:"classes",   Icon:CalendarDays,   label:"Classes",    tabs:["completed-classes","schedule","book-class"]     },
+  { id:"classes",   Icon:CalendarDays,   label:"Classes",    tabs:["completed-classes","schedule","book-class","class-reports"]     },
   { id:"progress",  Icon:BarChart2,      label:"Progress",   tabs:["charts","badges"]                  },
   { id:"more",      Icon:MoreHorizontal, label:"More",       tabs:["recordings","reviews","referral","leaderboard"]  },
 ];
@@ -93,7 +94,7 @@ const NAV = [
 const SUB_TABS = {
   study:    [{ key:"homework",label:"Homework" }, { key:"quiz",label:"Quizzes" }, { key:"flashcards",label:"Flashcards" }],
   practice: [{ key:"pronunciation",label:"Speak" }, { key:"conversation",label:"AI Chat" }],
-  classes:  [{ key:"completed-classes",label:"Completed" }, { key:"schedule",label:"Schedule" }, { key:"book-class",label:"Book a Class" }],
+  classes:  [{ key:"completed-classes",label:"Completed" }, { key:"schedule",label:"Schedule" }, { key:"book-class",label:"Book a Class" }, { key:"class-reports",label:"Reports" }],
   progress: [{ key:"charts",label:"Charts" }, { key:"badges",label:"Badges" }],
   more:     [{ key:"recordings",label:"Recordings" }, { key:"reviews",label:"Reviews" }, { key:"referral",label:"Invite" }, { key:"leaderboard",label:"Leaderboard" }],
 };
@@ -762,6 +763,13 @@ export default function AcademyShell() {
           {d.activeTab === "schedule" && (
             <div style={{ background:P.card, borderRadius:"16px", padding:"24px", border:`1px solid ${P.border}` }}>
               <StudentScheduleTab studentId={d.student.id} isDarkMode={d.isDarkMode} />
+            </div>
+          )}
+
+          {/* ═══ CLASS REPORTS ═══ */}
+          {d.activeTab === "class-reports" && (
+            <div style={{ background:P.card, borderRadius:"16px", padding:"24px", border:`1px solid ${P.border}` }}>
+              <ClassReportsTab isDarkMode={d.isDarkMode} />
             </div>
           )}
 

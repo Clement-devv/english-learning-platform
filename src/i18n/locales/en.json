@@ -13,6 +13,7 @@
     "groupClasses": "Group Classes",
     "messages": "Messages",
     "completed": "Completed",
+    "classReports": "Class Reports",
     "schedule": "Schedule",
     "progress": "Progress",
     "charts": "Charts",
@@ -131,6 +132,7 @@
       "myClasses":     "My Classes",
       "groupClasses":  "Group Classes",
       "completed":     "Completed",
+      "classSummaries":     "Class Summaries",
       "schedule":      "Schedule",
       "students":      "Students",
       "bookings":      "Bookings",
@@ -195,6 +197,7 @@
       "disputes":             "Disputes",
       "parentChecks":         "Parent checks",
       "loggedClasses":        "Logged classes",
+      "shareLinks":          "Parent links",
       "branding":             "Branding",
       "customDomain":         "Custom Domain",
       "certTemplate":         "Certificate Template"

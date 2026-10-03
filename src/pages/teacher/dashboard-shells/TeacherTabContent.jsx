@@ -16,6 +16,7 @@ import VocabTab            from '../tabs/VocabTab';
 import RecordingsTab       from '../tabs/RecordingsTab';
 import ReviewsTab          from '../tabs/ReviewsTab';
 import RatingDashboardTab  from '../tabs/RatingDashboardTab';
+import ClassSummariesTab   from '../tabs/ClassSummariesTab';
 import ProfileTab          from '../tabs/ProfileTab';
 import MessagesTab         from '../../../components/chat/MessagesTab';
 import { Calendar, Users } from 'lucide-react';
@@ -78,6 +79,15 @@ export default function TeacherTabContent({ d, wrapStyle = {}, msgStyle = {}, he
           students={d.students}
           onRefresh={d.fetchTeacherData}
         />
+      </div>
+    );
+  }
+
+  // ── CLASS SUMMARIES (write what happened in each completed class) ─────────
+  if (activeTab === 'class-summaries') {
+    return (
+      <div style={wrapStyle}>
+        <ClassSummariesTab isDarkMode={isDarkMode} />
       </div>
     );
   }

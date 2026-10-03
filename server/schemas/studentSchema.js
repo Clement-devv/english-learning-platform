@@ -14,6 +14,11 @@ export const studentSchema = new mongoose.Schema({
   // Behaves like a normal student (assignments, bookings, lessons, credits) but
   // has no password and can never log in. Used by centers that don't onboard students.
   isManaged: { type: Boolean, default: false },
+  // Optional address for notifications only (e.g. "join your class now"). Never used to
+  // log in — managed students keep their placeholder login email. Hidden from teachers.
+  notifyEmail: { type: String, default: '', trim: true, lowercase: true, maxlength: 200, select: false },
+  // Admin switch: may this student's teachers send them "join your class" reminders?
+  joinReminderTeacherAllowed: { type: Boolean, default: true },
   password: { type: String, required: false },
   active: { type: Boolean, default: false },
   classCredits: { type: Number, default: 0 },

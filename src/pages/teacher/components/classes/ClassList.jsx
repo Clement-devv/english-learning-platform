@@ -1,7 +1,39 @@
 // src/pages/teacher/components/classes/ClassList.jsx
 import React, { useState } from "react";
-import { Calendar, Clock, Trash2, Users, ChevronRight, Video, Grid, List, CalendarDays, MoreVertical } from "lucide-react";
+import { Calendar, Clock, Trash2, Users, ChevronRight, Video, Grid, List, CalendarDays, MoreVertical, BellRing } from "lucide-react";
 import { getUserTimezone, formatInTZ, tzAbbr } from "../../../../utils/timezone";
+import api from "../../../../api";
+
+// "Remind to join": emails the student(s) that the class is starting (server/utils/joinReminder.js).
+// The teacher never sees the address; the admin can switch this off per student.
+function RemindButton({ classItem, full = false }) {
+  const [state, setState] = useState({ busy: false, msg: "", error: false });
+  if (!["live", "upcoming-soon"].includes(classItem.status)) return null;
+  const ids = classItem.bookingIds?.length ? classItem.bookingIds : [classItem.bookingId || classItem.id];
+  const send = async () => {
+    setState({ busy: true, msg: "", error: false });
+    const results = [];
+    for (const id of ids) {
+      try { const { data } = await api.post(`/bookings/${id}/join-reminder`); results.push({ ok: true, msg: data.message }); }
+      catch (err) { results.push({ ok: false, msg: err?.response?.data?.message || "Could not send" }); }
+    }
+    const okCount = results.filter(r => r.ok).length;
+    const firstError = results.find(r => !r.ok)?.msg;
+    setState({ busy: false, error: okCount === 0,
+      msg: okCount === ids.length ? (ids.length > 1 ? `Reminder sent to ${okCount} students` : results[0].msg)
+         : okCount ? `Sent to ${okCount} of ${ids.length} — ${firstError}` : firstError });
+    setTimeout(() => setState(s => ({ ...s, msg: "" })), 6000);
+  };
+  return (
+    <div className={full ? "flex-1" : ""}>
+      <button type="button" onClick={send} disabled={state.busy} title="Email the student that the class is starting"
+        className={`${full ? "w-full justify-center" : ""} px-4 py-2 rounded-lg font-semibold transition-all flex items-center gap-2 border border-amber-400 text-amber-700 bg-amber-50 hover:bg-amber-100 disabled:opacity-60`}>
+        <BellRing className="w-4 h-4" /> {state.busy ? "Sending…" : "Remind to join"}
+      </button>
+      {state.msg && <p role="status" className={`mt-1 text-xs font-semibold max-w-[220px] ${state.error ? "text-red-600" : "text-green-600"}`}>{state.msg}</p>}
+    </div>
+  );
+}
 
 export default function ClassList({ data, onJoin, onDelete, isDarkMode }) {
   const myTZ    = getUserTimezone();
@@ -339,6 +371,7 @@ export default function ClassList({ data, onJoin, onDelete, isDarkMode }) {
                           <Video className="w-4 h-4" />
                           {classItem.status === 'live' ? 'Join Now' : 'Start'}
                         </button>
+                        <RemindButton classItem={classItem} />
                         <button
                           onClick={() => onDelete(classItem)}
                           className={`px-4 py-2 rounded-lg font-semibold transition-all flex items-center gap-2 ${
@@ -444,6 +477,7 @@ export default function ClassList({ data, onJoin, onDelete, isDarkMode }) {
                   <Video className="w-4 h-4" />
                   {classItem.status === 'live' ? 'Join Now!' : 'Start Class'}
                 </button>
+                <RemindButton classItem={classItem} full />
                 <button
                   onClick={() => onDelete(classItem)}
                   className={`px-4 py-2 rounded-lg transition-all ${

@@ -16,6 +16,8 @@ import { studentSchema }            from "../schemas/studentSchema.js";
 import { paymentTransactionSchema } from "../schemas/paymentTransactionSchema.js";
 import { teacherAvailabilitySchema } from "../schemas/teacherAvailabilitySchema.js";
 import { freeIntervals, teacherTz, bookingInterval, BUSY_STATUSES } from "../utils/schedule.js";
+import { notifyAdmins } from "../utils/adminNotify.js";
+import { sendJoinReminder, ReminderError } from "../utils/joinReminder.js";
 import logger from "../utils/logger.js";
 import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
 import { checkAndAwardCertificates } from './certificateRoutes.js';
@@ -251,6 +253,17 @@ router.patch("/:id/accept", verifyToken, validateObjectId("id"), async (req, res
     booking.acceptedAt = new Date();
     await booking.save();
 
+    // A class the admin booked → tell the admins the teacher accepted it
+    if (isTeacher && booking.createdBy === "admin") {
+      const tName = `${booking.teacherId.firstName} ${booking.teacherId.lastName}`.trim();
+      const sName = `${booking.studentId.firstName} ${booking.studentId.lastName || ""}`.trim();
+      notifyAdmins(req.db, {
+        type: "booking_accepted", actorName: tName, actorRole: "teacher",
+        message: `${tName} accepted the class "${booking.classTitle}" with ${sName}.`,
+        metadata: { bookingId: booking._id, classTitle: booking.classTitle, teacherName: tName, studentName: sName, scheduledTime: booking.scheduledTime },
+      });
+    }
+
     try { await sendBookingAcceptedToStudent(booking.studentId, booking.teacherId, booking, req.center?.centerName || "", req.center); }
     catch (e) { logger.error("Email notification failed:", { error: e?.message }); }
 
@@ -270,6 +283,21 @@ router.patch("/:id/accept", verifyToken, validateObjectId("id"), async (req, res
   } catch (err) {
     logger.error("Error accepting booking:", { error: err?.message });
     res.status(500).json({ success: false, message: "Error accepting booking" });
+  }
+});
+
+// ─── POST join-reminder — "your class is starting, please join" email ────────
+// Teacher of the class (if the admin allows it for this student) or an admin.
+// The response never contains the student's email address for teachers.
+router.post("/:id/join-reminder", verifyToken, validateObjectId("id"), async (req, res) => {
+  try {
+    if (!["teacher", "admin"].includes(req.user.role)) return forbidden(res, "Not allowed");
+    const r = await sendJoinReminder(req.db, req.center, req.params.id, { role: req.user.role, id: req.user.id });
+    res.json({ success: true, message: `Reminder sent to ${r.studentName || "the student"}`, ...(req.user.role === "admin" ? { sentTo: r.sentTo } : {}) });
+  } catch (err) {
+    if (err instanceof ReminderError) return res.status(err.status).json({ success: false, message: err.message });
+    logger.error("Join reminder error:", { error: err?.message });
+    serverError(res, "Could not send the reminder");
   }
 });
 
@@ -293,6 +321,17 @@ router.patch("/:id/reject", verifyToken, validateObjectId("id"), async (req, res
     booking.rejectionReason = reason || "No reason provided";
     booking.rejectedAt      = new Date();
     await booking.save();
+
+    // A class the admin booked → tell the admins the teacher declined it (with the reason)
+    if (isTeacher && booking.createdBy === "admin") {
+      const tName = `${booking.teacherId.firstName} ${booking.teacherId.lastName}`.trim();
+      const sName = `${booking.studentId.firstName} ${booking.studentId.lastName || ""}`.trim();
+      notifyAdmins(req.db, {
+        type: "booking_rejected", actorName: tName, actorRole: "teacher",
+        message: `${tName} declined the class "${booking.classTitle}" with ${sName}. Reason: ${booking.rejectionReason}`,
+        metadata: { bookingId: booking._id, classTitle: booking.classTitle, teacherName: tName, studentName: sName, scheduledTime: booking.scheduledTime, reason: booking.rejectionReason },
+      });
+    }
 
     try { await sendBookingRejectedToStudent(booking.studentId, booking.teacherId, booking, req.center?.centerName || "", req.center); }
     catch (e) { logger.error("Email notification failed:", { error: e?.message }); }
