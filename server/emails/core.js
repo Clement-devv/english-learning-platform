@@ -3,6 +3,10 @@ import nodemailer from "nodemailer";
 import { config } from "../config/config.js";
 import logger from "../utils/logger.js";
 import { isManagedEmail } from "../utils/managedStudent.js";
+import { recordEvent, centerForEmail, emailActor } from "../utils/monitor.js";
+
+// Read by the super admin's App Health checks (utils/monitorChecks.js)
+export const emailHealth = { configured: null, provider: null, detail: "", checkedAt: null };
 
 /**
  * Resolve the correct base URL for email links sent to a center's users.
@@ -50,7 +54,10 @@ const smtpTransporter = !useResend
 
 // ── verifyEmailConfig ─────────────────────────────────────────────────────────
 export const verifyEmailConfig = async () => {
+  emailHealth.checkedAt = new Date();
+  emailHealth.provider = useResend ? "Resend" : "SMTP";
   if (useResend) {
+    emailHealth.configured = true;
     logger.info(`📧 Email via Resend HTTP API — from: ${config.emailFrom || process.env.EMAIL_FROM}`);
     logger.info("✅ Email service is ready (Resend)");
     return true;
@@ -59,15 +66,41 @@ export const verifyEmailConfig = async () => {
   try {
     await smtpTransporter.verify();
     logger.info("✅ Email service is ready (SMTP)");
+    emailHealth.configured = true;
     return true;
   } catch (error) {
     logger.error("❌ Email service error:", { error: error?.message });
+    emailHealth.configured = false;
+    emailHealth.detail = String(error?.message || "SMTP connection failed").slice(0, 200);
     return false;
   }
 };
 
 // ── sendEmail ─────────────────────────────────────────────────────────────────
+// Every real send (not managed-student placeholders) is recorded for the App
+// Health tab: which email, which center, sent or failed. Pass `kind` to give an
+// email a clear name there; otherwise the subject (minus numbers) is used.
 export const sendEmail = async (mailOptions) => {
+  const result = await deliver(mailOptions);
+  if (!result?.skipped) {
+    const first = [].concat(mailOptions?.to || [])[0];
+    recordEvent({
+      kind: "email",
+      action: mailOptions?.kind || emailName(mailOptions?.subject),
+      ok: !!result?.success,
+      msg: result?.success ? "" : result?.error,
+      center: mailOptions?.centerSlug || centerForEmail(mailOptions?.centerName),
+      actor: emailActor(first),
+      meta: { provider: useResend ? "Resend" : "SMTP" },
+    });
+  }
+  return result;
+};
+
+/** "Your class with Anna starts in 15 minutes" → "Your class with Anna starts in # minutes" */
+const emailName = (subject) => String(subject || "Email").replace(/\d+/g, "#").replace(/\s+/g, " ").trim().slice(0, 80);
+
+const deliver = async (mailOptions) => {
   const { centerName, subject, html, text, replyTo } = mailOptions;
 
   // Managed students have placeholder addresses — drop them so every email

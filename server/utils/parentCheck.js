@@ -19,6 +19,7 @@ import { teacherSchema } from "../schemas/teacherSchema.js";
 import { linkExpiresAt } from "./shareLink.js";
 import { reverseCompletedClass } from "./classReversal.js";
 import logger from "./logger.js";
+import { trackJob } from "./monitor.js";
 
 export const LINK_DAYS    = 4;
 export const DISPUTE_DAYS = 3;
@@ -109,8 +110,10 @@ const INTERVAL_MS = 10 * 60 * 1000;
 
 /** Start the sweep for one center (call once per center on startup). */
 export function startParentCheckScheduler(db, center) {
-  const run = () => sweepParentChecks(db, center).catch(err =>
-    logger.error("[ParentCheck] Sweep error:", { error: err?.message }));
+  const run = trackJob("Parent checks", center?.slug || db.name, INTERVAL_MS, () => sweepParentChecks(db, center).catch(err => {
+    logger.error("[ParentCheck] Sweep error:", { error: err?.message });
+    throw err; // → App Health
+  }));
   run(); // catch up on anything that expired while the server was down
   const id = setInterval(run, INTERVAL_MS);
   logger.info(`[ParentCheck] Scheduler started for ${center?.slug} (every ${INTERVAL_MS / 60000} min)`);

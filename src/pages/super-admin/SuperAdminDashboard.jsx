@@ -9,6 +9,7 @@ import {
   Globe, RefreshCw, Trash2, Mail, KeyRound, Palette,
   BarChart2, ChevronDown, ChevronUp, ToggleLeft, ToggleRight, Video, Mic, Film,
   AlertTriangle, RotateCcw, Zap, Send, Activity, Users, UserCheck, LogIn, Megaphone, SlidersHorizontal, Award, Sun, Moon, Menu,
+  HeartPulse,
 } from 'lucide-react';
 import api from '../../api';
 import { TIMEZONE_OPTIONS } from '../../utils/timezone';
@@ -22,6 +23,7 @@ import { CLASSROOM_THEMES }            from '../../data/classroomThemes';
 import CentersTab  from './tabs/CentersTab';
 import DomainsTab  from './tabs/DomainsTab';
 import HealthTab   from './tabs/HealthTab';
+import MonitorTab  from './tabs/MonitorTab';
 import UsageTab    from './tabs/UsageTab';
 import PeopleTab   from './tabs/PeopleTab';
 import ClassesTab  from './tabs/ClassesTab';
@@ -66,7 +68,7 @@ export default function SuperAdminDashboard() {
     return res;
   }, [authHeaders, navigate]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const [stats,       setStats]       = useState(null);
+  const [, setStats] = useState(null); // counts now come with the Centers tab's own list
   const [centers,     setCenters]     = useState([]);
   const [domains,     setDomains]     = useState([]);
   const [loading,     setLoading]     = useState(true);
@@ -195,10 +197,6 @@ export default function SuperAdminDashboard() {
 
   // ── People tab ───────────────────────────────────────────────────────────
   const [peopleCenter,  setPeopleCenter]  = useState('');
-  const [peopleData,    setPeopleData]    = useState({ teachers: [], students: [] });
-  const [peopleLoading, setPeopleLoading] = useState(false);
-  const [peopleSubTab,  setPeopleSubTab]  = useState('teachers');
-  const [peopleSearch,  setPeopleSearch]  = useState('');
 
   // ── Classes tab ──────────────────────────────────────────────────────────
   const [classesData,         setClassesData]         = useState([]);
@@ -745,10 +743,11 @@ export default function SuperAdminDashboard() {
     setLoading(true);
     Promise.all([
       fetch(`${API_BASE}/super-admin/stats`,          { headers: authHeaders }).then(r => r.json()),
-      fetch(`${API_BASE}/super-admin/centers`,         { headers: authHeaders }).then(r => r.json()),
+      // Every center (not just the newest 50) — feeds the center pickers on every tab
+      fetch(`${API_BASE}/super-admin/centers?all=1`,   { headers: authHeaders }).then(r => r.json()),
       fetch(`${API_BASE}/super-admin/centers/domains`, { headers: authHeaders }).then(r => r.json()),
       fetch(`${API_BASE}/super-admin/usage`,           { headers: authHeaders }).then(r => r.json()),
-      fetch(`${API_BASE}/super-admin/centers/deleted`, { headers: authHeaders }).then(r => r.json()),
+      fetch(`${API_BASE}/super-admin/centers/deleted?limit=200`, { headers: authHeaders }).then(r => r.json()),
     ])
       .then(([s, c, d, u, del]) => {
         if (s.success)   setStats(s.stats);
@@ -788,16 +787,6 @@ export default function SuperAdminDashboard() {
       .finally(() => setPronLoading(false));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const loadCenterPeople = useCallback((centerId) => {
-    if (!centerId) return;
-    setPeopleLoading(true);
-    fetch(`${API_BASE}/super-admin/centers/${centerId}/people`, { headers: authHeaders })
-      .then(r => r.json())
-      .then(d => { if (d.success) setPeopleData(d.data || { teachers: [], students: [] }); })
-      .catch(() => {})
-      .finally(() => setPeopleLoading(false));
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
   const loadClasses = useCallback((from, to, centerId) => {
     setClassesLoading(true);
     const params = new URLSearchParams();
@@ -819,6 +808,25 @@ export default function SuperAdminDashboard() {
   useEffect(() => { loadData(); }, [loadData]);
   useEffect(() => { if (tab === 'credits') { loadCredits(); loadPronCredits(); } }, [tab, loadCredits, loadPronCredits]);
   useEffect(() => { if (tab === 'health')  loadHealth();  }, [tab, loadHealth]);
+
+  // App Health badge: red count of open alerts / failing checks. The tab itself
+  // refreshes every 30s; elsewhere the badge refreshes every 60s (one small read).
+  const [monitorBadge, setMonitorBadge] = useState(0);
+  const onMonitorStatus = useCallback((d) => {
+    const failing = (d?.checks || []).filter(c => c.status === 'fail').length;
+    setMonitorBadge(Math.max(failing, d?.alerts?.open?.length || 0));
+  }, []);
+  useEffect(() => {
+    if (tab === 'monitor' || !superAdminToken) return undefined;
+    const load = () => {
+      if (document.visibilityState !== 'visible') return;
+      fetch(`${API_BASE}/super-admin/monitor/status`, { headers: { Authorization: `Bearer ${superAdminToken}` } })
+        .then(r => (r.ok ? r.json() : null)).then(d => d?.data && onMonitorStatus(d.data)).catch(() => {});
+    };
+    load();
+    const id = setInterval(load, 60_000);
+    return () => clearInterval(id);
+  }, [tab, superAdminToken, onMonitorStatus]);
   useEffect(() => { if (tab === 'classes') loadClasses('', '', ''); }, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { localStorage.setItem('saAdminDark', String(darkMode)); }, [darkMode]);
 
@@ -1128,7 +1136,7 @@ export default function SuperAdminDashboard() {
       if (!regRes.ok) throw new Error(regData.message || 'Registration failed');
 
       // Find the center by slug and immediately approve
-      const centersRes = await fetch(`${API_BASE}/super-admin/centers`, { headers: authHeaders });
+      const centersRes = await fetch(`${API_BASE}/super-admin/centers?all=1`, { headers: authHeaders });
       const centersData = await centersRes.json();
       const newCenter = centersData.centers?.find(c => c.slug === form.slug);
       if (!newCenter) throw new Error('Center registered but not found for approval');
@@ -1192,18 +1200,11 @@ export default function SuperAdminDashboard() {
     }
   };
 
-  const statusColor = (s) => ({ active: '#10b981', pending: '#f59e0b', suspended: '#ef4444', rejected: '#6b7280' }[s] || '#6b7280');
-  const statusIcon  = (s) => {
-    if (s === 'active')    return <CheckCircle size={13} />;
-    if (s === 'pending')   return <Clock size={13} />;
-    if (s === 'suspended') return <PauseCircle size={13} />;
-    return <XCircle size={13} />;
-  };
-
   const s = buildStyles(darkMode, isMobile, sidebarOpen);
   const TABS = [
     { key: 'centers',      label: 'Centers',        icon: Building2  },
-    { key: 'health',       label: 'Health',          icon: Activity   },
+    { key: 'monitor',      label: 'App Health',      icon: HeartPulse },
+    { key: 'health',       label: 'Center Usage',    icon: Activity   },
     { key: 'domains',      label: 'Custom Domains',  icon: Globe      },
     { key: 'usage',        label: 'Agora Usage',     icon: BarChart2  },
     { key: 'people',       label: 'People',          icon: Users      },
@@ -1241,6 +1242,7 @@ export default function SuperAdminDashboard() {
               <span style={{ flex: 1 }}>{label}</span>
               {key === 'domains'  && domains.length > 0 && <span style={s.navBadge}>{domains.length}</span>}
               {key === 'deleted'  && deleted.length > 0 && <span style={{ ...s.navBadge, background: '#ef4444' }}>{deleted.length}</span>}
+              {key === 'monitor'  && monitorBadge > 0 && <span style={{ ...s.navBadge, background: '#ef4444' }} title="Problems right now">{monitorBadge}</span>}
             </button>
           ))}
         </nav>
@@ -1283,33 +1285,12 @@ export default function SuperAdminDashboard() {
         </div>
 
         <div style={s.content}>
-          {/* Stats strip — centres tab only */}
-          {stats && tab === 'centers' && (
-            <div style={s.statsRow}>
-              {[
-                { label: 'Total',     value: stats.total,     color: '#0ea5e9', icon: Building2   },
-                { label: 'Active',    value: stats.active,    color: '#10b981', icon: CheckCircle },
-                { label: 'Pending',   value: stats.pending,   color: '#f59e0b', icon: Clock       },
-                { label: 'Suspended', value: stats.suspended, color: '#ef4444', icon: PauseCircle },
-              ].map(({ label, value, color, icon: Icon }) => (
-                <div key={label} style={s.statCard}>
-                  <div style={{ ...s.statIcon, background: `${color}18` }}>
-                    <Icon size={18} color={color} />
-                  </div>
-                  <div>
-                    <p style={s.statValue}>{value ?? '—'}</p>
-                    <p style={s.statLabel}>{label}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
           {/* ── Tab content ── */}
           <TabErrorBoundary key={tab}>
             {tab === 'centers' && (
               <CentersTab
-                centers={centers} loading={loading} loadData={loadData} setShowModal={setShowModal}
+                centers={centers} loadData={loadData} setShowModal={setShowModal}
+                apiBase={API_BASE} authHeaders={authHeaders}
                 handleApprove={handleApprove} handleReject={handleReject} handleSuspend={handleSuspend}
                 handleEnterAsAdmin={handleEnterAsAdmin} impersonating={impersonating}
                 setDeleteTarget={setDeleteTarget}
@@ -1324,7 +1305,6 @@ export default function SuperAdminDashboard() {
                 setLimitsModal={setLimitsModal} setLimitsUnlimT={setLimitsUnlimT} setLimitsUnlimS={setLimitsUnlimS}
                 setLimitsTeachers={setLimitsTeachers} setLimitsStudents={setLimitsStudents} setLimitsMsg={setLimitsMsg}
                 setPartnershipModal={(c) => { setPartnershipModal(c); setPartnershipText(c.branding?.partnershipText || ''); setPartnershipMsg(''); }}
-                statusColor={statusColor} statusIcon={statusIcon}
                 onEditWebsite={handleEditWebsite}
               />
             )}
@@ -1334,6 +1314,9 @@ export default function SuperAdminDashboard() {
                 handleVerifyDomain={handleVerifyDomain} handleRemoveDomain={handleRemoveDomain}
                 domainAction={domainAction}
               />
+            )}
+            {tab === 'monitor' && (
+              <MonitorTab apiBase={API_BASE} authHeaders={authHeaders} centers={centers} onStatus={onMonitorStatus} />
             )}
             {tab === 'health' && (
               <HealthTab health={health} healthLoading={healthLoading} loadHealth={loadHealth} centers={centers} />
@@ -1374,10 +1357,7 @@ export default function SuperAdminDashboard() {
             {tab === 'people' && (
               <PeopleTab
                 centers={centers} peopleCenter={peopleCenter} setPeopleCenter={setPeopleCenter}
-                peopleData={peopleData} peopleLoading={peopleLoading}
-                peopleSubTab={peopleSubTab} setPeopleSubTab={setPeopleSubTab}
-                peopleSearch={peopleSearch} setPeopleSearch={setPeopleSearch}
-                loadCenterPeople={loadCenterPeople}
+                apiBase={API_BASE} authHeaders={authHeaders}
               />
             )}
             {tab === 'classes' && (
@@ -1387,7 +1367,7 @@ export default function SuperAdminDashboard() {
                 classesDateFrom={classesDateFrom} classesDateTo={classesDateTo} classesFilterCenter={classesFilterCenter}
                 setClassesDateFrom={setClassesDateFrom} setClassesDateTo={setClassesDateTo} setClassesFilterCenter={setClassesFilterCenter}
                 classesGrandTotal={classesGrandTotal} classesExpanded={classesExpanded} setClassesExpanded={setClassesExpanded}
-                loadClasses={loadClasses}
+                loadClasses={loadClasses} apiBase={API_BASE} authHeaders={authHeaders}
               />
             )}
           </TabErrorBoundary>

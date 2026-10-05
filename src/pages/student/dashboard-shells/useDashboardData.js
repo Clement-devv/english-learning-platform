@@ -513,7 +513,7 @@ export function useDashboardData() {
         socket.disconnect();
       }
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── refreshCreditsAndConfirmations — silent background poll ──────────────
   const refreshCreditsAndConfirmations = useCallback(async () => {
@@ -546,7 +546,7 @@ export function useDashboardData() {
         return newConfs;
       });
     } catch { /* silent */ }
-  }, [student.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [student.id]);
 
   // ── Live refresh (replaces the 60s / 90s polling) ─────────────────────────
   const liveId = student.id || "me";
@@ -565,7 +565,7 @@ export function useDashboardData() {
   useEffect(() => {
     const id = setInterval(() => reclassify(), TICK_MS);
     return () => clearInterval(id);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   function reclassify() {
     {

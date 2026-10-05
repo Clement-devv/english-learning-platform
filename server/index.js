@@ -59,6 +59,8 @@ import { sweepExpiredSessionsFromDb } from "./utils/sessionManager.js";
 import { SESSION_CLEANUP_INTERVAL_MS } from "./config/constants.js";
 import redisClient from "./config/redis.js";
 import { applyLivePlugins, applyPresencePlugin, setLiveIO } from "./utils/liveUpdates.js";
+import { requestMonitor } from "./middleware/requestMonitor.js";
+import { startMonitorChecks } from "./utils/monitorChecks.js";
 
 // "data-changed" pushes — must be attached before any center model is compiled
 applyLivePlugins();
@@ -89,7 +91,13 @@ if (config.trustProxy) {
 
 // Serve /assets chunks BEFORE CORS — JS/CSS bundles are public, no origin check needed.
 // Only /assets is served here; manifest.json stays dynamic (handled later as a route).
-app.use('/assets', express.static(path.join(frontendPath, 'assets')));
+// Filenames are content-hashed by Vite, so they can be cached forever — a new
+// deploy produces new names. (Caddy only adds this header on the main domain;
+// this covers center subdomains and custom domains too.)
+app.use('/assets', express.static(path.join(frontendPath, 'assets'), {
+  maxAge: '1y',
+  immutable: true,
+}));
 
 // Security Middleware
 // NOTE: these run before the body parser, so they only see headers + query
@@ -207,6 +215,10 @@ app.use(compression({
   },
 }));
 
+// App Health: tag each request with its center and record the main actions
+// (logins, bookings, classes, homework, payments) and any server error.
+app.use('/api', requestMonitor);
+
 // ── Application-level request timeout ────────────────────────────────────────
 // Fires a 503 if any route handler hasn't sent a response within 30 seconds.
 // This is distinct from the TCP socket timeout above: it catches handlers that
@@ -303,6 +315,9 @@ mongoose
           backfillTeacherCodes(db.models.Teacher || db.model("Teacher", teacherSchema)).catch(err => logger.warn("teacher code backfill failed", { center: center.slug, error: err?.message }));
           startDailyClassReportScheduler(db, center);
         }
+
+        // App Health checks + alerts to the super admin (email / WhatsApp)
+        startMonitorChecks();
 
         // Hourly background sweep: remove expired/inactive sessions from all
         // center DBs. Re-fetches active centers each tick so newly added centers

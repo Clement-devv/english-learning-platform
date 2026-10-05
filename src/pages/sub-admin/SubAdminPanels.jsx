@@ -20,7 +20,7 @@ import { visibleEmail } from "../../utils/managedStudent.js";
 import { useCurrencySymbol, fmtMoney } from "../../hooks/useCurrencySymbol";
 
 // ── Shared helpers ─────────────────────────────────────────────────────────────
-export async function apiFetch(url) {
+async function apiFetch(url) {
   const token = sessionStorage.getItem("subAdminToken") || localStorage.getItem("subAdminToken");
   const slug  = import.meta.env.VITE_CENTER_SLUG || getCachedCenter()?.slug;
   const headers = { Authorization: `Bearer ${token}` };
@@ -398,7 +398,7 @@ export function RemoteVideo({ uid, videoTrack }) {
   const divRef = useRef(null);
   useEffect(() => {
     if (divRef.current && videoTrack) videoTrack.play(divRef.current);
-    return () => { try { videoTrack?.stop(); } catch (_) {} };
+    return () => { try { videoTrack?.stop(); } catch { /* track already closed */ } };
   }, [videoTrack]);
   return (
     <div style={{ flex: 1, minWidth: "280px", background: "#000", borderRadius: "10px", overflow: "hidden", position: "relative", minHeight: "220px" }}>
@@ -421,7 +421,6 @@ export function AgoraSpectatorModal({ booking, isDarkMode, onClose }) {
   const [remoteUsers, setRemoteUsers] = useState([]);
   const [secondsLeft, setSecondsLeft] = useState(SPECTATE_LIMIT);
   const clientRef = useRef(null);
-  const c = dashboardColors(isDarkMode);
 
   // 5-minute session limit — starts from mount
   useEffect(() => {

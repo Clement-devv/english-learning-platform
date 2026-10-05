@@ -23,6 +23,7 @@
 import { bookingSchema }          from "../schemas/bookingSchema.js";
 import { classroomSessionSchema } from "../schemas/classroomSessionSchema.js";
 import { logger } from '../utils/logger.js';
+import { trackJob } from "./monitor.js";
 
 const getBooking          = (db) => db.models.Booking          || db.model("Booking",          bookingSchema);
 const getClassroomSession = (db) => db.models.ClassroomSession || db.model("ClassroomSession", classroomSessionSchema);
@@ -135,11 +136,12 @@ export function startMissedClassScheduler(db) {
     logger.error("[MissedClassSweep] Initial sweep error:", { error: err?.message })
   );
 
-  const id = setInterval(() => {
-    sweepMissedClasses(db).catch(err =>
-      logger.error("[MissedClassSweep] Sweep error:", { error: err?.message })
-    );
-  }, INTERVAL_MS);
+  const id = setInterval(trackJob("Missed-class check", db.name, INTERVAL_MS, () =>
+    sweepMissedClasses(db).catch(err => {
+      logger.error("[MissedClassSweep] Sweep error:", { error: err?.message });
+      throw err; // → App Health
+    })
+  ), INTERVAL_MS);
 
   logger.info(`[MissedClassSweep] Scheduler started (every ${INTERVAL_MS / 60000} min)`);
   return id;

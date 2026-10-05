@@ -1,7 +1,15 @@
+import { useState } from 'react';
 import { Trash2, RefreshCw, RotateCcw } from 'lucide-react';
+import Pagination from '../../../components/Pagination';
+
+const PAGE_SIZE = 20;
 import styles from '../SuperAdmin.module.css';
 
 export default function DeletedTab({ deleted, loadData, restoring, handleRestore, daysRemaining }) {
+  const [page, setPage] = useState(1);
+  const totalPages = Math.max(1, Math.ceil(deleted.length / PAGE_SIZE));
+  const current = Math.min(page, totalPages);
+  const shown = deleted.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE);
   return (
     <div className={styles.card}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
@@ -27,7 +35,7 @@ export default function DeletedTab({ deleted, loadData, restoring, handleRestore
               </tr>
             </thead>
             <tbody>
-              {deleted.map(c => {
+              {shown.map(c => {
                 const days = daysRemaining(c.scheduledDeletionAt);
                 const urgent = days <= 2;
                 return (
@@ -67,6 +75,9 @@ export default function DeletedTab({ deleted, loadData, restoring, handleRestore
               })}
             </tbody>
           </table>
+          <div style={{ marginTop: 12 }}>
+            <Pagination page={current} totalPages={totalPages} total={deleted.length} pageSize={PAGE_SIZE} onPage={setPage} isDarkMode />
+          </div>
         </div>
       )}
     </div>

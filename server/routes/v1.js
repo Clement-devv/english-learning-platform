@@ -59,6 +59,7 @@ import publicRoutes              from "./publicRoutes.js";
 import adminEmailChangeRoutes    from "./adminEmailChangeRoutes.js";
 import analyticsPinRoutes        from "./analyticsPinRoutes.js";
 import classReportRoutes         from "./classReportRoutes.js";
+import { monitorAdminRoutes, clientErrorRoutes } from "./monitorRoutes.js";
 
 const router = Router();
 
@@ -106,6 +107,8 @@ router.use("/push",                 pushRoutes);
 router.use("/notifications",        notificationRoutes);
 router.use("/register-center",      centerRegistrationRoutes);
 router.use("/center",               centerConfigRoutes);
+router.use("/super-admin/monitor",  monitorAdminRoutes); // App Health (super admin)
+router.use("/client-errors",        clientErrorRoutes);  // browsers report page crashes
 router.use("/super-admin",          superAdminRoutes);
 router.use("/class-pricing",        classPricingRoutes);
 router.use("/ring",                 ringRoutes);

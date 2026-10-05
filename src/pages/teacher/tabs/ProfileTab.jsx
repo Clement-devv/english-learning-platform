@@ -98,7 +98,7 @@ export default function ProfileTab({ teacherInfo, isDarkMode, onUpdate }) {
       .then((res) => { setReviews(res.data.reviews || []); setReviewStats(res.data.stats || null); })
       .catch(() => {})
       .finally(() => setReviewsLoading(false));
-  }, [teacherInfo?._id, teacherInfo?.id]); // eslint-disable-line
+  }, [teacherInfo?._id, teacherInfo?.id]);
 
   useEffect(() => {
     if (teacherInfo) {

@@ -1,11 +1,20 @@
-import { useState } from 'react';
-import { Building2, RefreshCw, Palette, ToggleRight, SlidersHorizontal, LogIn, Trash2, Globe, Users, KeyRound, Copy, Check, Video } from 'lucide-react';
+// src/pages/super-admin/tabs/CentersTab.jsx
+// Super admin → Centers. Paged list (20 a page, pending first) with status tabs,
+// search and plan filter; each row shows plan, seat usage, App Health signals and
+// website state. Everything else lives in the "Manage" side panel.
+// Server: GET /api/v1/super-admin/centers?page&status&plan&q&withUsage=1
+import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  Building2, RefreshCw, Palette, ToggleRight, SlidersHorizontal, LogIn, Trash2, Globe, Users, KeyRound, Copy, Check, Video,
+  Search, Settings2, CheckCircle, XCircle, Crown, ChevronRight, X, PauseCircle, RotateCcw, LayoutDashboard,
+} from 'lucide-react';
+import Pagination from '../../../components/Pagination';
 import styles from '../SuperAdmin.module.css';
 
 const API_BASE = (import.meta.env.VITE_API_URL || 'http://localhost:5000') + '/api/v1';
 
 export default function CentersTab({
-  centers, loading, loadData, setShowModal,
+  centers, loadData, setShowModal, apiBase = API_BASE, authHeaders,
   handleApprove, handleReject, handleSuspend, handleEnterAsAdmin, impersonating,
   setDeleteTarget, setPlanModal, setPlanSelected, setPlanMsg,
   setThemeCenter, handleOpenLoginThemeModal, handleOpenTeacherThemeModal, handleOpenAdminLoginThemeModal, handleOpenDashThemeModal,
@@ -13,7 +22,6 @@ export default function CentersTab({
   setFeaturesCenter,
   setLimitsModal, setLimitsUnlimT, setLimitsUnlimS, setLimitsTeachers, setLimitsStudents, setLimitsMsg,
   setPartnershipModal,
-  statusColor, statusIcon,
   onEditWebsite,
 }) {
   const [overrideCenter,  setOverrideCenter]  = useState(null);
@@ -23,6 +31,43 @@ export default function CentersTab({
   const [overrideLoading, setOverrideLoading] = useState(false);
   const [overrideMsg,     setOverrideMsg]      = useState(null);  // { type: 'success'|'error', text }
   const [copiedCode,      setCopiedCode]       = useState(false);
+
+  // ── The paged list ──────────────────────────────────────────────────────────
+  const [status, setStatus]   = useState('all');
+  const [plan, setPlan]       = useState('');
+  const [search, setSearch]   = useState('');
+  const [query, setQuery]     = useState('');
+  const [page, setPage]       = useState(1);
+  const [list, setList]       = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError]     = useState('');
+  const [manage, setManage]   = useState(null);
+  const reqId = useRef(0);
+  const headersRef = useRef(authHeaders);
+  headersRef.current = authHeaders || { Authorization: `Bearer ${localStorage.getItem('superAdminToken')}` };
+
+  const loadPage = useCallback(async () => {
+    const id = ++reqId.current;
+    setLoading(true);
+    const params = new URLSearchParams({ page: String(page), limit: String(PAGE_SIZE), withUsage: '1' });
+    if (status !== 'all') params.set('status', status);
+    if (plan) params.set('plan', plan);
+    if (query) params.set('q', query);
+    try {
+      const res = await fetch(`${apiBase}/super-admin/centers?${params}`, { headers: headersRef.current });
+      const data = await res.json();
+      if (id !== reqId.current) return; // a newer request is on its way
+      if (!data.success) throw new Error(data.message || 'Could not load centers');
+      setList(data); setError('');
+      if (data.pagination && data.pagination.page !== page) setPage(data.pagination.page);
+    } catch (e) {
+      if (id === reqId.current) setError(e.message || 'Could not load centers');
+    } finally {
+      if (id === reqId.current) setLoading(false);
+    }
+  }, [apiBase, page, status, plan, query]);
+  // `centers` changes after every action in the dashboard (approve, plan, theme…) → refresh this page too
+  useEffect(() => { loadPage(); }, [loadPage, centers]);
 
   const openOverride = (center) => {
     setOverrideCenter(center);
@@ -57,7 +102,7 @@ export default function CentersTab({
         setOverrideMsg({ type: 'error', text: data.message || 'Override failed' });
         setOverrideStep('form');
       }
-    } catch (e) {
+    } catch {
       setOverrideMsg({ type: 'error', text: 'Network error — please try again' });
       setOverrideStep('form');
     } finally {
@@ -87,164 +132,162 @@ export default function CentersTab({
     });
   };
 
+  const rows = list?.centers || [];
+  const counts = list?.counts || { all: 0, pending: 0, active: 0, suspended: 0, rejected: 0 };
+  const pager = list?.pagination || { page: 1, totalPages: 1, total: 0, limit: PAGE_SIZE };
+
   return (
     <>
-    <div className={styles.card}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-        <h2 className={styles.sectionTitle}><Building2 size={16} color="#f59e0b" /> All Centers</h2>
-        <button onClick={loadData} className={styles.refreshBtn} title="Refresh"><RefreshCw size={14} /></button>
+    <div className={styles.card} style={{ padding: 0, overflow: 'hidden' }}>
+      {/* Header: title, search, plan filter */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', padding: '18px 20px 14px' }}>
+        <div>
+          <h2 className={styles.sectionTitle}><Building2 size={16} color="#f59e0b" /> Centers</h2>
+          <p style={{ margin: '4px 0 0', fontSize: 12.5, color: '#6b7280' }}>Pending registrations are shown first. Press Manage for everything else.</p>
+        </div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <form onSubmit={e => { e.preventDefault(); setQuery(search.trim()); setPage(1); }} style={{ position: 'relative' }}>
+            <Search size={14} style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }} />
+            <input value={search} onChange={e => setSearch(e.target.value)} onBlur={() => { if (search.trim() !== query) { setQuery(search.trim()); setPage(1); } }}
+              placeholder="Search name, slug, email, domain" aria-label="Search centers" className={styles.input} style={{ paddingLeft: 32, width: 250, fontSize: 13 }} />
+          </form>
+          <select value={plan} onChange={e => { setPlan(e.target.value); setPage(1); }} aria-label="Filter by plan" className={styles.input} style={{ width: 130, fontSize: 13 }}>
+            <option value="">All plans</option>
+            {['free', 'basic', 'pro', 'enterprise'].map(p => <option key={p} value={p}>{p[0].toUpperCase() + p.slice(1)}</option>)}
+          </select>
+          <button onClick={() => { loadPage(); loadData(); }} className={styles.refreshBtn} title="Refresh" aria-label="Refresh"><RefreshCw size={14} /></button>
+        </div>
       </div>
 
-      {loading ? (
-        <div style={{ padding: '40px', textAlign: 'center', color: '#6b7280' }}>Loading…</div>
-      ) : centers.length === 0 ? (
-        <div style={{ padding: '40px', textAlign: 'center', color: '#6b7280' }}>
-          No centers yet.{' '}
-          <button onClick={() => setShowModal(true)} style={{ background: 'none', border: 'none', color: '#f59e0b', cursor: 'pointer', fontWeight: '600' }}>
-            Create one →
-          </button>
+      {/* Status tabs with counts */}
+      <div role="tablist" aria-label="Center status" style={{ display: 'flex', gap: 4, padding: '0 20px', borderBottom: '1px solid rgba(255,255,255,0.06)', overflowX: 'auto' }}>
+        {STATUS_TABS.map(t => {
+          const on = status === t.key;
+          return (
+            <button key={t.key} role="tab" aria-selected={on} onClick={() => { setStatus(t.key); setPage(1); }}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '10px 12px', border: 'none', borderBottom: `2px solid ${on ? t.color : 'transparent'}`, background: 'transparent', color: on ? '#f1f5f9' : '#6b7280', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap', marginBottom: -1 }}>
+              {t.label}
+              <span style={{ fontSize: 11, fontWeight: 800, padding: '1px 7px', borderRadius: 999, background: on ? `${t.color}22` : 'rgba(255,255,255,0.05)', color: on ? t.color : '#9ca3af' }}>{counts[t.key] ?? 0}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {error && <div role="alert" style={{ margin: '12px 20px 0', padding: '10px 14px', borderRadius: 10, background: 'rgba(239,68,68,0.1)', color: '#fca5a5', fontSize: 13 }}>{error}</div>}
+
+      {loading && !list ? (
+        <div style={{ padding: 48, textAlign: 'center', color: '#6b7280' }}>Loading…</div>
+      ) : rows.length === 0 ? (
+        <div style={{ padding: '48px 20px', textAlign: 'center', color: '#6b7280' }}>
+          <Building2 size={32} style={{ opacity: 0.3, marginBottom: 10 }} />
+          {query || plan || status !== 'all' ? (
+            <p style={{ margin: 0 }}>No centers match these filters.</p>
+          ) : (
+            <p style={{ margin: 0 }}>No centers yet.{' '}
+              <button onClick={() => setShowModal(true)} style={{ background: 'none', border: 'none', color: '#f59e0b', cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit' }}>Create one →</button>
+            </p>
+          )}
         </div>
       ) : (
-        <div style={{ overflowX: 'auto' }}>
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                {['Center', 'Slug', 'Plan', 'Status', 'Website', 'Actions'].map(h => (
-                  <th key={h} className={styles.th}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {centers.map(c => (
-                <tr key={c._id} className={styles.tr}>
-                  <td className={styles.td}>
-                    <p style={{ margin: 0, fontWeight: '600', color: '#f1f5f9' }}>{c.centerName}</p>
-                    <p style={{ margin: 0, fontSize: '12px', color: '#6b7280' }}>{c.adminEmail}</p>
-                  </td>
-                  <td className={styles.td}><code className={styles.slug}>{c.slug}</code></td>
-                  <td className={styles.td}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span className={styles.planBadge}>{c.plan || 'basic'}</span>
-                      <button
-                        onClick={() => { setPlanModal(c); setPlanSelected(c.plan || 'basic'); setPlanMsg(''); }}
-                        title="Change plan"
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', padding: '2px 4px', borderRadius: 4, lineHeight: 1 }}
-                      >✏️</button>
+        <div style={{ overflowX: 'auto', opacity: loading ? 0.6 : 1, transition: 'opacity .15s' }}>
+          <div style={{ minWidth: 880 }}>
+            <div style={{ ...ROW, padding: '10px 20px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              <span>Center</span><span>Plan</span><span>Usage</span><span>Health</span><span>Website</span><span style={{ textAlign: 'right' }}>Actions</span>
+            </div>
+            {rows.map(c => (
+              <div key={c._id} style={{ ...ROW, padding: '12px 20px', borderTop: '1px solid rgba(255,255,255,0.05)', background: c.status === 'pending' ? 'rgba(245,158,11,0.05)' : 'transparent' }}>
+                {/* Center */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+                  <Avatar center={c} />
+                  <div style={{ minWidth: 0 }}>
+                    <button onClick={() => setManage(c)} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#f1f5f9', fontSize: 14, display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>{c.centerName}</button>
+                    <div style={{ fontSize: 12, color: '#6b7280', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      <code style={{ color: '#9ca3af' }}>{c.slug}</code>
+                      {c.customDomain && <> · {c.customDomain} {c.domainVerified ? <CheckCircle size={11} color="#34d399" style={{ verticalAlign: -1 }} /> : <span style={{ color: '#f59e0b' }}>(unverified)</span>}</>}
                     </div>
-                  </td>
-                  <td className={styles.td}>
-                    <span className={styles.statusBadge} style={{ color: statusColor(c.status), borderColor: `${statusColor(c.status)}40`, background: `${statusColor(c.status)}12` }}>
-                      {statusIcon(c.status)} {c.status}
-                    </span>
-                  </td>
-                  <td className={styles.td}>
-                    <WebsiteCell center={c} onEdit={onEditWebsite} />
-                  </td>
-                  <td className={styles.td}>
-                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                      {c.status === 'pending' && (
-                        <>
-                          <button onClick={() => handleApprove(c._id)} className={styles.approveBtn}>Approve</button>
-                          <button onClick={() => handleReject(c._id)}  className={styles.rejectBtn}>Reject</button>
-                        </>
-                      )}
-                      {c.status === 'active' && (
-                        <button onClick={() => handleSuspend(c._id)} className={styles.suspendBtn}>Suspend</button>
-                      )}
-                      {(c.status === 'rejected' || c.status === 'suspended') && (
-                        <button onClick={() => handleApprove(c._id)} className={styles.approveBtn}>Reactivate</button>
-                      )}
-                      <button onClick={() => setThemeCenter(c)} className={styles.themeBtn} title="Set theme">
-                        <Palette size={12} /> Theme
-                      </button>
-                      <button
-                        onClick={() => handleOpenLoginThemeModal(c)}
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '5px 12px', borderRadius: 7, fontSize: 12, fontWeight: 600, background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.2)', color: '#8b5cf6', cursor: 'pointer', fontFamily: 'inherit' }}
-                        title="Assign exclusive student login page theme"
-                      >
-                        <Palette size={12} /> Student Login
-                      </button>
-                      <button
-                        onClick={() => handleOpenTeacherThemeModal(c)}
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '5px 12px', borderRadius: 7, fontSize: 12, fontWeight: 600, background: 'rgba(34,211,238,0.1)', border: '1px solid rgba(34,211,238,0.2)', color: '#22d3ee', cursor: 'pointer', fontFamily: 'inherit' }}
-                        title="Assign exclusive teacher login page theme"
-                      >
-                        <Palette size={12} /> Teacher Login
-                      </button>
-                      <button
-                        onClick={() => handleOpenAdminLoginThemeModal(c)}
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '5px 12px', borderRadius: 7, fontSize: 12, fontWeight: 600, background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.25)', color: '#a5b4fc', cursor: 'pointer', fontFamily: 'inherit' }}
-                        title="Assign exclusive admin login page theme"
-                      >
-                        <Palette size={12} /> Admin Login
-                      </button>
-                      <button
-                        onClick={() => handleOpenDashThemeModal(c)}
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '5px 12px', borderRadius: 7, fontSize: 12, fontWeight: 600, background: 'rgba(6,182,212,0.1)', border: '1px solid rgba(6,182,212,0.2)', color: '#06b6d4', cursor: 'pointer', fontFamily: 'inherit' }}
-                        title="Assign exclusive student dashboard theme"
-                      >
-                        <Palette size={12} /> Dashboard
-                      </button>
-                      <button
-                        onClick={() => handleOpenClassroomThemeModal?.(c)}
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '5px 12px', borderRadius: 7, fontSize: 12, fontWeight: 600, background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.25)', color: '#818cf8', cursor: 'pointer', fontFamily: 'inherit' }}
-                        title="Assign classroom video tab theme"
-                      >
-                        <Video size={12} /> Classroom
-                      </button>
-                      <button onClick={() => setFeaturesCenter(c)} className={styles.featuresBtn} title="Toggle features">
-                        <ToggleRight size={12} /> Features
-                      </button>
-                      <button
-                        onClick={() => {
-                          setLimitsModal(c);
-                          setLimitsUnlimT(c.maxTeachers === -1);
-                          setLimitsUnlimS(c.maxStudents === -1);
-                          setLimitsTeachers(c.maxTeachers === -1 ? '' : String(c.maxTeachers || ''));
-                          setLimitsStudents(c.maxStudents === -1 ? '' : String(c.maxStudents || ''));
-                          setLimitsMsg('');
-                        }}
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '5px 12px', borderRadius: 7, fontSize: 12, fontWeight: 600, background: 'rgba(251,146,60,0.1)', border: '1px solid rgba(251,146,60,0.2)', color: '#fb923c', cursor: 'pointer', fontFamily: 'inherit' }}
-                        title="Edit seat limits"
-                      >
-                        <SlidersHorizontal size={12} /> Limits
-                      </button>
-                      <button
-                        onClick={() => setPartnershipModal(c)}
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '5px 12px', borderRadius: 7, fontSize: 12, fontWeight: 600, background: 'rgba(167,139,250,0.1)', border: '1px solid rgba(167,139,250,0.2)', color: '#a78bfa', cursor: 'pointer', fontFamily: 'inherit' }}
-                        title="Set partnership text"
-                      >
-                        <Users size={12} /> Partnership
-                      </button>
-                      {c.status === 'active' && (
-                        <button
-                          onClick={() => handleEnterAsAdmin(c)}
-                          disabled={impersonating === c._id}
-                          style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '5px 12px', borderRadius: 7, fontSize: 12, fontWeight: 600, background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.3)', color: '#818cf8', cursor: 'pointer', fontFamily: 'inherit' }}
-                          title="Open admin panel for this center (30 min session)"
-                        >
-                          <LogIn size={12} /> {impersonating === c._id ? '…' : 'Enter'}
-                        </button>
-                      )}
-                      <button
-                        onClick={() => openOverride(c)}
-                        title="Emergency: override admin login email"
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '5px 12px', borderRadius: 7, fontSize: 12, fontWeight: 600, background: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.2)', color: '#f87171', cursor: 'pointer', fontFamily: 'inherit' }}
-                      >
-                        <KeyRound size={12} /> Email
-                      </button>
-                      <button onClick={() => setDeleteTarget(c)} className={styles.deleteBtn} title="Schedule deletion">
-                        <Trash2 size={12} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                    <div style={{ fontSize: 11.5, color: '#6b7280', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.adminEmail}</div>
+                  </div>
+                </div>
+                {/* Plan */}
+                <div><span style={pillStyle(PLAN_COLORS[c.plan || 'free'])}>{c.plan || 'free'}</span></div>
+                {/* Usage */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {c.status === 'active' && c.usage ? (
+                    <>
+                      <UsageBar label="Teachers" used={c.usage.teachers} max={c.maxTeachers} />
+                      <UsageBar label="Students" used={c.usage.students} max={c.maxStudents} />
+                    </>
+                  ) : <span style={{ fontSize: 12, color: '#4b5563' }}>—</span>}
+                </div>
+                {/* Health */}
+                <HealthCell center={c} />
+                {/* Website */}
+                <div><WebsiteBadge center={c} /></div>
+                {/* Actions */}
+                <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', alignItems: 'center' }}>
+                  {c.status === 'pending' && (
+                    <>
+                      <button onClick={() => handleApprove(c._id)} className={styles.approveBtn}>Approve</button>
+                      <button onClick={() => handleReject(c._id)} className={styles.rejectBtn}>Reject</button>
+                    </>
+                  )}
+                  {c.status === 'active' && (
+                    <button onClick={() => handleEnterAsAdmin(c)} disabled={impersonating === c._id} style={ghostBtn('#818cf8')} title="Open this center's admin panel (30 min session)">
+                      <LogIn size={13} /> {impersonating === c._id ? '…' : 'Enter'}
+                    </button>
+                  )}
+                  {(c.status === 'rejected' || c.status === 'suspended') && (
+                    <button onClick={() => handleApprove(c._id)} className={styles.approveBtn}>Reactivate</button>
+                  )}
+                  <button onClick={() => setManage(c)} style={ghostBtn('#e5e7eb')} title="Plan, features, themes, website, account">
+                    <Settings2 size={13} /> Manage
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
+
+      <div style={{ padding: '12px 20px 16px', borderTop: rows.length ? '1px solid rgba(255,255,255,0.05)' : 'none' }}>
+        <Pagination page={pager.page} totalPages={pager.totalPages} total={pager.total} pageSize={pager.limit} onPage={setPage} isDarkMode />
+      </div>
     </div>
+
+    {manage && (
+      <ManagePanel
+        center={manage}
+        onClose={() => setManage(null)}
+        run={(fn) => { setManage(null); fn(); }}
+        actions={{
+          plan:       (c) => { setPlanModal(c); setPlanSelected(c.plan || 'basic'); setPlanMsg(''); },
+          features:   (c) => setFeaturesCenter(c),
+          limits:     (c) => {
+            setLimitsModal(c);
+            setLimitsUnlimT(c.maxTeachers === -1);
+            setLimitsUnlimS(c.maxStudents === -1);
+            setLimitsTeachers(c.maxTeachers === -1 ? '' : String(c.maxTeachers || ''));
+            setLimitsStudents(c.maxStudents === -1 ? '' : String(c.maxStudents || ''));
+            setLimitsMsg('');
+          },
+          theme:          (c) => setThemeCenter(c),
+          studentLogin:   (c) => handleOpenLoginThemeModal(c),
+          teacherLogin:   (c) => handleOpenTeacherThemeModal(c),
+          adminLogin:     (c) => handleOpenAdminLoginThemeModal(c),
+          dashboard:      (c) => handleOpenDashThemeModal(c),
+          classroom:      (c) => handleOpenClassroomThemeModal?.(c),
+          website:        onEditWebsite ? (c) => onEditWebsite(c) : null,
+          partnership:    (c) => setPartnershipModal(c),
+          enter:          (c) => handleEnterAsAdmin(c),
+          overrideEmail:  (c) => openOverride(c),
+          suspend:        (c) => handleSuspend(c._id),
+          reactivate:     (c) => handleApprove(c._id),
+          approve:        (c) => handleApprove(c._id),
+          reject:         (c) => handleReject(c._id),
+          remove:         (c) => setDeleteTarget(c),
+        }}
+      />
+    )}
 
     {/* ── Emergency Email Override Modal ──────────────────────────────────── */}
     {overrideCenter && (
@@ -412,50 +455,191 @@ export default function CentersTab({
   );
 }
 
+// ── Layout + small pieces ─────────────────────────────────────────────────────
+const PAGE_SIZE = 20;
+const ROW = { display: 'grid', gridTemplateColumns: 'minmax(240px,2.2fr) 90px minmax(170px,1.3fr) minmax(140px,1fr) 80px 210px', gap: 16, alignItems: 'center' };
+const STATUS_TABS = [
+  { key: 'all',       label: 'All',       color: '#f59e0b' },
+  { key: 'active',    label: 'Active',    color: '#10b981' },
+  { key: 'pending',   label: 'Pending',   color: '#f59e0b' },
+  { key: 'suspended', label: 'Suspended', color: '#ef4444' },
+  { key: 'rejected',  label: 'Rejected',  color: '#6b7280' },
+];
+const STATUS_COLORS = { active: '#10b981', pending: '#f59e0b', suspended: '#ef4444', rejected: '#6b7280' };
+const PLAN_COLORS = { free: '#9ca3af', basic: '#818cf8', pro: '#34d399', enterprise: '#f59e0b' };
+const AVATAR_COLORS = ['#f59e0b', '#34d399', '#818cf8', '#f472b6', '#22d3ee', '#fb923c', '#a78bfa'];
 
-function WebsiteCell({ center, onEdit }) {
-  const lp        = center.landingPage;
-  const published = lp?.published;
-  const template  = lp?.template;
-  const hasPage   = lp && (lp.hero?.headline || lp.about?.body || lp.teachers?.length);
+const pillStyle = (color) => ({
+  display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 9px', borderRadius: 999,
+  fontSize: 11.5, fontWeight: 700, textTransform: 'capitalize',
+  color, background: `${color}18`, border: `1px solid ${color}33`,
+});
+const ghostBtn = (color) => ({
+  display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 11px', borderRadius: 8,
+  fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+  background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', color,
+});
 
-  let badge, badgeColor, badgeBg;
-  if (published) {
-    badge = 'Live'; badgeColor = '#10b981'; badgeBg = 'rgba(16,185,129,0.1)';
-  } else if (hasPage) {
-    badge = 'Draft'; badgeColor = '#f59e0b'; badgeBg = 'rgba(245,158,11,0.1)';
-  } else {
-    badge = 'None'; badgeColor = '#64748b'; badgeBg = 'rgba(100,116,139,0.08)';
-  }
+function Avatar({ center, size = 38 }) {
+  const name = center.centerName || center.slug || '?';
+  const initials = name.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase();
+  const color = AVATAR_COLORS[[...(center.slug || name)].reduce((a, ch) => a + ch.charCodeAt(0), 0) % AVATAR_COLORS.length];
+  const logo = center.branding?.logoUrl || center.logoUrl;
+  return logo ? (
+    <img src={logo} alt="" style={{ width: size, height: size, borderRadius: 10, objectFit: 'cover', flexShrink: 0, background: '#111' }} />
+  ) : (
+    <div aria-hidden style={{ width: size, height: size, borderRadius: 10, flexShrink: 0, display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: size * 0.36, color, background: `${color}1f`, border: `1px solid ${color}33` }}>{initials}</div>
+  );
+}
 
+function UsageBar({ label, used = 0, max }) {
+  const unlimited = max === -1 || !max;
+  const pct = unlimited ? 0 : Math.min(100, Math.round((used / max) * 100));
+  const color = pct >= 100 ? '#ef4444' : pct >= 85 ? '#f59e0b' : '#818cf8';
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-start' }}>
-      <span style={{
-        fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 6,
-        color: badgeColor, background: badgeBg,
-        border: `1px solid ${badgeColor}30`,
-        textTransform: 'uppercase', letterSpacing: '0.06em',
-      }}>
-        {badge}
-      </span>
-      {template && published && (
-        <span style={{ fontSize: 11, color: '#64748b', textTransform: 'capitalize' }}>
-          {template}
+    <div title={unlimited ? `${used} ${label.toLowerCase()} (no limit)` : `${used} of ${max} ${label.toLowerCase()} (${pct}%)`}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, color: '#9ca3af' }}>
+        <span>{label}</span>
+        <span style={{ color: pct >= 85 ? color : '#d1d5db', fontWeight: 700 }}>{used}{unlimited ? '' : ` / ${max}`}</span>
+      </div>
+      <div style={{ height: 4, borderRadius: 4, background: 'rgba(255,255,255,0.06)', marginTop: 3, overflow: 'hidden' }}>
+        <div style={{ width: unlimited ? '100%' : `${pct}%`, height: '100%', background: unlimited ? 'rgba(129,140,248,0.25)' : color, borderRadius: 4 }} />
+      </div>
+    </div>
+  );
+}
+
+function HealthCell({ center: c }) {
+  if (c.status !== 'active') {
+    return <span style={pillStyle(STATUS_COLORS[c.status] || '#6b7280')}>{c.status}</span>;
+  }
+  const h = c.health;
+  let color = '#34d399', text = 'Healthy';
+  if (!h) { color = '#6b7280'; text = 'Not checked yet'; }
+  else if (h.ok === false) { color = '#ef4444'; text = h.error || 'Database problem'; }
+  else if (h.missed24h >= 3 || h.unanswered > 0) {
+    color = '#f59e0b';
+    text = [h.missed24h ? `${h.missed24h} missed (24h)` : null, h.unanswered ? `${h.unanswered} request${h.unanswered === 1 ? '' : 's'} waiting` : null].filter(Boolean).join(' · ');
+  }
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 12.5, color: '#d1d5db' }}>
+      <span aria-hidden style={{ width: 8, height: 8, borderRadius: 999, background: color, boxShadow: `0 0 0 3px ${color}26`, flexShrink: 0 }} />
+      {text}
+    </span>
+  );
+}
+
+function websiteState(center) {
+  const lp = center.landingPage;
+  if (lp?.published) return { label: 'Live', color: '#10b981' };
+  if (lp && (lp.hero?.headline || lp.about?.body || lp.teachers?.length)) return { label: 'Draft', color: '#f59e0b' };
+  return { label: 'None', color: '#64748b' };
+}
+function WebsiteBadge({ center }) {
+  const w = websiteState(center);
+  return <span style={pillStyle(w.color)}>{w.label}</span>;
+}
+
+// ── Manage panel (slides in from the right) ───────────────────────────────────
+function ManagePanel({ center: c, onClose, run, actions }) {
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  const item = (key, Icon, label, hint, opts = {}) => {
+    const fn = actions[key];
+    if (!fn || opts.hidden) return null;
+    return (
+      <button key={key} type="button" onClick={() => run(() => fn(c))}
+        style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', padding: '10px 12px', borderRadius: 10, border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', color: opts.danger ? '#f87171' : '#e5e7eb' }}
+        onMouseEnter={e => { e.currentTarget.style.background = opts.danger ? 'rgba(239,68,68,0.08)' : 'rgba(255,255,255,0.04)'; }}
+        onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>
+        <span style={{ width: 30, height: 30, borderRadius: 8, display: 'grid', placeItems: 'center', background: opts.danger ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.05)', flexShrink: 0 }}>
+          <Icon size={15} color={opts.danger ? '#f87171' : opts.color || '#9ca3af'} />
         </span>
-      )}
-      {onEdit && (
-        <button
-          onClick={() => onEdit(center)}
-          style={{
-            display: 'inline-flex', alignItems: 'center', gap: 4,
-            padding: '4px 10px', borderRadius: 6, border: '1px solid rgba(99,102,241,0.25)',
-            background: 'rgba(99,102,241,0.08)', color: '#818cf8',
-            cursor: 'pointer', fontSize: 11, fontWeight: 600, fontFamily: 'inherit',
-          }}
-        >
-          <Globe size={11} /> Edit
-        </button>
-      )}
+        <span style={{ flex: 1, minWidth: 0 }}>
+          <span style={{ display: 'block', fontSize: 13.5, fontWeight: 700 }}>{label}</span>
+          {hint && <span style={{ display: 'block', fontSize: 11.5, color: '#6b7280', marginTop: 1 }}>{hint}</span>}
+        </span>
+        <ChevronRight size={15} color="#4b5563" />
+      </button>
+    );
+  };
+  const section = (title, children) => {
+    const items = children.filter(Boolean);
+    if (!items.length) return null;
+    return (
+      <div style={{ marginTop: 18 }}>
+        <div style={{ fontSize: 11, fontWeight: 800, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.08em', padding: '0 12px 6px' }}>{title}</div>
+        {items}
+      </div>
+    );
+  };
+
+  const isActive = c.status === 'active';
+  const w = websiteState(c);
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 9000, background: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'flex-end' }}>
+      <aside onClick={e => e.stopPropagation()} role="dialog" aria-label={`Manage ${c.centerName}`}
+        style={{ width: 'min(440px, 100vw)', height: '100%', overflowY: 'auto', background: '#0f1117', borderLeft: '1px solid rgba(255,255,255,0.08)', padding: '20px 16px 28px', boxSizing: 'border-box' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '0 4px' }}>
+          <Avatar center={c} size={46} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 17, fontWeight: 800, color: '#f1f5f9' }}>{c.centerName}</div>
+            <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
+              <span style={pillStyle(STATUS_COLORS[c.status] || '#6b7280')}>{c.status}</span>
+              <span style={pillStyle(PLAN_COLORS[c.plan || 'free'])}>{c.plan || 'free'}</span>
+              <span style={pillStyle(w.color)}>Website: {w.label}</span>
+            </div>
+          </div>
+          <button type="button" onClick={onClose} aria-label="Close" style={{ ...ghostBtn('#9ca3af'), padding: 7 }}><X size={15} /></button>
+        </div>
+
+        <div style={{ margin: '16px 4px 0', padding: 14, borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px 16px', fontSize: 12.5 }}>
+          <div><div style={{ color: '#6b7280', fontSize: 11 }}>Slug</div><code style={{ color: '#d1d5db' }}>{c.slug}</code></div>
+          <div><div style={{ color: '#6b7280', fontSize: 11 }}>Created</div><span style={{ color: '#d1d5db' }}>{c.createdAt ? new Date(c.createdAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}</span></div>
+          <div style={{ gridColumn: '1 / -1', minWidth: 0 }}><div style={{ color: '#6b7280', fontSize: 11 }}>Admin email</div><span style={{ color: '#d1d5db', wordBreak: 'break-all' }}>{c.adminEmail || '—'}</span></div>
+          {c.customDomain && <div style={{ gridColumn: '1 / -1' }}><div style={{ color: '#6b7280', fontSize: 11 }}>Custom domain</div><span style={{ color: '#d1d5db' }}>{c.customDomain} {c.domainVerified ? '· verified' : '· not verified'}</span></div>}
+          {isActive && c.usage && (
+            <div style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+              <UsageBar label="Teachers" used={c.usage.teachers} max={c.maxTeachers} />
+              <UsageBar label="Students" used={c.usage.students} max={c.maxStudents} />
+            </div>
+          )}
+          {isActive && <div style={{ gridColumn: '1 / -1' }}><HealthCell center={c} /></div>}
+        </div>
+
+        {c.status === 'pending' && section('Registration', [
+          item('approve', CheckCircle, 'Approve center', 'Creates its database and emails the admin', { color: '#34d399' }),
+          item('reject', XCircle, 'Reject registration', null, { danger: true }),
+        ])}
+        {section('Plan and access', [
+          item('plan', Crown, 'Change plan', `Currently ${c.plan || 'free'}`, { color: '#f59e0b' }),
+          item('features', ToggleRight, 'Features', 'Video calling, recording, AI tools…'),
+          item('limits', SlidersHorizontal, 'Seat limits', `${c.maxTeachers === -1 ? 'Unlimited' : c.maxTeachers ?? '—'} teachers · ${c.maxStudents === -1 ? 'unlimited' : c.maxStudents ?? '—'} students`),
+        ])}
+        {section('Look and feel', [
+          item('theme', Palette, 'Center theme', 'Brand colours across the app'),
+          item('studentLogin', LogIn, 'Student login page'),
+          item('teacherLogin', LogIn, 'Teacher login page'),
+          item('adminLogin', LogIn, 'Admin login page'),
+          item('dashboard', LayoutDashboard, 'Dashboards', 'Student, teacher, admin and sub-admin'),
+          item('classroom', Video, 'Classroom theme'),
+        ])}
+        {section('Website and branding', [
+          item('website', Globe, 'Edit website', `Landing page · ${w.label.toLowerCase()}`),
+          item('partnership', Users, 'Partnership text', 'Co-branding shown on their pages'),
+        ])}
+        {section('Account', [
+          item('enter', LogIn, 'Enter as admin', 'Opens their admin panel for 30 minutes', { hidden: !isActive, color: '#818cf8' }),
+          item('overrideEmail', KeyRound, 'Override admin email', 'Emergency: admin lost access to their email'),
+          item('suspend', PauseCircle, 'Suspend center', 'Blocks all logins until reactivated', { hidden: !isActive, danger: true }),
+          item('reactivate', RotateCcw, 'Reactivate center', null, { hidden: !(c.status === 'suspended' || c.status === 'rejected'), color: '#34d399' }),
+          item('remove', Trash2, 'Schedule deletion', 'Can be restored until the countdown ends', { danger: true }),
+        ])}
+      </aside>
     </div>
   );
 }

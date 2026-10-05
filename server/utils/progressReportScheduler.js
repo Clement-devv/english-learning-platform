@@ -13,6 +13,7 @@ import { reminderLogSchema } from "../schemas/reminderLogSchema.js";
 import { generateProgressReport } from "./progressReportGenerator.js";
 import { sendProgressReport }     from "./emailService.js";
 import logger from "../utils/logger.js";
+import { trackJob, jobFailed } from "./monitor.js";
 
 const getStudent     = (db) => db.models.Student     || db.model("Student",     studentSchema);
 const getBooking     = (db) => db.models.Booking     || db.model("Booking",     bookingSchema);
@@ -98,7 +99,7 @@ async function checkMonthlyReports(db) {
 }
 
 // ── Main tick (runs every hour per center) ────────────────────────────────────
-function makeTick(db) {
+function makeTick(db, centerSlug) {
   return async function runTick() {
     if (db.readyState !== 1) return;
     try {
@@ -108,6 +109,7 @@ function makeTick(db) {
       ]);
     } catch (err) {
       logger.error("Progress report scheduler error:", { error: err?.message });
+      jobFailed("Progress reports", centerSlug, err);
     }
   };
 }
@@ -115,6 +117,6 @@ function makeTick(db) {
 export function startProgressReportScheduler(db) {
   const centerSlug = db.name || "unknown";
   logger.info(`📊 Progress report scheduler started for center: ${centerSlug} (hourly check)`);
-  const runTick = makeTick(db);
-  setInterval(runTick, 60 * 60 * 1000);
+  const runTick = makeTick(db, centerSlug);
+  setInterval(trackJob("Progress reports", centerSlug, 60 * 60 * 1000, runTick), 60 * 60 * 1000);
 }

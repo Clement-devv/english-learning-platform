@@ -25,6 +25,7 @@ import {
 } from "./emailService.js";
 import { pushToUser } from "./webPushService.js";
 import logger from "../utils/logger.js";
+import { trackJob, jobFailed } from "./monitor.js";
 
 const getBooking     = (db) => db.models.Booking     || db.model("Booking",     bookingSchema);
 const getHomework    = (db) => db.models.Homework    || db.model("Homework",    homeworkSchema);
@@ -232,6 +233,7 @@ function makeTick(db, centerSlug) {
       ]);
     } catch (err) {
       logger.error("Reminder scheduler error:", { error: err?.message });
+      jobFailed("Reminders", centerSlug, err);
     }
   };
 }
@@ -242,5 +244,5 @@ export function startReminderScheduler(db) {
   const runTick = makeTick(db, centerSlug);
   // Don't run immediately — DB connection may still be opening (readyState 2).
   // The interval will fire once fully connected.
-  setInterval(runTick, 60 * 1000);
+  setInterval(trackJob("Reminders", centerSlug, 60 * 1000, runTick), 60 * 1000);
 }

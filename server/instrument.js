@@ -14,9 +14,12 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname  = dirname(__filename);
 config({ path: resolve(__dirname, '.env') });
 
+// Off unless explicitly switched on with SENTRY_ENABLED=true (in server/.env),
+// so day-to-day development doesn't use up the Sentry quota. While off, every
+// Sentry call in the app (captureMessage, the Express error handler) is a no-op.
 Sentry.init({
   dsn: process.env.SENTRY_DSN,
   environment: process.env.NODE_ENV || 'development',
   tracesSampleRate: 0.1,
-  enabled: !!process.env.SENTRY_DSN,
+  enabled: !!process.env.SENTRY_DSN && process.env.SENTRY_ENABLED === 'true',
 });

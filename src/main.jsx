@@ -6,6 +6,7 @@ import './index.css';
 import './i18n/i18n.js';
 import { fetchBranding, applyBranding, setCachedBranding } from './utils/branding.js';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
+import { installClientErrorReporting } from './utils/reportClientError.js';
 
 // ── Handle impersonation hand-off ────────────────────────────────────────────
 // Super admin "Enter as Admin" opens a new tab with #imp_token=xxx&imp_center=slug.
@@ -37,6 +38,9 @@ if (_impToken && _impCenter) {
 const SECRET_PARAM_RE = /([?&#](?:imp_token|token|sessionToken|access_token|resetToken)=)[^&#\s]*/gi;
 const scrubUrl = (u) => (typeof u === 'string' ? u.replace(SECRET_PARAM_RE, '$1[redacted]') : u);
 
+// App Health: tell the platform owner when a page crashes (utils/reportClientError.js)
+installClientErrorReporting();
+
 Sentry.init({
   dsn: import.meta.env.VITE_SENTRY_DSN,
   environment: import.meta.env.MODE,
@@ -49,7 +53,9 @@ Sentry.init({
   tracesSampleRate: 0.1,
   replaysSessionSampleRate: 0.05,
   replaysOnErrorSampleRate: 1.0,
-  enabled: !!import.meta.env.VITE_SENTRY_DSN,
+  // Off unless VITE_SENTRY_ENABLED=true (set in .env / .env.production), so
+  // development doesn't use up the Sentry quota. Nothing is sent while off.
+  enabled: !!import.meta.env.VITE_SENTRY_DSN && import.meta.env.VITE_SENTRY_ENABLED === 'true',
   beforeSend(event) {
     if (event.request?.url) event.request.url = scrubUrl(event.request.url);
     return event;

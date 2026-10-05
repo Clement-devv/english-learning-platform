@@ -87,6 +87,7 @@ src/
 - Going live step-by-step: [docs/going-live.md](docs/going-live.md)
 - Scalability roadmap: [docs/scalability.md](docs/scalability.md)
 - Security audit: [docs/security.md](docs/security.md)
+- App Health monitoring + alerts: [docs/monitoring.md](docs/monitoring.md)
 - Code quality audit: [docs/code-quality.md](docs/code-quality.md)
 - Frontend design guide: [docs/frontend-guide.md](docs/frontend-guide.md)
 - Frontend design system (CSS): [docs/design-system.md](docs/design-system.md)

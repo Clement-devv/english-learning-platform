@@ -92,7 +92,7 @@ export default function RecordingsTab({ isDarkMode }) {
       .catch(() => {})
       .finally(() => { if (!stale) setLoadingRecs(false); });
     return () => { stale = true; };
-  }, [selectedStudent, page, listKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selectedStudent, page, listKey]);
 
   const formatDuration = (s) => {
     if (!s) return "--";

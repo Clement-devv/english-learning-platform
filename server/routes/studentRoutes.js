@@ -13,7 +13,7 @@ import {
 } from "../utils/emailService.js";
 import { generateStudentRecordPdf } from "../utils/recordPdfGenerator.js";
 import {
-  verifyToken, verifyAdmin, verifyAdminOrTeacher, verifyOwnership,
+  verifyToken, verifyAdmin, verifyAdminOrTeacher,
 } from "../middleware/authMiddleware.js";
 import { completeReferral } from "./referralRoutes.js";
 import { strictLimiter } from "../middleware/rateLimiter.js";
@@ -28,8 +28,8 @@ import { parsePagination, DIRECTORY_MAX } from "../utils/pagination.js";
 import logger from "../utils/logger.js";
 import { sharedSnapshot } from "../utils/sharedSnapshot.js";
 import { effectiveStreak } from "../utils/streakService.js";
-import { sendJoinReminder, currentClassFor, maskEmail, ReminderError } from "../utils/joinReminder.js";
-import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
+import { sendJoinReminder, currentClassFor, ReminderError } from "../utils/joinReminder.js";
+import { badRequest, forbidden, notFound, serverError } from '../utils/apiResponse.js';
 import { assignStudentId, generateStudentId } from '../utils/studentIdGenerator.js';
 import { generateSecurePassword } from '../utils/passwordUtils.js';
 import { makeManagedEmail, isManagedEmail } from '../utils/managedStudent.js';
@@ -365,7 +365,7 @@ router.post("/:id/convert", verifyToken, verifyAdmin, strictLimiter, async (req,
       logger.error("Convert: failed to send invite email:", { error: emailError?.message });
     }
 
-    const { password, inviteToken: _t, twoFactorSecret, twoFactorBackupCodes, ...safe } = student.toObject();
+    const { password: _p, inviteToken: _t, twoFactorSecret: _s, twoFactorBackupCodes: _b, ...safe } = student.toObject();
     res.json({
       message: emailSent
         ? `Converted. Invite email sent to ${email}.`
@@ -530,7 +530,7 @@ router.patch("/:id/timezone", verifyToken, async (req, res) => {
     catch { return badRequest(res, "Invalid timezone identifier"); }
     await getStudent(req.db).findByIdAndUpdate(req.params.id, { timezone });
     res.json({ ok: true });
-  } catch (err) {
+  } catch {
     serverError(res, "Error updating timezone");
   }
 });

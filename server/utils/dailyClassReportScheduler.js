@@ -21,6 +21,7 @@ import {
 } from "./dailyClassReport.js";
 import { sendDailyClassReportEmail, sendTeacherDailyClassReportEmail } from "./emailService.js";
 import logger from "./logger.js";
+import { trackJob, jobFailed } from "./monitor.js";
 
 const getReminderLog = (db) => db.models.ReminderLog || db.model("ReminderLog", reminderLogSchema);
 const getAdmin       = (db) => db.models.Admin       || db.model("Admin",       adminSchema);
@@ -129,10 +130,12 @@ export function startDailyClassReportScheduler(db, center) {
       if (sent) logger.info(`📋 Daily class report ${date} sent → ${sent} teacher(s) (${slug})`);
     } catch (err) {
       logger.error(`Daily class report error (${slug}):`, { error: err?.message });
+      jobFailed("Daily class report", slug, err);
     }
   };
+  const tracked = trackJob("Daily class report", slug, CHECK_EVERY_MS, tick);
 
   logger.info(`📋 Daily class report scheduler started for center: ${slug}`);
-  setTimeout(tick, 60 * 1000); // shortly after start-up (catch up a missed midnight)
-  setInterval(tick, CHECK_EVERY_MS);
+  setTimeout(tracked, 60 * 1000); // shortly after start-up (catch up a missed midnight)
+  setInterval(tracked, CHECK_EVERY_MS);
 }

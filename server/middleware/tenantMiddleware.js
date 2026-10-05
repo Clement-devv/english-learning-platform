@@ -1,4 +1,5 @@
 // @ts-check
+import { setRequestCenter } from './requestMonitor.js';
 import Center from '../models/master/Center.js';
 import { getDb } from '../config/dbManager.js';
 import logger from "../utils/logger.js";
@@ -34,6 +35,7 @@ export const tenantMiddleware = async (req, res, next) => {
 
     if (byCustomDomain) {
       req.center = byCustomDomain;
+      setRequestCenter(byCustomDomain.slug);
       req.db = await getDb(byCustomDomain.slug);
       return next();
     }
@@ -65,6 +67,7 @@ export const tenantMiddleware = async (req, res, next) => {
     }
 
     req.center = center;
+    setRequestCenter(center.slug);
     req.db = await getDb(center.slug);
     next();
   } catch (err) {

@@ -65,6 +65,27 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
+          // ── React core ────────────────────────────────────────────────────
+          // MUST be pinned to its own chunk. Otherwise Rollup hoists React into
+          // whichever manual chunk first depends on it (it landed in vendor-three
+          // and vendor-emoji), forcing every page — even login — to download
+          // Three.js, the emoji picker and jsPDF just to get React.
+          // Only react/react-dom/scheduler go here: they import nothing outside
+          // themselves, so this can't create the circular-chunk problem below.
+          // react-dom/server (only used by the lazy PDF export) is excluded so it
+          // stays in its own on-demand chunk.
+          if (/[\\/]node_modules[\\/](react|react-dom|scheduler)[\\/]/.test(id) &&
+              !/[\\/]react-dom[\\/](server|cjs[\\/]react-dom-server)/.test(id)) {
+            return 'vendor-react';
+          }
+          // Vite's dynamic-import helper + Rollup's CJS interop helper are used by
+          // every chunk. Left alone they got hoisted into vendor-jspdf (which does
+          // its own dynamic imports), making jsPDF load on every page. Keep them in
+          // the always-loaded React chunk instead.
+          if (id.includes('vite/preload-helper') || id.includes('commonjsHelpers')) {
+            return 'vendor-react';
+          }
+
           // ── Heavy standalone libs ─────────────────────────────────────────
           if (id.includes('agora-rtc-sdk-ng') || id.includes('agora-extension')) {
             return 'vendor-agora';

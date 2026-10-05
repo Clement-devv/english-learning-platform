@@ -1,4 +1,6 @@
+import { useEffect, useRef, useState } from 'react';
 import { BookOpen, RefreshCw, Search, ChevronDown, ChevronUp } from 'lucide-react';
+import Pagination from '../../../components/Pagination';
 import styles from '../SuperAdmin.module.css';
 
 export default function ClassesTab({
@@ -7,7 +9,7 @@ export default function ClassesTab({
   classesDateFrom, classesDateTo, classesFilterCenter,
   setClassesDateFrom, setClassesDateTo, setClassesFilterCenter,
   classesGrandTotal, classesExpanded, setClassesExpanded,
-  loadClasses }) {
+  loadClasses, apiBase, authHeaders }) {
   return (
     <div className={styles.card}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: 10 }}>
@@ -94,46 +96,79 @@ export default function ClassesTab({
                 </div>
               </button>
 
-              {/* Expanded class table */}
+              {/* Expanded: that center's classes, a page at a time */}
               {classesExpanded === center.centerId && (
-                <div style={{ overflowX: 'auto', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-                  <table className={styles.table}>
-                    <thead>
-                      <tr>{['Class Title', 'Topic', 'Teacher', 'Student', 'Date', 'Duration', 'Completed'].map(h => (
-                        <th key={h} className={styles.th} style={{ fontSize: 10 }}>{h}</th>
-                      ))}</tr>
-                    </thead>
-                    <tbody>
-                      {center.classes.map(cls => (
-                        <tr key={cls._id} className={styles.tr}>
-                          <td className={styles.td}><span style={{ fontWeight: 600, color: '#f1f5f9', fontSize: 13 }}>{cls.classTitle}</span></td>
-                          <td className={styles.td} style={{ color: '#9ca3af', fontSize: 12, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cls.topic || '—'}</td>
-                          <td className={styles.td} style={{ fontSize: 12 }}>
-                            <span style={{ background: 'rgba(52,211,153,0.1)', color: '#34d399', borderRadius: 6, padding: '2px 8px', fontSize: 11, fontWeight: 600 }}>{cls.teacherName}</span>
-                          </td>
-                          <td className={styles.td} style={{ fontSize: 12 }}>
-                            <span style={{ background: 'rgba(99,102,241,0.1)', color: '#818cf8', borderRadius: 6, padding: '2px 8px', fontSize: 11, fontWeight: 600 }}>{cls.studentName}</span>
-                          </td>
-                          <td className={styles.td} style={{ fontSize: 11, color: '#9ca3af' }}>
-                            {cls.scheduledTime ? new Date(cls.scheduledTime).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
-                          </td>
-                          <td className={styles.td} style={{ fontSize: 12, color: '#f59e0b', fontWeight: 600 }}>{cls.duration} min</td>
-                          <td className={styles.td} style={{ fontSize: 11, color: '#6b7280' }}>
-                            {cls.completedAt ? new Date(cls.completedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  {center.total > center.classes.length && (
-                    <p style={{ margin: '8px 18px', fontSize: 11, color: '#6b7280' }}>Showing {center.classes.length} of {center.total} — use date filters to narrow results.</p>
-                  )}
-                </div>
+                <CenterClasses center={center} from={classesDateFrom} to={classesDateTo} apiBase={apiBase} authHeaders={authHeaders} />
               )}
             </div>
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+// One center's completed classes, 25 a page (GET /super-admin/classes/:centerId)
+function CenterClasses({ center, from, to, apiBase, authHeaders }) {
+  const [page, setPage] = useState(1);
+  const [data, setData] = useState(null);
+  const [error, setError] = useState('');
+  const reqId = useRef(0);
+  const headersRef = useRef(authHeaders);
+  headersRef.current = authHeaders || { Authorization: `Bearer ${localStorage.getItem('superAdminToken')}` };
+
+  useEffect(() => {
+    const id = ++reqId.current;
+    const params = new URLSearchParams({ page: String(page), limit: '25' });
+    if (from) params.set('from', from);
+    if (to) params.set('to', to);
+    fetch(`${apiBase}/super-admin/classes/${center.centerId}?${params}`, { headers: headersRef.current })
+      .then(r => r.json())
+      .then(d => {
+        if (id !== reqId.current) return;
+        if (!d.success) throw new Error(d.message || 'Could not load classes');
+        setData(d); setError('');
+      })
+      .catch(e => { if (id === reqId.current) setError(e.message || 'Could not load classes'); });
+  }, [apiBase, center.centerId, from, to, page]);
+
+  const rows = data?.classes || [];
+  const pager = data?.pagination || { page: 1, totalPages: 1, total: center.total, limit: 25 };
+  const fmt = (d) => d ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+
+  return (
+    <div style={{ overflowX: 'auto', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+      {error ? <p style={{ margin: 16, color: '#fca5a5', fontSize: 13 }}>{error}</p>
+        : !data ? <p style={{ margin: 16, color: '#6b7280', fontSize: 13 }}>Loading…</p>
+        : (
+          <table className={styles.table}>
+            <thead>
+              <tr>{['Class Title', 'Topic', 'Teacher', 'Student', 'Date', 'Duration', 'Completed'].map(h => (
+                <th key={h} className={styles.th} style={{ fontSize: 10 }}>{h}</th>
+              ))}</tr>
+            </thead>
+            <tbody>
+              {rows.map(cls => (
+                <tr key={cls._id} className={styles.tr}>
+                  <td className={styles.td}><span style={{ fontWeight: 600, color: '#f1f5f9', fontSize: 13 }}>{cls.classTitle}</span></td>
+                  <td className={styles.td} style={{ color: '#9ca3af', fontSize: 12, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cls.topic || '—'}</td>
+                  <td className={styles.td} style={{ fontSize: 12 }}>
+                    <span style={{ background: 'rgba(52,211,153,0.1)', color: '#34d399', borderRadius: 6, padding: '2px 8px', fontSize: 11, fontWeight: 600 }}>{cls.teacherName}</span>
+                  </td>
+                  <td className={styles.td} style={{ fontSize: 12 }}>
+                    <span style={{ background: 'rgba(99,102,241,0.1)', color: '#818cf8', borderRadius: 6, padding: '2px 8px', fontSize: 11, fontWeight: 600 }}>{cls.studentName}</span>
+                  </td>
+                  <td className={styles.td} style={{ fontSize: 11, color: '#9ca3af' }}>{fmt(cls.scheduledTime)}</td>
+                  <td className={styles.td} style={{ fontSize: 12, color: '#f59e0b', fontWeight: 600 }}>{cls.duration} min</td>
+                  <td className={styles.td} style={{ fontSize: 11, color: '#6b7280' }}>{fmt(cls.completedAt)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      <div style={{ padding: '8px 18px 12px' }}>
+        <Pagination page={pager.page} totalPages={pager.totalPages} total={pager.total} pageSize={pager.limit} onPage={setPage} isDarkMode />
+      </div>
     </div>
   );
 }

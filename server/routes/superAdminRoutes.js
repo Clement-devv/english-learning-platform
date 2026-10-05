@@ -7,6 +7,7 @@ import SuperAdmin from '../models/master/SuperAdmin.js';
 import Center from '../models/master/Center.js';
 import AgoraUsage   from '../models/master/AgoraUsage.js';
 import AgoraSession from '../models/master/AgoraSession.js';
+import MonitorState from '../models/master/MonitorState.js';
 import { verifySuperAdmin } from '../middleware/superAdminMiddleware.js';
 import { loginLimiter, strictLimiter, apiLimiter, emailLimiter, trackFailedLogin, isAccountLocked, clearFailedAttempts } from '../middleware/rateLimiter.js';
 import { getDb } from '../config/dbManager.js';
@@ -343,17 +344,95 @@ router.post('/logout-all-devices', verifySuperAdmin, async (req, res) => {
 
 // GET /api/super-admin/centers — all centers with optional status filter
 // Query params: ?status=active&limit=50&skip=0
+// GET /api/super-admin/centers
+//   ?all=1                       → every center (used for the dashboard's center pickers)
+//   ?page&limit&status&plan&q    → one page for the Centers tab, pending centers first,
+//                                  plus counts per status
+//   &withUsage=1                 → teacher/student counts + App Health signals for that page
+const CENTER_STATUSES = ['pending', 'active', 'suspended', 'rejected'];
+const CENTER_PLANS = ['free', 'basic', 'pro', 'enterprise'];
+const escapeRegex = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 router.get('/centers', verifySuperAdmin, async (req, res) => {
   try {
     const { status } = req.query;
-    const limit = Math.min(parseInt(req.query.limit) || 50, 200);
-    const skip  = Math.max(parseInt(req.query.skip)  || 0,   0);
-    const filter = status ? { status } : {};
-    const [centers, total] = await Promise.all([
-      Center.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
-      Center.countDocuments(filter),
+    // Never send the pending admin's password hash to the browser
+    const HIDDEN = '-pendingPasswordHash';
+
+    if (req.query.all === '1') {
+      const centers = await Center.find({ status: { $ne: 'deleted' } }).select(HIDDEN).sort({ createdAt: -1 }).limit(5000).lean();
+      return res.json({ success: true, centers, total: centers.length, hasMore: false });
+    }
+
+    // Legacy callers: ?skip&limit
+    if (req.query.page === undefined) {
+      const limit = Math.min(parseInt(req.query.limit) || 50, 200);
+      const skip  = Math.max(parseInt(req.query.skip)  || 0,   0);
+      const filter = status ? { status } : {};
+      const [centers, total] = await Promise.all([
+        Center.find(filter).select(HIDDEN).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+        Center.countDocuments(filter),
+      ]);
+      return res.json({ success: true, centers, total, hasMore: skip + centers.length < total });
+    }
+
+    const limit = Math.min(Math.max(parseInt(req.query.limit) || 20, 1), 100);
+    let page    = Math.max(parseInt(req.query.page) || 1, 1);
+    const base = { status: { $ne: 'deleted' } };
+    if (CENTER_PLANS.includes(req.query.plan)) base.plan = req.query.plan;
+    const q = String(req.query.q || '').trim().slice(0, 80);
+    if (q) {
+      const re = new RegExp(escapeRegex(q), 'i');
+      base.$or = [{ centerName: re }, { slug: re }, { adminEmail: re }, { customDomain: re }];
+    }
+    const match = CENTER_STATUSES.includes(status) ? { ...base, status } : base;
+
+    const [countRows, total] = await Promise.all([
+      Center.aggregate([{ $match: base }, { $group: { _id: '$status', n: { $sum: 1 } } }]),
+      Center.countDocuments(match),
     ]);
-    res.json({ success: true, centers, total, hasMore: skip + centers.length < total });
+    const counts = { all: 0, pending: 0, active: 0, suspended: 0, rejected: 0 };
+    for (const r of countRows) { counts.all += r.n; if (r._id in counts) counts[r._id] = r.n; }
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+    page = Math.min(page, totalPages);
+
+    const ids = await Center.aggregate([
+      { $match: match },
+      { $addFields: { _pendingFirst: { $cond: [{ $eq: ['$status', 'pending'] }, 0, 1] } } },
+      { $sort: { _pendingFirst: 1, createdAt: -1 } },
+      { $skip: (page - 1) * limit },
+      { $limit: limit },
+      { $project: { _id: 1 } },
+    ]);
+    const order = ids.map(d => String(d._id));
+    const docs = await Center.find({ _id: { $in: order } }).select(HIDDEN).lean();
+    const byId = new Map(docs.map(d => [String(d._id), d]));
+    const centers = order.map(id => byId.get(id)).filter(Boolean);
+
+    if (req.query.withUsage === '1') {
+      const monitor = await MonitorState.findById('status').select('scan.centers').lean();
+      const signals = new Map((monitor?.scan?.centers || []).map(c => [c.slug, c]));
+      await Promise.all(centers.map(async (c) => {
+        const sig = signals.get(c.slug);
+        if (sig) c.health = { ok: sig.ok, missed24h: sig.missed24h || 0, unanswered: sig.unanswered || 0, error: sig.error || null };
+        if (c.status !== 'active') return;
+        try {
+          const db = await getDb(c.slug);
+          const Teacher = db.models.Teacher || db.model('Teacher', teacherSchema);
+          const Student = db.models.Student || db.model('Student', studentSchema);
+          const [teachers, students] = await Promise.all([
+            Teacher.countDocuments(),
+            Student.countDocuments({ status: { $ne: 'disabled' } }),
+          ]);
+          c.usage = { teachers, students };
+        } catch {
+          c.usage = null;
+          c.health = { ...(c.health || {}), ok: false, error: 'Database unreachable' };
+        }
+      }));
+    }
+
+    res.json({ success: true, centers, counts, pagination: { page, limit, total, totalPages } });
   } catch (err) {
     logger.error('❌ Get centers error:', { error: err?.message });
     serverError(res);
@@ -1362,7 +1441,7 @@ router.get('/centers/deleted', verifySuperAdmin, async (req, res) => {
     const limit = Math.min(parseInt(req.query.limit) || 50, 200);
     const skip  = Math.max(parseInt(req.query.skip)  || 0,   0);
     const [centers, total] = await Promise.all([
-      Center.find({ status: 'deleted' }).sort({ deletedAt: -1 }).skip(skip).limit(limit).lean(),
+      Center.find({ status: 'deleted' }).select('-pendingPasswordHash').sort({ deletedAt: -1 }).skip(skip).limit(limit).lean(),
       Center.countDocuments({ status: 'deleted' }),
     ]);
     res.json({ success: true, centers, total, hasMore: skip + centers.length < total });
@@ -1860,39 +1939,63 @@ router.get('/centers/:id/people', verifySuperAdmin, validateParamMongoId('id'), 
     const center = await Center.findById(req.params.id);
     if (!center) return notFound(res, 'Center not found');
 
+    // One page of teachers or students (?type=teachers|students&page&limit&q),
+    // plus how many of each the center has.
     const db      = await getDb(center.slug);
     const Teacher = db.models.Teacher || db.model('Teacher', teacherSchema);
     const Student = db.models.Student || db.model('Student', studentSchema);
+    const type    = req.query.type === 'students' ? 'students' : 'teachers';
+    const limit   = Math.min(Math.max(parseInt(req.query.limit) || 25, 1), 100);
+    let page      = Math.max(parseInt(req.query.page) || 1, 1);
+    const ACTIVE  = { $or: [{ active: true }, { status: 'active' }] };
 
-    const [teachers, students] = await Promise.all([
-      Teacher.find({ $or: [{ active: true }, { status: 'active' }] })
-        .select('firstName lastName email continent specializations lessonsCompleted createdAt')
-        .lean(),
-      Student.find({ $or: [{ active: true }, { status: 'active' }] })
-        .select('firstName lastName email country classCredits createdAt')
-        .lean(),
+    const q = String(req.query.q || '').trim().slice(0, 60);
+    const search = (codeField) => {
+      if (!q) return ACTIVE;
+      const re = new RegExp(escapeRegex(q), 'i');
+      const or = [{ firstName: re }, { lastName: re }, { email: re }, { [codeField]: re }];
+      const parts = q.split(/\s+/);
+      if (parts.length > 1) or.push({ firstName: new RegExp(escapeRegex(parts[0]), 'i'), lastName: new RegExp(escapeRegex(parts.slice(1).join(' ')), 'i') });
+      return { $and: [ACTIVE, { $or: or }] };
+    };
+    const Model = type === 'teachers' ? Teacher : Student;
+    const filter = type === 'teachers' ? search('teacherCode') : search('studentId');
+
+    const [teacherCount, studentCount, total] = await Promise.all([
+      Teacher.countDocuments(ACTIVE),
+      Student.countDocuments(ACTIVE),
+      Model.countDocuments(filter),
     ]);
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+    page = Math.min(page, totalPages);
+
+    const rows = await Model.find(filter)
+      .select(type === 'teachers'
+        ? 'firstName lastName email teacherCode continent specializations lessonsCompleted createdAt'
+        : 'firstName lastName email studentId country classCredits isManaged createdAt')
+      .sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit).lean();
+
+    const items = rows.map(p => type === 'teachers'
+      ? {
+          _id: p._id, code: p.teacherCode || null,
+          name: `${p.firstName || ''} ${p.lastName || ''}`.trim() || p.email,
+          email: p.email, continent: p.continent || '',
+          specializations: p.specializations || [], lessonsCompleted: p.lessonsCompleted || 0, joinedAt: p.createdAt,
+        }
+      : {
+          _id: p._id, code: p.studentId || null,
+          name: `${p.firstName || ''} ${p.lastName || ''}`.trim() || p.email,
+          email: p.email, country: p.country || '', classes: p.classCredits || 0, isManaged: !!p.isManaged, joinedAt: p.createdAt,
+        });
 
     res.json({
-      success:    true,
-      centerName: center.centerName,
-      teachers: teachers.map(t => ({
-        _id:              t._id,
-        name:             `${t.firstName || ''} ${t.lastName || ''}`.trim() || t.email,
-        email:            t.email,
-        continent:        t.continent || '',
-        specializations:  t.specializations || [],
-        lessonsCompleted: t.lessonsCompleted || 0,
-        joinedAt:         t.createdAt,
-      })),
-      students: students.map(s => ({
-        _id:      s._id,
-        name:     `${s.firstName || ''} ${s.lastName || ''}`.trim() || s.email,
-        email:    s.email,
-        country:  s.country || '',
-        classes:  s.classCredits || 0,
-        joinedAt: s.createdAt,
-      })),
+      success: true,
+      data: {
+        centerName: center.centerName,
+        counts: { teachers: teacherCount, students: studentCount },
+        type, items,
+        pagination: { page, limit, total, totalPages },
+      },
     });
   } catch (err) {
     logger.error('❌ People error:', { error: err?.message });
@@ -1904,7 +2007,8 @@ router.get('/centers/:id/people', verifySuperAdmin, validateParamMongoId('id'), 
 // Query: from (ISO date), to (ISO date), centerId (optional – single center)
 router.get('/classes', verifySuperAdmin, async (req, res) => {
   try {
-    const { from, to, centerId } = req.query;
+    const { from, to } = req.query;
+    const centerId = req.query.centerId || req.query.center; // the dashboard sends ?center=
 
     let targetCenters = await Center.find({ status: 'active' })
       .select('_id centerName slug').lean();
@@ -1931,7 +2035,13 @@ router.get('/classes', verifySuperAdmin, async (req, res) => {
         const query = { status: 'completed' };
         if (Object.keys(dateFilter).length > 0) query.scheduledTime = dateFilter;
 
-        const bookings = await Booking.find(query).sort({ scheduledTime: -1 }).limit(500).lean();
+        // Real total (not capped); the first page of classes comes with it and
+        // the rest is paged through GET /classes/:centerId
+        const PAGE = 25;
+        const [total, bookings] = await Promise.all([
+          Booking.countDocuments(query),
+          Booking.find(query).sort({ scheduledTime: -1 }).limit(PAGE).lean(),
+        ]);
         if (!bookings.length) {
           return { centerId: center._id, centerName: center.centerName, slug: center.slug, total: 0, classes: [] };
         }
@@ -1951,17 +2061,8 @@ router.get('/classes', verifySuperAdmin, async (req, res) => {
           centerId:   center._id,
           centerName: center.centerName,
           slug:       center.slug,
-          total:      bookings.length,
-          classes:    bookings.map(b => ({
-            _id:           b._id,
-            classTitle:    b.classTitle || 'Untitled',
-            topic:         b.topic || '',
-            teacherName:   tMap[b.teacherId?.toString()] || 'Unknown',
-            studentName:   sMap[b.studentId?.toString()] || 'Unknown',
-            scheduledTime: b.scheduledTime,
-            duration:      b.duration || 60,
-            completedAt:   b.completedAt || null,
-          })),
+          total,
+          classes:    bookings.map(b => classRow(b, tMap, sMap)),
         };
       } catch {
         return { centerId: center._id, centerName: center.centerName, slug: center.slug, total: 0, classes: [], error: true };
@@ -1975,6 +2076,59 @@ router.get('/classes', verifySuperAdmin, async (req, res) => {
     res.json({ success: true, centers: filtered, grandTotal });
   } catch (err) {
     logger.error('❌ Classes error:', { error: err?.message });
+    serverError(res);
+  }
+});
+
+function classRow(b, tMap, sMap) {
+  return {
+    _id:           b._id,
+    classTitle:    b.classTitle || 'Untitled',
+    topic:         b.topic || '',
+    teacherName:   tMap[b.teacherId?.toString()] || 'Unknown',
+    studentName:   sMap[b.studentId?.toString()] || 'Unknown',
+    scheduledTime: b.scheduledTime,
+    duration:      b.duration || 60,
+    completedAt:   b.completedAt || null,
+  };
+}
+
+// GET /api/super-admin/classes/:centerId?page&limit&from&to — one page of a center's completed classes
+router.get('/classes/:centerId', verifySuperAdmin, validateParamMongoId('centerId'), async (req, res) => {
+  try {
+    const center = await Center.findById(req.params.centerId).select('slug centerName').lean();
+    if (!center) return notFound(res, 'Center not found');
+    const limit = Math.min(Math.max(parseInt(req.query.limit) || 25, 1), 100);
+    let page    = Math.max(parseInt(req.query.page) || 1, 1);
+
+    const query = { status: 'completed' };
+    const dateFilter = {};
+    if (req.query.from) dateFilter.$gte = new Date(req.query.from);
+    if (req.query.to) { const t = new Date(req.query.to); t.setHours(23, 59, 59, 999); dateFilter.$lte = t; }
+    if (Object.keys(dateFilter).length) query.scheduledTime = dateFilter;
+
+    const db      = await getDb(center.slug);
+    const Booking = db.models.Booking || db.model('Booking', bookingSchema);
+    const Teacher = db.models.Teacher || db.model('Teacher', teacherSchema);
+    const Student = db.models.Student || db.model('Student', studentSchema);
+
+    const total = await Booking.countDocuments(query);
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+    page = Math.min(page, totalPages);
+    const bookings = await Booking.find(query).sort({ scheduledTime: -1 }).skip((page - 1) * limit).limit(limit).lean();
+
+    const tIds = [...new Set(bookings.map(b => b.teacherId?.toString()).filter(Boolean))];
+    const sIds = [...new Set(bookings.map(b => b.studentId?.toString()).filter(Boolean))];
+    const [teachers, students] = await Promise.all([
+      Teacher.find({ _id: { $in: tIds } }).select('firstName lastName').lean(),
+      Student.find({ _id: { $in: sIds } }).select('firstName lastName').lean(),
+    ]);
+    const tMap = Object.fromEntries(teachers.map(t => [t._id.toString(), `${t.firstName || ''} ${t.lastName || ''}`.trim()]));
+    const sMap = Object.fromEntries(students.map(s => [s._id.toString(), `${s.firstName || ''} ${s.lastName || ''}`.trim()]));
+
+    res.json({ success: true, classes: bookings.map(b => classRow(b, tMap, sMap)), pagination: { page, limit, total, totalPages } });
+  } catch (err) {
+    logger.error('❌ Center classes error:', { error: err?.message });
     serverError(res);
   }
 });

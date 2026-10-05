@@ -25,13 +25,11 @@ export default function AnalyticsDashboard({ isDarkMode }) {
   const [pinState, setPinState] = useState(null);
   const [loading, setLoading] = useState(true);
   const [overview, setOverview] = useState(null);
-  const [timeline, setTimeline] = useState([]);
   const [teacherPerformance, setTeacherPerformance] = useState([]);
   const [studentEngagement, setStudentEngagement] = useState([]);
   const [revenue, setRevenue] = useState(null);
   const [popularTimes, setPopularTimes] = useState([]);
   const [acceptanceRate, setAcceptanceRate] = useState([]);
-  const [period, setPeriod] = useState("week");
 
   const sym = useCurrencySymbol();
   const dm = isDarkMode;
@@ -43,7 +41,6 @@ export default function AnalyticsDashboard({ isDarkMode }) {
   const subText  = dm ? "text-gray-400"             : "text-gray-600";
   const mutedText= dm ? "text-gray-500"             : "text-gray-500";
   const divider  = dm ? "border-gray-700"           : "border-gray-200";
-  const rowHover = dm ? "hover:bg-gray-700/50"      : "hover:bg-gray-50";
   const inlineBg = dm ? "bg-gray-700"               : "bg-gray-50";
 
   const lock = () => {
@@ -56,11 +53,10 @@ export default function AnalyticsDashboard({ isDarkMode }) {
       if (quiet !== true) setLoading(true);
       const tz = encodeURIComponent(Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC");
       const [
-        overviewRes, timelineRes, teachersRes,
+        overviewRes, teachersRes,
         studentsRes, revenueRes, timesRes, acceptanceRes
       ] = await Promise.all([
         api.get("/analytics/overview"),
-        api.get(`/analytics/bookings-timeline?period=${period}`),
         api.get("/analytics/teacher-performance?limit=5"),
         api.get("/analytics/student-engagement?limit=5"),
         api.get("/analytics/revenue-breakdown"),
@@ -68,7 +64,6 @@ export default function AnalyticsDashboard({ isDarkMode }) {
         api.get("/analytics/booking-acceptance-rate")
       ]);
       setOverview(overviewRes.data.data);
-      setTimeline(timelineRes.data.data);
       setTeacherPerformance(teachersRes.data.data);
       setStudentEngagement(studentsRes.data.data);
       setRevenue(revenueRes.data.data);
@@ -94,7 +89,7 @@ export default function AnalyticsDashboard({ isDarkMode }) {
       .catch(() => setPinState({ pinSet: false, unlocked: true }));   // server still enforces the PIN
   }, []);
 
-  useEffect(() => { if (pinState?.unlocked) fetchAnalytics(); }, [period, pinState?.unlocked]);
+  useEffect(() => { if (pinState?.unlocked) fetchAnalytics(); }, [pinState?.unlocked]);
 
   // ── sub-components ──────────────────────────────────────────────────────────
   const StatCard = ({ icon: Icon, title, value, subtitle, color = "purple" }) => {

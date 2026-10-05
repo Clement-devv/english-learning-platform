@@ -157,7 +157,6 @@ export default function LessonActionModal({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
-  const steps = ["Select Person", "Select Other", "Choose Class", "Confirm"];
   const currentStepIndex = { teacher: 0, student: 0, class: startWith === "teacher" ? 1 : 1, confirm: 2, done: 3 }[step] ?? 0;
 
   // ── Load teachers when step = "teacher" ──

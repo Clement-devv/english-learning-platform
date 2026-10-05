@@ -95,7 +95,7 @@ export default function LessonMarkModal({
     try {
       const { data } = await api.get(`/admin/lessons/teacher/${teacherId}/students`);
       setStudentList(data.students || []);
-    } catch (err) {
+    } catch {
       setError("Could not load students for this teacher.");
     } finally {
       setLoading(false);
@@ -108,7 +108,7 @@ export default function LessonMarkModal({
     try {
       const { data } = await api.get(`/admin/lessons/student/${studentId}/teachers`);
       setTeacherList(data.teachers || []);
-    } catch (err) {
+    } catch {
       setError("Could not load teachers for this student.");
     } finally {
       setLoading(false);
@@ -123,7 +123,7 @@ export default function LessonMarkModal({
         `/admin/lessons/bookings?teacherId=${teacherId}&studentId=${studentId}&type=${mode}`
       );
       setBookingList(data.bookings || []);
-    } catch (err) {
+    } catch {
       setError("Could not load classes.");
     } finally {
       setLoading(false);
