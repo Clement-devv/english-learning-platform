@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 import { hideSecrets } from './shared/hideSecrets.js';
-import bcrypt from 'bcryptjs';
+import bcrypt from '../utils/passwordHash.js';
 import { sessionSchema, knownDeviceSchema, alertsSeenDef } from './shared/sessionSchema.js';
 
 export const subAdminSchema = new mongoose.Schema(

@@ -1,5 +1,5 @@
 import express          from 'express';
-import bcrypt           from 'bcryptjs';
+import bcrypt           from '../utils/passwordHash.js';
 import jwt              from 'jsonwebtoken';
 import crypto           from 'crypto';
 

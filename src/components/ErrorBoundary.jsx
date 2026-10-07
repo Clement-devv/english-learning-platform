@@ -243,12 +243,12 @@ const tabStyles = {
     margin: "0 0 6px",
     fontSize: "16px",
     fontWeight: "600",
-    color: "#1e293b",
+    color: "var(--sa-text, #1e293b)", // super admin dark mode sets --sa-text
   },
   body: {
     margin: "0 0 20px",
     fontSize: "13px",
-    color: "#64748b",
+    color: "var(--sa-muted, #64748b)",
     lineHeight: 1.6,
   },
   devError: {

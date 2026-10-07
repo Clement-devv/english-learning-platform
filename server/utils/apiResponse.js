@@ -70,5 +70,6 @@ export const conflict    = (res, message)                 => res.status(409).jso
  */
 export const serverError = (res, message = 'Server error', err) => {
   if (err instanceof Error) Sentry.captureException(err);
+  if (res.headersSent) return; // already answered (e.g. by the request timeout)
   res.status(500).json({ success: false, message });
 };

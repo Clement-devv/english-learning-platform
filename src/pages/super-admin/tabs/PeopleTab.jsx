@@ -9,7 +9,7 @@ import styles from '../SuperAdmin.module.css';
 import { visibleEmail } from "../../../utils/managedStudent.js";
 
 const PAGE_SIZE = 25;
-const codeChip = { color: '#d1d5db', background: 'rgba(255,255,255,0.06)', padding: '1px 6px', borderRadius: 6, fontSize: 11 };
+const codeChip = { color: 'var(--sa-text-2)', background: 'var(--sa-w06)', padding: '1px 6px', borderRadius: 6, fontSize: 11 };
 
 export default function PeopleTab({ centers, peopleCenter, setPeopleCenter, apiBase, authHeaders }) {
   const [type, setType]       = useState('teachers');
@@ -89,7 +89,7 @@ export default function PeopleTab({ centers, peopleCenter, setPeopleCenter, apiB
                 { key: 'students', label: `Students (${counts.students})`, icon: Users },
               ].map(({ key, label, icon: Icon }) => (
                 <button key={key} onClick={() => pickType(key)}
-                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 16px', borderRadius: 8, border: type === key ? '1px solid rgba(52,211,153,0.3)' : '1px solid rgba(255,255,255,0.07)', background: type === key ? 'rgba(52,211,153,0.1)' : 'rgba(255,255,255,0.03)', color: type === key ? '#34d399' : '#6b7280', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 16px', borderRadius: 8, border: type === key ? '1px solid rgba(52,211,153,0.3)' : '1px solid var(--sa-w07)', background: type === key ? 'rgba(52,211,153,0.1)' : 'var(--sa-w03)', color: type === key ? '#34d399' : '#6b7280', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
                   <Icon size={13} /> {label}
                 </button>
               ))}
@@ -102,7 +102,7 @@ export default function PeopleTab({ centers, peopleCenter, setPeopleCenter, apiB
             </div>
           </div>
 
-          {error && <p role="alert" style={{ color: '#fca5a5', fontSize: 13 }}>{error}</p>}
+          {error && <p role="alert" style={{ color: 'var(--sa-red-text)', fontSize: 13 }}>{error}</p>}
 
           {loading && !data ? (
             <div style={{ textAlign: 'center', padding: 40, color: '#6b7280' }}>Loading…</div>
@@ -120,12 +120,12 @@ export default function PeopleTab({ centers, peopleCenter, setPeopleCenter, apiB
                       {items.map(t => (
                         <tr key={t._id} className={styles.tr}>
                           <td className={styles.td}>
-                            <span style={{ fontWeight: 600, color: '#f1f5f9' }}>{t.name}</span>
+                            <span style={{ fontWeight: 600, color: 'var(--sa-text)' }}>{t.name}</span>
                             {t.code && <div style={{ marginTop: 3 }}><code style={codeChip}>{t.code}</code></div>}
                           </td>
-                          <td className={styles.td} style={{ color: '#9ca3af', fontSize: 12 }}>{t.email}</td>
+                          <td className={styles.td} style={{ color: 'var(--sa-muted)', fontSize: 12 }}>{t.email}</td>
                           <td className={styles.td}><span style={{ background: 'rgba(52,211,153,0.1)', color: '#34d399', borderRadius: 6, padding: '2px 8px', fontSize: 11, fontWeight: 600 }}>{t.continent || '—'}</span></td>
-                          <td className={styles.td} style={{ fontSize: 11, color: '#9ca3af', maxWidth: 180 }}>
+                          <td className={styles.td} style={{ fontSize: 11, color: 'var(--sa-muted)', maxWidth: 180 }}>
                             {t.specializations.length > 0
                               ? t.specializations.slice(0, 3).join(', ') + (t.specializations.length > 3 ? ` +${t.specializations.length - 3}` : '')
                               : '—'}
@@ -143,10 +143,10 @@ export default function PeopleTab({ centers, peopleCenter, setPeopleCenter, apiB
                       {items.map(st => (
                         <tr key={st._id} className={styles.tr}>
                           <td className={styles.td}>
-                            <span style={{ fontWeight: 600, color: '#f1f5f9' }}>{st.name}</span>
+                            <span style={{ fontWeight: 600, color: 'var(--sa-text)' }}>{st.name}</span>
                             {st.code && <div style={{ marginTop: 3 }}><code style={codeChip}>{st.code}</code></div>}
                           </td>
-                          <td className={styles.td} style={{ color: '#9ca3af', fontSize: 12 }}>{visibleEmail(st.email) || "No login (managed)"}</td>
+                          <td className={styles.td} style={{ color: 'var(--sa-muted)', fontSize: 12 }}>{visibleEmail(st.email) || "No login (managed)"}</td>
                           <td className={styles.td}><span style={{ background: 'rgba(99,102,241,0.1)', color: '#818cf8', borderRadius: 6, padding: '2px 8px', fontSize: 11, fontWeight: 600 }}>{st.country || '—'}</span></td>
                           <td className={styles.td} style={{ fontWeight: 700, color: st.classes > 0 ? '#34d399' : '#4b5563' }}>{st.classes}</td>
                           <td className={styles.td} style={{ fontSize: 11, color: '#6b7280' }}>{st.joinedAt ? new Date(st.joinedAt).toLocaleDateString('en-GB') : '—'}</td>

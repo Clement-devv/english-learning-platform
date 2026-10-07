@@ -160,20 +160,20 @@ export default function CentersTab({
       </div>
 
       {/* Status tabs with counts */}
-      <div role="tablist" aria-label="Center status" style={{ display: 'flex', gap: 4, padding: '0 20px', borderBottom: '1px solid rgba(255,255,255,0.06)', overflowX: 'auto' }}>
+      <div role="tablist" aria-label="Center status" style={{ display: 'flex', gap: 4, padding: '0 20px', borderBottom: '1px solid var(--sa-w06)', overflowX: 'auto' }}>
         {STATUS_TABS.map(t => {
           const on = status === t.key;
           return (
             <button key={t.key} role="tab" aria-selected={on} onClick={() => { setStatus(t.key); setPage(1); }}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '10px 12px', border: 'none', borderBottom: `2px solid ${on ? t.color : 'transparent'}`, background: 'transparent', color: on ? '#f1f5f9' : '#6b7280', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap', marginBottom: -1 }}>
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '10px 12px', border: 'none', borderBottom: `2px solid ${on ? t.color : 'transparent'}`, background: 'transparent', color: on ? 'var(--sa-text)' : '#6b7280', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap', marginBottom: -1 }}>
               {t.label}
-              <span style={{ fontSize: 11, fontWeight: 800, padding: '1px 7px', borderRadius: 999, background: on ? `${t.color}22` : 'rgba(255,255,255,0.05)', color: on ? t.color : '#9ca3af' }}>{counts[t.key] ?? 0}</span>
+              <span style={{ fontSize: 11, fontWeight: 800, padding: '1px 7px', borderRadius: 999, background: on ? `${t.color}22` : 'var(--sa-w05)', color: on ? t.color : 'var(--sa-muted)' }}>{counts[t.key] ?? 0}</span>
             </button>
           );
         })}
       </div>
 
-      {error && <div role="alert" style={{ margin: '12px 20px 0', padding: '10px 14px', borderRadius: 10, background: 'rgba(239,68,68,0.1)', color: '#fca5a5', fontSize: 13 }}>{error}</div>}
+      {error && <div role="alert" style={{ margin: '12px 20px 0', padding: '10px 14px', borderRadius: 10, background: 'rgba(239,68,68,0.1)', color: 'var(--sa-red-text)', fontSize: 13 }}>{error}</div>}
 
       {loading && !list ? (
         <div style={{ padding: 48, textAlign: 'center', color: '#6b7280' }}>Loading…</div>
@@ -190,19 +190,19 @@ export default function CentersTab({
         </div>
       ) : (
         <div style={{ overflowX: 'auto', opacity: loading ? 0.6 : 1, transition: 'opacity .15s' }}>
-          <div style={{ minWidth: 880 }}>
+          <div style={{ minWidth: 860 }}>
             <div style={{ ...ROW, padding: '10px 20px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
               <span>Center</span><span>Plan</span><span>Usage</span><span>Health</span><span>Website</span><span style={{ textAlign: 'right' }}>Actions</span>
             </div>
             {rows.map(c => (
-              <div key={c._id} style={{ ...ROW, padding: '12px 20px', borderTop: '1px solid rgba(255,255,255,0.05)', background: c.status === 'pending' ? 'rgba(245,158,11,0.05)' : 'transparent' }}>
+              <div key={c._id} style={{ ...ROW, padding: '12px 20px', borderTop: '1px solid var(--sa-w05)', background: c.status === 'pending' ? 'rgba(245,158,11,0.05)' : 'transparent' }}>
                 {/* Center */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
                   <Avatar center={c} />
                   <div style={{ minWidth: 0 }}>
-                    <button onClick={() => setManage(c)} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: '#f1f5f9', fontSize: 14, display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>{c.centerName}</button>
+                    <button onClick={() => setManage(c)} style={{ all: 'unset', cursor: 'pointer', fontWeight: 700, color: 'var(--sa-text)', fontSize: 14, display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>{c.centerName}</button>
                     <div style={{ fontSize: 12, color: '#6b7280', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      <code style={{ color: '#9ca3af' }}>{c.slug}</code>
+                      <code style={{ color: 'var(--sa-muted)' }}>{c.slug}</code>
                       {c.customDomain && <> · {c.customDomain} {c.domainVerified ? <CheckCircle size={11} color="#34d399" style={{ verticalAlign: -1 }} /> : <span style={{ color: '#f59e0b' }}>(unverified)</span>}</>}
                     </div>
                     <div style={{ fontSize: 11.5, color: '#6b7280', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.adminEmail}</div>
@@ -239,7 +239,7 @@ export default function CentersTab({
                   {(c.status === 'rejected' || c.status === 'suspended') && (
                     <button onClick={() => handleApprove(c._id)} className={styles.approveBtn}>Reactivate</button>
                   )}
-                  <button onClick={() => setManage(c)} style={ghostBtn('#e5e7eb')} title="Plan, features, themes, website, account">
+                  <button onClick={() => setManage(c)} style={ghostBtn('var(--sa-text)')} title="Plan, features, themes, website, account">
                     <Settings2 size={13} /> Manage
                   </button>
                 </div>
@@ -249,7 +249,7 @@ export default function CentersTab({
         </div>
       )}
 
-      <div style={{ padding: '12px 20px 16px', borderTop: rows.length ? '1px solid rgba(255,255,255,0.05)' : 'none' }}>
+      <div style={{ padding: '12px 20px 16px', borderTop: rows.length ? '1px solid var(--sa-w05)' : 'none' }}>
         <Pagination page={pager.page} totalPages={pager.totalPages} total={pager.total} pageSize={pager.limit} onPage={setPage} isDarkMode />
       </div>
     </div>
@@ -302,7 +302,7 @@ export default function CentersTab({
         <div
           onClick={e => e.stopPropagation()}
           style={{
-            background: '#1a1d2e', border: '1px solid #2a2d40', borderRadius: '18px',
+            background: 'var(--sa-modal)', border: '1px solid #2a2d40', borderRadius: '18px',
             padding: '28px 30px', maxWidth: '480px', width: '100%',
             boxShadow: '0 24px 64px rgba(0,0,0,0.5)',
           }}
@@ -313,7 +313,7 @@ export default function CentersTab({
               <KeyRound size={17} color="#f87171" />
             </div>
             <div>
-              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 800, color: '#f1f5f9' }}>
+              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 800, color: 'var(--sa-text)' }}>
                 Emergency Email Override
               </h3>
               <p style={{ margin: 0, fontSize: '12px', color: '#6b7280' }}>
@@ -324,9 +324,9 @@ export default function CentersTab({
 
           {/* Recovery Code */}
           {overrideCenter.recoveryCode && (
-            <div style={{ background: '#0f1117', border: '1px solid #2a2d40', borderRadius: '10px', padding: '10px 14px', marginBottom: '18px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{ background: 'var(--sa-panel)', border: '1px solid #2a2d40', borderRadius: '10px', padding: '10px 14px', marginBottom: '18px', display: 'flex', alignItems: 'center', gap: '10px' }}>
               <span style={{ fontSize: '11px', color: '#6b7280', flexShrink: 0 }}>Recovery code</span>
-              <span style={{ fontFamily: 'monospace', fontSize: '14px', fontWeight: 700, color: '#a5b4fc', flex: 1, letterSpacing: '0.06em' }}>
+              <span style={{ fontFamily: 'monospace', fontSize: '14px', fontWeight: 700, color: 'var(--sa-indigo-text)', flex: 1, letterSpacing: '0.06em' }}>
                 {overrideCenter.recoveryCode}
               </span>
               <button
@@ -344,7 +344,7 @@ export default function CentersTab({
             <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#6b7280', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               Current email
             </label>
-            <div style={{ padding: '10px 12px', background: '#0f1117', border: '1px solid #2a2d40', borderRadius: '8px', fontSize: '13px', color: '#94a3b8' }}>
+            <div style={{ padding: '10px 12px', background: 'var(--sa-panel)', border: '1px solid #2a2d40', borderRadius: '8px', fontSize: '13px', color: '#94a3b8' }}>
               {overrideCenter.adminEmail}
             </div>
           </div>
@@ -366,7 +366,7 @@ export default function CentersTab({
                   value={overrideEmail}
                   onChange={e => setOverrideEmail(e.target.value)}
                   placeholder="new@email.com"
-                  style={{ width: '100%', padding: '10px 12px', background: '#0f1117', border: '1px solid #2a2d40', borderRadius: '8px', color: '#e8eaf6', fontSize: '13px', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }}
+                  style={{ width: '100%', padding: '10px 12px', background: 'var(--sa-panel)', border: '1px solid #2a2d40', borderRadius: '8px', color: '#e8eaf6', fontSize: '13px', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }}
                 />
               </div>
 
@@ -379,7 +379,7 @@ export default function CentersTab({
                   onChange={e => setOverrideReason(e.target.value)}
                   placeholder="e.g. Admin reported account compromise — verified via recovery code XXXX"
                   rows={3}
-                  style={{ width: '100%', padding: '10px 12px', background: '#0f1117', border: '1px solid #2a2d40', borderRadius: '8px', color: '#e8eaf6', fontSize: '13px', fontFamily: 'inherit', outline: 'none', resize: 'vertical', boxSizing: 'border-box' }}
+                  style={{ width: '100%', padding: '10px 12px', background: 'var(--sa-panel)', border: '1px solid #2a2d40', borderRadius: '8px', color: '#e8eaf6', fontSize: '13px', fontFamily: 'inherit', outline: 'none', resize: 'vertical', boxSizing: 'border-box' }}
                 />
               </div>
 
@@ -414,7 +414,7 @@ export default function CentersTab({
           {overrideStep === 'confirm' && (
             <>
               <div style={{ background: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.25)', borderRadius: '10px', padding: '14px 16px', marginBottom: '20px' }}>
-                <p style={{ margin: '0 0 8px', fontSize: '13px', color: '#f1f5f9', fontWeight: 700 }}>
+                <p style={{ margin: '0 0 8px', fontSize: '13px', color: 'var(--sa-text)', fontWeight: 700 }}>
                   Confirm override for <em>{overrideCenter.centerName}</em>
                 </p>
                 <p style={{ margin: '0 0 4px', fontSize: '12px', color: '#94a3b8' }}>
@@ -457,7 +457,7 @@ export default function CentersTab({
 
 // ── Layout + small pieces ─────────────────────────────────────────────────────
 const PAGE_SIZE = 20;
-const ROW = { display: 'grid', gridTemplateColumns: 'minmax(240px,2.2fr) 90px minmax(170px,1.3fr) minmax(140px,1fr) 80px 210px', gap: 16, alignItems: 'center' };
+const ROW = { display: 'grid', gridTemplateColumns: 'minmax(210px,2fr) 72px minmax(140px,1.2fr) minmax(120px,1fr) 64px 196px', gap: 14, alignItems: 'center' };
 const STATUS_TABS = [
   { key: 'all',       label: 'All',       color: '#f59e0b' },
   { key: 'active',    label: 'Active',    color: '#10b981' },
@@ -466,7 +466,7 @@ const STATUS_TABS = [
   { key: 'rejected',  label: 'Rejected',  color: '#6b7280' },
 ];
 const STATUS_COLORS = { active: '#10b981', pending: '#f59e0b', suspended: '#ef4444', rejected: '#6b7280' };
-const PLAN_COLORS = { free: '#9ca3af', basic: '#818cf8', pro: '#34d399', enterprise: '#f59e0b' };
+const PLAN_COLORS = { free: '#64748b', basic: '#818cf8', pro: '#34d399', enterprise: '#f59e0b' };
 const AVATAR_COLORS = ['#f59e0b', '#34d399', '#818cf8', '#f472b6', '#22d3ee', '#fb923c', '#a78bfa'];
 
 const pillStyle = (color) => ({
@@ -477,7 +477,7 @@ const pillStyle = (color) => ({
 const ghostBtn = (color) => ({
   display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 11px', borderRadius: 8,
   fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
-  background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', color,
+  background: 'var(--sa-w03)', border: '1px solid var(--sa-w10)', color,
 });
 
 function Avatar({ center, size = 38 }) {
@@ -498,11 +498,11 @@ function UsageBar({ label, used = 0, max }) {
   const color = pct >= 100 ? '#ef4444' : pct >= 85 ? '#f59e0b' : '#818cf8';
   return (
     <div title={unlimited ? `${used} ${label.toLowerCase()} (no limit)` : `${used} of ${max} ${label.toLowerCase()} (${pct}%)`}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, color: '#9ca3af' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, color: 'var(--sa-muted)' }}>
         <span>{label}</span>
-        <span style={{ color: pct >= 85 ? color : '#d1d5db', fontWeight: 700 }}>{used}{unlimited ? '' : ` / ${max}`}</span>
+        <span style={{ color: pct >= 85 ? color : 'var(--sa-text-2)', fontWeight: 700 }}>{used}{unlimited ? '' : ` / ${max}`}</span>
       </div>
-      <div style={{ height: 4, borderRadius: 4, background: 'rgba(255,255,255,0.06)', marginTop: 3, overflow: 'hidden' }}>
+      <div style={{ height: 4, borderRadius: 4, background: 'var(--sa-w06)', marginTop: 3, overflow: 'hidden' }}>
         <div style={{ width: unlimited ? '100%' : `${pct}%`, height: '100%', background: unlimited ? 'rgba(129,140,248,0.25)' : color, borderRadius: 4 }} />
       </div>
     </div>
@@ -522,7 +522,7 @@ function HealthCell({ center: c }) {
     text = [h.missed24h ? `${h.missed24h} missed (24h)` : null, h.unanswered ? `${h.unanswered} request${h.unanswered === 1 ? '' : 's'} waiting` : null].filter(Boolean).join(' · ');
   }
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 12.5, color: '#d1d5db' }}>
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 12.5, color: 'var(--sa-text-2)' }}>
       <span aria-hidden style={{ width: 8, height: 8, borderRadius: 999, background: color, boxShadow: `0 0 0 3px ${color}26`, flexShrink: 0 }} />
       {text}
     </span>
@@ -553,10 +553,10 @@ function ManagePanel({ center: c, onClose, run, actions }) {
     if (!fn || opts.hidden) return null;
     return (
       <button key={key} type="button" onClick={() => run(() => fn(c))}
-        style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', padding: '10px 12px', borderRadius: 10, border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', color: opts.danger ? '#f87171' : '#e5e7eb' }}
-        onMouseEnter={e => { e.currentTarget.style.background = opts.danger ? 'rgba(239,68,68,0.08)' : 'rgba(255,255,255,0.04)'; }}
+        style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', padding: '10px 12px', borderRadius: 10, border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', color: opts.danger ? '#f87171' : 'var(--sa-text)' }}
+        onMouseEnter={e => { e.currentTarget.style.background = opts.danger ? 'rgba(239,68,68,0.08)' : 'var(--sa-w04)'; }}
         onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>
-        <span style={{ width: 30, height: 30, borderRadius: 8, display: 'grid', placeItems: 'center', background: opts.danger ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.05)', flexShrink: 0 }}>
+        <span style={{ width: 30, height: 30, borderRadius: 8, display: 'grid', placeItems: 'center', background: opts.danger ? 'rgba(239,68,68,0.1)' : 'var(--sa-w05)', flexShrink: 0 }}>
           <Icon size={15} color={opts.danger ? '#f87171' : opts.color || '#9ca3af'} />
         </span>
         <span style={{ flex: 1, minWidth: 0 }}>
@@ -583,25 +583,25 @@ function ManagePanel({ center: c, onClose, run, actions }) {
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 9000, background: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'flex-end' }}>
       <aside onClick={e => e.stopPropagation()} role="dialog" aria-label={`Manage ${c.centerName}`}
-        style={{ width: 'min(440px, 100vw)', height: '100%', overflowY: 'auto', background: '#0f1117', borderLeft: '1px solid rgba(255,255,255,0.08)', padding: '20px 16px 28px', boxSizing: 'border-box' }}>
+        style={{ width: 'min(440px, 100vw)', height: '100%', overflowY: 'auto', background: 'var(--sa-panel)', borderLeft: '1px solid var(--sa-w08)', padding: '20px 16px 28px', boxSizing: 'border-box' }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '0 4px' }}>
           <Avatar center={c} size={46} />
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 17, fontWeight: 800, color: '#f1f5f9' }}>{c.centerName}</div>
+            <div style={{ fontSize: 17, fontWeight: 800, color: 'var(--sa-text)' }}>{c.centerName}</div>
             <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
               <span style={pillStyle(STATUS_COLORS[c.status] || '#6b7280')}>{c.status}</span>
               <span style={pillStyle(PLAN_COLORS[c.plan || 'free'])}>{c.plan || 'free'}</span>
               <span style={pillStyle(w.color)}>Website: {w.label}</span>
             </div>
           </div>
-          <button type="button" onClick={onClose} aria-label="Close" style={{ ...ghostBtn('#9ca3af'), padding: 7 }}><X size={15} /></button>
+          <button type="button" onClick={onClose} aria-label="Close" style={{ ...ghostBtn('var(--sa-muted)'), padding: 7 }}><X size={15} /></button>
         </div>
 
-        <div style={{ margin: '16px 4px 0', padding: 14, borderRadius: 12, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px 16px', fontSize: 12.5 }}>
-          <div><div style={{ color: '#6b7280', fontSize: 11 }}>Slug</div><code style={{ color: '#d1d5db' }}>{c.slug}</code></div>
-          <div><div style={{ color: '#6b7280', fontSize: 11 }}>Created</div><span style={{ color: '#d1d5db' }}>{c.createdAt ? new Date(c.createdAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}</span></div>
-          <div style={{ gridColumn: '1 / -1', minWidth: 0 }}><div style={{ color: '#6b7280', fontSize: 11 }}>Admin email</div><span style={{ color: '#d1d5db', wordBreak: 'break-all' }}>{c.adminEmail || '—'}</span></div>
-          {c.customDomain && <div style={{ gridColumn: '1 / -1' }}><div style={{ color: '#6b7280', fontSize: 11 }}>Custom domain</div><span style={{ color: '#d1d5db' }}>{c.customDomain} {c.domainVerified ? '· verified' : '· not verified'}</span></div>}
+        <div style={{ margin: '16px 4px 0', padding: 14, borderRadius: 12, background: 'var(--sa-w03)', border: '1px solid var(--sa-w06)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px 16px', fontSize: 12.5 }}>
+          <div><div style={{ color: '#6b7280', fontSize: 11 }}>Slug</div><code style={{ color: 'var(--sa-text-2)' }}>{c.slug}</code></div>
+          <div><div style={{ color: '#6b7280', fontSize: 11 }}>Created</div><span style={{ color: 'var(--sa-text-2)' }}>{c.createdAt ? new Date(c.createdAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}</span></div>
+          <div style={{ gridColumn: '1 / -1', minWidth: 0 }}><div style={{ color: '#6b7280', fontSize: 11 }}>Admin email</div><span style={{ color: 'var(--sa-text-2)', wordBreak: 'break-all' }}>{c.adminEmail || '—'}</span></div>
+          {c.customDomain && <div style={{ gridColumn: '1 / -1' }}><div style={{ color: '#6b7280', fontSize: 11 }}>Custom domain</div><span style={{ color: 'var(--sa-text-2)' }}>{c.customDomain} {c.domainVerified ? '· verified' : '· not verified'}</span></div>}
           {isActive && c.usage && (
             <div style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
               <UsageBar label="Teachers" used={c.usage.teachers} max={c.maxTeachers} />

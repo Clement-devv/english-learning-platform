@@ -31,11 +31,11 @@ export default function DomainsTab({
               {domains.map(d => (
                 <tr key={d._id} className={styles.tr}>
                   <td className={styles.td}>
-                    <p style={{ margin: 0, fontWeight: '600', color: '#f1f5f9' }}>{d.centerName}</p>
+                    <p style={{ margin: 0, fontWeight: '600', color: 'var(--sa-text)' }}>{d.centerName}</p>
                     <code className={styles.slug} style={{ fontSize: '11px' }}>{d.slug}</code>
                   </td>
                   <td className={styles.td}>
-                    <span style={{ color: '#e2e8f0', fontFamily: 'monospace', fontSize: '13px' }}>{d.customDomain}</span>
+                    <span style={{ color: 'var(--sa-text)', fontFamily: 'monospace', fontSize: '13px' }}>{d.customDomain}</span>
                   </td>
                   <td className={styles.td}><span className={styles.planBadge}>{d.plan || 'basic'}</span></td>
                   <td className={styles.td}>

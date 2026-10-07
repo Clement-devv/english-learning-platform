@@ -37,13 +37,13 @@ export default function HealthTab({ health, healthLoading, loadHealth, centers }
                 return (
                   <tr key={h._id} className={styles.tr}>
                     <td className={styles.td}>
-                      <p style={{ margin: 0, fontWeight: 600, color: '#f1f5f9' }}>{centers.find(c => c._id === String(h._id))?.centerName || h.slug}</p>
+                      <p style={{ margin: 0, fontWeight: 600, color: 'var(--sa-text)' }}>{centers.find(c => c._id === String(h._id))?.centerName || h.slug}</p>
                       <code className={styles.slug} style={{ fontSize: 11 }}>{h.slug}</code>
                     </td>
                     <td className={styles.td}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                         <UserCheck size={13} color="#818cf8" />
-                        <span style={{ fontWeight: 700, color: '#f1f5f9' }}>{h.teachers}</span>
+                        <span style={{ fontWeight: 700, color: 'var(--sa-text)' }}>{h.teachers}</span>
                         {h.maxTeachers && h.maxTeachers !== -1 && (
                           <span style={{ color: '#6b7280', fontSize: 11 }}>/ {h.maxTeachers}</span>
                         )}
@@ -52,7 +52,7 @@ export default function HealthTab({ health, healthLoading, loadHealth, centers }
                     <td className={styles.td}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                         <Users size={13} color="#34d399" />
-                        <span style={{ fontWeight: 700, color: '#f1f5f9' }}>{h.students}</span>
+                        <span style={{ fontWeight: 700, color: 'var(--sa-text)' }}>{h.students}</span>
                         {h.maxStudents && h.maxStudents !== -1 && (
                           <span style={{ color: '#6b7280', fontSize: 11 }}>/ {h.maxStudents}</span>
                         )}

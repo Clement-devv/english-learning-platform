@@ -45,7 +45,7 @@ export default function UsageTab({
         <h2 className={styles.sectionTitle}><BarChart2 size={16} color="#f59e0b" /> Agora Usage — {usageMonth || 'All Time'}</h2>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <button onClick={handleMigrate} disabled={migrating}
-            style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 11px', borderRadius: 8, border: '1px solid #374151', background: 'transparent', color: '#9ca3af', fontSize: 12, cursor: 'pointer' }}
+            style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 11px', borderRadius: 8, border: '1px solid #374151', background: 'transparent', color: 'var(--sa-muted)', fontSize: 12, cursor: 'pointer' }}
             title="Import old AgoraUsage records into the new tracking table (one-time)">
             <Database size={12} />{migrating ? 'Migrating…' : 'Import Legacy'}
           </button>
@@ -69,7 +69,7 @@ export default function UsageTab({
             type="month"
             value={detailMonth || ''}
             onChange={e => onMonthChange && onMonthChange(e.target.value)}
-            style={{ padding: '4px 8px', borderRadius: 7, border: '1px solid #374151', background: '#1f2937', color: '#f1f5f9', fontSize: 12, cursor: 'pointer' }}
+            style={{ padding: '4px 8px', borderRadius: 7, border: '1px solid #374151', background: 'var(--sa-modal)', color: 'var(--sa-text)', fontSize: 12, cursor: 'pointer' }}
           />
         </div>
       </div>
@@ -98,17 +98,17 @@ export default function UsageTab({
                     onClick={() => toggleSessionDetail(u.centerId)}
                   >
                     <td className={styles.td}>
-                      <p style={{ margin: 0, fontWeight: '600', color: '#f1f5f9' }}>{u.centerName}</p>
+                      <p style={{ margin: 0, fontWeight: '600', color: 'var(--sa-text)' }}>{u.centerName}</p>
                       <code className={styles.slug} style={{ fontSize: '11px' }}>{u.centerId}</code>
                     </td>
                     <td className={styles.td}>
                       <span style={{ color: '#34d399', fontWeight: '700', fontSize: '15px' }}>{fmtMins(u.thisMonthMinutes)}</span>
                     </td>
                     <td className={styles.td}>
-                      <span style={{ color: '#9ca3af', fontWeight: '600' }}>{fmtMins(u.lastMonthMinutes)}</span>
+                      <span style={{ color: 'var(--sa-muted)', fontWeight: '600' }}>{fmtMins(u.lastMonthMinutes)}</span>
                     </td>
                     <td className={styles.td}>
-                      <span style={{ color: '#f1f5f9', fontWeight: '600' }}>{fmtMins(u.totalMinutes)}</span>
+                      <span style={{ color: 'var(--sa-text)', fontWeight: '600' }}>{fmtMins(u.totalMinutes)}</span>
                     </td>
                     <td className={styles.td}>
                       <span style={{ color: '#6b7280', fontSize: '13px' }}>{u.sessions} sessions</span>
@@ -161,10 +161,10 @@ export default function UsageTab({
                                     : '#6b7280';
                                   return (
                                     <tr key={sess._id} className={styles.tr}>
-                                      <td className={styles.td} style={{ color: '#9ca3af' }}>
+                                      <td className={styles.td} style={{ color: 'var(--sa-muted)' }}>
                                         {new Date(sess.startedAt).toLocaleDateString()} {new Date(sess.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                       </td>
-                                      <td className={styles.td} style={{ color: '#9ca3af' }}>
+                                      <td className={styles.td} style={{ color: 'var(--sa-muted)' }}>
                                         {sess.endedAt
                                           ? `${new Date(sess.endedAt).toLocaleDateString()} ${new Date(sess.endedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
                                           : <span style={{ color: '#f59e0b' }}>In progress</span>

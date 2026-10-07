@@ -1,6 +1,6 @@
 // server/routes/studentRoutes.js
 import express from "express";
-import bcrypt  from "bcryptjs";
+import bcrypt  from "../utils/passwordHash.js";
 import mongoose from "mongoose";
 import crypto  from "crypto";
 import {

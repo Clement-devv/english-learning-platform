@@ -41,9 +41,9 @@ const pill = (status) => ({
 const btn = (primary) => ({
   display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 10, fontSize: 13, fontWeight: 700,
   cursor: 'pointer', fontFamily: 'inherit',
-  border: primary ? 'none' : '1px solid rgba(255,255,255,0.12)',
+  border: primary ? 'none' : '1px solid var(--sa-w12)',
   background: primary ? 'linear-gradient(135deg,#b45309,#f59e0b)' : 'transparent',
-  color: primary ? '#0c0a00' : '#e5e7eb',
+  color: primary ? '#0c0a00' : 'var(--sa-text)',
 });
 const Dot = ({ status }) => <span aria-hidden style={{ width: 10, height: 10, borderRadius: 999, background: COLORS[status] || COLORS.unknown, flexShrink: 0, boxShadow: `0 0 0 3px ${COLORS[status] || COLORS.unknown}26` }} />;
 
@@ -110,7 +110,7 @@ export default function MonitorTab({ apiBase, authHeaders, centers = [], onStatu
           </div>
           <div>
             <h2 className={styles.sectionTitle} style={{ fontSize: 18 }}>App Health</h2>
-            <div style={{ fontSize: 12.5, color: '#9ca3af', marginTop: 3 }}>
+            <div style={{ fontSize: 12.5, color: 'var(--sa-muted)', marginTop: 3 }}>
               {status?.computedAt ? <>Checked {ago(status.computedAt)} · checks run every minute</> : 'The first check runs about 20 seconds after the server starts'}
             </div>
           </div>
@@ -124,20 +124,20 @@ export default function MonitorTab({ apiBase, authHeaders, centers = [], onStatu
         </div>
       </div>
 
-      {notice && <div role="status" style={{ padding: '10px 14px', borderRadius: 10, background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', color: '#fcd34d', fontSize: 13, fontWeight: 600 }}>{notice}</div>}
-      {error && <div role="alert" style={{ padding: '10px 14px', borderRadius: 10, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#fca5a5', fontSize: 13 }}>{error}</div>}
+      {notice && <div role="status" style={{ padding: '10px 14px', borderRadius: 10, background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', color: 'var(--sa-amber-text)', fontSize: 13, fontWeight: 600 }}>{notice}</div>}
+      {error && <div role="alert" style={{ padding: '10px 14px', borderRadius: 10, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: 'var(--sa-red-text)', fontSize: 13 }}>{error}</div>}
 
       {/* Open alerts */}
       {open.length > 0 && (
         <div className={styles.card} style={{ borderColor: 'rgba(239,68,68,0.4)', background: 'rgba(239,68,68,0.06)' }}>
-          <h3 className={styles.sectionTitle} style={{ color: '#fca5a5', marginBottom: 12 }}><AlertTriangle size={16} color="#ef4444" /> Open alerts ({open.length})</h3>
+          <h3 className={styles.sectionTitle} style={{ color: 'var(--sa-red-text)', marginBottom: 12 }}><AlertTriangle size={16} color="#ef4444" /> Open alerts ({open.length})</h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {open.map(a => (
-              <div key={a._id} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', padding: 12, borderRadius: 12, background: 'rgba(0,0,0,0.2)' }}>
+              <div key={a._id} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', padding: 12, borderRadius: 12, background: 'var(--sa-w04)' }}>
                 <div style={{ minWidth: 0, flex: 1 }}>
-                  <div style={{ fontWeight: 800, color: '#f1f5f9' }}>{a.title}</div>
-                  <div style={{ fontSize: 13, color: '#d1d5db', marginTop: 3 }}>{a.message}</div>
-                  <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 6, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                  <div style={{ fontWeight: 800, color: 'var(--sa-text)' }}>{a.title}</div>
+                  <div style={{ fontSize: 13, color: 'var(--sa-text-2)', marginTop: 3 }}>{a.message}</div>
+                  <div style={{ fontSize: 12, color: 'var(--sa-muted)', marginTop: 6, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
                     <span>Since {when(a.openedAt)}</span>
                     <span><Mail size={11} style={{ verticalAlign: -1 }} /> {a.delivery?.email || 'not sent yet'}</span>
                     <span><MessageCircle size={11} style={{ verticalAlign: -1 }} /> {a.delivery?.whatsapp || 'not sent yet'}</span>
@@ -160,7 +160,7 @@ export default function MonitorTab({ apiBase, authHeaders, centers = [], onStatu
         <div className={styles.card} style={{ textAlign: 'center', color: '#6b7280', padding: 40 }}>Loading…</div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))', gap: 12 }}>
-          {checks.length === 0 && <div className={styles.card} style={{ color: '#9ca3af' }}>No results yet — press "Run checks now".</div>}
+          {checks.length === 0 && <div className={styles.card} style={{ color: 'var(--sa-muted)' }}>No results yet — press "Run checks now".</div>}
           {checks.map(c => <CheckCard key={c.key} check={c} />)}
         </div>
       )}
@@ -173,9 +173,9 @@ export default function MonitorTab({ apiBase, authHeaders, centers = [], onStatu
         <div className={styles.card}>
           <h3 className={styles.sectionTitle} style={{ marginBottom: 10 }}><CheckCircle size={16} color="#34d399" /> Recently fixed</h3>
           {status.alerts.recent.map(a => (
-            <div key={a._id} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, fontSize: 13, padding: '7px 0', borderTop: '1px solid rgba(255,255,255,0.05)', color: '#d1d5db', flexWrap: 'wrap' }}>
-              <span><strong style={{ color: '#f1f5f9' }}>{a.title}</strong> — {a.message}</span>
-              <span style={{ color: '#9ca3af' }}>{when(a.openedAt)} → {when(a.resolvedAt)}</span>
+            <div key={a._id} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, fontSize: 13, padding: '7px 0', borderTop: '1px solid var(--sa-w05)', color: 'var(--sa-text-2)', flexWrap: 'wrap' }}>
+              <span><strong style={{ color: 'var(--sa-text)' }}>{a.title}</strong> — {a.message}</span>
+              <span style={{ color: 'var(--sa-muted)' }}>{when(a.openedAt)} → {when(a.resolvedAt)}</span>
             </div>
           ))}
         </div>
@@ -191,12 +191,12 @@ function CheckCard({ check }) {
   return (
     <div className={styles.card} style={{ padding: 16, borderColor: check.status === 'ok' ? undefined : `${COLORS[check.status]}55` }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 800, color: '#f1f5f9' }}><Dot status={check.status} /> {check.title}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 800, color: 'var(--sa-text)' }}><Dot status={check.status} /> {check.title}</div>
         <span style={pill(check.status)}>{LABEL[check.status]}</span>
       </div>
-      <div style={{ fontSize: 13, color: '#d1d5db', marginTop: 8, lineHeight: 1.5 }}>{check.summary}</div>
+      <div style={{ fontSize: 13, color: 'var(--sa-text-2)', marginTop: 8, lineHeight: 1.5 }}>{check.summary}</div>
       {shown.length > 0 && (
-        <ul style={{ margin: '10px 0 0', paddingLeft: 18, fontSize: 12.5, color: '#9ca3af', lineHeight: 1.55, wordBreak: 'break-word' }}>
+        <ul style={{ margin: '10px 0 0', paddingLeft: 18, fontSize: 12.5, color: 'var(--sa-muted)', lineHeight: 1.55, wordBreak: 'break-word' }}>
           {shown.map((d, i) => <li key={i}>{d}</li>)}
         </ul>
       )}
@@ -228,10 +228,10 @@ function TroublePanel({ call }) {
         <h3 className={styles.sectionTitle}><Users size={16} color="#818cf8" /> People having trouble <span style={{ color: '#6b7280', fontWeight: 600, fontSize: 12 }}>· last 7 days</span></h3>
         <button type="button" onClick={load} className={styles.refreshBtn} title="Refresh" aria-label="Refresh people"><RefreshCw size={14} /></button>
       </div>
-      <p style={{ margin: '0 0 12px', fontSize: 12.5, color: '#9ca3af' }}>
+      <p style={{ margin: '0 0 12px', fontSize: 12.5, color: 'var(--sa-muted)' }}>
         Repeated failed actions, lockouts, page crashes, emails that didn't reach them, unanswered class requests and missed classes.
       </p>
-      {error ? <p style={{ color: '#fca5a5', fontSize: 13 }}>{error}</p>
+      {error ? <p style={{ color: 'var(--sa-red-text)', fontSize: 13 }}>{error}</p>
         : people === null ? <p style={{ color: '#6b7280', fontSize: 13 }}>Loading…</p>
         : list.length === 0 ? <p style={{ color: '#34d399', fontSize: 13, fontWeight: 600 }}>Nobody seems to be stuck. 🎉</p>
         : (
@@ -244,18 +244,18 @@ function TroublePanel({ call }) {
                 {shown.map((p, i) => (
                   <tr key={`${p.key}-${p.center}-${i}`} className={styles.tr}>
                     <td className={styles.td}>
-                      <div style={{ fontWeight: 700, color: '#f1f5f9' }}>{p.name || 'Unknown person'}</div>
+                      <div style={{ fontWeight: 700, color: 'var(--sa-text)' }}>{p.name || 'Unknown person'}</div>
                       <div style={{ fontSize: 11.5, display: 'flex', gap: 6, alignItems: 'center', marginTop: 2 }}>
-                        {p.role && <span style={{ color: roleColor[p.role] || '#9ca3af', fontWeight: 700, textTransform: 'capitalize' }}>{p.role}</span>}
-                        {p.code && <code style={{ color: '#d1d5db', background: 'rgba(255,255,255,0.06)', padding: '1px 6px', borderRadius: 6 }}>{p.code}</code>}
+                        {p.role && <span style={{ color: roleColor[p.role] || 'var(--sa-muted)', fontWeight: 700, textTransform: 'capitalize' }}>{p.role}</span>}
+                        {p.code && <code style={{ color: 'var(--sa-text-2)', background: 'var(--sa-w06)', padding: '1px 6px', borderRadius: 6 }}>{p.code}</code>}
                       </div>
                     </td>
-                    <td className={styles.td} style={{ fontSize: 12.5, color: '#d1d5db' }}>{p.centerName}</td>
+                    <td className={styles.td} style={{ fontSize: 12.5, color: 'var(--sa-text-2)' }}>{p.centerName}</td>
                     <td className={styles.td} style={{ fontSize: 12.5 }}>
-                      <span style={{ color: p.severity === 'high' ? '#fca5a5' : '#fcd34d', fontWeight: 600 }}>{p.text}</span>
-                      {p.lastMsg && <div style={{ color: '#9ca3af', marginTop: 2 }}>“{p.lastMsg}”</div>}
+                      <span style={{ color: p.severity === 'high' ? 'var(--sa-red-text)' : 'var(--sa-amber-text)', fontWeight: 600 }}>{p.text}</span>
+                      {p.lastMsg && <div style={{ color: 'var(--sa-muted)', marginTop: 2 }}>“{p.lastMsg}”</div>}
                     </td>
-                    <td className={styles.td} style={{ fontSize: 12, color: '#9ca3af', whiteSpace: 'nowrap' }}>{p.lastAt ? ago(p.lastAt) : 'ongoing'}</td>
+                    <td className={styles.td} style={{ fontSize: 12, color: 'var(--sa-muted)', whiteSpace: 'nowrap' }}>{p.lastAt ? ago(p.lastAt) : 'ongoing'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -318,14 +318,14 @@ function EventLog({ call, centers }) {
             <button type="submit" style={btn(false)} aria-label="Search"><Search size={14} /></button>
           </div>
         </form>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#d1d5db', cursor: 'pointer', paddingBottom: 10 }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--sa-text-2)', cursor: 'pointer', paddingBottom: 10 }}>
           <input type="checkbox" checked={failOnly} onChange={e => reset(setFailOnly)(e.target.checked)} /> Problems only
         </label>
       </div>
 
-      {error ? <p style={{ color: '#fca5a5', fontSize: 13 }}>{error}</p>
+      {error ? <p style={{ color: 'var(--sa-red-text)', fontSize: 13 }}>{error}</p>
         : !data ? <p style={{ color: '#6b7280', fontSize: 13 }}>Loading…</p>
-        : events.length === 0 ? <p style={{ color: '#9ca3af', fontSize: 13 }}>{failOnly ? 'No problems recorded with these filters.' : 'Nothing recorded with these filters.'}</p>
+        : events.length === 0 ? <p style={{ color: 'var(--sa-muted)', fontSize: 13 }}>{failOnly ? 'No problems recorded with these filters.' : 'Nothing recorded with these filters.'}</p>
         : (
           <div style={{ overflowX: 'auto' }}>
             <table className={styles.table}>
@@ -335,10 +335,10 @@ function EventLog({ call, centers }) {
               <tbody>
                 {events.map(e => (
                   <tr key={e._id} className={styles.tr}>
-                    <td className={styles.td} style={{ fontSize: 12, color: '#9ca3af', whiteSpace: 'nowrap' }} title={new Date(e.at).toLocaleString()}>{when(e.at)}</td>
-                    <td className={styles.td} style={{ fontSize: 12.5, color: '#d1d5db' }}>{e.center || 'Platform'}</td>
+                    <td className={styles.td} style={{ fontSize: 12, color: 'var(--sa-muted)', whiteSpace: 'nowrap' }} title={new Date(e.at).toLocaleString()}>{when(e.at)}</td>
+                    <td className={styles.td} style={{ fontSize: 12.5, color: 'var(--sa-text-2)' }}>{e.center || 'Platform'}</td>
                     <td className={styles.td} style={{ fontSize: 12.5 }}>
-                      <div style={{ color: '#f1f5f9', fontWeight: 600 }}>{e.action}</div>
+                      <div style={{ color: 'var(--sa-text)', fontWeight: 600 }}>{e.action}</div>
                       <div style={{ color: '#6b7280', fontSize: 11.5, textTransform: 'capitalize' }}>{e.kind}</div>
                     </td>
                     <td className={styles.td}>
@@ -346,10 +346,10 @@ function EventLog({ call, centers }) {
                         {e.ok ? <CheckCircle size={12} /> : <XCircle size={12} />} {e.ok ? 'OK' : 'Failed'}{e.status ? ` ${e.status}` : ''}
                       </span>
                     </td>
-                    <td className={styles.td} style={{ fontSize: 12, color: '#d1d5db' }}>
+                    <td className={styles.td} style={{ fontSize: 12, color: 'var(--sa-text-2)' }}>
                       {e.actor?.label || (e.actor?.role ? <span style={{ textTransform: 'capitalize' }}>{e.actor.role}</span> : '—')}
                     </td>
-                    <td className={styles.td} style={{ fontSize: 12, color: '#9ca3af', maxWidth: 360, wordBreak: 'break-word' }}>
+                    <td className={styles.td} style={{ fontSize: 12, color: 'var(--sa-muted)', maxWidth: 360, wordBreak: 'break-word' }}>
                       {e.msg || (e.meta?.page ? `Page ${e.meta.page}` : '')}
                       {e.meta?.page && e.msg && <div style={{ color: '#6b7280' }}>Page {e.meta.page}</div>}
                     </td>
@@ -401,9 +401,9 @@ function AlertSettings({ call, initial, flash }) {
   };
 
   const provider = { twilio: 'Twilio', callmebot: 'CallMeBot' }[form.whatsappProvider];
-  const resultColor = (r) => (/^sent/.test(r) ? '#34d399' : /^off/.test(r) ? '#9ca3af' : '#fca5a5');
+  const resultColor = (r) => (/^sent/.test(r) ? '#34d399' : /^off/.test(r) ? 'var(--sa-muted)' : 'var(--sa-red-text)');
   const toggle = (checked, onChange, label) => (
-    <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13.5, fontWeight: 700, color: '#f1f5f9', cursor: 'pointer' }}>
+    <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13.5, fontWeight: 700, color: 'var(--sa-text)', cursor: 'pointer' }}>
       <input type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)} style={{ width: 16, height: 16 }} /> {label}
     </label>
   );
@@ -411,7 +411,7 @@ function AlertSettings({ call, initial, flash }) {
   return (
     <div className={styles.card}>
       <h3 className={styles.sectionTitle} style={{ marginBottom: 4 }}><Settings size={16} color="#9ca3af" /> Where alerts go</h3>
-      <p style={{ margin: '0 0 14px', fontSize: 12.5, color: '#9ca3af' }}>
+      <p style={{ margin: '0 0 14px', fontSize: 12.5, color: 'var(--sa-muted)' }}>
         When a check turns red (two minutes in a row) you're told on both channels — WhatsApp is the backup in case email itself is broken.
         Reminders repeat every 6 hours until it's fixed or you acknowledge it, and you get a message when it's fixed.
       </p>
@@ -431,7 +431,7 @@ function AlertSettings({ call, initial, flash }) {
           </span>
         </div>
       </div>
-      {error && <p role="alert" style={{ color: '#fca5a5', fontSize: 13, margin: '12px 0 0' }}>{error}</p>}
+      {error && <p role="alert" style={{ color: 'var(--sa-red-text)', fontSize: 13, margin: '12px 0 0' }}>{error}</p>}
       {result && (
         <div style={{ marginTop: 12, fontSize: 13, display: 'flex', gap: 16, flexWrap: 'wrap' }}>
           <span style={{ color: resultColor(result.email) }}><Mail size={13} style={{ verticalAlign: -2 }} /> Email: {result.email}</span>

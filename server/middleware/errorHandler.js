@@ -76,7 +76,11 @@ function classifyError(err) {
 }
 
 // ── Express error middleware (4-arg signature required) ───────────────────────
-export function errorHandler(err, req, res, next) { // eslint-disable-line no-unused-vars
+export function errorHandler(err, req, res, next) {
+  // Already answered (e.g. by the request timeout): a second reply would throw
+  // ERR_HTTP_HEADERS_SENT — let Express close the connection instead.
+  if (res.headersSent) return next(err);
+
   // Classify known framework errors first
   const classified = classifyError(err);
   const status  = classified?.status  ?? err.statusCode ?? err.status ?? 500;

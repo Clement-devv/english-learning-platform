@@ -1,6 +1,6 @@
 // server/routes/teacherRoutes.js
 import express from "express";
-import bcrypt from "bcryptjs";
+import bcrypt from "../utils/passwordHash.js";
 import crypto from "crypto";
 import multer from "multer";
 import path from "path";

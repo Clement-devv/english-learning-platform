@@ -2,7 +2,7 @@
 // Admin analytics PIN — an optional 4-digit PIN that must be entered (once per
 // login session) before revenue and analytics data are returned.
 import express from "express";
-import bcrypt from "bcryptjs";
+import bcrypt from "../utils/passwordHash.js";
 import crypto from "crypto";
 import { verifyToken, verifyAdmin } from "../middleware/authMiddleware.js";
 import { tenantMiddleware } from "../middleware/tenantMiddleware.js";

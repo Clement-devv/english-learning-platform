@@ -10,7 +10,7 @@ import { teacherSchema }              from "../schemas/teacherSchema.js";
 import { paymentTransactionSchema }   from "../schemas/paymentTransactionSchema.js";
 import logger from "../utils/logger.js";
 import { issueShareLink } from "../utils/shareLink.js";
-import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
+import { badRequest, forbidden, notFound, serverError } from '../utils/apiResponse.js';
 import { recordOutcomeChange } from "../utils/classOutcome.js";
 import { payForCompletedClass } from "../utils/classPayment.js";
 
@@ -38,6 +38,10 @@ const AUTO_COMPLETABLE = ["accepted", "pending", "missed"];
 // "Schema hasn't been registered for model Teacher".
 const registerModels = (db) => { getStudent(db); getTeacher(db); };
 router.use((req, _res, next) => { if (req.db) registerModels(req.db); next(); });
+
+// Only the latest heartbeat per person is ever read (admin "active in the last
+// 90 s", live presence), so a class keeps just its most recent ones.
+const HEARTBEATS_KEPT = 20;
 
 async function authorizeClass(req, res, bookingId, { teacherOnly = false, allowAdmin = false } = {}) {
   if (!bookingId || !/^[a-f\d]{24}$/i.test(String(bookingId))) { badRequest(res, "Valid bookingId is required"); return null; }
@@ -72,7 +76,8 @@ router.post("/attendance", verifyToken, async (req, res) => {
 
     const ClassroomSession = getClassroomSession(req.db);
 
-    let session = await ClassroomSession.findOne({ bookingId });
+    // Heartbeats aren't needed here (heartbeat writes them atomically below)
+    let session = await ClassroomSession.findOne({ bookingId }).select("-heartbeats");
 
     if (!session) {
       const booking = await getBooking(req.db).findById(bookingId);
@@ -131,19 +136,28 @@ router.post("/attendance", verifyToken, async (req, res) => {
       }
     }
     else if (action === "heartbeat") {
-      if (userRole === "teacher" && activeTime != null) session.teacherActiveTime = activeTime;
-      else if (userRole === "student" && activeTime != null) session.studentActiveTime = activeTime;
+      // One atomic update instead of load-whole-document + save: heartbeats arrive
+      // every 15 s per person, and re-saving an ever-growing array made the server
+      // slower the longer classes ran (load test: Mongoose was 22% of all CPU).
+      const set = {};
+      if (userRole === "teacher" && activeTime != null) set.teacherActiveTime = session.teacherActiveTime = activeTime;
+      else if (userRole === "student" && activeTime != null) set.studentActiveTime = session.studentActiveTime = activeTime;
 
       if (session.managedAttendance) {
         // Managed student has no device: the teacher's client only counts time while
         // the teacher has the student marked present. Cap at time since first confirmed.
         const sinceJoin = session.studentJoinedAt ? Math.floor((Date.now() - session.studentJoinedAt.getTime()) / 1000) : 0;
-        session.bothActiveTime = Math.max(0, Math.min(session.teacherActiveTime, sinceJoin));
+        set.bothActiveTime = Math.max(0, Math.min(session.teacherActiveTime, sinceJoin));
       } else if (session.teacherActiveTime > 0 && session.studentActiveTime > 0) {
-        session.bothActiveTime = Math.min(session.teacherActiveTime, session.studentActiveTime);
+        set.bothActiveTime = Math.min(session.teacherActiveTime, session.studentActiveTime);
       }
 
-      session.heartbeats.push({ userRole, timestamp: ts, activeTime: activeTime || 0 });
+      const updated = await ClassroomSession.findOneAndUpdate(
+        { bookingId },
+        { $set: set, $push: { heartbeats: { $each: [{ userRole, timestamp: ts, activeTime: activeTime || 0 }], $slice: -HEARTBEATS_KEPT } } },
+        { new: true, projection: { heartbeats: { $slice: -HEARTBEATS_KEPT } } }
+      ).lean();
+      return res.json({ message: "Attendance updated", session: updated });
     }
 
     await session.save();
@@ -390,10 +404,12 @@ router.post("/auto-complete", verifyToken, async (req, res) => {
 router.get("/session/:bookingId", verifyToken, async (req, res) => {
   try {
     if (!(await authorizeClass(req, res, req.params.bookingId, { allowAdmin: true }))) return;
-    const session = await getClassroomSession(req.db).findOne({ bookingId: req.params.bookingId });
+    // Polled every 5 s by both people in class: plain object, recent heartbeats only
+    const session = await getClassroomSession(req.db).findOne({ bookingId: req.params.bookingId })
+      .select({ heartbeats: { $slice: -HEARTBEATS_KEPT } }).lean();
     res.json({ session: session || null });
   } catch (err) {
-    serverError(res, "Error getting session");
+    serverError(res, "Error getting session", err);
   }
 });
 
@@ -413,7 +429,7 @@ router.patch("/session/:bookingId/video-provider", verifyToken, async (req, res)
     if (!session) return notFound(res, "Session not found");
     res.json({ session });
   } catch (err) {
-    serverError(res, "Error setting video provider");
+    serverError(res, "Error setting video provider", err);
   }
 });
 
@@ -442,7 +458,7 @@ router.patch("/session/:bookingId/content-state", verifyToken, async (req, res) 
       contentAnnotation: session.contentAnnotation,
     });
   } catch (err) {
-    serverError(res, "Error updating content state");
+    serverError(res, "Error updating content state", err);
   }
 });
 
@@ -460,7 +476,7 @@ router.get("/session/:bookingId/content-state", verifyToken, async (req, res) =>
       contentAnnotation: session.contentAnnotation ?? null,
     });
   } catch (err) {
-    serverError(res, "Error fetching content state");
+    serverError(res, "Error fetching content state", err);
   }
 });
 
@@ -507,7 +523,7 @@ router.get("/check-completion/:bookingId", verifyToken, async (req, res) => {
       percentage: Math.round((session.bothActiveTime / session.requiredTime) * 100),
     });
   } catch (err) {
-    serverError(res, "Error checking completion");
+    serverError(res, "Error checking completion", err);
   }
 });
 
@@ -557,7 +573,7 @@ router.get("/complaints", verifyToken, async (req, res) => {
       .sort({ createdAt: -1 });
     res.json({ complaints });
   } catch (err) {
-    serverError(res, "Error fetching complaints");
+    serverError(res, "Error fetching complaints", err);
   }
 });
 
@@ -577,7 +593,7 @@ router.patch("/complaints/:id", verifyToken, async (req, res) => {
     if (!complaint) return notFound(res, "Complaint not found");
     res.json({ complaint });
   } catch (err) {
-    serverError(res, "Error updating complaint");
+    serverError(res, "Error updating complaint", err);
   }
 });
 

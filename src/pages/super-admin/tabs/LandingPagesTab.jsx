@@ -3,11 +3,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Globe, ChevronDown, ChevronUp, Save, Eye, EyeOff,
-  Plus, Trash2, Loader2, Monitor, Smartphone, X,
+  Plus, Trash2, Loader2, Monitor, Smartphone, X, Wand2,
 } from 'lucide-react';
 import ClassicTemplate from '../../landing-page/templates/ClassicTemplate';
 import ModernTemplate  from '../../landing-page/templates/ModernTemplate';
 import MinimalTemplate from '../../landing-page/templates/MinimalTemplate';
+import { ImageField, ListEditor } from './LandingEditorFields';
+import { classicSample, CLASSIC_FEATURE_ICONS } from '../../landing-page/classicContent';
 import { GoogleFont }  from '../../landing-page/utils.jsx';
 
 const PREVIEW_TEMPLATES = { classic: ClassicTemplate, modern: ModernTemplate, minimal: MinimalTemplate };
@@ -21,7 +23,7 @@ const TEMPLATE_DEFS = [
   {
     id: 'classic',
     name: 'Classic',
-    desc: 'Full-viewport gradient hero, centered layout, card grid',
+    desc: 'Full school website: photo hero, programs, reviews, gallery, FAQ',
     thumb: ClassicThumb,
   },
   {
@@ -49,6 +51,15 @@ const NAV_STYLES = [
   { value: 'colored', label: 'Colored (primary)' },
 ];
 
+const SECTION_TABS = [
+  ['design', 'Design'], ['hero', 'Header & hero'], ['stats', 'Numbers'], ['about', 'About'],
+  ['programs', 'Programs'], ['features', 'Why us'], ['teachers', 'Teachers'], ['testimonials', 'Testimonials'],
+  ['gallery', 'Gallery'], ['cta', 'Enrol banner'], ['faq', 'FAQ'], ['contact', 'Contact & footer'],
+  ['links', 'Links'], ['seo', 'SEO'],
+];
+// Sections only the Classic template shows
+const CLASSIC_ONLY = ['stats', 'programs', 'features', 'testimonials', 'gallery', 'cta', 'faq'];
+
 const DEFAULT_LP = {
   published: false,
   template: 'classic',
@@ -65,9 +76,31 @@ const DEFAULT_LP = {
   about: { enabled: true, title: 'About Us', body: '', image: '' },
   teachers: [],
   links: { studentLogin: '', teacherLogin: '', parentLogin: '', facebook: '', instagram: '', youtube: '', whatsapp: '' },
-  contact: { enabled: false, email: '', phone: '', address: '' },
+  contact: { enabled: false, email: '', phone: '', address: '', hours: '' },
   seo: { title: '', description: '' },
+  topBar: { enabled: false, text: '' },
+  stats: { enabled: true, items: [] },
+  features: { enabled: true, title: '', subtitle: '', items: [] },
+  programs: { enabled: true, title: '', subtitle: '', items: [] },
+  testimonials: { enabled: true, title: '', subtitle: '', items: [] },
+  gallery: { enabled: true, title: '', subtitle: '', items: [] },
+  faq: { enabled: true, title: '', subtitle: '', items: [] },
+  cta: { enabled: false, title: '', text: '', buttonText: '', buttonUrl: '', image: '' },
+  footer: { about: '' },
 };
+
+/** Fill only what's empty with the sample — never overwrite what the admin typed. */
+function fillEmpty(target, sample) {
+  const out = deepClone(target);
+  for (const [k, v] of Object.entries(sample)) {
+    const cur = out[k];
+    if (Array.isArray(v)) { if (!Array.isArray(cur) || cur.length === 0) out[k] = deepClone(v); }
+    else if (v && typeof v === 'object') out[k] = fillEmpty(cur && typeof cur === 'object' ? cur : {}, v);
+    // empty text gets the sample; an "off" section switch is turned on so the sample shows
+    else if (cur === undefined || cur === null || cur === '' || (typeof v === 'boolean' && cur === false)) out[k] = v;
+  }
+  return out;
+}
 
 function authHeaders() {
   const token = localStorage.getItem('superAdminToken');
@@ -207,28 +240,11 @@ export default function LandingPagesTab({ centers, darkMode, focusCenterId }) {
     setPreview({ center: previewCenter, lp });
   };
 
-  const addTeacher = (cid) => {
-    setLps(p => {
-      const lp = deepClone(p[cid] || DEFAULT_LP);
-      lp.teachers = [...(lp.teachers || []), { name: '', photo: '', title: '', bio: '', order: (lp.teachers?.length || 0) }];
-      return { ...p, [cid]: lp };
-    });
-  };
-
-  const removeTeacher = (cid, idx) => {
-    setLps(p => {
-      const lp = deepClone(p[cid] || DEFAULT_LP);
-      lp.teachers = lp.teachers.filter((_, i) => i !== idx);
-      return { ...p, [cid]: lp };
-    });
-  };
-
-  const setTeacherField = (cid, idx, field, value) => {
-    setLps(p => {
-      const lp = deepClone(p[cid] || DEFAULT_LP);
-      lp.teachers[idx] = { ...(lp.teachers[idx] || {}), [field]: value };
-      return { ...p, [cid]: lp };
-    });
+  const fillSample = (center) => {
+    const cid = center._id;
+    if (!window.confirm('Fill the empty parts of this website with sample text and photos?\n\nNothing you have already typed will be changed. Replace the sample photos with your own before publishing.')) return;
+    setLps(p => ({ ...p, [cid]: { ...fillEmpty(p[cid] || DEFAULT_LP, classicSample(center.centerName)), template: 'classic' } }));
+    flash(cid, 'Sample content added — press Save to keep it');
   };
 
   const s = styles(isDark, card, bdr, txt, muted, inputBg, inputBdr);
@@ -297,6 +313,9 @@ export default function LandingPagesTab({ centers, darkMode, focusCenterId }) {
                   <button onClick={() => handlePreview(center)} style={s.previewBtn}>
                     <Eye size={14} /> Preview
                   </button>
+                  <button onClick={() => fillSample(center)} style={s.previewBtn} title="Fill empty sections with example text and photos">
+                    <Wand2 size={14} /> Fill with sample content
+                  </button>
                 </div>
 
                 {/* ── Template picker ── */}
@@ -308,12 +327,15 @@ export default function LandingPagesTab({ centers, darkMode, focusCenterId }) {
 
                 {/* Section tabs */}
                 <div style={s.sectionTabs}>
-                  {['design','hero','about','teachers','links','contact','seo'].map(k => (
+                  {SECTION_TABS.map(([k, label]) => (
                     <button key={k} onClick={() => setSection(p => ({ ...p, [cid]: k }))} style={{ ...s.sectionTab, ...(sec === k ? s.sectionTabActive : {}) }}>
-                      {k.charAt(0).toUpperCase() + k.slice(1)}
+                      {label}
                     </button>
                   ))}
                 </div>
+                {lp.template !== 'classic' && CLASSIC_ONLY.includes(sec) && (
+                  <p style={s.note}>This section shows on the <strong>Classic</strong> template. Pick Classic above to use it.</p>
+                )}
 
                 {/* ── DESIGN ── */}
                 {sec === 'design' && (
@@ -324,26 +346,49 @@ export default function LandingPagesTab({ centers, darkMode, focusCenterId }) {
                     <ColorField label="Background Color" value={lp.design?.bgColor} onChange={v => setField(cid,'design.bgColor',v)} s={s} />
                     <ColorField label="Text Color" value={lp.design?.textColor} onChange={v => setField(cid,'design.textColor',v)} s={s} />
                     <ColorField label="Muted Text Color" value={lp.design?.mutedColor} onChange={v => setField(cid,'design.mutedColor',v)} s={s} />
-                    <SelectField label="Font Family" value={lp.design?.fontFamily} options={FONT_OPTIONS.map(f => ({ value: f, label: f }))} onChange={v => setField(cid,'design.fontFamily',v)} s={s} />
+                    <SelectField label="Body Font" value={lp.design?.fontFamily} options={FONT_OPTIONS.map(f => ({ value: f, label: f }))} onChange={v => setField(cid,'design.fontFamily',v)} s={s} />
                     <SelectField label="Hero Style" value={lp.design?.heroStyle} options={HERO_STYLES} onChange={v => setField(cid,'design.heroStyle',v)} s={s} />
                     <SelectField label="Nav Style" value={lp.design?.navStyle} options={NAV_STYLES} onChange={v => setField(cid,'design.navStyle',v)} s={s} />
-                    {lp.design?.heroStyle === 'image' && (
-                      <TextField label="Hero Background Image URL" value={lp.design?.heroImage} onChange={v => setField(cid,'design.heroImage',v)} s={s} />
+                    {lp.design?.heroStyle === 'image' && lp.template !== 'classic' && (
+                      <ImageField label="Hero Background Image" value={lp.design?.heroImage} onChange={v => setField(cid,'design.heroImage',v)} centerId={cid} s={s} />
                     )}
                   </div>
                 )}
 
-                {/* ── HERO ── */}
+                {/* ── HEADER & HERO ── */}
                 {sec === 'hero' && (
                   <div style={s.stack}>
-                    <TextField label="Headline" value={lp.hero?.headline} onChange={v => setField(cid,'hero.headline',v)} placeholder="Master English with Expert Teachers" s={s} />
-                    <TextareaField label="Sub-headline" value={lp.hero?.subheadline} onChange={v => setField(cid,'hero.subheadline',v)} placeholder="Join hundreds of students improving their English skills" rows={3} s={s} />
-                    <div style={s.grid2}>
-                      <TextField label="Primary CTA Text" value={lp.hero?.ctaText} onChange={v => setField(cid,'hero.ctaText',v)} s={s} />
-                      <TextField label="Primary CTA URL" value={lp.hero?.ctaUrl} onChange={v => setField(cid,'hero.ctaUrl',v)} placeholder="/student/login" s={s} />
-                      <TextField label="Secondary CTA Text (optional)" value={lp.hero?.secondaryCtaText} onChange={v => setField(cid,'hero.secondaryCtaText',v)} s={s} />
-                      <TextField label="Secondary CTA URL" value={lp.hero?.secondaryCtaUrl} onChange={v => setField(cid,'hero.secondaryCtaUrl',v)} s={s} />
+                    <div style={s.subCard}>
+                      <ToggleField label="Show announcement bar above the header" value={lp.topBar?.enabled} onChange={v => setField(cid,'topBar.enabled',v)} s={s} />
+                      {lp.topBar?.enabled && <TextField label="Announcement" value={lp.topBar?.text} onChange={v => setField(cid,'topBar.text',v)} placeholder="Admissions are open — book a free placement test today." s={s} />}
+                      <span style={s.hint}>The bar also shows your phone, email and social links from the Contact and Links tabs.</span>
                     </div>
+                    <TextField label="Small label above the headline" value={lp.hero?.badge} onChange={v => setField(cid,'hero.badge',v)} placeholder="English for kids, teens & adults" s={s} />
+                    <TextField label="Headline" value={lp.hero?.headline} onChange={v => setField(cid,'hero.headline',v)} placeholder="Speak English with confidence" s={s} />
+                    <TextareaField label="Sub-headline" value={lp.hero?.subheadline} onChange={v => setField(cid,'hero.subheadline',v)} placeholder="Join hundreds of students improving their English skills" rows={3} s={s} />
+                    <ImageField label="Hero photo (large, landscape)" value={lp.hero?.image} onChange={v => setField(cid,'hero.image',v)} centerId={cid} s={s} hint="Best: 1900 × 1000 px or larger. Text sits on the left, so keep faces to the right." />
+                    <div style={s.grid2}>
+                      <TextField label="Main button text" value={lp.hero?.ctaText} onChange={v => setField(cid,'hero.ctaText',v)} s={s} />
+                      <TextField label="Main button link" value={lp.hero?.ctaUrl} onChange={v => setField(cid,'hero.ctaUrl',v)} placeholder="/student/login" s={s} />
+                      <TextField label="Second button text (optional)" value={lp.hero?.secondaryCtaText} onChange={v => setField(cid,'hero.secondaryCtaText',v)} s={s} />
+                      <TextField label="Second button link" value={lp.hero?.secondaryCtaUrl} onChange={v => setField(cid,'hero.secondaryCtaUrl',v)} placeholder="#programs" s={s} />
+                    </div>
+                    <span style={s.hint}>The first three “Why choose us” items appear as highlight cards at the bottom of the hero.</span>
+                  </div>
+                )}
+
+                {/* ── STATS ── */}
+                {sec === 'stats' && (
+                  <div style={s.stack}>
+                    <ToggleField label="Show numbers row" value={lp.stats?.enabled} onChange={v => setField(cid,'stats.enabled',v)} s={s} />
+                    <ListEditor s={s} items={lp.stats?.items} onChange={v => setField(cid,'stats.items',v)} max={6}
+                      itemLabel="Number" addLabel="Add number" newItem={() => ({ value: '', label: '' })} summary={x => x.value}
+                      render={(x, up) => (
+                        <div style={s.grid2}>
+                          <TextField label="Number" value={x.value} onChange={v => up({ value: v })} placeholder="1,200+" s={s} />
+                          <TextField label="Label" value={x.label} onChange={v => up({ label: v })} placeholder="Students taught" s={s} />
+                        </div>
+                      )} />
                   </div>
                 )}
 
@@ -351,34 +396,161 @@ export default function LandingPagesTab({ centers, darkMode, focusCenterId }) {
                 {sec === 'about' && (
                   <div style={s.stack}>
                     <ToggleField label="Show About Section" value={lp.about?.enabled} onChange={v => setField(cid,'about.enabled',v)} s={s} />
-                    <TextField label="Section Title" value={lp.about?.title} onChange={v => setField(cid,'about.title',v)} s={s} />
+                    <div style={s.grid2}>
+                      <TextField label="Small label" value={lp.about?.subtitle} onChange={v => setField(cid,'about.subtitle',v)} placeholder="About us" s={s} />
+                      <TextField label="Section Title" value={lp.about?.title} onChange={v => setField(cid,'about.title',v)} s={s} />
+                    </div>
                     <TextareaField label="Body Text" value={lp.about?.body} onChange={v => setField(cid,'about.body',v)} rows={6} placeholder="Tell prospective students about your center, teaching method, and what makes you unique." s={s} />
-                    <TextField label="Image URL (optional)" value={lp.about?.image} onChange={v => setField(cid,'about.image',v)} placeholder="https://..." s={s} />
+                    <div style={s.grid2}>
+                      <ImageField label="Main photo (portrait)" value={lp.about?.image} onChange={v => setField(cid,'about.image',v)} centerId={cid} s={s} />
+                      <ImageField label="Second photo (small, overlaps)" value={lp.about?.image2} onChange={v => setField(cid,'about.image2',v)} centerId={cid} s={s} />
+                      <TextField label="Badge number" value={lp.about?.badgeValue} onChange={v => setField(cid,'about.badgeValue',v)} placeholder="12+" s={s} />
+                      <TextField label="Badge text" value={lp.about?.badgeLabel} onChange={v => setField(cid,'about.badgeLabel',v)} placeholder="Years of experience" s={s} />
+                    </div>
+                    <p style={{ ...s.label, margin: '6px 0 0' }}>Checklist</p>
+                    <ListEditor s={s} items={lp.about?.points} onChange={v => setField(cid,'about.points',v)} max={8}
+                      itemLabel="Point" addLabel="Add point" newItem={() => ''}
+                      render={(x, up) => <input value={x || ''} onChange={e => up(e.target.value)} placeholder="Certified, experienced teachers" style={s.input} />} />
+                  </div>
+                )}
+
+                {/* ── PROGRAMS ── */}
+                {sec === 'programs' && (
+                  <div style={s.stack}>
+                    <ToggleField label="Show Programs" value={lp.programs?.enabled} onChange={v => setField(cid,'programs.enabled',v)} s={s} />
+                    <div style={s.grid2}>
+                      <TextField label="Section title" value={lp.programs?.title} onChange={v => setField(cid,'programs.title',v)} placeholder="Courses for every goal" s={s} />
+                      <TextField label="Section text" value={lp.programs?.subtitle} onChange={v => setField(cid,'programs.subtitle',v)} s={s} />
+                    </div>
+                    <ListEditor s={s} items={lp.programs?.items} onChange={v => setField(cid,'programs.items',v)} max={12}
+                      itemLabel="Program" addLabel="Add program" summary={x => x.title}
+                      newItem={() => ({ title: '', level: '', text: '', duration: '', price: '', image: '', ctaText: 'Learn more', ctaUrl: '#contact' })}
+                      render={(x, up) => (
+                        <div style={s.grid2}>
+                          <TextField label="Title" value={x.title} onChange={v => up({ title: v })} placeholder="Kids English" s={s} />
+                          <TextField label="Tag (age / level)" value={x.level} onChange={v => up({ level: v })} placeholder="Ages 5–12" s={s} />
+                          <div style={{ gridColumn: '1 / -1' }}><TextareaField label="Description" value={x.text} onChange={v => up({ text: v })} rows={2} s={s} /></div>
+                          <TextField label="Duration / schedule" value={x.duration} onChange={v => up({ duration: v })} placeholder="2 × 45 min / week" s={s} />
+                          <TextField label="Price" value={x.price} onChange={v => up({ price: v })} placeholder="From $60 / month" s={s} />
+                          <TextField label="Button text" value={x.ctaText} onChange={v => up({ ctaText: v })} s={s} />
+                          <TextField label="Button link" value={x.ctaUrl} onChange={v => up({ ctaUrl: v })} placeholder="#contact" s={s} />
+                          <ImageField label="Photo" value={x.image} onChange={v => up({ image: v })} centerId={cid} s={s} wide />
+                        </div>
+                      )} />
+                  </div>
+                )}
+
+                {/* ── WHY US ── */}
+                {sec === 'features' && (
+                  <div style={s.stack}>
+                    <ToggleField label="Show “Why choose us”" value={lp.features?.enabled} onChange={v => setField(cid,'features.enabled',v)} s={s} />
+                    <div style={s.grid2}>
+                      <TextField label="Section title" value={lp.features?.title} onChange={v => setField(cid,'features.title',v)} s={s} />
+                      <TextField label="Section text" value={lp.features?.subtitle} onChange={v => setField(cid,'features.subtitle',v)} s={s} />
+                    </div>
+                    <ListEditor s={s} items={lp.features?.items} onChange={v => setField(cid,'features.items',v)} max={12}
+                      itemLabel="Reason" addLabel="Add reason" summary={x => x.title}
+                      newItem={() => ({ icon: 'star', title: '', text: '' })}
+                      render={(x, up) => (
+                        <div style={s.grid2}>
+                          <TextField label="Title" value={x.title} onChange={v => up({ title: v })} placeholder="Small classes" s={s} />
+                          <SelectField label="Icon" value={x.icon || 'star'} options={CLASSIC_FEATURE_ICONS.map(i => ({ value: i, label: i[0].toUpperCase() + i.slice(1) }))} onChange={v => up({ icon: v })} s={s} />
+                          <div style={{ gridColumn: '1 / -1' }}><TextareaField label="Text" value={x.text} onChange={v => up({ text: v })} rows={2} s={s} /></div>
+                        </div>
+                      )} />
                   </div>
                 )}
 
                 {/* ── TEACHERS ── */}
                 {sec === 'teachers' && (
-                  <div style={s.stack}>
-                    {(lp.teachers || []).map((t, idx) => (
-                      <div key={idx} style={s.teacherCard}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-                          <span style={{ fontSize: 13, fontWeight: 700, color: txt }}>Teacher {idx + 1}</span>
-                          <button onClick={() => removeTeacher(cid, idx)} style={s.removeBtn}>
-                            <Trash2 size={13} /> Remove
-                          </button>
-                        </div>
-                        <div style={s.grid2}>
-                          <TextField label="Name" value={t.name} onChange={v => setTeacherField(cid,idx,'name',v)} s={s} />
-                          <TextField label="Title / Role" value={t.title} onChange={v => setTeacherField(cid,idx,'title',v)} placeholder="e.g. IELTS Specialist" s={s} />
-                          <TextField label="Photo URL" value={t.photo} onChange={v => setTeacherField(cid,idx,'photo',v)} placeholder="https://..." s={s} />
-                        </div>
-                        <TextareaField label="Short Bio" value={t.bio} onChange={v => setTeacherField(cid,idx,'bio',v)} rows={2} s={s} />
+                  <ListEditor s={s} items={lp.teachers} onChange={v => setField(cid,'teachers',v)} max={24}
+                    itemLabel="Teacher" addLabel="Add teacher" summary={x => x.name}
+                    newItem={() => ({ name: '', title: '', bio: '', photo: '' })}
+                    render={(t, up) => (
+                      <div style={s.grid2}>
+                        <TextField label="Name" value={t.name} onChange={v => up({ name: v })} s={s} />
+                        <TextField label="Title / Role" value={t.title} onChange={v => up({ title: v })} placeholder="e.g. IELTS Specialist" s={s} />
+                        <div style={{ gridColumn: '1 / -1' }}><TextareaField label="Short Bio" value={t.bio} onChange={v => up({ bio: v })} rows={2} s={s} /></div>
+                        <ImageField label="Photo (portrait)" value={t.photo} onChange={v => up({ photo: v })} centerId={cid} s={s} wide />
                       </div>
-                    ))}
-                    <button onClick={() => addTeacher(cid)} style={s.addTeacherBtn}>
-                      <Plus size={14} /> Add Teacher
-                    </button>
+                    )} />
+                )}
+
+                {/* ── TESTIMONIALS ── */}
+                {sec === 'testimonials' && (
+                  <div style={s.stack}>
+                    <ToggleField label="Show Testimonials" value={lp.testimonials?.enabled} onChange={v => setField(cid,'testimonials.enabled',v)} s={s} />
+                    <div style={s.grid2}>
+                      <TextField label="Section title" value={lp.testimonials?.title} onChange={v => setField(cid,'testimonials.title',v)} s={s} />
+                      <TextField label="Section text" value={lp.testimonials?.subtitle} onChange={v => setField(cid,'testimonials.subtitle',v)} s={s} />
+                    </div>
+                    <ListEditor s={s} items={lp.testimonials?.items} onChange={v => setField(cid,'testimonials.items',v)} max={12}
+                      itemLabel="Review" addLabel="Add review" summary={x => x.name}
+                      newItem={() => ({ name: '', role: '', quote: '', rating: 5, photo: '' })}
+                      render={(x, up) => (
+                        <div style={s.grid2}>
+                          <TextField label="Name" value={x.name} onChange={v => up({ name: v })} s={s} />
+                          <TextField label="Who they are" value={x.role} onChange={v => up({ role: v })} placeholder="Parent of a 9-year-old" s={s} />
+                          <div style={{ gridColumn: '1 / -1' }}><TextareaField label="What they said" value={x.quote} onChange={v => up({ quote: v })} rows={3} s={s} /></div>
+                          <SelectField label="Stars" value={String(x.rating || 5)} options={[5, 4, 3].map(n => ({ value: String(n), label: '★'.repeat(n) }))} onChange={v => up({ rating: Number(v) })} s={s} />
+                          <ImageField label="Photo (optional)" value={x.photo} onChange={v => up({ photo: v })} centerId={cid} s={s} />
+                        </div>
+                      )} />
+                  </div>
+                )}
+
+                {/* ── GALLERY ── */}
+                {sec === 'gallery' && (
+                  <div style={s.stack}>
+                    <ToggleField label="Show Gallery" value={lp.gallery?.enabled} onChange={v => setField(cid,'gallery.enabled',v)} s={s} />
+                    <div style={s.grid2}>
+                      <TextField label="Section title" value={lp.gallery?.title} onChange={v => setField(cid,'gallery.title',v)} placeholder="Life at our school" s={s} />
+                      <TextField label="Section text" value={lp.gallery?.subtitle} onChange={v => setField(cid,'gallery.subtitle',v)} s={s} />
+                    </div>
+                    <span style={s.hint}>The first photo is shown large. Visitors can click any photo to view it full size.</span>
+                    <ListEditor s={s} items={lp.gallery?.items} onChange={v => setField(cid,'gallery.items',v)} max={24}
+                      itemLabel="Photo" addLabel="Add photo" summary={x => x.caption}
+                      newItem={() => ({ image: '', caption: '' })}
+                      render={(x, up) => (
+                        <div style={s.grid2}>
+                          <ImageField label="Photo" value={x.image} onChange={v => up({ image: v })} centerId={cid} s={s} />
+                          <TextField label="Caption (optional)" value={x.caption} onChange={v => up({ caption: v })} s={s} />
+                        </div>
+                      )} />
+                  </div>
+                )}
+
+                {/* ── ENROLMENT BANNER ── */}
+                {sec === 'cta' && (
+                  <div style={s.stack}>
+                    <ToggleField label="Show enrolment banner" value={lp.cta?.enabled} onChange={v => setField(cid,'cta.enabled',v)} s={s} />
+                    <TextField label="Title" value={lp.cta?.title} onChange={v => setField(cid,'cta.title',v)} placeholder="Start your English journey this month" s={s} />
+                    <TextareaField label="Text" value={lp.cta?.text} onChange={v => setField(cid,'cta.text',v)} rows={2} s={s} />
+                    <div style={s.grid2}>
+                      <TextField label="Button text" value={lp.cta?.buttonText} onChange={v => setField(cid,'cta.buttonText',v)} placeholder="Book a free trial" s={s} />
+                      <TextField label="Button link" value={lp.cta?.buttonUrl} onChange={v => setField(cid,'cta.buttonUrl',v)} placeholder="/student/login" s={s} />
+                    </div>
+                    <ImageField label="Background photo (optional)" value={lp.cta?.image} onChange={v => setField(cid,'cta.image',v)} centerId={cid} s={s} />
+                  </div>
+                )}
+
+                {/* ── FAQ ── */}
+                {sec === 'faq' && (
+                  <div style={s.stack}>
+                    <ToggleField label="Show FAQ" value={lp.faq?.enabled} onChange={v => setField(cid,'faq.enabled',v)} s={s} />
+                    <div style={s.grid2}>
+                      <TextField label="Section title" value={lp.faq?.title} onChange={v => setField(cid,'faq.title',v)} s={s} />
+                      <TextField label="Section text" value={lp.faq?.subtitle} onChange={v => setField(cid,'faq.subtitle',v)} s={s} />
+                    </div>
+                    <ListEditor s={s} items={lp.faq?.items} onChange={v => setField(cid,'faq.items',v)} max={20}
+                      itemLabel="Question" addLabel="Add question" summary={x => x.q}
+                      newItem={() => ({ q: '', a: '' })}
+                      render={(x, up) => (
+                        <div style={s.stack}>
+                          <TextField label="Question" value={x.q} onChange={v => up({ q: v })} s={s} />
+                          <TextareaField label="Answer" value={x.a} onChange={v => up({ a: v })} rows={3} s={s} />
+                        </div>
+                      )} />
                   </div>
                 )}
 
@@ -395,7 +567,7 @@ export default function LandingPagesTab({ centers, darkMode, focusCenterId }) {
                   </div>
                 )}
 
-                {/* ── CONTACT ── */}
+                {/* ── CONTACT & FOOTER ── */}
                 {sec === 'contact' && (
                   <div style={s.stack}>
                     <ToggleField label="Show Contact Section" value={lp.contact?.enabled} onChange={v => setField(cid,'contact.enabled',v)} s={s} />
@@ -404,6 +576,9 @@ export default function LandingPagesTab({ centers, darkMode, focusCenterId }) {
                       <TextField label="Phone" value={lp.contact?.phone} onChange={v => setField(cid,'contact.phone',v)} placeholder="+1 555 0000" s={s} />
                     </div>
                     <TextField label="Address" value={lp.contact?.address} onChange={v => setField(cid,'contact.address',v)} s={s} />
+                    <TextField label="Opening hours" value={lp.contact?.hours} onChange={v => setField(cid,'contact.hours',v)} placeholder="Mon–Fri 8:00–20:00 · Sat 9:00–14:00" s={s} />
+                    <span style={s.hint}>The address gets an “Open in Google Maps” button.</span>
+                    <TextareaField label="Footer text (about your school)" value={lp.footer?.about} onChange={v => setField(cid,'footer.about',v)} rows={2} s={s} />
                   </div>
                 )}
 
@@ -414,6 +589,7 @@ export default function LandingPagesTab({ centers, darkMode, focusCenterId }) {
                     <TextareaField label="Meta Description" value={lp.seo?.description} onChange={v => setField(cid,'seo.description',v)} rows={3} placeholder="A short description shown in Google search results (160 chars max)" s={s} />
                   </div>
                 )}
+
 
               </div>
             )}
@@ -504,7 +680,8 @@ function PreviewOverlay({ center, lp, onClose }) {
           background: '#fff',
           boxShadow: isMobile ? '0 24px 80px rgba(0,0,0,0.5)' : 'none',
           borderRadius: isMobile ? 16 : 0,
-          overflow: 'hidden',
+          // clip (not hidden) so the template's sticky header can still stick
+          overflow: 'clip',
           // Isolate fixed positioning so template nav sticks within canvas
           isolation: 'isolate',
         }}>
@@ -704,7 +881,12 @@ function ToggleField({ label, value, onChange, s }) {
 /* ─── Stylesheet factory ─────────────────────────────────────────────────── */
 function styles(isDark, card, bdr, txt, muted, inputBg, inputBdr) {
   const s = {
-    _bdr: inputBdr, _txt: txt,
+    _bdr: inputBdr, _txt: txt, _muted: muted,
+    note: { fontSize: 12.5, color: '#f59e0b', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.25)', borderRadius: 9, padding: '8px 12px', margin: '0 0 16px' },
+    hint: { fontSize: 12, color: muted, lineHeight: 1.5 },
+    subCard: { display: 'flex', flexDirection: 'column', gap: 12, padding: 14, borderRadius: 12, border: `1px solid ${bdr}`, background: isDark ? 'rgba(255,255,255,0.02)' : '#f8fafc' },
+    smallBtn: { display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 11px', borderRadius: 8, border: `1px solid ${inputBdr}`, background: 'transparent', color: txt, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: FONT },
+    iconBtn: { display: 'inline-grid', placeItems: 'center', width: 28, height: 26, borderRadius: 7, border: `1px solid ${inputBdr}`, background: 'transparent', color: muted, cursor: 'pointer' },
     searchInput: {
       width: '100%', padding: '10px 14px', borderRadius: 10,
       background: inputBg, border: `1px solid ${inputBdr}`,

@@ -118,7 +118,7 @@ export default function CertificateTemplatesTab({ centers }) {
     <div style={{ fontFamily: F }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
         <div style={{ flex: 1 }}>
-          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#1e293b' }}>Certificate Templates</h3>
+          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--sa-text, #1e293b)' }}>Certificate Templates</h3>
           <p style={{ margin: '2px 0 0', fontSize: 13, color: '#64748b' }}>
             Configure certificate design and milestone thresholds per center. Changes apply immediately.
           </p>

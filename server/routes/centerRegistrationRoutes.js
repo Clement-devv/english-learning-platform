@@ -1,5 +1,5 @@
 import express from 'express';
-import bcrypt from 'bcryptjs';
+import bcrypt from '../utils/passwordHash.js';
 import Center from '../models/master/Center.js';
 import { config } from '../config/config.js';
 import { sendEmail } from '../utils/emailService.js';

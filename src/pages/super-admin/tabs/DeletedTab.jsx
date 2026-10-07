@@ -41,14 +41,14 @@ export default function DeletedTab({ deleted, loadData, restoring, handleRestore
                 return (
                   <tr key={c._id} className={styles.tr}>
                     <td className={styles.td}>
-                      <p style={{ margin: 0, fontWeight: '600', color: '#f1f5f9' }}>{c.centerName}</p>
+                      <p style={{ margin: 0, fontWeight: '600', color: 'var(--sa-text)' }}>{c.centerName}</p>
                       <p style={{ margin: 0, fontSize: '12px', color: '#6b7280' }}>{c.adminEmail}</p>
                     </td>
                     <td className={styles.td}><code className={styles.slug}>{c.slug}</code></td>
                     <td className={styles.td} style={{ fontSize: '12px', color: '#6b7280' }}>
                       {c.deletedAt ? new Date(c.deletedAt).toLocaleDateString() : '—'}
                     </td>
-                    <td className={styles.td} style={{ fontSize: '12px', color: urgent ? '#f87171' : '#9ca3af', fontWeight: urgent ? '700' : '400' }}>
+                    <td className={styles.td} style={{ fontSize: '12px', color: urgent ? '#f87171' : 'var(--sa-muted)', fontWeight: urgent ? '700' : '400' }}>
                       {c.scheduledDeletionAt ? new Date(c.scheduledDeletionAt).toLocaleDateString() : '—'}
                     </td>
                     <td className={styles.td}>

@@ -1,5 +1,5 @@
 // utils/passwordUtils.js
-import bcrypt from "bcryptjs";
+import bcrypt from "./passwordHash.js";
 import crypto from "crypto";
 import { config } from "../config/config.js";
 import logger from "../utils/logger.js";

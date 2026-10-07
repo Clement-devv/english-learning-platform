@@ -20,7 +20,6 @@ import {
   apiLimiter,
   realtimeLimiter,
   pollingLimiter,
-  loginLimiter
 } from "./middleware/rateLimiter.js";
 import { config } from "./config/config.js";
 import {
@@ -228,12 +227,21 @@ app.use('/api', requestMonitor);
 // call res.setTimeout(0) to disable per-response.
 const REQUEST_TIMEOUT_MS = 30_000;
 app.use((req, res, next) => {
-  let timer = setTimeout(() => {
-    if (!res.headersSent) {
-      logger.warn('Request timeout', { method: req.method, path: req.path });
-      res.status(503).json({ success: false, message: 'Request timeout' });
-    }
-  }, REQUEST_TIMEOUT_MS);
+  let timer = null;
+  const start = () => {
+    timer = setTimeout(() => {
+      if (!res.headersSent) {
+        logger.warn('Request timeout', { method: req.method, path: req.path });
+        res.status(503).json({ success: false, message: 'Request timeout' });
+      }
+    }, REQUEST_TIMEOUT_MS);
+  };
+  // File uploads: a 9 MB recording part on a slow connection takes well over
+  // 30 s just to arrive, so the clock starts once the body has been received —
+  // only the handler's own work is timed. (Load test: 44/90 recording parts
+  // were cut off mid-upload by this timer.)
+  if (/^multipart\/form-data/i.test(req.headers['content-type'] || '')) req.once('end', start);
+  else start();
   const clear = () => clearTimeout(timer);
   res.on('finish', clear);
   res.on('close', clear);

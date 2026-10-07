@@ -18,7 +18,7 @@ export default function ClassesTab({
       </div>
 
       {/* Filters */}
-      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, marginBottom: 20, flexWrap: 'wrap', padding: '16px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, marginBottom: 20, flexWrap: 'wrap', padding: '16px', background: 'var(--sa-w02)', border: '1px solid var(--sa-w06)', borderRadius: 12 }}>
         <div>
           <label className={styles.label} style={{ display: 'block', marginBottom: 4 }}>From</label>
           <input type="date" value={classesDateFrom} onChange={e => setClassesDateFrom(e.target.value)}
@@ -48,7 +48,7 @@ export default function ClassesTab({
         {(classesDateFrom || classesDateTo || classesFilterCenter) && (
           <button
             onClick={() => { setClassesDateFrom(''); setClassesDateTo(''); setClassesFilterCenter(''); setClassesExpanded(null); loadClasses('', '', ''); }}
-            style={{ padding: '10px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: '#9ca3af', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
+            style={{ padding: '10px 14px', borderRadius: 10, border: '1px solid var(--sa-w10)', background: 'transparent', color: 'var(--sa-muted)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
           >Clear</button>
         )}
       </div>
@@ -57,11 +57,11 @@ export default function ClassesTab({
       {!classesLoading && classesData.length > 0 && (
         <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
           <div style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 10, padding: '10px 16px' }}>
-            <p style={{ margin: '0 0 2px', fontSize: 10, color: '#9ca3af', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total Classes</p>
+            <p style={{ margin: '0 0 2px', fontSize: 10, color: 'var(--sa-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total Classes</p>
             <p style={{ margin: 0, fontSize: 24, fontWeight: 900, color: '#f59e0b' }}>{classesGrandTotal.toLocaleString()}</p>
           </div>
           <div style={{ background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.15)', borderRadius: 10, padding: '10px 16px' }}>
-            <p style={{ margin: '0 0 2px', fontSize: 10, color: '#9ca3af', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Centers</p>
+            <p style={{ margin: '0 0 2px', fontSize: 10, color: 'var(--sa-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Centers</p>
             <p style={{ margin: 0, fontSize: 24, fontWeight: 900, color: '#34d399' }}>{classesData.length}</p>
           </div>
         </div>
@@ -77,15 +77,15 @@ export default function ClassesTab({
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {classesData.map(center => (
-            <div key={center.centerId} style={{ border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, overflow: 'hidden' }}>
+            <div key={center.centerId} style={{ border: '1px solid var(--sa-w07)', borderRadius: 12, overflow: 'hidden' }}>
               {/* Center header row — clickable to expand */}
               <button
                 onClick={() => setClassesExpanded(classesExpanded === center.centerId ? null : center.centerId)}
-                style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', background: 'rgba(255,255,255,0.03)', border: 'none', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}
+                style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', background: 'var(--sa-w03)', border: 'none', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                   <BookOpen size={15} color="#f59e0b" />
-                  <span style={{ fontWeight: 700, color: '#f1f5f9', fontSize: 14 }}>{center.centerName}</span>
+                  <span style={{ fontWeight: 700, color: 'var(--sa-text)', fontSize: 14 }}>{center.centerName}</span>
                   <code className={styles.slug}>{center.slug}</code>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -137,8 +137,8 @@ function CenterClasses({ center, from, to, apiBase, authHeaders }) {
   const fmt = (d) => d ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
 
   return (
-    <div style={{ overflowX: 'auto', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-      {error ? <p style={{ margin: 16, color: '#fca5a5', fontSize: 13 }}>{error}</p>
+    <div style={{ overflowX: 'auto', borderTop: '1px solid var(--sa-w06)' }}>
+      {error ? <p style={{ margin: 16, color: 'var(--sa-red-text)', fontSize: 13 }}>{error}</p>
         : !data ? <p style={{ margin: 16, color: '#6b7280', fontSize: 13 }}>Loading…</p>
         : (
           <table className={styles.table}>
@@ -150,15 +150,15 @@ function CenterClasses({ center, from, to, apiBase, authHeaders }) {
             <tbody>
               {rows.map(cls => (
                 <tr key={cls._id} className={styles.tr}>
-                  <td className={styles.td}><span style={{ fontWeight: 600, color: '#f1f5f9', fontSize: 13 }}>{cls.classTitle}</span></td>
-                  <td className={styles.td} style={{ color: '#9ca3af', fontSize: 12, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cls.topic || '—'}</td>
+                  <td className={styles.td}><span style={{ fontWeight: 600, color: 'var(--sa-text)', fontSize: 13 }}>{cls.classTitle}</span></td>
+                  <td className={styles.td} style={{ color: 'var(--sa-muted)', fontSize: 12, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cls.topic || '—'}</td>
                   <td className={styles.td} style={{ fontSize: 12 }}>
                     <span style={{ background: 'rgba(52,211,153,0.1)', color: '#34d399', borderRadius: 6, padding: '2px 8px', fontSize: 11, fontWeight: 600 }}>{cls.teacherName}</span>
                   </td>
                   <td className={styles.td} style={{ fontSize: 12 }}>
                     <span style={{ background: 'rgba(99,102,241,0.1)', color: '#818cf8', borderRadius: 6, padding: '2px 8px', fontSize: 11, fontWeight: 600 }}>{cls.studentName}</span>
                   </td>
-                  <td className={styles.td} style={{ fontSize: 11, color: '#9ca3af' }}>{fmt(cls.scheduledTime)}</td>
+                  <td className={styles.td} style={{ fontSize: 11, color: 'var(--sa-muted)' }}>{fmt(cls.scheduledTime)}</td>
                   <td className={styles.td} style={{ fontSize: 12, color: '#f59e0b', fontWeight: 600 }}>{cls.duration} min</td>
                   <td className={styles.td} style={{ fontSize: 11, color: '#6b7280' }}>{fmt(cls.completedAt)}</td>
                 </tr>

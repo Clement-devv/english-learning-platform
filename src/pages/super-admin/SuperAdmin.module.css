@@ -1,11 +1,61 @@
 /* Super Admin Dashboard — shared CSS module */
+
+/* ── Theme colours ─────────────────────────────────────────────────────────
+   Set on the dashboard root (data-sa-theme="dark" | "light"). Every tab and
+   modal uses these instead of fixed colours, so both modes stay readable. */
+.themeRoot {
+  --sa-text: #f1f5f9;
+  --sa-text-2: #d1d5db;
+  --sa-muted: #9ca3af;
+  --sa-panel: #0f1117;
+  --sa-modal: #1a1d2e;
+  --sa-line: #2a2d40;
+  --sa-red-text: #fca5a5;
+  --sa-amber-text: #fcd34d;
+  --sa-indigo-text: #a5b4fc;
+  --sa-w01: rgba(255, 255, 255, 0.01);
+  --sa-w02: rgba(255, 255, 255, 0.02);
+  --sa-w03: rgba(255, 255, 255, 0.03);
+  --sa-w04: rgba(255, 255, 255, 0.04);
+  --sa-w05: rgba(255, 255, 255, 0.05);
+  --sa-w06: rgba(255, 255, 255, 0.06);
+  --sa-w07: rgba(255, 255, 255, 0.07);
+  --sa-w08: rgba(255, 255, 255, 0.08);
+  --sa-w10: rgba(255, 255, 255, 0.1);
+  --sa-w12: rgba(255, 255, 255, 0.12);
+  --sa-w22: rgba(255, 255, 255, 0.22);
+  color-scheme: dark;
+}
+.themeRoot[data-sa-theme="light"] {
+  --sa-text: #0f172a;
+  --sa-text-2: #334155;
+  --sa-muted: #64748b;
+  --sa-panel: #ffffff;
+  --sa-modal: #ffffff;
+  --sa-line: #e2e8f0;
+  --sa-red-text: #b91c1c;
+  --sa-amber-text: #92400e;
+  --sa-indigo-text: #4338ca;
+  --sa-w01: rgba(15, 23, 42, 0.015);
+  --sa-w02: rgba(15, 23, 42, 0.03);
+  --sa-w03: #ffffff;
+  --sa-w04: rgba(15, 23, 42, 0.045);
+  --sa-w05: rgba(15, 23, 42, 0.06);
+  --sa-w06: rgba(15, 23, 42, 0.08);
+  --sa-w07: rgba(15, 23, 42, 0.1);
+  --sa-w08: rgba(15, 23, 42, 0.11);
+  --sa-w10: rgba(15, 23, 42, 0.13);
+  --sa-w12: rgba(15, 23, 42, 0.15);
+  --sa-w22: rgba(15, 23, 42, 0.22);
+  color-scheme: light;
+}
 /* Replaces the inline `s` styles object that was passed as a prop to every tab */
 
 /* ── Layout ──────────────────────────────────────────────────────────────── */
 .root {
   min-height: 100vh;
-  background: #0a0b0f;
-  color: #f1f5f9;
+  background: var(--sa-panel);
+  color: var(--sa-text);
   font-family: 'Sora', 'Segoe UI', sans-serif;
   display: flex;
 }
@@ -14,7 +64,7 @@
 .sidebar {
   width: 220px;
   flex-shrink: 0;
-  background: #0d0e15;
+  background: var(--sa-panel);
   border-right: 1px solid rgba(245, 158, 11, 0.08);
   display: flex;
   flex-direction: column;
@@ -26,7 +76,7 @@
 
 .sidebarTop {
   padding: 20px 16px 16px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid var(--sa-w05);
   flex-shrink: 0;
 }
 
@@ -50,7 +100,7 @@
 .sidebarLogoText {
   font-size: 15px;
   font-weight: 800;
-  color: #f1f5f9;
+  color: var(--sa-text);
   letter-spacing: -0.02em;
 }
 
@@ -82,8 +132,8 @@
 }
 
 .navItem:hover {
-  background: rgba(255, 255, 255, 0.04);
-  color: #9ca3af;
+  background: var(--sa-w04);
+  color: var(--sa-muted);
 }
 
 .navItemActive {
@@ -108,7 +158,7 @@
 
 .sidebarBottom {
   padding: 12px 8px 16px;
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  border-top: 1px solid var(--sa-w05);
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -155,8 +205,8 @@
   gap: 8px;
   padding: 10px 8px;
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--sa-w03);
+  border: 1px solid var(--sa-w06);
 }
 
 .sidebarAvatar {
@@ -177,7 +227,7 @@
   margin: 0;
   font-size: 12px;
   font-weight: 600;
-  color: #f1f5f9;
+  color: var(--sa-text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -221,8 +271,8 @@
   gap: 14px;
   padding: 18px 20px;
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: var(--sa-w03);
+  border: 1px solid var(--sa-w07);
 }
 
 .statIcon {
@@ -239,7 +289,7 @@
   margin: 0 0 2px;
   font-size: 24px;
   font-weight: 700;
-  color: #f1f5f9;
+  color: var(--sa-text);
 }
 
 .statLabel {
@@ -263,8 +313,8 @@
   border-radius: 8px;
   font-size: 13px;
   font-weight: 600;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--sa-w04);
+  border: 1px solid var(--sa-w08);
   color: #6b7280;
   cursor: pointer;
   font-family: inherit;
@@ -292,8 +342,8 @@
 
 /* ── Content card ────────────────────────────────────────────────────────── */
 .card {
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: var(--sa-w03);
+  border: 1px solid var(--sa-w07);
   border-radius: 16px;
   padding: 20px;
 }
@@ -304,13 +354,13 @@
   gap: 8px;
   font-size: 15px;
   font-weight: 700;
-  color: #f1f5f9;
+  color: var(--sa-text);
   margin: 0;
 }
 
 .refreshBtn {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--sa-w05);
+  border: 1px solid var(--sa-w10);
   border-radius: 7px;
   color: #6b7280;
   cursor: pointer;
@@ -333,11 +383,11 @@
   letter-spacing: 0.08em;
   color: #6b7280;
   text-transform: uppercase;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid var(--sa-w06);
 }
 
 .tr {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  border-bottom: 1px solid var(--sa-w04);
 }
 
 .td {
@@ -495,7 +545,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 20px 24px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  border-bottom: 1px solid var(--sa-w07);
   position: sticky;
   top: 0;
   background: #110f1a;
@@ -505,7 +555,7 @@
 .modalTitle {
   font-size: 16px;
   font-weight: 700;
-  color: #f1f5f9;
+  color: var(--sa-text);
 }
 
 .stepTag {
@@ -537,7 +587,7 @@
 .stepDesc {
   margin: 0;
   font-size: 13.5px;
-  color: #9ca3af;
+  color: var(--sa-muted);
   line-height: 1.6;
 }
 
@@ -556,7 +606,7 @@
 .label {
   font-size: 11.5px;
   font-weight: 700;
-  color: #9ca3af;
+  color: var(--sa-muted);
   text-transform: uppercase;
   letter-spacing: 0.07em;
 }
@@ -564,10 +614,10 @@
 .input {
   width: 100%;
   padding: 10px 14px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--sa-w04);
+  border: 1px solid var(--sa-w10);
   border-radius: 10px;
-  color: #f1f5f9;
+  color: var(--sa-text);
   font-size: 14px;
   font-family: inherit;
   outline: none;
@@ -578,8 +628,8 @@
   display: flex;
   align-items: center;
   padding: 0 14px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--sa-w04);
+  border: 1px solid var(--sa-w10);
   border-radius: 10px;
   height: 42px;
   gap: 8px;
@@ -608,9 +658,9 @@
 .cancelBtn {
   padding: 10px 20px;
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: #9ca3af;
+  background: var(--sa-w05);
+  border: 1px solid var(--sa-w10);
+  color: var(--sa-muted);
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
@@ -631,3 +681,49 @@
   cursor: pointer;
   font-family: inherit;
 }
+
+/* Light mode: bright accent colours used as TEXT are too faint on white.
+   Inline styles can only be overridden with !important, so match the
+   colour value (not background-color) and use a darker shade of the same hue. */
+.themeRoot[data-sa-theme="light"] [style^="color: rgb(245, 158, 11)"],
+.themeRoot[data-sa-theme="light"] [style*="; color: rgb(245, 158, 11)"] { color: #b45309 !important; }
+.themeRoot[data-sa-theme="light"] [style^="color: rgb(52, 211, 153)"],
+.themeRoot[data-sa-theme="light"] [style*="; color: rgb(52, 211, 153)"] { color: #047857 !important; }
+.themeRoot[data-sa-theme="light"] [style^="color: rgb(16, 185, 129)"],
+.themeRoot[data-sa-theme="light"] [style*="; color: rgb(16, 185, 129)"] { color: #047857 !important; }
+.themeRoot[data-sa-theme="light"] [style^="color: rgb(34, 197, 94)"],
+.themeRoot[data-sa-theme="light"] [style*="; color: rgb(34, 197, 94)"] { color: #15803d !important; }
+.themeRoot[data-sa-theme="light"] [style^="color: rgb(251, 146, 60)"],
+.themeRoot[data-sa-theme="light"] [style*="; color: rgb(251, 146, 60)"] { color: #c2410c !important; }
+.themeRoot[data-sa-theme="light"] [style^="color: rgb(129, 140, 248)"],
+.themeRoot[data-sa-theme="light"] [style*="; color: rgb(129, 140, 248)"] { color: #4338ca !important; }
+.themeRoot[data-sa-theme="light"] [style^="color: rgb(34, 211, 238)"],
+.themeRoot[data-sa-theme="light"] [style*="; color: rgb(34, 211, 238)"] { color: #0e7490 !important; }
+.themeRoot[data-sa-theme="light"] [style^="color: rgb(6, 182, 212)"],
+.themeRoot[data-sa-theme="light"] [style*="; color: rgb(6, 182, 212)"] { color: #0e7490 !important; }
+.themeRoot[data-sa-theme="light"] [style^="color: rgb(167, 139, 250)"],
+.themeRoot[data-sa-theme="light"] [style*="; color: rgb(167, 139, 250)"] { color: #6d28d9 !important; }
+.themeRoot[data-sa-theme="light"] [style^="color: rgb(248, 113, 113)"],
+.themeRoot[data-sa-theme="light"] [style*="; color: rgb(248, 113, 113)"] { color: #b91c1c !important; }
+.themeRoot[data-sa-theme="light"] [style^="color: rgb(14, 165, 233)"],
+.themeRoot[data-sa-theme="light"] [style*="; color: rgb(14, 165, 233)"] { color: #0369a1 !important; }
+.themeRoot[data-sa-theme="light"] [style^="color: rgb(96, 165, 250)"],
+.themeRoot[data-sa-theme="light"] [style*="; color: rgb(96, 165, 250)"] { color: #1d4ed8 !important; }
+.themeRoot[data-sa-theme="light"] [style^="color: rgb(244, 114, 182)"],
+.themeRoot[data-sa-theme="light"] [style*="; color: rgb(244, 114, 182)"] { color: #be185d !important; }
+.themeRoot[data-sa-theme="light"] [style^="color: rgb(250, 204, 21)"],
+.themeRoot[data-sa-theme="light"] [style*="; color: rgb(250, 204, 21)"] { color: #a16207 !important; }
+
+/* Light mode: same darker shades for the shared classes above */
+.themeRoot[data-sa-theme="light"] .navItemActive { color: #b45309; }
+.themeRoot[data-sa-theme="light"] .sidebarBroadcastBtn { color: #b45309; }
+.themeRoot[data-sa-theme="light"] .tabBtnActive { color: #b45309; }
+.themeRoot[data-sa-theme="light"] .slug { color: #b45309; }
+.themeRoot[data-sa-theme="light"] .planBadge { color: #4338ca; }
+.themeRoot[data-sa-theme="light"] .approveBtn { color: #047857; }
+.themeRoot[data-sa-theme="light"] .rejectBtn { color: #b91c1c; }
+.themeRoot[data-sa-theme="light"] .suspendBtn { color: #b45309; }
+.themeRoot[data-sa-theme="light"] .themeBtn { color: #4338ca; }
+.themeRoot[data-sa-theme="light"] .featuresBtn { color: #047857; }
+.themeRoot[data-sa-theme="light"] .deleteBtn { color: #b91c1c; }
+.themeRoot[data-sa-theme="light"] .stepTag { color: #b45309; }

@@ -8,6 +8,7 @@ import { sendEmail }        from '../emails/core.js';
 import logger from '../utils/logger.js';
 import { contactFormLimiter } from '../middleware/rateLimiter.js';
 import { notFound, serverError } from '../utils/apiResponse.js';
+import { PUBLIC_LANDING_KEYS } from '../utils/landingPage.js';
 
 const router = express.Router();
 
@@ -37,16 +38,10 @@ router.get('/landing-page', tenantMiddleware, async (req, res) => {
         phone:           center.phone || '',
         website:         center.website || '',
       },
+      // Website content only (utils/landingPage.js lists the sections) — never updatedBy etc.
       landingPage: {
-        template:    lp.template,
-        design:      lp.design,
-        hero:        lp.hero,
-        about:       lp.about,
-        teachers:    lp.teachers || [],
-        links:       lp.links,
-        contact:     lp.contact,
-        seo:         lp.seo,
-        publishedAt: lp.publishedAt,
+        ...Object.fromEntries(PUBLIC_LANDING_KEYS.map(k => [k, lp[k]])),
+        teachers: lp.teachers || [],
       },
     });
   } catch (err) {

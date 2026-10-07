@@ -134,6 +134,8 @@ const centerSchema = new mongoose.Schema({
       ctaUrl:           { type: String, default: '/student/login' },
       secondaryCtaText: { type: String, default: '' },
       secondaryCtaUrl:  { type: String, default: '' },
+      badge:            { type: String, default: '' },   // small label above the headline
+      image:            { type: String, default: null }, // big hero photo (Classic template)
     },
 
     about: {
@@ -141,6 +143,11 @@ const centerSchema = new mongoose.Schema({
       title:   { type: String, default: 'About Us' },
       body:    { type: String, default: '' },
       image:   { type: String, default: null },
+      subtitle:   { type: String, default: '' },
+      image2:     { type: String, default: null },  // second photo in the collage
+      badgeValue: { type: String, default: '' },    // e.g. "15+"
+      badgeLabel: { type: String, default: '' },    // e.g. "Years of experience"
+      points:     { type: [String], default: [] },  // checklist
     },
 
     teachers: [{
@@ -166,7 +173,20 @@ const centerSchema = new mongoose.Schema({
       email:   { type: String, default: '' },
       phone:   { type: String, default: '' },
       address: { type: String, default: '' },
+      hours:   { type: String, default: '' },
     },
+
+    // ── Extra sections (Classic template). Each: { enabled, title, subtitle, items: [...] }.
+    // Shapes are validated/cleaned in superAdminRoutes.js (cleanLandingPage).
+    topBar:       { type: mongoose.Schema.Types.Mixed, default: undefined }, // { enabled, text }
+    stats:        { type: mongoose.Schema.Types.Mixed, default: undefined }, // items: [{ value, label }]
+    features:     { type: mongoose.Schema.Types.Mixed, default: undefined }, // items: [{ icon, title, text }]
+    programs:     { type: mongoose.Schema.Types.Mixed, default: undefined }, // items: [{ image, title, level, duration, price, text, ctaText, ctaUrl }]
+    testimonials: { type: mongoose.Schema.Types.Mixed, default: undefined }, // items: [{ name, role, photo, quote, rating }]
+    gallery:      { type: mongoose.Schema.Types.Mixed, default: undefined }, // items: [{ image, caption }]
+    faq:          { type: mongoose.Schema.Types.Mixed, default: undefined }, // items: [{ q, a }]
+    cta:          { type: mongoose.Schema.Types.Mixed, default: undefined }, // { enabled, title, text, buttonText, buttonUrl, image }
+    footer:       { type: mongoose.Schema.Types.Mixed, default: undefined }, // { about }
 
     seo: {
       title:       { type: String, default: '' },

@@ -3,7 +3,7 @@
 // verify/cancel are token-based (no JWT) so email prefetchers cannot trigger them.
 
 import express from 'express';
-import bcrypt from 'bcryptjs';
+import bcrypt from '../utils/passwordHash.js';
 import crypto from 'crypto';
 import Center from '../models/master/Center.js';
 import { tenantMiddleware } from '../middleware/tenantMiddleware.js';

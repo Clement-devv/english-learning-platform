@@ -861,6 +861,7 @@ export async function initializeSocket(httpServer) {
 
     // Handle disconnect — clean up whiteboard session and reaction rooms
     socket.on('disconnect', () => {
+      _memCounts.delete(socket.id); // rate-limit counter would otherwise outlive the socket
       try {
         logger.debug('🔌 Socket disconnected:', socket.id);
 

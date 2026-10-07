@@ -5,6 +5,9 @@ import { logger } from "../utils/logger.js";
 import LoginAttempt from "../models/master/LoginAttempt.js";
 import redisClient from "../config/redis.js";
 import { MAX_LOGIN_ATTEMPTS, ACCOUNT_LOCK_MS } from "../config/constants.js";
+import jwt from "jsonwebtoken";
+import { JWT_VERIFY_OPTIONS } from "../config/config.js";
+import { getCenterSecret } from "../utils/jwtUtils.js";
 
 // Build a Redis-backed store so rate-limit counters are shared across all PM2
 // cluster workers. Without this each worker keeps its own in-memory counter,
@@ -105,9 +108,29 @@ export const getRemainingAttempts = async (identifier, centerSlug = null) => {
 // per request would give the caller a fresh bucket every time. Authenticated
 // requests use the user id; everything else uses the IP (real client IP in
 // production — TRUST_PROXY=true behind Caddy, see docker-compose.yml).
+// The API limiters run before verifyToken, so req.user isn't set yet — without
+// this every signed-in user behind one IP (a center's office, a school lab, a
+// carrier NAT) shared a single bucket: 30 people in class ≈ 480 req/min against
+// 333/min. The token's signature is verified here, so nobody can mint fresh
+// buckets with made-up ids; anything unverifiable falls back to the IP.
+const userFromToken = (req) => {
+  const header = req.headers.authorization;
+  if (!header?.startsWith("Bearer ")) return null;
+  const token = header.slice(7);
+  try {
+    const unverified = jwt.decode(token);
+    if (!unverified?.centerId) return null;
+    const decoded = jwt.verify(token, getCenterSecret(unverified.centerId), JWT_VERIFY_OPTIONS);
+    return decoded?.id ? `${decoded.centerId}:${decoded.id}` : null;
+  } catch {
+    return null;
+  }
+};
+
 const createKeyGenerator = (useUser = true) => (req) => {
-  if (useUser && req.user?.id) {
-    return `u:${req.user.id}`;
+  if (useUser) {
+    const user = req.user?.id ? `${req.user.centerId}:${req.user.id}` : userFromToken(req);
+    if (user) return `u:${user}`;
   }
   return `ip:${req.ip}`;
 };

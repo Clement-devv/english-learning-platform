@@ -12,7 +12,7 @@ import { bookingSchema }    from "../schemas/bookingSchema.js";
 import { studentSchema }    from "../schemas/studentSchema.js";
 import { readPaging, pageMeta, oid } from "../utils/paging.js";
 import logger from "../utils/logger.js";
-import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
+import { badRequest, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
 import { wrapUpload } from '../middleware/validateObjectId.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -118,6 +118,16 @@ async function discardUploadedFile(file) {
   } else if (file.path) {
     fs.unlink(file.path, () => {});
   }
+}
+
+// Does the stored file behind a recording still exist?
+async function recordingFileExists(rec) {
+  if (!rec?.filename) return false;
+  if (useS3) {
+    const { s3ObjectExists } = await import('../utils/s3.js');
+    return s3ObjectExists(rec.filename);
+  }
+  return fs.existsSync(path.join(RECORDINGS_DIR, rec.filename));
 }
 
 const SESSION_ID_RE = /^[A-Za-z0-9_-]{8,64}$/;
@@ -245,6 +255,7 @@ router.patch("/:id/external", verifyToken, async (req, res) => {
 // (sessionId + partNumber + startOffset). Re-uploading a part that is already
 // saved returns the existing record, so client retries are safe.
 router.post("/upload", verifyToken, wrapUpload(upload.single("recording")), async (req, res) => {
+  let rec = null; // once a record exists, its file must never be discarded
   try {
     const { role, id: teacherId } = req.user;
     if (role !== "teacher") { await discardUploadedFile(req.file); return forbidden(res, "Teachers only"); }
@@ -279,11 +290,13 @@ router.post("/upload", verifyToken, wrapUpload(upload.single("recording")), asyn
     let sibling = null;
     if (sessionId) {
       const existing = await Recording.findOne({ sessionId, teacherId, partNumber });
-      if (existing) {
+      if (existing && await recordingFileExists(existing)) {
         // Retry of a part that was already saved — keep the first copy
         await discardUploadedFile(req.file);
         return res.status(200).json({ success: true, recording: existing, duplicate: true });
       }
+      // A record whose file is gone is not a saved part — replace it with this upload
+      if (existing) await existing.deleteOne();
       sibling = await Recording.findOne({ sessionId, teacherId }).sort({ partNumber: 1 })
         .select("autoDeleteAt visibleToStudent");
     }
@@ -305,7 +318,7 @@ router.post("/upload", verifyToken, wrapUpload(upload.single("recording")), asyn
     const filename = req.file.key || req.file.filename;
     if (!filename) return serverError(res, "File storage error — no filename assigned");
 
-    const rec = await Recording.create({
+    rec = await Recording.create({
       bookingId, teacherId, studentId,
       title:    title?.trim() || "",
       filename,
@@ -317,10 +330,11 @@ router.post("/upload", verifyToken, wrapUpload(upload.single("recording")), asyn
       ...(sessionId ? { sessionId, partNumber, startOffset } : {}),
     });
 
-    res.status(201).json({ success: true, recording: rec });
+    if (!res.headersSent) res.status(201).json({ success: true, recording: rec });
   } catch (err) {
     logger.error("Recording upload error:", { error: err?.message });
-    await discardUploadedFile(req.file);
+    // The part is saved: keep its file so a retry finds it as a duplicate
+    if (!rec) await discardUploadedFile(req.file);
     serverError(res, err.message, err);
   }
 });

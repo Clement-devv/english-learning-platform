@@ -1,5 +1,5 @@
 import express from 'express';
-import bcrypt from 'bcryptjs';
+import bcrypt from '../utils/passwordHash.js';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import mongoose from 'mongoose';
@@ -8,6 +8,15 @@ import Center from '../models/master/Center.js';
 import AgoraUsage   from '../models/master/AgoraUsage.js';
 import AgoraSession from '../models/master/AgoraSession.js';
 import MonitorState from '../models/master/MonitorState.js';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+import { s3Enabled, uploadToS3, s3PublicUrl } from '../utils/s3.js';
+import { cleanLandingPage } from '../utils/landingPage.js';
+
+// Same folder the center admins' logo uploads use (served publicly at /uploads/branding)
+const SA_BRANDING_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'uploads', 'branding');
 import { verifySuperAdmin } from '../middleware/superAdminMiddleware.js';
 import { loginLimiter, strictLimiter, apiLimiter, emailLimiter, trackFailedLogin, isAccountLocked, clearFailedAttempts } from '../middleware/rateLimiter.js';
 import { getDb } from '../config/dbManager.js';
@@ -2184,19 +2193,11 @@ router.patch('/centers/:id/landing-page', verifySuperAdmin, validateParamMongoId
     const { landingPage } = req.body;
     if (!landingPage || typeof landingPage !== 'object') return badRequest(res, 'landingPage object required');
 
-    // Sanitise teachers array: ensure each teacher has at least a name
-    if (Array.isArray(landingPage.teachers)) {
-      landingPage.teachers = landingPage.teachers
-        .filter(t => t && t.name && t.name.trim())
-        .map((t, i) => ({ ...t, order: i }));
-    }
-
-    // Build $set payload using dot-notation so we do a partial merge
+    // Keep only known sections, safe links/images and sensible lengths (utils/landingPage.js).
+    // published/publishedAt are not editable here — use /publish.
+    const clean = cleanLandingPage(landingPage);
     const setPayload = {};
-    for (const [key, val] of Object.entries(landingPage)) {
-      if (key === 'published' || key === 'publishedAt') continue; // protected
-      setPayload[`landingPage.${key}`] = val;
-    }
+    for (const [key, val] of Object.entries(clean)) setPayload[`landingPage.${key}`] = val;
     setPayload['landingPage.updatedBy'] = req.superAdmin?.email || 'superadmin';
 
     const center = await Center.findByIdAndUpdate(
@@ -2213,6 +2214,44 @@ router.patch('/centers/:id/landing-page', verifySuperAdmin, validateParamMongoId
     serverError(res);
   }
 });
+
+// POST /api/super-admin/centers/:id/landing-page/upload — one website photo (hero, about,
+// programs, teachers, gallery…). Returns { url } to put in the field; saved with the page.
+const SITE_IMAGE_TYPES = { 'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp', 'image/gif': '.gif' }; // no SVG (can carry scripts)
+const siteImageUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024, files: 1 },
+  fileFilter: (_req, file, cb) => (SITE_IMAGE_TYPES[file.mimetype] ? cb(null, true) : cb(new Error('Only JPG, PNG, WebP or GIF images are allowed'))),
+});
+router.post('/centers/:id/landing-page/upload', verifySuperAdmin, strictLimiter, validateParamMongoId('id'),
+  (req, res, next) => siteImageUpload.single('image')(req, res, (err) => {
+    if (err) return badRequest(res, err.code === 'LIMIT_FILE_SIZE' ? 'Image is too large (max 5 MB)' : err.message);
+    next();
+  }),
+  async (req, res) => {
+    try {
+      if (!req.file) return badRequest(res, 'No image uploaded');
+      const center = await Center.findById(req.params.id).select('slug').lean();
+      if (!center) return notFound(res, 'Center not found');
+      const ext = SITE_IMAGE_TYPES[req.file.mimetype];
+      const name = `site-${Date.now()}-${crypto.randomBytes(4).toString('hex')}${ext}`;
+      let url;
+      if (s3Enabled()) {
+        const key = `centers/${center.slug}/branding/${name}`;
+        await uploadToS3(req.file.buffer, key, req.file.mimetype);
+        url = s3PublicUrl(key);
+      } else {
+        const dir = path.join(SA_BRANDING_DIR, center.slug);
+        await fs.promises.mkdir(dir, { recursive: true });
+        await fs.promises.writeFile(path.join(dir, name), req.file.buffer);
+        url = `/uploads/branding/${center.slug}/${name}`;
+      }
+      res.json({ success: true, data: { url }, message: 'Image uploaded' });
+    } catch (err) {
+      logger.error('Website image upload failed:', { error: err?.message });
+      serverError(res);
+    }
+  });
 
 // PATCH /api/super-admin/centers/:id/landing-page/publish
 // Toggles published flag

@@ -20,6 +20,7 @@ import { TEACHER_DASHBOARD_THEMES } from '../../data/teacherDashboardThemes';
 import { ADMIN_DASHBOARD_THEMES }       from '../../data/adminDashboardThemes';
 import { SUBADMIN_DASHBOARD_THEMES }   from '../../data/subAdminDashboardThemes';
 import { CLASSROOM_THEMES }            from '../../data/classroomThemes';
+import themeStyles from './SuperAdmin.module.css'; // theme colour variables (light / dark)
 import CentersTab  from './tabs/CentersTab';
 import DomainsTab  from './tabs/DomainsTab';
 import HealthTab   from './tabs/HealthTab';
@@ -1216,7 +1217,7 @@ export default function SuperAdminDashboard() {
   ];
 
   return (
-    <div style={s.root}>
+    <div style={s.root} className={themeStyles.themeRoot} data-sa-theme={darkMode ? "dark" : "light"}>
 
       {/* ── Mobile sidebar backdrop ── */}
       <div style={s.sidebarOverlay} onClick={() => setSidebarOpen(false)} />
@@ -1389,15 +1390,15 @@ export default function SuperAdminDashboard() {
             <div style={{ padding: 24 }}>
               {/* Center info */}
               <div style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 10, padding: '12px 14px', marginBottom: 20 }}>
-                <p style={{ margin: '0 0 2px', fontWeight: 700, color: '#f1f5f9', fontSize: 14 }}>{planModal.centerName}</p>
-                <p style={{ margin: 0, fontSize: 12, color: '#9ca3af' }}>{planModal.adminEmail}</p>
+                <p style={{ margin: '0 0 2px', fontWeight: 700, color: 'var(--sa-text)', fontSize: 14 }}>{planModal.centerName}</p>
+                <p style={{ margin: 0, fontSize: 12, color: 'var(--sa-muted)' }}>{planModal.adminEmail}</p>
                 <p style={{ margin: '6px 0 0', fontSize: 12, color: '#818cf8' }}>
                   Current plan: <strong style={{ textTransform: 'capitalize' }}>{planModal.plan || 'basic'}</strong>
                 </p>
               </div>
 
               {/* Plan options */}
-              <p style={{ margin: '0 0 10px', fontSize: 12, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Select plan</p>
+              <p style={{ margin: '0 0 10px', fontSize: 12, fontWeight: 700, color: 'var(--sa-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Select plan</p>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 20 }}>
                 {[
                   { key: 'free',       label: 'Free',       color: '#6b7280' },
@@ -1411,18 +1412,18 @@ export default function SuperAdminDashboard() {
                     style={{
                       padding: '10px 12px', borderRadius: 10, cursor: 'pointer', textAlign: 'left',
                       border: planSelected === p.key ? `2px solid ${p.color}` : '1px solid #374151',
-                      background: planSelected === p.key ? `${p.color}18` : 'rgba(255,255,255,0.03)',
+                      background: planSelected === p.key ? `${p.color}18` : 'var(--sa-w03)',
                       transition: 'all 0.15s',
                     }}
                   >
-                    <p style={{ margin: '0 0 2px', fontWeight: 700, fontSize: 13, color: planSelected === p.key ? p.color : '#d1d5db' }}>{p.label}</p>
+                    <p style={{ margin: '0 0 2px', fontWeight: 700, fontSize: 13, color: planSelected === p.key ? p.color : 'var(--sa-text-2)' }}>{p.label}</p>
                     <p style={{ margin: 0, fontSize: 11, color: '#6b7280' }}>{p.desc}</p>
                   </button>
                 ))}
               </div>
 
               {planSelected !== planModal.plan && (
-                <p style={{ margin: '0 0 14px', fontSize: 12, color: '#9ca3af', lineHeight: 1.5 }}>
+                <p style={{ margin: '0 0 14px', fontSize: 12, color: 'var(--sa-muted)', lineHeight: 1.5 }}>
                   Takes effect immediately. Students the center already has keep working;
                   the plan only controls which type the admin can add.
                 </p>
@@ -1436,7 +1437,7 @@ export default function SuperAdminDashboard() {
                 <button
                   onClick={() => setPlanModal(null)}
                   disabled={planSaving}
-                  style={{ flex: 1, padding: '10px', borderRadius: 10, border: '1px solid #374151', background: 'transparent', color: '#9ca3af', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
+                  style={{ flex: 1, padding: '10px', borderRadius: 10, border: '1px solid #374151', background: 'transparent', color: 'var(--sa-muted)', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
                 >Cancel</button>
                 <button
                   disabled={planSaving || planSelected === planModal.plan}
@@ -1484,15 +1485,15 @@ export default function SuperAdminDashboard() {
             <div style={{ padding: 24 }}>
               {/* Center info */}
               <div style={{ background: 'rgba(167,139,250,0.08)', border: '1px solid rgba(167,139,250,0.2)', borderRadius: 10, padding: '12px 14px', marginBottom: 18 }}>
-                <p style={{ margin: '0 0 2px', fontWeight: 700, color: '#f1f5f9', fontSize: 14 }}>{allocModal.centerName}</p>
-                <p style={{ margin: 0, fontSize: 12, color: '#9ca3af' }}>{allocModal.adminEmail}</p>
+                <p style={{ margin: '0 0 2px', fontWeight: 700, color: 'var(--sa-text)', fontSize: 14 }}>{allocModal.centerName}</p>
+                <p style={{ margin: 0, fontSize: 12, color: 'var(--sa-muted)' }}>{allocModal.adminEmail}</p>
                 <p style={{ margin: '6px 0 0', fontSize: 12, color: '#a78bfa', fontWeight: 600 }}>
                   Current balance: <strong>{allocModal.balance.toLocaleString()}</strong> credits
                 </p>
               </div>
 
               {/* Preset amounts */}
-              <p style={{ margin: '0 0 8px', fontSize: 12, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Quick amounts</p>
+              <p style={{ margin: '0 0 8px', fontSize: 12, fontWeight: 700, color: 'var(--sa-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Quick amounts</p>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
                 {[100, 250, 500, 1000, 2000, 5000].map(n => (
                   <button
@@ -1501,14 +1502,14 @@ export default function SuperAdminDashboard() {
                     style={{
                       padding: '6px 14px', borderRadius: 8, fontWeight: 700, fontSize: 12, cursor: 'pointer',
                       border: allocAmount === String(n) ? '2px solid #7c3aed' : '1px solid #374151',
-                      background: allocAmount === String(n) ? 'rgba(124,58,237,0.2)' : 'rgba(255,255,255,0.04)',
-                      color: allocAmount === String(n) ? '#a78bfa' : '#9ca3af',
+                      background: allocAmount === String(n) ? 'rgba(124,58,237,0.2)' : 'var(--sa-w04)',
+                      color: allocAmount === String(n) ? '#a78bfa' : 'var(--sa-muted)',
                     }}
                   >{n.toLocaleString()}</button>
                 ))}
               </div>
 
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#9ca3af', marginBottom: 4, textTransform: 'uppercase' }}>Amount *</label>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--sa-muted)', marginBottom: 4, textTransform: 'uppercase' }}>Amount *</label>
               <input
                 type="number" min="1" max="100000"
                 value={allocAmount}
@@ -1517,7 +1518,7 @@ export default function SuperAdminDashboard() {
                 style={{ ...s.input, width: '100%', boxSizing: 'border-box', marginBottom: 12 }}
               />
 
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#9ca3af', marginBottom: 4, textTransform: 'uppercase' }}>Note (optional)</label>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--sa-muted)', marginBottom: 4, textTransform: 'uppercase' }}>Note (optional)</label>
               <input
                 value={allocNote}
                 onChange={e => setAllocNote(e.target.value)}
@@ -1533,7 +1534,7 @@ export default function SuperAdminDashboard() {
                 <button
                   onClick={() => setAllocModal(null)}
                   disabled={allocating}
-                  style={{ flex: 1, padding: '10px', borderRadius: 10, border: '1px solid #374151', background: 'transparent', color: '#9ca3af', fontWeight: 600, cursor: 'pointer' }}
+                  style={{ flex: 1, padding: '10px', borderRadius: 10, border: '1px solid #374151', background: 'transparent', color: 'var(--sa-muted)', fontWeight: 600, cursor: 'pointer' }}
                 >Cancel</button>
                 <button
                   disabled={allocating || !allocAmount}
@@ -1591,28 +1592,28 @@ export default function SuperAdminDashboard() {
 
             <div style={{ padding: 24 }}>
               <div style={{ background: 'rgba(249,115,22,0.08)', border: '1px solid rgba(249,115,22,0.2)', borderRadius: 10, padding: '12px 14px', marginBottom: 18 }}>
-                <p style={{ margin: '0 0 2px', fontWeight: 700, color: '#f1f5f9', fontSize: 14 }}>{pronAllocModal.centerName}</p>
-                <p style={{ margin: 0, fontSize: 12, color: '#9ca3af' }}>{pronAllocModal.adminEmail}</p>
+                <p style={{ margin: '0 0 2px', fontWeight: 700, color: 'var(--sa-text)', fontSize: 14 }}>{pronAllocModal.centerName}</p>
+                <p style={{ margin: 0, fontSize: 12, color: 'var(--sa-muted)' }}>{pronAllocModal.adminEmail}</p>
                 <p style={{ margin: '6px 0 0', fontSize: 12, color: '#fb923c', fontWeight: 600 }}>
                   Current balance: <strong>{pronAllocModal.balance.toLocaleString()}</strong> credits
                 </p>
               </div>
 
-              <p style={{ margin: '0 0 8px', fontSize: 12, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Quick amounts</p>
+              <p style={{ margin: '0 0 8px', fontSize: 12, fontWeight: 700, color: 'var(--sa-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Quick amounts</p>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
                 {[100, 250, 500, 1000, 2000, 5000].map(n => (
                   <button key={n} onClick={() => setPronAllocAmount(String(n))}
-                    style={{ padding: '6px 14px', borderRadius: 8, fontWeight: 700, fontSize: 12, cursor: 'pointer', border: pronAllocAmount === String(n) ? '2px solid #f97316' : '1px solid #374151', background: pronAllocAmount === String(n) ? 'rgba(249,115,22,0.2)' : 'rgba(255,255,255,0.04)', color: pronAllocAmount === String(n) ? '#fb923c' : '#9ca3af' }}>
+                    style={{ padding: '6px 14px', borderRadius: 8, fontWeight: 700, fontSize: 12, cursor: 'pointer', border: pronAllocAmount === String(n) ? '2px solid #f97316' : '1px solid #374151', background: pronAllocAmount === String(n) ? 'rgba(249,115,22,0.2)' : 'var(--sa-w04)', color: pronAllocAmount === String(n) ? '#fb923c' : 'var(--sa-muted)' }}>
                     {n.toLocaleString()}
                   </button>
                 ))}
               </div>
 
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#9ca3af', marginBottom: 4, textTransform: 'uppercase' }}>Amount *</label>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--sa-muted)', marginBottom: 4, textTransform: 'uppercase' }}>Amount *</label>
               <input type="number" min="1" max="100000" value={pronAllocAmount} onChange={e => setPronAllocAmount(e.target.value)}
                 placeholder="e.g. 500" style={{ ...s.input, width: '100%', boxSizing: 'border-box', marginBottom: 12 }} />
 
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#9ca3af', marginBottom: 4, textTransform: 'uppercase' }}>Note (optional)</label>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--sa-muted)', marginBottom: 4, textTransform: 'uppercase' }}>Note (optional)</label>
               <input value={pronAllocNote} onChange={e => setPronAllocNote(e.target.value)} placeholder="e.g. Monthly allocation"
                 style={{ ...s.input, width: '100%', boxSizing: 'border-box', marginBottom: 18 }} />
 
@@ -1622,7 +1623,7 @@ export default function SuperAdminDashboard() {
 
               <div style={{ display: 'flex', gap: 10 }}>
                 <button onClick={() => setPronAllocModal(null)} disabled={pronAllocating}
-                  style={{ flex: 1, padding: '10px', borderRadius: 10, border: '1px solid #374151', background: 'transparent', color: '#9ca3af', fontWeight: 600, cursor: 'pointer' }}>
+                  style={{ flex: 1, padding: '10px', borderRadius: 10, border: '1px solid #374151', background: 'transparent', color: 'var(--sa-muted)', fontWeight: 600, cursor: 'pointer' }}>
                   Cancel
                 </button>
                 <button disabled={pronAllocating || !pronAllocAmount}
@@ -1673,14 +1674,14 @@ export default function SuperAdminDashboard() {
             </div>
             <div style={{ padding: 24 }}>
               <div style={{ background: 'rgba(251,146,60,0.08)', border: '1px solid rgba(251,146,60,0.2)', borderRadius: 10, padding: '12px 14px', marginBottom: 20 }}>
-                <p style={{ margin: '0 0 2px', fontWeight: 700, color: '#f1f5f9', fontSize: 14 }}>{limitsModal.centerName}</p>
-                <p style={{ margin: 0, fontSize: 12, color: '#9ca3af' }}>Current: {limitsModal.maxTeachers === -1 ? '∞' : limitsModal.maxTeachers} teachers / {limitsModal.maxStudents === -1 ? '∞' : limitsModal.maxStudents} students</p>
+                <p style={{ margin: '0 0 2px', fontWeight: 700, color: 'var(--sa-text)', fontSize: 14 }}>{limitsModal.centerName}</p>
+                <p style={{ margin: 0, fontSize: 12, color: 'var(--sa-muted)' }}>Current: {limitsModal.maxTeachers === -1 ? '∞' : limitsModal.maxTeachers} teachers / {limitsModal.maxStudents === -1 ? '∞' : limitsModal.maxStudents} students</p>
               </div>
 
               {/* Max Teachers */}
               <div style={{ marginBottom: 16 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                  <label style={{ fontSize: 12, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase' }}>Max Teachers</label>
+                  <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--sa-muted)', textTransform: 'uppercase' }}>Max Teachers</label>
                   <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12, color: limitsUnlimT ? '#fb923c' : '#6b7280' }}>
                     <input type="checkbox" checked={limitsUnlimT} onChange={e => setLimitsUnlimT(e.target.checked)} />
                     Unlimited
@@ -1698,7 +1699,7 @@ export default function SuperAdminDashboard() {
               {/* Max Students */}
               <div style={{ marginBottom: 20 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                  <label style={{ fontSize: 12, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase' }}>Max Students</label>
+                  <label style={{ fontSize: 12, fontWeight: 700, color: 'var(--sa-muted)', textTransform: 'uppercase' }}>Max Students</label>
                   <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12, color: limitsUnlimS ? '#fb923c' : '#6b7280' }}>
                     <input type="checkbox" checked={limitsUnlimS} onChange={e => setLimitsUnlimS(e.target.checked)} />
                     Unlimited
@@ -1718,7 +1719,7 @@ export default function SuperAdminDashboard() {
               )}
 
               <div style={{ display: 'flex', gap: 10 }}>
-                <button onClick={() => setLimitsModal(null)} disabled={limitsSaving} style={{ flex: 1, padding: '10px', borderRadius: 10, border: '1px solid #374151', background: 'transparent', color: '#9ca3af', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Cancel</button>
+                <button onClick={() => setLimitsModal(null)} disabled={limitsSaving} style={{ flex: 1, padding: '10px', borderRadius: 10, border: '1px solid #374151', background: 'transparent', color: 'var(--sa-muted)', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Cancel</button>
                 <button
                   disabled={limitsSaving}
                   onClick={async () => {
@@ -1762,10 +1763,10 @@ export default function SuperAdminDashboard() {
             </div>
             <div style={{ padding: 24 }}>
               <div style={{ background: 'rgba(167,139,250,0.08)', border: '1px solid rgba(167,139,250,0.2)', borderRadius: 10, padding: '12px 14px', marginBottom: 20 }}>
-                <p style={{ margin: '0 0 2px', fontWeight: 700, color: '#f1f5f9', fontSize: 14 }}>{partnershipModal.centerName}</p>
-                <p style={{ margin: 0, fontSize: 12, color: '#9ca3af' }}>Shown in sidebar and landing page footer</p>
+                <p style={{ margin: '0 0 2px', fontWeight: 700, color: 'var(--sa-text)', fontSize: 14 }}>{partnershipModal.centerName}</p>
+                <p style={{ margin: 0, fontSize: 12, color: 'var(--sa-muted)' }}>Shown in sidebar and landing page footer</p>
               </div>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', marginBottom: 8 }}>Partnership Text</label>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--sa-muted)', textTransform: 'uppercase', marginBottom: 8 }}>Partnership Text</label>
               <input
                 type="text"
                 placeholder='e.g. In partnership with Ego'
@@ -1781,7 +1782,7 @@ export default function SuperAdminDashboard() {
               )}
 
               <div style={{ display: 'flex', gap: 10 }}>
-                <button onClick={() => setPartnershipModal(null)} disabled={partnershipSaving} style={{ flex: 1, padding: '10px', borderRadius: 10, border: '1px solid #374151', background: 'transparent', color: '#9ca3af', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Cancel</button>
+                <button onClick={() => setPartnershipModal(null)} disabled={partnershipSaving} style={{ flex: 1, padding: '10px', borderRadius: 10, border: '1px solid #374151', background: 'transparent', color: 'var(--sa-muted)', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Cancel</button>
                 <button
                   disabled={partnershipSaving}
                   onClick={async () => {
@@ -1961,12 +1962,12 @@ export default function SuperAdminDashboard() {
             <div style={{ padding: '24px' }}>
               {/* Center info */}
               <div style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)', borderRadius: '10px', padding: '14px 16px', marginBottom: '18px' }}>
-                <p style={{ margin: '0 0 4px', fontWeight: '700', color: '#f1f5f9', fontSize: '15px' }}>{deleteTarget.centerName}</p>
+                <p style={{ margin: '0 0 4px', fontWeight: '700', color: 'var(--sa-text)', fontSize: '15px' }}>{deleteTarget.centerName}</p>
                 <p style={{ margin: 0, fontSize: '12px', color: '#6b7280' }}>{deleteTarget.adminEmail}</p>
               </div>
 
-              <p style={{ margin: '0 0 12px', fontSize: '14px', color: '#9ca3af', lineHeight: '1.6' }}>
-                This center will <strong style={{ color: '#f1f5f9' }}>not be deleted immediately</strong>. Here's what will happen:
+              <p style={{ margin: '0 0 12px', fontSize: '14px', color: 'var(--sa-muted)', lineHeight: '1.6' }}>
+                This center will <strong style={{ color: 'var(--sa-text)' }}>not be deleted immediately</strong>. Here's what will happen:
               </p>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '20px' }}>
@@ -1976,7 +1977,7 @@ export default function SuperAdminDashboard() {
                   { icon: '🔄', text: 'You can restore it at any time before the deadline.' },
                   { icon: '🗑️', text: 'After 7 days, the center becomes permanently removed.' },
                 ].map(({ icon, text }) => (
-                  <div key={text} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', fontSize: '13px', color: '#9ca3af' }}>
+                  <div key={text} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', fontSize: '13px', color: 'var(--sa-muted)' }}>
                     <span style={{ fontSize: '15px', flexShrink: 0 }}>{icon}</span>
                     <span style={{ lineHeight: '1.5' }}>{text}</span>
                   </div>
@@ -2076,14 +2077,14 @@ export default function SuperAdminDashboard() {
                     <div key={key} style={{
                       display: 'flex', alignItems: 'center', gap: '14px',
                       padding: '14px 16px', borderRadius: '12px',
-                      background: enabled ? `${color}0c` : 'rgba(255,255,255,0.02)',
-                      border: `1px solid ${enabled ? `${color}30` : 'rgba(255,255,255,0.07)'}`,
+                      background: enabled ? `${color}0c` : 'var(--sa-w02)',
+                      border: `1px solid ${enabled ? `${color}30` : 'var(--sa-w07)'}`,
                       transition: 'all 0.2s',
                     }}>
                       {/* Icon */}
                       <div style={{
                         width: '38px', height: '38px', borderRadius: '10px', flexShrink: 0,
-                        background: enabled ? `${color}18` : 'rgba(255,255,255,0.05)',
+                        background: enabled ? `${color}18` : 'var(--sa-w05)',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                       }}>
                         <Icon size={17} color={enabled ? color : '#4b5563'} />
@@ -2091,7 +2092,7 @@ export default function SuperAdminDashboard() {
 
                       {/* Label + description */}
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <p style={{ margin: '0 0 2px', fontSize: '14px', fontWeight: '700', color: enabled ? '#f1f5f9' : '#6b7280' }}>
+                        <p style={{ margin: '0 0 2px', fontSize: '14px', fontWeight: '700', color: enabled ? 'var(--sa-text)' : '#6b7280' }}>
                           {label}
                         </p>
                         <p style={{ margin: 0, fontSize: '11.5px', color: '#6b7280', lineHeight: '1.4' }}>
@@ -2160,10 +2161,10 @@ export default function SuperAdminDashboard() {
                       borderRadius: '14px',
                       border: isActive
                         ? `2px solid ${theme.primaryColor}`
-                        : '2px solid rgba(255,255,255,0.08)',
+                        : '2px solid var(--sa-w08)',
                       background: isActive
                         ? `${theme.primaryColor}14`
-                        : 'rgba(255,255,255,0.03)',
+                        : 'var(--sa-w03)',
                       overflow: 'hidden',
                       transition: 'border-color 0.15s, background 0.15s',
                     }}>
@@ -2194,7 +2195,7 @@ export default function SuperAdminDashboard() {
                             fontSize: '9px', fontWeight: '700',
                             padding: '4px 9px',
                             borderRadius: theme.borderRadius,
-                            background: 'rgba(255,255,255,0.22)',
+                            background: 'var(--sa-w22)',
                             color: 'white',
                             fontFamily: `'${theme.fontFamily}', sans-serif`,
                           }}>Button</div>
@@ -2210,7 +2211,7 @@ export default function SuperAdminDashboard() {
                       {/* Info section */}
                       <div style={{ padding: '12px 12px 6px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-                          <span style={{ fontSize: '13px', fontWeight: '700', color: '#f1f5f9' }}>{theme.name}</span>
+                          <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--sa-text)' }}>{theme.name}</span>
                           {isActive && <CheckCircle size={14} color={theme.primaryColor} />}
                         </div>
                         <p style={{ margin: '0 0 8px', fontSize: '11px', color: '#6b7280', lineHeight: '1.4' }}>
@@ -2220,7 +2221,7 @@ export default function SuperAdminDashboard() {
                           {[shapeLabel, theme.spacing, theme.shadowStyle === 'none' ? 'flat' : `${theme.shadowStyle} shadow`].map(tag => (
                             <span key={tag} style={{
                               fontSize: '9px', padding: '2px 6px', borderRadius: '20px',
-                              background: 'rgba(255,255,255,0.06)', color: '#6b7280', fontWeight: '600',
+                              background: 'var(--sa-w06)', color: '#6b7280', fontWeight: '600',
                             }}>{tag}</span>
                           ))}
                         </div>
@@ -2236,7 +2237,7 @@ export default function SuperAdminDashboard() {
                             background: isActive
                               ? `${theme.primaryColor}20`
                               : isApplying
-                                ? 'rgba(255,255,255,0.05)'
+                                ? 'var(--sa-w05)'
                                 : theme.primaryColor,
                             color: isActive ? theme.primaryColor : 'white',
                             fontSize: '12px', fontWeight: '700',
@@ -2271,7 +2272,7 @@ export default function SuperAdminDashboard() {
             </div>
 
             {/* Student / Teacher / Admin tab selector */}
-            <div style={{ display: 'flex', gap: '4px', padding: '16px 24px 0', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+            <div style={{ display: 'flex', gap: '4px', padding: '16px 24px 0', borderBottom: '1px solid var(--sa-w06)' }}>
               {[
                 { key: 'student',  label: '🎓 Student Dashboards'   },
                 { key: 'teacher',  label: '👩‍🏫 Teacher Dashboards'  },
@@ -2337,8 +2338,8 @@ export default function SuperAdminDashboard() {
                   return (
                     <div key={theme.id} style={{
                       borderRadius: '16px',
-                      border: isActive ? `2px solid ${theme.preview.accent}` : isLocked ? '2px solid rgba(255,255,255,0.04)' : '2px solid rgba(255,255,255,0.08)',
-                      background: isActive ? `${theme.preview.accent}15` : isLocked ? 'rgba(255,255,255,0.01)' : 'rgba(255,255,255,0.03)',
+                      border: isActive ? `2px solid ${theme.preview.accent}` : isLocked ? '2px solid var(--sa-w04)' : '2px solid var(--sa-w08)',
+                      background: isActive ? `${theme.preview.accent}15` : isLocked ? 'var(--sa-w01)' : 'var(--sa-w03)',
                       overflow: 'hidden',
                       opacity: isLocked ? 0.5 : 1,
                       transition: 'border-color .15s, background .15s',
@@ -2369,7 +2370,7 @@ export default function SuperAdminDashboard() {
                       {/* Info */}
                       <div style={{ padding: '10px 12px 6px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '3px' }}>
-                          <span style={{ fontSize: '13px', fontWeight: '700', color: '#f1f5f9' }}>{theme.name}</span>
+                          <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--sa-text)' }}>{theme.name}</span>
                           {isActive && <CheckCircle size={14} color={theme.preview.accent} />}
                         </div>
                         <p style={{ margin: '0 0 5px', fontSize: '10px', color: '#6b7280', lineHeight: '1.4' }}>
@@ -2389,7 +2390,7 @@ export default function SuperAdminDashboard() {
                           disabled={isAssigning || isActive || isLocked}
                           style={{
                             width: '100%', padding: '7px 0', borderRadius: '8px', border: 'none',
-                            background: isActive ? `${theme.preview.accent}22` : isLocked ? 'rgba(255,255,255,0.04)' : theme.preview.accent,
+                            background: isActive ? `${theme.preview.accent}22` : isLocked ? 'var(--sa-w04)' : theme.preview.accent,
                             color: isActive ? theme.preview.accent : isLocked ? '#4b5563' : 'white',
                             fontSize: '12px', fontWeight: '700',
                             cursor: isAssigning || isActive || isLocked ? 'default' : 'pointer',
@@ -2415,8 +2416,8 @@ export default function SuperAdminDashboard() {
                   return (
                     <div key={theme.id} style={{
                       borderRadius: '16px',
-                      border: isActive ? `2px solid ${theme.preview.accent}` : isLocked ? '2px solid rgba(255,255,255,0.04)' : '2px solid rgba(255,255,255,0.08)',
-                      background: isActive ? `${theme.preview.accent}15` : isLocked ? 'rgba(255,255,255,0.01)' : 'rgba(255,255,255,0.03)',
+                      border: isActive ? `2px solid ${theme.preview.accent}` : isLocked ? '2px solid var(--sa-w04)' : '2px solid var(--sa-w08)',
+                      background: isActive ? `${theme.preview.accent}15` : isLocked ? 'var(--sa-w01)' : 'var(--sa-w03)',
                       overflow: 'hidden',
                       opacity: isLocked ? 0.5 : 1,
                       transition: 'border-color .15s, background .15s',
@@ -2440,7 +2441,7 @@ export default function SuperAdminDashboard() {
                       </div>
                       <div style={{ padding: '10px 12px 6px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '3px' }}>
-                          <span style={{ fontSize: '13px', fontWeight: '700', color: '#f1f5f9' }}>{theme.name}</span>
+                          <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--sa-text)' }}>{theme.name}</span>
                           {isActive && <CheckCircle size={14} color={theme.preview.accent} />}
                         </div>
                         <p style={{ margin: '0 0 5px', fontSize: '10px', color: '#6b7280', lineHeight: '1.4' }}>{theme.description}</p>
@@ -2454,7 +2455,7 @@ export default function SuperAdminDashboard() {
                           disabled={isAssigning || isActive || isLocked}
                           style={{
                             width: '100%', padding: '7px 0', borderRadius: '8px', border: 'none',
-                            background: isActive ? `${theme.preview.accent}22` : isLocked ? 'rgba(255,255,255,0.04)' : theme.preview.accent,
+                            background: isActive ? `${theme.preview.accent}22` : isLocked ? 'var(--sa-w04)' : theme.preview.accent,
                             color: isActive ? theme.preview.accent : isLocked ? '#4b5563' : 'white',
                             fontSize: '12px', fontWeight: '700',
                             cursor: isAssigning || isActive || isLocked ? 'default' : 'pointer',
@@ -2471,7 +2472,7 @@ export default function SuperAdminDashboard() {
 
               {/* Unassign row */}
               {dashThemeTab === 'student' && dashThemeModal.branding?.dashboardTheme && (
-                <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid var(--sa-w06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <span style={{ fontSize: '13px', color: '#6b7280' }}>
                     Remove student dashboard theme → falls back to default (Sunshine Explorer)
                   </span>
@@ -2485,7 +2486,7 @@ export default function SuperAdminDashboard() {
                 </div>
               )}
               {dashThemeTab === 'teacher' && dashThemeModal.branding?.teacherDashboardTheme && (
-                <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid var(--sa-w06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <span style={{ fontSize: '13px', color: '#6b7280' }}>
                     Remove teacher dashboard theme → falls back to default (Sunshine Explorer)
                   </span>
@@ -2509,8 +2510,8 @@ export default function SuperAdminDashboard() {
                   return (
                     <div key={theme.id} style={{
                       borderRadius: '16px',
-                      border: isActive ? `2px solid ${theme.preview.accent}` : isLocked ? '2px solid rgba(255,255,255,0.04)' : '2px solid rgba(255,255,255,0.08)',
-                      background: isActive ? `${theme.preview.accent}15` : isLocked ? 'rgba(255,255,255,0.01)' : 'rgba(255,255,255,0.03)',
+                      border: isActive ? `2px solid ${theme.preview.accent}` : isLocked ? '2px solid var(--sa-w04)' : '2px solid var(--sa-w08)',
+                      background: isActive ? `${theme.preview.accent}15` : isLocked ? 'var(--sa-w01)' : 'var(--sa-w03)',
                       overflow: 'hidden',
                       opacity: isLocked ? 0.5 : 1,
                       transition: 'border-color .15s, background .15s',
@@ -2534,7 +2535,7 @@ export default function SuperAdminDashboard() {
                       </div>
                       <div style={{ padding: '10px 12px 6px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '3px' }}>
-                          <span style={{ fontSize: '13px', fontWeight: '700', color: '#f1f5f9' }}>{theme.name}</span>
+                          <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--sa-text)' }}>{theme.name}</span>
                           {isActive && <CheckCircle size={14} color={theme.preview.accent} />}
                         </div>
                         <p style={{ margin: '0 0 5px', fontSize: '10px', color: '#6b7280', lineHeight: '1.4' }}>{theme.description}</p>
@@ -2548,7 +2549,7 @@ export default function SuperAdminDashboard() {
                           disabled={isAssigning || isActive || isLocked}
                           style={{
                             width: '100%', padding: '7px 0', borderRadius: '8px', border: 'none',
-                            background: isActive ? `${theme.preview.accent}22` : isLocked ? 'rgba(255,255,255,0.04)' : theme.preview.accent,
+                            background: isActive ? `${theme.preview.accent}22` : isLocked ? 'var(--sa-w04)' : theme.preview.accent,
                             color: isActive ? theme.preview.accent : isLocked ? '#4b5563' : 'white',
                             fontSize: '12px', fontWeight: '700',
                             cursor: isAssigning || isActive || isLocked ? 'default' : 'pointer',
@@ -2564,7 +2565,7 @@ export default function SuperAdminDashboard() {
               </div>}
 
               {dashThemeTab === 'admin' && dashThemeModal.branding?.adminDashboardTheme && (
-                <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid var(--sa-w06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <span style={{ fontSize: '13px', color: '#6b7280' }}>
                     Remove admin dashboard theme → falls back to default (Sunshine Explorer)
                   </span>
@@ -2589,8 +2590,8 @@ export default function SuperAdminDashboard() {
                   return (
                     <div key={theme.id} style={{
                       borderRadius: '16px',
-                      border: isActive ? `2px solid ${theme.preview.accent}` : isLocked ? '2px solid rgba(255,255,255,0.04)' : '2px solid rgba(255,255,255,0.08)',
-                      background: isActive ? `${theme.preview.accent}15` : isLocked ? 'rgba(255,255,255,0.01)' : 'rgba(255,255,255,0.03)',
+                      border: isActive ? `2px solid ${theme.preview.accent}` : isLocked ? '2px solid var(--sa-w04)' : '2px solid var(--sa-w08)',
+                      background: isActive ? `${theme.preview.accent}15` : isLocked ? 'var(--sa-w01)' : 'var(--sa-w03)',
                       overflow: 'hidden',
                       opacity: isLocked ? 0.5 : 1,
                       transition: 'border-color .15s, background .15s',
@@ -2614,7 +2615,7 @@ export default function SuperAdminDashboard() {
                       </div>
                       <div style={{ padding: '10px 12px 6px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '3px' }}>
-                          <span style={{ fontSize: '13px', fontWeight: '700', color: '#f1f5f9' }}>{theme.name}</span>
+                          <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--sa-text)' }}>{theme.name}</span>
                           {isActive && <CheckCircle size={14} color={theme.preview.accent} />}
                         </div>
                         <p style={{ margin: '0 0 5px', fontSize: '10px', color: '#6b7280', lineHeight: '1.4' }}>{theme.description}</p>
@@ -2628,7 +2629,7 @@ export default function SuperAdminDashboard() {
                           disabled={isAssigning || isActive || isLocked}
                           style={{
                             width: '100%', padding: '7px 0', borderRadius: '8px', border: 'none',
-                            background: isActive ? `${theme.preview.accent}22` : isLocked ? 'rgba(255,255,255,0.04)' : theme.preview.accent,
+                            background: isActive ? `${theme.preview.accent}22` : isLocked ? 'var(--sa-w04)' : theme.preview.accent,
                             color: isActive ? theme.preview.accent : isLocked ? '#4b5563' : 'white',
                             fontSize: '12px', fontWeight: '700',
                             cursor: isAssigning || isActive || isLocked ? 'default' : 'pointer',
@@ -2644,7 +2645,7 @@ export default function SuperAdminDashboard() {
               </div>}
 
               {dashThemeTab === 'subadmin' && dashThemeModal.branding?.subAdminDashboardTheme && (
-                <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid var(--sa-w06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <span style={{ fontSize: '13px', color: '#6b7280' }}>
                     Remove sub-admin dashboard theme → falls back to default (Sunshine Explorer)
                   </span>
@@ -2699,8 +2700,8 @@ export default function SuperAdminDashboard() {
                   return (
                     <div key={theme.id} style={{
                       borderRadius: '14px',
-                      border: isActive ? '2px solid #8b5cf6' : isLocked ? '2px solid rgba(255,255,255,0.04)' : '2px solid rgba(255,255,255,0.08)',
-                      background: isActive ? 'rgba(139,92,246,0.12)' : isLocked ? 'rgba(255,255,255,0.01)' : 'rgba(255,255,255,0.03)',
+                      border: isActive ? '2px solid #8b5cf6' : isLocked ? '2px solid var(--sa-w04)' : '2px solid var(--sa-w08)',
+                      background: isActive ? 'rgba(139,92,246,0.12)' : isLocked ? 'var(--sa-w01)' : 'var(--sa-w03)',
                       overflow: 'hidden',
                       opacity: isLocked ? 0.5 : 1,
                       transition: 'border-color .15s, background .15s, opacity .15s',
@@ -2723,7 +2724,7 @@ export default function SuperAdminDashboard() {
                       {/* Info */}
                       <div style={{ padding: '10px 12px 6px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '3px' }}>
-                          <span style={{ fontSize: '13px', fontWeight: '700', color: '#f1f5f9' }}>{theme.name}</span>
+                          <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--sa-text)' }}>{theme.name}</span>
                           {isActive && <CheckCircle size={14} color="#8b5cf6" />}
                         </div>
                         <p style={{ margin: '0 0 6px', fontSize: '10px', color: '#6b7280', lineHeight: '1.4' }}>
@@ -2743,7 +2744,7 @@ export default function SuperAdminDashboard() {
                           disabled={isAssigning || isActive || isLocked}
                           style={{
                             width: '100%', padding: '7px 0', borderRadius: '8px', border: 'none',
-                            background: isActive ? 'rgba(139,92,246,0.2)' : isLocked ? 'rgba(255,255,255,0.04)' : '#8b5cf6',
+                            background: isActive ? 'rgba(139,92,246,0.2)' : isLocked ? 'var(--sa-w04)' : '#8b5cf6',
                             color: isActive ? '#8b5cf6' : isLocked ? '#4b5563' : 'white',
                             fontSize: '12px', fontWeight: '700',
                             cursor: isAssigning || isActive || isLocked ? 'default' : 'pointer',
@@ -2761,7 +2762,7 @@ export default function SuperAdminDashboard() {
 
               {/* Unassign row */}
               {loginThemeModal.branding?.loginTheme && (
-                <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid var(--sa-w06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <span style={{ fontSize: '13px', color: '#6b7280' }}>
                     Remove login theme from this center → falls back to default (Space Explorer)
                   </span>
@@ -2818,8 +2819,8 @@ export default function SuperAdminDashboard() {
                   return (
                     <div style={{
                       borderRadius: '16px',
-                      border: isActive ? '2px solid #6366f1' : '2px solid rgba(255,255,255,0.08)',
-                      background: isActive ? 'rgba(99,102,241,0.1)' : 'rgba(255,255,255,0.03)',
+                      border: isActive ? '2px solid #6366f1' : '2px solid var(--sa-w08)',
+                      background: isActive ? 'rgba(99,102,241,0.1)' : 'var(--sa-w03)',
                       overflow: 'hidden',
                       transition: 'border-color .15s, background .15s',
                     }}>
@@ -2832,14 +2833,14 @@ export default function SuperAdminDashboard() {
                         <span style={{ fontSize: '36px' }}>🖥️</span>
                         {/* Mini panel preview */}
                         <div style={{ display: 'flex', gap: 4 }}>
-                          {['#1f2937','#1f2937'].map((bg,i) => (
+                          {['var(--sa-modal)','var(--sa-modal)'].map((bg,i) => (
                             <div key={i} style={{ width: 44, height: 28, borderRadius: 6, background: bg, border: '1px solid rgba(52,211,153,0.4)' }} />
                           ))}
                         </div>
                       </div>
                       <div style={{ padding: '10px 14px 6px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '3px' }}>
-                          <span style={{ fontSize: '13px', fontWeight: '700', color: '#f1f5f9' }}>Default</span>
+                          <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--sa-text)' }}>Default</span>
                           {isActive && <CheckCircle size={14} color="#6366f1" />}
                         </div>
                         <p style={{ margin: '0 0 8px', fontSize: '10px', color: '#6b7280', lineHeight: '1.4' }}>
@@ -2901,8 +2902,8 @@ export default function SuperAdminDashboard() {
                   return (
                     <div key={theme.id} style={{
                       borderRadius: '16px',
-                      border: isActive ? `2px solid ${theme.preview.bgStart}` : '2px solid rgba(255,255,255,0.08)',
-                      background: isActive ? `${theme.preview.bgStart}18` : 'rgba(255,255,255,0.03)',
+                      border: isActive ? `2px solid ${theme.preview.bgStart}` : '2px solid var(--sa-w08)',
+                      background: isActive ? `${theme.preview.bgStart}18` : 'var(--sa-w03)',
                       overflow: 'hidden',
                       transition: 'border-color .15s, background .15s',
                     }}>
@@ -2920,7 +2921,7 @@ export default function SuperAdminDashboard() {
                       {/* Info */}
                       <div style={{ padding: '10px 14px 6px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '3px' }}>
-                          <span style={{ fontSize: '13px', fontWeight: '700', color: '#f1f5f9' }}>{theme.emoji} {theme.name}</span>
+                          <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--sa-text)' }}>{theme.emoji} {theme.name}</span>
                           {isActive && <CheckCircle size={14} color={theme.preview.bgStart} />}
                         </div>
                         <p style={{ margin: '0 0 8px', fontSize: '10px', color: '#6b7280', lineHeight: '1.4' }}>
@@ -2954,7 +2955,7 @@ export default function SuperAdminDashboard() {
 
               {/* Unassign row — shown when a named theme is active */}
               {classroomThemeModal.branding?.classroomTheme && (
-                <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid var(--sa-w06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <span style={{ fontSize: '13px', color: '#6b7280' }}>
                     Remove theme → falls back to the dark default design
                   </span>
@@ -3009,8 +3010,8 @@ export default function SuperAdminDashboard() {
                   return (
                     <div key={theme.id} style={{
                       borderRadius: '14px',
-                      border: isActive ? '2px solid #f59e0b' : isLocked ? '2px solid rgba(255,255,255,0.04)' : '2px solid rgba(255,255,255,0.08)',
-                      background: isActive ? 'rgba(245,158,11,0.12)' : isLocked ? 'rgba(255,255,255,0.01)' : 'rgba(255,255,255,0.03)',
+                      border: isActive ? '2px solid #f59e0b' : isLocked ? '2px solid var(--sa-w04)' : '2px solid var(--sa-w08)',
+                      background: isActive ? 'rgba(245,158,11,0.12)' : isLocked ? 'var(--sa-w01)' : 'var(--sa-w03)',
                       overflow: 'hidden',
                       opacity: isLocked ? 0.5 : 1,
                       transition: 'border-color .15s, background .15s, opacity .15s',
@@ -3031,7 +3032,7 @@ export default function SuperAdminDashboard() {
 
                       <div style={{ padding: '10px 12px 6px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '3px' }}>
-                          <span style={{ fontSize: '13px', fontWeight: '700', color: '#f1f5f9' }}>{theme.name}</span>
+                          <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--sa-text)' }}>{theme.name}</span>
                           {isActive && <CheckCircle size={14} color="#f59e0b" />}
                         </div>
                         <p style={{ margin: '0 0 6px', fontSize: '10px', color: '#6b7280', lineHeight: '1.4' }}>
@@ -3050,7 +3051,7 @@ export default function SuperAdminDashboard() {
                           disabled={isAssigning || isActive || isLocked}
                           style={{
                             width: '100%', padding: '7px 0', borderRadius: '8px', border: 'none',
-                            background: isActive ? 'rgba(245,158,11,0.2)' : isLocked ? 'rgba(255,255,255,0.04)' : '#f59e0b',
+                            background: isActive ? 'rgba(245,158,11,0.2)' : isLocked ? 'var(--sa-w04)' : '#f59e0b',
                             color: isActive ? '#f59e0b' : isLocked ? '#4b5563' : '#0c0a00',
                             fontSize: '12px', fontWeight: '700',
                             cursor: isAssigning || isActive || isLocked ? 'default' : 'pointer',
@@ -3067,7 +3068,7 @@ export default function SuperAdminDashboard() {
               </div>
 
               {teacherThemeModal.branding?.teacherLoginTheme && (
-                <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid var(--sa-w06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <span style={{ fontSize: '13px', color: '#6b7280' }}>
                     Remove teacher login theme from this center → falls back to default
                   </span>
@@ -3122,8 +3123,8 @@ export default function SuperAdminDashboard() {
                   return (
                     <div key={theme.id} style={{
                       borderRadius: '14px',
-                      border: isActive ? '2px solid #22d3ee' : isLocked ? '2px solid rgba(255,255,255,0.04)' : '2px solid rgba(255,255,255,0.08)',
-                      background: isActive ? 'rgba(34,211,238,0.08)' : isLocked ? 'rgba(255,255,255,0.01)' : 'rgba(255,255,255,0.03)',
+                      border: isActive ? '2px solid #22d3ee' : isLocked ? '2px solid var(--sa-w04)' : '2px solid var(--sa-w08)',
+                      background: isActive ? 'rgba(34,211,238,0.08)' : isLocked ? 'var(--sa-w01)' : 'var(--sa-w03)',
                       overflow: 'hidden',
                       opacity: isLocked ? 0.5 : 1,
                       transition: 'border-color .15s, background .15s',
@@ -3134,7 +3135,7 @@ export default function SuperAdminDashboard() {
                       </div>
                       <div style={{ padding: '10px 12px 6px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '3px' }}>
-                          <span style={{ fontSize: '13px', fontWeight: '700', color: '#f1f5f9' }}>{theme.name}</span>
+                          <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--sa-text)' }}>{theme.name}</span>
                           {isActive && <CheckCircle size={14} color="#22d3ee" />}
                         </div>
                         <p style={{ margin: '0 0 6px', fontSize: '10px', color: '#6b7280', lineHeight: '1.4' }}>{theme.description}</p>
@@ -3144,7 +3145,7 @@ export default function SuperAdminDashboard() {
                         <button
                           onClick={() => !isAssigning && !isActive && !isLocked && handleAssignAdminLoginTheme(theme.id)}
                           disabled={isAssigning || isActive || isLocked}
-                          style={{ width: '100%', padding: '7px 0', borderRadius: '8px', border: 'none', background: isActive ? 'rgba(34,211,238,0.15)' : isLocked ? 'rgba(255,255,255,0.04)' : '#22d3ee', color: isActive ? '#22d3ee' : isLocked ? '#4b5563' : '#060a14', fontSize: '12px', fontWeight: '700', cursor: isAssigning || isActive || isLocked ? 'default' : 'pointer', fontFamily: 'inherit', opacity: isAssigning ? 0.6 : 1 }}
+                          style={{ width: '100%', padding: '7px 0', borderRadius: '8px', border: 'none', background: isActive ? 'rgba(34,211,238,0.15)' : isLocked ? 'var(--sa-w04)' : '#22d3ee', color: isActive ? '#22d3ee' : isLocked ? '#4b5563' : '#060a14', fontSize: '12px', fontWeight: '700', cursor: isAssigning || isActive || isLocked ? 'default' : 'pointer', fontFamily: 'inherit', opacity: isAssigning ? 0.6 : 1 }}
                         >
                           {isAssigning ? 'Assigning…' : isActive ? '✓ Active' : isLocked ? 'Taken' : 'Assign'}
                         </button>
@@ -3155,7 +3156,7 @@ export default function SuperAdminDashboard() {
               </div>
 
               {adminLoginThemeModal.branding?.adminLoginTheme && (
-                <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid var(--sa-w06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <span style={{ fontSize: '13px', color: '#6b7280' }}>Remove custom theme → falls back to Executive Command (default)</span>
                   <button onClick={handleUnassignAdminLoginTheme} disabled={assigningAdminLoginTheme === '__unassign__'}
                     style={{ padding: '7px 16px', borderRadius: '8px', border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.08)', color: '#ef4444', fontSize: '12px', fontWeight: '700', cursor: 'pointer', fontFamily: 'inherit' }}>
@@ -3460,8 +3461,8 @@ export default function SuperAdminDashboard() {
             {step === 'done' && (
               <div style={{ padding: '28px', display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'center', textAlign: 'center' }}>
                 <CheckCircle size={40} color="#34d399" />
-                <p style={{ margin: 0, fontSize: '17px', fontWeight: '700', color: '#f1f5f9' }}>Center Created!</p>
-                <p style={{ margin: 0, fontSize: '14px', color: '#9ca3af', maxWidth: '360px', lineHeight: '1.6' }}>{successMsg}</p>
+                <p style={{ margin: 0, fontSize: '17px', fontWeight: '700', color: 'var(--sa-text)' }}>Center Created!</p>
+                <p style={{ margin: 0, fontSize: '14px', color: 'var(--sa-muted)', maxWidth: '360px', lineHeight: '1.6' }}>{successMsg}</p>
                 <button onClick={closeModal} style={{ ...s.submitBtn, marginTop: '8px' }}>Done</button>
               </div>
             )}
