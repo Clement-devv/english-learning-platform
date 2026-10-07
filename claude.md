@@ -31,6 +31,8 @@ router.get('/teachers', tenantMiddleware, verifyToken, verifyAdmin, handler);
 - `/api/super-admin/*` — super admin operates across all centers
 - `/api/register-center` — no center exists yet
 - `/api/v1/public/*` — public endpoints resolved internally
+- `/api/v1/center-invite/*` — new center's admin accepting the super admin's invite (center not live yet)
+- `/api/v1/library/file/:token` — teaching-library download link; the signed token (5 min) carries the center + file. All other `/library` routes DO use tenantMiddleware.
 - `/api/health/*` — health checks
 
 ### 4. JWT Tokens
@@ -39,8 +41,10 @@ router.get('/teachers', tenantMiddleware, verifyToken, verifyAdmin, handler);
 
 ### 5. Center Registration
 - New centers always start with `status: 'pending'`
-- Center DB is ONLY created when super admin approves — never on registration
-- `pendingPasswordHash` on Center doc is cleared immediately after approval
+- Center DB is ONLY created by `activateCenter()` (`server/utils/centerActivation.js`) — never on registration. Two callers:
+  - super admin approves a self-registered center (`PATCH /super-admin/centers/:id/approve`)
+  - the admin accepts a super-admin invite (`POST /center-invite/:token`, `server/routes/centerInviteRoutes.js`) — the super admin's "Create Center" sends that invite, so creating it is the approval
+- `pendingPasswordHash` on Center doc is cleared immediately after approval; invite links store only a SHA-256 (`invite.tokenHash`)
 
 ## Response Conventions
 

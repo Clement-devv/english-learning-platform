@@ -14,6 +14,7 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { s3Enabled, uploadToS3, s3PublicUrl } from '../utils/s3.js';
 import { cleanLandingPage } from '../utils/landingPage.js';
+import { activateCenter } from '../utils/centerActivation.js';
 
 // Same folder the center admins' logo uploads use (served publicly at /uploads/branding)
 const SA_BRANDING_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'uploads', 'branding');
@@ -475,39 +476,14 @@ router.patch('/centers/:id/approve', verifySuperAdmin, strictLimiter, validatePa
       return res.status(400).json({ success: false, message: `Center is already ${center.status}` });
     }
     if (!center.pendingPasswordHash) {
-      return badRequest(res, 'No pending password hash found for this center');
+      // Invited centers go live when their admin accepts the emailed invite
+      return badRequest(res, center.invite?.sentAt
+        ? 'This center is waiting for its admin to accept the invite. Use "Resend invite" if they lost the email.'
+        : 'No pending password hash found for this center');
     }
 
-    // Create the center's database and admin account
-    const db = await getDb(center.slug);
-
-    // Import admin schema to register on center DB
-    const { adminSchema } = await import('../schemas/adminSchema.js');
-    const Admin = db.models.Admin || db.model('Admin', adminSchema);
-
-    await Admin.create({
-      username: center.adminEmail.split('@')[0],
-      email:    center.adminEmail,
-      password: center.pendingPasswordHash,
-      role:     'admin',
-      active:   true,
-    });
-
-    // Clear the pending password hash and mark active
-    center.pendingPasswordHash = null;
-    center.status     = 'active';
-    center.approvedAt = new Date();
-    center.approvedBy = req.superAdmin._id.toString();
-
-    // One-time recovery code — never overwritten so admin can quote it for manual support
-    if (!center.recoveryCode) {
-      const raw = crypto.randomBytes(8).toString('hex').toUpperCase();
-      center.recoveryCode = raw.match(/.{4}/g).join('-'); // e.g. ABCD-1234-EF56-7890
-    }
-
-    await center.save();
-
-    await invalidateCache(`tenant:slug:${center.slug}`);
+    // Create the center's database and admin account (utils/centerActivation.js)
+    await activateCenter(center, { passwordHash: center.pendingPasswordHash, approvedBy: req.superAdmin._id.toString() });
 
     await writeAuditLog({
       action: 'CENTER_APPROVED', superAdmin: req.superAdmin,

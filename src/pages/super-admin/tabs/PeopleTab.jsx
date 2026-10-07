@@ -147,7 +147,7 @@ export default function PeopleTab({ centers, peopleCenter, setPeopleCenter, apiB
                             {st.code && <div style={{ marginTop: 3 }}><code style={codeChip}>{st.code}</code></div>}
                           </td>
                           <td className={styles.td} style={{ color: 'var(--sa-muted)', fontSize: 12 }}>{visibleEmail(st.email) || "No login (managed)"}</td>
-                          <td className={styles.td}><span style={{ background: 'rgba(99,102,241,0.1)', color: '#818cf8', borderRadius: 6, padding: '2px 8px', fontSize: 11, fontWeight: 600 }}>{st.country || '—'}</span></td>
+                          <td className={styles.td}><span style={{ background: 'rgba(219,39,119,0.1)', color: '#f472b6', borderRadius: 6, padding: '2px 8px', fontSize: 11, fontWeight: 600 }}>{st.country || '—'}</span></td>
                           <td className={styles.td} style={{ fontWeight: 700, color: st.classes > 0 ? '#34d399' : '#4b5563' }}>{st.classes}</td>
                           <td className={styles.td} style={{ fontSize: 11, color: '#6b7280' }}>{st.joinedAt ? new Date(st.joinedAt).toLocaleDateString('en-GB') : '—'}</td>
                         </tr>

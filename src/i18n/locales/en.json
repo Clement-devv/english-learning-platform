@@ -133,6 +133,7 @@
       "groupClasses":  "Group Classes",
       "completed":     "Completed",
       "classSummaries":     "Class Summaries",
+      "library":            "Library",
       "schedule":      "Schedule",
       "students":      "Students",
       "bookings":      "Bookings",
@@ -198,6 +199,7 @@
       "parentChecks":         "Parent checks",
       "loggedClasses":        "Logged classes",
       "shareLinks":          "Parent links",
+      "library":             "Teaching library",
       "branding":             "Branding",
       "customDomain":         "Custom Domain",
       "certTemplate":         "Certificate Template"

@@ -38,6 +38,7 @@ import StudentLogin        from "./pages/student/StudentLogin";
 const SuperAdminDashboard = lazy(() => import("./pages/super-admin/SuperAdminDashboard"));
 const AdminDashboard      = lazy(() => import("./pages/admin/AdminDashboard"));
 const SubAdminSetup            = lazy(() => import("./pages/sub-admin/SubAdminSetup"));
+const CenterInvitePage         = lazy(() => import("./pages/center-invite/CenterInvitePage"));
 const SubAdminDashboard        = lazy(() => import("./pages/sub-admin/SubAdminDashboard"));
 const SubAdminForgotPassword   = lazy(() => import("./pages/sub-admin/ForgotPassword"));
 const SubAdminResetPassword    = lazy(() => import("./pages/sub-admin/ResetPassword"));
@@ -185,6 +186,7 @@ function App() {
             <Route path="/sub-admin/forgot-password"        element={<SubAdminForgotPassword />} />
             <Route path="/sub-admin/reset-password/:token"  element={<SubAdminResetPassword />} />
             <Route path="/sub-admin/setup"                  element={<SubAdminSetup />} />
+            <Route path="/center-invite/:token"            element={<CenterInvitePage />} />
             <Route path="/sub-admin/dashboard"              element={<AuthGuard role="sub-admin"><SubAdminDashboard /></AuthGuard>} />
 
             <Route path="/classroom" element={<AuthGuard role="classroom"><Classroom /></AuthGuard>} />

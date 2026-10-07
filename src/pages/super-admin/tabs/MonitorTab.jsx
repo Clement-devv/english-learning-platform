@@ -220,12 +220,12 @@ function TroublePanel({ call }) {
 
   const list = people || [];
   const shown = showAll ? list : list.slice(0, 10);
-  const roleColor = { teacher: '#818cf8', student: '#34d399', admin: '#f59e0b', subadmin: '#f59e0b', 'sub-admin': '#f59e0b' };
+  const roleColor = { teacher: '#f472b6', student: '#34d399', admin: '#f59e0b', subadmin: '#f59e0b', 'sub-admin': '#f59e0b' };
 
   return (
     <div className={styles.card}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, gap: 10 }}>
-        <h3 className={styles.sectionTitle}><Users size={16} color="#818cf8" /> People having trouble <span style={{ color: '#6b7280', fontWeight: 600, fontSize: 12 }}>· last 7 days</span></h3>
+        <h3 className={styles.sectionTitle}><Users size={16} color="#f472b6" /> People having trouble <span style={{ color: '#6b7280', fontWeight: 600, fontSize: 12 }}>· last 7 days</span></h3>
         <button type="button" onClick={load} className={styles.refreshBtn} title="Refresh" aria-label="Refresh people"><RefreshCw size={14} /></button>
       </div>
       <p style={{ margin: '0 0 12px', fontSize: 12.5, color: 'var(--sa-muted)' }}>

@@ -86,9 +86,9 @@ export async function sendJoinReminder(db, center, bookingId, by) {
   const meetLink = t.googleMeetLink || t.zoomLink || "";
   const joinHtml = s.isManaged
     ? (meetLink
-        ? `<p style="margin:20px 0"><a href="${esc(meetLink)}" style="background:#4f46e5;color:#fff;padding:12px 22px;border-radius:10px;text-decoration:none;font-weight:700">Join the class</a></p>`
+        ? `<p style="margin:20px 0"><a href="${esc(meetLink)}" style="background:#be185d;color:#fff;padding:12px 22px;border-radius:10px;text-decoration:none;font-weight:700">Join the class</a></p>`
         : `<p>Please join using the class link your teacher shared with you.</p>`)
-    : `<p style="margin:20px 0"><a href="${esc(baseUrl)}/student/dashboard" style="background:#4f46e5;color:#fff;padding:12px 22px;border-radius:10px;text-decoration:none;font-weight:700">Open my classes</a></p>`;
+    : `<p style="margin:20px 0"><a href="${esc(baseUrl)}/student/dashboard" style="background:#be185d;color:#fff;padding:12px 22px;border-radius:10px;text-decoration:none;font-weight:700">Open my classes</a></p>`;
 
   try {
     const result = await sendEmail({

@@ -9,7 +9,7 @@ const GroupClassesTab = lazy(() => import('../../tabs/GroupClassesTab'));
 import {
   Home, Calendar, CheckCircle2, Users, BookOpen, MessageCircle, NotebookPen,
   DollarSign, Star, User, CalendarDays, FileText, Layers, ClipboardList,
-  Settings, LogOut, Plus, RefreshCw, Video, Bell, BarChart2, PhoneMissed, X, Clock4,
+  Settings, LogOut, Plus, RefreshCw, Video, Bell, BarChart2, PhoneMissed, X, Clock4, Library,
 } from 'lucide-react';
 import { useBranding }              from '../../../../context/BrandingContext';
 import { useTeacherDashboardData }  from '../useTeacherDashboardData';
@@ -73,6 +73,7 @@ const makeNavGroups = (t) => [
       { key: 'homework', icon: '📚', label: t('teacher.nav.homework'),   lucide: BookOpen },
       { key: 'quiz',     icon: '📝', label: t('teacher.nav.quizzes'),    lucide: FileText },
       { key: 'vocab',    icon: '📒', label: t('teacher.nav.vocabulary'), lucide: Layers   },
+      { key: 'library',  icon: '📚', label: t('teacher.nav.library'),    lucide: Library  },
     ],
   },
   {

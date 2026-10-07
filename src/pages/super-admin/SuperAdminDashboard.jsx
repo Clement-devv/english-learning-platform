@@ -9,10 +9,9 @@ import {
   Globe, RefreshCw, Trash2, Mail, KeyRound, Palette,
   BarChart2, ChevronDown, ChevronUp, ToggleLeft, ToggleRight, Video, Mic, Film,
   AlertTriangle, RotateCcw, Zap, Send, Activity, Users, UserCheck, LogIn, Megaphone, SlidersHorizontal, Award, Sun, Moon, Menu,
-  HeartPulse,
+  HeartPulse, HardDrive,
 } from 'lucide-react';
 import api from '../../api';
-import { TIMEZONE_OPTIONS } from '../../utils/timezone';
 import { THEMES } from '../../data/themes';
 import { LOGIN_THEMES, TEACHER_LOGIN_THEMES, ADMIN_LOGIN_THEMES } from '../../data/loginThemes';
 import { DASHBOARD_THEMES } from '../../data/dashboardThemes';
@@ -25,6 +24,8 @@ import CentersTab  from './tabs/CentersTab';
 import DomainsTab  from './tabs/DomainsTab';
 import HealthTab   from './tabs/HealthTab';
 import MonitorTab  from './tabs/MonitorTab';
+import LibraryStorageTab from './tabs/LibraryStorageTab';
+import CreateCenterModal from './CreateCenterModal';
 import UsageTab    from './tabs/UsageTab';
 import PeopleTab   from './tabs/PeopleTab';
 import ClassesTab  from './tabs/ClassesTab';
@@ -37,14 +38,6 @@ import { studentModesLabel }   from '../../utils/planFeatures';
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api/v1';
 
 
-const EMPTY_FORM = {
-  centerName: '', slug: '', adminEmail: '', password: '',
-  phone: '', country: '', plan: 'basic',
-  website: '', description: '', timezone: 'UTC',
-  address: '', maxTeachers: '', maxStudents: '',
-};
-
-// OTP step: 'email' → 'otp' → 'form' → 'done'
 export default function SuperAdminDashboard() {
   const navigate = useNavigate();
   const { logout: authLogout } = useAuth();
@@ -89,19 +82,8 @@ export default function SuperAdminDashboard() {
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
-  // ── Create center modal ──────────────────────────────────────────────────
-  const [showModal, setShowModal]       = useState(false);
-  const [step,      setStep]            = useState('email'); // 'email'|'otp'|'form'|'done'
-  const [form,      setForm]            = useState(EMPTY_FORM);
-  const [otpInput,  setOtpInput]        = useState('');
-  const [sendingOtp,setSendingOtp]      = useState(false);
-  const [otpError,  setOtpError]        = useState('');
-  const [verifying, setVerifying]       = useState(false);
-  const [verifyErr, setVerifyErr]       = useState('');
-  const [creating,  setCreating]        = useState(false);
-  const [createErr, setCreateErr]       = useState('');
-  const [successMsg,setSuccessMsg]      = useState('');
-  const [showPwd,   setShowPwd]         = useState(false);
+  // ── Create center modal (CreateCenterModal.jsx — invite flow) ──
+  const [showModal, setShowModal] = useState(false);
 
   // ── Domain actions ───────────────────────────────────────────────────────
   const [domainAction, setDomainAction] = useState({}); // { [id]: 'verifying'|'removing' }
@@ -1047,117 +1029,6 @@ export default function SuperAdminDashboard() {
     }
   };
 
-  // ── Modal steps ──────────────────────────────────────────────────────────
-  const closeModal = () => {
-    setShowModal(false);
-    setTimeout(() => {
-      setStep('email');
-      setForm(EMPTY_FORM);
-      setOtpInput('');
-      setOtpError('');
-      setVerifyErr('');
-      setCreateErr('');
-      setSuccessMsg('');
-      setShowPwd(false);
-    }, 200);
-  };
-
-  const handleCenterNameChange = (val) => {
-    const slug = val.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-    setForm(f => ({ ...f, centerName: val, slug }));
-  };
-
-  const handleSendOtp = async (e) => {
-    e.preventDefault();
-    if (!form.adminEmail.trim()) return;
-    setSendingOtp(true);
-    setOtpError('');
-    try {
-      const res = await fetch(`${API_BASE}/super-admin/send-otp`, {
-        method: 'POST',
-        headers: { ...authHeaders, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ adminEmail: form.adminEmail }),
-      });
-      const data = await res.json();
-      if (!data.success) throw new Error(data.message);
-      setStep('otp');
-    } catch (err) {
-      setOtpError(err.message || 'Failed to send OTP');
-    } finally {
-      setSendingOtp(false);
-    }
-  };
-
-  const handleVerifyOtp = async (e) => {
-    e.preventDefault();
-    setVerifying(true);
-    setVerifyErr('');
-    try {
-      const res = await fetch(`${API_BASE}/super-admin/verify-otp`, {
-        method: 'POST',
-        headers: { ...authHeaders, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ adminEmail: form.adminEmail, code: otpInput }),
-      });
-      const data = await res.json();
-      if (!data.success) throw new Error(data.message);
-      setStep('form');
-    } catch (err) {
-      setVerifyErr(err.message || 'Incorrect code');
-    } finally {
-      setVerifying(false);
-    }
-  };
-
-  const handleCreateCenter = async (e) => {
-    e.preventDefault();
-    setCreating(true);
-    setCreateErr('');
-    try {
-      // Register (creates center as 'pending')
-      const regRes = await fetch(`${API_BASE}/register-center`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          centerName: form.centerName,
-          slug:       form.slug,
-          adminEmail: form.adminEmail,
-          password:   form.password,
-          phone:      form.phone,
-          country:    form.country,
-          website:    form.website,
-          description:form.description,
-          timezone:   form.timezone,
-          address:    form.address,
-          maxTeachers:form.maxTeachers ? Number(form.maxTeachers) : undefined,
-          maxStudents:form.maxStudents ? Number(form.maxStudents) : undefined,
-          plan:       form.plan,
-        }),
-      });
-      const regData = await regRes.json();
-      if (!regRes.ok) throw new Error(regData.message || 'Registration failed');
-
-      // Find the center by slug and immediately approve
-      const centersRes = await fetch(`${API_BASE}/super-admin/centers?all=1`, { headers: authHeaders });
-      const centersData = await centersRes.json();
-      const newCenter = centersData.centers?.find(c => c.slug === form.slug);
-      if (!newCenter) throw new Error('Center registered but not found for approval');
-
-      const approveRes = await fetch(`${API_BASE}/super-admin/centers/${newCenter._id}/approve`, {
-        method: 'PATCH', headers: authHeaders,
-      });
-      const approveData = await approveRes.json();
-      if (!approveData.success) throw new Error(approveData.message || 'Approval failed');
-
-      setSuccessMsg(`"${form.centerName}" is live! The admin can log in at once using their email and password.`);
-      setStep('done');
-      loadData();
-    } catch (err) {
-      setCreateErr(err.message || 'Failed to create center');
-    } finally {
-      setCreating(false);
-    }
-  };
-
   // ── Impersonation ─────────────────────────────────────────────────────────
   const handleEnterAsAdmin = async (center) => {
     setImpersonating(center._id);
@@ -1211,6 +1082,7 @@ export default function SuperAdminDashboard() {
     { key: 'people',       label: 'People',          icon: Users      },
     { key: 'classes',      label: 'Classes',         icon: Video      },
     { key: 'credits',      label: 'AI Credits',      icon: Zap        },
+    { key: 'library',      label: 'Library Storage', icon: HardDrive  },
     { key: 'certificates', label: 'Certificates',    icon: Award      },
     { key: 'websites',     label: 'Websites',        icon: Globe      },
     { key: 'deleted',      label: 'Deleted',         icon: Trash2     },
@@ -1316,6 +1188,9 @@ export default function SuperAdminDashboard() {
                 domainAction={domainAction}
               />
             )}
+            {tab === 'library' && (
+              <LibraryStorageTab apiBase={API_BASE} authHeaders={authHeaders} />
+            )}
             {tab === 'monitor' && (
               <MonitorTab apiBase={API_BASE} authHeaders={authHeaders} centers={centers} onStatus={onMonitorStatus} />
             )}
@@ -1381,7 +1256,7 @@ export default function SuperAdminDashboard() {
           <div style={{ ...s.modal, maxWidth: 380 }}>
             <div style={s.modalHeader}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <KeyRound size={16} color="#818cf8" />
+                <KeyRound size={16} color="#f472b6" />
                 <span style={s.modalTitle}>Change Plan</span>
               </div>
               {!planSaving && <button onClick={() => setPlanModal(null)} style={s.closeBtn}><X size={18} /></button>}
@@ -1389,10 +1264,10 @@ export default function SuperAdminDashboard() {
 
             <div style={{ padding: 24 }}>
               {/* Center info */}
-              <div style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 10, padding: '12px 14px', marginBottom: 20 }}>
+              <div style={{ background: 'rgba(219,39,119,0.08)', border: '1px solid rgba(219,39,119,0.2)', borderRadius: 10, padding: '12px 14px', marginBottom: 20 }}>
                 <p style={{ margin: '0 0 2px', fontWeight: 700, color: 'var(--sa-text)', fontSize: 14 }}>{planModal.centerName}</p>
                 <p style={{ margin: 0, fontSize: 12, color: 'var(--sa-muted)' }}>{planModal.adminEmail}</p>
-                <p style={{ margin: '6px 0 0', fontSize: 12, color: '#818cf8' }}>
+                <p style={{ margin: '6px 0 0', fontSize: 12, color: '#f472b6' }}>
                   Current plan: <strong style={{ textTransform: 'capitalize' }}>{planModal.plan || 'basic'}</strong>
                 </p>
               </div>
@@ -1402,7 +1277,7 @@ export default function SuperAdminDashboard() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 20 }}>
                 {[
                   { key: 'free',       label: 'Free',       color: '#6b7280' },
-                  { key: 'basic',      label: 'Basic',      color: '#818cf8' },
+                  { key: 'basic',      label: 'Basic',      color: '#f472b6' },
                   { key: 'pro',        label: 'Pro',        color: '#34d399' },
                   { key: 'enterprise', label: 'Enterprise', color: '#f59e0b' },
                 ].map(p => ({ ...p, desc: studentModesLabel(p.key) })).map(p => (
@@ -1460,7 +1335,7 @@ export default function SuperAdminDashboard() {
                   }}
                   style={{
                     flex: 2, padding: '10px', borderRadius: 10, border: 'none', fontFamily: 'inherit',
-                    background: planSaving || planSelected === planModal.plan ? '#374151' : 'linear-gradient(135deg,#6366f1,#818cf8)',
+                    background: planSaving || planSelected === planModal.plan ? '#374151' : 'linear-gradient(135deg,#db2777,#f472b6)',
                     color: '#fff', fontWeight: 700, cursor: planSaving || planSelected === planModal.plan ? 'not-allowed' : 'pointer',
                   }}
                 >{planSaving ? 'Saving…' : 'Save Plan'}</button>
@@ -1476,7 +1351,7 @@ export default function SuperAdminDashboard() {
           <div style={{ ...s.modal, maxWidth: 420 }}>
             <div style={s.modalHeader}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <Zap size={16} color="#a78bfa" />
+                <Zap size={16} color="#f472b6" />
                 <span style={s.modalTitle}>Allocate AI Credits</span>
               </div>
               {!allocating && <button onClick={() => setAllocModal(null)} style={s.closeBtn}><X size={18} /></button>}
@@ -1484,10 +1359,10 @@ export default function SuperAdminDashboard() {
 
             <div style={{ padding: 24 }}>
               {/* Center info */}
-              <div style={{ background: 'rgba(167,139,250,0.08)', border: '1px solid rgba(167,139,250,0.2)', borderRadius: 10, padding: '12px 14px', marginBottom: 18 }}>
+              <div style={{ background: 'rgba(244,114,182,0.08)', border: '1px solid rgba(244,114,182,0.2)', borderRadius: 10, padding: '12px 14px', marginBottom: 18 }}>
                 <p style={{ margin: '0 0 2px', fontWeight: 700, color: 'var(--sa-text)', fontSize: 14 }}>{allocModal.centerName}</p>
                 <p style={{ margin: 0, fontSize: 12, color: 'var(--sa-muted)' }}>{allocModal.adminEmail}</p>
-                <p style={{ margin: '6px 0 0', fontSize: 12, color: '#a78bfa', fontWeight: 600 }}>
+                <p style={{ margin: '6px 0 0', fontSize: 12, color: '#f472b6', fontWeight: 600 }}>
                   Current balance: <strong>{allocModal.balance.toLocaleString()}</strong> credits
                 </p>
               </div>
@@ -1501,9 +1376,9 @@ export default function SuperAdminDashboard() {
                     onClick={() => setAllocAmount(String(n))}
                     style={{
                       padding: '6px 14px', borderRadius: 8, fontWeight: 700, fontSize: 12, cursor: 'pointer',
-                      border: allocAmount === String(n) ? '2px solid #7c3aed' : '1px solid #374151',
-                      background: allocAmount === String(n) ? 'rgba(124,58,237,0.2)' : 'var(--sa-w04)',
-                      color: allocAmount === String(n) ? '#a78bfa' : 'var(--sa-muted)',
+                      border: allocAmount === String(n) ? '2px solid #db2777' : '1px solid #374151',
+                      background: allocAmount === String(n) ? 'rgba(219,39,119,0.2)' : 'var(--sa-w04)',
+                      color: allocAmount === String(n) ? '#f472b6' : 'var(--sa-muted)',
                     }}
                   >{n.toLocaleString()}</button>
                 ))}
@@ -1568,7 +1443,7 @@ export default function SuperAdminDashboard() {
                     } catch { setAllocMsg('❌ Network error'); }
                     finally { setAllocating(false); }
                   }}
-                  style={{ flex: 2, padding: '10px', borderRadius: 10, border: 'none', background: allocating || !allocAmount ? '#374151' : 'linear-gradient(135deg,#7c3aed,#4f46e5)', color: '#fff', fontWeight: 700, cursor: allocating || !allocAmount ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+                  style={{ flex: 2, padding: '10px', borderRadius: 10, border: 'none', background: allocating || !allocAmount ? '#374151' : 'linear-gradient(135deg,#db2777,#be185d)', color: '#fff', fontWeight: 700, cursor: allocating || !allocAmount ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
                 >
                   <Send size={13} /> {allocating ? 'Allocating…' : 'Allocate Credits'}
                 </button>
@@ -1756,13 +1631,13 @@ export default function SuperAdminDashboard() {
           <div style={{ ...s.modal, maxWidth: 420 }}>
             <div style={s.modalHeader}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <Users size={16} color="#a78bfa" />
+                <Users size={16} color="#f472b6" />
                 <span style={s.modalTitle}>Partnership Text</span>
               </div>
               {!partnershipSaving && <button onClick={() => setPartnershipModal(null)} style={s.closeBtn}><X size={18} /></button>}
             </div>
             <div style={{ padding: 24 }}>
-              <div style={{ background: 'rgba(167,139,250,0.08)', border: '1px solid rgba(167,139,250,0.2)', borderRadius: 10, padding: '12px 14px', marginBottom: 20 }}>
+              <div style={{ background: 'rgba(244,114,182,0.08)', border: '1px solid rgba(244,114,182,0.2)', borderRadius: 10, padding: '12px 14px', marginBottom: 20 }}>
                 <p style={{ margin: '0 0 2px', fontWeight: 700, color: 'var(--sa-text)', fontSize: 14 }}>{partnershipModal.centerName}</p>
                 <p style={{ margin: 0, fontSize: 12, color: 'var(--sa-muted)' }}>Shown in sidebar and landing page footer</p>
               </div>
@@ -1802,7 +1677,7 @@ export default function SuperAdminDashboard() {
                     } catch { setPartnershipMsg('❌ Network error'); }
                     finally { setPartnershipSaving(false); }
                   }}
-                  style={{ flex: 2, padding: '10px', borderRadius: 10, border: 'none', background: partnershipSaving ? '#374151' : 'linear-gradient(135deg,#a78bfa,#7c3aed)', color: '#fff', fontWeight: 700, cursor: partnershipSaving ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}
+                  style={{ flex: 2, padding: '10px', borderRadius: 10, border: 'none', background: partnershipSaving ? '#374151' : 'linear-gradient(135deg,#f472b6,#db2777)', color: '#fff', fontWeight: 700, cursor: partnershipSaving ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}
                 >{partnershipSaving ? 'Saving…' : 'Save'}</button>
               </div>
             </div>
@@ -2021,7 +1896,7 @@ export default function SuperAdminDashboard() {
             label:       'Agora Video Calling',
             description: 'In-platform video calls using Agora RTC. Disable if the center uses only Google Meet.',
             icon:        Video,
-            color:       '#6366f1',
+            color:       '#db2777',
           },
           {
             key:         'googleMeet',
@@ -2669,7 +2544,7 @@ export default function SuperAdminDashboard() {
           <div style={{ ...s.modal, maxWidth: '820px' }}>
             <div style={s.modalHeader}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <Palette size={18} color="#8b5cf6" />
+                <Palette size={18} color="#ec4899" />
                 <span style={s.modalTitle}>Login Page Theme</span>
                 <span style={{ fontSize: '13px', color: '#6b7280' }}>for {loginThemeModal.centerName}</span>
               </div>
@@ -2700,8 +2575,8 @@ export default function SuperAdminDashboard() {
                   return (
                     <div key={theme.id} style={{
                       borderRadius: '14px',
-                      border: isActive ? '2px solid #8b5cf6' : isLocked ? '2px solid var(--sa-w04)' : '2px solid var(--sa-w08)',
-                      background: isActive ? 'rgba(139,92,246,0.12)' : isLocked ? 'var(--sa-w01)' : 'var(--sa-w03)',
+                      border: isActive ? '2px solid #ec4899' : isLocked ? '2px solid var(--sa-w04)' : '2px solid var(--sa-w08)',
+                      background: isActive ? 'rgba(236,72,153,0.12)' : isLocked ? 'var(--sa-w01)' : 'var(--sa-w03)',
                       overflow: 'hidden',
                       opacity: isLocked ? 0.5 : 1,
                       transition: 'border-color .15s, background .15s, opacity .15s',
@@ -2725,7 +2600,7 @@ export default function SuperAdminDashboard() {
                       <div style={{ padding: '10px 12px 6px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '3px' }}>
                           <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--sa-text)' }}>{theme.name}</span>
-                          {isActive && <CheckCircle size={14} color="#8b5cf6" />}
+                          {isActive && <CheckCircle size={14} color="#ec4899" />}
                         </div>
                         <p style={{ margin: '0 0 6px', fontSize: '10px', color: '#6b7280', lineHeight: '1.4' }}>
                           {theme.description}
@@ -2744,8 +2619,8 @@ export default function SuperAdminDashboard() {
                           disabled={isAssigning || isActive || isLocked}
                           style={{
                             width: '100%', padding: '7px 0', borderRadius: '8px', border: 'none',
-                            background: isActive ? 'rgba(139,92,246,0.2)' : isLocked ? 'var(--sa-w04)' : '#8b5cf6',
-                            color: isActive ? '#8b5cf6' : isLocked ? '#4b5563' : 'white',
+                            background: isActive ? 'rgba(236,72,153,0.2)' : isLocked ? 'var(--sa-w04)' : '#ec4899',
+                            color: isActive ? '#ec4899' : isLocked ? '#4b5563' : 'white',
                             fontSize: '12px', fontWeight: '700',
                             cursor: isAssigning || isActive || isLocked ? 'default' : 'pointer',
                             fontFamily: 'inherit',
@@ -2786,7 +2661,7 @@ export default function SuperAdminDashboard() {
           <div style={{ ...s.modal, maxWidth: '760px' }}>
             <div style={s.modalHeader}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <Video size={18} color="#6366f1" />
+                <Video size={18} color="#db2777" />
                 <span style={s.modalTitle}>Classroom Theme</span>
                 <span style={{ fontSize: '13px', color: '#6b7280' }}>for {classroomThemeModal.centerName}</span>
               </div>
@@ -2819,8 +2694,8 @@ export default function SuperAdminDashboard() {
                   return (
                     <div style={{
                       borderRadius: '16px',
-                      border: isActive ? '2px solid #6366f1' : '2px solid var(--sa-w08)',
-                      background: isActive ? 'rgba(99,102,241,0.1)' : 'var(--sa-w03)',
+                      border: isActive ? '2px solid #db2777' : '2px solid var(--sa-w08)',
+                      background: isActive ? 'rgba(219,39,119,0.1)' : 'var(--sa-w03)',
                       overflow: 'hidden',
                       transition: 'border-color .15s, background .15s',
                     }}>
@@ -2841,7 +2716,7 @@ export default function SuperAdminDashboard() {
                       <div style={{ padding: '10px 14px 6px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '3px' }}>
                           <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--sa-text)' }}>Default</span>
-                          {isActive && <CheckCircle size={14} color="#6366f1" />}
+                          {isActive && <CheckCircle size={14} color="#db2777" />}
                         </div>
                         <p style={{ margin: '0 0 8px', fontSize: '10px', color: '#6b7280', lineHeight: '1.4' }}>
                           Dark professional design · emerald green accents
@@ -2853,8 +2728,8 @@ export default function SuperAdminDashboard() {
                           disabled={isActive || isAssigning}
                           style={{
                             width: '100%', padding: '7px 0', borderRadius: '8px', border: 'none',
-                            background: isActive ? 'rgba(99,102,241,0.2)' : '#6366f1',
-                            color: isActive ? '#6366f1' : 'white',
+                            background: isActive ? 'rgba(219,39,119,0.2)' : '#db2777',
+                            color: isActive ? '#db2777' : 'white',
                             fontSize: '12px', fontWeight: '700', cursor: isActive ? 'default' : 'pointer',
                             fontFamily: 'inherit', opacity: isAssigning ? 0.6 : 1,
                           }}
@@ -3171,303 +3046,8 @@ export default function SuperAdminDashboard() {
 
       {/* ── Create Center Modal ── */}
       {showModal && (
-        <div style={s.overlay} onClick={(e) => e.target === e.currentTarget && closeModal()}>
-          <div style={s.modal}>
-            {/* Modal header */}
-            <div style={s.modalHeader}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <Plus size={18} color="#f59e0b" />
-                <span style={s.modalTitle}>Create New Center</span>
-                {step !== 'done' && (
-                  <span style={s.stepTag}>
-                    Step {step === 'email' ? 1 : step === 'otp' ? 2 : 3} / 3
-                  </span>
-                )}
-              </div>
-              <button onClick={closeModal} style={s.closeBtn}><X size={18} /></button>
-            </div>
-
-            {/* ── Step 1: Email ── */}
-            {step === 'email' && (
-              <form onSubmit={handleSendOtp} style={s.modalForm}>
-                <p style={s.stepDesc}>
-                  Enter the admin&apos;s email address. We&apos;ll send a verification code to confirm it&apos;s valid.
-                </p>
-
-                <div style={s.field}>
-                  <label style={s.label}>Admin Email *</label>
-                  <input
-                    style={s.input}
-                    type="email"
-                    placeholder="admin@thecenter.com"
-                    value={form.adminEmail}
-                    onChange={e => setForm(f => ({ ...f, adminEmail: e.target.value }))}
-                    required
-                    autoFocus
-                  />
-                </div>
-
-                {otpError && <ErrorBox msg={otpError} />}
-
-                <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-                  <button type="button" onClick={closeModal} style={s.cancelBtn}>Cancel</button>
-                  <button type="submit" style={s.submitBtn} disabled={sendingOtp}>
-                    <Mail size={14} />
-                    {sendingOtp ? 'Sending…' : 'Send Verification Code'}
-                  </button>
-                </div>
-              </form>
-            )}
-
-            {/* ── Step 2: OTP ── */}
-            {step === 'otp' && (
-              <form onSubmit={handleVerifyOtp} style={s.modalForm}>
-                <p style={s.stepDesc}>
-                  A 6-digit code was sent to <strong style={{ color: '#f59e0b' }}>{form.adminEmail}</strong>.
-                  Enter it below. The code expires in 10 minutes.
-                </p>
-
-                <div style={s.field}>
-                  <label style={s.label}>Verification Code *</label>
-                  <input
-                    style={{ ...s.input, letterSpacing: '0.3em', fontSize: '22px', textAlign: 'center' }}
-                    type="text"
-                    inputMode="numeric"
-                    pattern="[0-9]{6}"
-                    maxLength={6}
-                    placeholder="000000"
-                    value={otpInput}
-                    onChange={e => setOtpInput(e.target.value.replace(/\D/g, ''))}
-                    required
-                    autoFocus
-                  />
-                </div>
-
-                {verifyErr && <ErrorBox msg={verifyErr} />}
-
-                <div style={{ display: 'flex', gap: '10px', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <button
-                    type="button"
-                    onClick={() => { setStep('email'); setOtpInput(''); setVerifyErr(''); }}
-                    style={{ background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', fontSize: '13px', fontFamily: 'inherit' }}
-                  >
-                    ← Change email
-                  </button>
-                  <div style={{ display: 'flex', gap: '10px' }}>
-                    <button type="button" onClick={closeModal} style={s.cancelBtn}>Cancel</button>
-                    <button type="submit" style={s.submitBtn} disabled={verifying || otpInput.length < 6}>
-                      <KeyRound size={14} />
-                      {verifying ? 'Verifying…' : 'Verify Code'}
-                    </button>
-                  </div>
-                </div>
-              </form>
-            )}
-
-            {/* ── Step 3: Center Details Form ── */}
-            {step === 'form' && (
-              <form onSubmit={handleCreateCenter} style={s.modalForm}>
-                <p style={s.stepDesc}>
-                  Email <strong style={{ color: '#34d399' }}>✓ verified</strong>. Fill in the center details below.
-                </p>
-
-                {createErr && <ErrorBox msg={createErr} />}
-
-                {/* Row: Center Name */}
-                <div style={s.field}>
-                  <label style={s.label}>Center Name *</label>
-                  <input
-                    style={s.input}
-                    type="text"
-                    placeholder="e.g. Greenfield Academy"
-                    value={form.centerName}
-                    onChange={e => handleCenterNameChange(e.target.value)}
-                    required
-                    disabled={creating}
-                  />
-                </div>
-
-                {/* Row: Slug */}
-                <div style={s.field}>
-                  <label style={s.label}>Slug * <span style={{ color: '#6b7280', fontWeight: '400', textTransform: 'none' }}>(auto-generated, editable)</span></label>
-                  <input
-                    style={s.input}
-                    type="text"
-                    placeholder="greenfield-academy"
-                    value={form.slug}
-                    onChange={e => setForm(f => ({ ...f, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') }))}
-                    required
-                    disabled={creating}
-                  />
-                </div>
-
-                {/* Row: Password + Phone */}
-                <div style={s.twoCol}>
-                  <div style={s.field}>
-                    <label style={s.label}>Admin Password *</label>
-                    <div style={s.passwordWrap}>
-                      <input
-                        style={{ ...s.input, border: 'none', padding: '0', flex: 1, background: 'transparent' }}
-                        type={showPwd ? 'text' : 'password'}
-                        placeholder="Min 8 characters"
-                        value={form.password}
-                        onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
-                        required
-                        disabled={creating}
-                        minLength={8}
-                      />
-                      <button type="button" onClick={() => setShowPwd(v => !v)} style={s.eyeBtn}>
-                        {showPwd ? <EyeOff size={15} /> : <Eye size={15} />}
-                      </button>
-                    </div>
-                  </div>
-                  <div style={s.field}>
-                    <label style={s.label}>Phone</label>
-                    <input
-                      style={s.input}
-                      type="text"
-                      placeholder="+1234567890"
-                      value={form.phone}
-                      onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
-                      disabled={creating}
-                    />
-                  </div>
-                </div>
-
-                {/* Row: Plan + Timezone */}
-                <div style={s.twoCol}>
-                  <div style={s.field}>
-                    <label style={s.label}>Plan *</label>
-                    <select
-                      style={s.input}
-                      value={form.plan}
-                      onChange={e => setForm(f => ({ ...f, plan: e.target.value }))}
-                      disabled={creating}
-                    >
-                      {['free', 'basic', 'pro', 'enterprise'].map(p => (
-                        <option key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</option>
-                      ))}
-                    </select>
-                    <p style={{ margin: '5px 0 0', fontSize: 11, color: '#818cf8' }}>
-                      Students: {studentModesLabel(form.plan)}
-                    </p>
-                  </div>
-                  <div style={s.field}>
-                    <label style={s.label}>Timezone</label>
-                    <select
-                      style={s.input}
-                      value={form.timezone}
-                      onChange={e => setForm(f => ({ ...f, timezone: e.target.value }))}
-                      disabled={creating}
-                    >
-                      {TIMEZONE_OPTIONS.map(tz => <option key={tz.value} value={tz.value}>{tz.label}</option>)}
-                    </select>
-                  </div>
-                </div>
-
-                {/* Row: Country + Address */}
-                <div style={s.twoCol}>
-                  <div style={s.field}>
-                    <label style={s.label}>Country</label>
-                    <input
-                      style={s.input}
-                      type="text"
-                      placeholder="e.g. Nigeria"
-                      value={form.country}
-                      onChange={e => setForm(f => ({ ...f, country: e.target.value }))}
-                      disabled={creating}
-                    />
-                  </div>
-                  <div style={s.field}>
-                    <label style={s.label}>City / Address</label>
-                    <input
-                      style={s.input}
-                      type="text"
-                      placeholder="e.g. Lagos"
-                      value={form.address}
-                      onChange={e => setForm(f => ({ ...f, address: e.target.value }))}
-                      disabled={creating}
-                    />
-                  </div>
-                </div>
-
-                {/* Row: Website + Limits */}
-                <div style={s.twoCol}>
-                  <div style={s.field}>
-                    <label style={s.label}>Website</label>
-                    <input
-                      style={s.input}
-                      type="url"
-                      placeholder="https://thecenter.com"
-                      value={form.website}
-                      onChange={e => setForm(f => ({ ...f, website: e.target.value }))}
-                      disabled={creating}
-                    />
-                  </div>
-                  <div style={s.twoCol}>
-                    <div style={s.field}>
-                      <label style={s.label}>Max Teachers</label>
-                      <input
-                        style={s.input}
-                        type="number"
-                        min="1"
-                        placeholder="∞"
-                        value={form.maxTeachers}
-                        onChange={e => setForm(f => ({ ...f, maxTeachers: e.target.value }))}
-                        disabled={creating}
-                      />
-                    </div>
-                    <div style={s.field}>
-                      <label style={s.label}>Max Students</label>
-                      <input
-                        style={s.input}
-                        type="number"
-                        min="1"
-                        placeholder="∞"
-                        value={form.maxStudents}
-                        onChange={e => setForm(f => ({ ...f, maxStudents: e.target.value }))}
-                        disabled={creating}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Description */}
-                <div style={s.field}>
-                  <label style={s.label}>Description <span style={{ color: '#6b7280', fontWeight: '400', textTransform: 'none' }}>(optional)</span></label>
-                  <textarea
-                    style={{ ...s.input, height: '72px', resize: 'vertical' }}
-                    placeholder="A brief description of what this center offers…"
-                    value={form.description}
-                    onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-                    disabled={creating}
-                  />
-                </div>
-
-                <div style={s.modalNote}>
-                  The center will be registered and activated immediately. The admin can log in right away using the email and password above.
-                </div>
-
-                <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-                  <button type="button" onClick={closeModal} style={s.cancelBtn} disabled={creating}>Cancel</button>
-                  <button type="submit" style={s.submitBtn} disabled={creating}>
-                    {creating ? 'Creating…' : 'Create & Activate Center'}
-                  </button>
-                </div>
-              </form>
-            )}
-
-            {/* ── Done ── */}
-            {step === 'done' && (
-              <div style={{ padding: '28px', display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'center', textAlign: 'center' }}>
-                <CheckCircle size={40} color="#34d399" />
-                <p style={{ margin: 0, fontSize: '17px', fontWeight: '700', color: 'var(--sa-text)' }}>Center Created!</p>
-                <p style={{ margin: 0, fontSize: '14px', color: 'var(--sa-muted)', maxWidth: '360px', lineHeight: '1.6' }}>{successMsg}</p>
-                <button onClick={closeModal} style={{ ...s.submitBtn, marginTop: '8px' }}>Done</button>
-              </div>
-            )}
-          </div>
-        </div>
+        <CreateCenterModal s={s} apiBase={API_BASE} authHeaders={authHeaders}
+          onClose={() => setShowModal(false)} onCreated={loadData} />
       )}
     </div>
   );
@@ -3692,8 +3272,8 @@ function buildStyles(isDark, isMobile = false, sidebarOpen = false) {
     },
     planBadge: {
       fontSize: 11, padding: '2px 8px', borderRadius: 20,
-      background: isDark ? 'rgba(99,102,241,0.12)' : 'rgba(99,102,241,0.1)',
-      color: '#818cf8', fontWeight: 600, textTransform: 'capitalize',
+      background: isDark ? 'rgba(219,39,119,0.12)' : 'rgba(219,39,119,0.1)',
+      color: '#f472b6', fontWeight: 600, textTransform: 'capitalize',
     },
     statusBadge: {
       display: 'inline-flex', alignItems: 'center', gap: 5,
@@ -3723,8 +3303,8 @@ function buildStyles(isDark, isMobile = false, sidebarOpen = false) {
     themeBtn: {
       display: 'inline-flex', alignItems: 'center', gap: 4,
       padding: '5px 12px', borderRadius: 7, fontSize: 12, fontWeight: 600,
-      background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)',
-      color: '#818cf8', cursor: 'pointer', fontFamily: font,
+      background: 'rgba(219,39,119,0.1)', border: '1px solid rgba(219,39,119,0.2)',
+      color: '#f472b6', cursor: 'pointer', fontFamily: font,
     },
     featuresBtn: {
       display: 'inline-flex', alignItems: 'center', gap: 4,
@@ -3780,6 +3360,8 @@ function buildStyles(isDark, isMobile = false, sidebarOpen = false) {
       border: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : '#cbd5e1'}`,
       borderRadius: 10, color: isDark ? '#f0f9ff' : '#0f172a',
       fontSize: 14, fontFamily: font, outline: 'none', boxSizing: 'border-box',
+      // Native dropdown lists (select options) follow the theme instead of OS white
+      colorScheme: isDark ? 'dark' : 'light',
     },
     passwordWrap: {
       display: 'flex', alignItems: 'center',

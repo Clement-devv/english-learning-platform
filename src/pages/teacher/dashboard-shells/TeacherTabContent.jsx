@@ -17,6 +17,7 @@ import RecordingsTab       from '../tabs/RecordingsTab';
 import ReviewsTab          from '../tabs/ReviewsTab';
 import RatingDashboardTab  from '../tabs/RatingDashboardTab';
 import ClassSummariesTab   from '../tabs/ClassSummariesTab';
+import TeachingLibrary     from '../../../components/library/TeachingLibrary';
 import ProfileTab          from '../tabs/ProfileTab';
 import MessagesTab         from '../../../components/chat/MessagesTab';
 import { Calendar, Users } from 'lucide-react';
@@ -79,6 +80,15 @@ export default function TeacherTabContent({ d, wrapStyle = {}, msgStyle = {}, he
           students={d.students}
           onRefresh={d.fetchTeacherData}
         />
+      </div>
+    );
+  }
+
+  // ── TEACHING LIBRARY (PDFs shared by the school — search, view, download) ──
+  if (activeTab === 'library') {
+    return (
+      <div style={wrapStyle}>
+        <TeachingLibrary isDarkMode={isDarkMode} />
       </div>
     );
   }

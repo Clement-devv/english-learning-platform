@@ -133,6 +133,7 @@
       "groupClasses":  "Lớp nhóm",
       "completed":     "Đã hoàn thành",
       "classSummaries":     "Tóm tắt buổi học",
+      "library":            "Thư viện",
       "schedule":      "Lịch dạy",
       "students":      "Học viên",
       "bookings":      "Đặt lịch",
@@ -198,6 +199,7 @@
       "parentChecks":         "Xác nhận phụ huynh",
       "loggedClasses":        "Lớp học ghi nhận",
       "shareLinks":          "Liên kết phụ huynh",
+      "library":             "Thư viện giảng dạy",
       "branding":             "Thương hiệu",
       "customDomain":         "Tên miền riêng",
       "certTemplate":         "Mẫu chứng chỉ"

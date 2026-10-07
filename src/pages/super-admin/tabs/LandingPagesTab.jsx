@@ -64,7 +64,7 @@ const DEFAULT_LP = {
   published: false,
   template: 'classic',
   design: {
-    primaryColor: '#4F46E5', secondaryColor: '#E0E7FF', accentColor: '#f59e0b',
+    primaryColor: '#BE185D', secondaryColor: '#FCE7F3', accentColor: '#f59e0b',
     bgColor: '#ffffff', textColor: '#1e293b', mutedColor: '#64748b',
     fontFamily: 'Inter', heroStyle: 'gradient', heroImage: '', navStyle: 'light',
   },
@@ -163,7 +163,7 @@ export default function LandingPagesTab({ centers, darkMode, focusCenterId }) {
         const d = await r.json();
         const lp = d.landingPage && Object.keys(d.landingPage).length
           ? mergeDeep({ ...DEFAULT_LP }, d.landingPage)
-          : { ...DEFAULT_LP, design: { ...DEFAULT_LP.design, primaryColor: center.branding?.primaryColor || '#4F46E5' } };
+          : { ...DEFAULT_LP, design: { ...DEFAULT_LP.design, primaryColor: center.branding?.primaryColor || '#BE185D' } };
         setLps(p => ({ ...p, [cid]: lp }));
         setSection(p => ({ ...p, [cid]: 'design' }));
       } catch {
@@ -705,18 +705,18 @@ function TemplatePicker({ selected, onChange, s, isDark, txt, muted, bdr }) {
           const active = selected === id;
           return (
             <button key={id} onClick={() => onChange(id)} style={{
-              border: `2px solid ${active ? '#818cf8' : bdr}`,
+              border: `2px solid ${active ? '#f472b6' : bdr}`,
               borderRadius: 12, padding: 0, cursor: 'pointer', overflow: 'hidden', textAlign: 'left',
-              background: active ? 'rgba(99,102,241,0.06)' : (isDark ? 'rgba(255,255,255,0.03)' : '#fff'),
+              background: active ? 'rgba(219,39,119,0.06)' : (isDark ? 'rgba(255,255,255,0.03)' : '#fff'),
               transition: 'all 0.15s',
-              boxShadow: active ? '0 0 0 3px rgba(99,102,241,0.18)' : 'none',
+              boxShadow: active ? '0 0 0 3px rgba(219,39,119,0.18)' : 'none',
             }}>
               {/* CSS wireframe thumbnail */}
               <div style={{ borderBottom: `1px solid ${bdr}`, padding: 12, background: isDark ? 'rgba(255,255,255,0.02)' : '#f8fafc' }}>
                 <Thumb active={active} />
               </div>
               <div style={{ padding: '10px 12px' }}>
-                <p style={{ fontSize: 13, fontWeight: 700, color: active ? '#818cf8' : txt, margin: '0 0 3px' }}>{name}</p>
+                <p style={{ fontSize: 13, fontWeight: 700, color: active ? '#f472b6' : txt, margin: '0 0 3px' }}>{name}</p>
                 <p style={{ fontSize: 11, color: muted, margin: 0, lineHeight: 1.4 }}>{desc}</p>
               </div>
             </button>
@@ -729,8 +729,8 @@ function TemplatePicker({ selected, onChange, s, isDark, txt, muted, bdr }) {
 
 /* ─── Template thumbnail SVGs ────────────────────────────────────────────── */
 function ClassicThumb({ active }) {
-  const c = active ? '#818cf8' : '#94a3b8';
-  const c2 = active ? '#c4b5fd' : '#cbd5e1';
+  const c = active ? '#f472b6' : '#94a3b8';
+  const c2 = active ? '#f9a8d4' : '#cbd5e1';
   return (
     <svg width="100%" viewBox="0 0 140 90" fill="none" xmlns="http://www.w3.org/2000/svg">
       {/* Nav bar */}
@@ -751,8 +751,8 @@ function ClassicThumb({ active }) {
 }
 
 function ModernThumb({ active }) {
-  const c = active ? '#818cf8' : '#94a3b8';
-  const c2 = active ? '#c4b5fd' : '#cbd5e1';
+  const c = active ? '#f472b6' : '#94a3b8';
+  const c2 = active ? '#f9a8d4' : '#cbd5e1';
   return (
     <svg width="100%" viewBox="0 0 140 90" fill="none" xmlns="http://www.w3.org/2000/svg">
       {/* Nav */}
@@ -779,8 +779,8 @@ function ModernThumb({ active }) {
 }
 
 function MinimalThumb({ active }) {
-  const c = active ? '#818cf8' : '#94a3b8';
-  const c2 = active ? '#c4b5fd' : '#cbd5e1';
+  const c = active ? '#f472b6' : '#94a3b8';
+  const c2 = active ? '#f9a8d4' : '#cbd5e1';
   return (
     <svg width="100%" viewBox="0 0 140 90" fill="none" xmlns="http://www.w3.org/2000/svg">
       {/* Top accent bar */}
@@ -917,7 +917,7 @@ function styles(isDark, card, bdr, txt, muted, inputBg, inputBdr) {
       transition: 'all 0.15s',
     },
     sectionTabActive: {
-      background: 'rgba(99,102,241,0.12)', color: '#818cf8',
+      background: 'rgba(219,39,119,0.12)', color: '#f472b6',
     },
     grid2: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 14 },
     stack: { display: 'flex', flexDirection: 'column', gap: 16 },
@@ -936,7 +936,7 @@ function styles(isDark, card, bdr, txt, muted, inputBg, inputBdr) {
       display: 'inline-flex', alignItems: 'center', gap: 6,
       padding: '8px 18px', borderRadius: 9, border: 'none', cursor: 'pointer',
       fontSize: 13, fontWeight: 700, fontFamily: FONT,
-      background: 'linear-gradient(135deg,#4f63d2,#7c3aed)', color: '#fff',
+      background: 'linear-gradient(135deg,#be185d,#db2777)', color: '#fff',
       boxShadow: '0 4px 14px rgba(79,99,210,0.35)',
     },
     publishBtn: {

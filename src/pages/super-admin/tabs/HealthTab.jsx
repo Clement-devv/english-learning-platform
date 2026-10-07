@@ -42,7 +42,7 @@ export default function HealthTab({ health, healthLoading, loadHealth, centers }
                     </td>
                     <td className={styles.td}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <UserCheck size={13} color="#818cf8" />
+                        <UserCheck size={13} color="#f472b6" />
                         <span style={{ fontWeight: 700, color: 'var(--sa-text)' }}>{h.teachers}</span>
                         {h.maxTeachers && h.maxTeachers !== -1 && (
                           <span style={{ color: '#6b7280', fontSize: 11 }}>/ {h.maxTeachers}</span>

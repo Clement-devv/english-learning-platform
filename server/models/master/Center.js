@@ -23,6 +23,36 @@ const centerSchema = new mongoose.Schema({
   // Temporary storage during pending state — cleared after center DB admin is created
   pendingPasswordHash: { type: String, default: null, select: false },
 
+  // Teaching library storage (utils/libraryQuota.js). Files themselves live in the
+  // center DB (LibraryFile) + S3 or local disk; this is the usage/billing summary.
+  library: {
+    quotaMb:        { type: Number, default: null },  // super admin override of the plan allowance
+    extraMb:        { type: Number, default: 0 },     // extra space packs added by the super admin
+    usedBytes:      { type: Number, default: 0 },
+    fileCount:      { type: Number, default: 0 },
+    month:          { type: String, default: null },  // "2026-10" — current billing month
+    monthPeakBytes: { type: Number, default: 0 },     // highest usage this month (billed on this)
+    warned:         { type: String, default: null },  // '80' | '100' — last warning email sent
+    history: [{
+      _id: false, month: String, peakBytes: Number, allowanceBytes: Number,
+      overageBytes: Number, overageGb: Number, amount: Number, currency: String,
+      paid: { type: Boolean, default: false },
+    }],
+    log: [{ _id: false, at: { type: Date, default: Date.now }, mb: Number, note: String, by: String }],
+  },
+
+  // Invite flow (super admin → "Create center"): the center stays 'pending' until
+  // the admin opens the emailed link and sets their name, location and password
+  // (routes/centerInviteRoutes.js). Only a SHA-256 of the link token is stored.
+  invite: {
+    tokenHash:  { type: String, default: null, select: false },
+    expiresAt:  { type: Date,   default: null },
+    sentAt:     { type: Date,   default: null },
+    sentCount:  { type: Number, default: 0 },
+    invitedBy:  { type: String, default: null },  // super admin id
+    acceptedAt: { type: Date,   default: null },
+  },
+
   branding: {
     logo:           { type: String, default: null },
     primaryColor:   { type: String, default: '#4F46E5' },
@@ -115,8 +145,8 @@ const centerSchema = new mongoose.Schema({
     template:   { type: String, default: 'classic' },
 
     design: {
-      primaryColor:   { type: String, default: '#4F46E5' },
-      secondaryColor: { type: String, default: '#E0E7FF' },
+      primaryColor:   { type: String, default: '#BE185D' },
+      secondaryColor: { type: String, default: '#FCE7F3' },
       accentColor:    { type: String, default: '#f59e0b' },
       bgColor:        { type: String, default: '#ffffff' },
       textColor:      { type: String, default: '#1e293b' },
@@ -242,5 +272,6 @@ const centerSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 centerSchema.index({ 'pendingEmailChange.token': 1 }, { sparse: true });
+centerSchema.index({ 'invite.tokenHash': 1 }, { sparse: true });
 
 export default mongoose.model('Center', centerSchema);

@@ -40,9 +40,10 @@ export async function s3ObjectExists(key) {
 }
 
 // Generate a presigned GET URL valid for `expiresIn` seconds (default 1 hour).
-export async function getPresignedUrl(key, expiresIn = 3600) {
+// `response` can set ResponseContentDisposition / ResponseContentType (e.g. download file name).
+export async function getPresignedUrl(key, expiresIn = 3600, response = {}) {
   if (!s3) return null;
-  const cmd = new GetObjectCommand({ Bucket: BUCKET, Key: key });
+  const cmd = new GetObjectCommand({ Bucket: BUCKET, Key: key, ...response });
   return getSignedUrl(s3, cmd, { expiresIn });
 }
 

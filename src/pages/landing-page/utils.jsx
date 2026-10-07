@@ -22,8 +22,8 @@ export function adjustHex(hex = '#000000', amount) {
 // Resolves design tokens from the lp.design object
 export function resolveDesign(design = {}) {
   return {
-    primary:   design.primaryColor   || '#4F46E5',
-    secondary: design.secondaryColor || '#E0E7FF',
+    primary:   design.primaryColor   || '#BE185D',
+    secondary: design.secondaryColor || '#FCE7F3',
     accent:    design.accentColor    || '#f59e0b',
     bg:        design.bgColor        || '#ffffff',
     text:      design.textColor      || '#1e293b',
@@ -75,7 +75,7 @@ export function SectionLabel({ color, font, children }) {
 export function PageLoader() {
   return (
     <div style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fff', zIndex: 9999 }}>
-      <div style={{ width: 40, height: 40, borderRadius: '50%', border: '4px solid #e5e7eb', borderTopColor: '#6366f1', animation: 'spin 0.75s linear infinite' }} />
+      <div style={{ width: 40, height: 40, borderRadius: '50%', border: '4px solid #e5e7eb', borderTopColor: '#db2777', animation: 'spin 0.75s linear infinite' }} />
       <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
     </div>
   );

@@ -17,7 +17,7 @@ function CreditTable({ centers, loading, totals, search, setSearch, expandedLog,
             { label: 'Currently Available',   value: totals.totalBalance.toLocaleString(),   color: '#34d399'   },
             { label: 'Total Used by Students',value: totals.totalUsed.toLocaleString(),       color: '#fb923c'   },
           ].map(t => (
-            <div key={t.label} style={{ background: `rgba(${accentColor === '#a78bfa' ? '167,139,250' : '249,115,22'},0.08)`, border: `1px solid rgba(${accentColor === '#a78bfa' ? '167,139,250' : '249,115,22'},0.2)`, borderRadius: 10, padding: '14px 16px' }}>
+            <div key={t.label} style={{ background: `rgba(${accentColor === '#f472b6' ? '167,139,250' : '249,115,22'},0.08)`, border: `1px solid rgba(${accentColor === '#f472b6' ? '167,139,250' : '249,115,22'},0.2)`, borderRadius: 10, padding: '14px 16px' }}>
               <p style={{ margin: '0 0 4px', fontSize: 11, color: 'var(--sa-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t.label}</p>
               <p style={{ margin: 0, fontSize: 24, fontWeight: 900, color: t.color }}>{t.value}</p>
             </div>
@@ -53,7 +53,7 @@ function CreditTable({ centers, loading, totals, search, setSearch, expandedLog,
                         <p style={{ margin: 0, fontSize: 11, color: '#6b7280' }}>{c.adminEmail}</p>
                       </td>
                       <td className={styles.td}>
-                        <span style={{ background: `rgba(${accentColor === '#a78bfa' ? '167,139,250' : '249,115,22'},0.15)`, color: accentColor, borderRadius: 6, padding: '2px 8px', fontSize: 11, fontWeight: 700, textTransform: 'uppercase' }}>{c.plan}</span>
+                        <span style={{ background: `rgba(${accentColor === '#f472b6' ? '167,139,250' : '249,115,22'},0.15)`, color: accentColor, borderRadius: 6, padding: '2px 8px', fontSize: 11, fontWeight: 700, textTransform: 'uppercase' }}>{c.plan}</span>
                       </td>
                       <td className={styles.td}>
                         <span style={{ fontWeight: 800, fontSize: 16, color: c.balance === 0 ? '#ef4444' : c.balance <= 50 ? '#f59e0b' : '#34d399' }}>{c.balance.toLocaleString()}</span>
@@ -71,14 +71,14 @@ function CreditTable({ centers, loading, totals, search, setSearch, expandedLog,
                       </td>
                       <td className={styles.td}>
                         <button onClick={() => { setAllocModal(c); setAllocAmount(''); setAllocNote(''); setAllocMsg(''); }}
-                          style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 8, border: 'none', background: accentColor === '#a78bfa' ? 'linear-gradient(135deg,#7c3aed,#4f46e5)' : 'linear-gradient(135deg,#f97316,#fb923c)', color: '#fff', fontWeight: 700, fontSize: 11, cursor: 'pointer' }}>
+                          style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 8, border: 'none', background: accentColor === '#f472b6' ? 'linear-gradient(135deg,#db2777,#be185d)' : 'linear-gradient(135deg,#f97316,#fb923c)', color: '#fff', fontWeight: 700, fontSize: 11, cursor: 'pointer' }}>
                           <Icon size={12} /> Allocate
                         </button>
                       </td>
                     </tr>
                     {expandedLog === c._id && (
                       <tr>
-                        <td colSpan={7} className={styles.td} style={{ background: 'rgba(167,139,250,0.04)', padding: '10px 16px' }}>
+                        <td colSpan={7} className={styles.td} style={{ background: 'rgba(244,114,182,0.04)', padding: '10px 16px' }}>
                           <p style={{ margin: '0 0 8px', fontSize: 11, fontWeight: 700, color: accentColor, textTransform: 'uppercase' }}>Allocation Log (last 10)</p>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                             {c.log.map((entry, i) => (
@@ -128,7 +128,7 @@ export default function CreditsTab({
         search={creditSearch} setSearch={setCreditSearch}
         expandedLog={expandedLog} setExpandedLog={setExpandedLog}
         setAllocModal={setAllocModal} setAllocAmount={setAllocAmount} setAllocNote={setAllocNote} setAllocMsg={setAllocMsg}
-        accentColor="#a78bfa" icon={Zap} label="AI Chat Credits"
+        accentColor="#f472b6" icon={Zap} label="AI Chat Credits"
       />
 
       <CreditTable

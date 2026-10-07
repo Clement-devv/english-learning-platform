@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Building2, RefreshCw, Palette, ToggleRight, SlidersHorizontal, LogIn, Trash2, Globe, Users, KeyRound, Copy, Check, Video,
-  Search, Settings2, CheckCircle, XCircle, Crown, ChevronRight, X, PauseCircle, RotateCcw, LayoutDashboard,
+  Search, Settings2, CheckCircle, XCircle, Crown, ChevronRight, X, PauseCircle, RotateCcw, LayoutDashboard, Send,
 } from 'lucide-react';
 import Pagination from '../../../components/Pagination';
 import styles from '../SuperAdmin.module.css';
@@ -42,6 +42,23 @@ export default function CentersTab({
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState('');
   const [manage, setManage]   = useState(null);
+  // Invited centers: resend the invite (routes/centerInviteRoutes.js)
+  const [resending, setResending] = useState(null);
+  const [inviteNote, setInviteNote] = useState(null); // { centerName, message, inviteUrl, emailed }
+  const resendInvite = async (c) => {
+    setResending(c._id); setError('');
+    try {
+      const res = await fetch(`${apiBase}/super-admin/center-invites/${c._id}/resend`, { method: 'POST', headers: headersRef.current });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message || 'Could not resend the invite');
+      setInviteNote({ centerName: c.centerName, message: data.message, inviteUrl: data.data.inviteUrl, emailed: data.data.emailed });
+      loadPage();
+    } catch (e) {
+      setError(e.message || 'Could not resend the invite');
+    } finally {
+      setResending(null);
+    }
+  };
   const reqId = useRef(0);
   const headersRef = useRef(authHeaders);
   headersRef.current = authHeaders || { Authorization: `Bearer ${localStorage.getItem('superAdminToken')}` };
@@ -174,6 +191,13 @@ export default function CentersTab({
       </div>
 
       {error && <div role="alert" style={{ margin: '12px 20px 0', padding: '10px 14px', borderRadius: 10, background: 'rgba(239,68,68,0.1)', color: 'var(--sa-red-text)', fontSize: 13 }}>{error}</div>}
+      {inviteNote && (
+        <div role="status" style={{ margin: '12px 20px 0', padding: '10px 14px', borderRadius: 10, background: inviteNote.emailed ? 'rgba(16,185,129,0.1)' : 'rgba(245,158,11,0.12)', fontSize: 13, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+          <span style={{ color: 'var(--sa-text)', fontWeight: 600 }}>{inviteNote.centerName}: {inviteNote.message}</span>
+          <button type="button" onClick={() => navigator.clipboard?.writeText(inviteNote.inviteUrl).catch(() => {})} style={ghostBtn('var(--sa-text)')}><Copy size={13} /> Copy link</button>
+          <button type="button" onClick={() => setInviteNote(null)} style={{ ...ghostBtn('var(--sa-muted)'), marginLeft: 'auto' }} aria-label="Dismiss"><X size={13} /></button>
+        </div>
+      )}
 
       {loading && !list ? (
         <div style={{ padding: 48, textAlign: 'center', color: '#6b7280' }}>Loading…</div>
@@ -225,14 +249,19 @@ export default function CentersTab({
                 <div><WebsiteBadge center={c} /></div>
                 {/* Actions */}
                 <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', alignItems: 'center' }}>
-                  {c.status === 'pending' && (
+                  {c.status === 'pending' && isInvited(c) && (
+                    <button onClick={() => resendInvite(c)} disabled={resending === c._id} style={ghostBtn('#0ea5e9')} title="Send a new invite link (the old one stops working)">
+                      <Send size={13} /> {resending === c._id ? 'Sending…' : 'Resend'}
+                    </button>
+                  )}
+                  {c.status === 'pending' && !isInvited(c) && (
                     <>
                       <button onClick={() => handleApprove(c._id)} className={styles.approveBtn}>Approve</button>
                       <button onClick={() => handleReject(c._id)} className={styles.rejectBtn}>Reject</button>
                     </>
                   )}
                   {c.status === 'active' && (
-                    <button onClick={() => handleEnterAsAdmin(c)} disabled={impersonating === c._id} style={ghostBtn('#818cf8')} title="Open this center's admin panel (30 min session)">
+                    <button onClick={() => handleEnterAsAdmin(c)} disabled={impersonating === c._id} style={ghostBtn('#f472b6')} title="Open this center's admin panel (30 min session)">
                       <LogIn size={13} /> {impersonating === c._id ? '…' : 'Enter'}
                     </button>
                   )}
@@ -283,6 +312,7 @@ export default function CentersTab({
           suspend:        (c) => handleSuspend(c._id),
           reactivate:     (c) => handleApprove(c._id),
           approve:        (c) => handleApprove(c._id),
+          resendInvite:   (c) => resendInvite(c),
           reject:         (c) => handleReject(c._id),
           remove:         (c) => setDeleteTarget(c),
         }}
@@ -326,7 +356,7 @@ export default function CentersTab({
           {overrideCenter.recoveryCode && (
             <div style={{ background: 'var(--sa-panel)', border: '1px solid #2a2d40', borderRadius: '10px', padding: '10px 14px', marginBottom: '18px', display: 'flex', alignItems: 'center', gap: '10px' }}>
               <span style={{ fontSize: '11px', color: '#6b7280', flexShrink: 0 }}>Recovery code</span>
-              <span style={{ fontFamily: 'monospace', fontSize: '14px', fontWeight: 700, color: 'var(--sa-indigo-text)', flex: 1, letterSpacing: '0.06em' }}>
+              <span style={{ fontFamily: 'monospace', fontSize: '14px', fontWeight: 700, color: 'var(--sa-accent-text)', flex: 1, letterSpacing: '0.06em' }}>
                 {overrideCenter.recoveryCode}
               </span>
               <button
@@ -466,8 +496,8 @@ const STATUS_TABS = [
   { key: 'rejected',  label: 'Rejected',  color: '#6b7280' },
 ];
 const STATUS_COLORS = { active: '#10b981', pending: '#f59e0b', suspended: '#ef4444', rejected: '#6b7280' };
-const PLAN_COLORS = { free: '#64748b', basic: '#818cf8', pro: '#34d399', enterprise: '#f59e0b' };
-const AVATAR_COLORS = ['#f59e0b', '#34d399', '#818cf8', '#f472b6', '#22d3ee', '#fb923c', '#a78bfa'];
+const PLAN_COLORS = { free: '#64748b', basic: '#f472b6', pro: '#34d399', enterprise: '#f59e0b' };
+const AVATAR_COLORS = ['#f59e0b', '#34d399', '#f472b6', '#f472b6', '#22d3ee', '#fb923c', '#f472b6'];
 
 const pillStyle = (color) => ({
   display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 9px', borderRadius: 999,
@@ -495,7 +525,7 @@ function Avatar({ center, size = 38 }) {
 function UsageBar({ label, used = 0, max }) {
   const unlimited = max === -1 || !max;
   const pct = unlimited ? 0 : Math.min(100, Math.round((used / max) * 100));
-  const color = pct >= 100 ? '#ef4444' : pct >= 85 ? '#f59e0b' : '#818cf8';
+  const color = pct >= 100 ? '#ef4444' : pct >= 85 ? '#f59e0b' : '#f472b6';
   return (
     <div title={unlimited ? `${used} ${label.toLowerCase()} (no limit)` : `${used} of ${max} ${label.toLowerCase()} (${pct}%)`}>
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, color: 'var(--sa-muted)' }}>
@@ -503,13 +533,25 @@ function UsageBar({ label, used = 0, max }) {
         <span style={{ color: pct >= 85 ? color : 'var(--sa-text-2)', fontWeight: 700 }}>{used}{unlimited ? '' : ` / ${max}`}</span>
       </div>
       <div style={{ height: 4, borderRadius: 4, background: 'var(--sa-w06)', marginTop: 3, overflow: 'hidden' }}>
-        <div style={{ width: unlimited ? '100%' : `${pct}%`, height: '100%', background: unlimited ? 'rgba(129,140,248,0.25)' : color, borderRadius: 4 }} />
+        <div style={{ width: unlimited ? '100%' : `${pct}%`, height: '100%', background: unlimited ? 'rgba(244,114,182,0.25)' : color, borderRadius: 4 }} />
       </div>
     </div>
   );
 }
 
+const isInvited = (c) => !!c.invite?.sentAt && !c.invite?.acceptedAt;
+const shortDate = (d) => new Date(d).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+
 function HealthCell({ center: c }) {
+  if (c.status === 'pending' && isInvited(c)) {
+    const expired = c.invite.expiresAt && new Date(c.invite.expiresAt) < new Date();
+    return (
+      <span style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+        <span style={pillStyle(expired ? '#ef4444' : '#0ea5e9')}>{expired ? 'Invite expired' : 'Invite sent'}</span>
+        <span style={{ fontSize: 11.5, color: 'var(--sa-muted)' }}>{expired ? `Expired ${shortDate(c.invite.expiresAt)}` : `Sent ${shortDate(c.invite.sentAt)} · waiting for admin`}</span>
+      </span>
+    );
+  }
   if (c.status !== 'active') {
     return <span style={pillStyle(STATUS_COLORS[c.status] || '#6b7280')}>{c.status}</span>;
   }
@@ -611,7 +653,10 @@ function ManagePanel({ center: c, onClose, run, actions }) {
           {isActive && <div style={{ gridColumn: '1 / -1' }}><HealthCell center={c} /></div>}
         </div>
 
-        {c.status === 'pending' && section('Registration', [
+        {c.status === 'pending' && isInvited(c) && section('Invite', [
+          item('resendInvite', Send, 'Resend invite', `Sent to ${c.adminEmail} ${c.invite.sentCount > 1 ? `(${c.invite.sentCount} times)` : ''} — a new link replaces the old one`, { color: '#0ea5e9' }),
+        ])}
+        {c.status === 'pending' && !isInvited(c) && section('Registration', [
           item('approve', CheckCircle, 'Approve center', 'Creates its database and emails the admin', { color: '#34d399' }),
           item('reject', XCircle, 'Reject registration', null, { danger: true }),
         ])}
@@ -633,7 +678,7 @@ function ManagePanel({ center: c, onClose, run, actions }) {
           item('partnership', Users, 'Partnership text', 'Co-branding shown on their pages'),
         ])}
         {section('Account', [
-          item('enter', LogIn, 'Enter as admin', 'Opens their admin panel for 30 minutes', { hidden: !isActive, color: '#818cf8' }),
+          item('enter', LogIn, 'Enter as admin', 'Opens their admin panel for 30 minutes', { hidden: !isActive, color: '#f472b6' }),
           item('overrideEmail', KeyRound, 'Override admin email', 'Emergency: admin lost access to their email'),
           item('suspend', PauseCircle, 'Suspend center', 'Blocks all logins until reactivated', { hidden: !isActive, danger: true }),
           item('reactivate', RotateCcw, 'Reactivate center', null, { hidden: !(c.status === 'suspended' || c.status === 'rejected'), color: '#34d399' }),

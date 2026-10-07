@@ -156,7 +156,7 @@ function CenterClasses({ center, from, to, apiBase, authHeaders }) {
                     <span style={{ background: 'rgba(52,211,153,0.1)', color: '#34d399', borderRadius: 6, padding: '2px 8px', fontSize: 11, fontWeight: 600 }}>{cls.teacherName}</span>
                   </td>
                   <td className={styles.td} style={{ fontSize: 12 }}>
-                    <span style={{ background: 'rgba(99,102,241,0.1)', color: '#818cf8', borderRadius: 6, padding: '2px 8px', fontSize: 11, fontWeight: 600 }}>{cls.studentName}</span>
+                    <span style={{ background: 'rgba(219,39,119,0.1)', color: '#f472b6', borderRadius: 6, padding: '2px 8px', fontSize: 11, fontWeight: 600 }}>{cls.studentName}</span>
                   </td>
                   <td className={styles.td} style={{ fontSize: 11, color: 'var(--sa-muted)' }}>{fmt(cls.scheduledTime)}</td>
                   <td className={styles.td} style={{ fontSize: 12, color: '#f59e0b', fontWeight: 600 }}>{cls.duration} min</td>

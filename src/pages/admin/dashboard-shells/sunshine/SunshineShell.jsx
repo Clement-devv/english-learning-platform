@@ -10,7 +10,7 @@ import {
   BookOpen, Shield, CalendarDays, FileText, Star, Palette, Globe,
   Settings, LogOut, CheckCircle2, ClipboardList, Award,
   Megaphone, Send, X, CheckCircle,
-  ShieldCheck, ClipboardCheck, Link2,
+  ShieldCheck, ClipboardCheck, Link2, Library,
 } from 'lucide-react';
 import { useNavigate }            from 'react-router-dom';
 import { useAuth }                from '../../../../context/AuthContext.jsx';
@@ -42,6 +42,7 @@ const AssignStudentsTab  = lazy(() => import('../../tabs/AssignStudentsTab'));
 const BookingsTab        = lazy(() => import('../../tabs/BookingsTab'));
 const ParentChecksTab    = lazy(() => import('../../tabs/ParentChecksTab'));
 const ShareLinksTab      = lazy(() => import('../../tabs/ShareLinksTab'));
+const TeachingLibrary    = lazy(() => import('../../../../components/library/TeachingLibrary'));
 const LoggedClassesTab   = lazy(() => import('../../tabs/LoggedClassesTab'));
 const ClassReportTab     = lazy(() => import('../../tabs/ClassReportTab'));
 const MessagesTab        = lazy(() => import('../../../../components/chat/MessagesTab'));
@@ -119,6 +120,7 @@ const makeNavGroups = (t) => [
       { key: 'bookings',      label: t('admin.nav.bookings'),        lucide: ClipboardList},
       { key: 'parent-checks', label: t('admin.nav.parentChecks'),    lucide: ShieldCheck  },
       { key: 'share-links',   label: t('admin.nav.shareLinks'),      lucide: Link2        },
+      { key: 'library',       label: t('admin.nav.library'),         lucide: Library      },
       { key: 'logged-classes', label: t('admin.nav.loggedClasses'), lucide: ClipboardCheck },
       { key: 'recordings',    label: t('admin.nav.recordings'),      lucide: Video        },
       { key: 'certificates',  label: t('admin.nav.certificates'),    lucide: Award        },
@@ -372,6 +374,7 @@ export default function SunshineShell() {
       case 'disputes':          return <DisputeReview isDarkMode={isDarkMode} />;
       case 'parent-checks':     return <ParentChecksTab isDarkMode={isDarkMode} />;
       case 'share-links':       return <ShareLinksTab isDarkMode={isDarkMode} />;
+      case 'library':           return <TeachingLibrary isDarkMode={isDarkMode} canManage />;
       case 'logged-classes':    return <LoggedClassesTab isDarkMode={isDarkMode} />;
       case 'class-report':      return <ClassReportTab isDarkMode={isDarkMode} />;
       case 'recordings':        return <RecordingsTab teachers={teachers} isDarkMode={isDarkMode} />;

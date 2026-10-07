@@ -60,6 +60,9 @@ import adminEmailChangeRoutes    from "./adminEmailChangeRoutes.js";
 import analyticsPinRoutes        from "./analyticsPinRoutes.js";
 import classReportRoutes         from "./classReportRoutes.js";
 import { monitorAdminRoutes, clientErrorRoutes } from "./monitorRoutes.js";
+import { centerInviteAdminRoutes, centerInviteRoutes } from "./centerInviteRoutes.js";
+import libraryRoutes from "./libraryRoutes.js";
+import libraryAdminRoutes from "./libraryAdminRoutes.js";
 
 const router = Router();
 
@@ -108,6 +111,10 @@ router.use("/notifications",        notificationRoutes);
 router.use("/register-center",      centerRegistrationRoutes);
 router.use("/center",               centerConfigRoutes);
 router.use("/super-admin/monitor",  monitorAdminRoutes); // App Health (super admin)
+router.use("/super-admin/center-invites", centerInviteAdminRoutes); // create center by invite
+router.use("/super-admin/library", libraryAdminRoutes); // library storage, billing, takedowns
+router.use("/library",              libraryRoutes);      // center teaching library (PDFs)
+router.use("/center-invite",        centerInviteRoutes); // public invite page (no tenantMiddleware — center not live yet)
 router.use("/client-errors",        clientErrorRoutes);  // browsers report page crashes
 router.use("/super-admin",          superAdminRoutes);
 router.use("/class-pricing",        classPricingRoutes);

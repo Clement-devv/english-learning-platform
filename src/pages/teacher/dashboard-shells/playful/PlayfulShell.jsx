@@ -80,7 +80,7 @@ const SECTION_TABS = {
   classes:   ['classes', 'completed-classes', 'class-summaries', 'schedule'],
   students:  ['students'],
   bookings:  ['bookings'],
-  content:   ['homework', 'quiz', 'vocab'],
+  content:   ['homework', 'quiz', 'vocab', 'library'],
   messages:  ['messages'],
   more:      ['payment', 'recordings', 'reviews', 'rating-dashboard', 'profile'],
 };
@@ -97,6 +97,7 @@ const SUB_TABS = {
     { key: 'homework', label: 'Homework'   },
     { key: 'quiz',     label: 'Quizzes'   },
     { key: 'vocab',    label: 'Vocabulary'},
+    { key: 'library',  label: 'Library'   },
   ],
   more: [
     { key: 'payment',    label: 'Payment'    },
@@ -122,7 +123,7 @@ const TILES = [
 const PAGE_TITLE = {
   dashboard: 'Home', classes: 'My Classes', 'completed-classes': 'Completed Classes', 'class-summaries': 'Class Summaries',
   schedule: 'Schedule', students: 'Students', bookings: 'Bookings', messages: 'Messages',
-  payment: 'Payment', homework: 'Homework', quiz: 'Quizzes', vocab: 'Vocabulary',
+  payment: 'Payment', homework: 'Homework', quiz: 'Quizzes', vocab: 'Vocabulary', library: 'Teaching Library',
   recordings: 'Recordings', reviews: 'Reviews', profile: 'Profile', 'rating-dashboard': 'Rating Insights',
 };
 

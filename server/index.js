@@ -198,6 +198,7 @@ app.use('/uploads/teachers', serveUploadSecure, express.static(path.join(__dirna
 app.use('/uploads/recordings', (_req, res) => res.status(403).json({ message: 'Access denied' }));
 app.use('/uploads/content', (_req, res) => res.status(403).json({ message: 'Access denied' }));
 app.use('/uploads/homework', (_req, res) => res.status(403).json({ message: 'Access denied' }));
+app.use('/uploads/library', (_req, res) => res.status(403).json({ message: 'Access denied' })); // via /api/v1/library links only
 
 // Body parser with size limits
 app.use(express.json(requestLimits.json));
