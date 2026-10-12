@@ -8,16 +8,19 @@ import {
 } from "lucide-react";
 import api from "../../../api";
 import { useOnDataChanged } from "../../../hooks/useLiveData";
+import { useTranslation } from "react-i18next";
+import { dateLocale } from "../../../i18n/dateLocale.js";
 
 const fmtDateTime = (d) =>
   d
-    ? new Date(d).toLocaleString("en-US", {
+    ? new Date(d).toLocaleString(dateLocale("en-US"), {
         month: "short", day: "numeric", year: "numeric",
         hour: "2-digit", minute: "2-digit",
       })
     : "—";
 
 function StudentDualTime({ scheduledTime, teacherTimezone }) {
+  const { t: tr } = useTranslation("student");
   if (!scheduledTime) return <span>—</span>;
   const myTZ = getUserTimezone();
   const dual = dualTime(scheduledTime, myTZ, teacherTimezone);
@@ -25,8 +28,7 @@ function StudentDualTime({ scheduledTime, teacherTimezone }) {
     <span>
       {dual.myTime} {dual.myAbbr}
       {!dual.sameZone && teacherTimezone && (
-        <span style={{ marginLeft: 6, opacity: 0.65, fontSize: "0.85em" }}>
-          · Teacher ({tzCity(teacherTimezone)}): {dual.theirTime} {dual.theirAbbr}
+        <span style={{ marginLeft: 6, opacity: 0.65, fontSize: "0.85em" }}>{tr("studentCompletedTab.teacher", { tzCity: tzCity(teacherTimezone), theirTime: dual.theirTime, theirAbbr: dual.theirAbbr })}
         </span>
       )}
     </span>
@@ -35,14 +37,15 @@ function StudentDualTime({ scheduledTime, teacherTimezone }) {
 
 // ─── Why a class is "not completed" ──────────────────────────────────────────
 function NotCompletedReason({ cls, isDarkMode }) {
+  const { t: tr } = useTranslation("student");
   if (cls.adminRejected) {
     return (
       <div className={`mt-2.5 flex items-start gap-2 px-3 py-2 rounded-lg text-xs
         ${isDarkMode ? "bg-red-950/40 border border-red-800/40 text-red-300" : "bg-red-50 border border-red-200 text-red-700"}`}>
         <XCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
         <div>
-          <strong>Reversed by admin.</strong> The completion was reviewed and reversed — your class credit has been restored.
-          {cls.adminRejectedReason && <span className="block mt-0.5"><strong>Reason:</strong> {cls.adminRejectedReason}</span>}
+          <strong>{tr("studentCompletedTab.reversedByAdmin")}</strong> {tr("studentCompletedTab.theCompletionWasReviewedAnd")}
+          {cls.adminRejectedReason && <span className="block mt-0.5"><strong>{tr("studentCompletedTab.reason")}</strong> {cls.adminRejectedReason}</span>}
         </div>
       </div>
     );
@@ -53,9 +56,9 @@ function NotCompletedReason({ cls, isDarkMode }) {
         ${isDarkMode ? "bg-amber-950/40 border border-amber-800/40 text-amber-300" : "bg-amber-50 border border-amber-200 text-amber-700"}`}>
         <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
         <div>
-          <strong>Attendance requirement not met.</strong>
+          <strong>{tr("studentCompletedTab.attendanceRequirementNotMet")}</strong>
           <span className="block mt-0.5">{cls.missedReason}</span>
-          <span className="block mt-1 opacity-75">Your class credit was not deducted.</span>
+          <span className="block mt-1 opacity-75">{tr("studentCompletedTab.yourClassCreditWasNot")}</span>
         </div>
       </div>
     );
@@ -64,6 +67,7 @@ function NotCompletedReason({ cls, isDarkMode }) {
 }
 
 export default function StudentCompletedTab({ studentId, isDarkMode }) {
+  const { t: tr } = useTranslation("student");
   const [classes,     setClasses]     = useState([]);
   const [loading,     setLoading]     = useState(true);
   const [refreshing,  setRefreshing]  = useState(false);
@@ -136,7 +140,7 @@ export default function StudentCompletedTab({ studentId, isDarkMode }) {
     return (
       <div className="flex items-center justify-center py-16 gap-3">
         <div className="w-7 h-7 border-4 border-blue-400 border-t-transparent rounded-full animate-spin" />
-        <span className={`text-sm ${textSub}`}>Loading your classes…</span>
+        <span className={`text-sm ${textSub}`}>{tr("studentCompletedTab.loadingYourClasses")}</span>
       </div>
     );
   }
@@ -148,10 +152,9 @@ export default function StudentCompletedTab({ studentId, isDarkMode }) {
       <div className={`${bg} rounded-2xl shadow-sm p-5`}>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5">
           <div>
-            <h2 className={`text-xl font-bold ${textPrimary}`}>My Classes</h2>
+            <h2 className={`text-xl font-bold ${textPrimary}`}>{tr("studentCompletedTab.myClasses")}</h2>
             <p className={`text-sm mt-0.5 ${textSub}`}>
-              {counts.completed} completed · {counts.notCompleted} not completed
-            </p>
+              {tr("studentCompletedTab.completedNotCompleted", { completed: counts.completed, notCompleted: counts.notCompleted })}</p>
           </div>
           <button
             onClick={load}
@@ -161,7 +164,7 @@ export default function StudentCompletedTab({ studentId, isDarkMode }) {
             }`}
           >
             <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
-            Refresh
+            {tr("studentCompletedTab.refresh")}
           </button>
         </div>
 
@@ -176,7 +179,7 @@ export default function StudentCompletedTab({ studentId, isDarkMode }) {
             }`}
           >
             <CheckCircle className="w-4 h-4" />
-            Completed
+            {tr("studentCompletedTab.completed")}
             <span className={`px-1.5 py-0.5 rounded-full text-xs font-bold ${
               tab === "completed" ? "bg-white/20 text-white" : isDarkMode ? "bg-gray-700 text-gray-300" : "bg-gray-200 text-gray-600"
             }`}>
@@ -192,7 +195,7 @@ export default function StudentCompletedTab({ studentId, isDarkMode }) {
             }`}
           >
             <XCircle className="w-4 h-4" />
-            Not Completed
+            {tr("studentCompletedTab.notCompleted")}
             <span className={`px-1.5 py-0.5 rounded-full text-xs font-bold ${
               tab === "not_completed" ? "bg-white/20 text-white" : isDarkMode ? "bg-gray-700 text-gray-300" : "bg-gray-200 text-gray-600"
             }`}>
@@ -207,7 +210,7 @@ export default function StudentCompletedTab({ studentId, isDarkMode }) {
             <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${textSub}`} />
             <input
               type="text"
-              placeholder="Search class, topic, teacher…"
+              placeholder={tr("studentCompletedTab.searchClassTopicTeacher")}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className={`w-full pl-9 pr-3 py-2 border rounded-xl text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none ${inputCls}`}
@@ -233,8 +236,7 @@ export default function StudentCompletedTab({ studentId, isDarkMode }) {
         }`}>
           <span className="text-base flex-shrink-0">ℹ️</span>
           <span>
-            Classes here either <strong>did not meet the attendance requirement</strong> (≥83% of class duration with both teacher and student present)
-            or were <strong>reversed by admin</strong>. Credits for these classes are <strong>not deducted</strong> from your account.
+            {tr("studentCompletedTab.classesHereEither")} <strong>{tr("studentCompletedTab.didNotMeetTheAttendance")}</strong> {tr("studentCompletedTab.t83OfClassDurationWith")} <strong>{tr("studentCompletedTab.reversedByAdmin2")}</strong>{tr("studentCompletedTab.creditsForTheseClassesAre")} <strong>{tr("studentCompletedTab.notDeducted")}</strong> {tr("studentCompletedTab.fromYourAccount")}
           </span>
         </div>
       )}
@@ -245,17 +247,17 @@ export default function StudentCompletedTab({ studentId, isDarkMode }) {
           <BookOpen className={`w-12 h-12 mx-auto mb-3 opacity-20 ${textSub}`} />
           <p className={`${textSub}`}>
             {search || startDate || endDate
-              ? "No classes match your filters."
+              ? tr("studentCompletedTab.noClassesMatchYourFilters")
               : tab === "completed"
-              ? "No completed classes yet."
-              : "No incomplete classes — great attendance!"}
+              ? tr("studentCompletedTab.noCompletedClassesYet")
+              : tr("studentCompletedTab.noIncompleteClassesGreatAttendance")}
           </p>
           {(search || startDate || endDate) && (
             <button
               onClick={() => { setSearch(""); setStartDate(""); setEndDate(""); }}
               className="mt-3 text-sm text-blue-600 hover:underline"
             >
-              Clear filters
+              {tr("studentCompletedTab.clearFilters")}
             </button>
           )}
         </div>
@@ -282,22 +284,22 @@ export default function StudentCompletedTab({ studentId, isDarkMode }) {
                     <h3 className={`font-semibold ${textPrimary}`}>{cls.title}</h3>
                     {tab === "completed" ? (
                       <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700 border border-emerald-200">
-                        <CheckCircle className="w-3 h-3" /> Completed
+                        <CheckCircle className="w-3 h-3" /> {tr("studentCompletedTab.completed")}
                       </span>
                     ) : cls.adminRejected ? (
                       <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700 border border-red-200">
-                        <XCircle className="w-3 h-3" /> Reversed by Admin
+                        <XCircle className="w-3 h-3" /> {tr("studentCompletedTab.reversedByAdmin3")}
                       </span>
                     ) : (
                       <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-700 border border-amber-200">
-                        <AlertCircle className="w-3 h-3" /> Attendance Not Met
+                        <AlertCircle className="w-3 h-3" /> {tr("studentCompletedTab.attendanceNotMet")}
                       </span>
                     )}
                   </div>
 
                   {cls.topic && (
                     <p className={`text-sm mt-0.5 ${textSub}`}>
-                      <strong>Topic:</strong> {cls.topic}
+                      <strong>{tr("studentCompletedTab.topic")}</strong> {cls.topic}
                     </p>
                   )}
 
@@ -313,7 +315,7 @@ export default function StudentCompletedTab({ studentId, isDarkMode }) {
                     </span>
                     <span className="flex items-center gap-1.5">
                       <Clock className="w-4 h-4" />
-                      {cls.duration} min
+                      {cls.duration} {tr("studentCompletedTab.min")}
                     </span>
                     {tab === "completed" && cls.completedAt && (
                       <span className="flex items-center gap-1.5 text-emerald-600">
@@ -344,7 +346,7 @@ export default function StudentCompletedTab({ studentId, isDarkMode }) {
           >
             <ChevronLeft className="w-5 h-5" />
           </button>
-          <span className={`text-sm ${textSub}`}>Page {currentPage} of {totalPages}</span>
+          <span className={`text-sm ${textSub}`}>{tr("studentCompletedTab.pageOf", { currentPage, totalPages })}</span>
           <button
             onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
             disabled={currentPage === totalPages}

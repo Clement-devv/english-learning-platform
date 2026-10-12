@@ -25,7 +25,7 @@ import { config } from '../config/config.js';
 import { sendEmail, getCenterBaseUrl } from '../emails/core.js';
 import { writeAuditLog } from '../utils/auditLog.js';
 import { activateCenter } from '../utils/centerActivation.js';
-import { centerEmailInUse, emailInUseMessage } from '../utils/centerEmail.js';
+import { centerEmailInUse, emailInUseMessage, isEmailTakenError } from '../utils/centerEmail.js';
 import { validatePasswordStrength } from '../utils/passwordUtils.js';
 import passwordHash from '../utils/passwordHash.js';
 import logger from '../utils/logger.js';
@@ -155,6 +155,7 @@ centerInviteAdminRoutes.post('/', strictLimiter, async (req, res) => {
       message: emailed ? `Invite sent to ${adminEmail}` : 'Center created, but the invite email could not be sent — copy the link and send it yourself',
     });
   } catch (err) {
+    if (isEmailTakenError(err)) return fail(res, 409, 'This email is already the admin of another center — use a different email');
     if (err?.code === 11000) return fail(res, 409, 'That web address is already taken');
     logger.error('Center invite failed', { error: err?.message });
     fail(res, 500, 'Something went wrong');

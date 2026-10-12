@@ -30,6 +30,7 @@ import { useTranslation }         from 'react-i18next';
 import ChangePassword             from '../../../../components/admin/auth/ChangePassword';
 import ChangeEmail               from '../../../../components/admin/auth/ChangeEmail';
 import AnalyticsPinSettings      from '../../../../components/admin/auth/AnalyticsPinSettings';
+import { dateLocale } from "../../../../i18n/dateLocale.js";
 
 // Tab components — lazy loaded
 const OverviewTab        = lazy(() => import('../../tabs/OverviewTab'));
@@ -164,6 +165,7 @@ function TabLoader() {
 
 // ── Shell ─────────────────────────────────────────────────────────────────────
 export default function SunshineShell() {
+  const { t: tr } = useTranslation("admin");
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { user: adminInfo, logout: authLogout } = useAuth();
@@ -328,7 +330,7 @@ export default function SunshineShell() {
       if (res.data.success) setBroadcastResult(res.data);
       else throw new Error(res.data.message);
     } catch (err) {
-      alert(err.response?.data?.message || err.message || 'Broadcast failed');
+      alert(err.response?.data?.message || err.message || tr("sunshineShell.broadcastFailed"));
     } finally {
       setBroadcasting(false);
     }
@@ -391,10 +393,10 @@ export default function SunshineShell() {
   }, [activeTab, isDarkMode, loading, teachers, students, analyticsPinVersion]);
 
   const STATS = [
-    { label: 'Teachers',  value: teachers.length,       icon: Video,         g: 'linear-gradient(135deg,#f97316,#fbbf24)' },
-    { label: 'Students',  value: students.length,       icon: Users,         g: 'linear-gradient(135deg,#f43f5e,#fb7185)' },
-    { label: 'Messages',  value: unreadMessages || 0,   icon: MessageCircle, g: 'linear-gradient(135deg,#8b5cf6,#a78bfa)' },
-    { label: 'Alerts',    value: unreadNotif || 0,      icon: Bell,          g: 'linear-gradient(135deg,#06b6d4,#67e8f9)' },
+    { label: tr("sunshineShell.teachers"),  value: teachers.length,       icon: Video,         g: 'linear-gradient(135deg,#f97316,#fbbf24)' },
+    { label: tr("sunshineShell.students"),  value: students.length,       icon: Users,         g: 'linear-gradient(135deg,#f43f5e,#fb7185)' },
+    { label: tr("sunshineShell.messages"),  value: unreadMessages || 0,   icon: MessageCircle, g: 'linear-gradient(135deg,#8b5cf6,#a78bfa)' },
+    { label: tr("sunshineShell.alerts"),    value: unreadNotif || 0,      icon: Bell,          g: 'linear-gradient(135deg,#06b6d4,#67e8f9)' },
   ];
 
   const showHero = activeTab === 'overview';
@@ -445,9 +447,9 @@ export default function SunshineShell() {
           </div>
           <div style={{ minWidth: 0 }}>
             <div style={{ fontSize: 13, fontWeight: 800, color: col.heading, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {adminInfo?.firstName || 'Admin'}
+              {adminInfo?.firstName || tr("sunshineShell.admin")}
             </div>
-            <div style={{ fontSize: 11, fontWeight: 600, color: col.muted }}>{teachers.length} teachers</div>
+            <div style={{ fontSize: 11, fontWeight: 600, color: col.muted }}>{tr("sunshineShell.teachers2", { teachersCount: teachers.length })}</div>
           </div>
         </div>
 
@@ -527,22 +529,22 @@ export default function SunshineShell() {
         {/* Top bar */}
         <header style={{ height: 64, background: col.sidebar, borderBottom: `2px solid ${col.border}`, display: 'flex', alignItems: 'center', padding: '0 24px', gap: 14, flexShrink: 0 }}>
           <h1 style={{ margin: 0, fontSize: 18, fontWeight: 900, color: col.heading, flex: 1, fontFamily: F }}>
-            {PAGE_LABEL[activeTab] || 'Overview'}
+            {PAGE_LABEL[activeTab] || tr("sunshineShell.overview")}
           </h1>
 
           {/* ── Notification chips ── */}
           {unreadMessages > 0 && (
-            <button onClick={() => { setActiveTab('messages'); setUnreadMessages(0); }} title="Go to messages"
+            <button onClick={() => { setActiveTab('messages'); setUnreadMessages(0); }} title={tr("sunshineShell.goToMessages")}
               style={{ display: 'flex', alignItems: 'center', gap: 6, background: isDarkMode ? 'rgba(139,92,246,0.15)' : '#f5f3ff', border: `2px solid ${isDarkMode ? 'rgba(139,92,246,0.3)' : '#ddd6fe'}`, borderRadius: 999, padding: '5px 14px', cursor: 'pointer', fontFamily: F }}>
               <span style={{ fontSize: 13 }}>💬</span>
-              <span style={{ fontSize: 13, fontWeight: 800, color: isDarkMode ? '#a78bfa' : '#7c3aed' }}>{unreadMessages} new</span>
+              <span style={{ fontSize: 13, fontWeight: 800, color: isDarkMode ? '#a78bfa' : '#7c3aed' }}>{tr("sunshineShell.new", { unreadMessages })}</span>
             </button>
           )}
           {missedCallCount > 0 && (
-            <button onClick={clearMissedCalls} title="Clear missed calls"
+            <button onClick={clearMissedCalls} title={tr("sunshineShell.clearMissedCalls")}
               style={{ display: 'flex', alignItems: 'center', gap: 6, background: isDarkMode ? 'rgba(239,68,68,0.12)' : '#fff5f5', border: `2px solid ${isDarkMode ? 'rgba(239,68,68,0.3)' : '#fecaca'}`, borderRadius: 999, padding: '5px 14px', cursor: 'pointer', fontFamily: F }}>
               <span style={{ fontSize: 13 }}>📞</span>
-              <span style={{ fontSize: 13, fontWeight: 800, color: '#ef4444' }}>{missedCallCount} missed</span>
+              <span style={{ fontSize: 13, fontWeight: 800, color: '#ef4444' }}>{tr("sunshineShell.missed", { missedCallCount })}</span>
             </button>
           )}
 
@@ -582,7 +584,7 @@ export default function SunshineShell() {
                   {centerName}
                 </p>
                 <h2 style={{ margin: '0 0 20px', color: '#fff', fontWeight: 900, fontSize: 26, fontFamily: F }}>
-                  Welcome back, {adminInfo?.firstName || 'Admin'} 👋
+                  {tr("sunshineShell.welcomeBack")} {adminInfo?.firstName || tr("sunshineShell.admin")} 👋
                 </h2>
                 <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
                   {STATS.map(({ label, value, icon: Icon, g }) => (
@@ -610,9 +612,9 @@ export default function SunshineShell() {
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
                   <h3 style={{ margin: 0, fontSize: 14, fontWeight: 900, color: isDarkMode ? '#fca5a5' : '#dc2626', fontFamily: F }}>
-                    {missedCallCount} Missed Call{missedCallCount > 1 ? 's' : ''}
+                    {tr("sunshineShell.missedCall", { missedCallCount, value: missedCallCount > 1 ? 's' : '' })}
                   </h3>
-                  <span style={{ fontSize: 11, color: col.muted, fontWeight: 600 }}>while you were away</span>
+                  <span style={{ fontSize: 11, color: col.muted, fontWeight: 600 }}>{tr("sunshineShell.whileYouWereAway")}</span>
                 </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                   {missedCalls.map((mc, i) => (
@@ -623,7 +625,7 @@ export default function SunshineShell() {
                       <div>
                         <p style={{ margin: 0, fontSize: 12, fontWeight: 800, color: col.heading, lineHeight: 1.2 }}>{mc.callerName}</p>
                         <p style={{ margin: 0, fontSize: 10, color: col.muted, fontWeight: 600 }}>
-                          {mc.callerRole === 'teacher' ? 'Teacher' : mc.callerRole === 'student' ? 'Student' : mc.callerRole} · {new Date(mc.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          {mc.callerRole === 'teacher' ? tr("sunshineShell.teacher") : mc.callerRole === 'student' ? tr("sunshineShell.student") : mc.callerRole} · {new Date(mc.at).toLocaleTimeString(dateLocale(), { hour: '2-digit', minute: '2-digit' })}
                         </p>
                       </div>
                     </div>
@@ -631,7 +633,7 @@ export default function SunshineShell() {
                 </div>
               </div>
               <button onClick={clearMissedCalls} style={{ background: isDarkMode ? 'rgba(255,255,255,0.08)' : '#fff', border: `1px solid ${isDarkMode ? 'rgba(255,255,255,0.12)' : '#fecaca'}`, borderRadius: 10, padding: '6px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 700, color: col.muted, flexShrink: 0, fontFamily: F }}>
-                ✓ Mark seen
+                {tr("sunshineShell.markSeen")}
               </button>
             </div>
           )}
@@ -648,9 +650,9 @@ export default function SunshineShell() {
       {/* ── Broadcast Modal ── */}
       {broadcastModal && (() => {
         const GROUPS = [
-          { key: 'teachers', emoji: '👩‍🏫', label: 'Teachers', people: teachers.filter(t => t.active) },
-          { key: 'students', emoji: '👨‍🎓', label: 'Students', people: students.filter(s => s.active) },
-          { key: 'parents',  emoji: '👪',   label: 'Parents',  people: broadcastParents },
+          { key: 'teachers', emoji: '👩‍🏫', label: tr("sunshineShell.teachers"), people: teachers.filter(t => t.active) },
+          { key: 'students', emoji: '👨‍🎓', label: tr("sunshineShell.students"), people: students.filter(s => s.active) },
+          { key: 'parents',  emoji: '👪',   label: tr("sunshineShell.parents"),  people: broadcastParents },
         ];
 
         const anyEnabled  = Object.values(broadcastTargets).some(t => t.enabled);
@@ -688,7 +690,7 @@ export default function SunshineShell() {
                   <div style={{ width: 36, height: 36, borderRadius: 12, background: ACCENT_GRADIENT, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                     <Megaphone size={18} color="#fff" />
                   </div>
-                  <span style={{ fontSize: 16, fontWeight: 900, color: col.heading }}>Broadcast Email</span>
+                  <span style={{ fontSize: 16, fontWeight: 900, color: col.heading }}>{tr("sunshineShell.broadcastEmail")}</span>
                 </div>
                 {!broadcasting && <button onClick={() => setBroadcastModal(false)} style={{ background: 'none', border: 'none', color: col.muted, cursor: 'pointer', padding: 4, display: 'flex' }}><X size={20} /></button>}
               </div>
@@ -698,18 +700,18 @@ export default function SunshineShell() {
                   /* ── Success ── */
                   <div style={{ textAlign: 'center', padding: '24px 0' }}>
                     <CheckCircle size={44} color="#10b981" style={{ marginBottom: 14 }} />
-                    <p style={{ margin: '0 0 6px', fontSize: 18, fontWeight: 900, color: col.heading }}>Sent!</p>
+                    <p style={{ margin: '0 0 6px', fontSize: 18, fontWeight: 900, color: col.heading }}>{tr("sunshineShell.sent")}</p>
                     <p style={{ margin: '0 0 4px', fontSize: 13, color: col.body }}>
-                      <strong style={{ color: '#10b981' }}>{broadcastResult.sent}</strong> email{broadcastResult.sent !== 1 ? 's' : ''} delivered
+                      <strong style={{ color: '#10b981' }}>{broadcastResult.sent}</strong> {tr("sunshineShell.email")}{broadcastResult.sent !== 1 ? 's' : ''} {tr("sunshineShell.delivered")}
                       {broadcastResult.failed > 0 && <>, <strong style={{ color: '#ef4444' }}>{broadcastResult.failed}</strong> failed</>}
                     </p>
-                    <p style={{ margin: '0 0 24px', fontSize: 12, color: col.muted }}>Total: {broadcastResult.total}</p>
-                    <button onClick={() => setBroadcastModal(false)} style={{ padding: '10px 32px', borderRadius: 14, border: 'none', background: ACCENT_GRADIENT, color: '#fff', fontWeight: 800, fontSize: 14, cursor: 'pointer', fontFamily: F }}>Done</button>
+                    <p style={{ margin: '0 0 24px', fontSize: 12, color: col.muted }}>{tr("sunshineShell.total", { total: broadcastResult.total })}</p>
+                    <button onClick={() => setBroadcastModal(false)} style={{ padding: '10px 32px', borderRadius: 14, border: 'none', background: ACCENT_GRADIENT, color: '#fff', fontWeight: 800, fontSize: 14, cursor: 'pointer', fontFamily: F }}>{tr("sunshineShell.done")}</button>
                   </div>
                 ) : (
                   <>
                     {/* ── Group toggle cards ── */}
-                    <p style={{ ...lbl, marginBottom: 8 }}>Who should receive this?</p>
+                    <p style={{ ...lbl, marginBottom: 8 }}>{tr("sunshineShell.whoShouldReceiveThis")}</p>
                     <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
                       {GROUPS.map(g => {
                         const t = broadcastTargets[g.key];
@@ -723,7 +725,7 @@ export default function SunshineShell() {
                             <div style={{ fontSize: 22, marginBottom: 3 }}>{g.emoji}</div>
                             <div style={{ fontSize: 12, fontWeight: 800, color: t.enabled ? col.accent : col.body }}>{g.label}</div>
                             <div style={{ fontSize: 10, color: col.muted, marginTop: 2 }}>
-                              {t.enabled && t.mode === 'specific' ? `${t.ids.length} selected` : `${g.people.length}`}
+                              {t.enabled && t.mode === 'specific' ? tr("sunshineShell.selected", { idsCount: t.ids.length }) : `${g.people.length}`}
                             </div>
                             {t.enabled && (
                               <div style={{ width: 18, height: 18, borderRadius: '50%', background: col.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '5px auto 0' }}>
@@ -753,8 +755,8 @@ export default function SunshineShell() {
                           {/* All / Specific toggle */}
                           <div style={{ display: 'flex', gap: 6, marginBottom: t.mode === 'specific' ? 10 : 0 }}>
                             {[
-                              { mode: 'all',      label: `All ${g.label}` },
-                              { mode: 'specific', label: 'Choose specific' },
+                              { mode: 'all',      label: tr("sunshineShell.all", { label: g.label }) },
+                              { mode: 'specific', label: tr("sunshineShell.chooseSpecific") },
                             ].map(opt => (
                               <button key={opt.mode} onClick={() => setGroupMode(g.key, opt.mode)} style={{
                                 flex: 1, padding: '7px 10px', borderRadius: 10, cursor: 'pointer', fontFamily: F, fontSize: 12, fontWeight: 700,
@@ -774,19 +776,19 @@ export default function SunshineShell() {
                                 <input
                                   value={search}
                                   onChange={e => setBroadcastSearch(prev => ({ ...prev, [g.key]: e.target.value }))}
-                                  placeholder={`Search ${g.label.toLowerCase()}…`}
+                                  placeholder={tr("sunshineShell.search", { value: g.label.toLowerCase() })}
                                   style={{ ...inp, flex: 1, padding: '7px 11px', fontSize: 12 }}
                                 />
                                 <button
                                   onClick={() => selectAllInGroup(g.key, filtered)}
                                   style={{ padding: '7px 11px', borderRadius: 10, border: `2px solid ${col.border}`, background: 'transparent', color: col.accent, fontWeight: 700, fontSize: 11, cursor: 'pointer', fontFamily: F, whiteSpace: 'nowrap' }}
-                                >Select all</button>
+                                >{tr("sunshineShell.selectAll")}</button>
                               </div>
 
                               {/* Scrollable list */}
                               <div style={{ maxHeight: 170, overflowY: 'auto', borderRadius: 10, border: `2px solid ${col.border}`, background: isDarkMode ? 'rgba(255,255,255,0.03)' : '#fff' }}>
                                 {filtered.length === 0 ? (
-                                  <div style={{ padding: 16, textAlign: 'center', fontSize: 12, color: col.muted }}>No results</div>
+                                  <div style={{ padding: 16, textAlign: 'center', fontSize: 12, color: col.muted }}>{tr("sunshineShell.noResults")}</div>
                                 ) : filtered.map(p => {
                                   const id      = p._id || p.id;
                                   const checked = t.ids.includes(id);
@@ -804,7 +806,7 @@ export default function SunshineShell() {
                                 })}
                               </div>
                               {t.ids.length > 0 && (
-                                <div style={{ marginTop: 5, fontSize: 11, fontWeight: 700, color: col.accent }}>{t.ids.length} selected</div>
+                                <div style={{ marginTop: 5, fontSize: 11, fontWeight: 700, color: col.accent }}>{tr("sunshineShell.selected", { idsCount: t.ids.length })}</div>
                               )}
                             </>
                           )}
@@ -815,24 +817,24 @@ export default function SunshineShell() {
                     {/* ── Recipient summary ── */}
                     {anyEnabled && (
                       <div style={{ background: isDarkMode ? 'rgba(249,115,22,0.07)' : '#fff7ed', border: `2px solid ${isDarkMode ? 'rgba(249,115,22,0.2)' : '#fed7aa'}`, borderRadius: 12, padding: '8px 13px', marginBottom: 14, fontSize: 12, color: col.body }}>
-                        This will email <strong style={{ color: col.accent }}>{recipientSummary}</strong>.
+                        {tr("sunshineShell.thisWillEmail")} <strong style={{ color: col.accent }}>{recipientSummary}</strong>.
                       </div>
                     )}
 
                     {/* ── Subject ── */}
-                    <label style={lbl}>Subject *</label>
-                    <input value={broadcastSubject} onChange={e => setBroadcastSubject(e.target.value)} placeholder="e.g. Important update" style={{ ...inp, marginBottom: 12 }} disabled={broadcasting} />
+                    <label style={lbl}>{tr("sunshineShell.subject")}</label>
+                    <input value={broadcastSubject} onChange={e => setBroadcastSubject(e.target.value)} placeholder={tr("sunshineShell.eGImportantUpdate")} style={{ ...inp, marginBottom: 12 }} disabled={broadcasting} />
 
                     {/* ── Message ── */}
-                    <label style={lbl}>Message *</label>
-                    <textarea value={broadcastMessage} onChange={e => setBroadcastMessage(e.target.value)} placeholder="Write your message here…" rows={5} style={{ ...inp, marginBottom: 18, resize: 'vertical', height: 120 }} disabled={broadcasting} />
+                    <label style={lbl}>{tr("sunshineShell.message")}</label>
+                    <textarea value={broadcastMessage} onChange={e => setBroadcastMessage(e.target.value)} placeholder={tr("sunshineShell.writeYourMessageHere")} rows={5} style={{ ...inp, marginBottom: 18, resize: 'vertical', height: 120 }} disabled={broadcasting} />
 
                     {/* ── Actions ── */}
                     <div style={{ display: 'flex', gap: 10 }}>
-                      <button onClick={() => setBroadcastModal(false)} disabled={broadcasting} style={{ flex: 1, padding: '11px', borderRadius: 14, border: `2px solid ${col.border}`, background: 'transparent', color: col.body, fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: F }}>Cancel</button>
+                      <button onClick={() => setBroadcastModal(false)} disabled={broadcasting} style={{ flex: 1, padding: '11px', borderRadius: 14, border: `2px solid ${col.border}`, background: 'transparent', color: col.body, fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: F }}>{tr("sunshineShell.cancel")}</button>
                       <button disabled={!canSend || broadcasting} onClick={handleBroadcast} style={{ flex: 2, padding: '11px', borderRadius: 14, border: 'none', background: canSend && !broadcasting ? ACCENT_GRADIENT : (isDarkMode ? '#2a2d40' : '#f5f0ec'), color: canSend && !broadcasting ? '#fff' : col.muted, fontWeight: 800, fontSize: 13, cursor: canSend && !broadcasting ? 'pointer' : 'not-allowed', fontFamily: F, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, boxShadow: canSend && !broadcasting ? `0 4px 14px ${TAB_SHADOW}` : 'none', transition: 'all 0.15s' }}>
                         <Send size={14} />
-                        {broadcasting ? 'Sending…' : `Send to ${enabledLabel}`}
+                        {broadcasting ? tr("sunshineShell.sending") : tr("sunshineShell.sendTo", { enabledLabel })}
                       </button>
                     </div>
                   </>

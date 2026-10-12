@@ -30,11 +30,13 @@ import {
 import api from "../../../api";
 import { useCurrencySymbol, fmtMoney } from "../../../hooks/useCurrencySymbol";
 import { visibleEmail } from "../../../utils/managedStudent.js";
+import { useTranslation } from "react-i18next";
+import { dateLocale } from "../../../i18n/dateLocale.js";
 
 // ─── tiny helpers ────────────────────────────────────────────────────────────
 const fmtDate = (d) =>
   d
-    ? new Date(d).toLocaleString("en-US", {
+    ? new Date(d).toLocaleString(dateLocale("en-US"), {
         month: "short",
         day: "numeric",
         year: "numeric",
@@ -55,6 +57,7 @@ export default function LessonMarkModal({
   onSuccess,
   isDarkMode = false,
 }) {
+  const { t: tr } = useTranslation("admin");
   const sym = useCurrencySymbol();
   const fmt = (n) => fmtMoney(n, sym);
   const isMarkMode = mode === "mark";
@@ -96,11 +99,11 @@ export default function LessonMarkModal({
       const { data } = await api.get(`/admin/lessons/teacher/${teacherId}/students`);
       setStudentList(data.students || []);
     } catch {
-      setError("Could not load students for this teacher.");
+      setError(tr("lessonMarkModal.couldNotLoadStudentsFor"));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [tr]);
 
   const fetchTeachersForStudent = useCallback(async (studentId) => {
     setLoading(true);
@@ -109,11 +112,11 @@ export default function LessonMarkModal({
       const { data } = await api.get(`/admin/lessons/student/${studentId}/teachers`);
       setTeacherList(data.teachers || []);
     } catch {
-      setError("Could not load teachers for this student.");
+      setError(tr("lessonMarkModal.couldNotLoadTeachersFor"));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [tr]);
 
   const fetchBookings = useCallback(async (teacherId, studentId) => {
     setLoading(true);
@@ -124,11 +127,11 @@ export default function LessonMarkModal({
       );
       setBookingList(data.bookings || []);
     } catch {
-      setError("Could not load classes.");
+      setError(tr("lessonMarkModal.couldNotLoadClasses"));
     } finally {
       setLoading(false);
     }
-  }, [mode]);
+  }, [mode, tr]);
 
   // ── Step navigation ────────────────────────────────────────────────────────
   // Advance to next step and trigger any needed fetches
@@ -182,7 +185,7 @@ export default function LessonMarkModal({
       onSuccess?.(data);
       setStep(4); // done
     } catch (err) {
-      setError(err.response?.data?.message || "Operation failed. Please try again.");
+      setError(err.response?.data?.message || tr("lessonMarkModal.operationFailedPleaseTryAgain"));
     } finally {
       setSubmitting(false);
     }
@@ -225,12 +228,12 @@ export default function LessonMarkModal({
             </div>
             <div>
               <h2 className={`font-bold ${textPrimary}`}>
-                {isMarkMode ? "Mark Lesson Complete" : "Unmark Lesson"}
+                {isMarkMode ? tr("lessonMarkModal.markLessonComplete") : tr("lessonMarkModal.unmarkLesson")}
               </h2>
               <p className={`text-xs ${textSecondary}`}>
                 {isMarkMode
-                  ? "Select the class to mark as completed"
-                  : "Select the completed class to reverse"}
+                  ? tr("lessonMarkModal.selectTheClassToMark")
+                  : tr("lessonMarkModal.selectTheCompletedClassTo")}
               </p>
             </div>
           </div>
@@ -268,19 +271,19 @@ export default function LessonMarkModal({
           {/* ─────────────────────────────────────────────────────────── */}
           {step === 0 && startWith === "teacher" && (
             <>
-              <StepHeader icon={GraduationCap} title="Select Teacher" sub="Choose the teacher for this lesson" />
+              <StepHeader icon={GraduationCap} title={tr("lessonMarkModal.selectTeacher")} sub={tr("lessonMarkModal.chooseTheTeacherForThis")} />
               {/* For step 0 teacher side, we don't have a list — admin pastes teacher from the table so this step is usually skipped */}
               <p className={`text-sm ${textSecondary}`}>
-                This modal was opened without a pre-selected teacher. Please close and click Mark/Unmark from a specific teacher card.
+                {tr("lessonMarkModal.thisModalWasOpenedWithout")}
               </p>
             </>
           )}
 
           {step === 0 && startWith === "student" && (
             <>
-              <StepHeader icon={User} title="Select Student" sub="Choose the student for this lesson" />
+              <StepHeader icon={User} title={tr("lessonMarkModal.selectStudent")} sub={tr("lessonMarkModal.chooseTheStudentForThis")} />
               <p className={`text-sm ${textSecondary}`}>
-                This modal was opened without a pre-selected student. Please close and click Mark/Unmark from a specific student card.
+                {tr("lessonMarkModal.thisModalWasOpenedWithout2")}
               </p>
             </>
           )}
@@ -294,8 +297,8 @@ export default function LessonMarkModal({
                 <>
                   <StepHeader
                     icon={User}
-                    title="Select Student"
-                    sub={`Students assigned to ${selectedTeacher?.firstName} ${selectedTeacher?.lastName}`}
+                    title={tr("lessonMarkModal.selectStudent")}
+                    sub={tr("lessonMarkModal.studentsAssignedTo", { firstName: selectedTeacher?.firstName, lastName: selectedTeacher?.lastName })}
                   />
                   {loading ? (
                     <div className="flex justify-center py-8">
@@ -303,7 +306,7 @@ export default function LessonMarkModal({
                     </div>
                   ) : studentList.length === 0 ? (
                     <p className={`text-sm text-center py-8 ${textSecondary}`}>
-                      No students assigned to this teacher.
+                      {tr("lessonMarkModal.noStudentsAssignedToThis")}
                     </p>
                   ) : (
                     <div className="space-y-2">
@@ -319,11 +322,11 @@ export default function LessonMarkModal({
                             {s.firstName} {s.lastName}
                           </p>
                           <p className={`text-xs mt-0.5 ${textSecondary}`}>
-                            {visibleEmail(s.email) || "Managed student"} · {s.classCredits} class{s.classCredits !== 1 ? "es" : ""} remaining
+                            {visibleEmail(s.email) || tr("lessonMarkModal.managedStudent")} · {s.classCredits} {tr("lessonMarkModal.class")}{s.classCredits !== 1 ? "es" : ""} {tr("lessonMarkModal.remaining")}
                           </p>
                           {isMarkMode && s.classCredits <= 0 && (
                             <span className="inline-block mt-1 text-[10px] px-2 py-0.5 rounded-full bg-red-100 text-red-600">
-                              No classes left
+                              {tr("lessonMarkModal.noClassesLeft")}
                             </span>
                           )}
                         </button>
@@ -335,8 +338,8 @@ export default function LessonMarkModal({
                 <>
                   <StepHeader
                     icon={GraduationCap}
-                    title="Select Teacher"
-                    sub={`Teachers assigned to ${selectedStudent?.firstName} ${selectedStudent?.lastName}`}
+                    title={tr("lessonMarkModal.selectTeacher")}
+                    sub={tr("lessonMarkModal.teachersAssignedTo", { firstName: selectedStudent?.firstName, lastName: selectedStudent?.lastName })}
                   />
                   {loading ? (
                     <div className="flex justify-center py-8">
@@ -344,7 +347,7 @@ export default function LessonMarkModal({
                     </div>
                   ) : teacherList.length === 0 ? (
                     <p className={`text-sm text-center py-8 ${textSecondary}`}>
-                      No teachers assigned to this student.
+                      {tr("lessonMarkModal.noTeachersAssignedToThis")}
                     </p>
                   ) : (
                     <div className="space-y-2">
@@ -360,8 +363,7 @@ export default function LessonMarkModal({
                             {t.displayName?.trim() || `${t.firstName} ${t.lastName}`}
                           </p>
                           <p className={`text-xs mt-0.5 ${textSecondary}`}>
-                            {t.email} · Rate: {fmt(t.ratePerClass)}/class
-                          </p>
+                            {tr("lessonMarkModal.rateClass", { email: t.email, fmt: fmt(t.ratePerClass) })}</p>
                         </button>
                       ))}
                     </div>
@@ -378,11 +380,11 @@ export default function LessonMarkModal({
             <>
               <StepHeader
                 icon={BookOpen}
-                title={isMarkMode ? "Select Class to Mark" : "Select Class to Unmark"}
+                title={isMarkMode ? tr("lessonMarkModal.selectClassToMark") : tr("lessonMarkModal.selectClassToUnmark")}
                 sub={
                   isMarkMode
-                    ? "Choose a class that was not successfully completed"
-                    : "Choose a completed class to reverse"
+                    ? tr("lessonMarkModal.chooseAClassThatWas")
+                    : tr("lessonMarkModal.chooseACompletedClassTo")
                 }
               />
               {loading ? (
@@ -394,8 +396,8 @@ export default function LessonMarkModal({
                   <BookOpen className="w-10 h-10 mx-auto mb-2 opacity-30" />
                   <p className="text-sm">
                     {isMarkMode
-                      ? "No incomplete classes found for this pair."
-                      : "No completed classes found for this pair."}
+                      ? tr("lessonMarkModal.noIncompleteClassesFoundFor")
+                      : tr("lessonMarkModal.noCompletedClassesFoundFor")}
                   </p>
                 </div>
               ) : (
@@ -423,7 +425,7 @@ export default function LessonMarkModal({
                             </span>
                             <span className={`flex items-center gap-1 text-xs ${textSecondary}`}>
                               <Clock className="w-3 h-3" />
-                              {b.duration} min
+                              {b.duration} {tr("lessonMarkModal.min")}
                             </span>
                           </div>
                         </div>
@@ -439,12 +441,12 @@ export default function LessonMarkModal({
                           }`}
                         >
                           {b.status === "completed"
-                            ? "Completed"
+                            ? tr("lessonMarkModal.completed")
                             : b.status === "missed"
-                            ? "Missed"
+                            ? tr("lessonMarkModal.missed")
                             : b.status === "accepted"
-                            ? "Accepted"
-                            : "Pending"}
+                            ? tr("lessonMarkModal.accepted")
+                            : tr("lessonMarkModal.pending")}
                         </span>
                       </div>
                     </button>
@@ -456,14 +458,14 @@ export default function LessonMarkModal({
               {!isMarkMode && selectedBooking && (
                 <div className="mt-4">
                   <label className={`block text-xs font-semibold mb-1.5 ${textSecondary}`}>
-                    Reason for rejection (optional)
+                    {tr("lessonMarkModal.reasonForRejectionOptional")}
                   </label>
                   <div className="relative">
                     <MessageSquare className={`absolute left-3 top-3 w-4 h-4 ${textSecondary}`} />
                     <textarea
                       value={reason}
                       onChange={(e) => setReason(e.target.value)}
-                      placeholder="e.g. Student reported teacher did not show up..."
+                      placeholder={tr("lessonMarkModal.eGStudentReportedTeacher")}
                       rows={3}
                       className={`w-full pl-9 pr-3 py-2.5 text-sm rounded-xl border resize-none focus:outline-none focus:ring-2 focus:ring-rose-400 ${inputCls}`}
                     />
@@ -480,35 +482,35 @@ export default function LessonMarkModal({
             <>
               <StepHeader
                 icon={isMarkMode ? Check : AlertTriangle}
-                title="Confirm Action"
+                title={tr("lessonMarkModal.confirmAction")}
                 sub={`Review the details before ${isMarkMode ? "marking complete" : "rejecting"}`}
               />
 
               {/* Class card */}
               <div className={`rounded-xl border p-4 mb-4 ${cardBg}`}>
-                <p className={`text-sm font-bold ${textPrimary} mb-3`}>📚 Class Details</p>
+                <p className={`text-sm font-bold ${textPrimary} mb-3`}>{tr("lessonMarkModal.classDetails")}</p>
                 <div className="space-y-2">
-                  <InfoRow label="Class" value={selectedBooking.classTitle} textPrimary={textPrimary} textSecondary={textSecondary} />
+                  <InfoRow label={tr("lessonMarkModal.class2")} value={selectedBooking.classTitle} textPrimary={textPrimary} textSecondary={textSecondary} />
                   {selectedBooking.topic && (
-                    <InfoRow label="Topic" value={selectedBooking.topic} textPrimary={textPrimary} textSecondary={textSecondary} />
+                    <InfoRow label={tr("lessonMarkModal.topic")} value={selectedBooking.topic} textPrimary={textPrimary} textSecondary={textSecondary} />
                   )}
-                  <InfoRow label="Scheduled" value={fmtDate(selectedBooking.scheduledTime)} textPrimary={textPrimary} textSecondary={textSecondary} />
-                  <InfoRow label="Duration" value={`${selectedBooking.duration} minutes`} textPrimary={textPrimary} textSecondary={textSecondary} />
+                  <InfoRow label={tr("lessonMarkModal.scheduled")} value={fmtDate(selectedBooking.scheduledTime)} textPrimary={textPrimary} textSecondary={textSecondary} />
+                  <InfoRow label={tr("lessonMarkModal.duration")} value={`${selectedBooking.duration} minutes`} textPrimary={textPrimary} textSecondary={textSecondary} />
                 </div>
               </div>
 
               {/* People card */}
               <div className={`rounded-xl border p-4 mb-4 ${cardBg}`}>
-                <p className={`text-sm font-bold ${textPrimary} mb-3`}>👥 People</p>
+                <p className={`text-sm font-bold ${textPrimary} mb-3`}>{tr("lessonMarkModal.people")}</p>
                 <div className="space-y-2">
                   <InfoRow
-                    label="Teacher"
+                    label={tr("lessonMarkModal.teacher")}
                     value={`${selectedTeacher?.firstName} ${selectedTeacher?.lastName}`}
                     textPrimary={textPrimary}
                     textSecondary={textSecondary}
                   />
                   <InfoRow
-                    label="Student"
+                    label={tr("lessonMarkModal.student")}
                     value={`${selectedStudent?.firstName} ${selectedStudent?.lastName}`}
                     textPrimary={textPrimary}
                     textSecondary={textSecondary}
@@ -523,61 +525,61 @@ export default function LessonMarkModal({
                   : isDarkMode ? "border-rose-700/40 bg-rose-900/20" : "border-rose-200 bg-rose-50"
               }`}>
                 <p className={`text-sm font-bold mb-3 ${isMarkMode ? "text-emerald-600" : "text-rose-600"}`}>
-                  What will happen:
+                  {tr("lessonMarkModal.whatWillHappen")}
                 </p>
                 <ul className="space-y-1.5">
                   {isMarkMode ? (
                     <>
                       <li className="text-xs text-emerald-700 flex items-center gap-2">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0" />
-                        Booking status → Completed
+                        {tr("lessonMarkModal.bookingStatusCompleted")}
                       </li>
                       <li className="text-xs text-emerald-700 flex items-center gap-2">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0" />
-                        Teacher earnings +{fmt(selectedTeacher?.ratePerClass)}
+                        {tr("lessonMarkModal.teacherEarnings")}{fmt(selectedTeacher?.ratePerClass)}
                       </li>
                       <li className="text-xs text-emerald-700 flex items-center gap-2">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0" />
-                        Teacher lessons completed +1
+                        {tr("lessonMarkModal.teacherLessonsCompleted1")}
                       </li>
                       <li className="text-xs text-emerald-700 flex items-center gap-2">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0" />
-                        Student classes remaining -1
+                        {tr("lessonMarkModal.studentClassesRemaining1")}
                       </li>
                       <li className="text-xs text-emerald-700 flex items-center gap-2">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0" />
-                        Payment transaction created (pending)
+                        {tr("lessonMarkModal.paymentTransactionCreatedPending")}
                       </li>
                       <li className="text-xs text-emerald-700 flex items-center gap-2">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0" />
-                        Email sent to both teacher & student
+                        {tr("lessonMarkModal.emailSentToBothTeacher")}
                       </li>
                     </>
                   ) : (
                     <>
                       <li className="text-xs text-rose-700 flex items-center gap-2">
                         <span className="w-1.5 h-1.5 rounded-full bg-rose-500 flex-shrink-0" />
-                        Class flagged as "Rejected by Admin"
+                        {tr("lessonMarkModal.classFlaggedAsRejectedBy")}
                       </li>
                       <li className="text-xs text-rose-700 flex items-center gap-2">
                         <span className="w-1.5 h-1.5 rounded-full bg-rose-500 flex-shrink-0" />
-                        Teacher earnings -{fmt(selectedTeacher?.ratePerClass)}
+                        {tr("lessonMarkModal.teacherEarnings2")}{fmt(selectedTeacher?.ratePerClass)}
                       </li>
                       <li className="text-xs text-rose-700 flex items-center gap-2">
                         <span className="w-1.5 h-1.5 rounded-full bg-rose-500 flex-shrink-0" />
-                        Teacher lessons completed -1
+                        {tr("lessonMarkModal.teacherLessonsCompleted12")}
                       </li>
                       <li className="text-xs text-rose-700 flex items-center gap-2">
                         <span className="w-1.5 h-1.5 rounded-full bg-rose-500 flex-shrink-0" />
-                        Student gets 1 class restored
+                        {tr("lessonMarkModal.studentGets1ClassRestored")}
                       </li>
                       <li className="text-xs text-rose-700 flex items-center gap-2">
                         <span className="w-1.5 h-1.5 rounded-full bg-rose-500 flex-shrink-0" />
-                        Payment transaction cancelled
+                        {tr("lessonMarkModal.paymentTransactionCancelled")}
                       </li>
                       <li className="text-xs text-rose-700 flex items-center gap-2">
                         <span className="w-1.5 h-1.5 rounded-full bg-rose-500 flex-shrink-0" />
-                        Email sent to both teacher & student
+                        {tr("lessonMarkModal.emailSentToBothTeacher")}
                       </li>
                     </>
                   )}
@@ -586,7 +588,7 @@ export default function LessonMarkModal({
 
               {reason && !isMarkMode && (
                 <p className={`text-xs mt-2 ${textSecondary}`}>
-                  <strong>Reason:</strong> {reason}
+                  <strong>{tr("lessonMarkModal.reason")}</strong> {reason}
                 </p>
               )}
             </>
@@ -607,18 +609,18 @@ export default function LessonMarkModal({
                 )}
               </div>
               <h3 className={`text-lg font-bold mb-2 ${textPrimary}`}>
-                {isMarkMode ? "Lesson Marked Complete!" : "Lesson Rejected Successfully!"}
+                {isMarkMode ? tr("lessonMarkModal.lessonMarkedComplete") : tr("lessonMarkModal.lessonRejectedSuccessfully")}
               </h3>
               <p className={`text-sm ${textSecondary} mb-6`}>
                 {isMarkMode
-                  ? "Teacher earnings updated and notification emails sent to both parties."
-                  : "Class flagged as rejected. Student's class has been restored and emails sent."}
+                  ? tr("lessonMarkModal.teacherEarningsUpdatedAndNotification")
+                  : tr("lessonMarkModal.classFlaggedAsRejectedStudent")}
               </p>
               <button
                 onClick={onClose}
                 className={`px-6 py-2.5 rounded-xl text-white font-semibold text-sm ${modeColor.btn} transition-all`}
               >
-                Done
+                {tr("lessonMarkModal.done")}
               </button>
             </div>
           )}
@@ -640,7 +642,7 @@ export default function LessonMarkModal({
               }`}
             >
               <ChevronLeft className="w-4 h-4" />
-              Back
+              {tr("lessonMarkModal.back")}
             </button>
 
             {/* Next / Submit button */}
@@ -656,7 +658,7 @@ export default function LessonMarkModal({
                 className={`flex items-center gap-2 px-5 py-2 rounded-xl text-white text-sm font-semibold transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed ${modeColor.btn}`}
               >
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                Continue
+                {tr("lessonMarkModal.continue")}
                 <ChevronRight className="w-4 h-4" />
               </button>
             ) : (
@@ -673,10 +675,10 @@ export default function LessonMarkModal({
                   <RotateCcw className="w-4 h-4" />
                 )}
                 {submitting
-                  ? "Processing…"
+                  ? tr("lessonMarkModal.processing")
                   : isMarkMode
-                  ? "Mark Complete"
-                  : "Reject Lesson"}
+                  ? tr("lessonMarkModal.markComplete")
+                  : tr("lessonMarkModal.rejectLesson")}
               </button>
             )}
           </div>

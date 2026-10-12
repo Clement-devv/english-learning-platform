@@ -6,9 +6,11 @@ import {
   BookOpen, User, Video, FileText, Info, Loader2, AlertCircle, FlaskConical,
 } from "lucide-react";
 import RecurringBookingForm from "../../../components/bookings/RecurringBookingForm";
+import { useTranslation } from "react-i18next";
 
 // ── Searchable dropdown (same pattern as AssignStudentsTab) ──────────────────
 function SearchableSelect({ options, value, onChange, placeholder, isDarkMode, getId, getLabel, renderOption, disabled }) {
+  const { t: tr } = useTranslation("admin");
   const [open, setOpen]   = useState(false);
   const [query, setQuery] = useState("");
   const containerRef      = useRef(null);
@@ -92,7 +94,7 @@ function SearchableSelect({ options, value, onChange, placeholder, isDarkMode, g
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Type to search…"
+                placeholder={tr("bookingsTab.typeToSearch")}
                 className="text-sm bg-transparent outline-none w-full"
               />
               {query && (
@@ -103,7 +105,7 @@ function SearchableSelect({ options, value, onChange, placeholder, isDarkMode, g
 
           <div className="max-h-52 overflow-y-auto p-1.5 space-y-0.5">
             {filtered.length === 0 ? (
-              <p className={`text-xs text-center py-4 ${mutedCls}`}>No results found</p>
+              <p className={`text-xs text-center py-4 ${mutedCls}`}>{tr("bookingsTab.noResultsFound")}</p>
             ) : (
               filtered.map((o) => {
                 const id         = getId(o);
@@ -127,7 +129,7 @@ function SearchableSelect({ options, value, onChange, placeholder, isDarkMode, g
           </div>
 
           <div className={`px-3 py-1.5 text-xs border-t ${mutedCls} ${dm ? "border-[#2a2f45]" : "border-slate-100"}`}>
-            {filtered.length} of {options.length}
+            {tr("bookingsTab.of", { filteredCount: filtered.length, optionsCount: options.length })}
           </div>
         </div>
       )}
@@ -137,6 +139,7 @@ function SearchableSelect({ options, value, onChange, placeholder, isDarkMode, g
 
 // ── Main component ────────────────────────────────────────────────────────────
 export default function BookingsTab({ teachers = [], students = [], onNotify, isDarkMode }) {
+  const { t: tr } = useTranslation("admin");
   const [teacherId, setTeacherId]       = useState("");
   const [studentId, setStudentId]       = useState("");
   const [classTitle, setClassTitle]     = useState("");
@@ -190,14 +193,14 @@ export default function BookingsTab({ teachers = [], students = [], onNotify, is
   };
 
   const handleSendBooking = async () => {
-    if (!validateForm()) { showToast("Please fix the errors below.", "error"); return; }
+    if (!validateForm()) { showToast(tr("bookingsTab.pleaseFixTheErrorsBelow"), "error"); return; }
     setLoading(true);
     setErrors({});
     try {
       const teacher = teachers.find((t) => t._id === teacherId);
       const student = students.find((s) => s._id === studentId);
       if (!isTrial && student.classCredits <= 0) {
-        showToast(`${student.firstName} ${student.lastName} has no classes remaining.`, "error");
+        showToast(tr("bookingsTab.hasNoClassesRemaining", { firstName: student.firstName, lastName: student.lastName }), "error");
         return;
       }
       await createBooking({
@@ -210,11 +213,11 @@ export default function BookingsTab({ teachers = [], students = [], onNotify, is
         createdBy: "admin",
         isTrial,
       });
-      showToast(`Booking sent to ${teacher.firstName} ${teacher.lastName} for ${student.firstName} ${student.lastName}.`);
+      showToast(tr("bookingsTab.bookingSentToFor", { firstName: teacher.firstName, lastName: teacher.lastName, firstName2: student.firstName, lastName2: student.lastName }));
       if (onNotify) onNotify(`Booking request sent to ${teacher.firstName} ${teacher.lastName}`);
       clearForm();
     } catch (err) {
-      showToast(err.response?.data?.message || err.message || "Failed to create booking.", "error");
+      showToast(err.response?.data?.message || err.message || tr("bookingsTab.failedToCreateBooking"), "error");
     } finally {
       setLoading(false);
     }
@@ -253,15 +256,15 @@ export default function BookingsTab({ teachers = [], students = [], onNotify, is
       {/* ── Header ───────────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h2 className="text-2xl font-bold text-violet-500">Send Booking Request</h2>
-          <p className={`text-sm mt-1 ${th.muted}`}>Create a class request for a teacher to accept.</p>
+          <h2 className="text-2xl font-bold text-violet-500">{tr("bookingsTab.sendBookingRequest")}</h2>
+          <p className={`text-sm mt-1 ${th.muted}`}>{tr("bookingsTab.createAClassRequestFor")}</p>
         </div>
         <button
           onClick={() => setShowRecurringForm(true)}
           className="flex items-center gap-2 px-4 py-2.5 bg-sky-600 hover:bg-sky-700 text-white text-sm font-semibold rounded-xl transition shadow-sm"
         >
           <Repeat size={15} />
-          Recurring Classes
+          {tr("bookingsTab.recurringClasses")}
         </button>
       </div>
 
@@ -272,7 +275,7 @@ export default function BookingsTab({ teachers = [], students = [], onNotify, is
         <div className={`flex-1 min-w-0 rounded-xl border overflow-hidden ${th.card}`}>
           <div className={`px-5 py-4 border-b flex items-center gap-2 ${th.cardHead} ${th.divider}`}>
             <Plus size={16} className="text-violet-500" />
-            <span className="font-semibold text-sm">Booking Details</span>
+            <span className="font-semibold text-sm">{tr("bookingsTab.bookingDetails")}</span>
           </div>
 
           <div className="p-5 space-y-5">
@@ -280,13 +283,13 @@ export default function BookingsTab({ teachers = [], students = [], onNotify, is
             {/* Teacher */}
             <div>
               <label className={`flex items-center gap-1.5 text-xs font-medium mb-1.5 ${th.label}`}>
-                <Video size={12} /> Teacher <span className="text-red-400">*</span>
+                <Video size={12} /> {tr("bookingsTab.teacher")} <span className="text-red-400">*</span>
               </label>
               <SearchableSelect
                 options={teachers}
                 value={teacherId}
                 onChange={(v) => { setTeacherId(v); setErrors((e) => ({ ...e, teacher: "" })); }}
-                placeholder="Select a teacher…"
+                placeholder={tr("bookingsTab.selectATeacher")}
                 isDarkMode={dm}
                 disabled={loading}
                 getId={(o) => o._id}
@@ -308,13 +311,13 @@ export default function BookingsTab({ teachers = [], students = [], onNotify, is
             {/* Student */}
             <div>
               <label className={`flex items-center gap-1.5 text-xs font-medium mb-1.5 ${th.label}`}>
-                <User size={12} /> Student <span className="text-red-400">*</span>
+                <User size={12} /> {tr("bookingsTab.student")} <span className="text-red-400">*</span>
               </label>
               <SearchableSelect
                 options={students}
                 value={studentId}
                 onChange={(v) => { setStudentId(v); setErrors((e) => ({ ...e, student: "" })); }}
-                placeholder="Select a student…"
+                placeholder={tr("bookingsTab.selectAStudent")}
                 isDarkMode={dm}
                 disabled={loading}
                 getId={(o) => o._id}
@@ -326,11 +329,10 @@ export default function BookingsTab({ teachers = [], students = [], onNotify, is
                         {o.firstName} {o.lastName}
                       </div>
                       <div className={`text-xs ${dark ? "text-slate-500" : "text-slate-400"}`}>
-                        {o.classCredits} class{o.classCredits !== 1 ? "es" : ""} remaining
-                      </div>
+                        {tr("bookingsTab.classRemaining", { classCredits: o.classCredits, value: o.classCredits !== 1 ? "es" : "" })}</div>
                     </div>
                     {o.classCredits <= 0 && (
-                      <span className="text-xs px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 flex-shrink-0">No classes</span>
+                      <span className="text-xs px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 flex-shrink-0">{tr("bookingsTab.noClasses")}</span>
                     )}
                   </div>
                 )}
@@ -339,7 +341,7 @@ export default function BookingsTab({ teachers = [], students = [], onNotify, is
               {noClassesLeft && (
                 <div className={`mt-2 flex items-center gap-2 text-xs px-3 py-2 rounded-lg border ${th.warningBg}`}>
                   <AlertCircle size={13} className="flex-shrink-0" />
-                  This student has no classes remaining. Please add classes first.
+                  {tr("bookingsTab.thisStudentHasNoClasses")}
                 </div>
               )}
             </div>
@@ -347,11 +349,11 @@ export default function BookingsTab({ teachers = [], students = [], onNotify, is
             {/* Class Title */}
             <div>
               <label className={`flex items-center gap-1.5 text-xs font-medium mb-1.5 ${th.label}`}>
-                <BookOpen size={12} /> Class Title <span className="text-red-400">*</span>
+                <BookOpen size={12} /> {tr("bookingsTab.classTitle")} <span className="text-red-400">*</span>
               </label>
               <input
                 type="text"
-                placeholder="e.g., Grammar Fundamentals"
+                placeholder={tr("bookingsTab.eGGrammarFundamentals")}
                 className={fieldCls("classTitle")}
                 value={classTitle}
                 onChange={(e) => { setClassTitle(e.target.value); setErrors((er) => ({ ...er, classTitle: "" })); }}
@@ -364,11 +366,11 @@ export default function BookingsTab({ teachers = [], students = [], onNotify, is
             {/* Topic */}
             <div>
               <label className={`flex items-center gap-1.5 text-xs font-medium mb-1.5 ${th.label}`}>
-                <FileText size={12} /> Topic <span className={th.muted + " font-normal"}>(optional)</span>
+                <FileText size={12} /> {tr("bookingsTab.topic")} <span className={th.muted + " font-normal"}>{tr("bookingsTab.optional")}</span>
               </label>
               <input
                 type="text"
-                placeholder="e.g., Present Perfect Tense"
+                placeholder={tr("bookingsTab.eGPresentPerfectTense")}
                 className={fieldCls("topic")}
                 value={topic}
                 onChange={(e) => setTopic(e.target.value)}
@@ -381,7 +383,7 @@ export default function BookingsTab({ teachers = [], students = [], onNotify, is
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className={`flex items-center gap-1.5 text-xs font-medium mb-1.5 ${th.label}`}>
-                  <Clock size={12} /> Duration (min) <span className="text-red-400">*</span>
+                  <Clock size={12} /> {tr("bookingsTab.durationMin")} <span className="text-red-400">*</span>
                 </label>
                 <input
                   type="number"
@@ -398,7 +400,7 @@ export default function BookingsTab({ teachers = [], students = [], onNotify, is
 
               <div>
                 <label className={`flex items-center gap-1.5 text-xs font-medium mb-1.5 ${th.label}`}>
-                  <Calendar size={12} /> Date & Time <span className="text-red-400">*</span>
+                  <Calendar size={12} /> {tr("bookingsTab.dateTime")} <span className="text-red-400">*</span>
                 </label>
                 <input
                   type="datetime-local"
@@ -415,10 +417,10 @@ export default function BookingsTab({ teachers = [], students = [], onNotify, is
             {/* Notes */}
             <div>
               <label className={`flex items-center gap-1.5 text-xs font-medium mb-1.5 ${th.label}`}>
-                <FileText size={12} /> Notes <span className={th.muted + " font-normal"}>(optional)</span>
+                <FileText size={12} /> {tr("bookingsTab.notes")} <span className={th.muted + " font-normal"}>{tr("bookingsTab.optional")}</span>
               </label>
               <textarea
-                placeholder="Any additional information for the teacher…"
+                placeholder={tr("bookingsTab.anyAdditionalInformationForThe")}
                 className={`${fieldCls("notes")} resize-none`}
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
@@ -442,10 +444,10 @@ export default function BookingsTab({ teachers = [], students = [], onNotify, is
                 <FlaskConical size={16} className={isTrial ? "text-amber-500" : dm ? "text-slate-500" : "text-slate-400"} />
                 <div className="min-w-0">
                   <div className={`text-sm font-semibold ${isTrial ? "text-amber-500" : dm ? "text-slate-200" : "text-slate-700"}`}>
-                    Trial Lesson
+                    {tr("bookingsTab.trialLesson")}
                   </div>
                   <div className={`text-xs ${dm ? "text-slate-500" : "text-slate-400"}`}>
-                    No credit deducted · No payment recorded · Student keeps their balance
+                    {tr("bookingsTab.noCreditDeductedNoPayment")}
                   </div>
                 </div>
               </div>
@@ -474,7 +476,7 @@ export default function BookingsTab({ teachers = [], students = [], onNotify, is
                 disabled={loading}
                 className={`px-5 py-2.5 rounded-xl border text-sm font-medium transition ${th.clearBtn}`}
               >
-                Clear
+                {tr("bookingsTab.clear")}
               </button>
             </div>
           </div>
@@ -486,7 +488,7 @@ export default function BookingsTab({ teachers = [], students = [], onNotify, is
           <div className={`rounded-xl border p-5 ${dm ? "bg-[#1a1d27] border-[#1e2235]" : "bg-white border-slate-200"}`}>
             <div className={`flex items-center gap-2 font-semibold text-sm mb-4 ${dm ? "text-blue-300" : "text-blue-700"}`}>
               <Info size={15} />
-              How it works
+              {tr("bookingsTab.howItWorks")}
             </div>
             <ol className="space-y-3">
               {[
@@ -510,12 +512,12 @@ export default function BookingsTab({ teachers = [], students = [], onNotify, is
           <div className={`rounded-xl border p-5 ${dm ? "bg-[#1a1d27] border-[#1e2235]" : "bg-white border-slate-200"}`}>
             <div className={`flex items-center gap-2 font-semibold text-sm mb-3 ${dm ? "text-amber-300" : "text-amber-700"}`}>
               <AlertCircle size={15} />
-              Tips
+              {tr("bookingsTab.tips")}
             </div>
             <ul className={`text-xs space-y-2 ${th.muted}`}>
-              <li className="flex items-start gap-2"><span className="mt-1">•</span> Students with 0 classes remaining cannot be booked.</li>
-              <li className="flex items-start gap-2"><span className="mt-1">•</span> Scheduled time must be at least 1 hour from now.</li>
-              <li className="flex items-start gap-2"><span className="mt-1">•</span> Use Recurring Classes for regular weekly/biweekly sessions.</li>
+              <li className="flex items-start gap-2"><span className="mt-1">•</span> {tr("bookingsTab.studentsWith0ClassesRemaining")}</li>
+              <li className="flex items-start gap-2"><span className="mt-1">•</span> {tr("bookingsTab.scheduledTimeMustBeAt")}</li>
+              <li className="flex items-start gap-2"><span className="mt-1">•</span> {tr("bookingsTab.useRecurringClassesForRegular")}</li>
             </ul>
           </div>
         </div>
@@ -530,7 +532,7 @@ export default function BookingsTab({ teachers = [], students = [], onNotify, is
             <div className={`flex items-center justify-between px-6 py-4 border-b flex-shrink-0 ${th.modalHead} ${th.divider}`}>
               <div className="flex items-center gap-2">
                 <Repeat size={18} className="text-sky-500" />
-                <h2 className="text-lg font-bold">Create Recurring Classes</h2>
+                <h2 className="text-lg font-bold">{tr("bookingsTab.createRecurringClasses")}</h2>
               </div>
               <button
                 onClick={() => setShowRecurringForm(false)}
@@ -547,7 +549,7 @@ export default function BookingsTab({ teachers = [], students = [], onNotify, is
                 onSuccess={(pattern) => {
                   setShowRecurringForm(false);
                   if (onNotify) onNotify(`Created ${pattern.occurrences} recurring classes!`);
-                  showToast(`Created ${pattern.occurrences} recurring classes!`);
+                  showToast(tr("bookingsTab.createdRecurringClasses", { occurrences: pattern.occurrences }));
                 }}
                 onCancel={() => setShowRecurringForm(false)}
               />

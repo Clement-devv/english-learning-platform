@@ -29,6 +29,8 @@ import {
   BellRing,
 } from "lucide-react";
 import { downloadStudentCard } from "../../../utils/studentPdf";
+import { useTranslation } from "react-i18next";
+import { dateLocale } from "../../../i18n/dateLocale.js";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function getInitials(firstName = "", lastName = "") {
@@ -60,7 +62,7 @@ function formatLastPayment(dateStr) {
   if (diffDays === 1) return "Yesterday";
   if (diffDays < 30) return `${diffDays}d ago`;
   if (diffDays < 365) return `${Math.floor(diffDays / 30)}mo ago`;
-  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "2-digit" });
+  return d.toLocaleDateString(dateLocale("en-GB"), { day: "numeric", month: "short", year: "2-digit" });
 }
 
 // Classes remaining urgency level
@@ -72,31 +74,32 @@ function getClassesUrgency(count) {
 }
 
 function ClassesBadge({ count, isDarkMode }) {
+  const { t: tr } = useTranslation("admin");
   const urgency = getClassesUrgency(count);
 
   const styles = {
     empty: {
       bg: isDarkMode ? "bg-red-900/50 border-red-700/50" : "bg-red-50 border-red-200",
       text: isDarkMode ? "text-red-300" : "text-red-700",
-      label: "No classes left",
+      label: tr("studentCard.noClassesLeft"),
       icon: <AlertTriangle className="w-3 h-3" />,
     },
     critical: {
       bg: isDarkMode ? "bg-orange-900/40 border-orange-700/40" : "bg-orange-50 border-orange-200",
       text: isDarkMode ? "text-orange-300" : "text-orange-700",
-      label: `${count} class${count === 1 ? "" : "es"} left`,
+      label: tr("studentCard.classLeft", { count, value: count === 1 ? "" : "es" }),
       icon: <AlertTriangle className="w-3 h-3" />,
     },
     low: {
       bg: isDarkMode ? "bg-amber-900/40 border-amber-700/40" : "bg-amber-50 border-amber-200",
       text: isDarkMode ? "text-amber-300" : "text-amber-700",
-      label: `${count} classes left`,
+      label: tr("studentCard.classesLeft", { count }),
       icon: <BookOpen className="w-3 h-3" />,
     },
     ok: {
       bg: isDarkMode ? "bg-emerald-900/30 border-emerald-700/30" : "bg-emerald-50 border-emerald-200",
       text: isDarkMode ? "text-emerald-300" : "text-emerald-700",
-      label: `${count} classes`,
+      label: tr("studentCard.classes", { count }),
       icon: <BookOpen className="w-3 h-3" />,
     },
   };
@@ -143,6 +146,7 @@ export default function StudentCard({
   onConvert,
   onNotifications,
 }) {
+  const { t: tr } = useTranslation("admin");
   const [menuOpen, setMenuOpen] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [profileExpanded, setProfileExpanded] = useState(false);
@@ -215,21 +219,21 @@ export default function StudentCard({
                     isDarkMode ? "text-white" : "text-gray-900"
                   }`}
                 >
-                  {fullName || "Unnamed Student"}
+                  {fullName || tr("studentCard.unnamedStudent")}
                 </h3>
                 {student.status === "pending" && (
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-700 border border-amber-300 flex-shrink-0">
-                    ⏳ Pending Setup
+                    {tr("studentCard.pendingSetup")}
                   </span>
                 )}
                 {student.isManaged && (
                   <span
-                    title="Admin-managed student with no login"
+                    title={tr("studentCard.adminManagedStudentWithNo")}
                     className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold border flex-shrink-0 ${
                       isDarkMode ? "bg-amber-900/40 text-amber-300 border-amber-700/50" : "bg-amber-50 text-amber-700 border-amber-300"
                     }`}
                   >
-                    Managed
+                    {tr("studentCard.managed")}
                   </span>
                 )}
               </div>
@@ -246,7 +250,7 @@ export default function StudentCard({
                 }`}
               >
                 {student.isManaged ? (
-                  <span className="italic">No login · managed by admin</span>
+                  <span className="italic">{tr("studentCard.noLoginManagedByAdmin")}</span>
                 ) : (
                   <>
                     <Mail className="w-3 h-3 flex-shrink-0" />
@@ -280,18 +284,18 @@ export default function StudentCard({
                     isDarkMode ? "text-gray-500" : "text-gray-400"
                   }`}
                 >
-                  History
+                  {tr("studentCard.history")}
                 </div>
                 <DropdownItem
                   icon={Receipt}
-                  label="Payment History"
+                  label={tr("studentCard.paymentHistory")}
                   color="green"
                   isDarkMode={isDarkMode}
                   onClick={() => { onViewPayment(); setMenuOpen(false); }}
                 />
                 <DropdownItem
                   icon={History}
-                  label="Lesson History"
+                  label={tr("studentCard.lessonHistory")}
                   color="blue"
                   isDarkMode={isDarkMode}
                   onClick={() => { onViewLessons(); setMenuOpen(false); }}
@@ -299,7 +303,7 @@ export default function StudentCard({
                 {onNotifications && (
                   <DropdownItem
                     icon={BellRing}
-                    label="Notifications & reminders"
+                    label={tr("studentCard.notificationsReminders")}
                     color="blue"
                     isDarkMode={isDarkMode}
                     onClick={() => { onNotifications(); setMenuOpen(false); }}
@@ -314,25 +318,25 @@ export default function StudentCard({
                     isDarkMode ? "text-gray-500" : "text-gray-400"
                   }`}
                 >
-                  Actions
+                  {tr("studentCard.actions")}
                 </div>
                 <DropdownItem
                   icon={DollarSign}
-                  label="Manual Payment"
+                  label={tr("studentCard.manualPayment")}
                   color="emerald"
                   isDarkMode={isDarkMode}
                   onClick={() => { onManualPayment(); setMenuOpen(false); }}
                 />
                 <DropdownItem
                   icon={BookOpen}
-                  label="Mark Lesson"
+                  label={tr("studentCard.markLesson")}
                   color="purple"
                   isDarkMode={isDarkMode}
                   onClick={() => { onMarkLesson(); setMenuOpen(false); }}
                 />
                 <DropdownItem
                   icon={MinusCircle}
-                  label="Unmark Lesson"
+                  label={tr("studentCard.unmarkLesson")}
                   color="rose"
                   isDarkMode={isDarkMode}
                   onClick={() => { onUnmarkLesson(); setMenuOpen(false); }}
@@ -340,7 +344,7 @@ export default function StudentCard({
                 {!student.isManaged && (
                   <DropdownItem
                     icon={RotateCcw}
-                    label="Reset Password"
+                    label={tr("studentCard.resetPassword")}
                     color="amber"
                     isDarkMode={isDarkMode}
                     onClick={() => { onResetPassword(); setMenuOpen(false); }}
@@ -349,7 +353,7 @@ export default function StudentCard({
                 {student.tempPassword && !student.isManaged && (
                   <DropdownItem
                     icon={Copy}
-                    label="Copy Password"
+                    label={tr("studentCard.copyPassword")}
                     color="indigo"
                     isDarkMode={isDarkMode}
                     onClick={() => { onCopyPassword(); setMenuOpen(false); }}
@@ -358,7 +362,7 @@ export default function StudentCard({
 
                 <DropdownItem
                   icon={FileDown}
-                  label="Download PDF"
+                  label={tr("studentCard.downloadPdf")}
                   color="indigo"
                   isDarkMode={isDarkMode}
                   onClick={() => { downloadStudentCard(student).catch(console.error); setMenuOpen(false); }}
@@ -367,7 +371,7 @@ export default function StudentCard({
                 {student.status === "pending" && !student.isManaged && (
                   <DropdownItem
                     icon={Mail}
-                    label="Resend Invite"
+                    label={tr("studentCard.resendInvite")}
                     color="blue"
                     isDarkMode={isDarkMode}
                     onClick={() => { onResendInvite(); setMenuOpen(false); }}
@@ -377,7 +381,7 @@ export default function StudentCard({
                 {student.isManaged && onConvert && (
                   <DropdownItem
                     icon={KeyRound}
-                    label="Give Login Access"
+                    label={tr("studentCard.giveLoginAccess")}
                     color="blue"
                     isDarkMode={isDarkMode}
                     onClick={() => { onConvert(); setMenuOpen(false); }}
@@ -389,7 +393,7 @@ export default function StudentCard({
                 {/* Danger zone */}
                 <DropdownItem
                   icon={Trash2}
-                  label="Delete Student"
+                  label={tr("studentCard.deleteStudent")}
                   color="red"
                   isDarkMode={isDarkMode}
                   onClick={() => { onDelete(); setMenuOpen(false); }}
@@ -407,19 +411,19 @@ export default function StudentCard({
         {/* ── Stats row ── */}
         <div className="grid grid-cols-3 gap-2 mb-4">
           <StatPill
-            label="Age"
+            label={tr("studentCard.age")}
             value={student.age ? `${student.age}y` : "—"}
             color="blue"
             isDarkMode={isDarkMode}
           />
           <StatPill
-            label="Classes"
+            label={tr("studentCard.classes2")}
             value={student.classCredits ?? 0}
             color="amber"
             isDarkMode={isDarkMode}
           />
           <StatPill
-            label="Last Pay"
+            label={tr("studentCard.lastPay")}
             value={formatLastPayment(student.lastPaymentDate)}
             color="purple"
             isDarkMode={isDarkMode}
@@ -436,7 +440,7 @@ export default function StudentCard({
             }`}
           >
             <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
-            Needs top-up — account will disable
+            {tr("studentCard.needsTopUpAccountWill")}
           </div>
         )}
 
@@ -454,7 +458,7 @@ export default function StudentCard({
                 isDarkMode ? "text-amber-300" : "text-amber-700"
               }`}
             >
-              🔑 Temporary Password
+              {tr("studentCard.temporaryPassword")}
             </p>
             <div className="flex items-center gap-2">
               <code
@@ -479,7 +483,7 @@ export default function StudentCard({
                 className={`p-1.5 rounded-lg flex-shrink-0 ${
                   isDarkMode ? "hover:bg-amber-800/40 text-amber-400" : "hover:bg-amber-100 text-amber-600"
                 }`}
-                title="Copy password"
+                title={tr("studentCard.copyPassword2")}
               >
                 <Copy className="w-3.5 h-3.5" />
               </button>
@@ -502,7 +506,7 @@ export default function StudentCard({
             >
               <span className="flex items-center gap-1.5">
                 <GraduationCap className="w-3.5 h-3.5" />
-                Profile Details
+                {tr("studentCard.profileDetails")}
               </span>
               {profileExpanded
                 ? <ChevronUp className="w-3.5 h-3.5" />
@@ -534,7 +538,7 @@ export default function StudentCard({
                   <div className="flex items-center gap-2">
                     <Calendar className={`w-3 h-3 flex-shrink-0 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`} />
                     <span className={`text-xs ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>
-                      {new Date(student.dateOfBirth).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                      {new Date(student.dateOfBirth).toLocaleDateString(dateLocale("en-GB"), { day: "numeric", month: "short", year: "numeric" })}
                     </span>
                   </div>
                 )}
@@ -554,7 +558,7 @@ export default function StudentCard({
             }`}
           >
             <Edit3 className="w-3.5 h-3.5" />
-            Edit
+            {tr("studentCard.edit")}
           </button>
 
           <button

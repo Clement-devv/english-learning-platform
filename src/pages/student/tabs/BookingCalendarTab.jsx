@@ -12,11 +12,13 @@ import {
   getMonday, addDays, localYmd, localHHMM, fmtTime, fmtRange, fmtDay, viewerTz, tzName,
   startTimes, fitsFree, overlapsAny, sameDay,
 } from '../../../utils/scheduleView';
+import { useTranslation } from "react-i18next";
 
 const F = "'Nunito','Inter',sans-serif";
 const DURATIONS = [30, 45, 60, 90];
 
 export default function BookingCalendarTab({ isDarkMode }) {
+  const { t: tr } = useTranslation("student");
   const col = {
     card:    isDarkMode ? '#1a1d2e' : '#ffffff',
     border:  isDarkMode ? '#2a2d40' : '#ffe8cc',
@@ -49,9 +51,9 @@ export default function BookingCalendarTab({ isDarkMode }) {
   useEffect(() => {
     api.get('/teachers/for-booking')
       .then(res => setTeachers(res.data?.teachers || []))
-      .catch(() => flash('Failed to load teachers'))
+      .catch(() => flash(tr("bookingCalendarTab.failedToLoadTeachers")))
       .finally(() => setLoadingT(false));
-  }, []);
+  }, [tr]);
 
   const loadWeek = useCallback(async () => {
     if (!selectedTeacher) return;
@@ -62,9 +64,9 @@ export default function BookingCalendarTab({ isDarkMode }) {
       });
       setCal(data);
     } catch {
-      flash('Failed to load schedule');
+      flash(tr("bookingCalendarTab.failedToLoadSchedule"));
     } finally { setLoading(false); }
-  }, [selectedTeacher, weekStart]);
+  }, [selectedTeacher, tr, weekStart]);
   useEffect(() => { loadWeek(); }, [loadWeek]);
   useOnDataChanged(['schedule', 'bookings'], loadWeek); // live: free time changes as others book
 
@@ -79,10 +81,10 @@ export default function BookingCalendarTab({ isDarkMode }) {
 
   const items = useMemo(() => blocks.map(b => ({
     ...b,
-    title: b.mine ? (b.kind === 'pending' ? 'Your request' : 'Your class') : 'Unavailable',
+    title: b.mine ? (b.kind === 'pending' ? tr("bookingCalendarTab.yourRequest") : tr("bookingCalendarTab.yourClass")) : tr("bookingCalendarTab.unavailable"),
     sub: b.mine ? b.title : '',
     kind: b.mine ? b.kind : 'busy',
-  })), [blocks]);
+  })), [blocks, tr]);
 
   // ── Request form ───────────────────────────────────────────────────────────
   const openRequest = (at) => {
@@ -104,8 +106,8 @@ export default function BookingCalendarTab({ isDarkMode }) {
     !canBook(modalStart, modal.duration) ? (cal.hasHours ? "That time isn't free for this teacher — pick one of the free times." : 'That time clashes with another class — please pick a different time.') : '';
 
   const handleSubmit = async () => {
-    if (!formTitle.trim()) return flash('Please enter a class title');
-    if (!formTopic.trim()) return flash('Please enter a class topic');
+    if (!formTitle.trim()) return flash(tr("bookingCalendarTab.pleaseEnterAClassTitle"));
+    if (!formTopic.trim()) return flash(tr("bookingCalendarTab.pleaseEnterAClassTopic"));
     if (timeError) return;
     setSubmitting(true);
     try {
@@ -114,10 +116,10 @@ export default function BookingCalendarTab({ isDarkMode }) {
         scheduledTime: modalStart.toISOString(), duration: modal.duration,
       });
       setModal(null);
-      flash(`✅ Request sent for ${fmtDay(modalStart)}, ${fmtTime(modalStart)}. You'll be notified when the teacher confirms.`);
+      flash(tr("bookingCalendarTab.requestSentForYouLl", { fmtDay: fmtDay(modalStart), fmtTime: fmtTime(modalStart) }));
       loadWeek();
     } catch (err) {
-      flash(err.response?.data?.message || 'Failed to send booking request');
+      flash(err.response?.data?.message || tr("bookingCalendarTab.failedToSendBookingRequest"));
       loadWeek();
     } finally { setSubmitting(false); }
   };
@@ -145,15 +147,15 @@ export default function BookingCalendarTab({ isDarkMode }) {
       {step === 'pick-teacher' && (
         <>
           <div style={{ marginBottom: 20 }}>
-            <h2 style={{ margin: '0 0 4px', fontSize: 20, fontWeight: 900, color: col.heading }}>Book a Class</h2>
-            <p style={{ margin: 0, fontSize: 13, color: col.muted }}>Choose a teacher to see their free times — shown in your own time ({tzName(myTz)})</p>
+            <h2 style={{ margin: '0 0 4px', fontSize: 20, fontWeight: 900, color: col.heading }}>{tr("bookingCalendarTab.bookAClass")}</h2>
+            <p style={{ margin: 0, fontSize: 13, color: col.muted }}>{tr("bookingCalendarTab.chooseATeacherToSee", { tzName: tzName(myTz) })}</p>
           </div>
           {loadingT ? (
             <div style={{ display: 'flex', justifyContent: 'center', padding: 60 }}><Loader size={28} color={col.accent} style={{ animation: 'spin 1s linear infinite' }} /></div>
           ) : teachers.length === 0 ? (
             <div style={{ textAlign: 'center', padding: 60, background: col.card, borderRadius: 20, border: `2px solid ${col.border}` }}>
               <Calendar size={40} color={col.muted} style={{ margin: '0 auto 12px' }} />
-              <p style={{ color: col.muted, fontWeight: 700, margin: 0 }}>No teachers available right now</p>
+              <p style={{ color: col.muted, fontWeight: 700, margin: 0 }}>{tr("bookingCalendarTab.noTeachersAvailableRightNow")}</p>
             </div>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))', gap: 14 }}>
@@ -174,7 +176,7 @@ export default function BookingCalendarTab({ isDarkMode }) {
                       {t.specializations.slice(0, 3).map(s => <span key={s} style={{ fontSize: 11, fontWeight: 700, background: isDarkMode ? 'rgba(249,115,22,0.12)' : '#fff7ed', color: col.accent, borderRadius: 999, padding: '2px 8px' }}>{s}</span>)}
                     </div>
                   )}
-                  <div style={{ fontSize: 12, fontWeight: 700, color: col.accent }}>See free times →</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: col.accent }}>{tr("bookingCalendarTab.seeFreeTimes")}</div>
                 </button>
               ))}
             </div>
@@ -187,7 +189,7 @@ export default function BookingCalendarTab({ isDarkMode }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             <button type="button" onClick={() => setStep('pick-teacher')} style={{ ...btn(isDarkMode ? '#2a2d40' : '#f5f0ec', col.body), display: 'flex', alignItems: 'center', gap: 5 }}>
-              <ChevronLeft size={14} /> Teachers
+              <ChevronLeft size={14} /> {tr("bookingCalendarTab.teachers")}
             </button>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <div style={{ width: 38, height: 38, borderRadius: 12, background: ORANGE, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 900, fontSize: 16, overflow: 'hidden', flexShrink: 0 }}>
@@ -195,28 +197,28 @@ export default function BookingCalendarTab({ isDarkMode }) {
               </div>
               <div>
                 <div style={{ fontSize: 15, fontWeight: 900, color: col.heading }}>{selectedTeacher.firstName} {selectedTeacher.lastName}</div>
-                <div style={{ fontSize: 12, color: col.muted, display: 'flex', alignItems: 'center', gap: 4 }}><Globe size={11} /> Times are in your time: {tzName(myTz)}</div>
+                <div style={{ fontSize: 12, color: col.muted, display: 'flex', alignItems: 'center', gap: 4 }}><Globe size={11} /> {tr("bookingCalendarTab.timesAreInYourTime")} {tzName(myTz)}</div>
               </div>
             </div>
             <button type="button" onClick={() => openRequest()} disabled={cal.hidden}
-              style={{ ...btn(ORANGE, '#fff', cal.hidden), marginLeft: 'auto', padding: '10px 18px' }}>+ Request a class</button>
+              style={{ ...btn(ORANGE, '#fff', cal.hidden), marginLeft: 'auto', padding: '10px 18px' }}>{tr("bookingCalendarTab.requestAClass")}</button>
           </div>
 
           {cal.hidden ? (
             <div style={{ padding: 24, borderRadius: 16, background: col.card, border: `2px solid ${col.border}`, color: col.body, fontWeight: 700, textAlign: 'center' }}>
-              This teacher isn't taking bookings here right now.
+              {tr("bookingCalendarTab.thisTeacherIsnTTaking")}
             </div>
           ) : (
             <>
               <div style={{ padding: '12px 14px', borderRadius: 14, background: col.card, border: `2px solid ${col.border}`, display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: 12.5, fontWeight: 800, color: col.heading, display: 'flex', alignItems: 'center', gap: 5 }}><Clock size={13} /> Class length:</span>
-                  {DURATIONS.map(d => <button key={d} type="button" onClick={() => setDuration(d)} style={chip(duration === d)}>{d} min</button>)}
+                  <span style={{ fontSize: 12.5, fontWeight: 800, color: col.heading, display: 'flex', alignItems: 'center', gap: 5 }}><Clock size={13} /> {tr("bookingCalendarTab.classLength")}</span>
+                  {DURATIONS.map(d => <button key={d} type="button" onClick={() => setDuration(d)} style={chip(duration === d)}>{tr("bookingCalendarTab.min", { d })}</button>)}
                 </div>
                 {cal.hasHours ? (
                   nextTimes.length ? (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: 12.5, fontWeight: 800, color: col.heading }}>Next free times:</span>
+                      <span style={{ fontSize: 12.5, fontWeight: 800, color: col.heading }}>{tr("bookingCalendarTab.nextFreeTimes")}</span>
                       {nextTimes.map(t => (
                         <button key={t.toISOString()} type="button" onClick={() => openRequest(t)}
                           style={{ ...chip(false), borderColor: '#10b981', color: isDarkMode ? '#6ee7b7' : '#047857', background: isDarkMode ? 'rgba(16,185,129,0.12)' : '#ecfdf5' }}>
@@ -224,10 +226,10 @@ export default function BookingCalendarTab({ isDarkMode }) {
                         </button>
                       ))}
                     </div>
-                  ) : <span style={{ fontSize: 13, color: col.muted, fontWeight: 700 }}>No free {duration}-minute times this week — try next week or a shorter class.</span>
+                  ) : <span style={{ fontSize: 13, color: col.muted, fontWeight: 700 }}>{tr("bookingCalendarTab.noFreeMinuteTimesThis", { duration })}</span>
                 ) : (
                   <span style={{ fontSize: 13, color: col.body, fontWeight: 600 }}>
-                    This teacher hasn't set their working hours yet. Pick any time that suits you — they'll confirm or suggest another.
+                    {tr("bookingCalendarTab.thisTeacherHasnTSet")}
                   </span>
                 )}
               </div>
@@ -239,7 +241,7 @@ export default function BookingCalendarTab({ isDarkMode }) {
                 pickDuration={duration}
                 onPickTime={cal.hasHours ? (at) => openRequest(at) : undefined}
                 onEmptyClick={cal.hasHours ? undefined : (at) => openRequest(at)}
-                emptyText={cal.hasHours ? 'No free time' : 'Nothing booked'}
+                emptyText={cal.hasHours ? tr("bookingCalendarTab.noFreeTime") : tr("bookingCalendarTab.nothingBooked")}
               />
             </>
           )}
@@ -249,30 +251,30 @@ export default function BookingCalendarTab({ isDarkMode }) {
       {/* ═════ REQUEST MODAL ═════ */}
       {modal && (
         <div onClick={() => setModal(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: 16 }}>
-          <div onClick={e => e.stopPropagation()} role="dialog" aria-label="Request a class"
+          <div onClick={e => e.stopPropagation()} role="dialog" aria-label={tr("bookingCalendarTab.requestAClass2")}
             style={{ background: col.card, borderRadius: 24, padding: 24, width: '100%', maxWidth: 480, fontFamily: F, maxHeight: '90vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div style={{ display: 'flex', alignItems: 'center' }}>
-              <h3 style={{ margin: 0, fontSize: 18, fontWeight: 900, color: col.heading, flex: 1 }}>Request a class with {selectedTeacher?.firstName}</h3>
-              <button type="button" aria-label="Close" onClick={() => setModal(null)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} color={col.muted} /></button>
+              <h3 style={{ margin: 0, fontSize: 18, fontWeight: 900, color: col.heading, flex: 1 }}>{tr("bookingCalendarTab.requestAClassWith", { firstName: selectedTeacher?.firstName })}</h3>
+              <button type="button" aria-label={tr("bookingCalendarTab.close")} onClick={() => setModal(null)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} color={col.muted} /></button>
             </div>
 
             <div style={{ padding: '12px 14px', borderRadius: 14, background: isDarkMode ? 'rgba(16,185,129,0.10)' : '#ecfdf5', border: '1.5px solid #86efac' }}>
               <div style={{ fontSize: 16, fontWeight: 900, color: isDarkMode ? '#6ee7b7' : '#047857' }}>
-                {modalStart && !isNaN(modalStart) ? `${fmtDay(modalStart)} · ${fmtRange(modalStart, modalEnd)}` : 'Choose a time'}
+                {modalStart && !isNaN(modalStart) ? `${fmtDay(modalStart)} · ${fmtRange(modalStart, modalEnd)}` : tr("bookingCalendarTab.chooseATime")}
               </div>
-              <div style={{ fontSize: 12, color: col.body, marginTop: 2 }}>Your time ({tzName(myTz)}) · {modal.duration} minutes</div>
+              <div style={{ fontSize: 12, color: col.body, marginTop: 2 }}>{tr("bookingCalendarTab.yourTimeMinutes", { tzName: tzName(myTz), duration: modal.duration })}</div>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
               <div>
-                <label style={lbl} htmlFor="bk-date">Date</label>
+                <label style={lbl} htmlFor="bk-date">{tr("bookingCalendarTab.date")}</label>
                 <input id="bk-date" type="date" value={modal.date} min={localYmd(new Date())} onChange={e => setModal(m => ({ ...m, date: e.target.value }))} style={inp} />
               </div>
               <div>
-                <label style={lbl} htmlFor="bk-start">Start</label>
+                <label style={lbl} htmlFor="bk-start">{tr("bookingCalendarTab.start")}</label>
                 {cal.hasHours ? (
                   <select id="bk-start" value={modal.start} onChange={e => setModal(m => ({ ...m, start: e.target.value }))} style={inp}>
-                    {!dayOptions.some(t => localHHMM(t) === modal.start) && <option value={modal.start}>{fmtTime(modalStart)} (not free)</option>}
+                    {!dayOptions.some(t => localHHMM(t) === modal.start) && <option value={modal.start}>{tr("bookingCalendarTab.notFree", { fmtTime: fmtTime(modalStart) })}</option>}
                     {dayOptions.map(t => <option key={t.toISOString()} value={localHHMM(t)}>{fmtTime(t)}</option>)}
                   </select>
                 ) : (
@@ -280,13 +282,13 @@ export default function BookingCalendarTab({ isDarkMode }) {
                 )}
               </div>
               <div>
-                <label style={lbl} htmlFor="bk-dur">Length</label>
+                <label style={lbl} htmlFor="bk-dur">{tr("bookingCalendarTab.length")}</label>
                 <select id="bk-dur" value={modal.duration} onChange={e => setModal(m => ({ ...m, duration: Number(e.target.value) }))} style={inp}>
-                  {DURATIONS.map(d => <option key={d} value={d}>{d} min</option>)}
+                  {DURATIONS.map(d => <option key={d} value={d}>{tr("bookingCalendarTab.min", { d })}</option>)}
                 </select>
               </div>
             </div>
-            {cal.hasHours && dayOptions.length === 0 && <div style={{ fontSize: 12.5, color: col.muted, fontWeight: 700 }}>No free {modal.duration}-minute times on this day.</div>}
+            {cal.hasHours && dayOptions.length === 0 && <div style={{ fontSize: 12.5, color: col.muted, fontWeight: 700 }}>{tr("bookingCalendarTab.noFreeMinuteTimesOn", { duration: modal.duration })}</div>}
 
             {timeError && (
               <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', background: '#fef2f2', border: '1.5px solid #fecaca', borderRadius: 12, padding: '10px 14px' }}>
@@ -296,24 +298,24 @@ export default function BookingCalendarTab({ isDarkMode }) {
             )}
 
             <div>
-              <label style={lbl} htmlFor="bk-title">Class title *</label>
-              <input id="bk-title" value={formTitle} maxLength={200} onChange={e => setFormTitle(e.target.value)} placeholder="e.g. Speaking practice" style={inp} />
+              <label style={lbl} htmlFor="bk-title">{tr("bookingCalendarTab.classTitle")}</label>
+              <input id="bk-title" value={formTitle} maxLength={200} onChange={e => setFormTitle(e.target.value)} placeholder={tr("bookingCalendarTab.eGSpeakingPractice")} style={inp} />
             </div>
             <div>
-              <label style={lbl} htmlFor="bk-topic">Topic *</label>
-              <input id="bk-topic" value={formTopic} maxLength={500} onChange={e => setFormTopic(e.target.value)} placeholder="e.g. Job interviews, IELTS writing" style={inp} />
+              <label style={lbl} htmlFor="bk-topic">{tr("bookingCalendarTab.topic")}</label>
+              <input id="bk-topic" value={formTopic} maxLength={500} onChange={e => setFormTopic(e.target.value)} placeholder={tr("bookingCalendarTab.eGJobInterviewsIelts")} style={inp} />
             </div>
             <div>
-              <label style={lbl} htmlFor="bk-notes">Notes for teacher (optional)</label>
-              <textarea id="bk-notes" value={formNotes} maxLength={2000} onChange={e => setFormNotes(e.target.value)} rows={3} placeholder="Anything you'd like to cover…" style={{ ...inp, resize: 'vertical' }} />
+              <label style={lbl} htmlFor="bk-notes">{tr("bookingCalendarTab.notesForTeacherOptional")}</label>
+              <textarea id="bk-notes" value={formNotes} maxLength={2000} onChange={e => setFormNotes(e.target.value)} rows={3} placeholder={tr("bookingCalendarTab.anythingYouDLikeTo")} style={{ ...inp, resize: 'vertical' }} />
             </div>
 
-            <p style={{ fontSize: 12, color: col.muted, margin: 0, fontWeight: 600 }}>The teacher will accept or decline your request. A class is only used up when it's completed.</p>
+            <p style={{ fontSize: 12, color: col.muted, margin: 0, fontWeight: 600 }}>{tr("bookingCalendarTab.theTeacherWillAcceptOr")}</p>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-              <button type="button" onClick={() => setModal(null)} style={btn(isDarkMode ? '#2a2d40' : '#f5f0ec', col.body)}>Cancel</button>
+              <button type="button" onClick={() => setModal(null)} style={btn(isDarkMode ? '#2a2d40' : '#f5f0ec', col.body)}>{tr("bookingCalendarTab.cancel")}</button>
               <button type="button" onClick={handleSubmit} disabled={submitting || !formTitle.trim() || !formTopic.trim() || !!timeError}
                 style={btn(ORANGE, '#fff', submitting || !formTitle.trim() || !formTopic.trim() || !!timeError)}>
-                {submitting ? 'Sending…' : 'Send request'}
+                {submitting ? tr("bookingCalendarTab.sending") : tr("bookingCalendarTab.sendRequest")}
               </button>
             </div>
           </div>

@@ -2,8 +2,10 @@
 import React from "react";
 import { LogOut, Shield } from "lucide-react";
 import { useAuth } from "../../../context/AuthContext.jsx";
+import { useTranslation } from "react-i18next";
 
 export default function Header({ onLogout }) {
+  const { t: tr } = useTranslation("admin");
   const { user: adminInfo } = useAuth();
 
   return (
@@ -16,8 +18,8 @@ export default function Header({ onLogout }) {
               <Shield className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-gray-900">Admin Dashboard</h1>
-              <p className="text-xs text-gray-500">Platform Management</p>
+              <h1 className="text-xl font-bold text-gray-900">{tr("header.adminDashboard")}</h1>
+              <p className="text-xs text-gray-500">{tr("header.platformManagement")}</p>
             </div>
           </div>
 
@@ -27,7 +29,7 @@ export default function Header({ onLogout }) {
             {adminInfo?.email && (
               <div className="hidden sm:block text-right">
                 <p className="text-sm font-semibold text-gray-900">
-                  {adminInfo.firstName || "Admin"} {adminInfo.lastName || ""}
+                  {adminInfo.firstName || tr("header.admin")} {adminInfo.lastName || ""}
                 </p>
                 <p className="text-xs text-gray-500">{adminInfo.email}</p>
               </div>
@@ -39,7 +41,7 @@ export default function Header({ onLogout }) {
               className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors font-medium"
             >
               <LogOut className="w-4 h-4" />
-              <span className="hidden sm:inline">Logout</span>
+              <span className="hidden sm:inline">{tr("header.logout")}</span>
             </button>
           </div>
         </div>

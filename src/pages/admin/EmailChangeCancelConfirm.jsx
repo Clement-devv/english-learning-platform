@@ -7,10 +7,12 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { useTranslation } from "react-i18next";
 
 const BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5000') + '/api/v1';
 
 export default function EmailChangeCancelConfirm() {
+  const { t: tr } = useTranslation("admin");
   const { token } = useParams();
   const navigate  = useNavigate();
 
@@ -23,20 +25,20 @@ export default function EmailChangeCancelConfirm() {
       const res = await axios.post(`${BASE_URL}/admin/email-change/cancel`, { token });
       if (res.data.success) {
         setStatus('success');
-        setMessage(res.data.message || 'Email change cancelled.');
+        setMessage(res.data.message || tr("emailChangeCancelConfirm.emailChangeCancelled"));
         setTimeout(() => navigate('/admin/login'), 3500);
       } else {
         setStatus('error');
-        setMessage(res.data.message || 'Something went wrong.');
+        setMessage(res.data.message || tr("emailChangeCancelConfirm.somethingWentWrong"));
       }
     } catch (err) {
       const data = err.response?.data;
       if (err.response?.status === 410) {
         setStatus('expired');
-        setMessage(data?.message || 'This cancel link is no longer valid.');
+        setMessage(data?.message || tr("emailChangeCancelConfirm.thisCancelLinkIsNo"));
       } else {
         setStatus('error');
-        setMessage(data?.message || 'Failed to cancel. Please try again.');
+        setMessage(data?.message || tr("emailChangeCancelConfirm.failedToCancelPleaseTry"));
       }
     }
   };
@@ -68,13 +70,13 @@ export default function EmailChangeCancelConfirm() {
           <>
             <div style={{ fontSize: '52px', marginBottom: '16px' }}>🚫</div>
             <h1 style={{ margin: '0 0 10px', fontSize: '22px', fontWeight: 900, color: col.danger }}>
-              Cancel Email Change?
+              {tr("emailChangeCancelConfirm.cancelEmailChange")}
             </h1>
             <p style={{ color: col.muted, fontSize: '14px', margin: '0 0 12px', lineHeight: 1.6 }}>
-              You are about to cancel the pending admin email change for this center.
+              {tr("emailChangeCancelConfirm.youAreAboutToCancel")}
             </p>
             <p style={{ color: col.muted, fontSize: '14px', margin: '0 0 28px', lineHeight: 1.6 }}>
-              If the change was already applied, your original email will be restored and all sessions will be signed out.
+              {tr("emailChangeCancelConfirm.ifTheChangeWasAlready")}
             </p>
             <button
               onClick={handleCancel}
@@ -84,7 +86,7 @@ export default function EmailChangeCancelConfirm() {
                 cursor: 'pointer', marginBottom: '12px',
               }}
             >
-              Yes, Cancel the Change
+              {tr("emailChangeCancelConfirm.yesCancelTheChange")}
             </button>
             <button
               onClick={() => navigate('/admin/login')}
@@ -94,7 +96,7 @@ export default function EmailChangeCancelConfirm() {
                 color: col.muted, fontSize: '14px', fontWeight: 600, cursor: 'pointer',
               }}
             >
-              Never mind — go to login
+              {tr("emailChangeCancelConfirm.neverMindGoToLogin")}
             </button>
           </>
         )}
@@ -103,9 +105,9 @@ export default function EmailChangeCancelConfirm() {
           <>
             <div style={{ fontSize: '52px', marginBottom: '16px' }}>⏳</div>
             <h1 style={{ margin: '0 0 10px', fontSize: '22px', fontWeight: 900, color: col.text }}>
-              Processing…
+              {tr("emailChangeCancelConfirm.processing")}
             </h1>
-            <p style={{ color: col.muted, fontSize: '14px', margin: 0 }}>Please wait.</p>
+            <p style={{ color: col.muted, fontSize: '14px', margin: 0 }}>{tr("emailChangeCancelConfirm.pleaseWait")}</p>
           </>
         )}
 
@@ -113,10 +115,10 @@ export default function EmailChangeCancelConfirm() {
           <>
             <div style={{ fontSize: '52px', marginBottom: '16px' }}>✅</div>
             <h1 style={{ margin: '0 0 10px', fontSize: '22px', fontWeight: 900, color: col.success }}>
-              Cancelled
+              {tr("emailChangeCancelConfirm.cancelled")}
             </h1>
             <p style={{ color: col.muted, fontSize: '14px', margin: '0 0 20px' }}>{message}</p>
-            <p style={{ color: col.muted, fontSize: '13px', margin: 0 }}>Redirecting to login…</p>
+            <p style={{ color: col.muted, fontSize: '13px', margin: 0 }}>{tr("emailChangeCancelConfirm.redirectingToLogin")}</p>
           </>
         )}
 
@@ -124,11 +126,11 @@ export default function EmailChangeCancelConfirm() {
           <>
             <div style={{ fontSize: '52px', marginBottom: '16px' }}>⏱</div>
             <h1 style={{ margin: '0 0 10px', fontSize: '22px', fontWeight: 900, color: col.warn }}>
-              Link Expired
+              {tr("emailChangeCancelConfirm.linkExpired")}
             </h1>
             <p style={{ color: col.muted, fontSize: '14px', margin: '0 0 24px' }}>{message}</p>
             <p style={{ color: col.muted, fontSize: '13px', margin: '0 0 20px' }}>
-              If you believe your account was compromised, contact platform support.
+              {tr("emailChangeCancelConfirm.ifYouBelieveYourAccount")}
             </p>
             <button
               onClick={() => navigate('/admin/login')}
@@ -138,7 +140,7 @@ export default function EmailChangeCancelConfirm() {
                 fontWeight: 700, cursor: 'pointer',
               }}
             >
-              Go to Login
+              {tr("emailChangeCancelConfirm.goToLogin")}
             </button>
           </>
         )}
@@ -147,7 +149,7 @@ export default function EmailChangeCancelConfirm() {
           <>
             <div style={{ fontSize: '52px', marginBottom: '16px' }}>⚠️</div>
             <h1 style={{ margin: '0 0 10px', fontSize: '22px', fontWeight: 900, color: col.danger }}>
-              Something Went Wrong
+              {tr("emailChangeCancelConfirm.somethingWentWrong2")}
             </h1>
             <p style={{ color: col.muted, fontSize: '14px', margin: '0 0 24px' }}>{message}</p>
             <button
@@ -158,7 +160,7 @@ export default function EmailChangeCancelConfirm() {
                 fontWeight: 700, cursor: 'pointer',
               }}
             >
-              Try Again
+              {tr("emailChangeCancelConfirm.tryAgain")}
             </button>
           </>
         )}

@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { downloadTeacherCard } from "../../../utils/teacherPdf";
 import { useCurrencySymbol } from "../../../hooks/useCurrencySymbol";
+import { useTranslation } from "react-i18next";
 
 function getInitials(firstName = "", lastName = "") {
   return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
@@ -31,6 +32,7 @@ function getAvatarColor(name = "") {
 }
 
 function ContinentBadge({ continent, isDarkMode }) {
+  const { t: tr } = useTranslation("admin");
   const map = {
     Africa: { bg: isDarkMode ? "bg-amber-900/50 text-amber-300" : "bg-amber-100 text-amber-800", emoji: "🌍" },
     Europe: { bg: isDarkMode ? "bg-blue-900/50 text-blue-300" : "bg-blue-100 text-blue-800", emoji: "🌍" },
@@ -45,13 +47,14 @@ function ContinentBadge({ continent, isDarkMode }) {
   return (
     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${style.bg}`}>
       <Globe className="w-3 h-3" />
-      {continent || "Unknown"}
+      {continent || tr("teacherCard.unknown")}
     </span>
   );
 }
 
 // Renders 5 stars with partial fill via CSS clip trick
 function StarRating({ rating, totalRatings, isDarkMode }) {
+  const { t: tr } = useTranslation("admin");
   const pct = Math.round((rating / 5) * 100);
   return (
     <div className="flex items-center gap-1.5">
@@ -69,9 +72,7 @@ function StarRating({ rating, totalRatings, isDarkMode }) {
       <span className={`text-xs font-bold ${isDarkMode ? "text-amber-400" : "text-amber-500"}`}>
         {rating.toFixed(1)}
       </span>
-      <span className={`text-xs ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
-        ({totalRatings} review{totalRatings !== 1 ? "s" : ""})
-      </span>
+      <span className={`text-xs ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>{tr("teacherCard.review", { totalRatings, value: totalRatings !== 1 ? "s" : "" })}</span>
     </div>
   );
 }
@@ -104,6 +105,7 @@ export default function TeacherCard({
   onPayHistory,
   onResendInvite,
 }) {
+  const { t: tr } = useTranslation("admin");
   const [menuOpen, setMenuOpen] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [profileExpanded, setProfileExpanded] = useState(false);
@@ -196,7 +198,7 @@ export default function TeacherCard({
                   isDarkMode ? "text-white" : "text-gray-900"
                 }`}
               >
-                {displayName || fullName || "Unnamed Teacher"}
+                {displayName || fullName || tr("teacherCard.unnamedTeacher")}
               </h3>
               {displayName && (
                 <p className={`text-xs truncate mt-0.5 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
@@ -236,7 +238,7 @@ export default function TeacherCard({
                   <>
                     <DropdownItem
                       icon={Send}
-                      label="Resend Invite"
+                      label={tr("teacherCard.resendInvite")}
                       color="amber"
                       isDarkMode={isDarkMode}
                       onClick={() => {
@@ -249,7 +251,7 @@ export default function TeacherCard({
                 )}
                 <DropdownItem
                   icon={BookOpen}
-                  label="Mark Lesson"
+                  label={tr("teacherCard.markLesson")}
                   color="blue"
                   isDarkMode={isDarkMode}
                   onClick={() => {
@@ -259,7 +261,7 @@ export default function TeacherCard({
                 />
                 <DropdownItem
                   icon={MinusCircle}
-                  label="Unmark Lesson"
+                  label={tr("teacherCard.unmarkLesson")}
                   color="rose"
                   isDarkMode={isDarkMode}
                   onClick={() => {
@@ -269,7 +271,7 @@ export default function TeacherCard({
                 />
                 <DropdownItem
                   icon={DollarSign}
-                  label="Mark as Paid"
+                  label={tr("teacherCard.markAsPaid")}
                   color="emerald"
                   isDarkMode={isDarkMode}
                   onClick={() => {
@@ -279,7 +281,7 @@ export default function TeacherCard({
                 />
                 <DropdownItem
                   icon={History}
-                  label="Payment History"
+                  label={tr("teacherCard.paymentHistory")}
                   color="indigo"
                   isDarkMode={isDarkMode}
                   onClick={() => {
@@ -289,7 +291,7 @@ export default function TeacherCard({
                 />
                 <DropdownItem
                   icon={RotateCcw}
-                  label="Reset Password"
+                  label={tr("teacherCard.resetPassword")}
                   color="purple"
                   isDarkMode={isDarkMode}
                   onClick={() => {
@@ -300,7 +302,7 @@ export default function TeacherCard({
                 {teacher.password && (
                   <DropdownItem
                     icon={Copy}
-                    label="Copy Password"
+                    label={tr("teacherCard.copyPassword")}
                     color="indigo"
                     isDarkMode={isDarkMode}
                     onClick={() => {
@@ -312,7 +314,7 @@ export default function TeacherCard({
 
                 <DropdownItem
                   icon={FileDown}
-                  label="Download PDF"
+                  label={tr("teacherCard.downloadPdf")}
                   color="indigo"
                   isDarkMode={isDarkMode}
                   onClick={() => { downloadTeacherCard(teacher).catch(err => { console.error(err); alert(`Could not create the PDF: ${err?.message || "unknown error"}`); }); setMenuOpen(false); }}
@@ -327,7 +329,7 @@ export default function TeacherCard({
 
                 <DropdownItem
                   icon={Trash2}
-                  label="Delete Teacher"
+                  label={tr("teacherCard.deleteTeacher")}
                   color="red"
                   isDarkMode={isDarkMode}
                   onClick={() => {
@@ -348,7 +350,7 @@ export default function TeacherCard({
               isDarkMode ? "bg-amber-900/50 text-amber-300" : "bg-amber-100 text-amber-700"
             }`}>
               <Clock className="w-3 h-3" />
-              Pending Setup
+              {tr("teacherCard.pendingSetup")}
             </span>
           )}
         </div>
@@ -359,7 +361,7 @@ export default function TeacherCard({
             <StarRating rating={teacher.avgRating} totalRatings={teacher.totalRatings} isDarkMode={isDarkMode} />
           ) : (
             <span className={`text-xs italic ${isDarkMode ? "text-gray-600" : "text-gray-400"}`}>
-              No reviews yet
+              {tr("teacherCard.noReviewsYet")}
             </span>
           )}
         </div>
@@ -367,19 +369,19 @@ export default function TeacherCard({
         {/* Stats row */}
         <div className="grid grid-cols-3 gap-2 mb-4">
           <StatPill
-            label="Rate"
+            label={tr("teacherCard.rate")}
             value={`${sym}${teacher.ratePerClass || 0}`}
             color="blue"
             isDarkMode={isDarkMode}
           />
           <StatPill
-            label="Lessons"
+            label={tr("teacherCard.lessons")}
             value={teacher.lessonsCompleted || 0}
             color="amber"
             isDarkMode={isDarkMode}
           />
           <StatPill
-            label="Earned"
+            label={tr("teacherCard.earned")}
             value={`${sym}${earned}`}
             color="green"
             isDarkMode={isDarkMode}
@@ -398,7 +400,7 @@ export default function TeacherCard({
                 isDarkMode ? "text-gray-400 hover:text-gray-200" : "text-gray-500 hover:text-gray-700"
               }`}
             >
-              <span>Profile Details</span>
+              <span>{tr("teacherCard.profileDetails")}</span>
               <ChevronDown
                 className={`w-3.5 h-3.5 transition-transform duration-200 ${profileExpanded ? "rotate-180" : ""}`}
               />
@@ -425,7 +427,7 @@ export default function TeacherCard({
                 )}
                 {teacher.yearsOfExperience > 0 && (
                   <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${isDarkMode ? "bg-purple-900/40 text-purple-300" : "bg-purple-50 text-purple-700"}`}>
-                    <TrendingUp className="w-3 h-3" />{teacher.yearsOfExperience} yrs exp
+                    <TrendingUp className="w-3 h-3" />{teacher.yearsOfExperience} {tr("teacherCard.yrsExp")}
                   </span>
                 )}
               </div>
@@ -435,7 +437,7 @@ export default function TeacherCard({
             {teacher.specializations?.length > 0 && (
               <div>
                 <p className={`text-xs font-semibold mb-1.5 flex items-center gap-1 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
-                  <BookOpen className="w-3 h-3" /> Specializations
+                  <BookOpen className="w-3 h-3" /> {tr("teacherCard.specializations")}
                 </p>
                 <div className="flex flex-wrap gap-1">
                   {teacher.specializations.slice(0, 4).map((s) => (
@@ -444,9 +446,7 @@ export default function TeacherCard({
                     </span>
                   ))}
                   {teacher.specializations.length > 4 && (
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${isDarkMode ? "bg-gray-600 text-gray-300" : "bg-gray-100 text-gray-500"}`}>
-                      +{teacher.specializations.length - 4} more
-                    </span>
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${isDarkMode ? "bg-gray-600 text-gray-300" : "bg-gray-100 text-gray-500"}`}>{tr("teacherCard.more", { value: teacher.specializations.length - 4 })}</span>
                   )}
                 </div>
               </div>
@@ -456,7 +456,7 @@ export default function TeacherCard({
             {teacher.certifications?.length > 0 && (
               <div>
                 <p className={`text-xs font-semibold mb-1.5 flex items-center gap-1 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
-                  <Award className="w-3 h-3" /> Certifications
+                  <Award className="w-3 h-3" /> {tr("teacherCard.certifications")}
                 </p>
                 <div className="flex flex-wrap gap-1">
                   {teacher.certifications.map((c) => (
@@ -476,7 +476,7 @@ export default function TeacherCard({
                 rel="noopener noreferrer"
                 className={`inline-flex items-center gap-1.5 text-xs font-medium hover:underline ${isDarkMode ? "text-cyan-400" : "text-cyan-600"}`}
               >
-                <Video className="w-3 h-3" /> Meet Link
+                <Video className="w-3 h-3" /> {tr("teacherCard.meetLink")}
               </a>
             )}
             {/* Zoom link */}
@@ -487,7 +487,7 @@ export default function TeacherCard({
                 rel="noopener noreferrer"
                 className={`inline-flex items-center gap-1.5 text-xs font-medium hover:underline ${isDarkMode ? "text-blue-400" : "text-blue-600"}`}
               >
-                <span style={{ fontWeight: 900, fontSize: 11, fontFamily: "Arial,sans-serif" }}>Z</span> Zoom Link
+                <span style={{ fontWeight: 900, fontSize: 11, fontFamily: "Arial,sans-serif" }}>Z</span> {tr("teacherCard.zoomLink")}
               </a>
             )}
           </div>
@@ -509,7 +509,7 @@ export default function TeacherCard({
                 isDarkMode ? "text-amber-300" : "text-amber-700"
               }`}
             >
-              🔑 Temporary Password
+              {tr("teacherCard.temporaryPassword")}
             </p>
             <div className="flex items-center gap-2">
               <code
@@ -542,7 +542,7 @@ export default function TeacherCard({
                     ? "hover:bg-amber-800/40 text-amber-400"
                     : "hover:bg-amber-100 text-amber-600"
                 }`}
-                title="Copy password"
+                title={tr("teacherCard.copyPassword2")}
               >
                 <Copy className="w-3.5 h-3.5" />
               </button>
@@ -562,7 +562,7 @@ export default function TeacherCard({
             } shadow-sm`}
           >
             <Edit3 className="w-3.5 h-3.5" />
-            Edit
+            {tr("teacherCard.edit")}
           </button>
 
           {/* Toggle active/disabled */}

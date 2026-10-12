@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { User, DollarSign, BookOpen, Award, X, ChevronDown, Banknote } from "lucide-react";
 import { TIMEZONE_OPTIONS } from "../../../utils/timezone";
+import { useTranslation } from "react-i18next";
 
 const SPECIALIZATIONS = [
   "General English", "Business English", "Conversation",
@@ -76,6 +77,7 @@ function CheckGroup({ options, selected, onChange }) {
 }
 
 export default function TeacherModal({ isOpen, onClose, onSave, initialData }) {
+  const { t: tr } = useTranslation("admin");
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
   const isEdit = !!initialData;
@@ -148,12 +150,12 @@ export default function TeacherModal({ isOpen, onClose, onSave, initialData }) {
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700 flex-shrink-0">
           <div>
             <h2 className="text-lg font-bold text-gray-900 dark:text-white">
-              {isEdit ? "Edit Teacher" : "Add New Teacher"}
+              {isEdit ? tr("teacherModal.editTeacher") : tr("teacherModal.addNewTeacher")}
             </h2>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
               {isEdit
-                ? "Update teacher profile details"
-                : "Fill in the details — an invite email will be sent"}
+                ? tr("teacherModal.updateTeacherProfileDetails")
+                : tr("teacherModal.fillInTheDetailsAn")}
             </p>
           </div>
           <button
@@ -168,38 +170,38 @@ export default function TeacherModal({ isOpen, onClose, onSave, initialData }) {
         <div className="overflow-y-auto flex-1 min-h-0 px-6 py-5 space-y-6">
 
           {/* Personal Info */}
-          <Section icon={User} title="Personal Information">
+          <Section icon={User} title={tr("teacherModal.personalInformation")}>
             <div className="grid grid-cols-2 gap-3">
-              <Field label="First Name" required>
-                <input value={form.firstName} onChange={set("firstName")} className={inputCls} placeholder="Jane" required />
+              <Field label={tr("teacherModal.firstName")} required>
+                <input value={form.firstName} onChange={set("firstName")} className={inputCls} placeholder={tr("teacherModal.jane")} required />
               </Field>
-              <Field label="Last Name" required>
-                <input value={form.lastName} onChange={set("lastName")} className={inputCls} placeholder="Smith" required />
+              <Field label={tr("teacherModal.lastName")} required>
+                <input value={form.lastName} onChange={set("lastName")} className={inputCls} placeholder={tr("teacherModal.smith")} required />
               </Field>
             </div>
-            <Field label="Display Name" hint="Nickname shown to students — leave blank to use real name">
+            <Field label={tr("teacherModal.displayName")} hint={tr("teacherModal.nicknameShownToStudentsLeave")}>
               <input value={form.displayName} onChange={set("displayName")} className={inputCls} placeholder={`${form.firstName || "Jane"} ${form.lastName || "Smith"}`.trim()} maxLength={50} />
             </Field>
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Email" required>
+              <Field label={tr("teacherModal.email")} required>
                 <input
                   value={form.email} onChange={set("email")} type="email"
                   className={inputCls + (isEdit ? " opacity-60 cursor-not-allowed" : "")}
-                  placeholder="jane@example.com" required disabled={isEdit}
+                  placeholder={tr("teacherModal.janeExampleCom")} required disabled={isEdit}
                 />
               </Field>
-              <Field label="Phone / WhatsApp">
+              <Field label={tr("teacherModal.phoneWhatsapp")}>
                 <input value={form.phone} onChange={set("phone")} type="tel" className={inputCls} placeholder="+1 234 567 8900" />
               </Field>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Country">
-                <input value={form.country} onChange={set("country")} className={inputCls} placeholder="e.g. Nigeria" />
+              <Field label={tr("teacherModal.country")}>
+                <input value={form.country} onChange={set("country")} className={inputCls} placeholder={tr("teacherModal.eGNigeria")} />
               </Field>
-              <Field label="Continent" required>
+              <Field label={tr("teacherModal.continent")} required>
                 <div className="relative">
                   <select value={form.continent} onChange={set("continent")} className={inputCls + " appearance-none pr-8"} required>
-                    <option value="">Select continent</option>
+                    <option value="">{tr("teacherModal.selectContinent")}</option>
                     {CONTINENTS.map((c) => <option key={c} value={c}>{c}</option>)}
                   </select>
                   <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
@@ -211,19 +213,19 @@ export default function TeacherModal({ isOpen, onClose, onSave, initialData }) {
           <div className="border-t border-gray-100 dark:border-gray-700" />
 
           {/* Professional Details */}
-          <Section icon={DollarSign} title="Professional Details">
+          <Section icon={DollarSign} title={tr("teacherModal.professionalDetails")}>
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Rate per Class (USD)">
+              <Field label={tr("teacherModal.ratePerClassUsd")}>
                 <input value={form.ratePerClass} onChange={set("ratePerClass")} type="number" min="0" step="0.50" className={inputCls} placeholder="e.g. 15.00" />
               </Field>
-              <Field label="Years of Experience">
+              <Field label={tr("teacherModal.yearsOfExperience")}>
                 <input value={form.yearsOfExperience} onChange={set("yearsOfExperience")} type="number" min="0" max="50" className={inputCls} placeholder="e.g. 3" />
               </Field>
             </div>
-            <Field label="Timezone">
+            <Field label={tr("teacherModal.timezone")}>
               <div className="relative">
                 <select value={form.timezone} onChange={set("timezone")} className={inputCls + " appearance-none pr-8"}>
-                  <option value="">Select timezone</option>
+                  <option value="">{tr("teacherModal.selectTimezone")}</option>
                   {TIMEZONE_OPTIONS.map((tz) => (
                     <option key={tz.value} value={tz.value}>{tz.label}</option>
                   ))}
@@ -232,10 +234,10 @@ export default function TeacherModal({ isOpen, onClose, onSave, initialData }) {
               </div>
             </Field>
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Google Meet Link">
+              <Field label={tr("teacherModal.googleMeetLink")}>
                 <input value={form.googleMeetLink} onChange={set("googleMeetLink")} type="url" className={inputCls} placeholder="https://meet.google.com/..." />
               </Field>
-              <Field label="Zoom Link">
+              <Field label={tr("teacherModal.zoomLink")}>
                 <input value={form.zoomLink} onChange={set("zoomLink")} type="url" className={inputCls} placeholder="https://zoom.us/j/123456789" />
               </Field>
             </div>
@@ -244,18 +246,18 @@ export default function TeacherModal({ isOpen, onClose, onSave, initialData }) {
           <div className="border-t border-gray-100 dark:border-gray-700" />
 
           {/* Teaching Profile */}
-          <Section icon={BookOpen} title="Teaching Profile">
-            <Field label="Specializations" hint="Select all that apply">
+          <Section icon={BookOpen} title={tr("teacherModal.teachingProfile")}>
+            <Field label={tr("teacherModal.specializations")} hint={tr("teacherModal.selectAllThatApply")}>
               <CheckGroup options={SPECIALIZATIONS} selected={form.specializations} onChange={setVal("specializations")} />
             </Field>
-            <Field label="Certifications" hint="Select all that apply">
+            <Field label={tr("teacherModal.certifications")} hint={tr("teacherModal.selectAllThatApply")}>
               <CheckGroup options={CERTIFICATIONS} selected={form.certifications} onChange={setVal("certifications")} />
             </Field>
-            <Field label="Bio / About" hint="Brief description shown to students">
+            <Field label={tr("teacherModal.bioAbout")} hint={tr("teacherModal.briefDescriptionShownToStudents")}>
               <textarea
                 value={form.bio} onChange={set("bio")} rows={3} maxLength={500}
                 className={inputCls + " resize-none"}
-                placeholder="e.g. Experienced IELTS coach with a passion for helping students reach their goals..."
+                placeholder={tr("teacherModal.eGExperiencedIeltsCoach")}
               />
               <p className="text-xs text-gray-400 dark:text-gray-500 mt-1 text-right">{form.bio.length}/500</p>
             </Field>
@@ -265,13 +267,13 @@ export default function TeacherModal({ isOpen, onClose, onSave, initialData }) {
           {isEdit && (
             <>
               <div className="border-t border-gray-100 dark:border-gray-700" />
-              <Section icon={Banknote} title="Bank Details">
+              <Section icon={Banknote} title={tr("teacherModal.bankDetails")}>
                 {initialData?.bankName || initialData?.accountNumber ? (
                   <div className="space-y-3">
                     {[
-                      { label: "Account Holder Name", value: initialData?.accountName },
-                      { label: "Bank Name",            value: initialData?.bankName },
-                      { label: "Account Number",       value: initialData?.accountNumber },
+                      { label: tr("teacherModal.accountHolderName"), value: initialData?.accountName },
+                      { label: tr("teacherModal.bankName"),            value: initialData?.bankName },
+                      { label: tr("teacherModal.accountNumber"),       value: initialData?.accountNumber },
                     ].map(({ label, value }) => (
                       <Field key={label} label={label}>
                         <div className={inputCls + " opacity-70 cursor-default bg-gray-50 dark:bg-gray-700/50"}>
@@ -282,7 +284,7 @@ export default function TeacherModal({ isOpen, onClose, onSave, initialData }) {
                   </div>
                 ) : (
                   <p className="text-sm text-gray-400 dark:text-gray-500">
-                    Teacher has not added bank details yet.
+                    {tr("teacherModal.teacherHasNotAddedBank")}
                   </p>
                 )}
               </Section>
@@ -293,9 +295,9 @@ export default function TeacherModal({ isOpen, onClose, onSave, initialData }) {
           {!isEdit && (
             <>
               <div className="border-t border-gray-100 dark:border-gray-700" />
-              <Section icon={Award} title="Account">
-                <Field label="Temporary Password" hint="Leave blank — teacher sets their own password via invite email">
-                  <input value={form.password} onChange={set("password")} type="text" className={inputCls} placeholder="Optional override" />
+              <Section icon={Award} title={tr("teacherModal.account")}>
+                <Field label={tr("teacherModal.temporaryPassword")} hint={tr("teacherModal.leaveBlankTeacherSetsTheir")}>
+                  <input value={form.password} onChange={set("password")} type="text" className={inputCls} placeholder={tr("teacherModal.optionalOverride")} />
                 </Field>
               </Section>
             </>
@@ -305,22 +307,22 @@ export default function TeacherModal({ isOpen, onClose, onSave, initialData }) {
         {/* Footer */}
         <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 dark:border-gray-700 flex-shrink-0 bg-gray-50 dark:bg-gray-800/50 rounded-b-2xl">
           <p className="text-xs text-gray-400 dark:text-gray-500">
-            {isEdit ? "Changes save immediately" : "An invite email will be sent to the teacher"}
+            {isEdit ? tr("teacherModal.changesSaveImmediately") : tr("teacherModal.anInviteEmailWillBe")}
           </p>
           <div className="flex gap-3">
             <button
               type="button" onClick={onClose}
               className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition"
             >
-              Cancel
+              {tr("teacherModal.cancel")}
             </button>
             <button
               type="button" onClick={handleSubmit} disabled={saving}
               className="px-5 py-2 text-sm font-medium bg-brand-primary text-white rounded-lg hover:opacity-90 transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {saving
-                ? (isEdit ? "Saving…" : "Sending invite…")
-                : (isEdit ? "Save Changes" : "Create & Send Invite")}
+                ? (isEdit ? tr("teacherModal.saving") : tr("teacherModal.sendingInvite"))
+                : (isEdit ? tr("teacherModal.saveChanges") : tr("teacherModal.createSendInvite"))}
             </button>
           </div>
         </div>

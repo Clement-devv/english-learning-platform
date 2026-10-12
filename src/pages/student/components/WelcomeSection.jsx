@@ -2,8 +2,11 @@
 
 import React from "react";
 import { Smile } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import { dateLocale } from "../../../i18n/dateLocale.js";
 
 export default function WelcomeSection({ studentName = "Student" }) {
+  const { t: tr } = useTranslation("student");
   const today = new Date();
   const hours = today.getHours();
 
@@ -12,7 +15,7 @@ export default function WelcomeSection({ studentName = "Student" }) {
   else if (hours < 18) greeting = "Good Afternoon";
   else greeting = "Good Evening";
 
-  const dateString = today.toLocaleDateString("en-US", {
+  const dateString = today.toLocaleDateString(dateLocale("en-US"), {
     weekday: "long",
     month: "long",
     day: "numeric",
@@ -25,7 +28,7 @@ export default function WelcomeSection({ studentName = "Student" }) {
           {greeting}, {studentName}! 👋
         </h1>
         <p className="text-sm sm:text-base mt-1 opacity-90">
-          Welcome back! Let’s make today a productive learning day.
+          {tr("welcomeSection.welcomeBackLetSMake")}
         </p>
         <p className="text-xs sm:text-sm mt-2 opacity-80">{dateString}</p>
       </div>

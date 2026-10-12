@@ -1,6 +1,7 @@
 // src/pages/admin/components/TeacherTable.jsx
 import React, { useState } from "react";
 import { useCurrencySymbol } from "../../../hooks/useCurrencySymbol";
+import { useTranslation } from "react-i18next";
 
 export default function TeacherTable({
   teachers,
@@ -13,6 +14,7 @@ export default function TeacherTable({
   onCopyPassword,
   onResetPassword,
 }) {
+  const { t: tr } = useTranslation("admin");
   const sym = useCurrencySymbol();
   const [continentFilter, setContinentFilter] = useState("All");
 
@@ -30,38 +32,38 @@ export default function TeacherTable({
     <div className="mt-4 overflow-x-auto">
       {/* Continent Filter */}
       <div className="mb-3 flex items-center gap-3">
-        <label className="font-medium">Filter by Continent:</label>
+        <label className="font-medium">{tr("teacherTable.filterByContinent")}</label>
         <select
           value={continentFilter}
           onChange={(e) => setContinentFilter(e.target.value)}
           className="border px-3 py-1 rounded shadow-sm"
         >
-          <option value="All">All</option>
-          <option value="Africa">Africa</option>
-          <option value="Asia">Asia</option>
-          <option value="Europe">Europe</option>
+          <option value="All">{tr("teacherTable.all")}</option>
+          <option value="Africa">{tr("teacherTable.africa")}</option>
+          <option value="Asia">{tr("teacherTable.asia")}</option>
+          <option value="Europe">{tr("teacherTable.europe")}</option>
         </select>
       </div>
 
       <table className="w-full border-collapse border border-gray-300 shadow-sm text-sm">
         <thead className="bg-gray-100">
           <tr>
-            <th className="border p-2">First</th>
-            <th className="border p-2">Last</th>
-            <th className="border p-2">Email</th>
-            <th className="border p-2">Rate ({sym})</th>
-            <th className="border p-2">Lessons</th>
-            <th className="border p-2">Earned ({sym})</th>
-            <th className="border p-2">Continent</th>
-            <th className="border p-2">Password</th>
-            <th className="border p-2">Actions</th>
+            <th className="border p-2">{tr("teacherTable.first")}</th>
+            <th className="border p-2">{tr("teacherTable.last")}</th>
+            <th className="border p-2">{tr("teacherTable.email")}</th>
+            <th className="border p-2">{tr("teacherTable.rate", { sym })}</th>
+            <th className="border p-2">{tr("teacherTable.lessons")}</th>
+            <th className="border p-2">{tr("teacherTable.earned", { sym })}</th>
+            <th className="border p-2">{tr("teacherTable.continent")}</th>
+            <th className="border p-2">{tr("teacherTable.password")}</th>
+            <th className="border p-2">{tr("teacherTable.actions")}</th>
           </tr>
         </thead>
         <tbody>
           {filteredTeachers.length === 0 ? (
             <tr>
               <td colSpan="9" className="text-center p-4 text-gray-500 italic">
-                No teachers found
+                {tr("teacherTable.noTeachersFound")}
               </td>
             </tr>
           ) : (
@@ -82,7 +84,7 @@ export default function TeacherTable({
                       {t.password}
                     </span>
                   ) : (
-                    <span className="text-gray-400 italic text-xs">Hidden</span>
+                    <span className="text-gray-400 italic text-xs">{tr("teacherTable.hidden")}</span>
                   )}
                 </td>
 
@@ -94,14 +96,14 @@ export default function TeacherTable({
                       onClick={() => onEdit(i)}
                       className="px-2 py-1 bg-yellow-500 text-white rounded hover:bg-yellow-600"
                     >
-                      Edit
+                      {tr("teacherTable.edit")}
                     </button>
 
                     <button
                       onClick={() => onDelete(i)}
                       className="px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600"
                     >
-                      Delete
+                      {tr("teacherTable.delete")}
                     </button>
 
                     <button
@@ -110,7 +112,7 @@ export default function TeacherTable({
                         t.active ? "bg-gray-500 hover:bg-gray-600" : "bg-green-600 hover:bg-green-700"
                       }`}
                     >
-                      {t.active ? "Disable" : "Enable"}
+                      {t.active ? tr("teacherTable.disable") : tr("teacherTable.enable")}
                     </button>
 
                     {/* ✅ Mark Lesson */}
@@ -118,7 +120,7 @@ export default function TeacherTable({
                       onClick={() => onMarkLesson(i)}
                       className="px-2 py-1 bg-emerald-600 text-white rounded hover:bg-emerald-700"
                     >
-                      ✅ Mark
+                      {tr("teacherTable.mark")}
                     </button>
 
                     {/* ✅ NEW: Unmark Lesson */}
@@ -126,14 +128,14 @@ export default function TeacherTable({
                       onClick={() => onUnmarkLesson(i)}
                       className="px-2 py-1 bg-rose-600 text-white rounded hover:bg-rose-700"
                     >
-                      ⚠️ Unmark
+                      {tr("teacherTable.unmark")}
                     </button>
 
                     <button
                       onClick={() => onPay(i)}
                       className="px-2 py-1 bg-yellow-600 text-white rounded hover:bg-yellow-700"
                     >
-                      Paid
+                      {tr("teacherTable.paid")}
                     </button>
 
                     {t.password && (
@@ -142,13 +144,13 @@ export default function TeacherTable({
                           onClick={() => onCopyPassword(i)}
                           className="px-2 py-1 bg-indigo-500 text-white rounded hover:bg-indigo-600"
                         >
-                          Copy
+                          {tr("teacherTable.copy")}
                         </button>
                         <button
                           onClick={() => onResetPassword(i)}
                           className="px-2 py-1 bg-purple-500 text-white rounded hover:bg-purple-600"
                         >
-                          Reset
+                          {tr("teacherTable.reset")}
                         </button>
                       </>
                     )}
@@ -163,8 +165,7 @@ export default function TeacherTable({
 
       {/* Total salary footer */}
       {filteredTeachers.length > 0 && (
-        <div className="mt-3 text-right pr-2 text-gray-700 font-semibold">
-          Total Salaries: {sym}{totalSalary.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        <div className="mt-3 text-right pr-2 text-gray-700 font-semibold">{tr("teacherTable.totalSalaries", { sym, value: totalSalary.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) })}
         </div>
       )}
     </div>

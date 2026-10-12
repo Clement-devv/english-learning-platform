@@ -7,10 +7,12 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { useTranslation } from "react-i18next";
 
 const BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:5000') + '/api/v1';
 
 export default function EmailChangeVerify() {
+  const { t: tr } = useTranslation("admin");
   const { token } = useParams();
   const navigate  = useNavigate();
 
@@ -24,20 +26,20 @@ export default function EmailChangeVerify() {
       const res = await axios.post(`${BASE_URL}/admin/email-change/verify`, { token });
       if (res.data.success) {
         setStatus('success');
-        setMessage(res.data.message || 'Email changed successfully.');
+        setMessage(res.data.message || tr("emailChangeVerify.emailChangedSuccessfully"));
         setTimeout(() => navigate('/admin/login?emailChanged=1'), 3000);
       } else {
         setStatus('error');
-        setMessage(res.data.message || 'Something went wrong.');
+        setMessage(res.data.message || tr("emailChangeVerify.somethingWentWrong"));
       }
     } catch (err) {
       const data = err.response?.data;
       if (err.response?.status === 410) {
         setStatus(data?.expired ? 'expired' : 'invalid');
-        setMessage(data?.message || 'This link is no longer valid.');
+        setMessage(data?.message || tr("emailChangeVerify.thisLinkIsNoLonger"));
       } else {
         setStatus('error');
-        setMessage(data?.message || 'Failed to verify. Please try again.');
+        setMessage(data?.message || tr("emailChangeVerify.failedToVerifyPleaseTry"));
       }
     }
   };
@@ -80,10 +82,10 @@ export default function EmailChangeVerify() {
         {status === 'idle' && (
           <>
             <h1 style={{ margin: '0 0 10px', fontSize: '22px', fontWeight: 900, color: col.text }}>
-              Confirm Email Change
+              {tr("emailChangeVerify.confirmEmailChange")}
             </h1>
             <p style={{ color: col.muted, fontSize: '14px', margin: '0 0 28px', lineHeight: 1.6 }}>
-              You are about to change the admin login email for this center. All existing sessions will be signed out.
+              {tr("emailChangeVerify.youAreAboutToChange")}
             </p>
             <button
               onClick={handleConfirm}
@@ -93,10 +95,10 @@ export default function EmailChangeVerify() {
                 color: '#fff', fontSize: '15px', fontWeight: 800, cursor: 'pointer',
               }}
             >
-              Confirm Email Change
+              {tr("emailChangeVerify.confirmEmailChange")}
             </button>
             <p style={{ marginTop: '14px', fontSize: '12px', color: col.muted }}>
-              If you didn't request this, close this page — nothing will change.
+              {tr("emailChangeVerify.ifYouDidnTRequest")}
             </p>
           </>
         )}
@@ -104,20 +106,20 @@ export default function EmailChangeVerify() {
         {status === 'loading' && (
           <>
             <h1 style={{ margin: '0 0 10px', fontSize: '22px', fontWeight: 900, color: col.text }}>
-              Verifying…
+              {tr("emailChangeVerify.verifying")}
             </h1>
-            <p style={{ color: col.muted, fontSize: '14px', margin: 0 }}>Please wait.</p>
+            <p style={{ color: col.muted, fontSize: '14px', margin: 0 }}>{tr("emailChangeVerify.pleaseWait")}</p>
           </>
         )}
 
         {status === 'success' && (
           <>
             <h1 style={{ margin: '0 0 10px', fontSize: '22px', fontWeight: 900, color: col.success }}>
-              Email Changed
+              {tr("emailChangeVerify.emailChanged")}
             </h1>
             <p style={{ color: col.muted, fontSize: '14px', margin: '0 0 20px' }}>{message}</p>
             <p style={{ color: col.muted, fontSize: '13px', margin: 0 }}>
-              Redirecting to login…
+              {tr("emailChangeVerify.redirectingToLogin")}
             </p>
           </>
         )}
@@ -125,7 +127,7 @@ export default function EmailChangeVerify() {
         {(status === 'expired') && (
           <>
             <h1 style={{ margin: '0 0 10px', fontSize: '22px', fontWeight: 900, color: col.warn }}>
-              Link Expired
+              {tr("emailChangeVerify.linkExpired")}
             </h1>
             <p style={{ color: col.muted, fontSize: '14px', margin: '0 0 24px' }}>{message}</p>
             <button
@@ -136,7 +138,7 @@ export default function EmailChangeVerify() {
                 fontWeight: 700, cursor: 'pointer',
               }}
             >
-              Back to Login
+              {tr("emailChangeVerify.backToLogin")}
             </button>
           </>
         )}
@@ -144,7 +146,7 @@ export default function EmailChangeVerify() {
         {(status === 'invalid' || status === 'error') && (
           <>
             <h1 style={{ margin: '0 0 10px', fontSize: '22px', fontWeight: 900, color: col.danger }}>
-              {status === 'invalid' ? 'Invalid Link' : 'Something Went Wrong'}
+              {status === 'invalid' ? tr("emailChangeVerify.invalidLink") : tr("emailChangeVerify.somethingWentWrong2")}
             </h1>
             <p style={{ color: col.muted, fontSize: '14px', margin: '0 0 24px' }}>{message}</p>
             <button
@@ -155,7 +157,7 @@ export default function EmailChangeVerify() {
                 fontWeight: 700, cursor: 'pointer',
               }}
             >
-              Back to Login
+              {tr("emailChangeVerify.backToLogin")}
             </button>
           </>
         )}

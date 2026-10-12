@@ -28,6 +28,12 @@ import ProgressCard        from "../../components/ProgressCard";
 import DashboardAlertsBar from "../../../../components/DashboardAlertsBar";
 // Tabs load on demand (see src/pages/student/tabs/lazyTabs.js)
 import { LeaderboardTab, ChangePassword, StudentCompletedTab, BookingCalendarTab, ClassReportsTab, StudentScheduleTab, StudentHomeworkTab, StudentQuizTab, PronunciationTab, ConversationTab, FlashcardsTab, RecordingsTab, ReviewsTab, ReferralTab, MessagesTab, Classroom } from "../../tabs/lazyTabs";
+import { useTranslation } from "react-i18next";
+import i18n from "../../../../i18n/i18n.js";
+
+// For text in file-level lists: read when rendered, so it follows the chosen language
+const ta = (key, opts) => i18n.t(`student:${key}`, opts);
+
 
 // ── Palette ────────────────────────────────────────────────────────────────────
 const LIGHT = {
@@ -67,49 +73,50 @@ const DARK = {
 
 // ── Sidebar nav ────────────────────────────────────────────────────────────────
 const NAV = [
-  { id:"dashboard", Icon:Home,          label:"Home",     tabs:["dashboard"],                       dot:"#FF6B9D" },
-  { id:"study",     Icon:BookOpen,       label:"Study",    tabs:["homework","quiz","flashcards"],    dot:"#4D96FF" },
-  { id:"practice",  Icon:Mic2,           label:"Practice", tabs:["pronunciation","conversation"],    dot:"#FFD93D" },
-  { id:"messages",  Icon:MessageSquare,  label:"Messages", tabs:["messages"],                        dot:"#4ADE80" },
-  { id:"classes",   Icon:CalendarDays,   label:"Classes",  tabs:["completed-classes","schedule","book-class","class-reports"],    dot:"#06B6D4" },
-  { id:"progress",  Icon:BarChart2,      label:"Progress", tabs:["charts","badges"],                 dot:"#FF8E53" },
-  { id:"more",      Icon:MoreHorizontal, label:"More",     tabs:["recordings","reviews","referral","leaderboard"], dot:"#818CF8" },
+  { id:"dashboard", Icon:Home,          get label() { return ta("playfulShell.navHome"); },     tabs:["dashboard"],                       dot:"#FF6B9D" },
+  { id:"study",     Icon:BookOpen,       get label() { return ta("playfulShell.navStudy"); },    tabs:["homework","quiz","flashcards"],    dot:"#4D96FF" },
+  { id:"practice",  Icon:Mic2,           get label() { return ta("playfulShell.navPractice"); }, tabs:["pronunciation","conversation"],    dot:"#FFD93D" },
+  { id:"messages",  Icon:MessageSquare,  get label() { return ta("playfulShell.navMessages"); }, tabs:["messages"],                        dot:"#4ADE80" },
+  { id:"classes",   Icon:CalendarDays,   get label() { return ta("playfulShell.navClasses"); },  tabs:["completed-classes","schedule","book-class","class-reports"],    dot:"#06B6D4" },
+  { id:"progress",  Icon:BarChart2,      get label() { return ta("playfulShell.navProgress"); }, tabs:["charts","badges"],                 dot:"#FF8E53" },
+  { id:"more",      Icon:MoreHorizontal, get label() { return ta("playfulShell.navMore"); },     tabs:["recordings","reviews","referral","leaderboard"], dot:"#818CF8" },
 ];
 
 const SUB_TABS = {
-  study:    [{ key:"homework",label:"Homework" }, { key:"quiz",label:"Quizzes" }, { key:"flashcards",label:"Flashcards" }],
-  practice: [{ key:"pronunciation",label:"Speak" }, { key:"conversation",label:"AI Chat" }],
-  classes:  [{ key:"completed-classes",label:"Completed" }, { key:"schedule",label:"Schedule" }, { key:"book-class",label:"Book a Class" }, { key:"class-reports",label:"Reports" }],
-  progress: [{ key:"charts",label:"Charts" }, { key:"badges",label:"Badges" }],
-  more:     [{ key:"recordings",label:"Recordings" }, { key:"reviews",label:"Reviews" }, { key:"referral",label:"Invite" }, { key:"leaderboard",label:"Leaderboard" }],
+  study:    [{ key:"homework",get label() { return ta("playfulShell.subTabsHomework"); } }, { key:"quiz",get label() { return ta("playfulShell.subTabsQuizzes"); } }, { key:"flashcards",get label() { return ta("playfulShell.subTabsFlashcards"); } }],
+  practice: [{ key:"pronunciation",get label() { return ta("playfulShell.subTabsSpeak"); } }, { key:"conversation",get label() { return ta("playfulShell.subTabsAiChat"); } }],
+  classes:  [{ key:"completed-classes",get label() { return ta("playfulShell.subTabsCompleted"); } }, { key:"schedule",get label() { return ta("playfulShell.subTabsSchedule"); } }, { key:"book-class",get label() { return ta("playfulShell.subTabsBookAClass"); } }, { key:"class-reports",get label() { return ta("playfulShell.subTabsReports"); } }],
+  progress: [{ key:"charts",get label() { return ta("playfulShell.subTabsCharts"); } }, { key:"badges",get label() { return ta("playfulShell.subTabsBadges"); } }],
+  more:     [{ key:"recordings",get label() { return ta("playfulShell.subTabsRecordings"); } }, { key:"reviews",get label() { return ta("playfulShell.subTabsReviews"); } }, { key:"referral",get label() { return ta("playfulShell.subTabsInvite"); } }, { key:"leaderboard",get label() { return ta("playfulShell.subTabsLeaderboard"); } }],
 };
 
 // ── Lesson category tiles ──────────────────────────────────────────────────────
 const TILES = [
-  { tab:"homework",      label:"Homework",   emoji:"📚", g:["#FF6B6B","#FF8E53"], light:"#FFF1EE" },
-  { tab:"quiz",          label:"Quiz",        emoji:"🎯", g:["#4D96FF","#818CF8"], light:"#EEF3FF" },
-  { tab:"flashcards",    label:"Flashcards", emoji:"🃏", g:["#FFD93D","#FF8E53"], light:"#FFFAEE" },
-  { tab:"pronunciation", label:"Speaking",   emoji:"🎤", g:["#FF6B9D","#FF6B6B"], light:"#FFF0F6" },
-  { tab:"conversation",  label:"AI Chat",    emoji:"🤖", g:["#06B6D4","#4D96FF"], light:"#EEF9FF" },
-  { tab:"messages",      label:"Messages",   emoji:"💬", g:["#4ADE80","#06B6D4"], light:"#EDFFF6" },
-  { tab:"charts",        label:"Progress",   emoji:"📊", g:["#FF8E53","#FFD93D"], light:"#FFF5EE" },
-  { tab:"schedule",      label:"Schedule",   emoji:"📅", g:["#FF6B9D","#818CF8"], light:"#F5F0FF" },
+  { tab:"homework",      get label() { return ta("playfulShell.tilesHomework"); },   emoji:"📚", g:["#FF6B6B","#FF8E53"], light:"#FFF1EE" },
+  { tab:"quiz",          get label() { return ta("playfulShell.tilesQuiz"); },        emoji:"🎯", g:["#4D96FF","#818CF8"], light:"#EEF3FF" },
+  { tab:"flashcards",    get label() { return ta("playfulShell.tilesFlashcards"); }, emoji:"🃏", g:["#FFD93D","#FF8E53"], light:"#FFFAEE" },
+  { tab:"pronunciation", get label() { return ta("playfulShell.tilesSpeaking"); },   emoji:"🎤", g:["#FF6B9D","#FF6B6B"], light:"#FFF0F6" },
+  { tab:"conversation",  get label() { return ta("playfulShell.tilesAiChat"); },    emoji:"🤖", g:["#06B6D4","#4D96FF"], light:"#EEF9FF" },
+  { tab:"messages",      get label() { return ta("playfulShell.tilesMessages"); },   emoji:"💬", g:["#4ADE80","#06B6D4"], light:"#EDFFF6" },
+  { tab:"charts",        get label() { return ta("playfulShell.tilesProgress"); },   emoji:"📊", g:["#FF8E53","#FFD93D"], light:"#FFF5EE" },
+  { tab:"schedule",      get label() { return ta("playfulShell.tilesSchedule"); },   emoji:"📅", g:["#FF6B9D","#818CF8"], light:"#F5F0FF" },
 ];
 
 const PAGE_TITLE = {
-  dashboard:"Home",homework:"Homework",quiz:"Quizzes",flashcards:"Flashcards",
-  pronunciation:"Speaking",conversation:"AI Chat",messages:"Messages",
-  "completed-classes":"Completed Classes",schedule:"Schedule",
-  charts:"Progress",badges:"Badges",recordings:"Recordings",
-  reviews:"Reviews",referral:"Invite Friends",leaderboard:"Leaderboard",
+  get dashboard() { return ta("playfulShell.pageTitleHome"); },get homework() { return ta("playfulShell.pageTitleHomework"); },get quiz() { return ta("playfulShell.pageTitleQuizzes"); },get flashcards() { return ta("playfulShell.pageTitleFlashcards"); },
+  get pronunciation() { return ta("playfulShell.pageTitleSpeaking"); },get conversation() { return ta("playfulShell.pageTitleAiChat"); },get messages() { return ta("playfulShell.pageTitleMessages"); },
+  get "completed-classes"() { return ta("playfulShell.pageTitleCompletedClasses"); },get schedule() { return ta("playfulShell.pageTitleSchedule"); },
+  get charts() { return ta("playfulShell.pageTitleProgress"); },get badges() { return ta("playfulShell.pageTitleBadges"); },get recordings() { return ta("playfulShell.pageTitleRecordings"); },
+  get reviews() { return ta("playfulShell.pageTitleReviews"); },get referral() { return ta("playfulShell.pageTitleInviteFriends"); },get leaderboard() { return ta("playfulShell.pageTitleLeaderboard"); },
 };
 
 // ── Badges panel ───────────────────────────────────────────────────────────────
 function PlayfulBadgesPanel({ badges, progress, completedClasses, shareAchievement, P }) {
+  const { t: tr } = useTranslation("student");
   const [filter, setFilter] = useState("all");
   const cats = [
-    {key:"all",label:"All"},{key:"journey",label:"Journey"},
-    {key:"consistency",label:"Streak"},{key:"weekly",label:"Weekly"},{key:"special",label:"Special"},
+    {key:"all",label:tr("playfulShell.all")},{key:"journey",label:tr("playfulShell.journey")},
+    {key:"consistency",label:tr("playfulShell.streak")},{key:"weekly",label:tr("playfulShell.weekly")},{key:"special",label:tr("playfulShell.special")},
   ];
   const shown = BADGE_DEFINITIONS.filter(b => filter==="all" || b.category===filter);
   const pct = Math.round((badges.length/BADGE_DEFINITIONS.length)*100);
@@ -120,10 +127,10 @@ function PlayfulBadgesPanel({ badges, progress, completedClasses, shareAchieveme
       <div style={{background:P.card,borderRadius:20,padding:24,border:`1px solid ${P.border}`}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
           <div>
-            <h2 style={{margin:"0 0 4px",fontSize:20,fontWeight:800,color:P.text}}>🏅 My Badges</h2>
-            <p style={{margin:0,color:P.textSub,fontSize:14}}>{badges.length===0?"Complete classes to earn your first badge!": `${badges.length} of ${BADGE_DEFINITIONS.length} earned · ${pct}%`}</p>
+            <h2 style={{margin:"0 0 4px",fontSize:20,fontWeight:800,color:P.text}}>{tr("playfulShell.myBadges")}</h2>
+            <p style={{margin:0,color:P.textSub,fontSize:14}}>{badges.length===0?tr("playfulShell.completeClassesToEarnYour"): tr("playfulShell.ofEarned", { badgesCount: badges.length, BADGEDEFINITIONSCount: BADGE_DEFINITIONS.length, pct })}</p>
           </div>
-          {badges.length>0&&<button onClick={()=>shareAchievement("badge")} style={{background:`linear-gradient(135deg,${P.pink},${P.coral})`,color:"#fff",border:"none",borderRadius:999,padding:"9px 20px",fontWeight:700,cursor:"pointer",fontSize:14}}>Share</button>}
+          {badges.length>0&&<button onClick={()=>shareAchievement("badge")} style={{background:`linear-gradient(135deg,${P.pink},${P.coral})`,color:"#fff",border:"none",borderRadius:999,padding:"9px 20px",fontWeight:700,cursor:"pointer",fontSize:14}}>{tr("playfulShell.share")}</button>}
         </div>
         <div style={{height:10,background:P.border,borderRadius:999,overflow:"hidden",marginBottom:16}}>
           <div style={{height:"100%",width:`${pct}%`,background:`linear-gradient(90deg,${P.pink},${P.orange},${P.yellow})`,borderRadius:999,transition:"width .4s"}}/>
@@ -155,7 +162,7 @@ function PlayfulBadgesPanel({ badges, progress, completedClasses, shareAchieveme
                   </div>
                 </>
               )}
-              {earned&&<div style={{fontSize:11,color:P.green,fontWeight:700}}>Earned ✓</div>}
+              {earned&&<div style={{fontSize:11,color:P.green,fontWeight:700}}>{tr("playfulShell.earned")}</div>}
             </div>
           );
         })}
@@ -168,6 +175,7 @@ function PlayfulBadgesPanel({ badges, progress, completedClasses, shareAchieveme
 // PlayfulShell
 // ══════════════════════════════════════════════════════════════════════════════
 export default function PlayfulShell() {
+  const { t: tr } = useTranslation("student");
   const { branding, center } = useBranding();
   const d = useDashboardData();
   const { missedCallCount, clearMissedCalls } = useRing();
@@ -216,10 +224,10 @@ export default function PlayfulShell() {
       : "linear-gradient(135deg, #FF6B9D 0%, #FF8E53 100%)";
   const heroEmojis = hasLive ? ["🔴","📡","🎉"] : d.homeworkPending>0 ? ["📚","✏️","🎒"] : ["🌟","📖","🎓"];
   const heroBtn = hasLive
-    ? { label:"Join Class →", action:()=>d.handleJoinClass(d.activeClasses[0]) }
+    ? { label:tr("playfulShell.joinClass"), action:()=>d.handleJoinClass(d.activeClasses[0]) }
     : d.homeworkPending > 0
-      ? { label:"Start Homework →", action:()=>d.setActiveTab("homework") }
-      : { label:"View Schedule →", action:()=>d.setActiveTab("schedule") };
+      ? { label:tr("playfulShell.startHomework"), action:()=>d.setActiveTab("homework") }
+      : { label:tr("playfulShell.viewSchedule"), action:()=>d.setActiveTab("schedule") };
 
   return (
     <div style={{display:"flex",height:"100vh",overflow:"hidden",fontFamily:"'Poppins','Inter',sans-serif",background:P.bg}}>
@@ -283,11 +291,11 @@ export default function PlayfulShell() {
 
         <div style={{flex:1}}/>
 
-        <button className="pf-nav" title="Settings" onClick={()=>setShowSettings(true)}
+        <button className="pf-nav" title={tr("playfulShell.settings")} onClick={()=>setShowSettings(true)}
           style={{width:52,height:52,borderRadius:16,border:"none",cursor:"pointer",background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",color:P.sideText}}>
           <Settings size={20} strokeWidth={1.8}/>
         </button>
-        <button className="pf-nav" title="Sign out" onClick={d.handleLogout}
+        <button className="pf-nav" title={tr("playfulShell.signOut")} onClick={d.handleLogout}
           style={{width:52,height:52,borderRadius:16,border:"none",cursor:"pointer",background:"transparent",display:"flex",alignItems:"center",justifyContent:"center",color:P.sideText,marginBottom:4}}>
           <LogOut size={20} strokeWidth={1.8}/>
         </button>
@@ -302,7 +310,7 @@ export default function PlayfulShell() {
           display:"flex", alignItems:"center", padding:"0 24px", gap:14, flexShrink:0,
         }}>
           <h1 style={{margin:0,fontSize:17,fontWeight:800,color:P.text,whiteSpace:"nowrap"}}>
-            {PAGE_TITLE[d.activeTab] || "Home"}
+            {PAGE_TITLE[d.activeTab] || tr("playfulShell.home")}
           </h1>
 
           {/* Sub-tab pills */}
@@ -326,7 +334,7 @@ export default function PlayfulShell() {
           {!isMobile && (
           <div style={{position:"relative"}}>
             <Search size={14} style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",color:P.textMuted}}/>
-            <input placeholder="Search anything..."
+            <input placeholder={tr("playfulShell.searchAnything")}
               style={{width:200,height:36,background:P.inputBg,border:"none",borderRadius:12,padding:"0 10px 0 30px",fontSize:13,color:P.text,outline:"none",fontFamily:"Poppins,sans-serif"}}/>
           </div>
           )}
@@ -341,17 +349,17 @@ export default function PlayfulShell() {
 
           {/* ── Notification chips — desktop only ── */}
           {!isMobile && d.unreadMessages > 0 && (
-            <button onClick={()=>{ d.setActiveTab("messages"); d.setUnreadMessages(0); }} title="Go to messages"
+            <button onClick={()=>{ d.setActiveTab("messages"); d.setUnreadMessages(0); }} title={tr("playfulShell.goToMessages")}
               style={{display:"flex",alignItems:"center",gap:5,background:d.isDarkMode?"rgba(139,92,246,0.15)":"#f5f3ff",border:`1.5px solid ${d.isDarkMode?"rgba(139,92,246,0.3)":"#ddd6fe"}`,borderRadius:999,padding:"5px 13px",cursor:"pointer",fontFamily:"Poppins,sans-serif"}}>
               <span style={{fontSize:13}}>💬</span>
-              <span style={{fontSize:12,fontWeight:700,color:d.isDarkMode?"#a78bfa":"#7c3aed"}}>{d.unreadMessages} new</span>
+              <span style={{fontSize:12,fontWeight:700,color:d.isDarkMode?"#a78bfa":"#7c3aed"}}>{tr("playfulShell.new", { unreadMessages: d.unreadMessages })}</span>
             </button>
           )}
           {!isMobile && missedCallCount > 0 && (
-            <button onClick={clearMissedCalls} title="Clear missed calls"
+            <button onClick={clearMissedCalls} title={tr("playfulShell.clearMissedCalls")}
               style={{display:"flex",alignItems:"center",gap:5,background:d.isDarkMode?"rgba(239,68,68,0.12)":"#fff5f5",border:`1.5px solid ${d.isDarkMode?"rgba(239,68,68,0.3)":"#fecaca"}`,borderRadius:999,padding:"5px 13px",cursor:"pointer",fontFamily:"Poppins,sans-serif"}}>
               <span style={{fontSize:13}}>📞</span>
-              <span style={{fontSize:12,fontWeight:700,color:"#ef4444"}}>{missedCallCount} missed</span>
+              <span style={{fontSize:12,fontWeight:700,color:"#ef4444"}}>{tr("playfulShell.missed", { missedCallCount })}</span>
             </button>
           )}
 
@@ -369,8 +377,8 @@ export default function PlayfulShell() {
               {(d.student.firstName?.[0]||"S").toUpperCase()}
             </div>
             <div style={{lineHeight:1.2}}>
-              <div style={{fontSize:13,fontWeight:700,color:P.text}}>{d.student.firstName||"Student"}</div>
-              <div style={{fontSize:11,color:P.textMuted}}>Student</div>
+              <div style={{fontSize:13,fontWeight:700,color:P.text}}>{d.student.firstName||tr("playfulShell.student")}</div>
+              <div style={{fontSize:11,color:P.textMuted}}>{tr("playfulShell.student")}</div>
             </div>
           </div>
         </header>
@@ -403,7 +411,7 @@ export default function PlayfulShell() {
                   {/* Text */}
                   <div style={{zIndex:1,maxWidth: isMobile ? "100%" : "58%"}}>
                     <div style={{display:"inline-block",background:"rgba(255,255,255,0.25)",borderRadius:999,padding:"3px 14px",fontSize:11,fontWeight:700,color:"#fff",letterSpacing:1,marginBottom:10,backdropFilter:"blur(6px)"}}>
-                      {hasLive ? "🔴 LIVE NOW" : d.homeworkPending>0 ? "📋 DUE TODAY" : "🌟 DAILY GOAL"}
+                      {hasLive ? tr("playfulShell.liveNow") : d.homeworkPending>0 ? tr("playfulShell.dueToday") : tr("playfulShell.dailyGoal")}
                     </div>
                     <h2 style={{margin:"0 0 8px",fontSize:22,fontWeight:900,color:"#fff",lineHeight:1.25,letterSpacing:"-0.3px"}}>
                       {heroTitle}
@@ -439,8 +447,8 @@ export default function PlayfulShell() {
                 {/* ── CATEGORY TILES ── */}
                 <div>
                   <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
-                    <h2 style={{margin:0,fontSize:16,fontWeight:800,color:P.text}}>Lesson Categories</h2>
-                    <span style={{fontSize:13,color:P.textMuted}}>Pick where to continue</span>
+                    <h2 style={{margin:0,fontSize:16,fontWeight:800,color:P.text}}>{tr("playfulShell.lessonCategories")}</h2>
+                    <span style={{fontSize:13,color:P.textMuted}}>{tr("playfulShell.pickWhereToContinue")}</span>
                   </div>
                   <div style={{display:"grid",gridTemplateColumns: isMobile ? "repeat(2,1fr)" : "repeat(4,1fr)",gap:12}}>
                     {TILES.map(tile=>{
@@ -476,11 +484,11 @@ export default function PlayfulShell() {
                 {/* ── ACTIVE CLASSES ── */}
                 <div className="pf-card" style={{background:P.card,borderRadius:20,padding:20,border:`1px solid ${P.border}`}}>
                   <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
-                    <h2 style={{margin:0,fontSize:15,fontWeight:800,color:P.text}}>🔴 Active Classes</h2>
-                    {d.activeClasses.length>0&&<span style={{background:"#FEE2E2",color:P.red,borderRadius:999,padding:"2px 10px",fontSize:11,fontWeight:700}}>{d.activeClasses.length} live</span>}
+                    <h2 style={{margin:0,fontSize:15,fontWeight:800,color:P.text}}>{tr("playfulShell.activeClasses")}</h2>
+                    {d.activeClasses.length>0&&<span style={{background:"#FEE2E2",color:P.red,borderRadius:999,padding:"2px 10px",fontSize:11,fontWeight:700}}>{tr("playfulShell.live", { activeClassesCount: d.activeClasses.length })}</span>}
                   </div>
                   {d.activeClasses.length===0
-                    ? <div style={{textAlign:"center",padding:"16px 0",color:P.textMuted}}><div style={{fontSize:28,marginBottom:6}}>📡</div><p style={{margin:0,fontSize:13}}>No live classes right now. You're free!</p></div>
+                    ? <div style={{textAlign:"center",padding:"16px 0",color:P.textMuted}}><div style={{fontSize:28,marginBottom:6}}>📡</div><p style={{margin:0,fontSize:13}}>{tr("playfulShell.noLiveClassesRightNow")}</p></div>
                     : <ActiveClasses activeClasses={d.activeClasses} onJoin={d.handleJoinClass}/>
                   }
                 </div>
@@ -492,10 +500,10 @@ export default function PlayfulShell() {
                 {/* Stats row */}
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
                   {[
-                    {label:"Classes Done", value:d.progress.completedLessons, emoji:"🎓", g:[P.blue,P.teal]},
-                    {label:"Day Streak",   value:d.progress.streakDays,       emoji:"🔥", g:[P.coral,P.orange]},
-                    {label:"Remaining",    value:d.progress.classesRemaining, emoji:"📅", g:[P.pink,P.indigo]},
-                    {label:"This Week",    value:d.progress.weeklyCompleted,  emoji:"⚡", g:[P.green,P.teal]},
+                    {label:tr("playfulShell.classesDone"), value:d.progress.completedLessons, emoji:"🎓", g:[P.blue,P.teal]},
+                    {label:tr("playfulShell.dayStreak"),   value:d.progress.streakDays,       emoji:"🔥", g:[P.coral,P.orange]},
+                    {label:tr("playfulShell.remaining"),    value:d.progress.classesRemaining, emoji:"📅", g:[P.pink,P.indigo]},
+                    {label:tr("playfulShell.thisWeek"),    value:d.progress.weeklyCompleted,  emoji:"⚡", g:[P.green,P.teal]},
                   ].map(s=>(
                     <div key={s.label} style={{background:`linear-gradient(135deg,${s.g[0]},${s.g[1]})`,borderRadius:16,padding:"14px 12px",textAlign:"center",boxShadow:`0 4px 14px ${s.g[0]}44`}}>
                       <div style={{fontSize:22,marginBottom:4}}>{s.emoji}</div>
@@ -508,23 +516,23 @@ export default function PlayfulShell() {
                 {/* What's New */}
                 <div className="pf-card" style={{background:P.card,borderRadius:20,border:`1px solid ${P.border}`,overflow:"hidden"}}>
                   <div style={{padding:"16px 18px 12px",borderBottom:`1px solid ${P.border}`}}>
-                    <h3 style={{margin:0,fontSize:14,fontWeight:800,color:P.text}}>What's New</h3>
-                    <p style={{margin:"2px 0 0",fontSize:12,color:P.textMuted}}>Latest updates for you</p>
+                    <h3 style={{margin:0,fontSize:14,fontWeight:800,color:P.text}}>{tr("playfulShell.whatSNew")}</h3>
+                    <p style={{margin:"2px 0 0",fontSize:12,color:P.textMuted}}>{tr("playfulShell.latestUpdatesForYou")}</p>
                   </div>
                   <div style={{padding:"12px 18px",display:"flex",flexDirection:"column",gap:10,maxHeight:280,overflowY:"auto"}}>
                     {/* Upcoming classes */}
                     {d.upcomingClasses.length===0 && d.notifications.length===0 && d.homeworkPending===0 ? (
                       <div style={{textAlign:"center",padding:16,color:P.textMuted}}>
                         <div style={{fontSize:28,marginBottom:6}}>🎉</div>
-                        <p style={{margin:0,fontSize:12}}>All clear! Nothing new right now.</p>
+                        <p style={{margin:0,fontSize:12}}>{tr("playfulShell.allClearNothingNewRight")}</p>
                       </div>
                     ) : (
                       <>
                         {d.homeworkPending>0 && (
-                          <WhatsNewItem emoji="📚" title={`${d.homeworkPending} homework assignment${d.homeworkPending>1?"s":""}`} sub="Due soon — your teacher is waiting" bg="#FFF1EE" onClick={()=>d.setActiveTab("homework")} P={P}/>
+                          <WhatsNewItem emoji="📚" title={tr("playfulShell.homeworkAssignment", { homeworkPending: d.homeworkPending, value: d.homeworkPending>1?"s":"" })} sub={tr("playfulShell.dueSoonYourTeacherIs")} bg="#FFF1EE" onClick={()=>d.setActiveTab("homework")} P={P}/>
                         )}
                         {d.quizPending>0 && (
-                          <WhatsNewItem emoji="🎯" title={`${d.quizPending} new quiz${d.quizPending>1?"zes":""}`} sub="Test your knowledge!" bg="#EEF3FF" onClick={()=>d.setActiveTab("quiz")} P={P}/>
+                          <WhatsNewItem emoji="🎯" title={tr("playfulShell.newQuiz", { quizPending: d.quizPending, value: d.quizPending>1?"zes":"" })} sub={tr("playfulShell.testYourKnowledge")} bg="#EEF3FF" onClick={()=>d.setActiveTab("quiz")} P={P}/>
                         )}
                         {d.upcomingClasses.slice(0,3).map((cls,i)=>(
                           <WhatsNewItem key={cls.id||i} emoji="📅" title={cls.title} sub={`${cls.teacher} · ${cls.time}`} bg="#EDFFF6" P={P}/>
@@ -540,13 +548,13 @@ export default function PlayfulShell() {
                 {/* Upcoming classes full card */}
                 <div className="pf-card" style={{background:P.card,borderRadius:20,padding:18,border:`1px solid ${P.border}`}}>
                   <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
-                    <h3 style={{margin:0,fontSize:14,fontWeight:800,color:P.text}}>📅 Upcoming</h3>
+                    <h3 style={{margin:0,fontSize:14,fontWeight:800,color:P.text}}>{tr("playfulShell.upcoming")}</h3>
                     <button onClick={()=>d.setActiveTab("schedule")} style={{background:"none",border:"none",color:P.blue,fontWeight:700,fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",gap:3}}>
-                      All <ChevronRight size={13}/>
+                      {tr("playfulShell.all")} <ChevronRight size={13}/>
                     </button>
                   </div>
                   {d.upcomingClasses.length===0
-                    ? <div style={{textAlign:"center",padding:"12px 0",color:P.textMuted,fontSize:12}}>No upcoming classes scheduled.</div>
+                    ? <div style={{textAlign:"center",padding:"12px 0",color:P.textMuted,fontSize:12}}>{tr("playfulShell.noUpcomingClassesScheduled")}</div>
                     : <UpcomingClasses upcomingClasses={d.upcomingClasses.slice(0,3)} onEnroll={()=>d.showToast("Coming soon!")}/>
                   }
                 </div>
@@ -558,8 +566,8 @@ export default function PlayfulShell() {
                 {d.badges.length>0&&(
                   <div className="pf-card" style={{background:P.card,borderRadius:20,padding:16,border:`1px solid ${P.border}`}}>
                     <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
-                      <h3 style={{margin:0,fontSize:14,fontWeight:800,color:P.text}}>🏅 Badges</h3>
-                      <button onClick={()=>d.setActiveTab("badges")} style={{background:"none",border:"none",color:P.pink,fontWeight:700,fontSize:12,cursor:"pointer"}}>See all</button>
+                      <h3 style={{margin:0,fontSize:14,fontWeight:800,color:P.text}}>{tr("playfulShell.badges2")}</h3>
+                      <button onClick={()=>d.setActiveTab("badges")} style={{background:"none",border:"none",color:P.pink,fontWeight:700,fontSize:12,cursor:"pointer"}}>{tr("playfulShell.seeAll")}</button>
                     </div>
                     <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
                       {d.badges.slice(-6).map(b=>(
@@ -608,9 +616,9 @@ export default function PlayfulShell() {
             <div style={{display:"flex",flexDirection:"column",gap:16}}>
               <div style={{display:"grid",gridTemplateColumns: isMobile ? "1fr" : "repeat(3,1fr)",gap:12}}>
                 {[
-                  {label:"Total Classes",value:d.completedClasses.length,g:[P.blue,P.teal],emoji:"🎓"},
-                  {label:"Day Streak",   value:d.progress.streakDays,    g:[P.coral,P.orange],emoji:"🔥"},
-                  {label:"Total Hours",  value:d.completedClasses.length>0?Math.round(d.completedClasses.reduce((s,c)=>s+c.duration,0)/60):0, g:[P.pink,P.indigo],emoji:"⏱️"},
+                  {label:tr("playfulShell.totalClasses"),value:d.completedClasses.length,g:[P.blue,P.teal],emoji:"🎓"},
+                  {label:tr("playfulShell.dayStreak"),   value:d.progress.streakDays,    g:[P.coral,P.orange],emoji:"🔥"},
+                  {label:tr("playfulShell.totalHours"),  value:d.completedClasses.length>0?Math.round(d.completedClasses.reduce((s,c)=>s+c.duration,0)/60):0, g:[P.pink,P.indigo],emoji:"⏱️"},
                 ].map(({label,value,g,emoji})=>(
                   <div key={label} style={{background:`linear-gradient(135deg,${g[0]},${g[1]})`,borderRadius:20,padding:20,textAlign:"center",boxShadow:`0 6px 20px ${g[0]}44`}}>
                     <div style={{fontSize:28,marginBottom:8}}>{emoji}</div>
@@ -619,7 +627,7 @@ export default function PlayfulShell() {
                   </div>
                 ))}
               </div>
-              {[{title:"Last 7 Days",data:d.chartData.last7,type:"bar"},{title:"Last 30 Days",data:d.chartData.last30,type:"line"}].map(({title,data,type})=>(
+              {[{title:tr("playfulShell.last7Days"),data:d.chartData.last7,type:"bar"},{title:tr("playfulShell.last30Days"),data:d.chartData.last30,type:"line"}].map(({title,data,type})=>(
                 <div key={title} style={{background:P.card,borderRadius:20,padding:20,border:`1px solid ${P.border}`}}>
                   <h3 style={{margin:"0 0 16px",fontSize:15,fontWeight:800,color:P.text}}>{title}</h3>
                   <ResponsiveContainer width="100%" height={220}>
@@ -653,7 +661,7 @@ export default function PlayfulShell() {
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:9000,display:"flex",justifyContent:"flex-end"}} onClick={()=>setShowSettings(false)}>
           <div style={{width:320,background:P.white,height:"100%",padding:28,overflowY:"auto",boxShadow:"-6px 0 32px rgba(0,0,0,0.15)"}} onClick={e=>e.stopPropagation()}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:24}}>
-              <h2 style={{margin:0,fontSize:18,fontWeight:800,color:P.text}}>Settings</h2>
+              <h2 style={{margin:0,fontSize:18,fontWeight:800,color:P.text}}>{tr("playfulShell.settings")}</h2>
               <button onClick={()=>setShowSettings(false)} style={{background:P.inputBg,border:"none",borderRadius:10,width:32,height:32,cursor:"pointer",fontSize:16,color:P.text}}>✕</button>
             </div>
 
@@ -667,7 +675,7 @@ export default function PlayfulShell() {
                 {d.student.studentId && (
                   <div style={{fontSize:10,fontFamily:"monospace",fontWeight:700,color:"rgba(255,255,255,0.7)",letterSpacing:"0.05em"}}>{d.student.studentId}</div>
                 )}
-                <div style={{fontSize:12,color:"rgba(255,255,255,0.8)"}}>{d.student.email||"Student"}</div>
+                <div style={{fontSize:12,color:"rgba(255,255,255,0.8)"}}>{d.student.email||tr("playfulShell.student")}</div>
               </div>
             </div>
 
@@ -675,7 +683,7 @@ export default function PlayfulShell() {
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 14px",background:P.settingRow,borderRadius:12,marginBottom:8,border:`1px solid ${P.border}`}}>
               <div style={{display:"flex",alignItems:"center",gap:10}}>
                 {d.isDarkMode?<Moon size={15} color={P.pink}/>:<Sun size={15} color={P.orange}/>}
-                <span style={{fontSize:14,color:P.text,fontWeight:600}}>{d.isDarkMode?"Dark Mode":"Light Mode"}</span>
+                <span style={{fontSize:14,color:P.text,fontWeight:600}}>{d.isDarkMode?tr("playfulShell.darkMode"):tr("playfulShell.lightMode")}</span>
               </div>
               <button onClick={()=>d.setIsDarkMode(v=>!v)}
                 style={{width:44,height:24,borderRadius:999,border:"none",cursor:"pointer",background:d.isDarkMode?P.pink:P.border,position:"relative",transition:"background .2s"}}>
@@ -684,9 +692,9 @@ export default function PlayfulShell() {
             </div>
 
             {[
-              {Icon:KeyRound,label:"Change Password",action:()=>{setShowSettings(false);d.setShowChangePassword(true);}},
-              {Icon:Shield,  label:"Session Management",action:()=>{setShowSettings(false);d.setShowSessionManagement(true);}},
-              {Icon:Settings,label:"Security & 2FA",action:()=>{setShowSettings(false);setShow2FA(true);}},
+              {Icon:KeyRound,label:tr("playfulShell.changePassword"),action:()=>{setShowSettings(false);d.setShowChangePassword(true);}},
+              {Icon:Shield,  label:tr("playfulShell.sessionManagement"),action:()=>{setShowSettings(false);d.setShowSessionManagement(true);}},
+              {Icon:Settings,label:tr("playfulShell.security2fa"),action:()=>{setShowSettings(false);setShow2FA(true);}},
             ].map(({Icon,label,action})=>(
               <button key={label} onClick={action}
                 style={{width:"100%",display:"flex",alignItems:"center",gap:12,padding:"12px 14px",background:P.settingRow,border:`1px solid ${P.border}`,borderRadius:12,marginBottom:8,cursor:"pointer",fontFamily:"Poppins,sans-serif",fontSize:14,color:P.text,fontWeight:500}}>
@@ -696,7 +704,7 @@ export default function PlayfulShell() {
 
             <button onClick={d.handleLogout}
               style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"center",gap:8,padding:13,background:`linear-gradient(135deg,${P.coral},${P.orange})`,border:"none",borderRadius:12,cursor:"pointer",color:"#fff",fontWeight:800,fontSize:14,marginTop:16,fontFamily:"Poppins,sans-serif",boxShadow:`0 4px 16px ${P.coral}55`}}>
-              <LogOut size={16}/> Sign Out
+              <LogOut size={16}/> {tr("playfulShell.signOut2")}
             </button>
           </div>
         </div>
@@ -719,10 +727,10 @@ export default function PlayfulShell() {
       {isMobile && (
         <nav style={{ position:'fixed', bottom:0, left:0, right:0, height:60, background:P.sidebar, borderTop:'1px solid rgba(255,255,255,0.1)', display:'flex', zIndex:200, boxShadow:'0 -4px 20px rgba(0,0,0,0.3)' }}>
           {[
-            { key:'dashboard', Icon:Home,          label:'Home',    dot:P.pink   },
-            { key:'homework',  Icon:BookOpen,       label:'Study',   dot:P.blue   },
-            { key:'messages',  Icon:MessageSquare,  label:'Chat',    dot:P.green  },
-            { key:'schedule',  Icon:CalendarDays,   label:'Classes', dot:P.teal   },
+            { key:'dashboard', Icon:Home,          label:tr("playfulShell.home"),    dot:P.pink   },
+            { key:'homework',  Icon:BookOpen,       label:tr("playfulShell.study"),   dot:P.blue   },
+            { key:'messages',  Icon:MessageSquare,  label:tr("playfulShell.chat"),    dot:P.green  },
+            { key:'schedule',  Icon:CalendarDays,   label:tr("playfulShell.classes"), dot:P.teal   },
           ].map(({ key, Icon, label, dot }) => {
             const isActive = d.activeTab === key || (key==='homework' && ['homework','quiz','flashcards'].includes(d.activeTab));
             return (
@@ -736,7 +744,7 @@ export default function PlayfulShell() {
           <button onClick={() => setShowMobileMenu(true)}
             style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:3, border:'none', background:'transparent', cursor:'pointer', fontFamily:"'Poppins',sans-serif", color:'rgba(255,255,255,0.5)', borderTop:'3px solid transparent' }}>
             <MoreHorizontal size={20} strokeWidth={1.8} />
-            <span style={{ fontSize:10, fontWeight:500 }}>More</span>
+            <span style={{ fontSize:10, fontWeight:500 }}>{tr("playfulShell.more")}</span>
           </button>
         </nav>
       )}
@@ -765,12 +773,12 @@ export default function PlayfulShell() {
               <button onClick={() => { setShowMobileMenu(false); setShowSettings(true); }}
                 style={{ display:'flex', alignItems:'center', gap:12, padding:'11px 14px', borderRadius:14, border:'none', background:'transparent', color:P.text, cursor:'pointer', fontFamily:"'Poppins',sans-serif", width:'100%', fontSize:14, fontWeight:500 }}>
                 <Settings size={18} color={P.textMuted} strokeWidth={1.8} />
-                Settings
+                {tr("playfulShell.settings")}
               </button>
               <button onClick={d.handleLogout}
                 style={{ display:'flex', alignItems:'center', gap:12, padding:'11px 14px', borderRadius:14, border:'none', background:'transparent', color:P.coral, cursor:'pointer', fontFamily:"'Poppins',sans-serif", width:'100%', fontSize:14, fontWeight:600 }}>
                 <LogOut size={18} color={P.coral} strokeWidth={1.8} />
-                Sign Out
+                {tr("playfulShell.signOut2")}
               </button>
             </div>
           </div>
@@ -789,7 +797,7 @@ export default function PlayfulShell() {
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999,padding:16}}>
           <div style={{background:P.white,borderRadius:24,padding:28,maxWidth:400,width:"100%",boxShadow:"0 24px 60px rgba(0,0,0,0.25)"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
-              <h3 style={{margin:0,fontSize:18,fontWeight:800,color:P.text}}>🎉 Share Achievement</h3>
+              <h3 style={{margin:0,fontSize:18,fontWeight:800,color:P.text}}>{tr("playfulShell.shareAchievement")}</h3>
               <button onClick={()=>d.setShowShareModal(false)} style={{background:P.inputBg,border:"none",borderRadius:10,width:32,height:32,cursor:"pointer",fontSize:16,color:P.text}}>✕</button>
             </div>
             <div style={{background:`linear-gradient(135deg,${P.pink}22,${P.orange}22)`,border:`1px solid ${P.pink}33`,borderRadius:14,padding:16,marginBottom:16}}>
@@ -798,7 +806,7 @@ export default function PlayfulShell() {
             </div>
             <div style={{display:"flex",flexDirection:"column",gap:10}}>
               <button onClick={d.copyShareText} style={{width:"100%",padding:11,border:`1.5px solid ${P.border}`,borderRadius:999,background:"transparent",color:P.text,fontWeight:700,cursor:"pointer",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",gap:8,fontFamily:"Poppins,sans-serif"}}>
-                <Copy size={14}/> Copy to Clipboard
+                <Copy size={14}/> {tr("playfulShell.copyToClipboard")}
               </button>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
                 {[["twitter","Twitter","#1DA1F2"],["facebook","Facebook","#1877F2"],["whatsapp","WhatsApp","#25D366"],["linkedin","LinkedIn","#0A66C2"]].map(([p,label,bg])=>(

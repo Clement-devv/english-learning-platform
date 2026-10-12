@@ -38,33 +38,40 @@ import UpcomingClasses from "../components/UpcomingClasses";
 import ProgressCard from "../components/ProgressCard";
 import NotificationsCard from "../components/NotificationsCard";
 import { useDashboardData, BADGE_DEFINITIONS } from "./useDashboardData";
+import { useTranslation } from "react-i18next";
+import i18n from "../../../i18n/i18n.js";
+
+// For text in file-level lists: read when rendered, so it follows the chosen language
+const ta = (key, opts) => i18n.t(`student:${key}`, opts);
+
 
 // ── Sidebar section definitions ───────────────────────────────────────────────
 const SIDEBAR = [
-  { id: "dashboard",  Icon: Home,           label: "Home",     tabs: ["dashboard"]                             },
-  { id: "study",      Icon: BookOpen,        label: "Study",    tabs: ["homework", "quiz", "flashcards"]        },
-  { id: "practice",   Icon: Mic2,            label: "Practice", tabs: ["pronunciation", "conversation"]         },
-  { id: "messages",   Icon: MessageSquare,   label: "Messages", tabs: ["messages"]                              },
-  { id: "classes",    Icon: CalendarDays,    label: "Classes",  tabs: ["completed-classes", "schedule"]         },
-  { id: "progress",   Icon: BarChart2,       label: "Progress", tabs: ["charts", "badges"]                      },
-  { id: "more",       Icon: MoreHorizontal,  label: "More",     tabs: ["recordings", "reviews", "referral"]     },
+  { id: "dashboard",  Icon: Home,           get label() { return ta("cRMShell.sidebarHome"); },     tabs: ["dashboard"]                             },
+  { id: "study",      Icon: BookOpen,        get label() { return ta("cRMShell.sidebarStudy"); },    tabs: ["homework", "quiz", "flashcards"]        },
+  { id: "practice",   Icon: Mic2,            get label() { return ta("cRMShell.sidebarPractice"); }, tabs: ["pronunciation", "conversation"]         },
+  { id: "messages",   Icon: MessageSquare,   get label() { return ta("cRMShell.sidebarMessages"); }, tabs: ["messages"]                              },
+  { id: "classes",    Icon: CalendarDays,    get label() { return ta("cRMShell.sidebarClasses"); },  tabs: ["completed-classes", "schedule"]         },
+  { id: "progress",   Icon: BarChart2,       get label() { return ta("cRMShell.sidebarProgress"); }, tabs: ["charts", "badges"]                      },
+  { id: "more",       Icon: MoreHorizontal,  get label() { return ta("cRMShell.sidebarMore"); },     tabs: ["recordings", "reviews", "referral"]     },
 ];
 
 // Sub-tab labels per section
 const SUB_TABS = {
-  study:    [{ key: "homework", label: "Homework" }, { key: "quiz", label: "Quizzes" }, { key: "flashcards", label: "Flashcards" }],
-  practice: [{ key: "pronunciation", label: "Speak" }, { key: "conversation", label: "AI Chat" }],
-  classes:  [{ key: "completed-classes", label: "Completed" }, { key: "schedule", label: "Schedule" }],
-  progress: [{ key: "charts", label: "Charts" }, { key: "badges", label: "Badges" }],
-  more:     [{ key: "recordings", label: "Recordings" }, { key: "reviews", label: "Reviews" }, { key: "referral", label: "Invite" }],
+  study:    [{ key: "homework", get label() { return ta("cRMShell.subTabsHomework"); } }, { key: "quiz", get label() { return ta("cRMShell.subTabsQuizzes"); } }, { key: "flashcards", get label() { return ta("cRMShell.subTabsFlashcards"); } }],
+  practice: [{ key: "pronunciation", get label() { return ta("cRMShell.subTabsSpeak"); } }, { key: "conversation", get label() { return ta("cRMShell.subTabsAiChat"); } }],
+  classes:  [{ key: "completed-classes", get label() { return ta("cRMShell.subTabsCompleted"); } }, { key: "schedule", get label() { return ta("cRMShell.subTabsSchedule"); } }],
+  progress: [{ key: "charts", get label() { return ta("cRMShell.subTabsCharts"); } }, { key: "badges", get label() { return ta("cRMShell.subTabsBadges"); } }],
+  more:     [{ key: "recordings", get label() { return ta("cRMShell.subTabsRecordings"); } }, { key: "reviews", get label() { return ta("cRMShell.subTabsReviews"); } }, { key: "referral", get label() { return ta("cRMShell.subTabsInvite"); } }],
 };
 
 // ── CRM Badges Panel ──────────────────────────────────────────────────────────
 function CRMBadgesPanel({ badges, progress, completedClasses, accent, shareAchievement }) {
+  const { t: tr } = useTranslation("student");
   const [filter, setFilter] = useState("all");
   const categories = [
-    { key: "all", label: "All" }, { key: "journey", label: "Journey" },
-    { key: "consistency", label: "Consistency" }, { key: "weekly", label: "Weekly" }, { key: "special", label: "Special" },
+    { key: "all", label: tr("cRMShell.all") }, { key: "journey", label: tr("cRMShell.journey") },
+    { key: "consistency", label: tr("cRMShell.consistency") }, { key: "weekly", label: tr("cRMShell.weekly") }, { key: "special", label: tr("cRMShell.special") },
   ];
   const shown  = BADGE_DEFINITIONS.filter(b => filter === "all" || b.category === filter);
   const pct    = Math.round((badges.length / BADGE_DEFINITIONS.length) * 100);
@@ -83,15 +90,15 @@ function CRMBadgesPanel({ badges, progress, completedClasses, accent, shareAchie
       <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: "12px", padding: "24px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
           <div>
-            <h2 style={{ margin: "0 0 4px", fontSize: "20px", fontWeight: 700, color: "#111827" }}>Achievement Badges</h2>
+            <h2 style={{ margin: "0 0 4px", fontSize: "20px", fontWeight: 700, color: "#111827" }}>{tr("cRMShell.achievementBadges2")}</h2>
             <p style={{ margin: 0, color: "#6b7280", fontSize: "14px" }}>
-              {badges.length === 0 ? "Complete classes to start earning!" : `${badges.length} of ${BADGE_DEFINITIONS.length} earned · ${pct}%`}
+              {badges.length === 0 ? tr("cRMShell.completeClassesToStartEarning") : tr("cRMShell.ofEarned", { badgesCount: badges.length, BADGEDEFINITIONSCount: BADGE_DEFINITIONS.length, pct })}
             </p>
           </div>
           {badges.length > 0 && (
             <button onClick={() => shareAchievement("badge")}
               style={{ background: accent, color: "#fff", border: "none", borderRadius: "999px", padding: "9px 20px", fontWeight: 600, cursor: "pointer", fontFamily: "Inter,sans-serif", fontSize: "14px" }}>
-              Share All
+              {tr("cRMShell.shareAll")}
             </button>
           )}
         </div>
@@ -99,7 +106,7 @@ function CRMBadgesPanel({ badges, progress, completedClasses, accent, shareAchie
         {/* Progress bar */}
         <div style={{ marginBottom: "20px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", color: "#6b7280", marginBottom: "6px" }}>
-            <span>Overall Progress</span><span>{pct}%</span>
+            <span>{tr("cRMShell.overallProgress")}</span><span>{pct}%</span>
           </div>
           <div style={{ background: "#f3f4f6", borderRadius: "999px", height: "8px", overflow: "hidden" }}>
             <div style={{ width: `${pct}%`, height: "100%", borderRadius: "999px", background: accent, transition: "width 1s ease" }} />
@@ -138,7 +145,7 @@ function CRMBadgesPanel({ badges, progress, completedClasses, accent, shareAchie
                 </div>
               )}
               <span style={{ display: "inline-block", padding: "3px 12px", borderRadius: "999px", fontSize: "11px", fontWeight: 600, background: earned ? `${badge.grad[0]}15` : "#f3f4f6", color: earned ? badge.grad[0] : "#9ca3af" }}>
-                {earned ? "✓ Earned" : "Locked"}
+                {earned ? tr("cRMShell.earned") : tr("cRMShell.locked2")}
               </span>
             </div>
           );
@@ -148,7 +155,7 @@ function CRMBadgesPanel({ badges, progress, completedClasses, accent, shareAchie
       {/* Almost there */}
       {nextUp.length > 0 && (
         <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: "12px", padding: "24px" }}>
-          <h3 style={{ margin: "0 0 16px", fontSize: "17px", fontWeight: 700, color: "#111827" }}>Almost There</h3>
+          <h3 style={{ margin: "0 0 16px", fontSize: "17px", fontWeight: 700, color: "#111827" }}>{tr("cRMShell.almostThere2")}</h3>
           <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
             {nextUp.map(badge => {
               const cur = getCur(badge);
@@ -177,6 +184,7 @@ function CRMBadgesPanel({ badges, progress, completedClasses, accent, shareAchie
 
 // ── Main CRM Shell ────────────────────────────────────────────────────────────
 export default function CRMShell() {
+  const { t: tr } = useTranslation("student");
   const { branding } = useBranding();
   const accent = branding.primaryColor || "#4F46E5";
 
@@ -196,7 +204,7 @@ export default function CRMShell() {
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap'); @keyframes spin{to{transform:rotate(360deg)}}`}</style>
       <div style={{ textAlign: "center" }}>
         <div style={{ width: "40px", height: "40px", border: `3px solid #e5e7eb`, borderTopColor: accent, borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "0 auto 16px" }} />
-        <p style={{ color: "#6b7280", fontWeight: 500, fontSize: "15px" }}>Loading your dashboard...</p>
+        <p style={{ color: "#6b7280", fontWeight: 500, fontSize: "15px" }}>{tr("cRMShell.loadingYourDashboard")}</p>
       </div>
     </div>
   );
@@ -233,10 +241,10 @@ export default function CRMShell() {
             <div style={{ background: accent, color: "#fff", padding: "40px 52px", borderRadius: "20px", textAlign: "center", boxShadow: "0 20px 60px rgba(0,0,0,0.25)", pointerEvents: "auto", maxWidth: "90vw" }}>
               <div style={{ fontSize: "64px", marginBottom: "12px" }}>{d.celebrationEmoji}</div>
               <h2 style={{ margin: "0 0 8px", fontSize: "26px", fontWeight: 700 }}>{d.celebrationMessage}</h2>
-              <p style={{ margin: "0 0 20px", opacity: 0.85, fontSize: "15px" }}>Keep up the amazing work!</p>
+              <p style={{ margin: "0 0 20px", opacity: 0.85, fontSize: "15px" }}>{tr("cRMShell.keepUpTheAmazingWork2")}</p>
               <button className="crm-btn" onClick={() => d.shareAchievement(d.newBadge ? "badge" : d.progress.streakDays >= 5 ? "streak" : "total")}
                 style={{ background: "rgba(255,255,255,0.2)", border: "2px solid rgba(255,255,255,0.5)", color: "#fff", padding: "10px 24px", borderRadius: "999px", fontWeight: 600, cursor: "pointer", fontFamily: "Inter,sans-serif", fontSize: "14px" }}>
-                Share Achievement
+                {tr("cRMShell.shareAchievement")}
               </button>
             </div>
           </div>
@@ -280,7 +288,7 @@ export default function CRMShell() {
         </nav>
 
         {/* Bottom: logout */}
-        <button title="Sign out" className="crm-nav-item" onClick={d.handleLogout}
+        <button title={tr("cRMShell.signOut2")} className="crm-nav-item" onClick={d.handleLogout}
           style={{ width: "44px", height: "44px", border: "none", background: "transparent", borderRadius: "8px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
           <LogOut size={18} color="#9ca3af" />
         </button>
@@ -297,7 +305,7 @@ export default function CRMShell() {
           {/* Search */}
           <div style={{ flex: 1, maxWidth: "400px", position: "relative" }}>
             <Search size={16} color="#9ca3af" style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)" }} />
-            <input placeholder="Search..." style={{ width: "100%", height: "36px", background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: "999px", paddingLeft: "36px", paddingRight: "14px", fontSize: "14px", color: "#111827", outline: "none", fontFamily: "Inter,sans-serif" }}
+            <input placeholder={tr("cRMShell.search")} style={{ width: "100%", height: "36px", background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: "999px", paddingLeft: "36px", paddingRight: "14px", fontSize: "14px", color: "#111827", outline: "none", fontFamily: "Inter,sans-serif" }}
               onFocus={e => { e.target.style.borderColor = accent; e.target.style.boxShadow = `0 0 0 3px ${accent}20`; }}
               onBlur={e => { e.target.style.borderColor = "#e5e7eb"; e.target.style.boxShadow = "none"; }} />
           </div>
@@ -337,13 +345,13 @@ export default function CRMShell() {
                 <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                   <span style={{ fontSize: "18px" }}>⚠️</span>
                   <div>
-                    <p style={{ margin: 0, color: "#92400e", fontSize: "14px", fontWeight: 600 }}>Attendance confirmation needed for "{conf.title}"</p>
-                    <p style={{ margin: "2px 0 0", color: "#b45309", fontSize: "12px" }}>Auto-confirms in {d.getTimeRemaining(conf.autoConfirmAt)}</p>
+                    <p style={{ margin: 0, color: "#92400e", fontSize: "14px", fontWeight: 600 }}>{tr("cRMShell.attendanceConfirmationNeededFor", { title: conf.title })}</p>
+                    <p style={{ margin: "2px 0 0", color: "#b45309", fontSize: "12px" }}>{tr("cRMShell.autoConfirmsIn2", { value: d.getTimeRemaining(conf.autoConfirmAt) })}</p>
                   </div>
                 </div>
                 <button className="crm-btn" onClick={() => { d.setSelectedConfirmation(conf); d.setShowConfirmationModal(true); }}
                   style={{ background: "#f59e0b", color: "#fff", border: "none", borderRadius: "999px", padding: "7px 16px", fontWeight: 600, cursor: "pointer", fontFamily: "Inter,sans-serif", fontSize: "13px", whiteSpace: "nowrap" }}>
-                  Review
+                  {tr("cRMShell.review2")}
                 </button>
               </div>
             ))}
@@ -377,23 +385,23 @@ export default function CRMShell() {
               {/* Welcome bar */}
               <div className="crm-card" style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: "12px", padding: "20px 24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <div>
-                  <p style={{ margin: "0 0 2px", fontSize: "12px", color: "#6b7280", fontWeight: 500, textTransform: "uppercase", letterSpacing: ".06em" }}>Welcome back</p>
+                  <p style={{ margin: "0 0 2px", fontSize: "12px", color: "#6b7280", fontWeight: 500, textTransform: "uppercase", letterSpacing: ".06em" }}>{tr("cRMShell.welcomeBack2")}</p>
                   <h1 style={{ margin: "0 0 4px", fontSize: "22px", fontWeight: 700, color: "#111827" }}>{d.student.name || d.student.firstName}</h1>
-                  <p style={{ margin: 0, fontSize: "14px", color: "#6b7280" }}>You have <strong style={{ color: accent }}>{d.progress.classesRemaining}</strong> classes remaining.</p>
+                  <p style={{ margin: 0, fontSize: "14px", color: "#6b7280" }}>{tr("cRMShell.youHave")} <strong style={{ color: accent }}>{d.progress.classesRemaining}</strong> {tr("cRMShell.classesRemaining")}</p>
                 </div>
                 <button className="crm-btn" onClick={() => d.setActiveTab("completed-classes")}
                   style={{ background: accent, color: "#fff", border: "none", borderRadius: "999px", padding: "10px 22px", fontWeight: 600, cursor: "pointer", fontFamily: "Inter,sans-serif", fontSize: "14px", display: "flex", alignItems: "center", gap: "6px" }}>
-                  View Classes <ChevronRight size={16} />
+                  {tr("cRMShell.viewClasses")} <ChevronRight size={16} />
                 </button>
               </div>
 
               {/* Stats row */}
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: "12px" }}>
                 {[
-                  { Icon: CheckSquare, label: "Completed",  value: d.progress.completedLessons, color: "#059669", bg: "#f0fdf4" },
-                  { Icon: Clock,       label: "Remaining",  value: d.progress.classesRemaining,  color: "#2563eb", bg: "#eff6ff" },
-                  { Icon: Flame,       label: "Day Streak", value: d.progress.streakDays,        color: "#ea580c", bg: "#fff7ed" },
-                  { Icon: Star,        label: "This Week",  value: d.progress.weeklyCompleted,   color: "#7c3aed", bg: "#f5f3ff" },
+                  { Icon: CheckSquare, label: tr("cRMShell.completed"),  value: d.progress.completedLessons, color: "#059669", bg: "#f0fdf4" },
+                  { Icon: Clock,       label: tr("cRMShell.remaining"),  value: d.progress.classesRemaining,  color: "#2563eb", bg: "#eff6ff" },
+                  { Icon: Flame,       label: tr("cRMShell.dayStreak2"), value: d.progress.streakDays,        color: "#ea580c", bg: "#fff7ed" },
+                  { Icon: Star,        label: tr("cRMShell.thisWeek"),  value: d.progress.weeklyCompleted,   color: "#7c3aed", bg: "#f5f3ff" },
                 ].map(({ Icon, label, value, color, bg }) => (
                   <div key={label} className="crm-card" style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: "12px", padding: "20px" }}>
                     <div style={{ width: "40px", height: "40px", borderRadius: "10px", background: bg, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "12px" }}>
@@ -411,15 +419,15 @@ export default function CRMShell() {
                   {/* Live classes */}
                   <div className="crm-card" style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: "12px", padding: "20px" }}>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
-                      <h2 style={{ margin: 0, fontSize: "16px", fontWeight: 700, color: "#111827" }}>Live & Starting Soon</h2>
-                      {d.activeClasses.length > 0 && <span style={{ background: "#fee2e2", color: "#dc2626", borderRadius: "999px", padding: "2px 10px", fontSize: "12px", fontWeight: 600 }}>{d.activeClasses.length} active</span>}
+                      <h2 style={{ margin: 0, fontSize: "16px", fontWeight: 700, color: "#111827" }}>{tr("cRMShell.liveStartingSoon2")}</h2>
+                      {d.activeClasses.length > 0 && <span style={{ background: "#fee2e2", color: "#dc2626", borderRadius: "999px", padding: "2px 10px", fontSize: "12px", fontWeight: 600 }}>{tr("cRMShell.active", { activeClassesCount: d.activeClasses.length })}</span>}
                     </div>
                     <ActiveClasses activeClasses={d.activeClasses} onJoin={d.handleJoinClass} />
                   </div>
 
                   {/* Upcoming */}
                   <div className="crm-card" style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: "12px", padding: "20px" }}>
-                    <h2 style={{ margin: "0 0 16px", fontSize: "16px", fontWeight: 700, color: "#111827" }}>Upcoming Classes</h2>
+                    <h2 style={{ margin: "0 0 16px", fontSize: "16px", fontWeight: 700, color: "#111827" }}>{tr("cRMShell.upcomingClasses")}</h2>
                     <UpcomingClasses upcomingClasses={d.upcomingClasses} onEnroll={() => d.showToast("Coming soon!")} />
                   </div>
                 </div>
@@ -428,7 +436,7 @@ export default function CRMShell() {
                 <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
                   {/* Progress */}
                   <div className="crm-card" style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: "12px", padding: "20px" }}>
-                    <h2 style={{ margin: "0 0 14px", fontSize: "15px", fontWeight: 700, color: "#111827" }}>My Progress</h2>
+                    <h2 style={{ margin: "0 0 14px", fontSize: "15px", fontWeight: 700, color: "#111827" }}>{tr("cRMShell.myProgress")}</h2>
                     <ProgressCard progress={d.progress} />
                   </div>
 
@@ -438,11 +446,11 @@ export default function CRMShell() {
                   {/* Recent badges */}
                   <div className="crm-card" style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: "12px", padding: "20px" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
-                      <h2 style={{ margin: 0, fontSize: "15px", fontWeight: 700, color: "#111827" }}>My Badges</h2>
-                      <button className="crm-btn" onClick={() => d.setActiveTab("badges")} style={{ background: "transparent", border: "none", color: accent, fontWeight: 600, cursor: "pointer", fontFamily: "Inter,sans-serif", fontSize: "13px" }}>See all</button>
+                      <h2 style={{ margin: 0, fontSize: "15px", fontWeight: 700, color: "#111827" }}>{tr("cRMShell.myBadges2")}</h2>
+                      <button className="crm-btn" onClick={() => d.setActiveTab("badges")} style={{ background: "transparent", border: "none", color: accent, fontWeight: 600, cursor: "pointer", fontFamily: "Inter,sans-serif", fontSize: "13px" }}>{tr("cRMShell.seeAll2")}</button>
                     </div>
                     {d.badges.length === 0 ? (
-                      <p style={{ textAlign: "center", color: "#9ca3af", fontSize: "13px" }}>Complete classes to earn badges.</p>
+                      <p style={{ textAlign: "center", color: "#9ca3af", fontSize: "13px" }}>{tr("cRMShell.completeClassesToEarnBadges2")}</p>
                     ) : (
                       <div style={{ display: "flex", flexWrap: "wrap", gap: "10px" }}>
                         {d.badges.slice(-4).map(b => (
@@ -457,7 +465,7 @@ export default function CRMShell() {
 
                   {/* Notifications */}
                   <div className="crm-card" style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: "12px", padding: "20px" }}>
-                    <h2 style={{ margin: "0 0 14px", fontSize: "15px", fontWeight: 700, color: "#111827" }}>Notifications</h2>
+                    <h2 style={{ margin: "0 0 14px", fontSize: "15px", fontWeight: 700, color: "#111827" }}>{tr("cRMShell.notifications")}</h2>
                     <NotificationsCard notifications={d.notifications} onClearAll={() => d.setNotifications([])} />
                   </div>
                 </div>
@@ -506,7 +514,7 @@ export default function CRMShell() {
           {/* ══ COMPLETED CLASSES ══ */}
           {d.activeTab === "completed-classes" && (
             <div className="crm-card" style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: "12px", padding: "24px" }}>
-              <h2 style={{ margin: "0 0 20px", fontSize: "18px", fontWeight: 700, color: "#111827" }}>Completed Classes</h2>
+              <h2 style={{ margin: "0 0 20px", fontSize: "18px", fontWeight: 700, color: "#111827" }}>{tr("cRMShell.completedClasses2")}</h2>
               <StudentCompletedTab studentId={d.student.id} isDarkMode={false} />
             </div>
           )}
@@ -524,9 +532,9 @@ export default function CRMShell() {
               {/* Stats */}
               <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "12px" }}>
                 {[
-                  { label: "Total Classes", value: d.completedClasses.length, color: "#ea580c" },
-                  { label: "Day Streak",    value: d.progress.streakDays,     color: "#db2777" },
-                  { label: "Total Hours",   value: d.completedClasses.length > 0 ? Math.round(d.completedClasses.reduce((s, c) => s + c.duration, 0) / 60) : 0, color: "#7c3aed" },
+                  { label: tr("cRMShell.totalClasses"), value: d.completedClasses.length, color: "#ea580c" },
+                  { label: tr("cRMShell.dayStreak2"),    value: d.progress.streakDays,     color: "#db2777" },
+                  { label: tr("cRMShell.totalHours"),   value: d.completedClasses.length > 0 ? Math.round(d.completedClasses.reduce((s, c) => s + c.duration, 0) / 60) : 0, color: "#7c3aed" },
                 ].map(({ label, value, color }) => (
                   <div key={label} className="crm-card" style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: "12px", padding: "20px" }}>
                     <div style={{ fontSize: "30px", fontWeight: 700, color, marginBottom: "4px" }}>{value}</div>
@@ -536,7 +544,7 @@ export default function CRMShell() {
               </div>
 
               {/* Charts */}
-              {[{ title: "Last 7 Days", data: d.chartData.last7, type: "bar" }, { title: "Last 30 Days", data: d.chartData.last30, type: "line" }].map(({ title, data, type }) => (
+              {[{ title: tr("cRMShell.last7Days"), data: d.chartData.last7, type: "bar" }, { title: tr("cRMShell.last30Days"), data: d.chartData.last30, type: "line" }].map(({ title, data, type }) => (
                 <div key={title} className="crm-card" style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: "12px", padding: "20px" }}>
                   <h3 style={{ margin: "0 0 16px", fontSize: "15px", fontWeight: 700, color: "#111827" }}>{title}</h3>
                   <ResponsiveContainer width="100%" height={220}>
@@ -551,7 +559,7 @@ export default function CRMShell() {
 
               {/* Pie */}
               <div className="crm-card" style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: "12px", padding: "20px" }}>
-                <h3 style={{ margin: "0 0 16px", fontSize: "15px", fontWeight: 700, color: "#111827" }}>Classes by Time of Day</h3>
+                <h3 style={{ margin: "0 0 16px", fontSize: "15px", fontWeight: 700, color: "#111827" }}>{tr("cRMShell.classesByTimeOfDay")}</h3>
                 <ResponsiveContainer width="100%" height={220}>
                   <PieChart><Pie data={d.chartData.timeDist} cx="50%" cy="50%" outerRadius={80} dataKey="value" label={({ name, value }) => `${name}: ${value}`} labelLine={false}>{d.chartData.timeDist.map((e, i) => <Cell key={i} fill={e.color} />)}</Pie><RechartsTooltip contentStyle={tooltipStyle} /></PieChart>
                 </ResponsiveContainer>
@@ -580,7 +588,7 @@ export default function CRMShell() {
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999, padding: "16px" }}>
           <div style={{ background: "#fff", borderRadius: "16px", padding: "28px", maxWidth: "420px", width: "100%", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-              <h3 style={{ margin: 0, fontSize: "18px", fontWeight: 700, color: "#111827" }}>Share Your Achievement</h3>
+              <h3 style={{ margin: 0, fontSize: "18px", fontWeight: 700, color: "#111827" }}>{tr("cRMShell.shareYourAchievement")}</h3>
               <button className="crm-btn" onClick={() => d.setShowShareModal(false)} style={{ background: "#f3f4f6", border: "none", borderRadius: "8px", width: "32px", height: "32px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#374151", fontSize: "16px" }}>✕</button>
             </div>
             <div style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: "10px", padding: "16px", marginBottom: "16px" }}>
@@ -589,7 +597,7 @@ export default function CRMShell() {
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
               <button className="crm-btn" onClick={d.copyShareText} style={{ width: "100%", padding: "11px", border: "1px solid #e5e7eb", borderRadius: "999px", background: "transparent", color: "#374151", fontWeight: 600, cursor: "pointer", fontFamily: "Inter,sans-serif", fontSize: "14px", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}>
-                <Copy size={15} /> Copy to Clipboard
+                <Copy size={15} /> {tr("cRMShell.copyToClipboard")}
               </button>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
                 {[["twitter", "Twitter", "#1DA1F2"], ["facebook", "Facebook", "#1877F2"], ["whatsapp", "WhatsApp", "#25D366"], ["linkedin", "LinkedIn", "#0A66C2"]].map(([p, label, bg]) => (
@@ -609,14 +617,14 @@ export default function CRMShell() {
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999 }}>
           <div style={{ background: "#fff", borderRadius: "16px", padding: "24px", maxWidth: "380px", width: "calc(100% - 32px)", boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-              <h3 style={{ margin: 0, fontSize: "18px", fontWeight: 700, color: "#111827" }}>Settings</h3>
+              <h3 style={{ margin: 0, fontSize: "18px", fontWeight: 700, color: "#111827" }}>{tr("cRMShell.settings")}</h3>
               <button onClick={() => setShowSettingsPanel(false)} style={{ background: "#f3f4f6", border: "none", borderRadius: "8px", width: "32px", height: "32px", cursor: "pointer", fontSize: "16px" }}>✕</button>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
               {[
-                { Icon: KeyRound, label: "Change Password", action: () => { setShowSettingsPanel(false); d.setShowChangePassword(true); } },
-                { Icon: Layers,   label: "Manage Sessions", action: () => { setShowSettingsPanel(false); d.setShowSessionManagement(true); } },
-                { Icon: Shield,   label: "Two-Factor Auth", action: () => { setShowSettingsPanel(false); setShow2FA(true); } },
+                { Icon: KeyRound, label: tr("cRMShell.changePassword"), action: () => { setShowSettingsPanel(false); d.setShowChangePassword(true); } },
+                { Icon: Layers,   label: tr("cRMShell.manageSessions"), action: () => { setShowSettingsPanel(false); d.setShowSessionManagement(true); } },
+                { Icon: Shield,   label: tr("cRMShell.twoFactorAuth"), action: () => { setShowSettingsPanel(false); setShow2FA(true); } },
               ].map(({ Icon, label, action }) => (
                 <button key={label} className="crm-btn" onClick={action}
                   style={{ width: "100%", padding: "12px 16px", border: "1px solid #e5e7eb", borderRadius: "10px", background: "#fff", cursor: "pointer", fontFamily: "Inter,sans-serif", fontSize: "14px", fontWeight: 500, color: "#374151", display: "flex", alignItems: "center", gap: "12px", textAlign: "left" }}>
@@ -626,7 +634,7 @@ export default function CRMShell() {
             </div>
             <button className="crm-btn" onClick={d.handleLogout}
               style={{ width: "100%", marginTop: "12px", padding: "12px 16px", border: "1px solid #fca5a5", borderRadius: "10px", background: "#fff", cursor: "pointer", fontFamily: "Inter,sans-serif", fontSize: "14px", fontWeight: 500, color: "#dc2626", display: "flex", alignItems: "center", gap: "12px" }}>
-              <LogOut size={17} color="#dc2626" /> Sign Out
+              <LogOut size={17} color="#dc2626" /> {tr("cRMShell.signOut")}
             </button>
           </div>
         </div>

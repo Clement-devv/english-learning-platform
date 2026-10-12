@@ -4,8 +4,10 @@ import { Lock, Eye, EyeOff, AlertCircle, ShieldCheck, ArrowRight, Mail, CheckCir
 import TwoFactorLogin from '../../../components/TwoFactorLogin';
 import { useBranding } from '../../../context/BrandingContext';
 import { useAdminLoginLogic } from './useAdminLoginLogic';
+import { useTranslation } from "react-i18next";
 
 export default function ExecutiveTheme() {
+  const { t: tr } = useTranslation("admin");
   const {
     username, setUsername,
     password, setPassword,
@@ -91,7 +93,7 @@ export default function ExecutiveTheme() {
                       <span className="ex-sdot ex-sdot-y" />
                       <span className="ex-sdot ex-sdot-r" />
                     </div>
-                    <span className="ex-screen-title">Dashboard · Live</span>
+                    <span className="ex-screen-title">{tr("executiveTheme.dashboardLive")}</span>
                   </div>
                   <div className="ex-chart">
                     {[55, 72, 43, 88, 61, 95, 50, 78].map((h, i) => (
@@ -99,7 +101,7 @@ export default function ExecutiveTheme() {
                     ))}
                   </div>
                   <div className="ex-screen-hr" />
-                  <div className="ex-live-badge"><span className="ex-live-dot-sm" />LIVE</div>
+                  <div className="ex-live-badge"><span className="ex-live-dot-sm" />{tr("executiveTheme.live")}</div>
                 </div>
                 <div className="ex-stand" />
                 <div className="ex-base" />
@@ -112,8 +114,8 @@ export default function ExecutiveTheme() {
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#22d3ee" strokeWidth="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
               </div>
               <div className="ex-fc-body">
-                <div className="ex-fc-feat">Analytics</div>
-                <div className="ex-fc-status"><span className="ex-live-dot" style={{ background: '#22d3ee' }} />Live</div>
+                <div className="ex-fc-feat">{tr("executiveTheme.analytics")}</div>
+                <div className="ex-fc-status"><span className="ex-live-dot" style={{ background: '#22d3ee' }} />{tr("executiveTheme.live2")}</div>
               </div>
             </div>
 
@@ -122,8 +124,8 @@ export default function ExecutiveTheme() {
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#818cf8" strokeWidth="2.5"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
               </div>
               <div className="ex-fc-body">
-                <div className="ex-fc-feat">Manage Roster</div>
-                <div className="ex-fc-status"><span className="ex-live-dot" style={{ background: '#818cf8' }} />Active</div>
+                <div className="ex-fc-feat">{tr("executiveTheme.manageRoster")}</div>
+                <div className="ex-fc-status"><span className="ex-live-dot" style={{ background: '#818cf8' }} />{tr("executiveTheme.active")}</div>
               </div>
             </div>
 
@@ -132,20 +134,20 @@ export default function ExecutiveTheme() {
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" strokeWidth="2.5"><circle cx="12" cy="12" r="3"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="9" y2="12"/><line x1="15" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
               </div>
               <div className="ex-fc-body">
-                <div className="ex-fc-feat">Full Control</div>
-                <div className="ex-fc-status"><span className="ex-live-dot" style={{ background: '#fbbf24' }} />Running</div>
+                <div className="ex-fc-feat">{tr("executiveTheme.fullControl")}</div>
+                <div className="ex-fc-status"><span className="ex-live-dot" style={{ background: '#fbbf24' }} />{tr("executiveTheme.running")}</div>
               </div>
             </div>
 
           </div>
 
           <div className="ex-hero">
-            <h2 className="ex-h2">Your Command<br /><span className="ex-h2-accent">Center</span></h2>
-            <p className="ex-hp">Full visibility. Total control.<br />Manage your entire learning center from one place.</p>
+            <h2 className="ex-h2">{tr("executiveTheme.yourCommand")}<br /><span className="ex-h2-accent">{tr("executiveTheme.center")}</span></h2>
+            <p className="ex-hp">{tr("executiveTheme.fullVisibilityTotalControl")}<br />{tr("executiveTheme.manageYourEntireLearningCenter")}</p>
             <div className="ex-badges">
-              <span className="ex-chip">📊 Analytics</span>
-              <span className="ex-chip">👥 Full roster</span>
-              <span className="ex-chip">⚙️ Settings</span>
+              <span className="ex-chip">{tr("executiveTheme.analytics2")}</span>
+              <span className="ex-chip">{tr("executiveTheme.fullRoster")}</span>
+              <span className="ex-chip">{tr("executiveTheme.settings")}</span>
             </div>
           </div>
         </div>
@@ -159,28 +161,28 @@ export default function ExecutiveTheme() {
                 <div className="ex-shield"><Mail size={24} color="#22d3ee" strokeWidth={1.5} /></div>
                 <div>
                   <p className="ex-center-tag">{centerName}</p>
-                  <h1 className="ex-card-title">Reset Password</h1>
-                  <p className="ex-card-sub">Enter your admin email address</p>
+                  <h1 className="ex-card-title">{tr("executiveTheme.resetPassword")}</h1>
+                  <p className="ex-card-sub">{tr("executiveTheme.enterYourAdminEmailAddress")}</p>
                 </div>
               </div>
               <div className="ex-sep" />
               {forgotError && <div className="ex-err"><AlertCircle size={14} color="#f87171" /><span>{forgotError}</span></div>}
               <form onSubmit={handleForgotPassword} className="ex-form">
                 <div className="ex-field">
-                  <label htmlFor="ex-forgot-email" className="ex-lbl">Admin Email</label>
+                  <label htmlFor="ex-forgot-email" className="ex-lbl">{tr("executiveTheme.adminEmail")}</label>
                   <div className={`ex-inp-wrap${focusedField === 'forgot' ? ' ex-focused' : ''}`}>
                     <Mail size={14} color={focusedField === 'forgot' ? '#22d3ee' : '#4b5563'} />
                     <input id="ex-forgot-email" name="email" type="email" value={forgotEmail} onChange={e => setForgotEmail(e.target.value)}
                       onFocus={() => setFocusedField('forgot')} onBlur={() => setFocusedField(null)}
-                      placeholder="admin@example.com" required disabled={forgotLoading} className="ex-inp" autoFocus />
+                      placeholder={tr("executiveTheme.adminExampleCom")} required disabled={forgotLoading} className="ex-inp" autoFocus />
                   </div>
                 </div>
                 <button type="submit" disabled={forgotLoading} className="ex-btn">
                   {forgotLoading
-                    ? <span className="ex-btn-row"><span className="ex-spin" />Sending…</span>
-                    : <span className="ex-btn-row"><Mail size={15} />Send Reset Link</span>}
+                    ? <span className="ex-btn-row"><span className="ex-spin" />{tr("executiveTheme.sending")}</span>
+                    : <span className="ex-btn-row"><Mail size={15} />{tr("executiveTheme.sendResetLink")}</span>}
                 </button>
-                <button type="button" onClick={() => setView('login')} className="ex-back">← Back to login</button>
+                <button type="button" onClick={() => setView('login')} className="ex-back">{tr("executiveTheme.backToLogin")}</button>
               </form>
             </div>
 
@@ -188,12 +190,12 @@ export default function ExecutiveTheme() {
             <div className="ex-card">
               <div className="ex-sent">
                 <div className="ex-sent-icon"><CheckCircle size={30} color="#34d399" /></div>
-                <h2 className="ex-sent-h">Check your email</h2>
+                <h2 className="ex-sent-h">{tr("executiveTheme.checkYourEmail")}</h2>
                 <p className="ex-sent-p">
-                  If <strong>{forgotEmail}</strong> is registered, a reset link has been sent. Check your inbox — expires in 1 hour.
+                  {tr("executiveTheme.if")} <strong>{forgotEmail}</strong> {tr("executiveTheme.isRegisteredAResetLink")}
                 </p>
                 <button onClick={() => { setView('login'); setForgotEmail(''); }} className="ex-btn" style={{ width: 'auto', padding: '12px 32px' }}>
-                  Back to Login
+                  {tr("executiveTheme.backToLogin2")}
                 </button>
               </div>
             </div>
@@ -205,24 +207,24 @@ export default function ExecutiveTheme() {
                 <div className="ex-shield"><ShieldCheck size={24} color="#22d3ee" strokeWidth={1.5} /></div>
                 <div>
                   <p className="ex-center-tag">{centerName}</p>
-                  <h1 className="ex-card-title">Admin Portal</h1>
-                  <p className="ex-card-sub">Authorized personnel only</p>
+                  <h1 className="ex-card-title">{tr("executiveTheme.adminPortal")}</h1>
+                  <p className="ex-card-sub">{tr("executiveTheme.authorizedPersonnelOnly")}</p>
                 </div>
               </div>
               <div className="ex-sep" />
               {error && <div className="ex-err"><AlertCircle size={14} color="#f87171" /><span>{error}</span></div>}
               <form onSubmit={handleInitialLogin} className="ex-form">
                 <div className="ex-field">
-                  <label htmlFor="ex-username" className="ex-lbl">Username or Email</label>
+                  <label htmlFor="ex-username" className="ex-lbl">{tr("executiveTheme.usernameOrEmail")}</label>
                   <div className={`ex-inp-wrap${focusedField === 'user' ? ' ex-focused' : ''}`}>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={focusedField === 'user' ? '#22d3ee' : '#4b5563'} strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                     <input id="ex-username" name="username" type="text" value={username} onChange={e => setUsername(e.target.value)}
                       onFocus={() => setFocusedField('user')} onBlur={() => setFocusedField(null)}
-                      placeholder="admin@example.com" required disabled={loading} className="ex-inp" />
+                      placeholder={tr("executiveTheme.adminExampleCom")} required disabled={loading} className="ex-inp" />
                   </div>
                 </div>
                 <div className="ex-field">
-                  <label htmlFor="ex-password" className="ex-lbl">Password</label>
+                  <label htmlFor="ex-password" className="ex-lbl">{tr("executiveTheme.password")}</label>
                   <div className={`ex-inp-wrap${focusedField === 'pass' ? ' ex-focused' : ''}`}>
                     <Lock size={14} color={focusedField === 'pass' ? '#22d3ee' : '#4b5563'} />
                     <input id="ex-password" name="password" type={showPassword ? 'text' : 'password'} value={password}
@@ -235,26 +237,26 @@ export default function ExecutiveTheme() {
                   </div>
                 </div>
                 <div style={{ textAlign: 'right', marginTop: '-4px' }}>
-                  <button type="button" onClick={() => { setView('forgot'); }} className="ex-forgot">Forgot password?</button>
+                  <button type="button" onClick={() => { setView('forgot'); }} className="ex-forgot">{tr("executiveTheme.forgotPassword")}</button>
                 </div>
                 <button type="submit" disabled={loading} className="ex-btn">
                   {loading
-                    ? <span className="ex-btn-row"><span className="ex-spin" />Authenticating…</span>
-                    : <span className="ex-btn-row">Access Dashboard <ArrowRight size={15} /></span>}
+                    ? <span className="ex-btn-row"><span className="ex-spin" />{tr("executiveTheme.authenticating")}</span>
+                    : <span className="ex-btn-row">{tr("executiveTheme.accessDashboard")} <ArrowRight size={15} /></span>}
                 </button>
               </form>
               <div className="ex-sec-row">
                 <span className="ex-sec-dot" />
-                <span className="ex-sec-txt">256-bit encrypted · Secured connection</span>
+                <span className="ex-sec-txt">{tr("executiveTheme.t256BitEncryptedSecuredConnection")}</span>
               </div>
               <div className="ex-warn">
                 <AlertCircle size={11} color="#92400e" />
-                <span>Unauthorized access attempts are logged and may result in account lockout.</span>
+                <span>{tr("executiveTheme.unauthorizedAccessAttemptsAreLogged")}</span>
               </div>
             </div>
           )}
 
-          <p className="ex-ver">{centerName} Admin · {new Date().getFullYear()}</p>
+          <p className="ex-ver">{tr("executiveTheme.admin", { centerName, value: new Date().getFullYear() })}</p>
         </div>
       </div>
     </>

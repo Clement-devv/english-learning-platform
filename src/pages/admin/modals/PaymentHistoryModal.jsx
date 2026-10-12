@@ -1,6 +1,8 @@
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 
 export default function PaymentHistoryModal({ isOpen, onClose, history }) {
+  const { t: tr } = useTranslation("admin");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
 
@@ -61,7 +63,7 @@ export default function PaymentHistoryModal({ isOpen, onClose, history }) {
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg shadow-lg w-full max-w-3xl p-6">
-        <h2 className="text-xl font-bold mb-4">Payment History</h2>
+        <h2 className="text-xl font-bold mb-4">{tr("paymentHistoryModal.paymentHistory")}</h2>
 
         <div className="flex gap-3 mb-4">
           <input
@@ -80,13 +82,13 @@ export default function PaymentHistoryModal({ isOpen, onClose, history }) {
             onClick={handlePrint}
             className="ml-auto px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
           >
-            PDF
+            {tr("paymentHistoryModal.pdf")}
           </button>
           <button
             onClick={handleCSV}
             className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
           >
-            CSV
+            {tr("paymentHistoryModal.csv")}
           </button>
         </div>
 
@@ -94,12 +96,12 @@ export default function PaymentHistoryModal({ isOpen, onClose, history }) {
           <table className="w-full text-sm border-collapse">
             <thead className="bg-gray-100">
               <tr>
-                <th className="border p-2">Date</th>
-                <th className="border p-2">Student</th>
-                <th className="border p-2">Method</th>
-                <th className="border p-2">Amount</th>
-                <th className="border p-2">Classes</th>
-                <th className="border p-2">Status</th>
+                <th className="border p-2">{tr("paymentHistoryModal.date")}</th>
+                <th className="border p-2">{tr("paymentHistoryModal.student")}</th>
+                <th className="border p-2">{tr("paymentHistoryModal.method")}</th>
+                <th className="border p-2">{tr("paymentHistoryModal.amount")}</th>
+                <th className="border p-2">{tr("paymentHistoryModal.classes")}</th>
+                <th className="border p-2">{tr("paymentHistoryModal.status")}</th>
               </tr>
             </thead>
             <tbody>
@@ -109,7 +111,7 @@ export default function PaymentHistoryModal({ isOpen, onClose, history }) {
                     <td className="border p-2">
                       {new Date(row.date).toLocaleDateString()}
                     </td>
-                    <td className="border p-2">{row.student || "Unknown"}</td>
+                    <td className="border p-2">{row.student || tr("paymentHistoryModal.unknown")}</td>
                     <td className="border p-2">{row.method}</td>
                     <td className="border p-2">₦{row.amount}</td>
                     <td className="border p-2">{row.classes || "-"}</td>
@@ -119,7 +121,7 @@ export default function PaymentHistoryModal({ isOpen, onClose, history }) {
               ) : (
                 <tr>
                   <td colSpan="6" className="text-center p-4 text-gray-500">
-                    No payment records found
+                    {tr("paymentHistoryModal.noPaymentRecordsFound")}
                   </td>
                 </tr>
               )}
@@ -132,7 +134,7 @@ export default function PaymentHistoryModal({ isOpen, onClose, history }) {
             onClick={onClose}
             className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
           >
-            Close
+            {tr("paymentHistoryModal.close")}
           </button>
         </div>
       </div>

@@ -1,9 +1,12 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Users, UserCheck, Search, Trash2, Plus, ChevronDown, ChevronRight, X, LayoutList, Grid3X3 } from "lucide-react";
 import { getAssignments, createAssignment, deleteAssignment } from "../../../services/assignmentService";
+import { useTranslation } from "react-i18next";
+import { dateLocale } from "../../../i18n/dateLocale.js";
 
 // ── Searchable dropdown combobox ─────────────────────────────────────────────
 function SearchableSelect({ options, value, onChange, placeholder, isDarkMode, getLabel, getId, renderOption }) {
+  const { t: tr } = useTranslation("admin");
   const [open, setOpen]       = useState(false);
   const [query, setQuery]     = useState("");
   const containerRef          = useRef(null);
@@ -101,7 +104,7 @@ function SearchableSelect({ options, value, onChange, placeholder, isDarkMode, g
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Type to search…"
+                placeholder={tr("assignStudentsTab.typeToSearch")}
                 className="text-sm bg-transparent outline-none w-full"
               />
               {query && (
@@ -115,7 +118,7 @@ function SearchableSelect({ options, value, onChange, placeholder, isDarkMode, g
           {/* Options list */}
           <div className="max-h-48 overflow-y-auto p-1.5">
             {filtered.length === 0 ? (
-              <p className={`text-xs text-center py-4 ${mutedCls}`}>No results found</p>
+              <p className={`text-xs text-center py-4 ${mutedCls}`}>{tr("assignStudentsTab.noResultsFound")}</p>
             ) : (
               filtered.map((o) => {
                 const id        = getId(o);
@@ -141,7 +144,7 @@ function SearchableSelect({ options, value, onChange, placeholder, isDarkMode, g
 
           {/* Count footer */}
           <div className={`px-3 py-1.5 text-xs border-t ${mutedCls} ${isDarkMode ? "border-[#2a2f45]" : "border-slate-100"}`}>
-            {filtered.length} of {options.length}
+            {tr("assignStudentsTab.of", { filteredCount: filtered.length, optionsCount: options.length })}
           </div>
         </div>
       )}
@@ -151,16 +154,18 @@ function SearchableSelect({ options, value, onChange, placeholder, isDarkMode, g
 
 // Marks admin-managed, no-login students
 function ManagedTag({ isDarkMode }) {
+  const { t: tr } = useTranslation("admin");
   return (
     <span className={`ml-1.5 align-middle inline-flex px-1.5 py-px rounded text-[9px] font-semibold uppercase tracking-wide ${
       isDarkMode ? "bg-amber-900/40 text-amber-300" : "bg-amber-100 text-amber-700"
     }`}>
-      Managed
+      {tr("assignStudentsTab.managed")}
     </span>
   );
 }
 
 export default function AssignStudentsTab({ teachers = [], students = [], onNotify, isDarkMode }) {
+  const { t: tr } = useTranslation("admin");
   const [teacherId, setTeacherId]   = useState("");
   const [studentId, setStudentId]   = useState("");
   const [assignments, setAssignments] = useState([]);
@@ -210,7 +215,7 @@ export default function AssignStudentsTab({ teachers = [], students = [], onNoti
 
   const handleAssign = async () => {
     if (!teacherId || !studentId) {
-      showToast("Please select both a teacher and a student.", "error");
+      showToast(tr("assignStudentsTab.pleaseSelectBothATeacher"), "error");
       return;
     }
     setAssigning(true);
@@ -219,25 +224,25 @@ export default function AssignStudentsTab({ teachers = [], students = [], onNoti
       setAssignments((prev) => [newAssignment, ...prev]);
       const teacher = teachers.find((t) => t._id === teacherId);
       const student = students.find((s) => s._id === studentId);
-      showToast(`${student?.firstName} assigned to ${teacher?.firstName}`);
+      showToast(tr("assignStudentsTab.assignedTo", { firstName: student?.firstName, firstName2: teacher?.firstName }));
       if (onNotify) onNotify(`Student ${student?.firstName} assigned to ${teacher?.firstName}`);
       setTeacherId("");
       setStudentId("");
     } catch (err) {
-      showToast(err.response?.data?.message || "Error creating assignment.", "error");
+      showToast(err.response?.data?.message || tr("assignStudentsTab.errorCreatingAssignment"), "error");
     } finally {
       setAssigning(false);
     }
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm("Remove this assignment?")) return;
+    if (!window.confirm(tr("assignStudentsTab.removeThisAssignment"))) return;
     try {
       await deleteAssignment(id);
       setAssignments((prev) => prev.filter((a) => a._id !== id));
-      showToast("Assignment removed.");
+      showToast(tr("assignStudentsTab.assignmentRemoved"));
     } catch (err) {
-      showToast("Error removing assignment.", "error");
+      showToast(tr("assignStudentsTab.errorRemovingAssignment"), "error");
     }
   };
 
@@ -289,7 +294,7 @@ export default function AssignStudentsTab({ teachers = [], students = [], onNoti
       <div className={`flex items-center justify-center h-64 ${isDarkMode ? "text-slate-400" : "text-slate-500"}`}>
         <div className="flex items-center gap-3">
           <div className="w-5 h-5 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
-          Loading assignments…
+          {tr("assignStudentsTab.loadingAssignments")}
         </div>
       </div>
     );
@@ -308,16 +313,16 @@ export default function AssignStudentsTab({ teachers = [], students = [], onNoti
 
       {/* ── Page header ────────────────────────────────────────────────────── */}
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-violet-500">Assign Students</h2>
-        <p className={`text-sm mt-1 ${t.muted}`}>Link students to their assigned teachers.</p>
+        <h2 className="text-2xl font-bold text-violet-500">{tr("assignStudentsTab.assignStudents")}</h2>
+        <p className={`text-sm mt-1 ${t.muted}`}>{tr("assignStudentsTab.linkStudentsToTheirAssigned")}</p>
       </div>
 
       {/* ── Stat cards ─────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-3 gap-4 mb-6">
         {[
-          { icon: Users,     label: "Total Assignments", value: totalAssignments,   color: "violet" },
-          { icon: UserCheck, label: "Teachers Assigned", value: uniqueTeacherCount, color: "sky"    },
-          { icon: UserCheck, label: "Students Assigned", value: uniqueStudentCount, color: "emerald"},
+          { icon: Users,     label: tr("assignStudentsTab.totalAssignments"), value: totalAssignments,   color: "violet" },
+          { icon: UserCheck, label: tr("assignStudentsTab.teachersAssigned"), value: uniqueTeacherCount, color: "sky"    },
+          { icon: UserCheck, label: tr("assignStudentsTab.studentsAssigned"), value: uniqueStudentCount, color: "emerald"},
         ].map(({ icon: Icon, label, value, color }) => (
           <div key={label} className={`rounded-xl border p-4 flex items-center gap-4 ${t.statCard}`}>
             <div className={`p-2.5 rounded-lg
@@ -342,18 +347,18 @@ export default function AssignStudentsTab({ teachers = [], students = [], onNoti
         <div className={`w-72 flex-shrink-0 rounded-xl border overflow-hidden ${t.card}`}>
           <div className={`px-5 py-4 border-b flex items-center gap-2 ${t.cardHeader} ${t.divider}`}>
             <Plus size={16} className="text-violet-500" />
-            <span className="font-semibold text-sm">New Assignment</span>
+            <span className="font-semibold text-sm">{tr("assignStudentsTab.newAssignment")}</span>
           </div>
 
           <div className="p-5 space-y-4">
             {/* Teacher select */}
             <div>
-              <label className={`block text-xs font-medium mb-1.5 ${t.label}`}>Teacher</label>
+              <label className={`block text-xs font-medium mb-1.5 ${t.label}`}>{tr("assignStudentsTab.teacher")}</label>
               <SearchableSelect
                 options={teachers}
                 value={teacherId}
                 onChange={setTeacherId}
-                placeholder="Select a teacher…"
+                placeholder={tr("assignStudentsTab.selectATeacher")}
                 isDarkMode={isDarkMode}
                 getId={(o) => o._id}
                 getLabel={(o) => o.displayName?.trim() || `${o.firstName} ${o.lastName}`}
@@ -362,12 +367,12 @@ export default function AssignStudentsTab({ teachers = [], students = [], onNoti
 
             {/* Student select */}
             <div>
-              <label className={`block text-xs font-medium mb-1.5 ${t.label}`}>Student</label>
+              <label className={`block text-xs font-medium mb-1.5 ${t.label}`}>{tr("assignStudentsTab.student")}</label>
               <SearchableSelect
                 options={students}
                 value={studentId}
                 onChange={setStudentId}
-                placeholder="Select a student…"
+                placeholder={tr("assignStudentsTab.selectAStudent")}
                 isDarkMode={isDarkMode}
                 getId={(o) => o._id}
                 getLabel={(o) => `${o.firstName} ${o.lastName}`}
@@ -387,14 +392,14 @@ export default function AssignStudentsTab({ teachers = [], students = [], onNoti
               <div className={`rounded-lg p-3 text-xs space-y-1 ${isDarkMode ? "bg-violet-900/20 border border-violet-800/30" : "bg-violet-50 border border-violet-100"}`}>
                 {selectedStudent && (
                   <div className={t.muted}>
-                    Student: <span className={`font-medium ${isDarkMode ? "text-violet-300" : "text-violet-700"}`}>
+                    {tr("assignStudentsTab.student2")} <span className={`font-medium ${isDarkMode ? "text-violet-300" : "text-violet-700"}`}>
                       {selectedStudent.firstName} {selectedStudent.lastName}
                     </span>
                   </div>
                 )}
                 {selectedTeacher && (
                   <div className={t.muted}>
-                    Teacher: <span className={`font-medium ${isDarkMode ? "text-violet-300" : "text-violet-700"}`}>
+                    {tr("assignStudentsTab.teacher2")} <span className={`font-medium ${isDarkMode ? "text-violet-300" : "text-violet-700"}`}>
                       {selectedTeacher.displayName?.trim() || `${selectedTeacher.firstName} ${selectedTeacher.lastName}`}
                     </span>
                   </div>
@@ -429,7 +434,7 @@ export default function AssignStudentsTab({ teachers = [], students = [], onNoti
             <div className="flex items-center gap-2 flex-1 min-w-0">
               <Users size={16} className="text-violet-500 flex-shrink-0" />
               <span className="font-semibold text-sm">
-                Current Assignments
+                {tr("assignStudentsTab.currentAssignments")}
                 <span className={`ml-2 px-2 py-0.5 rounded-full text-xs font-medium ${t.badge}`}>
                   {filtered.length}
                 </span>
@@ -441,7 +446,7 @@ export default function AssignStudentsTab({ teachers = [], students = [], onNoti
               <Search size={13} className={`mr-2 flex-shrink-0 ${t.muted}`} />
               <input
                 type="text"
-                placeholder="Search name…"
+                placeholder={tr("assignStudentsTab.searchName")}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className={`text-sm bg-transparent outline-none w-full ${isDarkMode ? "text-slate-100 placeholder-slate-500" : "text-slate-800 placeholder-slate-400"}`}
@@ -456,7 +461,7 @@ export default function AssignStudentsTab({ teachers = [], students = [], onNoti
                 className={`rounded-lg border px-3 py-1.5 text-sm appearance-none pr-7 focus:outline-none focus:ring-2 focus:ring-violet-500/30 transition ${t.input}`}
                 style={{ minWidth: 140 }}
               >
-                <option value="">All teachers</option>
+                <option value="">{tr("assignStudentsTab.allTeachers")}</option>
                 {uniqueTeachersInAssignments.map((teacher) => (
                   <option key={teacher._id} value={teacher._id}>
                     {teacher.displayName?.trim() || `${teacher.firstName} ${teacher.lastName}`}
@@ -469,8 +474,8 @@ export default function AssignStudentsTab({ teachers = [], students = [], onNoti
             {/* View toggle */}
             <div className={`flex rounded-lg border overflow-hidden ${isDarkMode ? "border-[#2a2f45]" : "border-slate-200"}`}>
               {[
-                { mode: "grouped", Icon: Grid3X3,   title: "Grouped by teacher" },
-                { mode: "table",   Icon: LayoutList, title: "Flat table" },
+                { mode: "grouped", Icon: Grid3X3,   title: tr("assignStudentsTab.groupedByTeacher") },
+                { mode: "table",   Icon: LayoutList, title: tr("assignStudentsTab.flatTable") },
               ].map(({ mode, Icon, title }) => (
                 <button
                   key={mode}
@@ -492,7 +497,7 @@ export default function AssignStudentsTab({ teachers = [], students = [], onNoti
             <div className={`flex flex-col items-center justify-center py-16 gap-3 ${t.muted}`}>
               <Users size={36} className="opacity-30" />
               <p className="text-sm">
-                {assignments.length === 0 ? "No assignments yet." : "No results match your filters."}
+                {assignments.length === 0 ? tr("assignStudentsTab.noAssignmentsYet") : tr("assignStudentsTab.noResultsMatchYourFilters")}
               </p>
             </div>
           ) : viewMode === "grouped" ? (
@@ -515,7 +520,7 @@ export default function AssignStudentsTab({ teachers = [], students = [], onNoti
                         {initial}
                       </div>
                       <span className="font-semibold text-sm flex-1">{teacherDisplayName}</span>
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${t.badge}`}>{rows.length} student{rows.length !== 1 ? "s" : ""}</span>
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${t.badge}`}>{tr("assignStudentsTab.student3", { rowsCount: rows.length, value: rows.length !== 1 ? "s" : "" })}</span>
                       {isOpen ? <ChevronDown size={14} className={t.muted} /> : <ChevronRight size={14} className={t.muted} />}
                     </button>
 
@@ -539,11 +544,11 @@ export default function AssignStudentsTab({ teachers = [], students = [], onNoti
                               )}
                             </div>
                             <span className={`text-xs ${t.muted}`}>
-                              {a.assignedDate ? new Date(a.assignedDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "—"}
+                              {a.assignedDate ? new Date(a.assignedDate).toLocaleDateString(dateLocale("en-GB"), { day: "numeric", month: "short", year: "numeric" }) : "—"}
                             </span>
                             <button
                               onClick={() => handleDelete(a._id)}
-                              title="Remove"
+                              title={tr("assignStudentsTab.remove")}
                               className={`p-1.5 rounded-lg transition ${isDarkMode ? "text-red-400 hover:bg-red-900/30" : "text-red-500 hover:bg-red-50"}`}
                             >
                               <Trash2 size={13} />
@@ -562,10 +567,10 @@ export default function AssignStudentsTab({ teachers = [], students = [], onNoti
               <table className="w-full min-w-[520px] text-sm">
                 <thead className={`sticky top-0 z-10 ${t.tableHead}`}>
                   <tr>
-                    <th className="px-5 py-3 text-left font-medium text-xs uppercase tracking-wide">Student</th>
-                    <th className="px-5 py-3 text-left font-medium text-xs uppercase tracking-wide">Teacher</th>
-                    <th className="px-5 py-3 text-left font-medium text-xs uppercase tracking-wide">Assigned</th>
-                    <th className="px-5 py-3 text-right font-medium text-xs uppercase tracking-wide">Action</th>
+                    <th className="px-5 py-3 text-left font-medium text-xs uppercase tracking-wide">{tr("assignStudentsTab.student")}</th>
+                    <th className="px-5 py-3 text-left font-medium text-xs uppercase tracking-wide">{tr("assignStudentsTab.teacher")}</th>
+                    <th className="px-5 py-3 text-left font-medium text-xs uppercase tracking-wide">{tr("assignStudentsTab.assigned")}</th>
+                    <th className="px-5 py-3 text-right font-medium text-xs uppercase tracking-wide">{tr("assignStudentsTab.action")}</th>
                   </tr>
                 </thead>
                 <tbody className={`divide-y ${isDarkMode ? "divide-[#1e2235]" : "divide-slate-100"}`}>
@@ -598,20 +603,20 @@ export default function AssignStudentsTab({ teachers = [], students = [], onNoti
                       </td>
                       <td className={`px-5 py-3 ${t.muted} text-xs`}>
                         {a.assignedDate
-                          ? new Date(a.assignedDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
+                          ? new Date(a.assignedDate).toLocaleDateString(dateLocale("en-GB"), { day: "numeric", month: "short", year: "numeric" })
                           : "—"}
                       </td>
                       <td className="px-5 py-3 text-right">
                         <button
                           onClick={() => handleDelete(a._id)}
-                          title="Remove assignment"
+                          title={tr("assignStudentsTab.removeAssignment")}
                           className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition
                             ${isDarkMode
                               ? "bg-red-900/30 text-red-400 hover:bg-red-900/60"
                               : "bg-red-50 text-red-600 hover:bg-red-100"}`}
                         >
                           <Trash2 size={12} />
-                          Remove
+                          {tr("assignStudentsTab.remove")}
                         </button>
                       </td>
                     </tr>

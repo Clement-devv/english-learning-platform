@@ -3,6 +3,7 @@ import { Search, Mic, Plus, RefreshCw, ShieldCheck, AlertTriangle } from "lucide
 import api from "../../../api";
 import { getStudents } from "../../../services/studentService";
 import { visibleEmail } from "../../../utils/managedStudent.js";
+import { useTranslation } from "react-i18next";
 
 const PRESET_AMOUNTS = [25, 50, 100, 150, 200, 500];
 
@@ -17,6 +18,7 @@ function StatCard({ label, value, emoji, color, bg }) {
 }
 
 export default function PronunciationCreditsTab({ isDarkMode }) {
+  const { t: tr } = useTranslation("admin");
   const col = isDarkMode
     ? { bg: "#0f1117", card: "#1a1d2e", border: "#2a2d40", heading: "#f0f4ff", body: "#c8cce0", muted: "#6b7090", input: "#1a1d2e" }
     : { bg: "#f8fafc", card: "#ffffff", border: "#e2e8f0", heading: "#1e293b", body: "#475569", muted: "#94a3b8", input: "#fff" };
@@ -80,7 +82,7 @@ export default function PronunciationCreditsTab({ isDarkMode }) {
   const handleGrant = async () => {
     const finalAmount = customAmt ? parseInt(customAmt, 10) : amount;
     if (!finalAmount || finalAmount < 1 || finalAmount > 10000) {
-      showToast("Enter a valid amount (1–10000)", "error");
+      showToast(tr("pronunciationCreditsTab.enterAValidAmount1"), "error");
       return;
     }
     setGranting(modal.student._id);
@@ -94,10 +96,10 @@ export default function PronunciationCreditsTab({ isDarkMode }) {
         s._id === modal.student._id ? { ...s, credits: s.credits + finalAmount } : s
       ));
       fetchBudget();
-      showToast(`✅ ${finalAmount} credits granted to ${modal.student.firstName}!`);
+      showToast(tr("pronunciationCreditsTab.creditsGrantedTo", { finalAmount, firstName: modal.student.firstName }));
       setModal(null);
     } catch (err) {
-      showToast(err?.response?.data?.message || "Failed to grant credits", "error");
+      showToast(err?.response?.data?.message || tr("pronunciationCreditsTab.failedToGrantCredits"), "error");
     } finally {
       setGranting(null);
     }
@@ -148,13 +150,12 @@ export default function PronunciationCreditsTab({ isDarkMode }) {
               <Icon size={18} color={textC} />
               <div>
                 <p style={{ margin: 0, fontWeight: 800, fontSize: 13, color: textC }}>
-                  {empty ? "Pronunciation credit budget is empty — cannot grant credits"
-                   : low  ? `Low budget — only ${bal} credits remaining`
-                   :        "Pronunciation credit budget is healthy"}
+                  {empty ? tr("pronunciationCreditsTab.pronunciationCreditBudgetIsEmpty")
+                   : low  ? tr("pronunciationCreditsTab.lowBudgetOnlyCreditsRemaining", { bal })
+                   :        tr("pronunciationCreditsTab.pronunciationCreditBudgetIsHealthy")}
                 </p>
                 <p style={{ margin: "2px 0 0", fontSize: 11, color: textC, opacity: 0.8 }}>
-                  {bal.toLocaleString()} available · {(budget.totalAllocated ?? 0).toLocaleString()} total allocated · {(budget.used ?? 0).toLocaleString()} used
-                </p>
+                  {tr("pronunciationCreditsTab.availableTotalAllocatedUsed", { value: bal.toLocaleString(), value2: (budget.totalAllocated ?? 0).toLocaleString(), value3: (budget.used ?? 0).toLocaleString() })}</p>
               </div>
             </div>
             <div style={{ background: textC, color: "#fff", fontWeight: 800, fontSize: 22, borderRadius: 10, padding: "6px 18px" }}>
@@ -167,20 +168,20 @@ export default function PronunciationCreditsTab({ isDarkMode }) {
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
         <div>
-          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 900, color: col.heading }}>🎤 Pronunciation Credits</h1>
-          <p style={{ margin: "4px 0 0", fontSize: 13, color: col.muted }}>Grant pronunciation analysis credits to students</p>
+          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 900, color: col.heading }}>{tr("pronunciationCreditsTab.pronunciationCredits")}</h1>
+          <p style={{ margin: "4px 0 0", fontSize: 13, color: col.muted }}>{tr("pronunciationCreditsTab.grantPronunciationAnalysisCreditsTo")}</p>
         </div>
         <button onClick={() => { fetchStudents(); fetchBudget(); }} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 10, border: `2px solid ${col.border}`, background: col.card, color: col.body, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
-          <RefreshCw size={14} /> Refresh
+          <RefreshCw size={14} /> {tr("pronunciationCreditsTab.refresh")}
         </button>
       </div>
 
       {/* Stats */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 14 }}>
-        <StatCard label="Active Credits"      value={totalCredits}         emoji="🎤" color="#f97316" bg={isDarkMode ? "#1a1206" : "#fff7ed"} />
-        <StatCard label="Total Analyses"      value={totalUsed}            emoji="✨" color="#059669" bg={isDarkMode ? "#0d2318" : "#ecfdf5"} />
-        <StatCard label="Students w/ Credits" value={studentsWithCredits}  emoji="👤" color="#2563eb" bg={isDarkMode ? "#0d1a2e" : "#eff6ff"} />
-        <StatCard label="Low Credit (≤5)"     value={lowCreditStudents}    emoji="⚠️" color="#d97706" bg={isDarkMode ? "#2a1a06" : "#fffbeb"} />
+        <StatCard label={tr("pronunciationCreditsTab.activeCredits")}      value={totalCredits}         emoji="🎤" color="#f97316" bg={isDarkMode ? "#1a1206" : "#fff7ed"} />
+        <StatCard label={tr("pronunciationCreditsTab.totalAnalyses")}      value={totalUsed}            emoji="✨" color="#059669" bg={isDarkMode ? "#0d2318" : "#ecfdf5"} />
+        <StatCard label={tr("pronunciationCreditsTab.studentsWCredits")} value={studentsWithCredits}  emoji="👤" color="#2563eb" bg={isDarkMode ? "#0d1a2e" : "#eff6ff"} />
+        <StatCard label={tr("pronunciationCreditsTab.lowCredit5")}     value={lowCreditStudents}    emoji="⚠️" color="#d97706" bg={isDarkMode ? "#2a1a06" : "#fffbeb"} />
       </div>
 
       {/* Search */}
@@ -189,7 +190,7 @@ export default function PronunciationCreditsTab({ isDarkMode }) {
         <input
           value={search}
           onChange={e => setSearch(e.target.value)}
-          placeholder="Search students…"
+          placeholder={tr("pronunciationCreditsTab.searchStudents")}
           style={{ width: "100%", padding: "10px 12px 10px 38px", borderRadius: 10, border: `2px solid ${col.border}`, background: col.input, color: col.heading, fontSize: 14, fontFamily: "inherit", boxSizing: "border-box" }}
         />
       </div>
@@ -198,19 +199,19 @@ export default function PronunciationCreditsTab({ isDarkMode }) {
       {loading ? (
         <div style={{ textAlign: "center", padding: 60, color: col.muted }}>
           <RefreshCw size={28} style={{ animation: "spin 1s linear infinite" }} />
-          <p style={{ marginTop: 12, fontWeight: 700 }}>Loading students…</p>
+          <p style={{ marginTop: 12, fontWeight: 700 }}>{tr("pronunciationCreditsTab.loadingStudents")}</p>
         </div>
       ) : (
         <div style={{ background: col.card, borderRadius: 16, border: `2px solid ${col.border}`, overflow: "hidden" }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1.2fr auto auto auto", padding: "12px 20px", borderBottom: `2px solid ${col.border}`, fontSize: 11, fontWeight: 800, color: col.muted, textTransform: "uppercase", letterSpacing: "0.06em", gap: 12 }}>
-            <span>Student</span><span>Email</span>
-            <span style={{ textAlign: "center" }}>Credits Left</span>
-            <span style={{ textAlign: "center" }}>Used</span>
-            <span style={{ textAlign: "center" }}>Action</span>
+            <span>{tr("pronunciationCreditsTab.student")}</span><span>{tr("pronunciationCreditsTab.email")}</span>
+            <span style={{ textAlign: "center" }}>{tr("pronunciationCreditsTab.creditsLeft")}</span>
+            <span style={{ textAlign: "center" }}>{tr("pronunciationCreditsTab.used")}</span>
+            <span style={{ textAlign: "center" }}>{tr("pronunciationCreditsTab.action")}</span>
           </div>
 
           {filtered.length === 0 ? (
-            <div style={{ textAlign: "center", padding: 40, color: col.muted, fontWeight: 700 }}>No students found</div>
+            <div style={{ textAlign: "center", padding: 40, color: col.muted, fontWeight: 700 }}>{tr("pronunciationCreditsTab.noStudentsFound")}</div>
           ) : (
             filtered.map((s, i) => {
               const creditColor = s.credits === 0 ? "#dc2626" : s.credits <= 5 ? "#d97706" : "#059669";
@@ -219,19 +220,19 @@ export default function PronunciationCreditsTab({ isDarkMode }) {
                 <div key={s._id} style={{ display: "grid", gridTemplateColumns: "1fr 1.2fr auto auto auto", padding: "14px 20px", gap: 12, alignItems: "center", borderBottom: i < filtered.length - 1 ? `1px solid ${col.border}` : "none", background: i % 2 === 0 ? "transparent" : (isDarkMode ? "#ffffff08" : "#f8fafc") }}>
                   <div>
                     <div style={{ fontWeight: 700, fontSize: 14, color: col.heading }}>{s.firstName} {s.lastName}</div>
-                    <div style={{ fontSize: 11, color: col.muted, marginTop: 2 }}>{s.status === "active" ? "✅ Active" : "⏳ Pending"}</div>
+                    <div style={{ fontSize: 11, color: col.muted, marginTop: 2 }}>{s.status === "active" ? tr("pronunciationCreditsTab.active") : tr("pronunciationCreditsTab.pending")}</div>
                   </div>
-                  <div style={{ fontSize: 13, color: col.body, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{visibleEmail(s.email) || <span style={{ color: col.muted, fontStyle: "italic" }}>No login (managed)</span>}</div>
+                  <div style={{ fontSize: 13, color: col.body, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{visibleEmail(s.email) || <span style={{ color: col.muted, fontStyle: "italic" }}>{tr("pronunciationCreditsTab.noLoginManaged")}</span>}</div>
                   <div style={{ textAlign: "center" }}>
                     <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 12px", borderRadius: 20, fontSize: 13, fontWeight: 800, color: creditColor, background: creditBg }}>
                       <Mic size={12} />
                       {s.credits}
                     </span>
                   </div>
-                  <div style={{ textAlign: "center", fontSize: 13, fontWeight: 700, color: col.muted }}>{s.totalUsed} uses</div>
+                  <div style={{ textAlign: "center", fontSize: 13, fontWeight: 700, color: col.muted }}>{tr("pronunciationCreditsTab.uses", { totalUsed: s.totalUsed })}</div>
                   <div style={{ textAlign: "center" }}>
                     <button onClick={() => openModal(s)} style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "7px 16px", borderRadius: 10, border: "none", background: "linear-gradient(135deg,#f97316,#fb923c)", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", boxShadow: "0 2px 8px #f9731630" }}>
-                      <Plus size={13} /> Grant
+                      <Plus size={13} /> {tr("pronunciationCreditsTab.grant")}
                     </button>
                   </div>
                 </div>
@@ -246,15 +247,15 @@ export default function PronunciationCreditsTab({ isDarkMode }) {
         <div style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}
           onClick={e => { if (e.target === e.currentTarget) setModal(null); }}>
           <div style={{ background: col.card, borderRadius: 20, padding: "28px 28px 24px", width: "100%", maxWidth: 420, boxShadow: "0 20px 60px rgba(0,0,0,0.3)", border: `2px solid ${col.border}` }}>
-            <h2 style={{ margin: "0 0 4px", fontSize: 18, fontWeight: 900, color: col.heading }}>🎤 Grant Pronunciation Credits</h2>
+            <h2 style={{ margin: "0 0 4px", fontSize: 18, fontWeight: 900, color: col.heading }}>{tr("pronunciationCreditsTab.grantPronunciationCredits")}</h2>
             <p style={{ margin: "0 0 20px", fontSize: 13, color: col.muted }}>
-              Student: <strong style={{ color: col.body }}>{modal.student.firstName} {modal.student.lastName}</strong>
-              &nbsp;· Balance: <strong style={{ color: "#f97316" }}>{modal.student.credits} credits</strong>
+              {tr("pronunciationCreditsTab.student2")} <strong style={{ color: col.body }}>{modal.student.firstName} {modal.student.lastName}</strong>
+              {tr("pronunciationCreditsTab.balance")} <strong style={{ color: "#f97316" }}>{tr("pronunciationCreditsTab.credits", { credits: modal.student.credits })}</strong>
             </p>
 
             {/* Presets */}
             <div style={{ marginBottom: 16 }}>
-              <div style={{ fontSize: 12, fontWeight: 800, color: col.muted, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>Quick select</div>
+              <div style={{ fontSize: 12, fontWeight: 800, color: col.muted, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>{tr("pronunciationCreditsTab.quickSelect")}</div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                 {PRESET_AMOUNTS.map(a => (
                   <button key={a} onClick={() => { setAmount(a); setCustomAmt(""); }}
@@ -267,7 +268,7 @@ export default function PronunciationCreditsTab({ isDarkMode }) {
 
             {/* Custom */}
             <div style={{ marginBottom: 16 }}>
-              <div style={{ fontSize: 12, fontWeight: 800, color: col.muted, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>Custom amount</div>
+              <div style={{ fontSize: 12, fontWeight: 800, color: col.muted, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>{tr("pronunciationCreditsTab.customAmount")}</div>
               <input type="number" value={customAmt} onChange={e => { setCustomAmt(e.target.value); setAmount(0); }}
                 placeholder="e.g. 75" min={1} max={10000}
                 style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: `2px solid ${customAmt ? "#f97316" : col.border}`, background: col.input, color: col.heading, fontSize: 14, fontFamily: "inherit", boxSizing: "border-box" }}
@@ -276,28 +277,27 @@ export default function PronunciationCreditsTab({ isDarkMode }) {
 
             {/* Note */}
             <div style={{ marginBottom: 22 }}>
-              <div style={{ fontSize: 12, fontWeight: 800, color: col.muted, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>Note (optional)</div>
-              <input value={note} onChange={e => setNote(e.target.value)} placeholder="e.g. Payment received"
+              <div style={{ fontSize: 12, fontWeight: 800, color: col.muted, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>{tr("pronunciationCreditsTab.noteOptional")}</div>
+              <input value={note} onChange={e => setNote(e.target.value)} placeholder={tr("pronunciationCreditsTab.eGPaymentReceived")}
                 style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: `2px solid ${col.border}`, background: col.input, color: col.heading, fontSize: 14, fontFamily: "inherit", boxSizing: "border-box" }}
               />
             </div>
 
             {/* Summary */}
             <div style={{ background: isDarkMode ? "#1f2235" : "#fff7ed", borderRadius: 12, padding: "12px 16px", marginBottom: 20, fontSize: 13, color: col.body, display: "flex", justifyContent: "space-between" }}>
-              <span>Credits after grant:</span>
+              <span>{tr("pronunciationCreditsTab.creditsAfterGrant")}</span>
               <strong style={{ color: "#f97316", fontSize: 15 }}>
-                {modal.student.credits + (customAmt ? parseInt(customAmt) || 0 : amount)} credits
-              </strong>
+                {tr("pronunciationCreditsTab.credits2", { value: modal.student.credits + (customAmt ? parseInt(customAmt) || 0 : amount) })}</strong>
             </div>
 
             <div style={{ display: "flex", gap: 10 }}>
               <button onClick={() => setModal(null)} style={{ flex: 1, padding: "11px", borderRadius: 12, border: `2px solid ${col.border}`, background: col.card, color: col.body, fontWeight: 700, fontSize: 14, cursor: "pointer" }}>
-                Cancel
+                {tr("pronunciationCreditsTab.cancel")}
               </button>
               <button onClick={handleGrant} disabled={!!granting}
                 style={{ flex: 2, padding: "11px", borderRadius: 12, border: "none", background: "linear-gradient(135deg,#f97316,#fb923c)", color: "#fff", fontWeight: 800, fontSize: 14, cursor: granting ? "not-allowed" : "pointer", opacity: granting ? 0.7 : 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 7 }}>
                 <Mic size={15} />
-                {granting ? "Granting…" : `Grant ${customAmt || amount} Credits`}
+                {granting ? tr("pronunciationCreditsTab.granting") : tr("pronunciationCreditsTab.grantCredits", { value: customAmt || amount })}
               </button>
             </div>
           </div>

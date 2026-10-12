@@ -16,9 +16,12 @@ import Pagination from "../../../components/Pagination";
 import { useCurrencySymbol, fmtMoney } from "../../../hooks/useCurrencySymbol";
 import AnalyticsPinPrompt from "../../../components/admin/analytics/AnalyticsPinPrompt";
 import { isAnalyticsLocked } from "../../../utils/analyticsPin";
+import { useTranslation } from "react-i18next";
+import { dateLocale } from "../../../i18n/dateLocale.js";
 
 // ─── Pay-all confirmation modal ───────────────────────────────────────────────
 function PayAllModal({ target, onConfirm, onCancel, isDarkMode }) {
+  const { t: tr } = useTranslation("admin");
   const sym = useCurrencySymbol();
   if (!target) return null;
   const { teacherName, pendingAmount, pendingCount, paymentMethod, notes } = target;
@@ -31,35 +34,35 @@ function PayAllModal({ target, onConfirm, onCancel, isDarkMode }) {
           </div>
           <div>
             <h3 className={`text-lg font-bold ${isDarkMode ? "text-white" : "text-gray-900"}`}>
-              Confirm Salary Payment
+              {tr("paymentTab.confirmSalaryPayment")}
             </h3>
             <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
-              This will mark all pending lessons as paid
+              {tr("paymentTab.thisWillMarkAllPending")}
             </p>
           </div>
         </div>
 
         <div className={`rounded-xl p-4 mb-5 space-y-2 ${isDarkMode ? "bg-emerald-900/20 border border-emerald-800/40" : "bg-emerald-50 border border-emerald-100"}`}>
           <div className="flex justify-between">
-            <span className={`text-sm ${isDarkMode ? "text-emerald-300" : "text-emerald-700"}`}>Teacher</span>
+            <span className={`text-sm ${isDarkMode ? "text-emerald-300" : "text-emerald-700"}`}>{tr("paymentTab.teacher")}</span>
             <span className={`text-sm font-bold ${isDarkMode ? "text-white" : "text-gray-900"}`}>{teacherName}</span>
           </div>
           <div className="flex justify-between">
-            <span className={`text-sm ${isDarkMode ? "text-emerald-300" : "text-emerald-700"}`}>Pending lessons</span>
+            <span className={`text-sm ${isDarkMode ? "text-emerald-300" : "text-emerald-700"}`}>{tr("paymentTab.pendingLessons")}</span>
             <span className={`text-sm font-semibold ${isDarkMode ? "text-white" : "text-gray-900"}`}>{pendingCount}</span>
           </div>
           <div className="flex justify-between">
-            <span className={`text-sm ${isDarkMode ? "text-emerald-300" : "text-emerald-700"}`}>Payment method</span>
+            <span className={`text-sm ${isDarkMode ? "text-emerald-300" : "text-emerald-700"}`}>{tr("paymentTab.paymentMethod")}</span>
             <span className={`text-sm font-semibold ${isDarkMode ? "text-white" : "text-gray-900"}`}>{paymentMethod.replace("_", " ")}</span>
           </div>
           {notes && (
             <div className="flex justify-between">
-              <span className={`text-sm ${isDarkMode ? "text-emerald-300" : "text-emerald-700"}`}>Notes</span>
+              <span className={`text-sm ${isDarkMode ? "text-emerald-300" : "text-emerald-700"}`}>{tr("paymentTab.notes")}</span>
               <span className={`text-sm ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>{notes}</span>
             </div>
           )}
           <div className={`flex justify-between pt-2 border-t ${isDarkMode ? "border-emerald-800/40" : "border-emerald-200"}`}>
-            <span className={`text-sm font-semibold ${isDarkMode ? "text-emerald-300" : "text-emerald-700"}`}>Total payout</span>
+            <span className={`text-sm font-semibold ${isDarkMode ? "text-emerald-300" : "text-emerald-700"}`}>{tr("paymentTab.totalPayout")}</span>
             <span className={`text-xl font-bold ${isDarkMode ? "text-emerald-300" : "text-emerald-600"}`}>{fmtMoney(pendingAmount, sym)}</span>
           </div>
         </div>
@@ -69,13 +72,12 @@ function PayAllModal({ target, onConfirm, onCancel, isDarkMode }) {
             onClick={onCancel}
             className={`flex-1 py-2.5 rounded-xl text-sm font-semibold border transition-all ${isDarkMode ? "border-gray-600 text-gray-300 hover:bg-gray-700" : "border-gray-300 text-gray-700 hover:bg-gray-50"}`}
           >
-            Cancel
+            {tr("paymentTab.cancel")}
           </button>
           <button
             onClick={onConfirm}
             className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-emerald-600 hover:bg-emerald-700 text-white transition-all"
-          >
-            Pay {fmtMoney(pendingAmount, sym)}
+          >{tr("paymentTab.pay", { fmtMoney: fmtMoney(pendingAmount, sym) })}
           </button>
         </div>
       </div>
@@ -84,6 +86,7 @@ function PayAllModal({ target, onConfirm, onCancel, isDarkMode }) {
 }
 
 export default function PaymentsTab({ isDarkMode }) {
+  const { t: tr } = useTranslation("admin");
   const sym = useCurrencySymbol();
   const [teachers, setTeachers] = useState([]);
   const [transactions, setTransactions] = useState([]);
@@ -137,7 +140,7 @@ export default function PaymentsTab({ isDarkMode }) {
         setPinLocked(true);   // no PIN entered yet, or the unlock expired / PIN changed
       } else {
         console.error("Error loading payment data:", err);
-        showToast("Error loading payment data");
+        showToast(tr("paymentTab.errorLoadingPaymentData"));
       }
     } finally {
       setLoading(false);
@@ -145,7 +148,7 @@ export default function PaymentsTab({ isDarkMode }) {
   };
 
   const handlePaySingleTransaction = async (transactionId) => {
-    if (!window.confirm("Mark this payment as paid?")) return;
+    if (!window.confirm(tr("paymentTab.markThisPaymentAsPaid"))) return;
 
     try {
       await api.patch(`/payment-transactions/${transactionId}/pay`, {
@@ -153,20 +156,20 @@ export default function PaymentsTab({ isDarkMode }) {
         notes: paymentNotes
       });
 
-      showToast("Payment processed successfully!");
+      showToast(tr("paymentTab.paymentProcessedSuccessfully"));
       loadPaymentData();
       setPaymentNotes("");
 
     } catch (err) {
       console.error("Error processing payment:", err);
-      showToast("Error processing payment");
+      showToast(tr("paymentTab.errorProcessingPayment"));
     }
   };
 
   const handlePayAllForTeacher = (teacherId, teacherName) => {
     const teacher = teacherSummary.find(t => t.teacherId === teacherId);
     if (!teacher || teacher.pendingAmount <= 0) {
-      showToast("No pending payments for this teacher");
+      showToast(tr("paymentTab.noPendingPaymentsForThis"));
       return;
     }
     setPayAllTarget({
@@ -188,12 +191,12 @@ export default function PaymentsTab({ isDarkMode }) {
         paymentMethod,
         notes: paymentNotes,
       });
-      showToast(`Successfully paid ${fmtMoney(res.data.totalAmount, sym)} to ${teacherName}!`);
+      showToast(tr("paymentTab.successfullyPaidTo", { fmtMoney: fmtMoney(res.data.totalAmount, sym), teacherName }));
       loadPaymentData();
       setPaymentNotes("");
     } catch (err) {
       console.error("Error processing bulk payment:", err);
-      showToast("Error processing bulk payment");
+      showToast(tr("paymentTab.errorProcessingBulkPayment"));
     }
   };
 
@@ -204,7 +207,7 @@ export default function PaymentsTab({ isDarkMode }) {
 
   const formatDate = (date) => {
     if (!date) return "-";
-    return new Date(date).toLocaleDateString('en-US', {
+    return new Date(date).toLocaleDateString(dateLocale('en-US'), {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
@@ -233,7 +236,7 @@ export default function PaymentsTab({ isDarkMode }) {
       <AnalyticsPinPrompt
         inline
         isDarkMode={isDarkMode}
-        title="Payments are locked"
+        title={tr("paymentTab.paymentsAreLocked")}
         onUnlocked={() => { setPinLocked(false); loadPaymentData(); }}
       />
     );
@@ -267,13 +270,13 @@ export default function PaymentsTab({ isDarkMode }) {
       {/* Header */}
       <div className="flex items-center justify-between">
         <h2 className={`text-2xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
-          Payment Management
+          {tr("paymentTab.paymentManagement")}
         </h2>
         <button
           onClick={loadPaymentData}
           className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
         >
-          Refresh Data
+          {tr("paymentTab.refreshData")}
         </button>
       </div>
 
@@ -283,7 +286,7 @@ export default function PaymentsTab({ isDarkMode }) {
         <div className={`rounded-lg shadow-md p-6 ${isDarkMode ? 'bg-gray-800' : 'bg-white'} border-l-4 border-yellow-500`}>
           <div className="flex items-center justify-between">
             <div>
-              <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Total Pending</p>
+              <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>{tr("paymentTab.totalPending")}</p>
               <p className={`text-3xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-800'} mt-1`}>
                 {fmtMoney(totals.totalPending, sym)}
               </p>
@@ -296,7 +299,7 @@ export default function PaymentsTab({ isDarkMode }) {
         <div className={`rounded-lg shadow-md p-6 ${isDarkMode ? 'bg-gray-800' : 'bg-white'} border-l-4 border-green-500`}>
           <div className="flex items-center justify-between">
             <div>
-              <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Total Paid</p>
+              <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>{tr("paymentTab.totalPaid")}</p>
               <p className={`text-3xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-800'} mt-1`}>
                 {fmtMoney(totals.totalPaid, sym)}
               </p>
@@ -309,7 +312,7 @@ export default function PaymentsTab({ isDarkMode }) {
         <div className={`rounded-lg shadow-md p-6 ${isDarkMode ? 'bg-gray-800' : 'bg-white'} border-l-4 border-blue-500`}>
           <div className="flex items-center justify-between">
             <div>
-              <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Active Teachers</p>
+              <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>{tr("paymentTab.activeTeachers")}</p>
               <p className={`text-3xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-800'} mt-1`}>
                 {totals.totalTeachers}
               </p>
@@ -322,7 +325,7 @@ export default function PaymentsTab({ isDarkMode }) {
         <div className={`rounded-lg shadow-md p-6 ${isDarkMode ? 'bg-gray-800' : 'bg-white'} border-l-4 border-purple-500`}>
           <div className="flex items-center justify-between">
             <div>
-              <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Total Lessons</p>
+              <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>{tr("paymentTab.totalLessons")}</p>
               <p className={`text-3xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-800'} mt-1`}>
                 {totals.totalLessons}
               </p>
@@ -356,12 +359,12 @@ export default function PaymentsTab({ isDarkMode }) {
       {/* Payment Method Selection */}
       <div className={`rounded-lg p-4 ${isDarkMode ? 'bg-gray-800' : 'bg-white'} shadow-md`}>
         <h3 className={`font-semibold mb-3 ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
-          Payment Settings
+          {tr("paymentTab.paymentSettings")}
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-              Payment Method
+              {tr("paymentTab.paymentMethod2")}
             </label>
             <select
               value={paymentMethod}
@@ -372,22 +375,22 @@ export default function PaymentsTab({ isDarkMode }) {
                   : 'bg-white border-gray-300 text-gray-900'
               }`}
             >
-              <option value="bank_transfer">Bank Transfer</option>
-              <option value="paypal">PayPal</option>
-              <option value="cash">Cash</option>
-              <option value="check">Check</option>
-              <option value="other">Other</option>
+              <option value="bank_transfer">{tr("paymentTab.bankTransfer")}</option>
+              <option value="paypal">{tr("paymentTab.paypal")}</option>
+              <option value="cash">{tr("paymentTab.cash")}</option>
+              <option value="check">{tr("paymentTab.check")}</option>
+              <option value="other">{tr("paymentTab.other")}</option>
             </select>
           </div>
           <div>
             <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-              Payment Notes (Optional)
+              {tr("paymentTab.paymentNotesOptional")}
             </label>
             <input
               type="text"
               value={paymentNotes}
               onChange={(e) => setPaymentNotes(e.target.value)}
-              placeholder="e.g., Transaction ID, Reference number..."
+              placeholder={tr("paymentTab.eGTransactionIdReference")}
               className={`w-full px-4 py-2 rounded-lg border ${
                 isDarkMode
                   ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400'
@@ -402,7 +405,7 @@ export default function PaymentsTab({ isDarkMode }) {
       {activeTab === "overview" && (
         <div className="space-y-4">
           <h3 className={`text-xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
-            Teacher Payment Overview
+            {tr("paymentTab.teacherPaymentOverview")}
           </h3>
           
           <div className={`rounded-lg shadow-md overflow-hidden ${isDarkMode ? 'bg-gray-800' : 'bg-white'}`}>
@@ -411,22 +414,22 @@ export default function PaymentsTab({ isDarkMode }) {
                 <thead className={isDarkMode ? 'bg-gray-700' : 'bg-gray-50'}>
                   <tr>
                     <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${isDarkMode ? 'text-gray-300' : 'text-gray-500'}`}>
-                      Teacher
+                      {tr("paymentTab.teacher")}
                     </th>
                     <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${isDarkMode ? 'text-gray-300' : 'text-gray-500'}`}>
-                      Rate/Class
+                      {tr("paymentTab.rateClass")}
                     </th>
                     <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${isDarkMode ? 'text-gray-300' : 'text-gray-500'}`}>
-                      Completed Lessons
+                      {tr("paymentTab.completedLessons")}
                     </th>
                     <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${isDarkMode ? 'text-gray-300' : 'text-gray-500'}`}>
-                      Pending Payment
+                      {tr("paymentTab.pendingPayment")}
                     </th>
                     <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${isDarkMode ? 'text-gray-300' : 'text-gray-500'}`}>
-                      Total Paid
+                      {tr("paymentTab.totalPaid")}
                     </th>
                     <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${isDarkMode ? 'text-gray-300' : 'text-gray-500'}`}>
-                      Actions
+                      {tr("paymentTab.actions")}
                     </th>
                   </tr>
                 </thead>
@@ -443,23 +446,20 @@ export default function PaymentsTab({ isDarkMode }) {
                         {sym}{teacher.ratePerClass}
                       </td>
                       <td className={`px-6 py-4 whitespace-nowrap text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-900'}`}>
-                        {teacher.lessonsCompleted} classes
-                      </td>
+                        {tr("paymentTab.classes", { lessonsCompleted: teacher.lessonsCompleted })}</td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-semibold text-yellow-600">
                           {fmtMoney(teacher.pendingAmount, sym)}
                         </div>
                         <div className={`text-xs ${isDarkMode ? 'text-gray-500' : 'text-gray-500'}`}>
-                          {teacher.pendingCount} pending
-                        </div>
+                          {tr("paymentTab.pending", { pendingCount: teacher.pendingCount })}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-semibold text-green-600">
                           {fmtMoney(teacher.paidAmount, sym)}
                         </div>
                         <div className={`text-xs ${isDarkMode ? 'text-gray-500' : 'text-gray-500'}`}>
-                          {teacher.paidCount} paid
-                        </div>
+                          {tr("paymentTab.paid", { paidCount: teacher.paidCount })}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
                         <button
@@ -470,9 +470,7 @@ export default function PaymentsTab({ isDarkMode }) {
                               ? 'bg-green-600 text-white hover:bg-green-700'
                               : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                           }`}
-                        >
-                          Pay All ({fmtMoney(teacher.pendingAmount, sym)})
-                        </button>
+                        >{tr("paymentTab.payAll", { fmtMoney: fmtMoney(teacher.pendingAmount, sym) })}</button>
                       </td>
                     </tr>
                   ))}
@@ -488,15 +486,15 @@ export default function PaymentsTab({ isDarkMode }) {
           <div className="flex items-center justify-between">
             <div>
               <h3 className={`text-xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
-                Teacher Bank Details
+                {tr("paymentTab.teacherBankDetails")}
               </h3>
               <p className={`text-sm mt-0.5 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                Bank information saved by each teacher for salary payments
+                {tr("paymentTab.bankInformationSavedByEach")}
               </p>
             </div>
             <div className={`flex items-center gap-2 text-sm px-3 py-1.5 rounded-lg ${isDarkMode ? 'bg-blue-900/30 text-blue-300' : 'bg-blue-50 text-blue-700'}`}>
               <Banknote className="w-4 h-4" />
-              {teacherSummary.filter(t => t.bankName || t.accountNumber).length} of {teacherSummary.length} saved
+              {teacherSummary.filter(t => t.bankName || t.accountNumber).length} {tr("paymentTab.of")} {teacherSummary.length} {tr("paymentTab.saved")}
             </div>
           </div>
 
@@ -533,11 +531,11 @@ export default function PaymentsTab({ isDarkMode }) {
                         <td className="px-6 py-4">
                           {hasBankDetails ? (
                             <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${isDarkMode ? 'bg-emerald-900/40 text-emerald-300' : 'bg-emerald-50 text-emerald-700'}`}>
-                              <CheckCircle className="w-3 h-3" /> Saved
+                              <CheckCircle className="w-3 h-3" /> {tr("paymentTab.saved2")}
                             </span>
                           ) : (
                             <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${isDarkMode ? 'bg-gray-700 text-gray-400' : 'bg-gray-100 text-gray-500'}`}>
-                              <AlertCircle className="w-3 h-3" /> Not set
+                              <AlertCircle className="w-3 h-3" /> {tr("paymentTab.notSet")}
                             </span>
                           )}
                         </td>
@@ -547,7 +545,7 @@ export default function PaymentsTab({ isDarkMode }) {
                   {teacherSummary.length === 0 && (
                     <tr>
                       <td colSpan={5} className={`px-6 py-12 text-center text-sm ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>
-                        No teachers found
+                        {tr("paymentTab.noTeachersFound")}
                       </td>
                     </tr>
                   )}
@@ -561,7 +559,7 @@ export default function PaymentsTab({ isDarkMode }) {
       {activeTab === "transactions" && (
         <div className="space-y-4">
           <h3 className={`text-xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
-            All Payment Transactions
+            {tr("paymentTab.allPaymentTransactions")}
           </h3>
           
           <div className={`rounded-lg shadow-md overflow-hidden ${isDarkMode ? 'bg-gray-800' : 'bg-white'}`}>
@@ -570,22 +568,22 @@ export default function PaymentsTab({ isDarkMode }) {
                 <thead className={isDarkMode ? 'bg-gray-700' : 'bg-gray-50'}>
                   <tr>
                     <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${isDarkMode ? 'text-gray-300' : 'text-gray-500'}`}>
-                      Teacher
+                      {tr("paymentTab.teacher")}
                     </th>
                     <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${isDarkMode ? 'text-gray-300' : 'text-gray-500'}`}>
-                      Class / Student
+                      {tr("paymentTab.classStudent")}
                     </th>
                     <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${isDarkMode ? 'text-gray-300' : 'text-gray-500'}`}>
-                      Completed
+                      {tr("paymentTab.completed")}
                     </th>
                     <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${isDarkMode ? 'text-gray-300' : 'text-gray-500'}`}>
-                      Amount
+                      {tr("paymentTab.amount")}
                     </th>
                     <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${isDarkMode ? 'text-gray-300' : 'text-gray-500'}`}>
-                      Status
+                      {tr("paymentTab.status")}
                     </th>
                     <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${isDarkMode ? 'text-gray-300' : 'text-gray-500'}`}>
-                      Actions
+                      {tr("paymentTab.actions")}
                     </th>
                   </tr>
                 </thead>
@@ -618,11 +616,10 @@ export default function PaymentsTab({ isDarkMode }) {
                             onClick={() => handlePaySingleTransaction(tx._id)}
                             className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
                           >
-                            Mark as Paid
+                            {tr("paymentTab.markAsPaid")}
                           </button>
                         ) : (
-                          <span className={`text-xs ${isDarkMode ? 'text-gray-500' : 'text-gray-500'}`}>
-                            Paid {formatDate(tx.paidAt)}
+                          <span className={`text-xs ${isDarkMode ? 'text-gray-500' : 'text-gray-500'}`}>{tr("paymentTab.paid2", { formatDate: formatDate(tx.paidAt) })}
                           </span>
                         )}
                       </td>

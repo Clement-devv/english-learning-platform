@@ -2,8 +2,10 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import api from "../../api";
+import { useTranslation } from "react-i18next";
 
 export default function StudentSetup() {
+  const { t: tr } = useTranslation("student");
   const [searchParams]   = useSearchParams();
   const navigate         = useNavigate();
   const token            = searchParams.get("token");
@@ -32,7 +34,7 @@ export default function StudentSetup() {
 
   // ── Verify token on mount ─────────────────────────────────────────────────
   useEffect(() => {
-    if (!token) { setStep("error"); setErrorMsg("No invite token found in the URL."); return; }
+    if (!token) { setStep("error"); setErrorMsg(tr("studentSetup.noInviteTokenFoundIn")); return; }
     (async () => {
       try {
         const res = await api.get(`/students/verify-invite/${token}`, { headers: { "x-center-slug": centerSlug } });
@@ -40,10 +42,10 @@ export default function StudentSetup() {
         setStep("form");
       } catch (err) {
         setStep("error");
-        setErrorMsg(err.response?.data?.message || "Invalid or expired invite link.");
+        setErrorMsg(err.response?.data?.message || tr("studentSetup.invalidOrExpiredInviteLink"));
       }
     })();
-  }, [token]);
+  }, [token, tr]);
 
   // ── Submit ────────────────────────────────────────────────────────────────
   const handleSubmit = async (e) => {
@@ -56,7 +58,7 @@ export default function StudentSetup() {
       await api.post("/students/setup-account", { token, password }, { headers: { "x-center-slug": centerSlug } });
       setStep("success");
     } catch (err) {
-      setErrorMsg(err.response?.data?.message || "Something went wrong. Please try again.");
+      setErrorMsg(err.response?.data?.message || tr("studentSetup.somethingWentWrongPleaseTry"));
       setStep("error");
     } finally {
       setSubmitting(false);
@@ -94,7 +96,7 @@ export default function StudentSetup() {
           {step === "loading" && (
             <div style={{ padding:"60px 40px", textAlign:"center" }}>
               <div style={{ width:"48px", height:"48px", borderRadius:"50%", border:"4px solid #dbeafe", borderTopColor:"#3b82f6", animation:"spin 0.8s linear infinite", margin:"0 auto 16px" }} />
-              <p style={{ color:c.muted, fontSize:"14px" }}>Verifying your invite link…</p>
+              <p style={{ color:c.muted, fontSize:"14px" }}>{tr("studentSetup.verifyingYourInviteLink")}</p>
               <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
             </div>
           )}
@@ -105,8 +107,8 @@ export default function StudentSetup() {
               {/* Header */}
               <div style={{ background:"linear-gradient(135deg,#3b82f6,#6366f1)", padding:"36px 40px", textAlign:"center" }}>
                 <div style={{ width:"64px", height:"64px", borderRadius:"50%", background:"rgba(255,255,255,0.2)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:"28px", margin:"0 auto 12px" }}>🎓</div>
-                <h1 style={{ color:"#fff", fontSize:"22px", fontWeight:"800", marginBottom:"6px" }}>Welcome, {student.firstName}!</h1>
-                <p style={{ color:"rgba(255,255,255,0.8)", fontSize:"13.5px" }}>Set your password to activate your account</p>
+                <h1 style={{ color:"#fff", fontSize:"22px", fontWeight:"800", marginBottom:"6px" }}>{tr("studentSetup.welcome", { firstName: student.firstName })}</h1>
+                <p style={{ color:"rgba(255,255,255,0.8)", fontSize:"13.5px" }}>{tr("studentSetup.setYourPasswordToActivate")}</p>
               </div>
 
               {/* Body */}
@@ -114,11 +116,11 @@ export default function StudentSetup() {
                 {/* Student info pill */}
                 <div style={{ background:"#f0f7ff", border:"1px solid #bfdbfe", borderRadius:"12px", padding:"14px 18px", marginBottom:"24px", display:"flex", justifyContent:"space-between", flexWrap:"wrap", gap:"8px" }}>
                   <div style={{ fontSize:"13px" }}>
-                    <span style={{ color:c.muted }}>Email: </span>
+                    <span style={{ color:c.muted }}>{tr("studentSetup.email")} </span>
                     <span style={{ fontWeight:"700", color:c.head }}>{student.email}</span>
                   </div>
                   <div style={{ fontSize:"13px" }}>
-                    <span style={{ color:c.muted }}>Classes: </span>
+                    <span style={{ color:c.muted }}>{tr("studentSetup.classes")} </span>
                     <span style={{ fontWeight:"700", color:"#3b82f6" }}>{student.classCredits}</span>
                   </div>
                 </div>
@@ -126,12 +128,12 @@ export default function StudentSetup() {
                 <form onSubmit={handleSubmit}>
                   {/* Password field */}
                   <div style={{ marginBottom:"16px" }}>
-                    <label style={{ display:"block", fontSize:"13px", fontWeight:"700", color:c.head, marginBottom:"6px" }}>New Password</label>
+                    <label style={{ display:"block", fontSize:"13px", fontWeight:"700", color:c.head, marginBottom:"6px" }}>{tr("studentSetup.newPassword")}</label>
                     <div style={{ position:"relative" }}>
                       <input
                         className="ss-input"
                         type={showPass ? "text" : "password"}
-                        placeholder="Enter your password"
+                        placeholder={tr("studentSetup.enterYourPassword")}
                         value={password}
                         onChange={e => setPassword(e.target.value)}
                         required
@@ -155,12 +157,12 @@ export default function StudentSetup() {
 
                   {/* Confirm field */}
                   <div style={{ marginBottom:"20px" }}>
-                    <label style={{ display:"block", fontSize:"13px", fontWeight:"700", color:c.head, marginBottom:"6px" }}>Confirm Password</label>
+                    <label style={{ display:"block", fontSize:"13px", fontWeight:"700", color:c.head, marginBottom:"6px" }}>{tr("studentSetup.confirmPassword")}</label>
                     <div style={{ position:"relative" }}>
                       <input
                         className="ss-input"
                         type={showConf ? "text" : "password"}
-                        placeholder="Repeat your password"
+                        placeholder={tr("studentSetup.repeatYourPassword")}
                         value={confirm}
                         onChange={e => setConfirm(e.target.value)}
                         required
@@ -176,11 +178,11 @@ export default function StudentSetup() {
                   {password && (
                     <div style={{ background:"#f8fafc", border:`1px solid ${c.border}`, borderRadius:"12px", padding:"14px 18px", marginBottom:"20px" }}>
                       {[
-                        { key:"length", label:"At least 8 characters" },
-                        { key:"upper",  label:"One uppercase letter" },
-                        { key:"lower",  label:"One lowercase letter" },
-                        { key:"number", label:"One number" },
-                        { key:"match",  label:"Passwords match" },
+                        { key:"length", label:tr("studentSetup.atLeast8Characters") },
+                        { key:"upper",  label:tr("studentSetup.oneUppercaseLetter") },
+                        { key:"lower",  label:tr("studentSetup.oneLowercaseLetter") },
+                        { key:"number", label:tr("studentSetup.oneNumber") },
+                        { key:"match",  label:tr("studentSetup.passwordsMatch") },
                       ].map(({ key, label }) => (
                         <div key={key} className="ss-check">
                           <div className="dot" style={{ background: checks[key] ? "#22c55e" : "#e2e8f0", color: checks[key] ? "#fff" : "#94a3b8" }}>
@@ -194,7 +196,7 @@ export default function StudentSetup() {
 
                   <button className="ss-btn" type="submit"
                     disabled={submitting || !checks.length || !checks.match}>
-                    {submitting ? "Activating account…" : "Activate My Account 🚀"}
+                    {submitting ? tr("studentSetup.activatingAccount") : tr("studentSetup.activateMyAccount")}
                   </button>
                 </form>
               </div>
@@ -205,12 +207,12 @@ export default function StudentSetup() {
           {step === "success" && (
             <div style={{ padding:"60px 40px", textAlign:"center" }}>
               <div style={{ fontSize:"64px", marginBottom:"16px" }}>🎉</div>
-              <h2 style={{ fontSize:"22px", fontWeight:"800", color:c.head, marginBottom:"10px" }}>Account Activated!</h2>
+              <h2 style={{ fontSize:"22px", fontWeight:"800", color:c.head, marginBottom:"10px" }}>{tr("studentSetup.accountActivated")}</h2>
               <p style={{ color:c.muted, fontSize:"14px", lineHeight:"1.7", marginBottom:"28px" }}>
-                Your account is all set. You can now log in and join your English classes!
+                {tr("studentSetup.yourAccountIsAllSet")}
               </p>
               <button className="ss-btn" onClick={() => navigate("/student/login")} style={{ width:"auto", padding:"13px 36px" }}>
-                Go to Login →
+                {tr("studentSetup.goToLogin")}
               </button>
             </div>
           )}
@@ -219,12 +221,12 @@ export default function StudentSetup() {
           {step === "error" && (
             <div style={{ padding:"60px 40px", textAlign:"center" }}>
               <div style={{ fontSize:"56px", marginBottom:"16px" }}>😕</div>
-              <h2 style={{ fontSize:"20px", fontWeight:"800", color:"#ef4444", marginBottom:"10px" }}>Link Invalid or Expired</h2>
+              <h2 style={{ fontSize:"20px", fontWeight:"800", color:"#ef4444", marginBottom:"10px" }}>{tr("studentSetup.linkInvalidOrExpired")}</h2>
               <p style={{ color:c.muted, fontSize:"14px", lineHeight:"1.7", marginBottom:"28px" }}>
-                {errorMsg || "This invite link has expired or already been used. Please ask your admin to resend the invitation."}
+                {errorMsg || tr("studentSetup.thisInviteLinkHasExpired")}
               </p>
               <button className="ss-btn" onClick={() => navigate("/student/login")} style={{ width:"auto", padding:"13px 36px", background:"linear-gradient(135deg,#64748b,#475569)" }}>
-                Back to Login
+                {tr("studentSetup.backToLogin")}
               </button>
             </div>
           )}

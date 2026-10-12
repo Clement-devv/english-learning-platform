@@ -5,6 +5,7 @@ import { useState } from "react";
 import { FileText, Send, Eye, ChevronDown } from "lucide-react";
 import api from "../../../api";
 import { visibleEmail } from "../../../utils/managedStudent.js";
+import { useTranslation } from "react-i18next";
 
 // Build query string for period + reference date
 function buildQuery(period, refDate) {
@@ -23,6 +24,7 @@ function buildQuery(period, refDate) {
 }
 
 export default function ReportsTab({ students = [], isDarkMode }) {
+  const { t: tr } = useTranslation("admin");
   const [selectedStudent, setSelectedStudent] = useState("");
   const [period,   setPeriod]   = useState("monthly");
   const [refDate,  setRefDate]  = useState(() => {
@@ -46,25 +48,25 @@ export default function ReportsTab({ students = [], isDarkMode }) {
   }
 
   async function handlePreview() {
-    if (!selectedStudent) return showToast("Please select a student", false);
+    if (!selectedStudent) return showToast(tr("reportsTab.pleaseSelectAStudent"), false);
     const q    = buildQuery(period, refDate);
     try {
       const resp = await api.get(`/reports/preview/${selectedStudent}${q}`, { responseType: 'blob' });
       const objUrl = URL.createObjectURL(new Blob([resp.data]));
       window.open(objUrl, "_blank");
     } catch (e) {
-      showToast(e.response?.data?.error || "Failed to generate report", false);
+      showToast(e.response?.data?.error || tr("reportsTab.failedToGenerateReport"), false);
     }
   }
 
   async function handleSend() {
-    if (!selectedStudent) return showToast("Please select a student", false);
+    if (!selectedStudent) return showToast(tr("reportsTab.pleaseSelectAStudent"), false);
     setBusy(true);
     try {
       const q    = buildQuery(period, refDate);
       const resp = await api.post(`/reports/send/${selectedStudent}${q}`);
       const data = resp.data;
-      showToast(data.message || "Report sent!");
+      showToast(data.message || tr("reportsTab.reportSent"));
     } catch (e) {
       showToast(e.message, false);
     } finally {
@@ -97,10 +99,10 @@ export default function ReportsTab({ students = [], isDarkMode }) {
       {/* Header */}
       <div style={{ marginBottom: 24 }}>
         <h2 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: text, display: "flex", alignItems: "center", gap: 8 }}>
-          <FileText size={20} color="#16a34a" /> Progress Reports
+          <FileText size={20} color="#16a34a" /> {tr("reportsTab.progressReports")}
         </h2>
         <p style={{ margin: "4px 0 0", fontSize: 13, color: muted }}>
-          Generate and email PDF progress reports for students. Reports are also sent automatically (weekly every Monday, monthly on the 1st).
+          {tr("reportsTab.generateAndEmailPdfProgress")}
         </p>
       </div>
 
@@ -109,9 +111,9 @@ export default function ReportsTab({ students = [], isDarkMode }) {
 
         {/* Student picker */}
         <div style={{ marginBottom: 16 }}>
-          <label style={labelStyle}>Student</label>
+          <label style={labelStyle}>{tr("reportsTab.student")}</label>
           <select value={selectedStudent} onChange={e => setSelectedStudent(e.target.value)} style={inputStyle}>
-            <option value="">— Select a student —</option>
+            <option value="">{tr("reportsTab.selectAStudent")}</option>
             {students.map(s => (
               <option key={s._id} value={s._id}>
                 {s.firstName} {s.lastName} · {visibleEmail(s.email) || "managed"}
@@ -122,7 +124,7 @@ export default function ReportsTab({ students = [], isDarkMode }) {
 
         {/* Period */}
         <div style={{ marginBottom: 16 }}>
-          <label style={labelStyle}>Report period</label>
+          <label style={labelStyle}>{tr("reportsTab.reportPeriod")}</label>
           <div style={{ display: "flex", gap: 8 }}>
             {["monthly", "weekly"].map(p => (
               <button key={p} onClick={() => setPeriod(p)} style={{
@@ -142,7 +144,7 @@ export default function ReportsTab({ students = [], isDarkMode }) {
         {/* Reference date */}
         <div style={{ marginBottom: 24 }}>
           <label style={labelStyle}>
-            {period === "weekly" ? "Any date within the target week" : "Any date within the target month"}
+            {period === "weekly" ? tr("reportsTab.anyDateWithinTheTarget") : tr("reportsTab.anyDateWithinTheTarget2")}
           </label>
           <input type="date" value={refDate} onChange={e => setRefDate(e.target.value)} style={inputStyle} />
         </div>
@@ -155,7 +157,7 @@ export default function ReportsTab({ students = [], isDarkMode }) {
             border: `1px solid #16a34a`, background: "transparent", color: "#16a34a",
             cursor: "pointer", fontFamily: "inherit",
           }}>
-            <Eye size={15} /> Preview PDF
+            <Eye size={15} /> {tr("reportsTab.previewPdf")}
           </button>
 
           <button onClick={handleSend} disabled={busy} style={{
@@ -165,7 +167,7 @@ export default function ReportsTab({ students = [], isDarkMode }) {
             cursor: busy ? "not-allowed" : "pointer", opacity: busy ? 0.6 : 1,
             fontFamily: "inherit",
           }}>
-            <Send size={15} /> {busy ? "Sending…" : "Email to Student"}
+            <Send size={15} /> {busy ? tr("reportsTab.sending") : tr("reportsTab.emailToStudent")}
           </button>
         </div>
       </div>
@@ -173,12 +175,12 @@ export default function ReportsTab({ students = [], isDarkMode }) {
       {/* Info panel */}
       <div style={{ background: card, border: `1px solid ${border}`, borderRadius: 12, padding: 20, maxWidth: 560, marginTop: 16 }}>
         <p style={{ margin: 0, fontSize: 12, color: muted, lineHeight: 1.7 }}>
-          <strong style={{ color: text }}>What's in the report?</strong><br />
-          ✅ Completed classes &amp; total study time<br />
-          📝 Graded homework with scores<br />
-          🧠 Quiz results and averages<br />
-          📖 Vocabulary flashcard reviews &amp; mastered words<br />
-          🏅 Overall performance badge (Excellent / Good / Passed / Keep Practising)
+          <strong style={{ color: text }}>{tr("reportsTab.whatSInTheReport")}</strong><br />
+          {tr("reportsTab.completedClassesTotalStudyTime")}<br />
+          {tr("reportsTab.gradedHomeworkWithScores")}<br />
+          {tr("reportsTab.quizResultsAndAverages")}<br />
+          {tr("reportsTab.vocabularyFlashcardReviewsMasteredWords")}<br />
+          {tr("reportsTab.overallPerformanceBadgeExcellentGood")}
         </p>
       </div>
     </div>

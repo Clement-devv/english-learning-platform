@@ -1,6 +1,12 @@
 // src/pages/admin/modals/StudentModal.jsx
 import React, { useState, useEffect } from "react";
 import { X, ChevronDown } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import i18n from "../../../i18n/i18n.js";
+
+// For text in file-level lists: read when rendered, so it follows the chosen language
+const ta = (key, opts) => i18n.t(`admin:${key}`, opts);
+
 
 // Country list + dial codes — Vietnam first as primary market
 const COUNTRIES = [
@@ -46,12 +52,12 @@ const COUNTRIES = [
 ];
 
 const CEFR_LEVELS = [
-  { value: "A1", label: "A1 — Beginner" },
-  { value: "A2", label: "A2 — Elementary" },
-  { value: "B1", label: "B1 — Pre-Intermediate" },
-  { value: "B2", label: "B2 — Upper Intermediate" },
-  { value: "C1", label: "C1 — Advanced" },
-  { value: "C2", label: "C2 — Proficiency" },
+  { value: "A1", get label() { return ta("shared.levels.A1"); } },
+  { value: "A2", get label() { return ta("shared.levels.A2"); } },
+  { value: "B1", get label() { return ta("shared.levels.B1"); } },
+  { value: "B2", get label() { return ta("shared.levels.B2"); } },
+  { value: "C1", get label() { return ta("shared.levels.C1"); } },
+  { value: "C2", get label() { return ta("shared.levels.C2"); } },
 ];
 
 const EMPTY = {
@@ -61,6 +67,7 @@ const EMPTY = {
 };
 
 export default function StudentModal({ isOpen, onClose, onSave, initialData, isDarkMode = false }) {
+  const { t: tr } = useTranslation("admin");
   const [formData, setFormData] = useState(EMPTY);
   const [invited,  setInvited]  = useState(false);
   const [savedStudent, setSavedStudent] = useState(null);
@@ -156,15 +163,15 @@ export default function StudentModal({ isOpen, onClose, onSave, initialData, isD
         {invited ? (
           <div style={{ padding: "48px 40px", textAlign: "center", background: modalBg }}>
             <div style={{ fontSize: "60px", marginBottom: "12px" }}>📨</div>
-            <h2 style={{ fontSize: "20px", fontWeight: "800", color: textPri, marginBottom: "8px" }}>Invite Sent!</h2>
+            <h2 style={{ fontSize: "20px", fontWeight: "800", color: textPri, marginBottom: "8px" }}>{tr("studentModal.inviteSent")}</h2>
             <p style={{ fontSize: "14px", color: textSec, lineHeight: "1.7", marginBottom: "6px" }}>
-              An invite email has been sent to
+              {tr("studentModal.anInviteEmailHasBeen")}
             </p>
             <p style={{ fontSize: "15px", fontWeight: "700", color: "#3b82f6", marginBottom: "20px" }}>
               {savedStudent?.email || formData.email}
             </p>
             <p style={{ fontSize: "13px", color: textMut, lineHeight: "1.6", marginBottom: "28px" }}>
-              <strong>{savedStudent?.firstName || formData.firstName}</strong> will receive a link to set their password and activate their account. The link expires in <strong>48 hours</strong>.
+              <strong>{savedStudent?.firstName || formData.firstName}</strong> {tr("studentModal.willReceiveALinkTo")} <strong>{tr("studentModal.t48Hours")}</strong>.
             </p>
             <div style={{ display: "flex", gap: "10px", justifyContent: "center", flexWrap: "wrap", marginBottom: "28px" }}>
               {formData.rank && (
@@ -178,11 +185,11 @@ export default function StudentModal({ isOpen, onClose, onSave, initialData, isD
                 </div>
               )}
               <div style={{ background: badgeBg3, border: "1px solid #e9d5ff", borderRadius: "20px", padding: "5px 14px", fontSize: "12px", fontWeight: "700", color: "#7c3aed" }}>
-                🕐 Pending activation
+                {tr("studentModal.pendingActivation")}
               </div>
             </div>
             <button onClick={onClose} style={{ padding: "12px 32px", borderRadius: "12px", border: "none", background: "linear-gradient(135deg,#3b82f6,#6366f1)", color: "#fff", fontSize: "14px", fontWeight: "700", cursor: "pointer", fontFamily: "inherit" }}>
-              Done
+              {tr("studentModal.done")}
             </button>
           </div>
         ) : (
@@ -192,11 +199,11 @@ export default function StudentModal({ isOpen, onClose, onSave, initialData, isD
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <div>
                   <h2 style={{ fontSize: "18px", fontWeight: "800", color: textPri, margin: 0 }}>
-                    {isEdit ? "Edit Student" : "Create Student"}
+                    {isEdit ? tr("studentModal.editStudent") : tr("studentModal.createStudent")}
                   </h2>
                   {!isEdit && (
                     <p style={{ fontSize: "12px", color: textSec, margin: "3px 0 0" }}>
-                      An invite email will be sent to the student
+                      {tr("studentModal.anInviteEmailWillBe")}
                     </p>
                   )}
                 </div>
@@ -212,25 +219,25 @@ export default function StudentModal({ isOpen, onClose, onSave, initialData, isD
               {/* Name row */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "12px" }}>
                 <div>
-                  <label style={lbl}>First Name *</label>
-                  <input style={inp} name="firstName" value={formData.firstName} onChange={handleChange} required placeholder="e.g. Linh" />
+                  <label style={lbl}>{tr("studentModal.firstName")}</label>
+                  <input style={inp} name="firstName" value={formData.firstName} onChange={handleChange} required placeholder={tr("studentModal.eGLinh")} />
                 </div>
                 <div>
-                  <label style={lbl}>Surname *</label>
-                  <input style={inp} name="lastName" value={formData.lastName} onChange={handleChange} required placeholder="e.g. Nguyen" />
+                  <label style={lbl}>{tr("studentModal.surname")}</label>
+                  <input style={inp} name="lastName" value={formData.lastName} onChange={handleChange} required placeholder={tr("studentModal.eGNguyen")} />
                 </div>
               </div>
 
               {/* Email */}
               <div style={{ marginBottom: "12px" }}>
-                <label style={lbl}>Email Address *</label>
-                <input style={{ ...inp, opacity: isEdit ? 0.6 : 1 }} type="email" name="email" value={formData.email} onChange={handleChange} required placeholder="student@email.com" disabled={isEdit} />
-                {isEdit && <p style={{ fontSize: "11px", color: textMut, marginTop: "4px" }}>Email cannot be changed after creation</p>}
+                <label style={lbl}>{tr("studentModal.emailAddress")}</label>
+                <input style={{ ...inp, opacity: isEdit ? 0.6 : 1 }} type="email" name="email" value={formData.email} onChange={handleChange} required placeholder={tr("studentModal.studentEmailCom")} disabled={isEdit} />
+                {isEdit && <p style={{ fontSize: "11px", color: textMut, marginTop: "4px" }}>{tr("studentModal.emailCannotBeChangedAfter")}</p>}
               </div>
 
               {/* Country + Phone */}
               <div style={{ marginBottom: "12px" }}>
-                <label style={lbl}>Country</label>
+                <label style={lbl}>{tr("studentModal.country")}</label>
                 <div style={{ position: "relative" }}>
                   <select
                     name="country"
@@ -238,7 +245,7 @@ export default function StudentModal({ isOpen, onClose, onSave, initialData, isD
                     onChange={handleCountryChange}
                     style={{ ...inp, appearance: "none", paddingRight: "32px", cursor: "pointer" }}
                   >
-                    <option value="">Select country</option>
+                    <option value="">{tr("studentModal.selectCountry")}</option>
                     {COUNTRIES.map(c => (
                       <option key={c.code + c.name} value={c.name}>{c.name}</option>
                     ))}
@@ -248,7 +255,7 @@ export default function StudentModal({ isOpen, onClose, onSave, initialData, isD
               </div>
 
               <div style={{ marginBottom: "12px" }}>
-                <label style={lbl}>Phone Number</label>
+                <label style={lbl}>{tr("studentModal.phoneNumber")}</label>
                 <div style={{ display: "flex", gap: "8px" }}>
                   {/* Dial code badge */}
                   <div style={{ display: "flex", alignItems: "center", padding: "0 12px", borderRadius: "10px", border: `1.5px solid ${borderC}`, background: dialBg, fontSize: "13px", fontWeight: "600", color: dm ? "#94a3b8" : "#475569", whiteSpace: "nowrap", minWidth: "70px", justifyContent: "center" }}>
@@ -260,12 +267,12 @@ export default function StudentModal({ isOpen, onClose, onSave, initialData, isD
                     name="phone"
                     value={formData.phone}
                     onChange={handleChange}
-                    placeholder={formData.country === "Vietnam" ? "90 123 4567" : "Phone number"}
+                    placeholder={formData.country === "Vietnam" ? "90 123 4567" : tr("studentModal.phoneNumber2")}
                   />
                 </div>
                 {formData.dialCode && formData.phone && (
                   <p style={{ fontSize: "11px", color: textSec, marginTop: "4px" }}>
-                    Will be saved as: <strong>{formData.dialCode} {formData.phone}</strong>
+                    {tr("studentModal.willBeSavedAs")} <strong>{formData.dialCode} {formData.phone}</strong>
                   </p>
                 )}
               </div>
@@ -273,18 +280,18 @@ export default function StudentModal({ isOpen, onClose, onSave, initialData, isD
               {/* Age + DOB */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "12px" }}>
                 <div>
-                  <label style={lbl}>Age</label>
+                  <label style={lbl}>{tr("studentModal.age")}</label>
                   <input style={inp} type="number" name="age" value={formData.age} onChange={handleChange} placeholder="e.g. 14" min="3" max="99" />
                 </div>
                 <div>
-                  <label style={lbl}>Date of Birth</label>
+                  <label style={lbl}>{tr("studentModal.dateOfBirth")}</label>
                   <input style={inp} type="date" name="dateOfBirth" value={formData.dateOfBirth} onChange={handleChange} />
                 </div>
               </div>
 
               {/* CEFR Level */}
               <div style={{ marginBottom: "18px" }}>
-                <label style={lbl}>ESL Level (CEFR)</label>
+                <label style={lbl}>{tr("studentModal.eslLevelCefr")}</label>
                 <div style={{ position: "relative" }}>
                   <select
                     name="rank"
@@ -292,7 +299,7 @@ export default function StudentModal({ isOpen, onClose, onSave, initialData, isD
                     onChange={handleChange}
                     style={{ ...inp, appearance: "none", paddingRight: "32px", cursor: "pointer" }}
                   >
-                    <option value="">Select level</option>
+                    <option value="">{tr("studentModal.selectLevel")}</option>
                     {CEFR_LEVELS.map(l => (
                       <option key={l.value} value={l.value}>{l.label}</option>
                     ))}
@@ -306,8 +313,8 @@ export default function StudentModal({ isOpen, onClose, onSave, initialData, isD
                 <div style={{ background: infoBg, border: `1px solid ${infoBdr}`, borderRadius: "12px", padding: "12px 14px", marginBottom: "18px", display: "flex", gap: "10px", alignItems: "flex-start" }}>
                   <span style={{ fontSize: "16px", flexShrink: 0 }}>📧</span>
                   <div>
-                    <p style={{ fontSize: "12.5px", fontWeight: "700", color: "#1e40af", margin: "0 0 2px" }}>Invite email will be sent</p>
-                    <p style={{ fontSize: "11.5px", color: "#3b82f6", margin: 0 }}>Student receives a link to set their password and activate their account.</p>
+                    <p style={{ fontSize: "12.5px", fontWeight: "700", color: "#1e40af", margin: "0 0 2px" }}>{tr("studentModal.inviteEmailWillBeSent")}</p>
+                    <p style={{ fontSize: "11.5px", color: "#3b82f6", margin: 0 }}>{tr("studentModal.studentReceivesALinkTo")}</p>
                   </div>
                 </div>
               )}
@@ -315,10 +322,10 @@ export default function StudentModal({ isOpen, onClose, onSave, initialData, isD
               {/* Buttons */}
               <div style={{ display: "flex", gap: "10px" }}>
                 <button type="button" onClick={onClose} style={{ flex: 1, padding: "11px", borderRadius: "10px", border: `1.5px solid ${borderC}`, background: "transparent", color: dm ? "#94a3b8" : "#475569", fontSize: "14px", fontWeight: "600", cursor: "pointer", fontFamily: "inherit" }}>
-                  Cancel
+                  {tr("studentModal.cancel")}
                 </button>
                 <button type="submit" disabled={loading} style={{ flex: 2, padding: "11px", borderRadius: "10px", border: "none", background: loading ? "#94a3b8" : "linear-gradient(135deg,#3b82f6,#6366f1)", color: "#fff", fontSize: "14px", fontWeight: "700", cursor: loading ? "not-allowed" : "pointer", fontFamily: "inherit" }}>
-                  {loading ? "Saving…" : isEdit ? "Save Changes" : "Create & Send Invite"}
+                  {loading ? tr("studentModal.saving") : isEdit ? tr("studentModal.saveChanges") : tr("studentModal.createSendInvite")}
                 </button>
               </div>
 

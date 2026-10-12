@@ -29,11 +29,13 @@ import {
 } from "lucide-react";
 import api from "../../../api";
 import { visibleEmail } from "../../../utils/managedStudent.js";
+import { useTranslation } from "react-i18next";
+import { dateLocale } from "../../../i18n/dateLocale.js";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 function fmt(dateStr) {
   if (!dateStr) return "—";
-  return new Date(dateStr).toLocaleString("en-GB", {
+  return new Date(dateStr).toLocaleString(dateLocale("en-GB"), {
     day: "numeric",
     month: "short",
     year: "numeric",
@@ -135,6 +137,7 @@ export default function LessonActionModal({
   onSuccess,
   isDarkMode = false,
 }) {
+  const { t: tr } = useTranslation("admin");
   const isMarking = mode === "mark";
 
   // State machine: "teacher" | "student" | "class" | "confirm" | "done"
@@ -165,10 +168,10 @@ export default function LessonActionModal({
       setLoading(true);
       api.get(`/admin/lessons/assignments/${student._id}/teachers`)
         .then((r) => setTeacherList(r.data.teachers || []))
-        .catch(() => setError("Failed to load teachers"))
+        .catch(() => setError(tr("lessonActionModal.failedToLoadTeachers")))
         .finally(() => setLoading(false));
     }
-  }, [step, student?._id]);
+  }, [step, student._id, tr]);
 
   // ── Load students when step = "student" ──
   useEffect(() => {
@@ -176,10 +179,10 @@ export default function LessonActionModal({
       setLoading(true);
       api.get(`/admin/lessons/assignments/${teacher._id}/students`)
         .then((r) => setStudentList(r.data.students || []))
-        .catch(() => setError("Failed to load students"))
+        .catch(() => setError(tr("lessonActionModal.failedToLoadStudents")))
         .finally(() => setLoading(false));
     }
-  }, [step, teacher?._id]);
+  }, [step, teacher._id, tr]);
 
   // ── Load bookings when step = "class" ──
   useEffect(() => {
@@ -188,10 +191,10 @@ export default function LessonActionModal({
       const statusFilter = isMarking ? "accepted,pending" : "completed";
       api.get(`/admin/lessons/pair-bookings?teacherId=${teacher._id}&studentId=${student._id}&status=${statusFilter}`)
         .then((r) => setBookings(r.data.bookings || []))
-        .catch(() => setError("Failed to load classes"))
+        .catch(() => setError(tr("lessonActionModal.failedToLoadClasses")))
         .finally(() => setLoading(false));
     }
-  }, [step, teacher?._id, student?._id, isMarking]);
+  }, [step, teacher._id, student._id, isMarking, tr]);
 
   // ── Submit ──
   const handleSubmit = async () => {
@@ -204,7 +207,7 @@ export default function LessonActionModal({
       onSuccess?.(res.data);
       setStep("done");
     } catch (err) {
-      setError(err.response?.data?.message || "Operation failed. Please try again.");
+      setError(err.response?.data?.message || tr("lessonActionModal.operationFailedPleaseTryAgain"));
     } finally {
       setSubmitting(false);
     }
@@ -236,12 +239,12 @@ export default function LessonActionModal({
             </div>
             <div>
               <h2 className="text-white font-bold text-lg">
-                {isMarking ? "Mark Lesson Complete" : "Unmark Lesson"}
+                {isMarking ? tr("lessonActionModal.markLessonComplete") : tr("lessonActionModal.unmarkLesson")}
               </h2>
               <p className="text-white/70 text-xs">
                 {isMarking
-                  ? "Select the class to mark as completed"
-                  : "Reverse a completed class back to accepted"}
+                  ? tr("lessonActionModal.selectTheClassToMark")
+                  : tr("lessonActionModal.reverseACompletedClassBack")}
               </p>
             </div>
           </div>
@@ -278,9 +281,9 @@ export default function LessonActionModal({
                   <Users className="w-4 h-4 text-blue-500" />
                 </div>
                 <div>
-                  <p className={`text-sm font-semibold ${textPrimary}`}>Select Teacher</p>
+                  <p className={`text-sm font-semibold ${textPrimary}`}>{tr("lessonActionModal.selectTeacher")}</p>
                   <p className={`text-xs ${textSecondary}`}>
-                    Teachers assigned to{" "}
+                    {tr("lessonActionModal.teachersAssignedTo")}{" "}
                     <span className="font-medium">{student?.firstName} {student?.lastName}</span>
                   </p>
                 </div>
@@ -289,18 +292,18 @@ export default function LessonActionModal({
               {loading ? (
                 <div className="flex items-center justify-center py-8 gap-2">
                   <Loader className="w-5 h-5 animate-spin text-blue-500" />
-                  <span className={`text-sm ${textSecondary}`}>Loading teachers...</span>
+                  <span className={`text-sm ${textSecondary}`}>{tr("lessonActionModal.loadingTeachers")}</span>
                 </div>
               ) : teacherList.length === 0 ? (
                 <div className={`text-center py-8 text-sm ${textSecondary}`}>
-                  No teachers assigned to this student.
+                  {tr("lessonActionModal.noTeachersAssignedToThis")}
                 </div>
               ) : (
                 teacherList.map((t) => (
                   <SelectRow
                     key={t._id}
                     label={t.displayName?.trim() || `${t.firstName} ${t.lastName}`}
-                    sub={`${t.email} · $${t.ratePerClass}/class · ${t.continent}`}
+                    sub={tr("lessonActionModal.class", { email: t.email, ratePerClass: t.ratePerClass, continent: t.continent })}
                     isDarkMode={isDarkMode}
                     onClick={() => { setTeacher(t); setStep("class"); }}
                   />
@@ -317,9 +320,9 @@ export default function LessonActionModal({
                   <User className="w-4 h-4 text-purple-500" />
                 </div>
                 <div>
-                  <p className={`text-sm font-semibold ${textPrimary}`}>Select Student</p>
+                  <p className={`text-sm font-semibold ${textPrimary}`}>{tr("lessonActionModal.selectStudent")}</p>
                   <p className={`text-xs ${textSecondary}`}>
-                    Students assigned to{" "}
+                    {tr("lessonActionModal.studentsAssignedTo")}{" "}
                     <span className="font-medium">{teacher?.firstName} {teacher?.lastName}</span>
                   </p>
                 </div>
@@ -328,11 +331,11 @@ export default function LessonActionModal({
               {loading ? (
                 <div className="flex items-center justify-center py-8 gap-2">
                   <Loader className="w-5 h-5 animate-spin text-blue-500" />
-                  <span className={`text-sm ${textSecondary}`}>Loading students...</span>
+                  <span className={`text-sm ${textSecondary}`}>{tr("lessonActionModal.loadingStudents")}</span>
                 </div>
               ) : studentList.length === 0 ? (
                 <div className={`text-center py-8 text-sm ${textSecondary}`}>
-                  No students assigned to this teacher.
+                  {tr("lessonActionModal.noStudentsAssignedToThis")}
                 </div>
               ) : (
                 studentList.map((s) => (
@@ -358,7 +361,7 @@ export default function LessonActionModal({
                 </div>
                 <div>
                   <p className={`text-sm font-semibold ${textPrimary}`}>
-                    Select {isMarking ? "Accepted" : "Completed"} Class
+                    {tr("lessonActionModal.select")} {isMarking ? tr("lessonActionModal.accepted") : tr("lessonActionModal.completed")} {tr("lessonActionModal.class2")}
                   </p>
                   <p className={`text-xs ${textSecondary}`}>
                     {teacher?.firstName} {teacher?.lastName} ↔ {student?.firstName} {student?.lastName}
@@ -369,16 +372,16 @@ export default function LessonActionModal({
               {loading ? (
                 <div className="flex items-center justify-center py-8 gap-2">
                   <Loader className="w-5 h-5 animate-spin text-blue-500" />
-                  <span className={`text-sm ${textSecondary}`}>Loading classes...</span>
+                  <span className={`text-sm ${textSecondary}`}>{tr("lessonActionModal.loadingClasses")}</span>
                 </div>
               ) : bookings.length === 0 ? (
                 <div className={`text-center py-10`}>
                   <BookOpen className={`w-10 h-10 mx-auto mb-2 ${textSecondary}`} />
-                  <p className={`text-sm font-medium ${textPrimary}`}>No {isMarking ? "accepted" : "completed"} classes found</p>
+                  <p className={`text-sm font-medium ${textPrimary}`}>{tr(isMarking ? "lessonActionModal.noAcceptedClassesFound" : "lessonActionModal.noCompletedClassesFound")}</p>
                   <p className={`text-xs ${textSecondary} mt-1`}>
                     {isMarking
-                      ? "There are no accepted bookings between this teacher and student."
-                      : "There are no completed bookings to unmark."}
+                      ? tr("lessonActionModal.thereAreNoAcceptedBookings")
+                      : tr("lessonActionModal.thereAreNoCompletedBookings")}
                   </p>
                 </div>
               ) : (
@@ -403,7 +406,7 @@ export default function LessonActionModal({
                           </span>
                           <span className="flex items-center gap-1">
                             <Clock className="w-3 h-3" />
-                            {b.duration} min
+                            {b.duration} {tr("lessonActionModal.min")}
                           </span>
                         </div>
                       </div>
@@ -418,8 +421,7 @@ export default function LessonActionModal({
               <button
                 onClick={() => { setStep(startWith === "teacher" ? "student" : "teacher"); }}
                 className={`text-xs ${textSecondary} hover:underline mt-1`}
-              >
-                ← Change {startWith === "teacher" ? "student" : "teacher"}
+              >{tr(startWith === "teacher" ? "lessonActionModal.changeStudent" : "lessonActionModal.changeTeacher")}
               </button>
             </div>
           )}
@@ -430,25 +432,25 @@ export default function LessonActionModal({
               {/* Summary card */}
               <div className={`rounded-xl border p-4 ${cardBg}`}>
                 <p className={`text-xs font-semibold uppercase tracking-wide mb-3 ${textSecondary}`}>
-                  You are about to
+                  {tr("lessonActionModal.youAreAboutTo")}
                 </p>
                 <div className={`text-base font-bold mb-4 ${isMarking ? "text-emerald-600" : "text-rose-600"}`}>
-                  {isMarking ? "✅ Mark as Completed" : "↩️ Unmark (Reverse Completion)"}
+                  {isMarking ? tr("lessonActionModal.markAsCompleted") : tr("lessonActionModal.unmarkReverseCompletion")}
                 </div>
 
                 <div className="space-y-2.5">
-                  <InfoRow label="Class" value={selectedBooking.classTitle} isDarkMode={isDarkMode} />
+                  <InfoRow label={tr("lessonActionModal.class2")} value={selectedBooking.classTitle} isDarkMode={isDarkMode} />
                   {selectedBooking.topic && (
-                    <InfoRow label="Topic" value={selectedBooking.topic} isDarkMode={isDarkMode} />
+                    <InfoRow label={tr("lessonActionModal.topic")} value={selectedBooking.topic} isDarkMode={isDarkMode} />
                   )}
-                  <InfoRow label="Scheduled" value={fmt(selectedBooking.scheduledTime)} isDarkMode={isDarkMode} />
+                  <InfoRow label={tr("lessonActionModal.scheduled")} value={fmt(selectedBooking.scheduledTime)} isDarkMode={isDarkMode} />
                   <InfoRow
-                    label="Teacher"
+                    label={tr("lessonActionModal.teacher")}
                     value={`${teacher?.firstName} ${teacher?.lastName}`}
                     isDarkMode={isDarkMode}
                   />
                   <InfoRow
-                    label="Student"
+                    label={tr("lessonActionModal.student")}
                     value={`${student?.firstName} ${student?.lastName}`}
                     isDarkMode={isDarkMode}
                   />
@@ -462,30 +464,30 @@ export default function LessonActionModal({
                   : isDarkMode ? "bg-rose-900/20 border-rose-700/40" : "bg-rose-50 border-rose-200"
               }`}>
                 <p className={`text-xs font-semibold mb-2 ${isMarking ? "text-emerald-600" : "text-rose-600"}`}>
-                  What will happen:
+                  {tr("lessonActionModal.whatWillHappen")}
                 </p>
                 <ul className={`text-xs space-y-1 ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
                   {isMarking ? (
                     <>
-                      <li>• Booking → <strong>completed</strong></li>
-                      <li>• Teacher earnings +<strong>${teacher?.ratePerClass || 0}</strong></li>
-                      <li>• Teacher lessons completed +1</li>
-                      <li>• Student classes remaining <strong>-1</strong></li>
+                      <li>{tr("lessonActionModal.booking")} <strong>{tr("lessonActionModal.completed2")}</strong></li>
+                      <li>{tr("lessonActionModal.teacherEarnings")}<strong>${teacher?.ratePerClass || 0}</strong></li>
+                      <li>{tr("lessonActionModal.teacherLessonsCompleted1")}</li>
+                      <li>{tr("lessonActionModal.studentClassesRemaining")} <strong>-1</strong></li>
                       <li className="flex items-center gap-1">
                         <Mail className="w-3 h-3" />
-                        Emails sent to teacher &amp; student
+                        {tr("lessonActionModal.emailsSentToTeacherStudent")}
                       </li>
                     </>
                   ) : (
                     <>
-                      <li>• Booking → <strong>accepted</strong> (reversed)</li>
-                      <li>• Teacher earnings -<strong>${teacher?.ratePerClass || 0}</strong></li>
-                      <li>• Teacher lessons completed -1</li>
-                      <li>• Student classes remaining <strong>+1</strong></li>
-                      <li>• Payment transaction cancelled</li>
+                      <li>{tr("lessonActionModal.booking")} <strong>{tr("lessonActionModal.accepted2")}</strong> {tr("lessonActionModal.reversed")}</li>
+                      <li>{tr("lessonActionModal.teacherEarnings2")}<strong>${teacher?.ratePerClass || 0}</strong></li>
+                      <li>{tr("lessonActionModal.teacherLessonsCompleted12")}</li>
+                      <li>{tr("lessonActionModal.studentClassesRemaining")} <strong>+1</strong></li>
+                      <li>{tr("lessonActionModal.paymentTransactionCancelled")}</li>
                       <li className="flex items-center gap-1">
                         <Mail className="w-3 h-3" />
-                        Emails sent to teacher &amp; student
+                        {tr("lessonActionModal.emailsSentToTeacherStudent")}
                       </li>
                     </>
                   )}
@@ -507,12 +509,12 @@ export default function LessonActionModal({
                 )}
               </div>
               <p className={`text-lg font-bold ${textPrimary}`}>
-                {isMarking ? "Lesson Marked!" : "Lesson Unmarked!"}
+                {isMarking ? tr("lessonActionModal.lessonMarked") : tr("lessonActionModal.lessonUnmarked")}
               </p>
               <p className={`text-sm ${textSecondary}`}>
                 {isMarking
-                  ? "The class has been marked as completed. Emails have been sent to both the teacher and student."
-                  : "The class has been reversed. Teacher earnings and student classes have been adjusted."}
+                  ? tr("lessonActionModal.theClassHasBeenMarked")
+                  : tr("lessonActionModal.theClassHasBeenReversed")}
               </p>
             </div>
           )}
@@ -527,7 +529,7 @@ export default function LessonActionModal({
                 isDarkMode ? "text-gray-300 hover:bg-gray-700" : "text-gray-600 hover:bg-gray-100"
               }`}
             >
-              {step === "confirm" ? "← Back" : "Cancel"}
+              {step === "confirm" ? tr("lessonActionModal.back") : tr("lessonActionModal.cancel")}
             </button>
 
             {step === "confirm" && (
@@ -542,10 +544,10 @@ export default function LessonActionModal({
               >
                 {submitting && <Loader className="w-4 h-4 animate-spin" />}
                 {submitting
-                  ? "Processing..."
+                  ? tr("lessonActionModal.processing")
                   : isMarking
-                  ? "Confirm & Mark Complete"
-                  : "Confirm & Reverse"}
+                  ? tr("lessonActionModal.confirmMarkComplete")
+                  : tr("lessonActionModal.confirmReverse")}
               </button>
             )}
           </div>
@@ -557,7 +559,7 @@ export default function LessonActionModal({
               onClick={onClose}
               className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm transition-all"
             >
-              Done
+              {tr("lessonActionModal.done")}
             </button>
           </div>
         )}

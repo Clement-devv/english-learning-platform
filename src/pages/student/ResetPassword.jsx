@@ -2,8 +2,10 @@ import React, { useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Lock, Eye, EyeOff, CheckCircle, BookOpen } from 'lucide-react';
 import api from '../../api';
+import { useTranslation } from "react-i18next";
 
 export default function StudentResetPassword() {
+  const { t: tr } = useTranslation("student");
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showNewPassword, setShowNewPassword] = useState(false);
@@ -21,17 +23,17 @@ export default function StudentResetPassword() {
     setError('');
 
     if (!newPassword || !confirmPassword) {
-      setError('All fields are required');
+      setError(tr("resetPassword.allFieldsAreRequired"));
       return;
     }
 
     if (newPassword.length < 6) {
-      setError('Password must be at least 6 characters long');
+      setError(tr("resetPassword.passwordMustBeAtLeast"));
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      setError('Passwords do not match');
+      setError(tr("resetPassword.passwordsDoNotMatch"));
       return;
     }
 
@@ -51,7 +53,7 @@ export default function StudentResetPassword() {
       
     } catch (err) {
       console.error('Reset password error:', err);
-      setError(err.response?.data?.message || 'Failed to reset password');
+      setError(err.response?.data?.message || tr("resetPassword.failedToResetPassword"));
     } finally {
       setLoading(false);
     }
@@ -66,14 +68,14 @@ export default function StudentResetPassword() {
               <CheckCircle className="w-8 h-8 text-green-600" />
             </div>
             
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">Password Reset Successful!</h1>
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">{tr("resetPassword.passwordResetSuccessful")}</h1>
             <p className="text-gray-600 mb-6">
-              Your password has been reset successfully. You can now login with your new password.
+              {tr("resetPassword.yourPasswordHasBeenReset")}
             </p>
             
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
               <p className="text-sm text-blue-800">
-                ✅ You're all set! Redirecting to login page...
+                {tr("resetPassword.youReAllSetRedirecting")}
               </p>
             </div>
 
@@ -81,7 +83,7 @@ export default function StudentResetPassword() {
               onClick={() => navigate('/student/login')}
               className="w-full px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg font-medium hover:from-blue-700 hover:to-indigo-700 transition"
             >
-              Go to Login Now
+              {tr("resetPassword.goToLoginNow")}
             </button>
           </div>
         </div>
@@ -97,9 +99,9 @@ export default function StudentResetPassword() {
           <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl mb-4">
             <BookOpen className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Reset Password</h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">{tr("resetPassword.resetPassword")}</h1>
           <p className="text-gray-600">
-            Enter your new password below
+            {tr("resetPassword.enterYourNewPasswordBelow")}
           </p>
         </div>
 
@@ -115,7 +117,7 @@ export default function StudentResetPassword() {
             {/* New Password */}
             <div>
               <label htmlFor="newPassword" className="block text-sm font-medium text-gray-700 mb-2">
-                New Password
+                {tr("resetPassword.newPassword")}
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -127,7 +129,7 @@ export default function StudentResetPassword() {
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   className="block w-full pl-10 pr-10 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Enter new password"
+                  placeholder={tr("resetPassword.enterNewPassword")}
                   required
                 />
                 <button
@@ -143,14 +145,14 @@ export default function StudentResetPassword() {
                 </button>
               </div>
               <p className="text-xs text-gray-500 mt-1">
-                Must be at least 6 characters long
+                {tr("resetPassword.mustBeAtLeast6")}
               </p>
             </div>
 
             {/* Confirm Password */}
             <div>
               <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-2">
-                Confirm New Password
+                {tr("resetPassword.confirmNewPassword")}
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -162,7 +164,7 @@ export default function StudentResetPassword() {
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   className="block w-full pl-10 pr-10 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Confirm new password"
+                  placeholder={tr("resetPassword.confirmNewPassword2")}
                   required
                 />
                 <button
@@ -184,7 +186,7 @@ export default function StudentResetPassword() {
               disabled={loading}
               className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-3 px-4 rounded-lg font-semibold hover:from-blue-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? 'Resetting Password...' : 'Reset Password'}
+              {loading ? tr("resetPassword.resettingPassword") : tr("resetPassword.resetPassword")}
             </button>
           </form>
         </div>

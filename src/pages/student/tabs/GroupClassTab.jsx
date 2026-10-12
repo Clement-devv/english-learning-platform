@@ -6,6 +6,7 @@ import api from '../../../api';
 import { useOnDataChanged } from '../../../hooks/useLiveData';
 import Classroom from '../../Classroom';
 import { formatDateInTZ, getUserTimezone, dualTime } from '../../../utils/timezone';
+import { useTranslation } from "react-i18next";
 
 const F = "'Nunito','Inter',sans-serif";
 const myTZ = getUserTimezone();
@@ -13,6 +14,7 @@ const myTZ = getUserTimezone();
 // Show the time in the student's local timezone. If the teacher's timezone
 // differs, also show the teacher's local time so students know the reference.
 function GCTime({ scheduledTime, teacherTimezone }) {
+  const { t: tr } = useTranslation("student");
   const dt = dualTime(scheduledTime, myTZ, teacherTimezone || myTZ);
   if (!dt) return null;
   const dateLabel = formatDateInTZ(scheduledTime, myTZ);
@@ -22,7 +24,7 @@ function GCTime({ scheduledTime, teacherTimezone }) {
   return (
     <span>
       📅 {dateLabel} ({dt.myAbbr})
-      <span style={{ opacity: 0.75, marginLeft: 4 }}>· {dt.theirTime} {dt.theirAbbr} teacher</span>
+      <span style={{ opacity: 0.75, marginLeft: 4 }}>{tr("groupClassTab.teacher", { theirTime: dt.theirTime, theirAbbr: dt.theirAbbr })}</span>
     </span>
   );
 }
@@ -52,6 +54,7 @@ function LevelBadge({ level }) {
 }
 
 export default function GroupClassTab({ isDarkMode, studentInfo }) {
+  const { t: tr } = useTranslation("student");
   const col = {
     bg:      isDarkMode ? '#0f1117' : '#fff8f0',
     card:    isDarkMode ? '#1a1d2e' : '#ffffff',
@@ -83,11 +86,11 @@ export default function GroupClassTab({ isDarkMode, studentInfo }) {
       setAllClasses(all.filter(gc => gc.status === 'open' && !gc.enrollments?.some(e => (e.studentId?._id || e.studentId)?.toString() === studentId?.toString())));
       setMyClasses(all.filter(gc => gc.enrollments?.some(e => (e.studentId?._id || e.studentId)?.toString() === studentId?.toString())));
     } catch {
-      flash('Failed to load classes');
+      flash(tr("groupClassTab.failedToLoadClasses"));
     } finally {
       setLoading(false);
     }
-  }, [studentInfo?.id || studentInfo?._id]);
+  }, [studentInfo?.id || studentInfo?._id, tr]);
 
   useEffect(() => { load(); }, [load]);
   useOnDataChanged(['group-classes'], () => load(true)); // live: seats, invites, status
@@ -107,23 +110,23 @@ export default function GroupClassTab({ isDarkMode, studentInfo }) {
     try {
       const res = await api.post(`/group-classes/${gc._id}/enroll`);
       if (res.data.creditsRemaining !== undefined) setMyCredits(res.data.creditsRemaining);
-      flash(`Enrolled in "${gc.title}" — ${gc.pricePerSeat} credit(s) deducted`);
+      flash(tr("groupClassTab.enrolledInCreditSDeducted", { title: gc.title, pricePerSeat: gc.pricePerSeat }));
       load();
     } catch (e) {
-      flash(e.response?.data?.message || 'Enrollment failed');
+      flash(e.response?.data?.message || tr("groupClassTab.enrollmentFailed"));
     } finally {
       setEnrolling(p => ({ ...p, [gc._id]: false }));
     }
   };
 
   const handleUnenroll = async (gc) => {
-    if (!window.confirm('Leave this class and get a credit refund?')) return;
+    if (!window.confirm(tr("groupClassTab.leaveThisClassAndGet"))) return;
     try {
       await api.delete(`/group-classes/${gc._id}/enroll/${studentInfo.id || studentInfo._id}`);
-      flash('You have left the class. Credits refunded.');
+      flash(tr("groupClassTab.youHaveLeftTheClass"));
       load();
     } catch (e) {
-      flash(e.response?.data?.message || 'Failed to unenroll');
+      flash(e.response?.data?.message || tr("groupClassTab.failedToUnenroll"));
     }
   };
 
@@ -154,8 +157,8 @@ export default function GroupClassTab({ isDarkMode, studentInfo }) {
       {/* Tab bar */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
         {[
-          { key: 'browse',   label: '🔍 Browse Open', count: allClasses.length },
-          { key: 'enrolled', label: '📚 My Classes',  count: myClasses.length  },
+          { key: 'browse',   label: tr("groupClassTab.browseOpen"), count: allClasses.length },
+          { key: 'enrolled', label: tr("groupClassTab.myClasses"),  count: myClasses.length  },
         ].map(t => (
           <button key={t.key} onClick={() => setTab(t.key)} style={{
             background: tab === t.key ? 'linear-gradient(135deg,#f97316,#f43f5e)' : (isDarkMode ? '#1a1d2e' : '#ffffff'),
@@ -181,8 +184,8 @@ export default function GroupClassTab({ isDarkMode, studentInfo }) {
       {/* Credits balance */}
       {myCredits !== null && (
         <div style={{ background: isDarkMode ? 'rgba(249,115,22,0.08)' : '#fff7ed', border: `1.5px solid ${isDarkMode ? 'rgba(249,115,22,0.2)' : '#fed7aa'}`, borderRadius: 14, padding: '10px 16px', marginBottom: 16, fontSize: 13, fontWeight: 700, color: col.accent }}>
-          💳 Class credits: <strong>{myCredits}</strong>
-          {myCredits === 0 && <span style={{ marginLeft: 8, color: '#ef4444', fontWeight: 600 }}>— Contact your school to top up</span>}
+          {tr("groupClassTab.classCredits")} <strong>{myCredits}</strong>
+          {myCredits === 0 && <span style={{ marginLeft: 8, color: '#ef4444', fontWeight: 600 }}>{tr("groupClassTab.contactYourSchoolToTop")}</span>}
         </div>
       )}
 
@@ -195,7 +198,7 @@ export default function GroupClassTab({ isDarkMode, studentInfo }) {
         <div style={{ ...card, textAlign: 'center', padding: 60 }}>
           <Users size={40} color={col.muted} style={{ margin: '0 auto 12px' }} />
           <p style={{ color: col.muted, fontWeight: 700 }}>
-            {tab === 'browse' ? 'No open classes available right now' : "You're not enrolled in any group classes yet"}
+            {tab === 'browse' ? tr("groupClassTab.noOpenClassesAvailableRight") : tr("groupClassTab.youReNotEnrolledIn")}
           </p>
         </div>
       ) : (
@@ -214,23 +217,22 @@ export default function GroupClassTab({ isDarkMode, studentInfo }) {
                     <Badge status={gc.status} />
                     <LevelBadge level={gc.level} />
                     {gc.enrollmentMode === 'invite-only' && (
-                      <span style={{ fontSize: 11, background: '#6366f118', color: '#6366f1', borderRadius: 999, padding: '2px 8px', fontWeight: 700 }}>🔒 Invite-Only</span>
+                      <span style={{ fontSize: 11, background: '#6366f118', color: '#6366f1', borderRadius: 999, padding: '2px 8px', fontWeight: 700 }}>{tr("groupClassTab.inviteOnly")}</span>
                     )}
                   </div>
 
                   <div style={{ fontSize: 13, color: col.muted, display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 6 }}>
-                    <span>👨‍🏫 {gc.teacherId?.firstName ? `${gc.teacherId.firstName} ${gc.teacherId.lastName}` : 'Teacher'}</span>
+                    <span>👨‍🏫 {gc.teacherId?.firstName ? `${gc.teacherId.firstName} ${gc.teacherId.lastName}` : tr("groupClassTab.teacher2")}</span>
                     <GCTime scheduledTime={gc.scheduledTime} teacherTimezone={gc.teacherTimezone} />
-                    <span>⏱ {gc.duration}min</span>
-                    <span>💳 {gc.pricePerSeat} credit{gc.pricePerSeat !== 1 ? 's' : ''}</span>
-                    {tab === 'browse' && <span style={{ color: seatsLeft <= 2 ? '#f59e0b' : col.muted }}>🪑 {seatsLeft} seat{seatsLeft !== 1 ? 's' : ''} left</span>}
+                    <span>{tr("groupClassTab.min", { duration: gc.duration })}</span>
+                    <span>{tr("groupClassTab.credit", { pricePerSeat: gc.pricePerSeat, value: gc.pricePerSeat !== 1 ? 's' : '' })}</span>
+                    {tab === 'browse' && <span style={{ color: seatsLeft <= 2 ? '#f59e0b' : col.muted }}>{tr("groupClassTab.seatLeft", { seatsLeft, value: seatsLeft !== 1 ? 's' : '' })}</span>}
                   </div>
 
                   {gc.description && <p style={{ fontSize: 13, color: col.body, margin: 0 }}>{gc.description}</p>}
 
                   {myEnrollment && (
-                    <div style={{ marginTop: 8, fontSize: 12, color: STATUS_COLOR[myEnrollment.attendance] || col.muted, fontWeight: 700 }}>
-                      Attendance: {myEnrollment.attendance}
+                    <div style={{ marginTop: 8, fontSize: 12, color: STATUS_COLOR[myEnrollment.attendance] || col.muted, fontWeight: 700 }}>{tr("groupClassTab.attendance", { attendance: myEnrollment.attendance })}
                     </div>
                   )}
                 </div>
@@ -238,7 +240,7 @@ export default function GroupClassTab({ isDarkMode, studentInfo }) {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-end' }}>
                   {canJoin && (
                     <button onClick={() => handleJoin(gc)} style={{ ...btn('linear-gradient(135deg,#10b981,#34d399)'), display: 'flex', alignItems: 'center', gap: 5 }}>
-                      <Video size={13} /> Join Class
+                      <Video size={13} /> {tr("groupClassTab.joinClass")}
                     </button>
                   )}
                   {tab === 'browse' && gc.status === 'open' && (
@@ -247,12 +249,12 @@ export default function GroupClassTab({ isDarkMode, studentInfo }) {
                       disabled={enrolling[gc._id] || (myCredits ?? 0) < gc.pricePerSeat}
                       style={btn('linear-gradient(135deg,#f97316,#f43f5e)', '#fff', enrolling[gc._id] || (myCredits ?? 0) < gc.pricePerSeat)}>
                       <LogIn size={13} style={{ display: 'inline', marginRight: 4 }} />
-                      {enrolling[gc._id] ? 'Enrolling…' : (myCredits ?? 0) < gc.pricePerSeat ? 'Not enough credits' : 'Enroll'}
+                      {enrolling[gc._id] ? tr("groupClassTab.enrolling") : (myCredits ?? 0) < gc.pricePerSeat ? tr("groupClassTab.notEnoughCredits") : tr("groupClassTab.enroll")}
                     </button>
                   )}
                   {tab === 'enrolled' && !['completed','cancelled'].includes(gc.status) && (
                     <button onClick={() => handleUnenroll(gc)} style={btn('#fef2f2', '#dc2626')}>
-                      Leave Class
+                      {tr("groupClassTab.leaveClass")}
                     </button>
                   )}
                 </div>

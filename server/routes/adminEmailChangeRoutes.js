@@ -6,6 +6,7 @@ import express from 'express';
 import bcrypt from '../utils/passwordHash.js';
 import crypto from 'crypto';
 import Center from '../models/master/Center.js';
+import { isEmailTakenError } from '../utils/centerEmail.js';
 import { tenantMiddleware } from '../middleware/tenantMiddleware.js';
 import { verifyToken, verifyAdmin } from '../middleware/authMiddleware.js';
 import { strictLimiter } from '../middleware/rateLimiter.js';
@@ -144,7 +145,15 @@ router.post('/verify', async (req, res) => {
       cancelToken,                // kept — raw cancel link already in the old-email alert
       cancelExpiresAt,
     };
-    await center.save();
+    try {
+      await center.save();
+    } catch (err) {
+      // Taken by another center since the change was requested (unique index)
+      if (isEmailTakenError(err)) {
+        return res.status(409).json({ success: false, message: 'This email address is now in use by another center. Please request the change again with a different email.' });
+      }
+      throw err;
+    }
 
     // Update Admin doc in the center's tenant DB + clear all sessions
     const db    = await getDb(center.slug);

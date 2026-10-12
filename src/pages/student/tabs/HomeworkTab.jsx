@@ -10,6 +10,13 @@ import { useGrammarCheck } from "../../../hooks/useGrammarCheck";
 import ListenButton from "../../../components/ListenButton";
 import StreakToast from "../components/StreakToast";
 import Pagination from "../../../components/Pagination";
+import { useTranslation } from "react-i18next";
+import i18n from "../../../i18n/i18n.js";
+import { dateLocale } from "../../../i18n/dateLocale.js";
+
+// For text in file-level lists: read when rendered, so it follows the chosen language
+const ta = (key, opts) => i18n.t(`student:${key}`, opts);
+
 
 const ALLOWED_TYPES = [
   "application/pdf",
@@ -23,9 +30,9 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 const MAX_FILES     = 5;
 
 const STATUS_CONFIG = {
-  assigned:  { label: "To Do",     emoji: "📝", color: "#f97316", bg: "#fff7ed" },
-  submitted: { label: "Submitted", emoji: "📤", color: "#d97706", bg: "#fef3c7" },
-  graded:    { label: "Graded",    emoji: "🌟", color: "#059669", bg: "#ecfdf5" },
+  assigned:  { get label() { return ta("homeworkTab.statusConfigToDo"); },     emoji: "📝", color: "#f97316", bg: "#fff7ed" },
+  submitted: { get label() { return ta("homeworkTab.statusConfigSubmitted"); }, emoji: "📤", color: "#d97706", bg: "#fef3c7" },
+  graded:    { get label() { return ta("homeworkTab.statusConfigGraded"); },    emoji: "🌟", color: "#059669", bg: "#ecfdf5" },
 };
 
 function FileIcon({ mimeType, size = 16 }) {
@@ -49,7 +56,7 @@ function StatusBadge({ status }) {
 
 function formatDate(d) {
   if (!d) return "—";
-  return new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+  return new Date(d).toLocaleDateString(dateLocale("en-GB"), { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
 }
 
 function daysUntil(d) {
@@ -96,17 +103,18 @@ function ScoreRing({ score }) {
 
 // ── File picker ───────────────────────────────────────────────────────────────
 function FilePicker({ files, setFiles, accent }) {
+  const { t: tr } = useTranslation("student");
   const inputRef = useRef(null);
 
   const addFiles = (newFiles) => {
     const valid = [];
     for (const f of newFiles) {
       if (!ALLOWED_TYPES.includes(f.type)) {
-        alert(`"${f.name}" is not allowed.\nAllowed: PDF, DOC, DOCX, JPG, PNG, TXT`);
+        alert(tr("homeworkTab.isNotAllowedAllowedPdf", { name: f.name }));
         continue;
       }
       if (f.size > MAX_FILE_SIZE) {
-        alert(`"${f.name}" exceeds the 10 MB limit.`);
+        alert(tr("homeworkTab.exceedsThe10MbLimit", { name: f.name }));
         continue;
       }
       valid.push(f);
@@ -114,7 +122,7 @@ function FilePicker({ files, setFiles, accent }) {
     setFiles(prev => {
       const combined = [...prev, ...valid];
       if (combined.length > MAX_FILES) {
-        alert(`Maximum ${MAX_FILES} files allowed.`);
+        alert(tr("homeworkTab.maximumFilesAllowed", { MAXFILES: MAX_FILES }));
         return combined.slice(0, MAX_FILES);
       }
       return combined;
@@ -130,9 +138,9 @@ function FilePicker({ files, setFiles, accent }) {
             padding: "7px 14px", borderRadius: 10, border: `2px dashed ${accent}`,
             background: "#fdf4ff", color: accent, fontSize: 13, fontWeight: 700, cursor: "pointer",
           }}>
-          <Paperclip size={14} /> Attach files
+          <Paperclip size={14} /> {tr("homeworkTab.attachFiles")}
         </button>
-        <span style={{ fontSize: 11, color: "#9b8ab0" }}>PDF, DOC, DOCX, JPG, PNG, TXT · max 10 MB · up to {MAX_FILES}</span>
+        <span style={{ fontSize: 11, color: "#9b8ab0" }}>{tr("homeworkTab.pdfDocDocxJpgPng", { MAXFILES: MAX_FILES })}</span>
       </div>
       <input ref={inputRef} type="file" multiple accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.txt"
         style={{ display: "none" }}
@@ -162,6 +170,7 @@ function FilePicker({ files, setFiles, accent }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 export default function StudentHomeworkTab({ studentInfo, isDarkMode }) {
+  const { t: tr } = useTranslation("student");
   const col = isDarkMode
     ? { bg: "#0f1117", card: "#1a1d2e", cardAlt: "#1f2235", border: "#2a2d40", heading: "#f0f4ff", body: "#c8cce0", muted: "#6b7090", input: "#0f1117", inputBorder: "#475569" }
     : { bg: "#fff8f0", card: "#ffffff", cardAlt: "#fffbf5", border: "#ffe8cc", heading: "#3d2e20", body: "#5a4a3a", muted: "#a89480", input: "#fff", inputBorder: "#fed7aa" };
@@ -211,7 +220,7 @@ export default function StudentHomeworkTab({ studentInfo, isDarkMode }) {
         if (data.counts) setCounts(data.counts);
         if (data.pagination) { setPager(data.pagination); if (data.pagination.page !== page) setPage(data.pagination.page); }
       } catch {
-        if (!stale) showToast("Failed to load homework", "error");
+        if (!stale) showToast(tr("homeworkTab.failedToLoadHomework"), "error");
       } finally {
         if (!stale) setLoading(false);
       }
@@ -235,7 +244,7 @@ export default function StudentHomeworkTab({ studentInfo, isDarkMode }) {
   const handleSubmit = async (hwId) => {
     const sf = getSubForm(hwId);
     if (!sf.text.trim() && sf.files.length === 0) {
-      showToast("Please write something or attach a file", "error");
+      showToast(tr("homeworkTab.pleaseWriteSomethingOrAttach"), "error");
       return;
     }
     try {
@@ -244,7 +253,7 @@ export default function StudentHomeworkTab({ studentInfo, isDarkMode }) {
       fd.append("text", sf.text.trim());
       sf.files.forEach(f => fd.append("files", f));
       const { data: submitData } = await api.post(`/homework/${hwId}/submit`, fd, { headers: { "Content-Type": "multipart/form-data" } });
-      showToast("Homework submitted! Great job! 🎉");
+      showToast(tr("homeworkTab.homeworkSubmittedGreatJob"));
       if (submitData?.streak?.incremented) setStreakToast(submitData.streak);
       setSubForms(prev => {
         const next = { ...prev };
@@ -254,7 +263,7 @@ export default function StudentHomeworkTab({ studentInfo, isDarkMode }) {
       setExpandedId(null);
       fetchHomework();
     } catch (err) {
-      showToast(err?.response?.data?.message || "Failed to submit", "error");
+      showToast(err?.response?.data?.message || tr("homeworkTab.failedToSubmit"), "error");
     } finally {
       setSubmitting(false);
     }
@@ -266,15 +275,15 @@ export default function StudentHomeworkTab({ studentInfo, isDarkMode }) {
         const url = URL.createObjectURL(data);
         window.open(url, "_blank");
       })
-      .catch(() => showToast("Could not open file", "error"));
+      .catch(() => showToast(tr("homeworkTab.couldNotOpenFile"), "error"));
   };
 
   // ── Stats row items ──────────────────────────────────────────────────────────
   const statsItems = [
-    { key: "all",       label: "All Tasks",  emoji: "📚", color: "#f97316", bg: "#fff7ed" },
-    { key: "assigned",  label: "To Do",      emoji: "📝", color: "#c2410c", bg: "#ffedd5" },
-    { key: "submitted", label: "Submitted",  emoji: "📤", color: "#a16207", bg: "#fef3c7" },
-    { key: "graded",    label: "Graded",     emoji: "🌟", color: "#059669", bg: "#ecfdf5" },
+    { key: "all",       label: tr("homeworkTab.allTasks"),  emoji: "📚", color: "#f97316", bg: "#fff7ed" },
+    { key: "assigned",  label: tr("homeworkTab.toDo"),      emoji: "📝", color: "#c2410c", bg: "#ffedd5" },
+    { key: "submitted", label: tr("homeworkTab.submitted"),  emoji: "📤", color: "#a16207", bg: "#fef3c7" },
+    { key: "graded",    label: tr("homeworkTab.graded"),     emoji: "🌟", color: "#059669", bg: "#ecfdf5" },
   ];
 
   // ── Render ───────────────────────────────────────────────────────────────────
@@ -299,16 +308,16 @@ export default function StudentHomeworkTab({ studentInfo, isDarkMode }) {
       {/* Header */}
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
         <div>
-          <div style={{ fontSize: 11.5, fontWeight: 800, color: accent, textTransform: "uppercase", letterSpacing: "0.1em" }}>Learning</div>
-          <h1 style={{ margin: "2px 0 0", fontSize: 28, fontWeight: 900, color: col.heading, letterSpacing: "-0.4px" }}>Homework</h1>
+          <div style={{ fontSize: 11.5, fontWeight: 800, color: accent, textTransform: "uppercase", letterSpacing: "0.1em" }}>{tr("homeworkTab.learning")}</div>
+          <h1 style={{ margin: "2px 0 0", fontSize: 28, fontWeight: 900, color: col.heading, letterSpacing: "-0.4px" }}>{tr("homeworkTab.homework")}</h1>
           <p style={{ margin: "4px 0 0", fontSize: 14, color: col.muted, fontWeight: 600 }}>
-            {counts.assigned > 0 ? `${counts.assigned} assignment${counts.assigned !== 1 ? "s" : ""} due soon · keep that streak going` : "All caught up — no pending assignments!"}
+            {counts.assigned > 0 ? tr("homeworkTab.assignmentDueSoonKeepThat", { assigned: counts.assigned, value: counts.assigned !== 1 ? "s" : "" }) : tr("homeworkTab.allCaughtUpNoPending")}
           </p>
         </div>
         <div style={{ display: "flex", gap: 10 }}>
           <button onClick={fetchHomework}
             style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "10px 14px", borderRadius: 12, border: `2px solid ${col.border}`, background: col.card, color: col.body, cursor: "pointer", fontSize: 13, fontWeight: 800, fontFamily: "inherit" }}>
-            <RefreshCw size={14} /> Refresh
+            <RefreshCw size={14} /> {tr("homeworkTab.refresh")}
           </button>
         </div>
       </div>
@@ -355,7 +364,7 @@ export default function StudentHomeworkTab({ studentInfo, isDarkMode }) {
       {loading ? (
         <div style={{ textAlign: "center", padding: 60, color: col.muted }}>
           <div style={{ fontSize: 40, marginBottom: 12 }}>⏳</div>
-          <p style={{ fontWeight: 700 }}>Loading your homework…</p>
+          <p style={{ fontWeight: 700 }}>{tr("homeworkTab.loadingYourHomework")}</p>
         </div>
       ) : filtered.length === 0 ? (
         <div style={{
@@ -367,13 +376,13 @@ export default function StudentHomeworkTab({ studentInfo, isDarkMode }) {
             {filter === "graded" ? "🏆" : filter === "submitted" ? "📤" : "🎉"}
           </div>
           <p style={{ fontWeight: 700, fontSize: 16, color: col.heading, margin: "0 0 4px" }}>
-            {filter === "all"       ? "No homework yet!" :
-             filter === "assigned"  ? "All caught up! No pending tasks." :
-             filter === "submitted" ? "Nothing waiting to be graded." :
-                                      "No graded homework yet."}
+            {filter === "all"       ? tr("homeworkTab.noHomeworkYet") :
+             filter === "assigned"  ? tr("homeworkTab.allCaughtUpNoPending2") :
+             filter === "submitted" ? tr("homeworkTab.nothingWaitingToBeGraded") :
+                                      tr("homeworkTab.noGradedHomeworkYet")}
           </p>
           <p style={{ fontSize: 13, color: col.muted, margin: 0 }}>
-            {filter === "all" ? "Your teacher hasn't assigned anything yet. Enjoy the free time!" : ""}
+            {filter === "all" ? tr("homeworkTab.yourTeacherHasnTAssigned") : ""}
           </p>
         </div>
       ) : (
@@ -423,7 +432,7 @@ export default function StudentHomeworkTab({ studentInfo, isDarkMode }) {
                       <div style={{ fontSize: 12, color: col.muted, marginTop: 3, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                         <span>👩‍🏫 {teacher?.firstName} {teacher?.lastName}</span>
                         <span>·</span>
-                        <span>Due {formatDate(hw.dueDate)}</span>
+                        <span>{tr("homeworkTab.due", { formatDate: formatDate(hw.dueDate) })}</span>
                         <DuePill dueDate={hw.dueDate} status={hw.status} />
                       </div>
                     </div>
@@ -449,7 +458,7 @@ export default function StudentHomeworkTab({ studentInfo, isDarkMode }) {
                       <div style={{ background: isDarkMode ? "#1f2235" : "#fff7ed", borderRadius: 12, padding: 14, border: `1.5px solid ${isDarkMode ? "#2a2d40" : "#fed7aa"}` }}>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
                           <div style={{ fontSize: 11, fontWeight: 800, color: accent, textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                            Instructions
+                            {tr("homeworkTab.instructions")}
                           </div>
                           {hw.description && <ListenButton text={hw.description} />}
                         </div>
@@ -468,7 +477,7 @@ export default function StudentHomeworkTab({ studentInfo, isDarkMode }) {
                     {hw.attachments?.length > 0 && (
                       <div>
                         <div style={{ fontSize: 11, fontWeight: 800, color: col.muted, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                          📎 Reference Files from Teacher
+                          {tr("homeworkTab.referenceFilesFromTeacher")}
                         </div>
                         <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                           {hw.attachments.map(a => (
@@ -490,8 +499,7 @@ export default function StudentHomeworkTab({ studentInfo, isDarkMode }) {
                     {/* Submitted work (read-only) */}
                     {(hw.status === "submitted" || hw.status === "graded") && hw.submission && (
                       <div style={{ background: isDarkMode ? "#1f2235" : "#fffbeb", borderRadius: 12, padding: 14, border: `1.5px solid ${isDarkMode ? "#2a2d40" : "#fde68a"}` }}>
-                        <div style={{ fontSize: 11, fontWeight: 800, color: "#92400e", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                          📤 Your Submission · {formatDate(hw.submission.submittedAt)}
+                        <div style={{ fontSize: 11, fontWeight: 800, color: "#92400e", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.06em" }}>{tr("homeworkTab.yourSubmission", { formatDate: formatDate(hw.submission.submittedAt) })}
                         </div>
                         {hw.submission.text && (
                           <p style={{ margin: "0 0 10px", fontSize: 14, color: col.heading, whiteSpace: "pre-wrap", lineHeight: 1.6 }}>
@@ -526,9 +534,7 @@ export default function StudentHomeworkTab({ studentInfo, isDarkMode }) {
                       }}>
                         <ScoreRing score={hw.grade.score} />
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontWeight: 900, fontSize: 16, color: "#065f46", marginBottom: 4 }}>
-                            🎊 Great job! You scored {hw.grade.score}/100
-                          </div>
+                          <div style={{ fontWeight: 900, fontSize: 16, color: "#065f46", marginBottom: 4 }}>{tr("homeworkTab.greatJobYouScored100", { score: hw.grade.score })}</div>
                           {hw.grade.feedback && (
                             <p style={{ margin: 0, fontSize: 14, color: "#166534", lineHeight: 1.5 }}>
                               💬 {hw.grade.feedback}
@@ -537,8 +543,7 @@ export default function StudentHomeworkTab({ studentInfo, isDarkMode }) {
                           {hw.grade.audioFeedback?.fileId && (
                             <StudentAudioPlayer fileId={hw.grade.audioFeedback.fileId} duration={hw.grade.audioFeedback.duration} />
                           )}
-                          <p style={{ margin: "6px 0 0", fontSize: 11, color: "#4ade80" }}>
-                            Graded on {formatDate(hw.grade.gradedAt)}
+                          <p style={{ margin: "6px 0 0", fontSize: 11, color: "#4ade80" }}>{tr("homeworkTab.gradedOn", { formatDate: formatDate(hw.grade.gradedAt) })}
                           </p>
                         </div>
                         <div style={{ fontSize: 48 }}>
@@ -555,7 +560,7 @@ export default function StudentHomeworkTab({ studentInfo, isDarkMode }) {
                         border: `2px solid ${col.border}`,
                       }}>
                         <div style={{ fontSize: 12, fontWeight: 800, color: accent, marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                          ✏️ Submit Your Work
+                          {tr("homeworkTab.submitYourWork")}
                         </div>
 
                         {/* Grammar status badge */}
@@ -576,12 +581,12 @@ export default function StudentHomeworkTab({ studentInfo, isDarkMode }) {
                               : grammarStatus === "error" ? "#991b1b"
                               : "#374151",
                           }}>
-                            {grammarStatus === "loading"  && "⏳ Loading grammar model (first time only)…"}
-                            {grammarStatus === "checking" && "🔍 Checking grammar…"}
-                            {grammarStatus === "ready"    && "✅ Grammar checker ready"}
-                            {grammarStatus === "done" && grammarSuggestions.length === 0 && "✅ Grammar looks great!"}
-                            {grammarStatus === "done" && grammarSuggestions.length > 0  && `⚠️ ${grammarSuggestions.length} suggestion${grammarSuggestions.length > 1 ? "s" : ""} found`}
-                            {grammarStatus === "error"    && "⚠️ Grammar check unavailable"}
+                            {grammarStatus === "loading"  && tr("homeworkTab.loadingGrammarModelFirstTime")}
+                            {grammarStatus === "checking" && tr("homeworkTab.checkingGrammar")}
+                            {grammarStatus === "ready"    && tr("homeworkTab.grammarCheckerReady")}
+                            {grammarStatus === "done" && grammarSuggestions.length === 0 && tr("homeworkTab.grammarLooksGreat")}
+                            {grammarStatus === "done" && grammarSuggestions.length > 0  && tr("homeworkTab.suggestionFound", { grammarSuggestionsCount: grammarSuggestions.length, value: grammarSuggestions.length > 1 ? "s" : "" })}
+                            {grammarStatus === "error"    && tr("homeworkTab.grammarCheckUnavailable")}
                           </div>
                         )}
 
@@ -594,7 +599,7 @@ export default function StudentHomeworkTab({ studentInfo, isDarkMode }) {
                             if (grammarHwId !== hw._id) setGrammarHwId(hw._id);
                             grammarCheck(val);
                           }}
-                          placeholder="Write your answer here... 📖"
+                          placeholder={tr("homeworkTab.writeYourAnswerHere")}
                           maxLength={5000}
                           rows={5}
                           style={{
@@ -613,7 +618,7 @@ export default function StudentHomeworkTab({ studentInfo, isDarkMode }) {
                             borderRadius: 12, padding: "12px 14px", marginBottom: 12,
                           }}>
                             <div style={{ fontSize: 12, fontWeight: 800, color: "#b45309", marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                              ✏️ Grammar Suggestions
+                              {tr("homeworkTab.grammarSuggestions")}
                             </div>
                             {grammarSuggestions.map((s, i) => (
                               <div key={i} style={{ marginBottom: i < grammarSuggestions.length - 1 ? 10 : 0 }}>
@@ -628,7 +633,7 @@ export default function StudentHomeworkTab({ studentInfo, isDarkMode }) {
                                       {w.word}
                                     </span>
                                   ))}{" "}
-                                  <span style={{ fontSize: 11, color: col.muted }}>← original</span>
+                                  <span style={{ fontSize: 11, color: col.muted }}>{tr("homeworkTab.original")}</span>
                                 </div>
                                 {/* Corrected version in green */}
                                 <div style={{ fontSize: 13, color: "#16a34a", lineHeight: 1.5 }}>
@@ -659,7 +664,7 @@ export default function StudentHomeworkTab({ studentInfo, isDarkMode }) {
                               boxShadow: "0 6px 16px rgba(249,115,22,0.4)",
                               fontFamily: "'Nunito', sans-serif",
                             }}>
-                            <Send size={15} /> {submitting ? "Submitting…" : "Submit Homework 🚀"}
+                            <Send size={15} /> {submitting ? tr("homeworkTab.submitting") : tr("homeworkTab.submitHomework")}
                           </button>
                         </div>
                       </div>
@@ -683,6 +688,7 @@ export default function StudentHomeworkTab({ studentInfo, isDarkMode }) {
 
 // ── Instruction audio player ───────────────────────────────────────────────────
 function InstructionAudioPlayer({ fileId, duration }) {
+  const { t: tr } = useTranslation("student");
   const [blobUrl, setBlobUrl] = useState(null);
   const [loading, setLoading] = useState(false);
   const [playing, setPlaying] = useState(false);
@@ -714,11 +720,11 @@ function InstructionAudioPlayer({ fileId, duration }) {
     <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", background: "linear-gradient(135deg,rgba(249,115,22,0.08),rgba(251,146,60,0.05))", borderRadius: 10, border: "1px solid #fed7aa", marginTop: 10 }}>
       {blobUrl && <audio ref={audioRef} src={blobUrl} onEnded={() => setPlaying(false)} style={{ display: "none" }} />}
       <Mic size={14} color="#f97316" />
-      <span style={{ fontSize: 12, fontWeight: 800, color: "#c2410c", flex: 1 }}>Teacher's Voice Instructions</span>
+      <span style={{ fontSize: 12, fontWeight: 800, color: "#c2410c", flex: 1 }}>{tr("homeworkTab.teacherSVoiceInstructions")}</span>
       {duration > 0 && <span style={{ fontSize: 11, color: "#f97316", fontWeight: 700 }}>{formatTime(duration)}</span>}
       <button onClick={load} disabled={loading}
         style={{ padding: "6px 14px", borderRadius: 8, border: "none", background: "#f97316", color: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 800, fontFamily: "inherit" }}>
-        {loading ? "Loading…" : playing ? "⏸ Pause" : "▶ Listen"}
+        {loading ? tr("homeworkTab.loading") : playing ? tr("homeworkTab.pause") : tr("homeworkTab.listen")}
       </button>
     </div>
   );
@@ -726,6 +732,7 @@ function InstructionAudioPlayer({ fileId, duration }) {
 
 // ── Student audio feedback player ─────────────────────────────────────────────
 function StudentAudioPlayer({ fileId, duration }) {
+  const { t: tr } = useTranslation("student");
   const [blobUrl, setBlobUrl] = useState(null);
   const [loading, setLoading] = useState(false);
   const [playing, setPlaying] = useState(false);
@@ -757,11 +764,11 @@ function StudentAudioPlayer({ fileId, duration }) {
     <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", background: "linear-gradient(135deg,rgba(22,163,74,0.12),rgba(16,185,129,0.08))", borderRadius: 10, border: "1px solid #86efac", marginTop: 8 }}>
       {blobUrl && <audio ref={audioRef} src={blobUrl} onEnded={() => setPlaying(false)} style={{ display: "none" }} />}
       <Mic size={14} color="#16a34a" />
-      <span style={{ fontSize: 12, fontWeight: 800, color: "#065f46", flex: 1 }}>Teacher's Voice Feedback</span>
+      <span style={{ fontSize: 12, fontWeight: 800, color: "#065f46", flex: 1 }}>{tr("homeworkTab.teacherSVoiceFeedback")}</span>
       {duration > 0 && <span style={{ fontSize: 11, color: "#4ade80", fontWeight: 700 }}>{formatTime(duration)}</span>}
       <button onClick={load} disabled={loading}
         style={{ padding: "6px 14px", borderRadius: 8, border: "none", background: "#16a34a", color: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 800, fontFamily: "inherit" }}>
-        {loading ? "Loading…" : playing ? "⏸ Pause" : "▶ Listen"}
+        {loading ? tr("homeworkTab.loading") : playing ? tr("homeworkTab.pause") : tr("homeworkTab.listen")}
       </button>
     </div>
   );

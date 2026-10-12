@@ -3,10 +3,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Users, Plus, Trash2, RefreshCw, Loader2, Mail, Search, Edit2 } from 'lucide-react';
 import api from '../../../api';
+import { useTranslation } from "react-i18next";
 
 const F = "'Nunito','Inter',sans-serif";
 
 export default function ParentsTab({ isDarkMode }) {
+  const { t: tr } = useTranslation("admin");
   const col = {
     card:    isDarkMode ? '#1a1d2e' : '#ffffff',
     border:  isDarkMode ? '#2a2d40' : '#ffe8cc',
@@ -44,11 +46,11 @@ export default function ParentsTab({ isDarkMode }) {
       setParents(pRes.data.parents || []);
       setStudents(sRes.data?.students || sRes.data || []);
     } catch {
-      flash('Failed to load data', true);
+      flash(tr("parentsTab.failedToLoadData"), true);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [tr]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -66,34 +68,34 @@ export default function ParentsTab({ isDarkMode }) {
 
   const handleSave = async () => {
     if (!form.firstName.trim() || !form.lastName.trim() || !form.email.trim()) {
-      return flash('First name, last name, and email are required', true);
+      return flash(tr("parentsTab.firstNameLastNameAnd"), true);
     }
     setSaving(true);
     try {
       if (editParent) {
         await api.patch(`/parents/${editParent._id}`, form);
-        flash('Parent updated');
+        flash(tr("parentsTab.parentUpdated"));
       } else {
         await api.post('/parents', form);
-        flash('Parent created and invite sent');
+        flash(tr("parentsTab.parentCreatedAndInviteSent"));
       }
       setShowModal(false);
       load();
     } catch (e) {
-      flash(e.response?.data?.message || 'Failed to save', true);
+      flash(e.response?.data?.message || tr("parentsTab.failedToSave"), true);
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = async (p) => {
-    if (!window.confirm(`Deactivate ${p.firstName} ${p.lastName}'s account?`)) return;
+    if (!window.confirm(tr("parentsTab.deactivateSAccount", { firstName: p.firstName, lastName: p.lastName }))) return;
     try {
       await api.delete(`/parents/${p._id}`);
-      flash('Parent deactivated');
+      flash(tr("parentsTab.parentDeactivated"));
       load();
     } catch (e) {
-      flash(e.response?.data?.message || 'Failed to deactivate', true);
+      flash(e.response?.data?.message || tr("parentsTab.failedToDeactivate"), true);
     }
   };
 
@@ -101,9 +103,9 @@ export default function ParentsTab({ isDarkMode }) {
     setResending(p._id);
     try {
       await api.post(`/parents/${p._id}/resend-invite`);
-      flash('Invite resent');
+      flash(tr("parentsTab.inviteResent"));
     } catch (e) {
-      flash(e.response?.data?.message || 'Failed to resend invite', true);
+      flash(e.response?.data?.message || tr("parentsTab.failedToResendInvite"), true);
     } finally {
       setResending(null);
     }
@@ -134,17 +136,17 @@ export default function ParentsTab({ isDarkMode }) {
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
         <div style={{ flex: 1 }}>
-          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 900, color: col.heading }}>Parents</h2>
-          <p style={{ margin: '2px 0 0', fontSize: 13, color: col.muted }}>{parents.length} parent account{parents.length !== 1 ? 's' : ''}</p>
+          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 900, color: col.heading }}>{tr("parentsTab.parents")}</h2>
+          <p style={{ margin: '2px 0 0', fontSize: 13, color: col.muted }}>{tr("parentsTab.parentAccount", { parentsCount: parents.length, value: parents.length !== 1 ? 's' : '' })}</p>
         </div>
         <div style={{ position: 'relative' }}>
           <Search size={14} color={col.muted} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)' }} />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search parents…"
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder={tr("parentsTab.searchParents")}
             style={{ ...inp, paddingLeft: 30, width: 210 }} />
         </div>
         <button onClick={load} style={{ ...btn(isDarkMode ? '#2a2d40' : '#f5f0ec', col.body), padding: '8px 10px' }}><RefreshCw size={14} /></button>
         <button onClick={openCreate} style={btn('linear-gradient(135deg,#f97316,#f43f5e)')}>
-          <Plus size={14} /> Add Parent
+          <Plus size={14} /> {tr("parentsTab.addParent")}
         </button>
       </div>
 
@@ -161,14 +163,14 @@ export default function ParentsTab({ isDarkMode }) {
       ) : filtered.length === 0 ? (
         <div style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: 20, padding: 60, textAlign: 'center' }}>
           <Users size={40} color={col.muted} style={{ margin: '0 auto 12px' }} />
-          <p style={{ color: col.muted, fontWeight: 700 }}>{search ? 'No matching parents' : 'No parent accounts yet'}</p>
-          {!search && <p style={{ color: col.muted, fontSize: 13 }}>Add a parent to give them read-only access to their child's progress.</p>}
+          <p style={{ color: col.muted, fontWeight: 700 }}>{search ? tr("parentsTab.noMatchingParents") : tr("parentsTab.noParentAccountsYet")}</p>
+          {!search && <p style={{ color: col.muted, fontSize: 13 }}>{tr("parentsTab.addAParentToGive")}</p>}
         </div>
       ) : (
         <div style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: 20, overflow: 'hidden' }}>
           {/* Table header */}
           <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1.5fr 1fr 80px 110px', gap: 12, padding: '10px 18px', background: isDarkMode ? 'rgba(255,255,255,0.03)' : '#fff8f0', borderBottom: `1.5px solid ${col.border}`, fontSize: 11, fontWeight: 800, color: col.muted, textTransform: 'uppercase', letterSpacing: '.06em' }}>
-            <span>Parent</span><span>Email</span><span>Children</span><span>Status</span><span>Actions</span>
+            <span>{tr("parentsTab.parent")}</span><span>{tr("parentsTab.email")}</span><span>{tr("parentsTab.children")}</span><span>{tr("parentsTab.status")}</span><span>{tr("parentsTab.actions")}</span>
           </div>
           {filtered.map(p => (
             <div key={p._id} style={{ display: 'grid', gridTemplateColumns: '1.5fr 1.5fr 1fr 80px 110px', gap: 12, padding: '13px 18px', borderBottom: `1px solid ${col.border}`, alignItems: 'center' }}>
@@ -176,7 +178,7 @@ export default function ParentsTab({ isDarkMode }) {
               <span style={{ fontSize: 13, color: col.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.email}</span>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                 {(p.children || []).length === 0
-                  ? <span style={{ fontSize: 11, color: col.muted }}>None</span>
+                  ? <span style={{ fontSize: 11, color: col.muted }}>{tr("parentsTab.none")}</span>
                   : (p.children || []).map(c => (
                     <span key={c._id || c} style={{ fontSize: 11, fontWeight: 700, background: isDarkMode ? 'rgba(249,115,22,0.12)' : '#fff7ed', color: col.accent, borderRadius: 999, padding: '2px 8px' }}>
                       {c.firstName || '?'}
@@ -187,18 +189,18 @@ export default function ParentsTab({ isDarkMode }) {
                 {p.status}
               </span>
               <div style={{ display: 'flex', gap: 4 }}>
-                <button onClick={() => openEdit(p)} title="Edit" style={{ background: 'none', border: `1px solid ${col.border}`, borderRadius: 8, padding: '5px 7px', cursor: 'pointer' }}>
+                <button onClick={() => openEdit(p)} title={tr("parentsTab.edit")} style={{ background: 'none', border: `1px solid ${col.border}`, borderRadius: 8, padding: '5px 7px', cursor: 'pointer' }}>
                   <Edit2 size={13} color={col.accent} />
                 </button>
                 {p.status === 'pending' && (
-                  <button onClick={() => handleResend(p)} disabled={resending === p._id} title="Resend invite"
+                  <button onClick={() => handleResend(p)} disabled={resending === p._id} title={tr("parentsTab.resendInvite")}
                     style={{ background: 'none', border: `1px solid ${col.border}`, borderRadius: 8, padding: '5px 7px', cursor: 'pointer' }}>
                     {resending === p._id
                       ? <Loader2 size={13} color={col.muted} style={{ animation: 'spin .7s linear infinite' }} />
                       : <Mail size={13} color={col.accent} />}
                   </button>
                 )}
-                <button onClick={() => handleDelete(p)} title="Deactivate"
+                <button onClick={() => handleDelete(p)} title={tr("parentsTab.deactivate")}
                   style={{ background: 'none', border: '1px solid #fecaca', borderRadius: 8, padding: '5px 7px', cursor: 'pointer' }}>
                   <Trash2 size={13} color="#ef4444" />
                 </button>
@@ -214,7 +216,7 @@ export default function ParentsTab({ isDarkMode }) {
           <div style={{ background: col.card, borderRadius: 24, padding: 28, width: '100%', maxWidth: 520, fontFamily: F, maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ display: 'flex', alignItems: 'center', marginBottom: 20 }}>
               <h3 style={{ margin: 0, fontSize: 18, fontWeight: 900, color: col.heading, flex: 1 }}>
-                {editParent ? 'Edit Parent' : 'Add Parent'}
+                {editParent ? tr("parentsTab.editParent") : tr("parentsTab.addParent")}
               </h3>
               <button onClick={() => setShowModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 20 }}>✕</button>
             </div>
@@ -222,32 +224,30 @@ export default function ParentsTab({ isDarkMode }) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div>
-                  <label style={{ fontSize: 12, fontWeight: 800, color: col.muted, textTransform: 'uppercase', letterSpacing: '.06em' }}>First Name *</label>
-                  <input value={form.firstName} onChange={e => setForm(p => ({ ...p, firstName: e.target.value }))} style={{ ...inp, marginTop: 4 }} placeholder="Nguyen" />
+                  <label style={{ fontSize: 12, fontWeight: 800, color: col.muted, textTransform: 'uppercase', letterSpacing: '.06em' }}>{tr("parentsTab.firstName")}</label>
+                  <input value={form.firstName} onChange={e => setForm(p => ({ ...p, firstName: e.target.value }))} style={{ ...inp, marginTop: 4 }} placeholder={tr("parentsTab.nguyen")} />
                 </div>
                 <div>
-                  <label style={{ fontSize: 12, fontWeight: 800, color: col.muted, textTransform: 'uppercase', letterSpacing: '.06em' }}>Last Name *</label>
-                  <input value={form.lastName} onChange={e => setForm(p => ({ ...p, lastName: e.target.value }))} style={{ ...inp, marginTop: 4 }} placeholder="Van A" />
+                  <label style={{ fontSize: 12, fontWeight: 800, color: col.muted, textTransform: 'uppercase', letterSpacing: '.06em' }}>{tr("parentsTab.lastName")}</label>
+                  <input value={form.lastName} onChange={e => setForm(p => ({ ...p, lastName: e.target.value }))} style={{ ...inp, marginTop: 4 }} placeholder={tr("parentsTab.vanA")} />
                 </div>
               </div>
 
               <div>
-                <label style={{ fontSize: 12, fontWeight: 800, color: col.muted, textTransform: 'uppercase', letterSpacing: '.06em' }}>Email Address *</label>
-                <input type="email" value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} style={{ ...inp, marginTop: 4 }} placeholder="parent@example.com" />
+                <label style={{ fontSize: 12, fontWeight: 800, color: col.muted, textTransform: 'uppercase', letterSpacing: '.06em' }}>{tr("parentsTab.emailAddress")}</label>
+                <input type="email" value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} style={{ ...inp, marginTop: 4 }} placeholder={tr("parentsTab.parentExampleCom")} />
               </div>
 
               <div>
-                <label style={{ fontSize: 12, fontWeight: 800, color: col.muted, textTransform: 'uppercase', letterSpacing: '.06em' }}>Phone (optional)</label>
+                <label style={{ fontSize: 12, fontWeight: 800, color: col.muted, textTransform: 'uppercase', letterSpacing: '.06em' }}>{tr("parentsTab.phoneOptional")}</label>
                 <input value={form.phone} onChange={e => setForm(p => ({ ...p, phone: e.target.value }))} style={{ ...inp, marginTop: 4 }} placeholder="0912 345 678" />
               </div>
 
               <div>
                 <label style={{ fontSize: 12, fontWeight: 800, color: col.muted, textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 8 }}>
-                  Link to Students
+                  {tr("parentsTab.linkToStudents")}
                   {form.children.length > 0 && (
-                    <span style={{ marginLeft: 8, fontWeight: 700, color: col.accent, textTransform: 'none', letterSpacing: 0 }}>
-                      ({form.children.length} selected)
-                    </span>
+                    <span style={{ marginLeft: 8, fontWeight: 700, color: col.accent, textTransform: 'none', letterSpacing: 0 }}>{tr("parentsTab.selected", { childrenCount: form.children.length })}</span>
                   )}
                 </label>
 
@@ -276,7 +276,7 @@ export default function ParentsTab({ isDarkMode }) {
                   <input
                     value={studentSearch}
                     onChange={e => setStudentSearch(e.target.value)}
-                    placeholder="Search students…"
+                    placeholder={tr("parentsTab.searchStudents")}
                     style={{ ...inp, paddingLeft: 30 }}
                   />
                 </div>
@@ -302,30 +302,30 @@ export default function ParentsTab({ isDarkMode }) {
                       );
                     })}
                   {students.length === 0 && (
-                    <div style={{ padding: '12px 14px', fontSize: 13, color: col.muted }}>No students found</div>
+                    <div style={{ padding: '12px 14px', fontSize: 13, color: col.muted }}>{tr("parentsTab.noStudentsFound")}</div>
                   )}
                   {students.length > 0 && studentSearch.trim() && students.filter(s => `${s.firstName} ${s.lastName}`.toLowerCase().includes(studentSearch.toLowerCase())).length === 0 && (
-                    <div style={{ padding: '12px 14px', fontSize: 13, color: col.muted }}>No matching students</div>
+                    <div style={{ padding: '12px 14px', fontSize: 13, color: col.muted }}>{tr("parentsTab.noMatchingStudents")}</div>
                   )}
                 </div>
               </div>
 
               <div>
-                <label style={{ fontSize: 12, fontWeight: 800, color: col.muted, textTransform: 'uppercase', letterSpacing: '.06em' }}>Notes (internal)</label>
-                <textarea value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} rows={2} style={{ ...inp, marginTop: 4, resize: 'vertical' }} placeholder="e.g. Father of Minh and Linh" />
+                <label style={{ fontSize: 12, fontWeight: 800, color: col.muted, textTransform: 'uppercase', letterSpacing: '.06em' }}>{tr("parentsTab.notesInternal")}</label>
+                <textarea value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} rows={2} style={{ ...inp, marginTop: 4, resize: 'vertical' }} placeholder={tr("parentsTab.eGFatherOfMinh")} />
               </div>
             </div>
 
             {!editParent && (
               <p style={{ fontSize: 12, color: col.muted, marginTop: 14, background: isDarkMode ? 'rgba(249,115,22,0.08)' : '#fff7ed', border: `1px solid ${isDarkMode ? 'rgba(249,115,22,0.2)' : '#fed7aa'}`, borderRadius: 10, padding: '10px 14px' }}>
-                📧 An invite email will be sent to the parent so they can set their password.
+                {tr("parentsTab.anInviteEmailWillBe")}
               </p>
             )}
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
-              <button onClick={() => setShowModal(false)} style={btn(isDarkMode ? '#2a2d40' : '#f5f0ec', col.body)}>Cancel</button>
+              <button onClick={() => setShowModal(false)} style={btn(isDarkMode ? '#2a2d40' : '#f5f0ec', col.body)}>{tr("parentsTab.cancel")}</button>
               <button onClick={handleSave} disabled={saving} style={btn('linear-gradient(135deg,#f97316,#f43f5e)', '#fff', saving)}>
-                {saving ? 'Saving…' : editParent ? 'Save Changes' : 'Create & Send Invite'}
+                {saving ? tr("parentsTab.saving") : editParent ? tr("parentsTab.saveChanges") : tr("parentsTab.createSendInvite")}
               </button>
             </div>
           </div>

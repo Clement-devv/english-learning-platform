@@ -4,18 +4,26 @@
 import { useState, useEffect } from "react";
 import { CheckCircle, XCircle, RefreshCw, Users } from "lucide-react";
 import api from "../../../api";
+import { useTranslation } from "react-i18next";
+import i18n from "../../../i18n/i18n.js";
+import { dateLocale } from "../../../i18n/dateLocale.js";
+
+// For text in file-level lists: read when rendered, so it follows the chosen language
+const ta = (key, opts) => i18n.t(`admin:${key}`, opts);
+
 
 const fmt = (d) =>
-  d ? new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—";
+  d ? new Date(d).toLocaleDateString(dateLocale("en-US"), { month: "short", day: "numeric", year: "numeric" }) : "—";
 
 const STATUS_META = {
-  pending:  { label: "Pending",  color: "#f59e0b", bg: "#fef3c7" },
-  invited:  { label: "Invited",  color: "#3b82f6", bg: "#eff6ff" },
-  active:   { label: "Active",   color: "#16a34a", bg: "#f0fdf4" },
-  rejected: { label: "Rejected", color: "#94a3b8", bg: "#f1f5f9" },
+  pending:  { get label() { return ta("referralsTab.status.pending"); },  color: "#f59e0b", bg: "#fef3c7" },
+  invited:  { get label() { return ta("referralsTab.status.invited"); },  color: "#3b82f6", bg: "#eff6ff" },
+  active:   { get label() { return ta("referralsTab.status.active"); },   color: "#16a34a", bg: "#f0fdf4" },
+  rejected: { get label() { return ta("referralsTab.status.rejected"); }, color: "#94a3b8", bg: "#f1f5f9" },
 };
 
 export default function ReferralsTab({ isDarkMode }) {
+  const { t: tr } = useTranslation("admin");
   const [referrals, setReferrals] = useState([]);
   const [loading,   setLoading]   = useState(true);
   const [filter,    setFilter]    = useState("pending");
@@ -53,24 +61,24 @@ export default function ReferralsTab({ isDarkMode }) {
     setBusy(b => ({ ...b, [id]: true }));
     try {
       await api.post(`/referrals/${id}/approve`);
-      showToast("Student invited! Referrer credited +1 class.");
+      showToast(tr("referralsTab.studentInvitedReferrerCredited1"));
       load();
     } catch (e) {
-      showToast(e.response?.data?.error || "Approval failed", false);
+      showToast(e.response?.data?.error || tr("referralsTab.approvalFailed"), false);
     } finally {
       setBusy(b => ({ ...b, [id]: false }));
     }
   }
 
   async function reject(id) {
-    if (!window.confirm("Reject this referral application?")) return;
+    if (!window.confirm(tr("referralsTab.rejectThisReferralApplication"))) return;
     setBusy(b => ({ ...b, [id]: true }));
     try {
       await api.post(`/referrals/${id}/reject`);
-      showToast("Application rejected.");
+      showToast(tr("referralsTab.applicationRejected"));
       load();
     } catch (e) {
-      showToast(e.response?.data?.error || "Rejection failed", false);
+      showToast(e.response?.data?.error || tr("referralsTab.rejectionFailed"), false);
     } finally {
       setBusy(b => ({ ...b, [id]: false }));
     }
@@ -111,10 +119,10 @@ export default function ReferralsTab({ isDarkMode }) {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
         <div>
           <h2 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: text, display: "flex", alignItems: "center", gap: 8 }}>
-            <Users size={20} /> Referral Applications
+            <Users size={20} /> {tr("referralsTab.referralApplications")}
           </h2>
           <p style={{ margin: "4px 0 0", fontSize: 13, color: muted }}>
-            Approve to send an invite and automatically credit the referrer +1 class.
+            {tr("referralsTab.approveToSendAnInvite")}
           </p>
         </div>
         <button onClick={load} style={{ background: "none", border: "none", cursor: "pointer", color: muted }}>
@@ -132,11 +140,11 @@ export default function ReferralsTab({ isDarkMode }) {
       </div>
 
       {loading ? (
-        <p style={{ color: muted, fontSize: 13 }}>Loading…</p>
+        <p style={{ color: muted, fontSize: 13 }}>{tr("referralsTab.loading")}</p>
       ) : referrals.length === 0 ? (
         <div style={{ textAlign: "center", padding: 48, color: muted }}>
           <p style={{ fontSize: 30, margin: 0 }}>🎁</p>
-          <p style={{ margin: "8px 0 0", fontWeight: 600, color: text }}>No {filter || ""} referrals</p>
+          <p style={{ margin: "8px 0 0", fontWeight: 600, color: text }}>{tr("referralsTab.noReferrals", { value: filter || "" })}</p>
         </div>
       ) : (
         referrals.map(r => {
@@ -157,15 +165,15 @@ export default function ReferralsTab({ isDarkMode }) {
                   </div>
                   <div style={{ fontSize: 13, color: muted, marginTop: 2 }}>{r.referredEmail}</div>
                   <div style={{ fontSize: 12, color: muted, marginTop: 6 }}>
-                    Referred by: <strong style={{ color: text }}>{referrerName}</strong>
+                    {tr("referralsTab.referredBy")} <strong style={{ color: text }}>{referrerName}</strong>
                     <span style={{ marginLeft: 6, fontFamily: "monospace", fontSize: 11, color: "#3b82f6" }}>
                       [{r.referrerCode}]
                     </span>
-                    <span style={{ marginLeft: 8 }}>· Applied {fmt(r.createdAt)}</span>
+                    <span style={{ marginLeft: 8 }}>{tr("referralsTab.applied", { fmt: fmt(r.createdAt) })}</span>
                   </div>
                   {r.referredStudentId && (
                     <div style={{ fontSize: 11, color: muted, marginTop: 3 }}>
-                      Student status: <strong>{r.referredStudentId.status}</strong>
+                      {tr("referralsTab.studentStatus")} <strong>{r.referredStudentId.status}</strong>
                     </div>
                   )}
                 </div>
@@ -194,7 +202,7 @@ export default function ReferralsTab({ isDarkMode }) {
                     }}
                   >
                     <CheckCircle size={14} />
-                    {busy[r._id] ? "Processing…" : "Approve & Invite"}
+                    {busy[r._id] ? tr("referralsTab.processing") : tr("referralsTab.approveInvite")}
                   </button>
                   <button
                     onClick={() => reject(r._id)}
@@ -207,7 +215,7 @@ export default function ReferralsTab({ isDarkMode }) {
                       fontFamily: "inherit", opacity: busy[r._id] ? 0.6 : 1,
                     }}
                   >
-                    <XCircle size={14} /> Reject
+                    <XCircle size={14} /> {tr("referralsTab.reject")}
                   </button>
                 </div>
               )}

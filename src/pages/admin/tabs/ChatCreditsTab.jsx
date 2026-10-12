@@ -3,6 +3,7 @@ import { Search, Zap, Plus, RefreshCw, ShieldCheck, AlertTriangle } from "lucide
 import api from "../../../api";
 import { getStudents } from "../../../services/studentService";
 import { visibleEmail } from "../../../utils/managedStudent.js";
+import { useTranslation } from "react-i18next";
 
 const PRESET_AMOUNTS = [25, 50, 100, 150, 200, 500];
 
@@ -17,6 +18,7 @@ function StatCard({ label, value, emoji, color, bg }) {
 }
 
 export default function ChatCreditsTab({ isDarkMode }) {
+  const { t: tr } = useTranslation("admin");
   const col = isDarkMode
     ? { bg: "#0f1117", card: "#1a1d2e", border: "#2a2d40", heading: "#f0f4ff", body: "#c8cce0", muted: "#6b7090", input: "#1a1d2e" }
     : { bg: "#f8fafc", card: "#ffffff", border: "#e2e8f0", heading: "#1e293b", body: "#475569", muted: "#94a3b8", input: "#fff" };
@@ -81,7 +83,7 @@ export default function ChatCreditsTab({ isDarkMode }) {
   const handleGrant = async () => {
     const finalAmount = customAmt ? parseInt(customAmt, 10) : amount;
     if (!finalAmount || finalAmount < 1 || finalAmount > 10000) {
-      showToast("Enter a valid amount (1–10000)", "error");
+      showToast(tr("chatCreditsTab.enterAValidAmount1"), "error");
       return;
     }
 
@@ -90,7 +92,7 @@ export default function ChatCreditsTab({ isDarkMode }) {
       await api.post("/chat/credits/grant", {
         studentId: modal.student._id,
         amount:    finalAmount,
-        note:      note.trim() || `Granted by admin`,
+        note:      note.trim() || "Granted by admin",
       });
 
       // Update locally
@@ -101,10 +103,10 @@ export default function ChatCreditsTab({ isDarkMode }) {
       ));
 
       fetchBudget(); // refresh center budget display
-      showToast(`✅ ${finalAmount} credits granted to ${modal.student.firstName}!`);
+      showToast(tr("chatCreditsTab.creditsGrantedTo", { finalAmount, firstName: modal.student.firstName }));
       setModal(null);
     } catch (err) {
-      showToast(err?.response?.data?.message || "Failed to grant credits", "error");
+      showToast(err?.response?.data?.message || tr("chatCreditsTab.failedToGrantCredits"), "error");
     } finally {
       setGranting(null);
     }
@@ -159,13 +161,12 @@ export default function ChatCreditsTab({ isDarkMode }) {
               <Icon size={18} color={textC} />
               <div>
                 <p style={{ margin: 0, fontWeight: 800, fontSize: 13, color: textC }}>
-                  {empty ? "Center credit budget is empty — cannot grant credits to students"
-                   : low  ? `Low center budget — only ${bal} credits remaining`
-                   :        "Center credit budget is healthy"}
+                  {empty ? tr("chatCreditsTab.centerCreditBudgetIsEmpty")
+                   : low  ? tr("chatCreditsTab.lowCenterBudgetOnlyCredits", { bal })
+                   :        tr("chatCreditsTab.centerCreditBudgetIsHealthy")}
                 </p>
                 <p style={{ margin: "2px 0 0", fontSize: 11, color: textC, opacity: 0.8 }}>
-                  {bal.toLocaleString()} available  •  {(budget.totalAllocated ?? 0).toLocaleString()} total allocated  •  {(budget.used ?? 0).toLocaleString()} used
-                </p>
+                  {tr("chatCreditsTab.availableTotalAllocatedUsed", { value: bal.toLocaleString(), value2: (budget.totalAllocated ?? 0).toLocaleString(), value3: (budget.used ?? 0).toLocaleString() })}</p>
               </div>
             </div>
             <div style={{
@@ -182,10 +183,10 @@ export default function ChatCreditsTab({ isDarkMode }) {
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
         <div>
           <h1 style={{ margin: 0, fontSize: 22, fontWeight: 900, color: col.heading }}>
-            💬 AI Chat Credits
+            {tr("chatCreditsTab.aiChatCredits")}
           </h1>
           <p style={{ margin: "4px 0 0", fontSize: 13, color: col.muted }}>
-            Grant conversation credits to students who have paid
+            {tr("chatCreditsTab.grantConversationCreditsToStudents")}
           </p>
         </div>
         <button onClick={fetchStudents} style={{
@@ -193,16 +194,16 @@ export default function ChatCreditsTab({ isDarkMode }) {
           borderRadius: 10, border: `2px solid ${col.border}`, background: col.card,
           color: col.body, fontSize: 13, fontWeight: 700, cursor: "pointer",
         }}>
-          <RefreshCw size={14} /> Refresh
+          <RefreshCw size={14} /> {tr("chatCreditsTab.refresh")}
         </button>
       </div>
 
       {/* Stats */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 14 }}>
-        <StatCard label="Active Credits"     value={totalCredits}          emoji="⚡" color="#7c3aed" bg={isDarkMode ? "#1a1230" : "#f5f3ff"} />
-        <StatCard label="Total Messages Sent" value={totalUsed}            emoji="💬" color="#059669" bg={isDarkMode ? "#0d2318" : "#ecfdf5"} />
-        <StatCard label="Students w/ Credits" value={studentsWithCredits}  emoji="👤" color="#2563eb" bg={isDarkMode ? "#0d1a2e" : "#eff6ff"} />
-        <StatCard label="Low Credit (≤10)"    value={lowCreditStudents}    emoji="⚠️" color="#d97706" bg={isDarkMode ? "#2a1a06" : "#fffbeb"} />
+        <StatCard label={tr("chatCreditsTab.activeCredits")}     value={totalCredits}          emoji="⚡" color="#7c3aed" bg={isDarkMode ? "#1a1230" : "#f5f3ff"} />
+        <StatCard label={tr("chatCreditsTab.totalMessagesSent")} value={totalUsed}            emoji="💬" color="#059669" bg={isDarkMode ? "#0d2318" : "#ecfdf5"} />
+        <StatCard label={tr("chatCreditsTab.studentsWCredits")} value={studentsWithCredits}  emoji="👤" color="#2563eb" bg={isDarkMode ? "#0d1a2e" : "#eff6ff"} />
+        <StatCard label={tr("chatCreditsTab.lowCredit10")}    value={lowCreditStudents}    emoji="⚠️" color="#d97706" bg={isDarkMode ? "#2a1a06" : "#fffbeb"} />
       </div>
 
       {/* Search */}
@@ -211,7 +212,7 @@ export default function ChatCreditsTab({ isDarkMode }) {
         <input
           value={search}
           onChange={e => setSearch(e.target.value)}
-          placeholder="Search students…"
+          placeholder={tr("chatCreditsTab.searchStudents")}
           style={{
             width: "100%", padding: "10px 12px 10px 38px", borderRadius: 10,
             border: `2px solid ${col.border}`, background: col.input,
@@ -225,7 +226,7 @@ export default function ChatCreditsTab({ isDarkMode }) {
       {loading ? (
         <div style={{ textAlign: "center", padding: 60, color: col.muted }}>
           <RefreshCw size={28} style={{ animation: "spin 1s linear infinite" }} />
-          <p style={{ marginTop: 12, fontWeight: 700 }}>Loading students…</p>
+          <p style={{ marginTop: 12, fontWeight: 700 }}>{tr("chatCreditsTab.loadingStudents")}</p>
         </div>
       ) : (
         <div style={{ background: col.card, borderRadius: 16, border: `2px solid ${col.border}`, overflow: "hidden" }}>
@@ -236,16 +237,16 @@ export default function ChatCreditsTab({ isDarkMode }) {
             fontSize: 11, fontWeight: 800, color: col.muted, textTransform: "uppercase", letterSpacing: "0.06em",
             gap: 12,
           }}>
-            <span>Student</span>
-            <span>Email</span>
-            <span style={{ textAlign: "center" }}>Credits Left</span>
-            <span style={{ textAlign: "center" }}>Used</span>
-            <span style={{ textAlign: "center" }}>Action</span>
+            <span>{tr("chatCreditsTab.student")}</span>
+            <span>{tr("chatCreditsTab.email")}</span>
+            <span style={{ textAlign: "center" }}>{tr("chatCreditsTab.creditsLeft")}</span>
+            <span style={{ textAlign: "center" }}>{tr("chatCreditsTab.used")}</span>
+            <span style={{ textAlign: "center" }}>{tr("chatCreditsTab.action")}</span>
           </div>
 
           {filtered.length === 0 ? (
             <div style={{ textAlign: "center", padding: 40, color: col.muted, fontWeight: 700 }}>
-              No students found
+              {tr("chatCreditsTab.noStudentsFound")}
             </div>
           ) : (
             filtered.map((s, i) => {
@@ -263,11 +264,11 @@ export default function ChatCreditsTab({ isDarkMode }) {
                       {s.firstName} {s.lastName}
                     </div>
                     <div style={{ fontSize: 11, color: col.muted, marginTop: 2 }}>
-                      {s.status === "active" ? "✅ Active" : "⏳ Pending"}
+                      {s.status === "active" ? tr("chatCreditsTab.active") : tr("chatCreditsTab.pending")}
                     </div>
                   </div>
                   <div style={{ fontSize: 13, color: col.body, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {visibleEmail(s.email) || <span style={{ color: col.muted, fontStyle: "italic" }}>No login (managed)</span>}
+                    {visibleEmail(s.email) || <span style={{ color: col.muted, fontStyle: "italic" }}>{tr("chatCreditsTab.noLoginManaged")}</span>}
                   </div>
                   <div style={{ textAlign: "center" }}>
                     <span style={{
@@ -280,8 +281,7 @@ export default function ChatCreditsTab({ isDarkMode }) {
                     </span>
                   </div>
                   <div style={{ textAlign: "center", fontSize: 13, fontWeight: 700, color: col.muted }}>
-                    {s.totalUsed} msgs
-                  </div>
+                    {tr("chatCreditsTab.msgs", { totalUsed: s.totalUsed })}</div>
                   <div style={{ textAlign: "center" }}>
                     <button onClick={() => openModal(s)}
                       style={{
@@ -291,7 +291,7 @@ export default function ChatCreditsTab({ isDarkMode }) {
                         fontSize: 13, fontWeight: 700, cursor: "pointer",
                         boxShadow: "0 2px 8px #7c3aed30",
                       }}>
-                      <Plus size={13} /> Grant
+                      <Plus size={13} /> {tr("chatCreditsTab.grant")}
                     </button>
                   </div>
                 </div>
@@ -313,17 +313,17 @@ export default function ChatCreditsTab({ isDarkMode }) {
             border: `2px solid ${col.border}`,
           }}>
             <h2 style={{ margin: "0 0 4px", fontSize: 18, fontWeight: 900, color: col.heading }}>
-              ⚡ Grant Chat Credits
+              {tr("chatCreditsTab.grantChatCredits")}
             </h2>
             <p style={{ margin: "0 0 20px", fontSize: 13, color: col.muted }}>
-              Student: <strong style={{ color: col.body }}>{modal.student.firstName} {modal.student.lastName}</strong>
-              &nbsp;· Current balance: <strong style={{ color: "#7c3aed" }}>{modal.student.credits} credits</strong>
+              {tr("chatCreditsTab.student2")} <strong style={{ color: col.body }}>{modal.student.firstName} {modal.student.lastName}</strong>
+              {tr("chatCreditsTab.currentBalance")} <strong style={{ color: "#7c3aed" }}>{tr("chatCreditsTab.credits", { credits: modal.student.credits })}</strong>
             </p>
 
             {/* Preset amounts */}
             <div style={{ marginBottom: 16 }}>
               <div style={{ fontSize: 12, fontWeight: 800, color: col.muted, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>
-                Quick select
+                {tr("chatCreditsTab.quickSelect")}
               </div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                 {PRESET_AMOUNTS.map(a => (
@@ -343,7 +343,7 @@ export default function ChatCreditsTab({ isDarkMode }) {
             {/* Custom amount */}
             <div style={{ marginBottom: 16 }}>
               <div style={{ fontSize: 12, fontWeight: 800, color: col.muted, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>
-                Custom amount
+                {tr("chatCreditsTab.customAmount")}
               </div>
               <input
                 type="number"
@@ -363,12 +363,12 @@ export default function ChatCreditsTab({ isDarkMode }) {
             {/* Note */}
             <div style={{ marginBottom: 22 }}>
               <div style={{ fontSize: 12, fontWeight: 800, color: col.muted, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>
-                Note (optional)
+                {tr("chatCreditsTab.noteOptional")}
               </div>
               <input
                 value={note}
                 onChange={e => setNote(e.target.value)}
-                placeholder="e.g. Payment received 17 Mar"
+                placeholder={tr("chatCreditsTab.eGPaymentReceived17")}
                 style={{
                   width: "100%", padding: "10px 14px", borderRadius: 10,
                   border: `2px solid ${col.border}`, background: col.input,
@@ -384,10 +384,9 @@ export default function ChatCreditsTab({ isDarkMode }) {
               borderRadius: 12, padding: "12px 16px", marginBottom: 20,
               fontSize: 13, color: col.body, display: "flex", justifyContent: "space-between",
             }}>
-              <span>Credits after grant:</span>
+              <span>{tr("chatCreditsTab.creditsAfterGrant")}</span>
               <strong style={{ color: "#7c3aed", fontSize: 15 }}>
-                {modal.student.credits + (customAmt ? parseInt(customAmt) || 0 : amount)} credits
-              </strong>
+                {tr("chatCreditsTab.credits2", { value: modal.student.credits + (customAmt ? parseInt(customAmt) || 0 : amount) })}</strong>
             </div>
 
             <div style={{ display: "flex", gap: 10 }}>
@@ -397,7 +396,7 @@ export default function ChatCreditsTab({ isDarkMode }) {
                   border: `2px solid ${col.border}`, background: col.card,
                   color: col.body, fontWeight: 700, fontSize: 14, cursor: "pointer",
                 }}>
-                Cancel
+                {tr("chatCreditsTab.cancel")}
               </button>
               <button
                 onClick={handleGrant}
@@ -410,7 +409,7 @@ export default function ChatCreditsTab({ isDarkMode }) {
                   display: "flex", alignItems: "center", justifyContent: "center", gap: 7,
                 }}>
                 <Zap size={15} fill="#fff" />
-                {granting ? "Granting…" : `Grant ${customAmt || amount} Credits`}
+                {granting ? tr("chatCreditsTab.granting") : tr("chatCreditsTab.grantCredits", { value: customAmt || amount })}
               </button>
             </div>
           </div>

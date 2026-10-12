@@ -1,13 +1,15 @@
 // src/pages/student/components/UpcomingClasses.jsx
 import { getUserTimezone, dualTime, tzCity } from "../../../utils/timezone";
+import { useTranslation } from "react-i18next";
 
 export default function UpcomingClasses({ upcomingClasses, onEnroll }) {
+  const { t: tr } = useTranslation("student");
   const myTZ = getUserTimezone();
 
   if (upcomingClasses.length === 0) {
     return (
       <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
-        No upcoming classes at the moment.
+        {tr("upcomingClasses.noUpcomingClassesAtThe")}
       </p>
     );
   }
@@ -34,8 +36,7 @@ export default function UpcomingClasses({ upcomingClasses, onEnroll }) {
               </p>
 
               {showTeacherTZ && (
-                <p className="text-xs text-indigo-500 dark:text-indigo-400">
-                  Teacher ({tzCity(cls.teacherTimezone)}): {dual.theirTime} {dual.theirAbbr}
+                <p className="text-xs text-indigo-500 dark:text-indigo-400">{tr("upcomingClasses.teacher", { tzCity: tzCity(cls.teacherTimezone), theirTime: dual.theirTime, theirAbbr: dual.theirAbbr })}
                 </p>
               )}
 
@@ -51,7 +52,7 @@ export default function UpcomingClasses({ upcomingClasses, onEnroll }) {
                   : "bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 text-white"
               }`}
             >
-              {cls.enrolled ? "Enrolled" : "Enroll"}
+              {cls.enrolled ? tr("upcomingClasses.enrolled") : tr("upcomingClasses.enroll")}
             </button>
           </div>
         );

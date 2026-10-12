@@ -36,6 +36,7 @@ import { useDashboardData, BADGE_DEFINITIONS } from "../useDashboardData";
 import DashboardAlertsBar from "../../../../components/DashboardAlertsBar";
 // Tabs load on demand (see src/pages/student/tabs/lazyTabs.js)
 import { ChangePassword, StudentCompletedTab, StudentScheduleTab, StudentHomeworkTab, StudentQuizTab, PronunciationTab, ConversationTab, FlashcardsTab, RecordingsTab, ReviewsTab, ReferralTab, LeaderboardTab, MessagesTab, Classroom } from "../../tabs/lazyTabs";
+import { dateLocale } from "../../../../i18n/dateLocale.js";
 
 // ── Sidebar nav groups ────────────────────────────────────────────────────────
 const NAV_GROUPS = [
@@ -90,13 +91,14 @@ const NAV_GROUPS = [
 
 // ── BadgesTab (unchanged logic, same as before) ───────────────────────────────
 function BadgesTab({ badges, progress, completedClasses, col, isDarkMode, shareAchievement, accentGradient, tabShadow, fontFamily }) {
+  const { t: tr } = useTranslation("student");
   const [badgeFilter, setBadgeFilter] = useState("all");
   const categories = [
-    { key: "all",         label: "🏅 All"        },
-    { key: "journey",     label: "🚀 Journey"     },
-    { key: "consistency", label: "🔥 Consistency" },
-    { key: "weekly",      label: "📅 Weekly"      },
-    { key: "special",     label: "⭐ Special"     },
+    { key: "all",         label: tr("sunshineShell.all")        },
+    { key: "journey",     label: tr("sunshineShell.journey")     },
+    { key: "consistency", label: tr("sunshineShell.consistency") },
+    { key: "weekly",      label: tr("sunshineShell.weekly")      },
+    { key: "special",     label: tr("sunshineShell.special")     },
   ];
   const shown  = BADGE_DEFINITIONS.filter(b => badgeFilter === "all" || b.category === badgeFilter);
   const pct    = Math.round((badges.length / BADGE_DEFINITIONS.length) * 100);
@@ -122,15 +124,15 @@ function BadgesTab({ badges, progress, completedClasses, col, isDarkMode, shareA
       <div style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: "24px", padding: "24px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px", marginBottom: "20px" }}>
           <div>
-            <h2 style={{ margin: "0 0 4px", fontSize: "22px", fontWeight: 900, color: col.heading, display: "flex", alignItems: "center", gap: 8 }}><Award size={20} color={col.accent} strokeWidth={2} /> Achievement Badges</h2>
+            <h2 style={{ margin: "0 0 4px", fontSize: "22px", fontWeight: 900, color: col.heading, display: "flex", alignItems: "center", gap: 8 }}><Award size={20} color={col.accent} strokeWidth={2} /> {tr("sunshineShell.achievementBadges")}</h2>
             <p style={{ margin: 0, color: col.muted, fontSize: "14px", fontWeight: 600 }}>
-              {badges.length === 0 ? "Complete classes to start earning!" : `${badges.length} of ${BADGE_DEFINITIONS.length} earned · ${pct}%`}
+              {badges.length === 0 ? tr("sunshineShell.completeClassesToStartEarning") : tr("sunshineShell.ofEarned", { badgesCount: badges.length, BADGEDEFINITIONSCount: BADGE_DEFINITIONS.length, pct })}
             </p>
           </div>
           {badges.length > 0 && (
             <button onClick={() => shareAchievement("badge")}
               style={{ background: accentGradient, color: "#fff", border: "none", borderRadius: "14px", padding: "10px 20px", fontWeight: 800, cursor: "pointer", fontFamily: `${fontFamily},sans-serif`, fontSize: "14px", boxShadow: `0 4px 14px ${tabShadow}` }}>
-              🎉 Share All
+              {tr("sunshineShell.shareAll")}
             </button>
           )}
         </div>
@@ -168,8 +170,8 @@ function BadgesTab({ badges, progress, completedClasses, col, isDarkMode, shareA
                 </div>
               )}
               {earned
-                ? <span style={{ display: "inline-flex", alignItems: "center", gap: "4px", padding: "4px 10px", borderRadius: "999px", fontSize: "11px", fontWeight: 800, background: `linear-gradient(135deg,${badge.grad[0]},${badge.grad[1]})`, color: "#fff" }}>✓ Earned</span>
-                : <span style={{ display: "inline-flex", alignItems: "center", gap: "4px", padding: "4px 10px", borderRadius: "999px", fontSize: "11px", fontWeight: 800, background: col.border, color: col.muted }}>🔒 Locked</span>
+                ? <span style={{ display: "inline-flex", alignItems: "center", gap: "4px", padding: "4px 10px", borderRadius: "999px", fontSize: "11px", fontWeight: 800, background: `linear-gradient(135deg,${badge.grad[0]},${badge.grad[1]})`, color: "#fff" }}>{tr("sunshineShell.earned")}</span>
+                : <span style={{ display: "inline-flex", alignItems: "center", gap: "4px", padding: "4px 10px", borderRadius: "999px", fontSize: "11px", fontWeight: 800, background: col.border, color: col.muted }}>{tr("sunshineShell.locked")}</span>
               }
             </div>
           );
@@ -178,7 +180,7 @@ function BadgesTab({ badges, progress, completedClasses, col, isDarkMode, shareA
 
       {nextUp.length > 0 && (
         <div style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: "24px", padding: "24px" }}>
-          <h3 style={{ margin: "0 0 16px", fontSize: "20px", fontWeight: 900, color: col.heading, display: "flex", alignItems: "center", gap: 8 }}><Target size={19} color={col.accent} strokeWidth={2} /> Almost There!</h3>
+          <h3 style={{ margin: "0 0 16px", fontSize: "20px", fontWeight: 900, color: col.heading, display: "flex", alignItems: "center", gap: 8 }}><Target size={19} color={col.accent} strokeWidth={2} /> {tr("sunshineShell.almostThere")}</h3>
           <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
             {nextUp.map(badge => {
               const cur = getCur(badge);
@@ -210,6 +212,7 @@ function BadgesTab({ badges, progress, completedClasses, col, isDarkMode, shareA
 // SunshineShell
 // ══════════════════════════════════════════════════════════════════════════════
 export default function SunshineShell() {
+  const { t: tr } = useTranslation("student");
   const { t } = useTranslation();
   const { branding, center } = useBranding();
   const dashTheme = getDashboardThemeById(branding.dashboardTheme);
@@ -399,7 +402,7 @@ export default function SunshineShell() {
             <button className="ss-navitem" onClick={() => setViewMode("mobile")}
               style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", borderRadius: 14, border: "none", cursor: "pointer", background: d.isDarkMode ? "rgba(249,115,22,0.1)" : "#fff7ed", fontFamily: F, marginTop: 4 }}>
               <span style={{ fontSize: 15 }}>📱</span>
-              <span style={{ fontSize: 13, fontWeight: 700, color: col.accent }}>Mobile View</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: col.accent }}>{tr("sunshineShell.mobileView")}</span>
             </button>
           )}
         </div>
@@ -420,23 +423,23 @@ export default function SunshineShell() {
           {d.progress.streakDays > 0 && !isMobile && (
             <div style={{ display: "flex", alignItems: "center", gap: 6, background: d.isDarkMode ? "rgba(249,115,22,0.15)" : "#fff7ed", border: `2px solid ${d.isDarkMode ? "rgba(249,115,22,0.3)" : "#fed7aa"}`, borderRadius: 999, padding: "5px 14px" }}>
               <span style={{ fontSize: 16 }}>🔥</span>
-              <span style={{ fontSize: 13, fontWeight: 800, color: col.accent }}>{d.progress.streakDays} day streak</span>
+              <span style={{ fontSize: 13, fontWeight: 800, color: col.accent }}>{tr("sunshineShell.dayStreak", { streakDays: d.progress.streakDays })}</span>
             </div>
           )}
 
           {/* ── Notification chips — desktop only ── */}
           {!isMobile && d.unreadMessages > 0 && (
-            <button onClick={() => { d.setActiveTab("messages"); d.setUnreadMessages(0); }} title="Go to messages"
+            <button onClick={() => { d.setActiveTab("messages"); d.setUnreadMessages(0); }} title={tr("sunshineShell.goToMessages")}
               style={{ display: "flex", alignItems: "center", gap: 6, background: d.isDarkMode ? "rgba(139,92,246,0.15)" : "#f5f3ff", border: `2px solid ${d.isDarkMode ? "rgba(139,92,246,0.3)" : "#ddd6fe"}`, borderRadius: 999, padding: "5px 14px", cursor: "pointer", fontFamily: F }}>
               <span style={{ fontSize: 13 }}>💬</span>
-              <span style={{ fontSize: 13, fontWeight: 800, color: d.isDarkMode ? "#a78bfa" : "#7c3aed" }}>{d.unreadMessages} new</span>
+              <span style={{ fontSize: 13, fontWeight: 800, color: d.isDarkMode ? "#a78bfa" : "#7c3aed" }}>{tr("sunshineShell.new", { unreadMessages: d.unreadMessages })}</span>
             </button>
           )}
           {!isMobile && missedCallCount > 0 && (
-            <button onClick={clearMissedCalls} title="Clear missed calls"
+            <button onClick={clearMissedCalls} title={tr("sunshineShell.clearMissedCalls")}
               style={{ display: "flex", alignItems: "center", gap: 6, background: d.isDarkMode ? "rgba(239,68,68,0.12)" : "#fff5f5", border: `2px solid ${d.isDarkMode ? "rgba(239,68,68,0.3)" : "#fecaca"}`, borderRadius: 999, padding: "5px 14px", cursor: "pointer", fontFamily: F }}>
               <span style={{ fontSize: 13 }}>📞</span>
-              <span style={{ fontSize: 13, fontWeight: 800, color: "#ef4444" }}>{missedCallCount} missed</span>
+              <span style={{ fontSize: 13, fontWeight: 800, color: "#ef4444" }}>{tr("sunshineShell.missed", { missedCallCount })}</span>
             </button>
           )}
 
@@ -527,14 +530,14 @@ export default function SunshineShell() {
                           <div>
                             <p style={{ margin: 0, fontSize: 12, fontWeight: 800, color: col.heading, lineHeight: 1.2 }}>{mc.callerName}</p>
                             <p style={{ margin: 0, fontSize: 10, color: col.muted, fontWeight: 600 }}>
-                              {mc.callerRole === "teacher" ? t('common.teacher') : mc.callerRole === "admin" ? t('common.admin') : mc.callerRole} · {new Date(mc.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                              {mc.callerRole === "teacher" ? t('common.teacher') : mc.callerRole === "admin" ? t('common.admin') : mc.callerRole} · {new Date(mc.at).toLocaleTimeString(dateLocale(), { hour: "2-digit", minute: "2-digit" })}
                             </p>
                           </div>
                         </div>
                       ))}
                     </div>
                   </div>
-                  <button onClick={clearMissedCalls} title="Mark all as seen" style={{ background: d.isDarkMode ? "rgba(255,255,255,0.08)" : "#fff", border: `1px solid ${d.isDarkMode ? "rgba(255,255,255,0.12)" : "#fecaca"}`, borderRadius: 10, padding: "6px 12px", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontSize: 11, fontWeight: 700, color: col.muted, flexShrink: 0, fontFamily: F }}>
+                  <button onClick={clearMissedCalls} title={tr("sunshineShell.markAllAsSeen")} style={{ background: d.isDarkMode ? "rgba(255,255,255,0.08)" : "#fff", border: `1px solid ${d.isDarkMode ? "rgba(255,255,255,0.12)" : "#fecaca"}`, borderRadius: 10, padding: "6px 12px", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontSize: 11, fontWeight: 700, color: col.muted, flexShrink: 0, fontFamily: F }}>
                     <X size={12} /> {t('dashboard.markSeen')}
                   </button>
                 </div>
@@ -796,7 +799,7 @@ export default function SunshineShell() {
       {isSmallScreen && !isMobile && (
         <button onClick={() => setViewMode("mobile")}
           style={{ position:'fixed', bottom:16, right:16, zIndex:9999, display:'flex', alignItems:'center', gap:6, padding:'10px 16px', borderRadius:999, background: col.accent, color:'#fff', border:'none', cursor:'pointer', fontFamily:F, fontSize:13, fontWeight:800, boxShadow:'0 4px 18px rgba(249,115,22,0.45)' }}>
-          📱 Mobile View
+          {tr("sunshineShell.mobileView2")}
         </button>
       )}
 
@@ -804,10 +807,10 @@ export default function SunshineShell() {
       {isMobile && (
         <nav style={{ position:'fixed', bottom:0, left:0, right:0, background: d.isDarkMode ? '#13111a' : '#fff', borderTop:`2px solid ${col.border}`, display:'flex', zIndex:200, boxShadow:'0 -4px 20px rgba(0,0,0,0.12)', paddingBottom:'env(safe-area-inset-bottom,0px)' }}>
           {[
-            { key:'dashboard', Icon:Home, label:'Home' },
-            { key:'homework',  Icon:BookOpen, label:'Study' },
-            { key:'messages',  Icon:MessageCircle, label:'Chat' },
-            { key:'schedule',  Icon:CalendarDays, label:'Classes' },
+            { key:'dashboard', Icon:Home, label:tr("sunshineShell.home") },
+            { key:'homework',  Icon:BookOpen, label:tr("sunshineShell.study") },
+            { key:'messages',  Icon:MessageCircle, label:tr("sunshineShell.chat") },
+            { key:'schedule',  Icon:CalendarDays, label:tr("sunshineShell.classes") },
           ].map(({ key, Icon, label }) => {
             const isActive = d.activeTab === key;
             const badge = key === 'messages' && d.unreadMessages > 0 ? d.unreadMessages : 0;
@@ -830,7 +833,7 @@ export default function SunshineShell() {
           <button onClick={() => setShowMobileMenu(true)}
             style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:4, border:'none', background:'transparent', cursor:'pointer', fontFamily:F, color: col.muted, position:'relative', height:62, paddingBottom:6 }}>
             <Settings size={22} strokeWidth={1.8} />
-            <span style={{ fontSize:10, fontWeight:600 }}>More</span>
+            <span style={{ fontSize:10, fontWeight:600 }}>{tr("sunshineShell.more")}</span>
           </button>
         </nav>
       )}

@@ -7,11 +7,14 @@
 import { useEffect, useState } from "react";
 import { X, Mail, BellRing, Send, Loader2 } from "lucide-react";
 import api from "../../../api";
+import { useTranslation } from "react-i18next";
+import { dateLocale } from "../../../i18n/dateLocale.js";
 
 const BRAND = "var(--brand-primary, #2563eb)";
-const fmtWhen = (d) => new Date(d).toLocaleString(undefined, { weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
+const fmtWhen = (d) => new Date(d).toLocaleString(dateLocale(), { weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
 
 export default function StudentNotifyModal({ student, isDarkMode, onClose, notify }) {
+  const { t: tr } = useTranslation("admin");
   const [settings, setSettings] = useState(null);
   const [email, setEmail]       = useState("");
   const [saving, setSaving]     = useState(false);
@@ -24,7 +27,7 @@ export default function StudentNotifyModal({ student, isDarkMode, onClose, notif
 
   const load = () => api.get(`/students/${student._id}/notify-settings`)
     .then(({ data }) => { setSettings(data.settings); setEmail(data.settings.notifyEmail || ""); })
-    .catch(() => setError("Could not load settings"));
+    .catch(() => setError(tr("studentNotifyModal.couldNotLoadSettings")));
   useEffect(() => { load(); }, [student._id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const save = async (patch) => {
@@ -33,7 +36,7 @@ export default function StudentNotifyModal({ student, isDarkMode, onClose, notif
       const { data } = await api.patch(`/students/${student._id}/notify-settings`, patch);
       setSettings(s => ({ ...s, ...data.settings, reminderEmail: s.isManaged ? data.settings.notifyEmail : s.reminderEmail }));
       notify?.(data.message || "Saved");
-    } catch (err) { setError(err?.response?.data?.message || "Could not save"); }
+    } catch (err) { setError(err?.response?.data?.message || tr("studentNotifyModal.couldNotSave")); }
     finally { setSaving(false); }
   };
 
@@ -42,7 +45,7 @@ export default function StudentNotifyModal({ student, isDarkMode, onClose, notif
     try {
       const { data } = await api.post(`/students/${student._id}/join-reminder`);
       notify?.(data.message || "Reminder sent");
-    } catch (err) { setError(err?.response?.data?.message || "Could not send the reminder"); }
+    } catch (err) { setError(err?.response?.data?.message || tr("studentNotifyModal.couldNotSendTheReminder")); }
     finally { setSending(false); }
   };
 
@@ -53,36 +56,36 @@ export default function StudentNotifyModal({ student, isDarkMode, onClose, notif
 
   return (
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
-      <div onClick={e => e.stopPropagation()} role="dialog" aria-label="Notifications and reminders"
+      <div onClick={e => e.stopPropagation()} role="dialog" aria-label={tr("studentNotifyModal.notificationsAndReminders")}
         style={{ background: c.card, borderRadius: 18, width: "100%", maxWidth: 460, padding: 20, display: "flex", flexDirection: "column", gap: 14, border: `1px solid ${c.border}` }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
           <div>
-            <div style={{ fontSize: 17, fontWeight: 800, color: c.heading, display: "flex", alignItems: "center", gap: 8 }}><BellRing size={18} color={BRAND} /> Notifications & reminders</div>
-            <div style={{ fontSize: 12.5, color: c.body }}>{name}{student.isManaged ? " · Managed student" : ""}</div>
+            <div style={{ fontSize: 17, fontWeight: 800, color: c.heading, display: "flex", alignItems: "center", gap: 8 }}><BellRing size={18} color={BRAND} /> {tr("studentNotifyModal.notificationsReminders")}</div>
+            <div style={{ fontSize: 12.5, color: c.body }}>{name}{student.isManaged ? tr("studentNotifyModal.managedStudent") : ""}</div>
           </div>
-          <button type="button" aria-label="Close" onClick={onClose} style={{ ...btn(false), padding: 6 }}><X size={15} /></button>
+          <button type="button" aria-label={tr("studentNotifyModal.close")} onClick={onClose} style={{ ...btn(false), padding: 6 }}><X size={15} /></button>
         </div>
 
         {!settings ? (
-          <p style={{ color: c.muted, textAlign: "center", padding: 20 }}>{error || "Loading…"}</p>
+          <p style={{ color: c.muted, textAlign: "center", padding: 20 }}>{error || tr("studentNotifyModal.loading")}</p>
         ) : (
           <>
             {/* Where reminders go */}
             {settings.isManaged ? (
               <div>
                 <label htmlFor="notify-email" style={{ fontSize: 12, fontWeight: 800, color: c.muted, textTransform: "uppercase", letterSpacing: ".05em" }}>
-                  Notification email <span style={{ textTransform: "none", fontWeight: 500 }}>(optional — not a login)</span>
+                  {tr("studentNotifyModal.notificationEmail")} <span style={{ textTransform: "none", fontWeight: 500 }}>{tr("studentNotifyModal.optionalNotALogin")}</span>
                 </label>
                 <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
-                  <input id="notify-email" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="parent@example.com" style={inp} />
+                  <input id="notify-email" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder={tr("studentNotifyModal.parentExampleCom")} style={inp} />
                   <button type="button" disabled={saving || email.trim() === (settings.notifyEmail || "")} onClick={() => save({ notifyEmail: email.trim() })}
-                    style={{ ...btn(true), opacity: saving || email.trim() === (settings.notifyEmail || "") ? 0.6 : 1 }}>Save</button>
+                    style={{ ...btn(true), opacity: saving || email.trim() === (settings.notifyEmail || "") ? 0.6 : 1 }}>{tr("studentNotifyModal.save")}</button>
                 </div>
-                <p style={{ margin: "6px 0 0", fontSize: 12, color: c.muted }}>Used only to send this student notifications such as "your class is starting". Teachers can't see it.</p>
+                <p style={{ margin: "6px 0 0", fontSize: 12, color: c.muted }}>{tr("studentNotifyModal.usedOnlyToSendThis")}</p>
               </div>
             ) : (
               <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13, color: c.body, padding: "10px 12px", borderRadius: 10, background: c.soft }}>
-                <Mail size={14} /> Reminders go to the student's account email{settings.reminderEmail ? <strong style={{ color: c.heading }}>&nbsp;{settings.reminderEmail}</strong> : null}.
+                <Mail size={14} /> {tr("studentNotifyModal.remindersGoToTheStudent")}{settings.reminderEmail ? <strong style={{ color: c.heading }}>&nbsp;{settings.reminderEmail}</strong> : null}.
               </div>
             )}
 
@@ -91,8 +94,8 @@ export default function StudentNotifyModal({ student, isDarkMode, onClose, notif
               <input type="checkbox" checked={settings.joinReminderTeacherAllowed} disabled={saving}
                 onChange={e => save({ joinReminderTeacherAllowed: e.target.checked })} style={{ width: 18, height: 18 }} />
               <span>
-                <span style={{ display: "block", fontSize: 14, fontWeight: 700, color: c.heading }}>Teachers can send join reminders</span>
-                <span style={{ display: "block", fontSize: 12, color: c.muted }}>Shows a "Remind to join" button on the teacher's class. The teacher never sees the email address.</span>
+                <span style={{ display: "block", fontSize: 14, fontWeight: 700, color: c.heading }}>{tr("studentNotifyModal.teachersCanSendJoinReminders")}</span>
+                <span style={{ display: "block", fontSize: 12, color: c.muted }}>{tr("studentNotifyModal.showsARemindToJoin")}</span>
               </span>
             </label>
 
@@ -101,13 +104,13 @@ export default function StudentNotifyModal({ student, isDarkMode, onClose, notif
               <div style={{ fontSize: 13, color: c.body }}>
                 {settings.currentClass
                   ? <>Class now: <strong style={{ color: c.heading }}>{settings.currentClass.title}</strong> · {fmtWhen(settings.currentClass.scheduledTime)}</>
-                  : "No class right now — reminders can be sent from 30 minutes before a class until it ends."}
+                  : tr("studentNotifyModal.noClassRightNowReminders")}
               </div>
               <button type="button" onClick={remind} disabled={sending || !settings.currentClass || !settings.reminderEmail}
                 style={{ ...btn(true), alignSelf: "flex-start", opacity: sending || !settings.currentClass || !settings.reminderEmail ? 0.55 : 1 }}>
-                {sending ? <Loader2 size={14} /> : <Send size={14} />} Send "join your class now" email
+                {sending ? <Loader2 size={14} /> : <Send size={14} />} {tr("studentNotifyModal.sendJoinYourClassNow")}
               </button>
-              {!settings.reminderEmail && <span style={{ fontSize: 12, color: "#b45309" }}>Add a notification email first.</span>}
+              {!settings.reminderEmail && <span style={{ fontSize: 12, color: "#b45309" }}>{tr("studentNotifyModal.addANotificationEmailFirst")}</span>}
             </div>
           </>
         )}

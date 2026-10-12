@@ -2,31 +2,39 @@ import { useState, useEffect, useRef, useCallback, lazy, Suspense } from "react"
 import api from "../../../api";
 import { Send, Trash2, RefreshCw, Zap, Mic, MicOff, Volume2, VolumeX, Circle, Bot } from "lucide-react";
 import AvatarPuppet from "../../../components/AvatarPuppet";
+import { useTranslation } from "react-i18next";
+import i18n from "../../../i18n/i18n.js";
+
+// For text in file-level lists: read when rendered, so it follows the chosen language
+const ta = (key, opts) => i18n.t(`student:${key}`, opts);
+
 
 // Lazy-load the heavy Three.js bundle — only downloaded when student switches to 3D
 const AvatarHead3D = lazy(() => import("../../../components/AvatarHead3D"));
 
 const LEVELS = [
-  { value: "beginner",     label: "🌱 Beginner"     },
-  { value: "intermediate", label: "🌿 Intermediate"  },
-  { value: "advanced",     label: "🌳 Advanced"      },
+  { value: "beginner",     get label() { return ta("conversationTab.levelsBeginner"); }     },
+  { value: "intermediate", get label() { return ta("conversationTab.levelsIntermediate"); }  },
+  { value: "advanced",     get label() { return ta("conversationTab.levelsAdvanced"); }      },
 ];
 
 const HAS_SPEECH_INPUT  = !!(window.SpeechRecognition || window.webkitSpeechRecognition);
 const HAS_SPEECH_OUTPUT = !!window.speechSynthesis;
 
 function CreditBadge({ credits }) {
+  const { t: tr } = useTranslation("student");
   const color = credits === 0 ? "#dc2626" : credits <= 10 ? "#d97706" : "#059669";
   const bg    = credits === 0 ? "#fee2e2" : credits <= 10 ? "#fef3c7" : "#dcfce7";
   return (
     <span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "4px 12px", borderRadius: 20, fontSize: 13, fontWeight: 800, color, background: bg }}>
       <Zap size={13} fill={color} />
-      {credits} credit{credits !== 1 ? "s" : ""} left
+      {credits} {tr("conversationTab.credit")}{credits !== 1 ? "s" : ""} {tr("conversationTab.left")}
     </span>
   );
 }
 
 function Message({ msg, isDarkMode, onSpeak, isSpeaking }) {
+  const { t: tr } = useTranslation("student");
   const isUser = msg.role === "user";
   return (
     <div style={{ display: "flex", justifyContent: isUser ? "flex-end" : "flex-start", marginBottom: 12 }}>
@@ -60,7 +68,7 @@ function Message({ msg, isDarkMode, onSpeak, isSpeaking }) {
         {!isUser && HAS_SPEECH_OUTPUT && (
           <button
             onClick={() => onSpeak(msg.content)}
-            title={isSpeaking ? "Stop" : "Read aloud"}
+            title={isSpeaking ? tr("conversationTab.stop") : tr("conversationTab.readAloud")}
             style={{
               position: "absolute", bottom: -8, right: 8,
               width: 26, height: 26, borderRadius: "50%", border: "none",
@@ -99,6 +107,7 @@ function TypingIndicator({ isDarkMode }) {
 }
 
 export default function ConversationTab({ studentInfo, isDarkMode }) {
+  const { t: tr } = useTranslation("student");
   const col = isDarkMode
     ? { bg: "#0f1117", card: "#1a1d2e", border: "#2a2d40", heading: "#f0f4ff", body: "#c8cce0", muted: "#6b7090", input: "#0f1117" }
     : { bg: "#fff8f0", card: "#ffffff", border: "#ffe8cc", heading: "#2d1f6e", body: "#4a4060", muted: "#9b8ab0", input: "#fff" };
@@ -172,13 +181,13 @@ export default function ConversationTab({ studentInfo, isDarkMode }) {
         setMessages(histRes.data.messages || []);
         setCredits(credRes.data.credits ?? 0);
       } catch {
-        if (mountedRef.current) showToast("Failed to load chat", "error");
+        if (mountedRef.current) showToast(tr("conversationTab.failedToLoadChat"), "error");
       } finally {
         if (mountedRef.current) setLoading(false);
       }
     };
     init();
-  }, []);
+  }, [tr]);
 
   useEffect(() => { scrollToBottom(); }, [messages, scrollToBottom]);
 
@@ -206,7 +215,7 @@ export default function ConversationTab({ studentInfo, isDarkMode }) {
   const sendMessage = useCallback(async (overrideText) => {
     const trimmed = (overrideText ?? text).trim();
     if (!trimmed || sending) return;
-    if (credits <= 0) { showToast("No credits left! Ask your teacher to top up.", "error"); return; }
+    if (credits <= 0) { showToast(tr("conversationTab.noCreditsLeftAskYour"), "error"); return; }
 
     setText("");
     setLiveText("");
@@ -243,7 +252,7 @@ export default function ConversationTab({ studentInfo, isDarkMode }) {
         inputRef.current?.focus();
       }
     }
-  }, [text, sending, credits, level, autoSpeak, speakText]);
+  }, [text, sending, credits, tr, level, autoSpeak, speakText]);
 
   // ── Voice input ─────────────────────────────────────────────────────────────
   const startListening = useCallback(() => {
@@ -308,15 +317,15 @@ export default function ConversationTab({ studentInfo, isDarkMode }) {
   };
 
   const clearHistory = async () => {
-    if (!window.confirm("Clear your entire conversation history?")) return;
+    if (!window.confirm(tr("conversationTab.clearYourEntireConversationHistory"))) return;
     try {
       await api.delete("/chat/history");
       setMessages([]);
       window.speechSynthesis?.cancel();
       setSpeakingId(null);
-      showToast("Conversation cleared!");
+      showToast(tr("conversationTab.conversationCleared"));
     } catch {
-      showToast("Failed to clear history", "error");
+      showToast(tr("conversationTab.failedToClearHistory"), "error");
     }
   };
 
@@ -325,15 +334,15 @@ export default function ConversationTab({ studentInfo, isDarkMode }) {
     return (
       <div style={{ fontFamily: "'Nunito', sans-serif", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, padding: "60px 24px", textAlign: "center" }}>
         <div style={{ fontSize: 64 }}>💬</div>
-        <h2 style={{ margin: 0, fontSize: 22, fontWeight: 900, color: col.heading }}>Chat Credits Needed</h2>
+        <h2 style={{ margin: 0, fontSize: 22, fontWeight: 900, color: col.heading }}>{tr("conversationTab.chatCreditsNeeded")}</h2>
         <p style={{ margin: 0, fontSize: 14, color: col.muted, maxWidth: 360, lineHeight: 1.7 }}>
-          You've used all your conversation credits. Ask your teacher to top up your credits so you can keep practising!
+          {tr("conversationTab.youVeUsedAllYour")}
         </p>
         <div style={{ background: isDarkMode ? "#1f2235" : "#f5f3ff", border: `2px solid #7c3aed40`, borderRadius: 16, padding: "16px 24px", fontSize: 13, color: col.body, lineHeight: 1.8, maxWidth: 340 }}>
-          <strong style={{ color: "#7c3aed" }}>💡 How credits work:</strong><br />
-          Each message = 1 credit<br />
-          Your teacher grants credits when you pay for a top-up<br />
-          Credits never expire
+          <strong style={{ color: "#7c3aed" }}>{tr("conversationTab.howCreditsWork")}</strong><br />
+          {tr("conversationTab.eachMessage1Credit")}<br />
+          {tr("conversationTab.yourTeacherGrantsCreditsWhen")}<br />
+          {tr("conversationTab.creditsNeverExpire")}
         </div>
       </div>
     );
@@ -361,9 +370,9 @@ export default function ConversationTab({ studentInfo, isDarkMode }) {
             {speakingId ? "🔊" : "🤖"}
           </div>
           <div>
-            <div style={{ fontWeight: 900, fontSize: 16, color: col.heading }}>AI Conversation Coach</div>
+            <div style={{ fontWeight: 900, fontSize: 16, color: col.heading }}>{tr("conversationTab.aiConversationCoach")}</div>
             <div style={{ fontSize: 12, color: col.muted }}>
-              {listening ? "🎤 Listening…" : speakingId ? "🔊 Speaking…" : "Practise English 24/7 · Corrections included"}
+              {listening ? tr("conversationTab.listening") : speakingId ? tr("conversationTab.speaking") : tr("conversationTab.practiseEnglish247Corrections")}
             </div>
           </div>
         </div>
@@ -373,7 +382,7 @@ export default function ConversationTab({ studentInfo, isDarkMode }) {
           {/* Avatar toggle: puppet ↔ classic */}
           <button
             onClick={cycleAvatarMode}
-            title={avatarMode === "puppet" ? "Hide robot avatar" : "Show robot avatar"}
+            title={avatarMode === "puppet" ? tr("conversationTab.hideRobotAvatar") : tr("conversationTab.showRobotAvatar")}
             style={{
               display: "flex", alignItems: "center", gap: 5, padding: "6px 12px",
               borderRadius: 10, cursor: "pointer", fontSize: 12, fontWeight: 700,
@@ -382,13 +391,13 @@ export default function ConversationTab({ studentInfo, isDarkMode }) {
               color: avatarMode === "puppet" ? "#059669" : col.muted,
             }}>
             {avatarMode === "puppet" ? <Bot size={13} /> : <Circle size={13} />}
-            {avatarMode === "puppet" ? "Robot On" : "Robot Off"}
+            {avatarMode === "puppet" ? tr("conversationTab.robotOn") : tr("conversationTab.robotOff")}
           </button>
 
           {/* Auto-speak toggle */}
           {HAS_SPEECH_OUTPUT && (
             <button onClick={() => { setAutoSpeak(v => !v); window.speechSynthesis?.cancel(); setSpeakingId(null); }}
-              title={autoSpeak ? "Auto-read ON — click to turn off" : "Auto-read OFF — click to turn on"}
+              title={autoSpeak ? tr("conversationTab.autoReadOnClickTo") : tr("conversationTab.autoReadOffClickTo")}
               style={{
                 display: "flex", alignItems: "center", gap: 5, padding: "6px 12px",
                 borderRadius: 10, border: `2px solid ${autoSpeak ? "#7c3aed" : col.border}`,
@@ -397,7 +406,7 @@ export default function ConversationTab({ studentInfo, isDarkMode }) {
                 fontSize: 12, fontWeight: 700, cursor: "pointer",
               }}>
               {autoSpeak ? <Volume2 size={13} /> : <VolumeX size={13} />}
-              {autoSpeak ? "Auto-read ON" : "Auto-read OFF"}
+              {autoSpeak ? tr("conversationTab.autoReadOn") : tr("conversationTab.autoReadOff")}
             </button>
           )}
 
@@ -405,9 +414,9 @@ export default function ConversationTab({ studentInfo, isDarkMode }) {
             style={{ padding: "6px 12px", borderRadius: 10, border: `2px solid ${col.border}`, background: col.card, color: col.body, fontSize: 13, fontWeight: 700, fontFamily: "'Nunito', sans-serif", cursor: "pointer" }}>
             {LEVELS.map(l => <option key={l.value} value={l.value}>{l.label}</option>)}
           </select>
-          <button onClick={clearHistory} title="Clear conversation"
+          <button onClick={clearHistory} title={tr("conversationTab.clearConversation")}
             style={{ padding: "6px 10px", borderRadius: 10, border: `2px solid ${col.border}`, background: col.card, color: col.muted, cursor: "pointer", display: "flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 700 }}>
-            <Trash2 size={13} /> Clear
+            <Trash2 size={13} /> {tr("conversationTab.clear")}
           </button>
         </div>
       </div>
@@ -457,7 +466,7 @@ export default function ConversationTab({ studentInfo, isDarkMode }) {
           )}
           <Suspense fallback={
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "#7c3aed", fontWeight: 700, fontSize: 13 }}>
-              Loading 3D avatar…
+              {tr("conversationTab.loading3dAvatar")}
             </div>
           }>
             <AvatarHead3D isSpeaking={!!speakingId} isDarkMode={isDarkMode} />
@@ -472,7 +481,7 @@ export default function ConversationTab({ studentInfo, isDarkMode }) {
             color: speakingId ? "#059669" : isDarkMode ? "#a78bfa" : "#7c3aed",
             zIndex: 3,
           }}>
-            {listening ? "🎤 Listening…" : speakingId ? "🔊 Speaking…" : "AI Coach · Ready"}
+            {listening ? tr("conversationTab.listening") : speakingId ? tr("conversationTab.speaking") : tr("conversationTab.aiCoachReady")}
           </div>
         </div>
       )}
@@ -482,14 +491,14 @@ export default function ConversationTab({ studentInfo, isDarkMode }) {
         {loading ? (
           <div style={{ textAlign: "center", padding: 40, color: col.muted }}>
             <RefreshCw size={28} style={{ animation: "spin 1s linear infinite" }} />
-            <p style={{ marginTop: 12, fontWeight: 700 }}>Loading conversation…</p>
+            <p style={{ marginTop: 12, fontWeight: 700 }}>{tr("conversationTab.loadingConversation")}</p>
           </div>
         ) : messages.length === 0 ? (
           <div style={{ textAlign: "center", padding: "40px 20px", color: col.muted }}>
             <div style={{ fontSize: 56, marginBottom: 12 }}>💬</div>
-            <p style={{ fontWeight: 800, fontSize: 16, color: col.heading, margin: "0 0 8px" }}>Start a conversation!</p>
+            <p style={{ fontWeight: 800, fontSize: 16, color: col.heading, margin: "0 0 8px" }}>{tr("conversationTab.startAConversation")}</p>
             <p style={{ fontSize: 13, maxWidth: 340, margin: "0 auto", lineHeight: 1.7 }}>
-              {HAS_SPEECH_INPUT ? "Type or tap 🎤 to speak. The AI replies and reads its answer aloud." : "Type a message below. The AI will chat and gently correct your English."}
+              {HAS_SPEECH_INPUT ? tr("conversationTab.typeOrTapToSpeak") : tr("conversationTab.typeAMessageBelowThe")}
             </p>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "center", marginTop: 20 }}>
               {["👋 Hello! How are you?", "Tell me about yourself", "What should I talk about?", "Let's practise past tense"].map(s => (
@@ -522,7 +531,7 @@ export default function ConversationTab({ studentInfo, isDarkMode }) {
           display: "flex", alignItems: "center", gap: 8,
         }}>
           <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#ef4444", animation: "pulse 1s ease-in-out infinite", flexShrink: 0 }} />
-          {liveText || "Listening… speak now"}
+          {liveText || tr("conversationTab.listeningSpeakNow")}
         </div>
       )}
 
@@ -532,7 +541,7 @@ export default function ConversationTab({ studentInfo, isDarkMode }) {
         {/* Mic button */}
         {HAS_SPEECH_INPUT && (
           <button onClick={toggleMic} disabled={sending || credits === 0}
-            title={listening ? "Stop recording" : "Speak your message"}
+            title={listening ? tr("conversationTab.stopRecording") : tr("conversationTab.speakYourMessage")}
             style={{
               width: 48, height: 48, borderRadius: 14, border: "none", flexShrink: 0,
               background: listening
@@ -556,10 +565,10 @@ export default function ConversationTab({ studentInfo, isDarkMode }) {
           onChange={e => setText(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={
-            credits === 0 ? "No credits left…"
-            : listening ? "Speaking… (will send automatically)"
-            : HAS_SPEECH_INPUT ? "Type or tap 🎤 to speak…"
-            : "Type your message… (Enter to send)"
+            credits === 0 ? tr("conversationTab.noCreditsLeft")
+            : listening ? tr("conversationTab.speakingWillSendAutomatically")
+            : HAS_SPEECH_INPUT ? tr("conversationTab.typeOrTapToSpeak2")
+            : tr("conversationTab.typeYourMessageEnterTo")
           }
           disabled={inputDisabled}
           maxLength={1000}
@@ -600,9 +609,7 @@ export default function ConversationTab({ studentInfo, isDarkMode }) {
 
       {/* Low credits warning */}
       {credits !== null && credits > 0 && credits <= 10 && (
-        <div style={{ marginTop: 10, padding: "8px 14px", borderRadius: 10, background: "#fef3c7", border: "1.5px solid #fde68a", fontSize: 12, fontWeight: 700, color: "#92400e", textAlign: "center" }}>
-          ⚠️ Only {credits} credit{credits !== 1 ? "s" : ""} left — ask your teacher to top up soon
-        </div>
+        <div style={{ marginTop: 10, padding: "8px 14px", borderRadius: 10, background: "#fef3c7", border: "1.5px solid #fde68a", fontSize: 12, fontWeight: 700, color: "#92400e", textAlign: "center" }}>{tr("conversationTab.onlyCreditLeftAskYour", { credits, value: credits !== 1 ? "s" : "" })}</div>
       )}
 
       <style>{`

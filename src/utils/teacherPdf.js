@@ -144,7 +144,7 @@ export async function downloadTeacherRoster(teachers, centerName) {
 
   autoTable(doc, {
     startY: 44,
-    head: [["#", "Full Name", "Email", "Phone", "Country", "Continent", "Rate", "Exp", "Lessons", "Earned", "Specializations", "Status"]],
+    head: [["#", "Full Name", "Email", "Phone", "Country", "Continent", "Rate", "Exp", "Lessons", "Unpaid", "Specializations", "Status"]],
     body: rows,
     theme: "striped",
     headStyles: {
@@ -256,7 +256,7 @@ export async function downloadTeacherCard(teacher, centerName) {
     ["Rate per Class",      num(teacher.ratePerClass) ? `$${num(teacher.ratePerClass)} USD` : "—"],
     ["Years of Experience", num(teacher.yearsOfExperience) ? `${num(teacher.yearsOfExperience)} years` : "—"],
     ["Lessons Completed",   String(num(teacher.lessonsCompleted))],
-    ["Total Earned",        `$${num(teacher.earned).toFixed(2)} USD`],
+    ["Unpaid Balance",      `$${num(teacher.earned).toFixed(2)} USD`],
     ["Specializations",     list(teacher.specializations).join(", ") || "—"],
     ["Certifications",      list(teacher.certifications).join(", ") || "—"],
     ["Meet / Zoom Link",    text(teacher.googleMeetLink || teacher.zoomLink)],

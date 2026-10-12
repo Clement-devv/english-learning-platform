@@ -6,9 +6,11 @@ import { useState, useEffect } from "react";
 import { Star, CheckCircle, Send, RefreshCw } from "lucide-react";
 import api from "../../../api";
 import { useOnDataChanged } from "../../../hooks/useLiveData";
+import { useTranslation } from "react-i18next";
+import { dateLocale } from "../../../i18n/dateLocale.js";
 
 const fmt = (d) =>
-  d ? new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—";
+  d ? new Date(d).toLocaleDateString(dateLocale("en-US"), { month: "short", day: "numeric", year: "numeric" }) : "—";
 
 // ── Star picker ───────────────────────────────────────────────────────────────
 function StarPicker({ value, onChange }) {
@@ -44,6 +46,7 @@ function Stars({ rating, size = 14 }) {
 
 // ── Review form for one booking ───────────────────────────────────────────────
 function ReviewForm({ booking, isDarkMode, onSubmitted }) {
+  const { t: tr } = useTranslation("student");
   const [rating,  setRating]  = useState(0);
   const [comment, setComment] = useState("");
   const [busy,    setBusy]    = useState(false);
@@ -93,7 +96,7 @@ function ReviewForm({ booking, isDarkMode, onSubmitted }) {
       <textarea
         value={comment}
         onChange={e => setComment(e.target.value)}
-        placeholder="Share what you learned or how the class went… (optional)"
+        placeholder={tr("reviewsTab.shareWhatYouLearnedOr")}
         rows={3}
         maxLength={1000}
         style={{
@@ -116,7 +119,7 @@ function ReviewForm({ booking, isDarkMode, onSubmitted }) {
           fontFamily: "inherit",
         }}
       >
-        <Send size={13} /> {busy ? "Submitting…" : "Submit Review"}
+        <Send size={13} /> {busy ? tr("reviewsTab.submitting") : tr("reviewsTab.submitReview")}
       </button>
     </div>
   );
@@ -132,6 +135,7 @@ const getStudentId = () => {
 };
 
 export default function ReviewsTab({ isDarkMode }) {
+  const { t: tr } = useTranslation("student");
   const [pending,   setPending]   = useState([]);   // completed bookings not yet reviewed
   const [myReviews, setMyReviews] = useState([]);   // already submitted
   const [loading,   setLoading]   = useState(true);
@@ -207,10 +211,10 @@ export default function ReviewsTab({ isDarkMode }) {
       {/* Header */}
       <div style={{ marginBottom: 20 }}>
         <h2 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: text, display: "flex", alignItems: "center", gap: 8 }}>
-          ⭐ Class Reviews
+          {tr("reviewsTab.classReviews")}
         </h2>
         <p style={{ margin: "4px 0 0", fontSize: 13, color: muted }}>
-          Rate your classes to help us improve your learning experience.
+          {tr("reviewsTab.rateYourClassesToHelp")}
         </p>
       </div>
 
@@ -221,20 +225,20 @@ export default function ReviewsTab({ isDarkMode }) {
         <button
           onClick={load}
           style={{ marginLeft: "auto", background: "none", border: "none", cursor: "pointer", color: muted }}
-          title="Refresh"
+          title={tr("reviewsTab.refresh")}
         >
           <RefreshCw size={15} />
         </button>
       </div>
 
       {loading ? (
-        <p style={{ color: muted, fontSize: 13 }}>Loading…</p>
+        <p style={{ color: muted, fontSize: 13 }}>{tr("reviewsTab.loading")}</p>
       ) : view === "pending" ? (
         pending.length === 0 ? (
           <div style={{ textAlign: "center", padding: 48, color: muted }}>
             <CheckCircle size={36} style={{ marginBottom: 10, color: "#16a34a" }} />
-            <p style={{ margin: 0, fontWeight: 600 }}>All caught up!</p>
-            <p style={{ margin: "4px 0 0", fontSize: 13 }}>No classes waiting for a review.</p>
+            <p style={{ margin: 0, fontWeight: 600 }}>{tr("reviewsTab.allCaughtUp")}</p>
+            <p style={{ margin: "4px 0 0", fontSize: 13 }}>{tr("reviewsTab.noClassesWaitingForA")}</p>
           </div>
         ) : (
           pending.map(booking => (
@@ -249,7 +253,7 @@ export default function ReviewsTab({ isDarkMode }) {
       ) : (
         // Submitted reviews
         myReviews.length === 0 ? (
-          <p style={{ color: muted, fontSize: 13 }}>No reviews submitted yet.</p>
+          <p style={{ color: muted, fontSize: 13 }}>{tr("reviewsTab.noReviewsSubmittedYet")}</p>
         ) : (
           myReviews.map(r => (
             <div key={r._id} style={{
@@ -259,7 +263,7 @@ export default function ReviewsTab({ isDarkMode }) {
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 6 }}>
                 <div>
                   <span style={{ fontWeight: 700, fontSize: 14, color: text }}>
-                    {r.bookingId?.classTitle ?? "Class"}
+                    {r.bookingId?.classTitle ?? tr("reviewsTab.class")}
                   </span>
                   <span style={{ fontSize: 12, color: muted, marginLeft: 8 }}>
                     {fmt(r.bookingId?.scheduledTime)}
@@ -277,8 +281,7 @@ export default function ReviewsTab({ isDarkMode }) {
                   "{r.comment}"
                 </p>
               )}
-              <p style={{ margin: "6px 0 0", fontSize: 11, color: muted }}>
-                Submitted {fmt(r.createdAt)}
+              <p style={{ margin: "6px 0 0", fontSize: 11, color: muted }}>{tr("reviewsTab.submitted", { fmt: fmt(r.createdAt) })}
               </p>
             </div>
           ))

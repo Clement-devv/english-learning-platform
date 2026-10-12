@@ -4,6 +4,7 @@
 
 import { useState, useEffect } from "react";
 import api from "../../../api";
+import { useTranslation } from "react-i18next";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -73,6 +74,7 @@ function DayDot({ active, isToday, label, isDarkMode }) {
 // ── main widget ───────────────────────────────────────────────────────────────
 
 export default function StreakWidget({ isDarkMode, onLoad }) {
+  const { t: tr } = useTranslation("student");
   const [data,    setData]    = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -98,7 +100,7 @@ export default function StreakWidget({ isDarkMode, onLoad }) {
     return (
       <div style={{ background: c.card, border: `1px solid ${c.border}`, borderRadius: 16, padding: "20px 24px" }}>
         <div style={{ height: 80, display: "flex", alignItems: "center", justifyContent: "center", color: c.muted, fontSize: 13 }}>
-          Loading streaks…
+          {tr("streakWidget.loadingStreaks")}
         </div>
       </div>
     );
@@ -128,17 +130,16 @@ export default function StreakWidget({ isDarkMode, onLoad }) {
       {/* ── Header ── */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: c.muted }}>
-          Streaks
+          {tr("streakWidget.streaks")}
         </span>
         {freezes > 0 && (
-          <span title={`${freezes} streak freeze${freezes !== 1 ? "s" : ""} available`} style={{
+          <span title={tr("streakWidget.streakFreezeAvailable", { freezes, value: freezes !== 1 ? "s" : "" })} style={{
             display: "flex", alignItems: "center", gap: 4,
             fontSize: 11, fontWeight: 700, color: "#60a5fa",
             background: isDarkMode ? "rgba(96,165,250,0.1)" : "#eff6ff",
             border: "1px solid rgba(96,165,250,0.3)",
             padding: "2px 8px", borderRadius: 20,
-          }}>
-            🛡️ {freezes} freeze{freezes !== 1 ? "s" : ""}
+          }}>{tr("streakWidget.freeze", { freezes, value: freezes !== 1 ? "s" : "" })}
           </span>
         )}
       </div>
@@ -162,13 +163,12 @@ export default function StreakWidget({ isDarkMode, onLoad }) {
 
         <div>
           <p style={{ margin: 0, fontSize: 20, fontWeight: 800, color: c.text, lineHeight: 1 }}>
-            {current} day{current !== 1 ? "s" : ""}
+            {tr("streakWidget.day", { current, value: current !== 1 ? "s" : "" })}
           </p>
           <p style={{ margin: "3px 0 0", fontSize: 13, color: "#f59e0b", fontWeight: 600 }}>
             {streakLabel(current)}
           </p>
-          <p style={{ margin: "4px 0 0", fontSize: 11, color: c.muted }}>
-            Longest: {longest} day{longest !== 1 ? "s" : ""}
+          <p style={{ margin: "4px 0 0", fontSize: 11, color: c.muted }}>{tr("streakWidget.longestDay", { longest, value: longest !== 1 ? "s" : "" })}
           </p>
         </div>
       </div>
@@ -195,10 +195,10 @@ export default function StreakWidget({ isDarkMode, onLoad }) {
           <span style={{ fontSize: 22 }}>📅</span>
           <div>
             <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: c.text }}>
-              Weekly Class Streak
+              {tr("streakWidget.weeklyClassStreak")}
             </p>
             <p style={{ margin: "2px 0 0", fontSize: 11, color: c.muted }}>
-              Attend ≥1 class every week to keep it going
+              {tr("streakWidget.attend1ClassEveryWeek")}
             </p>
           </div>
         </div>
@@ -206,16 +206,14 @@ export default function StreakWidget({ isDarkMode, onLoad }) {
           <p style={{ margin: 0, fontSize: 24, fontWeight: 900, color: weekStreak > 0 ? "#10b981" : c.muted, lineHeight: 1 }}>
             {weekStreak}
           </p>
-          <p style={{ margin: "2px 0 0", fontSize: 10, color: c.muted }}>
-            best: {weekLongest}
+          <p style={{ margin: "2px 0 0", fontSize: 10, color: c.muted }}>{tr("streakWidget.best", { weekLongest })}
           </p>
         </div>
       </div>
 
       {/* ── What counts note ── */}
       <p style={{ margin: 0, fontSize: 11, color: c.muted, lineHeight: 1.5 }}>
-        🔥 Daily streak — any activity (class, quiz, homework, flashcards) counts.
-        &nbsp;📅 Weekly streak — needs at least one completed class per week.
+        {tr("streakWidget.dailyStreakAnyActivityClass")}
       </p>
 
     </div>

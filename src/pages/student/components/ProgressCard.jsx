@@ -1,4 +1,6 @@
-export default function ProgressCard({ progress }) {
+
+import { useTranslation } from "react-i18next";export default function ProgressCard({ progress }) {
+  const { t: tr } = useTranslation("student");
   const completionPercentage = progress.totalLessons > 0
     ? Math.round((progress.completedLessons / progress.totalLessons) * 100)
     : 0;
@@ -9,22 +11,21 @@ export default function ProgressCard({ progress }) {
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-      <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100 mb-4">Learning Progress</h3>
+      <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100 mb-4">{tr("progressCard.learningProgress")}</h3>
 
       {/* Total Classes Paid */}
       <div className="mb-4">
         <div className="flex justify-between items-center mb-1">
-          <span className="text-sm text-gray-600 dark:text-gray-300">Total Classes Paid</span>
+          <span className="text-sm text-gray-600 dark:text-gray-300">{tr("progressCard.totalClassesPaid")}</span>
           <span className="text-sm font-semibold text-gray-800 dark:text-gray-100">
-            {progress.totalLessons} classes
-          </span>
+            {tr("progressCard.classes", { totalLessons: progress.totalLessons })}</span>
         </div>
       </div>
 
       {/* Classes Completed */}
       <div className="mb-4">
         <div className="flex justify-between items-center mb-1">
-          <span className="text-sm text-gray-600 dark:text-gray-300">Classes Completed</span>
+          <span className="text-sm text-gray-600 dark:text-gray-300">{tr("progressCard.classesCompleted")}</span>
           <span className="text-sm font-semibold text-blue-600 dark:text-blue-400">
             {progress.completedLessons} / {progress.totalLessons}
           </span>
@@ -42,20 +43,18 @@ export default function ProgressCard({ progress }) {
       <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border-2 border-blue-200 dark:border-blue-700">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm text-gray-600 dark:text-gray-300">Classes Remaining</p>
+            <p className="text-sm text-gray-600 dark:text-gray-300">{tr("progressCard.classesRemaining")}</p>
             <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">{progress.classesRemaining}</p>
           </div>
           <div className="text-4xl">📚</div>
         </div>
         {progress.classesRemaining === 0 && (
           <p className="text-xs text-red-600 dark:text-red-400 mt-2">
-            ⚠️ You have no classes remaining. Please contact admin to purchase more.
+            {tr("progressCard.youHaveNoClassesRemaining")}
           </p>
         )}
         {progress.classesRemaining > 0 && progress.classesRemaining <= 5 && (
-          <p className="text-xs text-orange-600 dark:text-orange-400 mt-2">
-            ⚠️ Running low! Only {progress.classesRemaining} classes left.
-          </p>
+          <p className="text-xs text-orange-600 dark:text-orange-400 mt-2">{tr("progressCard.runningLowOnlyClassesLeft", { classesRemaining: progress.classesRemaining })}</p>
         )}
       </div>
 
@@ -63,18 +62,17 @@ export default function ProgressCard({ progress }) {
       <div className="flex items-center gap-4 mb-4 p-4 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
         <div className="text-3xl">🔥</div>
         <div>
-          <p className="text-sm text-gray-600 dark:text-gray-300">Current Streak</p>
-          <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">{progress.streakDays} days</p>
+          <p className="text-sm text-gray-600 dark:text-gray-300">{tr("progressCard.currentStreak")}</p>
+          <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">{tr("progressCard.days", { streakDays: progress.streakDays })}</p>
         </div>
       </div>
 
       {/* Weekly Goal */}
       <div className="mb-2">
         <div className="flex justify-between items-center mb-1">
-          <span className="text-sm text-gray-600 dark:text-gray-300">Weekly Goal</span>
+          <span className="text-sm text-gray-600 dark:text-gray-300">{tr("progressCard.weeklyGoal")}</span>
           <span className="text-sm font-semibold text-gray-800 dark:text-gray-100">
-            {progress.weeklyCompleted} / {progress.weeklyGoal} classes
-          </span>
+            {tr("progressCard.classes2", { weeklyCompleted: progress.weeklyCompleted, weeklyGoal: progress.weeklyGoal })}</span>
         </div>
         <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
           <div

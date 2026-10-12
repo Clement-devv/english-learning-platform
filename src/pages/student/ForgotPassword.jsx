@@ -2,8 +2,10 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Mail, ArrowLeft, CheckCircle, BookOpen } from 'lucide-react';
 import api from '../../api';
+import { useTranslation } from "react-i18next";
 
 export default function StudentForgotPassword() {
+  const { t: tr } = useTranslation("student");
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
@@ -16,7 +18,7 @@ export default function StudentForgotPassword() {
     setLoading(true);
 
     if (!email) {
-      setError('Email is required');
+      setError(tr("forgotPassword.emailIsRequired"));
       setLoading(false);
       return;
     }
@@ -30,7 +32,7 @@ export default function StudentForgotPassword() {
       
     } catch (err) {
       console.error('Forgot password error:', err);
-      setError(err.response?.data?.message || 'Failed to send reset email');
+      setError(err.response?.data?.message || tr("forgotPassword.failedToSendResetEmail"));
     } finally {
       setLoading(false);
     }
@@ -45,32 +47,32 @@ export default function StudentForgotPassword() {
               <CheckCircle className="w-8 h-8 text-green-600" />
             </div>
             
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">Check Your Email</h1>
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">{tr("forgotPassword.checkYourEmail")}</h1>
             <p className="text-gray-600 mb-6">
-              A password reset link has been sent to <strong>{email}</strong>. Check your inbox and spam folder.
+              {tr("forgotPassword.aPasswordResetLinkHas")} <strong>{email}</strong>{tr("forgotPassword.checkYourInboxAndSpam")}
             </p>
             
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
               <p className="text-sm text-blue-800">
-                <strong>📧 Next Steps:</strong>
+                <strong>{tr("forgotPassword.nextSteps")}</strong>
               </p>
               <ul className="text-sm text-blue-700 mt-2 space-y-1 text-left">
-                <li>• Check your email inbox</li>
-                <li>• Look for an email from School App</li>
-                <li>• Click the reset link (valid for 1 hour)</li>
-                <li>• Create your new password</li>
+                <li>{tr("forgotPassword.checkYourEmailInbox")}</li>
+                <li>{tr("forgotPassword.lookForAnEmailFrom")}</li>
+                <li>{tr("forgotPassword.clickTheResetLinkValid")}</li>
+                <li>{tr("forgotPassword.createYourNewPassword")}</li>
               </ul>
             </div>
 
             <p className="text-xs text-gray-500 mb-4">
-              Didn't receive the email? Check your spam folder or contact your administrator.
+              {tr("forgotPassword.didnTReceiveTheEmail")}
             </p>
 
             <button
               onClick={() => navigate('/student/login')}
               className="w-full px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg font-medium hover:from-blue-700 hover:to-indigo-700 transition"
             >
-              Back to Login
+              {tr("forgotPassword.backToLogin")}
             </button>
           </div>
         </div>
@@ -86,9 +88,9 @@ export default function StudentForgotPassword() {
           <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl mb-4">
             <BookOpen className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Forgot Password?</h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">{tr("forgotPassword.forgotPassword")}</h1>
           <p className="text-gray-600">
-            Enter your email and we'll send you a reset link
+            {tr("forgotPassword.enterYourEmailAndWe")}
           </p>
         </div>
 
@@ -103,7 +105,7 @@ export default function StudentForgotPassword() {
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                Email Address
+                {tr("forgotPassword.emailAddress")}
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -115,7 +117,7 @@ export default function StudentForgotPassword() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="your.email@example.com"
+                  placeholder={tr("forgotPassword.yourEmailExampleCom")}
                   required
                 />
               </div>
@@ -126,7 +128,7 @@ export default function StudentForgotPassword() {
               disabled={loading}
               className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-3 px-4 rounded-lg font-semibold hover:from-blue-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? 'Sending...' : 'Send Reset Link'}
+              {loading ? tr("forgotPassword.sending") : tr("forgotPassword.sendResetLink")}
             </button>
           </form>
 
@@ -136,7 +138,7 @@ export default function StudentForgotPassword() {
               className="inline-flex items-center text-sm text-blue-600 hover:text-blue-700 font-medium"
             >
               <ArrowLeft className="w-4 h-4 mr-1" />
-              Back to Login
+              {tr("forgotPassword.backToLogin")}
             </button>
           </div>
         </div>
@@ -144,7 +146,7 @@ export default function StudentForgotPassword() {
         {/* Help Text */}
         <div className="mt-6 text-center">
           <p className="text-xs text-gray-500">
-            Need help? Contact your teacher or administrator
+            {tr("forgotPassword.needHelpContactYourTeacher")}
           </p>
         </div>
       </div>

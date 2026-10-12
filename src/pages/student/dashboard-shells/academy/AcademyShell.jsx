@@ -29,6 +29,12 @@ import ProgressCard from "../../components/ProgressCard";
 import DashboardAlertsBar from "../../../../components/DashboardAlertsBar";
 // Tabs load on demand (see src/pages/student/tabs/lazyTabs.js)
 import { LeaderboardTab, ChangePassword, StudentCompletedTab, BookingCalendarTab, ClassReportsTab, StudentScheduleTab, StudentHomeworkTab, StudentQuizTab, PronunciationTab, ConversationTab, FlashcardsTab, RecordingsTab, ReviewsTab, ReferralTab, MessagesTab, Classroom } from "../../tabs/lazyTabs";
+import { useTranslation } from "react-i18next";
+import i18n from "../../../../i18n/i18n.js";
+
+// For text in file-level lists: read when rendered, so it follows the chosen language
+const ta = (key, opts) => i18n.t(`student:${key}`, opts);
+
 
 // ── Light palette (base) ───────────────────────────────────────────────────────
 const LIGHT = {
@@ -68,40 +74,40 @@ const DARK_OVER = {
 
 // ── Sidebar nav ────────────────────────────────────────────────────────────────
 const NAV = [
-  { id:"dashboard", Icon:Home,          label:"Dashboard",  tabs:["dashboard"]                        },
-  { id:"study",     Icon:BookOpen,       label:"Study",      tabs:["homework","quiz","flashcards"]     },
-  { id:"practice",  Icon:Mic2,           label:"Practice",   tabs:["pronunciation","conversation"]     },
-  { id:"messages",  Icon:MessageSquare,  label:"Messages",   tabs:["messages"]                         },
-  { id:"classes",   Icon:CalendarDays,   label:"Classes",    tabs:["completed-classes","schedule","book-class","class-reports"]     },
-  { id:"progress",  Icon:BarChart2,      label:"Progress",   tabs:["charts","badges"]                  },
-  { id:"more",      Icon:MoreHorizontal, label:"More",       tabs:["recordings","reviews","referral","leaderboard"]  },
+  { id:"dashboard", Icon:Home,          get label() { return ta("academyShell.navDashboard"); },  tabs:["dashboard"]                        },
+  { id:"study",     Icon:BookOpen,       get label() { return ta("academyShell.navStudy"); },      tabs:["homework","quiz","flashcards"]     },
+  { id:"practice",  Icon:Mic2,           get label() { return ta("academyShell.navPractice"); },   tabs:["pronunciation","conversation"]     },
+  { id:"messages",  Icon:MessageSquare,  get label() { return ta("academyShell.navMessages"); },   tabs:["messages"]                         },
+  { id:"classes",   Icon:CalendarDays,   get label() { return ta("academyShell.navClasses"); },    tabs:["completed-classes","schedule","book-class","class-reports"]     },
+  { id:"progress",  Icon:BarChart2,      get label() { return ta("academyShell.navProgress"); },   tabs:["charts","badges"]                  },
+  { id:"more",      Icon:MoreHorizontal, get label() { return ta("academyShell.navMore"); },       tabs:["recordings","reviews","referral","leaderboard"]  },
 ];
 
 const SUB_TABS = {
-  study:    [{ key:"homework",label:"Homework" }, { key:"quiz",label:"Quizzes" }, { key:"flashcards",label:"Flashcards" }],
-  practice: [{ key:"pronunciation",label:"Speak" }, { key:"conversation",label:"AI Chat" }],
-  classes:  [{ key:"completed-classes",label:"Completed" }, { key:"schedule",label:"Schedule" }, { key:"book-class",label:"Book a Class" }, { key:"class-reports",label:"Reports" }],
-  progress: [{ key:"charts",label:"Charts" }, { key:"badges",label:"Badges" }],
-  more:     [{ key:"recordings",label:"Recordings" }, { key:"reviews",label:"Reviews" }, { key:"referral",label:"Invite" }, { key:"leaderboard",label:"Leaderboard" }],
+  study:    [{ key:"homework",get label() { return ta("academyShell.subTabsHomework"); } }, { key:"quiz",get label() { return ta("academyShell.subTabsQuizzes"); } }, { key:"flashcards",get label() { return ta("academyShell.subTabsFlashcards"); } }],
+  practice: [{ key:"pronunciation",get label() { return ta("academyShell.subTabsSpeak"); } }, { key:"conversation",get label() { return ta("academyShell.subTabsAiChat"); } }],
+  classes:  [{ key:"completed-classes",get label() { return ta("academyShell.subTabsCompleted"); } }, { key:"schedule",get label() { return ta("academyShell.subTabsSchedule"); } }, { key:"book-class",get label() { return ta("academyShell.subTabsBookAClass"); } }, { key:"class-reports",get label() { return ta("academyShell.subTabsReports"); } }],
+  progress: [{ key:"charts",get label() { return ta("academyShell.subTabsCharts"); } }, { key:"badges",get label() { return ta("academyShell.subTabsBadges"); } }],
+  more:     [{ key:"recordings",get label() { return ta("academyShell.subTabsRecordings"); } }, { key:"reviews",get label() { return ta("academyShell.subTabsReviews"); } }, { key:"referral",get label() { return ta("academyShell.subTabsInvite"); } }, { key:"leaderboard",get label() { return ta("academyShell.subTabsLeaderboard"); } }],
 };
 
 // ── Page titles ────────────────────────────────────────────────────────────────
 const PAGE_TITLES = {
-  dashboard:         "Dashboard",
-  homework:          "Homework",
-  quiz:              "Quizzes",
-  flashcards:        "Flashcards",
-  pronunciation:     "Speaking Practice",
-  conversation:      "AI Conversation",
-  messages:          "Messages",
-  "completed-classes": "Completed Classes",
-  schedule:          "My Schedule",
-  charts:            "Progress Charts",
-  badges:            "My Badges",
-  recordings:        "Recordings",
-  reviews:           "Reviews",
-  referral:          "Invite Friends",
-  leaderboard:       "Leaderboard",
+  get dashboard() { return ta("academyShell.pageTitlesDashboard"); },
+  get homework() { return ta("academyShell.pageTitlesHomework"); },
+  get quiz() { return ta("academyShell.pageTitlesQuizzes"); },
+  get flashcards() { return ta("academyShell.pageTitlesFlashcards"); },
+  get pronunciation() { return ta("academyShell.pageTitlesSpeakingPractice"); },
+  get conversation() { return ta("academyShell.pageTitlesAiConversation"); },
+  get messages() { return ta("academyShell.pageTitlesMessages"); },
+  get "completed-classes"() { return ta("academyShell.pageTitlesCompletedClasses"); },
+  get schedule() { return ta("academyShell.pageTitlesMySchedule"); },
+  get charts() { return ta("academyShell.pageTitlesProgressCharts"); },
+  get badges() { return ta("academyShell.pageTitlesMyBadges"); },
+  get recordings() { return ta("academyShell.pageTitlesRecordings"); },
+  get reviews() { return ta("academyShell.pageTitlesReviews"); },
+  get referral() { return ta("academyShell.pageTitlesInviteFriends"); },
+  get leaderboard() { return ta("academyShell.pageTitlesLeaderboard"); },
 };
 
 // ── Grade colour helpers ───────────────────────────────────────────────────────
@@ -115,20 +121,22 @@ const gradeColor = (g) => GRADE_COLORS[g] || LIGHT.orange;
 
 // ── Donut centre label ─────────────────────────────────────────────────────────
 function DonutLabel({ cx, cy, completed, total, textColor }) {
+  const { t: tr } = useTranslation("student");
   return (
     <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle">
       <tspan x={cx} dy="-6" fontSize="22" fontWeight="700" fill={textColor}>{completed}</tspan>
-      <tspan x={cx} dy="20" fontSize="11" fill={LIGHT.textMuted}>of {total}</tspan>
+      <tspan x={cx} dy="20" fontSize="11" fill={LIGHT.textMuted}>{tr("academyShell.of", { total })}</tspan>
     </text>
   );
 }
 
 // ── Badges panel ───────────────────────────────────────────────────────────────
 function AcademyBadgesPanel({ badges, progress, completedClasses, shareAchievement, P }) {
+  const { t: tr } = useTranslation("student");
   const [filter, setFilter] = useState("all");
   const cats = [
-    { key:"all",label:"All" },{ key:"journey",label:"Journey" },
-    { key:"consistency",label:"Streak" },{ key:"weekly",label:"Weekly" },{ key:"special",label:"Special" },
+    { key:"all",label:tr("academyShell.all") },{ key:"journey",label:tr("academyShell.journey") },
+    { key:"consistency",label:tr("academyShell.streak") },{ key:"weekly",label:tr("academyShell.weekly") },{ key:"special",label:tr("academyShell.special") },
   ];
   const shown = BADGE_DEFINITIONS.filter(b => filter === "all" || b.category === filter);
   const pct = Math.round((badges.length / BADGE_DEFINITIONS.length) * 100);
@@ -144,15 +152,15 @@ function AcademyBadgesPanel({ badges, progress, completedClasses, shareAchieveme
       <div style={{ background:P.card, borderRadius:"16px", padding:"24px", border:`1px solid ${P.border}` }}>
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"16px" }}>
           <div>
-            <h2 style={{ margin:"0 0 4px", fontSize:"20px", fontWeight:700, color:P.text }}>Achievement Badges</h2>
+            <h2 style={{ margin:"0 0 4px", fontSize:"20px", fontWeight:700, color:P.text }}>{tr("academyShell.achievementBadges")}</h2>
             <p style={{ margin:0, color:P.textSub, fontSize:"14px" }}>
-              {badges.length === 0 ? "Complete classes to start earning!" : `${badges.length} of ${BADGE_DEFINITIONS.length} earned · ${pct}%`}
+              {badges.length === 0 ? tr("academyShell.completeClassesToStartEarning") : tr("academyShell.ofEarned", { badgesCount: badges.length, BADGEDEFINITIONSCount: BADGE_DEFINITIONS.length, pct })}
             </p>
           </div>
           {badges.length > 0 && (
             <button onClick={() => shareAchievement("badge")}
               style={{ background:P.orange, color:"#fff", border:"none", borderRadius:"999px", padding:"9px 20px", fontWeight:600, cursor:"pointer", fontSize:"14px" }}>
-              Share
+              {tr("academyShell.share")}
             </button>
           )}
         </div>
@@ -187,7 +195,7 @@ function AcademyBadgesPanel({ badges, progress, completedClasses, shareAchieveme
                   </div>
                 </>
               )}
-              {earned && <div style={{ fontSize:"11px", color:P.green, fontWeight:700 }}>Earned ✓</div>}
+              {earned && <div style={{ fontSize:"11px", color:P.green, fontWeight:700 }}>{tr("academyShell.earned")}</div>}
             </div>
           );
         })}
@@ -200,6 +208,7 @@ function AcademyBadgesPanel({ badges, progress, completedClasses, shareAchieveme
 // AcademyShell
 // ══════════════════════════════════════════════════════════════════════════════
 export default function AcademyShell() {
+  const { t: tr } = useTranslation("student");
   const { branding, center } = useBranding();
   const d = useDashboardData();
   const { missedCallCount, clearMissedCalls } = useRing();
@@ -234,7 +243,7 @@ export default function AcademyShell() {
   const GRADE_POOL = ["A+","B+","B+","B1+","A","B","A-","B2","C+","A+"];
   const recentMarks = d.completedClasses.slice(0, 8).map((c, i) => ({
     grade: GRADE_POOL[i % GRADE_POOL.length],
-    label: c.title || c.topic || "Lesson",
+    label: c.title || c.topic || tr("academyShell.lesson"),
     teacher: c.teacher,
   }));
 
@@ -312,12 +321,12 @@ export default function AcademyShell() {
         <button className="aca-nav-btn" onClick={() => setShowSettingsPanel(true)}
           style={{ width:"100%", height:"42px", borderRadius:"12px", border:"none", cursor:"pointer", background:"transparent", display:"flex", alignItems:"center", gap:"10px", padding:"0 12px", color:"rgba(255,255,255,0.9)" }}>
           <Settings size={17} style={{ flexShrink:0 }} />
-          <span style={{ fontSize:"13px", fontWeight:500 }}>Settings</span>
+          <span style={{ fontSize:"13px", fontWeight:500 }}>{tr("academyShell.settings")}</span>
         </button>
         <button className="aca-nav-btn" onClick={d.handleLogout}
           style={{ width:"100%", height:"42px", borderRadius:"12px", border:"none", cursor:"pointer", background:"transparent", display:"flex", alignItems:"center", gap:"10px", padding:"0 12px", color:"rgba(255,255,255,0.9)" }}>
           <LogOut size={17} style={{ flexShrink:0 }} />
-          <span style={{ fontSize:"13px", fontWeight:500 }}>Sign Out</span>
+          <span style={{ fontSize:"13px", fontWeight:500 }}>{tr("academyShell.signOut")}</span>
         </button>
       </aside>
 
@@ -356,7 +365,7 @@ export default function AcademyShell() {
           {!isMobile && (
           <div style={{ position:"relative" }}>
             <Search size={15} style={{ position:"absolute", left:"10px", top:"50%", transform:"translateY(-50%)", color:P.textMuted }} />
-            <input placeholder="Search..."
+            <input placeholder={tr("academyShell.search")}
               style={{ width:"180px", height:"36px", background:P.inputBg, border:`1px solid ${P.border}`, borderRadius:"10px", padding:"0 10px 0 32px", fontSize:"13px", color:P.text, outline:"none", fontFamily:"Inter,sans-serif" }} />
           </div>
           )}
@@ -365,24 +374,24 @@ export default function AcademyShell() {
 
           {/* Dark mode toggle */}
           <button onClick={() => d.setIsDarkMode(v => !v)}
-            title={d.isDarkMode ? "Light mode" : "Dark mode"}
+            title={d.isDarkMode ? tr("academyShell.lightMode") : tr("academyShell.darkMode")}
             style={{ width:"36px", height:"36px", borderRadius:"10px", border:`1px solid ${P.border}`, background:P.inputBg, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", color:P.textSub, flexShrink:0 }}>
             {d.isDarkMode ? <Sun size={16} /> : <Moon size={16} />}
           </button>
 
           {/* ── Notification chips — desktop only ── */}
           {!isMobile && d.unreadMessages > 0 && (
-            <button onClick={() => { d.setActiveTab("messages"); d.setUnreadMessages(0); }} title="Go to messages"
+            <button onClick={() => { d.setActiveTab("messages"); d.setUnreadMessages(0); }} title={tr("academyShell.goToMessages")}
               style={{ display:"flex", alignItems:"center", gap:"5px", background: d.isDarkMode?"rgba(139,92,246,0.15)":"#f5f3ff", border:`1.5px solid ${d.isDarkMode?"rgba(139,92,246,0.3)":"#ddd6fe"}`, borderRadius:"999px", padding:"5px 13px", cursor:"pointer" }}>
               <span style={{ fontSize:"13px" }}>💬</span>
-              <span style={{ fontSize:"12px", fontWeight:800, color: d.isDarkMode?"#a78bfa":"#7c3aed" }}>{d.unreadMessages} new</span>
+              <span style={{ fontSize:"12px", fontWeight:800, color: d.isDarkMode?"#a78bfa":"#7c3aed" }}>{tr("academyShell.new", { unreadMessages: d.unreadMessages })}</span>
             </button>
           )}
           {!isMobile && missedCallCount > 0 && (
-            <button onClick={clearMissedCalls} title="Clear missed calls"
+            <button onClick={clearMissedCalls} title={tr("academyShell.clearMissedCalls")}
               style={{ display:"flex", alignItems:"center", gap:"5px", background: d.isDarkMode?"rgba(239,68,68,0.12)":"#fff5f5", border:`1.5px solid ${d.isDarkMode?"rgba(239,68,68,0.3)":"#fecaca"}`, borderRadius:"999px", padding:"5px 13px", cursor:"pointer" }}>
               <span style={{ fontSize:"13px" }}>📞</span>
-              <span style={{ fontSize:"12px", fontWeight:800, color:"#ef4444" }}>{missedCallCount} missed</span>
+              <span style={{ fontSize:"12px", fontWeight:800, color:"#ef4444" }}>{tr("academyShell.missed", { missedCallCount })}</span>
             </button>
           )}
 
@@ -401,11 +410,11 @@ export default function AcademyShell() {
             </div>
             {!isMobile && (
             <div style={{ lineHeight:1.2 }}>
-              <div style={{ fontSize:"14px", fontWeight:600, color:P.text }}>{d.student.name || "Student"}</div>
+              <div style={{ fontSize:"14px", fontWeight:600, color:P.text }}>{d.student.name || tr("academyShell.student")}</div>
               {d.student.studentId && (
                 <div style={{ fontSize:"11px", fontFamily:"monospace", fontWeight:700, color:P.textMuted, letterSpacing:"0.03em" }}>{d.student.studentId}</div>
               )}
-              <div style={{ fontSize:"12px", color:P.textMuted }}>Student</div>
+              <div style={{ fontSize:"12px", color:P.textMuted }}>{tr("academyShell.student")}</div>
             </div>
             )}
           </div>
@@ -426,26 +435,23 @@ export default function AcademyShell() {
 
                 {/* Greeting */}
                 <div>
-                  <h1 style={{ margin:"0 0 4px", fontSize:"24px", fontWeight:800, color:P.text }}>
-                    Good {new Date().getHours() < 12 ? "morning" : new Date().getHours() < 18 ? "afternoon" : "evening"}, {d.student.firstName || "there"}! 👋
-                  </h1>
-                  <p style={{ margin:0, color:P.textSub, fontSize:"14px" }}>Here's what's on your plate today.</p>
+                  <h1 style={{ margin:"0 0 4px", fontSize:"24px", fontWeight:800, color:P.text }}>{tr(new Date().getHours() < 12 ? "academyShell.goodMorning" : new Date().getHours() < 18 ? "academyShell.goodAfternoon" : "academyShell.goodEvening", { name: d.student.firstName || tr("academyShell.there") })}</h1>
+                  <p style={{ margin:0, color:P.textSub, fontSize:"14px" }}>{tr("academyShell.hereSWhatSOn")}</p>
                 </div>
 
                 {/* Live classes — always visible */}
                 <div className="aca-card" style={{ background:P.card, borderRadius:"16px", padding:"20px", border:`1px solid ${d.activeClasses.length > 0 ? P.red+"55" : P.border}`, boxShadow:"0 1px 6px rgba(0,0,0,0.05)" }}>
                   <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:"14px" }}>
-                    <h2 style={{ margin:0, fontSize:"16px", fontWeight:700, color:P.text }}>🔴 Active Classes</h2>
+                    <h2 style={{ margin:0, fontSize:"16px", fontWeight:700, color:P.text }}>{tr("academyShell.activeClasses")}</h2>
                     {d.activeClasses.length > 0 && (
                       <span style={{ background:"#FEE2E2", color:P.red, borderRadius:"999px", padding:"2px 10px", fontSize:"12px", fontWeight:600 }}>
-                        {d.activeClasses.length} live
-                      </span>
+                        {tr("academyShell.live", { activeClassesCount: d.activeClasses.length })}</span>
                     )}
                   </div>
                   {d.activeClasses.length === 0 ? (
                     <div style={{ textAlign:"center", padding:"16px 0", color:P.textMuted }}>
                       <div style={{ fontSize:"28px", marginBottom:"6px" }}>📡</div>
-                      <p style={{ margin:0, fontSize:"13px" }}>No live classes right now. You're all clear!</p>
+                      <p style={{ margin:0, fontSize:"13px" }}>{tr("academyShell.noLiveClassesRightNow")}</p>
                     </div>
                   ) : (
                     <ActiveClasses activeClasses={d.activeClasses} onJoin={d.handleJoinClass} />
@@ -455,16 +461,16 @@ export default function AcademyShell() {
                 {/* Upcoming classes — always visible */}
                 <div className="aca-card" style={{ background:P.card, borderRadius:"16px", padding:"20px", border:`1px solid ${P.border}`, boxShadow:"0 1px 6px rgba(0,0,0,0.05)" }}>
                   <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:"14px" }}>
-                    <h2 style={{ margin:0, fontSize:"16px", fontWeight:700, color:P.text }}>📅 Upcoming Classes</h2>
+                    <h2 style={{ margin:0, fontSize:"16px", fontWeight:700, color:P.text }}>{tr("academyShell.upcomingClasses")}</h2>
                     <button onClick={() => d.setActiveTab("schedule")}
                       style={{ background:"none", border:"none", color:P.orange, fontWeight:600, fontSize:"13px", cursor:"pointer", display:"flex", alignItems:"center", gap:"4px" }}>
-                      Schedule <ChevronRight size={14} />
+                      {tr("academyShell.schedule")} <ChevronRight size={14} />
                     </button>
                   </div>
                   {d.upcomingClasses.length === 0 ? (
                     <div style={{ textAlign:"center", padding:"16px 0", color:P.textMuted }}>
                       <div style={{ fontSize:"28px", marginBottom:"6px" }}>📭</div>
-                      <p style={{ margin:0, fontSize:"13px" }}>No upcoming classes scheduled yet.</p>
+                      <p style={{ margin:0, fontSize:"13px" }}>{tr("academyShell.noUpcomingClassesScheduledYet")}</p>
                     </div>
                   ) : (
                     <UpcomingClasses upcomingClasses={d.upcomingClasses.slice(0,4)} onEnroll={() => d.showToast("Coming soon!")} />
@@ -474,34 +480,33 @@ export default function AcademyShell() {
                 {/* Due Assignments */}
                 <div className="aca-card" style={{ background:P.card, borderRadius:"16px", padding:"20px", border:`1px solid ${P.border}`, boxShadow:"0 1px 6px rgba(0,0,0,0.05)" }}>
                   <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:"16px" }}>
-                    <h2 style={{ margin:0, fontSize:"16px", fontWeight:700, color:P.text }}>Your Due Assignments</h2>
+                    <h2 style={{ margin:0, fontSize:"16px", fontWeight:700, color:P.text }}>{tr("academyShell.yourDueAssignments")}</h2>
                     <button onClick={() => d.setActiveTab("homework")}
                       style={{ background:"none", border:"none", color:P.orange, fontWeight:600, fontSize:"13px", cursor:"pointer", display:"flex", alignItems:"center", gap:"4px" }}>
-                      View all <ChevronRight size={14} />
+                      {tr("academyShell.viewAll")} <ChevronRight size={14} />
                     </button>
                   </div>
 
                   {d.homeworkPending === 0 ? (
                     <div style={{ textAlign:"center", padding:"24px", color:P.textMuted }}>
                       <div style={{ fontSize:"32px", marginBottom:"8px" }}>📋</div>
-                      <p style={{ margin:0, fontSize:"14px" }}>No pending assignments! You're all caught up.</p>
+                      <p style={{ margin:0, fontSize:"14px" }}>{tr("academyShell.noPendingAssignmentsYouRe")}</p>
                     </div>
                   ) : (
                     <div style={{ display:"flex", gap:"14px", alignItems:"flex-start", padding:"14px", background:d.isDarkMode ? "#1F1A12" : "#FFF7F0", borderRadius:"12px", border:`1px solid ${d.isDarkMode ? "#3A2A10" : "#FFE0C8"}` }}>
                       <div style={{ width:"52px", height:"52px", borderRadius:"12px", background:P.orangeGrad, display:"flex", alignItems:"center", justifyContent:"center", fontSize:"22px", flexShrink:0 }}>📚</div>
                       <div style={{ flex:1, minWidth:0 }}>
                         <div style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"4px" }}>
-                          <span style={{ background:P.orange, color:"#fff", borderRadius:"999px", padding:"2px 10px", fontSize:"11px", fontWeight:700 }}>HOMEWORK</span>
-                          <span style={{ fontSize:"11px", color:P.textMuted }}>Due soon</span>
+                          <span style={{ background:P.orange, color:"#fff", borderRadius:"999px", padding:"2px 10px", fontSize:"11px", fontWeight:700 }}>{tr("academyShell.homework2")}</span>
+                          <span style={{ fontSize:"11px", color:P.textMuted }}>{tr("academyShell.dueSoon")}</span>
                         </div>
-                        <div style={{ fontSize:"15px", fontWeight:700, color:P.text, marginBottom:"4px" }}>
-                          You have {d.homeworkPending} pending homework assignment{d.homeworkPending > 1 ? "s" : ""}
+                        <div style={{ fontSize:"15px", fontWeight:700, color:P.text, marginBottom:"4px" }}>{tr("academyShell.youHavePendingHomeworkAssignment", { homeworkPending: d.homeworkPending, value: d.homeworkPending > 1 ? "s" : "" })}
                         </div>
-                        <div style={{ fontSize:"13px", color:P.textSub }}>Assigned by your teacher · Complete before your next class</div>
+                        <div style={{ fontSize:"13px", color:P.textSub }}>{tr("academyShell.assignedByYourTeacherComplete")}</div>
                       </div>
                       <button className="aca-start aca-btn" onClick={() => d.setActiveTab("homework")}
                         style={{ flexShrink:0, background:P.orange, color:"#fff", border:"none", borderRadius:"999px", padding:"9px 20px", fontWeight:700, fontSize:"14px", cursor:"pointer" }}>
-                        Start →
+                        {tr("academyShell.start")}
                       </button>
                     </div>
                   )}
@@ -511,16 +516,15 @@ export default function AcademyShell() {
                       <div style={{ width:"52px", height:"52px", borderRadius:"12px", background:`linear-gradient(135deg, ${P.green}, #34D399)`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:"22px", flexShrink:0 }}>📝</div>
                       <div style={{ flex:1, minWidth:0 }}>
                         <div style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"4px" }}>
-                          <span style={{ background:P.green, color:"#fff", borderRadius:"999px", padding:"2px 10px", fontSize:"11px", fontWeight:700 }}>QUIZ</span>
+                          <span style={{ background:P.green, color:"#fff", borderRadius:"999px", padding:"2px 10px", fontSize:"11px", fontWeight:700 }}>{tr("academyShell.quiz")}</span>
                         </div>
                         <div style={{ fontSize:"15px", fontWeight:700, color:P.text, marginBottom:"4px" }}>
-                          {d.quizPending} quiz{d.quizPending > 1 ? "zes" : ""} waiting for you
-                        </div>
-                        <div style={{ fontSize:"13px", color:P.textSub }}>Test your knowledge!</div>
+                          {tr("academyShell.quizWaitingForYou", { quizPending: d.quizPending, value: d.quizPending > 1 ? "zes" : "" })}</div>
+                        <div style={{ fontSize:"13px", color:P.textSub }}>{tr("academyShell.testYourKnowledge")}</div>
                       </div>
                       <button className="aca-btn" onClick={() => d.setActiveTab("quiz")}
                         style={{ flexShrink:0, background:P.green, color:"#fff", border:"none", borderRadius:"999px", padding:"9px 20px", fontWeight:700, fontSize:"14px", cursor:"pointer" }}>
-                        Start →
+                        {tr("academyShell.start")}
                       </button>
                     </div>
                   )}
@@ -528,7 +532,7 @@ export default function AcademyShell() {
 
                 {/* Statistics */}
                 <div className="aca-card" style={{ background:P.card, borderRadius:"16px", padding:"20px", border:`1px solid ${P.border}`, boxShadow:"0 1px 6px rgba(0,0,0,0.05)" }}>
-                  <h2 style={{ margin:"0 0 16px", fontSize:"16px", fontWeight:700, color:P.text }}>Statistics</h2>
+                  <h2 style={{ margin:"0 0 16px", fontSize:"16px", fontWeight:700, color:P.text }}>{tr("academyShell.statistics")}</h2>
                   <div style={{ display:"flex", alignItems:"center", gap:"24px" }}>
                     <div style={{ flexShrink:0, width:"160px", height:"160px" }}>
                       <PieChart width={160} height={160}>
@@ -540,14 +544,14 @@ export default function AcademyShell() {
                     </div>
                     <div style={{ flex:1 }}>
                       <p style={{ margin:"0 0 16px", fontSize:"14px", color:P.textSub, lineHeight:1.5 }}>
-                        Out of <strong style={{ color:P.text }}>{total} total classes</strong>, you have completed{" "}
-                        <strong style={{ color:P.orange }}>{completed}</strong> and have{" "}
-                        <strong style={{ color:P.text }}>{remaining}</strong> remaining.
+                        {tr("academyShell.outOf")} <strong style={{ color:P.text }}>{tr("academyShell.totalClasses", { total })}</strong>{tr("academyShell.youHaveCompleted")}{" "}
+                        <strong style={{ color:P.orange }}>{completed}</strong> {tr("academyShell.andHave")}{" "}
+                        <strong style={{ color:P.text }}>{remaining}</strong> {tr("academyShell.remaining")}
                       </p>
                       <div style={{ display:"flex", flexDirection:"column", gap:"10px" }}>
                         {[
-                          { label:"Completed", value:completed, color:P.orange },
-                          { label:"Remaining", value:remaining, color:P.border },
+                          { label:tr("academyShell.completed"), value:completed, color:P.orange },
+                          { label:tr("academyShell.remaining2"), value:remaining, color:P.border },
                         ].map(item => (
                           <div key={item.label} style={{ display:"flex", alignItems:"center", gap:"10px" }}>
                             <div style={{ width:"10px", height:"10px", borderRadius:"50%", background:item.color, flexShrink:0 }} />
@@ -557,7 +561,7 @@ export default function AcademyShell() {
                         ))}
                         <div style={{ display:"flex", alignItems:"center", gap:"10px" }}>
                           <div style={{ width:"10px", height:"10px", borderRadius:"50%", background:P.blue, flexShrink:0 }} />
-                          <span style={{ fontSize:"13px", color:P.textSub, flex:1 }}>Day Streak</span>
+                          <span style={{ fontSize:"13px", color:P.textSub, flex:1 }}>{tr("academyShell.dayStreak")}</span>
                           <span style={{ fontSize:"14px", fontWeight:700, color:P.text }}>🔥 {d.progress.streakDays}</span>
                         </div>
                       </div>
@@ -573,7 +577,7 @@ export default function AcademyShell() {
                 {/* Latest Marks */}
                 <div className="aca-card" style={{ background:P.card, borderRadius:"16px", padding:"20px", border:`1px solid ${P.border}`, boxShadow:"0 1px 6px rgba(0,0,0,0.05)" }}>
                   <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:"14px" }}>
-                    <h2 style={{ margin:0, fontSize:"15px", fontWeight:700, color:P.text }}>Latest Marks</h2>
+                    <h2 style={{ margin:0, fontSize:"15px", fontWeight:700, color:P.text }}>{tr("academyShell.latestMarks")}</h2>
                     <div style={{ display:"flex", alignItems:"center", gap:"4px" }}>
                       <button onClick={() => setMarksPage(p => Math.max(0, p - 1))}
                         style={{ background:P.inputBg, border:"none", borderRadius:"8px", width:"26px", height:"26px", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", color:P.textSub }}>
@@ -588,7 +592,7 @@ export default function AcademyShell() {
                   {recentMarks.length === 0 ? (
                     <div style={{ textAlign:"center", padding:"20px", color:P.textMuted }}>
                       <div style={{ fontSize:"28px", marginBottom:"6px" }}>🎓</div>
-                      <p style={{ margin:0, fontSize:"13px" }}>Complete classes to see your marks here.</p>
+                      <p style={{ margin:0, fontSize:"13px" }}>{tr("academyShell.completeClassesToSeeYour")}</p>
                     </div>
                   ) : (
                     <div style={{ display:"flex", flexDirection:"column", gap:"10px" }}>
@@ -610,7 +614,7 @@ export default function AcademyShell() {
                 {/* Class Wall / Messages */}
                 <div className="aca-card" style={{ background:P.card, borderRadius:"16px", border:`1px solid ${P.border}`, boxShadow:"0 1px 6px rgba(0,0,0,0.05)", overflow:"hidden" }}>
                   <div style={{ display:"flex", borderBottom:`1px solid ${P.border}` }}>
-                    {[{ key:"wall",label:"Class Wall" }, { key:"messages",label:"Messages" }].map(t => (
+                    {[{ key:"wall",label:tr("academyShell.classWall") }, { key:"messages",label:tr("academyShell.messages") }].map(t => (
                       <button key={t.key} onClick={() => setWallTab(t.key)}
                         style={{ flex:1, padding:"12px", border:"none", cursor:"pointer", fontSize:"13px", fontWeight:600, fontFamily:"Inter,sans-serif", background:wallTab===t.key ? P.card : P.inputBg, color:wallTab===t.key ? P.orange : P.textSub, borderBottom:wallTab===t.key ? `2px solid ${P.orange}` : "2px solid transparent" }}>
                         {t.label}
@@ -623,7 +627,7 @@ export default function AcademyShell() {
                       {d.notifications.length === 0 && d.activeClasses.length === 0 && d.upcomingClasses.length === 0 ? (
                         <div style={{ textAlign:"center", padding:"20px", color:P.textMuted }}>
                           <div style={{ fontSize:"28px", marginBottom:"6px" }}>💬</div>
-                          <p style={{ margin:0, fontSize:"13px" }}>No wall activity yet.</p>
+                          <p style={{ margin:0, fontSize:"13px" }}>{tr("academyShell.noWallActivityYet")}</p>
                         </div>
                       ) : (
                         <>
@@ -631,11 +635,11 @@ export default function AcademyShell() {
                             <div key={cls.id} style={{ display:"flex", gap:"10px", alignItems:"flex-start" }}>
                               <div style={{ width:"34px", height:"34px", borderRadius:"50%", background:`linear-gradient(135deg, ${P.red}, #F87171)`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:"14px", flexShrink:0 }}>🔴</div>
                               <div style={{ flex:1 }}>
-                                <div style={{ fontSize:"13px", fontWeight:600, color:P.text }}>{cls.title} is live</div>
-                                <div style={{ fontSize:"11px", color:P.textMuted }}>{cls.teacher} · Now</div>
+                                <div style={{ fontSize:"13px", fontWeight:600, color:P.text }}>{tr("academyShell.isLive", { title: cls.title })}</div>
+                                <div style={{ fontSize:"11px", color:P.textMuted }}>{tr("academyShell.now", { teacher: cls.teacher })}</div>
                                 <button onClick={() => d.handleJoinClass(cls)}
                                   style={{ marginTop:"6px", background:P.orange, color:"#fff", border:"none", borderRadius:"999px", padding:"4px 12px", fontSize:"11px", fontWeight:700, cursor:"pointer" }}>
-                                  Join →
+                                  {tr("academyShell.join")}
                                 </button>
                               </div>
                             </div>
@@ -675,7 +679,7 @@ export default function AcademyShell() {
 
                 {/* Progress */}
                 <div className="aca-card" style={{ background:P.card, borderRadius:"16px", padding:"16px", border:`1px solid ${P.border}`, boxShadow:"0 1px 6px rgba(0,0,0,0.05)" }}>
-                  <h3 style={{ margin:"0 0 12px", fontSize:"14px", fontWeight:700, color:P.text }}>My Progress</h3>
+                  <h3 style={{ margin:"0 0 12px", fontSize:"14px", fontWeight:700, color:P.text }}>{tr("academyShell.myProgress")}</h3>
                   <ProgressCard progress={d.progress} />
                 </div>
 
@@ -683,8 +687,8 @@ export default function AcademyShell() {
                 {d.badges.length > 0 && (
                   <div className="aca-card" style={{ background:P.card, borderRadius:"16px", padding:"16px", border:`1px solid ${P.border}`, boxShadow:"0 1px 6px rgba(0,0,0,0.05)" }}>
                     <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:"12px" }}>
-                      <h3 style={{ margin:0, fontSize:"14px", fontWeight:700, color:P.text }}>Recent Badges</h3>
-                      <button onClick={() => d.setActiveTab("badges")} style={{ background:"none", border:"none", color:P.orange, fontWeight:600, fontSize:"12px", cursor:"pointer" }}>See all</button>
+                      <h3 style={{ margin:0, fontSize:"14px", fontWeight:700, color:P.text }}>{tr("academyShell.recentBadges")}</h3>
+                      <button onClick={() => d.setActiveTab("badges")} style={{ background:"none", border:"none", color:P.orange, fontWeight:600, fontSize:"12px", cursor:"pointer" }}>{tr("academyShell.seeAll")}</button>
                     </div>
                     <div style={{ display:"flex", flexWrap:"wrap", gap:"8px" }}>
                       {d.badges.slice(-6).map(b => (
@@ -771,9 +775,9 @@ export default function AcademyShell() {
             <div style={{ display:"flex", flexDirection:"column", gap:"16px" }}>
               <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3,1fr)", gap:"12px" }}>
                 {[
-                  { label:"Total Classes", value:d.completedClasses.length, color:P.orange, icon:"🎓" },
-                  { label:"Day Streak",    value:d.progress.streakDays,     color:P.red,    icon:"🔥" },
-                  { label:"Total Hours",   value:d.completedClasses.length > 0 ? Math.round(d.completedClasses.reduce((s,c) => s + c.duration, 0) / 60) : 0, color:P.blue, icon:"⏱️" },
+                  { label:tr("academyShell.totalClasses2"), value:d.completedClasses.length, color:P.orange, icon:"🎓" },
+                  { label:tr("academyShell.dayStreak"),    value:d.progress.streakDays,     color:P.red,    icon:"🔥" },
+                  { label:tr("academyShell.totalHours"),   value:d.completedClasses.length > 0 ? Math.round(d.completedClasses.reduce((s,c) => s + c.duration, 0) / 60) : 0, color:P.blue, icon:"⏱️" },
                 ].map(({ label, value, color, icon }) => (
                   <div key={label} style={{ background:P.card, border:`1px solid ${P.border}`, borderRadius:"16px", padding:"20px" }}>
                     <div style={{ fontSize:"28px", marginBottom:"8px" }}>{icon}</div>
@@ -782,7 +786,7 @@ export default function AcademyShell() {
                   </div>
                 ))}
               </div>
-              {[{ title:"Last 7 Days", data:d.chartData.last7, type:"bar" }, { title:"Last 30 Days", data:d.chartData.last30, type:"line" }].map(({ title, data, type }) => (
+              {[{ title:tr("academyShell.last7Days"), data:d.chartData.last7, type:"bar" }, { title:tr("academyShell.last30Days"), data:d.chartData.last30, type:"line" }].map(({ title, data, type }) => (
                 <div key={title} style={{ background:P.card, border:`1px solid ${P.border}`, borderRadius:"16px", padding:"20px" }}>
                   <h3 style={{ margin:"0 0 16px", fontSize:"15px", fontWeight:700, color:P.text }}>{title}</h3>
                   <ResponsiveContainer width="100%" height={220}>
@@ -826,7 +830,7 @@ export default function AcademyShell() {
           <div style={{ width:"320px", background:P.white, height:"100%", padding:"28px", overflowY:"auto", boxShadow:"-4px 0 24px rgba(0,0,0,0.12)" }}
             onClick={e => e.stopPropagation()}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"28px" }}>
-              <h2 style={{ margin:0, fontSize:"18px", fontWeight:700, color:P.text }}>Settings</h2>
+              <h2 style={{ margin:0, fontSize:"18px", fontWeight:700, color:P.text }}>{tr("academyShell.settings")}</h2>
               <button onClick={() => setShowSettingsPanel(false)}
                 style={{ background:P.inputBg, border:"none", borderRadius:"8px", width:"32px", height:"32px", cursor:"pointer", fontSize:"16px", color:P.text }}>✕</button>
             </div>
@@ -837,7 +841,7 @@ export default function AcademyShell() {
               </div>
               <div>
                 <div style={{ fontSize:"15px", fontWeight:700, color:P.text }}>{d.student.name}</div>
-                <div style={{ fontSize:"12px", color:P.textMuted }}>{d.student.email || "Student"}</div>
+                <div style={{ fontSize:"12px", color:P.textMuted }}>{d.student.email || tr("academyShell.student")}</div>
               </div>
             </div>
 
@@ -845,7 +849,7 @@ export default function AcademyShell() {
             <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"12px 14px", background:P.settingRow, border:`1px solid ${P.border}`, borderRadius:"10px", marginBottom:"8px" }}>
               <div style={{ display:"flex", alignItems:"center", gap:"10px" }}>
                 {d.isDarkMode ? <Moon size={16} color={P.orange} /> : <Sun size={16} color={P.orange} />}
-                <span style={{ fontSize:"14px", color:P.text, fontWeight:500 }}>{d.isDarkMode ? "Dark Mode" : "Light Mode"}</span>
+                <span style={{ fontSize:"14px", color:P.text, fontWeight:500 }}>{d.isDarkMode ? tr("academyShell.darkMode2") : tr("academyShell.lightMode2")}</span>
               </div>
               <button onClick={() => d.setIsDarkMode(v => !v)}
                 style={{ width:"44px", height:"24px", borderRadius:"999px", border:"none", cursor:"pointer", background:d.isDarkMode ? P.orange : P.border, position:"relative", transition:"background .2s" }}>
@@ -854,9 +858,9 @@ export default function AcademyShell() {
             </div>
 
             {[
-              { Icon:KeyRound, label:"Change Password", action:() => { setShowSettingsPanel(false); d.setShowChangePassword(true); } },
-              { Icon:Shield,   label:"Session Management", action:() => { setShowSettingsPanel(false); d.setShowSessionManagement(true); } },
-              { Icon:Settings, label:"Security & 2FA", action:() => { setShowSettingsPanel(false); setShow2FA(true); } },
+              { Icon:KeyRound, label:tr("academyShell.changePassword"), action:() => { setShowSettingsPanel(false); d.setShowChangePassword(true); } },
+              { Icon:Shield,   label:tr("academyShell.sessionManagement"), action:() => { setShowSettingsPanel(false); d.setShowSessionManagement(true); } },
+              { Icon:Settings, label:tr("academyShell.security2fa"), action:() => { setShowSettingsPanel(false); setShow2FA(true); } },
             ].map(({ Icon, label, action }) => (
               <button key={label} onClick={action}
                 style={{ width:"100%", display:"flex", alignItems:"center", gap:"12px", padding:"12px 14px", background:P.settingRow, border:`1px solid ${P.border}`, borderRadius:"10px", marginBottom:"8px", cursor:"pointer", fontFamily:"Inter,sans-serif", fontSize:"14px", color:P.text, fontWeight:500 }}>
@@ -868,7 +872,7 @@ export default function AcademyShell() {
 
             <button onClick={d.handleLogout}
               style={{ width:"100%", display:"flex", alignItems:"center", justifyContent:"center", gap:"8px", padding:"12px", background:P.orange, border:"none", borderRadius:"10px", cursor:"pointer", color:"#fff", fontWeight:700, fontSize:"14px", marginTop:"16px" }}>
-              <LogOut size={16} /> Sign Out
+              <LogOut size={16} /> {tr("academyShell.signOut")}
             </button>
           </div>
         </div>
@@ -891,10 +895,10 @@ export default function AcademyShell() {
       {isMobile && (
         <nav style={{ position:'fixed', bottom:0, left:0, right:0, height:60, background:P.orange, borderTop:'1px solid rgba(255,255,255,0.2)', display:'flex', zIndex:200, boxShadow:'0 -4px 20px rgba(249,115,22,0.3)' }}>
           {[
-            { key:'dashboard',         Icon:Home,          label:'Home'    },
-            { key:'homework',          Icon:BookOpen,       label:'Study'   },
-            { key:'messages',          Icon:MessageSquare,  label:'Chat'    },
-            { key:'completed-classes', Icon:CalendarDays,   label:'Classes' },
+            { key:'dashboard',         Icon:Home,          label:tr("academyShell.home")    },
+            { key:'homework',          Icon:BookOpen,       label:tr("academyShell.study")   },
+            { key:'messages',          Icon:MessageSquare,  label:tr("academyShell.chat")    },
+            { key:'completed-classes', Icon:CalendarDays,   label:tr("academyShell.classes") },
           ].map(({ key, Icon, label }) => {
             const isActive = d.activeTab === key;
             return (
@@ -908,7 +912,7 @@ export default function AcademyShell() {
           <button onClick={() => setShowMobileMenu(true)}
             style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:3, border:'none', background:'transparent', cursor:'pointer', fontFamily:"'Inter',sans-serif", color:'rgba(255,255,255,0.6)', borderTop:'3px solid transparent' }}>
             <Settings size={20} strokeWidth={1.8} />
-            <span style={{ fontSize:10, fontWeight:500 }}>More</span>
+            <span style={{ fontSize:10, fontWeight:500 }}>{tr("academyShell.more")}</span>
           </button>
         </nav>
       )}
@@ -933,12 +937,12 @@ export default function AcademyShell() {
               <button onClick={() => { setShowMobileMenu(false); setShowSettingsPanel(true); }}
                 style={{ display:'flex', alignItems:'center', gap:12, padding:'11px 14px', borderRadius:14, border:'none', background:'transparent', color:P.text, cursor:'pointer', fontFamily:"'Inter',sans-serif", width:'100%', fontSize:14, fontWeight:500 }}>
                 <Settings size={18} color={P.textSub} strokeWidth={1.8} />
-                Settings
+                {tr("academyShell.settings")}
               </button>
               <button onClick={d.handleLogout}
                 style={{ display:'flex', alignItems:'center', gap:12, padding:'11px 14px', borderRadius:14, border:'none', background:'transparent', color:P.red, cursor:'pointer', fontFamily:"'Inter',sans-serif", width:'100%', fontSize:14, fontWeight:600 }}>
                 <LogOut size={18} color={P.red} strokeWidth={1.8} />
-                Sign Out
+                {tr("academyShell.signOut")}
               </button>
             </div>
           </div>
@@ -957,7 +961,7 @@ export default function AcademyShell() {
         <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.5)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:9999, padding:"16px" }}>
           <div style={{ background:P.white, borderRadius:"20px", padding:"28px", maxWidth:"420px", width:"100%", boxShadow:"0 20px 60px rgba(0,0,0,0.2)" }}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"20px" }}>
-              <h3 style={{ margin:0, fontSize:"18px", fontWeight:700, color:P.text }}>Share Your Achievement</h3>
+              <h3 style={{ margin:0, fontSize:"18px", fontWeight:700, color:P.text }}>{tr("academyShell.shareYourAchievement")}</h3>
               <button onClick={() => d.setShowShareModal(false)}
                 style={{ background:P.inputBg, border:"none", borderRadius:"8px", width:"32px", height:"32px", cursor:"pointer", fontSize:"16px", color:P.text }}>✕</button>
             </div>
@@ -968,7 +972,7 @@ export default function AcademyShell() {
             <div style={{ display:"flex", flexDirection:"column", gap:"10px" }}>
               <button onClick={d.copyShareText}
                 style={{ width:"100%", padding:"11px", border:`1px solid ${P.border}`, borderRadius:"999px", background:"transparent", color:P.text, fontWeight:600, cursor:"pointer", fontSize:"14px", display:"flex", alignItems:"center", justifyContent:"center", gap:"8px" }}>
-                <Copy size={15} /> Copy to Clipboard
+                <Copy size={15} /> {tr("academyShell.copyToClipboard")}
               </button>
               <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"8px" }}>
                 {[["twitter","Twitter","#1DA1F2"],["facebook","Facebook","#1877F2"],["whatsapp","WhatsApp","#25D366"],["linkedin","LinkedIn","#0A66C2"]].map(([p,label,bg]) => (

@@ -3,30 +3,37 @@ import React, { useState, useEffect } from "react";
 import { DollarSign, Save, RefreshCw, BookOpen, Calculator } from "lucide-react";
 import api from "../../../api";
 import { invalidateCurrencyCache } from "../../../hooks/useCurrencySymbol";
+import { useTranslation } from "react-i18next";
+import i18n from "../../../i18n/i18n.js";
+
+// For text in file-level lists: read when rendered, so it follows the chosen language
+const ta = (key, opts) => i18n.t(`admin:${key}`, opts);
+
 
 const CURRENCIES = [
-  { code: "USD", symbol: "$",  label: "USD — US Dollar"        },
-  { code: "GBP", symbol: "£",  label: "GBP — British Pound"    },
-  { code: "EUR", symbol: "€",  label: "EUR — Euro"             },
-  { code: "NGN", symbol: "₦",  label: "NGN — Nigerian Naira"   },
-  { code: "VND", symbol: "₫",  label: "VND — Vietnamese Dong"  },
-  { code: "JPY", symbol: "¥",  label: "JPY — Japanese Yen"     },
-  { code: "KRW", symbol: "₩",  label: "KRW — South Korean Won" },
-  { code: "BRL", symbol: "R$", label: "BRL — Brazilian Real"   },
-  { code: "MXN", symbol: "$",  label: "MXN — Mexican Peso"     },
-  { code: "INR", symbol: "₹",  label: "INR — Indian Rupee"     },
-  { code: "AUD", symbol: "A$", label: "AUD — Australian Dollar"},
-  { code: "CAD", symbol: "C$", label: "CAD — Canadian Dollar"  },
-  { code: "SGD", symbol: "S$", label: "SGD — Singapore Dollar" },
-  { code: "SAR", symbol: "﷼",  label: "SAR — Saudi Riyal"      },
-  { code: "AED", symbol: "د.إ",label: "AED — UAE Dirham"       },
-  { code: "EGP", symbol: "£",  label: "EGP — Egyptian Pound"   },
-  { code: "TRY", symbol: "₺",  label: "TRY — Turkish Lira"     },
-  { code: "ZAR", symbol: "R",  label: "ZAR — South African Rand"},
-  { code: "OTHER", symbol: "",  label: "Other / Custom"        },
+  { code: "USD", symbol: "$",  get label() { return ta("classPricingTab.currencyName.USD"); }        },
+  { code: "GBP", symbol: "£",  get label() { return ta("classPricingTab.currencyName.GBP"); }    },
+  { code: "EUR", symbol: "€",  get label() { return ta("classPricingTab.currencyName.EUR"); }             },
+  { code: "NGN", symbol: "₦",  get label() { return ta("classPricingTab.currencyName.NGN"); }   },
+  { code: "VND", symbol: "₫",  get label() { return ta("classPricingTab.currencyName.VND"); }  },
+  { code: "JPY", symbol: "¥",  get label() { return ta("classPricingTab.currencyName.JPY"); }     },
+  { code: "KRW", symbol: "₩",  get label() { return ta("classPricingTab.currencyName.KRW"); } },
+  { code: "BRL", symbol: "R$", get label() { return ta("classPricingTab.currencyName.BRL"); }   },
+  { code: "MXN", symbol: "$",  get label() { return ta("classPricingTab.currencyName.MXN"); }     },
+  { code: "INR", symbol: "₹",  get label() { return ta("classPricingTab.currencyName.INR"); }     },
+  { code: "AUD", symbol: "A$", get label() { return ta("classPricingTab.currencyName.AUD"); }},
+  { code: "CAD", symbol: "C$", get label() { return ta("classPricingTab.currencyName.CAD"); }  },
+  { code: "SGD", symbol: "S$", get label() { return ta("classPricingTab.currencyName.SGD"); } },
+  { code: "SAR", symbol: "﷼",  get label() { return ta("classPricingTab.currencyName.SAR"); }      },
+  { code: "AED", symbol: "د.إ",get label() { return ta("classPricingTab.currencyName.AED"); }       },
+  { code: "EGP", symbol: "£",  get label() { return ta("classPricingTab.currencyName.EGP"); }   },
+  { code: "TRY", symbol: "₺",  get label() { return ta("classPricingTab.currencyName.TRY"); }     },
+  { code: "ZAR", symbol: "R",  get label() { return ta("classPricingTab.currencyName.ZAR"); }},
+  { code: "OTHER", symbol: "",  get label() { return ta("classPricingTab.currencyName.other"); }        },
 ];
 
 export default function ClassPricingTab({ isDarkMode }) {
+  const { t: tr } = useTranslation("admin");
   const [price,    setPrice]    = useState("");
   const [currency, setCurrency] = useState("USD");
   const [symbol,   setSymbol]   = useState("$");
@@ -69,7 +76,7 @@ export default function ClassPricingTab({ isDarkMode }) {
 
   const handleSave = async () => {
     if (!price || isNaN(Number(price)) || Number(price) < 0) {
-      setMsg({ type: "error", text: "Please enter a valid price per class" });
+      setMsg({ type: "error", text: tr("classPricingTab.pleaseEnterAValidPrice") });
       return;
     }
     setSaving(true);
@@ -81,10 +88,10 @@ export default function ClassPricingTab({ isDarkMode }) {
         currencySymbol: symbol,
         notes,
       });
-      setMsg({ type: "success", text: "Pricing saved successfully!" });
+      setMsg({ type: "success", text: tr("classPricingTab.pricingSavedSuccessfully") });
       invalidateCurrencyCache();
     } catch {
-      setMsg({ type: "error", text: "Failed to save pricing" });
+      setMsg({ type: "error", text: tr("classPricingTab.failedToSavePricing") });
     } finally {
       setSaving(false);
     }
@@ -108,9 +115,9 @@ export default function ClassPricingTab({ isDarkMode }) {
 
       {/* Page heading */}
       <div style={{ marginBottom: "28px" }}>
-        <h1 style={{ fontSize: "22px", fontWeight: "800", color: textPri, margin: 0 }}>Class Pricing</h1>
+        <h1 style={{ fontSize: "22px", fontWeight: "800", color: textPri, margin: 0 }}>{tr("classPricingTab.classPricing")}</h1>
         <p style={{ fontSize: "13px", color: textSec, margin: "4px 0 0" }}>
-          Set the price per class and currency for your center. Payments recorded via Manual Payment will auto-calculate the total.
+          {tr("classPricingTab.setThePricePerClass")}
         </p>
       </div>
 
@@ -122,12 +129,12 @@ export default function ClassPricingTab({ isDarkMode }) {
             <div style={{ background: "linear-gradient(135deg,#6366f1,#818cf8)", borderRadius: "10px", padding: "8px", display: "flex" }}>
               <DollarSign size={16} color="#fff" />
             </div>
-            <h2 style={{ fontSize: "15px", fontWeight: "700", color: textPri, margin: 0 }}>Pricing Settings</h2>
+            <h2 style={{ fontSize: "15px", fontWeight: "700", color: textPri, margin: 0 }}>{tr("classPricingTab.pricingSettings")}</h2>
           </div>
 
           {/* Price per class */}
           <div style={{ marginBottom: "16px" }}>
-            <label style={lbl}>Price Per Class *</label>
+            <label style={lbl}>{tr("classPricingTab.pricePerClass")}</label>
             <input
               style={inp}
               type="number"
@@ -141,7 +148,7 @@ export default function ClassPricingTab({ isDarkMode }) {
 
           {/* Currency select */}
           <div style={{ marginBottom: "16px" }}>
-            <label style={lbl}>Currency</label>
+            <label style={lbl}>{tr("classPricingTab.currency")}</label>
             <select
               value={currency}
               onChange={handleCurrencyChange}
@@ -155,7 +162,7 @@ export default function ClassPricingTab({ isDarkMode }) {
 
           {/* Currency symbol (editable for "Other") */}
           <div style={{ marginBottom: "16px" }}>
-            <label style={lbl}>Currency Symbol</label>
+            <label style={lbl}>{tr("classPricingTab.currencySymbol")}</label>
             <input
               style={inp}
               value={symbol}
@@ -163,16 +170,16 @@ export default function ClassPricingTab({ isDarkMode }) {
               placeholder="e.g. $"
               maxLength={5}
             />
-            <p style={{ fontSize: "11px", color: textSec, marginTop: "4px" }}>Auto-filled from currency selection. Edit for custom currencies.</p>
+            <p style={{ fontSize: "11px", color: textSec, marginTop: "4px" }}>{tr("classPricingTab.autoFilledFromCurrencySelection")}</p>
           </div>
 
           {/* Notes */}
           <div style={{ marginBottom: "20px" }}>
-            <label style={lbl}>Notes (Optional)</label>
+            <label style={lbl}>{tr("classPricingTab.notesOptional")}</label>
             <textarea
               value={notes}
               onChange={e => setNotes(e.target.value)}
-              placeholder="e.g. Price includes materials. Packages discounts available on request."
+              placeholder={tr("classPricingTab.eGPriceIncludesMaterials")}
               rows={2}
               style={{ ...inp, resize: "vertical", lineHeight: "1.5" }}
             />
@@ -197,7 +204,7 @@ export default function ClassPricingTab({ isDarkMode }) {
             style={{ width: "100%", padding: "12px", borderRadius: "10px", border: "none", background: saving ? "#94a3b8" : "linear-gradient(135deg,#6366f1,#818cf8)", color: "#fff", fontSize: "14px", fontWeight: "700", cursor: saving ? "not-allowed" : "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}
           >
             <Save size={15} />
-            {saving ? "Saving…" : "Save Pricing"}
+            {saving ? tr("classPricingTab.saving") : tr("classPricingTab.savePricing")}
           </button>
         </div>
 
@@ -207,24 +214,24 @@ export default function ClassPricingTab({ isDarkMode }) {
             <div style={{ background: "linear-gradient(135deg,#10b981,#059669)", borderRadius: "10px", padding: "8px", display: "flex" }}>
               <Calculator size={16} color="#fff" />
             </div>
-            <h2 style={{ fontSize: "15px", fontWeight: "700", color: textPri, margin: 0 }}>Price Calculator</h2>
+            <h2 style={{ fontSize: "15px", fontWeight: "700", color: textPri, margin: 0 }}>{tr("classPricingTab.priceCalculator")}</h2>
           </div>
 
           {/* Current rate display */}
           <div style={{ background: dm ? "#0f172a" : "#f8fafc", borderRadius: "12px", padding: "16px", marginBottom: "20px", border: `1px solid ${border}` }}>
-            <p style={{ fontSize: "12px", color: textSec, margin: "0 0 4px", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: "700" }}>Current Rate</p>
+            <p style={{ fontSize: "12px", color: textSec, margin: "0 0 4px", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: "700" }}>{tr("classPricingTab.currentRate")}</p>
             {price && Number(price) > 0 ? (
               <p style={{ fontSize: "24px", fontWeight: "800", color: "#6366f1", margin: 0 }}>
-                {symbol}{Number(price).toLocaleString()} <span style={{ fontSize: "14px", color: textSec, fontWeight: "600" }}>per class</span>
+                {symbol}{Number(price).toLocaleString()} <span style={{ fontSize: "14px", color: textSec, fontWeight: "600" }}>{tr("classPricingTab.perClass")}</span>
               </p>
             ) : (
-              <p style={{ fontSize: "14px", color: textSec, margin: 0 }}>Not set yet — enter a price and save.</p>
+              <p style={{ fontSize: "14px", color: textSec, margin: 0 }}>{tr("classPricingTab.notSetYetEnterA")}</p>
             )}
           </div>
 
           {/* Calculator input */}
           <div style={{ marginBottom: "16px" }}>
-            <label style={lbl}>Number of Classes to Price</label>
+            <label style={lbl}>{tr("classPricingTab.numberOfClassesToPrice")}</label>
             <input
               style={inp}
               type="number"
@@ -237,16 +244,16 @@ export default function ClassPricingTab({ isDarkMode }) {
 
           {/* Result */}
           <div style={{ background: dm ? "#0f172a" : "#f0f7ff", borderRadius: "12px", padding: "16px", border: `1px solid ${dm ? border : "#bfdbfe"}` }}>
-            <p style={{ fontSize: "12px", color: textSec, margin: "0 0 4px", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: "700" }}>Total Cost</p>
+            <p style={{ fontSize: "12px", color: textSec, margin: "0 0 4px", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: "700" }}>{tr("classPricingTab.totalCost")}</p>
             <p style={{ fontSize: "28px", fontWeight: "800", color: dm ? "#818cf8" : "#4f46e5", margin: 0 }}>
               {calcTotal != null
                 ? `${symbol}${Number(calcTotal).toLocaleString()}`
-                : <span style={{ fontSize: "16px", color: textSec, fontWeight: "600" }}>Enter classes above</span>
+                : <span style={{ fontSize: "16px", color: textSec, fontWeight: "600" }}>{tr("classPricingTab.enterClassesAbove")}</span>
               }
             </p>
             {calcTotal != null && (
               <p style={{ fontSize: "12px", color: textSec, margin: "4px 0 0" }}>
-                {calc} class{Number(calc) !== 1 ? "es" : ""} × {symbol}{Number(price).toLocaleString()} = {symbol}{Number(calcTotal).toLocaleString()} {currency}
+                {tr("classPricingTab.class", { calc, value: Number(calc) !== 1 ? "es" : "", symbol, value2: Number(price).toLocaleString(), value3: Number(calcTotal).toLocaleString(), currency })}
               </p>
             )}
           </div>
@@ -256,7 +263,7 @@ export default function ClassPricingTab({ isDarkMode }) {
             <div style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
               <BookOpen size={14} color={dm ? "#818cf8" : "#7c3aed"} style={{ flexShrink: 0, marginTop: "1px" }} />
               <p style={{ fontSize: "12px", color: dm ? "#a5b4fc" : "#6d28d9", margin: 0, lineHeight: "1.5" }}>
-                When you record a payment for a student, the amount will auto-calculate based on this rate. You can always override it manually.
+                {tr("classPricingTab.whenYouRecordAPayment")}
               </p>
             </div>
           </div>

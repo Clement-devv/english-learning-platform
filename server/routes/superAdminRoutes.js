@@ -15,7 +15,7 @@ import { fileURLToPath } from 'url';
 import { s3Enabled, uploadToS3, s3PublicUrl } from '../utils/s3.js';
 import { cleanLandingPage } from '../utils/landingPage.js';
 import { activateCenter } from '../utils/centerActivation.js';
-import { centerEmailInUse, emailInUseMessage } from '../utils/centerEmail.js';
+import { centerEmailInUse, emailInUseMessage, isEmailTakenError } from '../utils/centerEmail.js';
 
 // Same folder the center admins' logo uploads use (served publicly at /uploads/branding)
 const SA_BRANDING_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'uploads', 'branding');
@@ -2295,7 +2295,12 @@ router.patch('/centers/:id/override-email', verifySuperAdmin, strictLimiter, val
     const previousEmail = center.adminEmail;
     center.adminEmail = normalizedNew;
     center.pendingEmailChange = {}; // clear any in-progress change
-    await center.save();
+    try {
+      await center.save();
+    } catch (err) {
+      if (isEmailTakenError(err)) return res.status(409).json({ success: false, message: 'This email is already in use by another center' });
+      throw err;
+    }
 
     // Update Admin doc in the center's tenant DB + clear all sessions
     try {

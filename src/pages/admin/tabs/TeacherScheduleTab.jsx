@@ -9,6 +9,7 @@ import { tzAbbr, tzCity } from "../../../utils/timezone";
 import WeekCalendar, { Legend } from "../../../components/schedule/WeekCalendar";
 import ManagedBadge from "../../../components/ManagedBadge";
 import { getMonday, addDays, viewerTz, tzName, tzDiffText, fmtDay, fmtRange, fmtTime, fmtHHMM, localYmd, WEEKDAYS_SUN0 } from "../../../utils/scheduleView";
+import { useTranslation } from "react-i18next";
 
 const CONTINENTS = ["Africa", "Europe", "Asia", "Americas", "Oceania"];
 const HALF_HOURS = Array.from({ length: 49 }, (_, i) => `${String(Math.floor(i / 2)).padStart(2, "0")}:${i % 2 ? "30" : "00"}`);
@@ -30,6 +31,7 @@ function pal(dark) {
 
 // ── Teacher picker card ────────────────────────────────────────────────────
 function TeacherCard({ teacher, onClick, isDarkMode }) {
+  const { t: tr } = useTranslation("admin");
   const c = pal(isDarkMode);
   const displayName = teacher.displayName?.trim() || `${teacher.firstName || ""} ${teacher.lastName || ""}`.trim();
   const initials = `${teacher.firstName?.[0] || ""}${teacher.lastName?.[0] || ""}`.toUpperCase();
@@ -75,15 +77,15 @@ function TeacherCard({ teacher, onClick, isDarkMode }) {
           </span>
         )}
         <span style={{ fontSize: "11px", fontWeight: "600", padding: "3px 8px", borderRadius: "6px", background: teacher.active ? (isDarkMode ? "rgba(16,185,129,0.12)" : "#f0fdf4") : (isDarkMode ? "rgba(239,68,68,0.1)" : "#fef2f2"), color: teacher.active ? "#059669" : "#dc2626" }}>
-          {teacher.active ? "Active" : "Inactive"}
+          {teacher.active ? tr("teacherScheduleTab.active") : tr("teacherScheduleTab.inactive")}
         </span>
       </div>
 
       {/* View schedule button */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "2px" }}>
-        <span style={{ fontSize: "12px", color: c.muted }}>{teacher.lessonsCompleted || 0} lessons done</span>
+        <span style={{ fontSize: "12px", color: c.muted }}>{tr("teacherScheduleTab.lessonsDone", { value: teacher.lessonsCompleted || 0 })}</span>
         <span style={{ fontSize: "12px", fontWeight: "700", color: "#7c3aed", display: "flex", alignItems: "center", gap: "4px" }}>
-          View Schedule <ChevronRight size={13} />
+          {tr("teacherScheduleTab.viewSchedule")} <ChevronRight size={13} />
         </span>
       </div>
     </div>
@@ -92,6 +94,7 @@ function TeacherCard({ teacher, onClick, isDarkMode }) {
 
 // ── Main component ─────────────────────────────────────────────────────────
 export default function TeacherScheduleTab({ teachers = [], isDarkMode }) {
+  const { t: tr } = useTranslation("admin");
   const c = pal(isDarkMode);
   const myTz = viewerTz();
   const [search,    setSearch]    = useState("");
@@ -144,10 +147,10 @@ export default function TeacherScheduleTab({ teachers = [], isDarkMode }) {
 
   const items = useMemo(() => (cal.blocks || []).map(b => ({
     ...b,
-    title: b.kind === "off" ? (b.note || "Time off") : b.kind === "reserved" ? `Reserved · ${b.studentName}` : b.title,
+    title: b.kind === "off" ? (b.note || tr("teacherScheduleTab.timeOff")) : b.kind === "reserved" ? tr("teacherScheduleTab.reserved", { studentName: b.studentName }) : b.title,
     sub: ["booked", "pending", "done"].includes(b.kind) ? b.studentName : "",
     onClick: () => setDetail(b),
-  })), [cal.blocks]);
+  })), [cal.blocks, tr]);
 
   const filtered = teachers.filter(t =>
     (!continent || t.continent === continent) &&
@@ -162,9 +165,7 @@ export default function TeacherScheduleTab({ teachers = [], isDarkMode }) {
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontWeight: 800, fontSize: 14, color: c.heading }}>{r.name} <span style={{ fontWeight: 600, fontSize: 12, color: c.muted }}>· {r.continent || "—"}</span></div>
-        <div style={{ fontSize: 12, color: c.text }}>
-          Their time: {found && fmtRange(found.start, found.end, r.timezone)} ({tzCity(r.timezone)})
-          {extra}
+        <div style={{ fontSize: 12, color: c.text }}>{tr("teacherScheduleTab.theirTime", { value: found && fmtRange(found.start, found.end, r.timezone), tzCity: tzCity(r.timezone), extra })}
         </div>
       </div>
       <ChevronRight size={16} color={c.muted} />
@@ -181,37 +182,37 @@ export default function TeacherScheduleTab({ teachers = [], isDarkMode }) {
 
         {/* Header */}
         <div>
-          <h1 style={{ margin: 0, fontSize: "22px", fontWeight: "800", color: c.heading }}>Teacher Schedules</h1>
+          <h1 style={{ margin: 0, fontSize: "22px", fontWeight: "800", color: c.heading }}>{tr("teacherScheduleTab.teacherSchedules")}</h1>
           <p style={{ margin: "4px 0 0", fontSize: "13px", color: c.text }}>
-            Select a teacher to view their availability and bookings
+            {tr("teacherScheduleTab.selectATeacherToView")}
           </p>
         </div>
 
         {/* ── Free-time finder ── */}
         <div style={{ background: c.card, border: `1px solid ${c.border}`, borderRadius: 16, padding: 16, display: "flex", flexDirection: "column", gap: 12 }}>
           <div>
-            <div style={{ fontSize: 15, fontWeight: 800, color: c.heading, display: "flex", alignItems: "center", gap: 6 }}><Clock size={15} color="#7c3aed" /> Find a free teacher</div>
-            <div style={{ fontSize: 12.5, color: c.text }}>Times are in your time ({tzName(myTz)}). Each teacher's own time is shown in the results.</div>
+            <div style={{ fontSize: 15, fontWeight: 800, color: c.heading, display: "flex", alignItems: "center", gap: 6 }}><Clock size={15} color="#7c3aed" /> {tr("teacherScheduleTab.findAFreeTeacher")}</div>
+            <div style={{ fontSize: 12.5, color: c.text }}>{tr("teacherScheduleTab.timesAreInYourTime", { tzName: tzName(myTz) })}</div>
           </div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
-            <label style={{ fontSize: 11, fontWeight: 700, color: c.muted }}>DATE<br />
+            <label style={{ fontSize: 11, fontWeight: 700, color: c.muted }}>{tr("teacherScheduleTab.date")}<br />
               <input type="date" value={fDate} min={localYmd(new Date())} onChange={e => setFDate(e.target.value)} style={inp} />
             </label>
-            <label style={{ fontSize: 11, fontWeight: 700, color: c.muted }}>FROM<br />
+            <label style={{ fontSize: 11, fontWeight: 700, color: c.muted }}>{tr("teacherScheduleTab.from")}<br />
               <select value={fFrom} onChange={e => setFFrom(e.target.value)} style={inp}>{HALF_HOURS.slice(0, -1).map(t => <option key={t} value={t}>{fmtHHMM(t)}</option>)}</select>
             </label>
-            <label style={{ fontSize: 11, fontWeight: 700, color: c.muted }}>TO<br />
+            <label style={{ fontSize: 11, fontWeight: 700, color: c.muted }}>{tr("teacherScheduleTab.to")}<br />
               <select value={fTo} onChange={e => setFTo(e.target.value)} style={{ ...inp, borderColor: fTo <= fFrom ? "#ef4444" : c.border }}>{HALF_HOURS.slice(1).map(t => <option key={t} value={t}>{fmtHHMM(t)}</option>)}</select>
             </label>
-            <label style={{ fontSize: 11, fontWeight: 700, color: c.muted }}>CONTINENT<br />
+            <label style={{ fontSize: 11, fontWeight: 700, color: c.muted }}>{tr("teacherScheduleTab.continent")}<br />
               <select value={continent} onChange={e => setContinent(e.target.value)} style={inp}>
-                <option value="">All continents</option>
+                <option value="">{tr("teacherScheduleTab.allContinents")}</option>
                 {CONTINENTS.map(x => <option key={x} value={x}>{x}</option>)}
               </select>
             </label>
             <button type="button" onClick={findFree} disabled={finding}
               style={{ padding: "10px 18px", borderRadius: 10, border: "none", background: "#7c3aed", color: "#fff", fontWeight: 800, fontSize: 13.5, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: 6 }}>
-              {finding ? <Loader size={14} /> : <Search size={14} />} Find free teachers
+              {finding ? <Loader size={14} /> : <Search size={14} />} {tr("teacherScheduleTab.findFreeTeachers")}
             </button>
           </div>
           {findErr && <div style={{ fontSize: 13, color: "#dc2626", fontWeight: 600 }}>{findErr}</div>}
@@ -219,25 +220,25 @@ export default function TeacherScheduleTab({ teachers = [], isDarkMode }) {
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               <div style={{ fontSize: 13, color: c.text }}>
                 {fmtDay(found.start)} · <strong style={{ color: c.heading }}>{fmtRange(found.start, found.end)}</strong>{continent ? ` · ${continent}` : ""}
-                <button type="button" onClick={() => setFound(null)} style={{ marginLeft: 10, background: "none", border: "none", color: c.muted, cursor: "pointer", fontSize: 12, textDecoration: "underline" }}>Clear</button>
+                <button type="button" onClick={() => setFound(null)} style={{ marginLeft: 10, background: "none", border: "none", color: c.muted, cursor: "pointer", fontSize: 12, textDecoration: "underline" }}>{tr("teacherScheduleTab.clear")}</button>
               </div>
               <div>
-                <div style={{ fontSize: 12, fontWeight: 800, color: "#059669", marginBottom: 6 }}>✓ FREE THE WHOLE TIME ({found.available.length})</div>
+                <div style={{ fontSize: 12, fontWeight: 800, color: "#059669", marginBottom: 6 }}>{tr("teacherScheduleTab.freeTheWholeTime", { availableCount: found.available.length })}</div>
                 {found.available.length ? <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(280px,1fr))", gap: 8 }}>{found.available.map(r => resultRow(r))}</div>
-                  : <div style={{ fontSize: 13, color: c.muted }}>No teacher is free for the whole time.</div>}
+                  : <div style={{ fontSize: 13, color: c.muted }}>{tr("teacherScheduleTab.noTeacherIsFreeFor")}</div>}
               </div>
               {found.partial.length > 0 && (
                 <div>
-                  <div style={{ fontSize: 12, fontWeight: 800, color: "#d97706", marginBottom: 6 }}>◐ PARTLY FREE ({found.partial.length})</div>
+                  <div style={{ fontSize: 12, fontWeight: 800, color: "#d97706", marginBottom: 6 }}>{tr("teacherScheduleTab.partlyFree", { partialCount: found.partial.length })}</div>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(280px,1fr))", gap: 8 }}>
-                    {found.partial.map(r => resultRow(r, <><br /><span style={{ color: "#d97706", fontWeight: 700 }}>Free {r.free.map(f => fmtRange(f.start, f.end)).join(", ")} (your time)</span></>))}
+                    {found.partial.map(r => resultRow(r, <><br /><span style={{ color: "#d97706", fontWeight: 700 }}>{tr("teacherScheduleTab.freeYourTime", { value: r.free.map(f => fmtRange(f.start, f.end)).join(", ") })}</span></>))}
                   </div>
                 </div>
               )}
               {found.noHours.length > 0 && (
                 <div>
-                  <div style={{ fontSize: 12, fontWeight: 800, color: c.muted, marginBottom: 6 }}>? NO WORKING HOURS SET — NOTHING BOOKED THEN ({found.noHours.length})</div>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(280px,1fr))", gap: 8 }}>{found.noHours.map(r => resultRow(r, <><br /><span style={{ color: c.muted }}>Ask the teacher to confirm</span></>))}</div>
+                  <div style={{ fontSize: 12, fontWeight: 800, color: c.muted, marginBottom: 6 }}>{tr("teacherScheduleTab.noWorkingHoursSetNothing", { noHoursCount: found.noHours.length })}</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(280px,1fr))", gap: 8 }}>{found.noHours.map(r => resultRow(r, <><br /><span style={{ color: c.muted }}>{tr("teacherScheduleTab.askTheTeacherToConfirm")}</span></>))}</div>
                 </div>
               )}
             </div>
@@ -250,7 +251,7 @@ export default function TeacherScheduleTab({ teachers = [], isDarkMode }) {
           <Search size={15} color={c.muted} style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
           <input
             value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="Search teachers…"
+            placeholder={tr("teacherScheduleTab.searchTeachers")}
             style={{
               width: "100%", padding: "10px 12px 10px 36px",
               background: c.card, border: `1.5px solid ${c.border}`,
@@ -259,15 +260,15 @@ export default function TeacherScheduleTab({ teachers = [], isDarkMode }) {
             }}
           />
         </div>
-          <select value={continent} onChange={e => setContinent(e.target.value)} aria-label="Filter by continent" style={inp}>
-            <option value="">All continents</option>
+          <select value={continent} onChange={e => setContinent(e.target.value)} aria-label={tr("teacherScheduleTab.filterByContinent")} style={inp}>
+            <option value="">{tr("teacherScheduleTab.allContinents")}</option>
             {CONTINENTS.map(x => <option key={x} value={x}>{x}</option>)}
           </select>
         </div>
 
         {/* Teacher grid */}
         {filtered.length === 0 ? (
-          <p style={{ color: c.muted, fontSize: "13px" }}>No teachers found.</p>
+          <p style={{ color: c.muted, fontSize: "13px" }}>{tr("teacherScheduleTab.noTeachersFound")}</p>
         ) : (
           <div style={{
             display: "grid",
@@ -302,7 +303,7 @@ export default function TeacherScheduleTab({ teachers = [], isDarkMode }) {
       <div style={{ display: "flex", alignItems: "center", gap: "16px", flexWrap: "wrap" }}>
         <button type="button" onClick={() => { setSelected(null); setDetail(null); setCal({ free: [], blocks: [], hasHours: false }); }}
           style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 14px", background: isDarkMode ? "#1e2235" : "#f1f5f9", border: `1px solid ${c.border}`, borderRadius: "10px", cursor: "pointer", color: c.heading, fontSize: "13px", fontWeight: "700", fontFamily: "inherit" }}>
-          <ChevronLeft size={15} /> All Teachers
+          <ChevronLeft size={15} /> {tr("teacherScheduleTab.allTeachers")}
         </button>
         <div style={{ display: "flex", alignItems: "center", gap: "12px", flex: 1, minWidth: 0 }}>
           <div style={{ width: "42px", height: "42px", borderRadius: "50%", flexShrink: 0, background: "linear-gradient(135deg,#7c3aed,#6d28d9)", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -322,16 +323,16 @@ export default function TeacherScheduleTab({ teachers = [], isDarkMode }) {
 
       {/* Whose clock is this? */}
       <div style={{ padding: "10px 14px", borderRadius: 12, background: c.card, border: `1px solid ${c.border}`, fontSize: 13, color: c.text, display: "flex", gap: 14, flexWrap: "wrap", alignItems: "center" }}>
-        <span style={{ display: "flex", alignItems: "center", gap: 6 }}><Globe size={13} /> Shown in <strong style={{ color: c.heading }}>your time: {tzName(myTz)}</strong></span>
-        {tTz && <span>Teacher: <strong style={{ color: c.heading }}>{tzName(tTz)}</strong> · {tzDiffText(tTz, myTz)}</span>}
+        <span style={{ display: "flex", alignItems: "center", gap: 6 }}><Globe size={13} /> {tr("teacherScheduleTab.shownIn")} <strong style={{ color: c.heading }}>{tr("teacherScheduleTab.yourTime", { tzName: tzName(myTz) })}</strong></span>
+        {tTz && <span>{tr("teacherScheduleTab.teacher")} <strong style={{ color: c.heading }}>{tzName(tTz)}</strong> · {tzDiffText(tTz, myTz)}</span>}
         <span style={{ flexBasis: "100%", fontSize: 12.5 }}>
-          {cal.hasHours ? <>Working hours ({tzCity(tTz)}): {hoursText}</> : "This teacher hasn't set working hours — students can request any time and the teacher approves."}
+          {cal.hasHours ? <>Working hours ({tzCity(tTz)}): {hoursText}</> : tr("teacherScheduleTab.thisTeacherHasnTSet")}
         </span>
       </div>
 
       <Legend kinds={["free", "booked", "pending", "off", "reserved"]} isDarkMode={isDarkMode} />
       <WeekCalendar weekStart={weekStart} onWeekChange={(w) => setWeekStart(w || getMonday())}
-        free={cal.free} items={items} loading={loading} isDarkMode={isDarkMode} emptyText="Nothing scheduled" />
+        free={cal.free} items={items} loading={loading} isDarkMode={isDarkMode} emptyText={tr("teacherScheduleTab.nothingScheduled")} />
 
       {detail && (
         <div onClick={() => setDetail(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 999, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
@@ -340,15 +341,15 @@ export default function TeacherScheduleTab({ teachers = [], isDarkMode }) {
               <div style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: ".06em", color: c.muted }}>
                 {{ booked: "Booked class", pending: "Pending request", done: "Completed class", off: "Time off", reserved: "Reserved" }[detail.kind]}
               </div>
-              <button type="button" aria-label="Close" onClick={() => setDetail(null)} style={{ background: "none", border: "none", cursor: "pointer", color: c.muted }}><X size={16} /></button>
+              <button type="button" aria-label={tr("teacherScheduleTab.close")} onClick={() => setDetail(null)} style={{ background: "none", border: "none", cursor: "pointer", color: c.muted }}><X size={16} /></button>
             </div>
-            <div style={{ fontSize: 18, fontWeight: 800, color: c.heading }}>{detail.kind === "off" ? (detail.note || "Time off") : detail.title || detail.studentName}</div>
-            <div style={{ fontSize: 14, color: c.heading }}>{fmtDay(detail.start)} · <strong>{fmtRange(detail.start, detail.end)}</strong> <span style={{ color: c.muted }}>your time</span></div>
-            {tTz && tTz !== myTz && <div style={{ fontSize: 13, color: c.text }}>Teacher's time: <strong>{fmtDay(detail.start, tTz)} · {fmtRange(detail.start, detail.end, tTz)}</strong> ({tzAbbr(tTz)})</div>}
-            {detail.studentTimezone && detail.studentTimezone !== myTz && <div style={{ fontSize: 13, color: c.text }}>Student's time: <strong>{fmtTime(detail.start, detail.studentTimezone)}</strong> ({tzName(detail.studentTimezone)})</div>}
-            {detail.studentName && <div style={{ fontSize: 13.5, color: c.text, display: "flex", alignItems: "center", gap: 6 }}>Student: <strong style={{ color: c.heading }}>{detail.studentName}</strong> {detail.isManaged && <ManagedBadge isDarkMode={isDarkMode} />}</div>}
-            {detail.topic && <div style={{ fontSize: 13, color: c.text }}>Topic: {detail.topic}</div>}
-            {detail.recurring && <div style={{ fontSize: 12.5, color: c.muted, display: "flex", alignItems: "center", gap: 5 }}><Repeat size={12} /> Repeats every week</div>}
+            <div style={{ fontSize: 18, fontWeight: 800, color: c.heading }}>{detail.kind === "off" ? (detail.note || tr("teacherScheduleTab.timeOff")) : detail.title || detail.studentName}</div>
+            <div style={{ fontSize: 14, color: c.heading }}>{fmtDay(detail.start)} · <strong>{fmtRange(detail.start, detail.end)}</strong> <span style={{ color: c.muted }}>{tr("teacherScheduleTab.yourTime2")}</span></div>
+            {tTz && tTz !== myTz && <div style={{ fontSize: 13, color: c.text }}>{tr("teacherScheduleTab.teacherSTime")} <strong>{fmtDay(detail.start, tTz)} · {fmtRange(detail.start, detail.end, tTz)}</strong> ({tzAbbr(tTz)})</div>}
+            {detail.studentTimezone && detail.studentTimezone !== myTz && <div style={{ fontSize: 13, color: c.text }}>{tr("teacherScheduleTab.studentSTime")} <strong>{fmtTime(detail.start, detail.studentTimezone)}</strong> ({tzName(detail.studentTimezone)})</div>}
+            {detail.studentName && <div style={{ fontSize: 13.5, color: c.text, display: "flex", alignItems: "center", gap: 6 }}>{tr("teacherScheduleTab.student")} <strong style={{ color: c.heading }}>{detail.studentName}</strong> {detail.isManaged && <ManagedBadge isDarkMode={isDarkMode} />}</div>}
+            {detail.topic && <div style={{ fontSize: 13, color: c.text }}>{tr("teacherScheduleTab.topic", { topic: detail.topic })}</div>}
+            {detail.recurring && <div style={{ fontSize: 12.5, color: c.muted, display: "flex", alignItems: "center", gap: 5 }}><Repeat size={12} /> {tr("teacherScheduleTab.repeatsEveryWeek")}</div>}
           </div>
         </div>
       )}

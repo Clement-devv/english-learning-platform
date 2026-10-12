@@ -8,12 +8,14 @@ import {
 import ListenButton from "../../../components/ListenButton";
 import StreakToast from "../components/StreakToast";
 import Pagination from "../../../components/Pagination";
+import { useTranslation } from "react-i18next";
+import { dateLocale } from "../../../i18n/dateLocale.js";
 
 const LS_KEY = (quizId) => `quiz_start_${quizId}`;
 
 function formatDate(d) {
   if (!d) return "—";
-  return new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+  return new Date(d).toLocaleDateString(dateLocale("en-GB"), { day: "numeric", month: "short", year: "numeric" });
 }
 
 function daysUntil(d) {
@@ -22,6 +24,7 @@ function daysUntil(d) {
 
 // ── Countdown display ─────────────────────────────────────────────────────────
 function Countdown({ secondsLeft, totalSeconds }) {
+  const { t: tr } = useTranslation("student");
   const pct      = secondsLeft / totalSeconds;
   const mins     = Math.floor(secondsLeft / 60);
   const secs     = secondsLeft % 60;
@@ -49,7 +52,7 @@ function Countdown({ secondsLeft, totalSeconds }) {
         {String(mins).padStart(2, "0")}:{String(secs).padStart(2, "0")}
       </div>
       <div style={{ position: "relative", top: -68, fontSize: 11, fontWeight: 700, color: "#9b8ab0" }}>
-        {critical ? "HURRY!" : "REMAINING"}
+        {critical ? tr("quizTab.hurry") : "REMAINING"}
       </div>
     </div>
   );
@@ -57,6 +60,7 @@ function Countdown({ secondsLeft, totalSeconds }) {
 
 // ── Active quiz screen ────────────────────────────────────────────────────────
 function QuizScreen({ quiz, onComplete, isDarkMode }) {
+  const { t: tr } = useTranslation("student");
   const col = isDarkMode
     ? { bg: "#0f1117", card: "#1a1d2e", border: "#2a2d40", heading: "#f0f4ff", body: "#c8cce0", muted: "#6b7090" }
     : { bg: "#fff8f0", card: "#ffffff", border: "#e5e7ef", heading: "#2d1f6e", body: "#4a4060", muted: "#9b8ab0" };
@@ -103,11 +107,11 @@ function QuizScreen({ quiz, onComplete, isDarkMode }) {
       localStorage.removeItem(LS_KEY(quiz._id));
       onComplete(data.quiz, data.attempt, data.streak);
     } catch (err) {
-      alert(err?.response?.data?.message || "Submission failed. Please try again.");
+      alert(err?.response?.data?.message || tr("quizTab.submissionFailedPleaseTryAgain"));
       submittingRef.current = false;
       setSubmitting(false);
     }
-  }, [quiz._id, secondsLeft, startedAt, totalSeconds, onComplete]);
+  }, [totalSeconds, secondsLeft, quiz._id, startedAt, onComplete, tr]);
 
   // Countdown tick
   useEffect(() => {
@@ -157,9 +161,7 @@ function QuizScreen({ quiz, onComplete, isDarkMode }) {
           <div style={{ fontWeight: 900, fontSize: 18, color: isDarkMode ? "#f0f4ff" : "#2d1f6e" }}>
             📝 {quiz.title}
           </div>
-          <div style={{ fontSize: 12, color: isDarkMode ? "#6b7090" : "#9b8ab0", marginTop: 2 }}>
-            Question {current + 1} of {total} · {answered}/{total} answered
-          </div>
+          <div style={{ fontSize: 12, color: isDarkMode ? "#6b7090" : "#9b8ab0", marginTop: 2 }}>{tr("quizTab.questionOfAnswered", { value: current + 1, total, answered })}</div>
         </div>
 
         {/* Timer */}
@@ -261,12 +263,11 @@ function QuizScreen({ quiz, onComplete, isDarkMode }) {
             display: "flex", alignItems: "center", gap: 6, opacity: current === 0 ? 0.4 : 1,
             fontFamily: "'Nunito', sans-serif",
           }}>
-          <ArrowLeft size={16} /> Prev
+          <ArrowLeft size={16} /> {tr("quizTab.prev")}
         </button>
 
         <div style={{ fontSize: 13, fontWeight: 700, color: isDarkMode ? "#6b7090" : "#9b8ab0" }}>
-          {answered}/{total} answered
-        </div>
+          {tr("quizTab.answered", { answered, total })}</div>
 
         {current < total - 1 ? (
           <button onClick={() => setCurrent(c => Math.min(c + 1, total - 1))}
@@ -277,7 +278,7 @@ function QuizScreen({ quiz, onComplete, isDarkMode }) {
               display: "flex", alignItems: "center", gap: 6,
               fontFamily: "'Nunito', sans-serif",
             }}>
-            Next <ArrowRight size={16} />
+            {tr("quizTab.next")} <ArrowRight size={16} />
           </button>
         ) : (
           <button onClick={() => submit(answers)} disabled={submitting}
@@ -291,7 +292,7 @@ function QuizScreen({ quiz, onComplete, isDarkMode }) {
               display: "flex", alignItems: "center", gap: 6, opacity: submitting ? 0.7 : 1,
               fontFamily: "'Nunito', sans-serif",
             }}>
-            <Send size={15} /> {submitting ? "Submitting…" : allAnswered ? "Submit Quiz 🚀" : `Submit (${total - answered} unanswered)`}
+            <Send size={15} /> {submitting ? tr("quizTab.submitting") : allAnswered ? tr("quizTab.submitQuiz") : tr("quizTab.submitUnanswered", { value: total - answered })}
           </button>
         )}
       </div>
@@ -301,6 +302,7 @@ function QuizScreen({ quiz, onComplete, isDarkMode }) {
 
 // ── Result screen shown inline after completion ───────────────────────────────
 function ResultScreen({ quiz, attempt, col, onDone }) {
+  const { t: tr } = useTranslation("student");
   const [expanded, setExpanded] = useState(false);
 
   const scoreColor = attempt.percentage >= 80 ? "#10b981" : attempt.percentage >= 60 ? "#f59e0b" : "#ef4444";
@@ -317,15 +319,14 @@ function ResultScreen({ quiz, attempt, col, onDone }) {
         <div style={{ fontSize: 56, marginBottom: 8 }}>{trophy}</div>
         <div style={{ fontWeight: 900, fontSize: 48, color: scoreColor }}>{attempt.percentage}%</div>
         <div style={{ fontWeight: 700, fontSize: 18, color: col.heading, marginBottom: 4 }}>
-          {attempt.score} out of {attempt.totalQuestions} correct
-        </div>
+          {tr("quizTab.outOfCorrect", { score: attempt.score, totalQuestions: attempt.totalQuestions })}</div>
         <div style={{ fontSize: 13, color: col.muted }}>
-          {attempt.timeTaken != null && `Completed in ${Math.floor(attempt.timeTaken / 60)}m ${attempt.timeTaken % 60}s · `}
+          {attempt.timeTaken != null && tr("quizTab.completedInMS", { value: Math.floor(attempt.timeTaken / 60), value2: attempt.timeTaken % 60 })}
           {formatDate(attempt.submittedAt)}
         </div>
         {attempt.percentage >= 80 && (
           <div style={{ marginTop: 12, fontWeight: 700, fontSize: 15, color: "#059669" }}>
-            Amazing work! Keep it up! 🌟
+            {tr("quizTab.amazingWorkKeepItUp")}
           </div>
         )}
       </div>
@@ -338,7 +339,7 @@ function ResultScreen({ quiz, attempt, col, onDone }) {
           cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between",
           fontFamily: "'Nunito', sans-serif",
         }}>
-        <span>📋 Review Answers</span>
+        <span>{tr("quizTab.reviewAnswers")}</span>
         {expanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
       </button>
 
@@ -371,8 +372,8 @@ function ResultScreen({ quiz, attempt, col, onDone }) {
                       color: isCorrect ? "#166534" : isWrong ? "#991b1b" : col.body,
                     }}>
                       {String.fromCharCode(65 + oi)}. {opt.text}
-                      {isCorrect && " ✓ Correct"}
-                      {isWrong   && " ← Your answer"}
+                      {isCorrect && tr("quizTab.correct")}
+                      {isWrong   && tr("quizTab.yourAnswer")}
                       {isSelected && studentAns === -1 && " (skipped)"}
                     </div>
                   );
@@ -394,7 +395,7 @@ function ResultScreen({ quiz, attempt, col, onDone }) {
           background: "linear-gradient(135deg,#7c3aed,#a855f7)", color: "#fff",
           fontWeight: 800, fontSize: 15, cursor: "pointer", fontFamily: "'Nunito', sans-serif",
         }}>
-        Back to Quiz List
+        {tr("quizTab.backToQuizList")}
       </button>
     </div>
   );
@@ -402,6 +403,7 @@ function ResultScreen({ quiz, attempt, col, onDone }) {
 
 // ── Start-quiz confirmation modal ─────────────────────────────────────────────
 function StartQuizModal({ quiz, onConfirm, onCancel, isDarkMode }) {
+  const { t: tr } = useTranslation("student");
   const col = isDarkMode
     ? { bg: "#1a1d2e", border: "#2a2d40", heading: "#f0f4ff", body: "#c8cce0", muted: "#6b7090" }
     : { bg: "#ffffff", border: "#e9d5ff", heading: "#2d1f6e", body: "#4a4060", muted: "#9b8ab0" };
@@ -424,10 +426,10 @@ function StartQuizModal({ quiz, onConfirm, onCancel, isDarkMode }) {
         <div style={{ textAlign: "center", marginBottom: 24 }}>
           <div style={{ fontSize: 52, marginBottom: 10 }}>📝</div>
           <h2 style={{ margin: "0 0 6px", fontSize: 22, fontWeight: 900, color: col.heading }}>
-            Start Quiz?
+            {tr("quizTab.startQuiz")}
           </h2>
           <p style={{ margin: 0, fontSize: 14, color: col.muted, fontWeight: 600 }}>
-            Are you ready to begin?
+            {tr("quizTab.areYouReadyToBegin")}
           </p>
         </div>
 
@@ -439,8 +441,8 @@ function StartQuizModal({ quiz, onConfirm, onCancel, isDarkMode }) {
         }}>
           <div style={{ fontWeight: 800, fontSize: 16, color: col.heading }}>{quiz.title}</div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 12, fontSize: 13, color: col.body, fontWeight: 600 }}>
-            <span>📋 {quiz.questions?.length || "—"} questions</span>
-            <span>⏱ {quiz.timeLimit} min</span>
+            <span>{tr("quizTab.questions", { value: quiz.questions?.length || "—" })}</span>
+            <span>{tr("quizTab.min", { timeLimit: quiz.timeLimit })}</span>
             <span>👩‍🏫 {quiz.teacherId?.firstName} {quiz.teacherId?.lastName}</span>
           </div>
         </div>
@@ -454,7 +456,7 @@ function StartQuizModal({ quiz, onConfirm, onCancel, isDarkMode }) {
         }}>
           <AlertTriangle size={16} color="#d97706" style={{ flexShrink: 0, marginTop: 2 }} />
           <p style={{ margin: 0, fontSize: 12.5, color: isDarkMode ? "#fcd34d" : "#92400e", fontWeight: 700, lineHeight: 1.5 }}>
-            You only get <strong>one attempt</strong>. The timer starts immediately once you confirm. Make sure you're in a quiet place before you begin.
+            {tr("quizTab.youOnlyGet")} <strong>{tr("quizTab.oneAttempt")}</strong>{tr("quizTab.theTimerStartsImmediatelyOnce")}
           </p>
         </div>
 
@@ -466,7 +468,7 @@ function StartQuizModal({ quiz, onConfirm, onCancel, isDarkMode }) {
               color: col.body, fontWeight: 700, fontSize: 14,
               cursor: "pointer", fontFamily: "'Nunito', sans-serif",
             }}>
-            Not yet
+            {tr("quizTab.notYet")}
           </button>
           <button onClick={onConfirm}
             style={{
@@ -476,7 +478,7 @@ function StartQuizModal({ quiz, onConfirm, onCancel, isDarkMode }) {
               fontFamily: "'Nunito', sans-serif",
               display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
             }}>
-            Yes, start now! <ArrowRight size={16} />
+            {tr("quizTab.yesStartNow")} <ArrowRight size={16} />
           </button>
         </div>
       </div>
@@ -486,6 +488,7 @@ function StartQuizModal({ quiz, onConfirm, onCancel, isDarkMode }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 export default function StudentQuizTab({ studentInfo, isDarkMode }) {
+  const { t: tr } = useTranslation("student");
   const col = isDarkMode
     ? { bg: "#0f1117", card: "#1a1d2e", border: "#2a2d40", heading: "#f0f4ff", body: "#c8cce0", muted: "#6b7090" }
     : { bg: "#fff8f0", card: "#ffffff", border: "#ffe8cc", heading: "#3d2e20", body: "#5a4a3a", muted: "#a89480" };
@@ -531,7 +534,7 @@ export default function StudentQuizTab({ studentInfo, isDarkMode }) {
         if (data.stats) setStats(data.stats);
         if (data.pagination) { setPager(data.pagination); if (data.pagination.page !== page) setPage(data.pagination.page); }
       } catch {
-        if (!stale) showToast("Failed to load quizzes", "error");
+        if (!stale) showToast(tr("quizTab.failedToLoadQuizzes"), "error");
       } finally {
         if (!stale) setLoading(false);
       }
@@ -615,15 +618,15 @@ export default function StudentQuizTab({ studentInfo, isDarkMode }) {
       {/* Header */}
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
         <div>
-          <div style={{ fontSize: 11.5, fontWeight: 800, color: accent, textTransform: "uppercase", letterSpacing: "0.1em" }}>Learning</div>
-          <h1 style={{ margin: "2px 0 0", fontSize: 28, fontWeight: 900, color: col.heading, letterSpacing: "-0.4px" }}>Quizzes</h1>
+          <div style={{ fontSize: 11.5, fontWeight: 800, color: accent, textTransform: "uppercase", letterSpacing: "0.1em" }}>{tr("quizTab.learning")}</div>
+          <h1 style={{ margin: "2px 0 0", fontSize: 28, fontWeight: 900, color: col.heading, letterSpacing: "-0.4px" }}>{tr("quizTab.quizzes")}</h1>
           <p style={{ margin: "4px 0 0", fontSize: 14, color: col.muted, fontWeight: 600 }}>
-            {counts.assigned > 0 ? `${counts.assigned} ready to take` : "All quizzes done!"}{avgScore != null ? ` · avg score ${avgScore}%` : ""}
+            {counts.assigned > 0 ? tr("quizTab.readyToTake", { assigned: counts.assigned }) : tr("quizTab.allQuizzesDone")}{avgScore != null ? tr("quizTab.avgScore", { avgScore }) : ""}
           </p>
         </div>
         <button onClick={fetchQuizzes}
           style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "10px 14px", borderRadius: 12, border: `2px solid ${col.border}`, background: col.card, color: col.body, cursor: "pointer", fontSize: 13, fontWeight: 800, fontFamily: "inherit" }}>
-          <RefreshCw size={14} /> Refresh
+          <RefreshCw size={14} /> {tr("quizTab.refresh")}
         </button>
       </div>
 
@@ -638,21 +641,21 @@ export default function StudentQuizTab({ studentInfo, isDarkMode }) {
             </div>
             <div style={{ flex: 1, minWidth: 0, position: "relative" }}>
               <div style={{ fontSize: 11.5, fontWeight: 800, letterSpacing: "0.1em", opacity: 0.9 }}>
-                {bannerOverdue ? "OVERDUE" : "NEXT UP"}
+                {bannerOverdue ? "OVERDUE" : tr("quizTab.nextUp")}
               </div>
               <div style={{ fontSize: 20, fontWeight: 900, marginTop: 2 }}>{nextQuiz.title}</div>
               <div style={{ fontSize: 13, fontWeight: 600, opacity: 0.95, marginTop: 2 }}>
-                {nextQuiz.questions?.length || "—"} questions · {nextQuiz.timeLimit} min · {nextQuiz.teacherId?.firstName} {nextQuiz.teacherId?.lastName}
+                {tr("quizTab.questionsMin", { value: nextQuiz.questions?.length || "—", timeLimit: nextQuiz.timeLimit, firstName: nextQuiz.teacherId?.firstName, lastName: nextQuiz.teacherId?.lastName })}
               </div>
             </div>
             {bannerOverdue ? (
               <div style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "12px 22px", borderRadius: 999, background: "rgba(255,255,255,0.2)", color: "rgba(255,255,255,0.7)", fontSize: 14, fontWeight: 800, flexShrink: 0 }}>
-                Overdue ⛔
+                {tr("quizTab.overdue")}
               </div>
             ) : (
               <button onClick={() => handleStartQuiz(nextQuiz)}
                 style={{ position: "relative", display: "inline-flex", alignItems: "center", gap: 6, padding: "12px 22px", borderRadius: 999, border: "none", background: "#fff", color: "#c2410c", fontSize: 14, fontWeight: 900, cursor: "pointer", fontFamily: "inherit", boxShadow: "0 8px 20px rgba(0,0,0,0.15)", flexShrink: 0 }}>
-                Start quiz <ArrowRight size={14} stroke="#c2410c"/>
+                {tr("quizTab.startQuiz2")} <ArrowRight size={14} stroke="#c2410c"/>
               </button>
             )}
           </div>
@@ -662,10 +665,10 @@ export default function StudentQuizTab({ studentInfo, isDarkMode }) {
       {/* Stats strip */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12 }}>
         {[
-          { key: "all",       label: "Total",        emoji: "📝", color: "#f97316", bg: "#fff7ed" },
-          { key: "assigned",  label: "Ready to take", emoji: "⏳", color: "#a16207", bg: "#fef3c7" },
-          { key: "attempted", label: "Completed",    emoji: "🏆", color: "#059669", bg: "#ecfdf5" },
-          { key: "_avg",      label: "Avg score",    emoji: "⭐", color: "#be185d", bg: "#fce7f3" },
+          { key: "all",       label: tr("quizTab.total"),        emoji: "📝", color: "#f97316", bg: "#fff7ed" },
+          { key: "assigned",  label: tr("quizTab.readyToTake2"), emoji: "⏳", color: "#a16207", bg: "#fef3c7" },
+          { key: "attempted", label: tr("quizTab.completed"),    emoji: "🏆", color: "#059669", bg: "#ecfdf5" },
+          { key: "_avg",      label: tr("quizTab.avgScore2"),    emoji: "⭐", color: "#be185d", bg: "#fce7f3" },
         ].map(({ key, label, emoji, color, bg }) => (
           <div key={key} onClick={() => key !== "_avg" && changeFilter(key)}
             style={{ background: col.card, border: `2px solid ${filter === key ? color : col.border}`, borderRadius: 18, padding: "14px 16px", cursor: key !== "_avg" ? "pointer" : "default", display: "flex", alignItems: "center", gap: 12, transition: "all 0.2s", boxShadow: filter === key ? `0 4px 16px ${color}25` : "none" }}>
@@ -702,13 +705,13 @@ export default function StudentQuizTab({ studentInfo, isDarkMode }) {
       {loading ? (
         <div style={{ textAlign: "center", padding: 60, color: col.muted }}>
           <div style={{ fontSize: 40, marginBottom: 12 }}>⏳</div>
-          <p style={{ fontWeight: 700 }}>Loading quizzes…</p>
+          <p style={{ fontWeight: 700 }}>{tr("quizTab.loadingQuizzes")}</p>
         </div>
       ) : filtered.length === 0 ? (
         <div style={{ textAlign: "center", padding: "60px 24px", background: col.card, borderRadius: 20, border: `2.5px dashed ${col.border}` }}>
           <div style={{ fontSize: 56, marginBottom: 12 }}>{filter === "attempted" ? "🏆" : "🎉"}</div>
           <p style={{ fontWeight: 700, fontSize: 16, color: col.heading, margin: "0 0 4px" }}>
-            {filter === "all" ? "No quizzes assigned yet!" : filter === "assigned" ? "No pending quizzes — you're all caught up!" : "No completed quizzes yet."}
+            {filter === "all" ? tr("quizTab.noQuizzesAssignedYet") : filter === "assigned" ? tr("quizTab.noPendingQuizzesYouRe") : tr("quizTab.noCompletedQuizzesYet")}
           </p>
         </div>
       ) : (
@@ -744,16 +747,16 @@ export default function StudentQuizTab({ studentInfo, isDarkMode }) {
                       </div>
                       <div style={{ fontSize: 12, color: col.muted, marginTop: 3, display: "flex", flexWrap: "wrap", gap: 8 }}>
                         <span>👩‍🏫 {teacher?.firstName} {teacher?.lastName}</span>
-                        <span>· {quiz.questions.length} questions</span>
-                        <span>· ⏱ {quiz.timeLimit} min</span>
-                        <span style={{ color: overdue ? "#ef4444" : col.muted }}>· Due {formatDate(quiz.dueDate)}</span>
+                        <span>{tr("quizTab.questions2", { questionsCount: quiz.questions.length })}</span>
+                        <span>{tr("quizTab.min2", { timeLimit: quiz.timeLimit })}</span>
+                        <span style={{ color: overdue ? "#ef4444" : col.muted }}>{tr("quizTab.due", { formatDate: formatDate(quiz.dueDate) })}</span>
                         {quiz.status === "assigned" && (
                           <span style={{
                             padding: "1px 8px", borderRadius: 10, fontSize: 11, fontWeight: 700,
                             background: overdue ? "#fee2e2" : days <= 2 ? "#fef3c7" : "#f0fdf4",
                             color: overdue ? "#dc2626" : days <= 2 ? "#d97706" : "#059669",
                           }}>
-                            {overdue ? "Expired" : days === 0 ? "Due today!" : `${days}d left`}
+                            {overdue ? tr("quizTab.expired") : days === 0 ? tr("quizTab.dueToday") : tr("quizTab.dLeft", { days })}
                           </span>
                         )}
                       </div>
@@ -769,7 +772,7 @@ export default function StudentQuizTab({ studentInfo, isDarkMode }) {
                     {quiz.status === "assigned" ? (
                       overdue ? (
                         <button disabled
-                          title="This quiz is past its due date and can no longer be started."
+                          title={tr("quizTab.thisQuizIsPastIts")}
                           style={{
                             padding: "8px 20px", borderRadius: 999, border: "none",
                             background: isDarkMode ? "#2a2d40" : "#f3f4f6",
@@ -777,7 +780,7 @@ export default function StudentQuizTab({ studentInfo, isDarkMode }) {
                             fontWeight: 700, fontSize: 13, cursor: "not-allowed",
                             fontFamily: "'Nunito', sans-serif",
                           }}>
-                          Overdue ⛔
+                          {tr("quizTab.overdue")}
                         </button>
                       ) : (
                         <button onClick={() => handleStartQuiz(quiz)}
@@ -787,13 +790,13 @@ export default function StudentQuizTab({ studentInfo, isDarkMode }) {
                             fontWeight: 900, fontSize: 13, cursor: "pointer",
                             boxShadow: "0 4px 14px rgba(249,115,22,0.4)", fontFamily: "'Nunito', sans-serif",
                           }}>
-                          Start Quiz 🚀
+                          {tr("quizTab.startQuiz3")}
                         </button>
                       )
                     ) : (
                       <button onClick={() => setExpandedId(isExpanded ? null : quiz._id)}
                         style={{ padding: "8px 16px", borderRadius: 12, border: `2px solid ${col.border}`, background: col.card, color: col.body, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
-                        {isExpanded ? "Hide" : "Review"}
+                        {isExpanded ? tr("quizTab.hide") : tr("quizTab.review")}
                       </button>
                     )}
                   </div>
@@ -804,7 +807,7 @@ export default function StudentQuizTab({ studentInfo, isDarkMode }) {
                   <div style={{ borderTop: `2px solid ${col.border}`, padding: "14px 20px", background: isDarkMode ? "#1f2235" : "#faf5ff" }}>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
                       <div style={{ fontSize: 11, fontWeight: 800, color: "#7c3aed", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                        📋 Instructions
+                        {tr("quizTab.instructions")}
                       </div>
                       <ListenButton text={quiz.instructions} />
                     </div>

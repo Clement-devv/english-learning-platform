@@ -8,6 +8,7 @@ import api from "../../../api";
 import { useOnDataChanged } from "../../../hooks/useLiveData";
 import WeekCalendar, { Legend } from "../../../components/schedule/WeekCalendar";
 import { getMonday, addDays, viewerTz, tzName, fmtDay, fmtRange } from "../../../utils/scheduleView";
+import { useTranslation } from "react-i18next";
 
 function pal(dark) {
   return {
@@ -17,6 +18,7 @@ function pal(dark) {
 }
 
 export default function StudentScheduleTab({ studentId, isDarkMode }) {
+  const { t: tr } = useTranslation("student");
   const col = pal(isDarkMode);
   const myTz = viewerTz();
   const [teachers,  setTeachers]  = useState([]);
@@ -63,25 +65,25 @@ export default function StudentScheduleTab({ studentId, isDarkMode }) {
   const items = useMemo(() => (cal.blocks || []).map(b => ({
     ...b,
     kind: b.mine ? b.kind : "busy",
-    title: b.mine ? (b.kind === "pending" ? "Your request" : "Your class") : "Unavailable",
+    title: b.mine ? (b.kind === "pending" ? tr("studentScheduleTab.yourRequest") : tr("studentScheduleTab.yourClass")) : tr("studentScheduleTab.unavailable"),
     sub: b.mine ? b.title : "",
     onClick: b.mine ? () => setDetail(b) : undefined,
-  })), [cal.blocks]);
+  })), [cal.blocks, tr]);
 
   const teacherName = (t) => t.displayName?.trim() || `${t.firstName} ${t.lastName}`.trim();
 
   if (!teacher) {
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-        <h2 style={{ margin: 0, fontSize: 20, fontWeight: 900, color: col.heading }}>Your teachers' schedules</h2>
+        <h2 style={{ margin: 0, fontSize: 20, fontWeight: 900, color: col.heading }}>{tr("studentScheduleTab.yourTeachersSchedules")}</h2>
         {teachers.length === 0 ? (
-          <p style={{ color: col.muted, fontWeight: 700 }}>You don't have a teacher yet.</p>
+          <p style={{ color: col.muted, fontWeight: 700 }}>{tr("studentScheduleTab.youDonTHaveA")}</p>
         ) : (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(200px,1fr))", gap: 12 }}>
             {teachers.map(t => (
               <button key={t._id} type="button" onClick={() => setTeacher(t)}
                 style={{ textAlign: "left", padding: 16, borderRadius: 16, border: `2px solid ${col.border}`, background: col.card, cursor: "pointer", fontFamily: "inherit", color: col.heading, fontWeight: 800 }}>
-                {teacherName(t)}<div style={{ fontSize: 12, color: col.muted, fontWeight: 600, marginTop: 4 }}>See free times →</div>
+                {teacherName(t)}<div style={{ fontSize: 12, color: col.muted, fontWeight: 600, marginTop: 4 }}>{tr("studentScheduleTab.seeFreeTimes")}</div>
               </button>
             ))}
           </div>
@@ -95,7 +97,7 @@ export default function StudentScheduleTab({ studentId, isDarkMode }) {
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
         {teachers.length > 1 && (
           <button type="button" onClick={() => setTeacher(null)} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 10, border: `1px solid ${col.border}`, background: "transparent", color: col.heading, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
-            <ChevronLeft size={14} /> Back
+            <ChevronLeft size={14} /> {tr("studentScheduleTab.back")}
           </button>
         )}
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -104,7 +106,7 @@ export default function StudentScheduleTab({ studentId, isDarkMode }) {
           </div>
           <div>
             <div style={{ fontWeight: 800, fontSize: 16, color: col.heading }}>{teacherName(teacher)}</div>
-            <div style={{ fontSize: 12, color: col.muted, display: "flex", alignItems: "center", gap: 4 }}><Globe size={11} /> Times are in your time: {tzName(myTz)}</div>
+            <div style={{ fontSize: 12, color: col.muted, display: "flex", alignItems: "center", gap: 4 }}><Globe size={11} /> {tr("studentScheduleTab.timesAreInYourTime")} {tzName(myTz)}</div>
           </div>
         </div>
       </div>
@@ -112,25 +114,25 @@ export default function StudentScheduleTab({ studentId, isDarkMode }) {
       {cal.hidden ? (
         <div style={{ padding: 28, borderRadius: 16, border: `2px solid ${col.border}`, background: col.card, textAlign: "center", color: col.text }}>
           <Lock size={28} style={{ opacity: 0.5 }} />
-          <p style={{ fontWeight: 800, margin: "8px 0 0" }}>Your teacher's schedule is private.</p>
+          <p style={{ fontWeight: 800, margin: "8px 0 0" }}>{tr("studentScheduleTab.yourTeacherSScheduleIs")}</p>
         </div>
       ) : (
         <>
-          {!cal.hasHours && <p style={{ margin: 0, fontSize: 13, color: col.text }}>Your teacher hasn't set working hours yet, so free time isn't shown — you can still request any time from <strong>Book a Class</strong>.</p>}
+          {!cal.hasHours && <p style={{ margin: 0, fontSize: 13, color: col.text }}>{tr("studentScheduleTab.yourTeacherHasnTSet")} <strong>{tr("studentScheduleTab.bookAClass")}</strong>.</p>}
           <Legend kinds={cal.hasHours ? ["free", "booked", "pending", "busy"] : ["booked", "pending", "busy"]} isDarkMode={isDarkMode} />
           <WeekCalendar weekStart={weekStart} onWeekChange={(w) => setWeekStart(w || getMonday())}
-            free={cal.free} items={items} loading={loading} isDarkMode={isDarkMode} emptyText={cal.hasHours ? "No free time" : "Nothing booked"} />
+            free={cal.free} items={items} loading={loading} isDarkMode={isDarkMode} emptyText={cal.hasHours ? tr("studentScheduleTab.noFreeTime") : tr("studentScheduleTab.nothingBooked")} />
         </>
       )}
 
       {detail && (
         <div onClick={() => setDetail(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 999, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
           <div onClick={e => e.stopPropagation()} role="dialog" style={{ background: col.card, borderRadius: 18, padding: 20, width: "100%", maxWidth: 380, border: `1px solid ${col.border}` }}>
-            <div style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", color: col.muted }}>{detail.kind === "pending" ? "Waiting for teacher" : "Your class"}</div>
+            <div style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", color: col.muted }}>{detail.kind === "pending" ? tr("studentScheduleTab.waitingForTeacher") : tr("studentScheduleTab.yourClass")}</div>
             <div style={{ fontSize: 18, fontWeight: 800, color: col.heading, margin: "4px 0 8px" }}>{detail.title}</div>
             <div style={{ fontSize: 14, color: col.heading }}>{fmtDay(detail.start)} · <strong>{fmtRange(detail.start, detail.end)}</strong></div>
-            {detail.topic && <div style={{ fontSize: 13, color: col.text, marginTop: 6 }}>Topic: {detail.topic}</div>}
-            <button type="button" onClick={() => setDetail(null)} style={{ marginTop: 14, width: "100%", padding: 10, borderRadius: 10, border: `1px solid ${col.border}`, background: "transparent", color: col.heading, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Close</button>
+            {detail.topic && <div style={{ fontSize: 13, color: col.text, marginTop: 6 }}>{tr("studentScheduleTab.topic", { topic: detail.topic })}</div>}
+            <button type="button" onClick={() => setDetail(null)} style={{ marginTop: 14, width: "100%", padding: 10, borderRadius: 10, border: `1px solid ${col.border}`, background: "transparent", color: col.heading, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>{tr("studentScheduleTab.close")}</button>
           </div>
         </div>
       )}

@@ -3,10 +3,12 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext.jsx';
 import api from '../../../api';
+import { useTranslation } from "react-i18next";
 
 const DASHBOARD = '/admin';
 
 export function useAdminLoginLogic() {
+  const { t: tr } = useTranslation("admin");
   const [username,      setUsername]      = useState('');
   const [password,      setPassword]      = useState('');
   const [showPassword,  setShowPassword]  = useState(false);
@@ -48,7 +50,7 @@ export function useAdminLoginLogic() {
         setPendingToken(res.data.pendingToken);
       }
     } catch (err) {
-      setError(err.response?.data?.message || 'Invalid credentials. Access denied.');
+      setError(err.response?.data?.message || tr("useAdminLoginLogic.invalidCredentialsAccessDenied"));
     } finally {
       setLoading(false);
     }
@@ -63,7 +65,7 @@ export function useAdminLoginLogic() {
         _completeLogin(res.data.user, res.data.token, res.data.sessionToken);
       }
     } catch (err) {
-      setError(err.response?.data?.message || 'Invalid 2FA code');
+      setError(err.response?.data?.message || tr("useAdminLoginLogic.invalid2faCode"));
     } finally {
       setLoading(false);
     }
@@ -78,9 +80,9 @@ export function useAdminLoginLogic() {
     try {
       const res = await api.post('/auth/admin/forgot-password', { email: forgotEmail.trim() });
       if (res.data.success) setView('forgot-sent');
-      else setForgotError(res.data.message || 'Something went wrong.');
+      else setForgotError(res.data.message || tr("useAdminLoginLogic.somethingWentWrong"));
     } catch (err) {
-      setForgotError(err.response?.data?.message || 'Failed to send reset email.');
+      setForgotError(err.response?.data?.message || tr("useAdminLoginLogic.failedToSendResetEmail"));
     } finally {
       setForgotLoading(false);
     }

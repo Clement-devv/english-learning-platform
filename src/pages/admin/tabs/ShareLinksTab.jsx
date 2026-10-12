@@ -10,6 +10,13 @@ import { useOnDataChanged } from "../../../hooks/useLiveData";
 import { getCachedCenter } from "../../../utils/branding";
 import ManagedBadge from "../../../components/ManagedBadge";
 import Pagination from "../../../components/Pagination";
+import { useTranslation } from "react-i18next";
+import i18n from "../../../i18n/i18n.js";
+import { dateLocale } from "../../../i18n/dateLocale.js";
+
+// For text in file-level lists: read when rendered, so it follows the chosen language
+const ta = (key, opts) => i18n.t(`admin:${key}`, opts);
+
 
 const BRAND  = "var(--brand-primary, #2563eb)";
 const brandA = (a) => `rgba(var(--brand-primary-rgb, 37, 99, 235), ${a})`;
@@ -18,14 +25,15 @@ const KINDS = {
   quiz:     { path: "q",  noun: "Quiz",     icon: ClipboardList, resource: "quizzes" },
 };
 const STATUS = {
-  assigned:  { label: "Not done yet", color: "#b45309", bg: "#fef3c7" },
-  submitted: { label: "Submitted",    color: "#1d4ed8", bg: "#dbeafe" },
-  graded:    { label: "Graded",       color: "#047857", bg: "#d1fae5" },
-  attempted: { label: "Completed",    color: "#047857", bg: "#d1fae5" },
+  assigned:  { get label() { return ta("shareLinksTab.status.assigned"); }, color: "#b45309", bg: "#fef3c7" },
+  submitted: { get label() { return ta("shareLinksTab.status.submitted"); },    color: "#1d4ed8", bg: "#dbeafe" },
+  graded:    { get label() { return ta("shareLinksTab.status.graded"); },       color: "#047857", bg: "#d1fae5" },
+  attempted: { get label() { return ta("shareLinksTab.status.attempted"); },    color: "#047857", bg: "#d1fae5" },
 };
-const fmtDay = (d) => new Date(d).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+const fmtDay = (d) => new Date(d).toLocaleDateString(dateLocale("en-GB"), { weekday: "short", day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
 
 export default function ShareLinksTab({ isDarkMode }) {
+  const { t: tr } = useTranslation("admin");
   const [kind, setKind]       = useState("homework");
   const [view, setView]       = useState("active");
   const [q, setQ]             = useState("");
@@ -52,7 +60,7 @@ export default function ShareLinksTab({ isDarkMode }) {
       const { data } = await api.get("/share-links", { params: { kind, view, q: debouncedQ || undefined, page } });
       setItems(data.items || []);
       if (data.pagination) { setPager(data.pagination); if (data.pagination.page !== page) setPage(data.pagination.page); }
-    } catch { notify("Could not load links", "error"); }
+    } catch { notify(tr("shareLinksTab.couldNotLoadLinks"), "error"); }
     finally { setLoading(false); }
   };
   useEffect(() => { load(); }, [kind, view, debouncedQ, page]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -68,8 +76,8 @@ export default function ShareLinksTab({ isDarkMode }) {
       + `Type the student's name and the teacher's name to open it.`;
   };
   const copy = async (text, what) => {
-    try { await navigator.clipboard.writeText(text); notify(`${what} copied — paste it into WhatsApp, Zalo or Facebook`); }
-    catch { notify("Could not copy — open the link and copy it from the address bar", "error"); }
+    try { await navigator.clipboard.writeText(text); notify(tr("shareLinksTab.copiedPasteItIntoWhatsapp", { what })); }
+    catch { notify(tr("shareLinksTab.couldNotCopyOpenThe"), "error"); }
   };
   const whatsapp = (it) => {
     const phone = (it.student?.phone || "").replace(/\D/g, "");
@@ -94,44 +102,43 @@ export default function ShareLinksTab({ isDarkMode }) {
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "flex-start" }}>
         <div style={{ maxWidth: 680 }}>
           <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: c.heading, display: "flex", alignItems: "center", gap: 8 }}>
-            <Link2 size={22} color={BRAND} /> Parent links
+            <Link2 size={22} color={BRAND} /> {tr("shareLinksTab.parentLinks")}
           </h1>
           <p style={{ margin: "6px 0 0", fontSize: 13, color: c.body, lineHeight: 1.6 }}>
-            Homework and quiz links teachers created for students' parents. Copy the ready-made message and send it on WhatsApp, Zalo or Facebook.
-            Parents type the student's and teacher's names to open it; links stop working at the end of the due day.
+            {tr("shareLinksTab.homeworkAndQuizLinksTeachers")}
           </p>
         </div>
-        <button type="button" onClick={() => load()} style={btn(false)}><RefreshCw size={14} /> Refresh</button>
+        <button type="button" onClick={() => load()} style={btn(false)}><RefreshCw size={14} /> {tr("shareLinksTab.refresh")}</button>
       </div>
 
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-        <div role="tablist" aria-label="Link type" style={{ display: "flex", gap: 6 }}>
+        <div role="tablist" aria-label={tr("shareLinksTab.linkType")} style={{ display: "flex", gap: 6 }}>
           {Object.entries(KINDS).map(([k, v]) => (
-            <button key={k} type="button" role="tab" aria-selected={kind === k} onClick={() => setKind(k)} style={pill(kind === k)}>{v.noun === "Quiz" ? "Quizzes" : v.noun}</button>
+            <button key={k} type="button" role="tab" aria-selected={kind === k} onClick={() => setKind(k)} style={pill(kind === k)}>{v.noun === "Quiz" ? tr("shareLinksTab.quizzes") : v.noun}</button>
           ))}
         </div>
-        <select value={view} onChange={e => setView(e.target.value)} aria-label="Show"
+        <select value={view} onChange={e => setView(e.target.value)} aria-label={tr("shareLinksTab.show")}
           style={{ padding: "7px 10px", borderRadius: 9, border: `1px solid ${c.border}`, background: c.input, color: c.heading, fontSize: 13, fontFamily: "inherit" }}>
-          <option value="active">Still open</option>
-          <option value="expired">Expired</option>
-          <option value="all">All</option>
+          <option value="active">{tr("shareLinksTab.stillOpen")}</option>
+          <option value="expired">{tr("shareLinksTab.expired")}</option>
+          <option value="all">{tr("shareLinksTab.all")}</option>
         </select>
         <div style={{ position: "relative", flex: "1 1 260px", maxWidth: 380 }}>
           <Search size={14} color={c.body} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)" }} />
-          <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search title, student, teacher or ID (STU-… / TCH-…)"
+          <input value={q} onChange={e => setQ(e.target.value)} placeholder={tr("shareLinksTab.searchTitleStudentTeacherOr")}
             style={{ width: "100%", boxSizing: "border-box", padding: "8px 10px 8px 30px", borderRadius: 9, border: `1px solid ${c.border}`, background: c.input, color: c.heading, fontSize: 13, fontFamily: "inherit" }} />
         </div>
       </div>
 
       {loading ? (
-        <p style={{ color: c.body, textAlign: "center", padding: 40 }}>Loading…</p>
+        <p style={{ color: c.body, textAlign: "center", padding: 40 }}>{tr("shareLinksTab.loading")}</p>
       ) : items.length === 0 ? (
         <div style={{ textAlign: "center", padding: "40px 20px", background: c.card, border: `1px dashed ${c.border}`, borderRadius: 16, color: c.body }}>
           <Link2 size={32} style={{ opacity: .4 }} />
           <p style={{ margin: "10px 0 0", fontWeight: 600 }}>
-            {debouncedQ ? "No links match your search." : view === "active" ? `No open ${KINDS[kind].noun.toLowerCase()} links right now.` : "Nothing here."}
+            {debouncedQ ? tr("shareLinksTab.noLinksMatchYourSearch") : view === "active" ? tr("shareLinksTab.noOpenLinksRightNow", { value: KINDS[kind].noun.toLowerCase() }) : tr("shareLinksTab.nothingHere")}
           </p>
-          <p style={{ margin: "6px 0 0", fontSize: 12.5 }}>Teachers create these from Homework / Quizzes when assigning work to a managed student.</p>
+          <p style={{ margin: "6px 0 0", fontSize: 12.5 }}>{tr("shareLinksTab.teachersCreateTheseFromHomework")}</p>
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -146,28 +153,28 @@ export default function ShareLinksTab({ isDarkMode }) {
                       <Icon size={16} color={BRAND} />
                       <span style={{ fontWeight: 800, fontSize: 15, color: c.heading }}>{it.title}</span>
                       <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 999, color: st.color, background: st.bg }}>{st.label}</span>
-                      {it.expired && <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 999, color: "#b91c1c", background: "#fee2e2" }}>Link expired</span>}
+                      {it.expired && <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 999, color: "#b91c1c", background: "#fee2e2" }}>{tr("shareLinksTab.linkExpired")}</span>}
                     </div>
                     <div style={{ marginTop: 6, fontSize: 13, color: c.body, display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-                      <span>Student: <strong style={{ color: c.heading }}>{it.student?.name || "—"}</strong></span>
+                      <span>{tr("shareLinksTab.student")} <strong style={{ color: c.heading }}>{it.student?.name || "—"}</strong></span>
                       {it.student?.code && <span style={code}>{it.student.code}</span>}
                       {it.student?.isManaged && <ManagedBadge isDarkMode={isDarkMode} />}
                       <span style={{ margin: "0 4px" }}>·</span>
-                      <span>Teacher: <strong style={{ color: c.heading }}>{it.teacher?.name || "—"}</strong></span>
+                      <span>{tr("shareLinksTab.teacher")} <strong style={{ color: c.heading }}>{it.teacher?.name || "—"}</strong></span>
                       {it.teacher?.code && <span style={code}>{it.teacher.code}</span>}
                     </div>
                     <div style={{ marginTop: 4, fontSize: 12.5, color: c.body }}>
-                      Due {fmtDay(it.dueDate)}{it.student?.phone ? ` · Parent phone ${it.student.phone}` : ""}
+                      {tr("shareLinksTab.due")} {fmtDay(it.dueDate)}{it.student?.phone ? tr("shareLinksTab.parentPhone", { phone: it.student.phone }) : ""}
                     </div>
                   </div>
                   {!it.expired && (
                     <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                      <button type="button" onClick={() => copy(messageOf(it), "Message with link")} style={btn(true)}><Copy size={13} /> Copy message</button>
-                      <button type="button" onClick={() => copy(urlOf(it), "Link")} style={btn(false)}><Link2 size={13} /> Copy link</button>
-                      <button type="button" onClick={() => whatsapp(it)} style={btn(false)} title={it.student?.phone ? "Opens WhatsApp to the parent's number" : "Opens WhatsApp — choose the parent"}>
-                        <Send size={13} /> WhatsApp
+                      <button type="button" onClick={() => copy(messageOf(it), "Message with link")} style={btn(true)}><Copy size={13} /> {tr("shareLinksTab.copyMessage")}</button>
+                      <button type="button" onClick={() => copy(urlOf(it), "Link")} style={btn(false)}><Link2 size={13} /> {tr("shareLinksTab.copyLink")}</button>
+                      <button type="button" onClick={() => whatsapp(it)} style={btn(false)} title={it.student?.phone ? tr("shareLinksTab.opensWhatsappToTheParent") : tr("shareLinksTab.opensWhatsappChooseTheParent")}>
+                        <Send size={13} /> {tr("shareLinksTab.whatsapp")}
                       </button>
-                      <a href={urlOf(it)} target="_blank" rel="noopener noreferrer" style={btn(false)} title="See what the parent sees"><ExternalLink size={13} /> Open</a>
+                      <a href={urlOf(it)} target="_blank" rel="noopener noreferrer" style={btn(false)} title={tr("shareLinksTab.seeWhatTheParentSees")}><ExternalLink size={13} /> {tr("shareLinksTab.open")}</a>
                     </div>
                   )}
                 </div>

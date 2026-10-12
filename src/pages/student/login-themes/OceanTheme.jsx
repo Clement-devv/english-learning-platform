@@ -4,8 +4,10 @@ import { Mail, Lock, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import TwoFactorLogin from '../../../components/TwoFactorLogin';
 import { useBranding } from '../../../context/BrandingContext';
 import { useLoginLogic } from './useLoginLogic';
+import { useTranslation } from "react-i18next";
 
 export default function OceanTheme({ loginHook } = {}) {
+  const { t: tr } = useTranslation("student");
   const {
     email, setEmail, password, setPassword,
     showPassword, setShowPassword,
@@ -91,12 +93,12 @@ export default function OceanTheme({ loginHook } = {}) {
           </div>
 
           <div className="oc-hero-text">
-            <h2 className="oc-hero-h2">Dive Into<br />Learning.</h2>
-            <p className="oc-hero-p">Explore the depths of English!</p>
+            <h2 className="oc-hero-h2">{tr("oceanTheme.diveInto")}<br />{tr("oceanTheme.learning")}</h2>
+            <p className="oc-hero-p">{tr("oceanTheme.exploreTheDepthsOfEnglish")}</p>
             <div className="oc-badge-row">
-              <span className="oc-badge">🎓 Expert lessons</span>
-              <span className="oc-badge">🌍 Live classes</span>
-              <span className="oc-badge">🏆 Track progress</span>
+              <span className="oc-badge">{tr("oceanTheme.expertLessons")}</span>
+              <span className="oc-badge">{tr("oceanTheme.liveClasses")}</span>
+              <span className="oc-badge">{tr("oceanTheme.trackProgress")}</span>
             </div>
           </div>
         </div>
@@ -112,7 +114,7 @@ export default function OceanTheme({ loginHook } = {}) {
             </div>
 
             <h1 className="oc-title">{centerName}</h1>
-            <p className="oc-subtitle">Sign in to start exploring!</p>
+            <p className="oc-subtitle">{tr("oceanTheme.signInToStartExploring")}</p>
 
             {error && (
               <div className="oc-error">
@@ -123,16 +125,16 @@ export default function OceanTheme({ loginHook } = {}) {
 
             <form onSubmit={handleInitialLogin} className="oc-form">
               <div className="oc-field">
-                <label className="oc-label"><Mail size={13} /> Email</label>
+                <label className="oc-label"><Mail size={13} /> {tr("oceanTheme.email")}</label>
                 <div className={`oc-input-wrap${focusedField === 'email' ? ' oc-focused' : ''}`}>
                   <input type="email" value={email} onChange={e => setEmail(e.target.value)}
                     onFocus={() => setFocusedField('email')} onBlur={() => setFocusedField(null)}
-                    placeholder="your.email@example.com" required disabled={loading} className="oc-input" />
+                    placeholder={tr("oceanTheme.yourEmailExampleCom")} required disabled={loading} className="oc-input" />
                 </div>
               </div>
 
               <div className="oc-field">
-                <label className="oc-label"><Lock size={13} /> Password</label>
+                <label className="oc-label"><Lock size={13} /> {tr("oceanTheme.password")}</label>
                 <div className={`oc-input-wrap${focusedField === 'password' ? ' oc-focused' : ''}`}>
                   <input type={showPassword ? 'text' : 'password'} value={password}
                     onChange={e => setPassword(e.target.value)}
@@ -146,19 +148,19 @@ export default function OceanTheme({ loginHook } = {}) {
 
               <div style={{ textAlign: 'right', marginTop: '-6px' }}>
                 <button type="button" onClick={() => navigate('/student/forgot-password')} className="oc-forgot">
-                  Forgot password?
+                  {tr("oceanTheme.forgotPassword")}
                 </button>
               </div>
 
               <button type="submit" disabled={loading} className="oc-submit">
                 {loading
-                  ? <span className="oc-loading-row"><span className="oc-spinner" />Signing in…</span>
-                  : <span>Dive In! 🌊</span>
+                  ? <span className="oc-loading-row"><span className="oc-spinner" />{tr("oceanTheme.signingIn")}</span>
+                  : <span>{tr("oceanTheme.diveIn")}</span>
                 }
               </button>
             </form>
 
-            <p className="oc-footer">Your account is managed by your school 🏫</p>
+            <p className="oc-footer">{tr("oceanTheme.yourAccountIsManagedBy")}</p>
             <div className="oc-dots">
               {['#0891b2','#06b6d4','#22d3ee','#67e8f9'].map((c, i) => (
                 <span key={i} className="oc-dot" style={{ background: c }} />

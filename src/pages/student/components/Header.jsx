@@ -3,8 +3,10 @@ import React from "react";
 import { LogOut, BookOpen } from "lucide-react";
 import GoogleTranslate from "../../../components/GoogleTranslate";
 import { useBranding } from "../../../context/BrandingContext";
+import { useTranslation } from "react-i18next";
 
 export default function Header({ student, notifications, onLogout }) {
+  const { t: tr } = useTranslation("student");
   const unreadCount = notifications?.filter(n => n.unread).length || 0;
   const { branding, center } = useBranding();
   const centerName = center?.centerName || "Student Portal";
@@ -24,7 +26,7 @@ export default function Header({ student, notifications, onLogout }) {
             )}
             <div>
               <h1 className="text-xl font-bold text-gray-900">{centerName}</h1>
-              <p className="text-xs text-gray-500">Your learning journey</p>
+              <p className="text-xs text-gray-500">{tr("header.yourLearningJourney")}</p>
             </div>
           </div>
 
@@ -37,7 +39,7 @@ export default function Header({ student, notifications, onLogout }) {
                   {student.name || student.firstName}
                 </p>
                 <p className="text-xs text-gray-500">
-                  {student.level || "Student"}
+                  {student.level || tr("header.student")}
                 </p>
               </div>
             )}
@@ -51,7 +53,7 @@ export default function Header({ student, notifications, onLogout }) {
               className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors font-medium"
             >
               <LogOut className="w-4 h-4" />
-              <span className="hidden sm:inline">Logout</span>
+              <span className="hidden sm:inline">{tr("header.logout")}</span>
             </button>
           </div>
         </div>

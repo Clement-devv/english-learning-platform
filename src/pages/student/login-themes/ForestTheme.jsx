@@ -4,8 +4,10 @@ import { Mail, Lock, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import TwoFactorLogin from '../../../components/TwoFactorLogin';
 import { useBranding } from '../../../context/BrandingContext';
 import { useLoginLogic } from './useLoginLogic';
+import { useTranslation } from "react-i18next";
 
 export default function ForestTheme({ loginHook } = {}) {
+  const { t: tr } = useTranslation("student");
   const {
     email, setEmail, password, setPassword,
     showPassword, setShowPassword,
@@ -100,12 +102,12 @@ export default function ForestTheme({ loginHook } = {}) {
           </div>
 
           <div className="ft-hero-text">
-            <h2 className="ft-hero-h2">Grow With<br />Every Lesson.</h2>
-            <p className="ft-hero-p">Knowledge blooms here!</p>
+            <h2 className="ft-hero-h2">{tr("forestTheme.growWith")}<br />{tr("forestTheme.everyLesson")}</h2>
+            <p className="ft-hero-p">{tr("forestTheme.knowledgeBloomsHere")}</p>
             <div className="ft-badge-row">
-              <span className="ft-badge">🎓 Expert lessons</span>
-              <span className="ft-badge">🌍 Live classes</span>
-              <span className="ft-badge">🏆 Track progress</span>
+              <span className="ft-badge">{tr("forestTheme.expertLessons")}</span>
+              <span className="ft-badge">{tr("forestTheme.liveClasses")}</span>
+              <span className="ft-badge">{tr("forestTheme.trackProgress")}</span>
             </div>
           </div>
         </div>
@@ -121,7 +123,7 @@ export default function ForestTheme({ loginHook } = {}) {
             </div>
 
             <h1 className="ft-title">{centerName}</h1>
-            <p className="ft-subtitle">Sign in and start growing!</p>
+            <p className="ft-subtitle">{tr("forestTheme.signInAndStartGrowing")}</p>
 
             {error && (
               <div className="ft-error">
@@ -132,16 +134,16 @@ export default function ForestTheme({ loginHook } = {}) {
 
             <form onSubmit={handleInitialLogin} className="ft-form">
               <div className="ft-field">
-                <label className="ft-label"><Mail size={13} /> Email</label>
+                <label className="ft-label"><Mail size={13} /> {tr("forestTheme.email")}</label>
                 <div className={`ft-input-wrap${focusedField === 'email' ? ' ft-focused' : ''}`}>
                   <input type="email" value={email} onChange={e => setEmail(e.target.value)}
                     onFocus={() => setFocusedField('email')} onBlur={() => setFocusedField(null)}
-                    placeholder="your.email@example.com" required disabled={loading} className="ft-input" />
+                    placeholder={tr("forestTheme.yourEmailExampleCom")} required disabled={loading} className="ft-input" />
                 </div>
               </div>
 
               <div className="ft-field">
-                <label className="ft-label"><Lock size={13} /> Password</label>
+                <label className="ft-label"><Lock size={13} /> {tr("forestTheme.password")}</label>
                 <div className={`ft-input-wrap${focusedField === 'password' ? ' ft-focused' : ''}`}>
                   <input type={showPassword ? 'text' : 'password'} value={password}
                     onChange={e => setPassword(e.target.value)}
@@ -155,19 +157,19 @@ export default function ForestTheme({ loginHook } = {}) {
 
               <div style={{ textAlign: 'right', marginTop: '-6px' }}>
                 <button type="button" onClick={() => navigate('/student/forgot-password')} className="ft-forgot">
-                  Forgot password?
+                  {tr("forestTheme.forgotPassword")}
                 </button>
               </div>
 
               <button type="submit" disabled={loading} className="ft-submit">
                 {loading
-                  ? <span className="ft-loading-row"><span className="ft-spinner" />Signing in…</span>
-                  : <span>Let's Grow! 🌱</span>
+                  ? <span className="ft-loading-row"><span className="ft-spinner" />{tr("forestTheme.signingIn")}</span>
+                  : <span>{tr("forestTheme.letSGrow")}</span>
                 }
               </button>
             </form>
 
-            <p className="ft-footer">Your account is managed by your school 🏫</p>
+            <p className="ft-footer">{tr("forestTheme.yourAccountIsManagedBy")}</p>
             <div className="ft-dots">
               {['#16a34a','#4ade80','#fbbf24','#86efac'].map((c, i) => (
                 <span key={i} className="ft-dot" style={{ background: c }} />

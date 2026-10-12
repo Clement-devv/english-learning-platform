@@ -36,16 +36,18 @@ import ReviewsTab        from "../tabs/ReviewsTab";
 import ReferralTab      from "../tabs/ReferralTab";
 import StreakWidget      from "../components/StreakWidget";
 import { useDashboardData, BADGE_DEFINITIONS, TABS } from "./useDashboardData";
+import { useTranslation } from "react-i18next";
 
 // ── Badges Tab ────────────────────────────────────────────────────────────────
 function BadgesTab({ badges, progress, completedClasses, col, isDarkMode, shareAchievement, accentGradient, tabShadow, fontFamily }) {
+  const { t: tr } = useTranslation("student");
   const [badgeFilter, setBadgeFilter] = useState("all");
   const categories = [
-    { key: "all",         label: "🏅 All"        },
-    { key: "journey",     label: "🚀 Journey"     },
-    { key: "consistency", label: "🔥 Consistency" },
-    { key: "weekly",      label: "📅 Weekly"      },
-    { key: "special",     label: "⭐ Special"     },
+    { key: "all",         label: tr("sunshineShell.all")        },
+    { key: "journey",     label: tr("sunshineShell.journey")     },
+    { key: "consistency", label: tr("sunshineShell.consistency") },
+    { key: "weekly",      label: tr("sunshineShell.weekly")      },
+    { key: "special",     label: tr("sunshineShell.special")     },
   ];
   const shown  = BADGE_DEFINITIONS.filter(b => badgeFilter === "all" || b.category === badgeFilter);
   const pct    = Math.round((badges.length / BADGE_DEFINITIONS.length) * 100);
@@ -54,8 +56,8 @@ function BadgesTab({ badges, progress, completedClasses, col, isDarkMode, shareA
   const shareBadge = async (badge) => {
     const msg = `🎉 I just earned the "${badge.name}" ${badge.icon} badge!\n"${badge.desc}"\n\nLearning English every day! 📚 #EnglishLearning #Achievement`;
     try {
-      if (navigator.share) { await navigator.share({ title: `I earned the ${badge.name} badge!`, text: msg }); }
-      else { await navigator.clipboard.writeText(msg); alert("Copied to clipboard! Paste it anywhere to share 🎉"); }
+      if (navigator.share) { await navigator.share({ title: tr("sunshineShell.iEarnedTheBadge", { name: badge.name }), text: msg }); }
+      else { await navigator.clipboard.writeText(msg); alert(tr("sunshineShell.copiedToClipboardPasteIt")); }
     } catch {}
   };
 
@@ -80,22 +82,22 @@ function BadgesTab({ badges, progress, completedClasses, col, isDarkMode, shareA
       <div style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: "24px", padding: "24px", boxShadow: "0 4px 12px rgba(0,0,0,0.06)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px", marginBottom: "20px" }}>
           <div>
-            <h2 style={{ margin: "0 0 4px", fontSize: "24px", fontWeight: 900, color: col.heading }}>🏅 Achievement Badges</h2>
+            <h2 style={{ margin: "0 0 4px", fontSize: "24px", fontWeight: 900, color: col.heading }}>{tr("sunshineShell.achievementBadges2")}</h2>
             <p style={{ margin: 0, color: col.muted, fontSize: "14px", fontWeight: 600 }}>
-              {badges.length === 0 ? "Complete classes to start earning!" : `${badges.length} of ${BADGE_DEFINITIONS.length} earned · ${pct}% complete`}
+              {badges.length === 0 ? tr("sunshineShell.completeClassesToStartEarning") : tr("sunshineShell.ofEarnedComplete", { badgesCount: badges.length, BADGEDEFINITIONSCount: BADGE_DEFINITIONS.length, pct })}
             </p>
           </div>
           {badges.length > 0 && (
             <button onClick={() => shareAchievement("badge")}
               style={{ background: accentGradient, color: "#fff", border: "none", borderRadius: "16px", padding: "10px 20px", fontWeight: 800, cursor: "pointer", fontFamily: `${fontFamily},sans-serif`, fontSize: "14px", boxShadow: `0 4px 14px ${tabShadow}` }}>
-              🎉 Share All
+              {tr("sunshineShell.shareAll")}
             </button>
           )}
         </div>
 
         <div style={{ marginBottom: "20px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", fontWeight: 700, color: col.muted, marginBottom: "6px" }}>
-            <span>Overall Progress</span><span>{pct}%</span>
+            <span>{tr("sunshineShell.overallProgress")}</span><span>{pct}%</span>
           </div>
           <div style={{ background: col.border, borderRadius: "999px", height: "12px", overflow: "hidden" }}>
             <div style={{ width: `${pct}%`, height: "100%", borderRadius: "999px", transition: "width 1s ease", background: accentGradient, backgroundSize: "200% 100%", animation: "badge-shine 3s linear infinite" }} />
@@ -134,11 +136,11 @@ function BadgesTab({ badges, progress, completedClasses, col, isDarkMode, shareA
               )}
               {earned ? (
                 <div style={{ display: "flex", gap: "6px", justifyContent: "center", flexWrap: "wrap" }}>
-                  <span style={{ display: "inline-flex", alignItems: "center", gap: "4px", padding: "4px 10px", borderRadius: "999px", fontSize: "11px", fontWeight: 800, background: `linear-gradient(135deg,${badge.grad[0]},${badge.grad[1]})`, color: "#fff" }}>✓ Earned</span>
-                  <button onClick={() => shareBadge(badge)} style={{ display: "inline-flex", alignItems: "center", gap: "3px", padding: "4px 10px", borderRadius: "999px", fontSize: "11px", fontWeight: 800, border: "none", cursor: "pointer", fontFamily: `${fontFamily},sans-serif`, background: isDarkMode ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.06)", color: col.heading }}>🔗 Share</button>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: "4px", padding: "4px 10px", borderRadius: "999px", fontSize: "11px", fontWeight: 800, background: `linear-gradient(135deg,${badge.grad[0]},${badge.grad[1]})`, color: "#fff" }}>{tr("sunshineShell.earned")}</span>
+                  <button onClick={() => shareBadge(badge)} style={{ display: "inline-flex", alignItems: "center", gap: "3px", padding: "4px 10px", borderRadius: "999px", fontSize: "11px", fontWeight: 800, border: "none", cursor: "pointer", fontFamily: `${fontFamily},sans-serif`, background: isDarkMode ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.06)", color: col.heading }}>{tr("sunshineShell.share")}</button>
                 </div>
               ) : (
-                <span style={{ display: "inline-flex", alignItems: "center", gap: "4px", padding: "4px 10px", borderRadius: "999px", fontSize: "11px", fontWeight: 800, background: col.border, color: col.muted }}>🔒 Locked</span>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: "4px", padding: "4px 10px", borderRadius: "999px", fontSize: "11px", fontWeight: 800, background: col.border, color: col.muted }}>{tr("sunshineShell.locked")}</span>
               )}
             </div>
           );
@@ -147,7 +149,7 @@ function BadgesTab({ badges, progress, completedClasses, col, isDarkMode, shareA
 
       {nextUp.length > 0 && (
         <div style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: "24px", padding: "24px", boxShadow: "0 4px 12px rgba(0,0,0,0.06)" }}>
-          <h3 style={{ margin: "0 0 16px", fontSize: "20px", fontWeight: 900, color: col.heading }}>🎯 Almost There!</h3>
+          <h3 style={{ margin: "0 0 16px", fontSize: "20px", fontWeight: 900, color: col.heading }}>{tr("sunshineShell.almostThere2")}</h3>
           <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
             {nextUp.map(badge => {
               const cur = getCur(badge);
@@ -177,6 +179,7 @@ function BadgesTab({ badges, progress, completedClasses, col, isDarkMode, shareA
 
 // ── Main shell ────────────────────────────────────────────────────────────────
 export default function SunshineShell() {
+  const { t: tr } = useTranslation("student");
   const { branding } = useBranding();
   const dashTheme = getDashboardThemeById(branding.dashboardTheme);
 
@@ -229,10 +232,10 @@ export default function SunshineShell() {
             <div className="pop-in" style={{ background: dashTheme.welcomeGradient, color: "#fff", padding: "40px 56px", borderRadius: "32px", textAlign: "center", boxShadow: "0 24px 64px rgba(0,0,0,0.3)", pointerEvents: "auto", maxWidth: "90vw" }}>
               <div style={{ fontSize: "72px", marginBottom: "12px" }}>{d.celebrationEmoji}</div>
               <h2 style={{ margin: "0 0 8px", fontSize: "28px", fontWeight: 900 }}>{d.celebrationMessage}</h2>
-              <p style={{ margin: "0 0 20px", opacity: 0.9, fontSize: "16px" }}>Keep up the amazing work! 🌟</p>
+              <p style={{ margin: "0 0 20px", opacity: 0.9, fontSize: "16px" }}>{tr("sunshineShell.keepUpTheAmazingWork")}</p>
               <button className="kid-btn" onClick={() => d.shareAchievement(d.newBadge ? "badge" : d.progress.streakDays >= 5 ? "streak" : "total")}
                 style={{ background: "rgba(255,255,255,0.25)", border: "2px solid rgba(255,255,255,0.5)", color: "#fff", padding: "10px 24px", borderRadius: "20px", fontWeight: 700, cursor: "pointer", fontFamily: "Nunito,sans-serif", fontSize: "15px" }}>
-                🎉 Share Achievement
+                {tr("sunshineShell.shareAchievement")}
               </button>
             </div>
           </div>
@@ -258,18 +261,18 @@ export default function SunshineShell() {
               <div style={{ flex: 1 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
                   <span style={{ fontSize: "22px" }}>⚠️</span>
-                  <strong style={{ color: d.isDarkMode ? "#fbbf24" : "#92400e", fontSize: "15px" }}>Attendance Confirmation Needed!</strong>
+                  <strong style={{ color: d.isDarkMode ? "#fbbf24" : "#92400e", fontSize: "15px" }}>{tr("sunshineShell.attendanceConfirmationNeeded")}</strong>
                 </div>
                 <p style={{ margin: "0 0 4px", color: d.isDarkMode ? "#fcd34d" : "#b45309", fontSize: "14px" }}>
-                  Your teacher marked <strong>"{conf.title}"</strong> complete. Can you confirm you were there?
+                  {tr("sunshineShell.yourTeacherMarked")} <strong>"{conf.title}"</strong> {tr("sunshineShell.completeCanYouConfirmYou")}
                 </p>
                 <p style={{ margin: 0, color: d.isDarkMode ? "#f59e0b" : "#d97706", fontSize: "12px" }}>
-                  ⏰ Auto-confirms in: <strong>{d.getTimeRemaining(conf.autoConfirmAt)}</strong>
+                  {tr("sunshineShell.autoConfirmsIn")} <strong>{d.getTimeRemaining(conf.autoConfirmAt)}</strong>
                 </p>
               </div>
               <button className="kid-btn" onClick={() => { d.setSelectedConfirmation(conf); d.setShowConfirmationModal(true); }}
                 style={{ background: "linear-gradient(135deg,#f59e0b,#fbbf24)", color: "#fff", border: "none", borderRadius: "14px", padding: "10px 20px", fontWeight: 800, cursor: "pointer", fontFamily: "Nunito,sans-serif", fontSize: "14px", whiteSpace: "nowrap", flexShrink: 0 }}>
-                Review 👀
+                {tr("sunshineShell.review")}
               </button>
             </div>
           ))}
@@ -305,10 +308,10 @@ export default function SunshineShell() {
           <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
             <div className="kid-card" style={{ background: dashTheme.welcomeGradient, borderRadius: "28px", padding: "28px 32px", color: "#fff", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "20px", boxShadow: `0 12px 40px ${dashTheme.welcomeShadow}` }}>
               <div>
-                <p style={{ margin: "0 0 4px", fontSize: "13px", fontWeight: 700, opacity: 0.85, letterSpacing: ".04em", textTransform: "uppercase" }}>Welcome back 🎉</p>
-                <h1 style={{ margin: "0 0 8px", fontSize: "28px", fontWeight: 900 }}>Hey, {d.student.firstName}! 👋</h1>
+                <p style={{ margin: "0 0 4px", fontSize: "13px", fontWeight: 700, opacity: 0.85, letterSpacing: ".04em", textTransform: "uppercase" }}>{tr("sunshineShell.welcomeBack")}</p>
+                <h1 style={{ margin: "0 0 8px", fontSize: "28px", fontWeight: 900 }}>{tr("sunshineShell.hey", { firstName: d.student.firstName })}</h1>
                 <p style={{ margin: 0, opacity: 0.9, fontSize: "15px" }}>
-                  You have <strong>{d.progress.classesRemaining}</strong> classes left. Let's learn something amazing today!
+                  {tr("sunshineShell.youHave")} <strong>{d.progress.classesRemaining}</strong> {tr("sunshineShell.classesLeftLetSLearn")}
                 </p>
               </div>
               <div style={{ fontSize: "80px", flexShrink: 0 }}>📚</div>
@@ -316,10 +319,10 @@ export default function SunshineShell() {
 
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: "14px" }}>
               {[
-                { Icon: CheckCircle2, label: "Completed",  value: d.progress.completedLessons, grad: "linear-gradient(135deg,#10b981,#34d399)", shadow: "rgba(16,185,129,0.3)"  },
-                { Icon: CalendarDays, label: "Remaining",  value: d.progress.classesRemaining,  grad: "linear-gradient(135deg,#3b82f6,#60a5fa)", shadow: "rgba(59,130,246,0.3)"  },
-                { Icon: Flame,        label: "Day Streak", value: d.progress.streakDays,        grad: "linear-gradient(135deg,#f97316,#fb923c)", shadow: "rgba(249,115,22,0.3)"  },
-                { Icon: Star,         label: "This Week",  value: d.progress.weeklyCompleted,   grad: "linear-gradient(135deg,#8b5cf6,#a78bfa)", shadow: "rgba(139,92,246,0.3)"  },
+                { Icon: CheckCircle2, label: tr("sunshineShell.completed"),  value: d.progress.completedLessons, grad: "linear-gradient(135deg,#10b981,#34d399)", shadow: "rgba(16,185,129,0.3)"  },
+                { Icon: CalendarDays, label: tr("sunshineShell.remaining"),  value: d.progress.classesRemaining,  grad: "linear-gradient(135deg,#3b82f6,#60a5fa)", shadow: "rgba(59,130,246,0.3)"  },
+                { Icon: Flame,        label: tr("sunshineShell.dayStreak2"), value: d.progress.streakDays,        grad: "linear-gradient(135deg,#f97316,#fb923c)", shadow: "rgba(249,115,22,0.3)"  },
+                { Icon: Star,         label: tr("sunshineShell.thisWeek"),  value: d.progress.weeklyCompleted,   grad: "linear-gradient(135deg,#8b5cf6,#a78bfa)", shadow: "rgba(139,92,246,0.3)"  },
               ].map(({ Icon, label, value, grad, shadow }) => (
                 <div key={label} className="kid-card" style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: "20px", padding: "18px 16px", textAlign: "center", boxShadow: "0 4px 12px rgba(0,0,0,0.06)" }}>
                   <div style={{ width: "44px", height: "44px", borderRadius: "14px", background: grad, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 10px", boxShadow: `0 4px 10px ${shadow}` }}>
@@ -335,30 +338,30 @@ export default function SunshineShell() {
               <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
                 <div style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: "24px", padding: "20px", boxShadow: "0 4px 12px rgba(0,0,0,0.06)" }}>
                   <h2 style={{ margin: "0 0 16px", fontSize: "18px", fontWeight: 900, color: col.heading, display: "flex", alignItems: "center", gap: "8px" }}>
-                    🚀 Live & Starting Soon
+                    {tr("sunshineShell.liveStartingSoon")}
                     {d.activeClasses.length > 0 && <span style={{ background: "#ef4444", color: "#fff", borderRadius: "999px", padding: "2px 10px", fontSize: "12px", fontWeight: 900 }}>{d.activeClasses.length}</span>}
                   </h2>
                   <ActiveClasses activeClasses={d.activeClasses} onJoin={d.handleJoinClass} />
                 </div>
                 <div style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: "24px", padding: "20px", boxShadow: "0 4px 12px rgba(0,0,0,0.06)" }}>
-                  <h2 style={{ margin: "0 0 16px", fontSize: "18px", fontWeight: 900, color: col.heading, display: "flex", alignItems: "center", gap: "8px" }}>📅 Upcoming Classes</h2>
+                  <h2 style={{ margin: "0 0 16px", fontSize: "18px", fontWeight: 900, color: col.heading, display: "flex", alignItems: "center", gap: "8px" }}>{tr("sunshineShell.upcomingClasses")}</h2>
                   <UpcomingClasses upcomingClasses={d.upcomingClasses} onEnroll={() => d.showToast("Coming soon!")} />
                 </div>
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
                 <div style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: "24px", padding: "20px", boxShadow: "0 4px 12px rgba(0,0,0,0.06)" }}>
-                  <h2 style={{ margin: "0 0 14px", fontSize: "17px", fontWeight: 900, color: col.heading }}>📈 My Progress</h2>
+                  <h2 style={{ margin: "0 0 14px", fontSize: "17px", fontWeight: 900, color: col.heading }}>{tr("sunshineShell.myProgress")}</h2>
                   <ProgressCard progress={d.progress} />
                 </div>
                 <StreakWidget isDarkMode={d.isDarkMode} onLoad={d.handleStreakLoaded} />
                 <div style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: "24px", padding: "20px", boxShadow: "0 4px 12px rgba(0,0,0,0.06)" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
-                    <h2 style={{ margin: 0, fontSize: "17px", fontWeight: 900, color: col.heading }}>🏅 My Badges</h2>
-                    <button className="kid-btn" onClick={() => d.setActiveTab("badges")} style={{ background: d.isDarkMode ? "rgba(249,115,22,0.15)" : "#fff7ed", border: "none", color: "#f97316", fontWeight: 800, borderRadius: "12px", padding: "5px 12px", cursor: "pointer", fontFamily: "Nunito,sans-serif", fontSize: "12px" }}>See all →</button>
+                    <h2 style={{ margin: 0, fontSize: "17px", fontWeight: 900, color: col.heading }}>{tr("sunshineShell.myBadges")}</h2>
+                    <button className="kid-btn" onClick={() => d.setActiveTab("badges")} style={{ background: d.isDarkMode ? "rgba(249,115,22,0.15)" : "#fff7ed", border: "none", color: "#f97316", fontWeight: 800, borderRadius: "12px", padding: "5px 12px", cursor: "pointer", fontFamily: "Nunito,sans-serif", fontSize: "12px" }}>{tr("sunshineShell.seeAll")}</button>
                   </div>
                   {d.badges.length === 0 ? (
-                    <p style={{ textAlign: "center", color: col.muted, fontSize: "13px", fontWeight: 600 }}>Complete classes to earn badges! 🌟</p>
+                    <p style={{ textAlign: "center", color: col.muted, fontSize: "13px", fontWeight: 600 }}>{tr("sunshineShell.completeClassesToEarnBadges")}</p>
                   ) : (
                     <div style={{ display: "flex", flexWrap: "wrap", gap: "10px" }}>
                       {d.badges.slice(-4).map(b => (
@@ -371,7 +374,7 @@ export default function SunshineShell() {
                   )}
                 </div>
                 <div style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: "24px", padding: "20px", boxShadow: "0 4px 12px rgba(0,0,0,0.06)" }}>
-                  <h2 style={{ margin: "0 0 14px", fontSize: "17px", fontWeight: 900, color: col.heading }}>🔔 Notifications</h2>
+                  <h2 style={{ margin: "0 0 14px", fontSize: "17px", fontWeight: 900, color: col.heading }}>{tr("sunshineShell.notifications")}</h2>
                   <NotificationsCard notifications={d.notifications} onClearAll={() => d.setNotifications([])} />
                 </div>
               </div>
@@ -382,7 +385,7 @@ export default function SunshineShell() {
         {/* COMPLETED CLASSES */}
         {d.activeTab === "completed-classes" && (
           <div style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: "24px", padding: "24px", boxShadow: "0 4px 12px rgba(0,0,0,0.06)" }}>
-            <h2 style={{ margin: "0 0 20px", fontSize: "22px", fontWeight: 900, color: col.heading }}>✅ Completed Classes</h2>
+            <h2 style={{ margin: "0 0 20px", fontSize: "22px", fontWeight: 900, color: col.heading }}>{tr("sunshineShell.completedClasses")}</h2>
             <StudentCompletedTab studentId={d.student.id} isDarkMode={d.isDarkMode} />
           </div>
         )}
@@ -397,9 +400,9 @@ export default function SunshineShell() {
           <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "14px" }}>
               {[
-                { Icon: BookOpen, label: "Total Classes", value: d.completedClasses.length, grad: "linear-gradient(135deg,#f97316,#fb923c)", shadow: "rgba(249,115,22,0.3)" },
-                { Icon: Flame,    label: "Day Streak",    value: d.progress.streakDays,     grad: "linear-gradient(135deg,#ec4899,#f9a8d4)", shadow: "rgba(236,72,153,0.3)"  },
-                { Icon: Clock,    label: "Total Hours",   value: d.completedClasses.length > 0 ? Math.round(d.completedClasses.reduce((s, c) => s + c.duration, 0) / 60) : 0, grad: "linear-gradient(135deg,#8b5cf6,#a78bfa)", shadow: "rgba(139,92,246,0.3)" },
+                { Icon: BookOpen, label: tr("sunshineShell.totalClasses"), value: d.completedClasses.length, grad: "linear-gradient(135deg,#f97316,#fb923c)", shadow: "rgba(249,115,22,0.3)" },
+                { Icon: Flame,    label: tr("sunshineShell.dayStreak2"),    value: d.progress.streakDays,     grad: "linear-gradient(135deg,#ec4899,#f9a8d4)", shadow: "rgba(236,72,153,0.3)"  },
+                { Icon: Clock,    label: tr("sunshineShell.totalHours"),   value: d.completedClasses.length > 0 ? Math.round(d.completedClasses.reduce((s, c) => s + c.duration, 0) / 60) : 0, grad: "linear-gradient(135deg,#8b5cf6,#a78bfa)", shadow: "rgba(139,92,246,0.3)" },
               ].map(({ Icon, label, value, grad, shadow }) => (
                 <div key={label} className="kid-card" style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: "24px", padding: "24px", textAlign: "center", boxShadow: "0 4px 12px rgba(0,0,0,0.06)" }}>
                   <div style={{ width: 56, height: 56, borderRadius: 18, background: grad, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 12px", boxShadow: `0 6px 16px ${shadow}` }}>
@@ -410,7 +413,7 @@ export default function SunshineShell() {
                 </div>
               ))}
             </div>
-            {[{ title: "📊 Last 7 Days", data: d.chartData.last7, type: "bar" }, { title: "📈 Last 30 Days", data: d.chartData.last30, type: "line" }].map(({ title, data, type }) => (
+            {[{ title: tr("sunshineShell.last7Days"), data: d.chartData.last7, type: "bar" }, { title: tr("sunshineShell.last30Days"), data: d.chartData.last30, type: "line" }].map(({ title, data, type }) => (
               <div key={title} className="kid-card" style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: "24px", padding: "24px", boxShadow: "0 4px 12px rgba(0,0,0,0.06)" }}>
                 <h3 style={{ margin: "0 0 20px", fontSize: "20px", fontWeight: 900, color: col.heading }}>{title}</h3>
                 <ResponsiveContainer width="100%" height={260}>
@@ -423,7 +426,7 @@ export default function SunshineShell() {
               </div>
             ))}
             <div className="kid-card" style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: "24px", padding: "24px", boxShadow: "0 4px 12px rgba(0,0,0,0.06)" }}>
-              <h3 style={{ margin: "0 0 20px", fontSize: "20px", fontWeight: 900, color: col.heading }}>🕐 Classes by Time of Day</h3>
+              <h3 style={{ margin: "0 0 20px", fontSize: "20px", fontWeight: 900, color: col.heading }}>{tr("sunshineShell.classesByTimeOfDay")}</h3>
               <ResponsiveContainer width="100%" height={260}>
                 <PieChart><Pie data={d.chartData.timeDist} cx="50%" cy="50%" outerRadius={90} dataKey="value" label={({ name, value }) => `${name}: ${value}`} labelLine={false}>{d.chartData.timeDist.map((e, i) => <Cell key={i} fill={e.color} />)}</Pie><RechartsTooltip contentStyle={tooltipStyle} /></PieChart>
               </ResponsiveContainer>
@@ -460,7 +463,7 @@ export default function SunshineShell() {
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999, padding: "16px" }}>
           <div className="pop-in kid-card" style={{ background: col.card, borderRadius: "28px", padding: "28px", maxWidth: "420px", width: "100%", boxShadow: "0 24px 64px rgba(0,0,0,0.3)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-              <h3 style={{ margin: 0, fontSize: "22px", fontWeight: 900, color: col.heading }}>🎉 Share Your Win!</h3>
+              <h3 style={{ margin: 0, fontSize: "22px", fontWeight: 900, color: col.heading }}>{tr("sunshineShell.shareYourWin")}</h3>
               <button className="kid-btn" onClick={() => d.setShowShareModal(false)} style={{ background: col.border, border: "none", borderRadius: "50%", width: "36px", height: "36px", cursor: "pointer", fontSize: "18px", display: "flex", alignItems: "center", justifyContent: "center", color: col.body }}>✕</button>
             </div>
             <div style={{ background: d.isDarkMode ? "rgba(249,115,22,0.1)" : "#fff7ed", border: `2px solid ${d.isDarkMode ? "rgba(249,115,22,0.3)" : "#fed7aa"}`, borderRadius: "18px", padding: "16px", marginBottom: "20px" }}>
@@ -468,7 +471,7 @@ export default function SunshineShell() {
               <p style={{ margin: 0, fontSize: "14px", color: col.body, fontWeight: 600 }}>{d.shareData?.message}</p>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-              <button className="kid-btn" onClick={d.copyShareText} style={{ width: "100%", padding: "12px", border: `2px solid ${col.border}`, borderRadius: "16px", background: "transparent", color: col.heading, fontWeight: 800, cursor: "pointer", fontFamily: "Nunito,sans-serif", fontSize: "14px" }}>📋 Copy to Clipboard</button>
+              <button className="kid-btn" onClick={d.copyShareText} style={{ width: "100%", padding: "12px", border: `2px solid ${col.border}`, borderRadius: "16px", background: "transparent", color: col.heading, fontWeight: 800, cursor: "pointer", fontFamily: "Nunito,sans-serif", fontSize: "14px" }}>{tr("sunshineShell.copyToClipboard")}</button>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
                 {[["twitter", "🐦 Twitter", "#1DA1F2"], ["facebook", "📘 Facebook", "#1877F2"], ["whatsapp", "💬 WhatsApp", "#25D366"], ["linkedin", "💼 LinkedIn", "#0A66C2"]].map(([p, label, bg]) => (
                   <button key={p} className="kid-btn" onClick={() => d.shareOnSocial(p)} style={{ padding: "11px", background: bg, color: "#fff", border: "none", borderRadius: "14px", fontWeight: 800, cursor: "pointer", fontFamily: "Nunito,sans-serif", fontSize: "13px" }}>{label}</button>

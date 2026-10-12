@@ -23,9 +23,11 @@ import TeacherModal from "../modals/TeacherModal";
 import Pagination from "../../../components/Pagination";
 import LessonMarkModal from "../modals/LessonMarkModal";
 import TeacherPaymentHistoryModal from "../modals/TeacherPaymentHistoryModal";
+import { useTranslation } from "react-i18next";
 
 // ─── Delete confirmation modal ────────────────────────────────────────────────
 function DeleteConfirmModal({ teacher, onConfirm, onCancel, isDarkMode }) {
+  const { t: tr } = useTranslation("admin");
   if (!teacher) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
@@ -40,29 +42,29 @@ function DeleteConfirmModal({ teacher, onConfirm, onCancel, isDarkMode }) {
           </div>
           <div>
             <h3 className={`text-lg font-bold ${isDarkMode ? "text-white" : "text-gray-900"}`}>
-              Schedule teacher for deletion?
+              {tr("teachersTab.scheduleTeacherForDeletion")}
             </h3>
             <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
-              This cannot be undone after 7 days
+              {tr("teachersTab.thisCannotBeUndoneAfter")}
             </p>
           </div>
         </div>
 
         <div className={`rounded-xl p-4 mb-5 ${isDarkMode ? "bg-red-900/20 border border-red-800/40" : "bg-red-50 border border-red-100"}`}>
           <p className={`text-sm font-semibold mb-1 ${isDarkMode ? "text-red-300" : "text-red-700"}`}>
-            What will happen:
+            {tr("teachersTab.whatWillHappen")}
           </p>
           <ul className={`text-sm space-y-1 ${isDarkMode ? "text-red-400" : "text-red-600"}`}>
-            <li>• Account disabled immediately</li>
-            <li>• Teacher receives a warning email</li>
-            <li>• Permanently deleted after <strong>7 days</strong></li>
-            <li>• You can restore the account within 7 days</li>
+            <li>{tr("teachersTab.accountDisabledImmediately")}</li>
+            <li>{tr("teachersTab.teacherReceivesAWarningEmail")}</li>
+            <li>{tr("teachersTab.permanentlyDeletedAfter")} <strong>{tr("teachersTab.t7Days")}</strong></li>
+            <li>{tr("teachersTab.youCanRestoreTheAccount")}</li>
           </ul>
         </div>
 
         <p className={`text-sm mb-5 ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>
-          Are you sure you want to schedule{" "}
-          <strong>{teacher.firstName} {teacher.lastName}</strong> for deletion?
+          {tr("teachersTab.areYouSureYouWant")}{" "}
+          <strong>{teacher.firstName} {teacher.lastName}</strong> {tr("teachersTab.forDeletion")}
         </p>
 
         <div className="flex gap-3">
@@ -74,13 +76,13 @@ function DeleteConfirmModal({ teacher, onConfirm, onCancel, isDarkMode }) {
                 : "border-gray-300 text-gray-700 hover:bg-gray-50"
             }`}
           >
-            Cancel
+            {tr("teachersTab.cancel")}
           </button>
           <button
             onClick={onConfirm}
             className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-red-600 hover:bg-red-700 text-white transition-all"
           >
-            Yes, Schedule Deletion
+            {tr("teachersTab.yesScheduleDeletion")}
           </button>
         </div>
       </div>
@@ -90,6 +92,7 @@ function DeleteConfirmModal({ teacher, onConfirm, onCancel, isDarkMode }) {
 
 // ─── Pay confirmation modal (single teacher) ─────────────────────────────────
 function PayConfirmModal({ teacher, onConfirm, onCancel, isDarkMode }) {
+  const { t: tr } = useTranslation("admin");
   const sym = useCurrencySymbol();
   if (!teacher) return null;
   const amount = (teacher.earned || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -106,10 +109,10 @@ function PayConfirmModal({ teacher, onConfirm, onCancel, isDarkMode }) {
           </div>
           <div>
             <h3 className={`text-lg font-bold ${isDarkMode ? "text-white" : "text-gray-900"}`}>
-              Confirm Payment
+              {tr("teachersTab.confirmPayment")}
             </h3>
             <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
-              This will reset the teacher's earnings to $0
+              {tr("teachersTab.thisWillResetTheTeacher")}
             </p>
           </div>
         </div>
@@ -117,7 +120,7 @@ function PayConfirmModal({ teacher, onConfirm, onCancel, isDarkMode }) {
         <div className={`rounded-xl p-4 mb-5 ${isDarkMode ? "bg-emerald-900/20 border border-emerald-800/40" : "bg-emerald-50 border border-emerald-100"}`}>
           <div className="flex justify-between items-center">
             <span className={`text-sm font-medium ${isDarkMode ? "text-emerald-300" : "text-emerald-700"}`}>
-              Teacher
+              {tr("teachersTab.teacher")}
             </span>
             <span className={`text-sm font-bold ${isDarkMode ? "text-white" : "text-gray-900"}`}>
               {teacher.displayName?.trim() || `${teacher.firstName} ${teacher.lastName}`}
@@ -125,7 +128,7 @@ function PayConfirmModal({ teacher, onConfirm, onCancel, isDarkMode }) {
           </div>
           <div className="flex justify-between items-center mt-2">
             <span className={`text-sm font-medium ${isDarkMode ? "text-emerald-300" : "text-emerald-700"}`}>
-              Amount to pay
+              {tr("teachersTab.amountToPay")}
             </span>
             <span className={`text-xl font-bold ${isDarkMode ? "text-emerald-300" : "text-emerald-600"}`}>
               {sym}{amount}
@@ -142,13 +145,13 @@ function PayConfirmModal({ teacher, onConfirm, onCancel, isDarkMode }) {
                 : "border-gray-300 text-gray-700 hover:bg-gray-50"
             }`}
           >
-            Cancel
+            {tr("teachersTab.cancel")}
           </button>
           <button
             onClick={onConfirm}
             className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-emerald-600 hover:bg-emerald-700 text-white transition-all"
           >
-            Confirm Payment
+            {tr("teachersTab.confirmPayment")}
           </button>
         </div>
       </div>
@@ -158,6 +161,7 @@ function PayConfirmModal({ teacher, onConfirm, onCancel, isDarkMode }) {
 
 // ─── Pay all confirmation modal ───────────────────────────────────────────────
 function PayAllConfirmModal({ teachers, onConfirm, onCancel, isDarkMode }) {
+  const { t: tr } = useTranslation("admin");
   const sym = useCurrencySymbol();
   if (!teachers) return null;
   const total = teachers.reduce((sum, t) => sum + (t.earned || 0), 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -174,10 +178,10 @@ function PayAllConfirmModal({ teachers, onConfirm, onCancel, isDarkMode }) {
           </div>
           <div>
             <h3 className={`text-lg font-bold ${isDarkMode ? "text-white" : "text-gray-900"}`}>
-              Mark All as Paid
+              {tr("teachersTab.markAllAsPaid")}
             </h3>
             <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
-              This will reset earnings to $0 for all teachers below
+              {tr("teachersTab.thisWillResetEarningsTo")}
             </p>
           </div>
         </div>
@@ -197,7 +201,7 @@ function PayAllConfirmModal({ teachers, onConfirm, onCancel, isDarkMode }) {
 
         <div className={`flex justify-between items-center px-1 mb-5`}>
           <span className={`text-sm font-semibold ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>
-            Total payout
+            {tr("teachersTab.totalPayout")}
           </span>
           <span className={`text-xl font-bold ${isDarkMode ? "text-emerald-300" : "text-emerald-600"}`}>
             {sym}{total}
@@ -213,13 +217,12 @@ function PayAllConfirmModal({ teachers, onConfirm, onCancel, isDarkMode }) {
                 : "border-gray-300 text-gray-700 hover:bg-gray-50"
             }`}
           >
-            Cancel
+            {tr("teachersTab.cancel")}
           </button>
           <button
             onClick={onConfirm}
             className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-emerald-600 hover:bg-emerald-700 text-white transition-all"
-          >
-            Pay All {sym}{total}
+          >{tr("teachersTab.payAll", { sym, total })}
           </button>
         </div>
       </div>
@@ -283,6 +286,7 @@ function SummaryCard({ icon: Icon, label, value, sub, color, isDarkMode }) {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function TeachersTab({ onNotify, isDarkMode = false }) {
+  const { t: tr } = useTranslation("admin");
   const sym = useCurrencySymbol();
   const [teachers, setTeachers] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -335,7 +339,7 @@ export default function TeachersTab({ onNotify, isDarkMode = false }) {
       } catch (err) {
         console.error("Error fetching teachers:", err);
         showToast(
-          `Could not load teachers: ${err.response?.data?.message || err.message}`,
+          tr("teachersTab.couldNotLoadTeachers", { value: err.response?.data?.message || err.message }),
           "error"
         );
       } finally {
@@ -343,7 +347,7 @@ export default function TeachersTab({ onNotify, isDarkMode = false }) {
       }
     };
     fetchTeachers();
-  }, []);
+  }, [tr]);
 
   // ── Save teacher (create / update) ─────────────────────────────────────────
   const handleSaveTeacher = async (teacherData) => {
@@ -353,16 +357,16 @@ export default function TeachersTab({ onNotify, isDarkMode = false }) {
         const res = await api.put(`/teachers/${id}`, teacherData);
         setTeachers((prev) => prev.map((t, i) => (i === editIndex ? res.data : t)));
         onNotify?.(`Teacher updated: ${teacherData.firstName} ${teacherData.lastName}`);
-        showToast(`${teacherData.firstName} ${teacherData.lastName} updated successfully!`);
+        showToast(tr("teachersTab.updatedSuccessfully", { firstName: teacherData.firstName, lastName: teacherData.lastName }));
       } else {
         const res = await api.post("/teachers", teacherData);
         setTeachers((prev) => [...prev, res.data.teacher ?? res.data]);
         onNotify?.(`Teacher created: ${teacherData.firstName} ${teacherData.lastName}`);
-        showToast(`${teacherData.firstName} ${teacherData.lastName} added successfully!`);
+        showToast(tr("teachersTab.addedSuccessfully", { firstName: teacherData.firstName, lastName: teacherData.lastName }));
       }
     } catch (err) {
       console.error("Save teacher error:", err);
-      showToast(err.response?.data?.message || "Could not save teacher. Please try again.", "error");
+      showToast(err.response?.data?.message || tr("teachersTab.couldNotSaveTeacherPlease"), "error");
     } finally {
       setEditIndex(null);
       setIsModalOpen(false);
@@ -383,11 +387,11 @@ export default function TeachersTab({ onNotify, isDarkMode = false }) {
       setTeachers((prev) =>
         prev.map((t) => (t._id === deleteTarget._id ? { ...t, ...res.data.teacher } : t))
       );
-      showToast(`${deleteTarget.firstName} scheduled for deletion. Warning email sent.`, "info");
+      showToast(tr("teachersTab.scheduledForDeletionWarningEmail", { firstName: deleteTarget.firstName }), "info");
       onNotify?.(`Teacher ${deleteTarget.firstName} scheduled for deletion`);
     } catch (err) {
       console.error("Delete teacher error:", err);
-      showToast(err.response?.data?.message || "Could not schedule teacher for deletion.", "error");
+      showToast(err.response?.data?.message || tr("teachersTab.couldNotScheduleTeacherFor"), "error");
     } finally {
       setDeleteTarget(null);
     }
@@ -400,11 +404,11 @@ export default function TeachersTab({ onNotify, isDarkMode = false }) {
       setTeachers((prev) =>
         prev.map((t) => (t._id === teacher._id ? { ...t, ...res.teacher } : t))
       );
-      showToast(`${teacher.firstName} ${teacher.lastName} account restored.`);
+      showToast(tr("teachersTab.accountRestored", { firstName: teacher.firstName, lastName: teacher.lastName }));
       onNotify?.(`Teacher ${teacher.firstName} restored`);
     } catch (err) {
       console.error("Restore teacher error:", err);
-      showToast(err.response?.data?.message || "Could not restore teacher.", "error");
+      showToast(err.response?.data?.message || tr("teachersTab.couldNotRestoreTeacher"), "error");
     }
   };
 
@@ -423,7 +427,7 @@ export default function TeachersTab({ onNotify, isDarkMode = false }) {
       );
     } catch (err) {
       console.error("Toggle teacher error:", err);
-      showToast("Could not update teacher status.", "error");
+      showToast(tr("teachersTab.couldNotUpdateTeacherStatus"), "error");
     }
   };
 
@@ -460,7 +464,7 @@ export default function TeachersTab({ onNotify, isDarkMode = false }) {
     const teacher = teachers[index];
     if (!teacher) return;
     if (!teacher.earned || teacher.earned <= 0) {
-      showToast("No payment due for this teacher.", "info");
+      showToast(tr("teachersTab.noPaymentDueForThis"), "info");
       return;
     }
     setPayTarget(teacher);
@@ -473,10 +477,10 @@ export default function TeachersTab({ onNotify, isDarkMode = false }) {
       const res = await api.patch(`/payment-transactions/teacher/${payTarget._id}/pay-all`, {});
       const earned = res.data?.teacher?.earned ?? 0;
       setTeachers((prev) => prev.map((t) => (t._id === payTarget._id ? { ...t, earned } : t)));
-      showToast(`${fmtMoney(res.data?.totalAmount ?? 0, sym)} paid to ${payTarget.firstName}!`);
+      showToast(tr("teachersTab.paidTo", { fmtMoney: fmtMoney(res.data?.totalAmount ?? 0, sym), firstName: payTarget.firstName }));
     } catch (err) {
       console.error("Pay teacher error:", err);
-      showToast(err.response?.data?.message || "Could not process payment.", "error");
+      showToast(err.response?.data?.message || tr("teachersTab.couldNotProcessPayment"), "error");
     } finally {
       setPayTarget(null);
     }
@@ -500,9 +504,9 @@ export default function TeachersTab({ onNotify, isDarkMode = false }) {
     const failed = results.length - paid;
     if (failed) {
       console.error("Pay all errors:", results.filter((r) => r.status === "rejected").map((r) => r.reason));
-      showToast(`${paid} teacher${paid !== 1 ? "s" : ""} paid, ${failed} could not be paid — check the Payments tab.`, "error");
+      showToast(tr("teachersTab.teacherPaidCouldNotBe", { paid, value: paid !== 1 ? "s" : "", failed }), "error");
     } else {
-      showToast(`${paid} teacher${paid !== 1 ? "s" : ""} marked as paid!`);
+      showToast(tr("teachersTab.teacherMarkedAsPaid", { paid, value: paid !== 1 ? "s" : "" }));
     }
   };
 
@@ -522,7 +526,7 @@ export default function TeachersTab({ onNotify, isDarkMode = false }) {
             : t
         )
       );
-      showToast("Password reset. Copy it from the card.", "info");
+      showToast(tr("teachersTab.passwordResetCopyItFrom"), "info");
 
       setTimeout(() => {
         setTeachers((prev) =>
@@ -533,7 +537,7 @@ export default function TeachersTab({ onNotify, isDarkMode = false }) {
       }, 15000);
     } catch (err) {
       console.error("Reset password error:", err);
-      showToast("Could not reset password.", "error");
+      showToast(tr("teachersTab.couldNotResetPassword"), "error");
     }
   };
 
@@ -542,7 +546,7 @@ export default function TeachersTab({ onNotify, isDarkMode = false }) {
     const teacher = teachers[index];
     if (teacher?.password && navigator.clipboard) {
       navigator.clipboard.writeText(teacher.password);
-      showToast("Password copied to clipboard!");
+      showToast(tr("teachersTab.passwordCopiedToClipboard"));
       setTeachers((prev) =>
         prev.map((t, i) =>
           i === index ? { ...t, showTempPassword: false, password: undefined } : t
@@ -563,9 +567,9 @@ export default function TeachersTab({ onNotify, isDarkMode = false }) {
     if (!teacher) return;
     try {
       await api.post(`/teachers/${teacher._id}/resend-invite`);
-      showToast(`Invite resent to ${teacher.email}!`);
+      showToast(tr("teachersTab.inviteResentTo", { email: teacher.email }));
     } catch (err) {
-      showToast(err.response?.data?.message || "Failed to resend invite", "error");
+      showToast(err.response?.data?.message || tr("teachersTab.failedToResendInvite"), "error");
     }
   };
 
@@ -692,15 +696,15 @@ export default function TeachersTab({ onNotify, isDarkMode = false }) {
       {/* ── Page header ── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
-          <h2 className={`text-2xl font-bold ${textPrimary}`}>Teachers</h2>
+          <h2 className={`text-2xl font-bold ${textPrimary}`}>{tr("teachersTab.teachers")}</h2>
           <p className={`text-sm mt-0.5 ${textSecondary}`}>
-            Manage all teachers on the platform
+            {tr("teachersTab.manageAllTeachersOnThe")}
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <button
             onClick={() => downloadTeacherRoster(filteredTeachers).catch(err => { console.error(err); showToast(`Could not create the PDF: ${err?.message || "unknown error"}`, "error"); })}
-            title="Download visible teachers as PDF"
+            title={tr("teachersTab.downloadVisibleTeachersAsPdf")}
             className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-all ${
               isDarkMode
                 ? "border-gray-600 text-gray-300 hover:bg-gray-700"
@@ -708,7 +712,7 @@ export default function TeachersTab({ onNotify, isDarkMode = false }) {
             }`}
           >
             <Download className="w-3.5 h-3.5" />
-            Download PDF
+            {tr("teachersTab.downloadPdf")}
           </button>
 
           <button
@@ -719,7 +723,7 @@ export default function TeachersTab({ onNotify, isDarkMode = false }) {
             className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold text-sm shadow-md transition-all duration-150 active:scale-95 flex-shrink-0"
           >
             <Plus className="w-4 h-4" />
-            Add Teacher
+            {tr("teachersTab.addTeacher")}
           </button>
         </div>
       </div>
@@ -728,22 +732,22 @@ export default function TeachersTab({ onNotify, isDarkMode = false }) {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
         <SummaryCard
           icon={Users}
-          label="Total Teachers"
+          label={tr("teachersTab.totalTeachers")}
           value={teachers.length}
           color="blue"
           isDarkMode={isDarkMode}
         />
         <SummaryCard
           icon={UserCheck}
-          label="Active"
+          label={tr("teachersTab.active")}
           value={activeTeachers.length}
-          sub={`${disabledTeachers.length} disabled`}
+          sub={tr("teachersTab.disabled", { disabledTeachersCount: disabledTeachers.length })}
           color="emerald"
           isDarkMode={isDarkMode}
         />
         <SummaryCard
           icon={TrendingUp}
-          label="Total Lessons"
+          label={tr("teachersTab.totalLessons")}
           value={totalLessons}
           color="amber"
           isDarkMode={isDarkMode}
@@ -756,7 +760,7 @@ export default function TeachersTab({ onNotify, isDarkMode = false }) {
           </div>
           <div className="flex-1 min-w-0">
             <p className={`text-xs font-medium ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
-              Pending Payout
+              {tr("teachersTab.pendingPayout")}
             </p>
             <p className={`text-xl font-bold ${isDarkMode ? "text-purple-300" : "text-purple-700"}`}>
               {sym}{totalEarned.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -767,7 +771,7 @@ export default function TeachersTab({ onNotify, isDarkMode = false }) {
                 className="mt-1 flex items-center gap-1 text-xs font-semibold text-emerald-600 hover:text-emerald-700 transition-colors"
               >
                 <CheckCircle className="w-3 h-3" />
-                Mark all as paid
+                {tr("teachersTab.markAllAsPaid2")}
               </button>
             )}
           </div>
@@ -781,12 +785,12 @@ export default function TeachersTab({ onNotify, isDarkMode = false }) {
         {/* View tabs */}
         <div className={`flex gap-1 p-1 rounded-lg flex-wrap ${isDarkMode ? "bg-gray-900" : "bg-gray-100"}`}>
           {[
-            { key: "all", label: `All (${teachers.length})` },
-            { key: "active", label: `Active (${activeTeachers.length})` },
-            { key: "disabled", label: `Disabled (${disabledTeachers.length})` },
+            { key: "all", label: tr("teachersTab.all", { teachersCount: teachers.length }) },
+            { key: "active", label: tr("teachersTab.active2", { activeTeachersCount: activeTeachers.length }) },
+            { key: "disabled", label: tr("teachersTab.disabled2", { disabledTeachersCount: disabledTeachers.length }) },
             {
               key: "pending_deletion",
-              label: `Pending Deletion (${pendingDeletionTeachers.length})`,
+              label: tr("teachersTab.pendingDeletion", { pendingDeletionTeachersCount: pendingDeletionTeachers.length }),
             },
           ].map(({ key, label }) => (
             <button
@@ -808,7 +812,7 @@ export default function TeachersTab({ onNotify, isDarkMode = false }) {
           />
           <input
             type="text"
-            placeholder="Search teachers..."
+            placeholder={tr("teachersTab.searchTeachers")}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className={`w-full pl-9 pr-3 py-2 rounded-lg border text-sm transition-colors ${inputCls}`}
@@ -825,12 +829,12 @@ export default function TeachersTab({ onNotify, isDarkMode = false }) {
             onChange={(e) => setContinentFilter(e.target.value)}
             className={`pl-9 pr-3 py-2 rounded-lg border text-sm transition-colors appearance-none ${selectCls}`}
           >
-            <option value="">All Continents</option>
-            <option value="Africa">Africa</option>
-            <option value="Europe">Europe</option>
-            <option value="Asia">Asia</option>
-            <option value="Americas">Americas</option>
-            <option value="Oceania">Oceania</option>
+            <option value="">{tr("teachersTab.allContinents")}</option>
+            <option value="Africa">{tr("teachersTab.africa")}</option>
+            <option value="Europe">{tr("teachersTab.europe")}</option>
+            <option value="Asia">{tr("teachersTab.asia")}</option>
+            <option value="Americas">{tr("teachersTab.americas")}</option>
+            <option value="Oceania">{tr("teachersTab.oceania")}</option>
           </select>
         </div>
       </div>
@@ -839,7 +843,7 @@ export default function TeachersTab({ onNotify, isDarkMode = false }) {
       {loading && (
         <div className="flex flex-col items-center justify-center py-20 gap-3">
           <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
-          <p className={`text-sm ${textSecondary}`}>Loading teachers...</p>
+          <p className={`text-sm ${textSecondary}`}>{tr("teachersTab.loadingTeachers")}</p>
         </div>
       )}
 
@@ -853,15 +857,15 @@ export default function TeachersTab({ onNotify, isDarkMode = false }) {
           >
             <Users className={`w-8 h-8 ${textSecondary}`} />
           </div>
-          <p className={`text-base font-semibold ${textPrimary}`}>No teachers found</p>
+          <p className={`text-base font-semibold ${textPrimary}`}>{tr("teachersTab.noTeachersFound")}</p>
           <p className={`text-sm ${textSecondary}`}>
             {searchQuery || continentFilter
-              ? "Try adjusting your search or filters."
+              ? tr("teachersTab.tryAdjustingYourSearchOr")
               : view === "disabled"
-              ? "There are no disabled teachers."
+              ? tr("teachersTab.thereAreNoDisabledTeachers")
               : view === "pending_deletion"
-              ? "No teachers are pending deletion."
-              : "Add your first teacher to get started."}
+              ? tr("teachersTab.noTeachersArePendingDeletion")
+              : tr("teachersTab.addYourFirstTeacherTo")}
           </p>
           {!searchQuery && !continentFilter && view === "active" && (
             <button
@@ -872,7 +876,7 @@ export default function TeachersTab({ onNotify, isDarkMode = false }) {
               className="mt-2 flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold transition-all"
             >
               <Plus className="w-4 h-4" />
-              Add First Teacher
+              {tr("teachersTab.addFirstTeacher")}
             </button>
           )}
         </div>
@@ -882,9 +886,9 @@ export default function TeachersTab({ onNotify, isDarkMode = false }) {
       {!loading && filteredTeachers.length > 0 && (
         <>
           <p className={`text-xs mb-4 ${textSecondary}`}>
-            Showing {Math.min((page - 1) * PAGE_SIZE + 1, filteredTeachers.length)}–{Math.min(page * PAGE_SIZE, filteredTeachers.length)} of {filteredTeachers.length} teacher
+            {tr("teachersTab.showing")} {Math.min((page - 1) * PAGE_SIZE + 1, filteredTeachers.length)}–{Math.min(page * PAGE_SIZE, filteredTeachers.length)} {tr("teachersTab.of")} {filteredTeachers.length} {tr("teachersTab.teacher2")}
             {filteredTeachers.length !== 1 ? "s" : ""}
-            {searchQuery && ` matching "${searchQuery}"`}
+            {searchQuery && tr("teachersTab.matching", { searchQuery })}
           </p>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -899,14 +903,14 @@ export default function TeachersTab({ onNotify, isDarkMode = false }) {
                     <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between gap-2 px-3 py-2 bg-red-600 rounded-t-xl text-white text-xs font-semibold">
                       <span className="flex items-center gap-1">
                         <Clock className="w-3.5 h-3.5" />
-                        Deleted in {days} day{days !== 1 ? "s" : ""}
+                        {tr("teachersTab.deletedIn")} {days} {tr("teachersTab.day")}{days !== 1 ? "s" : ""}
                       </span>
                       <button
                         onClick={() => handleRestoreTeacher(teacher)}
                         className="flex items-center gap-1 px-2 py-0.5 bg-white/20 hover:bg-white/30 rounded-lg transition-all"
                       >
                         <RotateCcw className="w-3 h-3" />
-                        Restore
+                        {tr("teachersTab.restore")}
                       </button>
                     </div>
                   )}

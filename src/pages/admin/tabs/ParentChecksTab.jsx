@@ -13,12 +13,19 @@ import { getCachedCenter } from "../../../utils/branding";
 import ManagedBadge from "../../../components/ManagedBadge";
 import DisputePulse, { DISPUTE_GLOW_CLASS } from "../../../components/DisputePulse";
 import Pagination from "../../../components/Pagination";
+import { useTranslation } from "react-i18next";
+import i18n from "../../../i18n/i18n.js";
+import { dateLocale } from "../../../i18n/dateLocale.js";
+
+// For text in file-level lists: read when rendered, so it follows the chosen language
+const ta = (key, opts) => i18n.t(`admin:${key}`, opts);
+
 
 // Center brand colour (set by utils/branding.js)
 const BRAND  = "var(--brand-primary, #2563eb)";
 const brandA = (a) => `rgba(var(--brand-primary-rgb, 37, 99, 235), ${a})`;
 
-const fmtWhen = (d) => new Date(d).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+const fmtWhen = (d) => new Date(d).toLocaleString(dateLocale("en-GB"), { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 const nameOf  = (p) => `${p?.firstName || ""} ${p?.lastName || ""}`.trim();
 const teacherName = (t) => t?.displayName?.trim() || nameOf(t) || "—";
 const ANSWER = { confirmed: "Yes", denied: "No", waiting: "—" };
@@ -35,15 +42,16 @@ function stateOf(c) {
 }
 
 const STATE = {
-  waiting:   { label: "Waiting for parent",             icon: Clock,         color: "#b45309", bg: "#fef3c7" },
-  confirmed: { label: "Parent confirmed",               icon: CheckCircle2,  color: "#047857", bg: "#d1fae5" },
-  noreply:   { label: "No reply · counted as attended", icon: CheckCircle2,  color: "#4b5563", bg: "#e5e7eb" },
-  disputed:  { label: "Parent said No",                 icon: XCircle,       color: "#b91c1c", bg: "#fee2e2" },
-  settled:   { label: "Dispute settled",                icon: AlertTriangle, color: "#6b7280", bg: "#f3f4f6" },
-  nolink:    { label: "No link",                        icon: Link2,         color: "#6b7280", bg: "#f3f4f6" },
+  waiting:   { get label() { return ta("parentChecksTab.state.waiting"); },             icon: Clock,         color: "#b45309", bg: "#fef3c7" },
+  confirmed: { get label() { return ta("parentChecksTab.state.confirmed"); },               icon: CheckCircle2,  color: "#047857", bg: "#d1fae5" },
+  noreply:   { get label() { return ta("parentChecksTab.state.noreply"); }, icon: CheckCircle2,  color: "#4b5563", bg: "#e5e7eb" },
+  disputed:  { get label() { return ta("parentChecksTab.state.disputed"); },                 icon: XCircle,       color: "#b91c1c", bg: "#fee2e2" },
+  settled:   { get label() { return ta("parentChecksTab.state.settled"); },                icon: AlertTriangle, color: "#6b7280", bg: "#f3f4f6" },
+  nolink:    { get label() { return ta("parentChecksTab.state.nolink"); },                        icon: Link2,         color: "#6b7280", bg: "#f3f4f6" },
 };
 
 export default function ParentChecksTab({ isDarkMode }) {
+  const { t: tr } = useTranslation("admin");
   const [checks, setChecks]   = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter]   = useState("waiting");
@@ -72,7 +80,7 @@ export default function ParentChecksTab({ isDarkMode }) {
       if (data.pagination) { setPager(data.pagination); if (data.pagination.page !== p) setPage(data.pagination.page); }
       if (data.counts) setCounts({ waiting: data.counts.waiting, confirmed: data.counts.attended, disputed: data.counts.disputed });
     }
-    catch { notify("Could not load parent checks", "error"); }
+    catch { notify(tr("parentChecksTab.couldNotLoadParentChecks"), "error"); }
     finally { setLoading(false); }
   };
   useEffect(() => { load(page, filter); }, [page, filter]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -86,8 +94,8 @@ export default function ParentChecksTab({ isDarkMode }) {
   };
 
   const copy = async (ch) => {
-    try { await navigator.clipboard.writeText(messageFor(ch)); notify("Message with link copied — paste it into WhatsApp, Zalo or Facebook"); }
-    catch { notify("Could not copy", "error"); }
+    try { await navigator.clipboard.writeText(messageFor(ch)); notify(tr("parentChecksTab.messageWithLinkCopiedPaste")); }
+    catch { notify(tr("parentChecksTab.couldNotCopy"), "error"); }
   };
   const whatsapp = (ch) => {
     const phone = (ch.studentId?.phone || "").replace(/\D/g, "");
@@ -98,8 +106,8 @@ export default function ParentChecksTab({ isDarkMode }) {
     try {
       const { data } = await api.post(`/parent-checks/${ch._id}/link`);
       setChecks(prev => prev.map(x => (x._id === ch._id ? { ...x, ...data.check, studentId: x.studentId, teacherId: x.teacherId } : x)));
-      notify("New link ready — valid for 7 days");
-    } catch (err) { notify(err?.response?.data?.message || "Could not create link", "error"); }
+      notify(tr("parentChecksTab.newLinkReadyValidFor"));
+    } catch (err) { notify(err?.response?.data?.message || tr("parentChecksTab.couldNotCreateLink"), "error"); }
     finally { setBusy(null); }
   };
 
@@ -124,15 +132,13 @@ export default function ParentChecksTab({ isDarkMode }) {
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <div style={{ maxWidth: 640 }}>
           <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: c.heading, display: "flex", alignItems: "center", gap: 8 }}>
-            <ShieldCheck size={22} color={BRAND} /> Parent checks
+            <ShieldCheck size={22} color={BRAND} /> {tr("parentChecksTab.parentChecks")}
           </h1>
           <p style={{ margin: "6px 0 0", fontSize: 13, color: c.body, lineHeight: 1.6 }}>
-            Managed students can't log in, so only their teacher confirms they joined a class. Send the parent this quick check:
-            links last <strong>4 days</strong> and no reply means the class stands. If they answer <strong>No</strong>, nothing is taken back
-            yet: a dispute opens in <strong>Disputes</strong> and you have <strong>3 days</strong> to settle it, or the class is returned to the student automatically.
+            {tr("parentChecksTab.managedStudentsCanTLog")} <strong>{tr("parentChecksTab.t4Days")}</strong> {tr("parentChecksTab.andNoReplyMeansThe")} <strong>{tr("parentChecksTab.no")}</strong>{tr("parentChecksTab.nothingIsTakenBackYet")} <strong>{tr("parentChecksTab.disputes")}</strong> {tr("parentChecksTab.andYouHave")} <strong>{tr("parentChecksTab.t3Days")}</strong> {tr("parentChecksTab.toSettleItOrThe")}
           </p>
         </div>
-        <button type="button" onClick={() => load()} style={btn(false)}><RefreshCw size={14} /> Refresh</button>
+        <button type="button" onClick={() => load()} style={btn(false)}><RefreshCw size={14} /> {tr("parentChecksTab.refresh")}</button>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12 }}>
@@ -157,12 +163,12 @@ export default function ParentChecksTab({ isDarkMode }) {
       </div>
 
       {loading ? (
-        <p style={{ color: c.body, textAlign: "center", padding: 40 }}>Loading…</p>
+        <p style={{ color: c.body, textAlign: "center", padding: 40 }}>{tr("parentChecksTab.loading")}</p>
       ) : shown.length === 0 ? (
         <div style={{ textAlign: "center", padding: "40px 20px", background: c.card, border: `1px dashed ${c.border}`, borderRadius: 16, color: c.body }}>
           <ShieldCheck size={36} style={{ opacity: .4 }} />
           <p style={{ margin: "10px 0 0", fontWeight: 600 }}>
-            {filter === "all" ? "No teacher-confirmed classes yet. They appear here when a managed student's class is completed." : "Nothing here."}
+            {filter === "all" ? tr("parentChecksTab.noTeacherConfirmedClassesYet") : tr("parentChecksTab.nothingHere")}
           </p>
         </div>
       ) : (
@@ -174,17 +180,17 @@ export default function ParentChecksTab({ isDarkMode }) {
                 style={{ background: s === "disputed" ? (isDarkMode ? "rgba(220,38,38,.08)" : "#fff5f5") : c.card, border: `1px solid ${c.border}`, borderRadius: 14, padding: "14px 16px", display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap" }}>
                 <div style={{ flex: "1 1 260px", minWidth: 0 }}>
                   <div style={{ fontWeight: 700, fontSize: 14, color: c.heading, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                    {nameOf(ch.studentId) || "Student"} <ManagedBadge isDarkMode={isDarkMode} />
+                    {nameOf(ch.studentId) || tr("parentChecksTab.student")} <ManagedBadge isDarkMode={isDarkMode} />
                   </div>
                   <div style={{ fontSize: 12, color: c.body, marginTop: 3 }}>
-                    {ch.classTitle} · {fmtWhen(ch.scheduledTime)} · Teacher {teacherName(ch.teacherId)}
+                    {tr("parentChecksTab.teacher", { classTitle: ch.classTitle, fmtWhen: fmtWhen(ch.scheduledTime), teacherName: teacherName(ch.teacherId) })}
                   </div>
                   {(s === "disputed" || s === "settled") && ch.parentCheck?.comment && (
-                    <div style={{ fontSize: 12, color: STATE.disputed.color, marginTop: 4 }}>Parent's note: “{ch.parentCheck.comment}”</div>
+                    <div style={{ fontSize: 12, color: STATE.disputed.color, marginTop: 4 }}>{tr("parentChecksTab.parentSNote", { comment: ch.parentCheck.comment })}</div>
                   )}
                   {s === "disputed" && (
                     <div style={{ fontSize: 12, color: c.body, marginTop: 4 }}>
-                      Class still counts as completed. <strong>Settle it in Disputes</strong> — or it's returned to the student automatically.
+                      {tr("parentChecksTab.classStillCountsAsCompleted")} <strong>{tr("parentChecksTab.settleItInDisputes")}</strong> {tr("parentChecksTab.orItSReturnedTo")}
                     </div>
                   )}
                   {/* Parent changed their answer — a withdrawn report is shown faded + struck through */}
@@ -192,22 +198,22 @@ export default function ParentChecksTab({ isDarkMode }) {
                     <div style={{ fontSize: 12, color: c.body, marginTop: 4 }}>
                       {ch.parentCheck.history.map((h, i) => (
                         <span key={i} style={{ marginRight: 10 }}>
-                          Parent changed <strong>{ANSWER[h.from] || h.from} → {ANSWER[h.to] || h.to}</strong> on {fmtWhen(h.at)}
+                          {tr("parentChecksTab.parentChanged")} <strong>{ANSWER[h.from] || h.from} → {ANSWER[h.to] || h.to}</strong> {tr("parentChecksTab.on")} {fmtWhen(h.at)}
                         </span>
                       ))}
                     </div>
                   )}
                   {ch.disputeStatus === "withdrawn" && (
                     <div style={{ fontSize: 12, marginTop: 4, color: STATE.disputed.color, opacity: 0.55, textDecoration: "line-through", filter: "blur(0.3px)" }}
-                      title="The parent withdrew their report — nothing to review">
-                      Parent's dispute · cancelled by the parent
+                      title={tr("parentChecksTab.theParentWithdrewTheirReport")}>
+                      {tr("parentChecksTab.parentSDisputeCancelledBy")}
                     </div>
                   )}
                   {s === "settled" && (
                     <div style={{ fontSize: 12, color: c.body, marginTop: 4 }}>
-                      Outcome: <strong>{ch.disputeStatus === "resolved_teacher" ? "teacher upheld — class stands"
-                        : ch.disputeResolution === "auto_parent" ? "not settled in 3 days — class returned to student"
-                        : "parent upheld — class returned to student"}</strong>
+                      {tr("parentChecksTab.outcome")} <strong>{ch.disputeStatus === "resolved_teacher" ? tr("parentChecksTab.teacherUpheldClassStands")
+                        : ch.disputeResolution === "auto_parent" ? tr("parentChecksTab.notSettledIn3Days")
+                        : tr("parentChecksTab.parentUpheldClassReturnedTo")}</strong>
                     </div>
                   )}
                 </div>
@@ -223,15 +229,15 @@ export default function ParentChecksTab({ isDarkMode }) {
                 {s === "waiting" && (
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                     <button type="button" style={btn(true)} onClick={() => whatsapp(ch)}
-                      title={ch.studentId?.phone ? `Opens WhatsApp for ${ch.studentId.phone}` : "No phone saved — pick the contact in WhatsApp"}>
-                      <Send size={13} /> WhatsApp
+                      title={ch.studentId?.phone ? tr("parentChecksTab.opensWhatsappFor", { phone: ch.studentId.phone }) : tr("parentChecksTab.noPhoneSavedPickThe")}>
+                      <Send size={13} /> {tr("parentChecksTab.whatsapp")}
                     </button>
-                    <button type="button" style={btn(false)} onClick={() => copy(ch)}><Copy size={13} /> Copy message</button>
+                    <button type="button" style={btn(false)} onClick={() => copy(ch)}><Copy size={13} /> {tr("parentChecksTab.copyMessage")}</button>
                   </div>
                 )}
                 {s === "nolink" && (
                   <button type="button" style={btn(true)} disabled={busy === ch._id} onClick={() => newLink(ch)}>
-                    <Link2 size={13} /> {busy === ch._id ? "Creating…" : "New link"}
+                    <Link2 size={13} /> {busy === ch._id ? tr("parentChecksTab.creating") : tr("parentChecksTab.newLink")}
                   </button>
                 )}
               </div>

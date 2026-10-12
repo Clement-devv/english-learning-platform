@@ -3,8 +3,10 @@ import React, { useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Lock, Eye, EyeOff, AlertCircle, CheckCircle, ArrowRight, ShieldCheck } from 'lucide-react';
 import api from '../../api';
+import { useTranslation } from "react-i18next";
 
 export default function AdminResetPassword() {
+  const { t: tr } = useTranslation("admin");
   const { token }    = useParams();
   const navigate     = useNavigate();
   const [searchParams] = useSearchParams();
@@ -20,8 +22,8 @@ export default function AdminResetPassword() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (password !== confirm) { setError('Passwords do not match.'); return; }
-    if (password.length < 8)  { setError('Password must be at least 8 characters.'); return; }
+    if (password !== confirm) { setError(tr("adminResetPassword.passwordsDoNotMatch")); return; }
+    if (password.length < 8)  { setError(tr("adminResetPassword.passwordMustBeAtLeast")); return; }
     setLoading(true);
     setError('');
     try {
@@ -29,9 +31,9 @@ export default function AdminResetPassword() {
         headers: centerSlug ? { 'x-center-slug': centerSlug } : {},
       });
       if (res.data.success) setDone(true);
-      else setError(res.data.message || 'Reset failed.');
+      else setError(res.data.message || tr("adminResetPassword.resetFailed"));
     } catch (err) {
-      setError(err.response?.data?.message || 'Invalid or expired link. Please request a new one.');
+      setError(err.response?.data?.message || tr("adminResetPassword.invalidOrExpiredLinkPlease"));
     } finally {
       setLoading(false);
     }
@@ -52,9 +54,9 @@ export default function AdminResetPassword() {
               <ShieldCheck size={28} color="#22d3ee" strokeWidth={1.5} />
             </div>
             <div>
-              <p style={s.systemLabel}>ADMIN PORTAL</p>
-              <h1 style={s.title}>Set New Password</h1>
-              <p style={s.subtitle}>Choose a strong password</p>
+              <p style={s.systemLabel}>{tr("adminResetPassword.adminPortal")}</p>
+              <h1 style={s.title}>{tr("adminResetPassword.setNewPassword")}</h1>
+              <p style={s.subtitle}>{tr("adminResetPassword.chooseAStrongPassword")}</p>
             </div>
           </div>
 
@@ -65,12 +67,12 @@ export default function AdminResetPassword() {
               <div style={{ width: '60px', height: '60px', borderRadius: '50%', background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <CheckCircle size={28} color="#34d399" />
               </div>
-              <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: '#f1f5f9' }}>Password Updated!</h2>
+              <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: '#f1f5f9' }}>{tr("adminResetPassword.passwordUpdated")}</h2>
               <p style={{ margin: 0, fontSize: '13.5px', color: '#6b7280', lineHeight: '1.6' }}>
-                Your admin password has been reset. You can now log in with your new password.
+                {tr("adminResetPassword.yourAdminPasswordHasBeen")}
               </p>
               <button onClick={() => navigate('/admin/login')} style={{ ...s.submitBtn, width: 'auto', padding: '12px 28px', marginTop: '8px' }} className="al-submit">
-                <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>Go to Login <ArrowRight size={16} /></span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>{tr("adminResetPassword.goToLogin")} <ArrowRight size={16} /></span>
               </button>
             </div>
           ) : (
@@ -83,7 +85,7 @@ export default function AdminResetPassword() {
               )}
 
               <div style={s.fieldGroup}>
-                <label style={s.label}>New Password</label>
+                <label style={s.label}>{tr("adminResetPassword.newPassword")}</label>
                 <div style={{ ...s.inputWrap, ...(focused === 'pwd' ? s.inputFocused : {}) }}>
                   <Lock size={16} color={focused === 'pwd' ? '#22d3ee' : '#374151'} />
                   <input
@@ -92,7 +94,7 @@ export default function AdminResetPassword() {
                     onChange={e => setPassword(e.target.value)}
                     onFocus={() => setFocused('pwd')}
                     onBlur={() => setFocused(null)}
-                    placeholder="Min 8 characters"
+                    placeholder={tr("adminResetPassword.min8Characters")}
                     required
                     minLength={8}
                     disabled={loading}
@@ -106,7 +108,7 @@ export default function AdminResetPassword() {
               </div>
 
               <div style={s.fieldGroup}>
-                <label style={s.label}>Confirm Password</label>
+                <label style={s.label}>{tr("adminResetPassword.confirmPassword")}</label>
                 <div style={{ ...s.inputWrap, ...(focused === 'confirm' ? s.inputFocused : {}) }}>
                   <Lock size={16} color={focused === 'confirm' ? '#22d3ee' : '#374151'} />
                   <input
@@ -115,7 +117,7 @@ export default function AdminResetPassword() {
                     onChange={e => setConfirm(e.target.value)}
                     onFocus={() => setFocused('confirm')}
                     onBlur={() => setFocused(null)}
-                    placeholder="Re-enter password"
+                    placeholder={tr("adminResetPassword.reEnterPassword")}
                     required
                     disabled={loading}
                     style={s.input}
@@ -125,13 +127,13 @@ export default function AdminResetPassword() {
 
               <button type="submit" disabled={loading} style={s.submitBtn} className="al-submit">
                 {loading
-                  ? <span style={{ display: 'flex', alignItems: 'center', gap: '10px', justifyContent: 'center' }}><span className="al-spinner" /> Saving…</span>
-                  : <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>Reset Password <ArrowRight size={17} /></span>
+                  ? <span style={{ display: 'flex', alignItems: 'center', gap: '10px', justifyContent: 'center' }}><span className="al-spinner" /> {tr("adminResetPassword.saving")}</span>
+                  : <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>{tr("adminResetPassword.resetPassword")} <ArrowRight size={17} /></span>
                 }
               </button>
 
               <button type="button" onClick={() => navigate('/admin/login')} style={{ background: 'none', border: 'none', color: '#374151', cursor: 'pointer', fontSize: '13px', fontFamily: 'inherit', textAlign: 'center' }}>
-                ← Back to login
+                {tr("adminResetPassword.backToLogin")}
               </button>
             </form>
           )}

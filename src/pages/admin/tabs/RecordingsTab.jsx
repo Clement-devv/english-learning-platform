@@ -12,11 +12,14 @@ import api from "../../../api";
 import { useOnDataChanged } from "../../../hooks/useLiveData";
 import Pagination from "../../../components/Pagination";
 import { groupRecordingSessions, groupByDay, partLabel, isExternal, linkSource, openExternal } from "../../../utils/recordingSessions.js";
+import { useTranslation } from "react-i18next";
+import { dateLocale } from "../../../i18n/dateLocale.js";
 
 const UNASSIGNED = "__unassigned__";
 const studentKey = (rec) => rec.studentId?._id || rec.studentId?.id || UNASSIGNED;
 
 export default function RecordingsTab({ teachers = [], isDarkMode }) {
+  const { t: tr } = useTranslation("admin");
   const [selectedTeacher, setSelectedTeacher] = useState(null);
   const [selectedStudent, setSelectedStudent] = useState(null); // { id, name, count }
   const [recordings,      setRecordings]      = useState([]);
@@ -56,7 +59,7 @@ export default function RecordingsTab({ teachers = [], isDarkMode }) {
     setStudentList([]);
     api.get("/recordings/students", { params: { teacherId: teacherIdOf(selectedTeacher) } })
       .then(r => setStudentList(r.data.students || []))
-      .catch(() => showToast("Failed to load recordings"))
+      .catch(() => showToast(tr("recordingsTab.failedToLoadRecordings")))
       .finally(() => setLoadingRecs(false));
   }, [selectedTeacher, listKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -67,7 +70,7 @@ export default function RecordingsTab({ teachers = [], isDarkMode }) {
     setLoadingRecs(true);
     api.get(`/recordings/teacher/${teacherIdOf(selectedTeacher)}`, { params: { studentId: selectedStudent.id, page, limit: 10 } })
       .then(r => { if (stale) return; setRecordings(r.data.recordings || []); if (r.data.pagination) { setPager(r.data.pagination); if (r.data.pagination.page !== page) setPage(r.data.pagination.page); } })
-      .catch(() => showToast("Failed to load recordings"))
+      .catch(() => showToast(tr("recordingsTab.failedToLoadRecordings")))
       .finally(() => { if (!stale) setLoadingRecs(false); });
     return () => { stale = true; };
   }, [selectedTeacher, selectedStudent, page, listKey]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -78,7 +81,7 @@ export default function RecordingsTab({ teachers = [], isDarkMode }) {
     return sec > 0 ? `${m}m ${sec}s` : `${m}m`;
   };
 
-  const formatDate = (d) => new Date(d).toLocaleDateString("en-US", {
+  const formatDate = (d) => new Date(d).toLocaleDateString(dateLocale("en-US"), {
     day: "numeric", month: "short", year: "numeric",
   });
 
@@ -126,7 +129,7 @@ export default function RecordingsTab({ teachers = [], isDarkMode }) {
     try {
       await fetchVideoUrl(rec);
       setPlaying({ key: session.key, index });
-    } catch { showToast("Failed to load video"); }
+    } catch { showToast(tr("recordingsTab.failedToLoadVideo")); }
   };
 
   const downloadVideo = async (rec) => {
@@ -146,7 +149,7 @@ export default function RecordingsTab({ teachers = [], isDarkMode }) {
         a.href = url; a.download = name; a.click();
         URL.revokeObjectURL(url);
       }
-    } catch { showToast("Download failed"); }
+    } catch { showToast(tr("recordingsTab.downloadFailed")); }
   };
 
   const filteredTeachers = teachers.filter(t =>
@@ -186,19 +189,18 @@ export default function RecordingsTab({ teachers = [], isDarkMode }) {
       <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
           <button onClick={() => setPlaying(null)} style={{ background: "none", border: "none", color: col.muted, cursor: "pointer", fontSize: "14px", fontWeight: 700, display: "flex", alignItems: "center", gap: "6px" }}>
-            <X size={16} /> Back
+            <X size={16} /> {tr("recordingsTab.back")}
           </button>
           <h2 style={{ margin: 0, fontSize: "18px", fontWeight: 900, color: col.text, flex: 1 }}>
-            {playingRec.title || playingRec.bookingId?.classTitle || "Class Recording"}
+            {playingRec.title || playingRec.bookingId?.classTitle || tr("recordingsTab.classRecording")}
             {total > 1 && (
-              <span style={{ marginLeft: "10px", fontSize: "13px", fontWeight: 700, color: col.muted }}>
-                Part {playing.index + 1} of {total}
+              <span style={{ marginLeft: "10px", fontSize: "13px", fontWeight: 700, color: col.muted }}>{tr("recordingsTab.partOf", { value: playing.index + 1, total })}
               </span>
             )}
           </h2>
           <button onClick={() => downloadVideo(playingRec)}
             style={{ padding: "8px 14px", borderRadius: "10px", background: col.input, color: col.text, border: `1px solid ${col.border}`, cursor: "pointer", fontSize: "12px", fontWeight: 800, display: "flex", alignItems: "center", gap: "6px" }}>
-            <Download size={13} /> {total > 1 ? "Download this part" : "Download"}
+            <Download size={13} /> {total > 1 ? tr("recordingsTab.downloadThisPart") : tr("recordingsTab.download")}
           </button>
         </div>
 
@@ -239,7 +241,7 @@ export default function RecordingsTab({ teachers = [], isDarkMode }) {
             <span style={{ fontSize: "13px", color: col.muted }}>💾 {formatSize(playingSession.totalSize)}</span>
           )}
           <span style={{ fontSize: "13px", color: playingSession.visibleToStudent ? "#10b981" : col.muted }}>
-            {playingSession.visibleToStudent ? "👁 Visible to student" : "🚫 Hidden from student"}
+            {playingSession.visibleToStudent ? tr("recordingsTab.visibleToStudent") : tr("recordingsTab.hiddenFromStudent")}
           </span>
         </div>
         {toastEl}
@@ -255,7 +257,7 @@ export default function RecordingsTab({ teachers = [], isDarkMode }) {
         <div style={{ flex: 1 }}>
           <h2 style={{ margin: 0, fontSize: "20px", fontWeight: 900, color: col.text }}>{selectedStudent.name}</h2>
           <p style={{ margin: "2px 0 0", fontSize: "13px", color: col.muted }}>
-            with {teacherName} · {loadingRecs ? "Loading…" : `${pager.total} recorded class${pager.total !== 1 ? "es" : ""}`}
+            {tr("recordingsTab.with")} {teacherName} · {loadingRecs ? tr("recordingsTab.loading") : tr("recordingsTab.recordedClass", { total: pager.total, value: pager.total !== 1 ? "es" : "" })}
           </p>
         </div>
       </div>
@@ -263,7 +265,7 @@ export default function RecordingsTab({ teachers = [], isDarkMode }) {
       {studentSessions.length === 0 ? (
         <div style={{ background: col.card, border: `2px dashed ${col.border}`, borderRadius: "18px", padding: "48px 24px", textAlign: "center" }}>
           <div style={{ fontSize: "48px", marginBottom: "12px" }}>🎬</div>
-          <p style={{ margin: 0, fontWeight: 800, color: col.text }}>No recordings yet</p>
+          <p style={{ margin: 0, fontWeight: 800, color: col.text }}>{tr("recordingsTab.noRecordingsYet")}</p>
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "22px" }}>
@@ -279,7 +281,7 @@ export default function RecordingsTab({ teachers = [], isDarkMode }) {
                 const rec    = session.first;
                 const total  = session.parts.length;
                 const isOpen = expanded.has(session.key);
-                const classTime = new Date(session.classDate).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+                const classTime = new Date(session.classDate).toLocaleTimeString(dateLocale(), { hour: "numeric", minute: "2-digit" });
                 return (
                   <div key={session.key} style={{ background: col.card, border: `1px solid ${col.border}`, borderRadius: "16px", overflow: "hidden" }}>
                     <div style={{ padding: "14px 18px", display: "flex", alignItems: "center", gap: "14px", flexWrap: "wrap" }}>
@@ -289,14 +291,14 @@ export default function RecordingsTab({ teachers = [], isDarkMode }) {
 
                       <div style={{ flex: 1, minWidth: "180px" }}>
                         <p style={{ margin: "0 0 4px", fontSize: "15px", fontWeight: 800, color: col.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {rec.title || rec.bookingId?.classTitle || "Class Recording"}
+                          {rec.title || rec.bookingId?.classTitle || tr("recordingsTab.classRecording")}
                         </p>
                         <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
                           <span style={{ fontSize: "12px", color: col.muted, display: "flex", alignItems: "center", gap: "4px" }}>
                             <Clock size={11} /> {classTime}
                           </span>
                           {session.totalDuration > 0 && (
-                            <span style={{ fontSize: "12px", color: col.muted }}>{formatDuration(session.totalDuration)} total</span>
+                            <span style={{ fontSize: "12px", color: col.muted }}>{tr("recordingsTab.total", { formatDuration: formatDuration(session.totalDuration) })}</span>
                           )}
                           {total > 1 && pill("rgba(99,102,241,0.12)", col.accent, `${total} parts`)}
                           {session.hasExternal && pill("rgba(14,165,233,0.12)", "#0284c7", "🔗 External link", "The teacher recorded outside the app and saved the link")}
@@ -313,11 +315,11 @@ export default function RecordingsTab({ teachers = [], isDarkMode }) {
                       </div>
 
                       <div style={{ display: "flex", gap: "6px", flexShrink: 0, alignItems: "center" }}>
-                        <button onClick={() => loadVideo(session, 0)} title={isExternal(rec) ? "Opens the teacher's link in a new tab" : total > 1 ? "Plays all parts in order" : "Watch recording"}
+                        <button onClick={() => loadVideo(session, 0)} title={isExternal(rec) ? tr("recordingsTab.opensTheTeacherSLink") : total > 1 ? tr("recordingsTab.playsAllPartsInOrder") : tr("recordingsTab.watchRecording")}
                           style={{ padding: "8px 14px", borderRadius: "10px", background: isExternal(rec) ? "linear-gradient(135deg,#0ea5e9,#6366f1)" : "linear-gradient(135deg,#6366f1,#8b5cf6)", color: "#fff", border: "none", cursor: "pointer", fontSize: "12px", fontWeight: 800, display: "flex", alignItems: "center", gap: "5px" }}>
                           {isExternal(rec)
-                            ? <><ExternalLink size={13} /> {total > 1 ? "Open Part 1" : "Open link"}</>
-                            : <><Play size={13} fill="white" /> {total > 1 ? "Watch Part 1" : "Watch"}</>}
+                            ? <><ExternalLink size={13} /> {total > 1 ? tr("recordingsTab.openPart1") : tr("recordingsTab.openLink")}</>
+                            : <><Play size={13} fill="white" /> {total > 1 ? tr("recordingsTab.watchPart1") : tr("recordingsTab.watch")}</>}
                         </button>
                         {total > 1 ? (
                           <button onClick={() => toggleExpanded(session.key)}
@@ -325,7 +327,7 @@ export default function RecordingsTab({ teachers = [], isDarkMode }) {
                             {isOpen ? <>Hide <ChevronUp size={14} /></> : <>See more ({total}) <ChevronDown size={14} /></>}
                           </button>
                         ) : !isExternal(rec) && (
-                          <button onClick={() => downloadVideo(rec)} title="Download recording"
+                          <button onClick={() => downloadVideo(rec)} title={tr("recordingsTab.downloadRecording")}
                             style={{ padding: "8px", borderRadius: "10px", border: `1px solid ${col.border}`, background: "none", color: col.text, cursor: "pointer" }}>
                             <Download size={15} />
                           </button>
@@ -351,12 +353,12 @@ export default function RecordingsTab({ teachers = [], isDarkMode }) {
                               )}
                             </div>
                             {!isExternal(p) && p.fileSize > 0 && <span style={{ fontSize: "11px", color: col.muted }}>{formatSize(p.fileSize)}</span>}
-                            <button onClick={() => loadVideo(session, i)} title={isExternal(p) ? "Open the saved link" : "Watch this part"}
+                            <button onClick={() => loadVideo(session, i)} title={isExternal(p) ? tr("recordingsTab.openTheSavedLink") : tr("recordingsTab.watchThisPart")}
                               style={{ padding: "6px 10px", borderRadius: "8px", background: isExternal(p) ? "linear-gradient(135deg,#0ea5e9,#6366f1)" : "linear-gradient(135deg,#6366f1,#8b5cf6)", color: "#fff", border: "none", cursor: "pointer", fontSize: "11px", fontWeight: 800, display: "flex", alignItems: "center", gap: "4px" }}>
                               {isExternal(p) ? <><ExternalLink size={11} /> Open</> : <><Play size={11} fill="white" /> Watch</>}
                             </button>
                             {!isExternal(p) && (
-                              <button onClick={() => downloadVideo(p)} title="Download this part"
+                              <button onClick={() => downloadVideo(p)} title={tr("recordingsTab.downloadThisPart")}
                                 style={{ padding: "6px", borderRadius: "8px", border: `1px solid ${col.border}`, background: col.card, color: col.text, cursor: "pointer" }}>
                                 <Download size={13} />
                               </button>
@@ -388,7 +390,7 @@ export default function RecordingsTab({ teachers = [], isDarkMode }) {
         <div style={{ flex: 1 }}>
           <h2 style={{ margin: 0, fontSize: "20px", fontWeight: 900, color: col.text }}>{teacherName}</h2>
           <p style={{ margin: "2px 0 0", fontSize: "13px", color: col.muted }}>
-            {loadingRecs ? "Loading…" : `${students.length} student${students.length !== 1 ? "s" : ""} with recordings · select a student`}
+            {loadingRecs ? tr("recordingsTab.loading") : tr("recordingsTab.studentWithRecordingsSelectA", { studentsCount: students.length, value: students.length !== 1 ? "s" : "" })}
           </p>
         </div>
       </div>
@@ -397,7 +399,7 @@ export default function RecordingsTab({ teachers = [], isDarkMode }) {
         <div style={{ position: "relative" }}>
           <Search size={15} color={col.muted}
             style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
-          <input type="text" placeholder="Search students…" value={studentSearch} onChange={e => setStudentSearch(e.target.value)}
+          <input type="text" placeholder={tr("recordingsTab.searchStudents")} value={studentSearch} onChange={e => setStudentSearch(e.target.value)}
             style={{ width: "100%", boxSizing: "border-box", padding: "10px 14px 10px 38px", borderRadius: "12px", border: `1px solid ${col.border}`, background: col.input, color: col.text, fontSize: "14px", fontFamily: "inherit", outline: "none" }} />
         </div>
       )}
@@ -405,13 +407,13 @@ export default function RecordingsTab({ teachers = [], isDarkMode }) {
       {!loadingRecs && students.length === 0 && (
         <div style={{ background: col.card, border: `2px dashed ${col.border}`, borderRadius: "18px", padding: "48px 24px", textAlign: "center" }}>
           <div style={{ fontSize: "48px", marginBottom: "12px" }}>🎬</div>
-          <p style={{ margin: 0, fontWeight: 800, color: col.text }}>No recordings yet</p>
-          <p style={{ margin: "6px 0 0", fontSize: "13px", color: col.muted }}>This teacher hasn't recorded or linked any classes.</p>
+          <p style={{ margin: 0, fontWeight: 800, color: col.text }}>{tr("recordingsTab.noRecordingsYet")}</p>
+          <p style={{ margin: "6px 0 0", fontSize: "13px", color: col.muted }}>{tr("recordingsTab.thisTeacherHasnTRecorded")}</p>
         </div>
       )}
 
       {!loadingRecs && students.length > 0 && filteredStudents.length === 0 && (
-        <p style={{ color: col.muted, fontSize: "14px" }}>No students match your search.</p>
+        <p style={{ color: col.muted, fontSize: "14px" }}>{tr("recordingsTab.noStudentsMatchYourSearch")}</p>
       )}
 
       <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
@@ -428,7 +430,7 @@ export default function RecordingsTab({ teachers = [], isDarkMode }) {
               <div style={{ flex: 1, minWidth: 0 }}>
                 <p style={{ margin: 0, fontSize: "15px", fontWeight: 800, color: col.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name}</p>
                 <p style={{ margin: "2px 0 0", fontSize: "12px", color: col.muted }}>
-                  {s.count} recorded class{s.count !== 1 ? "es" : ""}{s.links > 0 ? ` · ${s.links} external link${s.links !== 1 ? "s" : ""}` : ""}
+                  {s.count} {tr("recordingsTab.recordedClass2")}{s.count !== 1 ? "es" : ""}{s.links > 0 ? tr("recordingsTab.externalLink", { links: s.links, value: s.links !== 1 ? "s" : "" }) : ""}
                 </p>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: "10px", flexShrink: 0 }}>
@@ -447,20 +449,20 @@ export default function RecordingsTab({ teachers = [], isDarkMode }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
       <div>
-        <h2 style={{ margin: "0 0 4px", fontSize: "22px", fontWeight: 900, color: col.text }}>🎬 Class Recordings</h2>
-        <p style={{ margin: 0, fontSize: "13px", color: col.muted }}>Select a teacher, then a student, to view their classes</p>
+        <h2 style={{ margin: "0 0 4px", fontSize: "22px", fontWeight: 900, color: col.text }}>{tr("recordingsTab.classRecordings")}</h2>
+        <p style={{ margin: 0, fontSize: "13px", color: col.muted }}>{tr("recordingsTab.selectATeacherThenA")}</p>
       </div>
 
       <div style={{ position: "relative" }}>
         <Search size={15} color={col.muted}
           style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
-        <input type="text" placeholder="Search teachers…" value={search} onChange={e => setSearch(e.target.value)}
+        <input type="text" placeholder={tr("recordingsTab.searchTeachers")} value={search} onChange={e => setSearch(e.target.value)}
           style={{ width: "100%", boxSizing: "border-box", padding: "10px 14px 10px 38px", borderRadius: "12px", border: `1px solid ${col.border}`, background: col.input, color: col.text, fontSize: "14px", fontFamily: "inherit", outline: "none" }} />
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
         {filteredTeachers.length === 0 && (
-          <p style={{ color: col.muted, fontSize: "14px" }}>No teachers found.</p>
+          <p style={{ color: col.muted, fontSize: "14px" }}>{tr("recordingsTab.noTeachersFound")}</p>
         )}
         {filteredTeachers.map(t => {
           const id = t._id || t.id;

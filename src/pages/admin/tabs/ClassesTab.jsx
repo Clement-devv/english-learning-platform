@@ -8,6 +8,8 @@ import {
 import { getAllBookings } from "../../../services/bookingService";
 import api from "../../../api";
 import { useOnDataChanged, useLiveEvent } from "../../../hooks/useLiveData";
+import { useTranslation } from "react-i18next";
+import { dateLocale } from "../../../i18n/dateLocale.js";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 const isLiveNow = (b) => {
@@ -29,7 +31,7 @@ const fmtTime = (sec) => {
 };
 
 const fmtDate = (iso) =>
-  new Date(iso).toLocaleString("en-GB", {
+  new Date(iso).toLocaleString(dateLocale("en-GB"), {
     day: "numeric", month: "short", year: "numeric",
     hour: "2-digit", minute: "2-digit",
   });
@@ -60,12 +62,13 @@ const getPresenceStatus = (session, role) => {
 };
 
 function PresenceBadge({ session, dm }) {
+  const { t: tr } = useTranslation("admin");
   if (!session) {
     return (
       <div className="flex items-center gap-2 flex-wrap">
         <span className={`flex items-center gap-1.5 text-xs px-2 py-1 rounded-full
           ${dm ? "bg-slate-800 text-slate-500" : "bg-slate-100 text-slate-400"}`}>
-          <WifiOff size={11} /> Classroom not opened yet
+          <WifiOff size={11} /> {tr("classesTab.classroomNotOpenedYet")}
         </span>
       </div>
     );
@@ -95,7 +98,7 @@ function PresenceBadge({ session, dm }) {
       <span className={`flex items-center gap-1.5 text-xs px-2 py-1 rounded-full font-medium
         ${present ? (uncertain ? colorUncertain : colorPresent) : colorAbsent}`}>
         {present ? <Wifi size={11} /> : <WifiOff size={11} />}
-        {label} {present ? (uncertain ? "joined" : "active") : "not joined"}
+        {label} {present ? (uncertain ? "joined" : "active") : tr("classesTab.notJoined")}
       </span>
     );
   };
@@ -108,7 +111,7 @@ function PresenceBadge({ session, dm }) {
         <span className={`flex items-center gap-1.5 text-xs px-2 py-1 rounded-full font-medium
           ${dm ? "bg-violet-900/40 text-violet-300 border border-violet-800/40"
                : "bg-violet-100 text-violet-700 border border-violet-200"}`}>
-          <CheckCircle2 size={11} /> Both in class
+          <CheckCircle2 size={11} /> {tr("classesTab.bothInClass")}
         </span>
       )}
     </div>
@@ -117,6 +120,7 @@ function PresenceBadge({ session, dm }) {
 
 // ── Live countdown bar ────────────────────────────────────────────────────────
 function LiveTimer({ booking }) {
+  const { t: tr } = useTranslation("admin");
   const [elapsed, setElapsed] = useState(0);
   const dur = (booking.duration || 60) * 60;
 
@@ -135,10 +139,9 @@ function LiveTimer({ booking }) {
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between text-xs">
-        <span className="text-slate-400">Elapsed {fmtTime(elapsed)}</span>
+        <span className="text-slate-400">{tr("classesTab.elapsed", { fmtTime: fmtTime(elapsed) })}</span>
         <span className={`font-medium ${remaining < 300 ? "text-red-400" : "text-slate-400"}`}>
-          {fmtTime(remaining)} left
-        </span>
+          {tr("classesTab.left", { fmtTime: fmtTime(remaining) })}</span>
       </div>
       <div className="w-full h-1.5 rounded-full bg-slate-700/30 overflow-hidden">
         <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${pct}%` }} />
@@ -157,6 +160,7 @@ const PLATFORM_COLOR = {
 
 // ── Single live class card ────────────────────────────────────────────────────
 function LiveClassCard({ booking, session, onJoinAgora, onJoinMeet, dm }) {
+  const { t: tr } = useTranslation("admin");
   const teacherName    = `${booking.teacherId?.firstName ?? ""} ${booking.teacherId?.lastName ?? ""}`.trim() || "—";
   const studentName    = `${booking.studentId?.firstName ?? ""} ${booking.studentId?.lastName ?? ""}`.trim() || "—";
   const meetLink       = booking.teacherId?.googleMeetLink;
@@ -183,14 +187,14 @@ function LiveClassCard({ booking, session, onJoinAgora, onJoinMeet, dm }) {
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
             <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500" />
           </span>
-          <span className="text-xs font-bold text-red-500 uppercase tracking-widest">Live</span>
+          <span className="text-xs font-bold text-red-500 uppercase tracking-widest">{tr("classesTab.live")}</span>
           <span className={`text-xs px-2 py-0.5 rounded-full font-medium
             ${both
               ? dm ? "bg-emerald-900/40 text-emerald-300" : "bg-emerald-100 text-emerald-700"
               : session
               ? dm ? "bg-amber-900/40 text-amber-300"     : "bg-amber-100 text-amber-700"
               : dm ? "bg-slate-800 text-slate-500"        : "bg-slate-100 text-slate-500"}`}>
-            {both ? "Both present" : session ? "Waiting…" : "Not opened"}
+            {both ? tr("classesTab.bothPresent") : session ? tr("classesTab.waiting") : tr("classesTab.notOpened")}
           </span>
         </div>
         <div className="flex items-center gap-2">
@@ -201,7 +205,7 @@ function LiveClassCard({ booking, session, onJoinAgora, onJoinMeet, dm }) {
               {PLATFORM_LABEL[activeProvider]}
             </span>
           )}
-          <span className={`text-xs ${dm ? "text-slate-500" : "text-slate-400"}`}>{booking.duration} min</span>
+          <span className={`text-xs ${dm ? "text-slate-500" : "text-slate-400"}`}>{tr("classesTab.min", { duration: booking.duration })}</span>
         </div>
       </div>
 
@@ -217,9 +221,9 @@ function LiveClassCard({ booking, session, onJoinAgora, onJoinMeet, dm }) {
         {/* People */}
         <div className="grid grid-cols-2 gap-2">
           {[
-            { label: "Teacher", name: teacherName,
+            { label: tr("classesTab.teacher"), name: teacherName,
               bg: dm ? "bg-violet-900/50 text-violet-300" : "bg-violet-100 text-violet-600" },
-            { label: "Student", name: studentName,
+            { label: tr("classesTab.student"), name: studentName,
               bg: dm ? "bg-emerald-900/50 text-emerald-300" : "bg-emerald-100 text-emerald-600" },
           ].map(({ label, name, bg }) => (
             <div key={label} className={`rounded-lg p-3 ${dm ? "bg-[#13161f]" : "bg-slate-50"}`}>
@@ -252,7 +256,7 @@ function LiveClassCard({ booking, session, onJoinAgora, onJoinMeet, dm }) {
               : undefined
             }
             disabled={!zoomLink}
-            title={!zoomLink ? "Teacher is on Zoom but hasn't saved a Zoom link to their profile yet" : "Join Zoom meeting"}
+            title={!zoomLink ? tr("classesTab.teacherIsOnZoomBut") : tr("classesTab.joinZoomMeeting")}
             className={`flex items-center justify-center gap-2 py-2.5 rounded-xl text-white text-sm font-semibold transition
               ${zoomLink
                 ? "bg-[#2D8CFF] hover:bg-[#1a7de8] cursor-pointer"
@@ -260,8 +264,8 @@ function LiveClassCard({ booking, session, onJoinAgora, onJoinMeet, dm }) {
               ${zoomActive ? "ring-2 ring-offset-1 ring-[#2D8CFF]" : ""}`}
           >
             <ExternalLink size={14} />
-            {zoomActive ? "Join Zoom (Active)" : "Join Zoom"}
-            {!zoomLink && <span className="text-xs opacity-75 ml-1">— no link saved</span>}
+            {zoomActive ? tr("classesTab.joinZoomActive") : tr("classesTab.joinZoom")}
+            {!zoomLink && <span className="text-xs opacity-75 ml-1">{tr("classesTab.noLinkSaved")}</span>}
           </button>
         )}
 
@@ -273,7 +277,7 @@ function LiveClassCard({ booking, session, onJoinAgora, onJoinMeet, dm }) {
               ${meetActive ? "ring-2 ring-offset-1 ring-emerald-400" : ""}`}
           >
             <ExternalLink size={14} />
-            {meetActive ? "Join Meet (Active)" : "Join Meet"}
+            {meetActive ? tr("classesTab.joinMeetActive") : tr("classesTab.joinMeet")}
           </button>
         )}
 
@@ -284,13 +288,13 @@ function LiveClassCard({ booking, session, onJoinAgora, onJoinMeet, dm }) {
             ${agoraActive ? "ring-2 ring-offset-1 ring-violet-400" : ""}`}
         >
           <Video size={14} />
-          {agoraActive ? "Join Agora (Active)" : "Spectate via Agora"}
+          {agoraActive ? tr("classesTab.joinAgoraActive") : tr("classesTab.spectateViaAgora")}
         </button>
 
         {/* Fallback when no external links and provider not yet chosen */}
         {!zoomLink && !meetLink && !zoomActive && !meetActive && !activeProvider && (
           <p className={`text-center text-xs mt-1 ${dm ? "text-slate-500" : "text-slate-400"}`}>
-            No Meet/Zoom link set on teacher profile
+            {tr("classesTab.noMeetZoomLinkSet")}
           </p>
         )}
       </div>
@@ -300,6 +304,7 @@ function LiveClassCard({ booking, session, onJoinAgora, onJoinMeet, dm }) {
 
 // ── Upcoming row ──────────────────────────────────────────────────────────────
 function UpcomingRow({ booking, dm }) {
+  const { t: tr } = useTranslation("admin");
   const teacherName = `${booking.teacherId?.firstName ?? ""} ${booking.teacherId?.lastName ?? ""}`.trim() || "—";
   const studentName = `${booking.studentId?.firstName ?? ""} ${booking.studentId?.lastName ?? ""}`.trim() || "—";
   const [countdown, setCountdown] = useState("");
@@ -330,7 +335,7 @@ function UpcomingRow({ booking, dm }) {
         </div>
       </div>
       <div className="text-right flex-shrink-0">
-        <div className={`text-xs font-semibold ${dm ? "text-sky-400" : "text-sky-600"}`}>in {countdown}</div>
+        <div className={`text-xs font-semibold ${dm ? "text-sky-400" : "text-sky-600"}`}>{tr("classesTab.in", { countdown })}</div>
         <div className={`text-xs ${dm ? "text-slate-500" : "text-slate-400"}`}>{fmtDate(booking.scheduledTime)}</div>
       </div>
       <span className={`text-xs px-2 py-1 rounded-full flex-shrink-0 ${dm ? "bg-slate-800 text-slate-400" : "bg-slate-100 text-slate-500"}`}>
@@ -344,6 +349,7 @@ function UpcomingRow({ booking, dm }) {
 const SPECTATE_LIMIT = 300; // 5 minutes
 
 function AgoraModal({ booking, onClose, dm }) {
+  const { t: tr } = useTranslation("admin");
   const [phase,       setPhase]       = useState("connecting");
   const [errorMsg,    setErrorMsg]    = useState("");
   const [remoteUsers, setRemoteUsers] = useState([]);
@@ -420,12 +426,9 @@ function AgoraModal({ booking, onClose, dm }) {
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
             <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500" />
           </span>
-          <span className="text-white font-semibold text-sm">
-            Monitoring: {booking.classTitle}
+          <span className="text-white font-semibold text-sm">{tr("classesTab.monitoring", { classTitle: booking.classTitle })}
           </span>
-          <span className="text-slate-400 text-xs">
-            ({booking.teacherId?.firstName} → {booking.studentId?.firstName}) · Spectator only
-          </span>
+          <span className="text-slate-400 text-xs">{tr("classesTab.spectatorOnly", { firstName: booking.teacherId?.firstName, firstName2: booking.studentId?.firstName })}</span>
         </div>
         <div className="flex items-center gap-3">
           <span className={`text-xs font-mono font-bold px-2.5 py-1 rounded-lg border
@@ -438,14 +441,12 @@ function AgoraModal({ booking, onClose, dm }) {
             onClick={onClose}
             className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-red-600 text-white text-sm transition"
           >
-            <X size={14} /> Leave
+            <X size={14} /> {tr("classesTab.leave")}
           </button>
         </div>
       </div>
       {timerWarn && (
-        <div className="bg-red-900/30 border-b border-red-800/40 px-5 py-1.5 text-center text-xs text-red-300 font-semibold">
-          Session ending in {secondsLeft}s — spectating limit is 5 minutes
-        </div>
+        <div className="bg-red-900/30 border-b border-red-800/40 px-5 py-1.5 text-center text-xs text-red-300 font-semibold">{tr("classesTab.sessionEndingInSSpectating", { secondsLeft })}</div>
       )}
 
       {/* Body */}
@@ -453,20 +454,20 @@ function AgoraModal({ booking, onClose, dm }) {
         {phase === "connecting" && (
           <>
             <Loader2 size={36} className="text-violet-400 animate-spin" />
-            <p className="text-slate-300 text-sm">Joining as spectator…</p>
+            <p className="text-slate-300 text-sm">{tr("classesTab.joiningAsSpectator")}</p>
           </>
         )}
         {phase === "error" && (
           <>
             <AlertCircle size={36} className="text-red-400" />
-            <p className="text-red-400 font-semibold text-sm">Failed to connect</p>
+            <p className="text-red-400 font-semibold text-sm">{tr("classesTab.failedToConnect")}</p>
             <p className="text-slate-400 text-xs">{errorMsg}</p>
           </>
         )}
         {phase === "connected" && remoteUsers.length === 0 && (
           <>
             <Monitor size={36} className="text-slate-500" />
-            <p className="text-slate-400 text-sm">Connected — waiting for video from teacher or student</p>
+            <p className="text-slate-400 text-sm">{tr("classesTab.connectedWaitingForVideoFrom")}</p>
           </>
         )}
         {remoteUsers.length > 0 && (
@@ -482,6 +483,7 @@ function AgoraModal({ booking, onClose, dm }) {
 }
 
 function RemoteVideoTile({ uid, videoTrack }) {
+  const { t: tr } = useTranslation("admin");
   const ref = useRef(null);
   useEffect(() => {
     if (videoTrack && ref.current) {
@@ -493,8 +495,7 @@ function RemoteVideoTile({ uid, videoTrack }) {
     <div className="relative rounded-xl overflow-hidden bg-slate-900 border border-slate-700"
       style={{ width: "480px", maxWidth: "100%", aspectRatio: "16/9" }}>
       <div ref={ref} className="w-full h-full" />
-      <span className="absolute bottom-2 left-2 text-xs bg-black/60 text-white px-2 py-0.5 rounded-full">
-        UID {uid}
+      <span className="absolute bottom-2 left-2 text-xs bg-black/60 text-white px-2 py-0.5 rounded-full">{tr("classesTab.uid", { uid })}
       </span>
     </div>
   );
@@ -502,6 +503,7 @@ function RemoteVideoTile({ uid, videoTrack }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 export default function ClassesTab({ isDarkMode }) {
+  const { t: tr } = useTranslation("admin");
   const dm = isDarkMode;
 
   const [bookings,     setBookings]     = useState([]);
@@ -560,11 +562,11 @@ export default function ClassesTab({ isDarkMode }) {
       liveIdsRef.current = live.map((b) => b._id);
       await fetchSessions(liveIdsRef.current);
     } catch {
-      setError("Failed to load classes. Please try refreshing.");
+      setError(tr("classesTab.failedToLoadClassesPlease"));
     } finally {
       setLoading(false);
     }
-  }, [fetchSessions]);
+  }, [fetchSessions, tr]);
 
   // ── Live updates (no polling) ───────────────────────────────────────────────
   // • The class list reloads when the server says bookings changed.
@@ -615,7 +617,7 @@ export default function ClassesTab({ isDarkMode }) {
       <div className={`flex items-center justify-center h-64 ${dm ? "text-slate-400" : "text-slate-500"}`}>
         <div className="flex items-center gap-3">
           <Loader2 size={20} className="animate-spin text-violet-500" />
-          Loading classes…
+          {tr("classesTab.loadingClasses")}
         </div>
       </div>
     );
@@ -632,12 +634,12 @@ export default function ClassesTab({ isDarkMode }) {
       {/* ── Header ───────────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h2 className="text-2xl font-bold text-violet-500">Live Classes</h2>
-          <p className={`text-sm mt-1 ${th.muted}`}>Monitor and join ongoing classes in real time.</p>
+          <h2 className="text-2xl font-bold text-violet-500">{tr("classesTab.liveClasses")}</h2>
+          <p className={`text-sm mt-1 ${th.muted}`}>{tr("classesTab.monitorAndJoinOngoingClasses")}</p>
         </div>
         <div className="flex items-center gap-3">
           {lastRefresh && (
-            <span className={`text-xs ${th.muted}`}>Updated {lastRefresh.toLocaleTimeString()}</span>
+            <span className={`text-xs ${th.muted}`}>{tr("classesTab.updated", { value: lastRefresh.toLocaleTimeString() })}</span>
           )}
           <button
             onClick={fetchBookings}
@@ -645,7 +647,7 @@ export default function ClassesTab({ isDarkMode }) {
               ${dm ? "border-[#2a2f45] text-slate-300 hover:bg-[#1e2235]" : "border-slate-300 text-slate-600 hover:bg-slate-50"}`}
           >
             <RefreshCw size={14} />
-            Refresh
+            {tr("classesTab.refresh")}
           </button>
         </div>
       </div>
@@ -660,11 +662,11 @@ export default function ClassesTab({ isDarkMode }) {
       {/* ── Stat cards ────────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-3 gap-4 mb-6">
         {[
-          { icon: Radio,        label: "Live Now",            value: liveClasses.length,
+          { icon: Radio,        label: tr("classesTab.liveNow"),            value: liveClasses.length,
             cls: dm ? "bg-red-900/30 text-red-400" : "bg-red-100 text-red-600" },
-          { icon: Calendar,     label: "Upcoming (Accepted)", value: upcomingClasses.length,
+          { icon: Calendar,     label: tr("classesTab.upcomingAccepted"), value: upcomingClasses.length,
             cls: dm ? "bg-sky-900/30 text-sky-400" : "bg-sky-100 text-sky-600" },
-          { icon: CheckCircle2, label: "Total Accepted",      value: acceptedTotal,
+          { icon: CheckCircle2, label: tr("classesTab.totalAccepted"),      value: acceptedTotal,
             cls: dm ? "bg-violet-900/30 text-violet-400" : "bg-violet-100 text-violet-600" },
         ].map(({ icon: Icon, label, value, cls }) => (
           <div key={label} className={`rounded-xl border p-4 flex items-center gap-4 ${th.statCard}`}>
@@ -684,20 +686,19 @@ export default function ClassesTab({ isDarkMode }) {
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
             <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500" />
           </span>
-          <h3 className="font-bold text-base">Happening Now</h3>
+          <h3 className="font-bold text-base">{tr("classesTab.happeningNow")}</h3>
           <span className={`text-xs px-2 py-0.5 rounded-full font-medium
             ${dm ? "bg-red-900/40 text-red-300" : "bg-red-100 text-red-600"}`}>
-            {liveClasses.length} active
-          </span>
+            {tr("classesTab.active", { liveClassesCount: liveClasses.length })}</span>
           <span className={`text-xs ml-auto ${th.muted}`}>
-            Session status updates every 4s
+            {tr("classesTab.sessionStatusUpdatesEvery4s")}
           </span>
         </div>
 
         {liveClasses.length === 0 ? (
           <div className={`rounded-xl border p-14 flex flex-col items-center gap-3 ${th.card}`}>
             <Monitor size={40} className={`opacity-25 ${th.muted}`} />
-            <p className={`text-sm ${th.muted}`}>No classes are live right now.</p>
+            <p className={`text-sm ${th.muted}`}>{tr("classesTab.noClassesAreLiveRight")}</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -719,7 +720,7 @@ export default function ClassesTab({ isDarkMode }) {
       <section>
         <div className="flex items-center gap-3 mb-4">
           <Clock size={16} className={th.muted} />
-          <h3 className="font-bold text-base">Upcoming Accepted Classes</h3>
+          <h3 className="font-bold text-base">{tr("classesTab.upcomingAcceptedClasses")}</h3>
           <span className={`text-xs px-2 py-0.5 rounded-full font-medium
             ${dm ? "bg-sky-900/40 text-sky-300" : "bg-sky-100 text-sky-700"}`}>
             {upcomingClasses.length}
@@ -729,16 +730,16 @@ export default function ClassesTab({ isDarkMode }) {
         {upcomingClasses.length === 0 ? (
           <div className={`rounded-xl border p-10 flex flex-col items-center gap-3 ${th.card}`}>
             <Calendar size={36} className={`opacity-25 ${th.muted}`} />
-            <p className={`text-sm ${th.muted}`}>No upcoming classes scheduled.</p>
+            <p className={`text-sm ${th.muted}`}>{tr("classesTab.noUpcomingClassesScheduled")}</p>
           </div>
         ) : (
           <div className={`rounded-xl border overflow-hidden ${th.card}`}>
             <div className={`px-5 py-3 border-b ${th.cardHead} ${th.divider}`}>
               <div className={`grid grid-cols-4 gap-4 text-xs font-medium uppercase tracking-wide ${th.muted}`}>
-                <span>Class</span>
-                <span>Teacher → Student</span>
-                <span>Scheduled</span>
-                <span>Starts in</span>
+                <span>{tr("classesTab.class")}</span>
+                <span>{tr("classesTab.teacherStudent")}</span>
+                <span>{tr("classesTab.scheduled")}</span>
+                <span>{tr("classesTab.startsIn")}</span>
               </div>
             </div>
             {upcomingClasses.map((b) => (
@@ -753,9 +754,7 @@ export default function ClassesTab({ isDarkMode }) {
         ${dm ? "bg-blue-900/20 border-blue-800/30 text-blue-300" : "bg-blue-50 border-blue-100 text-blue-700"}`}>
         <AlertCircle size={14} className="flex-shrink-0 mt-0.5" />
         <span>
-          <strong>Monitoring mode:</strong> The active platform badge shows what the teacher chose for this class.
-          The active button is highlighted with a ring. Zoom and Meet open the teacher's saved link in a new tab.
-          Agora spectate makes you visible to both teacher and student (5-minute limit).
+          <strong>{tr("classesTab.monitoringMode")}</strong> {tr("classesTab.theActivePlatformBadgeShows")}
         </span>
       </div>
     </div>

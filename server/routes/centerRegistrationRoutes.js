@@ -1,7 +1,7 @@
 import express from 'express';
 import bcrypt from '../utils/passwordHash.js';
 import Center from '../models/master/Center.js';
-import { centerEmailInUse } from '../utils/centerEmail.js';
+import { centerEmailInUse, isEmailTakenError } from '../utils/centerEmail.js';
 import { config } from '../config/config.js';
 import { sendEmail } from '../utils/emailService.js';
 import { validateCenterRegistration } from '../middleware/validation.js';
@@ -98,6 +98,9 @@ router.post('/', validateCenterRegistration, async (req, res) => {
     res.status(201).json({ success: true, message: 'Registration received. Your application is pending approval.' });
 
   } catch (err) {
+    if (isEmailTakenError(err)) {
+      return conflict(res, 'This email is already registered with a center. Log in to that center, or use a different email.');
+    }
     logger.error('❌ Center registration error:', { error: err?.message });
     serverError(res, 'Server error');
   }

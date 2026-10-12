@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import api from "../../../api";
 import StreakToast from "../components/StreakToast";
 import { Layers, CheckCircle2, Clock, Trophy, ChevronLeft, ArrowRight } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 const HEADING = "#3d2e20";
 const MUTED   = "#a89480";
@@ -27,6 +28,7 @@ function ProgressRing({ pct, color, size = 80 }) {
 }
 
 export default function FlashcardsTab({ isDarkMode }) {
+  const { t: tr } = useTranslation("student");
   const [stats,       setStats]       = useState([]);
   const [cards,       setCards]       = useState([]);
   const [mode,        setMode]        = useState("home");
@@ -78,13 +80,13 @@ export default function FlashcardsTab({ isDarkMode }) {
       <div style={{ width: 96, height: 96, borderRadius: "50%", background: HEROG, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 20, boxShadow: "0 20px 40px rgba(249,115,22,0.35)" }}>
         <Trophy size={48} stroke="#fff" strokeWidth={2.2}/>
       </div>
-      <h2 style={{ margin: 0, fontSize: 28, fontWeight: 900, color: HEADING, letterSpacing: "-0.4px" }}>Session complete!</h2>
+      <h2 style={{ margin: 0, fontSize: 28, fontWeight: 900, color: HEADING, letterSpacing: "-0.4px" }}>{tr("flashcardsTab.sessionComplete")}</h2>
       <p style={{ margin: "8px 0 0", fontSize: 15, color: MUTED, fontWeight: 700, maxWidth: 380 }}>
-        You reviewed <strong style={{ color: ACCENT }}>{reviewed} card{reviewed !== 1 ? "s" : ""}</strong>. Great work! Come back tomorrow for your next batch.
+        {tr("flashcardsTab.youReviewed")} <strong style={{ color: ACCENT }}>{tr("flashcardsTab.card", { reviewed, value: reviewed !== 1 ? "s" : "" })}</strong>{tr("flashcardsTab.greatWorkComeBackTomorrow")}
       </p>
       <div style={{ marginTop: 24, display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "center" }}>
-        <button onClick={() => setMode("home")} style={{ padding: "12px 22px", borderRadius: 999, background: HEROG, color: "#fff", border: "none", cursor: "pointer", fontSize: 14, fontWeight: 900, boxShadow: "0 8px 18px rgba(249,115,22,0.35)", fontFamily: "inherit" }}>Back to decks</button>
-        <button onClick={startReview}            style={{ padding: "12px 22px", borderRadius: 999, background: "#fff", color: "#5a4a3a", border: `2px solid ${BORDER}`, cursor: "pointer", fontSize: 14, fontWeight: 900, fontFamily: "inherit" }}>Review again</button>
+        <button onClick={() => setMode("home")} style={{ padding: "12px 22px", borderRadius: 999, background: HEROG, color: "#fff", border: "none", cursor: "pointer", fontSize: 14, fontWeight: 900, boxShadow: "0 8px 18px rgba(249,115,22,0.35)", fontFamily: "inherit" }}>{tr("flashcardsTab.backToDecks")}</button>
+        <button onClick={startReview}            style={{ padding: "12px 22px", borderRadius: 999, background: "#fff", color: "#5a4a3a", border: `2px solid ${BORDER}`, cursor: "pointer", fontSize: 14, fontWeight: 900, fontFamily: "inherit" }}>{tr("flashcardsTab.reviewAgain")}</button>
       </div>
     </div>
   );
@@ -109,7 +111,7 @@ export default function FlashcardsTab({ isDarkMode }) {
           </button>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-              <span style={{ fontSize: 12.5, fontWeight: 800, color: HEADING, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{card?.listTitle || "Flashcards"}</span>
+              <span style={{ fontSize: 12.5, fontWeight: 800, color: HEADING, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{card?.listTitle || tr("flashcardsTab.flashcards")}</span>
               <span style={{ fontSize: 12.5, fontWeight: 800, color: MUTED, flexShrink: 0 }}>{idx + 1} / {cards.length}</span>
             </div>
             <div style={{ height: 7, borderRadius: 999, background: BORDER, overflow: "hidden" }}>
@@ -124,13 +126,13 @@ export default function FlashcardsTab({ isDarkMode }) {
             <div className="sfc-face" style={{ borderRadius: 28, background: HEROG, padding: "48px 32px", textAlign: "center", boxShadow: "0 20px 50px rgba(249,115,22,0.35)", position: "relative", overflow: "hidden", minHeight: 280, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
               <div style={{ position: "absolute", top: -30, right: -30, width: 180, height: 180, borderRadius: "50%", background: "rgba(255,255,255,0.12)" }}/>
               <div style={{ position: "absolute", bottom: -40, left: -20, width: 140, height: 140, borderRadius: "50%", background: "rgba(255,255,255,0.08)" }}/>
-              <p style={{ margin: 0, fontSize: 12, fontWeight: 800, color: "rgba(255,255,255,0.8)", textTransform: "uppercase", letterSpacing: "0.12em", position: "relative" }}>Word</p>
+              <p style={{ margin: 0, fontSize: 12, fontWeight: 800, color: "rgba(255,255,255,0.8)", textTransform: "uppercase", letterSpacing: "0.12em", position: "relative" }}>{tr("flashcardsTab.word")}</p>
               <h2 style={{ margin: "12px 0 0", fontSize: 52, fontWeight: 900, color: "#fff", letterSpacing: "-1px", position: "relative" }}>{card?.word}</h2>
-              <p style={{ margin: "28px 0 0", fontSize: 12.5, color: "rgba(255,255,255,0.75)", fontWeight: 700, position: "relative" }}>Tap to flip →</p>
+              <p style={{ margin: "28px 0 0", fontSize: 12.5, color: "rgba(255,255,255,0.75)", fontWeight: 700, position: "relative" }}>{tr("flashcardsTab.tapToFlip")}</p>
             </div>
           ) : (
             <div className="sfc-face" style={{ borderRadius: 28, background: "#fff", border: `2px solid ${BORDER}`, padding: "40px 32px", textAlign: "center", boxShadow: "0 20px 40px rgba(61,46,32,0.08)", minHeight: 280, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16 }}>
-              <p style={{ margin: 0, fontSize: 12, fontWeight: 800, color: ACCENT, textTransform: "uppercase", letterSpacing: "0.12em" }}>Definition</p>
+              <p style={{ margin: 0, fontSize: 12, fontWeight: 800, color: ACCENT, textTransform: "uppercase", letterSpacing: "0.12em" }}>{tr("flashcardsTab.definition")}</p>
               <p style={{ margin: 0, fontSize: 20, fontWeight: 800, color: HEADING, lineHeight: 1.4, maxWidth: 420 }}>{card?.definition}</p>
               {card?.example && (
                 <div style={{ padding: "12px 18px", background: "#fff8f0", borderLeft: "3px solid #f97316", borderRadius: "8px 14px 14px 8px", maxWidth: 420 }}>
@@ -143,10 +145,10 @@ export default function FlashcardsTab({ isDarkMode }) {
 
         {flipped ? (
           <div style={{ marginTop: 24 }}>
-            <p style={{ margin: "0 0 12px", textAlign: "center", fontSize: 13, fontWeight: 800, color: HEADING }}>How well did you know it?</p>
+            <p style={{ margin: "0 0 12px", textAlign: "center", fontSize: 13, fontWeight: 800, color: HEADING }}>{tr("flashcardsTab.howWellDidYouKnow")}</p>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8 }}>
               {[
-                { q: 0, l: "Forgot", sub: "< 1 day",  bg: "#ef4444" },
+                { q: 0, l: "Forgot", sub: tr("flashcardsTab.t1Day"),  bg: "#ef4444" },
                 { q: 1, l: "Hard",   sub: "1–2 days", bg: "#f97316" },
                 { q: 2, l: "Good",   sub: "4 days",   bg: "#3b82f6" },
                 { q: 3, l: "Easy",   sub: "1 week+",  bg: "#059669" },
@@ -158,10 +160,10 @@ export default function FlashcardsTab({ isDarkMode }) {
                 </button>
               ))}
             </div>
-            <p style={{ margin: "12px 0 0", textAlign: "center", fontSize: 11, color: MUTED, fontWeight: 700 }}>Spaced repetition — harder words come back sooner</p>
+            <p style={{ margin: "12px 0 0", textAlign: "center", fontSize: 11, color: MUTED, fontWeight: 700 }}>{tr("flashcardsTab.spacedRepetitionHarderWordsCome")}</p>
           </div>
         ) : (
-          <p style={{ margin: "20px 0 0", textAlign: "center", fontSize: 13, color: MUTED, fontWeight: 700 }}>Think of the meaning, then tap to reveal.</p>
+          <p style={{ margin: "20px 0 0", textAlign: "center", fontSize: 13, color: MUTED, fontWeight: 700 }}>{tr("flashcardsTab.thinkOfTheMeaningThen")}</p>
         )}
       </div>
     );
@@ -173,10 +175,10 @@ export default function FlashcardsTab({ isDarkMode }) {
 
       {/* Header */}
       <div>
-        <div style={{ fontSize: 11.5, fontWeight: 800, color: ACCENT, textTransform: "uppercase", letterSpacing: "0.1em" }}>Learning</div>
-        <h1 style={{ margin: "2px 0 0", fontSize: 28, fontWeight: 900, color: HEADING, letterSpacing: "-0.4px" }}>Flashcards</h1>
+        <div style={{ fontSize: 11.5, fontWeight: 800, color: ACCENT, textTransform: "uppercase", letterSpacing: "0.1em" }}>{tr("flashcardsTab.learning")}</div>
+        <h1 style={{ margin: "2px 0 0", fontSize: 28, fontWeight: 900, color: HEADING, letterSpacing: "-0.4px" }}>{tr("flashcardsTab.flashcards")}</h1>
         <div style={{ fontSize: 14, color: MUTED, fontWeight: 600, marginTop: 4 }}>
-          {loading ? "Loading…" : `${totalDue} cards due · ${totalMastered} of ${totalWords} words mastered`}
+          {loading ? tr("flashcardsTab.loading") : tr("flashcardsTab.cardsDueOfWordsMastered", { totalDue, totalMastered, totalWords })}
         </div>
       </div>
 
@@ -189,21 +191,21 @@ export default function FlashcardsTab({ isDarkMode }) {
             <div style={{ position: "absolute", inset: 0, borderRadius: 12, background: "rgba(255,255,255,0.2)", transform: "rotate(-8deg) translateX(-6px)" }}/>
             <div style={{ position: "absolute", inset: 0, borderRadius: 12, background: "rgba(255,255,255,0.35)", transform: "rotate(4deg) translateX(4px)" }}/>
             <div style={{ position: "absolute", inset: 0, borderRadius: 12, background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 8px 20px rgba(0,0,0,0.15)" }}>
-              <span style={{ fontSize: 28, fontWeight: 900, color: ACCENT, letterSpacing: "-1px" }}>Aa</span>
+              <span style={{ fontSize: 28, fontWeight: 900, color: ACCENT, letterSpacing: "-1px" }}>{tr("flashcardsTab.aa")}</span>
             </div>
           </div>
           <div style={{ flex: 1, minWidth: 0, position: "relative" }}>
-            <div style={{ fontSize: 11.5, fontWeight: 800, letterSpacing: "0.1em", opacity: 0.9 }}>TODAY'S REVIEW</div>
+            <div style={{ fontSize: 11.5, fontWeight: 800, letterSpacing: "0.1em", opacity: 0.9 }}>{tr("flashcardsTab.todaySReview")}</div>
             <div style={{ fontSize: 24, fontWeight: 900, marginTop: 2, letterSpacing: "-0.4px" }}>
-              {totalDue > 0 ? `${totalDue} cards ready to review` : "All caught up! 🎉"}
+              {totalDue > 0 ? tr("flashcardsTab.cardsReadyToReview", { totalDue }) : tr("flashcardsTab.allCaughtUp")}
             </div>
             <div style={{ fontSize: 13, fontWeight: 600, opacity: 0.95, marginTop: 4 }}>
-              {totalDue > 0 ? "Spaced repetition · keeps your streak alive" : "No cards due right now. Check back tomorrow!"}
+              {totalDue > 0 ? tr("flashcardsTab.spacedRepetitionKeepsYourStreak") : tr("flashcardsTab.noCardsDueRightNow")}
             </div>
           </div>
           {totalDue > 0 && (
             <button onClick={startReview} style={{ position: "relative", display: "inline-flex", alignItems: "center", gap: 6, padding: "14px 24px", borderRadius: 999, border: "none", background: "#fff", color: "#c2410c", fontSize: 15, fontWeight: 900, cursor: "pointer", fontFamily: "inherit", boxShadow: "0 10px 24px rgba(0,0,0,0.15)", flexShrink: 0 }}>
-              Start review <ArrowRight size={14} stroke="#c2410c"/>
+              {tr("flashcardsTab.startReview")} <ArrowRight size={14} stroke="#c2410c"/>
             </button>
           )}
         </div>
@@ -232,10 +234,8 @@ export default function FlashcardsTab({ isDarkMode }) {
         <div style={{ background: "#fff", borderRadius: 20, border: `2px solid ${BORDER}`, padding: 20, display: "flex", alignItems: "center", gap: 20 }}>
           <ProgressRing pct={overallPct} color={ACCENT} size={80}/>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 900, color: HEADING, letterSpacing: "-0.3px" }}>Overall vocabulary mastery</h3>
-            <p style={{ margin: "4px 0 10px", fontSize: 13, color: MUTED, fontWeight: 600 }}>
-              Across all {stats.length} deck{stats.length !== 1 ? "s" : ""} — keep reviewing to move words from seen to mastered.
-            </p>
+            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 900, color: HEADING, letterSpacing: "-0.3px" }}>{tr("flashcardsTab.overallVocabularyMastery")}</h3>
+            <p style={{ margin: "4px 0 10px", fontSize: 13, color: MUTED, fontWeight: 600 }}>{tr("flashcardsTab.acrossAllDeckKeepReviewing", { statsCount: stats.length, value: stats.length !== 1 ? "s" : "" })}</p>
             <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
               {[
                 { l: "Mastered", v: totalMastered,                                                      c: "#059669" },
@@ -256,7 +256,7 @@ export default function FlashcardsTab({ isDarkMode }) {
       {!loading && stats.length > 0 && (
         <div>
           <h3 style={{ margin: "0 0 12px", fontSize: 15, fontWeight: 900, color: HEADING, display: "inline-flex", alignItems: "center", gap: 8 }}>
-            <Layers size={17} stroke={ACCENT}/> Your word decks
+            <Layers size={17} stroke={ACCENT}/> {tr("flashcardsTab.yourWordDecks")}
           </h3>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))", gap: 14 }}>
             {stats.map((d, i) => {
@@ -270,9 +270,9 @@ export default function FlashcardsTab({ isDarkMode }) {
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <h4 style={{ margin: 0, fontSize: 15, fontWeight: 900, color: HEADING, letterSpacing: "-0.2px" }}>{d.title}</h4>
-                      <div style={{ fontSize: 12, color: MUTED, fontWeight: 700 }}>{d.total} words · {d.mastered} mastered</div>
+                      <div style={{ fontSize: 12, color: MUTED, fontWeight: 700 }}>{tr("flashcardsTab.wordsMastered", { total: d.total, mastered: d.mastered })}</div>
                     </div>
-                    {d.due > 0 && <span style={{ padding: "4px 10px", borderRadius: 999, fontSize: 11, fontWeight: 900, color: "#c2410c", background: "#ffedd5", whiteSpace: "nowrap" }}>{d.due} due</span>}
+                    {d.due > 0 && <span style={{ padding: "4px 10px", borderRadius: 999, fontSize: 11, fontWeight: 900, color: "#c2410c", background: "#ffedd5", whiteSpace: "nowrap" }}>{tr("flashcardsTab.due", { due: d.due })}</span>}
                   </div>
 
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 6 }}>
@@ -291,7 +291,7 @@ export default function FlashcardsTab({ isDarkMode }) {
 
                   <div>
                     <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                      <span style={{ fontSize: 11, fontWeight: 800, color: MUTED, textTransform: "uppercase", letterSpacing: "0.06em" }}>Mastery</span>
+                      <span style={{ fontSize: 11, fontWeight: 800, color: MUTED, textTransform: "uppercase", letterSpacing: "0.06em" }}>{tr("flashcardsTab.mastery")}</span>
                       <span style={{ fontSize: 12, fontWeight: 900, color }}>{pct}%</span>
                     </div>
                     <div style={{ height: 7, borderRadius: 999, background: BORDER, overflow: "hidden" }}>
@@ -301,7 +301,7 @@ export default function FlashcardsTab({ isDarkMode }) {
 
                   <button onClick={() => d.due > 0 && startReview()}
                     style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "10px 14px", borderRadius: 12, border: "none", background: d.due > 0 ? HEROG : "#fff3e6", color: d.due > 0 ? "#fff" : MUTED, fontSize: 13, fontWeight: 900, cursor: d.due > 0 ? "pointer" : "default", fontFamily: "inherit", boxShadow: d.due > 0 ? "0 6px 14px rgba(249,115,22,0.35)" : "none" }}>
-                    {d.due > 0 ? <><ArrowRight size={13} stroke="#fff"/> Review {d.due}</> : "All caught up 🎉"}
+                    {d.due > 0 ? <><ArrowRight size={13} stroke="#fff"/> Review {d.due}</> : tr("flashcardsTab.allCaughtUp2")}
                   </button>
                 </div>
               );
@@ -315,8 +315,8 @@ export default function FlashcardsTab({ isDarkMode }) {
           <div style={{ width: 60, height: 60, margin: "0 auto 14px", borderRadius: 20, background: "#fff3e6", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <Layers size={28} stroke="#c2410c"/>
           </div>
-          <div style={{ fontSize: 16, fontWeight: 900, color: HEADING }}>No word lists yet</div>
-          <div style={{ fontSize: 13, color: MUTED, fontWeight: 600, marginTop: 4 }}>Your teacher will add vocabulary lists soon!</div>
+          <div style={{ fontSize: 16, fontWeight: 900, color: HEADING }}>{tr("flashcardsTab.noWordListsYet")}</div>
+          <div style={{ fontSize: 13, color: MUTED, fontWeight: 600, marginTop: 4 }}>{tr("flashcardsTab.yourTeacherWillAddVocabulary")}</div>
         </div>
       )}
     </div>

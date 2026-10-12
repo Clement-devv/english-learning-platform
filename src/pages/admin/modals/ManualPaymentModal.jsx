@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { DollarSign, BookOpen, X, AlertCircle, XCircle } from "lucide-react";
 import api from "../../../api";
+import { useTranslation } from "react-i18next";
 
 export default function ManualPaymentModal({ isOpen, onClose, onSave, student, isDarkMode = false }) {
+  const { t: tr } = useTranslation("admin");
   const [classes,      setClasses]      = useState("");
   const [amount,       setAmount]       = useState("");
   const [method,       setMethod]       = useState("Manual");
@@ -65,7 +67,7 @@ export default function ManualPaymentModal({ isOpen, onClose, onSave, student, i
       const hint   = lower > 0
         ? `${currSym}${(lower * ppc).toFixed(2)} for ${lower} class${lower > 1 ? "es" : ""} or ${currSym}${(upper * ppc).toFixed(2)} for ${upper} class${upper > 1 ? "es" : ""}`
         : `${currSym}${(upper * ppc).toFixed(2)} for ${upper} class${upper > 1 ? "es" : ""}`;
-      setAmountError(`Cannot record — ${currSym}${entered} is not a valid amount at ${currSym}${ppc}/${curr || "class"}. Try ${hint}.`);
+      setAmountError(tr("manualPaymentModal.cannotRecordIsNotA", { currSym, entered, ppc, value: curr || tr("manualPaymentModal.classWord"), hint }));
       setClasses("");
     }
   };
@@ -87,15 +89,15 @@ export default function ManualPaymentModal({ isOpen, onClose, onSave, student, i
   const handleSubmit = async () => {
     if (amountError) return; // blocked by mismatch
     if (!amount || Number(amount) <= 0)
-      return alert("Please enter the amount paid");
+      return alert(tr("manualPaymentModal.pleaseEnterTheAmountPaid"));
     if (!classes || Number(classes) <= 0)
-      return alert("Please enter a valid number of classes");
+      return alert(tr("manualPaymentModal.pleaseEnterAValidNumber"));
 
     // Final guard: re-check mismatch
     if (ppc) {
       const expected = Number(classes) * ppc;
       if (Math.abs(Number(amount) - expected) > 0.01) {
-        setAmountError(`Cannot record — expected ${currSym}${expected.toFixed(2)} for ${classes} class${Number(classes) > 1 ? "es" : ""} (${currSym}${ppc} each), but entered ${currSym}${Number(amount).toFixed(2)}.`);
+        setAmountError(tr("manualPaymentModal.cannotRecordExpectedForClass", { currSym, value: expected.toFixed(2), classes, value2: Number(classes) > 1 ? "es" : "", ppc, value3: Number(amount).toFixed(2) }));
         return;
       }
     }
@@ -126,7 +128,7 @@ export default function ManualPaymentModal({ isOpen, onClose, onSave, student, i
               <DollarSign size={16} color="#fff" />
             </div>
             <div>
-              <h2 style={{ fontSize: "16px", fontWeight: "800", color: textPri, margin: 0 }}>Record Payment</h2>
+              <h2 style={{ fontSize: "16px", fontWeight: "800", color: textPri, margin: 0 }}>{tr("manualPaymentModal.recordPayment")}</h2>
               {student && (
                 <p style={{ fontSize: "12px", color: textSec, margin: 0 }}>
                   {student.firstName} {student.lastName}
@@ -153,11 +155,9 @@ export default function ManualPaymentModal({ isOpen, onClose, onSave, student, i
                 <>
                   <BookOpen size={15} color={dm ? "#34d399" : "#059669"} style={{ flexShrink: 0, marginTop: "1px" }} />
                   <div>
-                    <p style={{ fontSize: "12.5px", fontWeight: "700", color: dm ? "#34d399" : "#059669", margin: "0 0 2px" }}>
-                      Center Pricing — {currSym}{ppc} {curr} per class
-                    </p>
+                    <p style={{ fontSize: "12.5px", fontWeight: "700", color: dm ? "#34d399" : "#059669", margin: "0 0 2px" }}>{tr("manualPaymentModal.centerPricingPerClass", { currSym, ppc, curr })}</p>
                     <p style={{ fontSize: "11.5px", color: dm ? "#6ee7b7" : "#065f46", margin: 0 }}>
-                      Enter the amount paid — classes will auto-fill. Or enter classes first to calculate the total.
+                      {tr("manualPaymentModal.enterTheAmountPaidClasses")}
                     </p>
                   </div>
                 </>
@@ -165,7 +165,7 @@ export default function ManualPaymentModal({ isOpen, onClose, onSave, student, i
                 <>
                   <AlertCircle size={15} color={dm ? "#fbbf24" : "#d97706"} style={{ flexShrink: 0, marginTop: "1px" }} />
                   <p style={{ fontSize: "12px", color: dm ? "#fcd34d" : "#92400e", margin: 0 }}>
-                    No pricing set. Go to <strong>Finance → Class Pricing</strong> to configure rates. You can still enter manually.
+                    {tr("manualPaymentModal.noPricingSetGoTo")} <strong>{tr("manualPaymentModal.financeClassPricing")}</strong> {tr("manualPaymentModal.toConfigureRatesYouCan")}
                   </p>
                 </>
               )}
@@ -174,8 +174,7 @@ export default function ManualPaymentModal({ isOpen, onClose, onSave, student, i
 
           {/* ── Amount FIRST ── */}
           <div style={{ marginBottom: "14px" }}>
-            <label style={lbl}>
-              Amount Paid {curr ? `(${curr})` : ""}
+            <label style={lbl}>{tr("manualPaymentModal.amountPaid", { value: curr ? `(${curr})` : "" })}
             </label>
             <div style={{ position: "relative" }}>
               {currSym && (
@@ -211,15 +210,14 @@ export default function ManualPaymentModal({ isOpen, onClose, onSave, student, i
 
             {/* Success hint when amount auto-filled classes */}
             {!hasError && amount && classes && expectedAmount && (
-              <p style={{ fontSize: "11.5px", color: dm ? "#34d399" : "#059669", marginTop: "5px", fontWeight: "600" }}>
-                ✓ {currSym}{amount} = {classes} class{Number(classes) !== 1 ? "es" : ""} × {currSym}{ppc}
+              <p style={{ fontSize: "11.5px", color: dm ? "#34d399" : "#059669", marginTop: "5px", fontWeight: "600" }}>{tr("manualPaymentModal.class", { currSym, amount, classes, value: Number(classes) !== 1 ? "es" : "", ppc })}
               </p>
             )}
           </div>
 
           {/* ── Classes SECOND ── */}
           <div style={{ marginBottom: "14px" }}>
-            <label style={lbl}>Number of Classes</label>
+            <label style={lbl}>{tr("manualPaymentModal.numberOfClasses")}</label>
             <input
               style={inp}
               type="number"
@@ -237,18 +235,18 @@ export default function ManualPaymentModal({ isOpen, onClose, onSave, student, i
 
           {/* ── Payment method ── */}
           <div style={{ marginBottom: "20px" }}>
-            <label style={lbl}>Payment Method</label>
+            <label style={lbl}>{tr("manualPaymentModal.paymentMethod")}</label>
             <div style={{ position: "relative" }}>
               <select
                 value={method}
                 onChange={e => setMethod(e.target.value)}
                 style={{ ...inp, appearance: "none", paddingRight: "32px", cursor: "pointer" }}
               >
-                <option value="Manual">Manual / Cash</option>
-                <option value="Bank Transfer">Bank Transfer</option>
-                <option value="Card">Card</option>
-                <option value="Online">Online Payment</option>
-                <option value="Other">Other</option>
+                <option value="Manual">{tr("manualPaymentModal.manualCash")}</option>
+                <option value="Bank Transfer">{tr("manualPaymentModal.bankTransfer")}</option>
+                <option value="Card">{tr("manualPaymentModal.card")}</option>
+                <option value="Online">{tr("manualPaymentModal.onlinePayment")}</option>
+                <option value="Other">{tr("manualPaymentModal.other")}</option>
               </select>
               <svg style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} width="12" height="12" viewBox="0 0 12 12" fill="none">
                 <path d="M2 4l4 4 4-4" stroke={textSec} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -262,7 +260,7 @@ export default function ManualPaymentModal({ isOpen, onClose, onSave, student, i
               onClick={onClose}
               style={{ flex: 1, padding: "11px", borderRadius: "10px", border: `1.5px solid ${border}`, background: "transparent", color: textSec, fontSize: "14px", fontWeight: "600", cursor: "pointer", fontFamily: "inherit" }}
             >
-              Cancel
+              {tr("manualPaymentModal.cancel")}
             </button>
             <button
               onClick={handleSubmit}
@@ -275,7 +273,7 @@ export default function ManualPaymentModal({ isOpen, onClose, onSave, student, i
                 fontFamily: "inherit",
               }}
             >
-              {loading ? "Saving…" : canSave && expectedAmount ? `Save — ${currSym}${amount} for ${classes} class${Number(classes) !== 1 ? "es" : ""}` : "Save Payment"}
+              {loading ? tr("manualPaymentModal.saving") : canSave && expectedAmount ? tr("manualPaymentModal.saveForClass", { currSym, amount, classes, value: Number(classes) !== 1 ? "es" : "" }) : tr("manualPaymentModal.savePayment")}
             </button>
           </div>
         </div>

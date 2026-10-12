@@ -5,8 +5,11 @@ import api from "../../../api";
 import { useOnDataChanged } from "../../../hooks/useLiveData";
 import Pagination from "../../../components/Pagination";
 import { groupRecordingSessions, partLabel, isExternal, openExternal } from "../../../utils/recordingSessions.js";
+import { useTranslation } from "react-i18next";
+import { dateLocale } from "../../../i18n/dateLocale.js";
 
 export default function RecordingsTab({ isDarkMode }) {
+  const { t: tr } = useTranslation("student");
   const [recordings, setRecordings] = useState([]);
   const [loading,    setLoading]    = useState(true);
   const [playing,    setPlaying]    = useState(null); // { session, index }
@@ -48,7 +51,7 @@ export default function RecordingsTab({ isDarkMode }) {
     return s > 0 ? `${m}m ${s}s` : `${m}m`;
   };
 
-  const formatDate = (d) => new Date(d).toLocaleDateString("en-US", {
+  const formatDate = (d) => new Date(d).toLocaleDateString(dateLocale("en-US"), {
     day: "numeric", month: "short", year: "numeric",
   });
 
@@ -102,11 +105,11 @@ export default function RecordingsTab({ isDarkMode }) {
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
         <button onClick={closeVideo} style={{ background: "none", border: "none", color: col.muted, cursor: "pointer", display: "flex", alignItems: "center", gap: "6px", fontSize: "14px", fontWeight: 700, padding: 0 }}>
-          <X size={16} /> Back
+          <X size={16} /> {tr("recordingsTab.back")}
         </button>
         <h2 style={{ margin: 0, fontSize: "17px", fontWeight: 900, color: col.text, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          {rec.title || rec.bookingId?.classTitle || "Class Recording"}
-          {total > 1 && <span style={{ marginLeft: "8px", fontSize: "13px", fontWeight: 700, color: col.muted }}>Part {index + 1} of {total}</span>}
+          {rec.title || rec.bookingId?.classTitle || tr("recordingsTab.classRecording")}
+          {total > 1 && <span style={{ marginLeft: "8px", fontSize: "13px", fontWeight: 700, color: col.muted }}>{tr("recordingsTab.partOf", { value: index + 1, total })}</span>}
         </h2>
       </div>
 
@@ -160,7 +163,7 @@ export default function RecordingsTab({ isDarkMode }) {
       {/* Other recordings quick-switch */}
       {sessions.length > 1 && (
         <div>
-          <p style={{ margin: "0 0 8px", fontSize: "12px", fontWeight: 700, color: col.muted, textTransform: "uppercase", letterSpacing: "0.05em" }}>Other recordings</p>
+          <p style={{ margin: "0 0 8px", fontSize: "12px", fontWeight: 700, color: col.muted, textTransform: "uppercase", letterSpacing: "0.05em" }}>{tr("recordingsTab.otherRecordings")}</p>
           <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
             {sessions.filter(s => s.key !== session.key).map(s => (
               <button key={s.key} onClick={() => openVideo(s)} disabled={loadingId === s.key}
@@ -169,7 +172,7 @@ export default function RecordingsTab({ isDarkMode }) {
                   {loadingId === s.key ? <Loader2 size={12} color="white" style={{ animation: "spin 1s linear infinite" }} /> : <Play size={10} fill="white" color="white" />}
                 </div>
                 <span style={{ fontSize: "13px", fontWeight: 700, color: col.text, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {s.first.title || s.first.bookingId?.classTitle || "Class Recording"}
+                  {s.first.title || s.first.bookingId?.classTitle || tr("recordingsTab.classRecording")}
                 </span>
                 <span style={{ fontSize: "11px", color: col.muted, flexShrink: 0 }}>{formatDate(s.createdAt)}</span>
               </button>
@@ -185,17 +188,17 @@ export default function RecordingsTab({ isDarkMode }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
       <div>
-        <h2 style={{ margin: "0 0 4px", fontSize: "22px", fontWeight: 900, color: col.text }}>🎬 Class Recordings</h2>
+        <h2 style={{ margin: "0 0 4px", fontSize: "22px", fontWeight: 900, color: col.text }}>{tr("recordingsTab.classRecordings")}</h2>
         <p style={{ margin: 0, fontSize: "13px", color: col.muted }}>
-          {loading ? "Loading…" : `${pager.total} recording${pager.total !== 1 ? "s" : ""}`}
+          {loading ? tr("recordingsTab.loading") : tr("recordingsTab.recording", { total: pager.total, value: pager.total !== 1 ? "s" : "" })}
         </p>
       </div>
 
       {!loading && recordings.length === 0 && (
         <div style={{ background: col.card, border: `2px dashed ${col.border}`, borderRadius: "18px", padding: "48px 24px", textAlign: "center" }}>
           <div style={{ fontSize: "56px", marginBottom: "14px" }}>🎬</div>
-          <p style={{ margin: 0, fontSize: "16px", fontWeight: 800, color: col.text }}>No recordings yet</p>
-          <p style={{ margin: "6px 0 0", fontSize: "13px", color: col.muted }}>Your teacher will share class recordings here.</p>
+          <p style={{ margin: 0, fontSize: "16px", fontWeight: 800, color: col.text }}>{tr("recordingsTab.noRecordingsYet")}</p>
+          <p style={{ margin: "6px 0 0", fontSize: "13px", color: col.muted }}>{tr("recordingsTab.yourTeacherWillShareClass")}</p>
         </div>
       )}
 
@@ -218,7 +221,7 @@ export default function RecordingsTab({ isDarkMode }) {
               {/* Info */}
               <div style={{ flex: 1, minWidth: 0 }}>
                 <p style={{ margin: "0 0 4px", fontSize: "15px", fontWeight: 800, color: col.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {rec.title || rec.bookingId?.classTitle || "Class Recording"}
+                  {rec.title || rec.bookingId?.classTitle || tr("recordingsTab.classRecording")}
                 </p>
                 <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", alignItems: "center" }}>
                   <span style={{ fontSize: "12px", color: col.muted, display: "flex", alignItems: "center", gap: "3px" }}>
@@ -231,8 +234,7 @@ export default function RecordingsTab({ isDarkMode }) {
                   )}
                   {total > 1 && (
                     <span style={{ fontSize: "11px", fontWeight: 800, padding: "2px 8px", borderRadius: "20px", background: "rgba(99,102,241,0.12)", color: col.accent }}>
-                      {total} parts
-                    </span>
+                      {tr("recordingsTab.parts", { total })}</span>
                   )}
                   {rec.teacherId && (
                     <span style={{ fontSize: "12px", color: col.muted }}>

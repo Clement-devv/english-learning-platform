@@ -11,6 +11,12 @@ import { getUserTimezone } from "../../../utils/timezone";
 import { pushSupported, enablePush, disablePush, getPushStatus } from "../../../utils/pushNotifications";
 import { getStudentBookings } from "../../../services/bookingService";
 import { useLiveRefresh, refreshStale } from "../../../hooks/useLiveData";
+import { useTranslation } from "react-i18next";
+import i18n from "../../../i18n/i18n.js";
+
+// For text in file-level lists: read when rendered, so it follows the chosen language
+const ta = (key, opts) => i18n.t(`student:${key}`, opts);
+
 
 // Heartbeat intervals
 // Data refresh is event-driven (hooks/useLiveData.js): the server pushes
@@ -59,44 +65,45 @@ export const getStudentToken = () =>
 
 // ── Badge definitions ─────────────────────────────────────────────────────────
 export const BADGE_DEFINITIONS = [
-  { id:"first_class", name:"First Step",      icon:"🚀", requirement:1,   type:"total",   category:"journey",      desc:"Showed up for your very first class!",          grad:["#f97316","#fb923c"] },
-  { id:"total_5",     name:"Finding Rhythm",  icon:"🎵", requirement:5,   type:"total",   category:"journey",      desc:"5 classes done — you're building a habit!",     grad:["#f59e0b","#fbbf24"] },
-  { id:"total_10",    name:"In The Groove",   icon:"🌊", requirement:10,  type:"total",   category:"journey",      desc:"10 classes — things are really clicking!",      grad:["#10b981","#34d399"] },
-  { id:"total_20",    name:"On A Roll",       icon:"🎯", requirement:20,  type:"total",   category:"journey",      desc:"20 classes and going strong!",                  grad:["#3b82f6","#60a5fa"] },
-  { id:"total_30",    name:"Committed",       icon:"💪", requirement:30,  type:"total",   category:"journey",      desc:"30 classes — truly committed to English!",      grad:["#8b5cf6","#a78bfa"] },
-  { id:"total_50",    name:"Half Century",    icon:"🏆", requirement:50,  type:"total",   category:"journey",      desc:"50 classes — absolute dedication!",             grad:["#ec4899","#f472b6"] },
-  { id:"total_100",   name:"English Legend",  icon:"👑", requirement:100, type:"total",   category:"journey",      desc:"100 classes — you are a legend!",               grad:["#fbbf24","#fcd34d"] },
-  { id:"streak_3",    name:"Getting Warm",    icon:"🌱", requirement:3,   type:"streak",  category:"consistency",  desc:"3 active learning days — great start!",         grad:["#22c55e","#4ade80"] },
-  { id:"streak_7",    name:"Full Week",       icon:"🔥", requirement:7,   type:"streak",  category:"consistency",  desc:"7 active learning days — on fire!",             grad:["#f97316","#fb923c"] },
-  { id:"streak_14",   name:"Two Weeks!",      icon:"⚡", requirement:14,  type:"streak",  category:"consistency",  desc:"14 active learning days — phenomenal!",         grad:["#eab308","#fbbf24"] },
-  { id:"streak_30",   name:"Monthly Pro",     icon:"🌟", requirement:30,  type:"streak",  category:"consistency",  desc:"30 active learning days — truly incredible!",   grad:["#a855f7","#c084fc"] },
-  { id:"weekly_2",    name:"Busy Bee",        icon:"🐝", requirement:2,   type:"weekly",  category:"weekly",       desc:"2 classes in one week — buzzing!",              grad:["#f59e0b","#fbbf24"] },
-  { id:"weekly_3",    name:"Triple Boost",    icon:"🎖️", requirement:3,  type:"weekly",  category:"weekly",       desc:"3 classes in one week — amazing effort!",       grad:["#10b981","#34d399"] },
-  { id:"weekly_5",    name:"Week Champion",   icon:"🦸", requirement:5,   type:"weekly",  category:"weekly",       desc:"5 classes in one week — unstoppable!",          grad:["#6366f1","#818cf8"] },
-  { id:"early_bird",  name:"Early Bird",      icon:"🌅", requirement:1,   type:"special", category:"special",      desc:"Attended a class before 9 AM!",                 grad:["#f97316","#fbbf24"] },
-  { id:"night_owl",   name:"Night Owl",       icon:"🦉", requirement:1,   type:"special", category:"special",      desc:"Attended a class after 8 PM!",                  grad:["#7c3aed","#a855f7"] },
+  { id:"first_class", get name() { return ta("useDashboardData.badgeDefinitionsFirstStep"); },      icon:"🚀", requirement:1,   type:"total",   category:"journey",      get desc() { return ta("useDashboardData.badgeDefinitionsShowedUpForYour"); },          grad:["#f97316","#fb923c"] },
+  { id:"total_5",     get name() { return ta("useDashboardData.badgeDefinitionsFindingRhythm"); },  icon:"🎵", requirement:5,   type:"total",   category:"journey",      get desc() { return ta("useDashboardData.badgeDefinitionsT5ClassesDoneYou"); },     grad:["#f59e0b","#fbbf24"] },
+  { id:"total_10",    get name() { return ta("useDashboardData.badgeDefinitionsInTheGroove"); },   icon:"🌊", requirement:10,  type:"total",   category:"journey",      get desc() { return ta("useDashboardData.badgeDefinitionsT10ClassesThingsAre"); },      grad:["#10b981","#34d399"] },
+  { id:"total_20",    get name() { return ta("useDashboardData.badgeDefinitionsOnARoll"); },       icon:"🎯", requirement:20,  type:"total",   category:"journey",      get desc() { return ta("useDashboardData.badgeDefinitionsT20ClassesAndGoing"); },                  grad:["#3b82f6","#60a5fa"] },
+  { id:"total_30",    get name() { return ta("useDashboardData.badgeDefinitionsCommitted"); },       icon:"💪", requirement:30,  type:"total",   category:"journey",      get desc() { return ta("useDashboardData.badgeDefinitionsT30ClassesTrulyCommitted"); },      grad:["#8b5cf6","#a78bfa"] },
+  { id:"total_50",    get name() { return ta("useDashboardData.badgeDefinitionsHalfCentury"); },    icon:"🏆", requirement:50,  type:"total",   category:"journey",      get desc() { return ta("useDashboardData.badgeDefinitionsT50ClassesAbsoluteDedication"); },             grad:["#ec4899","#f472b6"] },
+  { id:"total_100",   get name() { return ta("useDashboardData.badgeDefinitionsEnglishLegend"); },  icon:"👑", requirement:100, type:"total",   category:"journey",      get desc() { return ta("useDashboardData.badgeDefinitionsT100ClassesYouAre"); },               grad:["#fbbf24","#fcd34d"] },
+  { id:"streak_3",    get name() { return ta("useDashboardData.badgeDefinitionsGettingWarm"); },    icon:"🌱", requirement:3,   type:"streak",  category:"consistency",  get desc() { return ta("useDashboardData.badgeDefinitionsT3ActiveLearningDays"); },         grad:["#22c55e","#4ade80"] },
+  { id:"streak_7",    get name() { return ta("useDashboardData.badgeDefinitionsFullWeek"); },       icon:"🔥", requirement:7,   type:"streak",  category:"consistency",  get desc() { return ta("useDashboardData.badgeDefinitionsT7ActiveLearningDays"); },             grad:["#f97316","#fb923c"] },
+  { id:"streak_14",   get name() { return ta("useDashboardData.badgeDefinitionsTwoWeeks"); },      icon:"⚡", requirement:14,  type:"streak",  category:"consistency",  get desc() { return ta("useDashboardData.badgeDefinitionsT14ActiveLearningDays"); },         grad:["#eab308","#fbbf24"] },
+  { id:"streak_30",   get name() { return ta("useDashboardData.badgeDefinitionsMonthlyPro"); },     icon:"🌟", requirement:30,  type:"streak",  category:"consistency",  get desc() { return ta("useDashboardData.badgeDefinitionsT30ActiveLearningDays"); },   grad:["#a855f7","#c084fc"] },
+  { id:"weekly_2",    get name() { return ta("useDashboardData.badgeDefinitionsBusyBee"); },        icon:"🐝", requirement:2,   type:"weekly",  category:"weekly",       get desc() { return ta("useDashboardData.badgeDefinitionsT2ClassesInOne"); },              grad:["#f59e0b","#fbbf24"] },
+  { id:"weekly_3",    get name() { return ta("useDashboardData.badgeDefinitionsTripleBoost"); },    icon:"🎖️", requirement:3,  type:"weekly",  category:"weekly",       get desc() { return ta("useDashboardData.badgeDefinitionsT3ClassesInOne"); },       grad:["#10b981","#34d399"] },
+  { id:"weekly_5",    get name() { return ta("useDashboardData.badgeDefinitionsWeekChampion"); },   icon:"🦸", requirement:5,   type:"weekly",  category:"weekly",       get desc() { return ta("useDashboardData.badgeDefinitionsT5ClassesInOne"); },          grad:["#6366f1","#818cf8"] },
+  { id:"early_bird",  get name() { return ta("useDashboardData.badgeDefinitionsEarlyBird"); },      icon:"🌅", requirement:1,   type:"special", category:"special",      get desc() { return ta("useDashboardData.badgeDefinitionsAttendedAClassBefore"); },                 grad:["#f97316","#fbbf24"] },
+  { id:"night_owl",   get name() { return ta("useDashboardData.badgeDefinitionsNightOwl"); },       icon:"🦉", requirement:1,   type:"special", category:"special",      get desc() { return ta("useDashboardData.badgeDefinitionsAttendedAClassAfter"); },                  grad:["#7c3aed","#a855f7"] },
 ];
 
 // ── Navigation tabs ───────────────────────────────────────────────────────────
 export const TABS = [
-  { key: "dashboard",         label: "🏠 Home",       emoji: "🏠" },
-  { key: "homework",          label: "📚 Homework",    emoji: "📚" },
-  { key: "quiz",              label: "📝 Quizzes",     emoji: "📝" },
-  { key: "flashcards",        label: "📖 Flashcards",  emoji: "📖" },
-  { key: "pronunciation",     label: "🎤 Speak",       emoji: "🎤" },
-  { key: "conversation",      label: "🤖 AI Chat",     emoji: "🤖" },
-  { key: "messages",          label: "💬 Messages",    emoji: "💬" },
-  { key: "recordings",        label: "🎬 Recordings",  emoji: "🎬" },
-  { key: "reviews",           label: "⭐ Reviews",     emoji: "⭐" },
-  { key: "referral",          label: "🎁 Invite",      emoji: "🎁" },
-  { key: "completed-classes", label: "✅ Completed",   emoji: "✅" },
-  { key: "badges",            label: "🏅 Badges",      emoji: "🏅" },
-  { key: "charts",            label: "📊 Progress",    emoji: "📊" },
-  { key: "schedule",          label: "📅 Schedule",    emoji: "📅" },
+  { key: "dashboard",         get label() { return ta("useDashboardData.tabsHome"); },       emoji: "🏠" },
+  { key: "homework",          get label() { return ta("useDashboardData.tabsHomework"); },    emoji: "📚" },
+  { key: "quiz",              get label() { return ta("useDashboardData.tabsQuizzes"); },     emoji: "📝" },
+  { key: "flashcards",        get label() { return ta("useDashboardData.tabsFlashcards"); },  emoji: "📖" },
+  { key: "pronunciation",     get label() { return ta("useDashboardData.tabsSpeak"); },       emoji: "🎤" },
+  { key: "conversation",      get label() { return ta("useDashboardData.tabsAiChat"); },     emoji: "🤖" },
+  { key: "messages",          get label() { return ta("useDashboardData.tabsMessages"); },    emoji: "💬" },
+  { key: "recordings",        get label() { return ta("useDashboardData.tabsRecordings"); },  emoji: "🎬" },
+  { key: "reviews",           get label() { return ta("useDashboardData.tabsReviews"); },     emoji: "⭐" },
+  { key: "referral",          get label() { return ta("useDashboardData.tabsInvite"); },      emoji: "🎁" },
+  { key: "completed-classes", get label() { return ta("useDashboardData.tabsCompleted"); },   emoji: "✅" },
+  { key: "badges",            get label() { return ta("useDashboardData.tabsBadges"); },      emoji: "🏅" },
+  { key: "charts",            get label() { return ta("useDashboardData.tabsProgress"); },    emoji: "📊" },
+  { key: "schedule",          get label() { return ta("useDashboardData.tabsSchedule"); },    emoji: "📅" },
 ];
 
 // ── Main hook ─────────────────────────────────────────────────────────────────
 export function useDashboardData() {
+  const { t: tr } = useTranslation("student");
   const navigate = useNavigate();
   const location = useLocation();
   const { user: authUser, setUser: setAuthUser } = useAuth();
@@ -250,12 +257,12 @@ export function useDashboardData() {
         if (prevHomeworkRef.current !== null && pending > prevHomeworkRef.current) {
           const diff = pending - prevHomeworkRef.current;
           if ("Notification" in window && Notification.permission === "granted") {
-            new Notification("📚 New Homework!", { body: `You have ${diff} new homework assignment${diff > 1 ? "s" : ""} from your teacher.`, icon: "/favicon.ico" });
+            new Notification(tr("useDashboardData.notifyNewHomework"), { body: tr("useDashboardData.youHaveNewHomeworkAssignment", { diff, value: diff > 1 ? "s" : "" }), icon: "/favicon.ico" });
           }
         }
         prevHomeworkRef.current = pending;
       } catch { /* silent */ }
-  }, []);
+  }, [tr]);
   useEffect(() => { checkHomework(); }, [checkHomework]);
 
   // ── Quiz badge ─────────────────────────────────────────────────────────────
@@ -267,12 +274,12 @@ export function useDashboardData() {
         if (prevQuizRef.current !== null && pending > prevQuizRef.current) {
           const diff = pending - prevQuizRef.current;
           if ("Notification" in window && Notification.permission === "granted") {
-            new Notification("📝 New Quiz!", { body: `You have ${diff} new quiz${diff > 1 ? "zes" : ""} assigned by your teacher.`, icon: "/favicon.ico" });
+            new Notification(tr("useDashboardData.notifyNewQuiz"), { body: tr("useDashboardData.youHaveNewQuizAssigned", { diff, value: diff > 1 ? "zes" : "" }), icon: "/favicon.ico" });
           }
         }
         prevQuizRef.current = pending;
       } catch { /* silent */ }
-  }, []);
+  }, [tr]);
   useEffect(() => { checkQuizzes(); }, [checkQuizzes]);
 
   // ── Helpers ────────────────────────────────────────────────────────────────
@@ -340,7 +347,7 @@ export function useDashboardData() {
     try {
       if (!quiet) setLoading(true);
       const studentId = student.id;
-      if (!studentId) { showToast("Please login again.", "error"); handleLogout(); return; }
+      if (!studentId) { showToast(tr("useDashboardData.pleaseLoginAgain"), "error"); handleLogout(); return; }
 
       if (!quiet) api.patch(`/students/${studentId}/timezone`, { timezone: getUserTimezone() }).catch(() => {});
 
@@ -435,7 +442,7 @@ export function useDashboardData() {
       const notifs = [];
       active.forEach(cls => {
         if (cls.status === "starting-soon")
-          notifs.push({ id: `class-${cls.id}`, type: "class", message: `${cls.title} starts soon!`, time: cls.time, read: false });
+          notifs.push({ id: `class-${cls.id}`, type: "class", message: tr("useDashboardData.startsSoon", { title: cls.title }), time: cls.time, read: false });
       });
       // Background refreshes run this again — don't add the same notice twice
       if (notifs.length) setNotifications(prev => [...notifs.filter(n => !prev.some(p => p.id === n.id)), ...prev]);
@@ -443,7 +450,7 @@ export function useDashboardData() {
       setDataReady(true);
     } catch (err) {
       console.error("Failed to fetch student data:", err);
-      if (!quiet) showToast("Failed to load your classes", "error");
+      if (!quiet) showToast(tr("useDashboardData.failedToLoadYourClasses"), "error");
       setLoading(false);
       setDataReady(true);
     }
@@ -538,15 +545,15 @@ export function useDashboardData() {
           topic: b.topic || "English Lesson",
         }));
         if (newConfs.length > prev.length && "Notification" in window && Notification.permission === "granted") {
-          new Notification("✅ Class Confirmation", {
-            body: `Please confirm attendance for "${newConfs[0]?.title}"`,
+          new Notification(tr("useDashboardData.notifyClassConfirmation"), {
+            body: tr("useDashboardData.pleaseConfirmAttendanceFor", { title: newConfs[0]?.title }),
             icon: "/favicon.ico",
           });
         }
         return newConfs;
       });
     } catch { /* silent */ }
-  }, [student.id]);
+  }, [student.id, tr]);
 
   // ── Live refresh (replaces the 60s / 90s polling) ─────────────────────────
   const liveId = student.id || "me";
@@ -663,7 +670,7 @@ export function useDashboardData() {
     setShareData({ title, message }); setShowShareModal(true);
   };
 
-  const copyShareText = () => { navigator.clipboard.writeText(shareData.message); showToast("Copied!"); };
+  const copyShareText = () => { navigator.clipboard.writeText(shareData.message); showToast(tr("useDashboardData.copied")); };
   const shareOnSocial = (p) => {
     const t = encodeURIComponent(shareData.message), u = encodeURIComponent(window.location.origin);
     const urls = { twitter: `https://twitter.com/intent/tweet?text=${t}&url=${u}`, facebook: `https://www.facebook.com/sharer/sharer.php?u=${u}&quote=${t}`, linkedin: `https://www.linkedin.com/sharing/share-offsite/?url=${u}`, whatsapp: `https://wa.me/?text=${t}%20${u}` };
@@ -689,26 +696,26 @@ export function useDashboardData() {
   const handleJoinClass = async (classItem) => {
     try {
       const bookingId = classItem.bookingId || classItem.id;
-      if (!bookingId) { showToast("Missing booking ID", "error"); return; }
+      if (!bookingId) { showToast(tr("useDashboardData.missingBookingId"), "error"); return; }
       const { data } = await api.get(`/bookings/${bookingId}`);
-      navigate("/classroom", { state: { classData: { id: bookingId, bookingId, title: classItem.title || "Class", topic: classItem.topic || "English Lesson", duration: classItem.duration, teacherGoogleMeetLink: data.booking?.teacherId?.googleMeetLink || "" }, userRole: "student" } });
-    } catch { showToast("Failed to join class", "error"); }
+      navigate("/classroom", { state: { classData: { id: bookingId, bookingId, title: classItem.title || tr("useDashboardData.class"), topic: classItem.topic || "English Lesson", duration: classItem.duration, teacherGoogleMeetLink: data.booking?.teacherId?.googleMeetLink || "" }, userRole: "student" } });
+    } catch { showToast(tr("useDashboardData.failedToJoinClass"), "error"); }
   };
 
   const handleLeaveClassroom = () => { setIsClassroomOpen(false); setActiveClass(null); fetchStudentData(); };
 
   // ── Push notification handlers ─────────────────────────────────────────────
   const enableNotifications = async () => {
-    if (!pushSupported()) { showToast("Your browser doesn't support push notifications"); return; }
+    if (!pushSupported()) { showToast(tr("useDashboardData.yourBrowserDoesnTSupport")); return; }
     const { ok, reason } = await enablePush();
     if (ok) {
       setNotificationsEnabled(true); setNotificationPermission("granted");
       localStorage.setItem("notificationsEnabled", "true");
-      showToast("🔔 Notifications enabled! You'll be reminded before class.");
+      showToast(tr("useDashboardData.notificationsEnabledYouLlBe"));
     } else if (reason === "denied") {
-      showToast("Notifications blocked. Please allow them in your browser settings.");
+      showToast(tr("useDashboardData.notificationsBlockedPleaseAllowThem"));
     } else {
-      showToast("Could not enable notifications. Try again later.");
+      showToast(tr("useDashboardData.couldNotEnableNotificationsTry"));
     }
   };
 
@@ -716,7 +723,7 @@ export function useDashboardData() {
     await disablePush();
     setNotificationsEnabled(false);
     localStorage.setItem("notificationsEnabled", "false");
-    showToast("Notifications disabled");
+    showToast(tr("useDashboardData.notificationsDisabled"));
   };
 
   // ── Return everything shells need ──────────────────────────────────────────

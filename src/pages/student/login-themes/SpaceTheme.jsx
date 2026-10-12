@@ -4,8 +4,10 @@ import { Mail, Lock, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import TwoFactorLogin from '../../../components/TwoFactorLogin';
 import { useBranding } from '../../../context/BrandingContext';
 import { useLoginLogic } from './useLoginLogic';
+import { useTranslation } from "react-i18next";
 
 export default function SpaceTheme({ loginHook } = {}) {
+  const { t: tr } = useTranslation("student");
   const {
     email, setEmail, password, setPassword,
     showPassword, setShowPassword,
@@ -82,12 +84,12 @@ export default function SpaceTheme({ loginHook } = {}) {
           </div>
 
           <div className="sl-hero-text">
-            <h2 className="sl-hero-h2">Learn.<br />Grow.<br />Shine.</h2>
-            <p className="sl-hero-p">Your classroom adventure awaits!</p>
+            <h2 className="sl-hero-h2">{tr("spaceTheme.learn")}<br />{tr("spaceTheme.grow")}<br />{tr("spaceTheme.shine")}</h2>
+            <p className="sl-hero-p">{tr("spaceTheme.yourClassroomAdventureAwaits")}</p>
             <div className="sl-badge-row">
-              <span className="sl-badge">🎓 Expert lessons</span>
-              <span className="sl-badge">🌍 Live classes</span>
-              <span className="sl-badge">🏆 Track progress</span>
+              <span className="sl-badge">{tr("spaceTheme.expertLessons")}</span>
+              <span className="sl-badge">{tr("spaceTheme.liveClasses")}</span>
+              <span className="sl-badge">{tr("spaceTheme.trackProgress")}</span>
             </div>
           </div>
         </div>
@@ -103,7 +105,7 @@ export default function SpaceTheme({ loginHook } = {}) {
             </div>
 
             <h1 className="sl-title">{centerName}</h1>
-            <p className="sl-subtitle">Sign in to start your adventure!</p>
+            <p className="sl-subtitle">{tr("spaceTheme.signInToStartYour")}</p>
 
             {error && (
               <div className="sl-error">
@@ -114,16 +116,16 @@ export default function SpaceTheme({ loginHook } = {}) {
 
             <form onSubmit={handleInitialLogin} className="sl-form">
               <div className="sl-field">
-                <label className="sl-label"><Mail size={13} /> Email</label>
+                <label className="sl-label"><Mail size={13} /> {tr("spaceTheme.email")}</label>
                 <div className={`sl-input-wrap${focusedField === 'email' ? ' sl-focused' : ''}`}>
                   <input type="email" value={email} onChange={e => setEmail(e.target.value)}
                     onFocus={() => setFocusedField('email')} onBlur={() => setFocusedField(null)}
-                    placeholder="your.email@example.com" required disabled={loading} className="sl-input" />
+                    placeholder={tr("spaceTheme.yourEmailExampleCom")} required disabled={loading} className="sl-input" />
                 </div>
               </div>
 
               <div className="sl-field">
-                <label className="sl-label"><Lock size={13} /> Password</label>
+                <label className="sl-label"><Lock size={13} /> {tr("spaceTheme.password")}</label>
                 <div className={`sl-input-wrap${focusedField === 'password' ? ' sl-focused' : ''}`}>
                   <input type={showPassword ? 'text' : 'password'} value={password}
                     onChange={e => setPassword(e.target.value)}
@@ -137,19 +139,19 @@ export default function SpaceTheme({ loginHook } = {}) {
 
               <div style={{ textAlign: 'right', marginTop: '-6px' }}>
                 <button type="button" onClick={() => navigate('/student/forgot-password')} className="sl-forgot">
-                  Forgot password?
+                  {tr("spaceTheme.forgotPassword")}
                 </button>
               </div>
 
               <button type="submit" disabled={loading} className="sl-submit">
                 {loading
-                  ? <span className="sl-loading-row"><span className="sl-spinner" />Signing in…</span>
-                  : <span>Let's Go! 🚀</span>
+                  ? <span className="sl-loading-row"><span className="sl-spinner" />{tr("spaceTheme.signingIn")}</span>
+                  : <span>{tr("spaceTheme.letSGo")}</span>
                 }
               </button>
             </form>
 
-            <p className="sl-footer">Your account is managed by your school 🏫</p>
+            <p className="sl-footer">{tr("spaceTheme.yourAccountIsManagedBy")}</p>
             <div className="sl-dots">
               {['#a855f7','#f97316','#facc15','#22d3ee'].map((c, i) => (
                 <span key={i} className="sl-dot" style={{ background: c }} />

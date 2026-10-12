@@ -517,7 +517,7 @@ export default function ProfileTab({ teacherInfo, isDarkMode, onUpdate }) {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 18 }}>
             <InfoRow label="Status"             value={teacherInfo.status}    c={c} />
             <InfoRow label="Lessons Completed"  value={teacherInfo.lessonsCompleted?.toString()} c={c} />
-            <InfoRow label="Total Earned"       value={teacherInfo.earned != null ? `${sym}${Number(teacherInfo.earned).toLocaleString("en-US")}` : null} c={c} />
+            <InfoRow label="Unpaid Balance"      value={teacherInfo.earned != null ? `${sym}${Number(teacherInfo.earned).toLocaleString("en-US")}` : null} c={c} />
             <InfoRow label="Last Login"         value={teacherInfo.lastLogin ? new Date(teacherInfo.lastLogin).toLocaleDateString() : null} c={c} />
           </div>
         </Section>

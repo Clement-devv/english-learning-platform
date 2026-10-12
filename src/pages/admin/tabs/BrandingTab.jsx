@@ -3,6 +3,12 @@ import { useState, useRef } from 'react';
 import { Upload, Image, Check, Eye } from 'lucide-react';
 import { useBranding } from '../../../context/BrandingContext';
 import api from '../../../api';
+import { useTranslation } from "react-i18next";
+import i18n from "../../../i18n/i18n.js";
+
+// For text in file-level lists: read when rendered, so it follows the chosen language
+const ta = (key, opts) => i18n.t(`admin:${key}`, opts);
+
 
 // ── Theme presets ──────────────────────────────────────────────────────────────
 const THEMES = {
@@ -15,12 +21,13 @@ const THEMES = {
 };
 
 const FONT_OPTIONS    = ['Inter', 'Poppins', 'Roboto', 'Lato', 'Montserrat', 'Open Sans'];
-const RADIUS_OPTIONS  = [{ label: 'Sharp', value: '4px' }, { label: 'Soft', value: '8px' }, { label: 'Rounded', value: '14px' }, { label: 'Pill', value: '20px' }];
-const SHADOW_OPTIONS  = [{ label: 'None', value: 'none' }, { label: 'Soft', value: 'soft' }, { label: 'Medium', value: 'medium' }, { label: 'Strong', value: 'strong' }];
-const SPACING_OPTIONS = [{ label: 'Compact', value: 'compact' }, { label: 'Comfortable', value: 'comfortable' }, { label: 'Spacious', value: 'spacious' }];
+const RADIUS_OPTIONS  = [{ get label() { return ta("brandingTab.radius.sharp"); }, value: '4px' }, { get label() { return ta("brandingTab.radius.soft"); }, value: '8px' }, { get label() { return ta("brandingTab.radius.rounded"); }, value: '14px' }, { get label() { return ta("brandingTab.radius.pill"); }, value: '20px' }];
+const SHADOW_OPTIONS  = [{ get label() { return ta("brandingTab.shadowOption.none"); }, value: 'none' }, { get label() { return ta("brandingTab.shadowOption.soft"); }, value: 'soft' }, { get label() { return ta("brandingTab.shadowOption.medium"); }, value: 'medium' }, { get label() { return ta("brandingTab.shadowOption.strong"); }, value: 'strong' }];
+const SPACING_OPTIONS = [{ get label() { return ta("brandingTab.spacingOption.compact"); }, value: 'compact' }, { get label() { return ta("brandingTab.spacingOption.comfortable"); }, value: 'comfortable' }, { get label() { return ta("brandingTab.spacingOption.spacious"); }, value: 'spacious' }];
 
 // ── ImageUploader ──────────────────────────────────────────────────────────────
 function ImageUploader({ label, hint, currentUrl, type, onUploaded, isDarkMode, tall }) {
+  const { t: tr } = useTranslation("admin");
   const inputRef    = useRef(null);
   const [uploading, setUploading] = useState(false);
   const [preview,   setPreview]   = useState(currentUrl || null);
@@ -29,8 +36,8 @@ function ImageUploader({ label, hint, currentUrl, type, onUploaded, isDarkMode, 
   const handleFile = async (file) => {
     if (!file) return;
     const maxMb = type === 'loginBackground' ? 5 : 2;
-    if (file.size > maxMb * 1024 * 1024) { setError(`File must be under ${maxMb} MB`); return; }
-    if (!file.type.startsWith('image/')) { setError('Only image files allowed'); return; }
+    if (file.size > maxMb * 1024 * 1024) { setError(tr("brandingTab.fileMustBeUnderMb", { maxMb })); return; }
+    if (!file.type.startsWith('image/')) { setError(tr("brandingTab.onlyImageFilesAllowed")); return; }
     setError('');
     setUploading(true);
     setPreview(URL.createObjectURL(file));
@@ -43,7 +50,7 @@ function ImageUploader({ label, hint, currentUrl, type, onUploaded, isDarkMode, 
       setPreview(res.data.url);
       onUploaded(res.data.url);
     } catch (e) {
-      setError(e.response?.data?.message || 'Upload failed');
+      setError(e.response?.data?.message || tr("brandingTab.uploadFailed"));
       setPreview(currentUrl || null);
     } finally {
       setUploading(false);
@@ -74,15 +81,15 @@ function ImageUploader({ label, hint, currentUrl, type, onUploaded, isDarkMode, 
         {preview ? (
           type === 'loginBackground' ? (
             <>
-              <img src={preview} alt="bg preview" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} onError={() => setPreview(null)} />
+              <img src={preview} alt={tr("brandingTab.bgPreview")} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} onError={() => setPreview(null)} />
               <div style={{ position: 'relative', zIndex: 1, background: 'rgba(0,0,0,0.55)', color: '#fff', fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 6 }}>
-                Click or drag to replace
+                {tr("brandingTab.clickOrDragToReplace")}
               </div>
             </>
           ) : (
             <>
-              <img src={preview} alt="preview" style={{ maxHeight: type === 'favicon' ? 48 : 64, maxWidth: '100%', objectFit: 'contain', borderRadius: 6 }} onError={() => setPreview(null)} />
-              <span style={{ fontSize: 12, color: muted }}>Click or drag to replace</span>
+              <img src={preview} alt={tr("brandingTab.preview")} style={{ maxHeight: type === 'favicon' ? 48 : 64, maxWidth: '100%', objectFit: 'contain', borderRadius: 6 }} onError={() => setPreview(null)} />
+              <span style={{ fontSize: 12, color: muted }}>{tr("brandingTab.clickOrDragToReplace")}</span>
             </>
           )
         ) : (
@@ -91,7 +98,7 @@ function ImageUploader({ label, hint, currentUrl, type, onUploaded, isDarkMode, 
               <Image size={18} color={muted} />
             </div>
             <div style={{ textAlign: 'center' }}>
-              <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: text }}>{uploading ? 'Uploading…' : 'Click or drag image here'}</p>
+              <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: text }}>{uploading ? tr("brandingTab.uploading") : tr("brandingTab.clickOrDragImageHere")}</p>
               <p style={{ margin: '3px 0 0', fontSize: 11, color: muted }}>{hint}</p>
             </div>
           </>
@@ -110,6 +117,7 @@ function ImageUploader({ label, hint, currentUrl, type, onUploaded, isDarkMode, 
 
 // ── Live Preview ───────────────────────────────────────────────────────────────
 function LivePreview({ form, isDarkMode }) {
+  const { t: tr } = useTranslation("admin");
   const shadows = {
     none:   'none',
     soft:   '0 1px 3px rgba(0,0,0,0.10)',
@@ -130,7 +138,7 @@ function LivePreview({ form, isDarkMode }) {
       {/* Fake nav */}
       <div style={{ background: primary, borderRadius: radius, padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, boxShadow: shadow }}>
         {form.logo ? (
-          <img src={form.logo} alt="logo" style={{ height: 22, objectFit: 'contain' }} />
+          <img src={form.logo} alt={tr("brandingTab.logo")} style={{ height: 22, objectFit: 'contain' }} />
         ) : (
           <div style={{ width: 80, height: 10, background: 'rgba(255,255,255,0.5)', borderRadius: 4 }} />
         )}
@@ -152,10 +160,10 @@ function LivePreview({ form, isDarkMode }) {
       {/* Fake button row */}
       <div style={{ display: 'flex', gap: 10 }}>
         <div style={{ flex: 1, background: primary, borderRadius: radius, padding: '9px 0', textAlign: 'center', boxShadow: shadow }}>
-          <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', fontFamily: `'${form.fontFamily}', sans-serif` }}>Primary</span>
+          <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', fontFamily: `'${form.fontFamily}', sans-serif` }}>{tr("brandingTab.primary")}</span>
         </div>
         <div style={{ flex: 1, background: card, borderRadius: radius, padding: '9px 0', textAlign: 'center', border: `1.5px solid ${secondary}`, boxShadow: shadow }}>
-          <span style={{ fontSize: 12, fontWeight: 700, color: secondary, fontFamily: `'${form.fontFamily}', sans-serif` }}>Secondary</span>
+          <span style={{ fontSize: 12, fontWeight: 700, color: secondary, fontFamily: `'${form.fontFamily}', sans-serif` }}>{tr("brandingTab.secondary")}</span>
         </div>
       </div>
     </div>
@@ -198,6 +206,7 @@ function PillGroup({ options, value, onChange, primary }) {
 
 // ── Main component ─────────────────────────────────────────────────────────────
 export default function BrandingTab({ isDarkMode }) {
+  const { t: tr } = useTranslation("admin");
   const { branding } = useBranding();
 
   const [form, setForm] = useState({
@@ -244,10 +253,10 @@ export default function BrandingTab({ isDarkMode }) {
       });
       document.documentElement.style.setProperty('--brand-primary',   form.primaryColor);
       document.documentElement.style.setProperty('--brand-secondary', form.secondaryColor);
-      setSuccess('✅ Branding saved! Changes are live across the platform.');
+      setSuccess(tr("brandingTab.brandingSavedChangesAreLive"));
       setTimeout(() => setSuccess(''), 4000);
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to save branding');
+      setError(err.response?.data?.message || tr("brandingTab.failedToSaveBranding"));
     } finally {
       setLoading(false);
     }
@@ -265,27 +274,27 @@ export default function BrandingTab({ isDarkMode }) {
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24 }}>
         <div>
-          <h2 style={{ margin: '0 0 4px', fontSize: 20, fontWeight: 800 }}>Branding & Appearance</h2>
-          <p style={{ margin: 0, fontSize: 13, color: muted }}>Customise how your platform looks to teachers and students.</p>
+          <h2 style={{ margin: '0 0 4px', fontSize: 20, fontWeight: 800 }}>{tr("brandingTab.brandingAppearance")}</h2>
+          <p style={{ margin: 0, fontSize: 13, color: muted }}>{tr("brandingTab.customiseHowYourPlatformLooks")}</p>
         </div>
         <button
           onClick={() => setShowPreview(p => !p)}
           style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 10, border: `1.5px solid ${border}`, background: 'transparent', color: text, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
         >
-          <Eye size={14} /> {showPreview ? 'Hide' : 'Preview'}
+          <Eye size={14} /> {showPreview ? tr("brandingTab.hide") : tr("brandingTab.preview2")}
         </button>
       </div>
 
       {/* Live preview panel */}
       {showPreview && (
         <div style={{ marginBottom: 20 }}>
-          <p style={{ margin: '0 0 8px', fontSize: 12, fontWeight: 600, color: muted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Live Preview</p>
+          <p style={{ margin: '0 0 8px', fontSize: 12, fontWeight: 600, color: muted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{tr("brandingTab.livePreview")}</p>
           <LivePreview form={form} isDarkMode={isDarkMode} />
         </div>
       )}
 
       {/* ── Theme Presets ── */}
-      <Section title="Theme Presets — pick one to set everything at once" card={card} border={border}>
+      <Section title={tr("brandingTab.themePresetsPickOneTo")} card={card} border={border}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
           {Object.entries(THEMES).map(([key, t]) => {
             const active = form.theme === key;
@@ -325,32 +334,32 @@ export default function BrandingTab({ isDarkMode }) {
           })}
         </div>
         <p style={{ margin: '12px 0 0', fontSize: 11, color: muted }}>
-          Choosing a theme sets colors, font, shape, shadow, and spacing. You can then fine-tune any individual setting below.
+          {tr("brandingTab.choosingAThemeSetsColors")}
         </p>
       </Section>
 
       {/* ── Images ── */}
-      <Section title="Images" card={card} border={border}>
+      <Section title={tr("brandingTab.images")} card={card} border={border}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}>
           <ImageUploader
-            label="Logo"
-            hint="PNG or SVG · max 2 MB · 200×60 px"
+            label={tr("brandingTab.logo2")}
+            hint={tr("brandingTab.pngOrSvgMax2")}
             currentUrl={form.logo}
             type="logo"
             onUploaded={(url) => setForm(f => ({ ...f, logo: url }))}
             isDarkMode={isDarkMode}
           />
           <ImageUploader
-            label="Favicon"
-            hint="ICO / PNG · max 2 MB · 32×32 px"
+            label={tr("brandingTab.favicon")}
+            hint={tr("brandingTab.icoPngMax2Mb")}
             currentUrl={form.favicon}
             type="favicon"
             onUploaded={(url) => setForm(f => ({ ...f, favicon: url }))}
             isDarkMode={isDarkMode}
           />
           <ImageUploader
-            label="Login Background"
-            hint="JPG / PNG · max 5 MB · landscape"
+            label={tr("brandingTab.loginBackground")}
+            hint={tr("brandingTab.jpgPngMax5Mb")}
             currentUrl={form.loginBackground}
             type="loginBackground"
             onUploaded={(url) => setForm(f => ({ ...f, loginBackground: url }))}
@@ -360,9 +369,7 @@ export default function BrandingTab({ isDarkMode }) {
         </div>
         {form.loginBackground && (
           <div style={{ marginTop: 14 }}>
-            <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: text, marginBottom: 6 }}>
-              Login background overlay darkness — {Math.round(form.loginBgOverlay * 100)}%
-            </label>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: text, marginBottom: 6 }}>{tr("brandingTab.loginBackgroundOverlayDarkness", { value: Math.round(form.loginBgOverlay * 100) })}</label>
             <input
               type="range"
               min={0} max={0.8} step={0.05}
@@ -371,19 +378,19 @@ export default function BrandingTab({ isDarkMode }) {
               style={{ width: '100%', accentColor: form.primaryColor }}
             />
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: muted, marginTop: 2 }}>
-              <span>Transparent</span><span>Dark</span>
+              <span>{tr("brandingTab.transparent")}</span><span>{tr("brandingTab.dark")}</span>
             </div>
           </div>
         )}
-        <p style={{ margin: '10px 0 0', fontSize: 11, color: muted }}>Images save instantly on upload. The login background appears behind the sign-in card on your login page.</p>
+        <p style={{ margin: '10px 0 0', fontSize: 11, color: muted }}>{tr("brandingTab.imagesSaveInstantlyOnUpload")}</p>
       </Section>
 
       {/* ── Colors ── */}
-      <Section title="Colors" card={card} border={border}>
+      <Section title={tr("brandingTab.colors")} card={card} border={border}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
           {[
-            { key: 'primaryColor',   label: 'Primary Color',   hint: 'Buttons, nav bar, highlights' },
-            { key: 'secondaryColor', label: 'Secondary Color', hint: 'Accents, badges, secondary buttons' },
+            { key: 'primaryColor',   label: tr("brandingTab.primaryColor"),   hint: tr("brandingTab.buttonsNavBarHighlights") },
+            { key: 'secondaryColor', label: tr("brandingTab.secondaryColor"), hint: tr("brandingTab.accentsBadgesSecondaryButtons") },
           ].map(({ key, label, hint }) => (
             <div key={key}>
               <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: text, marginBottom: 4 }}>{label}</label>
@@ -408,20 +415,20 @@ export default function BrandingTab({ isDarkMode }) {
         {/* Colour preview chips */}
         <div style={{ marginTop: 14, display: 'flex', gap: 10 }}>
           <div style={{ flex: 1, background: form.primaryColor, borderRadius: 8, padding: '10px 0', textAlign: 'center' }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>Primary</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>{tr("brandingTab.primary")}</span>
           </div>
           <div style={{ flex: 1, background: form.secondaryColor, borderRadius: 8, padding: '10px 0', textAlign: 'center' }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>Secondary</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>{tr("brandingTab.secondary")}</span>
           </div>
           <div style={{ flex: 1, background: form.primaryColor, opacity: 0.15, borderRadius: 8, padding: '10px 0', textAlign: 'center' }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: form.primaryColor }}>Tint</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: form.primaryColor }}>{tr("brandingTab.tint")}</span>
           </div>
         </div>
       </Section>
 
       {/* ── Typography ── */}
-      <Section title="Typography" card={card} border={border}>
-        <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: text, marginBottom: 8 }}>Font Family</label>
+      <Section title={tr("brandingTab.typography")} card={card} border={border}>
+        <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: text, marginBottom: 8 }}>{tr("brandingTab.fontFamily")}</label>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
           {FONT_OPTIONS.map(f => {
             const active = form.fontFamily === f;
@@ -444,27 +451,27 @@ export default function BrandingTab({ isDarkMode }) {
         </div>
         <div style={{ background: isDarkMode ? '#111827' : '#f8fafc', borderRadius: 10, padding: '14px 16px', border: `1px solid ${border}` }}>
           <p style={{ margin: 0, fontSize: 15, fontFamily: `'${form.fontFamily}', sans-serif`, color: text }}>
-            The quick brown fox jumps over the lazy dog. 1234567890
+            {tr("brandingTab.theQuickBrownFoxJumps")}
           </p>
           <p style={{ margin: '6px 0 0', fontSize: 12, fontFamily: `'${form.fontFamily}', sans-serif`, color: muted }}>
-            ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz
+            {tr("brandingTab.abcdefghijklmnopqrstuvwxyzAbcdefghijklmnopqrstuvwxyz")}
           </p>
         </div>
       </Section>
 
       {/* ── Shape & Style ── */}
-      <Section title="Shape & Style" card={card} border={border}>
+      <Section title={tr("brandingTab.shapeStyle")} card={card} border={border}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 20 }}>
           <div>
-            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: text, marginBottom: 8 }}>Corner Radius</label>
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: text, marginBottom: 8 }}>{tr("brandingTab.cornerRadius")}</label>
             <PillGroup options={RADIUS_OPTIONS} value={form.borderRadius} onChange={(v) => set('borderRadius', v)} primary={form.primaryColor} />
           </div>
           <div>
-            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: text, marginBottom: 8 }}>Shadow</label>
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: text, marginBottom: 8 }}>{tr("brandingTab.shadow")}</label>
             <PillGroup options={SHADOW_OPTIONS} value={form.shadowStyle} onChange={(v) => set('shadowStyle', v)} primary={form.primaryColor} />
           </div>
           <div>
-            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: text, marginBottom: 8 }}>Spacing</label>
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: text, marginBottom: 8 }}>{tr("brandingTab.spacing")}</label>
             <PillGroup options={SPACING_OPTIONS} value={form.spacing} onChange={(v) => set('spacing', v)} primary={form.primaryColor} />
           </div>
         </div>
@@ -496,10 +503,10 @@ export default function BrandingTab({ isDarkMode }) {
           transition: 'opacity 0.15s',
         }}
       >
-        {loading ? 'Saving…' : 'Save Branding'}
+        {loading ? tr("brandingTab.saving") : tr("brandingTab.saveBranding")}
       </button>
       <p style={{ margin: '8px 0 0', fontSize: 11, color: muted, textAlign: 'center' }}>
-        Images save instantly on upload. Save button applies all other changes platform-wide.
+        {tr("brandingTab.imagesSaveInstantlyOnUpload2")}
       </p>
     </div>
   );

@@ -273,5 +273,13 @@ const centerSchema = new mongoose.Schema({
 
 centerSchema.index({ 'pendingEmailChange.token': 1 }, { sparse: true });
 centerSchema.index({ 'invite.tokenHash': 1 }, { sparse: true });
+// One email = one center admin (utils/centerEmail.js checks first for a friendly
+// message; this makes it hold even when two creates race). Rejected registrations
+// don't hold the email. Partial filter with $in needs MongoDB 7+ (Atlas is).
+export const ADMIN_EMAIL_INDEX = 'adminEmail_one_center';
+centerSchema.index(
+  { adminEmail: 1 },
+  { name: ADMIN_EMAIL_INDEX, unique: true, partialFilterExpression: { status: { $in: ['pending', 'active', 'suspended', 'deleted'] } } },
+);
 
 export default mongoose.model('Center', centerSchema);

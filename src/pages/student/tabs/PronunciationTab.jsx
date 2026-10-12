@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import api from "../../../api";
+import { useTranslation } from "react-i18next";
 
 // ── Local sentence bank ───────────────────────────────────────────────────────
 const LOCAL_SENTENCES = {
@@ -125,6 +126,7 @@ const DIFF_LABELS = {
 
 // ── Component ──────────────────────────────────────────────────────────────────
 export default function PronunciationTab({ isDarkMode }) {
+  const { t: tr } = useTranslation("student");
   const [difficulty,      setDifficulty]      = useState("beginner");
   const [pool,            setPool]            = useState(() => shuffle(LOCAL_SENTENCES.beginner));
   const [sentenceIdx,     setSentenceIdx]     = useState(0);
@@ -258,20 +260,20 @@ export default function PronunciationTab({ isDarkMode }) {
         setPhase("result");
       } else if (data.reason === "no_credits") {
         setCredits(0);
-        setAnalyseError("No pronunciation credits remaining. Ask your admin to top up.");
+        setAnalyseError(tr("pronunciationTab.noPronunciationCreditsRemainingAsk"));
         setPhase("ready");
       } else {
-        setAnalyseError("Analysis failed. Please try again.");
+        setAnalyseError(tr("pronunciationTab.analysisFailedPleaseTryAgain"));
         setPhase("ready");
       }
     } catch (err) {
       console.error("Analysis error:", err);
       if (mountedRef.current) {
-        setAnalyseError("Could not reach the server. Please try again.");
+        setAnalyseError(tr("pronunciationTab.couldNotReachTheServer"));
         setPhase("ready");
       }
     }
-  }, [sentence, sentenceIdx]);
+  }, [sentence.text, sentenceIdx, tr]);
 
   // ── Start recording ────────────────────────────────────────────────────────
   const startRecording = useCallback(async () => {
@@ -321,10 +323,10 @@ export default function PronunciationTab({ isDarkMode }) {
       if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
         setNoMicPermission(true);
       } else {
-        setAnalyseError("Could not access microphone. Please check browser permissions.");
+        setAnalyseError(tr("pronunciationTab.couldNotAccessMicrophonePlease"));
       }
     }
-  }, [analyseAudio, drawWaveform]);
+  }, [analyseAudio, drawWaveform, tr]);
 
   const stopRecording = () => {
     if (mediaRecorderRef.current?.state === "recording") {
@@ -399,13 +401,13 @@ export default function PronunciationTab({ isDarkMode }) {
   if (noMicPermission) return (
     <div style={{ textAlign: "center", padding: "60px 20px", fontFamily: "Nunito, sans-serif" }}>
       <div style={{ fontSize: "52px", marginBottom: "16px" }}>🎙️</div>
-      <h3 style={{ color: col.heading, margin: "0 0 8px" }}>Microphone Access Denied</h3>
+      <h3 style={{ color: col.heading, margin: "0 0 8px" }}>{tr("pronunciationTab.microphoneAccessDenied")}</h3>
       <p style={{ color: col.sub, maxWidth: "340px", margin: "0 auto 20px", fontSize: "14px", lineHeight: 1.6 }}>
-        Please allow microphone access in your browser settings and reload the page to use pronunciation practice.
+        {tr("pronunciationTab.pleaseAllowMicrophoneAccessIn")}
       </p>
       <button onClick={() => setNoMicPermission(false)}
         style={{ background: "linear-gradient(135deg,#f97316,#fb923c)", border: "none", borderRadius: "12px", padding: "10px 24px", color: "#fff", fontWeight: 800, cursor: "pointer", fontFamily: "Nunito, sans-serif", fontSize: "14px" }}>
-        Try Again
+        {tr("pronunciationTab.tryAgain")}
       </button>
     </div>
   );
@@ -414,8 +416,8 @@ export default function PronunciationTab({ isDarkMode }) {
   if (isFetching) return (
     <div style={{ textAlign: "center", padding: "60px 20px", fontFamily: "Nunito, sans-serif" }}>
       <div style={{ fontSize: "52px", marginBottom: "16px", animation: "spin 1.2s linear infinite", display: "inline-block" }}>✨</div>
-      <h3 style={{ color: col.heading, margin: "0 0 8px" }}>Generating new sentences…</h3>
-      <p style={{ color: col.sub, fontSize: "14px" }}>AI is creating fresh practice material for you</p>
+      <h3 style={{ color: col.heading, margin: "0 0 8px" }}>{tr("pronunciationTab.generatingNewSentences")}</h3>
+      <p style={{ color: col.sub, fontSize: "14px" }}>{tr("pronunciationTab.aiIsCreatingFreshPractice")}</p>
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
@@ -426,10 +428,10 @@ export default function PronunciationTab({ isDarkMode }) {
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div style={{ textAlign: "center", padding: "4px 0 0" }}>
         <h2 style={{ margin: 0, fontSize: "26px", fontWeight: 900, color: col.heading }}>
-          🎤 Pronunciation Practice
+          {tr("pronunciationTab.pronunciationPractice")}
         </h2>
         <p style={{ margin: "6px 0 0", color: col.sub, fontSize: "14px" }}>
-          Record yourself and get phoneme-level feedback powered by AI
+          {tr("pronunciationTab.recordYourselfAndGetPhoneme")}
         </p>
         {/* Credit badge */}
         {credits !== null && (
@@ -438,7 +440,7 @@ export default function PronunciationTab({ isDarkMode }) {
             color: credits === 0 ? "#dc2626" : credits <= 5 ? "#b45309" : "#ea580c",
             border: `1.5px solid ${credits === 0 ? "rgba(239,68,68,0.3)" : credits <= 5 ? "rgba(234,179,8,0.3)" : "rgba(249,115,22,0.3)"}`,
           }}>
-            🎤 {credits === 0 ? "No credits — ask your admin to top up" : `${credits} analysis credit${credits === 1 ? "" : "s"} remaining`}
+            🎤 {credits === 0 ? tr("pronunciationTab.noCreditsAskYourAdmin") : tr("pronunciationTab.analysisCreditRemaining", { credits, value: credits === 1 ? "" : "s" })}
           </div>
         )}
       </div>
@@ -446,12 +448,12 @@ export default function PronunciationTab({ isDarkMode }) {
       {/* ── Status banners ────────────────────────────────────────────────── */}
       {fetchStatus === "ok" && (
         <div style={{ background: "rgba(34,197,94,0.12)", border: "2px solid rgba(34,197,94,0.35)", borderRadius: "12px", padding: "10px 16px", color: "#15803d", fontWeight: 700, fontSize: "13px", textAlign: "center" }}>
-          ✨ New AI-generated sentences added to your practice pool!
+          {tr("pronunciationTab.newAiGeneratedSentencesAdded")}
         </div>
       )}
       {fetchStatus === "fallback" && (
         <div style={{ background: "rgba(249,115,22,0.1)", border: "2px solid rgba(249,115,22,0.3)", borderRadius: "12px", padding: "10px 16px", color: "#c2410c", fontWeight: 700, fontSize: "13px", textAlign: "center" }}>
-          📚 Restarting with a fresh shuffle of your sentence bank
+          {tr("pronunciationTab.restartingWithAFreshShuffle")}
         </div>
       )}
       {analyseError && (
@@ -464,8 +466,8 @@ export default function PronunciationTab({ isDarkMode }) {
       {scores.length > 0 && (
         <div style={{ display: "flex", gap: "12px", justifyContent: "center", flexWrap: "wrap" }}>
           {[
-            { label: "Attempts",  value: scores.length,  grad: "linear-gradient(135deg,#f97316,#fb923c)" },
-            { label: "Avg Score", value: `${avgScore}%`, grad: "linear-gradient(135deg,#22c55e,#4ade80)" },
+            { label: tr("pronunciationTab.attempts"),  value: scores.length,  grad: "linear-gradient(135deg,#f97316,#fb923c)" },
+            { label: tr("pronunciationTab.avgScore"), value: `${avgScore}%`, grad: "linear-gradient(135deg,#22c55e,#4ade80)" },
             { label: "80%+ Runs", value: greatCount,     grad: "linear-gradient(135deg,#8b5cf6,#a78bfa)" },
           ].map(({ label, value, grad }) => (
             <div key={label} style={{ background: grad, borderRadius: "16px", padding: "10px 22px", color: "#fff", textAlign: "center", minWidth: "86px", boxShadow: "0 4px 12px rgba(0,0,0,0.12)" }}>
@@ -497,10 +499,10 @@ export default function PronunciationTab({ isDarkMode }) {
       <div>
         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
           <span style={{ fontSize: "12px", fontWeight: 700, color: col.sub }}>
-            Sentence {sentenceIdx + 1} of {pool.length}
-            {pool.length > LOCAL_SENTENCES[difficulty].length && " (incl. AI sentences)"}
+            {tr("pronunciationTab.sentence")} {sentenceIdx + 1} {tr("pronunciationTab.of")} {pool.length}
+            {pool.length > LOCAL_SENTENCES[difficulty].length && tr("pronunciationTab.inclAiSentences")}
           </span>
-          <span style={{ fontSize: "12px", fontWeight: 700, color: "#f97316" }}>{progress}% through set</span>
+          <span style={{ fontSize: "12px", fontWeight: 700, color: "#f97316" }}>{tr("pronunciationTab.throughSet", { progress })}</span>
         </div>
         <div style={{ background: col.progBg, borderRadius: "99px", height: "8px", overflow: "hidden" }}>
           <div style={{ background: "linear-gradient(90deg,#f97316,#fb923c)", height: "100%", width: `${progress}%`, borderRadius: "99px", transition: "width 0.4s ease" }} />
@@ -525,10 +527,10 @@ export default function PronunciationTab({ isDarkMode }) {
                   <span style={{ background: s.bg, color: s.color, border: `2px solid ${s.border}`, borderRadius: "8px", padding: "2px 8px", display: "inline-block" }}>
                     {w.expected}
                     {(w.status === "wrong" || w.status === "close") && w.spoken && (
-                      <span style={{ fontSize: "10px", display: "block", opacity: 0.85 }}>you: "{w.spoken}"</span>
+                      <span style={{ fontSize: "10px", display: "block", opacity: 0.85 }}>{tr("pronunciationTab.you", { spoken: w.spoken })}</span>
                     )}
                     {w.status === "missed" && (
-                      <span style={{ fontSize: "10px", display: "block", opacity: 0.75 }}>missed</span>
+                      <span style={{ fontSize: "10px", display: "block", opacity: 0.75 }}>{tr("pronunciationTab.missed")}</span>
                     )}
                   </span>
                 </span>
@@ -541,14 +543,12 @@ export default function PronunciationTab({ isDarkMode }) {
 
         {/* Whisper transcript */}
         {result?.transcript && (
-          <div style={{ background: isDarkMode ? "rgba(59,130,246,0.10)" : "#eff6ff", border: "1.5px solid rgba(59,130,246,0.3)", borderRadius: "10px", padding: "8px 14px", marginBottom: "16px", fontSize: "13px", color: isDarkMode ? "#93c5fd" : "#1d4ed8", fontWeight: 600 }}>
-            AI heard: "{result.transcript}"
-          </div>
+          <div style={{ background: isDarkMode ? "rgba(59,130,246,0.10)" : "#eff6ff", border: "1.5px solid rgba(59,130,246,0.3)", borderRadius: "10px", padding: "8px 14px", marginBottom: "16px", fontSize: "13px", color: isDarkMode ? "#93c5fd" : "#1d4ed8", fontWeight: 600 }}>{tr("pronunciationTab.aiHeard", { transcript: result.transcript })}</div>
         )}
 
         {/* Hear button */}
         <button onClick={speakSentence} style={{ background: "transparent", border: `2px solid ${col.border}`, borderRadius: "12px", padding: "7px 18px", color: col.body, cursor: "pointer", fontFamily: "Nunito, sans-serif", fontSize: "13px", fontWeight: 700, marginBottom: "28px" }}>
-          🔊 Hear correct pronunciation
+          {tr("pronunciationTab.hearCorrectPronunciation")}
         </button>
 
         {/* ── READY ─────────────────────────────────────────────────────────── */}
@@ -557,7 +557,7 @@ export default function PronunciationTab({ isDarkMode }) {
             {credits === 0 ? (
               <>
                 <div style={{ width: "84px", height: "84px", borderRadius: "50%", background: "rgba(239,68,68,0.1)", border: "3px solid rgba(239,68,68,0.2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "34px" }}>🚫</div>
-                <span style={{ color: "#dc2626", fontSize: "13px", fontWeight: 800, textAlign: "center", maxWidth: 260 }}>No credits remaining — contact your admin</span>
+                <span style={{ color: "#dc2626", fontSize: "13px", fontWeight: 800, textAlign: "center", maxWidth: 260 }}>{tr("pronunciationTab.noCreditsRemainingContactYour")}</span>
               </>
             ) : (
               <>
@@ -567,7 +567,7 @@ export default function PronunciationTab({ isDarkMode }) {
                   onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.1)"; e.currentTarget.style.boxShadow = "0 8px 28px rgba(249,115,22,0.55)"; }}
                   onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)";   e.currentTarget.style.boxShadow = "0 6px 24px rgba(249,115,22,0.45)"; }}
                 >🎤</button>
-                <span style={{ color: col.sub, fontSize: "13px", fontWeight: 700 }}>Tap to start recording</span>
+                <span style={{ color: col.sub, fontSize: "13px", fontWeight: 700 }}>{tr("pronunciationTab.tapToStartRecording")}</span>
               </>
             )}
           </div>
@@ -585,7 +585,7 @@ export default function PronunciationTab({ isDarkMode }) {
               <div style={{ position: "absolute", inset: "-8px", borderRadius: "50%", border: "3px solid rgba(239,68,68,0.35)", animation: "ping 1.4s cubic-bezier(0,0,0.2,1) infinite" }} />
               <button onClick={stopRecording} style={{ width: "84px", height: "84px", borderRadius: "50%", background: "linear-gradient(135deg,#ef4444,#f87171)", border: "none", fontSize: "28px", cursor: "pointer", boxShadow: "0 6px 20px rgba(239,68,68,0.45)" }}>⏹️</button>
             </div>
-            <div style={{ color: "#ef4444", fontWeight: 800, fontSize: "14px" }}>🔴 Recording… tap stop when you're done</div>
+            <div style={{ color: "#ef4444", fontWeight: 800, fontSize: "14px" }}>{tr("pronunciationTab.recordingTapStopWhenYou")}</div>
           </div>
         )}
 
@@ -593,8 +593,8 @@ export default function PronunciationTab({ isDarkMode }) {
         {phase === "analysing" && (
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "14px" }}>
             <div style={{ fontSize: "48px", animation: "spin 1s linear infinite", display: "inline-block" }}>✨</div>
-            <div style={{ color: col.body, fontWeight: 800, fontSize: "15px" }}>Analysing your pronunciation…</div>
-            <div style={{ color: col.sub, fontSize: "12px" }}>Powered by OpenAI Whisper</div>
+            <div style={{ color: col.body, fontWeight: 800, fontSize: "15px" }}>{tr("pronunciationTab.analysingYourPronunciation")}</div>
+            <div style={{ color: col.sub, fontSize: "12px" }}>{tr("pronunciationTab.poweredByOpenaiWhisper")}</div>
           </div>
         )}
 
@@ -604,7 +604,7 @@ export default function PronunciationTab({ isDarkMode }) {
             {/* Score ring */}
             <div style={{ width: "100px", height: "100px", borderRadius: "50%", background: ringGrad, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: "#fff", boxShadow: "0 8px 24px rgba(0,0,0,0.18)" }}>
               <div style={{ fontSize: "28px", fontWeight: 900 }}>{result.percentage}%</div>
-              <div style={{ fontSize: "10px", opacity: 0.9 }}>Score</div>
+              <div style={{ fontSize: "10px", opacity: 0.9 }}>{tr("pronunciationTab.score")}</div>
             </div>
             <div style={{ fontWeight: 800, fontSize: "17px", color: col.heading }}>{scoreLabel}</div>
 
@@ -617,10 +617,10 @@ export default function PronunciationTab({ isDarkMode }) {
 
             {/* Action buttons */}
             <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", justifyContent: "center" }}>
-              <button onClick={speakSentence} style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: "12px", padding: "10px 18px", color: col.body, cursor: "pointer", fontWeight: 800, fontFamily: "Nunito, sans-serif", fontSize: "14px" }}>🔊 Hear it again</button>
-              <button onClick={tryAgain}      style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: "12px", padding: "10px 18px", color: col.body, cursor: "pointer", fontWeight: 800, fontFamily: "Nunito, sans-serif", fontSize: "14px" }}>🔄 Try Again</button>
+              <button onClick={speakSentence} style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: "12px", padding: "10px 18px", color: col.body, cursor: "pointer", fontWeight: 800, fontFamily: "Nunito, sans-serif", fontSize: "14px" }}>{tr("pronunciationTab.hearItAgain")}</button>
+              <button onClick={tryAgain}      style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: "12px", padding: "10px 18px", color: col.body, cursor: "pointer", fontWeight: 800, fontFamily: "Nunito, sans-serif", fontSize: "14px" }}>{tr("pronunciationTab.tryAgain2")}</button>
               <button onClick={nextSentence}  style={{ background: "linear-gradient(135deg,#f97316,#fb923c)", border: "none", borderRadius: "12px", padding: "10px 22px", color: "#fff", cursor: "pointer", fontWeight: 800, fontFamily: "Nunito, sans-serif", fontSize: "14px", boxShadow: "0 4px 14px rgba(249,115,22,0.35)" }}>
-                {sentenceIdx >= pool.length - 1 ? "✨ Get New Sentences" : "Next Sentence →"}
+                {sentenceIdx >= pool.length - 1 ? tr("pronunciationTab.getNewSentences") : tr("pronunciationTab.nextSentence")}
               </button>
             </div>
 
@@ -628,7 +628,7 @@ export default function PronunciationTab({ isDarkMode }) {
             {ipaCards.length > 0 && (
               <div style={{ width: "100%", maxWidth: "480px", textAlign: "left" }}>
                 <div style={{ fontSize: "12px", fontWeight: 800, color: col.sub, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "10px" }}>
-                  🔤 Pronunciation Guide
+                  {tr("pronunciationTab.pronunciationGuide")}
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                   {ipaCards.map((w, i) => {
@@ -639,7 +639,7 @@ export default function PronunciationTab({ isDarkMode }) {
                           <span style={{ fontWeight: 900, fontSize: "16px", color: s.color }}>{w.expected}</span>
                           <span style={{ fontSize: "15px", color: col.body, fontFamily: "'Courier New', monospace", fontWeight: 700 }}>{w.ipa}</span>
                           {w.spoken && (
-                            <span style={{ fontSize: "12px", color: col.sub }}>you said: "<em>{w.spoken}</em>"</span>
+                            <span style={{ fontSize: "12px", color: col.sub }}>{tr("pronunciationTab.youSaid")}<em>{w.spoken}</em>"</span>
                           )}
                         </div>
                         {w.tip && (
@@ -678,13 +678,13 @@ export default function PronunciationTab({ isDarkMode }) {
 
       {/* ── Tips ───────────────────────────────────────────────────────────── */}
       <div style={{ background: col.tip, border: `2px solid ${col.tipBdr}`, borderRadius: "16px", padding: "16px 20px" }}>
-        <div style={{ fontWeight: 900, color: "#7c3aed", marginBottom: "8px", fontSize: "14px" }}>💡 Tips for better scores</div>
+        <div style={{ fontWeight: 900, color: "#7c3aed", marginBottom: "8px", fontSize: "14px" }}>{tr("pronunciationTab.tipsForBetterScores")}</div>
         <ul style={{ margin: 0, paddingLeft: "18px", color: col.body, fontSize: "13px", lineHeight: 1.9 }}>
-          <li>Tap <strong>🔊 Hear it</strong> first to learn the correct rhythm and sounds</li>
-          <li>Speak at a <strong>natural pace</strong> — not too fast, not too slow</li>
-          <li><strong>Yellow</strong> words were almost right — small improvement needed</li>
-          <li>The <strong>🔤 Pronunciation Guide</strong> shows IPA and tips for each missed word</li>
-          <li>Works best in <strong>Chrome or Edge</strong> — Safari may have limited support</li>
+          <li>{tr("pronunciationTab.tap")} <strong>{tr("pronunciationTab.hearIt")}</strong> {tr("pronunciationTab.firstToLearnTheCorrect")}</li>
+          <li>{tr("pronunciationTab.speakAtA")} <strong>{tr("pronunciationTab.naturalPace")}</strong> {tr("pronunciationTab.notTooFastNotToo")}</li>
+          <li><strong>{tr("pronunciationTab.yellow")}</strong> {tr("pronunciationTab.wordsWereAlmostRightSmall")}</li>
+          <li>{tr("pronunciationTab.the")} <strong>{tr("pronunciationTab.pronunciationGuide")}</strong> {tr("pronunciationTab.showsIpaAndTipsFor")}</li>
+          <li>{tr("pronunciationTab.worksBestIn")} <strong>{tr("pronunciationTab.chromeOrEdge")}</strong> {tr("pronunciationTab.safariMayHaveLimitedSupport")}</li>
         </ul>
       </div>
 

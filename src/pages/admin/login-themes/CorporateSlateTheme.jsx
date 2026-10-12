@@ -5,8 +5,10 @@ import { Lock, Eye, EyeOff, AlertCircle, LayoutDashboard, ArrowRight, Mail, Chec
 import TwoFactorLogin from '../../../components/TwoFactorLogin';
 import { useBranding } from '../../../context/BrandingContext';
 import { useAdminLoginLogic } from './useAdminLoginLogic';
+import { useTranslation } from "react-i18next";
 
 export default function CorporateSlateTheme() {
+  const { t: tr } = useTranslation("admin");
   const {
     username, setUsername, password, setPassword,
     showPassword, setShowPassword, error, loading, requires2FA,
@@ -26,13 +28,13 @@ export default function CorporateSlateTheme() {
 
   // Org chart nodes
   const nodes = [
-    { label: 'Admin', x: 50, y: 12, accent: '#818cf8' },
-    { label: 'Teachers', x: 20, y: 40, accent: '#38bdf8' },
-    { label: 'Students', x: 50, y: 40, accent: '#34d399' },
-    { label: 'Classes', x: 80, y: 40, accent: '#f59e0b' },
-    { label: 'Reports', x: 20, y: 68, accent: '#38bdf8' },
-    { label: 'Homework', x: 50, y: 68, accent: '#34d399' },
-    { label: 'Schedule', x: 80, y: 68, accent: '#f59e0b' },
+    { label: tr("corporateSlateTheme.admin"), x: 50, y: 12, accent: '#818cf8' },
+    { label: tr("corporateSlateTheme.teachers"), x: 20, y: 40, accent: '#38bdf8' },
+    { label: tr("corporateSlateTheme.students"), x: 50, y: 40, accent: '#34d399' },
+    { label: tr("corporateSlateTheme.classes"), x: 80, y: 40, accent: '#f59e0b' },
+    { label: tr("corporateSlateTheme.reports"), x: 20, y: 68, accent: '#38bdf8' },
+    { label: tr("corporateSlateTheme.homework"), x: 50, y: 68, accent: '#34d399' },
+    { label: tr("corporateSlateTheme.schedule"), x: 80, y: 68, accent: '#f59e0b' },
   ];
   const edges = [
     [0,1],[0,2],[0,3],[1,4],[2,5],[3,6],
@@ -121,8 +123,8 @@ export default function CorporateSlateTheme() {
 
           {/* Hero text */}
           <div className="cs-hero">
-            <h2 className="cs-h2">Manage with<br /><span className="cs-h2-accent">Clarity</span></h2>
-            <p className="cs-hp">One dashboard.<br />Full visibility over every class, teacher, and student.</p>
+            <h2 className="cs-h2">{tr("corporateSlateTheme.manageWith")}<br /><span className="cs-h2-accent">{tr("corporateSlateTheme.clarity")}</span></h2>
+            <p className="cs-hp">{tr("corporateSlateTheme.oneDashboard")}<br />{tr("corporateSlateTheme.fullVisibilityOverEveryClass")}</p>
             <div className="cs-chips">
               {['📊 Analytics', '👥 Team', '📅 Schedule', '🔒 Secure'].map(t => (
                 <span key={t} className="cs-chip">{t}</span>
@@ -139,28 +141,28 @@ export default function CorporateSlateTheme() {
                 <div className="cs-icon-box"><Mail size={22} color="#818cf8" strokeWidth={1.5} /></div>
                 <div>
                   <p className="cs-center-tag">{centerName}</p>
-                  <h1 className="cs-card-title">Reset Password</h1>
-                  <p className="cs-card-sub">Enter your admin email address</p>
+                  <h1 className="cs-card-title">{tr("corporateSlateTheme.resetPassword")}</h1>
+                  <p className="cs-card-sub">{tr("corporateSlateTheme.enterYourAdminEmailAddress")}</p>
                 </div>
               </div>
               <div className="cs-sep" />
               {forgotError && <div className="cs-err"><AlertCircle size={14} color="#f87171" /><span>{forgotError}</span></div>}
               <form onSubmit={handleForgotPassword} className="cs-form">
                 <div className="cs-field">
-                  <label htmlFor="cs-forgot-email" className="cs-lbl">Admin Email</label>
+                  <label htmlFor="cs-forgot-email" className="cs-lbl">{tr("corporateSlateTheme.adminEmail")}</label>
                   <div className={`cs-inp-wrap${focusedField === 'forgot' ? ' cs-focused' : ''}`}>
                     <Mail size={14} color={focusedField === 'forgot' ? '#818cf8' : '#4b5563'} />
                     <input id="cs-forgot-email" name="email" type="email" value={forgotEmail} onChange={e => setForgotEmail(e.target.value)}
                       onFocus={() => setFocusedField('forgot')} onBlur={() => setFocusedField(null)}
-                      placeholder="admin@example.com" required disabled={forgotLoading} className="cs-inp" autoFocus />
+                      placeholder={tr("corporateSlateTheme.adminExampleCom")} required disabled={forgotLoading} className="cs-inp" autoFocus />
                   </div>
                 </div>
                 <button type="submit" disabled={forgotLoading} className="cs-btn">
                   {forgotLoading
-                    ? <span className="cs-btn-row"><span className="cs-spin" />Sending…</span>
-                    : <span className="cs-btn-row"><Mail size={15} />Send Reset Link</span>}
+                    ? <span className="cs-btn-row"><span className="cs-spin" />{tr("corporateSlateTheme.sending")}</span>
+                    : <span className="cs-btn-row"><Mail size={15} />{tr("corporateSlateTheme.sendResetLink")}</span>}
                 </button>
-                <button type="button" onClick={() => setView('login')} className="cs-back">← Back to login</button>
+                <button type="button" onClick={() => setView('login')} className="cs-back">{tr("corporateSlateTheme.backToLogin")}</button>
               </form>
             </div>
 
@@ -168,10 +170,10 @@ export default function CorporateSlateTheme() {
             <div className="cs-card">
               <div className="cs-sent">
                 <div className="cs-sent-icon"><CheckCircle size={30} color="#34d399" /></div>
-                <h2 className="cs-sent-h">Check your email</h2>
-                <p className="cs-sent-p">If <strong>{forgotEmail}</strong> is registered, a reset link has been sent. Expires in 1 hour.</p>
+                <h2 className="cs-sent-h">{tr("corporateSlateTheme.checkYourEmail")}</h2>
+                <p className="cs-sent-p">{tr("corporateSlateTheme.if")} <strong>{forgotEmail}</strong> {tr("corporateSlateTheme.isRegisteredAResetLink")}</p>
                 <button onClick={() => { setView('login'); setForgotEmail(''); }} className="cs-btn" style={{ width: 'auto', padding: '12px 32px' }}>
-                  Back to Login
+                  {tr("corporateSlateTheme.backToLogin2")}
                 </button>
               </div>
             </div>
@@ -183,24 +185,24 @@ export default function CorporateSlateTheme() {
                 <div className="cs-icon-box"><LayoutDashboard size={22} color="#818cf8" strokeWidth={1.5} /></div>
                 <div>
                   <p className="cs-center-tag">{centerName}</p>
-                  <h1 className="cs-card-title">Admin Portal</h1>
-                  <p className="cs-card-sub">Authorized personnel only</p>
+                  <h1 className="cs-card-title">{tr("corporateSlateTheme.adminPortal")}</h1>
+                  <p className="cs-card-sub">{tr("corporateSlateTheme.authorizedPersonnelOnly")}</p>
                 </div>
               </div>
               <div className="cs-sep" />
               {error && <div className="cs-err"><AlertCircle size={14} color="#f87171" /><span>{error}</span></div>}
               <form onSubmit={handleInitialLogin} className="cs-form">
                 <div className="cs-field">
-                  <label htmlFor="cs-username" className="cs-lbl">Username or Email</label>
+                  <label htmlFor="cs-username" className="cs-lbl">{tr("corporateSlateTheme.usernameOrEmail")}</label>
                   <div className={`cs-inp-wrap${focusedField === 'user' ? ' cs-focused' : ''}`}>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={focusedField === 'user' ? '#818cf8' : '#4b5563'} strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                     <input id="cs-username" name="username" type="text" value={username} onChange={e => setUsername(e.target.value)}
                       onFocus={() => setFocusedField('user')} onBlur={() => setFocusedField(null)}
-                      placeholder="admin@example.com" required disabled={loading} className="cs-inp" />
+                      placeholder={tr("corporateSlateTheme.adminExampleCom")} required disabled={loading} className="cs-inp" />
                   </div>
                 </div>
                 <div className="cs-field">
-                  <label htmlFor="cs-password" className="cs-lbl">Password</label>
+                  <label htmlFor="cs-password" className="cs-lbl">{tr("corporateSlateTheme.password")}</label>
                   <div className={`cs-inp-wrap${focusedField === 'pass' ? ' cs-focused' : ''}`}>
                     <Lock size={14} color={focusedField === 'pass' ? '#818cf8' : '#4b5563'} />
                     <input id="cs-password" name="password" type={showPassword ? 'text' : 'password'} value={password}
@@ -213,25 +215,25 @@ export default function CorporateSlateTheme() {
                   </div>
                 </div>
                 <div style={{ textAlign: 'right', marginTop: '-4px' }}>
-                  <button type="button" onClick={() => setView('forgot')} className="cs-forgot">Forgot password?</button>
+                  <button type="button" onClick={() => setView('forgot')} className="cs-forgot">{tr("corporateSlateTheme.forgotPassword")}</button>
                 </div>
                 <button type="submit" disabled={loading} className="cs-btn">
                   {loading
-                    ? <span className="cs-btn-row"><span className="cs-spin" />Authenticating…</span>
-                    : <span className="cs-btn-row">Access Dashboard <ArrowRight size={15} /></span>}
+                    ? <span className="cs-btn-row"><span className="cs-spin" />{tr("corporateSlateTheme.authenticating")}</span>
+                    : <span className="cs-btn-row">{tr("corporateSlateTheme.accessDashboard")} <ArrowRight size={15} /></span>}
                 </button>
               </form>
               <div className="cs-sec-row">
                 <span className="cs-sec-dot" />
-                <span className="cs-sec-txt">256-bit encrypted · Secured connection</span>
+                <span className="cs-sec-txt">{tr("corporateSlateTheme.t256BitEncryptedSecuredConnection")}</span>
               </div>
               <div className="cs-warn">
                 <AlertCircle size={11} color="#92400e" />
-                <span>Unauthorized access attempts are logged and may result in account lockout.</span>
+                <span>{tr("corporateSlateTheme.unauthorizedAccessAttemptsAreLogged")}</span>
               </div>
             </div>
           )}
-          <p className="cs-ver">{centerName} Admin · {new Date().getFullYear()}</p>
+          <p className="cs-ver">{tr("corporateSlateTheme.admin2", { centerName, value: new Date().getFullYear() })}</p>
         </div>
       </div>
     </>

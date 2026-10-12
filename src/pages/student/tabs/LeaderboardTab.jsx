@@ -3,11 +3,17 @@
 
 import { useState, useEffect } from 'react';
 import api from '../../../api';
+import { useTranslation } from "react-i18next";
+import i18n from "../../../i18n/i18n.js";
+
+// For text in file-level lists: read when rendered, so it follows the chosen language
+const ta = (key, opts) => i18n.t(`student:${key}`, opts);
+
 
 const CATEGORIES = [
-  { key: 'streak',  icon: '🔥', label: 'Streak Kings',    unit: 'day streak'   },
-  { key: 'classes', icon: '📚', label: 'Class Champions', unit: 'classes done'  },
-  { key: 'quiz',    icon: '🧠', label: 'Quiz Stars',      unit: '% avg score'  },
+  { key: 'streak',  icon: '🔥', get label() { return ta("leaderboardTab.categoriesStreakKings"); },    unit: 'day streak'   },
+  { key: 'classes', icon: '📚', get label() { return ta("leaderboardTab.categoriesClassChampions"); }, unit: 'classes done'  },
+  { key: 'quiz',    icon: '🧠', get label() { return ta("leaderboardTab.categoriesQuizStars"); },      unit: '% avg score'  },
 ];
 
 const MEDALS = ['🥇', '🥈', '🥉'];
@@ -20,6 +26,7 @@ function getValue(entry, catKey) {
 }
 
 export default function LeaderboardTab({ isDarkMode }) {
+  const { t: tr } = useTranslation("student");
   const [data,     setData]     = useState(null);
   const [loading,  setLoading]  = useState(true);
   const [category, setCategory] = useState('streak');
@@ -47,8 +54,8 @@ export default function LeaderboardTab({ isDarkMode }) {
 
       {/* Header */}
       <div style={{ marginBottom: 20 }}>
-        <h2 style={{ margin: '0 0 4px', fontSize: 22, fontWeight: 900, color: text }}>🏆 Center Leaderboard</h2>
-        <p style={{ margin: 0, fontSize: 13, color: muted }}>Top performers this season — who will take the crown?</p>
+        <h2 style={{ margin: '0 0 4px', fontSize: 22, fontWeight: 900, color: text }}>{tr("leaderboardTab.centerLeaderboard")}</h2>
+        <p style={{ margin: 0, fontSize: 13, color: muted }}>{tr("leaderboardTab.topPerformersThisSeasonWho")}</p>
       </div>
 
       {/* Category pills */}
@@ -73,12 +80,12 @@ export default function LeaderboardTab({ isDarkMode }) {
 
       {/* Content */}
       {loading ? (
-        <p style={{ color: muted, fontSize: 13 }}>Loading leaderboard…</p>
+        <p style={{ color: muted, fontSize: 13 }}>{tr("leaderboardTab.loadingLeaderboard")}</p>
       ) : list.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '60px 0', background: card, border: `2px solid ${border}`, borderRadius: 24 }}>
           <p style={{ fontSize: 44, margin: '0 0 12px' }}>🏆</p>
-          <p style={{ margin: 0, fontWeight: 700, color: text, fontSize: 16 }}>No data yet</p>
-          <p style={{ margin: '6px 0 0', fontSize: 13, color: muted }}>Be the first to get on the board!</p>
+          <p style={{ margin: 0, fontWeight: 700, color: text, fontSize: 16 }}>{tr("leaderboardTab.noDataYet")}</p>
+          <p style={{ margin: '6px 0 0', fontSize: 13, color: muted }}>{tr("leaderboardTab.beTheFirstToGet")}</p>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>

@@ -47,6 +47,7 @@ import {
   getAllPayments,
   getAllLessons,
 } from "../../../services/studentService";
+import { useTranslation } from "react-i18next";
 
 const PASSWORD_TTL = 15000;
 const ACCOUNT_TYPE_KEY = "admin.students.accountType";
@@ -65,6 +66,7 @@ function daysUntilDeletion(dateStr) {
 
 // ── Delete confirmation modal ─────────────────────────────────────────────────
 function DeleteConfirmModal({ student, onConfirm, onCancel, isDarkMode }) {
+  const { t: tr } = useTranslation("admin");
   if (!student) return null;
 
   const overlay = "fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm";
@@ -83,13 +85,13 @@ function DeleteConfirmModal({ student, onConfirm, onCancel, isDarkMode }) {
         </div>
 
         {/* Heading */}
-        <h2 className="text-xl font-bold text-center mb-2">Schedule Account Deletion?</h2>
+        <h2 className="text-xl font-bold text-center mb-2">{tr("studentsTab.scheduleAccountDeletion")}</h2>
         <p className={`text-center text-sm mb-5 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
-          You are about to schedule{" "}
+          {tr("studentsTab.youAreAboutToSchedule")}{" "}
           <span className="font-semibold text-red-500">
             {student.firstName} {student.lastName}
           </span>{" "}
-          for deletion.
+          {tr("studentsTab.forDeletion")}
         </p>
 
         {/* Info box */}
@@ -97,23 +99,22 @@ function DeleteConfirmModal({ student, onConfirm, onCancel, isDarkMode }) {
           <div className="flex items-start gap-2">
             <Clock className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
             <span className={isDarkMode ? "text-red-300" : "text-red-700"}>
-              The account will be <strong>disabled immediately</strong> and permanently deleted after{" "}
-              <strong>7 days</strong>.
+              {tr("studentsTab.theAccountWillBe")} <strong>{tr("studentsTab.disabledImmediately")}</strong> {tr("studentsTab.andPermanentlyDeletedAfter")}{" "}
+              <strong>{tr("studentsTab.t7Days")}</strong>.
             </span>
           </div>
           {!student.isManaged && (
             <div className="flex items-start gap-2">
               <AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
               <span className={isDarkMode ? "text-amber-300" : "text-amber-700"}>
-                A warning email will be sent to <strong>{student.email}</strong> telling them to contact
-                admin if this is a mistake.
+                {tr("studentsTab.aWarningEmailWillBe")} <strong>{student.email}</strong> {tr("studentsTab.tellingThemToContactAdmin")}
               </span>
             </div>
           )}
           <div className="flex items-start gap-2">
             <RotateCcw className="w-4 h-4 text-sky-500 mt-0.5 flex-shrink-0" />
             <span className={isDarkMode ? "text-sky-300" : "text-sky-700"}>
-              You can <strong>restore</strong> the account any time within those 7 days.
+              {tr("studentsTab.youCan")} <strong>{tr("studentsTab.restore")}</strong> {tr("studentsTab.theAccountAnyTimeWithin")}
             </span>
           </div>
         </div>
@@ -128,13 +129,13 @@ function DeleteConfirmModal({ student, onConfirm, onCancel, isDarkMode }) {
                 : "bg-gray-100 hover:bg-gray-200 text-gray-700"
             }`}
           >
-            Cancel
+            {tr("studentsTab.cancel")}
           </button>
           <button
             onClick={onConfirm}
             className="flex-1 py-2.5 rounded-xl font-semibold text-sm bg-red-600 hover:bg-red-700 text-white transition-all"
           >
-            Schedule Deletion
+            {tr("studentsTab.scheduleDeletion")}
           </button>
         </div>
       </div>
@@ -144,6 +145,7 @@ function DeleteConfirmModal({ student, onConfirm, onCancel, isDarkMode }) {
 
 // ── Convert managed → student account modal ───────────────────────────────────
 function ConvertModal({ student, onConfirm, onCancel, isDarkMode }) {
+  const { t: tr } = useTranslation("admin");
   const [email, setEmail] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -168,14 +170,12 @@ function ConvertModal({ student, onConfirm, onCancel, isDarkMode }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
       <form onSubmit={submit} className={`rounded-2xl shadow-2xl p-6 w-full max-w-md ${box}`}>
-        <h2 className="text-lg font-bold mb-1">Give {student.firstName} login access</h2>
+        <h2 className="text-lg font-bold mb-1">{tr("studentsTab.giveLoginAccess", { firstName: student.firstName })}</h2>
         <p className={`text-sm mb-4 ${muted}`}>
-          {student.firstName} becomes a regular student account and gets an invite email to set a password.
-          Classes, bookings, teachers and credits stay exactly as they are.
-        </p>
+          {tr("studentsTab.becomesARegularStudentAccount", { firstName: student.firstName })}</p>
 
         <label className={`block text-xs font-bold uppercase tracking-wide mb-1.5 ${muted}`}>
-          Student's email
+          {tr("studentsTab.studentSEmail")}
         </label>
         <input
           type="email"
@@ -183,7 +183,7 @@ function ConvertModal({ student, onConfirm, onCancel, isDarkMode }) {
           autoFocus
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          placeholder="student@email.com"
+          placeholder={tr("studentsTab.studentEmailCom")}
           className={`w-full px-3 py-2.5 rounded-xl border text-sm ${
             isDarkMode ? "bg-gray-900 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"
           }`}
@@ -198,14 +198,14 @@ function ConvertModal({ student, onConfirm, onCancel, isDarkMode }) {
               isDarkMode ? "bg-gray-700 hover:bg-gray-600 text-gray-200" : "bg-gray-100 hover:bg-gray-200 text-gray-700"
             }`}
           >
-            Cancel
+            {tr("studentsTab.cancel")}
           </button>
           <button
             type="submit"
             disabled={saving}
             className="flex-1 py-2.5 rounded-xl font-semibold text-sm bg-sky-600 hover:bg-sky-700 disabled:opacity-60 text-white"
           >
-            {saving ? "Sending…" : "Send Invite"}
+            {saving ? tr("studentsTab.sending") : tr("studentsTab.sendInvite")}
           </button>
         </div>
       </form>
@@ -263,6 +263,7 @@ function SummaryCard({ icon: Icon, label, value, sub, color, isDarkMode }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 export default function StudentsTab({ onNotify, isDarkMode = false }) {
+  const { t: tr } = useTranslation("admin");
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -325,12 +326,12 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
 
       } catch (err) {
         console.error("❌ Load students error:", err);
-        showToast("Could not load students. Please refresh.", "error");
+        showToast(tr("studentsTab.couldNotLoadStudentsPlease"), "error");
       } finally {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [tr]);
 
   // ── Save student (create / update) ─────────────────────────────────────────
   const handleSaveStudent = async (data) => {
@@ -339,19 +340,19 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
         const updated = await updateStudent(editId, data);
         setStudents((prev) => prev.map((s) => (s._id === editId ? updated : s)));
         onNotify?.(`Student updated: ${updated.firstName} ${updated.lastName}`);
-        showToast(`${updated.firstName} updated successfully!`);
+        showToast(tr("studentsTab.updatedSuccessfully", { firstName: updated.firstName }));
         setEditId(null);
         setIsModalOpen(false);
       } else {
         const result = await createStudent(data);
         setStudents((prev) => [...prev, result.student]);
         onNotify?.(`New student created: ${result.student.firstName} ${result.student.lastName}`);
-        showToast(`${result.student.firstName} created successfully!`);
+        showToast(tr("studentsTab.createdSuccessfully", { firstName: result.student.firstName }));
         return result;
       }
     } catch (e) {
       console.error("❌ Save student error:", e);
-      showToast(e.response?.data?.message || "Could not save student. Please try again.", "error");
+      showToast(e.response?.data?.message || tr("studentsTab.couldNotSaveStudentPlease"), "error");
     }
   };
 
@@ -361,18 +362,18 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
       if (editId) {
         const updated = await updateStudent(editId, data);
         setStudents((prev) => prev.map((s) => (s._id === editId ? updated : s)));
-        showToast(`${updated.firstName} updated successfully!`);
+        showToast(tr("studentsTab.updatedSuccessfully", { firstName: updated.firstName }));
         setEditId(null);
       } else {
         const result = await createManagedStudent(data);
         setStudents((prev) => [result.student, ...prev]);
         onNotify?.(`Managed student created: ${result.student.firstName} ${result.student.lastName}`.trim());
-        showToast(`${result.student.firstName} created — ready to assign.`);
+        showToast(tr("studentsTab.createdReadyToAssign", { firstName: result.student.firstName }));
       }
       return true;
     } catch (e) {
       console.error("❌ Save managed student error:", e);
-      showToast(e.response?.data?.message || "Could not save managed student.", "error");
+      showToast(e.response?.data?.message || tr("studentsTab.couldNotSaveManagedStudent"), "error");
       return false;
     }
   };
@@ -394,7 +395,7 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
     try {
       const result = await convertManagedStudent(convertTarget._id, email);
       setStudents((prev) => prev.map((s) => (s._id === convertTarget._id ? { ...s, ...result.student } : s)));
-      showToast(`${convertTarget.firstName} moved to Student Accounts. ${result.message}`, result.emailSent ? "success" : "info");
+      showToast(tr("studentsTab.movedToStudentAccounts", { firstName: convertTarget.firstName, message: result.message }), result.emailSent ? "success" : "info");
       onNotify?.(`${convertTarget.firstName} converted to a student account.`);
       setConvertTarget(null);
       return null;
@@ -422,7 +423,7 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
       onNotify?.(`${deleteTarget.firstName} scheduled for deletion.`);
     } catch (e) {
       console.error("❌ Delete error:", e);
-      showToast(e.response?.data?.message || "Could not schedule deletion.", "error");
+      showToast(e.response?.data?.message || tr("studentsTab.couldNotScheduleDeletion"), "error");
     } finally {
       setDeleteTarget(null);
     }
@@ -440,11 +441,11 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
             : s
         )
       );
-      showToast(`${stu?.firstName}'s account has been restored!`, "success");
+      showToast(tr("studentsTab.sAccountHasBeenRestored", { firstName: stu?.firstName }), "success");
       onNotify?.(`${stu?.firstName} restored.`);
     } catch (e) {
       console.error("❌ Restore error:", e);
-      showToast("Could not restore student.", "error");
+      showToast(tr("studentsTab.couldNotRestoreStudent"), "error");
     }
   };
 
@@ -456,7 +457,7 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
       showToast(`${updated.firstName} ${newState ? "enabled" : "disabled"}.`, "info");
     } catch (e) {
       console.error("❌ Toggle error:", e);
-      showToast("Could not update student status.", "error");
+      showToast(tr("studentsTab.couldNotUpdateStudentStatus"), "error");
     }
   };
 
@@ -499,7 +500,7 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
   const handleSaveManualPayment = async (paymentData) => {
     try {
       if (!selectedStudent) {
-        showToast("No student selected", "error");
+        showToast(tr("studentsTab.noStudentSelected"), "error");
         return;
       }
       const result = await addPayment(selectedStudent, paymentData);
@@ -515,10 +516,10 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
       setIsManualModalOpen(false);
       const studentsData = await getStudents();
       setStudents(studentsData);
-      showToast("Payment recorded successfully!");
+      showToast(tr("studentsTab.paymentRecordedSuccessfully"));
     } catch (e) {
       console.error("❌ Manual payment error:", e);
-      showToast("Could not record payment.", "error");
+      showToast(tr("studentsTab.couldNotRecordPayment"), "error");
     }
   };
 
@@ -540,7 +541,7 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
           setIsPaymentModalOpen(false);
           setHistoryPinPrompt(true);
         } else {
-          showToast("Could not load payment history", "error");
+          showToast(tr("studentsTab.couldNotLoadPaymentHistory"), "error");
         }
       });
   }, [isPaymentModalOpen, selectedStudent]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -554,7 +555,7 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
         studentId: l.studentId._id,
         student: `${l.studentId.firstName} ${l.studentId.lastName}`,
       }))))
-      .catch(() => showToast("Could not load lesson history", "error"));
+      .catch(() => showToast(tr("studentsTab.couldNotLoadLessonHistory"), "error"));
   }, [isLessonModalOpen, selectedStudent]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── View modals ─────────────────────────────────────────────────────────────
@@ -582,7 +583,7 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
             : s
         )
       );
-      showToast("Password reset. Copy it from the card.", "info");
+      showToast(tr("studentsTab.passwordResetCopyItFrom"), "info");
 
       setTimeout(() => {
         setStudents((prev) =>
@@ -593,7 +594,7 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
       }, PASSWORD_TTL);
     } catch (e) {
       console.error("❌ Reset error:", e);
-      showToast("Could not reset password.", "error");
+      showToast(tr("studentsTab.couldNotResetPassword"), "error");
     }
   };
 
@@ -601,9 +602,9 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
   const handleResendInvite = async (id) => {
     try {
       await resendStudentInvite(id);
-      showToast("Invite email resent successfully.", "success");
+      showToast(tr("studentsTab.inviteEmailResentSuccessfully"), "success");
     } catch (e) {
-      showToast("Could not resend invite. Please try again.", "error");
+      showToast(tr("studentsTab.couldNotResendInvitePlease"), "error");
     }
   };
 
@@ -612,7 +613,7 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
     const stu = students.find((s) => s._id === id);
     if (stu?.tempPassword && navigator.clipboard) {
       navigator.clipboard.writeText(stu.tempPassword);
-      showToast("Password copied to clipboard!");
+      showToast(tr("studentsTab.passwordCopiedToClipboard"));
       setStudents((prev) =>
         prev.map((s) =>
           s._id === id ? { ...s, showTempPassword: false, tempPassword: undefined } : s
@@ -721,9 +722,9 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
       {/* ── Page header ── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
-          <h2 className={`text-2xl font-bold ${textPrimary}`}>Students</h2>
+          <h2 className={`text-2xl font-bold ${textPrimary}`}>{tr("studentsTab.students")}</h2>
           <p className={`text-sm mt-0.5 ${textSecondary}`}>
-            Manage all students on the platform
+            {tr("studentsTab.manageAllStudentsOnThe")}
           </p>
         </div>
 
@@ -737,7 +738,7 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
             }`}
           >
             <Receipt className="w-3.5 h-3.5" />
-            All Payments
+            {tr("studentsTab.allPayments")}
           </button>
           <button
             onClick={() => { setSelectedStudent(null); setIsLessonModalOpen(true); }}
@@ -748,12 +749,12 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
             }`}
           >
             <BookOpen className="w-3.5 h-3.5" />
-            All Lessons
+            {tr("studentsTab.allLessons")}
           </button>
 
           <button
             onClick={() => downloadStudentRoster(filteredStudents).catch(console.error)}
-            title="Download visible students as PDF"
+            title={tr("studentsTab.downloadVisibleStudentsAsPdf")}
             className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-all ${
               isDarkMode
                 ? "border-gray-600 text-gray-300 hover:bg-gray-700"
@@ -761,7 +762,7 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
             }`}
           >
             <Download className="w-3.5 h-3.5" />
-            Download PDF
+            {tr("studentsTab.downloadPdf")}
           </button>
 
           {canCreate && (
@@ -772,7 +773,7 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
               }`}
             >
               <Plus className="w-4 h-4" />
-              {accountType === "managed" ? "Add Managed Student" : "Add Student"}
+              {accountType === "managed" ? tr("studentsTab.addManagedStudent") : tr("studentsTab.addStudent")}
             </button>
           )}
         </div>
@@ -785,8 +786,7 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
         }`}>
           <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
           <span>
-            Your plan doesn't include {accountType === "managed" ? "managed students" : "student accounts"}.
-            The students below keep working, but you can't add new ones. Contact your platform admin to upgrade.
+            {tr("studentsTab.yourPlanDoesnTInclude")} {accountType === "managed" ? tr("studentsTab.managedStudents") : tr("studentsTab.studentAccounts")}{tr("studentsTab.theStudentsBelowKeepWorking")}
           </span>
         </div>
       )}
@@ -794,14 +794,14 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
       {/* ── Account type tabs: only the types this plan shows (Basic → managed, Pro → real, Enterprise → both) ── */}
       <div
         role="tablist"
-        aria-label="Student account type"
+        aria-label={tr("studentsTab.studentAccountType")}
         className={`grid gap-1 p-1 rounded-xl ${
           visibleTypes.length > 1 ? "grid-cols-2 max-w-md" : "grid-cols-1 max-w-[15rem]"
         } ${hiddenModeNote ? "mb-3" : "mb-6"} ${isDarkMode ? "bg-gray-800" : "bg-gray-200/70"}`}
       >
         {[
-          { key: "real",  icon: BadgeCheck, label: "Student Accounts", count: realCount,    hint: "Log in themselves" },
-          { key: "managed", icon: UserCog,    label: "Managed Students", count: managedCount, hint: "No login · run by admin" },
+          { key: "real",  icon: BadgeCheck, label: tr("studentsTab.studentAccounts2"), count: realCount,    hint: tr("studentsTab.logInThemselves") },
+          { key: "managed", icon: UserCog,    label: tr("studentsTab.managedStudents2"), count: managedCount, hint: tr("studentsTab.noLoginRunByAdmin") },
         ].filter(({ key }) => visibleTypes.includes(key)).map(({ key, icon: Icon, label, count, hint }) => {
           const selected = accountType === key;
           return (
@@ -844,32 +844,32 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
         <SummaryCard
           icon={Users}
-          label={accountType === "managed" ? "Managed Students" : "Total Students"}
+          label={accountType === "managed" ? tr("studentsTab.managedStudents2") : tr("studentsTab.totalStudents")}
           value={typedStudents.length}
           color="sky"
           isDarkMode={isDarkMode}
         />
         <SummaryCard
           icon={UserCheck}
-          label="Active"
+          label={tr("studentsTab.active")}
           value={activeStudents.length}
-          sub={`${disabledStudents.length} disabled`}
+          sub={tr("studentsTab.disabled", { disabledStudentsCount: disabledStudents.length })}
           color="emerald"
           isDarkMode={isDarkMode}
         />
         <SummaryCard
           icon={AlertTriangle}
-          label="Needs Top-up"
+          label={tr("studentsTab.needsTopUp")}
           value={zeroClassStudents.length}
-          sub="0 classes remaining"
+          sub={tr("studentsTab.t0ClassesRemaining")}
           color="red"
           isDarkMode={isDarkMode}
         />
         <SummaryCard
           icon={GraduationCap}
-          label="Total Classes"
+          label={tr("studentsTab.totalClasses")}
           value={totalClasses}
-          sub="across all students"
+          sub={tr("studentsTab.acrossAllStudents")}
           color="purple"
           isDarkMode={isDarkMode}
         />
@@ -882,10 +882,10 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
         {/* View tabs */}
         <div className={`flex gap-1 p-1 rounded-lg flex-wrap ${isDarkMode ? "bg-gray-900" : "bg-gray-100"}`}>
           {[
-            { key: "all",             label: `All (${typedStudents.length})` },
-            { key: "active",          label: `Active (${activeStudents.length})` },
-            { key: "disabled",        label: `Disabled (${disabledStudents.length})` },
-            { key: "pending_deletion", label: `🗑 Pending Deletion (${pendingDeletion.length})` },
+            { key: "all",             label: tr("studentsTab.all", { typedStudentsCount: typedStudents.length }) },
+            { key: "active",          label: tr("studentsTab.active2", { activeStudentsCount: activeStudents.length }) },
+            { key: "disabled",        label: tr("studentsTab.disabled2", { disabledStudentsCount: disabledStudents.length }) },
+            { key: "pending_deletion", label: tr("studentsTab.pendingDeletion", { pendingDeletionCount: pendingDeletion.length }) },
           ].map(({ key, label }) => (
             <button
               key={key}
@@ -906,7 +906,7 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
           />
           <input
             type="text"
-            placeholder="Search by name or email..."
+            placeholder={tr("studentsTab.searchByNameOrEmail")}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className={`w-full pl-9 pr-3 py-2 rounded-lg border text-sm transition-colors ${inputCls}`}
@@ -918,7 +918,7 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
       {loading && (
         <div className="flex flex-col items-center justify-center py-20 gap-3">
           <div className="w-10 h-10 border-4 border-sky-500 border-t-transparent rounded-full animate-spin" />
-          <p className={`text-sm ${textSecondary}`}>Loading students...</p>
+          <p className={`text-sm ${textSecondary}`}>{tr("studentsTab.loadingStudents")}</p>
         </div>
       )}
 
@@ -932,17 +932,17 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
           >
             <GraduationCap className={`w-8 h-8 ${textSecondary}`} />
           </div>
-          <p className={`text-base font-semibold ${textPrimary}`}>No students found</p>
+          <p className={`text-base font-semibold ${textPrimary}`}>{tr("studentsTab.noStudentsFound")}</p>
           <p className={`text-sm ${textSecondary}`}>
             {searchQuery
-              ? `No results for "${searchQuery}"`
+              ? tr("studentsTab.noResultsFor", { searchQuery })
               : view === "disabled"
-              ? "There are no disabled students."
+              ? tr("studentsTab.thereAreNoDisabledStudents")
               : view === "pending_deletion"
-              ? "No students scheduled for deletion."
+              ? tr("studentsTab.noStudentsScheduledForDeletion")
               : accountType === "managed"
-              ? "Managed students have no login — just a name you can assign to teachers and book classes for."
-              : "Add your first student to get started."}
+              ? tr("studentsTab.managedStudentsHaveNoLogin")
+              : tr("studentsTab.addYourFirstStudentTo")}
           </p>
           {!searchQuery && view === "active" && canCreate && (
             <button
@@ -952,7 +952,7 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
               }`}
             >
               <Plus className="w-4 h-4" />
-              {accountType === "managed" ? "Add First Managed Student" : "Add First Student"}
+              {accountType === "managed" ? tr("studentsTab.addFirstManagedStudent") : tr("studentsTab.addFirstStudent")}
             </button>
           )}
         </div>
@@ -962,9 +962,9 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
       {!loading && filteredStudents.length > 0 && (
         <>
           <p className={`text-xs mb-4 ${textSecondary}`}>
-            Showing {Math.min((page - 1) * PAGE_SIZE + 1, filteredStudents.length)}–{Math.min(page * PAGE_SIZE, filteredStudents.length)} of {filteredStudents.length} student
+            {tr("studentsTab.showing")} {Math.min((page - 1) * PAGE_SIZE + 1, filteredStudents.length)}–{Math.min(page * PAGE_SIZE, filteredStudents.length)} {tr("studentsTab.of")} {filteredStudents.length} {tr("studentsTab.student")}
             {filteredStudents.length !== 1 ? "s" : ""}
-            {searchQuery && ` matching "${searchQuery}"`}
+            {searchQuery && tr("studentsTab.matching", { searchQuery })}
           </p>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -979,14 +979,14 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
                     <div className="absolute -top-2 left-2 right-2 z-10 flex items-center justify-between gap-2 bg-red-600 text-white text-xs font-semibold px-3 py-1.5 rounded-lg shadow-lg">
                       <span className="flex items-center gap-1">
                         <Clock className="w-3 h-3" />
-                        Deletes in {days} day{days !== 1 ? "s" : ""}
+                        {tr("studentsTab.deletesIn")} {days} {tr("studentsTab.day")}{days !== 1 ? "s" : ""}
                       </span>
                       <button
                         onClick={() => handleRestoreStudent(student._id)}
                         className="flex items-center gap-1 bg-white text-red-600 px-2 py-0.5 rounded-md text-xs font-bold hover:bg-red-50 transition-colors"
                       >
                         <RotateCcw className="w-3 h-3" />
-                        Restore
+                        {tr("studentsTab.restore2")}
                       </button>
                     </div>
                   )}
@@ -1084,7 +1084,7 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
       {historyPinPrompt && (
         <AnalyticsPinPrompt
           isDarkMode={isDarkMode}
-          title="Payment history is locked"
+          title={tr("studentsTab.paymentHistoryIsLocked")}
           onCancel={() => setHistoryPinPrompt(false)}
           onUnlocked={() => { setHistoryPinPrompt(false); setIsPaymentModalOpen(true); }}
         />

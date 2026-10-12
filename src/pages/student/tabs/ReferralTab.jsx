@@ -4,18 +4,26 @@
 import { useState, useEffect } from "react";
 import { Copy, Check, RefreshCw, Gift, Users, Star, Clock } from "lucide-react";
 import api from "../../../api";
+import { useTranslation } from "react-i18next";
+import i18n from "../../../i18n/i18n.js";
+import { dateLocale } from "../../../i18n/dateLocale.js";
+
+// For text in file-level lists: read when rendered, so it follows the chosen language
+const ta = (key, opts) => i18n.t(`student:${key}`, opts);
+
 
 const fmt = (d) =>
-  d ? new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—";
+  d ? new Date(d).toLocaleDateString(dateLocale("en-US"), { month: "short", day: "numeric", year: "numeric" }) : "—";
 
 const STATUS_META = {
-  pending:  { label: "Pending",  color: "#f59e0b", bg: "#fef3c7" },
-  invited:  { label: "Invited",  color: "#3b82f6", bg: "#eff6ff" },
-  active:   { label: "Joined!",  color: "#16a34a", bg: "#f0fdf4" },
-  rejected: { label: "Declined", color: "#94a3b8", bg: "#f1f5f9" },
+  pending:  { get label() { return ta("referralTab.statusMetaPending"); },  color: "#f59e0b", bg: "#fef3c7" },
+  invited:  { get label() { return ta("referralTab.statusMetaInvited"); },  color: "#3b82f6", bg: "#eff6ff" },
+  active:   { get label() { return ta("referralTab.statusMetaJoined"); },  color: "#16a34a", bg: "#f0fdf4" },
+  rejected: { get label() { return ta("referralTab.statusMetaDeclined"); }, color: "#94a3b8", bg: "#f1f5f9" },
 };
 
 export default function ReferralTab({ isDarkMode }) {
+  const { t: tr } = useTranslation("student");
   const [data,    setData]    = useState(null);
   const [loading, setLoading] = useState(true);
   const [copied,  setCopied]  = useState(false);
@@ -49,10 +57,10 @@ export default function ReferralTab({ isDarkMode }) {
   }
 
   const statCards = data ? [
-    { icon: Users, label: "Friends invited", value: data.stats.total,   color: "#3b82f6" },
-    { icon: Check, label: "Joined",          value: data.stats.active,  color: "#16a34a" },
-    { icon: Clock, label: "Pending review",  value: data.stats.pending, color: "#f59e0b" },
-    { icon: Gift,  label: "Free classes won",value: data.stats.credits, color: "#8b5cf6" },
+    { icon: Users, label: tr("referralTab.friendsInvited"), value: data.stats.total,   color: "#3b82f6" },
+    { icon: Check, label: tr("referralTab.joined2"),          value: data.stats.active,  color: "#16a34a" },
+    { icon: Clock, label: tr("referralTab.pendingReview"),  value: data.stats.pending, color: "#f59e0b" },
+    { icon: Gift,  label: tr("referralTab.freeClassesWon"),value: data.stats.credits, color: "#8b5cf6" },
   ] : [];
 
   return (
@@ -61,18 +69,18 @@ export default function ReferralTab({ isDarkMode }) {
       {/* Header */}
       <div style={{ marginBottom: 24 }}>
         <h2 style={{ margin: 0, fontSize: 22, fontWeight: 900, color: text, display: "flex", alignItems: "center", gap: 8 }}>
-          🎁 Invite a Friend
+          {tr("referralTab.inviteAFriend")}
         </h2>
         <p style={{ margin: "6px 0 0", fontSize: 14, color: muted, lineHeight: 1.6 }}>
-          Share your link — when your friend joins and activates their account, you get{" "}
-          <strong style={{ color: text }}>1 free class</strong> added automatically. No limits!
+          {tr("referralTab.shareYourLinkWhenYour")}{" "}
+          <strong style={{ color: text }}>{tr("referralTab.t1FreeClass")}</strong> {tr("referralTab.addedAutomaticallyNoLimits")}
         </p>
       </div>
 
       {loading ? (
-        <p style={{ color: muted, fontSize: 13 }}>Loading…</p>
+        <p style={{ color: muted, fontSize: 13 }}>{tr("referralTab.loading")}</p>
       ) : !data ? (
-        <p style={{ color: "#ef4444", fontSize: 13 }}>Could not load referral data.</p>
+        <p style={{ color: "#ef4444", fontSize: 13 }}>{tr("referralTab.couldNotLoadReferralData")}</p>
       ) : (
         <>
           {/* Referral link card */}
@@ -84,7 +92,7 @@ export default function ReferralTab({ isDarkMode }) {
             borderRadius: 16, padding: 24, marginBottom: 20,
           }}>
             <p style={{ margin: "0 0 10px", fontSize: 13, fontWeight: 700, color: muted, textTransform: "uppercase", letterSpacing: 1 }}>
-              Your referral link
+              {tr("referralTab.yourReferralLink")}
             </p>
 
             <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
@@ -113,7 +121,7 @@ export default function ReferralTab({ isDarkMode }) {
             </div>
 
             <div style={{ marginTop: 14, display: "flex", alignItems: "center", gap: 10 }}>
-              <span style={{ fontSize: 12, color: muted }}>Your code:</span>
+              <span style={{ fontSize: 12, color: muted }}>{tr("referralTab.yourCode")}</span>
               <span style={{
                 padding: "4px 12px", borderRadius: 6,
                 background: isDarkMode ? "#0f172a" : "#fff",
@@ -145,11 +153,11 @@ export default function ReferralTab({ isDarkMode }) {
             background: card, border: `1px solid ${border}`, borderRadius: 14,
             padding: 20, marginBottom: 24,
           }}>
-            <h3 style={{ margin: "0 0 14px", fontSize: 15, fontWeight: 800, color: text }}>How it works</h3>
+            <h3 style={{ margin: "0 0 14px", fontSize: 15, fontWeight: 800, color: text }}>{tr("referralTab.howItWorks")}</h3>
             {[
-              { n: "1", label: "Share your link", desc: "Send it to a friend by WhatsApp, email, or any way you like." },
-              { n: "2", label: "Friend applies",  desc: "They fill out a short form. Our team reviews the application." },
-              { n: "3", label: "They join",        desc: "Once they set up their account, you get +1 free class instantly." },
+              { n: "1", label: tr("referralTab.shareYourLink"), desc: tr("referralTab.sendItToAFriend") },
+              { n: "2", label: tr("referralTab.friendApplies"),  desc: tr("referralTab.theyFillOutAShort") },
+              { n: "3", label: tr("referralTab.theyJoin"),        desc: tr("referralTab.onceTheySetUpTheir") },
             ].map(step => (
               <div key={step.n} style={{ display: "flex", gap: 14, marginBottom: 12 }}>
                 <div style={{
@@ -170,9 +178,7 @@ export default function ReferralTab({ isDarkMode }) {
           {/* Referral list */}
           {data.referrals.length > 0 && (
             <div>
-              <h3 style={{ margin: "0 0 12px", fontSize: 15, fontWeight: 800, color: text }}>
-                People you invited ({data.referrals.length})
-              </h3>
+              <h3 style={{ margin: "0 0 12px", fontSize: 15, fontWeight: 800, color: text }}>{tr("referralTab.peopleYouInvited", { referralsCount: data.referrals.length })}</h3>
               {data.referrals.map(r => {
                 const meta = STATUS_META[r.status] ?? STATUS_META.pending;
                 return (
@@ -186,11 +192,11 @@ export default function ReferralTab({ isDarkMode }) {
                         {r.referredFirstName} {r.referredLastName}
                       </span>
                       <span style={{ fontSize: 12, color: muted, marginLeft: 8 }}>{r.referredEmail}</span>
-                      <div style={{ fontSize: 11, color: muted, marginTop: 2 }}>Applied {fmt(r.createdAt)}</div>
+                      <div style={{ fontSize: 11, color: muted, marginTop: 2 }}>{tr("referralTab.applied", { fmt: fmt(r.createdAt) })}</div>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                       {r.creditAwarded && (
-                        <span style={{ fontSize: 11, fontWeight: 700, color: "#8b5cf6" }}>🎁 +1 class</span>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: "#8b5cf6" }}>{tr("referralTab.t1Class")}</span>
                       )}
                       <span style={{
                         padding: "3px 10px", borderRadius: 20, fontSize: 12, fontWeight: 700,

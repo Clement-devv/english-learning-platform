@@ -3,19 +3,26 @@
 // admin manages on the student's behalf (for centers that don't onboard students).
 import React, { useState, useEffect } from "react";
 import { X, ChevronDown } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import i18n from "../../../i18n/i18n.js";
+
+// For text in file-level lists: read when rendered, so it follows the chosen language
+const ta = (key, opts) => i18n.t(`admin:${key}`, opts);
+
 
 const CEFR_LEVELS = [
-  { value: "A1", label: "A1 — Beginner" },
-  { value: "A2", label: "A2 — Elementary" },
-  { value: "B1", label: "B1 — Pre-Intermediate" },
-  { value: "B2", label: "B2 — Upper Intermediate" },
-  { value: "C1", label: "C1 — Advanced" },
-  { value: "C2", label: "C2 — Proficiency" },
+  { value: "A1", get label() { return ta("shared.levels.A1"); } },
+  { value: "A2", get label() { return ta("shared.levels.A2"); } },
+  { value: "B1", get label() { return ta("shared.levels.B1"); } },
+  { value: "B2", get label() { return ta("shared.levels.B2"); } },
+  { value: "C1", get label() { return ta("shared.levels.C1"); } },
+  { value: "C2", get label() { return ta("shared.levels.C2"); } },
 ];
 
 const EMPTY = { firstName: "", lastName: "", age: "", rank: "" };
 
 export default function ManagedStudentModal({ isOpen, onClose, onSave, initialData, isDarkMode = false }) {
+  const { t: tr } = useTranslation("admin");
   const [formData, setFormData] = useState(EMPTY);
   const [loading, setLoading] = useState(false);
   const isEdit = !!initialData;
@@ -67,10 +74,10 @@ export default function ManagedStudentModal({ isOpen, onClose, onSave, initialDa
         <div style={{ padding: "22px 26px 18px", borderBottom: `1px solid ${borderC}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div>
             <h2 style={{ fontSize: "18px", fontWeight: "800", color: textPri, margin: 0 }}>
-              {isEdit ? "Edit Managed Student" : "Create Managed Student"}
+              {isEdit ? tr("managedStudentModal.editManagedStudent") : tr("managedStudentModal.createManagedStudent")}
             </h2>
             <p style={{ fontSize: "12px", color: textSec, margin: "3px 0 0" }}>
-              Name only — no email, no login
+              {tr("managedStudentModal.nameOnlyNoEmailNo")}
             </p>
           </div>
           <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: textMut, padding: "4px", display: "flex" }}>
@@ -82,25 +89,25 @@ export default function ManagedStudentModal({ isOpen, onClose, onSave, initialDa
         <form onSubmit={handleSubmit} style={{ overflowY: "auto", flex: 1, padding: "18px 26px 26px" }}>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "12px", marginBottom: "12px" }}>
             <div>
-              <label style={lbl}>Name *</label>
-              <input style={inp} name="firstName" value={formData.firstName} onChange={handleChange} required autoFocus placeholder="e.g. Linh" />
+              <label style={lbl}>{tr("managedStudentModal.name")}</label>
+              <input style={inp} name="firstName" value={formData.firstName} onChange={handleChange} required autoFocus placeholder={tr("managedStudentModal.eGLinh")} />
             </div>
             <div>
-              <label style={lbl}>Surname</label>
-              <input style={inp} name="lastName" value={formData.lastName} onChange={handleChange} placeholder="Optional" />
+              <label style={lbl}>{tr("managedStudentModal.surname")}</label>
+              <input style={inp} name="lastName" value={formData.lastName} onChange={handleChange} placeholder={tr("managedStudentModal.optional")} />
             </div>
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "12px", marginBottom: "18px" }}>
             <div>
-              <label style={lbl}>Age</label>
-              <input style={inp} type="number" name="age" value={formData.age} onChange={handleChange} placeholder="Optional" min="3" max="99" />
+              <label style={lbl}>{tr("managedStudentModal.age")}</label>
+              <input style={inp} type="number" name="age" value={formData.age} onChange={handleChange} placeholder={tr("managedStudentModal.optional")} min="3" max="99" />
             </div>
             <div>
-              <label style={lbl}>ESL Level</label>
+              <label style={lbl}>{tr("managedStudentModal.eslLevel")}</label>
               <div style={{ position: "relative" }}>
                 <select name="rank" value={formData.rank} onChange={handleChange} style={{ ...inp, appearance: "none", paddingRight: "32px", cursor: "pointer" }}>
-                  <option value="">Select level</option>
+                  <option value="">{tr("managedStudentModal.selectLevel")}</option>
                   {CEFR_LEVELS.map(l => <option key={l.value} value={l.value}>{l.label}</option>)}
                 </select>
                 <ChevronDown size={14} style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", color: textMut, pointerEvents: "none" }} />
@@ -110,19 +117,19 @@ export default function ManagedStudentModal({ isOpen, onClose, onSave, initialDa
 
           {!isEdit && (
             <div style={{ background: dm ? "rgba(245,158,11,0.1)" : "#fffbeb", border: `1px solid ${dm ? "#92400e" : "#fde68a"}`, borderRadius: "12px", padding: "12px 14px", marginBottom: "18px" }}>
-              <p style={{ fontSize: "12.5px", fontWeight: "700", color: dm ? "#fcd34d" : "#92400e", margin: "0 0 2px" }}>Active immediately</p>
+              <p style={{ fontSize: "12.5px", fontWeight: "700", color: dm ? "#fcd34d" : "#92400e", margin: "0 0 2px" }}>{tr("managedStudentModal.activeImmediately")}</p>
               <p style={{ fontSize: "11.5px", color: dm ? "#fbbf24" : "#b45309", margin: 0 }}>
-                Assign to teachers, book classes and add credits like any student. This student cannot log in.
+                {tr("managedStudentModal.assignToTeachersBookClasses")}
               </p>
             </div>
           )}
 
           <div style={{ display: "flex", gap: "10px" }}>
             <button type="button" onClick={onClose} style={{ flex: 1, padding: "11px", borderRadius: "10px", border: `1.5px solid ${borderC}`, background: "transparent", color: dm ? "#94a3b8" : "#475569", fontSize: "14px", fontWeight: "600", cursor: "pointer", fontFamily: "inherit" }}>
-              Cancel
+              {tr("managedStudentModal.cancel")}
             </button>
             <button type="submit" disabled={loading} style={{ flex: 2, padding: "11px", borderRadius: "10px", border: "none", background: loading ? "#94a3b8" : "linear-gradient(135deg,#f59e0b,#d97706)", color: "#fff", fontSize: "14px", fontWeight: "700", cursor: loading ? "not-allowed" : "pointer", fontFamily: "inherit" }}>
-              {loading ? "Saving…" : isEdit ? "Save Changes" : "Create Managed Student"}
+              {loading ? tr("managedStudentModal.saving") : isEdit ? tr("managedStudentModal.saveChanges") : tr("managedStudentModal.createManagedStudent")}
             </button>
           </div>
         </form>

@@ -4,10 +4,12 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext.jsx';
 import api from '../../../api';
+import { useTranslation } from "react-i18next";
 
 const DASHBOARD = '/student/dashboard';
 
 export function useLoginLogic() {
+  const { t: tr } = useTranslation("student");
   const [email,        setEmail]        = useState('');
   const [password,     setPassword]     = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -45,7 +47,7 @@ export function useLoginLogic() {
         setPendingToken(response.data.pendingToken);
       }
     } catch (err) {
-      setError(err.response?.data?.message || 'Oops! Wrong email or password. Try again! 🙈');
+      setError(err.response?.data?.message || tr("useLoginLogic.oopsWrongEmailOrPassword"));
     } finally {
       setLoading(false);
     }
@@ -62,7 +64,7 @@ export function useLoginLogic() {
         _completeLogin(response.data.user, response.data.token, response.data.sessionToken);
       }
     } catch (err) {
-      setError(err.response?.data?.message || 'Invalid 2FA code');
+      setError(err.response?.data?.message || tr("useLoginLogic.invalid2faCode"));
     } finally {
       setLoading(false);
     }

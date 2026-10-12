@@ -29,6 +29,7 @@ import ReviewsTab        from "../../tabs/ReviewsTab";
 import ReferralTab      from "../../tabs/ReferralTab";
 import StreakWidget      from "../../components/StreakWidget";
 import { useDashboardData, BADGE_DEFINITIONS } from "../useDashboardData";
+import { useTranslation } from "react-i18next";
 
 // ── Palette ───────────────────────────────────────────────────────────────────
 const B = {
@@ -65,6 +66,7 @@ const SUB = {
 
 // ── Brutalist Badges ──────────────────────────────────────────────────────────
 function BrutalistBadges({ badges, progress, completedClasses, shareAchievement }) {
+  const { t: tr } = useTranslation("student");
   const [filter, setFilter] = useState('all');
   const cats = ['ALL', 'JOURNEY', 'CONSISTENCY', 'WEEKLY', 'SPECIAL'];
   const shown = BADGE_DEFINITIONS.filter(b => filter === 'ALL' || b.category.toUpperCase() === filter);
@@ -76,15 +78,15 @@ function BrutalistBadges({ badges, progress, completedClasses, shareAchievement 
       {/* Header */}
       <div style={{ background: B.card, border: `1px solid ${B.border}`, borderBottom: 'none', padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
-          <div style={{ fontFamily: 'Space Mono,monospace', fontSize: '11px', color: B.dim, letterSpacing: '.1em' }}>[ ACHIEVEMENT REGISTRY ]</div>
+          <div style={{ fontFamily: 'Space Mono,monospace', fontSize: '11px', color: B.dim, letterSpacing: '.1em' }}>{tr("brutalistShell.achievementRegistry")}</div>
           <div style={{ fontFamily: 'Space Mono,monospace', fontSize: '13px', color: B.text, marginTop: '4px' }}>
-            <span style={{ color: B.red }}>{badges.length}</span> / {BADGE_DEFINITIONS.length} EARNED &nbsp;·&nbsp; {pct}% COMPLETE
+            <span style={{ color: B.red }}>{badges.length}</span> / {BADGE_DEFINITIONS.length} {tr("brutalistShell.earned")} {pct}{tr("brutalistShell.complete")}
           </div>
         </div>
         {badges.length > 0 && (
           <button onClick={() => shareAchievement('badge')}
             style={{ background: B.red, color: '#fff', border: 'none', padding: '8px 18px', fontFamily: 'Space Mono,monospace', fontSize: '11px', letterSpacing: '.08em', cursor: 'pointer' }}>
-            SHARE ALL &gt;&gt;
+            {tr("brutalistShell.shareAll")}
           </button>
         )}
       </div>
@@ -138,6 +140,7 @@ function BrutalistBadges({ badges, progress, completedClasses, shareAchievement 
 
 // ── Main shell ────────────────────────────────────────────────────────────────
 export default function BrutalistShell() {
+  const { t: tr } = useTranslation("student");
   const { branding } = useBranding();
   const d = useDashboardData();
   const [showSettingsPanel, setShowSettingsPanel] = useState(false);
@@ -154,9 +157,9 @@ export default function BrutalistShell() {
     <div style={{ minHeight: '100vh', background: B.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Space Mono,monospace' }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap'); @keyframes blink{0%,100%{opacity:1}50%{opacity:0}}`}</style>
       <div>
-        <div style={{ color: B.dim, fontSize: '11px', letterSpacing: '.1em', marginBottom: '8px' }}>// INITIALIZING ETS v1.0</div>
-        <div style={{ color: B.dim, fontSize: '11px', letterSpacing: '.1em', marginBottom: '8px' }}>// AUTHENTICATING OPERATOR...</div>
-        <div style={{ color: B.dim, fontSize: '11px', letterSpacing: '.1em', marginBottom: '8px' }}>// LOADING MISSION DATA...</div>
+        <div style={{ color: B.dim, fontSize: '11px', letterSpacing: '.1em', marginBottom: '8px' }}>{tr("brutalistShell.initializingEtsV10")}</div>
+        <div style={{ color: B.dim, fontSize: '11px', letterSpacing: '.1em', marginBottom: '8px' }}>{tr("brutalistShell.authenticatingOperator")}</div>
+        <div style={{ color: B.dim, fontSize: '11px', letterSpacing: '.1em', marginBottom: '8px' }}>{tr("brutalistShell.loadingMissionData")}</div>
         <div style={{ color: B.green, fontSize: '11px', letterSpacing: '.1em', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
           &gt; <span style={{ animation: 'blink 1s infinite' }}>█</span>
         </div>
@@ -200,13 +203,13 @@ export default function BrutalistShell() {
           <Confetti width={window.innerWidth} height={window.innerHeight} recycle={false} numberOfPieces={200} gravity={0.4} colors={[B.red, B.text, '#fff']} />
           <div style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999, pointerEvents: 'none' }}>
             <div style={{ background: B.card, border: `2px solid ${B.red}`, padding: '40px 56px', textAlign: 'center', pointerEvents: 'auto', maxWidth: '90vw' }}>
-              <div style={{ fontSize: '11px', color: B.dim, letterSpacing: '.1em', marginBottom: '12px' }}>[ ACHIEVEMENT UNLOCKED ]</div>
+              <div style={{ fontSize: '11px', color: B.dim, letterSpacing: '.1em', marginBottom: '12px' }}>{tr("brutalistShell.achievementUnlocked")}</div>
               <div style={{ fontSize: '48px', marginBottom: '8px' }}>{d.celebrationEmoji}</div>
               <div style={{ fontSize: '18px', fontWeight: 700, color: B.red, letterSpacing: '.04em', marginBottom: '8px' }}>{d.celebrationMessage.toUpperCase()}</div>
-              <div style={{ fontSize: '11px', color: B.dim, marginBottom: '20px', letterSpacing: '.06em' }}>MISSION STATUS: EXCEPTIONAL</div>
+              <div style={{ fontSize: '11px', color: B.dim, marginBottom: '20px', letterSpacing: '.06em' }}>{tr("brutalistShell.missionStatusExceptional")}</div>
               <button className="b-btn" onClick={() => d.shareAchievement(d.newBadge ? 'badge' : d.progress.streakDays >= 5 ? 'streak' : 'total')}
                 style={{ background: B.red, color: '#fff', border: 'none', padding: '10px 24px', fontFamily: 'Space Mono,monospace', fontSize: '11px', letterSpacing: '.1em' }}>
-                &gt;&gt; BROADCAST
+                {tr("brutalistShell.broadcast")}
               </button>
             </div>
           </div>
@@ -225,12 +228,12 @@ export default function BrutalistShell() {
         {/* Logo */}
         <div style={{ padding: '20px 16px', borderBottom: `1px solid ${B.border}` }}>
           <div style={{ color: B.red, fontSize: '13px', fontWeight: 700, letterSpacing: '.06em' }}>▣ {initials}</div>
-          <div style={{ color: B.dim, fontSize: '9px', letterSpacing: '.12em', marginTop: '3px' }}>TRAINING SYSTEM v1.0</div>
+          <div style={{ color: B.dim, fontSize: '9px', letterSpacing: '.12em', marginTop: '3px' }}>{tr("brutalistShell.trainingSystemV10")}</div>
         </div>
 
         {/* Nav section header */}
         <div style={{ padding: '12px 16px 6px', borderBottom: `1px solid ${B.border}` }}>
-          <div style={{ fontSize: '9px', color: B.faint, letterSpacing: '.14em' }}>// NAVIGATION</div>
+          <div style={{ fontSize: '9px', color: B.faint, letterSpacing: '.14em' }}>{tr("brutalistShell.navigation")}</div>
         </div>
 
         {/* Nav items */}
@@ -251,22 +254,22 @@ export default function BrutalistShell() {
 
         {/* System section */}
         <div style={{ borderTop: `1px solid ${B.border}`, padding: '6px 0 8px' }}>
-          <div style={{ padding: '8px 16px 4px', fontSize: '9px', color: B.faint, letterSpacing: '.14em' }}>// SYSTEM</div>
+          <div style={{ padding: '8px 16px 4px', fontSize: '9px', color: B.faint, letterSpacing: '.14em' }}>{tr("brutalistShell.system")}</div>
           <button className="b-nav-item b-btn" onClick={() => setShowSettingsPanel(true)}
             style={{ width: '100%', padding: '8px 16px', border: 'none', background: 'transparent', textAlign: 'left', color: B.dim, fontFamily: 'Space Mono,monospace', fontSize: '11px', letterSpacing: '.08em' }}>
-            &nbsp;&nbsp;&nbsp;SETTINGS
+            {tr("brutalistShell.settings")}
           </button>
           <button className="b-nav-item b-btn" onClick={d.handleLogout}
             style={{ width: '100%', padding: '8px 16px', border: 'none', background: 'transparent', textAlign: 'left', color: B.red, fontFamily: 'Space Mono,monospace', fontSize: '11px', letterSpacing: '.08em' }}>
-            &nbsp;&nbsp;&nbsp;EXIT
+            {tr("brutalistShell.exit")}
           </button>
         </div>
 
         {/* Status bar */}
         <div style={{ borderTop: `1px solid ${B.border}`, padding: '10px 16px' }}>
           <div style={{ fontSize: '9px', color: B.faint, letterSpacing: '.1em' }}>
-            <div>OPERATOR: {(d.student.firstName || 'USER').toUpperCase()}</div>
-            <div style={{ marginTop: '3px' }}>STATUS: <span style={{ color: B.green }}>ACTIVE</span></div>
+            <div>{tr("brutalistShell.operator", { value: (d.student.firstName || 'USER').toUpperCase() })}</div>
+            <div style={{ marginTop: '3px' }}>{tr("brutalistShell.status")} <span style={{ color: B.green }}>{tr("brutalistShell.active")}</span></div>
           </div>
         </div>
       </aside>
@@ -278,11 +281,11 @@ export default function BrutalistShell() {
         <header style={{ height: '48px', background: B.panel, borderBottom: `1px solid ${B.red}`, display: 'flex', alignItems: 'center', padding: '0 20px', gap: '16px', position: 'sticky', top: 0, zIndex: 40 }}>
           <span style={{ fontSize: '11px', letterSpacing: '.1em', color: B.text, fontWeight: 700 }}>[[ {centerName.toUpperCase()} ]]</span>
           <div style={{ flex: 1 }} />
-          <span style={{ fontSize: '10px', color: B.dim, letterSpacing: '.06em' }}>REMAINING: <span style={{ color: B.red }}>{d.progress.classesRemaining}</span></span>
-          <span style={{ fontSize: '10px', color: B.dim, letterSpacing: '.06em' }}>STREAK: <span style={{ color: B.red }}>{d.progress.streakDays}D</span></span>
+          <span style={{ fontSize: '10px', color: B.dim, letterSpacing: '.06em' }}>{tr("brutalistShell.remaining")} <span style={{ color: B.red }}>{d.progress.classesRemaining}</span></span>
+          <span style={{ fontSize: '10px', color: B.dim, letterSpacing: '.06em' }}>{tr("brutalistShell.streak")} <span style={{ color: B.red }}>{d.progress.streakDays}D</span></span>
           <button className="b-btn" onClick={() => d.notificationsEnabled ? d.disableNotifications() : d.enableNotifications()}
             style={{ background: 'transparent', border: `1px solid ${d.notificationsEnabled ? B.red : B.border}`, color: d.notificationsEnabled ? B.red : B.dim, padding: '4px 10px', fontFamily: 'Space Mono,monospace', fontSize: '10px', letterSpacing: '.06em' }}>
-            {d.notificationsEnabled ? '[NOTIF: ON]' : '[NOTIF: OFF]'}
+            {d.notificationsEnabled ? tr("brutalistShell.notifOn") : tr("brutalistShell.notifOff")}
           </button>
         </header>
 
@@ -291,12 +294,11 @@ export default function BrutalistShell() {
           <div style={{ background: B.card, borderBottom: `1px solid ${B.red}`, padding: '10px 20px' }}>
             {d.pendingConfirmations.map(conf => (
               <div key={conf.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
-                <div style={{ fontSize: '11px', color: B.red, letterSpacing: '.04em' }}>
-                  [!] ATTENDANCE CONFIRMATION: "{conf.title.toUpperCase()}" — AUTO-CONFIRMS IN {d.getTimeRemaining(conf.autoConfirmAt)}
+                <div style={{ fontSize: '11px', color: B.red, letterSpacing: '.04em' }}>{tr("brutalistShell.attendanceConfirmationAutoConfirmsIn", { value: conf.title.toUpperCase(), value2: d.getTimeRemaining(conf.autoConfirmAt) })}
                 </div>
                 <button className="b-btn" onClick={() => { d.setSelectedConfirmation(conf); d.setShowConfirmationModal(true); }}
                   style={{ background: B.red, color: '#fff', border: 'none', padding: '5px 14px', fontFamily: 'Space Mono,monospace', fontSize: '10px', letterSpacing: '.08em', whiteSpace: 'nowrap' }}>
-                  REVIEW &gt;&gt;
+                  {tr("brutalistShell.review")}
                 </button>
               </div>
             ))}
@@ -331,18 +333,18 @@ export default function BrutalistShell() {
               {/* Command header — gap trick for 1px grid lines */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1px', background: B.grill }}>
                 <div style={{ background: B.card, padding: '16px 20px' }}>
-                  <div style={{ fontSize: '10px', color: B.dim, letterSpacing: '.12em', marginBottom: '6px' }}>// OPERATOR BRIEF</div>
+                  <div style={{ fontSize: '10px', color: B.dim, letterSpacing: '.12em', marginBottom: '6px' }}>{tr("brutalistShell.operatorBrief")}</div>
                   <div style={{ fontSize: '18px', fontWeight: 700, color: B.text, letterSpacing: '.02em', marginBottom: '4px' }}>{(d.student.name || d.student.firstName).toUpperCase()}</div>
                   {d.student.studentId && (
                     <div style={{ fontSize: '10px', fontFamily: 'monospace', fontWeight: 700, color: B.red, letterSpacing: '.08em', marginBottom: '4px' }}>{d.student.studentId}</div>
                   )}
                   <div style={{ fontSize: '11px', color: B.dim, letterSpacing: '.04em' }}>
-                    SESSIONS REMAINING: <span style={{ color: B.red }}>{d.progress.classesRemaining}</span>
+                    {tr("brutalistShell.sessionsRemaining")} <span style={{ color: B.red }}>{d.progress.classesRemaining}</span>
                   </div>
                 </div>
                 <div style={{ background: B.card, padding: '16px 20px', display: 'flex', alignItems: 'center', gap: '24px' }}>
                   <div>
-                    <div style={{ fontSize: '9px', color: B.dim, letterSpacing: '.12em', marginBottom: '4px' }}>ACTIVE MISSIONS</div>
+                    <div style={{ fontSize: '9px', color: B.dim, letterSpacing: '.12em', marginBottom: '4px' }}>{tr("brutalistShell.activeMissions")}</div>
                     <div style={{ fontSize: '28px', fontWeight: 700, color: d.activeClasses.length > 0 ? B.green : B.faint }}>{d.activeClasses.length}</div>
                   </div>
                   {d.activeClasses.length > 0 && (
@@ -352,7 +354,7 @@ export default function BrutalistShell() {
                   )}
                   <button className="b-btn" onClick={() => d.setActiveTab('completed-classes')}
                     style={{ marginLeft: 'auto', background: 'transparent', border: `1px solid ${B.border}`, color: B.dim, padding: '6px 14px', fontFamily: 'Space Mono,monospace', fontSize: '10px', letterSpacing: '.08em' }}>
-                    RECORDS &gt;&gt;
+                    {tr("brutalistShell.records")}
                   </button>
                 </div>
               </div>
@@ -363,7 +365,7 @@ export default function BrutalistShell() {
                   { label: 'COMPLETED', value: d.progress.completedLessons, unit: 'SESSIONS' },
                   { label: 'REMAINING', value: d.progress.classesRemaining,  unit: 'SESSIONS' },
                   { label: 'STREAK',    value: d.progress.streakDays,        unit: 'DAYS' },
-                  { label: 'THIS WEEK', value: d.progress.weeklyCompleted,   unit: 'SESSIONS' },
+                  { label: tr("brutalistShell.thisWeek"), value: d.progress.weeklyCompleted,   unit: 'SESSIONS' },
                 ].map(({ label, value, unit }) => (
                   <div key={label} style={{ background: B.card, padding: '16px' }}>
                     <div style={{ fontSize: '9px', color: B.dim, letterSpacing: '.12em', marginBottom: '8px' }}>{label}</div>
@@ -380,16 +382,16 @@ export default function BrutalistShell() {
                   {/* Active classes */}
                   <div style={{ background: B.card, padding: '16px 20px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px', borderBottom: `1px solid ${B.border}`, paddingBottom: '10px' }}>
-                      <div style={{ fontSize: '10px', color: B.dim, letterSpacing: '.12em' }}>[ LIVE MISSIONS ]</div>
+                      <div style={{ fontSize: '10px', color: B.dim, letterSpacing: '.12em' }}>{tr("brutalistShell.liveMissions")}</div>
                       {d.activeClasses.length > 0 && (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                           <div style={{ width: '6px', height: '6px', background: B.green, borderRadius: '50%' }} />
-                          <span style={{ fontSize: '9px', color: B.green, letterSpacing: '.1em' }}>{d.activeClasses.length} ACTIVE</span>
+                          <span style={{ fontSize: '9px', color: B.green, letterSpacing: '.1em' }}>{tr("brutalistShell.active2", { activeClassesCount: d.activeClasses.length })}</span>
                         </div>
                       )}
                     </div>
                     {d.activeClasses.length === 0 ? (
-                      <div style={{ fontSize: '11px', color: B.faint, letterSpacing: '.06em' }}>// NO ACTIVE SESSIONS</div>
+                      <div style={{ fontSize: '11px', color: B.faint, letterSpacing: '.06em' }}>{tr("brutalistShell.noActiveSessions")}</div>
                     ) : (
                       d.activeClasses.map(cls => (
                         <div key={cls.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: `1px solid ${B.border}` }}>
@@ -399,12 +401,12 @@ export default function BrutalistShell() {
                               <span style={{ fontSize: '12px', color: B.text, letterSpacing: '.02em' }}>{cls.title.toUpperCase()}</span>
                             </div>
                             <div style={{ fontSize: '10px', color: B.dim, letterSpacing: '.04em' }}>
-                              {cls.status === 'live' ? <span style={{ color: B.green }}>// IN PROGRESS</span> : '// STARTING SOON'} — {cls.teacher.toUpperCase()}
+                              {cls.status === 'live' ? <span style={{ color: B.green }}>{tr("brutalistShell.inProgress")}</span> : '// STARTING SOON'} — {cls.teacher.toUpperCase()}
                             </div>
                           </div>
                           <button className="b-btn" onClick={() => d.handleJoinClass(cls)}
                             style={{ background: B.red, color: '#fff', border: 'none', padding: '8px 16px', fontFamily: 'Space Mono,monospace', fontSize: '10px', letterSpacing: '.08em' }}>
-                            JOIN &gt;&gt;
+                            {tr("brutalistShell.join")}
                           </button>
                         </div>
                       ))
@@ -413,9 +415,9 @@ export default function BrutalistShell() {
 
                   {/* Upcoming */}
                   <div style={{ background: B.card, padding: '16px 20px' }}>
-                    <div style={{ fontSize: '10px', color: B.dim, letterSpacing: '.12em', marginBottom: '14px', borderBottom: `1px solid ${B.border}`, paddingBottom: '10px' }}>[ SCHEDULED MISSIONS ]</div>
+                    <div style={{ fontSize: '10px', color: B.dim, letterSpacing: '.12em', marginBottom: '14px', borderBottom: `1px solid ${B.border}`, paddingBottom: '10px' }}>{tr("brutalistShell.scheduledMissions")}</div>
                     {d.upcomingClasses.length === 0 ? (
-                      <div style={{ fontSize: '11px', color: B.faint, letterSpacing: '.06em' }}>// NO UPCOMING SESSIONS</div>
+                      <div style={{ fontSize: '11px', color: B.faint, letterSpacing: '.06em' }}>{tr("brutalistShell.noUpcomingSessions")}</div>
                     ) : (
                       d.upcomingClasses.slice(0, 4).map(cls => (
                         <div key={cls.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: `1px solid ${B.border}`, fontSize: '11px' }}>
@@ -431,7 +433,7 @@ export default function BrutalistShell() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', background: B.grill }}>
                   {/* Progress */}
                   <div style={{ background: B.card, padding: '16px' }}>
-                    <div style={{ fontSize: '9px', color: B.dim, letterSpacing: '.12em', marginBottom: '12px', borderBottom: `1px solid ${B.border}`, paddingBottom: '8px' }}>[ PERFORMANCE DATA ]</div>
+                    <div style={{ fontSize: '9px', color: B.dim, letterSpacing: '.12em', marginBottom: '12px', borderBottom: `1px solid ${B.border}`, paddingBottom: '8px' }}>{tr("brutalistShell.performanceData")}</div>
                     {[
                       { label: 'COMPLETED', v: d.progress.completedLessons, max: d.progress.totalLessons },
                       { label: 'WEEKLY',    v: d.progress.weeklyCompleted,  max: d.progress.weeklyGoal   },
@@ -453,18 +455,18 @@ export default function BrutalistShell() {
 
                   {/* Streak */}
                   <div style={{ background: B.card, padding: '16px' }}>
-                    <div style={{ fontSize: '9px', color: B.dim, letterSpacing: '.12em', marginBottom: '10px' }}>[ STREAK TRACKER ]</div>
+                    <div style={{ fontSize: '9px', color: B.dim, letterSpacing: '.12em', marginBottom: '10px' }}>{tr("brutalistShell.streakTracker")}</div>
                     <StreakWidget isDarkMode={true} onLoad={d.handleStreakLoaded} />
                   </div>
 
                   {/* Badges */}
                   <div style={{ background: B.card, padding: '16px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', borderBottom: `1px solid ${B.border}`, paddingBottom: '8px' }}>
-                      <span style={{ fontSize: '9px', color: B.dim, letterSpacing: '.12em' }}>[ EARNED INSIGNIA ]</span>
-                      <button className="b-btn" onClick={() => d.setActiveTab('badges')} style={{ background: 'transparent', border: 'none', color: B.dim, fontFamily: 'Space Mono,monospace', fontSize: '9px', letterSpacing: '.08em' }}>ALL &gt;</button>
+                      <span style={{ fontSize: '9px', color: B.dim, letterSpacing: '.12em' }}>{tr("brutalistShell.earnedInsignia")}</span>
+                      <button className="b-btn" onClick={() => d.setActiveTab('badges')} style={{ background: 'transparent', border: 'none', color: B.dim, fontFamily: 'Space Mono,monospace', fontSize: '9px', letterSpacing: '.08em' }}>{tr("brutalistShell.all")}</button>
                     </div>
                     {d.badges.length === 0 ? (
-                      <div style={{ fontSize: '10px', color: B.faint, letterSpacing: '.06em' }}>// NONE EARNED YET</div>
+                      <div style={{ fontSize: '10px', color: B.faint, letterSpacing: '.06em' }}>{tr("brutalistShell.noneEarnedYet")}</div>
                     ) : (
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                         {d.badges.slice(-6).map(b => (
@@ -477,13 +479,13 @@ export default function BrutalistShell() {
                   {/* Notifications */}
                   <div style={{ background: B.card, padding: '16px', flex: 1 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', borderBottom: `1px solid ${B.border}`, paddingBottom: '8px' }}>
-                      <span style={{ fontSize: '9px', color: B.dim, letterSpacing: '.12em' }}>[ ALERTS ]</span>
+                      <span style={{ fontSize: '9px', color: B.dim, letterSpacing: '.12em' }}>{tr("brutalistShell.alerts")}</span>
                       {d.notifications.length > 0 && (
-                        <button className="b-btn" onClick={() => d.setNotifications([])} style={{ background: 'transparent', border: 'none', color: B.dim, fontFamily: 'Space Mono,monospace', fontSize: '9px', letterSpacing: '.08em' }}>CLR</button>
+                        <button className="b-btn" onClick={() => d.setNotifications([])} style={{ background: 'transparent', border: 'none', color: B.dim, fontFamily: 'Space Mono,monospace', fontSize: '9px', letterSpacing: '.08em' }}>{tr("brutalistShell.clr")}</button>
                       )}
                     </div>
                     {d.notifications.length === 0 ? (
-                      <div style={{ fontSize: '10px', color: B.faint, letterSpacing: '.06em' }}>// NO ACTIVE ALERTS</div>
+                      <div style={{ fontSize: '10px', color: B.faint, letterSpacing: '.06em' }}>{tr("brutalistShell.noActiveAlerts")}</div>
                     ) : (
                       d.notifications.slice(0, 3).map(n => (
                         <div key={n.id} style={{ fontSize: '10px', color: B.text, letterSpacing: '.03em', padding: '5px 0', borderBottom: `1px solid ${B.border}` }}>
@@ -501,7 +503,7 @@ export default function BrutalistShell() {
           {d.activeTab === 'homework' && (
             <div style={{ background: B.card, border: `1px solid ${B.border}` }}>
               <div style={{ padding: '12px 16px', borderBottom: `1px solid ${B.border}` }}>
-                <span style={{ fontSize: '10px', color: B.dim, letterSpacing: '.12em' }}>[ HOMEWORK ASSIGNMENTS ]</span>
+                <span style={{ fontSize: '10px', color: B.dim, letterSpacing: '.12em' }}>{tr("brutalistShell.homeworkAssignments")}</span>
               </div>
               <div style={{ padding: '16px' }}><StudentHomeworkTab studentInfo={d.student} isDarkMode={true} /></div>
             </div>
@@ -510,7 +512,7 @@ export default function BrutalistShell() {
           {d.activeTab === 'quiz' && (
             <div style={{ background: B.card, border: `1px solid ${B.border}` }}>
               <div style={{ padding: '12px 16px', borderBottom: `1px solid ${B.border}` }}>
-                <span style={{ fontSize: '10px', color: B.dim, letterSpacing: '.12em' }}>[ ASSESSMENT QUEUE ]</span>
+                <span style={{ fontSize: '10px', color: B.dim, letterSpacing: '.12em' }}>{tr("brutalistShell.assessmentQueue")}</span>
               </div>
               <div style={{ padding: '16px' }}><StudentQuizTab studentInfo={d.student} isDarkMode={true} /></div>
             </div>
@@ -521,7 +523,7 @@ export default function BrutalistShell() {
           {d.activeTab === 'pronunciation' && (
             <div style={{ background: B.card, border: `1px solid ${B.border}` }}>
               <div style={{ padding: '12px 16px', borderBottom: `1px solid ${B.border}` }}>
-                <span style={{ fontSize: '10px', color: B.dim, letterSpacing: '.12em' }}>[ SPEECH TRAINING ]</span>
+                <span style={{ fontSize: '10px', color: B.dim, letterSpacing: '.12em' }}>{tr("brutalistShell.speechTraining")}</span>
               </div>
               <div style={{ padding: '16px' }}><PronunciationTab isDarkMode={true} /></div>
             </div>
@@ -530,7 +532,7 @@ export default function BrutalistShell() {
           {d.activeTab === 'conversation' && (
             <div style={{ background: B.card, border: `1px solid ${B.border}` }}>
               <div style={{ padding: '12px 16px', borderBottom: `1px solid ${B.border}` }}>
-                <span style={{ fontSize: '10px', color: B.dim, letterSpacing: '.12em' }}>[ AI DIALOGUE SYSTEM ]</span>
+                <span style={{ fontSize: '10px', color: B.dim, letterSpacing: '.12em' }}>{tr("brutalistShell.aiDialogueSystem")}</span>
               </div>
               <div style={{ padding: '16px' }}><ConversationTab studentInfo={d.student} isDarkMode={true} /></div>
             </div>
@@ -539,7 +541,7 @@ export default function BrutalistShell() {
           {d.activeTab === 'messages' && (
             <div style={{ background: B.card, border: `1px solid ${B.border}`, overflow: 'hidden' }}>
               <div style={{ padding: '12px 16px', borderBottom: `1px solid ${B.border}` }}>
-                <span style={{ fontSize: '10px', color: B.dim, letterSpacing: '.12em' }}>[ COMMS CHANNEL ]</span>
+                <span style={{ fontSize: '10px', color: B.dim, letterSpacing: '.12em' }}>{tr("brutalistShell.commsChannel")}</span>
               </div>
               <MessagesTab userRole="student" />
             </div>
@@ -548,7 +550,7 @@ export default function BrutalistShell() {
           {d.activeTab === 'completed-classes' && (
             <div style={{ background: B.card, border: `1px solid ${B.border}` }}>
               <div style={{ padding: '12px 16px', borderBottom: `1px solid ${B.border}` }}>
-                <span style={{ fontSize: '10px', color: B.dim, letterSpacing: '.12em' }}>[ MISSION ARCHIVE ]</span>
+                <span style={{ fontSize: '10px', color: B.dim, letterSpacing: '.12em' }}>{tr("brutalistShell.missionArchive")}</span>
               </div>
               <div style={{ padding: '16px' }}><StudentCompletedTab studentId={d.student.id} isDarkMode={true} /></div>
             </div>
@@ -557,7 +559,7 @@ export default function BrutalistShell() {
           {d.activeTab === 'schedule' && (
             <div style={{ background: B.card, border: `1px solid ${B.border}` }}>
               <div style={{ padding: '12px 16px', borderBottom: `1px solid ${B.border}` }}>
-                <span style={{ fontSize: '10px', color: B.dim, letterSpacing: '.12em' }}>[ DEPLOYMENT SCHEDULE ]</span>
+                <span style={{ fontSize: '10px', color: B.dim, letterSpacing: '.12em' }}>{tr("brutalistShell.deploymentSchedule")}</span>
               </div>
               <div style={{ padding: '16px' }}><StudentScheduleTab studentId={d.student.id} isDarkMode={true} /></div>
             </div>
@@ -568,9 +570,9 @@ export default function BrutalistShell() {
               {/* Stats row */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '1px', background: B.grill }}>
                 {[
-                  { label: 'TOTAL SESSIONS', value: d.completedClasses.length },
-                  { label: 'STREAK DAYS',    value: d.progress.streakDays },
-                  { label: 'TOTAL HOURS',    value: d.completedClasses.length > 0 ? Math.round(d.completedClasses.reduce((s, c) => s + c.duration, 0) / 60) : 0 },
+                  { label: tr("brutalistShell.totalSessions"), value: d.completedClasses.length },
+                  { label: tr("brutalistShell.streakDays"),    value: d.progress.streakDays },
+                  { label: tr("brutalistShell.totalHours"),    value: d.completedClasses.length > 0 ? Math.round(d.completedClasses.reduce((s, c) => s + c.duration, 0) / 60) : 0 },
                 ].map(({ label, value }) => (
                   <div key={label} style={{ background: B.card, padding: '16px' }}>
                     <div style={{ fontSize: '9px', color: B.dim, letterSpacing: '.12em', marginBottom: '8px' }}>{label}</div>
@@ -579,7 +581,7 @@ export default function BrutalistShell() {
                 ))}
               </div>
 
-              {[{ title: 'LAST 7 DAYS', data: d.chartData.last7, type: 'bar' }, { title: 'LAST 30 DAYS', data: d.chartData.last30, type: 'line' }].map(({ title, data, type }) => (
+              {[{ title: tr("brutalistShell.last7Days"), data: d.chartData.last7, type: 'bar' }, { title: tr("brutalistShell.last30Days"), data: d.chartData.last30, type: 'line' }].map(({ title, data, type }) => (
                 <div key={title} style={{ background: B.card, padding: '16px' }}>
                   <div style={{ fontSize: '10px', color: B.dim, letterSpacing: '.12em', marginBottom: '14px' }}>[ {title} ]</div>
                   <ResponsiveContainer width="100%" height={200}>
@@ -609,7 +611,7 @@ export default function BrutalistShell() {
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
           <div style={{ background: B.card, border: `1px solid ${B.red}`, padding: '28px', maxWidth: '420px', width: 'calc(100% - 32px)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', paddingBottom: '12px', borderBottom: `1px solid ${B.border}` }}>
-              <div style={{ fontSize: '11px', color: B.dim, letterSpacing: '.12em' }}>[ BROADCAST ACHIEVEMENT ]</div>
+              <div style={{ fontSize: '11px', color: B.dim, letterSpacing: '.12em' }}>{tr("brutalistShell.broadcastAchievement")}</div>
               <button className="b-btn" onClick={() => d.setShowShareModal(false)} style={{ background: 'transparent', border: `1px solid ${B.border}`, color: B.dim, padding: '3px 10px', fontFamily: 'Space Mono,monospace', fontSize: '11px' }}>✕</button>
             </div>
             <div style={{ background: B.panel, border: `1px solid ${B.border}`, padding: '14px', marginBottom: '16px' }}>
@@ -618,7 +620,7 @@ export default function BrutalistShell() {
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <button className="b-btn" onClick={d.copyShareText} style={{ padding: '10px', border: `1px solid ${B.border}`, background: 'transparent', color: B.text, fontFamily: 'Space Mono,monospace', fontSize: '11px', letterSpacing: '.06em' }}>
-                &gt;&gt; COPY TO CLIPBOARD
+                {tr("brutalistShell.copyToClipboard")}
               </button>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                 {[['twitter','TWITTER','#1DA1F2'],['facebook','FACEBOOK','#1877F2'],['whatsapp','WHATSAPP','#25D366'],['linkedin','LINKEDIN','#0A66C2']].map(([p,label,bg]) => (
@@ -635,13 +637,13 @@ export default function BrutalistShell() {
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
           <div style={{ background: B.card, border: `1px solid ${B.border}`, padding: '0', maxWidth: '360px', width: 'calc(100% - 32px)' }}>
             <div style={{ padding: '14px 20px', borderBottom: `1px solid ${B.red}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '11px', color: B.dim, letterSpacing: '.12em' }}>[ SYSTEM SETTINGS ]</span>
+              <span style={{ fontSize: '11px', color: B.dim, letterSpacing: '.12em' }}>{tr("brutalistShell.systemSettings")}</span>
               <button className="b-btn" onClick={() => setShowSettingsPanel(false)} style={{ background: 'transparent', border: `1px solid ${B.border}`, color: B.dim, padding: '3px 10px', fontFamily: 'Space Mono,monospace', fontSize: '11px' }}>✕</button>
             </div>
             {[
-              { label: 'CHANGE PASSWORD', action: () => { setShowSettingsPanel(false); d.setShowChangePassword(true); } },
-              { label: 'MANAGE SESSIONS', action: () => { setShowSettingsPanel(false); d.setShowSessionManagement(true); } },
-              { label: 'TWO-FACTOR AUTH', action: () => { setShowSettingsPanel(false); setShow2FA(true); } },
+              { label: tr("brutalistShell.changePassword"), action: () => { setShowSettingsPanel(false); d.setShowChangePassword(true); } },
+              { label: tr("brutalistShell.manageSessions"), action: () => { setShowSettingsPanel(false); d.setShowSessionManagement(true); } },
+              { label: tr("brutalistShell.twoFactorAuth"), action: () => { setShowSettingsPanel(false); setShow2FA(true); } },
             ].map(({ label, action }) => (
               <button key={label} className="b-btn b-nav-item" onClick={action}
                 style={{ width: '100%', padding: '13px 20px', border: 'none', borderBottom: `1px solid ${B.border}`, background: 'transparent', textAlign: 'left', color: B.dim, fontFamily: 'Space Mono,monospace', fontSize: '11px', letterSpacing: '.08em' }}>
@@ -650,7 +652,7 @@ export default function BrutalistShell() {
             ))}
             <button className="b-btn" onClick={d.handleLogout}
               style={{ width: '100%', padding: '13px 20px', border: 'none', background: 'transparent', textAlign: 'left', color: B.red, fontFamily: 'Space Mono,monospace', fontSize: '11px', letterSpacing: '.08em' }}>
-              &gt; EXIT SYSTEM
+              {tr("brutalistShell.exitSystem")}
             </button>
           </div>
         </div>

@@ -28,6 +28,12 @@ import { useRing }                              from "../../../../context/RingCo
 import DashboardAlertsBar from "../../../../components/DashboardAlertsBar";
 // Tabs load on demand (see src/pages/student/tabs/lazyTabs.js)
 import { LeaderboardTab, StudentCompletedTab, StudentScheduleTab, BookingCalendarTab, ClassReportsTab, StudentHomeworkTab, StudentQuizTab, PronunciationTab, ConversationTab, FlashcardsTab, RecordingsTab, ReviewsTab, ReferralTab, ChangePassword, MessagesTab, Classroom } from "../../tabs/lazyTabs";
+import { useTranslation } from "react-i18next";
+import i18n from "../../../../i18n/i18n.js";
+
+// For text in file-level lists: read when rendered, so it follows the chosen language
+const ta = (key, opts) => i18n.t(`student:${key}`, opts);
+
 
 // ── Palette ────────────────────────────────────────────────────────────────────
 const LIGHT = {
@@ -65,69 +71,69 @@ const ACC = {
 
 // ── Subject island tiles ───────────────────────────────────────────────────────
 const ISLANDS = [
-  { key:"homework",      label:"Homework",   emoji:"📚", grad:["#22C55E","#16A34A"], tab:"homework"      },
-  { key:"quiz",          label:"Quizzes",    emoji:"🧠", grad:["#6366F1","#8B5CF6"], tab:"quiz"          },
-  { key:"flashcards",    label:"Flashcards", emoji:"🗂️", grad:["#F59E0B","#D97706"], tab:"flashcards"    },
-  { key:"pronunciation", label:"Speaking",   emoji:"🎤", grad:["#EC4899","#DB2777"], tab:"pronunciation" },
-  { key:"conversation",  label:"AI Chat",    emoji:"🤖", grad:["#0EA5E9","#0284C7"], tab:"conversation"  },
-  { key:"recordings",    label:"Recordings", emoji:"🎬", grad:["#F97316","#EA580C"], tab:"recordings"    },
+  { key:"homework",      get label() { return ta("cRMShell.islandsHomework"); },   emoji:"📚", grad:["#22C55E","#16A34A"], tab:"homework"      },
+  { key:"quiz",          get label() { return ta("cRMShell.islandsQuizzes"); },    emoji:"🧠", grad:["#6366F1","#8B5CF6"], tab:"quiz"          },
+  { key:"flashcards",    get label() { return ta("cRMShell.islandsFlashcards"); }, emoji:"🗂️", grad:["#F59E0B","#D97706"], tab:"flashcards"    },
+  { key:"pronunciation", get label() { return ta("cRMShell.islandsSpeaking"); },   emoji:"🎤", grad:["#EC4899","#DB2777"], tab:"pronunciation" },
+  { key:"conversation",  get label() { return ta("cRMShell.islandsAiChat"); },    emoji:"🤖", grad:["#0EA5E9","#0284C7"], tab:"conversation"  },
+  { key:"recordings",    get label() { return ta("cRMShell.islandsRecordings"); }, emoji:"🎬", grad:["#F97316","#EA580C"], tab:"recordings"    },
 ];
 
 // ── Grouped sidebar nav (same pattern as SunshineShell) ───────────────────────
 const NAV_GROUPS = [
   {
     label: null,
-    items: [{ key:"dashboard", Icon:Home, label:"Home" }],
+    items: [{ key:"dashboard", Icon:Home, get label() { return ta("cRMShell.navGroupsHome"); } }],
   },
   {
-    label: "Learning",
+    get label() { return ta("cRMShell.navGroupsLearning"); },
     items: [
-      { key:"homework",   Icon:BookOpen, label:"Homework"   },
-      { key:"quiz",       Icon:Brain,    label:"Quizzes"    },
-      { key:"flashcards", Icon:BookOpen, label:"Flashcards" },
+      { key:"homework",   Icon:BookOpen, get label() { return ta("cRMShell.navGroupsHomework"); }   },
+      { key:"quiz",       Icon:Brain,    get label() { return ta("cRMShell.navGroupsQuizzes"); }    },
+      { key:"flashcards", Icon:BookOpen, get label() { return ta("cRMShell.navGroupsFlashcards"); } },
     ],
   },
   {
-    label: "Practice",
+    get label() { return ta("cRMShell.navGroupsPractice"); },
     items: [
-      { key:"pronunciation", Icon:Mic2,          label:"Speaking" },
-      { key:"conversation",  Icon:MessageSquare, label:"AI Chat"  },
+      { key:"pronunciation", Icon:Mic2,          get label() { return ta("cRMShell.navGroupsSpeaking"); } },
+      { key:"conversation",  Icon:MessageSquare, get label() { return ta("cRMShell.navGroupsAiChat"); }  },
     ],
   },
   {
-    label: "Classes",
+    get label() { return ta("cRMShell.navGroupsClasses"); },
     items: [
-      { key:"messages",          Icon:MessageSquare, label:"Messages"  },
-      { key:"completed-classes", Icon:CheckSquare,   label:"Completed" },
-      { key:"class-reports",     Icon:CheckSquare,   label:"Class reports" },
-      { key:"schedule",          Icon:CalendarDays,  label:"Schedule"  },
-      { key:"book-class",        Icon:CalendarDays,  label:"Book a Class" },
+      { key:"messages",          Icon:MessageSquare, get label() { return ta("cRMShell.navGroupsMessages"); }  },
+      { key:"completed-classes", Icon:CheckSquare,   get label() { return ta("cRMShell.navGroupsCompleted"); } },
+      { key:"class-reports",     Icon:CheckSquare,   get label() { return ta("cRMShell.navGroupsClassReports"); } },
+      { key:"schedule",          Icon:CalendarDays,  get label() { return ta("cRMShell.navGroupsSchedule"); }  },
+      { key:"book-class",        Icon:CalendarDays,  get label() { return ta("cRMShell.navGroupsBookAClass"); } },
     ],
   },
   {
-    label: "Progress",
+    get label() { return ta("cRMShell.navGroupsProgress"); },
     items: [
-      { key:"charts", Icon:BarChart2, label:"Progress" },
-      { key:"badges", Icon:Star,      label:"Badges"   },
+      { key:"charts", Icon:BarChart2, get label() { return ta("cRMShell.navGroupsProgress"); } },
+      { key:"badges", Icon:Star,      get label() { return ta("cRMShell.navGroupsBadges"); }   },
     ],
   },
   {
-    label: "More",
+    get label() { return ta("cRMShell.navGroupsMore"); },
     items: [
-      { key:"recordings", Icon:Video,         label:"Recordings" },
-      { key:"reviews",    Icon:Star,          label:"Reviews"    },
-      { key:"referral",   Icon:Gift,          label:"Invite"     },
-      { key:"leaderboard", Icon:Award,        label:"Leaderboard" },
+      { key:"recordings", Icon:Video,         get label() { return ta("cRMShell.navGroupsRecordings"); } },
+      { key:"reviews",    Icon:Star,          get label() { return ta("cRMShell.navGroupsReviews"); }    },
+      { key:"referral",   Icon:Gift,          get label() { return ta("cRMShell.navGroupsInvite"); }     },
+      { key:"leaderboard", Icon:Award,        get label() { return ta("cRMShell.navGroupsLeaderboard"); } },
     ],
   },
 ];
 
 const PAGE_TITLES = {
-  dashboard:"Home", homework:"Homework", quiz:"Quizzes",
-  flashcards:"Flashcards", pronunciation:"Speaking", conversation:"AI Chat",
-  messages:"Messages", "completed-classes":"Completed Classes", "class-reports":"Class Reports",
-  schedule:"Schedule", charts:"Progress", badges:"Badges",
-  recordings:"Recordings", reviews:"Reviews", referral:"Invite Friends", leaderboard:"Leaderboard",
+  get dashboard() { return ta("cRMShell.pageTitlesHome"); }, get homework() { return ta("cRMShell.pageTitlesHomework"); }, get quiz() { return ta("cRMShell.pageTitlesQuizzes"); },
+  get flashcards() { return ta("cRMShell.pageTitlesFlashcards"); }, get pronunciation() { return ta("cRMShell.pageTitlesSpeaking"); }, get conversation() { return ta("cRMShell.pageTitlesAiChat"); },
+  get messages() { return ta("cRMShell.pageTitlesMessages"); }, get "completed-classes"() { return ta("cRMShell.pageTitlesCompletedClasses"); }, get "class-reports"() { return ta("cRMShell.pageTitlesClassReports"); },
+  get schedule() { return ta("cRMShell.pageTitlesSchedule"); }, get charts() { return ta("cRMShell.pageTitlesProgress"); }, get badges() { return ta("cRMShell.pageTitlesBadges"); },
+  get recordings() { return ta("cRMShell.pageTitlesRecordings"); }, get reviews() { return ta("cRMShell.pageTitlesReviews"); }, get referral() { return ta("cRMShell.pageTitlesInviteFriends"); }, get leaderboard() { return ta("cRMShell.pageTitlesLeaderboard"); },
 };
 
 // ── Floating island SVG card ───────────────────────────────────────────────────
@@ -186,10 +192,11 @@ function IslandCard({ island, pending, onClick }) {
 
 // ── Badges tab (receives P palette) ──────────────────────────────────────────
 function BadgesTab({ badges, progress, completedClasses, shareAchievement, P }) {
+  const { t: tr } = useTranslation("student");
   const [filter, setFilter] = useState("all");
   const cats = [
-    {key:"all",label:"All"},{key:"journey",label:"Journey"},
-    {key:"consistency",label:"Consistency"},{key:"weekly",label:"Weekly"},{key:"special",label:"Special"},
+    {key:"all",label:tr("cRMShell.all")},{key:"journey",label:tr("cRMShell.journey")},
+    {key:"consistency",label:tr("cRMShell.consistency")},{key:"weekly",label:tr("cRMShell.weekly")},{key:"special",label:tr("cRMShell.special")},
   ];
   const shown  = BADGE_DEFINITIONS.filter(b => filter==="all" || b.category===filter);
   const pct    = Math.round((badges.length/BADGE_DEFINITIONS.length)*100);
@@ -201,10 +208,10 @@ function BadgesTab({ badges, progress, completedClasses, shareAchievement, P }) 
       <div style={{background:P.card,border:`1px solid ${P.border}`,borderRadius:"20px",padding:"24px"}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"16px"}}>
           <div>
-            <h2 style={{margin:"0 0 4px",fontSize:"20px",fontWeight:800,color:P.text}}>🏅 Achievement Badges</h2>
-            <p style={{margin:0,color:P.textMuted,fontSize:"14px"}}>{badges.length===0?"Complete classes to start earning!":`${badges.length} of ${BADGE_DEFINITIONS.length} earned · ${pct}%`}</p>
+            <h2 style={{margin:"0 0 4px",fontSize:"20px",fontWeight:800,color:P.text}}>{tr("cRMShell.achievementBadges")}</h2>
+            <p style={{margin:0,color:P.textMuted,fontSize:"14px"}}>{badges.length===0?tr("cRMShell.completeClassesToStartEarning"):tr("cRMShell.ofEarned", { badgesCount: badges.length, BADGEDEFINITIONSCount: BADGE_DEFINITIONS.length, pct })}</p>
           </div>
-          {badges.length>0&&<button onClick={()=>shareAchievement("badge")} style={{background:`linear-gradient(135deg,${ACC.green},${ACC.teal})`,color:"#fff",border:"none",borderRadius:"999px",padding:"9px 20px",fontWeight:700,cursor:"pointer",fontSize:"14px"}}>Share All</button>}
+          {badges.length>0&&<button onClick={()=>shareAchievement("badge")} style={{background:`linear-gradient(135deg,${ACC.green},${ACC.teal})`,color:"#fff",border:"none",borderRadius:"999px",padding:"9px 20px",fontWeight:700,cursor:"pointer",fontSize:"14px"}}>{tr("cRMShell.shareAll")}</button>}
         </div>
         <div style={{background:P.border,borderRadius:"999px",height:"8px",overflow:"hidden",marginBottom:"16px"}}>
           <div style={{width:`${pct}%`,height:"100%",background:`linear-gradient(90deg,${ACC.green},${ACC.teal})`,borderRadius:"999px",transition:"width 1s ease"}}/>
@@ -236,7 +243,7 @@ function BadgesTab({ badges, progress, completedClasses, shareAchievement, P }) 
                 </div>
               )}
               <span style={{display:"inline-block",padding:"3px 12px",borderRadius:"999px",fontSize:"11px",fontWeight:700,background:earned?`${badge.grad[0]}25`:P.border,color:earned?badge.grad[0]:P.textMuted}}>
-                {earned?"✓ Earned":"🔒 Locked"}
+                {earned?tr("cRMShell.earned"):tr("cRMShell.locked")}
               </span>
             </div>
           );
@@ -244,7 +251,7 @@ function BadgesTab({ badges, progress, completedClasses, shareAchievement, P }) 
       </div>
       {nextUp.length>0&&(
         <div style={{background:P.card,border:`1px solid ${P.border}`,borderRadius:"20px",padding:"24px"}}>
-          <h3 style={{margin:"0 0 16px",fontSize:"18px",fontWeight:800,color:P.text}}>🎯 Almost There!</h3>
+          <h3 style={{margin:"0 0 16px",fontSize:"18px",fontWeight:800,color:P.text}}>{tr("cRMShell.almostThere")}</h3>
           <div style={{display:"flex",flexDirection:"column",gap:"12px"}}>
             {nextUp.map(badge=>{
               const cur=getCur(badge);
@@ -275,6 +282,7 @@ function BadgesTab({ badges, progress, completedClasses, shareAchievement, P }) 
 // Main Shell
 // ══════════════════════════════════════════════════════════════════════════════
 export default function CRMShell() {
+  const { t: tr } = useTranslation("student");
   const { branding, center } = useBranding();
   const d = useDashboardData();
   const { missedCallCount, clearMissedCalls } = useRing();
@@ -303,7 +311,7 @@ export default function CRMShell() {
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap'); @keyframes bounce{to{transform:translateY(-14px)}}`}</style>
       <div style={{ textAlign:"center" }}>
         <div style={{ fontSize:"60px", animation:"bounce 0.7s infinite alternate" }}>🌿</div>
-        <p style={{ color:ACC.green, fontWeight:800, fontSize:"17px", marginTop:"14px" }}>Loading your academy...</p>
+        <p style={{ color:ACC.green, fontWeight:800, fontSize:"17px", marginTop:"14px" }}>{tr("cRMShell.loadingYourAcademy")}</p>
       </div>
     </div>
   );
@@ -340,7 +348,7 @@ export default function CRMShell() {
             <div style={{ background:`linear-gradient(135deg,${ACC.green},${ACC.teal})`, color:"#fff", padding:"40px 52px", borderRadius:"28px", textAlign:"center", boxShadow:"0 24px 64px rgba(0,0,0,0.25)", pointerEvents:"auto", maxWidth:"90vw" }}>
               <div style={{ fontSize:"68px", marginBottom:"12px" }}>{d.celebrationEmoji}</div>
               <h2 style={{ margin:"0 0 8px", fontSize:"26px", fontWeight:900 }}>{d.celebrationMessage}</h2>
-              <p style={{ margin:"0 0 20px", opacity:0.9, fontSize:"15px" }}>Keep up the amazing work! 🌟</p>
+              <p style={{ margin:"0 0 20px", opacity:0.9, fontSize:"15px" }}>{tr("cRMShell.keepUpTheAmazingWork")}</p>
             </div>
           </div>
         </>
@@ -370,7 +378,7 @@ export default function CRMShell() {
               <div style={{ fontSize:15, fontWeight:900, color:"#fff", lineHeight:1.1 }}>
                 {center?.centerName}
               </div>
-              <div style={{ fontSize:11, fontWeight:600, color:"rgba(255,255,255,0.6)" }}>Learning Platform</div>
+              <div style={{ fontSize:11, fontWeight:600, color:"rgba(255,255,255,0.6)" }}>{tr("cRMShell.learningPlatform")}</div>
             </div>
           </div>
         </div>
@@ -385,7 +393,7 @@ export default function CRMShell() {
             {d.student.studentId && (
               <div style={{ fontSize:10, fontWeight:700, fontFamily:"monospace", color:"rgba(255,255,255,0.5)", letterSpacing:"0.03em" }}>{d.student.studentId}</div>
             )}
-            <div style={{ fontSize:11, fontWeight:600, color:"rgba(255,255,255,0.6)" }}>{d.progress.completedLessons} classes done</div>
+            <div style={{ fontSize:11, fontWeight:600, color:"rgba(255,255,255,0.6)" }}>{tr("cRMShell.classesDone", { completedLessons: d.progress.completedLessons })}</div>
           </div>
           {d.progress.streakDays > 0 && (
             <div style={{ marginLeft:"auto", display:"flex", alignItems:"center", gap:3, background:"rgba(255,255,255,0.15)", borderRadius:999, padding:"3px 8px" }}>
@@ -438,7 +446,7 @@ export default function CRMShell() {
         <div style={{ padding:"8px 10px 16px", borderTop:"1px solid rgba(255,255,255,0.12)" }}>
           {/* Dark mode toggle */}
           <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"8px 12px", marginBottom:4 }}>
-            <span style={{ fontSize:12, fontWeight:700, color:"rgba(255,255,255,0.55)" }}>{d.isDarkMode?"Dark":"Light"}</span>
+            <span style={{ fontSize:12, fontWeight:700, color:"rgba(255,255,255,0.55)" }}>{d.isDarkMode?tr("cRMShell.dark"):tr("cRMShell.light")}</span>
             <button onClick={() => d.setIsDarkMode(v=>!v)}
               style={{ width:38, height:20, borderRadius:999, border:"none", cursor:"pointer", background:d.isDarkMode?ACC.green:"rgba(255,255,255,0.25)", position:"relative", transition:"background .2s" }}>
               <div style={{ width:14, height:14, borderRadius:"50%", background:"#fff", position:"absolute", top:3, transition:"left .2s", left:d.isDarkMode?"21px":"3px" }}/>
@@ -447,12 +455,12 @@ export default function CRMShell() {
           <button className="ia-nav" onClick={() => setShowSettings(true)}
             style={{ width:"100%", display:"flex", alignItems:"center", gap:10, padding:"9px 12px", borderRadius:12, border:"none", cursor:"pointer", background:"transparent", marginBottom:1 }}>
             <Settings size={16} color="rgba(255,255,255,0.55)" />
-            <span style={{ fontSize:13, fontWeight:600, color:"rgba(255,255,255,0.65)" }}>Settings</span>
+            <span style={{ fontSize:13, fontWeight:600, color:"rgba(255,255,255,0.65)" }}>{tr("cRMShell.settings")}</span>
           </button>
           <button className="ia-nav" onClick={d.handleLogout}
             style={{ width:"100%", display:"flex", alignItems:"center", gap:10, padding:"9px 12px", borderRadius:12, border:"none", cursor:"pointer", background:"transparent" }}>
             <LogOut size={16} color="rgba(255,255,255,0.55)" />
-            <span style={{ fontSize:13, fontWeight:600, color:"rgba(255,255,255,0.65)" }}>Sign Out</span>
+            <span style={{ fontSize:13, fontWeight:600, color:"rgba(255,255,255,0.65)" }}>{tr("cRMShell.signOut")}</span>
           </button>
         </div>
       </aside>
@@ -463,27 +471,27 @@ export default function CRMShell() {
         {/* Top bar */}
         <header style={{ height:62, background:P.card, borderBottom:`1px solid ${P.border}`, display:"flex", alignItems:"center", padding: isMobile ? "0 12px" : "0 24px", gap: isMobile ? 8 : 14, flexShrink:0 }}>
           <h1 style={{ margin:0, fontSize:18, fontWeight:900, color:P.text, flex:1 }}>
-            {PAGE_TITLES[d.activeTab] || "Dashboard"}
+            {PAGE_TITLES[d.activeTab] || tr("cRMShell.dashboard")}
           </h1>
           {d.progress.streakDays > 0 && !isMobile && (
             <div style={{ display:"flex", alignItems:"center", gap:5, background: d.isDarkMode?"rgba(249,115,22,0.15)":"#FFF7ED", border:`1px solid ${d.isDarkMode?"rgba(249,115,22,0.3)":"#FED7AA"}`, borderRadius:999, padding:"5px 12px" }}>
               <span style={{ fontSize:15 }}>🔥</span>
-              <span style={{ fontSize:13, fontWeight:800, color:ACC.orange }}>{d.progress.streakDays} day streak</span>
+              <span style={{ fontSize:13, fontWeight:800, color:ACC.orange }}>{tr("cRMShell.dayStreak", { streakDays: d.progress.streakDays })}</span>
             </div>
           )}
           {/* ── Notification chips — desktop only ── */}
           {!isMobile && d.unreadMessages > 0 && (
-            <button onClick={() => { d.setActiveTab("messages"); d.setUnreadMessages(0); }} title="Go to messages"
+            <button onClick={() => { d.setActiveTab("messages"); d.setUnreadMessages(0); }} title={tr("cRMShell.goToMessages")}
               style={{ display:"flex", alignItems:"center", gap:5, background: d.isDarkMode?"rgba(139,92,246,0.15)":"#f5f3ff", border:`1.5px solid ${d.isDarkMode?"rgba(139,92,246,0.3)":"#ddd6fe"}`, borderRadius:999, padding:"5px 13px", cursor:"pointer", fontFamily:"inherit" }}>
               <span style={{ fontSize:13 }}>💬</span>
-              <span style={{ fontSize:12, fontWeight:800, color: d.isDarkMode?"#a78bfa":"#7c3aed" }}>{d.unreadMessages} new</span>
+              <span style={{ fontSize:12, fontWeight:800, color: d.isDarkMode?"#a78bfa":"#7c3aed" }}>{tr("cRMShell.new", { unreadMessages: d.unreadMessages })}</span>
             </button>
           )}
           {!isMobile && missedCallCount > 0 && (
-            <button onClick={clearMissedCalls} title="Clear missed calls"
+            <button onClick={clearMissedCalls} title={tr("cRMShell.clearMissedCalls")}
               style={{ display:"flex", alignItems:"center", gap:5, background: d.isDarkMode?"rgba(239,68,68,0.12)":"#fff5f5", border:`1.5px solid ${d.isDarkMode?"rgba(239,68,68,0.3)":"#fecaca"}`, borderRadius:999, padding:"5px 13px", cursor:"pointer", fontFamily:"inherit" }}>
               <span style={{ fontSize:13 }}>📞</span>
-              <span style={{ fontSize:12, fontWeight:800, color:"#ef4444" }}>{missedCallCount} missed</span>
+              <span style={{ fontSize:12, fontWeight:800, color:"#ef4444" }}>{tr("cRMShell.missed", { missedCallCount })}</span>
             </button>
           )}
 
@@ -511,14 +519,14 @@ export default function CRMShell() {
               <div style={{ flex:1 }}>
                 <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:4 }}>
                   <span style={{ fontSize:18 }}>⚠️</span>
-                  <strong style={{ color: d.isDarkMode?"#FCD34D":"#92400e", fontSize:14 }}>Attendance Confirmation Needed!</strong>
+                  <strong style={{ color: d.isDarkMode?"#FCD34D":"#92400e", fontSize:14 }}>{tr("cRMShell.attendanceConfirmationNeeded")}</strong>
                 </div>
-                <p style={{ margin:"0 0 3px", color: d.isDarkMode?"#FDE68A":"#b45309", fontSize:13 }}>Teacher marked <strong>"{conf.title}"</strong> complete.</p>
-                <p style={{ margin:0, color: d.isDarkMode?"#F59E0B":"#d97706", fontSize:12 }}>⏰ Auto-confirms in: <strong>{d.getTimeRemaining(conf.autoConfirmAt)}</strong></p>
+                <p style={{ margin:"0 0 3px", color: d.isDarkMode?"#FDE68A":"#b45309", fontSize:13 }}>{tr("cRMShell.teacherMarked")} <strong>"{conf.title}"</strong> {tr("cRMShell.complete")}</p>
+                <p style={{ margin:0, color: d.isDarkMode?"#F59E0B":"#d97706", fontSize:12 }}>{tr("cRMShell.autoConfirmsIn")} <strong>{d.getTimeRemaining(conf.autoConfirmAt)}</strong></p>
               </div>
               <button className="ia-btn" onClick={()=>{ d.setSelectedConfirmation(conf); d.setShowConfirmationModal(true); }}
                 style={{ background:`linear-gradient(135deg,#f59e0b,#fbbf24)`, color:"#fff", border:"none", borderRadius:12, padding:"9px 16px", fontWeight:800, cursor:"pointer", fontSize:13, flexShrink:0 }}>
-                Review 👀
+                {tr("cRMShell.review")}
               </button>
             </div>
           ))}
@@ -535,10 +543,10 @@ export default function CRMShell() {
                 boxShadow:"0 12px 36px rgba(26,122,74,0.3)",
               }}>
                 <div>
-                  <p style={{ margin:"0 0 4px", fontSize:12, fontWeight:700, opacity:0.8, textTransform:"uppercase", letterSpacing:".06em" }}>Welcome back 🌿</p>
-                  <h1 style={{ margin:"0 0 8px", fontSize:26, fontWeight:900 }}>Hey, {d.student.firstName}! 👋</h1>
+                  <p style={{ margin:"0 0 4px", fontSize:12, fontWeight:700, opacity:0.8, textTransform:"uppercase", letterSpacing:".06em" }}>{tr("cRMShell.welcomeBack")}</p>
+                  <h1 style={{ margin:"0 0 8px", fontSize:26, fontWeight:900 }}>{tr("cRMShell.hey", { firstName: d.student.firstName })}</h1>
                   <p style={{ margin:0, opacity:0.9, fontSize:15 }}>
-                    You have <strong>{d.progress.classesRemaining}</strong> classes left. Let's grow today!
+                    {tr("cRMShell.youHave")} <strong>{d.progress.classesRemaining}</strong> {tr("cRMShell.classesLeftLetSGrow")}
                   </p>
                 </div>
                 {!isMobile && <div style={{ fontSize:72, flexShrink:0, filter:"drop-shadow(0 6px 12px rgba(0,0,0,0.2))" }}>🌳</div>}
@@ -547,10 +555,10 @@ export default function CRMShell() {
               {/* Stats row */}
               <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))", gap:12 }}>
                 {[
-                  { icon:"✅", label:"Completed",  value:d.progress.completedLessons, color:ACC.green,  bg: d.isDarkMode?"rgba(34,197,94,0.12)":"#f0fdf4" },
-                  { icon:"📅", label:"Remaining",  value:d.progress.classesRemaining,  color:"#60A5FA",  bg: d.isDarkMode?"rgba(96,165,250,0.12)":"#eff6ff" },
-                  { icon:"🔥", label:"Day Streak", value:d.progress.streakDays,        color:ACC.orange, bg: d.isDarkMode?"rgba(249,115,22,0.12)":"#fff7ed" },
-                  { icon:"⭐", label:"This Week",  value:d.progress.weeklyCompleted,   color:ACC.purple, bg: d.isDarkMode?"rgba(139,92,246,0.12)":"#f5f3ff" },
+                  { icon:"✅", label:tr("cRMShell.completed"),  value:d.progress.completedLessons, color:ACC.green,  bg: d.isDarkMode?"rgba(34,197,94,0.12)":"#f0fdf4" },
+                  { icon:"📅", label:tr("cRMShell.remaining"),  value:d.progress.classesRemaining,  color:"#60A5FA",  bg: d.isDarkMode?"rgba(96,165,250,0.12)":"#eff6ff" },
+                  { icon:"🔥", label:tr("cRMShell.dayStreak2"), value:d.progress.streakDays,        color:ACC.orange, bg: d.isDarkMode?"rgba(249,115,22,0.12)":"#fff7ed" },
+                  { icon:"⭐", label:tr("cRMShell.thisWeek"),  value:d.progress.weeklyCompleted,   color:ACC.purple, bg: d.isDarkMode?"rgba(139,92,246,0.12)":"#f5f3ff" },
                 ].map(({icon,label,value,color,bg})=>(
                   <div key={label} style={{ background:P.card, border:`1px solid ${P.border}`, borderRadius:20, padding:"18px 16px", textAlign:"center" }}>
                     <div style={{ width:44, height:44, borderRadius:14, background:bg, display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 10px", fontSize:22 }}>{icon}</div>
@@ -573,19 +581,18 @@ export default function CRMShell() {
                     </PieChart>
                     <div style={{ position:"absolute", inset:0, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center" }}>
                       <div style={{ fontSize:20, fontWeight:900, color:P.text }}>{d.progress.completedLessons}</div>
-                      <div style={{ fontSize:9, fontWeight:700, color:P.textMuted, textTransform:"uppercase" }}>Done</div>
+                      <div style={{ fontSize:9, fontWeight:700, color:P.textMuted, textTransform:"uppercase" }}>{tr("cRMShell.done")}</div>
                     </div>
                   </div>
-                  <div style={{ fontSize:13, fontWeight:800, color:P.text, textAlign:"center" }}>Class Progress</div>
+                  <div style={{ fontSize:13, fontWeight:800, color:P.text, textAlign:"center" }}>{tr("cRMShell.classProgress")}</div>
                   <div style={{ fontSize:11, color:P.textMuted, textAlign:"center", marginTop:4 }}>
-                    {d.progress.classesRemaining} remaining
-                  </div>
+                    {tr("cRMShell.remaining2", { classesRemaining: d.progress.classesRemaining })}</div>
                 </div>
 
                 {/* Live classes */}
                 <div style={{ background:P.card, border:`1px solid ${P.border}`, borderRadius:20, padding:18 }}>
                   <h2 style={{ margin:"0 0 14px", fontSize:15, fontWeight:900, color:P.text, display:"flex", alignItems:"center", gap:8 }}>
-                    🚀 Live & Starting Soon
+                    {tr("cRMShell.liveStartingSoon")}
                     {d.activeClasses.length>0&&<span style={{ background:"#ef4444", color:"#fff", borderRadius:999, padding:"2px 8px", fontSize:11, fontWeight:900 }}>{d.activeClasses.length}</span>}
                   </h2>
                   <ActiveClasses activeClasses={d.activeClasses} onJoin={d.handleJoinClass} />
@@ -593,14 +600,14 @@ export default function CRMShell() {
 
                 {/* Upcoming */}
                 <div style={{ background:P.card, border:`1px solid ${P.border}`, borderRadius:20, padding:18 }}>
-                  <h2 style={{ margin:"0 0 14px", fontSize:15, fontWeight:900, color:P.text }}>📅 Upcoming</h2>
+                  <h2 style={{ margin:"0 0 14px", fontSize:15, fontWeight:900, color:P.text }}>{tr("cRMShell.upcoming")}</h2>
                   <UpcomingClasses upcomingClasses={d.upcomingClasses} onEnroll={()=>d.showToast("Coming soon!")} />
                 </div>
               </div>
 
               {/* Island subject cards */}
               <div>
-                <h2 style={{ margin:"0 0 16px", fontSize:17, fontWeight:900, color:P.text }}>🏝️ Your Learning Islands</h2>
+                <h2 style={{ margin:"0 0 16px", fontSize:17, fontWeight:900, color:P.text }}>{tr("cRMShell.yourLearningIslands")}</h2>
                 <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))", gap:14 }}>
                   {ISLANDS.map(island => (
                     <IslandCard
@@ -618,12 +625,12 @@ export default function CRMShell() {
                 <StreakWidget isDarkMode={d.isDarkMode} onLoad={d.handleStreakLoaded} />
                 <div style={{ background:P.card, border:`1px solid ${P.border}`, borderRadius:20, padding:18 }}>
                   <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12 }}>
-                    <h2 style={{ margin:0, fontSize:15, fontWeight:900, color:P.text }}>🏅 My Badges</h2>
+                    <h2 style={{ margin:0, fontSize:15, fontWeight:900, color:P.text }}>{tr("cRMShell.myBadges")}</h2>
                     <button className="ia-btn" onClick={()=>d.setActiveTab("badges")}
-                      style={{ background: d.isDarkMode?"rgba(34,197,94,0.15)":"#f0fdf4", border:"none", color:ACC.green, fontWeight:700, borderRadius:10, padding:"4px 12px", cursor:"pointer", fontSize:12 }}>See all →</button>
+                      style={{ background: d.isDarkMode?"rgba(34,197,94,0.15)":"#f0fdf4", border:"none", color:ACC.green, fontWeight:700, borderRadius:10, padding:"4px 12px", cursor:"pointer", fontSize:12 }}>{tr("cRMShell.seeAll")}</button>
                   </div>
                   {d.badges.length===0
-                    ? <p style={{ textAlign:"center", color:P.textMuted, fontSize:13 }}>Complete classes to earn badges! 🌟</p>
+                    ? <p style={{ textAlign:"center", color:P.textMuted, fontSize:13 }}>{tr("cRMShell.completeClassesToEarnBadges")}</p>
                     : <div style={{ display:"flex", flexWrap:"wrap", gap:10 }}>
                         {d.badges.slice(-4).map(b=>(
                           <div key={b.id} title={b.name} style={{ textAlign:"center" }}>
@@ -646,7 +653,7 @@ export default function CRMShell() {
           {d.activeTab==="pronunciation"     && <div style={{background:P.card,border:`1px solid ${P.border}`,borderRadius:20,padding:24}}><PronunciationTab isDarkMode={d.isDarkMode}/></div>}
           {d.activeTab==="conversation"      && <div style={{background:P.card,border:`1px solid ${P.border}`,borderRadius:20,padding:24}}><ConversationTab studentInfo={d.student} isDarkMode={d.isDarkMode}/></div>}
           {d.activeTab==="messages"          && <div style={{background:P.card,border:`1px solid ${P.border}`,borderRadius:20,overflow:"hidden"}}><MessagesTab userRole="student" onUnreadCount={d.setUnreadMessages}/></div>}
-          {d.activeTab==="completed-classes" && <div style={{background:P.card,border:`1px solid ${P.border}`,borderRadius:20,padding:24}}><h2 style={{margin:"0 0 20px",fontSize:20,fontWeight:900,color:P.text}}>✅ Completed Classes</h2><StudentCompletedTab studentId={d.student.id} isDarkMode={d.isDarkMode}/></div>}
+          {d.activeTab==="completed-classes" && <div style={{background:P.card,border:`1px solid ${P.border}`,borderRadius:20,padding:24}}><h2 style={{margin:"0 0 20px",fontSize:20,fontWeight:900,color:P.text}}>{tr("cRMShell.completedClasses")}</h2><StudentCompletedTab studentId={d.student.id} isDarkMode={d.isDarkMode}/></div>}
           {d.activeTab==="schedule"          && <div style={{background:P.card,border:`1px solid ${P.border}`,borderRadius:20,padding:24}}><StudentScheduleTab studentId={d.student.id} isDarkMode={d.isDarkMode}/></div>}
           {d.activeTab==="class-reports"     && <div style={{background:P.card,border:`1px solid ${P.border}`,borderRadius:20,padding:24}}><ClassReportsTab isDarkMode={d.isDarkMode}/></div>}
           {d.activeTab==="book-class"        && <div style={{background:P.card,border:`1px solid ${P.border}`,borderRadius:20,padding:24}}><BookingCalendarTab isDarkMode={d.isDarkMode} studentInfo={d.student}/></div>}
@@ -661,9 +668,9 @@ export default function CRMShell() {
             <div style={{display:"flex",flexDirection:"column",gap:20}}>
               <div style={{display:"grid",gridTemplateColumns: isMobile ? "1fr" : "repeat(3,1fr)",gap:14}}>
                 {[
-                  {icon:"📚",label:"Total Classes",value:d.completedClasses.length,color:ACC.green},
-                  {icon:"🔥",label:"Day Streak",value:d.progress.streakDays,color:ACC.orange},
-                  {icon:"⏱️",label:"Total Hours",value:d.completedClasses.length>0?Math.round(d.completedClasses.reduce((s,c)=>s+c.duration,0)/60):0,color:ACC.teal},
+                  {icon:"📚",label:tr("cRMShell.totalClasses"),value:d.completedClasses.length,color:ACC.green},
+                  {icon:"🔥",label:tr("cRMShell.dayStreak2"),value:d.progress.streakDays,color:ACC.orange},
+                  {icon:"⏱️",label:tr("cRMShell.totalHours"),value:d.completedClasses.length>0?Math.round(d.completedClasses.reduce((s,c)=>s+c.duration,0)/60):0,color:ACC.teal},
                 ].map(({icon,label,value,color})=>(
                   <div key={label} style={{background:P.card,border:`1px solid ${P.border}`,borderRadius:20,padding:24,textAlign:"center"}}>
                     <div style={{fontSize:36,marginBottom:8}}>{icon}</div>
@@ -674,7 +681,7 @@ export default function CRMShell() {
               </div>
               <div style={{display:"grid",gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",gap:16}}>
                 <div style={{background:P.card,border:`1px solid ${P.border}`,borderRadius:20,padding:24}}>
-                  <h3 style={{margin:"0 0 16px",fontSize:16,fontWeight:800,color:P.text}}>Classes Per Month</h3>
+                  <h3 style={{margin:"0 0 16px",fontSize:16,fontWeight:800,color:P.text}}>{tr("cRMShell.classesPerMonth")}</h3>
                   <ResponsiveContainer width="100%" height={200}>
                     <BarChart data={d.completedClasses.slice(-12).reduce((acc,c)=>{const m=new Date(c.scheduledTime).toLocaleString("en",{month:"short"});const ex=acc.find(a=>a.month===m);if(ex)ex.count++;else acc.push({month:m,count:1});return acc;},[])} barSize={20}>
                       <CartesianGrid strokeDasharray="3 3" stroke={P.border}/>
@@ -686,7 +693,7 @@ export default function CRMShell() {
                   </ResponsiveContainer>
                 </div>
                 <div style={{background:P.card,border:`1px solid ${P.border}`,borderRadius:20,padding:24}}>
-                  <h3 style={{margin:"0 0 16px",fontSize:16,fontWeight:800,color:P.text}}>Learning Trend</h3>
+                  <h3 style={{margin:"0 0 16px",fontSize:16,fontWeight:800,color:P.text}}>{tr("cRMShell.learningTrend")}</h3>
                   <ResponsiveContainer width="100%" height={200}>
                     <LineChart data={d.completedClasses.map((c,i)=>({i:i+1,total:i+1}))}>
                       <CartesianGrid strokeDasharray="3 3" stroke={P.border}/>
@@ -711,7 +718,7 @@ export default function CRMShell() {
           <div style={{ width:300, background:P.card, height:"100%", padding:26, overflowY:"auto", boxShadow:"-4px 0 24px rgba(0,0,0,0.2)" }}
             onClick={e=>e.stopPropagation()}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:24 }}>
-              <h2 style={{ margin:0, fontSize:17, fontWeight:800, color:P.text }}>Settings</h2>
+              <h2 style={{ margin:0, fontSize:17, fontWeight:800, color:P.text }}>{tr("cRMShell.settings")}</h2>
               <button onClick={()=>setShowSettings(false)} style={{ background:P.bg, border:"none", borderRadius:8, width:30, height:30, cursor:"pointer", fontSize:15, color:P.text }}>✕</button>
             </div>
             <div style={{ display:"flex", alignItems:"center", gap:12, padding:14, background:P.bg, borderRadius:14, marginBottom:18, border:`1px solid ${P.border}` }}>
@@ -720,7 +727,7 @@ export default function CRMShell() {
               </div>
               <div>
                 <div style={{ fontSize:14, fontWeight:800, color:P.text }}>{d.student.name}</div>
-                <div style={{ fontSize:12, color:P.textMuted }}>{d.student.email||"Student"}</div>
+                <div style={{ fontSize:12, color:P.textMuted }}>{d.student.email||tr("cRMShell.student")}</div>
               </div>
             </div>
 
@@ -728,7 +735,7 @@ export default function CRMShell() {
             <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"11px 14px", background:P.bg, border:`1px solid ${P.border}`, borderRadius:12, marginBottom:8 }}>
               <div style={{ display:"flex", alignItems:"center", gap:8 }}>
                 {d.isDarkMode?<Moon size={15} color={ACC.green}/>:<Sun size={15} color={ACC.green}/>}
-                <span style={{ fontSize:13, color:P.text, fontWeight:600 }}>{d.isDarkMode?"Dark Mode":"Light Mode"}</span>
+                <span style={{ fontSize:13, color:P.text, fontWeight:600 }}>{d.isDarkMode?tr("cRMShell.darkMode"):tr("cRMShell.lightMode")}</span>
               </div>
               <button onClick={()=>d.setIsDarkMode(v=>!v)}
                 style={{ width:40, height:22, borderRadius:999, border:"none", cursor:"pointer", background:d.isDarkMode?ACC.green:P.border, position:"relative", transition:"background .2s" }}>
@@ -737,9 +744,9 @@ export default function CRMShell() {
             </div>
 
             {[
-              {Icon:KeyRound, label:"Change Password",    action:()=>{setShowSettings(false);d.setShowChangePassword(true);}},
-              {Icon:Shield,   label:"Session Management", action:()=>{setShowSettings(false);d.setShowSessionManagement(true);}},
-              {Icon:Settings, label:"Security & 2FA",     action:()=>{setShowSettings(false);setShow2FA(true);}},
+              {Icon:KeyRound, label:tr("cRMShell.changePassword"),    action:()=>{setShowSettings(false);d.setShowChangePassword(true);}},
+              {Icon:Shield,   label:tr("cRMShell.sessionManagement"), action:()=>{setShowSettings(false);d.setShowSessionManagement(true);}},
+              {Icon:Settings, label:tr("cRMShell.security2fa"),     action:()=>{setShowSettings(false);setShow2FA(true);}},
             ].map(({Icon,label,action})=>(
               <button key={label} onClick={action}
                 style={{ width:"100%", display:"flex", alignItems:"center", gap:12, padding:"12px 14px", background:P.bg, border:`1px solid ${P.border}`, borderRadius:12, marginBottom:8, cursor:"pointer", fontFamily:F, fontSize:13, color:P.text, fontWeight:600 }}>
@@ -751,7 +758,7 @@ export default function CRMShell() {
 
             <button onClick={d.handleLogout}
               style={{ width:"100%", display:"flex", alignItems:"center", justifyContent:"center", gap:8, padding:12, background:`linear-gradient(135deg,${ACC.green},${ACC.teal})`, border:"none", borderRadius:12, cursor:"pointer", color:"#fff", fontWeight:800, fontSize:14, marginTop:12 }}>
-              <LogOut size={15}/> Sign Out
+              <LogOut size={15}/> {tr("cRMShell.signOut")}
             </button>
           </div>
         </div>
@@ -774,10 +781,10 @@ export default function CRMShell() {
       {isMobile && (
         <nav style={{ position:'fixed', bottom:0, left:0, right:0, height:60, background:`linear-gradient(90deg,${ACC.sidebar},#0F5C34)`, borderTop:'1px solid rgba(255,255,255,0.12)', display:'flex', zIndex:200, boxShadow:'0 -4px 20px rgba(0,0,0,0.25)' }}>
           {[
-            { key:'dashboard', Icon:Home,          label:'Home'    },
-            { key:'homework',  Icon:BookOpen,       label:'Learn'   },
-            { key:'messages',  Icon:MessageSquare,  label:'Chat'    },
-            { key:'schedule',  Icon:CalendarDays,   label:'Classes' },
+            { key:'dashboard', Icon:Home,          label:tr("cRMShell.home")    },
+            { key:'homework',  Icon:BookOpen,       label:tr("cRMShell.learn")   },
+            { key:'messages',  Icon:MessageSquare,  label:tr("cRMShell.chat")    },
+            { key:'schedule',  Icon:CalendarDays,   label:tr("cRMShell.classes") },
           ].map(({ key, Icon, label }) => {
             const isActive = d.activeTab === key;
             return (
@@ -791,7 +798,7 @@ export default function CRMShell() {
           <button onClick={() => setShowMobileMenu(true)}
             style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:3, border:'none', background:'transparent', cursor:'pointer', fontFamily:F, color:'rgba(255,255,255,0.5)', borderTop:'3px solid transparent' }}>
             <Settings size={20} strokeWidth={1.8} />
-            <span style={{ fontSize:10, fontWeight:600 }}>More</span>
+            <span style={{ fontSize:10, fontWeight:600 }}>{tr("cRMShell.more")}</span>
           </button>
         </nav>
       )}
@@ -818,12 +825,12 @@ export default function CRMShell() {
               <button onClick={() => { setShowMobileMenu(false); setShowSettings(true); }}
                 style={{ display:'flex', alignItems:'center', gap:12, padding:'11px 14px', borderRadius:14, border:'none', background:'transparent', color:P.text, cursor:'pointer', fontFamily:F, width:'100%', fontSize:14, fontWeight:600 }}>
                 <Settings size={18} color={P.textMuted} />
-                Settings
+                {tr("cRMShell.settings")}
               </button>
               <button onClick={d.handleLogout}
                 style={{ display:'flex', alignItems:'center', gap:12, padding:'11px 14px', borderRadius:14, border:'none', background:'transparent', color:'#ef4444', cursor:'pointer', fontFamily:F, width:'100%', fontSize:14, fontWeight:600 }}>
                 <LogOut size={18} color="#ef4444" />
-                Sign Out
+                {tr("cRMShell.signOut")}
               </button>
             </div>
           </div>

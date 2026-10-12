@@ -35,3 +35,11 @@ export function emailInUseMessage({ center, reason }) {
     default:          return `This email is already the admin of ${name}. Use a different email.`;
   }
 }
+
+/**
+ * True when a save failed on the one-email-per-center unique index — i.e. a
+ * second create/rename with the same email won a race the check above lost.
+ */
+export function isEmailTakenError(err) {
+  return err?.code === 11000 && (!!err.keyPattern?.adminEmail || String(err.message || '').includes('adminEmail_one_center'));
+}

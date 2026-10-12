@@ -3,13 +3,16 @@
 import React, { useState, useEffect } from 'react';
 import { Award, Download, RefreshCw, Loader2, Shield } from 'lucide-react';
 import api from '../../../api';
+import { useTranslation } from "react-i18next";
+import { dateLocale } from "../../../i18n/dateLocale.js";
 
 const F = "'Nunito','Inter',sans-serif";
 
 const fmtDate = (iso) =>
-  new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+  new Date(iso).toLocaleDateString(dateLocale('en-GB'), { day: 'numeric', month: 'long', year: 'numeric' });
 
 function CertCard({ cert, isDarkMode, onDownload, downloading }) {
+  const { t: tr } = useTranslation("student");
   const col = {
     card:    isDarkMode ? '#1a1d2e' : '#ffffff',
     border:  isDarkMode ? '#2a2d40' : '#ffe8cc',
@@ -42,7 +45,7 @@ function CertCard({ cert, isDarkMode, onDownload, downloading }) {
           )}
           <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', fontSize: 12, color: col.muted, fontWeight: 600 }}>
             <span>📅 {fmtDate(cert.issuedAt)}</span>
-            {cert.classesCompleted > 0 && <span>📚 {cert.classesCompleted} classes completed</span>}
+            {cert.classesCompleted > 0 && <span>{tr("certificatesTab.classesCompleted", { classesCompleted: cert.classesCompleted })}</span>}
             <span>🔖 {cert.certificateNumber}</span>
           </div>
         </div>
@@ -69,6 +72,7 @@ function CertCard({ cert, isDarkMode, onDownload, downloading }) {
 }
 
 export default function CertificatesTab({ isDarkMode }) {
+  const { t: tr } = useTranslation("student");
   const col = {
     heading: isDarkMode ? '#f0f4ff' : '#3d2e20',
     muted:   isDarkMode ? '#6b7090' : '#a89480',
@@ -90,7 +94,7 @@ export default function CertificatesTab({ isDarkMode }) {
       const res = await api.get('/certificates');
       setCerts(res.data.certificates || []);
     } catch {
-      flash('Failed to load certificates');
+      flash(tr("certificatesTab.failedToLoadCertificates"));
     } finally {
       setLoading(false);
     }
@@ -109,7 +113,7 @@ export default function CertificatesTab({ isDarkMode }) {
       a.click();
       window.URL.revokeObjectURL(url);
     } catch {
-      flash('Failed to download PDF. Please try again.');
+      flash(tr("certificatesTab.failedToDownloadPdfPlease"));
     } finally {
       setDownloading(null);
     }
@@ -121,10 +125,9 @@ export default function CertificatesTab({ isDarkMode }) {
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
         <div style={{ flex: 1 }}>
-          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 900, color: col.heading }}>My Certificates</h2>
+          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 900, color: col.heading }}>{tr("certificatesTab.myCertificates")}</h2>
           <p style={{ margin: '2px 0 0', fontSize: 13, color: col.muted }}>
-            {certs.length} certificate{certs.length !== 1 ? 's' : ''} earned
-          </p>
+            {tr("certificatesTab.certificateEarned", { certsCount: certs.length, value: certs.length !== 1 ? 's' : '' })}</p>
         </div>
         <button onClick={load} style={{ background: 'none', border: `1.5px solid ${col.border}`, borderRadius: 10, padding: '7px 10px', cursor: 'pointer' }}>
           <RefreshCw size={15} color={col.muted} />
@@ -144,9 +147,9 @@ export default function CertificatesTab({ isDarkMode }) {
       ) : certs.length === 0 ? (
         <div style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: 20, padding: 60, textAlign: 'center' }}>
           <Award size={48} color={col.muted} style={{ margin: '0 auto 16px' }} />
-          <p style={{ fontSize: 16, fontWeight: 800, color: col.heading, margin: '0 0 6px' }}>No certificates yet</p>
+          <p style={{ fontSize: 16, fontWeight: 800, color: col.heading, margin: '0 0 6px' }}>{tr("certificatesTab.noCertificatesYet")}</p>
           <p style={{ fontSize: 13, color: col.muted, margin: 0 }}>
-            Complete classes to earn certificates. Milestones are reached at 10, 25, 50, and 100 classes.
+            {tr("certificatesTab.completeClassesToEarnCertificates")}
           </p>
         </div>
       ) : (
@@ -168,7 +171,7 @@ export default function CertificatesTab({ isDarkMode }) {
         <div style={{ marginTop: 24, background: isDarkMode ? 'rgba(249,115,22,0.06)' : '#fff7ed', border: `1.5px solid ${isDarkMode ? 'rgba(249,115,22,0.18)' : '#fed7aa'}`, borderRadius: 16, padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 12 }}>
           <Shield size={18} color={col.accent} />
           <p style={{ margin: 0, fontSize: 13, color: col.muted, fontWeight: 600 }}>
-            All certificates are digitally signed and verifiable. Share your certificate number with employers or parents to verify authenticity.
+            {tr("certificatesTab.allCertificatesAreDigitallySigned")}
           </p>
         </div>
       )}

@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Award, Plus, Trash2, Loader2, RefreshCw, Save } from 'lucide-react';
 import api from '../../../api';
+import { useTranslation } from "react-i18next";
 
 const F = "'Nunito','Inter',sans-serif";
 
@@ -14,6 +15,7 @@ const DEFAULT_MILESTONES = [
 ];
 
 export default function CertificateTemplateSettingsTab({ isDarkMode }) {
+  const { t: tr } = useTranslation("admin");
   const col = {
     card:    isDarkMode ? '#1a1d2e' : '#ffffff',
     border:  isDarkMode ? '#2a2d40' : '#ffe8cc',
@@ -67,20 +69,20 @@ export default function CertificateTemplateSettingsTab({ isDarkMode }) {
           });
         }
       } catch {
-        flash('Failed to load certificate template', true);
+        flash(tr("certificateTemplateSettingsTab.failedToLoadCertificateTemplate"), true);
       } finally {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [tr]);
 
   const handleSave = async () => {
     setSaving(true);
     try {
       await api.patch('/center/certificate-template', { certificateTemplate: form });
-      flash('Certificate template saved');
+      flash(tr("certificateTemplateSettingsTab.certificateTemplateSaved"));
     } catch (e) {
-      flash(e.response?.data?.message || 'Failed to save', true);
+      flash(e.response?.data?.message || tr("certificateTemplateSettingsTab.failedToSave"), true);
     } finally {
       setSaving(false);
     }
@@ -151,8 +153,8 @@ export default function CertificateTemplateSettingsTab({ isDarkMode }) {
           <Award size={24} color="#fff" />
         </div>
         <div>
-          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 900, color: col.heading }}>Certificate Template</h2>
-          <p style={{ margin: '2px 0 0', fontSize: 13, color: col.muted }}>Customize certificates issued to your students</p>
+          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 900, color: col.heading }}>{tr("certificateTemplateSettingsTab.certificateTemplate")}</h2>
+          <p style={{ margin: '2px 0 0', fontSize: 13, color: col.muted }}>{tr("certificateTemplateSettingsTab.customizeCertificatesIssuedToYour")}</p>
         </div>
       </div>
 
@@ -166,7 +168,7 @@ export default function CertificateTemplateSettingsTab({ isDarkMode }) {
       {section('Organization', <>
         {field('Organization Name (appears on certificate)',
           <input value={form.organizationName} onChange={e => setField('organizationName', e.target.value)}
-            style={inp} placeholder="e.g. Sunshine English Academy" />
+            style={inp} placeholder={tr("certificateTemplateSettingsTab.eGSunshineEnglishAcademy")} />
         )}
       </>)}
 
@@ -181,13 +183,13 @@ export default function CertificateTemplateSettingsTab({ isDarkMode }) {
         {/* Live preview swatch */}
         <div style={{ marginTop: 8, borderRadius: 16, overflow: 'hidden', border: `2px solid ${col.border}` }}>
           <div style={{ background: form.primaryColor, padding: '14px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ color: '#fff', fontWeight: 900, fontSize: 14 }}>Certificate Preview</span>
+            <span style={{ color: '#fff', fontWeight: 900, fontSize: 14 }}>{tr("certificateTemplateSettingsTab.certificatePreview")}</span>
             <div style={{ width: 24, height: 24, borderRadius: '50%', background: form.accentColor, border: '2px solid rgba(255,255,255,0.5)' }} />
           </div>
           <div style={{ background: '#fff', padding: '20px', textAlign: 'center' }}>
-            <div style={{ fontSize: 13, color: form.secondaryColor, fontWeight: 700 }}>This is to certify that</div>
-            <div style={{ fontSize: 18, fontWeight: 900, color: form.primaryColor, margin: '6px 0' }}>Student Name</div>
-            <div style={{ fontSize: 12, color: form.secondaryColor }}>{form.organizationName || 'Your Center Name'}</div>
+            <div style={{ fontSize: 13, color: form.secondaryColor, fontWeight: 700 }}>{tr("certificateTemplateSettingsTab.thisIsToCertifyThat")}</div>
+            <div style={{ fontSize: 18, fontWeight: 900, color: form.primaryColor, margin: '6px 0' }}>{tr("certificateTemplateSettingsTab.studentName")}</div>
+            <div style={{ fontSize: 12, color: form.secondaryColor }}>{form.organizationName || tr("certificateTemplateSettingsTab.yourCenterName")}</div>
           </div>
         </div>
       </>)}
@@ -197,45 +199,45 @@ export default function CertificateTemplateSettingsTab({ isDarkMode }) {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
           {field('Signatory Name',
             <input value={form.signatureName} onChange={e => setField('signatureName', e.target.value)}
-              style={inp} placeholder="e.g. Jane Smith" />
+              style={inp} placeholder={tr("certificateTemplateSettingsTab.eGJaneSmith")} />
           )}
           {field('Signatory Title',
             <input value={form.signatureTitle} onChange={e => setField('signatureTitle', e.target.value)}
-              style={inp} placeholder="e.g. Director of Studies" />
+              style={inp} placeholder={tr("certificateTemplateSettingsTab.eGDirectorOfStudies")} />
           )}
         </div>
         {field('Footer Text',
           <input value={form.footerText} onChange={e => setField('footerText', e.target.value)}
-            style={inp} placeholder="e.g. Accredited by the British Council" />
+            style={inp} placeholder={tr("certificateTemplateSettingsTab.eGAccreditedByThe")} />
         )}
       </>)}
 
       {/* Milestones */}
       <div style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: 20, padding: 24, marginBottom: 20 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
-          <h3 style={{ margin: 0, fontSize: 15, fontWeight: 900, color: col.heading }}>Completion Milestones</h3>
+          <h3 style={{ margin: 0, fontSize: 15, fontWeight: 900, color: col.heading }}>{tr("certificateTemplateSettingsTab.completionMilestones")}</h3>
           <button onClick={addMilestone}
             style={{ background: 'linear-gradient(135deg,#f97316,#f43f5e)', color: '#fff', border: 'none', borderRadius: 12, padding: '7px 14px', fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: F, display: 'flex', alignItems: 'center', gap: 5 }}>
-            <Plus size={14} /> Add Milestone
+            <Plus size={14} /> {tr("certificateTemplateSettingsTab.addMilestone")}
           </button>
         </div>
         <p style={{ margin: '0 0 16px', fontSize: 13, color: col.muted }}>
-          Certificates are automatically issued when students reach these class counts.
+          {tr("certificateTemplateSettingsTab.certificatesAreAutomaticallyIssuedWhen")}
         </p>
 
         {form.completionMilestones.map((m, i) => (
           <div key={i} style={{ background: isDarkMode ? 'rgba(255,255,255,0.03)' : '#fff8f0', border: `1.5px solid ${col.border}`, borderRadius: 16, padding: '14px 16px', marginBottom: 10 }}>
             <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
               <div style={{ width: 70, flexShrink: 0 }}>
-                <label style={{ fontSize: 11, fontWeight: 800, color: col.muted, display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '.06em' }}>Classes</label>
+                <label style={{ fontSize: 11, fontWeight: 800, color: col.muted, display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '.06em' }}>{tr("certificateTemplateSettingsTab.classes")}</label>
                 <input type="number" value={m.count} min={1}
                   onChange={e => updateMilestone(i, 'count', e.target.value)}
                   style={{ ...inp, textAlign: 'center', fontWeight: 900, fontSize: 16 }} />
               </div>
               <div style={{ flex: 1 }}>
-                <label style={{ fontSize: 11, fontWeight: 800, color: col.muted, display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '.06em' }}>Certificate Title *</label>
+                <label style={{ fontSize: 11, fontWeight: 800, color: col.muted, display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '.06em' }}>{tr("certificateTemplateSettingsTab.certificateTitle")}</label>
                 <input value={m.title} onChange={e => updateMilestone(i, 'title', e.target.value)}
-                  style={inp} placeholder="e.g. English Starter Certificate" />
+                  style={inp} placeholder={tr("certificateTemplateSettingsTab.eGEnglishStarterCertificate")} />
               </div>
               <button onClick={() => removeMilestone(i)}
                 style={{ background: 'none', border: '1px solid #fecaca', borderRadius: 10, padding: '6px 8px', cursor: 'pointer', marginTop: 20, flexShrink: 0 }}>
@@ -243,16 +245,16 @@ export default function CertificateTemplateSettingsTab({ isDarkMode }) {
               </button>
             </div>
             <div style={{ marginTop: 10 }}>
-              <label style={{ fontSize: 11, fontWeight: 800, color: col.muted, display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '.06em' }}>Description (optional)</label>
+              <label style={{ fontSize: 11, fontWeight: 800, color: col.muted, display: 'block', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '.06em' }}>{tr("certificateTemplateSettingsTab.descriptionOptional")}</label>
               <input value={m.description} onChange={e => updateMilestone(i, 'description', e.target.value)}
-                style={inp} placeholder="e.g. Awarded for completing 10 classes." />
+                style={inp} placeholder={tr("certificateTemplateSettingsTab.eGAwardedForCompleting")} />
             </div>
           </div>
         ))}
 
         {form.completionMilestones.length === 0 && (
           <div style={{ textAlign: 'center', padding: '24px 0', color: col.muted, fontSize: 13, fontWeight: 600 }}>
-            No milestones set. Certificates will only be awarded manually.
+            {tr("certificateTemplateSettingsTab.noMilestonesSetCertificatesWill")}
           </div>
         )}
       </div>

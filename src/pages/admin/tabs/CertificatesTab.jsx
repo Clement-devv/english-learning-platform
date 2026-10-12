@@ -3,13 +3,16 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Award, Download, Plus, Trash2, RefreshCw, Loader2, Search } from 'lucide-react';
 import api from '../../../api';
+import { useTranslation } from "react-i18next";
+import { dateLocale } from "../../../i18n/dateLocale.js";
 
 const F = "'Nunito','Inter',sans-serif";
 
 const fmtDate = (iso) =>
-  new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  new Date(iso).toLocaleDateString(dateLocale('en-GB'), { day: 'numeric', month: 'short', year: 'numeric' });
 
 export default function CertificatesTab({ isDarkMode }) {
+  const { t: tr } = useTranslation("admin");
   const col = {
     card:    isDarkMode ? '#1a1d2e' : '#ffffff',
     border:  isDarkMode ? '#2a2d40' : '#ffe8cc',
@@ -44,11 +47,11 @@ export default function CertificatesTab({ isDarkMode }) {
       setCerts(cRes.data.certificates || []);
       setStudents(sRes.data?.students || sRes.data || []);
     } catch {
-      flash('Failed to load');
+      flash(tr("certificatesTab.failedToLoad"));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [tr]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -63,34 +66,34 @@ export default function CertificatesTab({ isDarkMode }) {
       a.click();
       window.URL.revokeObjectURL(url);
     } catch {
-      flash('Failed to download PDF');
+      flash(tr("certificatesTab.failedToDownloadPdf"));
     } finally {
       setDownloading(null);
     }
   };
 
   const handleRevoke = async (cert) => {
-    if (!window.confirm(`Revoke certificate "${cert.certificateNumber}"? This cannot be undone.`)) return;
+    if (!window.confirm(tr("certificatesTab.revokeCertificateThisCannotBe", { certificateNumber: cert.certificateNumber }))) return;
     try {
       await api.delete(`/certificates/${cert._id}`);
-      flash('Certificate revoked');
+      flash(tr("certificatesTab.certificateRevoked"));
       load();
     } catch (e) {
-      flash(e.response?.data?.message || 'Failed to revoke');
+      flash(e.response?.data?.message || tr("certificatesTab.failedToRevoke"));
     }
   };
 
   const handleAward = async () => {
-    if (!awardForm.studentId || !awardForm.title) return flash('Select student and enter title');
+    if (!awardForm.studentId || !awardForm.title) return flash(tr("certificatesTab.selectStudentAndEnterTitle"));
     setAwarding(true);
     try {
       await api.post('/certificates', awardForm);
-      flash('Certificate awarded');
+      flash(tr("certificatesTab.certificateAwarded"));
       setShowAward(false);
       setAwardForm({ studentId: '', title: '', description: '' });
       load();
     } catch (e) {
-      flash(e.response?.data?.message || 'Failed to award');
+      flash(e.response?.data?.message || tr("certificatesTab.failedToAward"));
     } finally {
       setAwarding(false);
     }
@@ -112,17 +115,17 @@ export default function CertificatesTab({ isDarkMode }) {
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
         <div style={{ flex: 1 }}>
-          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 900, color: col.heading }}>Certificates</h2>
-          <p style={{ margin: '2px 0 0', fontSize: 13, color: col.muted }}>{certs.length} issued</p>
+          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 900, color: col.heading }}>{tr("certificatesTab.certificates")}</h2>
+          <p style={{ margin: '2px 0 0', fontSize: 13, color: col.muted }}>{tr("certificatesTab.issued", { certsCount: certs.length })}</p>
         </div>
         <div style={{ position: 'relative' }}>
           <Search size={14} color={col.muted} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)' }} />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search student or cert #..."
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder={tr("certificatesTab.searchStudentOrCert")}
             style={{ ...inp, paddingLeft: 30, width: 220 }} />
         </div>
         <button onClick={load} style={{ ...btn(isDarkMode ? '#2a2d40' : '#f5f0ec', col.body), padding: '8px 10px' }}><RefreshCw size={14} /></button>
         <button onClick={() => setShowAward(true)} style={btn('linear-gradient(135deg,#f97316,#f43f5e)')}>
-          <Plus size={14} /> Award Certificate
+          <Plus size={14} /> {tr("certificatesTab.awardCertificate")}
         </button>
       </div>
 
@@ -139,13 +142,13 @@ export default function CertificatesTab({ isDarkMode }) {
       ) : filtered.length === 0 ? (
         <div style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: 20, padding: 60, textAlign: 'center' }}>
           <Award size={40} color={col.muted} style={{ margin: '0 auto 12px' }} />
-          <p style={{ color: col.muted, fontWeight: 700 }}>No certificates yet</p>
+          <p style={{ color: col.muted, fontWeight: 700 }}>{tr("certificatesTab.noCertificatesYet")}</p>
         </div>
       ) : (
         <div style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: 20, overflow: 'hidden' }}>
           {/* Table header */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr 1fr 100px 90px 80px', gap: 12, padding: '10px 18px', background: isDarkMode ? 'rgba(255,255,255,0.03)' : '#fff8f0', borderBottom: `1.5px solid ${col.border}`, fontSize: 11, fontWeight: 800, color: col.muted, textTransform: 'uppercase', letterSpacing: '.06em' }}>
-            <span>Student</span><span>Certificate</span><span>Cert #</span><span>Issued</span><span>Type</span><span>Actions</span>
+            <span>{tr("certificatesTab.student")}</span><span>{tr("certificatesTab.certificate")}</span><span>{tr("certificatesTab.cert")}</span><span>{tr("certificatesTab.issued2")}</span><span>{tr("certificatesTab.type")}</span><span>{tr("certificatesTab.actions")}</span>
           </div>
           {filtered.map(cert => {
             const student = cert.studentId;
@@ -166,14 +169,14 @@ export default function CertificatesTab({ isDarkMode }) {
                 </span>
                 <div style={{ display: 'flex', gap: 4 }}>
                   <button onClick={() => handleDownload(cert)} disabled={downloading === cert._id || revoked}
-                    title="Download PDF"
+                    title={tr("certificatesTab.downloadPdf")}
                     style={{ background: 'none', border: `1px solid ${col.border}`, borderRadius: 8, padding: '5px 7px', cursor: revoked ? 'default' : 'pointer' }}>
                     {downloading === cert._id
                       ? <Loader2 size={13} color={col.muted} style={{ animation: 'spin .7s linear infinite' }} />
                       : <Download size={13} color={col.accent} />}
                   </button>
                   {!revoked && (
-                    <button onClick={() => handleRevoke(cert)} title="Revoke"
+                    <button onClick={() => handleRevoke(cert)} title={tr("certificatesTab.revoke")}
                       style={{ background: 'none', border: '1px solid #fecaca', borderRadius: 8, padding: '5px 7px', cursor: 'pointer' }}>
                       <Trash2 size={13} color="#ef4444" />
                     </button>
@@ -190,30 +193,30 @@ export default function CertificatesTab({ isDarkMode }) {
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: 16 }}>
           <div style={{ background: col.card, borderRadius: 24, padding: 28, width: '100%', maxWidth: 460, fontFamily: F }}>
             <div style={{ display: 'flex', alignItems: 'center', marginBottom: 20 }}>
-              <h3 style={{ margin: 0, fontSize: 18, fontWeight: 900, color: col.heading, flex: 1 }}>Award Certificate</h3>
+              <h3 style={{ margin: 0, fontSize: 18, fontWeight: 900, color: col.heading, flex: 1 }}>{tr("certificatesTab.awardCertificate")}</h3>
               <button onClick={() => setShowAward(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 20 }}>✕</button>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div>
-                <label style={{ fontSize: 12, fontWeight: 800, color: col.muted, textTransform: 'uppercase', letterSpacing: '.06em' }}>Student *</label>
+                <label style={{ fontSize: 12, fontWeight: 800, color: col.muted, textTransform: 'uppercase', letterSpacing: '.06em' }}>{tr("certificatesTab.student2")}</label>
                 <select value={awardForm.studentId} onChange={e => setAwardForm(p => ({ ...p, studentId: e.target.value }))} style={{ ...inp, marginTop: 4 }}>
-                  <option value="">Select student</option>
+                  <option value="">{tr("certificatesTab.selectStudent")}</option>
                   {students.map(s => <option key={s._id} value={s._id}>{s.firstName} {s.lastName}</option>)}
                 </select>
               </div>
               <div>
-                <label style={{ fontSize: 12, fontWeight: 800, color: col.muted, textTransform: 'uppercase', letterSpacing: '.06em' }}>Certificate Title *</label>
-                <input value={awardForm.title} onChange={e => setAwardForm(p => ({ ...p, title: e.target.value }))} placeholder="e.g. Special Achievement Award" style={{ ...inp, marginTop: 4 }} />
+                <label style={{ fontSize: 12, fontWeight: 800, color: col.muted, textTransform: 'uppercase', letterSpacing: '.06em' }}>{tr("certificatesTab.certificateTitle")}</label>
+                <input value={awardForm.title} onChange={e => setAwardForm(p => ({ ...p, title: e.target.value }))} placeholder={tr("certificatesTab.eGSpecialAchievementAward")} style={{ ...inp, marginTop: 4 }} />
               </div>
               <div>
-                <label style={{ fontSize: 12, fontWeight: 800, color: col.muted, textTransform: 'uppercase', letterSpacing: '.06em' }}>Description</label>
+                <label style={{ fontSize: 12, fontWeight: 800, color: col.muted, textTransform: 'uppercase', letterSpacing: '.06em' }}>{tr("certificatesTab.description")}</label>
                 <textarea value={awardForm.description} onChange={e => setAwardForm(p => ({ ...p, description: e.target.value }))} rows={3} style={{ ...inp, marginTop: 4, resize: 'vertical' }} />
               </div>
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
-              <button onClick={() => setShowAward(false)} style={btn(isDarkMode ? '#2a2d40' : '#f5f0ec', col.body)}>Cancel</button>
+              <button onClick={() => setShowAward(false)} style={btn(isDarkMode ? '#2a2d40' : '#f5f0ec', col.body)}>{tr("certificatesTab.cancel")}</button>
               <button onClick={handleAward} disabled={awarding} style={btn('linear-gradient(135deg,#f97316,#f43f5e)')}>
-                {awarding ? 'Awarding…' : 'Award Certificate'}
+                {awarding ? tr("certificatesTab.awarding") : tr("certificatesTab.awardCertificate")}
               </button>
             </div>
           </div>

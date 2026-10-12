@@ -1,6 +1,8 @@
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 
 export default function LessonHistoryModal({ isOpen, onClose, history = [] }) {
+  const { t: tr } = useTranslation("admin");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
 
@@ -36,7 +38,7 @@ export default function LessonHistoryModal({ isOpen, onClose, history = [] }) {
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg shadow-lg w-full max-w-3xl p-6">
-        <h2 className="text-xl font-bold mb-4">Lesson History</h2>
+        <h2 className="text-xl font-bold mb-4">{tr("lessonHistoryModal.lessonHistory")}</h2>
 
         <div className="flex gap-3 mb-4">
           <input
@@ -55,7 +57,7 @@ export default function LessonHistoryModal({ isOpen, onClose, history = [] }) {
             onClick={handlePrint}
             className="ml-auto px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
           >
-            Print to PDF
+            {tr("lessonHistoryModal.printToPdf")}
           </button>
         </div>
 
@@ -63,10 +65,10 @@ export default function LessonHistoryModal({ isOpen, onClose, history = [] }) {
           <table className="w-full text-sm border-collapse">
             <thead className="bg-gray-100">
               <tr>
-                <th className="border p-2">Date</th>
-                <th className="border p-2">Class</th>
-                <th className="border p-2">Student</th>
-                <th className="border p-2">Teacher</th>
+                <th className="border p-2">{tr("lessonHistoryModal.date")}</th>
+                <th className="border p-2">{tr("lessonHistoryModal.class")}</th>
+                <th className="border p-2">{tr("lessonHistoryModal.student")}</th>
+                <th className="border p-2">{tr("lessonHistoryModal.teacher")}</th>
               </tr>
             </thead>
             <tbody>
@@ -77,14 +79,14 @@ export default function LessonHistoryModal({ isOpen, onClose, history = [] }) {
                       {new Date(row.date).toLocaleDateString()}
                     </td>
                     <td className="border p-2">{row.classTitle || "—"}</td>
-                    <td className="border p-2">{row.student || "Unknown"}</td>
-                    <td className="border p-2">{row.teacher || "Unknown"}</td>
+                    <td className="border p-2">{row.student || tr("lessonHistoryModal.unknown")}</td>
+                    <td className="border p-2">{row.teacher || tr("lessonHistoryModal.unknown")}</td>
                   </tr>
                 ))
               ) : (
                 <tr>
                   <td colSpan="4" className="text-center p-4 text-gray-500">
-                    No lesson records found
+                    {tr("lessonHistoryModal.noLessonRecordsFound")}
                   </td>
                 </tr>
               )}
@@ -97,7 +99,7 @@ export default function LessonHistoryModal({ isOpen, onClose, history = [] }) {
             onClick={onClose}
             className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
           >
-            Close
+            {tr("lessonHistoryModal.close")}
           </button>
         </div>
       </div>

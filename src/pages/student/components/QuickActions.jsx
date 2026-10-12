@@ -1,18 +1,20 @@
 // src/pages/student/QuickActions.jsx
 import { BookOpen, MessageSquare, Video, Trophy } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 export default function QuickActions() {
+  const { t: tr } = useTranslation("student");
   const actions = [
-    { id: 1, label: "View Materials", icon: <BookOpen size={18} />, color: "bg-blue-100 text-blue-700" },
-    { id: 2, label: "Join Chat", icon: <MessageSquare size={18} />, color: "bg-green-100 text-green-700" },
-    { id: 3, label: "Video Library", icon: <Video size={18} />, color: "bg-purple-100 text-purple-700" },
-    { id: 4, label: "Achievements", icon: <Trophy size={18} />, color: "bg-yellow-100 text-yellow-700" },
+    { id: 1, label: tr("quickActions.viewMaterials"), icon: <BookOpen size={18} />, color: "bg-blue-100 text-blue-700" },
+    { id: 2, label: tr("quickActions.joinChat"), icon: <MessageSquare size={18} />, color: "bg-green-100 text-green-700" },
+    { id: 3, label: tr("quickActions.videoLibrary"), icon: <Video size={18} />, color: "bg-purple-100 text-purple-700" },
+    { id: 4, label: tr("quickActions.achievements"), icon: <Trophy size={18} />, color: "bg-yellow-100 text-yellow-700" },
   ];
 
   return (
     <div className="bg-white rounded-2xl shadow p-6">
       <h3 className="text-lg font-semibold mb-4 text-gray-800">
-        ⚙️ Quick Actions
+        {tr("quickActions.quickActions")}
       </h3>
       <div className="grid grid-cols-2 gap-3">
         {actions.map((action) => (

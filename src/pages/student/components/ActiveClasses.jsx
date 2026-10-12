@@ -1,14 +1,16 @@
 // src/pages/student/components/ActiveClasses.jsx
 import StatusBadge from "./StatusBadge";
 import { getUserTimezone, dualTime, tzCity } from "../../../utils/timezone";
+import { useTranslation } from "react-i18next";
 
 export default function ActiveClasses({ activeClasses, onJoin }) {
+  const { t: tr } = useTranslation("student");
   const myTZ = getUserTimezone();
 
   if (activeClasses.length === 0) {
     return (
       <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
-        No active classes right now.
+        {tr("activeClasses.noActiveClassesRightNow")}
       </p>
     );
   }
@@ -39,8 +41,7 @@ export default function ActiveClasses({ activeClasses, onJoin }) {
                 </p>
 
                 {showTeacherTZ && (
-                  <p className="text-xs text-indigo-500 dark:text-indigo-400 mb-0.5">
-                    Teacher ({tzCity(cls.teacherTimezone)}): {dual.theirTime} {dual.theirAbbr}
+                  <p className="text-xs text-indigo-500 dark:text-indigo-400 mb-0.5">{tr("activeClasses.teacher", { tzCity: tzCity(cls.teacherTimezone), theirTime: dual.theirTime, theirAbbr: dual.theirAbbr })}
                   </p>
                 )}
 
@@ -55,7 +56,7 @@ export default function ActiveClasses({ activeClasses, onJoin }) {
                     : "bg-blue-500 hover:bg-blue-600 text-white"
                 }`}
               >
-                {cls.status === "live" ? "Join Live" : "Join Call"}
+                {cls.status === "live" ? tr("activeClasses.joinLive") : tr("activeClasses.joinCall")}
               </button>
             </div>
           </div>

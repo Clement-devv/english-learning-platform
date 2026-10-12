@@ -7,8 +7,10 @@ import {
   Copy, Link, X, UserPlus
 } from "lucide-react";
 import api from "../../../api";
+import { useTranslation } from "react-i18next";
 
 export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
+  const { t: tr } = useTranslation("admin");
   const [subAdmins, setSubAdmins]         = useState([]);
   const [allTeachers, setAllTeachers]     = useState(teachers);
   const [loading, setLoading]             = useState(true);
@@ -52,7 +54,7 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
       const res = await api.get("/sub-admins");
       setSubAdmins(res.data.subAdmins || []);
     } catch (e) {
-      showToast("Failed to load sub-admins", "error");
+      showToast(tr("subAdminsTab.failedToLoadSubAdmins"), "error");
     } finally {
       setLoading(false);
     }
@@ -81,10 +83,10 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
       setAction("form", true);
       if (editTarget) {
         await api.put(`/sub-admins/${editTarget._id}`, form);
-        showToast("Sub-admin updated successfully");
+        showToast(tr("subAdminsTab.subAdminUpdatedSuccessfully"));
       } else {
         const { data } = await api.post("/sub-admins/invite", form);
-        showToast(`Invitation sent to ${form.email} ✉️`);
+        showToast(tr("subAdminsTab.invitationSentTo", { email: form.email }));
         if (data.setupUrl) setSetupLink({ name: form.email, url: data.setupUrl });
       }
       setShowForm(false);
@@ -92,7 +94,7 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
       setForm(blankForm);
       fetchSubAdmins();
     } catch (e) {
-      showToast(e.response?.data?.message || "Action failed", "error");
+      showToast(e.response?.data?.message || tr("subAdminsTab.actionFailed"), "error");
     } finally {
       setAction("form", false);
     }
@@ -118,10 +120,10 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
     setAction(sa._id + "_resend", true);
     try {
       const { data } = await api.post(`/sub-admins/${sa._id}/resend-invite`);
-      showToast("Invitation resent ✉️");
+      showToast(tr("subAdminsTab.invitationResent"));
       if (data.setupUrl) setSetupLink({ name: sa.email, url: data.setupUrl });
     } catch (e) {
-      showToast("Failed to resend", "error");
+      showToast(tr("subAdminsTab.failedToResend"), "error");
     } finally {
       setAction(sa._id + "_resend", false);
     }
@@ -131,24 +133,24 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
     setAction(sa._id + "_toggle", true);
     try {
       const res = await api.patch(`/sub-admins/${sa._id}/toggle-status`);
-      showToast(`Sub-admin ${res.data.status === "active" ? "reactivated" : "suspended"}`);
+      showToast(tr(res.data.status === "active" ? "subAdminsTab.subAdminReactivated" : "subAdminsTab.subAdminSuspended"));
       fetchSubAdmins();
     } catch (e) {
-      showToast("Failed to toggle status", "error");
+      showToast(tr("subAdminsTab.failedToToggleStatus"), "error");
     } finally {
       setAction(sa._id + "_toggle", false);
     }
   };
 
   const handleDelete = async (sa) => {
-    if (!confirm(`Delete ${sa.firstName} ${sa.lastName}? This cannot be undone.`)) return;
+    if (!confirm(tr("subAdminsTab.deleteThisCannotBeUndone", { firstName: sa.firstName, lastName: sa.lastName }))) return;
     setAction(sa._id + "_delete", true);
     try {
       await api.delete(`/sub-admins/${sa._id}`);
-      showToast("Sub-admin deleted");
+      showToast(tr("subAdminsTab.subAdminDeleted"));
       fetchSubAdmins();
     } catch (e) {
-      showToast("Failed to delete", "error");
+      showToast(tr("subAdminsTab.failedToDelete"), "error");
     } finally {
       setAction(sa._id + "_delete", false);
     }
@@ -190,11 +192,11 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
     setAction(sa._id + "_assign", true);
     try {
       await api.patch(`/sub-admins/${sa._id}/assign-teachers`, { teacherIds: selected });
-      showToast(`Teachers updated for ${sa.firstName} ${sa.lastName}`);
+      showToast(tr("subAdminsTab.teachersUpdatedFor", { firstName: sa.firstName, lastName: sa.lastName }));
       setAssignModal(null);
       fetchSubAdmins();
     } catch (e) {
-      showToast(e.response?.data?.message || "Failed to save assignment", "error");
+      showToast(e.response?.data?.message || tr("subAdminsTab.failedToSaveAssignment"), "error");
     } finally {
       setAction(sa._id + "_assign", false);
     }
@@ -207,9 +209,9 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
 
   const statusBadge = (status) => {
     const map = {
-      active:    { color: "#10b981", bg: isDarkMode ? "rgba(16,185,129,0.12)" : "#d1fae5", label: "Active",    icon: CheckCircle },
-      pending:   { color: "#f59e0b", bg: isDarkMode ? "rgba(245,158,11,0.12)" : "#fef9c3", label: "Pending",   icon: Clock       },
-      suspended: { color: "#ef4444", bg: isDarkMode ? "rgba(239,68,68,0.12)" : "#fee2e2",  label: "Suspended", icon: XCircle     },
+      active:    { color: "#10b981", bg: isDarkMode ? "rgba(16,185,129,0.12)" : "#d1fae5", label: tr("subAdminsTab.active"),    icon: CheckCircle },
+      pending:   { color: "#f59e0b", bg: isDarkMode ? "rgba(245,158,11,0.12)" : "#fef9c3", label: tr("subAdminsTab.pending"),   icon: Clock       },
+      suspended: { color: "#ef4444", bg: isDarkMode ? "rgba(239,68,68,0.12)" : "#fee2e2",  label: tr("subAdminsTab.suspended"), icon: XCircle     },
     };
     const cfg = map[status] || map.pending;
     const Icon = cfg.icon;
@@ -228,11 +230,11 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
 
   const REGIONS = ["africa", "asia", "europe", "americas", "oceania"];
   const PERMS = [
-    { key: "canMarkLessons",  label: "Mark Lessons",   desc: "Can mark/unmark lessons as completed" },
-    { key: "canViewPayments", label: "View Payments",  desc: "Can see teacher payment records" },
-    { key: "canSendMessages", label: "Send Messages",  desc: "Can message teachers and students" },
-    { key: "canViewBookings", label: "View Bookings",  desc: "Can see class bookings" },
-    { key: "canViewClasses",  label: "View Classes",   desc: "Can see class details" },
+    { key: "canMarkLessons",  label: tr("subAdminsTab.markLessons"),   desc: tr("subAdminsTab.canMarkUnmarkLessonsAs") },
+    { key: "canViewPayments", label: tr("subAdminsTab.viewPayments"),  desc: tr("subAdminsTab.canSeeTeacherPaymentRecords") },
+    { key: "canSendMessages", label: tr("subAdminsTab.sendMessages"),  desc: tr("subAdminsTab.canMessageTeachersAndStudents") },
+    { key: "canViewBookings", label: tr("subAdminsTab.viewBookings"),  desc: tr("subAdminsTab.canSeeClassBookings") },
+    { key: "canViewClasses",  label: tr("subAdminsTab.viewClasses"),   desc: tr("subAdminsTab.canSeeClassDetails") },
   ];
 
   return (
@@ -270,17 +272,17 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
               </div>
               <div>
                 <p style={{ margin: 0, fontSize: "14px", fontWeight: "700", color: c.heading }}>
-                  Account Setup Link
+                  {tr("subAdminsTab.accountSetupLink")}
                 </p>
                 <p style={{ margin: "2px 0 0", fontSize: "12.5px", color: c.muted }}>
-                  Share this link with <strong style={{ color: c.text }}>{setupLink.name}</strong> to complete their account setup
-                  {" "}(use this if the email didn't arrive)
+                  {tr("subAdminsTab.shareThisLinkWith")} <strong style={{ color: c.text }}>{setupLink.name}</strong> {tr("subAdminsTab.toCompleteTheirAccountSetup")}
+                  {" "}{tr("subAdminsTab.useThisIfTheEmail")}
                 </p>
               </div>
             </div>
             <button
               onClick={() => setSetupLink(null)}
-              title="Dismiss"
+              title={tr("subAdminsTab.dismiss")}
               style={{
                 background: "none", border: "none", cursor: "pointer",
                 color: c.muted, padding: "2px", flexShrink: 0,
@@ -316,10 +318,10 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div>
           <h1 style={{ margin: 0, fontSize: "22px", fontWeight: "800", color: c.heading }}>
-            Sub-Admins
+            {tr("subAdminsTab.subAdmins")}
           </h1>
           <p style={{ margin: "4px 0 0", fontSize: "13.5px", color: c.muted }}>
-            Invite and manage team members with scoped access
+            {tr("subAdminsTab.inviteAndManageTeamMembers")}
           </p>
         </div>
         <button
@@ -334,7 +336,7 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
           }}
         >
           <Plus size={16} />
-          {showForm ? "Cancel" : "Invite Sub-Admin"}
+          {showForm ? tr("subAdminsTab.cancel") : tr("subAdminsTab.inviteSubAdmin")}
         </button>
       </div>
 
@@ -345,7 +347,7 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
           borderRadius: "16px", padding: "28px",
         }}>
           <h2 style={{ margin: "0 0 24px", fontSize: "17px", fontWeight: "800", color: c.heading }}>
-            {editTarget ? "Edit Sub-Admin" : "Invite New Sub-Admin"}
+            {editTarget ? tr("subAdminsTab.editSubAdmin") : tr("subAdminsTab.inviteNewSubAdmin")}
           </h2>
 
           <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
@@ -354,12 +356,12 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
               {["firstName", "lastName"].map((field) => (
                 <div key={field}>
-                  <label style={s.label(isDarkMode)}>{field === "firstName" ? "First Name" : "Last Name"} *</label>
+                  <label style={s.label(isDarkMode)}>{field === "firstName" ? tr("subAdminsTab.firstName") : tr("subAdminsTab.lastName")} *</label>
                   <input
                     value={form[field]}
                     onChange={(e) => setForm((p) => ({ ...p, [field]: e.target.value }))}
                     required
-                    placeholder={field === "firstName" ? "John" : "Smith"}
+                    placeholder={field === "firstName" ? tr("subAdminsTab.john") : tr("subAdminsTab.smith")}
                     style={s.input(isDarkMode)}
                   />
                 </div>
@@ -369,13 +371,13 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
             {/* Email */}
             {!editTarget && (
               <div>
-                <label style={s.label(isDarkMode)}>Email Address *</label>
+                <label style={s.label(isDarkMode)}>{tr("subAdminsTab.emailAddress")}</label>
                 <input
                   type="email"
                   value={form.email}
                   onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
                   required
-                  placeholder="john@company.com"
+                  placeholder={tr("subAdminsTab.johnCompanyCom")}
                   style={s.input(isDarkMode)}
                 />
               </div>
@@ -383,7 +385,7 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
 
             {/* Assignment type */}
             <div>
-              <label style={s.label(isDarkMode)}>Assignment Type</label>
+              <label style={s.label(isDarkMode)}>{tr("subAdminsTab.assignmentType")}</label>
               <div style={{ display: "flex", gap: "10px" }}>
                 {["manual", "region"].map((type) => (
                   <button
@@ -401,7 +403,7 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
                     }}
                   >
                     {type === "manual" ? <Users size={15} /> : <Globe size={15} />}
-                    {type === "manual" ? "Manual (pick teachers)" : "By Region (auto)"}
+                    {type === "manual" ? tr("subAdminsTab.manualPickTeachers") : tr("subAdminsTab.byRegionAuto")}
                   </button>
                 ))}
               </div>
@@ -410,7 +412,7 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
             {/* Region picker */}
             {form.assignmentType === "region" && (
               <div>
-                <label style={s.label(isDarkMode)}>Region</label>
+                <label style={s.label(isDarkMode)}>{tr("subAdminsTab.region")}</label>
                 <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                   {REGIONS.map((r) => (
                     <button
@@ -437,9 +439,7 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
             {/* Teacher picker */}
             {form.assignmentType === "manual" && (
               <div>
-                <label style={s.label(isDarkMode)}>
-                  Assign Teachers ({form.assignedTeachers.length} selected)
-                </label>
+                <label style={s.label(isDarkMode)}>{tr("subAdminsTab.assignTeachersSelected", { assignedTeachersCount: form.assignedTeachers.length })}</label>
                 <div style={{
                   border: `1.5px solid ${c.border}`, borderRadius: "12px",
                   maxHeight: "200px", overflowY: "auto", padding: "8px",
@@ -447,7 +447,7 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
                 }} className="sa-scroll">
                   {allTeachers.length === 0 ? (
                     <p style={{ padding: "12px", fontSize: "13px", color: c.muted, textAlign: "center" }}>
-                      No teachers available
+                      {tr("subAdminsTab.noTeachersAvailable")}
                     </p>
                   ) : (
                     allTeachers.map((t) => {
@@ -490,7 +490,7 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
 
             {/* Permissions */}
             <div>
-              <label style={s.label(isDarkMode)}>Permissions</label>
+              <label style={s.label(isDarkMode)}>{tr("subAdminsTab.permissions")}</label>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
                 {PERMS.map(({ key, label, desc }) => (
                   <div
@@ -524,11 +524,11 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
 
             {/* Notes */}
             <div>
-              <label style={s.label(isDarkMode)}>Internal Notes (optional)</label>
+              <label style={s.label(isDarkMode)}>{tr("subAdminsTab.internalNotesOptional")}</label>
               <textarea
                 value={form.notes}
                 onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
-                placeholder="e.g. Manages Nigeria teachers, 9am-5pm WAT"
+                placeholder={tr("subAdminsTab.eGManagesNigeriaTeachers")}
                 rows={2}
                 style={{ ...s.input(isDarkMode), resize: "vertical", minHeight: "64px", lineHeight: "1.5" }}
               />
@@ -568,7 +568,7 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
         <Search size={15} color={c.muted} />
         <input
           type="text"
-          placeholder="Search sub-admins…"
+          placeholder={tr("subAdminsTab.searchSubAdmins")}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           style={{
@@ -581,9 +581,9 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
       {/* ── Stats row ── */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "12px" }}>
         {[
-          { label: "Total",     value: subAdmins.length,                                    color: "#6b82f0" },
-          { label: "Active",    value: subAdmins.filter((s) => s.status === "active").length,  color: "#10b981" },
-          { label: "Pending",   value: subAdmins.filter((s) => s.status === "pending").length, color: "#f59e0b" },
+          { label: tr("subAdminsTab.total"),     value: subAdmins.length,                                    color: "#6b82f0" },
+          { label: tr("subAdminsTab.active"),    value: subAdmins.filter((s) => s.status === "active").length,  color: "#10b981" },
+          { label: tr("subAdminsTab.pending"),   value: subAdmins.filter((s) => s.status === "pending").length, color: "#f59e0b" },
         ].map(({ label, value, color }) => (
           <div key={label} style={{
             background: c.card, border: `1px solid ${c.border}`,
@@ -600,16 +600,16 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
       {loading ? (
         <div style={{ textAlign: "center", padding: "60px 0" }}>
           <div className="sa-spin" style={{ width: "32px", height: "32px", border: `3px solid ${c.border}`, borderTopColor: "#6b82f0", borderRadius: "50%", margin: "0 auto 12px" }} />
-          <p style={{ fontSize: "13px", color: c.muted }}>Loading…</p>
+          <p style={{ fontSize: "13px", color: c.muted }}>{tr("subAdminsTab.loading")}</p>
         </div>
       ) : filtered.length === 0 ? (
         <div style={{ textAlign: "center", padding: "60px 0" }}>
           <Shield size={40} color={isDarkMode ? "#1e2235" : "#e2e8f0"} style={{ margin: "0 auto 12px" }} />
           <p style={{ fontSize: "15px", fontWeight: "600", color: c.muted, margin: "0 0 6px" }}>
-            {searchQuery ? "No results found" : "No sub-admins yet"}
+            {searchQuery ? tr("subAdminsTab.noResultsFound") : tr("subAdminsTab.noSubAdminsYet")}
           </p>
           <p style={{ fontSize: "13px", color: isDarkMode ? "#252840" : "#d0d5ea", margin: 0 }}>
-            {searchQuery ? "Try a different search" : 'Click "Invite Sub-Admin" to get started'}
+            {searchQuery ? tr("subAdminsTab.tryADifferentSearch") : tr("subAdminsTab.clickInviteSubAdminTo")}
           </p>
         </div>
       ) : (
@@ -648,7 +648,7 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
                       {statusBadge(sa.status)}
                     </div>
                     <p style={{ margin: "2px 0 0", fontSize: "12.5px", color: c.muted }}>
-                      {sa.email} · {sa.assignmentType === "region" ? `Region: ${sa.region}` : `${sa.assignedTeachers?.length || 0} teacher(s) assigned`}
+                      {sa.email} · {sa.assignmentType === "region" ? tr("subAdminsTab.region2", { region: sa.region }) : tr("subAdminsTab.teacherSAssigned", { value: sa.assignedTeachers?.length || 0 })}
                     </p>
                   </div>
 
@@ -660,7 +660,7 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
                       <ActionBtn
                         onClick={() => handleResendInvite(sa)}
                         loading={actionLoading[sa._id + "_resend"]}
-                        title="Resend invite"
+                        title={tr("subAdminsTab.resendInvite")}
                         color="#6b82f0"
                         isDarkMode={isDarkMode}
                       >
@@ -671,7 +671,7 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
                       <ActionBtn
                         onClick={() => handleToggleStatus(sa)}
                         loading={actionLoading[sa._id + "_toggle"]}
-                        title={sa.status === "active" ? "Suspend" : "Reactivate"}
+                        title={sa.status === "active" ? tr("subAdminsTab.suspend") : tr("subAdminsTab.reactivate")}
                         color={sa.status === "active" ? "#f59e0b" : "#10b981"}
                         isDarkMode={isDarkMode}
                       >
@@ -682,7 +682,7 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
                       <ActionBtn
                         onClick={() => openAssignModal(sa)}
                         loading={actionLoading[sa._id + "_assign"]}
-                        title="Assign teachers"
+                        title={tr("subAdminsTab.assignTeachers")}
                         color="#10b981"
                         isDarkMode={isDarkMode}
                       >
@@ -691,7 +691,7 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
                     )}
                     <ActionBtn
                       onClick={() => openEdit(sa)}
-                      title="Edit"
+                      title={tr("subAdminsTab.edit")}
                       color="#3b82f6"
                       isDarkMode={isDarkMode}
                     >
@@ -700,7 +700,7 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
                     <ActionBtn
                       onClick={() => handleDelete(sa)}
                       loading={actionLoading[sa._id + "_delete"]}
-                      title="Delete"
+                      title={tr("subAdminsTab.delete")}
                       color="#ef4444"
                       isDarkMode={isDarkMode}
                     >
@@ -723,14 +723,14 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
                       {/* Assigned teachers */}
                       <div>
                         <p style={{ margin: "0 0 10px", fontSize: "12px", fontWeight: "700", color: c.muted, textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                          Assigned Teachers
+                          {tr("subAdminsTab.assignedTeachers")}
                         </p>
                         {sa.assignmentType === "region" ? (
                           <p style={{ fontSize: "13px", color: c.text, margin: 0 }}>
-                            🌍 All <strong style={{ textTransform: "capitalize" }}>{sa.region}</strong> teachers (auto)
+                            {tr("subAdminsTab.all")} <strong style={{ textTransform: "capitalize" }}>{sa.region}</strong> {tr("subAdminsTab.teachersAuto")}
                           </p>
                         ) : sa.assignedTeachers?.length === 0 ? (
-                          <p style={{ fontSize: "13px", color: c.muted, fontStyle: "italic", margin: 0 }}>None assigned</p>
+                          <p style={{ fontSize: "13px", color: c.muted, fontStyle: "italic", margin: 0 }}>{tr("subAdminsTab.noneAssigned")}</p>
                         ) : (
                           <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                             {sa.assignedTeachers?.map((t) => (
@@ -756,7 +756,7 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
                       {/* Permissions */}
                       <div>
                         <p style={{ margin: "0 0 10px", fontSize: "12px", fontWeight: "700", color: c.muted, textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                          Permissions
+                          {tr("subAdminsTab.permissions")}
                         </p>
                         <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
                           {PERMS.map(({ key, label }) => (
@@ -785,9 +785,9 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
                     )}
 
                     <p style={{ margin: "10px 0 0", fontSize: "11.5px", color: c.muted }}>
-                      Last login: {sa.lastLogin ? new Date(sa.lastLogin).toLocaleString() : "Never"}
+                      {tr("subAdminsTab.lastLogin")} {sa.lastLogin ? new Date(sa.lastLogin).toLocaleString() : tr("subAdminsTab.never")}
                       {" · "}
-                      Created: {new Date(sa.createdAt).toLocaleDateString()}
+                      {tr("subAdminsTab.created")} {new Date(sa.createdAt).toLocaleDateString()}
                     </p>
                   </div>
                 )}
@@ -831,11 +831,10 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
               }}>
                 <div>
                   <p style={{ margin: 0, fontSize: "15px", fontWeight: "800", color: c.heading }}>
-                    Assign Teachers
+                    {tr("subAdminsTab.assignTeachers2")}
                   </p>
                   <p style={{ margin: "2px 0 0", fontSize: "12.5px", color: c.muted }}>
-                    {sa.firstName} {sa.lastName} · {selected.length} selected
-                  </p>
+                    {tr("subAdminsTab.selected", { firstName: sa.firstName, lastName: sa.lastName, selectedCount: selected.length })}</p>
                 </div>
                 <button onClick={() => setAssignModal(null)} style={{
                   background: "none", border: "none", cursor: "pointer",
@@ -857,7 +856,7 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
                   <input
                     autoFocus
                     type="text"
-                    placeholder="Search teachers…"
+                    placeholder={tr("subAdminsTab.searchTeachers")}
                     value={assignSearch}
                     onChange={(e) => setAssignSearch(e.target.value)}
                     style={{
@@ -878,7 +877,7 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
               <div style={{ flex: 1, overflowY: "auto", padding: "10px 24px" }} className="sa-scroll">
                 {visibleTeachers.length === 0 ? (
                   <p style={{ textAlign: "center", padding: "24px 0", fontSize: "13px", color: c.muted }}>
-                    No teachers match your search
+                    {tr("subAdminsTab.noTeachersMatchYourSearch")}
                   </p>
                 ) : visibleTeachers.map((t) => {
                   const isSelected = selected.includes(t._id);
@@ -944,7 +943,7 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
                     color: c.text, fontSize: "13.5px", fontWeight: "700", fontFamily: "inherit",
                   }}
                 >
-                  Cancel
+                  {tr("subAdminsTab.cancel")}
                 </button>
                 <button
                   onClick={handleSaveAssign}
@@ -1001,6 +1000,7 @@ function ActionBtn({ onClick, loading, title, color, isDarkMode, children }) {
 }
 
 function CopyBtn({ url, isDarkMode }) {
+  const { t: tr } = useTranslation("admin");
   const [copied, setCopied] = useState(false);
   const handleCopy = async () => {
     try {
@@ -1014,7 +1014,7 @@ function CopyBtn({ url, isDarkMode }) {
   return (
     <button
       onClick={handleCopy}
-      title="Copy link"
+      title={tr("subAdminsTab.copyLink")}
       style={{
         display: "flex", alignItems: "center", gap: "6px",
         padding: "10px 16px", border: "none", borderRadius: "10px", cursor: "pointer",
@@ -1028,7 +1028,7 @@ function CopyBtn({ url, isDarkMode }) {
       }}
     >
       {copied ? <CheckCircle size={14} /> : <Copy size={14} />}
-      {copied ? "Copied!" : "Copy"}
+      {copied ? tr("subAdminsTab.copied") : tr("subAdminsTab.copy")}
     </button>
   );
 }

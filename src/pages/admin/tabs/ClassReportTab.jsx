@@ -9,6 +9,7 @@ import { ChevronLeft, ChevronRight, Download, Mail, Loader2, Search, CalendarDay
 import api from "../../../api";
 import { getCachedCenter } from "../../../utils/branding";
 import { useOnDataChanged } from "../../../hooks/useLiveData";
+import { useTranslation } from "react-i18next";
 
 const addDays = (dateStr, n) => {
   const d = new Date(`${dateStr}T12:00:00Z`);
@@ -17,6 +18,7 @@ const addDays = (dateStr, n) => {
 };
 
 export default function ClassReportTab({ isDarkMode }) {
+  const { t: tr } = useTranslation("admin");
   const [date,    setDate]    = useState(null);   // null → server picks "today" (school time)
   const [today,   setToday]   = useState(null);
   const [report,  setReport]  = useState(null);
@@ -43,8 +45,8 @@ Teacher: ${r.teacherName}
 ${r.summary}`;
   };
   const copySummary = async (r) => {
-    try { await navigator.clipboard.writeText(parentMessage(r)); setToast("Report copied — paste it into WhatsApp, Zalo or Facebook"); setTimeout(() => setToast(""), 3500); }
-    catch { setToast("Could not copy"); setTimeout(() => setToast(""), 3500); }
+    try { await navigator.clipboard.writeText(parentMessage(r)); setToast(tr("classReportTab.reportCopiedPasteItInto")); setTimeout(() => setToast(""), 3500); }
+    catch { setToast(tr("classReportTab.couldNotCopy")); setTimeout(() => setToast(""), 3500); }
   };
 
   const col = {
@@ -70,10 +72,10 @@ ${r.summary}`;
         setToday(r.data.data.today);
         if (!date) setDate(r.data.data.date);
       })
-      .catch(e => !cancelled && setError(e?.response?.data?.message || "Could not load the report"))
+      .catch(e => !cancelled && setError(e?.response?.data?.message || tr("classReportTab.couldNotLoadTheReport")))
       .finally(() => !cancelled && setLoading(false));
     return () => { cancelled = true; };
-  }, [date, reloadKey]);
+  }, [date, reloadKey, tr]);
 
   // Search filters rows by teacher, student or class name
   const filterGroups = (groups) => {
@@ -96,7 +98,7 @@ ${r.summary}`;
       const a = document.createElement("a");
       a.href = url; a.download = `Class_Report_${report.date}.pdf`; a.click();
       URL.revokeObjectURL(url);
-    } catch { showToast("Could not download the PDF"); }
+    } catch { showToast(tr("classReportTab.couldNotDownloadThePdf")); }
     finally { setBusy(""); }
   };
 
@@ -104,15 +106,15 @@ ${r.summary}`;
     setBusy("email");
     try {
       const { data } = await api.post("/admin/class-report/email", { date: report.date });
-      showToast(data.message || "Report sent");
-    } catch (e) { showToast(e?.response?.data?.message || "Could not send the report"); }
+      showToast(data.message || tr("classReportTab.reportSent"));
+    } catch (e) { showToast(e?.response?.data?.message || tr("classReportTab.couldNotSendTheReport")); }
     finally { setBusy(""); }
   };
 
   const c = report?.counts;
   const changed = c ? c.changedToCompleted + c.changedToNotCompleted : 0;
 
-  const Section = ({ title, icon, color, groups, empty }) => (
+  const Section = ({ title, icon, color, groups, empty }) => { const { t: tr } = useTranslation("admin"); return (
     <section style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <h3 style={{ margin: 0, fontSize: 16, fontWeight: 900, color, display: "flex", alignItems: "center", gap: 8 }}>
         {icon} {title}
@@ -122,7 +124,7 @@ ${r.summary}`;
       ) : groups.map(g => (
         <div key={g.teacherId} style={{ background: col.card, border: `1px solid ${col.border}`, borderRadius: 14, overflow: "hidden" }}>
           <div style={{ padding: "10px 14px", fontSize: 14, fontWeight: 800, color: col.text, borderBottom: `1px solid ${col.border}` }}>
-            {g.teacherName} <span style={{ color: col.muted, fontWeight: 600 }}>· {g.rows.length} class{g.rows.length !== 1 ? "es" : ""}</span>
+            {g.teacherName} <span style={{ color: col.muted, fontWeight: 600 }}>{tr("classReportTab.class", { rowsCount: g.rows.length, value: g.rows.length !== 1 ? "es" : "" })}</span>
           </div>
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: 680 }}>
@@ -160,17 +162,17 @@ ${r.summary}`;
                                 {r.summary.length > 140 && (
                                   <button type="button" onClick={() => setOpenSummary(o => ({ ...o, [r.id]: !o[r.id] }))}
                                     style={{ padding: "4px 8px", borderRadius: 8, border: `1px solid ${col.border}`, background: "transparent", color: col.muted, fontSize: 11.5, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
-                                    {openSummary[r.id] ? "Less" : "More"}
+                                    {openSummary[r.id] ? tr("classReportTab.less") : tr("classReportTab.more")}
                                   </button>
                                 )}
-                                <button type="button" onClick={() => copySummary(r)} title="Copy a ready-to-send message with this summary"
+                                <button type="button" onClick={() => copySummary(r)} title={tr("classReportTab.copyAReadyToSend")}
                                   style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 9px", borderRadius: 8, border: "none", background: col.accent, color: "#fff", fontSize: 11.5, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>
-                                  <Copy size={11} /> Copy for parent
+                                  <Copy size={11} /> {tr("classReportTab.copyForParent")}
                                 </button>
                               </div>
                             </div>
                           ) : (
-                            <span style={{ fontSize: 11.5, color: col.muted, fontStyle: "italic" }}>No class summary from the teacher yet</span>
+                            <span style={{ fontSize: 11.5, color: col.muted, fontStyle: "italic" }}>{tr("classReportTab.noClassSummaryFromThe")}</span>
                           )}
                         </td>
                       </tr>
@@ -178,11 +180,11 @@ ${r.summary}`;
                     r.change && (
                       <tr key={`${r.id}-chg`} style={{ boxShadow: `inset 3px 0 0 ${mark}` }}>
                         <td colSpan={6} style={{ padding: "0 12px 9px 15px", fontSize: 12, fontWeight: 700, color: mark }}>
-                          {r.change.to === "not_completed" ? "⚠ Was completed — turned NOT completed" : "✓ Was not completed — turned COMPLETED"}
+                          {r.change.to === "not_completed" ? tr("classReportTab.wasCompletedTurnedNotCompleted") : tr("classReportTab.wasNotCompletedTurnedCompleted")}
                           {" on "}{r.change.atLabel}
-                          {r.change.pastClass ? ` · class held ${r.classDate}` : ""}
+                          {r.change.pastClass ? tr("classReportTab.classHeld", { classDate: r.classDate }) : ""}
                           {" · "}{r.change.source}{r.change.reason ? `: ${r.change.reason}` : ""}
-                          {r.change.pastClass && r.change.to === "completed" ? " (dispute of a past date)" : ""}
+                          {r.change.pastClass && r.change.to === "completed" ? tr("classReportTab.disputeOfAPastDate") : ""}
                         </td>
                       </tr>
                     ),
@@ -194,26 +196,24 @@ ${r.summary}`;
         </div>
       ))}
     </section>
-  );
+  ); };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
       {/* Header */}
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <div>
-          <h2 style={{ margin: "0 0 4px", fontSize: 22, fontWeight: 900, color: col.text }}>📋 Class Report</h2>
-          <p style={{ margin: 0, fontSize: 13, color: col.muted }}>
-            Every class of the day, grouped by teacher. Emailed to admins every day after midnight{report?.tz ? ` (${report.tz})` : ""}.
-          </p>
+          <h2 style={{ margin: "0 0 4px", fontSize: 22, fontWeight: 900, color: col.text }}>{tr("classReportTab.classReport")}</h2>
+          <p style={{ margin: 0, fontSize: 13, color: col.muted }}>{tr("classReportTab.everyClassOfTheDay", { value: report?.tz ? ` (${report.tz})` : "" })}</p>
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <button onClick={downloadPdf} disabled={!report || !!busy}
             style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 14px", borderRadius: 10, border: `1px solid ${col.border}`, background: col.card, color: col.text, cursor: "pointer", fontSize: 13, fontWeight: 700, fontFamily: "inherit" }}>
-            {busy === "pdf" ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />} Download PDF
+            {busy === "pdf" ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />} {tr("classReportTab.downloadPdf")}
           </button>
           <button onClick={emailMe} disabled={!report || !!busy}
             style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 14px", borderRadius: 10, border: "none", background: "linear-gradient(135deg,#6366f1,#8b5cf6)", color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 800, fontFamily: "inherit" }}>
-            {busy === "email" ? <Loader2 size={15} className="animate-spin" /> : <Mail size={15} />} Email me
+            {busy === "email" ? <Loader2 size={15} className="animate-spin" /> : <Mail size={15} />} {tr("classReportTab.emailMe")}
           </button>
         </div>
       </div>
@@ -221,7 +221,7 @@ ${r.summary}`;
       {/* Day picker + search */}
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <button onClick={() => date && setDate(addDays(date, -1))} aria-label="Previous day"
+          <button onClick={() => date && setDate(addDays(date, -1))} aria-label={tr("classReportTab.previousDay")}
             style={{ padding: 8, borderRadius: 10, border: `1px solid ${col.border}`, background: col.card, color: col.text, cursor: "pointer", display: "flex" }}>
             <ChevronLeft size={16} />
           </button>
@@ -230,20 +230,20 @@ ${r.summary}`;
             <input type="date" value={date || ""} max={today || undefined} onChange={e => e.target.value && setDate(e.target.value)}
               style={{ border: "none", background: "transparent", color: col.text, fontSize: 13, fontFamily: "inherit", outline: "none" }} />
           </label>
-          <button onClick={() => date && setDate(addDays(date, 1))} disabled={!!today && date >= today} aria-label="Next day"
+          <button onClick={() => date && setDate(addDays(date, 1))} disabled={!!today && date >= today} aria-label={tr("classReportTab.nextDay")}
             style={{ padding: 8, borderRadius: 10, border: `1px solid ${col.border}`, background: col.card, color: col.text, cursor: "pointer", display: "flex", opacity: today && date >= today ? 0.4 : 1 }}>
             <ChevronRight size={16} />
           </button>
           {today && date !== today && (
             <button onClick={() => setDate(today)}
               style={{ padding: "7px 12px", borderRadius: 10, border: `1px solid ${col.border}`, background: col.card, color: col.accent, cursor: "pointer", fontSize: 12.5, fontWeight: 800, fontFamily: "inherit" }}>
-              Today
+              {tr("classReportTab.today")}
             </button>
           )}
         </div>
         <div style={{ position: "relative", flex: 1, minWidth: 200 }}>
           <Search size={15} color={col.muted} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search teacher, student or class…"
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder={tr("classReportTab.searchTeacherStudentOrClass")}
             style={{ width: "100%", boxSizing: "border-box", padding: "9px 12px 9px 34px", borderRadius: 10, border: `1px solid ${col.border}`, background: col.input, color: col.text, fontSize: 13, fontFamily: "inherit", outline: "none" }} />
         </div>
       </div>
@@ -273,14 +273,14 @@ ${r.summary}`;
 
           {changed > 0 && (
             <p style={{ margin: 0, fontSize: 12.5, color: col.muted, display: "flex", alignItems: "center", gap: 6 }}>
-              <RefreshCw size={13} /> Classes from earlier days whose result changed on this day are listed with a
-              <span style={{ color: "#dc2626", fontWeight: 800 }}>red</span> or <span style={{ color: "#059669", fontWeight: 800 }}>green</span> marker.
+              <RefreshCw size={13} /> {tr("classReportTab.classesFromEarlierDaysWhose")}
+              <span style={{ color: "#dc2626", fontWeight: 800 }}>{tr("classReportTab.red")}</span> {tr("classReportTab.or")} <span style={{ color: "#059669", fontWeight: 800 }}>{tr("classReportTab.green")}</span> {tr("classReportTab.marker")}
             </p>
           )}
 
-          <Section title="Completed classes" icon={<CheckCircle2 size={18} />} color="#059669" groups={completed}
+          <Section title={tr("classReportTab.completedClasses")} icon={<CheckCircle2 size={18} />} color="#059669" groups={completed}
             empty={search ? "No completed classes match your search." : "No completed classes on this day."} />
-          <Section title="Not completed" icon={<XCircle size={18} />} color="#dc2626" groups={notCompleted}
+          <Section title={tr("classReportTab.notCompleted")} icon={<XCircle size={18} />} color="#dc2626" groups={notCompleted}
             empty={search ? "No unsuccessful classes match your search." : "No unsuccessful classes on this day."} />
         </>
       )}

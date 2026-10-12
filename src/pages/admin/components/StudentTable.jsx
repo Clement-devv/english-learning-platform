@@ -1,6 +1,7 @@
 // src/pages/admin/components/StudentTable.jsx
 import React from "react";
 import { visibleEmail } from "../../../utils/managedStudent.js";
+import { useTranslation } from "react-i18next";
 
 export default function StudentTable({
   students,
@@ -15,24 +16,25 @@ export default function StudentTable({
   onCopyPassword,
   onResetPassword,
 }) {
+  const { t: tr } = useTranslation("admin");
   return (
     <div className="mt-4 overflow-x-auto">
       <table className="w-full border-collapse border border-gray-300">
         <thead>
           <tr className="bg-gray-100 text-left">
-            <th className="border p-2">First Name</th>
-            <th className="border p-2">Surname</th>
-            <th className="border p-2">Email</th>
-            <th className="border p-2">Password</th>
-            <th className="border p-2">No. of Classes</th>
-            <th className="border p-2">Actions</th>
+            <th className="border p-2">{tr("studentTable.firstName")}</th>
+            <th className="border p-2">{tr("studentTable.surname")}</th>
+            <th className="border p-2">{tr("studentTable.email")}</th>
+            <th className="border p-2">{tr("studentTable.password")}</th>
+            <th className="border p-2">{tr("studentTable.noOfClasses")}</th>
+            <th className="border p-2">{tr("studentTable.actions")}</th>
           </tr>
         </thead>
         <tbody>
           {students.length === 0 ? (
             <tr>
               <td colSpan="6" className="text-center p-4 text-gray-500">
-                No students found
+                {tr("studentTable.noStudentsFound")}
               </td>
             </tr>
           ) : (
@@ -40,7 +42,7 @@ export default function StudentTable({
               <tr key={s._id} className="hover:bg-gray-50">
                 <td className="border p-2">{s.firstName}</td>
                 <td className="border p-2">{s.lastName}</td>
-                <td className="border p-2">{visibleEmail(s.email) || "No login (managed)"}</td>
+                <td className="border p-2">{visibleEmail(s.email) || tr("studentTable.noLoginManaged")}</td>
 
                 {/* Password column */}
                 <td className="border p-2">
@@ -53,7 +55,7 @@ export default function StudentTable({
                         onClick={() => onCopyPassword(s._id)}
                         className="px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
                       >
-                        Copy
+                        {tr("studentTable.copy")}
                       </button>
                     </div>
                   ) : (
@@ -64,7 +66,7 @@ export default function StudentTable({
                       onClick={() => onResetPassword(s._id)}
                       className="px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600"
                     >
-                      Reset Password
+                      {tr("studentTable.resetPassword")}
                     </button>
                   </div>
                 </td>
@@ -81,7 +83,7 @@ export default function StudentTable({
                       onClick={() => onMarkLesson(s._id)}
                       className="px-2 py-1 bg-emerald-600 text-white rounded hover:bg-emerald-700 text-xs"
                     >
-                      ✅ Mark Lesson
+                      {tr("studentTable.markLesson")}
                     </button>
 
                     {/* ✅ NEW: Unmark Lesson */}
@@ -89,42 +91,42 @@ export default function StudentTable({
                       onClick={() => onUnmarkLesson(s._id)}
                       className="px-2 py-1 bg-rose-600 text-white rounded hover:bg-rose-700 text-xs"
                     >
-                      ⚠️ Unmark Lesson
+                      {tr("studentTable.unmarkLesson")}
                     </button>
 
                     <button
                       onClick={() => onManualPayment(s._id)}
                       className="px-2 py-1 bg-green-600 text-white rounded hover:bg-green-700 text-xs"
                     >
-                      Manual Payment
+                      {tr("studentTable.manualPayment")}
                     </button>
 
                     <button
                       onClick={() => onViewPayment(s._id)}
                       className="px-2 py-1 bg-yellow-600 text-white rounded hover:bg-yellow-700 text-xs"
                     >
-                      View Payment
+                      {tr("studentTable.viewPayment")}
                     </button>
 
                     <button
                       onClick={() => onViewLessons(s._id)}
                       className="px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-xs"
                     >
-                      View Lessons
+                      {tr("studentTable.viewLessons")}
                     </button>
 
                     <button
                       onClick={() => onEdit(s._id)}
                       className="px-2 py-1 bg-indigo-500 text-white rounded hover:bg-indigo-600 text-xs"
                     >
-                      Edit
+                      {tr("studentTable.edit")}
                     </button>
 
                     <button
                       onClick={() => onDelete(s._id)}
                       className="px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600 text-xs"
                     >
-                      Delete
+                      {tr("studentTable.delete")}
                     </button>
 
                     <button
@@ -135,7 +137,7 @@ export default function StudentTable({
                           : "bg-green-600 hover:bg-green-700"
                       }`}
                     >
-                      {s.active ? "Disable" : "Enable"}
+                      {s.active ? tr("studentTable.disable") : tr("studentTable.enable")}
                     </button>
 
                   </div>

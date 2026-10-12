@@ -3,30 +3,34 @@ import { useState, useEffect } from "react";
 import { X, DollarSign, Clock, CheckCircle, FileText, Download } from "lucide-react";
 import api from "../../../api";
 import { useCurrencySymbol, fmtMoney } from "../../../hooks/useCurrencySymbol";
+import { useTranslation } from "react-i18next";
+import { dateLocale } from "../../../i18n/dateLocale.js";
 
 function StatusBadge({ status }) {
+  const { t: tr } = useTranslation("admin");
   if (status === "paid") {
     return (
       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">
-        <CheckCircle className="w-3 h-3" /> Paid
+        <CheckCircle className="w-3 h-3" /> {tr("teacherPaymentHistoryModal.paid")}
       </span>
     );
   }
   if (status === "cancelled") {
     return (
       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700">
-        <X className="w-3 h-3" /> Cancelled
+        <X className="w-3 h-3" /> {tr("teacherPaymentHistoryModal.cancelled")}
       </span>
     );
   }
   return (
     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">
-      <Clock className="w-3 h-3" /> Pending
+      <Clock className="w-3 h-3" /> {tr("teacherPaymentHistoryModal.pending")}
     </span>
   );
 }
 
 export default function TeacherPaymentHistoryModal({ teacher, onClose, isDarkMode }) {
+  const { t: tr } = useTranslation("admin");
   const sym = useCurrencySymbol();
   const [transactions, setTransactions] = useState([]);
   const [summary, setSummary] = useState(null);
@@ -56,7 +60,7 @@ export default function TeacherPaymentHistoryModal({ teacher, onClose, isDarkMod
 
   const fmt = (date) =>
     date
-      ? new Date(date).toLocaleDateString("en-US", {
+      ? new Date(date).toLocaleDateString(dateLocale("en-US"), {
           year: "numeric",
           month: "short",
           day: "numeric",
@@ -104,7 +108,7 @@ export default function TeacherPaymentHistoryModal({ teacher, onClose, isDarkMod
         {/* Header */}
         <div className={`flex items-center justify-between px-6 py-4 border-b ${isDarkMode ? "border-gray-700" : "border-gray-100"}`}>
           <div>
-            <h3 className={`text-lg font-bold ${textPrimary}`}>Payment History</h3>
+            <h3 className={`text-lg font-bold ${textPrimary}`}>{tr("teacherPaymentHistoryModal.paymentHistory")}</h3>
             <p className={`text-sm ${textSecondary}`}>
               {teacher.firstName} {teacher.lastName} · {teacher.email}
             </p>
@@ -121,19 +125,19 @@ export default function TeacherPaymentHistoryModal({ teacher, onClose, isDarkMod
         {summary && (
           <div className={`grid grid-cols-3 gap-3 px-6 py-4 border-b ${isDarkMode ? "border-gray-700" : "border-gray-100"}`}>
             <div className={`rounded-xl p-3 ${cardBg}`}>
-              <p className={`text-xs font-medium ${textSecondary}`}>Total Pending</p>
+              <p className={`text-xs font-medium ${textSecondary}`}>{tr("teacherPaymentHistoryModal.totalPending")}</p>
               <p className="text-lg font-bold text-amber-500">{fmtMoney(summary.totalPending, sym)}</p>
-              <p className={`text-xs ${textSecondary}`}>{summary.pendingCount} transaction{summary.pendingCount !== 1 ? "s" : ""}</p>
+              <p className={`text-xs ${textSecondary}`}>{tr("teacherPaymentHistoryModal.transaction", { pendingCount: summary.pendingCount, value: summary.pendingCount !== 1 ? "s" : "" })}</p>
             </div>
             <div className={`rounded-xl p-3 ${cardBg}`}>
-              <p className={`text-xs font-medium ${textSecondary}`}>Total Paid</p>
+              <p className={`text-xs font-medium ${textSecondary}`}>{tr("teacherPaymentHistoryModal.totalPaid")}</p>
               <p className="text-lg font-bold text-emerald-500">{fmtMoney(summary.totalPaid, sym)}</p>
-              <p className={`text-xs ${textSecondary}`}>{summary.paidCount} transaction{summary.paidCount !== 1 ? "s" : ""}</p>
+              <p className={`text-xs ${textSecondary}`}>{tr("teacherPaymentHistoryModal.transaction2", { paidCount: summary.paidCount, value: summary.paidCount !== 1 ? "s" : "" })}</p>
             </div>
             <div className={`rounded-xl p-3 ${cardBg}`}>
-              <p className={`text-xs font-medium ${textSecondary}`}>Total Earned</p>
+              <p className={`text-xs font-medium ${textSecondary}`}>{tr("teacherPaymentHistoryModal.totalEarned")}</p>
               <p className={`text-lg font-bold ${isDarkMode ? "text-blue-300" : "text-blue-600"}`}>{fmtMoney(summary.totalEarned, sym)}</p>
-              <p className={`text-xs ${textSecondary}`}>{transactions.length} total</p>
+              <p className={`text-xs ${textSecondary}`}>{tr("teacherPaymentHistoryModal.total", { transactionsCount: transactions.length })}</p>
             </div>
           </div>
         )}
@@ -141,7 +145,7 @@ export default function TeacherPaymentHistoryModal({ teacher, onClose, isDarkMod
         {/* Filters + export */}
         <div className={`flex flex-wrap gap-3 items-center px-6 py-3 border-b ${isDarkMode ? "border-gray-700" : "border-gray-100"}`}>
           <div className="flex items-center gap-2">
-            <label className={`text-xs font-medium ${textSecondary}`}>From</label>
+            <label className={`text-xs font-medium ${textSecondary}`}>{tr("teacherPaymentHistoryModal.from")}</label>
             <input
               type="date"
               value={fromDate}
@@ -150,7 +154,7 @@ export default function TeacherPaymentHistoryModal({ teacher, onClose, isDarkMod
             />
           </div>
           <div className="flex items-center gap-2">
-            <label className={`text-xs font-medium ${textSecondary}`}>To</label>
+            <label className={`text-xs font-medium ${textSecondary}`}>{tr("teacherPaymentHistoryModal.to")}</label>
             <input
               type="date"
               value={toDate}
@@ -165,7 +169,7 @@ export default function TeacherPaymentHistoryModal({ teacher, onClose, isDarkMod
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-40 transition-colors"
           >
             <Download className="w-3.5 h-3.5" />
-            Export CSV
+            {tr("teacherPaymentHistoryModal.exportCsv")}
           </button>
         </div>
 
@@ -174,26 +178,26 @@ export default function TeacherPaymentHistoryModal({ teacher, onClose, isDarkMod
           {loading ? (
             <div className="flex flex-col items-center justify-center py-16 gap-3">
               <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
-              <p className={`text-sm ${textSecondary}`}>Loading payment history…</p>
+              <p className={`text-sm ${textSecondary}`}>{tr("teacherPaymentHistoryModal.loadingPaymentHistory")}</p>
             </div>
           ) : filtered.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 gap-2">
               <FileText className={`w-10 h-10 ${isDarkMode ? "text-gray-600" : "text-gray-300"}`} />
-              <p className={`text-sm font-medium ${textPrimary}`}>No transactions found</p>
+              <p className={`text-sm font-medium ${textPrimary}`}>{tr("teacherPaymentHistoryModal.noTransactionsFound")}</p>
               <p className={`text-xs ${textSecondary}`}>
-                {fromDate || toDate ? "Try adjusting the date range." : "No payment records for this teacher yet."}
+                {fromDate || toDate ? tr("teacherPaymentHistoryModal.tryAdjustingTheDateRange") : tr("teacherPaymentHistoryModal.noPaymentRecordsForThis")}
               </p>
             </div>
           ) : (
             <table className="w-full text-sm">
               <thead>
                 <tr className={`${thCls} text-xs uppercase tracking-wider`}>
-                  <th className="px-3 py-2 text-left font-semibold">Date</th>
-                  <th className="px-3 py-2 text-left font-semibold">Class</th>
-                  <th className="px-3 py-2 text-left font-semibold">Student</th>
-                  <th className="px-3 py-2 text-right font-semibold">Amount</th>
-                  <th className="px-3 py-2 text-left font-semibold">Status</th>
-                  <th className="px-3 py-2 text-left font-semibold">Paid On</th>
+                  <th className="px-3 py-2 text-left font-semibold">{tr("teacherPaymentHistoryModal.date")}</th>
+                  <th className="px-3 py-2 text-left font-semibold">{tr("teacherPaymentHistoryModal.class")}</th>
+                  <th className="px-3 py-2 text-left font-semibold">{tr("teacherPaymentHistoryModal.student")}</th>
+                  <th className="px-3 py-2 text-right font-semibold">{tr("teacherPaymentHistoryModal.amount")}</th>
+                  <th className="px-3 py-2 text-left font-semibold">{tr("teacherPaymentHistoryModal.status")}</th>
+                  <th className="px-3 py-2 text-left font-semibold">{tr("teacherPaymentHistoryModal.paidOn")}</th>
                 </tr>
               </thead>
               <tbody className={`divide-y ${isDarkMode ? "divide-gray-700" : "divide-gray-100"}`}>
@@ -225,8 +229,7 @@ export default function TeacherPaymentHistoryModal({ teacher, onClose, isDarkMod
         {/* Footer */}
         <div className={`flex items-center justify-between px-6 py-4 border-t ${isDarkMode ? "border-gray-700" : "border-gray-100"}`}>
           <p className={`text-xs ${textSecondary}`}>
-            {filtered.length} record{filtered.length !== 1 ? "s" : ""}
-            {(fromDate || toDate) && " (filtered)"}
+            {tr("teacherPaymentHistoryModal.record", { filteredCount: filtered.length, value: filtered.length !== 1 ? "s" : "", value2: (fromDate || toDate) && " (filtered)" })}
           </p>
           <button
             onClick={onClose}
@@ -234,7 +237,7 @@ export default function TeacherPaymentHistoryModal({ teacher, onClose, isDarkMod
               isDarkMode ? "border-gray-600 text-gray-300 hover:bg-gray-700" : "border-gray-300 text-gray-700 hover:bg-gray-50"
             }`}
           >
-            Close
+            {tr("teacherPaymentHistoryModal.close")}
           </button>
         </div>
       </div>

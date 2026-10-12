@@ -300,6 +300,17 @@ mongoose
   .then(async () => {
     logger.info("Master MongoDB connected");
 
+    // Mongoose builds indexes in the background and swallows failures. The
+    // one-email-per-center index fails if two live centers already share an
+    // admin email — say so loudly instead of silently running without it.
+    Center.init().catch((err) => {
+      logger.error(
+        "Center indexes could not be built — duplicate data must be fixed first " +
+        "(run: node scripts/auditPastBugs.js — it lists admin emails used by two centers)",
+        { error: err?.message },
+      );
+    });
+
     // Schedulers and sweep jobs run on the first worker only.
     // In PM2 cluster mode all other workers skip this block entirely.
     if (isFirstWorker) {

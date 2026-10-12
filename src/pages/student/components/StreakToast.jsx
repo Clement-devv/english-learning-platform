@@ -6,14 +6,20 @@
 //   <StreakToast data={streakToast} onDone={() => setStreakToast(null)} />
 
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
+import i18n from "../../../i18n/i18n.js";
+
+// For text in file-level lists: read when rendered, so it follows the chosen language
+const ta = (key, opts) => i18n.t(`student:${key}`, opts);
+
 
 const MILESTONE_MSG = {
-  3:   { emoji: "🌱", label: "3-Day Streak!" },
-  7:   { emoji: "🔥", label: "One Full Week!" },
-  14:  { emoji: "⚡", label: "Two Weeks Strong!" },
-  30:  { emoji: "🌟", label: "30-Day Legend!" },
-  50:  { emoji: "💎", label: "50 Days! Incredible!" },
-  100: { emoji: "🏆", label: "100 Days! You're a Master!" },
+  3:   { emoji: "🌱", get label() { return ta("streakToast.milestoneMsgT3DayStreak"); } },
+  7:   { emoji: "🔥", get label() { return ta("streakToast.milestoneMsgOneFullWeek"); } },
+  14:  { emoji: "⚡", get label() { return ta("streakToast.milestoneMsgTwoWeeksStrong"); } },
+  30:  { emoji: "🌟", get label() { return ta("streakToast.milestoneMsgT30DayLegend"); } },
+  50:  { emoji: "💎", get label() { return ta("streakToast.milestoneMsgT50DaysIncredible"); } },
+  100: { emoji: "🏆", get label() { return ta("streakToast.milestoneMsgT100DaysYouRe"); } },
 };
 
 /** Returns the highest milestone hit at `streak`, or null */
@@ -23,6 +29,7 @@ function getMilestone(streak) {
 }
 
 export default function StreakToast({ data, onDone }) {
+  const { t: tr } = useTranslation("student");
   const [visible, setVisible] = useState(false);
   const [exiting, setExiting] = useState(false);
 
@@ -127,17 +134,14 @@ export default function StreakToast({ data, onDone }) {
                 WebkitTextFillColor: "transparent",
                 animation: "shimmer 1.5s linear infinite",
               }}>
-                {newStreak} Day Streak!
-              </div>
+                {tr("streakToast.dayStreak", { newStreak })}</div>
             </>
           ) : (
             <>
               <div style={{ fontSize: 11, fontWeight: 600, color: "#9ca3af", marginBottom: 1 }}>
-                {usedFreeze ? "🛡️ Streak saved by freeze!" : "Keep it up!"}
+                {usedFreeze ? tr("streakToast.streakSavedByFreeze") : tr("streakToast.keepItUp")}
               </div>
-              <div style={{ fontSize: 18, fontWeight: 900, color: "#f59e0b" }}>
-                🔥 {newStreak} Day Streak!
-              </div>
+              <div style={{ fontSize: 18, fontWeight: 900, color: "#f59e0b" }}>{tr("streakToast.dayStreak2", { newStreak })}</div>
             </>
           )}
         </div>

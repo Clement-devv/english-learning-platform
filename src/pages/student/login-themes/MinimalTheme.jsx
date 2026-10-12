@@ -5,8 +5,10 @@ import { Mail, Lock, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import TwoFactorLogin from '../../../components/TwoFactorLogin';
 import { useBranding } from '../../../context/BrandingContext';
 import { useLoginLogic } from './useLoginLogic';
+import { useTranslation } from "react-i18next";
 
 export default function MinimalTheme({ loginHook } = {}) {
+  const { t: tr } = useTranslation("student");
   const {
     email, setEmail, password, setPassword,
     showPassword, setShowPassword,
@@ -62,7 +64,7 @@ export default function MinimalTheme({ loginHook } = {}) {
           </div>
 
           <h1 className="mn-title">{centerName}</h1>
-          <p className="mn-subtitle">Welcome back — sign in to continue</p>
+          <p className="mn-subtitle">{tr("minimalTheme.welcomeBackSignInTo")}</p>
 
           {error && (
             <div className="mn-error">
@@ -73,19 +75,19 @@ export default function MinimalTheme({ loginHook } = {}) {
 
           <form onSubmit={handleInitialLogin} className="mn-form">
             <div className="mn-field">
-              <label className="mn-label"><Mail size={13} /> Email address</label>
+              <label className="mn-label"><Mail size={13} /> {tr("minimalTheme.emailAddress")}</label>
               <div className={`mn-input-wrap${focusedField === 'email' ? ' mn-focused' : ''}`}>
                 <input type="email" value={email} onChange={e => setEmail(e.target.value)}
                   onFocus={() => setFocusedField('email')} onBlur={() => setFocusedField(null)}
-                  placeholder="you@example.com" required disabled={loading} className="mn-input" />
+                  placeholder={tr("minimalTheme.youExampleCom")} required disabled={loading} className="mn-input" />
               </div>
             </div>
 
             <div className="mn-field">
               <div className="mn-label-row">
-                <label className="mn-label"><Lock size={13} /> Password</label>
+                <label className="mn-label"><Lock size={13} /> {tr("minimalTheme.password")}</label>
                 <button type="button" onClick={() => navigate('/student/forgot-password')} className="mn-forgot">
-                  Forgot password?
+                  {tr("minimalTheme.forgotPassword")}
                 </button>
               </div>
               <div className={`mn-input-wrap${focusedField === 'password' ? ' mn-focused' : ''}`}>
@@ -101,13 +103,13 @@ export default function MinimalTheme({ loginHook } = {}) {
 
             <button type="submit" disabled={loading} className="mn-submit">
               {loading
-                ? <span className="mn-loading-row"><span className="mn-spinner" />Signing in…</span>
-                : <span>Sign In →</span>
+                ? <span className="mn-loading-row"><span className="mn-spinner" />{tr("minimalTheme.signingIn")}</span>
+                : <span>{tr("minimalTheme.signIn")}</span>
               }
             </button>
           </form>
 
-          <div className="mn-divider"><span>your account is managed by your school</span></div>
+          <div className="mn-divider"><span>{tr("minimalTheme.yourAccountIsManagedBy")}</span></div>
 
           <div className="mn-dots">
             {['#6366f1','#8b5cf6','#a78bfa','#c4b5fd'].map((c, i) => (

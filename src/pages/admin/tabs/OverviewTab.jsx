@@ -10,10 +10,13 @@ import { useCurrencySymbol } from "../../../hooks/useCurrencySymbol";
 import AnalyticsPinPrompt from "../../../components/admin/analytics/AnalyticsPinPrompt";
 import { useOnDataChanged } from "../../../hooks/useLiveData";
 import { clearAnalyticsUnlock } from "../../../utils/analyticsPin";
+import { useTranslation } from "react-i18next";
+import { dateLocale } from "../../../i18n/dateLocale.js";
 
 const MASK = "••••••";
 
 export default function OverviewTab({ isDarkMode }) {
+  const { t: tr } = useTranslation("admin");
   const [overview, setOverview] = useState(null);
   const [recentBookings, setRecentBookings] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -48,7 +51,7 @@ export default function OverviewTab({ isDarkMode }) {
 
     } catch (err) {
       console.error("Overview fetch error:", err);
-      setError("Failed to load dashboard data.");
+      setError(tr("overviewTab.failedToLoadDashboardData"));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -73,7 +76,7 @@ export default function OverviewTab({ isDarkMode }) {
         setShowPinPrompt(true);
       }
     } catch {
-      setError("Failed to load revenue.");
+      setError(tr("overviewTab.failedToLoadRevenue"));
     } finally {
       setRevealing(false);
     }
@@ -100,13 +103,13 @@ export default function OverviewTab({ isDarkMode }) {
   };
 
   const statusConfig = {
-    pending:   { color: "#f59e0b", bg: isDarkMode ? "rgba(245,158,11,0.12)" : "#fef9c3", label: "Pending" },
-    accepted:  { color: "#3b82f6", bg: isDarkMode ? "rgba(59,130,246,0.12)" : "#dbeafe", label: "Accepted" },
-    completed: { color: "#10b981", bg: isDarkMode ? "rgba(16,185,129,0.12)" : "#d1fae5", label: "Completed" },
-    missed:    { color: "#a855f7", bg: isDarkMode ? "rgba(168,85,247,0.12)" : "#f3e8ff", label: "Missed" },
-    pending_confirmation: { color: "#0ea5e9", bg: isDarkMode ? "rgba(14,165,233,0.12)" : "#e0f2fe", label: "Awaiting Confirmation" },
-    rejected:  { color: "#ef4444", bg: isDarkMode ? "rgba(239,68,68,0.12)" : "#fee2e2",  label: "Rejected" },
-    cancelled: { color: "#6b7280", bg: isDarkMode ? "rgba(107,114,128,0.12)" : "#f3f4f6", label: "Cancelled" },
+    pending:   { color: "#f59e0b", bg: isDarkMode ? "rgba(245,158,11,0.12)" : "#fef9c3", label: tr("overviewTab.pending") },
+    accepted:  { color: "#3b82f6", bg: isDarkMode ? "rgba(59,130,246,0.12)" : "#dbeafe", label: tr("overviewTab.accepted") },
+    completed: { color: "#10b981", bg: isDarkMode ? "rgba(16,185,129,0.12)" : "#d1fae5", label: tr("overviewTab.completed") },
+    missed:    { color: "#a855f7", bg: isDarkMode ? "rgba(168,85,247,0.12)" : "#f3e8ff", label: tr("overviewTab.missed") },
+    pending_confirmation: { color: "#0ea5e9", bg: isDarkMode ? "rgba(14,165,233,0.12)" : "#e0f2fe", label: tr("overviewTab.awaitingConfirmation") },
+    rejected:  { color: "#ef4444", bg: isDarkMode ? "rgba(239,68,68,0.12)" : "#fee2e2",  label: tr("overviewTab.rejected") },
+    cancelled: { color: "#6b7280", bg: isDarkMode ? "rgba(107,114,128,0.12)" : "#f3f4f6", label: tr("overviewTab.cancelled") },
   };
 
   // ── loading skeleton ─────────────────────────────────────────────────────
@@ -152,7 +155,7 @@ export default function OverviewTab({ isDarkMode }) {
           background: "#6b82f0", color: "white", border: "none", borderRadius: "10px",
           padding: "10px 20px", fontSize: "13px", fontWeight: "600", cursor: "pointer",
         }}>
-          Try Again
+          {tr("overviewTab.tryAgain")}
         </button>
       </div>
     );
@@ -166,9 +169,9 @@ export default function OverviewTab({ isDarkMode }) {
       type="button"
       onClick={toggleRevenue}
       disabled={revealing}
-      aria-label={showRevenue ? "Hide revenue" : "Show revenue"}
+      aria-label={showRevenue ? tr("overviewTab.hideRevenue") : tr("overviewTab.showRevenue")}
       aria-pressed={showRevenue}
-      title={showRevenue ? "Hide revenue" : "Show revenue"}
+      title={showRevenue ? tr("overviewTab.hideRevenue") : tr("overviewTab.showRevenue")}
       style={{
         border: "none", background: "transparent", cursor: "pointer", padding: 4, borderRadius: 8,
         display: "inline-flex", alignItems: "center", color: c.text, flexShrink: 0,
@@ -183,33 +186,33 @@ export default function OverviewTab({ isDarkMode }) {
   const statCards = [
     {
       icon: Video,
-      label: "Total Teachers",
+      label: tr("overviewTab.totalTeachers"),
       value: fmt(ov?.users?.teachers?.total),
-      sub: `${fmt(ov?.users?.teachers?.active)} active`,
+      sub: tr("overviewTab.active", { fmt: fmt(ov?.users?.teachers?.active) }),
       accent: "#3b82f6",
       lightBg: isDarkMode ? "rgba(59,130,246,0.1)" : "#eff6ff",
     },
     {
       icon: Users,
-      label: "Total Students",
+      label: tr("overviewTab.totalStudents"),
       value: fmt(ov?.users?.students?.total),
-      sub: `${fmt(ov?.users?.students?.active)} active`,
+      sub: tr("overviewTab.active", { fmt: fmt(ov?.users?.students?.active) }),
       accent: "#10b981",
       lightBg: isDarkMode ? "rgba(16,185,129,0.1)" : "#f0fdf4",
     },
     {
       icon: BookOpen,
-      label: "Total Bookings",
+      label: tr("overviewTab.totalBookings"),
       value: fmt(ov?.bookings?.total),
-      sub: `${fmt(ov?.bookings?.byStatus?.completed)} completed`,
+      sub: tr("overviewTab.completed2", { fmt: fmt(ov?.bookings?.byStatus?.completed) }),
       accent: "#8b5cf6",
       lightBg: isDarkMode ? "rgba(139,92,246,0.1)" : "#f5f3ff",
     },
     {
       icon: DollarSign,
-      label: "Total Revenue",
+      label: tr("overviewTab.totalRevenue"),
       value: showRevenue ? fmtMoney(ov.revenue.total) : MASK,
-      sub: showRevenue ? `${fmtMoney(ov.revenue.teacherPending)} owed to teachers` : "Hidden",
+      sub: showRevenue ? tr("overviewTab.owedToTeachers", { fmtMoney: fmtMoney(ov.revenue.teacherPending) }) : tr("overviewTab.hidden"),
       action: eyeButton,
       accent: "#f59e0b",
       lightBg: isDarkMode ? "rgba(245,158,11,0.1)" : "#fffbeb",
@@ -233,10 +236,10 @@ export default function OverviewTab({ isDarkMode }) {
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div>
           <h1 style={{ margin: 0, fontSize: "22px", fontWeight: "800", color: c.heading, letterSpacing: "-0.3px", fontFamily: "var(--font-display)" }}>
-            Dashboard Overview
+            {tr("overviewTab.dashboardOverview")}
           </h1>
           <p style={{ margin: "4px 0 0", fontSize: "13.5px", color: c.muted }}>
-            Live data from your platform
+            {tr("overviewTab.liveDataFromYourPlatform")}
           </p>
         </div>
         <button
@@ -253,7 +256,7 @@ export default function OverviewTab({ isDarkMode }) {
           }}
         >
           <RefreshCw size={14} style={{ animation: refreshing ? "ov-spin 0.8s linear infinite" : "none" }} />
-          {refreshing ? "Refreshing…" : "Refresh"}
+          {refreshing ? tr("overviewTab.refreshing") : tr("overviewTab.refresh")}
         </button>
       </div>
 
@@ -306,7 +309,7 @@ export default function OverviewTab({ isDarkMode }) {
           <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "18px" }}>
             <Activity size={16} color="#6b82f0" />
             <h2 style={{ margin: 0, fontSize: "15px", fontWeight: "700", color: c.heading }}>
-              Booking Status
+              {tr("overviewTab.bookingStatus")}
             </h2>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
@@ -345,7 +348,7 @@ export default function OverviewTab({ isDarkMode }) {
               </div>
             ))}
             {statusBreakdown.length === 0 && (
-              <p style={{ fontSize: "13px", color: c.muted, textAlign: "center", padding: "20px 0" }}>No bookings yet</p>
+              <p style={{ fontSize: "13px", color: c.muted, textAlign: "center", padding: "20px 0" }}>{tr("overviewTab.noBookingsYet")}</p>
             )}
           </div>
         </div>
@@ -355,7 +358,7 @@ export default function OverviewTab({ isDarkMode }) {
           <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "18px" }}>
             <TrendingUp size={16} color="#6b82f0" />
             <h2 style={{ margin: 0, fontSize: "15px", fontWeight: "700", color: c.heading, flex: 1 }}>
-              Revenue Breakdown
+              {tr("overviewTab.revenueBreakdown")}
             </h2>
             {eyeButton}
           </div>
@@ -364,22 +367,22 @@ export default function OverviewTab({ isDarkMode }) {
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "10px", padding: "28px 0" }}>
               <EyeOff size={26} color={c.muted} />
               <p style={{ margin: 0, fontSize: "13px", color: c.text, textAlign: "center" }}>
-                Revenue is hidden for privacy.
+                {tr("overviewTab.revenueIsHiddenForPrivacy")}
               </p>
               <button type="button" onClick={toggleRevenue} disabled={revealing} style={{
                 border: `1px solid ${c.border}`, background: isDarkMode ? "#0f1117" : "#f8faff", color: "#6b82f0",
                 borderRadius: "10px", padding: "7px 14px", fontSize: "12.5px", fontWeight: "700", cursor: "pointer",
               }}>
-                {ov?.revenue ? "Show revenue" : "Enter PIN to view"}
+                {ov?.revenue ? tr("overviewTab.showRevenue") : tr("overviewTab.enterPinToView")}
               </button>
             </div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
               {[
-                { label: "Student Payments", value: fmtMoney(ov.revenue.total), color: "#6b82f0", icon: DollarSign },
-                { label: "Paid to Teachers", value: fmtMoney(ov.revenue.teacherPaid), color: "#10b981", icon: CheckCircle },
-                { label: "Owed to Teachers", value: fmtMoney(ov.revenue.teacherPending), color: "#f59e0b", icon: Clock },
-                { label: "Net (after teacher pay)", value: fmtMoney(ov.revenue.net), color: ov.revenue.net < 0 ? "#ef4444" : "#0ea5e9", icon: Wallet },
+                { label: tr("overviewTab.studentPayments"), value: fmtMoney(ov.revenue.total), color: "#6b82f0", icon: DollarSign },
+                { label: tr("overviewTab.paidToTeachers"), value: fmtMoney(ov.revenue.teacherPaid), color: "#10b981", icon: CheckCircle },
+                { label: tr("overviewTab.owedToTeachers2"), value: fmtMoney(ov.revenue.teacherPending), color: "#f59e0b", icon: Clock },
+                { label: tr("overviewTab.netAfterTeacherPay"), value: fmtMoney(ov.revenue.net), color: ov.revenue.net < 0 ? "#ef4444" : "#0ea5e9", icon: Wallet },
               ].map(({ label, value, color, icon: Icon }) => (
                 <div key={label} style={{
                   display: "flex", alignItems: "center", justifyContent: "space-between",
@@ -396,9 +399,7 @@ export default function OverviewTab({ isDarkMode }) {
               ))}
 
               {ov.revenue.teachersWithPending > 0 && (
-                <p style={{ margin: 0, fontSize: "12px", color: c.muted, textAlign: "center" }}>
-                  💡 {ov.revenue.teachersWithPending} teacher{ov.revenue.teachersWithPending > 1 ? "s" : ""} awaiting payment
-                </p>
+                <p style={{ margin: 0, fontSize: "12px", color: c.muted, textAlign: "center" }}>{tr("overviewTab.teacherAwaitingPayment", { teachersWithPending: ov.revenue.teachersWithPending, value: ov.revenue.teachersWithPending > 1 ? "s" : "" })}</p>
               )}
             </div>
           )}
@@ -411,10 +412,10 @@ export default function OverviewTab({ isDarkMode }) {
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
             <Calendar size={16} color="#6b82f0" />
             <h2 style={{ margin: 0, fontSize: "15px", fontWeight: "700", color: c.heading }}>
-              Recent Bookings
+              {tr("overviewTab.recentBookings")}
             </h2>
           </div>
-          <span style={{ fontSize: "12px", color: c.muted }}>Last 6</span>
+          <span style={{ fontSize: "12px", color: c.muted }}>{tr("overviewTab.last6")}</span>
         </div>
 
         {recentBookings.length === 0 ? (
@@ -428,10 +429,10 @@ export default function OverviewTab({ isDarkMode }) {
               <Calendar size={28} color="var(--brand-primary)" />
             </div>
             <p style={{ fontSize: "16px", fontWeight: "700", color: c.heading, margin: "0 0 8px" }}>
-              No bookings yet
+              {tr("overviewTab.noBookingsYet")}
             </p>
             <p style={{ fontSize: "13.5px", color: c.muted, margin: 0 }}>
-              Bookings will appear here once teachers and students start scheduling classes
+              {tr("overviewTab.bookingsWillAppearHereOnce")}
             </p>
           </div>
         ) : (
@@ -461,7 +462,7 @@ export default function OverviewTab({ isDarkMode }) {
                   {/* Details */}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <p style={{ margin: 0, fontSize: "13.5px", fontWeight: "700", color: c.heading, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {booking.classTitle || "Untitled Class"}
+                      {booking.classTitle || tr("overviewTab.untitledClass")}
                     </p>
                     <p style={{ margin: "2px 0 0", fontSize: "12px", color: c.muted }}>
                       {teacherName} → {studentName}
@@ -480,7 +481,7 @@ export default function OverviewTab({ isDarkMode }) {
                   {/* Time */}
                   <span style={{ fontSize: "11px", color: c.muted, flexShrink: 0 }}>
                     {booking.scheduledTime
-                      ? new Date(booking.scheduledTime).toLocaleDateString("en-US", { month: "short", day: "numeric" })
+                      ? new Date(booking.scheduledTime).toLocaleDateString(dateLocale("en-US"), { month: "short", day: "numeric" })
                       : timeAgo(booking.createdAt)}
                   </span>
                 </div>
@@ -493,10 +494,10 @@ export default function OverviewTab({ isDarkMode }) {
       {/* ── Quick summary row ── */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "12px" }}>
         {[
-          { label: "Pending Bookings", value: fmt(ov?.bookings?.byStatus?.pending), icon: Clock, color: "#f59e0b" },
-          { label: "Accepted Bookings", value: fmt(ov?.bookings?.byStatus?.accepted), icon: CheckCircle, color: "#3b82f6" },
-          { label: "Completed Classes", value: fmt(ov?.bookings?.byStatus?.completed), icon: CheckCircle, color: "#10b981" },
-          { label: "Cancelled / Rejected", value: fmt((ov?.bookings?.byStatus?.cancelled || 0) + (ov?.bookings?.byStatus?.rejected || 0)), icon: XCircle, color: "#ef4444" },
+          { label: tr("overviewTab.pendingBookings"), value: fmt(ov?.bookings?.byStatus?.pending), icon: Clock, color: "#f59e0b" },
+          { label: tr("overviewTab.acceptedBookings"), value: fmt(ov?.bookings?.byStatus?.accepted), icon: CheckCircle, color: "#3b82f6" },
+          { label: tr("overviewTab.completedClasses"), value: fmt(ov?.bookings?.byStatus?.completed), icon: CheckCircle, color: "#10b981" },
+          { label: tr("overviewTab.cancelledRejected"), value: fmt((ov?.bookings?.byStatus?.cancelled || 0) + (ov?.bookings?.byStatus?.rejected || 0)), icon: XCircle, color: "#ef4444" },
         ].map(({ label, value, icon: Icon, color }) => (
           <div key={label} style={{
             background: c.card, border: `1px solid ${c.border}`,
@@ -515,7 +516,7 @@ export default function OverviewTab({ isDarkMode }) {
       {showPinPrompt && (
         <AnalyticsPinPrompt
           isDarkMode={isDarkMode}
-          title="Revenue is hidden"
+          title={tr("overviewTab.revenueIsHidden")}
           onCancel={() => setShowPinPrompt(false)}
           onUnlocked={() => { setShowPinPrompt(false); loadRevenue(); }}
         />

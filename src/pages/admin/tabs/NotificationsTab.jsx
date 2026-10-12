@@ -2,6 +2,12 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Bell, CheckCheck, Filter, RefreshCw, BookOpen, RotateCcw, Shield, CalendarCheck, CalendarX, User } from "lucide-react";
 import api from "../../../api";
 import { useOnDataChanged } from "../../../hooks/useLiveData";
+import { useTranslation } from "react-i18next";
+import i18n from "../../../i18n/i18n.js";
+
+// For text in file-level lists: read when rendered, so it follows the chosen language
+const ta = (key, opts) => i18n.t(`admin:${key}`, opts);
+
 
 const TYPE_META = {
   class_marked: {
@@ -9,14 +15,14 @@ const TYPE_META = {
     color:   "#10b981",
     bgLight: "#d1fae5",
     bgDark:  "rgba(16,185,129,0.12)",
-    label:   "Class Marked",
+    get label() { return ta("notificationsTab.type.classMarked"); },
   },
   class_unmarked: {
     icon:    RotateCcw,
     color:   "#f59e0b",
     bgLight: "#fef3c7",
     bgDark:  "rgba(245,158,11,0.12)",
-    label:   "Class Unmarked",
+    get label() { return ta("notificationsTab.type.classUnmarked"); },
   },
   // A teacher answered a class the admin booked for them
   booking_accepted: {
@@ -24,14 +30,14 @@ const TYPE_META = {
     color:   "#059669",
     bgLight: "#d1fae5",
     bgDark:  "rgba(5,150,105,0.12)",
-    label:   "Class Accepted",
+    get label() { return ta("notificationsTab.type.classAccepted"); },
   },
   booking_rejected: {
     icon:    CalendarX,
     color:   "#dc2626",
     bgLight: "#fee2e2",
     bgDark:  "rgba(220,38,38,0.12)",
-    label:   "Class Declined",
+    get label() { return ta("notificationsTab.type.classDeclined"); },
   },
 };
 
@@ -41,7 +47,7 @@ function getTypeMeta(type) {
     color:  "#6366f1",
     bgLight: "#e0e7ff",
     bgDark:  "rgba(99,102,241,0.12)",
-    label:  "Activity",
+    label:  ta("notificationsTab.type.activity"),
   };
 }
 
@@ -58,6 +64,7 @@ function timeAgo(dateStr) {
 }
 
 export default function NotificationsTab({ isDarkMode, onUnreadCount }) {
+  const { t: tr } = useTranslation("admin");
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount]     = useState(0);
   const [loading, setLoading]             = useState(true);
@@ -149,17 +156,16 @@ export default function NotificationsTab({ isDarkMode, onUnreadCount }) {
             <Bell size={20} color="white" />
           </div>
           <div>
-            <h2 style={{ margin: 0, fontSize: "20px", fontWeight: "800", color: text }}>Notifications</h2>
+            <h2 style={{ margin: 0, fontSize: "20px", fontWeight: "800", color: text }}>{tr("notificationsTab.notifications")}</h2>
             <p style={{ margin: 0, fontSize: "12px", color: muted }}>
-              Sub-admin activity log
+              {tr("notificationsTab.subAdminActivityLog")}
               {unreadCount > 0 && (
                 <span style={{
                   marginLeft: "8px", background: "#ef4444", color: "white",
                   borderRadius: "10px", padding: "1px 7px",
                   fontSize: "11px", fontWeight: "700",
                 }}>
-                  {unreadCount} unread
-                </span>
+                  {tr("notificationsTab.unread", { unreadCount })}</span>
               )}
             </p>
           </div>
@@ -177,7 +183,7 @@ export default function NotificationsTab({ isDarkMode, onUnreadCount }) {
             }}
           >
             <RefreshCw size={14} style={{ animation: loading ? "spin 1s linear infinite" : "none" }} />
-            Refresh
+            {tr("notificationsTab.refresh")}
           </button>
           {unreadCount > 0 && (
             <button
@@ -192,7 +198,7 @@ export default function NotificationsTab({ isDarkMode, onUnreadCount }) {
               }}
             >
               <CheckCheck size={14} />
-              Mark all read
+              {tr("notificationsTab.markAllRead")}
             </button>
           )}
         </div>
@@ -205,7 +211,7 @@ export default function NotificationsTab({ isDarkMode, onUnreadCount }) {
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
           <Filter size={13} color={muted} />
-          <span style={{ fontSize: "12px", color: muted, fontWeight: "600" }}>Filter:</span>
+          <span style={{ fontSize: "12px", color: muted, fontWeight: "600" }}>{tr("notificationsTab.filter")}</span>
         </div>
         <input
           type="date"
@@ -224,14 +230,14 @@ export default function NotificationsTab({ isDarkMode, onUnreadCount }) {
             onChange={(e) => setFilterUnread(e.target.checked)}
             style={{ accentColor: "#6366f1" }}
           />
-          Unread only
+          {tr("notificationsTab.unreadOnly")}
         </label>
         {(filterDate || filterUnread) && (
           <button
             onClick={() => { setFilterDate(""); setFilterUnread(false); }}
             style={{ fontSize: "12px", color: "#6366f1", background: "none", border: "none", cursor: "pointer", fontWeight: "600" }}
           >
-            Clear
+            {tr("notificationsTab.clear")}
           </button>
         )}
       </div>
@@ -252,9 +258,9 @@ export default function NotificationsTab({ isDarkMode, onUnreadCount }) {
           background: card, borderRadius: "16px", border: `1px solid ${border}`,
         }}>
           <Bell size={40} color={muted} style={{ marginBottom: "12px" }} />
-          <p style={{ margin: 0, fontSize: "15px", fontWeight: "700", color: text }}>No notifications</p>
+          <p style={{ margin: 0, fontSize: "15px", fontWeight: "700", color: text }}>{tr("notificationsTab.noNotifications")}</p>
           <p style={{ margin: "6px 0 0", fontSize: "13px", color: muted }}>
-            {filterDate || filterUnread ? "Try clearing your filters." : "Sub-admin activities will appear here."}
+            {filterDate || filterUnread ? tr("notificationsTab.tryClearingYourFilters") : tr("notificationsTab.subAdminActivitiesWillAppear")}
           </p>
         </div>
       ) : (
@@ -316,7 +322,7 @@ export default function NotificationsTab({ isDarkMode, onUnreadCount }) {
                   </p>
                   {n.metadata?.classTitle && (
                     <p style={{ margin: "4px 0 0", fontSize: "12px", color: muted }}>
-                      Class: <strong style={{ color: text }}>{n.metadata.classTitle}</strong>
+                      {tr("notificationsTab.class")} <strong style={{ color: text }}>{n.metadata.classTitle}</strong>
                     </p>
                   )}
                   <p style={{ margin: "6px 0 0", fontSize: "11.5px", color: muted }}>
