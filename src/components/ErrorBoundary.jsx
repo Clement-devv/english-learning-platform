@@ -5,7 +5,7 @@
 //                       Use key={activeTab} so it auto-resets when the user switches tabs.
 
 import { Component } from "react";
-import * as Sentry from "@sentry/react";
+import { captureException } from "@sentry/react";
 import { reportClientError } from "../utils/reportClientError";
 
 // Detects "Failed to fetch dynamically imported module" and similar
@@ -35,7 +35,7 @@ export default class ErrorBoundary extends Component {
   componentDidCatch(error, info) {
     if (!isChunkLoadError(error)) {
       console.error("[ErrorBoundary]", error, info.componentStack);
-      Sentry.captureException(error, { extra: { componentStack: info.componentStack } });
+      captureException(error, { extra: { componentStack: info.componentStack } });
       reportClientError(error, { where: info.componentStack?.trim().split("\n")[0] });
     } else {
       reportClientError(error, { type: "chunk-load" });
@@ -197,7 +197,7 @@ export class TabErrorBoundary extends Component {
 
   componentDidCatch(error, info) {
     console.error("[TabErrorBoundary]", error, info.componentStack);
-    Sentry.captureException(error, { extra: { componentStack: info.componentStack } });
+    captureException(error, { extra: { componentStack: info.componentStack } });
     reportClientError(error, { where: info.componentStack?.trim().split("\n")[0] });
   }
 

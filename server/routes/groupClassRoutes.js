@@ -235,16 +235,42 @@ router.post("/:id/enroll", verifyToken, validateObjectId("id"), async (req, res)
     if (gc.enrollments.length >= gc.maxSeats) return conflict(res, "Class is full");
 
     const price = gc.pricePerSeat || 1;
-    if (student.classCredits < price)
-      return badRequest(res, `Student needs ${price} credit(s) but only has ${student.classCredits}`);
+    const Student = getStudent(req.db);
+    const GroupClass = getGroupClass(req.db);
 
-    // Deduct credits
-    student.classCredits -= price;
-    await student.save();
+    // 1) Take the credits atomically — only if the student still has enough right now
+    //    (two enrollments at once can't both spend the same credit)
+    const charged = await Student.findOneAndUpdate(
+      { _id: studentId, classCredits: { $gte: price } },
+      { $inc: { classCredits: -price } },
+      { new: true },
+    ).select("classCredits").lean();
+    if (!charged)
+      return badRequest(res, `Student needs ${price} credit(s) but only has ${student.classCredits || 0}`);
 
-    gc.enrollments.push({ studentId, creditCharged: price });
-    if (gc.enrollments.length >= gc.maxSeats) gc.status = "full";
-    await gc.save();
+    // 2) Claim the seat atomically — still open, not already enrolled, a seat left
+    const seated = await GroupClass.findOneAndUpdate(
+      {
+        _id: gc._id, status: "open",
+        "enrollments.studentId": { $ne: studentId },
+        $expr: { $lt: [{ $size: "$enrollments" }, "$maxSeats"] },
+      },
+      { $push: { enrollments: { studentId, creditCharged: price } } },
+      { new: true },
+    );
+    if (!seated) {
+      // Lost the race (enrolled twice at once, last seat taken, class closed) — give the credits back
+      await Student.updateOne({ _id: studentId }, { $inc: { classCredits: price } });
+      const now = await GroupClass.findById(gc._id).select("status enrollments maxSeats").lean();
+      if (now?.enrollments?.some(e => String(e.studentId) === String(studentId))) return conflict(res, "Student is already enrolled");
+      if (now?.status !== "open") return badRequest(res, `Class is ${now?.status} — enrollment is closed`);
+      return conflict(res, "Class is full");
+    }
+    if (seated.enrollments.length >= seated.maxSeats) {
+      await GroupClass.updateOne({ _id: gc._id, status: "open" }, { $set: { status: "full" } });
+    }
+    student.classCredits = charged.classCredits; // for the response below
+    gc.enrollments = seated.enrollments;
 
     // Notify via socket
     try {
@@ -279,28 +305,34 @@ router.delete("/:id/enroll/:studentId", verifyToken, validateObjectId("id"), val
     if (role === "student" && userId !== studentId)
       return forbidden(res, "You can only remove your own enrollment");
 
-    const [gc, student] = await Promise.all([
-      getGroupClass(req.db).findById(req.params.id),
-      getStudent(req.db).findById(studentId),
-    ]);
+    const GroupClass = getGroupClass(req.db);
+    const gc = await GroupClass.findById(req.params.id);
     if (!gc) return notFound(res, "Group class not found");
     if (role !== "student" && !canManageRoster(req.user, gc))
       return forbidden(res, "You can only manage enrollments in your own classes");
     if (["completed", "cancelled"].includes(gc.status))
       return badRequest(res, "Cannot remove enrollment from a completed or cancelled class");
 
-    const idx = gc.enrollments.findIndex(e => e.studentId.toString() === studentId);
-    if (idx === -1) return notFound(res, "Student is not enrolled in this class");
+    // Remove the enrollment atomically and read what was charged from the removed entry —
+    // a double click (or a cancel at the same moment) can't refund twice
+    const before = await GroupClass.findOneAndUpdate(
+      { _id: gc._id, status: { $nin: ["completed", "cancelled"] }, "enrollments.studentId": studentId },
+      { $pull: { enrollments: { studentId } } },
+      { new: false },
+    ).lean();
+    if (!before) return notFound(res, "Student is not enrolled in this class");
 
-    const creditCharged = gc.enrollments[idx].creditCharged || 0;
-    gc.enrollments.splice(idx, 1);
-    if (gc.status === "full" && gc.enrollments.length < gc.maxSeats) gc.status = "open";
-    await gc.save();
+    const removed = before.enrollments.find(e => String(e.studentId) === String(studentId));
+    const creditCharged = removed?.creditCharged || 0;
+    // A seat opened up
+    await GroupClass.updateOne(
+      { _id: gc._id, status: "full", $expr: { $lt: [{ $size: "$enrollments" }, "$maxSeats"] } },
+      { $set: { status: "open" } },
+    );
 
-    // Refund credits
-    if (student && creditCharged > 0) {
-      student.classCredits += creditCharged;
-      await student.save();
+    // Refund credits (atomic)
+    if (creditCharged > 0) {
+      await getStudent(req.db).updateOne({ _id: studentId }, { $inc: { classCredits: creditCharged } });
     }
 
     res.json({
@@ -404,21 +436,24 @@ router.patch("/:id/cancel", verifyToken, validateObjectId("id"), async (req, res
     if (["completed", "cancelled"].includes(gc.status))
       return badRequest(res, `Class is already ${gc.status}`);
 
-    const reason = req.body.reason || "";
+    const reason = typeof req.body.reason === "string" ? req.body.reason.trim().slice(0, 500) : "";
 
-    // Refund all enrolled students
+    // Cancel FIRST, atomically, and refund exactly the enrollments it had at that
+    // moment — a double click can't refund twice, and an unenroll racing this
+    // (which refunds its own seat) is never refunded again here.
+    const claimed = await getGroupClass(req.db).findOneAndUpdate(
+      { _id: gc._id, status: { $nin: ["completed", "cancelled"] } },
+      { $set: { status: "cancelled", cancelledAt: new Date(), cancelReason: reason } },
+      { new: false },
+    ).lean();
+    if (!claimed) return badRequest(res, "Class is already cancelled or completed");
+
     const Student = getStudent(req.db);
-    const refundOps = gc.enrollments
+    await Promise.all(claimed.enrollments
       .filter(e => (e.creditCharged || 0) > 0)
-      .map(e =>
-        Student.findByIdAndUpdate(e.studentId, { $inc: { classCredits: e.creditCharged } })
-      );
-    await Promise.all(refundOps);
-
-    gc.status       = "cancelled";
-    gc.cancelledAt  = new Date();
-    gc.cancelReason = reason;
-    await gc.save();
+      .map(e => Student.updateOne({ _id: e.studentId }, { $inc: { classCredits: e.creditCharged } })));
+    gc.enrollments = claimed.enrollments;
+    Object.assign(gc, { status: "cancelled", cancelReason: reason });
 
     // Notify students
     try {

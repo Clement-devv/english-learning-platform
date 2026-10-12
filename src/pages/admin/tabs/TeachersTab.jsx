@@ -468,14 +468,15 @@ export default function TeachersTab({ onNotify, isDarkMode = false }) {
 
   const handleConfirmPay = async () => {
     if (!payTarget) return;
-    const amount = payTarget.earned;
     try {
-      const res = await api.put(`/teachers/${payTarget._id}`, { earned: 0 });
-      setTeachers((prev) => prev.map((t) => (t._id === payTarget._id ? res.data : t)));
-      showToast(`${fmtMoney(amount, sym)} paid to ${payTarget.firstName}!`);
+      // Settles the pending pay records too — only zeroing `earned` left them "owed" in Payments
+      const res = await api.patch(`/payment-transactions/teacher/${payTarget._id}/pay-all`, {});
+      const earned = res.data?.teacher?.earned ?? 0;
+      setTeachers((prev) => prev.map((t) => (t._id === payTarget._id ? { ...t, earned } : t)));
+      showToast(`${fmtMoney(res.data?.totalAmount ?? 0, sym)} paid to ${payTarget.firstName}!`);
     } catch (err) {
       console.error("Pay teacher error:", err);
-      showToast("Could not process payment.", "error");
+      showToast(err.response?.data?.message || "Could not process payment.", "error");
     } finally {
       setPayTarget(null);
     }
@@ -486,18 +487,22 @@ export default function TeachersTab({ onNotify, isDarkMode = false }) {
 
   const handleConfirmPayAll = async () => {
     setPayAllOpen(false);
-    try {
-      const results = await Promise.all(
-        unpaidTeachers.map((t) => api.put(`/teachers/${t._id}`, { earned: 0 }))
-      );
-      const updated = results.map((r) => r.data);
-      setTeachers((prev) =>
-        prev.map((t) => updated.find((u) => u._id === t._id) || t)
-      );
-      showToast(`${unpaidTeachers.length} teacher${unpaidTeachers.length !== 1 ? "s" : ""} marked as paid!`);
-    } catch (err) {
-      console.error("Pay all error:", err);
-      showToast("Could not complete payment for all teachers.", "error");
+    // Settle each teacher's pending pay records (not just zero `earned`); one failure doesn't stop the rest
+    const results = await Promise.allSettled(
+      unpaidTeachers.map((t) => api.patch(`/payment-transactions/teacher/${t._id}/pay-all`, {}))
+    );
+    const earnedById = {};
+    results.forEach((r, i) => {
+      if (r.status === "fulfilled") earnedById[unpaidTeachers[i]._id] = r.value.data?.teacher?.earned ?? 0;
+    });
+    setTeachers((prev) => prev.map((t) => (t._id in earnedById ? { ...t, earned: earnedById[t._id] } : t)));
+    const paid = Object.keys(earnedById).length;
+    const failed = results.length - paid;
+    if (failed) {
+      console.error("Pay all errors:", results.filter((r) => r.status === "rejected").map((r) => r.reason));
+      showToast(`${paid} teacher${paid !== 1 ? "s" : ""} paid, ${failed} could not be paid — check the Payments tab.`, "error");
+    } else {
+      showToast(`${paid} teacher${paid !== 1 ? "s" : ""} marked as paid!`);
     }
   };
 

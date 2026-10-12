@@ -3,7 +3,8 @@ import mongoose from 'mongoose';
 export const paymentTransactionSchema = new mongoose.Schema({
   teacherId:  { type: mongoose.Schema.Types.ObjectId, ref: 'Teacher', required: true, index: true },
   studentId:  { type: mongoose.Schema.Types.ObjectId, ref: 'Student', index: true },
-  bookingId:  { type: mongoose.Schema.Types.ObjectId, ref: 'Booking', default: null },
+  // No default: manual transactions omit it entirely (the unique sparse index indexes null)
+  bookingId:  { type: mongoose.Schema.Types.ObjectId, ref: 'Booking' },
   amount:     { type: Number, required: true, min: 0 },
   type: {
     type: String,
@@ -33,3 +34,8 @@ paymentTransactionSchema.index({ bookingId: 1 }, { unique: true, sparse: true })
 paymentTransactionSchema.index({ teacherId: 1, status: 1 });
 paymentTransactionSchema.index({ completedAt: -1 });
 paymentTransactionSchema.index({ paidAt: -1 });
+
+// Deductions are stored as a positive `amount` with type "deduction". Every total
+// must subtract them — use these instead of summing `amount` directly.
+export const SIGNED_AMOUNT = { $cond: [{ $eq: ['$type', 'deduction'] }, { $multiply: ['$amount', -1] }, '$amount'] };
+export const signedAmount = (tx) => (tx?.type === 'deduction' ? -1 : 1) * (Number(tx?.amount) || 0);

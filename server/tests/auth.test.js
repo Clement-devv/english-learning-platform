@@ -68,12 +68,12 @@ describe('POST /api/auth/teacher/login', () => {
     expect(res.status).toBe(401)
   })
 
-  it('returns 400 when fields are missing', async () => {
+  it('returns 422 when fields are missing', async () => {
     const res = await request(app)
       .post('/api/auth/teacher/login')
       .send({ email: CREDENTIALS.teacher.email })
 
-    expect(res.status).toBe(400)
+    expect(res.status).toBe(422) // express-validator rejects before the handler
     expect(res.body.message).toMatch(/required/i)
   })
 
@@ -156,12 +156,12 @@ describe('POST /api/auth/admin/login', () => {
     expect(res.status).toBe(401)
   })
 
-  it('returns 400 when fields are missing', async () => {
+  it('returns 422 when fields are missing', async () => {
     const res = await request(app)
       .post('/api/auth/admin/login')
       .send({ username: CREDENTIALS.admin.username })
 
-    expect(res.status).toBe(400)
+    expect(res.status).toBe(422) // express-validator rejects before the handler
   })
 })
 
@@ -237,12 +237,12 @@ describe('POST /api/auth/teacher/forgot-password', () => {
     expect(res.body.success).toBe(true)
   })
 
-  it('returns 400 when email is missing', async () => {
+  it('returns 422 when email is missing', async () => {
     const res = await request(app)
       .post('/api/auth/teacher/forgot-password')
       .send({})
 
-    expect(res.status).toBe(400)
+    expect(res.status).toBe(422) // express-validator rejects before the handler
   })
 })
 

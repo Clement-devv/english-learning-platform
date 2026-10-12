@@ -5,11 +5,11 @@ import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
 import { bookingSchema }            from "../schemas/bookingSchema.js";
 import { studentSchema }            from "../schemas/studentSchema.js";
 import { teacherSchema }            from "../schemas/teacherSchema.js";
-import { paymentTransactionSchema } from "../schemas/paymentTransactionSchema.js";
 import logger from "../utils/logger.js";
 import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
 import { reverseCompletedClass } from "../utils/classReversal.js";
 import { recordOutcomeChange } from "../utils/classOutcome.js";
+import { payForCompletedClass } from "../utils/classPayment.js";
 
 const router = express.Router();
 router.use(tenantMiddleware);
@@ -17,7 +17,6 @@ router.use(tenantMiddleware);
 const getBooking            = (db) => db.models.Booking            || db.model("Booking",            bookingSchema);
 const getStudent            = (db) => db.models.Student            || db.model("Student",            studentSchema);
 const getTeacher            = (db) => db.models.Teacher            || db.model("Teacher",            teacherSchema);
-const getPaymentTransaction = (db) => db.models.PaymentTransaction || db.model("PaymentTransaction", paymentTransactionSchema);
 
 // populate("teacherId"/"studentId") needs the models registered on this center's
 // connection first — otherwise the first request after a restart fails.
@@ -127,6 +126,8 @@ router.get("/stats", verifyToken, verifyAdmin, async (req, res) => {
  * resolution: "approve_teacher" | "approve_student"
  */
 router.patch("/:bookingId/resolve", verifyToken, verifyAdmin, async (req, res) => {
+  let claimedId = null;    // set once this request owns the dispute
+  let moneyMoved = false;  // after this, a failure must NOT reopen the dispute (a retry would pay/refund twice)
   try {
     const { resolution, adminNotes } = req.body;
 
@@ -134,17 +135,24 @@ router.patch("/:bookingId/resolve", verifyToken, verifyAdmin, async (req, res) =
       return badRequest(res, "Invalid resolution value");
     }
 
-    const booking = await getBooking(req.db).findById(req.params.bookingId)
+    // Claim the dispute atomically — a double click or a second admin can't settle it twice.
+    // (Money moves below; the claim is what makes it happen once.)
+    const finalStatus = resolution === "approve_teacher" ? "resolved_teacher" : "resolved_student";
+    const booking = await getBooking(req.db).findOneAndUpdate(
+      { _id: req.params.bookingId, disputeRaised: true, disputeStatus: "pending" },
+      { $set: { disputeStatus: finalStatus } },
+      { new: true },
+    )
       .populate("teacherId", "firstName lastName")
       .populate("studentId", "firstName lastName classCredits");
 
     if (!booking) {
-      return notFound(res, "Booking not found");
+      const exists = await getBooking(req.db).exists({ _id: req.params.bookingId });
+      return exists
+        ? badRequest(res, "No pending dispute found for this booking — it may have just been resolved")
+        : notFound(res, "Booking not found");
     }
-
-    if (!booking.disputeRaised || booking.disputeStatus !== "pending") {
-      return badRequest(res, "No pending dispute found for this booking");
-    }
+    claimedId = booking._id;
 
     if (booking.loggedByTeacher && booking.status === "pending_confirmation") {
       // Teacher-logged class still awaiting payment approval: nothing has been charged.
@@ -158,74 +166,44 @@ router.patch("/:bookingId/resolve", verifyToken, verifyAdmin, async (req, res) =
         booking.rejectionReason = "Logged class not approved: absence confirmed by admin";
         booking.set("offline.approval", { status: "rejected", decidedAt: new Date(), decidedBy: req.user.id, note: adminNotes || "Dispute upheld" });
       }
-    } else if (resolution === "approve_teacher") {
-      // Teacher wins — mark as completed and process payment/deduction if not already done
-      const wasMissed = booking.status === "missed";
-      // Not counting as completed before this decision → report it as a change
-      if (wasMissed || booking.adminRejected || booking.status !== "completed") {
-        recordOutcomeChange(booking, {
-          to: "completed", source: "dispute",
-          reason: `Dispute resolved for the teacher${adminNotes ? `: ${adminNotes}` : ""}`,
-        });
-      }
+    } else {
+      // Where the money stands before this decision:
+      //   missed                       → never charged, never paid
+      //   completed + adminRejected    → charged then reversed (reverseCompletedClass refunded
+      //                                  the credit and took back the pay) = not charged, not paid
+      //   completed, not rejected      → charged and paid
+      const countsAsCompleted = booking.status === "completed" && !booking.adminRejected;
 
-      booking.adminRejected = false;
-      booking.adminRejectedReason = "";
-      booking.status = "completed";
-      booking.markedBy = "admin";
-      booking.disputeStatus = "resolved_teacher";
-
-      if (wasMissed) {
-        // Missed class approved: deduct student class and pay teacher
-        const student = await getStudent(req.db).findById(booking.studentId._id);
-        if (student && student.classCredits > 0) {
-          student.classCredits -= 1;
-          if (student.classCredits === 0) student.active = false;
-          await student.save();
-        }
-
-        const teacher = await getTeacher(req.db).findById(booking.teacherId._id);
-        if (teacher) {
-          const earned = parseFloat(teacher.ratePerClass || 0);
-          teacher.lessonsCompleted = (teacher.lessonsCompleted || 0) + 1;
-          teacher.earned = (teacher.earned || 0) + earned;
-          await teacher.save();
-
-          await getPaymentTransaction(req.db).create({
-            bookingId: booking._id,
-            teacherId: booking.teacherId._id,
-            studentId: booking.studentId._id,
-            amount: earned,
-            status: "pending",
-            type: "class_completion",
-            classTitle: booking.classTitle,
-            completedAt: new Date(),
-            studentName: `${booking.studentId.firstName || ""} ${booking.studentId.lastName || ""}`.trim(),
-            description: `Dispute approved: ${booking.classTitle} (missed → completed by admin)`,
+      if (resolution === "approve_teacher") {
+        // Teacher wins → the class counts. Charge + pay only if it isn't settled as completed already.
+        if (!countsAsCompleted) {
+          recordOutcomeChange(booking, {
+            to: "completed", source: "dispute",
+            reason: `Dispute resolved for the teacher${adminNotes ? `: ${adminNotes}` : ""}`,
+          });
+          // Same charge/pay rules as every completion path (trial classes are free, 2dp rounding)
+          moneyMoved = true;
+          const { earned } = await payForCompletedClass(req.db, booking, {
+            description: `Dispute approved: ${booking.classTitle} (${booking.status === "missed" ? "missed" : "admin-rejected"} → completed by admin)`,
           });
           logger.info(`💰 Teacher paid $${earned} after dispute approval for booking ${booking._id}`);
         }
-      }
-    } else {
-      // Student wins: class stays rejected/missed, no change to teacher earnings
-      booking.disputeStatus = "resolved_student";
-
-      // Only refund student class if it was already deducted (adminRejected = completed then rejected)
-      // Missed classes never deducted student's class, so no refund needed
-      if (booking.status === "completed" && !booking.adminRejected) {
-        // Dispute on a class that still counts as completed (e.g. a parent says their
-        // managed child didn't attend): fully reverse it — credit back, teacher pay deducted.
-        await reverseCompletedClass(req.db, booking, {
+        booking.adminRejected = false;
+        booking.adminRejectedReason = "";
+        booking.status = "completed";
+        booking.markedBy = "admin";
+      } else if (countsAsCompleted) {
+        // Student wins on a class that still counts (e.g. a parent says their managed child
+        // didn't attend): fully reverse it — credit back, teacher pay deducted.
+        moneyMoved = true;
+        const { alreadyReversed } = await reverseCompletedClass(req.db, booking, {
           reason: `Dispute upheld: ${booking.disputeReason || "student did not attend"}`, adminId: req.user.id, source: "dispute",
         });
-      } else if (booking.adminRejected) {
-        const student = await getStudent(req.db).findById(booking.studentId._id);
-        if (student) {
-          student.classCredits = (student.classCredits || 0) + 1;
-          await student.save();
-          logger.info(`✅ Refunded 1 class to student ${student.firstName}`);
-        }
+        if (alreadyReversed) moneyMoved = false; // an admin unmarked it meanwhile — already refunded
+
       }
+      // Student wins on a missed / admin-rejected class: nothing was charged (or it was already
+      // refunded) — the class simply stays not completed.
     }
 
     booking.disputeResolution = resolution;
@@ -242,12 +220,20 @@ router.patch("/:bookingId/resolve", verifyToken, verifyAdmin, async (req, res) =
         ? "Dispute upheld — the logged class was rejected. Nothing was charged or paid."
         : resolution === "approve_teacher"
         ? "Dispute resolved in favour of teacher. Class marked as completed."
-        : "Dispute resolved in favour of student. Student class refunded.";
+        : moneyMoved
+        ? "Dispute resolved in favour of student. Student class refunded."
+        : "Dispute resolved in favour of student. The class stays not completed — nothing was charged.";
 
     logger.info(`✅ Dispute resolved (${resolution}) for booking ${booking._id}`);
 
     res.json({ success: true, message: msg, booking });
   } catch (err) {
+    if (claimedId && !moneyMoved) {
+      // Nothing was charged or paid yet — reopen so the admin can try again
+      await getBooking(req.db).updateOne({ _id: claimedId }, { $set: { disputeStatus: "pending" } }).catch(() => {});
+    } else if (claimedId) {
+      logger.error(`CRITICAL: dispute ${claimedId} failed after credits/pay changed — check the booking, student and teacher by hand`);
+    }
     logger.error("❌ Error resolving dispute:", { error: err?.message });
     serverError(res, "Error resolving dispute");
   }

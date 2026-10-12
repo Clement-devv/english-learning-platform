@@ -13,6 +13,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import api, { refreshToken } from '../api';
 import { ROLE_CONFIG, readStorage, clearAuth } from '../utils/authStorage.js';
+import { decodeJwtPayload } from '../utils/jwt.js';
 
 // Classroom accepts any of these roles
 const CLASSROOM_ROLES = ['teacher', 'student', 'sub-admin'];
@@ -26,12 +27,9 @@ function clearTokens(cfg) {
 }
 
 function clientSideValid(token) {
-  try {
-    const payload = JSON.parse(atob(token.split('.')[1]));
-    return payload.exp ? payload.exp * 1000 > Date.now() : true;
-  } catch {
-    return false;
-  }
+  const payload = decodeJwtPayload(token);
+  if (!payload) return false;
+  return payload.exp ? payload.exp * 1000 > Date.now() : true;
 }
 
 // Client-side roles (sub-admin) use short tokens that are renewed with their

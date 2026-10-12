@@ -8,6 +8,8 @@ vi.mock('../api', () => ({
     defaults: { headers: { common: {} } },
     get: vi.fn(),
   },
+  // AuthGuard tries a renewal before treating a sub-admin token as expired — none here
+  refreshToken: vi.fn().mockResolvedValue(null),
 }));
 
 import api from '../api';

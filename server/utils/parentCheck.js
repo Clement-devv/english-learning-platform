@@ -117,5 +117,5 @@ export function startParentCheckScheduler(db, center) {
   run(); // catch up on anything that expired while the server was down
   const id = setInterval(run, INTERVAL_MS);
   logger.info(`[ParentCheck] Scheduler started for ${center?.slug} (every ${INTERVAL_MS / 60000} min)`);
-  return id;
+  return [id];
 }

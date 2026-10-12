@@ -39,19 +39,12 @@ logger.info("  Email:", process.env.EMAIL_USER ? "✓ Configured" : "✗ Missing
 
 import { initializeSocket } from './socketServer.js';
 import { verifyEmailConfig } from "./utils/emailService.js";
-import { startReminderScheduler } from "./utils/reminderScheduler.js";
-import { startRecordingCleanup } from "./routes/recordingRoutes.js";
-import { startProgressReportScheduler } from "./utils/progressReportScheduler.js";
-import { startDailyClassReportScheduler } from "./utils/dailyClassReportScheduler.js";
-import { startMissedClassScheduler } from "./utils/missedClassScheduler.js";
-import { startParentCheckScheduler } from "./utils/parentCheck.js";
 import { linkPreviewHandler } from "./utils/linkPreview.js";
 import v1Router from "./routes/v1.js";
 import Center from "./models/master/Center.js";
 import SuperAdmin from "./models/master/SuperAdmin.js";
-import { getDb, closeAllConnections } from "./config/dbManager.js";
-import { teacherSchema } from "./schemas/teacherSchema.js";
-import { backfillTeacherCodes } from "./utils/teacherCode.js";
+import { getDb, closeConnection, closeAllConnections } from "./config/dbManager.js";
+import { startCenterJobSync, stopCenterJobs, stopAllCenterJobs, runningCenterJobs } from "./utils/centerJobs.js";
 import { errorHandler, notFoundHandler, registerProcessHandlers } from "./middleware/errorHandler.js";
 import healthRoutes from "./routes/healthRoutes.js";
 import { sweepExpiredSessionsFromDb } from "./utils/sessionManager.js";
@@ -311,19 +304,12 @@ mongoose
     // In PM2 cluster mode all other workers skip this block entirely.
     if (isFirstWorker) {
       try {
-        const activeCenters = await Center.find({ status: "active" }).select("slug timezone");
-        logger.info(`🏢 Found ${activeCenters.length} active center(s) — starting per-center schedulers`);
-        for (const center of activeCenters) {
-          const db = await getDb(center.slug);
-          startReminderScheduler(db);
-          startRecordingCleanup(db);
-          startProgressReportScheduler(db);
-          startMissedClassScheduler(db);
-          startParentCheckScheduler(db, center);
-          // Give teachers created before ID numbers existed a TCH-xxxxx code (once; no-op after)
-          backfillTeacherCodes(db.models.Teacher || db.model("Teacher", teacherSchema)).catch(err => logger.warn("teacher code backfill failed", { center: center.slug, error: err?.message }));
-          startDailyClassReportScheduler(db, center);
-        }
+        // Per-center jobs (utils/centerJobs.js): started for every active center now, then
+        // kept in sync every minute — newly approved / invited / reactivated centers get
+        // theirs without a restart, and suspended / deleted ones are stopped. A center
+        // whose DB can't be reached is retried and never blocks the others.
+        await startCenterJobSync();
+        logger.info(`🏢 Background jobs running for ${runningCenterJobs().length} active center(s)`);
 
         // App Health checks + alerts to the super admin (email / WhatsApp)
         startMonitorChecks();
@@ -362,9 +348,10 @@ mongoose
 
             for (const center of due) {
               try {
+                stopCenterJobs(center.slug); // its jobs must not run against the dropped DB
                 const db = await getDb(center.slug);
                 await db.dropDatabase();
-                await closeAllConnections();
+                await closeConnection(center.slug);
                 await Center.deleteOne({ slug: center.slug });
                 logger.info(`🗑️ Purged center DB and record: ${center.slug} (${center.centerName})`);
               } catch (e) {
@@ -589,7 +576,8 @@ const shutdown = async (signal) => {
     await new Promise((resolve) => io.close(resolve));
     logger.info("Socket.IO closed");
 
-    // 3. Close all per-center DB connections
+    // 3. Stop per-center background jobs, then close all per-center DB connections
+    stopAllCenterJobs();
     await closeAllConnections();
     logger.info("Per-center DB connections closed");
 

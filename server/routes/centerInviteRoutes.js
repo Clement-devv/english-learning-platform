@@ -25,6 +25,7 @@ import { config } from '../config/config.js';
 import { sendEmail, getCenterBaseUrl } from '../emails/core.js';
 import { writeAuditLog } from '../utils/auditLog.js';
 import { activateCenter } from '../utils/centerActivation.js';
+import { centerEmailInUse, emailInUseMessage } from '../utils/centerEmail.js';
 import { validatePasswordStrength } from '../utils/passwordUtils.js';
 import passwordHash from '../utils/passwordHash.js';
 import logger from '../utils/logger.js';
@@ -88,6 +89,19 @@ async function slugProblem(slug) {
 export const centerInviteAdminRoutes = express.Router();
 centerInviteAdminRoutes.use(verifySuperAdmin);
 
+// Live check for the "Admin email" field
+centerInviteAdminRoutes.get('/email-available', async (req, res) => {
+  try {
+    const email = str(req.query.email, 254).toLowerCase();
+    if (!EMAIL_RE.test(email)) return res.json({ success: true, data: { email, available: false, reason: '' } });
+    const taken = await centerEmailInUse(email);
+    res.json({ success: true, data: { email, available: !taken, reason: taken ? emailInUseMessage(taken) : '' } });
+  } catch (err) {
+    logger.error('email check failed', { error: err?.message });
+    fail(res, 500, 'Something went wrong');
+  }
+});
+
 centerInviteAdminRoutes.get('/slug-available', async (req, res) => {
   try {
     const slug = str(req.query.slug, 60).toLowerCase();
@@ -110,6 +124,8 @@ centerInviteAdminRoutes.post('/', strictLimiter, async (req, res) => {
 
     if (centerName.length < 2) return fail(res, 400, 'Enter the center name');
     if (!EMAIL_RE.test(adminEmail)) return fail(res, 400, 'Enter a valid admin email');
+    const taken = await centerEmailInUse(adminEmail);
+    if (taken) return fail(res, 409, emailInUseMessage(taken));
     const problem = await slugProblem(slug);
     if (problem) return fail(res, slug && problem.includes('taken') ? 409 : 400, problem);
 
@@ -152,6 +168,8 @@ centerInviteAdminRoutes.post('/:id/resend', strictLimiter, async (req, res) => {
     if (!center) return fail(res, 404, 'Center not found');
     if (center.status !== 'pending') return fail(res, 400, `This center is already ${center.status}`);
     if (!center.invite?.sentAt) return fail(res, 400, 'This center registered itself — approve or reject it instead');
+    const taken = await centerEmailInUse(center.adminEmail, { excludeId: center._id });
+    if (taken) return fail(res, 409, `${emailInUseMessage(taken)} Delete this invited center or change its email.`);
 
     const { token, fields } = newInvite(req.superAdmin._id.toString(), center.invite.sentCount || 0);
     await Center.updateOne({ _id: center._id }, { $set: fields });
@@ -215,6 +233,15 @@ centerInviteRoutes.post('/:token', strictLimiter, async (req, res) => {
   if (!timezone || !validTimeZone(timezone)) return fail(res, 400, 'Choose a valid time zone');
   const strength = validatePasswordStrength(password);
   if (!strength.isValid) return fail(res, 400, strength.errors?.[0] || 'Choose a stronger password');
+
+  // Invites made before the one-email-per-center check could clash with a live center
+  const pending = await findByToken(req.params.token);
+  if (pending) {
+    const taken = await centerEmailInUse(pending.adminEmail, { excludeId: pending._id });
+    if (taken && taken.reason !== 'invited' && taken.reason !== 'pending') {
+      return fail(res, 409, 'This email is already the admin of another center on our platform. Please contact support so we can set this center up with a different email.');
+    }
+  }
 
   // Claim the invite atomically — a double-click or a second tab can't create the center twice
   const now = new Date();

@@ -136,6 +136,8 @@ export function startDailyClassReportScheduler(db, center) {
   const tracked = trackJob("Daily class report", slug, CHECK_EVERY_MS, tick);
 
   logger.info(`📋 Daily class report scheduler started for center: ${slug}`);
-  setTimeout(tracked, 60 * 1000); // shortly after start-up (catch up a missed midnight)
-  setInterval(tracked, CHECK_EVERY_MS);
+  return [
+    setTimeout(tracked, 60 * 1000), // shortly after start-up (catch up a missed midnight)
+    setInterval(tracked, CHECK_EVERY_MS),
+  ];
 }

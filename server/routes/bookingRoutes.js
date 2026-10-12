@@ -1,8 +1,5 @@
 // server/routes/bookingRoutes.js
 import express from "express";
-import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
 import { verifyToken, verifyAdmin, verifyAdminOrTeacher } from "../middleware/authMiddleware.js";
 import {
   sendBookingRequestToTeacher, sendBookingAcceptedToStudent,
@@ -13,7 +10,6 @@ import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
 import { bookingSchema }            from "../schemas/bookingSchema.js";
 import { teacherSchema }            from "../schemas/teacherSchema.js";
 import { studentSchema }            from "../schemas/studentSchema.js";
-import { paymentTransactionSchema } from "../schemas/paymentTransactionSchema.js";
 import { teacherAvailabilitySchema } from "../schemas/teacherAvailabilitySchema.js";
 import { freeIntervals, teacherTz, bookingInterval, BUSY_STATUSES } from "../utils/schedule.js";
 import { notifyAdmins } from "../utils/adminNotify.js";
@@ -27,19 +23,7 @@ import { toStr, toObjectId } from '../utils/inputSanitizer.js';
 import { pushToUser, pushToAllAdmins } from '../utils/webPushService.js';
 import { disputeDeadlineFrom, DISPUTE_DAYS } from '../utils/parentCheck.js';
 import { sendEmail, getCenterBaseUrl } from '../utils/emailService.js';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname  = path.dirname(__filename);
-
-// Silently remove the session PDF for a booking — never throws.
-function deleteSessionPdf(bookingId) {
-  try {
-    const filePath = path.join(__dirname, "..", "uploads", "content", `${bookingId}.pdf`);
-    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-  } catch (e) {
-    logger.error("PDF cleanup failed:", { bookingId, error: e?.message });
-  }
-}
+import { completeClass } from '../services/classCompletionService.js';
 
 const router = express.Router();
 router.use(tenantMiddleware);
@@ -47,8 +31,12 @@ router.use(tenantMiddleware);
 const getBooking            = (db) => db.models.Booking            || db.model("Booking",            bookingSchema);
 const getTeacher            = (db) => db.models.Teacher            || db.model("Teacher",            teacherSchema);
 const getStudent            = (db) => db.models.Student            || db.model("Student",            studentSchema);
-const getPaymentTransaction = (db) => db.models.PaymentTransaction || db.model("PaymentTransaction", paymentTransactionSchema);
 const getTeacherAvailability = (db) => db.models.TeacherAvailability || db.model("TeacherAvailability", teacherAvailabilitySchema);
+
+// Statuses whose booking can be deleted outright (nothing charged, paid or disputed).
+// Teachers can't delete missed classes (their attendance record).
+const TEACHER_DELETABLE = ["pending", "accepted", "rejected", "cancelled"];
+const ADMIN_DELETABLE   = ["pending", "accepted", "rejected", "cancelled", "missed"];
 
 const canCreateBooking = (req, createdBy) => {
   const { role, id } = req.user;
@@ -248,10 +236,15 @@ router.patch("/:id/accept", verifyToken, validateObjectId("id"), async (req, res
       return forbidden(res, "You are not authorized to accept this booking");
     if (booking.status !== "pending")
       return res.status(400).json({ success: false, message: `Cannot accept booking with status: ${booking.status}` });
+    // Credits may have run out since the request — a completed class would then be
+    // free for the student while the teacher is still paid
+    if (!booking.isTrial && (booking.studentId?.classCredits || 0) <= 0)
+      return badRequest(res, `${booking.studentId?.firstName || "The student"} has no classes left — they need to buy more before this class can be accepted.`);
 
-    booking.status     = "accepted";
-    booking.acceptedAt = new Date();
-    await booking.save();
+    const acceptedAt = new Date();
+    const claimed = await Booking.updateOne({ _id: booking._id, status: "pending" }, { $set: { status: "accepted", acceptedAt } });
+    if (claimed.modifiedCount === 0) return conflict(res, "This booking was already handled — please refresh");
+    Object.assign(booking, { status: "accepted", acceptedAt });
 
     // A class the admin booked → tell the admins the teacher accepted it
     if (isTeacher && booking.createdBy === "admin") {
@@ -317,10 +310,17 @@ router.patch("/:id/reject", verifyToken, validateObjectId("id"), async (req, res
     if (!isTeacher && req.user.role !== "admin")
       return forbidden(res, "You are not authorized to reject this booking");
 
-    booking.status          = "rejected";
-    booking.rejectionReason = reason || "No reason provided";
-    booking.rejectedAt      = new Date();
-    await booking.save();
+    // Reject = decline a booking REQUEST. A class that is accepted, completed (already
+    // paid) or settled can't be rejected — use cancel / the admin unmark flow instead.
+    const rejectionReason = toStr(reason, "reason", { maxLen: 500 }) || "No reason provided";
+    const rejectedAt = new Date();
+    const updated = await Booking.updateOne(
+      { _id: booking._id, status: "pending" },
+      { $set: { status: "rejected", rejectionReason, rejectedAt } },
+    );
+    if (updated.modifiedCount === 0)
+      return badRequest(res, `Only a pending booking request can be rejected (this one is ${booking.status === "pending" ? "no longer pending" : booking.status})`);
+    Object.assign(booking, { status: "rejected", rejectionReason, rejectedAt });
 
     // A class the admin booked → tell the admins the teacher declined it (with the reason)
     if (isTeacher && booking.createdBy === "admin") {
@@ -350,6 +350,7 @@ router.patch("/:id/reject", verifyToken, validateObjectId("id"), async (req, res
 
     res.json({ success: true, message: "Booking rejected", booking });
   } catch (err) {
+    if (err.statusCode === 400) return badRequest(res, err.message);
     logger.error("Error rejecting booking:", { error: err?.message });
     res.status(500).json({ success: false, message: "Error rejecting booking" });
   }
@@ -364,43 +365,20 @@ router.patch("/:id/complete", verifyToken, verifyAdmin, validateObjectId("id"), 
     getTeacher(req.db);
     getStudent(req.db);
     const Booking = getBooking(req.db);
+    const current = await Booking.findById(req.params.id).select("status").lean();
+    if (!current) return notFound(res, "Booking not found");
+    if (current.status !== "accepted")
+      return res.status(400).json({ success: false, message: `Cannot complete booking with status: ${current.status}` });
+
+    // The single completion path: claims the booking atomically (a double click can't
+    // pay twice), charges the credit, pays the teacher (trial classes are free), deletes the PDF.
+    const result = await completeClass(req.db, req.params.id, "admin", { skipAttendanceCheck: true });
+    if (result.alreadyProcessed)
+      return conflict(res, "This class was already completed — please refresh");
+
     const booking = await Booking.findById(req.params.id)
-      .populate("teacherId", "firstName lastName email ratePerClass lessonsCompleted earned googleMeetLink zoomLink")
+      .populate("teacherId", "firstName lastName email googleMeetLink zoomLink")
       .populate("studentId", "firstName lastName email classCredits isManaged");
-    if (!booking) return notFound(res, "Booking not found");
-    if (booking.status !== "accepted")
-      return res.status(400).json({ success: false, message: `Cannot complete booking with status: ${booking.status}` });
-
-    booking.status        = "completed";
-    booking.markedBy      = "classroom";
-    booking.adminRejected = false;
-    booking.completedAt   = new Date();
-    await booking.save();
-
-    // Remove the session PDF — no longer needed after class ends
-    deleteSessionPdf(booking._id.toString());
-
-    const Student = getStudent(req.db);
-    const student = await Student.findById(booking.studentId._id);
-    if (student && student.classCredits > 0) {
-      student.classCredits -= 1;
-      await student.save();
-    }
-
-    const Teacher = getTeacher(req.db);
-    const teacher = await Teacher.findById(booking.teacherId._id);
-    if (teacher) {
-      const rate = parseFloat(teacher.ratePerClass || 0);
-      teacher.lessonsCompleted = (teacher.lessonsCompleted || 0) + 1;
-      teacher.earned           = (teacher.earned || 0) + rate;
-      await teacher.save();
-
-      await getPaymentTransaction(req.db).create({
-        bookingId: booking._id, teacherId: teacher._id,
-        studentId: student?._id, amount: rate,
-        status: "pending", completedAt: new Date(),
-      });
-    }
 
     try { await sendClassCompletedNotification(booking.teacherId, booking.studentId, booking, req.center?.centerName || "", req.center); }
     catch (e) { logger.error("Email notification failed:", { error: e?.message }); }
@@ -610,6 +588,19 @@ router.post("/student-request", verifyToken, async (req, res) => {
       return notFound(res, "Teacher not found or unavailable");
     if (!student) return notFound(res, "Student not found");
 
+    // Each class costs a credit. Classes already requested/booked and not yet held
+    // will use credits too, so a student with 1 credit can't request 10 classes.
+    const credits = student.classCredits || 0;
+    const upcoming = credits > 0 ? await getBooking(req.db).countDocuments({
+      studentId: req.user.id, isTrial: { $ne: true },
+      status: { $in: ["pending", "accepted"] }, scheduledTime: { $gte: new Date(Date.now() - 4 * 3600000) },
+    }) : 0;
+    if (credits - upcoming <= 0) {
+      return badRequest(res, credits <= 0
+        ? "You have no classes left. Please contact your school to buy more classes."
+        : `Your ${credits} remaining class${credits === 1 ? " is" : "es are"} already booked. Please buy more classes to request another.`);
+    }
+
     const slotStart = new Date(scheduledTime);
     const mins = Number(duration) || 60;
     if (isNaN(slotStart)) return badRequest(res, "scheduledTime is invalid");
@@ -687,7 +678,24 @@ router.delete("/:id", verifyToken, validateObjectId("id"), async (req, res) => {
     const isOwner = req.user.role === "teacher" && String(booking.teacherId) === String(req.user.id);
     if (!isAdmin && !isOwner) return forbidden(res, "Not authorised to delete this booking");
 
-    await booking.deleteOne();
+    // Bookings that carry money or a record of what happened are never deleted —
+    // a completed class has a payment, a disputed one is evidence, a logged one awaits approval.
+    const filter = {
+      _id: booking._id,
+      status: { $in: isAdmin ? ADMIN_DELETABLE : TEACHER_DELETABLE },
+      adminRejected: { $ne: true },
+      disputeStatus: { $ne: "pending" },
+      // A teacher can't erase a class that has already started (hiding a no-show before it's marked missed)
+      ...(isAdmin ? {} : { $or: [{ status: { $ne: "accepted" } }, { scheduledTime: { $gt: new Date() } }] }),
+    };
+    const deleted = await getBooking(req.db).findOneAndDelete(filter);
+    if (!deleted) {
+      return badRequest(res, booking.status === "completed" || booking.adminRejected
+        ? "A completed class can't be deleted — it has a payment record. Use \"unmark\" to reverse it instead."
+        : booking.disputeStatus === "pending"
+        ? "This class has an open dispute and can't be deleted"
+        : `This class can't be deleted (${booking.status}). Cancel it instead.`);
+    }
     res.json({ success: true, message: "Booking deleted successfully" });
   } catch (err) {
     logger.error("Error deleting booking:", { error: err?.message });

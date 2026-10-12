@@ -4,23 +4,34 @@
 // for the inner content area, optionally passing a wrapStyle for the card container.
 
 import React from 'react';
-import ClassList           from '../components/classes/ClassList';
-import CompletedClassesTab from '../components/classes/CompletedClasses';
-import StudentProgressList from '../components/students/StudentProgressList';
 import BookingList         from '../components/bookings/BookingList';
-import ScheduleTab         from '../tabs/ScheduleTab';
-import PaymentTab          from '../tabs/PaymentTab';
-import HomeworkTab         from '../tabs/HomeworkTab';
-import QuizTab             from '../tabs/QuizTab';
-import VocabTab            from '../tabs/VocabTab';
-import RecordingsTab       from '../tabs/RecordingsTab';
-import ReviewsTab          from '../tabs/ReviewsTab';
-import RatingDashboardTab  from '../tabs/RatingDashboardTab';
-import ClassSummariesTab   from '../tabs/ClassSummariesTab';
-import TeachingLibrary     from '../../../components/library/TeachingLibrary';
-import ProfileTab          from '../tabs/ProfileTab';
-import MessagesTab         from '../../../components/chat/MessagesTab';
+import { lazyTab, preloadWhenIdle } from '../../../lib/lazyTab';
 import { Calendar, Users } from 'lucide-react';
+
+// Each tab downloads the first time it is opened (see src/lib/lazyTab.jsx),
+// so the dashboard's first load doesn't include every tab's code.
+const ClassList           = lazyTab(() => import('../components/classes/ClassList'));
+const CompletedClassesTab = lazyTab(() => import('../components/classes/CompletedClasses'));
+const StudentProgressList = lazyTab(() => import('../components/students/StudentProgressList'));
+const ScheduleTab         = lazyTab(() => import('../tabs/ScheduleTab'));
+const PaymentTab          = lazyTab(() => import('../tabs/PaymentTab'));
+const HomeworkTab         = lazyTab(() => import('../tabs/HomeworkTab'));
+const QuizTab             = lazyTab(() => import('../tabs/QuizTab'));
+const VocabTab            = lazyTab(() => import('../tabs/VocabTab'));
+const RecordingsTab       = lazyTab(() => import('../tabs/RecordingsTab'));
+const ReviewsTab          = lazyTab(() => import('../tabs/ReviewsTab'));
+const RatingDashboardTab  = lazyTab(() => import('../tabs/RatingDashboardTab'));
+const ClassSummariesTab   = lazyTab(() => import('../tabs/ClassSummariesTab'));
+const TeachingLibrary     = lazyTab(() => import('../../../components/library/TeachingLibrary'));
+const ProfileTab          = lazyTab(() => import('../tabs/ProfileTab'));
+const MessagesTab         = lazyTab(() => import('../../../components/chat/MessagesTab'));
+
+// Warm the rest in the background once the dashboard is up, so tab clicks stay instant.
+preloadWhenIdle([
+  ClassList, ScheduleTab, MessagesTab, HomeworkTab, QuizTab, CompletedClassesTab,
+  StudentProgressList, PaymentTab, VocabTab, RecordingsTab, ReviewsTab,
+  RatingDashboardTab, ClassSummariesTab, TeachingLibrary, ProfileTab,
+]);
 
 /**
  * wrapStyle  – CSS object applied to the outer card container for non-messages tabs

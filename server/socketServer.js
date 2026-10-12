@@ -1,5 +1,6 @@
 // server/socketServer.js - WITH PDF VISIBILITY CONTROL
 import { Server } from 'socket.io';
+import mongoose from 'mongoose';
 import jwt from 'jsonwebtoken';
 import { config, JWT_VERIFY_OPTIONS } from './config/config.js';
 import { getCenterSecret } from './utils/jwtUtils.js';
@@ -12,7 +13,7 @@ import { teacherSchema } from './schemas/teacherSchema.js';
 import { adminSchema } from './schemas/adminSchema.js';
 import { subAdminSchema } from './schemas/subAdminSchema.js';
 import { pushToUser } from './utils/webPushService.js';
-import { isTokenBlacklisted } from './middleware/authMiddleware.js';
+import { isTokenBlacklisted, isImpersonationActive } from './middleware/authMiddleware.js';
 import redisClient from './config/redis.js';
 import {
   verifyChannel, verifyChat, joinedChannel, joinedChat,
@@ -65,14 +66,34 @@ async function getTargetInfo(centerId, targetUserId, targetRole) {
   try {
     const db = await getDb(centerId);
     const Model = getRingUserModel(db, targetRole);
-    if (!Model) return { ringEnabled: true, targetName: '' };
+    if (!Model || !mongoose.isValidObjectId(targetUserId)) return { found: false };
     const doc = await Model.findById(targetUserId).select('firstName lastName ringEnabled').lean();
-    if (!doc) return { ringEnabled: true, targetName: '' };
+    if (!doc) return { found: false };
     const name = `${doc.firstName || ''} ${doc.lastName || ''}`.trim();
-    return { ringEnabled: doc.ringEnabled !== false, targetName: name };
+    return { found: true, ringEnabled: doc.ringEnabled !== false, targetName: name };
   } catch {
-    return { ringEnabled: true, targetName: '' }; // fail open — don't silently block calls
+    return { found: true, ringEnabled: true, targetName: '' }; // DB hiccup — fail open, don't silently block calls
   }
+}
+
+const ROLE_LABEL = { admin: 'Admin', 'sub-admin': 'Sub-admin', teacher: 'Teacher', student: 'Student', parent: 'Parent' };
+// Roles that can be rung (ring contacts are teachers, students and admins — see routes/ringRoutes.js)
+const RING_TARGET_ROLES = new Set(['student', 'teacher', 'admin', 'sub-admin']);
+// Whiteboard snapshot kept per room for (re)joiners — a data:image URL, bounded
+const MAX_CANVAS_SNAPSHOT = 3 * 1024 * 1024;
+
+/** The caller's real name from the DB — the client-sent name can't be trusted (anyone could ring as "Admin"). */
+async function getCallerName(socket) {
+  try {
+    const db = await getDb(socket.centerId);
+    const Model = getRingUserModel(db, socket.userRole);
+    if (Model && mongoose.isValidObjectId(socket.userId)) {
+      const doc = await Model.findById(socket.userId).select('firstName lastName').lean();
+      const name = `${doc?.firstName || ''} ${doc?.lastName || ''}`.trim();
+      if (name) return name;
+    }
+  } catch { /* fall through */ }
+  return ROLE_LABEL[socket.userRole] || 'Someone';
 }
 
 async function isAllowedOrigin(origin) {
@@ -173,6 +194,10 @@ export async function initializeSocket(httpServer) {
       const unverified = jwt.decode(token);
       if (!unverified?.centerId) return next(new Error('Invalid token'));
       const decoded = jwt.verify(token, getCenterSecret(unverified.centerId), JWT_VERIFY_OPTIONS);
+      // A revoked super-admin impersonation can't open live connections either
+      if (decoded.isImpersonation && !(await isImpersonationActive(`Bearer ${token}`, decoded.centerId))) {
+        return next(new Error('Session revoked'));
+      }
       socket.userId = decoded.id;
       socket.userRole = decoded.role;     // role from JWT — not trusted from client
       socket.centerId = decoded.centerId; // center slug the token was issued for
@@ -325,7 +350,12 @@ export async function initializeSocket(httpServer) {
       try {
         const room = tenantRoom(socket, channelName);
         const session = whiteboardSessions.get(room);
-        if (session && dataUrl) session.canvasSnapshot = dataUrl;
+        if (!session) return;
+        // Same rule as drawing: a student can't change the board while it's locked
+        // (the snapshot is what everyone who (re)joins sees)
+        if (socket.userRole === 'student' && session.locked) return;
+        if (typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image/') || dataUrl.length > MAX_CANVAS_SNAPSHOT) return;
+        session.canvasSnapshot = dataUrl;
       } catch (err) {
         logger.error('save-canvas-state error:', { error: err?.message });
       }
@@ -518,25 +548,30 @@ export async function initializeSocket(httpServer) {
     // Caller emits ring-call → server checks target's ringEnabled preference,
     // then forwards incoming-ring to target's user-room.
     // The ring plays client-side audio and auto-cancels after RING_TIMEOUT_MS.
-    socket.on('ring-call', async ({ targetUserId, targetRole, callerName }) => {
+    socket.on('ring-call', async ({ targetUserId, targetRole } = {}) => {
       try {
-        if (!targetUserId || !callerName) return;
+        // targetRole is required: without it the "calls muted" check used to be skipped
+        if (!targetUserId || typeof targetUserId !== 'string' || !RING_TARGET_ROLES.has(targetRole)) return;
 
         const callerRoom = `user-room:${socket.centerId}:${socket.userId}`;
         const targetRoom = `user-room:${socket.centerId}:${targetUserId}`;
         const ringId = `${socket.centerId}:${socket.userId}:${targetUserId}:${Date.now()}`;
 
-        // Check target's ring preference + resolve display name for DB logs
-        let targetName = '';
-        if (targetRole) {
-          const info = await getTargetInfo(socket.centerId, targetUserId, targetRole);
-          targetName = info.targetName;
-          if (!info.ringEnabled) {
-            // Auto-decline immediately — don't bother the target or play ringtone
-            socket.emit('ring-declined', { ringId, reason: 'muted' });
-            logger.info(`🔕 Ring ${ringId} auto-declined — target has calls muted`);
-            return;
-          }
+        // Check target's ring preference + resolve display names (never trust the client's callerName)
+        const [info, callerName] = await Promise.all([
+          getTargetInfo(socket.centerId, targetUserId, targetRole),
+          getCallerName(socket),
+        ]);
+        if (!info.found) {
+          socket.emit('ring-declined', { ringId, reason: 'unavailable' });
+          return;
+        }
+        const targetName = info.targetName;
+        if (!info.ringEnabled) {
+          // Auto-decline immediately — don't bother the target or play ringtone
+          socket.emit('ring-declined', { ringId, reason: 'muted' });
+          logger.info(`🔕 Ring ${ringId} auto-declined — target has calls muted`);
+          return;
         }
 
         // Cancel any previous ring this caller already has in flight
@@ -585,9 +620,7 @@ export async function initializeSocket(httpServer) {
         logger.info(`🔔 Ring ${ringId}: ${socket.userId} (${socket.userRole}) → ${targetUserId}`);
 
         // Push notification so the target is alerted even when the app is in background
-        if (targetRole) {
-          sendRingPush(socket.centerId, targetUserId, targetRole, callerName).catch(() => { });
-        }
+        sendRingPush(socket.centerId, targetUserId, targetRole, callerName).catch(() => { });
       } catch (err) { logger.error('ring-call error:', { error: err?.message }); }
     });
 

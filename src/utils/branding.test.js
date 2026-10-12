@@ -7,6 +7,9 @@ import {
   setCachedBranding,
   getCachedBranding,
   getCachedCenter,
+  subscribeBranding,
+  loadStoredBranding,
+  storeBranding,
 } from './branding';
 
 // ── hexToRgb ────────────────────────────────────────────────────────────────
@@ -153,5 +156,71 @@ describe('branding cache', () => {
     setCachedBranding(branding, center);
     expect(getCachedBranding()).toEqual(branding);
     expect(getCachedCenter()).toEqual(center);
+  });
+});
+
+// ── authoritative flag ───────────────────────────────────────────────────────
+
+describe('fetchBranding authoritative flag', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('is false on a network failure (saved branding must be kept)', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Network error')));
+    expect((await fetchBranding()).authoritative).toBe(false);
+  });
+
+  it('is false on a 5xx and true on a 4xx', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 503 }));
+    expect((await fetchBranding()).authoritative).toBe(false);
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 404 }));
+    expect((await fetchBranding()).authoritative).toBe(true);
+  });
+
+  it('is true when the server returns branding', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: true, branding: {}, center: { centerName: 'T' } }),
+    }));
+    expect((await fetchBranding()).authoritative).toBe(true);
+  });
+});
+
+// ── saved branding (returning visitors) ─────────────────────────────────────
+
+describe('stored branding', () => {
+  afterEach(() => { localStorage.clear(); sessionStorage.clear(); });
+
+  it('round-trips branding + center', () => {
+    const branding = { ...DEFAULT_BRANDING, primaryColor: '#111111' };
+    storeBranding(branding, { centerName: 'Saved' });
+    expect(loadStoredBranding()).toEqual({ branding, center: { centerName: 'Saved' } });
+  });
+
+  it('clears saved branding when there is no center', () => {
+    storeBranding(DEFAULT_BRANDING, { centerName: 'Saved' });
+    storeBranding(DEFAULT_BRANDING, null);
+    expect(loadStoredBranding()).toBeNull();
+  });
+
+  it('keeps an impersonated center separate from the normal one', () => {
+    storeBranding(DEFAULT_BRANDING, { centerName: 'Own' });
+    sessionStorage.setItem('impersonationCenterSlug', 'other');
+    expect(loadStoredBranding()).toBeNull();
+  });
+
+  it('returns null for corrupt data', () => {
+    localStorage.setItem(`branding:v1:${window.location.hostname}:`, '{not json');
+    expect(loadStoredBranding()).toBeNull();
+  });
+});
+
+describe('subscribeBranding', () => {
+  it('notifies on setCachedBranding until unsubscribed', () => {
+    const fn = vi.fn();
+    const unsubscribe = subscribeBranding(fn);
+    setCachedBranding(DEFAULT_BRANDING, null);
+    unsubscribe();
+    setCachedBranding(DEFAULT_BRANDING, null);
+    expect(fn).toHaveBeenCalledTimes(1);
   });
 });

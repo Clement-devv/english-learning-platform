@@ -28,9 +28,18 @@ const log = (import.meta.env.DEV && import.meta.env.VITE_DEBUG_SOCKET)
 // even when this computer's clock is wrong.
 const toMs = (d) => (d ? new Date(d).getTime() || 0 : 0);
 
-// Storage-based fallback — used when useAuth() hasn't hydrated yet (e.g. HMR or first paint)
-function getSocketToken() {
-  const role = detectActiveRole();
+// Ring + chat belong to a center. The super admin's token has no center, so the
+// server rejects it on every ring/chat call — never start them for that role.
+const CENTER_ROLES = new Set(["admin", "sub-admin", "teacher", "student", "parent"]);
+
+/** The signed-in center role (auth state first, storage as the HMR/first-paint fallback). */
+function ringRole(authRole) {
+  const role = authRole || detectActiveRole();
+  return CENTER_ROLES.has(role) ? role : null;
+}
+
+// Freshest stored token for that role — may be newer than authToken after a silent refresh
+function getSocketToken(role) {
   return role ? getStoredToken(role) : null;
 }
 
@@ -127,8 +136,8 @@ export function RingProvider({ children }) {
   // survives logout, refresh, and cross-device sessions. Only calls newer than
   // this person's server-side "calls seen" marker count as new.
   useEffect(() => {
-    const token = getSocketToken() || authToken;
-    const role  = authRole || detectActiveRole();
+    const role  = ringRole(authRole);
+    const token = getSocketToken(role) || (role ? authToken : null);
     if (!token || !role) return; // not authenticated yet
 
     let cancelled = false;
@@ -156,7 +165,7 @@ export function RingProvider({ children }) {
   // whose last-message timestamp is newer than the person's "messages seen"
   // marker. Called once on login and then again on every new-message event.
   const refreshUnreadMessages = useCallback(async () => {
-    const role = authRole || detectActiveRole();
+    const role = ringRole(authRole);
     if (!role) return;
     const unreadKey = role === "sub-admin" ? "subAdmin" : role;
     await loadSeen();
@@ -190,16 +199,16 @@ export function RingProvider({ children }) {
 
   // Initial fetch + refetch on auth change
   useEffect(() => {
-    const token = getSocketToken() || authToken;
-    const role  = authRole || detectActiveRole();
+    const role  = ringRole(authRole);
+    const token = getSocketToken(role) || (role ? authToken : null);
     if (!token || !role) return;
     refreshUnreadMessages();
   }, [authRole, authToken, refreshUnreadMessages]);
 
   useEffect(() => {
     // Prefer sessionStorage token — it may be fresher than authToken after a silent refresh
-    const token = getSocketToken() || authToken;
-    const role  = authRole || detectActiveRole();
+    const role  = ringRole(authRole);
+    const token = getSocketToken(role) || (role ? authToken : null);
 
     if (!token || !role) {
       log("[RingContext] No token/role — socket not started", { authToken: !!authToken, authRole });
@@ -216,10 +225,10 @@ export function RingProvider({ children }) {
       transports: ["websocket"],
       autoConnect: false, // connected below, on the next tick
       auth: (cb) => {
-        const current = getSocketToken() || authToken;
+        const current = getSocketToken(role) || authToken;
         if (!tokenExpiresSoon(current)) return cb({ token: current });
         refreshToken()
-          .then(fresh => cb({ token: fresh || getSocketToken() || current }))
+          .then(fresh => cb({ token: fresh || getSocketToken(role) || current }))
           .catch(() => cb({ token: current }));
       },
     });

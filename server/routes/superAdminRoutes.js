@@ -15,6 +15,7 @@ import { fileURLToPath } from 'url';
 import { s3Enabled, uploadToS3, s3PublicUrl } from '../utils/s3.js';
 import { cleanLandingPage } from '../utils/landingPage.js';
 import { activateCenter } from '../utils/centerActivation.js';
+import { centerEmailInUse, emailInUseMessage } from '../utils/centerEmail.js';
 
 // Same folder the center admins' logo uploads use (served publicly at /uploads/branding)
 const SA_BRANDING_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'uploads', 'branding');
@@ -482,6 +483,12 @@ router.patch('/centers/:id/approve', verifySuperAdmin, strictLimiter, validatePa
         : 'No pending password hash found for this center');
     }
 
+    // One email = one center admin: don't create a second center for an email in use
+    const taken = await centerEmailInUse(center.adminEmail, { excludeId: center._id });
+    if (taken && taken.reason !== 'invited' && taken.reason !== 'pending') {
+      return res.status(409).json({ success: false, message: `${emailInUseMessage(taken)} Reject this registration or change its email first.` });
+    }
+
     // Create the center's database and admin account (utils/centerActivation.js)
     await activateCenter(center, { passwordHash: center.pendingPasswordHash, approvedBy: req.superAdmin._id.toString() });
 
@@ -683,7 +690,10 @@ router.post('/impersonate/:slug', verifySuperAdmin, loginLimiter, validateSlugPa
     const token = jwt.sign(
       {
         ...JWT_STANDARD_CLAIMS,
-        id: 'superadmin-impersonation',
+        // A real ObjectId (the super admin's own id — not a user in this center): routes write
+        // req.user.id into ObjectId fields (paidBy, decidedBy, adminRejectedBy…), and the old
+        // 'superadmin-impersonation' string made those writes fail mid-action.
+        id: req.superAdmin._id.toString(),
         role: 'admin',
         centerId: center.slug,
         isImpersonation: true,

@@ -11,37 +11,23 @@ import {
 } from "lucide-react";
 import { Award } from "lucide-react";
 import LanguageSwitcher from "../../../../components/LanguageSwitcher";
-import LeaderboardTab   from "../../tabs/LeaderboardTab";
 import {
   PieChart, Pie, Cell,
   BarChart, Bar, LineChart, Line,
   XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
 } from "recharts";
-import Classroom from "../../../Classroom";
-import MessagesTab from "../../../../components/chat/MessagesTab";
 import ClassConfirmation from "../../../../components/student/ClassConfirmation";
-import StudentCompletedTab from "../../tabs/StudentCompletedTab";
-import StudentScheduleTab  from "../../tabs/StudentScheduleTab";
-import BookingCalendarTab  from "../../tabs/BookingCalendarTab";
-import ClassReportsTab     from "../../tabs/ClassReportsTab";
-import StudentHomeworkTab  from "../../tabs/HomeworkTab";
-import StudentQuizTab      from "../../tabs/QuizTab";
-import PronunciationTab    from "../../tabs/PronunciationTab";
-import ConversationTab     from "../../tabs/ConversationTab";
-import FlashcardsTab       from "../../tabs/FlashcardsTab";
-import RecordingsTab       from "../../tabs/RecordingsTab";
-import ReviewsTab          from "../../tabs/ReviewsTab";
-import ReferralTab         from "../../tabs/ReferralTab";
 import StreakWidget        from "../../components/StreakWidget";
 import ActiveClasses       from "../../components/ActiveClasses";
 import UpcomingClasses     from "../../components/UpcomingClasses";
-import ChangePassword      from "../../../../components/student/auth/ChangePassword";
 import SessionManagement   from "../../../../components/SessionManagement";
 import SettingsModal       from "../../../../components/SettingsModal";
 import { useBranding }     from "../../../../context/BrandingContext";
 import { useDashboardData, BADGE_DEFINITIONS } from "../useDashboardData";
 import { useRing }                              from "../../../../context/RingContext";
 import DashboardAlertsBar from "../../../../components/DashboardAlertsBar";
+// Tabs load on demand (see src/pages/student/tabs/lazyTabs.js)
+import { LeaderboardTab, StudentCompletedTab, StudentScheduleTab, BookingCalendarTab, ClassReportsTab, StudentHomeworkTab, StudentQuizTab, PronunciationTab, ConversationTab, FlashcardsTab, RecordingsTab, ReviewsTab, ReferralTab, ChangePassword, MessagesTab, Classroom } from "../../tabs/lazyTabs";
 
 // ── Palette ────────────────────────────────────────────────────────────────────
 const LIGHT = {

@@ -1,8 +1,10 @@
 // server/routes/subAdminScopeRoutes.js
 // All routes here return data SCOPED to the sub-admin's assigned teachers only
 import express from "express";
+import mongoose from "mongoose";
 import { verifyToken } from "../middleware/authMiddleware.js";
 import { completeClass } from "../services/classCompletionService.js";
+import { reverseCompletedClass } from "../utils/classReversal.js";
 import { tenantMiddleware }           from "../middleware/tenantMiddleware.js";
 import { subAdminSchema }             from "../schemas/subAdminSchema.js";
 import { teacherSchema }              from "../schemas/teacherSchema.js";
@@ -13,7 +15,6 @@ import { paymentSchema }              from "../schemas/paymentSchema.js";
 import { recordingSchema }            from "../schemas/recordingSchema.js";
 import { reviewSchema }               from "../schemas/reviewSchema.js";
 import { notificationSchema }         from "../schemas/notificationSchema.js";
-import { paymentTransactionSchema }   from "../schemas/paymentTransactionSchema.js";
 import logger from "../utils/logger.js";
 import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
 
@@ -28,7 +29,6 @@ const getPayment             = (db) => db.models.Payment             || db.model
 const getRecording           = (db) => db.models.Recording           || db.model("Recording",           recordingSchema);
 const getReview              = (db) => db.models.Review              || db.model("Review",              reviewSchema);
 const getNotification        = (db) => db.models.Notification        || db.model("Notification",        notificationSchema);
-const getPaymentTransaction  = (db) => db.models.PaymentTransaction  || db.model("PaymentTransaction",  paymentTransactionSchema);
 
 // ── Auth middleware: must be an active sub-admin ──────────────────────────────
 const requireSubAdmin = async (req, res, next) => {
@@ -264,12 +264,13 @@ router.post("/classes/mark", verifyToken, requireSubAdmin, async (req, res) => {
     }
 
     const subAdminName = `${req.subAdmin.firstName} ${req.subAdmin.lastName}`;
-    const teacherName  = result.booking?.teacherId
-      ? `${result.booking.teacherId.firstName || ""} ${result.booking.teacherId.lastName || ""}`.trim()
-      : "";
-    const studentName  = result.booking?.studentId
-      ? `${result.booking.studentId.firstName || ""} ${result.booking.studentId.lastName || ""}`.trim()
-      : "";
+    // result.booking is not populated — look the names up for the notification
+    getStudent(req.db);
+    const named = await getBooking(req.db).findById(bookingId)
+      .populate("teacherId", "firstName lastName").populate("studentId", "firstName lastName").lean();
+    const fullName = (p) => (p ? `${p.firstName || ""} ${p.lastName || ""}`.trim() : "");
+    const teacherName  = fullName(named?.teacherId);
+    const studentName  = fullName(named?.studentId);
 
     getNotification(req.db).create({
       type:        "class_marked",
@@ -295,40 +296,36 @@ router.post("/classes/unmark", verifyToken, requireSubAdmin, async (req, res) =>
     const { bookingId } = req.body;
     if (!bookingId) return badRequest(res, "bookingId is required");
 
+    if (!mongoose.isValidObjectId(bookingId)) return badRequest(res, "Invalid booking");
+    const reason = typeof req.body.reason === "string" ? req.body.reason.trim().slice(0, 500) : "";
+
     const Booking = getBooking(req.db);
+    getTeacher(req.db); getStudent(req.db); // populate needs both models registered on this connection
     const booking = await Booking.findById(bookingId)
-      .populate("teacherId", "firstName lastName ratePerClass earned lessonsCompleted")
-      .populate("studentId", "firstName lastName classCredits active");
+      .populate("teacherId", "firstName lastName")
+      .populate("studentId", "firstName lastName");
 
     if (!booking) return notFound(res, "Booking not found");
     if (booking.status !== "completed")
       return res.status(400).json({ success: false, message: `Cannot unmark a booking with status "${booking.status}"` });
+    if (booking.adminRejected)
+      return res.status(400).json({ success: false, message: "This class has already been unmarked." });
 
     const teacherIds = await getScopedTeacherIds(req.subAdmin, req.db);
     if (!teacherIds.map(String).includes(booking.teacherId._id.toString()))
       return forbidden(res, "This booking's teacher is not in your scope");
 
-    const ratePerClass = Math.round((parseFloat(booking.teacherId.ratePerClass) || 0) * 100) / 100;
-
-    await Booking.updateOne(
-      { _id: bookingId },
-      { $set: { status: "accepted" }, $unset: { completedAt: "", markedBy: "" } }
-    );
-
-    await getStudent(req.db).findByIdAndUpdate(booking.studentId._id, {
-      $inc: { classCredits: 1 },
-      $set: { active: true },
-    });
-
-    const newEarned           = Math.max(0, Math.round(((booking.teacherId.earned || 0) - ratePerClass) * 100) / 100);
-    const newLessonsCompleted = Math.max(0, (booking.teacherId.lessonsCompleted || 0) - 1);
-    await getTeacher(req.db).findByIdAndUpdate(booking.teacherId._id, {
-      $set: { earned: newEarned, lessonsCompleted: newLessonsCompleted },
-    });
-
-    await getPaymentTransaction(req.db).deleteOne({ bookingId, status: "pending" });
-
+    // Same reversal as the admin unmark: the class stays "completed" + adminRejected
+    // (so the missed-class sweep doesn't later re-mark it), the credit goes back
+    // (not for trial classes), the teacher's pay is taken back atomically, and the
+    // pending payment is cancelled — locked, so a double click can't reverse twice.
     const subAdminName = `${req.subAdmin.firstName} ${req.subAdmin.lastName}`;
+    const { alreadyReversed } = await reverseCompletedClass(req.db, booking, {
+      reason: reason || `Unmarked by sub-admin ${subAdminName}`, adminId: req.subAdmin._id, source: "admin",
+    });
+    if (alreadyReversed)
+      return res.status(409).json({ success: false, message: "This class has already been unmarked." });
+
     const teacherName  = `${booking.teacherId.firstName} ${booking.teacherId.lastName}`;
     const studentName  = `${booking.studentId.firstName} ${booking.studentId.lastName}`;
 
@@ -340,7 +337,7 @@ router.post("/classes/unmark", verifyToken, requireSubAdmin, async (req, res) =>
       metadata: { bookingId, teacherName, studentName, classTitle: booking.classTitle || "" },
     }).catch((e) => logger.error("Failed to save unmark notification:", { error: e?.message }));
 
-    res.json({ success: true, message: "Class reverted to accepted." });
+    res.json({ success: true, message: "Class marked as not completed. The student's class was returned and the teacher's pay for it removed." });
   } catch (err) {
     logger.error("Sub-admin unmark class error:", { error: err?.message });
     res.status(500).json({ success: false, message: "Error unmarking class: " + err.message });

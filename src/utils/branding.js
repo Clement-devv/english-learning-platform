@@ -30,6 +30,10 @@ export const DEFAULT_BRANDING = {
  * Fetch branding from backend for the current center.
  * Center is identified by subdomain OR x-center-slug header.
  * Returns branding object — never throws, falls back to defaults.
+ *
+ * `authoritative` is true when the result reflects what the server says (or
+ * there is definitely no center), false when it is only a fallback because the
+ * request failed. Callers use it to decide whether to overwrite saved branding.
  */
 export const fetchBranding = async () => {
   try {
@@ -63,7 +67,7 @@ export const fetchBranding = async () => {
       window.location.hostname === platformHost ||
       window.location.hostname === `www.${platformHost}`
     );
-    if (isOnPlatformRoot) return { branding: DEFAULT_BRANDING, center: null };
+    if (isOnPlatformRoot) return { branding: DEFAULT_BRANDING, center: null, authoritative: true };
 
     const headers = {};
     if (slug) headers['x-center-slug'] = slug;
@@ -74,10 +78,11 @@ export const fetchBranding = async () => {
       signal: AbortSignal.timeout(5000),
     });
 
-    if (!res.ok) return { branding: DEFAULT_BRANDING, center: null };
+    // 4xx = the server says there is no such center; 5xx = temporary failure.
+    if (!res.ok) return { branding: DEFAULT_BRANDING, center: null, authoritative: res.status < 500 };
 
     const data = await res.json();
-    if (!data.success) return { branding: DEFAULT_BRANDING, center: null };
+    if (!data.success) return { branding: DEFAULT_BRANDING, center: null, authoritative: true };
 
     // If the center has a verified custom domain and we're on the old subdomain, redirect.
     const { customDomain, domainVerified } = data.center || {};
@@ -87,19 +92,20 @@ export const fetchBranding = async () => {
         window.location.replace(
           `https://${customDomain}${window.location.pathname}${window.location.search}`
         );
-        return { branding: DEFAULT_BRANDING, center: null };
+        return { branding: DEFAULT_BRANDING, center: null, authoritative: false };
       }
     }
 
     return {
       branding: { ...DEFAULT_BRANDING, ...data.branding },
       center:   data.center,
+      authoritative: true,
     };
   } catch (err) {
     // AbortError = component unmounted before fetch completed — not a real failure
-    if (err.name === 'AbortError') return { branding: DEFAULT_BRANDING, center: null };
+    if (err.name === 'AbortError') return { branding: DEFAULT_BRANDING, center: null, authoritative: false };
     if (import.meta.env.DEV) console.warn('Branding fetch failed, using defaults:', err.message);
-    return { branding: DEFAULT_BRANDING, center: null };
+    return { branding: DEFAULT_BRANDING, center: null, authoritative: false };
   }
 };
 
@@ -201,14 +207,48 @@ export const hexToRgb = (hex) => {
 
 /**
  * Store branding in memory so components can read it without refetching.
- * Never store in localStorage — branding can change, always fetch fresh.
+ * BrandingProvider subscribes, so a later update (the background refresh in
+ * main.jsx) reaches components that are already on screen.
  */
 let _cachedBranding = DEFAULT_BRANDING;
 let _cachedCenter   = null;
+const _listeners    = new Set();
 
 export const setCachedBranding = (branding, center) => {
   _cachedBranding = branding;
   _cachedCenter   = center;
+  _listeners.forEach((fn) => fn());
+};
+
+export const subscribeBranding = (fn) => {
+  _listeners.add(fn);
+  return () => _listeners.delete(fn);
+};
+
+/**
+ * Last branding this browser saw for this site, so a returning visitor's page
+ * can render immediately instead of waiting for /center/config. main.jsx always
+ * refetches in the background and updates it, so a branding change still shows
+ * up on the same visit. Keyed by hostname (+ impersonated center) so centers
+ * never mix.
+ */
+const storedBrandingKey = () =>
+  `branding:v1:${window.location.hostname}:${sessionStorage.getItem('impersonationCenterSlug') || ''}`;
+
+export const loadStoredBranding = () => {
+  try {
+    const saved = JSON.parse(localStorage.getItem(storedBrandingKey()));
+    return saved?.branding ? saved : null;
+  } catch {
+    return null;
+  }
+};
+
+export const storeBranding = (branding, center) => {
+  try {
+    if (center) localStorage.setItem(storedBrandingKey(), JSON.stringify({ branding, center }));
+    else        localStorage.removeItem(storedBrandingKey());
+  } catch { /* storage full or blocked — next visit just waits for the fetch */ }
 };
 
 export const getCachedBranding = () => _cachedBranding;

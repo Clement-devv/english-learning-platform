@@ -62,7 +62,7 @@ export async function isTokenBlacklisted(token) {
 // ─── Impersonation whitelist check ───────────────────────────────────────────
 // Returns true if the token is still whitelisted in Redis (not revoked).
 // Falls back to true when Redis is unavailable — the 10m expiry is the safety net.
-async function isImpersonationActive(authHeader, centerId) {
+export async function isImpersonationActive(authHeader, centerId) {
   if (!redisClient) return true;
   try {
     const sig = authHeader?.split(' ')[1]?.split('.')[2];
@@ -113,6 +113,12 @@ export const verifyToken = async (req, res, next) => {
         // Redis unavailable — in-memory blacklist above already covers recently-revoked tokens.
         // Tokens revoked on other instances during this outage won't be caught until Redis recovers.
       }
+    }
+
+    // Revoked super-admin impersonation — enforced here too, not only in verifyAdmin,
+    // so routes that check the role themselves can't be used with a revoked session
+    if (decoded.isImpersonation && !(await isImpersonationActive(req.headers.authorization, decoded.centerId))) {
+      return res.status(401).json({ success: false, message: "Impersonation session has been revoked" });
     }
 
     req.user = decoded;

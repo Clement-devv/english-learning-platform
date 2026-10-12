@@ -8,31 +8,37 @@ import {
 // Auth guard — single component for all roles
 import ActiveClassBanner  from "./components/ActiveClassBanner";
 import AuthGuard          from "./components/AuthGuard";
-import PWAInstallPrompt   from "./components/PWAInstallPrompt";
 import { RingProvider }   from "./context/RingContext";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "./lib/queryClient";
 import IncomingRingModal  from "./components/ring/IncomingRingModal";
 import MissedCallAlert    from "./components/ring/MissedCallAlert";
 import MessageAlert       from "./components/chat/MessageAlert";
-import DeviceNotificationPrompt from "./components/DeviceNotificationPrompt";
 import SignedOutNotice          from "./components/SignedOutNotice";
-import TermsModal                from "./components/TermsModal";
-import WelcomeCard              from "./components/WelcomeCard";
-import RecordingUploadBanner    from "./components/RecordingUploadBanner";
 import { UploadQueueProvider }  from "./context/UploadQueueContext";
 
-// Login pages — small, load fast, keep static
-import SuperAdminLogin     from "./pages/super-admin/SuperAdminLogin";
+// Prompts/popups that aren't needed for the first paint — they load right after
+// the page shows (own <Suspense> below), keeping them out of the main bundle.
+// The call/message alerts above stay static: they must be ready instantly.
+const PWAInstallPrompt         = lazy(() => import("./components/PWAInstallPrompt"));
+const DeviceNotificationPrompt = lazy(() => import("./components/DeviceNotificationPrompt"));
+const TermsModal               = lazy(() => import("./components/TermsModal"));
+const WelcomeCard              = lazy(() => import("./components/WelcomeCard"));
+const RecordingUploadBanner    = lazy(() => import("./components/RecordingUploadBanner"));
+
+// Role login pages — tiny wrappers (their themes are lazy), keep static
 import AdminLogin          from "./pages/admin/AdminLogin";
 import ParentLogin         from "./pages/parent/ParentLogin";
-import ParentSetup         from "./pages/parent/ParentSetup";
-import AdminResetPassword       from "./pages/admin/AdminResetPassword";
-import EmailChangeVerify        from "./pages/admin/EmailChangeVerify";
-import EmailChangeCancelConfirm from "./pages/admin/EmailChangeCancelConfirm";
 import SubAdminLogin       from "./pages/sub-admin/SubAdminLogin";
 import TeacherLogin        from "./pages/teacher/TeacherLogin";
 import StudentLogin        from "./pages/student/StudentLogin";
+
+// Rarely visited pages — lazy, so ordinary visitors never download them
+const SuperAdminLogin          = lazy(() => import("./pages/super-admin/SuperAdminLogin"));
+const ParentSetup              = lazy(() => import("./pages/parent/ParentSetup"));
+const AdminResetPassword       = lazy(() => import("./pages/admin/AdminResetPassword"));
+const EmailChangeVerify        = lazy(() => import("./pages/admin/EmailChangeVerify"));
+const EmailChangeCancelConfirm = lazy(() => import("./pages/admin/EmailChangeCancelConfirm"));
 
 // Heavy pages — lazy loaded (each becomes its own JS chunk)
 const SuperAdminDashboard = lazy(() => import("./pages/super-admin/SuperAdminDashboard"));
@@ -160,15 +166,17 @@ function App() {
       <div className="min-h-screen">
         <ImpersonationBanner />
         <ActiveClassBanner />
-        <PWAInstallPrompt />
-        <TermsModal />
-        <WelcomeCard />
-        <RecordingUploadBanner />
         <IncomingRingModal />
         <MissedCallAlert />
         <MessageAlert />
-        <DeviceNotificationPrompt />
         <SignedOutNotice />
+        <Suspense fallback={null}>
+          <PWAInstallPrompt />
+          <TermsModal />
+          <WelcomeCard />
+          <RecordingUploadBanner />
+          <DeviceNotificationPrompt />
+        </Suspense>
         <Suspense fallback={<PageLoader />}>
           <Routes>
             <Route path="/" element={<HomeRoute />} />

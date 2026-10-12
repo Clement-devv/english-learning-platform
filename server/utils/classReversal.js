@@ -6,6 +6,7 @@ import { studentSchema } from "../schemas/studentSchema.js";
 import { teacherSchema } from "../schemas/teacherSchema.js";
 import { paymentTransactionSchema } from "../schemas/paymentTransactionSchema.js";
 import { recordOutcomeChange } from "./classOutcome.js";
+import { refundClassCredit, adjustTeacherEarnings, toMoney } from "./classPayment.js";
 
 const getStudent            = (db) => db.models.Student            || db.model("Student",            studentSchema);
 const getTeacher            = (db) => db.models.Teacher            || db.model("Teacher",            teacherSchema);
@@ -14,8 +15,17 @@ const getPaymentTransaction = (db) => db.models.PaymentTransaction || db.model("
 /**
  * `booking` must be a completed, not-yet-rejected Booking document.
  * Marks it adminRejected and saves it. Returns { student, teacher, ratePerClass }.
+ * If another request reversed it first, nothing changes and the result is
+ * { alreadyReversed: true } — a double click can't refund / deduct twice.
  */
 export async function reverseCompletedClass(db, booking, { reason = "", adminId = null, source } = {}) {
+  // Claim the reversal atomically — only the request that flips adminRejected moves money
+  const claim = await booking.constructor.updateOne(
+    { _id: booking._id, status: "completed", adminRejected: { $ne: true } },
+    { $set: { adminRejected: true } },
+  );
+  if (claim.modifiedCount === 0) return { alreadyReversed: true, student: null, teacher: null, ratePerClass: 0 };
+
   booking.adminRejected       = true;
   booking.adminRejectedAt     = new Date();
   booking.adminRejectedBy     = adminId;
@@ -27,21 +37,17 @@ export async function reverseCompletedClass(db, booking, { reason = "", adminId 
   const studentId = booking.studentId?._id || booking.studentId;
   const teacherId = booking.teacherId?._id || booking.teacherId;
 
-  // Trial classes never deducted a credit or paid the teacher
-  const student = await getStudent(db).findById(studentId);
-  if (student && !booking.isTrial) {
-    student.classCredits = (student.classCredits || 0) + 1;
-    student.active = true;
-    await student.save();
-  }
+  // Trial classes never deducted a credit or paid the teacher.
+  // Atomic updates — a class settling for the same student/teacher at the same moment can't be overwritten.
+  const student = booking.isTrial
+    ? await getStudent(db).findById(studentId).lean()
+    : await refundClassCredit(db, studentId);
 
-  const teacher = await getTeacher(db).findById(teacherId);
+  let teacher = await getTeacher(db).findById(teacherId).select("ratePerClass firstName lastName earned lessonsCompleted").lean();
   let ratePerClass = 0;
   if (teacher && !booking.isTrial) {
-    ratePerClass = Math.round((parseFloat(teacher.ratePerClass) || 0) * 100) / 100;
-    teacher.lessonsCompleted = Math.max(0, (teacher.lessonsCompleted || 0) - 1);
-    teacher.earned = Math.max(0, Math.round(((teacher.earned || 0) - ratePerClass) * 100) / 100);
-    await teacher.save();
+    ratePerClass = toMoney(teacher.ratePerClass);
+    teacher = await adjustTeacherEarnings(db, teacherId, -ratePerClass, -1);
   }
 
   if (!booking.isTrial) {

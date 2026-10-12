@@ -7,12 +7,12 @@ import { classComplaintSchema }       from "../schemas/classComplaintSchema.js";
 import { bookingSchema }              from "../schemas/bookingSchema.js";
 import { studentSchema }              from "../schemas/studentSchema.js";
 import { teacherSchema }              from "../schemas/teacherSchema.js";
-import { paymentTransactionSchema }   from "../schemas/paymentTransactionSchema.js";
 import logger from "../utils/logger.js";
 import { issueShareLink } from "../utils/shareLink.js";
 import { badRequest, forbidden, notFound, serverError } from '../utils/apiResponse.js';
-import { recordOutcomeChange } from "../utils/classOutcome.js";
+import { outcomeChangePush } from "../utils/classOutcome.js";
 import { payForCompletedClass } from "../utils/classPayment.js";
+import { completeClass } from "../services/classCompletionService.js";
 
 const router = express.Router();
 router.use(tenantMiddleware);
@@ -22,7 +22,6 @@ const getClassComplaint     = (db) => db.models.ClassComplaint     || db.model("
 const getBooking            = (db) => db.models.Booking            || db.model("Booking",            bookingSchema);
 const getStudent            = (db) => db.models.Student            || db.model("Student",            studentSchema);
 const getTeacher            = (db) => db.models.Teacher            || db.model("Teacher",            teacherSchema);
-const getPaymentTransaction = (db) => db.models.PaymentTransaction || db.model("PaymentTransaction", paymentTransactionSchema);
 
 // ── Access control ────────────────────────────────────────────────────────────
 // Every classroom route acts on one booking. Only that booking's teacher or
@@ -604,55 +603,21 @@ router.patch("/admin-complete/:bookingId", verifyToken, async (req, res) => {
 
     const { complaintId, adminNotes } = req.body;
 
-    const booking = await getBooking(req.db).findById(req.params.bookingId)
-      .populate("teacherId", "firstName lastName email ratePerClass lessonsCompleted earned")
-      .populate("studentId", "firstName lastName email classCredits active");
+    const current = await getBooking(req.db).findById(req.params.bookingId).select("status").lean();
+    if (!current) return notFound(res, "Booking not found");
+    if (current.status === "completed") return badRequest(res, "Already completed");
+    if (!["missed", "accepted", "pending"].includes(current.status))
+      return res.status(400).json({ message: `Cannot complete booking with status: ${current.status}` });
 
-    if (!booking) return notFound(res, "Booking not found");
-    if (booking.status === "completed") return badRequest(res, "Already completed");
-    if (!["missed", "accepted", "pending"].includes(booking.status))
-      return res.status(400).json({ message: `Cannot complete booking with status: ${booking.status}` });
+    // The single completion path: claims the booking atomically (a double click can't
+    // pay twice), charges the credit, pays the teacher (trial classes are free), closes the session.
+    const result = await completeClass(req.db, req.params.bookingId, "admin", { skipAttendanceCheck: true });
+    if (result.alreadyProcessed) return badRequest(res, "Already completed");
 
-    const session = await getClassroomSession(req.db).findOne({ bookingId: req.params.bookingId });
-
-    booking.status = "completed";
-    booking.completedAt = new Date();
-    booking.markedBy = "admin";
-    booking.adminRejected = false;
-    recordOutcomeChange(booking, { to: "completed", source: "admin", reason: adminNotes || "Marked completed by admin" });
-    await booking.save();
-
-    const student = await getStudent(req.db).findById(booking.studentId._id);
-    if (student && student.classCredits > 0) {
-      student.classCredits -= 1;
-      if (student.classCredits === 0) student.active = false;
-      await student.save();
-    }
-
-    const teacher = await getTeacher(req.db).findById(booking.teacherId._id);
-    let earned = 0;
-    if (teacher) {
-      earned = parseFloat(teacher.ratePerClass || 0);
-      teacher.lessonsCompleted = (teacher.lessonsCompleted || 0) + 1;
-      teacher.earned = (teacher.earned || 0) + earned;
-      await teacher.save();
-    }
-
-    await getPaymentTransaction(req.db).create({
-      bookingId: booking._id,
-      teacherId: booking.teacherId._id,
-      studentId: booking.studentId._id,
-      amount: earned, status: "pending", type: "class_completion",
-      classTitle: booking.classTitle, completedAt: new Date(),
-      studentName: `${booking.studentId.firstName || ""} ${booking.studentId.lastName || ""}`.trim(),
-      description: `Admin-approved: ${booking.classTitle} (dispute resolved)`,
-    });
-
-    if (session) {
-      session.status = "completed";
-      session.classEndedAt = new Date();
-      await session.save();
-    }
+    // Not completed before → shows as a change in the daily completed-classes report
+    await getBooking(req.db).updateOne({ _id: req.params.bookingId },
+      outcomeChangePush({ to: "completed", source: "admin", reason: adminNotes || "Marked completed by admin" }));
+    const earned = result.rateEarned || 0;
 
     if (complaintId) {
       await getClassComplaint(req.db).findByIdAndUpdate(complaintId, {
@@ -666,7 +631,7 @@ router.patch("/admin-complete/:bookingId", verifyToken, async (req, res) => {
       success: true,
       message: `Class marked as completed by admin. Teacher earned $${earned}.`,
       teacherEarned: earned,
-      studentClassesRemaining: student?.classCredits ?? 0,
+      studentClassesRemaining: result.studentClassesRemaining ?? 0,
     });
   } catch (err) {
     logger.error("Admin-complete error:", { error: err?.message });

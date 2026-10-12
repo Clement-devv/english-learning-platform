@@ -719,14 +719,17 @@ export function TeacherClassesView({ teacher, isDarkMode, canMark, onBack }) {
   };
 
   const accepted  = bookings.filter((b) => b.status === "accepted");
-  const completed = bookings.filter((b) => b.status === "completed");
+  // An unmarked class keeps status "completed" with adminRejected — it no longer counts
+  const completed = bookings.filter((b) => b.status === "completed" && !b.adminRejected);
+  const unmarked  = bookings.filter((b) => b.status === "completed" && b.adminRejected);
   const statusCfg = {
     accepted:  { color: "#3b82f6", bg: isDarkMode ? "rgba(59,130,246,0.12)" : "#dbeafe",  label: "Accepted"  },
     completed: { color: "#10b981", bg: isDarkMode ? "rgba(16,185,129,0.12)" : "#d1fae5",  label: "Completed" },
+    unmarked:  { color: "#f59e0b", bg: isDarkMode ? "rgba(245,158,11,0.12)" : "#fef3c7",  label: "Not completed" },
   };
 
   const ClassRow = ({ b }) => {
-    const sc   = statusCfg[b.status] || statusCfg.accepted;
+    const sc   = b.adminRejected ? statusCfg.unmarked : (statusCfg[b.status] || statusCfg.accepted);
     const isBusy = busy[b._id];
     return (
       <div style={{ display: "flex", alignItems: "center", gap: "12px", padding: "14px 16px", background: c.card, border: `1px solid ${c.border}`, borderRadius: "14px" }}>
@@ -747,8 +750,8 @@ export function TeacherClassesView({ teacher, isDarkMode, canMark, onBack }) {
             Mark Done
           </button>
         )}
-        {canMark && b.status === "completed" && (
-          <button onClick={() => apiAction("unmark", b._id, "Class reverted to accepted ↩")} disabled={isBusy}
+        {canMark && b.status === "completed" && !b.adminRejected && (
+          <button onClick={() => apiAction("unmark", b._id, "Class marked as not completed ↩")} disabled={isBusy}
             style={{ padding: "7px 14px", borderRadius: "10px", border: `1px solid ${isDarkMode ? "rgba(245,158,11,0.3)" : "#fde68a"}`, cursor: isBusy ? "not-allowed" : "pointer", background: isDarkMode ? "rgba(245,158,11,0.15)" : "#fef3c7", color: "#f59e0b", fontSize: "12px", fontWeight: "700", fontFamily: "inherit", display: "flex", alignItems: "center", gap: "6px", flexShrink: 0, opacity: isBusy ? 0.6 : 1 }}>
             {isBusy ? <Loader2 size={12} style={{ animation: "db-spin 0.8s linear infinite" }} /> : <RotateCcw size={12} />}
             Unmark
@@ -802,6 +805,7 @@ export function TeacherClassesView({ teacher, isDarkMode, canMark, onBack }) {
         <>
           <Section title="Accepted Classes"  items={accepted}  emptyText="No accepted classes" />
           <Section title="Completed Classes" items={completed} emptyText="No completed classes" />
+          {unmarked.length > 0 && <Section title="Unmarked (Not Completed)" items={unmarked} emptyText="" />}
         </>
       )}
     </div>

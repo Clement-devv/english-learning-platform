@@ -12,21 +12,54 @@
  *   - If only one side joined
  *     → mark as missed with the appropriate reason
  *   - If both joined but bothActiveTime < requiredTime
- *     → mark as missed with attendance reason (handled by completeClass already,
- *       but catches edge cases where the classroom didn't call complete)
+ *     → mark as missed with attendance reason
+ *   - If both joined AND the attendance requirement was met (the classroom
+ *     never called complete — e.g. the browser closed at the end)
+ *     → complete it through completeClass(): student charged, teacher paid.
+ *       Managed students also get the parent-check link, as in the classroom flow.
  *
- * Does NOT deduct student credits or add teacher earnings — nobody joined.
+ * Missed classes are NOT charged or paid.
  * Safe to run multiple times — uses an optimistic lock (status: "accepted")
  * so concurrent runs never double-process.
  */
 
 import { bookingSchema }          from "../schemas/bookingSchema.js";
 import { classroomSessionSchema } from "../schemas/classroomSessionSchema.js";
+import { studentSchema }          from "../schemas/studentSchema.js";
+import { completeClass }          from "../services/classCompletionService.js";
+import { issueShareLink }         from "./shareLink.js";
 import { logger } from '../utils/logger.js';
 import { trackJob } from "./monitor.js";
 
 const getBooking          = (db) => db.models.Booking          || db.model("Booking",          bookingSchema);
 const getClassroomSession = (db) => db.models.ClassroomSession || db.model("ClassroomSession", classroomSessionSchema);
+const getStudent          = (db) => db.models.Student          || db.model("Student",          studentSchema);
+
+/** Same rule as completeClass(): both joined and together ≥ 83% of the class. */
+function attendanceMet(session, durationMinutes) {
+  if (!session?.teacherJoinedAt || !session?.studentJoinedAt) return false;
+  const requiredTime = session.requiredTime ?? Math.floor((durationMinutes || 60) * 60 * 0.83);
+  return (session.bothActiveTime || 0) >= requiredTime;
+}
+
+/** Attended class nobody marked complete → pay it via the single completion path. */
+async function completeAttendedClass(db, booking) {
+  const result = await completeClass(db, booking._id, "system");
+  if (!result.completed || result.alreadyProcessed) return;
+
+  // Managed student (no login): the teacher confirmed attendance — ask the parent, as classroomRoutes does
+  const student = await getStudent(db).findById(result.booking.studentId).select("isManaged").lean();
+  if (student?.isManaged) {
+    const doc = await getBooking(db).findById(booking._id);
+    if (doc && !doc.shareLink?.createdAt) {
+      issueShareLink(doc);
+      doc.parentCheck = { status: "waiting" };
+      doc.attendanceConfirmedBy = "teacher";
+      await doc.save();
+    }
+  }
+  logger.info(`[MissedClassSweep] Booking "${booking.classTitle}" (${booking._id}) → completed (attendance met, classroom never closed it)`);
+}
 
 const INTERVAL_MS    = 5 * 60 * 1000; // run every 5 minutes
 const GRACE_PERIOD_MS = 2 * 60 * 1000; // 2-minute grace after class ends before sweeping
@@ -46,7 +79,7 @@ function buildMissedReason(session) {
   return `Insufficient attendance: ${bothMins}m of ${requiredMins}m required (${pct}% — need ≥83%).`;
 }
 
-async function sweepMissedClasses(db) {
+export async function sweepMissedClasses(db) {
   const Booking          = getBooking(db);
   const ClassroomSession = getClassroomSession(db);
 
@@ -77,6 +110,12 @@ async function sweepMissedClasses(db) {
 
   for (const booking of toMark) {
     try {
+      const attended = await ClassroomSession.findOne({ bookingId: booking._id }).lean();
+      if (attendanceMet(attended, booking.duration)) {
+        await completeAttendedClass(db, booking);
+        continue;
+      }
+
       // Optimistic lock — only claim if still "accepted"
       const claimed = await Booking.findOneAndUpdate(
         { _id: booking._id, status: "accepted" },
@@ -144,5 +183,5 @@ export function startMissedClassScheduler(db) {
   ), INTERVAL_MS);
 
   logger.info(`[MissedClassSweep] Scheduler started (every ${INTERVAL_MS / 60000} min)`);
-  return id;
+  return [id];
 }

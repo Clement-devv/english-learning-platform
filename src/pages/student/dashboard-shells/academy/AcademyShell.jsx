@@ -10,7 +10,6 @@ import {
   Shield, KeyRound, Copy, MoreHorizontal, Sun, Moon,
 } from "lucide-react";
 import LanguageSwitcher from "../../../../components/LanguageSwitcher";
-import LeaderboardTab   from "../../tabs/LeaderboardTab";
 import {
   PieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer,
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -19,30 +18,17 @@ import {
 import { useBranding } from "../../../../context/BrandingContext";
 import { useDashboardData, BADGE_DEFINITIONS } from "../useDashboardData";
 import { useRing }                              from "../../../../context/RingContext";
-import ChangePassword from "../../../../components/student/auth/ChangePassword";
 import SessionManagement from "../../../../components/SessionManagement";
 import SettingsModal from "../../../../components/SettingsModal";
-import Classroom from "../../../Classroom";
-import MessagesTab from "../../../../components/chat/MessagesTab";
 import ClassConfirmation from "../../../../components/student/ClassConfirmation";
 import PendingConfirmationBanners from "../PendingConfirmationBanners";
-import StudentCompletedTab from "../../tabs/StudentCompletedTab";
-import BookingCalendarTab from "../../tabs/BookingCalendarTab";
-import ClassReportsTab from "../../tabs/ClassReportsTab";
-import StudentScheduleTab from "../../tabs/StudentScheduleTab";
-import StudentHomeworkTab from "../../tabs/HomeworkTab";
-import StudentQuizTab from "../../tabs/QuizTab";
-import PronunciationTab from "../../tabs/PronunciationTab";
-import ConversationTab from "../../tabs/ConversationTab";
-import FlashcardsTab from "../../tabs/FlashcardsTab";
-import RecordingsTab from "../../tabs/RecordingsTab";
-import ReviewsTab from "../../tabs/ReviewsTab";
-import ReferralTab from "../../tabs/ReferralTab";
 import StreakWidget from "../../components/StreakWidget";
 import ActiveClasses from "../../components/ActiveClasses";
 import UpcomingClasses from "../../components/UpcomingClasses";
 import ProgressCard from "../../components/ProgressCard";
 import DashboardAlertsBar from "../../../../components/DashboardAlertsBar";
+// Tabs load on demand (see src/pages/student/tabs/lazyTabs.js)
+import { LeaderboardTab, ChangePassword, StudentCompletedTab, BookingCalendarTab, ClassReportsTab, StudentScheduleTab, StudentHomeworkTab, StudentQuizTab, PronunciationTab, ConversationTab, FlashcardsTab, RecordingsTab, ReviewsTab, ReferralTab, MessagesTab, Classroom } from "../../tabs/lazyTabs";
 
 // ── Light palette (base) ───────────────────────────────────────────────────────
 const LIGHT = {

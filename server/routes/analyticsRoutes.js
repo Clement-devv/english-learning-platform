@@ -6,7 +6,7 @@ import { bookingSchema }              from "../schemas/bookingSchema.js";
 import { teacherSchema }              from "../schemas/teacherSchema.js";
 import { studentSchema }              from "../schemas/studentSchema.js";
 import { paymentSchema }              from "../schemas/paymentSchema.js";
-import { paymentTransactionSchema }   from "../schemas/paymentTransactionSchema.js";
+import { paymentTransactionSchema, SIGNED_AMOUNT } from "../schemas/paymentTransactionSchema.js";
 import { quizAttemptSchema }          from "../schemas/quizAttemptSchema.js";
 import { parsePagination }            from "../utils/pagination.js";
 import logger from "../utils/logger.js";
@@ -40,7 +40,7 @@ async function getRevenueSummary(db) {
     ]),
     getPaymentTransaction(db).aggregate([
       { $match: { status: { $in: ["paid", "pending"] } } },
-      { $group: { _id: "$teacherId", paid: { $sum: { $cond: [{ $eq: ["$status", "paid"] }, "$amount", 0] } }, pending: { $sum: { $cond: [{ $eq: ["$status", "pending"] }, "$amount", 0] } } } },
+      { $group: { _id: "$teacherId", paid: { $sum: { $cond: [{ $eq: ["$status", "paid"] }, SIGNED_AMOUNT, 0] } }, pending: { $sum: { $cond: [{ $eq: ["$status", "pending"] }, SIGNED_AMOUNT, 0] } } } },
     ]),
   ]);
   const total          = studentRevenue[0]?.total || 0;
@@ -174,7 +174,7 @@ router.get("/teacher-performance", verifyToken, verifyAdmin, requireAnalyticsUnl
           let: { tid: "$_id" },
           pipeline: [
             { $match: { $expr: { $and: [{ $eq: ["$teacherId", "$$tid"] }, { $ne: ["$status", "cancelled"] }] } } },
-            { $group: { _id: null, total: { $sum: "$amount" } } },
+            { $group: { _id: null, total: { $sum: SIGNED_AMOUNT } } },
           ],
           as: "earnings",
         },
@@ -277,7 +277,7 @@ router.get("/revenue-breakdown", verifyToken, verifyAdmin, requireAnalyticsUnloc
     const [revenueByTeacher, teacherSalarySummary, studentRevenueSummary] = await Promise.all([
       PaymentTransaction.aggregate([
         ...txMatchStage,
-        { $group: { _id: "$teacherId", totalEarned: { $sum: "$amount" }, paidAmount: { $sum: { $cond: [{ $eq: ["$status", "paid"] }, "$amount", 0] } }, pendingAmount: { $sum: { $cond: [{ $eq: ["$status", "pending"] }, "$amount", 0] } }, classCount: { $sum: 1 } } },
+        { $group: { _id: "$teacherId", totalEarned: { $sum: SIGNED_AMOUNT }, paidAmount: { $sum: { $cond: [{ $eq: ["$status", "paid"] }, SIGNED_AMOUNT, 0] } }, pendingAmount: { $sum: { $cond: [{ $eq: ["$status", "pending"] }, SIGNED_AMOUNT, 0] } }, classCount: { $sum: 1 } } },
         { $lookup: { from: "teachers", localField: "_id", foreignField: "_id", as: "teacher" } },
         { $unwind: "$teacher" },
         { $project: { teacherName: { $concat: ["$teacher.firstName", " ", "$teacher.lastName"] }, totalEarned: 1, paidAmount: 1, pendingAmount: 1, classCount: 1 } },
@@ -286,7 +286,7 @@ router.get("/revenue-breakdown", verifyToken, verifyAdmin, requireAnalyticsUnloc
       // Teacher salary totals (paid out vs still pending)
       PaymentTransaction.aggregate([
         ...txMatchStage,
-        { $group: { _id: null, totalPaid: { $sum: { $cond: [{ $eq: ["$status", "paid"] }, "$amount", 0] } }, totalPending: { $sum: { $cond: [{ $eq: ["$status", "pending"] }, "$amount", 0] } }, transactionCount: { $sum: 1 } } },
+        { $group: { _id: null, totalPaid: { $sum: { $cond: [{ $eq: ["$status", "paid"] }, SIGNED_AMOUNT, 0] } }, totalPending: { $sum: { $cond: [{ $eq: ["$status", "pending"] }, SIGNED_AMOUNT, 0] } }, transactionCount: { $sum: 1 } } },
       ]),
       // Total revenue = what students actually paid
       Payment.aggregate([

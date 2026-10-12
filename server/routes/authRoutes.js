@@ -5,7 +5,7 @@ import crypto from "crypto";
 import redisClient from "../config/redis.js";
 
 import { config, JWT_STANDARD_CLAIMS, JWT_VERIFY_OPTIONS } from "../config/config.js";
-import { getCenterSecret } from "../utils/jwtUtils.js";
+import { getCenterSecret, getCenter2faPendingSecret } from "../utils/jwtUtils.js";
 import { loginLimiter, passwordResetLimiter, trackFailedLogin, isAccountLocked, clearFailedAttempts } from "../middleware/rateLimiter.js";
 import { validatePasswordStrength } from "../utils/passwordUtils.js";
 import { startSession, verifyDeviceProof, endSession, notifySessionsRevoked, alertNewDevice, endSessionsAfterPasswordChange } from "../utils/sessionManager.js";
@@ -15,7 +15,7 @@ import mongoose from "mongoose";
 import { SESSION_EXPIRY_DAYS } from "../config/constants.js";
 import { sendForgotPasswordEmail, sendStudentForgotPasswordEmail, sendAdminForgotPasswordEmail } from "../utils/emailService.js";
 import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
-import { isTokenBlacklisted } from "../middleware/authMiddleware.js";
+import { isTokenBlacklisted, isImpersonationActive } from "../middleware/authMiddleware.js";
 import { decrypt, hashBackupCode } from "../utils/fieldEncryption.js";
 import { adminSchema } from "../schemas/adminSchema.js";
 import { teacherSchema } from "../schemas/teacherSchema.js";
@@ -121,10 +121,11 @@ const createLoginHandler = ({
 
     if (user.twoFactorEnabled) {
       if (!twoFactorToken && !backupCode) {
-        // Sign a short-lived token so the role is server-determined, not client-supplied
+        // Sign a short-lived token so the role is server-determined, not client-supplied.
+        // Own secret + typ: it must never work as a login token (only proves the password).
         const pendingToken = jwt.sign(
-          { ...JWT_STANDARD_CLAIMS, tempUserId: user._id.toString(), role, centerId: req.center.slug },
-          getCenterSecret(req.center.slug),
+          { ...JWT_STANDARD_CLAIMS, typ: "2fa-pending", tempUserId: user._id.toString(), role, centerId: req.center.slug },
+          getCenter2faPendingSecret(req.center.slug),
           { expiresIn: "5m" }
         );
         return res.status(202).json({
@@ -169,16 +170,42 @@ const createLoginHandler = ({
   }
 };
 
+/**
+ * Check the bearer token for the routes in this file that authenticate themselves
+ * (verify, change-password, accept-terms, sessions). Same rules as verifyToken:
+ * signature, this center, the expected role, not logged out (blacklist), and —
+ * for super-admin impersonation — not revoked. Without the blacklist check a
+ * logged-out / remotely signed-out token still worked here.
+ * @returns {Promise<{ token, decoded } | { status, error, code? }>}
+ */
+async function decodeBearer(req, role = null) {
+  const token = req.headers.authorization?.split(" ")[1];
+  if (!token) return { status: 401, error: "No token provided" };
+  let decoded;
+  try {
+    decoded = jwt.verify(token, getCenterSecret(req.center.slug), JWT_VERIFY_OPTIONS);
+  } catch {
+    return { status: 401, error: "Invalid or expired token" };
+  }
+  if (decoded.centerId !== req.center.slug) return { status: 401, error: "Token not valid for this center" };
+  if (role && decoded.role !== role) return { status: 403, error: `${role[0].toUpperCase()}${role.slice(1)} access required` };
+  if (await isTokenBlacklisted(token)) {
+    return { status: 401, error: "Session has been revoked. Please log in again.", code: "SESSION_REVOKED" };
+  }
+  if (decoded.isImpersonation && !(await isImpersonationActive(req.headers.authorization, decoded.centerId))) {
+    return { status: 401, error: "Impersonation session has been revoked" };
+  }
+  return { token, decoded };
+}
+const authError = (res, auth) => res.status(auth.status).json({ success: false, message: auth.error, ...(auth.code ? { code: auth.code } : {}) });
+
 // Local verifyToken used only for teacher-specific routes in this file.
 // Requires tenantMiddleware to run first (sets req.db).
 const verifyToken = async (req, res, next) => {
   try {
-    const token = req.headers.authorization?.split(" ")[1];
-    if (!token) {
-      return unauthorized(res, "No token provided");
-    }
-
-    const decoded = jwt.verify(token, getCenterSecret(req.center.slug), JWT_VERIFY_OPTIONS);
+    const auth = await decodeBearer(req, "teacher");
+    if (auth.error) return authError(res, auth);
+    const { decoded } = auth;
     const Teacher = getTeacherModel(req.db);
     const teacher = await Teacher.findById(decoded.id).select("-password");
 
@@ -211,10 +238,11 @@ router.post("/verify-2fa-login", tenantMiddleware, loginLimiter, verify2faRules,
     // Decode the server-signed pending token — role and userId are never taken from the client
     let pending;
     try {
-      pending = jwt.verify(pendingToken, getCenterSecret(req.center.slug), JWT_VERIFY_OPTIONS);
+      pending = jwt.verify(pendingToken, getCenter2faPendingSecret(req.center.slug), JWT_VERIFY_OPTIONS);
     } catch (_) {
       return unauthorized(res, "2FA session expired. Please log in again.");
     }
+    if (pending.typ !== "2fa-pending") return unauthorized(res, "Invalid session");
 
     const { tempUserId, role, centerId } = pending;
 
@@ -490,13 +518,9 @@ router.post("/student/login", tenantMiddleware, loginLimiter, loginRules, valida
 // Student verify token
 router.get("/student/verify", tenantMiddleware, async (req, res) => {
   try {
-    const token = req.headers.authorization?.split(" ")[1];
-
-    if (!token) {
-      return unauthorized(res, "No token provided");
-    }
-
-    const decoded = jwt.verify(token, getCenterSecret(req.center.slug), JWT_VERIFY_OPTIONS);
+    const auth = await decodeBearer(req, "student");
+    if (auth.error) return authError(res, auth);
+    const { decoded } = auth;
     const Student = getStudentModel(req.db);
     const student = await Student.findById(decoded.id).select("-password");
 
@@ -513,13 +537,9 @@ router.get("/student/verify", tenantMiddleware, async (req, res) => {
 // Student change password
 router.post("/student/change-password", tenantMiddleware, changePasswordRules, validate, async (req, res) => {
   try {
-    const token = req.headers.authorization?.split(" ")[1];
-
-    if (!token) {
-      return unauthorized(res, "No token provided");
-    }
-
-    const decoded = jwt.verify(token, getCenterSecret(req.center.slug), JWT_VERIFY_OPTIONS);
+    const auth = await decodeBearer(req, "student");
+    if (auth.error) return authError(res, auth);
+    const { decoded } = auth;
     const { currentPassword, newPassword } = req.body;
 
     if (!currentPassword || !newPassword) {
@@ -678,13 +698,9 @@ router.post("/admin/login", tenantMiddleware, loginLimiter, loginRules, validate
 // Admin verify token
 router.get("/admin/verify", tenantMiddleware, async (req, res) => {
   try {
-    const token = req.headers.authorization?.split(" ")[1];
-
-    if (!token) {
-      return unauthorized(res, "No token provided");
-    }
-
-    const decoded = jwt.verify(token, getCenterSecret(req.center.slug), JWT_VERIFY_OPTIONS);
+    const auth = await decodeBearer(req, "admin");
+    if (auth.error) return authError(res, auth);
+    const { decoded } = auth;
 
     if (decoded.role !== "admin") {
       return forbidden(res, "Admin access required");
@@ -718,13 +734,9 @@ router.get("/admin/verify", tenantMiddleware, async (req, res) => {
 // Admin change password
 router.post("/admin/change-password", tenantMiddleware, changePasswordRules, validate, async (req, res) => {
   try {
-    const token = req.headers.authorization?.split(" ")[1];
-
-    if (!token) {
-      return unauthorized(res, "No token provided");
-    }
-
-    const decoded = jwt.verify(token, getCenterSecret(req.center.slug), JWT_VERIFY_OPTIONS);
+    const auth = await decodeBearer(req, "admin");
+    if (auth.error) return authError(res, auth);
+    const { decoded } = auth;
     const { currentPassword, newPassword } = req.body;
 
     if (!currentPassword || !newPassword) {
@@ -849,17 +861,11 @@ router.post("/admin/reset-password/:token", tenantMiddleware, passwordResetLimit
 
 router.post("/accept-terms", tenantMiddleware, async (req, res) => {
   try {
-    const token = req.headers.authorization?.split(" ")[1];
-    if (!token) return unauthorized(res, "No token provided");
-
-    let decoded;
-    try {
-      decoded = jwt.verify(token, getCenterSecret(req.center.slug), JWT_VERIFY_OPTIONS);
-    } catch (_) {
-      return unauthorized(res, "Invalid or expired token");
-    }
-
-    const { id: userId, role } = decoded;
+    const auth = await decodeBearer(req);
+    if (auth.error) return authError(res, auth);
+    const { id: userId, role } = auth.decoded;
+    // Impersonation sessions have no user record to accept terms for
+    if (!mongoose.isValidObjectId(userId)) return badRequest(res, "Terms acceptance not applicable for this session");
 
     let UserModel;
     switch (role) {
@@ -902,16 +908,11 @@ router.post("/accept-terms", tenantMiddleware, async (req, res) => {
 
 /** Verify the bearer token (signature + revocation) and load its user. */
 async function authFromBearer(req) {
-  const token = req.headers.authorization?.split(" ")[1];
-  if (!token) return { error: "No token provided" };
-  let decoded;
-  try {
-    decoded = jwt.verify(token, getCenterSecret(req.center.slug), JWT_VERIFY_OPTIONS);
-  } catch {
-    return { error: "Invalid or expired token" };
-  }
-  if (decoded.centerId !== req.center.slug) return { error: "Token not valid for this center" };
-  if (await isTokenBlacklisted(token)) return { error: "Session has been revoked. Please log in again.", code: "SESSION_REVOKED" };
+  const auth = await decodeBearer(req);
+  if (auth.error) return auth;
+  const { token, decoded } = auth;
+  // Super-admin impersonation tokens have no device sessions (id isn't a user id)
+  if (!mongoose.isValidObjectId(decoded.id)) return { error: "Device sessions aren't available while impersonating" };
   const user = await getUserDocForRole(req.db, decoded.role, decoded.id);
   if (!user) return { error: "User not found" };
   return { token, decoded, user };

@@ -4,12 +4,13 @@ import mongoose from "mongoose";
 import { verifyToken, verifyAdmin } from "../middleware/authMiddleware.js";
 import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
 import { requireAnalyticsUnlock } from "../middleware/analyticsPinMiddleware.js";
-import { paymentTransactionSchema } from "../schemas/paymentTransactionSchema.js";
+import { paymentTransactionSchema, SIGNED_AMOUNT, signedAmount } from "../schemas/paymentTransactionSchema.js";
 import { teacherSchema }            from "../schemas/teacherSchema.js";
 import { bookingSchema }            from "../schemas/bookingSchema.js";
 import { studentSchema }            from "../schemas/studentSchema.js";
 import { adminSchema }              from "../schemas/adminSchema.js";
 import { parsePagination }          from "../utils/pagination.js";
+import { adjustTeacherEarnings }    from "../utils/classPayment.js";
 import logger from "../utils/logger.js";
 import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
 
@@ -22,6 +23,22 @@ const getTeacher  = (db) => db.models.Teacher  || db.model("Teacher",  teacherSc
 const getBooking  = (db) => db.models.Booking  || db.model("Booking",  bookingSchema);
 const getStudent  = (db) => db.models.Student  || db.model("Student",  studentSchema);
 const getAdmin    = (db) => db.models.Admin    || db.model("Admin",    adminSchema);
+
+const PAYMENT_METHODS   = ["bank_transfer", "paypal", "cash", "check", "other"];
+const MANUAL_TYPES      = ["manual_adjustment", "bonus", "deduction"];
+const MAX_MANUAL_AMOUNT = 1_000_000;
+
+/** Validated fields for marking transactions paid. Returns { fields } or { error }. */
+function payoutFields(req) {
+  const method = req.body?.paymentMethod || "bank_transfer";
+  if (!PAYMENT_METHODS.includes(method)) return { error: `Payment method must be one of: ${PAYMENT_METHODS.join(", ")}` };
+  const notes = typeof req.body?.notes === "string" ? req.body.notes.trim().slice(0, 500) : "";
+  return { fields: {
+    status: "paid", paidAt: new Date(), paymentMethod: method, notes,
+    // Impersonation tokens carry a non-ObjectId id — don't let it break the payout
+    ...(mongoose.isValidObjectId(req.user.id) ? { paidBy: req.user.id } : {}),
+  } };
+}
 
 // Ensure all ref models are registered on the connection before any populate call.
 const ensurePopulateModels = (db) => {
@@ -89,15 +106,15 @@ router.get("/teacher/:teacherId", verifyToken, async (req, res) => {
     const [rows, monthlyRows] = await Promise.all([
       getPaymentTransaction(req.db).aggregate([
         { $match: { teacherId: tid } },
-        { $group: { _id: "$status", amount: { $sum: "$amount" }, n: { $sum: 1 } } },
+        { $group: { _id: "$status", amount: { $sum: SIGNED_AMOUNT }, n: { $sum: 1 } } },
       ]),
       // Chart: last 6 months of pending/paid, by month in the teacher's timezone
       getPaymentTransaction(req.db).aggregate([
         { $match: { teacherId: tid, status: { $in: ["pending", "paid"] }, completedAt: { $gte: sixMonthsAgo } } },
         { $group: {
           _id: { $dateToString: { format: "%Y-%m", date: "$completedAt", timezone: tz } },
-          pending: { $sum: { $cond: [{ $eq: ["$status", "pending"] }, "$amount", 0] } },
-          paid:    { $sum: { $cond: [{ $eq: ["$status", "paid"] }, "$amount", 0] } },
+          pending: { $sum: { $cond: [{ $eq: ["$status", "pending"] }, SIGNED_AMOUNT, 0] } },
+          paid:    { $sum: { $cond: [{ $eq: ["$status", "paid"] }, SIGNED_AMOUNT, 0] } },
         } },
         { $sort: { _id: 1 } },
       ]).catch(() => []), // e.g. an unknown timezone name
@@ -182,27 +199,29 @@ router.get("/all", verifyToken, verifyAdmin, requireAnalyticsUnlock, async (req,
 router.patch("/:id/pay", verifyToken, verifyAdmin, async (req, res) => {
   try {
     ensurePopulateModels(req.db);
-    const { paymentMethod, notes } = req.body;
+    if (!mongoose.isValidObjectId(req.params.id)) return badRequest(res, "Invalid payment");
+    const payout = payoutFields(req);
+    if (payout.error) return badRequest(res, payout.error);
 
-    const transaction = await getPaymentTransaction(req.db).findById(req.params.id)
-      .populate("teacherId", "firstName lastName email earned lessonsCompleted");
-
+    // Claim it atomically: only a PENDING payment can be paid, and only once —
+    // a cancelled (reversed) class can't be paid, and a double click can't pay twice.
+    const transaction = await getPaymentTransaction(req.db).findOneAndUpdate(
+      { _id: req.params.id, status: "pending" },
+      { $set: payout.fields },
+      { new: true },
+    );
     if (!transaction) {
-      return notFound(res, "Payment transaction not found");
+      const existing = await getPaymentTransaction(req.db).findById(req.params.id).select("status").lean();
+      if (!existing) return notFound(res, "Payment transaction not found");
+      return badRequest(res, existing.status === "cancelled"
+        ? "This payment was cancelled (the class was reversed) — it can't be paid"
+        : "This payment has already been processed");
     }
 
-    if (transaction.status === "paid") {
-      return badRequest(res, "This payment has already been processed");
-    }
+    // Teacher.earned is the unpaid balance — it drops by what was just settled
+    const teacher = await adjustTeacherEarnings(req.db, transaction.teacherId, -signedAmount(transaction), 0);
 
-    transaction.status = "paid";
-    transaction.paidAt = new Date();
-    transaction.paidBy = req.user.id;
-    transaction.paymentMethod = paymentMethod || "bank_transfer";
-    transaction.notes = notes || "";
-    await transaction.save();
-
-    logger.info(`💳 Payment processed: $${transaction.amount} paid to ${transaction.teacherId.firstName} ${transaction.teacherId.lastName}`);
+    logger.info(`💳 Payment processed: $${signedAmount(transaction)} to ${teacher?.firstName || ""} ${teacher?.lastName || ""} (${transaction.teacherId})`);
 
     const updatedTransaction = await getPaymentTransaction(req.db).findById(transaction._id)
       .populate("teacherId", "firstName lastName email")
@@ -223,38 +242,39 @@ router.patch("/:id/pay", verifyToken, verifyAdmin, async (req, res) => {
 router.patch("/teacher/:teacherId/pay-all", verifyToken, verifyAdmin, async (req, res) => {
   try {
     const { teacherId } = req.params;
-    const { paymentMethod, notes } = req.body;
+    if (!mongoose.isValidObjectId(teacherId)) return badRequest(res, "Invalid teacher");
+    const payout = payoutFields(req);
+    if (payout.error) return badRequest(res, payout.error);
+    const PaymentTransaction = getPaymentTransaction(req.db);
 
-    const pendingTransactions = await getPaymentTransaction(req.db).find({
-      teacherId, status: "pending",
-    });
-
-    if (pendingTransactions.length === 0) {
+    // Pay exactly the transactions pending right now. A class completing during this
+    // request stays pending (owed) instead of being marked paid without being counted.
+    const pendingIds = (await PaymentTransaction.find({ teacherId, status: "pending" }).select("_id").lean()).map(t => t._id);
+    if (pendingIds.length === 0) {
       return badRequest(res, "No pending payments for this teacher");
     }
 
-    const totalAmount = pendingTransactions.reduce((sum, tx) => sum + tx.amount, 0);
+    // paidAt is unique to this request — it identifies exactly the rows THIS call paid
+    // (a single "Pay" clicked at the same moment may have taken some of them)
+    await PaymentTransaction.updateMany({ _id: { $in: pendingIds }, status: "pending" }, { $set: payout.fields });
+    const paidNow = await PaymentTransaction.find({ _id: { $in: pendingIds }, status: "paid", paidAt: payout.fields.paidAt })
+      .select("amount type").lean();
+    if (paidNow.length === 0) return badRequest(res, "No pending payments for this teacher");
 
-    await getPaymentTransaction(req.db).updateMany(
-      { teacherId, status: "pending" },
-      { $set: { status: "paid", paidAt: new Date(), paidBy: req.user.id,
-                paymentMethod: paymentMethod || "bank_transfer", notes: notes || "" } }
-    );
+    // Deductions count against the payout
+    const totalAmount = Math.round(paidNow.reduce((sum, tx) => sum + signedAmount(tx), 0) * 100) / 100;
 
-    const teacher = await getTeacher(req.db).findById(teacherId);
-    if (teacher) {
-      teacher.earned = 0;
-      await teacher.save();
-    }
+    // Teacher.earned is the unpaid balance — drop it by what was settled (atomic, never below 0)
+    const teacher = await adjustTeacherEarnings(req.db, teacherId, -totalAmount, 0);
 
-    logger.info(`💰 Bulk payment: $${totalAmount} paid to teacher ${teacherId} (${pendingTransactions.length} transactions)`);
+    logger.info(`💰 Bulk payment: $${totalAmount} paid to teacher ${teacherId} (${paidNow.length} transactions)`);
 
     res.json({
       message: "All pending payments processed successfully",
       totalAmount,
-      transactionCount: pendingTransactions.length,
+      transactionCount: paidNow.length,
       teacher: teacher
-        ? { id: teacher._id, name: `${teacher.firstName} ${teacher.lastName}`, earned: 0 }
+        ? { id: teacher._id, name: `${teacher.firstName} ${teacher.lastName}`, earned: teacher.earned }
         : null,
     });
   } catch (err) {
@@ -276,7 +296,7 @@ router.get("/summary", verifyToken, verifyAdmin, requireAnalyticsUnlock, async (
       {
         $group: {
           _id: { teacherId: "$teacherId", status: "$status" },
-          totalAmount: { $sum: "$amount" },
+          totalAmount: { $sum: SIGNED_AMOUNT },
           count:       { $sum: 1 },
         },
       },
@@ -366,38 +386,38 @@ router.get("/summary", verifyToken, verifyAdmin, requireAnalyticsUnlock, async (
  */
 router.post("/manual", verifyToken, verifyAdmin, async (req, res) => {
   try {
-    const { teacherId, amount, type, description, notes } = req.body;
+    const { teacherId, type } = req.body;
+    // A string amount used to be added as text ("100" + "50" → 10050)
+    const amount = Math.round(Number(req.body.amount) * 100) / 100;
 
-    if (!teacherId || !amount || !type) {
+    if (!teacherId || !type || req.body.amount == null) {
       return badRequest(res, "Teacher, amount, and type are required");
     }
+    if (!mongoose.isValidObjectId(teacherId)) return badRequest(res, "Invalid teacher");
+    if (!MANUAL_TYPES.includes(type)) return badRequest(res, `Type must be one of: ${MANUAL_TYPES.join(", ")}`);
+    if (!Number.isFinite(amount) || amount <= 0 || amount > MAX_MANUAL_AMOUNT) {
+      return badRequest(res, `Amount must be a number between 0.01 and ${MAX_MANUAL_AMOUNT}`);
+    }
+    const description = typeof req.body.description === "string" ? req.body.description.trim().slice(0, 500) : "";
+    const notes       = typeof req.body.notes === "string" ? req.body.notes.trim().slice(0, 500) : "";
 
-    const teacher = await getTeacher(req.db).findById(teacherId);
+    const teacher = await getTeacher(req.db).findById(teacherId).select("_id").lean();
     if (!teacher) {
       return notFound(res, "Teacher not found");
     }
 
-    const PaymentTransaction = getPaymentTransaction(req.db);
-    const transaction = new PaymentTransaction({
-      teacherId,
-      bookingId: null,
-      amount,
-      type,
-      status: "pending",
+    // No bookingId at all (not null): the unique sparse index on bookingId still
+    // indexes null, so a second manual transaction would collide.
+    const transaction = await getPaymentTransaction(req.db).create({
+      teacherId, amount, type, status: "pending", notes,
       description: description || `Manual ${type}`,
-      completedAt: new Date()
+      completedAt: new Date(),
     });
 
-    await transaction.save();
+    // Deductions lower the unpaid balance, everything else raises it (atomic, never below 0)
+    const updated = await adjustTeacherEarnings(req.db, teacherId, signedAmount(transaction), 0);
 
-    if (type === "deduction") {
-      teacher.earned = Math.max(0, (teacher.earned || 0) - amount);
-    } else {
-      teacher.earned = (teacher.earned || 0) + amount;
-    }
-    await teacher.save();
-
-    res.status(201).json({ message: "Manual payment transaction created", transaction });
+    res.status(201).json({ message: "Manual payment transaction created", transaction, earned: updated?.earned });
   } catch (err) {
     logger.error("Error creating manual payment:", { error: err?.message });
     serverError(res, "Error creating manual payment");

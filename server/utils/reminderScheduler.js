@@ -244,5 +244,5 @@ export function startReminderScheduler(db) {
   const runTick = makeTick(db, centerSlug);
   // Don't run immediately — DB connection may still be opening (readyState 2).
   // The interval will fire once fully connected.
-  setInterval(trackJob("Reminders", centerSlug, 60 * 1000, runTick), 60 * 1000);
+  return [setInterval(trackJob("Reminders", centerSlug, 60 * 1000, runTick), 60 * 1000)];
 }

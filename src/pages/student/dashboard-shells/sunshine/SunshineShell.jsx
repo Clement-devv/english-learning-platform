@@ -27,27 +27,15 @@ import ActiveClasses     from "../../components/ActiveClasses";
 import UpcomingClasses   from "../../components/UpcomingClasses";
 import ProgressCard      from "../../components/ProgressCard";
 import NotificationsCard from "../../components/NotificationsCard";
-import ChangePassword    from "../../../../components/student/auth/ChangePassword";
 import SessionManagement from "../../../../components/SessionManagement";
 import SettingsSidebar   from "../../../../components/SettingsSidebar";
 import SettingsModal     from "../../../../components/SettingsModal";
-import Classroom         from "../../../Classroom";
-import MessagesTab       from "../../../../components/chat/MessagesTab";
 import ClassConfirmation from "../../../../components/student/ClassConfirmation";
-import StudentCompletedTab from "../../tabs/StudentCompletedTab";
-import StudentScheduleTab  from "../../tabs/StudentScheduleTab";
-import StudentHomeworkTab  from "../../tabs/HomeworkTab";
-import StudentQuizTab      from "../../tabs/QuizTab";
-import PronunciationTab    from "../../tabs/PronunciationTab";
-import ConversationTab     from "../../tabs/ConversationTab";
-import FlashcardsTab       from "../../tabs/FlashcardsTab";
-import RecordingsTab       from "../../tabs/RecordingsTab";
-import ReviewsTab          from "../../tabs/ReviewsTab";
-import ReferralTab         from "../../tabs/ReferralTab";
-import LeaderboardTab      from "../../tabs/LeaderboardTab";
 import StreakWidget        from "../../components/StreakWidget";
 import { useDashboardData, BADGE_DEFINITIONS } from "../useDashboardData";
 import DashboardAlertsBar from "../../../../components/DashboardAlertsBar";
+// Tabs load on demand (see src/pages/student/tabs/lazyTabs.js)
+import { ChangePassword, StudentCompletedTab, StudentScheduleTab, StudentHomeworkTab, StudentQuizTab, PronunciationTab, ConversationTab, FlashcardsTab, RecordingsTab, ReviewsTab, ReferralTab, LeaderboardTab, MessagesTab, Classroom } from "../../tabs/lazyTabs";
 
 // ── Sidebar nav groups ────────────────────────────────────────────────────────
 const NAV_GROUPS = [

@@ -8,9 +8,9 @@ import { fileURLToPath } from "url";
 import { bookingSchema }            from "../schemas/bookingSchema.js";
 import { studentSchema }            from "../schemas/studentSchema.js";
 import { teacherSchema }            from "../schemas/teacherSchema.js";
-import { paymentTransactionSchema } from "../schemas/paymentTransactionSchema.js";
 import { classroomSessionSchema }   from "../schemas/classroomSessionSchema.js";
 import { recordActivity, recordClassCompletion } from "../utils/streakService.js";
+import { chargeClassCredit, adjustTeacherEarnings, toMoney, recordPendingPayment, rollbackPendingPayment } from "../utils/classPayment.js";
 import logger from "../utils/logger.js";
 
 const __filename   = fileURLToPath(import.meta.url);
@@ -32,13 +32,7 @@ function tryDeletePdf(bookingId) {
 const getBooking            = (db) => db.models.Booking            || db.model("Booking",            bookingSchema);
 const getStudent            = (db) => db.models.Student            || db.model("Student",            studentSchema);
 const getTeacher            = (db) => db.models.Teacher            || db.model("Teacher",            teacherSchema);
-const getPaymentTransaction = (db) => db.models.PaymentTransaction || db.model("PaymentTransaction", paymentTransactionSchema);
 const getClassroomSession   = (db) => db.models.ClassroomSession   || db.model("ClassroomSession",   classroomSessionSchema);
-
-/** Round to exactly 2dp — prevents 0.1+0.2 = 0.30000000000004 salary drift */
-function toMoney(n) {
-  return Math.round((parseFloat(n) || 0) * 100) / 100;
-}
 
 /**
  * Server-side only attendance evaluator.
@@ -92,7 +86,6 @@ export async function completeClass(db, bookingId, markedBy = "system", options 
   const Booking            = getBooking(db);
   const Student            = getStudent(db);
   const Teacher            = getTeacher(db);
-  const PaymentTransaction = getPaymentTransaction(db);
   const ClassroomSession   = getClassroomSession(db);
 
   // ══════════════════════════════════════════════════════
@@ -148,23 +141,30 @@ export async function completeClass(db, bookingId, markedBy = "system", options 
   const attendance = evaluateAttendance(session, claimedBooking.duration);
 
   if (!skipAttendanceCheck && !attendance.meetsRequirement) {
-    const missedBooking = await Booking.findByIdAndUpdate(
-      bookingId,
-      {
-        $set: {
-          status:       "missed",
-          markedBy,
-          missedReason: buildMissedReason(attendance),
-          completedAt:  new Date(),
+    let missedBooking;
+    try {
+      missedBooking = await Booking.findOneAndUpdate(
+        { _id: bookingId, status: "processing" },
+        {
+          $set: {
+            status:       "missed",
+            markedBy,
+            missedReason: buildMissedReason(attendance),
+            completedAt:  new Date(),
+          },
         },
-      },
-      { new: true }
-    );
+        { new: true }
+      );
+      if (!missedBooking) throw new Error("Booking left the processing state");
+    } catch (err) {
+      await releaseClaim(Booking, bookingId, claimedBooking.status, err);
+      throw err;
+    }
 
+    // Housekeeping — the outcome is already saved; a failure here must not undo it
     if (session) {
-      session.status       = "missed";
-      session.classEndedAt = new Date();
-      await session.save();
+      await ClassroomSession.updateOne({ _id: session._id }, { $set: { status: "missed", classEndedAt: new Date() } })
+        .catch((e) => logger.warn(`[ClassCompletion] Session update failed for ${bookingId}:`, { error: e?.message }));
     }
 
     tryDeletePdf(bookingId);
@@ -183,71 +183,81 @@ export async function completeClass(db, bookingId, markedBy = "system", options 
   }
 
   // ══════════════════════════════════════════════════════
-  // STEP 4 — Sequential writes
+  // STEP 4 — Money writes, then finalize the booking LAST
+  // The booking stays "processing" until every money write succeeded. If one
+  // fails, the ones already done are undone and the claim is released, so the
+  // booking is never "completed" with the student uncharged / teacher unpaid.
   // ══════════════════════════════════════════════════════
+  const now     = new Date();
+  const isTrial = !!claimedBooking.isTrial;
+  const done = { charged: false, deactivated: false, paid: 0, lessonAdded: false, paymentRecorded: false };
+
+  let student, teacher, teacherId, studentId, ratePerClass = 0;
   try {
-    const now       = new Date();
-    const teacherId = claimedBooking.teacherId._id;
-    const studentId = claimedBooking.studentId._id;
-    const isTrial   = !!claimedBooking.isTrial;
+    // populate() leaves null when the teacher/student was deleted — fail inside the try so the claim is released
+    teacherId = claimedBooking.teacherId?._id;
+    studentId = claimedBooking.studentId?._id;
+    if (!teacherId || !studentId) throw new Error(`Booking ${bookingId} has no ${teacherId ? "student" : "teacher"} (deleted?)`);
 
-    // Write 1: Finalize booking
-    await Booking.updateOne(
-      { _id: bookingId },
-      { $set: { status: "completed", completedAt: now, markedBy, adminRejected: false } }
-    );
-
-    // Write 2: Deduct 1 credit from student (skipped for trial lessons)
-    const student = await Student.findById(studentId);
+    // Write 1: Deduct 1 credit from student (skipped for trial lessons) — atomic, never below 0
+    if (isTrial) {
+      student = await Student.findById(studentId).lean();
+    } else {
+      const charge = await chargeClassCredit(db, studentId);
+      student = charge.student;
+      done.charged = charge.charged;
+      done.deactivated = charge.deactivated;
+    }
     if (!student) throw new Error(`Student ${studentId} not found`);
-    let newClassCount = student.classCredits || 0;
-    if (!isTrial) {
-      newClassCount = Math.max(0, newClassCount - 1);
-      student.classCredits = newClassCount;
-      if (newClassCount === 0) student.active = false;
-      await student.save();
-    }
 
-    // Write 3: Add teacher earnings — float-safe (skipped for trial lessons)
-    const teacher = await Teacher.findById(teacherId);
+    // Write 2: Add teacher earnings — atomic + rounded to 2dp (skipped for trial lessons)
+    teacher = await Teacher.findById(teacherId).select("firstName lastName ratePerClass earned lessonsCompleted").lean();
     if (!teacher) throw new Error(`Teacher ${teacherId} not found`);
-    let ratePerClass        = 0;
-    let newLessonsCompleted = teacher.lessonsCompleted || 0;
-    let newEarned           = toMoney(teacher.earned   || 0);
     if (!isTrial) {
-      ratePerClass        = toMoney(teacher.ratePerClass);
-      newLessonsCompleted = (teacher.lessonsCompleted || 0) + 1;
-      newEarned           = toMoney((teacher.earned   || 0) + ratePerClass);
-      teacher.lessonsCompleted = newLessonsCompleted;
-      teacher.earned           = newEarned;
-      await teacher.save();
+      ratePerClass = toMoney(teacher.ratePerClass);
+      teacher = await adjustTeacherEarnings(db, teacherId, ratePerClass, 1);
+      done.paid = ratePerClass;
+      done.lessonAdded = true;
     }
 
-    // Write 4: Create PaymentTransaction (skipped for trial lessons)
+    // Write 3: Pending PaymentTransaction (skipped for trial lessons)
     if (!isTrial) {
-      await PaymentTransaction.create({
-        bookingId:   claimedBooking._id,
-        teacherId,
-        studentId,
-        amount:      ratePerClass,
-        status:      "pending",
-        type:        "class_completion",
+      await recordPendingPayment(db, claimedBooking._id, {
+        teacherId, studentId, amount: ratePerClass,
         classTitle:  claimedBooking.classTitle,
         studentName: `${claimedBooking.studentId.firstName} ${claimedBooking.studentId.lastName}`,
         completedAt: now,
         description: `Completed by ${markedBy} — ${claimedBooking.classTitle}`,
       });
+      done.paymentRecorded = true;
     }
 
-    // Write 5: Update ClassroomSession
+    // Write 4: Finalize booking — only from our own "processing" claim
+    const fin = await Booking.updateOne(
+      { _id: bookingId, status: "processing" },
+      { $set: { status: "completed", completedAt: now, markedBy, adminRejected: false } }
+    );
+    if (fin.modifiedCount === 0) throw new Error("Booking left the processing state during completion");
+  } catch (err) {
+    await undoMoneyWrites(db, { bookingId, studentId, teacherId, done }, err);
+    await releaseClaim(Booking, bookingId, claimedBooking.status, err);
+    throw err;
+  }
+
+  // ── Housekeeping — the completion is saved; failures here never undo it ──
+  {
+    const newClassCount       = student.classCredits || 0;
+    const newLessonsCompleted = teacher.lessonsCompleted || 0;
+    const newEarned           = toMoney(teacher.earned || 0);
+
     if (session) {
       await ClassroomSession.updateOne(
         { _id: session._id },
         { $set: { status: "completed", classEndedAt: now, bothActiveTime: attendance.bothActiveTime } }
-      );
+      ).catch((e) => logger.warn(`[ClassCompletion] Session update failed for ${bookingId}:`, { error: e?.message }));
     }
 
-    // Write 6: Delete class PDF — non-blocking, failure never rolls back completion
+    // Delete class PDF — non-blocking
     tryDeletePdf(bookingId);
 
     logger.info(`[ClassCompletion] "${claimedBooking.classTitle}" (${bookingId})`, {
@@ -272,25 +282,42 @@ export async function completeClass(db, bookingId, markedBy = "system", options 
       rateEarned:              ratePerClass,
       markedBy,
     };
+  }
+}
 
-  } catch (err) {
-    // Release processing lock so the booking can be retried.
-    // Restore to the original status (before we claimed it as "processing").
-    const originalStatus = claimedBooking?.status || "accepted";
+/** Put a claimed booking back to the status it had before we set "processing". */
+async function releaseClaim(Booking, bookingId, originalStatus = "accepted", err) {
+  try {
+    await Booking.updateOne({ _id: bookingId, status: "processing" }, { $set: { status: originalStatus } });
+    logger.warn(`[ClassCompletion] Error on ${bookingId}, reset to "${originalStatus}". Error: ${err?.message}`);
+  } catch (resetErr) {
+    logger.error(`CRITICAL: Could not reset booking ${bookingId} after error!`, {
+      originalError: err?.message, resetError: resetErr.message,
+      fix: `db.bookings.updateOne({_id:ObjectId("${bookingId}")},{$set:{status:"${originalStatus}"}})`,
+    });
+  }
+}
+
+/** Undo the money writes a failed completion already made (each step independently). */
+async function undoMoneyWrites(db, { bookingId, studentId, teacherId, done }, err) {
+  const steps = [];
+  if (done.paymentRecorded) steps.push(["payment", () => rollbackPendingPayment(db, bookingId)]);
+  if (done.paid || done.lessonAdded) steps.push(["teacher", () => adjustTeacherEarnings(db, teacherId, -done.paid, done.lessonAdded ? -1 : 0)]);
+  if (done.charged) {
+    const Student = getStudent(db);
+    steps.push(["student", () => Student.updateOne(
+      { _id: studentId },
+      { $inc: { classCredits: 1 }, ...(done.deactivated ? { $set: { active: true } } : {}) },
+    )]);
+  }
+  for (const [what, undo] of steps) {
     try {
-      await Booking.updateOne(
-        { _id: bookingId, status: "processing" },
-        { $set: { status: originalStatus } }
-      );
-      logger.warn(`[ClassCompletion] Error on ${bookingId}, reset to "${originalStatus}". Error: ${err.message}`);
-    } catch (resetErr) {
-      logger.error(
-        `CRITICAL: Could not reset booking ${bookingId} after error!`,
-        { originalError: err.message, resetError: resetErr.message,
-          fix: `db.bookings.updateOne({_id:ObjectId("${bookingId}")},{$set:{status:"accepted"}})` }
-      );
+      await undo();
+    } catch (undoErr) {
+      logger.error(`CRITICAL: completion of ${bookingId} failed and the ${what} change could not be undone — fix by hand`, {
+        originalError: err?.message, undoError: undoErr?.message, studentId: String(studentId), teacherId: String(teacherId),
+        teacherAmount: done.paid,
+      });
     }
-
-    throw err;
   }
 }

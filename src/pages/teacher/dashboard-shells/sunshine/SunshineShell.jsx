@@ -16,7 +16,7 @@ import { useTeacherDashboardData }  from '../useTeacherDashboardData';
 import { useRing }                  from '../../../../context/RingContext';
 import TeacherTabContent            from '../TeacherTabContent';
 import { TabErrorBoundary }         from '../../../../components/ErrorBoundary';
-import Classroom                    from '../../../Classroom';
+import { lazyTab }                  from '../../../../lib/lazyTab';
 import ClassModal                   from '../../components/classes/ClassModal';
 import ConfirmModal                 from '../../components/classes/ConfirmModal';
 import RecurringClassForm           from '../../../../components/teacher/RecurringClassForm';
@@ -30,6 +30,9 @@ import UpcomingClasses              from '../../components/dashboard/UpcomingCla
 import LanguageSwitcher             from '../../../../components/LanguageSwitcher';
 import { useTranslation }           from 'react-i18next';
 import DashboardAlertsBar from "../../../../components/DashboardAlertsBar";
+
+// Only needed once the teacher joins a class — load it then.
+const Classroom = lazyTab(() => import('../../../Classroom'));
 
 // ── Palette ────────────────────────────────────────────────────────────────────
 const palette = (dark) => ({

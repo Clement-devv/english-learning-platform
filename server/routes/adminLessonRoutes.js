@@ -305,9 +305,13 @@ router.post("/unmark", verifyToken, verifyAdmin, async (req, res) => {
 
     // Flag as admin-rejected, restore the student credit, deduct teacher earnings,
     // cancel the pending payment (shared with dispute resolution)
-    const { student, teacher, ratePerClass } = await reverseCompletedClass(req.db, booking, {
+    const { student, teacher, ratePerClass, alreadyReversed } = await reverseCompletedClass(req.db, booking, {
       reason: reason || "", adminId: req.user.id,
     });
+    // Lost the race to another click / admin — they already reversed it
+    if (alreadyReversed) {
+      return res.status(409).json({ success: false, message: "This lesson has already been admin-rejected." });
+    }
 
     // Send emails non-blocking
     const db = req.db;

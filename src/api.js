@@ -1,4 +1,5 @@
 import axios from "axios";
+import { decodeJwtPayload } from "./utils/jwt";
 import { getCachedCenter } from "./utils/branding";
 import { getAnalyticsUnlock, needsAnalyticsUnlock, ANALYTICS_UNLOCK_HEADER } from "./utils/analyticsPin";
 import { deviceLoginHeaders, signRenewal } from "./utils/deviceKey";
@@ -141,12 +142,8 @@ let refreshQueue = []; // pending requests waiting for the new token
 
 // Decode the JWT payload and return true if the token expires within thresholdMs.
 function isTokenExpiringSoon(token, thresholdMs = 90_000) {
-  try {
-    const payload = JSON.parse(atob(token.split('.')[1]));
-    return typeof payload.exp === 'number' && (payload.exp * 1000 - Date.now()) < thresholdMs;
-  } catch {
-    return false;
-  }
+  const payload = decodeJwtPayload(token);
+  return typeof payload?.exp === 'number' && (payload.exp * 1000 - Date.now()) < thresholdMs;
 }
 
 function processRefreshQueue(newToken, error) {

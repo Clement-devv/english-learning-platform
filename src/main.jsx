@@ -1,10 +1,10 @@
-import * as Sentry from "@sentry/react";
+import { init as initSentry, browserTracingIntegration, addIntegration } from "@sentry/react";
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App.jsx';
 import './index.css';
 import './i18n/i18n.js';
-import { fetchBranding, applyBranding, setCachedBranding } from './utils/branding.js';
+import { fetchBranding, applyBranding, setCachedBranding, loadStoredBranding, storeBranding } from './utils/branding.js';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import { installClientErrorReporting } from './utils/reportClientError.js';
 
@@ -41,21 +41,22 @@ const scrubUrl = (u) => (typeof u === 'string' ? u.replace(SECRET_PARAM_RE, '$1[
 // App Health: tell the platform owner when a page crashes (utils/reportClientError.js)
 installClientErrorReporting();
 
-Sentry.init({
+const sentryEnabled =
+  !!import.meta.env.VITE_SENTRY_DSN && import.meta.env.VITE_SENTRY_ENABLED === 'true';
+
+initSentry({
   dsn: import.meta.env.VITE_SENTRY_DSN,
   environment: import.meta.env.MODE,
   integrations: [
-    Sentry.browserTracingIntegration(),
-    // Replays record what's on screen. Students' names, messages and grades are
-    // personal data (often of minors), so all text, inputs and media are masked.
-    Sentry.replayIntegration({ maskAllText: true, maskAllInputs: true, blockAllMedia: true }),
+    browserTracingIntegration(),
+    // Session replay is added below, after the page has loaded (it is ~300 KB).
   ],
   tracesSampleRate: 0.1,
   replaysSessionSampleRate: 0.05,
   replaysOnErrorSampleRate: 1.0,
   // Off unless VITE_SENTRY_ENABLED=true (set in .env / .env.production), so
   // development doesn't use up the Sentry quota. Nothing is sent while off.
-  enabled: !!import.meta.env.VITE_SENTRY_DSN && import.meta.env.VITE_SENTRY_ENABLED === 'true',
+  enabled: sentryEnabled,
   beforeSend(event) {
     if (event.request?.url) event.request.url = scrubUrl(event.request.url);
     return event;
@@ -72,6 +73,20 @@ Sentry.init({
     return crumb;
   },
 });
+
+// Session replay (~300 KB) is downloaded after the page has loaded instead of
+// in the main bundle. It still honours the replay sample rates set above.
+// Replays record what's on screen. Students' names, messages and grades are
+// personal data (often of minors), so all text, inputs and media are masked.
+if (sentryEnabled) {
+  window.addEventListener('load', () => {
+    import('./lib/sentryReplay.js')
+      .then(({ replayIntegration }) => addIntegration(
+        replayIntegration({ maskAllText: true, maskAllInputs: true, blockAllMedia: true }),
+      ))
+      .catch(() => {});
+  });
+}
 
 // PWA launch shortcut — when the installed app opens to `/`, skip the landing
 // page and go directly to the user's role route. AuthGuard handles the
@@ -99,15 +114,7 @@ if ('serviceWorker' in navigator) {
   });
 }
 
-// Fetch and apply branding BEFORE rendering React
-// If fetch fails, defaults from index.css are already applied
-fetchBranding().then(({ branding, center }) => {
-  applyBranding(branding, center);
-  setCachedBranding(branding, center);
-}).catch(() => {
-  // Silent fail — defaults apply, app renders normally
-}).finally(() => {
-  // Always render — branding failure must never block the app
+const renderApp = () => {
   ReactDOM.createRoot(document.getElementById('root')).render(
     <React.StrictMode>
       <ErrorBoundary>
@@ -115,4 +122,32 @@ fetchBranding().then(({ branding, center }) => {
       </ErrorBoundary>
     </React.StrictMode>
   );
+};
+
+// Branding picks each center's colours, logo AND which login/dashboard theme to
+// show, so rendering with the wrong branding would flash the wrong design.
+//  • Returning visitor: render NOW with the branding saved from last visit, and
+//    refresh it in the background (applied live if it changed).
+//  • First visit: wait for the fetch, as before (5 s timeout, then defaults).
+const stored = loadStoredBranding();
+if (stored) {
+  applyBranding(stored.branding, stored.center);
+  setCachedBranding(stored.branding, stored.center);
+  renderApp();
+}
+
+fetchBranding().then(({ branding, center, authoritative }) => {
+  // A failed request returns defaults — never let that replace good saved branding.
+  if (stored && !authoritative) return;
+  const changed = !stored || JSON.stringify(stored) !== JSON.stringify({ branding, center });
+  if (changed) {
+    applyBranding(branding, center);
+    setCachedBranding(branding, center);
+  }
+  if (authoritative) storeBranding(branding, center);
+}).catch(() => {
+  // Silent fail — defaults apply, app renders normally
+}).finally(() => {
+  // Always render — branding failure must never block the app
+  if (!stored) renderApp();
 });

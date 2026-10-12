@@ -17,6 +17,7 @@ export default function CreateCenterModal({ s, apiBase, authHeaders, onClose, on
   const [form, setForm] = useState({ centerName: '', slug: '', adminEmail: '', plan: 'basic', maxTeachers: '', maxStudents: '' });
   const [slugTouched, setSlugTouched] = useState(false);
   const [slugCheck, setSlugCheck] = useState({ state: 'idle', reason: '' }); // idle | checking | ok | bad
+  const [emailCheck, setEmailCheck] = useState({ state: 'idle', reason: '' }); // same states
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState(null); // { emailed, inviteUrl, adminEmail, expiresAt, message }
@@ -25,6 +26,24 @@ export default function CreateCenterModal({ s, apiBase, authHeaders, onClose, on
   headersRef.current = authHeaders;
 
   const set = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }));
+
+  // Live "is this email already a center admin?" check
+  useEffect(() => {
+    const email = form.adminEmail.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setEmailCheck({ state: 'idle', reason: '' }); return undefined; }
+    setEmailCheck({ state: 'checking', reason: '' });
+    const t = setTimeout(async () => {
+      try {
+        const r = await fetch(`${apiBase}/super-admin/center-invites/email-available?email=${encodeURIComponent(email)}`, { headers: headersRef.current });
+        const d = await r.json();
+        if (!d.success) throw new Error(d.message);
+        setEmailCheck(d.data.available ? { state: 'ok', reason: '' } : { state: 'bad', reason: d.data.reason });
+      } catch {
+        setEmailCheck({ state: 'idle', reason: '' });
+      }
+    }, 450);
+    return () => clearTimeout(t);
+  }, [form.adminEmail, apiBase]);
 
   // Live "is this web address free?" check
   useEffect(() => {
@@ -53,6 +72,7 @@ export default function CreateCenterModal({ s, apiBase, authHeaders, onClose, on
     e.preventDefault();
     setError('');
     if (slugCheck.state === 'bad') { setError(slugCheck.reason); return; }
+    if (emailCheck.state === 'bad') { setError(emailCheck.reason); return; }
     setSending(true);
     try {
       const r = await fetch(`${apiBase}/super-admin/center-invites`, {
@@ -124,7 +144,11 @@ export default function CreateCenterModal({ s, apiBase, authHeaders, onClose, on
               <label style={s.label} htmlFor="cc-email">Admin email *</label>
               <input id="cc-email" type="email" style={s.input} required maxLength={254} placeholder="owner@school.com"
                 value={form.adminEmail} onChange={set('adminEmail')} disabled={sending} />
-              <span style={{ fontSize: 12, color: 'var(--sa-muted)' }}>The invite goes here. This email becomes the admin's login.</span>
+              <span style={{ fontSize: 12, lineHeight: 1.45 }}>
+                {emailCheck.state === 'bad' ? <span style={{ color: '#ef4444' }}>{emailCheck.reason}</span>
+                  : emailCheck.state === 'checking' ? <span style={{ color: 'var(--sa-muted)' }}>Checking…</span>
+                  : <span style={{ color: 'var(--sa-muted)' }}>{emailCheck.state === 'ok' && <span style={{ color: '#10b981' }}>✓ Not used by any center · </span>}The invite goes here. This email becomes the admin's login.</span>}
+              </span>
             </div>
 
             <div style={s.field}>
@@ -163,7 +187,7 @@ export default function CreateCenterModal({ s, apiBase, authHeaders, onClose, on
 
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
               <button type="button" onClick={onClose} style={s.cancelBtn} disabled={sending}>Cancel</button>
-              <button type="submit" style={{ ...s.submitBtn, display: 'inline-flex', alignItems: 'center', gap: 8, opacity: sending || slugCheck.state === 'bad' ? 0.6 : 1 }} disabled={sending || slugCheck.state === 'bad' || slugCheck.state === 'checking'}>
+              <button type="submit" style={{ ...s.submitBtn, display: 'inline-flex', alignItems: 'center', gap: 8, opacity: sending || slugCheck.state === 'bad' || emailCheck.state === 'bad' ? 0.6 : 1 }} disabled={sending || slugCheck.state === 'bad' || emailCheck.state === 'bad' || slugCheck.state === 'checking' || emailCheck.state === 'checking'}>
                 {sending ? <Loader2 size={15} className="spin" /> : <Send size={15} />} {sending ? 'Sending invite…' : 'Create & send invite'}
               </button>
             </div>

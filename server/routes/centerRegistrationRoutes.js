@@ -1,6 +1,7 @@
 import express from 'express';
 import bcrypt from '../utils/passwordHash.js';
 import Center from '../models/master/Center.js';
+import { centerEmailInUse } from '../utils/centerEmail.js';
 import { config } from '../config/config.js';
 import { sendEmail } from '../utils/emailService.js';
 import { validateCenterRegistration } from '../middleware/validation.js';
@@ -22,6 +23,11 @@ router.post('/', validateCenterRegistration, async (req, res) => {
     // Validate slug format: lowercase, alphanumeric + hyphens only
     if (!/^[a-z0-9-]+$/.test(slug)) {
       return badRequest(res, 'Slug may only contain lowercase letters, numbers, and hyphens');
+    }
+
+    // One email = one center admin (public message — never names the other center)
+    if (await centerEmailInUse(adminEmail)) {
+      return conflict(res, 'This email is already registered with a center. Log in to that center, or use a different email.');
     }
 
     // Check slug uniqueness
