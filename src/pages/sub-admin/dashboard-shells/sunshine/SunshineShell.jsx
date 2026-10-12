@@ -9,6 +9,7 @@ import {
   MessageCircle, Shield, LogOut, Moon, Sun,
 } from 'lucide-react';
 import { useNavigate }      from 'react-router-dom';
+import { useTranslation }   from 'react-i18next';
 import { useAuth }          from '../../../../context/AuthContext.jsx';
 import { useDarkMode }      from '../../../../hooks/useDarkMode';
 import { TabErrorBoundary } from '../../../../components/ErrorBoundary';
@@ -42,10 +43,11 @@ const TAB_SHADOW     = 'rgba(249,115,22,0.35)';
 // ── Shell ──────────────────────────────────────────────────────────────────────
 export default function SunshineShell() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { user: subAdminInfo, logout: authLogout } = useAuth();
   const { isDarkMode, toggleDarkMode } = useDarkMode();
   const col        = palette(isDarkMode);
-  const centerName = getCachedCenter()?.centerName || 'Sub-Admin Panel';
+  const centerName = getCachedCenter()?.centerName || t('subAdmin.panelFallback');
   const perms      = subAdminInfo?.permissions || {};
 
   const [activeTab, setActiveTab] = useState('overview');
@@ -64,41 +66,41 @@ export default function SunshineShell() {
   const NAV_GROUPS = useMemo(() => [
     {
       label: null,
-      items: [{ key: 'overview', label: 'Overview', icon: TrendingUp }],
+      items: [{ key: 'overview', label: t('subAdmin.nav.overview'), icon: TrendingUp }],
     },
     {
-      label: 'People',
+      label: t('subAdmin.navGroup.people'),
       items: [
-        { key: 'teachers', label: 'Teachers', icon: Video  },
-        { key: 'students', label: 'Students', icon: Users  },
+        { key: 'teachers', label: t('subAdmin.nav.teachers'), icon: Video  },
+        { key: 'students', label: t('subAdmin.nav.students'), icon: Users  },
       ],
     },
     {
-      label: 'Classes',
+      label: t('subAdmin.navGroup.classes'),
       items: [
-        ...(perms.canViewClasses  !== false ? [{ key: 'classes',     label: 'Classes',      icon: CheckSquare }] : []),
-        ...(perms.canViewBookings !== false ? [{ key: 'live-classes', label: 'Live Classes', icon: Calendar    }] : []),
-        { key: 'recordings', label: 'Recordings', icon: Film     },
-        { key: 'reports',    label: 'Reports',    icon: BarChart2 },
-        { key: 'reviews',    label: 'Reviews',    icon: Star      },
+        ...(perms.canViewClasses  !== false ? [{ key: 'classes',     label: t('subAdmin.nav.classes'), icon: CheckSquare }] : []),
+        ...(perms.canViewBookings !== false ? [{ key: 'live-classes', label: t('subAdmin.nav.liveClasses'), icon: Calendar    }] : []),
+        { key: 'recordings', label: t('subAdmin.nav.recordings'), icon: Film     },
+        { key: 'reports',    label: t('subAdmin.nav.reports'), icon: BarChart2 },
+        { key: 'reviews',    label: t('subAdmin.nav.reviews'), icon: Star      },
       ],
     },
     {
-      label: 'Finance',
+      label: t('subAdmin.navGroup.finance'),
       items: [
-        ...(perms.canViewPayments ? [{ key: 'payments', label: 'Payments', icon: DollarSign }] : []),
+        ...(perms.canViewPayments ? [{ key: 'payments', label: t('subAdmin.nav.payments'), icon: DollarSign }] : []),
       ],
     },
     {
-      label: 'Communication',
+      label: t('subAdmin.navGroup.communication'),
       items: [
-        ...(perms.canSendMessages !== false ? [{ key: 'messages', label: 'Messages', icon: MessageCircle }] : []),
+        ...(perms.canSendMessages !== false ? [{ key: 'messages', label: t('subAdmin.nav.messages'), icon: MessageCircle }] : []),
       ],
     },
-  ].filter(g => g.items.length > 0), [perms]);
+  ].filter(g => g.items.length > 0), [perms, t]);
 
   const ALL_ITEMS  = NAV_GROUPS.flatMap(g => g.items);
-  const activeLabel = ALL_ITEMS.find(i => i.key === activeTab)?.label || 'Overview';
+  const activeLabel = ALL_ITEMS.find(i => i.key === activeTab)?.label || t('subAdmin.nav.overview');
 
   const tabContent = useMemo(() => {
     switch (activeTab) {
@@ -150,7 +152,7 @@ export default function SunshineShell() {
             </div>
             <div>
               <div style={{ fontSize: 13, fontWeight: 900, color: col.heading, lineHeight: 1.2 }}>{centerName}</div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: col.muted }}>Sub-Admin</div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: col.muted }}>{t('subAdmin.role')}</div>
             </div>
           </div>
         </div>
@@ -162,12 +164,12 @@ export default function SunshineShell() {
           </div>
           <div style={{ minWidth: 0 }}>
             <div style={{ fontSize: 13, fontWeight: 800, color: col.heading, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {subAdminInfo?.firstName || 'Sub-Admin'}
+              {subAdminInfo?.firstName || t('subAdmin.role')}
             </div>
             <div style={{ fontSize: 11, fontWeight: 600, color: col.muted }}>
               {subAdminInfo?.assignmentType === 'region'
                 ? `🌍 ${subAdminInfo.region}`
-                : `👥 ${subAdminInfo?.teacherScope?.length || 0} teachers`}
+                : `👥 ${t('subAdmin.teacherCount', { count: subAdminInfo?.teacherScope?.length || 0 })}`}
             </div>
           </div>
         </div>
@@ -220,7 +222,7 @@ export default function SunshineShell() {
             <div style={{ width: 30, height: 30, borderRadius: 10, flexShrink: 0, background: isDarkMode ? 'rgba(255,255,255,0.04)' : '#f5f0ec', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               {isDarkMode ? <Sun size={15} color={col.muted} /> : <Moon size={15} color={col.muted} />}
             </div>
-            <span style={{ fontSize: 13, fontWeight: 600, color: col.body }}>{isDarkMode ? 'Light Mode' : 'Dark Mode'}</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: col.body }}>{isDarkMode ? t('subAdmin.lightMode') : t('subAdmin.darkMode')}</span>
           </button>
           <LanguageSwitcher col={col} fontFamily={F} />
           <button className="sa-nav" onClick={() => setShowDevices(true)}
@@ -228,14 +230,14 @@ export default function SunshineShell() {
             <div style={{ width: 30, height: 30, borderRadius: 10, flexShrink: 0, background: isDarkMode ? 'rgba(255,255,255,0.04)' : '#f5f0ec', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Smartphone size={15} color={col.muted} />
             </div>
-            <span style={{ fontSize: 13, fontWeight: 600, color: col.body }}>My devices</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: col.body }}>{t('subAdmin.myDevices')}</span>
           </button>
           <button className="sa-nav" onClick={handleLogout}
             style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 14, border: 'none', cursor: 'pointer', background: 'transparent', fontFamily: F, marginTop: 2 }}>
             <div style={{ width: 30, height: 30, borderRadius: 10, flexShrink: 0, background: isDarkMode ? 'rgba(239,68,68,0.08)' : '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <LogOut size={15} color="#ef4444" />
             </div>
-            <span style={{ fontSize: 13, fontWeight: 600, color: '#ef4444' }}>Logout</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: '#ef4444' }}>{t('subAdmin.logout')}</span>
           </button>
         </div>
       </aside>
@@ -260,8 +262,8 @@ export default function SunshineShell() {
             {subAdminInfo?.assignmentType && (
               <div style={{ background: isDarkMode ? 'rgba(249,115,22,0.12)' : '#fff7ed', border: `1.5px solid ${isDarkMode ? 'rgba(249,115,22,0.25)' : '#fed7aa'}`, borderRadius: 20, padding: '4px 12px', fontSize: 11.5, fontWeight: 700, color: col.accent }}>
                 {subAdminInfo.assignmentType === 'region'
-                  ? `🌍 ${subAdminInfo.region?.charAt(0).toUpperCase() + subAdminInfo.region?.slice(1)} Region`
-                  : `👥 ${subAdminInfo.teacherScope?.length || 0} Teachers Assigned`}
+                  ? `🌍 ${t('subAdmin.region', { region: subAdminInfo.region?.charAt(0).toUpperCase() + subAdminInfo.region?.slice(1) })}`
+                  : `👥 ${t('subAdmin.teachersAssigned', { count: subAdminInfo.teacherScope?.length || 0 })}`}
               </div>
             )}
             <div style={{ width: 34, height: 34, borderRadius: 12, background: ACCENT_G, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 900, fontSize: 14, boxShadow: `0 3px 8px ${TAB_SHADOW}` }}>

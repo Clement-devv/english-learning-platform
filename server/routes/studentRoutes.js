@@ -37,6 +37,10 @@ import { planBlocksStudentMode } from '../utils/planFeatures.js';
 import { endSessionsAfterPasswordChange, notifySessionsRevoked } from '../utils/sessionManager.js';
 
 const router = express.Router();
+
+// Allowed values for recorded student payments (schemas/paymentSchema.js)
+const PAYMENT_METHODS  = ["Manual", "Bank Transfer", "Credit Card", "Other"];
+const PAYMENT_STATUSES = ["completed", "pending", "failed"];
 router.use(tenantMiddleware);
 
 const getStudent  = (db) => db.models.Student  || db.model("Student",  studentSchema);
@@ -665,17 +669,27 @@ router.post("/:id/reset-password", verifyToken, verifyAdmin, strictLimiter, asyn
 // ─── POST record payment ──────────────────────────────────────────────────────
 router.post("/:id/payment", verifyToken, verifyAdmin, async (req, res) => {
   try {
-    const { amount, classes, method = "Manual", status = "completed" } = req.body;
-    if (!amount || !classes) return badRequest(res, "Amount and number of classes are required");
+    const { method = "Manual", status = "completed" } = req.body;
+    if (req.body.amount == null || req.body.classes == null) return badRequest(res, "Amount and number of classes are required");
+    const amount  = Math.round(Number(req.body.amount) * 100) / 100;
+    const classes = Number(req.body.classes);
+    if (!Number.isFinite(amount) || amount <= 0) return badRequest(res, "Amount must be a positive number");
+    // A negative or fractional number used to REMOVE credits / add part of one
+    if (!Number.isInteger(classes) || classes < 1 || classes > 1000) return badRequest(res, "Number of classes must be a whole number from 1 to 1000");
+    if (!PAYMENT_METHODS.includes(method)) return badRequest(res, `Method must be one of: ${PAYMENT_METHODS.join(", ")}`);
+    if (!PAYMENT_STATUSES.includes(status)) return badRequest(res, `Status must be one of: ${PAYMENT_STATUSES.join(", ")}`);
+    if (!mongoose.isValidObjectId(req.params.id)) return badRequest(res, "Invalid student");
 
-    const Student = getStudent(req.db);
-    const student = await Student.findById(req.params.id);
+    // Only money actually received buys classes — a pending / failed payment is just recorded
+    const paid = status === "completed";
+    const student = await getStudent(req.db).findByIdAndUpdate(
+      req.params.id,
+      paid
+        ? { $inc: { classCredits: classes }, $set: { lastPaymentDate: new Date(), active: true } } // atomic — a class settling at the same moment isn't lost
+        : { $set: { lastPaymentDate: new Date() } },
+      { new: true },
+    );
     if (!student) return notFound(res, "Student not found");
-
-    student.lastPaymentDate = new Date();
-    student.active          = true;
-    student.classCredits     = (student.classCredits || 0) + (parseInt(classes, 10) || 0);
-    await student.save();
 
     const payment = await getPayment(req.db).create({
       studentId: student._id, amount, classes, method, status, date: new Date(),

@@ -399,9 +399,15 @@ router.patch("/:id/complete", verifyToken, validateObjectId("id"), async (req, r
       }
     }
 
-    gc.status      = "completed";
-    gc.completedAt = new Date();
-    await gc.save();
+    // Only from a still-running state: a cancel at the same moment (which refunds
+    // everyone) must not be overwritten to "completed"
+    const completedAt = new Date();
+    const done = await getGroupClass(req.db).updateOne(
+      { _id: gc._id, status: { $in: ["open", "full", "in-progress"] } },
+      { $set: { status: "completed", completedAt, enrollments: gc.enrollments } },
+    );
+    if (done.modifiedCount === 0) return conflict(res, "This class was just cancelled or completed — please refresh");
+    Object.assign(gc, { status: "completed", completedAt });
 
     // Notify enrolled students via socket
     try {

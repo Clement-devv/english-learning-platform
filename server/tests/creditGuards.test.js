@@ -27,6 +27,7 @@ vi.mock('../utils/webPushService.js', () => ({ pushToUser: vi.fn(), pushToAllAdm
 
 const { default: bookingRouter } = await import('../routes/bookingRoutes.js')
 const { default: groupRouter } = await import('../routes/groupClassRoutes.js')
+const { default: studentRouter } = await import('../routes/studentRoutes.js')
 const { JWT_STANDARD_CLAIMS } = await import('../config/config.js')
 const { getCenterSecret } = await import('../utils/jwtUtils.js')
 const { bookingSchema } = await import('../schemas/bookingSchema.js')
@@ -37,6 +38,7 @@ app.use(express.json())
 app.set('io', { to: () => ({ emit: () => {} }) })
 app.use('/api/bookings', bookingRouter)
 app.use('/api/group-classes', groupRouter)
+app.use('/api/students', studentRouter)
 
 const HOUR = 3600000
 let db, Booking, GroupClass, Student, Teacher, student, teacher, studentToken, teacherToken, adminToken
@@ -190,5 +192,45 @@ describe('#15 group classes', () => {
     await enroll(gc._id)
     await Promise.all([cancelGc(gc._id), unenroll(gc._id)])
     expect(await credits()).toBe(2)
+  })
+})
+
+describe('group class complete vs cancel', () => {
+  it('a cancel and a complete at the same moment never leave it "completed" after refunding', async () => {
+    const gc = await groupClass()
+    await enroll(gc._id)
+    const complete = request(app).patch(`/api/group-classes/${gc._id}/complete`).set('Authorization', `Bearer ${adminToken}`).send({})
+    await Promise.all([cancelGc(gc._id), complete])
+    const after = await GroupClass.findById(gc._id)
+    // Either outcome is fine — but refunded ⇔ cancelled
+    expect(await credits()).toBe(after.status === 'cancelled' ? 2 : 1)
+  })
+})
+
+describe('admin "record payment"', () => {
+  const pay = (body) => request(app).post(`/api/students/${student._id}/payment`)
+    .set('Authorization', `Bearer ${adminToken}`).send({ amount: 100, classes: 5, ...body })
+
+  it('adds the classes', async () => {
+    expect((await pay()).status).toBe(200)
+    expect(await credits()).toBe(7)
+  })
+
+  it('a pending or failed payment does not add classes', async () => {
+    expect((await pay({ status: 'pending' })).status).toBe(200)
+    expect((await pay({ status: 'failed' })).status).toBe(200)
+    expect(await credits()).toBe(2)
+  })
+
+  it('rejects negative / fractional / non-numeric classes and amounts', async () => {
+    for (const body of [{ classes: -5 }, { classes: 1.5 }, { classes: 'abc' }, { amount: -1 }, { amount: 'x' }, { method: 'Bitcoin' }]) {
+      expect((await pay(body)).status).toBe(400)
+    }
+    expect(await credits()).toBe(2)
+  })
+
+  it('does not return the password hash', async () => {
+    const res = await pay()
+    expect(res.body.student?.password).toBeUndefined()
   })
 })
