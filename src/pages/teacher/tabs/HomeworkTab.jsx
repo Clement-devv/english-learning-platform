@@ -27,8 +27,8 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 const MAX_FILES     = 5;
 
 // Center brand colour (set by utils/branding.js) — never hard-code a theme colour here
-const BRAND  = "var(--brand-primary, #2563eb)";
-const brandA = (a) => `rgba(var(--brand-primary-rgb, 37, 99, 235), ${a})`;
+const BRAND  = "var(--as-accent, var(--brand-primary, #2563eb))";
+const brandA = (a) => `color-mix(in srgb, var(--as-accent, var(--brand-primary, #2563eb)) calc(${a} * 100%), transparent)`;
 
 const STATUS_CONFIG = {
   assigned:  { label: "Assigned",  color: BRAND, bg: brandA(0.1) },
@@ -109,7 +109,7 @@ function FilePicker({ files, setFiles, label = "Attach files" }) {
           }}>
           <Paperclip size={14} /> {label}
         </button>
-        <span style={{ fontSize: 12, color: "#94a3b8" }}>PDF, DOC, DOCX, JPG, PNG, TXT · max 10 MB · up to {MAX_FILES}</span>
+        <span style={{ fontSize: 12, color: "var(--as-muted, #94a3b8)" }}>PDF, DOC, DOCX, JPG, PNG, TXT · max 10 MB · up to {MAX_FILES}</span>
       </div>
       <input ref={inputRef} type="file" multiple accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.txt"
         style={{ display: "none" }}
@@ -119,7 +119,7 @@ function FilePicker({ files, setFiles, label = "Attach files" }) {
           {files.map((f, i) => (
             <div key={i} style={{
               display: "inline-flex", alignItems: "center", gap: 6,
-              background: "#f1f5f9", border: "1px solid #e2e8f0",
+              background: "var(--as-raised, #f1f5f9)", border: "1px solid var(--as-line, #e2e8f0)",
               borderRadius: 8, padding: "4px 10px", fontSize: 12,
             }}>
               <FileIcon mimeType={f.type} size={13} />
@@ -127,7 +127,7 @@ function FilePicker({ files, setFiles, label = "Attach files" }) {
                 {f.name}
               </span>
               <button type="button" onClick={() => setFiles(prev => prev.filter((_, j) => j !== i))}
-                style={{ background: "none", border: "none", cursor: "pointer", color: "#94a3b8", padding: 0, lineHeight: 1 }}>
+                style={{ background: "none", border: "none", cursor: "pointer", color: "var(--as-muted, #94a3b8)", padding: 0, lineHeight: 1 }}>
                 <X size={12} />
               </button>
             </div>
@@ -141,8 +141,8 @@ function FilePicker({ files, setFiles, label = "Attach files" }) {
 // ── Main component ────────────────────────────────────────────────────────────
 export default function HomeworkTab({ teacherInfo, students, isDarkMode }) {
   const c = isDarkMode
-    ? { bg: "#0f172a", card: "#1e293b", border: "#334155", heading: "#f1f5f9", body: "#94a3b8", input: "#0f172a", inputBorder: "#475569" }
-    : { bg: "#f8fafc", card: "#ffffff", border: "#e2e8f0", heading: "#1e293b", body: "#64748b", input: "#fff", inputBorder: "#e2e8f0" };
+    ? { bg: "var(--as-surface, #0f172a)", card: "var(--as-raised, #1e293b)", border: "var(--as-line, #334155)", heading: "var(--as-ink, #f1f5f9)", body: "var(--as-muted, #94a3b8)", input: "var(--as-surface, #0f172a)", inputBorder: "var(--as-line, #475569)" }
+    : { bg: "var(--as-raised, #f8fafc)", card: "var(--as-surface, #ffffff)", border: "var(--as-line, #e2e8f0)", heading: "var(--as-ink, #1e293b)", body: "var(--as-ink-2, #64748b)", input: "var(--as-surface, #fff)", inputBorder: "var(--as-line, #e2e8f0)" };
 
   const [homeworkList, setHomeworkList]   = useState([]);
   const [loading,      setLoading]        = useState(true);
@@ -541,7 +541,7 @@ export default function HomeworkTab({ teacherInfo, students, isDarkMode }) {
             display: "flex", alignItems: "center", justifyContent: "center",
             margin: "0 auto 16px",
           }}>
-            <BookOpen size={28} color="var(--brand-primary)" />
+            <BookOpen size={28} color="var(--as-accent, var(--brand-primary))" />
           </div>
           <p style={{ fontSize: "16px", fontWeight: "700", color: c.heading, margin: "0 0 8px" }}>
             {filter === "all" ? "No homework yet" : `No ${filter} homework`}
@@ -630,8 +630,8 @@ export default function HomeworkTab({ teacherInfo, students, isDarkMode }) {
                             <button key={a.fileId} onClick={() => openFile("assignment", a.fileId)}
                               style={{
                                 display: "inline-flex", alignItems: "center", gap: 6,
-                                background: "#f1f5f9", border: "1px solid #e2e8f0", borderRadius: 8,
-                                padding: "5px 12px", fontSize: 12, color: "#475569", cursor: "pointer",
+                                background: "var(--as-raised, #f1f5f9)", border: "1px solid var(--as-line, #e2e8f0)", borderRadius: 8,
+                                padding: "5px 12px", fontSize: 12, color: "var(--as-ink-2, #475569)", cursor: "pointer",
                               }}>
                               <FileIcon mimeType={a.mimeType} size={13} />
                               {a.originalName}
@@ -643,7 +643,7 @@ export default function HomeworkTab({ teacherInfo, students, isDarkMode }) {
 
                     {/* Student submission */}
                     {(hw.status === "submitted" || hw.status === "graded") && (
-                      <div style={{ background: isDarkMode ? "#0f172a" : "#f8fafc", borderRadius: 12, padding: 14, border: `1px solid ${c.border}` }}>
+                      <div style={{ background: isDarkMode ? "var(--as-surface, #0f172a)" : "var(--as-raised, #f8fafc)", borderRadius: 12, padding: 14, border: `1px solid ${c.border}` }}>
                         <div style={{ fontSize: 12, fontWeight: 700, color: c.body, marginBottom: 8 }}>
                           STUDENT SUBMISSION · {formatDate(hw.submission?.submittedAt)}
                           {hw.submission?.via === "link" && " · via link"}
@@ -733,7 +733,7 @@ export default function HomeworkTab({ teacherInfo, students, isDarkMode }) {
                           <AudioFeedbackPlayer fileId={hw.grade.audioFeedback.fileId} duration={hw.grade.audioFeedback.duration} />
                         )}
                         <button type="button" onClick={() => handleDownloadPdf(hw)} disabled={pdfBusy === hw._id}
-                          style={{ marginTop: 10, display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 8, border: "1px solid #6ee7b7", background: "#fff", color: "#065f46", fontWeight: 700, fontSize: 12, cursor: pdfBusy === hw._id ? "not-allowed" : "pointer", fontFamily: "inherit" }}>
+                          style={{ marginTop: 10, display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 8, border: "1px solid #6ee7b7", background: "var(--as-surface, #fff)", color: "#065f46", fontWeight: 700, fontSize: 12, cursor: pdfBusy === hw._id ? "not-allowed" : "pointer", fontFamily: "inherit" }}>
                           <Download size={13} /> {pdfBusy === hw._id ? "Creating PDF…" : "Download PDF for parent"}
                         </button>
                       </div>

@@ -16,13 +16,13 @@ export default function VocabTab({ teacherInfo, students, isDarkMode }) {
   const [form, setForm] = useState({ title: "", description: "", words: [{ word: "", definition: "", example: "" }] });
 
   const col = {
-    bg:       isDarkMode ? "#0f1117" : "#f8faff",
-    card:     isDarkMode ? "#1a1d2e" : "#ffffff",
-    border:   isDarkMode ? "#2a2d40" : "#e8edf5",
-    text:     isDarkMode ? "#e8eaf6" : "#1a1d2e",
-    muted:    isDarkMode ? "#8b91b8" : "#6b7280",
-    input:    isDarkMode ? "#1e2235" : "#f3f4f6",
-    accent:   "#6366f1",
+    bg:       isDarkMode ? "var(--as-bg, #0f1117)" : "var(--as-raised, #f8faff)",
+    card:     isDarkMode ? "var(--as-raised, #1a1d2e)" : "var(--as-surface, #ffffff)",
+    border:   isDarkMode ? "var(--as-line, #2a2d40)" : "var(--as-line, #e8edf5)",
+    text:     isDarkMode ? "var(--as-ink, #e8eaf6)" : "var(--as-ink, #1a1d2e)",
+    muted:    isDarkMode ? "var(--as-muted, #8b91b8)" : "var(--as-ink-2, #6b7280)",
+    input:    isDarkMode ? "var(--as-raised, #1e2235)" : "var(--as-raised, #f3f4f6)",
+    accent:   "var(--as-accent-ink, #6366f1)",
   };
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(""), 3000); };
@@ -133,7 +133,7 @@ export default function VocabTab({ teacherInfo, students, isDarkMode }) {
         <Plus size={16} /> Add Word
       </button>
 
-      <button onClick={handleCreate} style={{ padding: "12px", borderRadius: "12px", background: "linear-gradient(135deg,#6366f1,#8b5cf6)", color: "#fff", border: "none", cursor: "pointer", fontSize: "15px", fontWeight: 800 }}>
+      <button onClick={handleCreate} style={{ padding: "12px", borderRadius: "12px", background: "linear-gradient(135deg,var(--as-accent, #6366f1),var(--as-accent, #8b5cf6))", color: "#fff", border: "none", cursor: "pointer", fontSize: "15px", fontWeight: 800 }}>
         Create List
       </button>
 
@@ -156,7 +156,7 @@ export default function VocabTab({ teacherInfo, students, isDarkMode }) {
               const id = s._id || s.id;
               const checked = selectedStu.includes(id);
               return (
-                <button key={id} onClick={() => toggleStu(id)} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "10px 14px", borderRadius: "10px", border: `1.5px solid ${checked ? col.accent : col.border}`, background: checked ? (isDarkMode ? "rgba(99,102,241,0.15)" : "rgba(99,102,241,0.08)") : "transparent", cursor: "pointer", textAlign: "left" }}>
+                <button key={id} onClick={() => toggleStu(id)} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "10px 14px", borderRadius: "10px", border: `1.5px solid ${checked ? col.accent : col.border}`, background: checked ? (isDarkMode ? "color-mix(in srgb, var(--as-accent, #6366f1) 15%, transparent)" : "color-mix(in srgb, var(--as-accent, #6366f1) 8%, transparent)") : "transparent", cursor: "pointer", textAlign: "left" }}>
                   <div style={{ width: "22px", height: "22px", borderRadius: "6px", border: `2px solid ${checked ? col.accent : col.border}`, background: checked ? col.accent : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                     {checked && <Check size={13} color="#fff" />}
                   </div>
@@ -167,7 +167,7 @@ export default function VocabTab({ teacherInfo, students, isDarkMode }) {
         }
       </div>
 
-      <button onClick={handleAssign} disabled={selectedStu.length === 0} style={{ padding: "12px", borderRadius: "12px", background: selectedStu.length ? "linear-gradient(135deg,#6366f1,#8b5cf6)" : col.border, color: selectedStu.length ? "#fff" : col.muted, border: "none", cursor: selectedStu.length ? "pointer" : "default", fontSize: "15px", fontWeight: 800 }}>
+      <button onClick={handleAssign} disabled={selectedStu.length === 0} style={{ padding: "12px", borderRadius: "12px", background: selectedStu.length ? "linear-gradient(135deg,var(--as-accent, #6366f1),var(--as-accent, #8b5cf6))" : col.border, color: selectedStu.length ? "#fff" : col.muted, border: "none", cursor: selectedStu.length ? "pointer" : "default", fontSize: "15px", fontWeight: 800 }}>
         Assign to {selectedStu.length} student{selectedStu.length !== 1 ? "s" : ""}
       </button>
 
@@ -183,7 +183,7 @@ export default function VocabTab({ teacherInfo, students, isDarkMode }) {
           <h2 style={{ margin: 0, fontSize: "22px", fontWeight: 900, color: col.text }}>📖 Vocabulary Lists</h2>
           <p style={{ margin: "4px 0 0", fontSize: "13px", color: col.muted }}>{lists.length} list{lists.length !== 1 ? "s" : ""} created</p>
         </div>
-        <button onClick={() => setView("create")} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "10px 18px", borderRadius: "12px", background: "linear-gradient(135deg,#6366f1,#8b5cf6)", color: "#fff", border: "none", cursor: "pointer", fontSize: "14px", fontWeight: 800 }}>
+        <button onClick={() => setView("create")} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "10px 18px", borderRadius: "12px", background: "linear-gradient(135deg,var(--as-accent, #6366f1),var(--as-accent, #8b5cf6))", color: "#fff", border: "none", cursor: "pointer", fontSize: "14px", fontWeight: 800 }}>
           <Plus size={16} /> New List
         </button>
       </div>
@@ -227,7 +227,7 @@ export default function VocabTab({ teacherInfo, students, isDarkMode }) {
                   {list.description && <p style={{ margin: "0 0 12px", fontSize: "13px", color: col.muted, fontStyle: "italic" }}>{list.description}</p>}
                   <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                     {(list.words || []).map((w, i) => (
-                      <div key={i} style={{ display: "flex", gap: "12px", padding: "10px 14px", background: isDarkMode ? "rgba(255,255,255,0.04)" : "#f8faff", borderRadius: "10px" }}>
+                      <div key={i} style={{ display: "flex", gap: "12px", padding: "10px 14px", background: isDarkMode ? "rgba(255,255,255,0.04)" : "var(--as-raised, #f8faff)", borderRadius: "10px" }}>
                         <span style={{ fontWeight: 800, color: col.accent, minWidth: "80px", fontSize: "14px" }}>{w.word}</span>
                         <div style={{ flex: 1 }}>
                           <p style={{ margin: 0, fontSize: "13px", color: col.text, fontWeight: 600 }}>{w.definition}</p>
@@ -246,7 +246,7 @@ export default function VocabTab({ teacherInfo, students, isDarkMode }) {
                           const s = a.studentId;
                           if (!s) return null;
                           return (
-                            <span key={s._id} style={{ padding: "4px 10px", borderRadius: "20px", background: isDarkMode ? "rgba(99,102,241,0.2)" : "rgba(99,102,241,0.1)", color: col.accent, fontSize: "12px", fontWeight: 700 }}>
+                            <span key={s._id} style={{ padding: "4px 10px", borderRadius: "20px", background: isDarkMode ? "color-mix(in srgb, var(--as-accent, #6366f1) 20%, transparent)" : "color-mix(in srgb, var(--as-accent, #6366f1) 10%, transparent)", color: col.accent, fontSize: "12px", fontWeight: 700 }}>
                               {s.firstName} {s.lastName}
                             </span>
                           );

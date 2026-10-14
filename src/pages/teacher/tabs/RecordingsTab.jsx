@@ -26,13 +26,13 @@ export default function RecordingsTab({ isDarkMode }) {
   const [linkModal,       setLinkModal]       = useState(null); // { studentId?, editing? } — add/edit external link
 
   const col = {
-    card:   isDarkMode ? "#1a1d2e" : "#ffffff",
-    border: isDarkMode ? "#2a2d40" : "#e8edf5",
-    text:   isDarkMode ? "#e8eaf6" : "#1a1d2e",
-    muted:  isDarkMode ? "#8b91b8" : "#6b7280",
-    input:  isDarkMode ? "#1e2235" : "#f3f4f6",
-    hover:  isDarkMode ? "rgba(255,255,255,0.04)" : "rgba(99,102,241,0.04)",
-    accent: "#6366f1",
+    card:   isDarkMode ? "var(--as-raised, #1a1d2e)" : "var(--as-surface, #ffffff)",
+    border: isDarkMode ? "var(--as-line, #2a2d40)" : "var(--as-line, #e8edf5)",
+    text:   isDarkMode ? "var(--as-ink, #e8eaf6)" : "var(--as-ink, #1a1d2e)",
+    muted:  isDarkMode ? "var(--as-muted, #8b91b8)" : "var(--as-ink-2, #6b7280)",
+    input:  isDarkMode ? "var(--as-raised, #1e2235)" : "var(--as-raised, #f3f4f6)",
+    hover:  isDarkMode ? "rgba(255,255,255,0.04)" : "color-mix(in srgb, var(--as-accent, #6366f1) 4%, transparent)",
+    accent: "var(--as-accent-ink, #6366f1)",
   };
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(""), 3000); };
@@ -61,7 +61,7 @@ export default function RecordingsTab({ isDarkMode }) {
   const addLinkBtn = (studentId) => (
     <button onClick={() => setLinkModal({ studentId })}
       title="Recorded in Zoom or Google Meet? Save the link here"
-      style={{ display: "flex", alignItems: "center", gap: "6px", padding: "9px 14px", borderRadius: "10px", border: `1px solid ${col.accent}`, background: "rgba(99,102,241,0.08)", color: col.accent, cursor: "pointer", fontSize: "13px", fontWeight: 800, fontFamily: "inherit", flexShrink: 0 }}>
+      style={{ display: "flex", alignItems: "center", gap: "6px", padding: "9px 14px", borderRadius: "10px", border: `1px solid ${col.accent}`, background: "color-mix(in srgb, var(--as-accent, #6366f1) 8%, transparent)", color: col.accent, cursor: "pointer", fontSize: "13px", fontWeight: 800, fontFamily: "inherit", flexShrink: 0 }}>
       <Link2 size={15} /> Add recording link
     </button>
   );
@@ -263,7 +263,7 @@ export default function RecordingsTab({ isDarkMode }) {
             const active = i === playing.index;
             return (
               <button key={p._id} onClick={() => loadVideo(playingSession, i)}
-                style={{ padding: "7px 12px", borderRadius: "10px", border: `1px solid ${active ? col.accent : col.border}`, background: active ? "rgba(99,102,241,0.12)" : col.card, color: active ? col.accent : col.text, cursor: "pointer", fontSize: "12px", fontWeight: 800, fontFamily: "inherit" }}>
+                style={{ padding: "7px 12px", borderRadius: "10px", border: `1px solid ${active ? col.accent : col.border}`, background: active ? "color-mix(in srgb, var(--as-accent, #6366f1) 12%, transparent)" : col.card, color: active ? col.accent : col.text, cursor: "pointer", fontSize: "12px", fontWeight: 800, fontFamily: "inherit" }}>
                 {partLabel(p, total, i)}
               </button>
             );
@@ -350,11 +350,11 @@ export default function RecordingsTab({ isDarkMode }) {
                 const expiringSoon = days !== null && days <= 7;
                 const classTime = new Date(session.classDate).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
                 return (
-                  <div key={session.key} style={{ background: col.card, border: `1px solid ${expiringSoon ? "#f97316" : col.border}`, borderRadius: "16px", overflow: "hidden" }}>
+                  <div key={session.key} style={{ background: col.card, border: `1px solid ${expiringSoon ? "var(--as-accent, #f97316)" : col.border}`, borderRadius: "16px", overflow: "hidden" }}>
                     <div style={{ padding: "14px 18px", display: "flex", alignItems: "center", gap: "14px", flexWrap: "wrap" }}>
 
                       {/* Thumbnail */}
-                      <div style={{ width: "58px", height: "42px", borderRadius: "10px", background: "linear-gradient(135deg,#6366f1,#8b5cf6)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                      <div style={{ width: "58px", height: "42px", borderRadius: "10px", background: "linear-gradient(135deg,var(--as-accent, #6366f1),var(--as-accent, #8b5cf6))", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                         <Video size={18} color="white" />
                       </div>
 
@@ -371,7 +371,7 @@ export default function RecordingsTab({ isDarkMode }) {
                             <span style={{ fontSize: "12px", color: col.muted }}>{formatDuration(session.totalDuration)} total</span>
                           )}
                           {total > 1 && (
-                            <span style={{ fontSize: "11px", fontWeight: 800, padding: "2px 8px", borderRadius: "20px", background: "rgba(99,102,241,0.12)", color: col.accent }}>
+                            <span style={{ fontSize: "11px", fontWeight: 800, padding: "2px 8px", borderRadius: "20px", background: "color-mix(in srgb, var(--as-accent, #6366f1) 12%, transparent)", color: col.accent }}>
                               {total} parts
                             </span>
                           )}
@@ -384,7 +384,7 @@ export default function RecordingsTab({ isDarkMode }) {
                             {session.visibleToStudent ? "👁 Visible" : "🚫 Hidden"}
                           </span>
                           {expiringSoon && (
-                            <span style={{ fontSize: "11px", fontWeight: 800, padding: "2px 8px", borderRadius: "20px", background: "rgba(249,115,22,0.12)", color: "#f97316" }}>
+                            <span style={{ fontSize: "11px", fontWeight: 800, padding: "2px 8px", borderRadius: "20px", background: "rgba(249,115,22,0.12)", color: "var(--as-accent-ink, #f97316)" }}>
                               ⏳ Deletes in {days}d
                             </span>
                           )}
@@ -403,14 +403,14 @@ export default function RecordingsTab({ isDarkMode }) {
                           {session.visibleToStudent ? <Eye size={15} /> : <EyeOff size={15} />}
                         </button>
                         <button onClick={() => loadVideo(session, 0)} title={isExternal(rec) ? "Opens the saved link in a new tab" : total > 1 ? "Plays all parts in order" : "Watch recording"}
-                          style={{ padding: "8px 14px", borderRadius: "10px", background: "linear-gradient(135deg,#6366f1,#8b5cf6)", color: "#fff", border: "none", cursor: "pointer", fontSize: "12px", fontWeight: 800, display: "flex", alignItems: "center", gap: "5px" }}>
+                          style={{ padding: "8px 14px", borderRadius: "10px", background: "linear-gradient(135deg,var(--as-accent, #6366f1),var(--as-accent, #8b5cf6))", color: "#fff", border: "none", cursor: "pointer", fontSize: "12px", fontWeight: 800, display: "flex", alignItems: "center", gap: "5px" }}>
                           {isExternal(rec)
                             ? <><ExternalLink size={13} /> {total > 1 ? "Open Part 1" : "Open link"}</>
                             : <><Play size={13} fill="white" /> {total > 1 ? "Watch Part 1" : "Watch"}</>}
                         </button>
                         {total > 1 ? (
                           <button onClick={() => toggleExpanded(session.key)}
-                            style={{ padding: "8px 12px", borderRadius: "10px", border: `1px solid ${isOpen ? col.accent : col.border}`, background: isOpen ? "rgba(99,102,241,0.12)" : "none", color: isOpen ? col.accent : col.text, cursor: "pointer", fontSize: "12px", fontWeight: 800, display: "flex", alignItems: "center", gap: "4px", fontFamily: "inherit" }}>
+                            style={{ padding: "8px 12px", borderRadius: "10px", border: `1px solid ${isOpen ? col.accent : col.border}`, background: isOpen ? "color-mix(in srgb, var(--as-accent, #6366f1) 12%, transparent)" : "none", color: isOpen ? col.accent : col.text, cursor: "pointer", fontSize: "12px", fontWeight: 800, display: "flex", alignItems: "center", gap: "4px", fontFamily: "inherit" }}>
                             {isOpen ? <>Hide <ChevronUp size={14} /></> : <>See more ({total}) <ChevronDown size={14} /></>}
                           </button>
                         ) : isExternal(rec) ? (
@@ -446,7 +446,7 @@ export default function RecordingsTab({ isDarkMode }) {
                               ? p.note && <span title={p.note} style={{ fontSize: "11px", color: col.muted, maxWidth: "160px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.note}</span>
                               : p.fileSize > 0 && <span style={{ fontSize: "11px", color: col.muted }}>{formatSize(p.fileSize)}</span>}
                             <button onClick={() => loadVideo(session, i)} title={isExternal(p) ? "Open the saved link" : "Watch this part"}
-                              style={{ padding: "6px 10px", borderRadius: "8px", background: "linear-gradient(135deg,#6366f1,#8b5cf6)", color: "#fff", border: "none", cursor: "pointer", fontSize: "11px", fontWeight: 800, display: "flex", alignItems: "center", gap: "4px" }}>
+                              style={{ padding: "6px 10px", borderRadius: "8px", background: "linear-gradient(135deg,var(--as-accent, #6366f1),var(--as-accent, #8b5cf6))", color: "#fff", border: "none", cursor: "pointer", fontSize: "11px", fontWeight: 800, display: "flex", alignItems: "center", gap: "4px" }}>
                               {isExternal(p) ? <><ExternalLink size={11} /> Open</> : <><Play size={11} fill="white" /> Watch</>}
                             </button>
                             {isExternal(p) ? (
@@ -483,7 +483,7 @@ export default function RecordingsTab({ isDarkMode }) {
       {linkModalEl}
 
       {toast && (
-        <div style={{ position: "fixed", bottom: "24px", right: "24px", padding: "12px 20px", background: "#1a1d2e", color: "#fff", borderRadius: "12px", fontWeight: 700, zIndex: 9999, border: "1px solid #2a2d40" }}>
+        <div style={{ position: "fixed", bottom: "24px", right: "24px", padding: "12px 20px", background: "var(--as-raised, #1a1d2e)", color: "#fff", borderRadius: "12px", fontWeight: 700, zIndex: 9999, border: "1px solid var(--as-line, #2a2d40)" }}>
           {toast}
         </div>
       )}
@@ -546,7 +546,7 @@ export default function RecordingsTab({ isDarkMode }) {
               onMouseLeave={e => e.currentTarget.style.background = col.card}
             >
               {/* Avatar */}
-              <div style={{ width: "44px", height: "44px", borderRadius: "12px", background: "linear-gradient(135deg,#6366f1,#8b5cf6)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <div style={{ width: "44px", height: "44px", borderRadius: "12px", background: "linear-gradient(135deg,var(--as-accent, #6366f1),var(--as-accent, #8b5cf6))", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                 <span style={{ fontSize: "16px", fontWeight: 900, color: "#fff" }}>{initials}</span>
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -571,7 +571,7 @@ export default function RecordingsTab({ isDarkMode }) {
       {linkModalEl}
 
       {toast && (
-        <div style={{ position: "fixed", bottom: "24px", right: "24px", padding: "12px 20px", background: "#1a1d2e", color: "#fff", borderRadius: "12px", fontWeight: 700, zIndex: 9999, border: "1px solid #2a2d40" }}>
+        <div style={{ position: "fixed", bottom: "24px", right: "24px", padding: "12px 20px", background: "var(--as-raised, #1a1d2e)", color: "#fff", borderRadius: "12px", fontWeight: 700, zIndex: 9999, border: "1px solid var(--as-line, #2a2d40)" }}>
           {toast}
         </div>
       )}

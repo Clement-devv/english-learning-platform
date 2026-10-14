@@ -9,11 +9,11 @@ export default function BookingCard({ booking, onAccept, onReject, isDarkMode, i
   const showStudentTZ = dual && !dual.sameZone && booking.studentTimezone;
 
   const col = {
-    border:  isDarkMode ? '#2a2d40' : '#e2e8f0',
-    heading: isDarkMode ? '#f0f4ff' : '#1e293b',
-    body:    isDarkMode ? '#c8cce0' : '#475569',
-    muted:   isDarkMode ? '#6b7090' : '#94a3b8',
-    hover:   isDarkMode ? 'rgba(255,255,255,0.03)' : '#f8faff',
+    border:  isDarkMode ? 'var(--as-line, #2a2d40)' : 'var(--as-line, #e2e8f0)',
+    heading: isDarkMode ? 'var(--as-ink, #f0f4ff)' : 'var(--as-ink, #1e293b)',
+    body:    isDarkMode ? 'var(--as-ink-2, #c8cce0)' : 'var(--as-ink-2, #475569)',
+    muted:   isDarkMode ? 'var(--as-ink-2, #6b7090)' : 'var(--as-muted, #94a3b8)',
+    hover:   isDarkMode ? 'rgba(255,255,255,0.03)' : 'var(--as-raised, #f8faff)',
   };
 
   return (
@@ -30,7 +30,7 @@ export default function BookingCard({ booking, onAccept, onReject, isDarkMode, i
           </h4>
           {booking.isManaged && <ManagedBadge isDarkMode={isDarkMode} />}
           {booking.isAdminBooking && (
-            <span style={{ fontSize: 11, fontWeight: 700, background: isDarkMode ? 'rgba(139,92,246,0.15)' : '#f3e8ff', color: '#7c3aed', borderRadius: 999, padding: '2px 8px' }}>
+            <span style={{ fontSize: 11, fontWeight: 700, background: isDarkMode ? 'color-mix(in srgb, var(--as-accent, #8b5cf6) 15%, transparent)' : 'var(--as-accent-soft, #f3e8ff)', color: 'var(--as-accent-ink, #7c3aed)', borderRadius: 999, padding: '2px 8px' }}>
               Admin Request
             </span>
           )}

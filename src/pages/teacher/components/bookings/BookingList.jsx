@@ -5,9 +5,9 @@ const F = "'Nunito','Inter',sans-serif";
 
 export default function BookingList({ bookings, onAccept, onReject, isDarkMode }) {
   const col = {
-    card:   isDarkMode ? '#1a1d2e' : '#ffffff',
-    border: isDarkMode ? '#2a2d40' : '#e2e8f0',
-    muted:  isDarkMode ? '#6b7090' : '#94a3b8',
+    card:   isDarkMode ? 'var(--as-raised, #1a1d2e)' : 'var(--as-surface, #ffffff)',
+    border: isDarkMode ? 'var(--as-line, #2a2d40)' : 'var(--as-line, #e2e8f0)',
+    muted:  isDarkMode ? 'var(--as-ink-2, #6b7090)' : 'var(--as-muted, #94a3b8)',
   };
 
   if (!bookings || bookings.length === 0) {

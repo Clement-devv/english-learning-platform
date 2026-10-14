@@ -9,8 +9,8 @@ import { useOnDataChanged } from "../../../hooks/useLiveData";
 import ManagedBadge from "../../../components/ManagedBadge";
 import Pagination from "../../../components/Pagination";
 
-const BRAND  = "var(--brand-primary, #2563eb)";
-const brandA = (a) => `rgba(var(--brand-primary-rgb, 37, 99, 235), ${a})`;
+const BRAND  = "var(--as-accent, var(--brand-primary, #2563eb))";
+const brandA = (a) => `color-mix(in srgb, var(--as-accent, var(--brand-primary, #2563eb)) calc(${a} * 100%), transparent)`;
 const MAX = 3000;
 const fmtWhen = (d) => new Date(d).toLocaleString(undefined, { weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
 const PROMPTS = [
@@ -37,8 +37,8 @@ export default function ClassSummariesTab({ isDarkMode }) {
   const quietRef = useRef(false);
 
   const c = isDarkMode
-    ? { card: "#1a1d2e", border: "#2a2d40", heading: "#f0f4ff", body: "#c8cce0", muted: "#8b91b8", input: "#0f1117", soft: "#141620" }
-    : { card: "#ffffff", border: "#e2e8f0", heading: "#1e293b", body: "#475569", muted: "#94a3b8", input: "#f8faff", soft: "#f8fafc" };
+    ? { card: "var(--as-raised, #1a1d2e)", border: "var(--as-line, #2a2d40)", heading: "var(--as-ink, #f0f4ff)", body: "var(--as-ink-2, #c8cce0)", muted: "var(--as-muted, #8b91b8)", input: "var(--as-bg, #0f1117)", soft: "var(--as-ink, #141620)" }
+    : { card: "var(--as-surface, #ffffff)", border: "var(--as-line, #e2e8f0)", heading: "var(--as-ink, #1e293b)", body: "var(--as-ink-2, #475569)", muted: "var(--as-muted, #94a3b8)", input: "var(--as-raised, #f8faff)", soft: "var(--as-ink, #f8fafc)" };
   const notify = (msg, type = "success") => { setToast({ msg, type }); setTimeout(() => setToast(null), 3000); };
 
   useEffect(() => { const t = setTimeout(() => setDq(q.trim()), 300); return () => clearTimeout(t); }, [q]);

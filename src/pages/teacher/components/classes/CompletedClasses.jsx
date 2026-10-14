@@ -222,7 +222,7 @@ export default function CompletedClassesTab({ teacherInfo, isDarkMode, students 
               type="button"
               onClick={() => setLogOpen(true)}
               className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white transition-opacity hover:opacity-90"
-              style={{ background: "var(--brand-primary, #2563eb)" }}
+              style={{ background: "var(--as-accent, var(--brand-primary, #2563eb))" }}
               title="For a class that happened outside the app (site down, Meet/Zoom directly…)"
             >
               <Plus className="w-4 h-4" />

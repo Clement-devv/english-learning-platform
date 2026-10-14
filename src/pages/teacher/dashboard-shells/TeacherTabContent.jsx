@@ -64,9 +64,9 @@ export default function TeacherTabContent({ d, wrapStyle = {}, msgStyle = {}, he
       <div style={wrapStyle}>
         {d.classes.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '60px 0' }}>
-            <Calendar size={36} color={isDarkMode ? '#1e2235' : '#e2e8f0'} style={{ margin: '0 auto 10px' }} />
-            <p style={{ fontSize: '14px', color: isDarkMode ? '#6b7090' : '#9b8ab0', margin: '0 0 4px', fontWeight: '600' }}>No classes scheduled yet</p>
-            <p style={{ fontSize: '12px', color: isDarkMode ? '#6b7090' : '#9b8ab0', margin: 0 }}>Accept booking requests to add classes to your schedule</p>
+            <Calendar size={36} color={isDarkMode ? 'var(--as-ink, #1e2235)' : 'var(--as-ink, #e2e8f0)'} style={{ margin: '0 auto 10px' }} />
+            <p style={{ fontSize: '14px', color: isDarkMode ? 'var(--as-ink-2, #6b7090)' : '#9b8ab0', margin: '0 0 4px', fontWeight: '600' }}>No classes scheduled yet</p>
+            <p style={{ fontSize: '12px', color: isDarkMode ? 'var(--as-ink-2, #6b7090)' : '#9b8ab0', margin: 0 }}>Accept booking requests to add classes to your schedule</p>
           </div>
         ) : (
           <ClassList
@@ -119,8 +119,8 @@ export default function TeacherTabContent({ d, wrapStyle = {}, msgStyle = {}, he
       <div style={wrapStyle}>
         {d.students.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '60px 0' }}>
-            <Users size={36} color={isDarkMode ? '#1e2235' : '#e2e8f0'} style={{ margin: '0 auto 10px' }} />
-            <p style={{ fontSize: '14px', color: isDarkMode ? '#6b7090' : '#9b8ab0', margin: 0, fontWeight: '600' }}>No students assigned yet</p>
+            <Users size={36} color={isDarkMode ? 'var(--as-ink, #1e2235)' : 'var(--as-ink, #e2e8f0)'} style={{ margin: '0 auto 10px' }} />
+            <p style={{ fontSize: '14px', color: isDarkMode ? 'var(--as-ink-2, #6b7090)' : '#9b8ab0', margin: 0, fontWeight: '600' }}>No students assigned yet</p>
           </div>
         ) : (
           <StudentProgressList students={d.students} isDarkMode={isDarkMode} />

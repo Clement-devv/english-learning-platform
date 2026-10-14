@@ -30,11 +30,11 @@ export default function RatingDashboardTab({ teacherInfo, isDarkMode }) {
   const [loading, setLoading] = useState(true);
   const [section, setSection] = useState('trend');
 
-  const card   = isDarkMode ? '#1a1d2e' : '#ffffff';
-  const border = isDarkMode ? '#2a2d40' : '#ffe8cc';
-  const text   = isDarkMode ? '#f0f4ff' : '#3d2e20';
-  const muted  = isDarkMode ? '#6b7090' : '#a89480';
-  const accent = '#f97316';
+  const card   = isDarkMode ? 'var(--as-raised, #1a1d2e)' : 'var(--as-surface, #ffffff)';
+  const border = isDarkMode ? 'var(--as-line, #2a2d40)' : 'var(--as-line, #ffe8cc)';
+  const text   = isDarkMode ? 'var(--as-ink, #f0f4ff)' : 'var(--as-ink, #3d2e20)';
+  const muted  = isDarkMode ? 'var(--as-ink-2, #6b7090)' : 'var(--as-muted, #a89480)';
+  const accent = 'var(--as-accent-ink, #f97316)';
   const F      = "'Nunito','Inter',sans-serif";
   const tooltipStyle = { backgroundColor: card, border: `1px solid ${border}`, color: text, borderRadius: 12, fontFamily: F };
 
@@ -103,7 +103,7 @@ export default function RatingDashboardTab({ teacherInfo, isDarkMode }) {
             <button key={s.key} onClick={() => setSection(s.key)} style={{
               padding: '7px 16px', borderRadius: 999, fontSize: 12, fontWeight: 800,
               border: `2px solid ${active ? accent : border}`,
-              background: active ? 'linear-gradient(135deg,#f97316,#fbbf24)' : 'transparent',
+              background: active ? 'linear-gradient(135deg,var(--as-accent, #f97316),#fbbf24)' : 'transparent',
               color: active ? '#fff' : text,
               cursor: 'pointer', fontFamily: F,
               transition: 'all 0.15s',

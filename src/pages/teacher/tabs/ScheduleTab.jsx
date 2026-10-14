@@ -14,15 +14,15 @@ import {
   getMonday, addDays, localYmd, localHHMM, fmtRange, fmtDay, fmtHHMM, fmtTime, viewerTz, tzName, tzDiffText, WEEKDAYS_SUN0,
 } from "../../../utils/scheduleView";
 
-const BRAND = "var(--brand-primary, #7c3aed)";
+const BRAND = "var(--as-accent, var(--brand-primary, #7c3aed))";
 const DAY_ORDER = [1, 2, 3, 4, 5, 6, 0]; // Mon → Sun
 const HALF_HOURS = Array.from({ length: 49 }, (_, i) => `${String(Math.floor(i / 2)).padStart(2, "0")}:${i % 2 ? "30" : "00"}`); // 00:00 … 24:00
 
 function pal(dark) {
   return {
-    card: dark ? "#111827" : "#ffffff", border: dark ? "#1f2937" : "#e5e7eb", soft: dark ? "#0b1220" : "#f8fafc",
-    heading: dark ? "#f1f5f9" : "#0f172a", text: dark ? "#cbd5e1" : "#475569", muted: dark ? "#64748b" : "#94a3b8",
-    input: dark ? "#0b1220" : "#ffffff",
+    card: dark ? "var(--as-surface, #111827)" : "var(--as-surface, #ffffff)", border: dark ? "var(--as-line, #1f2937)" : "var(--as-line, #e5e7eb)", soft: dark ? "#0b1220" : "var(--as-ink, #f8fafc)",
+    heading: dark ? "var(--as-ink, #f1f5f9)" : "var(--as-ink, #0f172a)", text: dark ? "var(--as-ink-2, #cbd5e1)" : "var(--as-ink-2, #475569)", muted: dark ? "var(--as-ink-2, #64748b)" : "var(--as-muted, #94a3b8)",
+    input: dark ? "#0b1220" : "var(--as-surface, #ffffff)",
   };
 }
 

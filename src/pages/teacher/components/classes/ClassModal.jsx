@@ -8,14 +8,14 @@ const F = "'Nunito','Inter',sans-serif";
 // Default theme matches the legacy purple look so the modal still renders
 // correctly when a shell forgets to pass one.  Override by passing `theme`.
 const DEFAULT_THEME = {
-  accent:         '#6366f1',
-  accentGradient: 'linear-gradient(135deg,#6366f1,#4f46e5)',
-  softBg:         '#eef2ff',
-  softBorder:     '#c7d2fe',
-  softText:       '#4338ca',
-  softBgDark:     'rgba(99,102,241,0.18)',
-  softBorderDark: 'rgba(99,102,241,0.3)',
-  softTextDark:   '#a5b4fc',
+  accent:         'var(--as-accent-ink, #6366f1)',
+  accentGradient: 'linear-gradient(135deg,var(--as-accent, #6366f1),var(--as-accent, #4f46e5))',
+  softBg:         'var(--as-accent-soft, #eef2ff)',
+  softBorder:     'var(--as-accent-line, #c7d2fe)',
+  softText:       'var(--as-accent-ink, #4338ca)',
+  softBgDark:     'color-mix(in srgb, var(--as-accent, #6366f1) 18%, transparent)',
+  softBorderDark: 'color-mix(in srgb, var(--as-accent, #6366f1) 30%, transparent)',
+  softTextDark:   'var(--as-accent-line, #a5b4fc)',
 };
 
 export default function ClassModal({ isOpen, onClose, onSave, students, isDarkMode, theme = DEFAULT_THEME }) {
@@ -31,19 +31,19 @@ export default function ClassModal({ isOpen, onClose, onSave, students, isDarkMo
   const T = { ...DEFAULT_THEME, ...theme };
 
   const col = {
-    bg:       isDarkMode ? '#0f1117' : '#ffffff',
-    card:     isDarkMode ? '#1a1d2e' : '#ffffff',
-    header:   isDarkMode ? '#141620' : '#f8faff',
-    border:   isDarkMode ? '#2a2d40' : '#e2e8f0',
-    heading:  isDarkMode ? '#f0f4ff' : '#1e293b',
-    body:     isDarkMode ? '#c8cce0' : '#475569',
-    muted:    isDarkMode ? '#6b7090' : '#94a3b8',
-    input:    isDarkMode ? '#0f1117' : '#f8faff',
+    bg:       isDarkMode ? 'var(--as-bg, #0f1117)' : 'var(--as-surface, #ffffff)',
+    card:     isDarkMode ? 'var(--as-raised, #1a1d2e)' : 'var(--as-surface, #ffffff)',
+    header:   isDarkMode ? 'var(--as-surface, #141620)' : 'var(--as-raised, #f8faff)',
+    border:   isDarkMode ? 'var(--as-line, #2a2d40)' : 'var(--as-line, #e2e8f0)',
+    heading:  isDarkMode ? 'var(--as-ink, #f0f4ff)' : 'var(--as-ink, #1e293b)',
+    body:     isDarkMode ? 'var(--as-ink-2, #c8cce0)' : 'var(--as-ink-2, #475569)',
+    muted:    isDarkMode ? 'var(--as-ink-2, #6b7090)' : 'var(--as-muted, #94a3b8)',
+    input:    isDarkMode ? 'var(--as-bg, #0f1117)' : 'var(--as-raised, #f8faff)',
     accent:   T.accent,
     accentBg: isDarkMode ? T.softBgDark : T.softBg,
     selBg:    isDarkMode ? T.softBgDark : T.softBg,
     selBorder:isDarkMode ? T.softBorderDark : T.accent,
-    rowHover: isDarkMode ? 'rgba(255,255,255,0.04)' : '#f8faff',
+    rowHover: isDarkMode ? 'rgba(255,255,255,0.04)' : 'var(--as-raised, #f8faff)',
     overlay:  'rgba(0,0,0,0.55)',
   };
 
@@ -119,11 +119,11 @@ export default function ClassModal({ isOpen, onClose, onSave, students, isDarkMo
           {/* Date & Time + Duration */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
             <div>
-              <label style={lbl}><Calendar size={13} color="#8b5cf6"/> Date & Time *</label>
+              <label style={lbl}><Calendar size={13} color="var(--as-accent-ink, #8b5cf6)"/> Date & Time *</label>
               <input type="datetime-local" value={time} onChange={e => setTime(e.target.value)} style={inp}/>
             </div>
             <div>
-              <label style={lbl}><Clock size={13} color="#f97316"/> Duration *</label>
+              <label style={lbl}><Clock size={13} color="var(--as-accent-ink, #f97316)"/> Duration *</label>
               <select value={duration} onChange={e => setDuration(e.target.value)}
                 style={{ ...inp, cursor: 'pointer', appearance: 'auto' }}>
                 <option value="30">30 minutes</option>
@@ -163,7 +163,7 @@ export default function ClassModal({ isOpen, onClose, onSave, students, isDarkMo
                 })}
               </div>
             ) : (
-              <div style={{ textAlign: 'center', padding: '32px 0', background: isDarkMode ? 'rgba(255,255,255,0.03)' : '#f8faff', borderRadius: 14, border: `1.5px dashed ${col.border}` }}>
+              <div style={{ textAlign: 'center', padding: '32px 0', background: isDarkMode ? 'rgba(255,255,255,0.03)' : 'var(--as-raised, #f8faff)', borderRadius: 14, border: `1.5px dashed ${col.border}` }}>
                 <Users size={32} color={col.muted} style={{ margin: '0 auto 8px' }}/>
                 <p style={{ margin: 0, fontSize: 13, color: col.muted, fontWeight: 600 }}>No students assigned yet</p>
               </div>

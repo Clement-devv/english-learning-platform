@@ -1,20 +1,24 @@
 // src/pages/sub-admin/dashboard-shells/sunshine/SunshineShell.jsx
-// Sub-admin dashboard — Sunshine Explorer design.
-// Warm amber/orange palette · permission-gated sidebar nav · Nunito font · dark mode support.
+// Sub-admin dashboard — Sunshine Explorer design (same look as the admin shell).
+// Admin tokens via .as-root (warm neutrals + the center accent) · topic-coloured,
+// permission-gated sidebar nav · sunrise/sunset artwork · Nunito font · dark mode.
 
 import React, { useState, useMemo, useEffect, lazy, Suspense } from 'react';
 import {
   TrendingUp, Video, Users, Calendar,
   DollarSign, Film, BarChart2, Star, CheckSquare,
-  MessageCircle, Shield, LogOut, Moon, Sun,
+  MessageCircle, LogOut, Moon, Sun,
   ClipboardList, GraduationCap, CalendarPlus, FileCheck, ShieldCheck, Link2,
 } from 'lucide-react';
 import { useNavigate }      from 'react-router-dom';
 import { useTranslation }   from 'react-i18next';
 import { useAuth }          from '../../../../context/AuthContext.jsx';
+import { useBranding }      from '../../../../context/BrandingContext';
 import { useDarkMode }      from '../../../../hooks/useDarkMode';
 import { TabErrorBoundary } from '../../../../components/ErrorBoundary';
 import { getCachedCenter }  from '../../../../utils/branding';
+import { adminAccent, adminOnAccent } from '../../../../utils/adminAccent';
+import { SunriseBackdrop, SunsetGlow } from '../../../../components/dashboard/SunriseArt';
 import {
   OverviewPanel, TeachersPanel, StudentsPanel, LiveClassesPanel,
   ClassesPanel, PaymentsPanel, RecordingsPanel, ReportsPanel,
@@ -36,29 +40,33 @@ const ParentChecksTab  = adminPage('ParentChecksTab');
 const ShareLinksTab    = adminPage('ShareLinksTab');
 
 // ── Design tokens ──────────────────────────────────────────────────────────────
-const palette = (dark) => ({
-  bg:      dark ? '#0f1117' : '#fff8f0',
-  card:    dark ? '#1a1d2e' : '#ffffff',
-  border:  dark ? '#2a2d40' : '#ffe8cc',
-  heading: dark ? '#f0f4ff' : '#3d2e20',
-  body:    dark ? '#c8cce0' : '#5a4a3a',
-  muted:   dark ? '#6b7090' : '#a89480',
-  accent:  dark ? '#fbbf24' : '#f97316',
-  sidebar: dark ? '#13111a' : '#ffffff',
+// Values live in src/index.css (.as-root) — same palette as the admin dashboard.
+const palette = () => ({
+  bg:      'var(--a-bg)',
+  card:    'var(--a-surface)',
+  border:  'var(--a-line)',
+  heading: 'var(--a-ink)',
+  body:    'var(--a-ink-2)',
+  muted:   'var(--a-muted)',
+  accent:  'var(--a-accent)',
+  sidebar: 'var(--a-surface)',
 });
 
-const F              = "'Nunito','Inter',sans-serif";
-const FONT_IMPORT    = 'https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap';
-const ACCENT_G       = 'linear-gradient(135deg,#f97316 0%,#f43f5e 100%)';
-const TAB_SHADOW     = 'rgba(249,115,22,0.35)';
+const F           = "'Nunito','Inter',sans-serif";
+const FONT_IMPORT = 'https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap';
+const ACCENT_FILL = 'var(--a-accent-grad)';
+const ON_ACCENT   = 'var(--a-on-accent)';
+const ACCENT_SHADOW = '0 4px 14px -4px color-mix(in srgb, var(--a-accent) 55%, transparent)';
 
 // ── Shell ──────────────────────────────────────────────────────────────────────
 export default function SunshineShell() {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { user: subAdminInfo, logout: authLogout, setUser } = useAuth();
+  const { branding } = useBranding();
   const { isDarkMode, toggleDarkMode } = useDarkMode();
-  const col        = palette(isDarkMode);
+  const col        = palette();
+  const accent     = adminAccent(branding);
   const centerName = getCachedCenter()?.centerName || t('subAdmin.panelFallback');
   const perms      = subAdminInfo?.permissions || {};
 
@@ -81,21 +89,21 @@ export default function SunshineShell() {
     navigate('/sub-admin/login', { replace: true });
   };
 
-  // ── Permission-gated nav groups ──────────────────────────────────────────────
+  // ── Permission-gated nav groups (each group has a topic colour, as in the admin) ──
   const NAV_GROUPS = useMemo(() => [
     {
-      label: null,
+      label: null, cat: 'accent',
       items: [{ key: 'overview', label: t('subAdmin.nav.overview'), icon: TrendingUp }],
     },
     {
-      label: t('subAdmin.navGroup.people'),
+      label: t('subAdmin.navGroup.people'), cat: 'teal',
       items: [
         { key: 'teachers', label: t('subAdmin.nav.teachers'), icon: Video  },
         { key: 'students', label: t('subAdmin.nav.students'), icon: Users  },
       ],
     },
     {
-      label: t('subAdmin.navGroup.classes'),
+      label: t('subAdmin.navGroup.classes'), cat: 'amber',
       items: [
         ...(perms.canViewClasses  !== false ? [{ key: 'classes',     label: t('subAdmin.nav.classes'), icon: CheckSquare }] : []),
         ...(perms.canViewBookings !== false ? [{ key: 'live-classes', label: t('subAdmin.nav.liveClasses'), icon: Calendar    }] : []),
@@ -109,20 +117,20 @@ export default function SunshineShell() {
       ],
     },
     {
-      label: t('subAdmin.navGroup.parents'),
+      label: t('subAdmin.navGroup.parents'), cat: 'sky',
       items: [
         ...(perms.canManageParentChecks ? [{ key: 'parent-checks', label: t('subAdmin.nav.parentChecks'), icon: ShieldCheck }] : []),
         ...(perms.canViewParentLinks    ? [{ key: 'parent-links',  label: t('subAdmin.nav.parentLinks'),  icon: Link2       }] : []),
       ],
     },
     {
-      label: t('subAdmin.navGroup.finance'),
+      label: t('subAdmin.navGroup.finance'), cat: 'green',
       items: [
         ...(perms.canViewPayments ? [{ key: 'payments', label: t('subAdmin.nav.payments'), icon: DollarSign }] : []),
       ],
     },
     {
-      label: t('subAdmin.navGroup.communication'),
+      label: t('subAdmin.navGroup.communication'), cat: 'rose',
       items: [
         ...(perms.canSendMessages !== false ? [{ key: 'messages', label: t('subAdmin.nav.messages'), icon: MessageCircle }] : []),
       ],
@@ -133,6 +141,8 @@ export default function SunshineShell() {
   // A page the admin has just switched off falls back to the overview
   const shownTab = ALL_ITEMS.some(i => i.key === activeTab) ? activeTab : 'overview';
   const activeLabel = ALL_ITEMS.find(i => i.key === shownTab)?.label || t('subAdmin.nav.overview');
+  const activeCat   = NAV_GROUPS.find(g => g.items.some(i => i.key === shownTab))?.cat || 'accent';
+  const ActiveIcon  = ALL_ITEMS.find(i => i.key === shownTab)?.icon || TrendingUp;
 
   const tabContent = useMemo(() => {
     switch (shownTab) {
@@ -157,17 +167,31 @@ export default function SunshineShell() {
   }, [shownTab, isDarkMode, perms.canMarkLessons, perms.canApproveLoggedClasses]);
 
   const noPadding = shownTab === 'messages';
+  const initial = (subAdminInfo?.firstName?.[0] || 'S').toUpperCase();
+
+  const footerBtn = { width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 10, border: 'none', cursor: 'pointer', background: 'transparent', fontFamily: F, marginTop: 2 };
 
   return (
-    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', fontFamily: F, background: col.bg }}>
+    <div
+      className="as-root"
+      data-theme={isDarkMode ? 'dark' : 'light'}
+      style={{ display: 'flex', height: '100vh', overflow: 'hidden', fontFamily: F, background: col.bg, '--a-accent': accent, '--a-on-accent': adminOnAccent(accent) }}
+    >
       <style>{`
         @import url('${FONT_IMPORT}');
         * { box-sizing: border-box; }
-        .sa-nav { transition: background 0.15s; }
-        .sa-nav:hover { background: ${isDarkMode ? 'rgba(249,115,22,0.12)' : 'rgba(249,115,22,0.08)'} !important; }
+        .sa-nav { transition: background-color 150ms ease, color 150ms ease, transform 120ms ease-out; }
+        .sa-nav:active { transform: scale(0.98); }
+        @media (hover: hover) and (pointer: fine) {
+          .sa-nav:not([aria-current="page"]):hover { background: var(--a-raised) !important; }
+        }
+        .as-root button:focus-visible, .as-root input:focus-visible, .as-root textarea:focus-visible {
+          outline: 2px solid var(--a-accent); outline-offset: 2px;
+        }
+        .as-root ::selection { background: var(--a-accent-soft); }
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: ${isDarkMode ? '#2a2d40' : '#ffd0a8'}; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb { background: var(--a-line-strong); border-radius: 10px; }
         @keyframes as-spin { to { transform: rotate(360deg); } }
         @keyframes db-spin  { to { transform: rotate(360deg); } }
         @keyframes db-ping  { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.4;transform:scale(1.6)} }
@@ -177,31 +201,50 @@ export default function SunshineShell() {
       <aside style={{
         width: 224, flexShrink: 0,
         background: col.sidebar,
-        borderRight: `2px solid ${col.border}`,
+        borderRight: `1px solid ${col.border}`,
         display: 'flex', flexDirection: 'column',
         overflowY: 'auto', overflowX: 'hidden',
         zIndex: 100,
       }}>
-        {/* Brand header */}
-        <div style={{ padding: '20px 16px 14px', borderBottom: `2px solid ${col.border}` }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ width: 40, height: 40, borderRadius: 14, background: ACCENT_G, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, boxShadow: `0 4px 12px ${TAB_SHADOW}`, flexShrink: 0 }}>
-              🔰
-            </div>
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 900, color: col.heading, lineHeight: 1.2 }}>{centerName}</div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: col.muted }}>{t('subAdmin.role')}</div>
+        {/* Brand header — center logo if it has one, otherwise its initial; small sunrise glow */}
+        <div style={{ position: 'relative', overflow: 'hidden', flexShrink: 0, padding: '18px 16px 16px', borderBottom: `1px solid ${col.border}` }}>
+          <div aria-hidden="true" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: [
+            'radial-gradient(60% 120% at 12% 40%, rgba(249,115,22,0.22) 0%, transparent 70%)',
+            'radial-gradient(70% 140% at 100% 0%, color-mix(in srgb, var(--a-accent) 20%, transparent) 0%, transparent 70%)',
+          ].join(', ') }} />
+          <svg aria-hidden="true" width="120" height="120" viewBox="0 0 120 120" style={{ position: 'absolute', right: -44, top: -52, pointerEvents: 'none' }}>
+            <defs>
+              <linearGradient id="sa-brand-ring" x1="0" y1="1" x2="1" y2="0">
+                <stop offset="0%" stopColor="#f97316" />
+                <stop offset="100%" stopColor="var(--a-accent)" />
+              </linearGradient>
+            </defs>
+            {[30, 50].map((r, i) => (
+              <circle key={r} cx="60" cy="60" r={r} fill="none" stroke="url(#sa-brand-ring)" strokeOpacity={0.45 - i * 0.15} strokeWidth="1.5" />
+            ))}
+          </svg>
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 10 }}>
+            {branding?.logo ? (
+              <img src={branding.logo} alt="" style={{ width: 38, height: 38, borderRadius: 11, objectFit: 'cover', flexShrink: 0, boxShadow: `0 0 0 1px ${col.border}` }} />
+            ) : (
+              <div style={{ width: 38, height: 38, borderRadius: 11, background: ACCENT_FILL, color: ON_ACCENT, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 17, fontWeight: 900, flexShrink: 0, boxShadow: ACCENT_SHADOW }}>
+                {(centerName?.[0] || 'S').toUpperCase()}
+              </div>
+            )}
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 800, color: col.heading, lineHeight: 1.25, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{centerName}</div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: col.muted }}>{t('subAdmin.role')}</div>
             </div>
           </div>
         </div>
 
         {/* Sub-admin info card */}
-        <div style={{ margin: '12px 10px', background: isDarkMode ? 'rgba(249,115,22,0.1)' : '#fff7ed', border: `2px solid ${isDarkMode ? 'rgba(249,115,22,0.2)' : '#fed7aa'}`, borderRadius: 16, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ width: 36, height: 36, borderRadius: 12, background: ACCENT_G, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 900, fontSize: 16, flexShrink: 0 }}>
-            {(subAdminInfo?.firstName?.[0] || 'S').toUpperCase()}
+        <div style={{ margin: '12px 10px 8px', background: 'var(--a-raised)', borderRadius: 14, padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ width: 32, height: 32, borderRadius: 10, background: 'var(--a-accent-soft)', color: 'var(--a-accent-ink)', boxShadow: 'inset 0 0 0 1px var(--a-accent-line)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 14, flexShrink: 0 }}>
+            {initial}
           </div>
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 13, fontWeight: 800, color: col.heading, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: col.heading, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {subAdminInfo?.firstName || t('subAdmin.role')}
             </div>
             <div style={{ fontSize: 11, fontWeight: 600, color: col.muted }}>
@@ -215,9 +258,9 @@ export default function SunshineShell() {
         {/* Nav */}
         <nav style={{ flex: 1, padding: '4px 8px' }}>
           {NAV_GROUPS.map((group, gi) => (
-            <div key={gi} style={{ marginBottom: 4 }}>
+            <div key={gi} className={`cat-${group.cat}`} style={{ marginBottom: 6 }}>
               {group.label && (
-                <div style={{ fontSize: 10, fontWeight: 800, color: col.muted, letterSpacing: '0.08em', textTransform: 'uppercase', padding: '8px 8px 4px' }}>
+                <div style={{ fontSize: 10, fontWeight: 800, color: col.muted, letterSpacing: '0.08em', textTransform: 'uppercase', padding: '10px 10px 4px' }}>
                   {group.label}
                 </div>
               )}
@@ -227,25 +270,18 @@ export default function SunshineShell() {
                 return (
                   <button key={item.key} className="sa-nav"
                     onClick={() => setActiveTab(item.key)}
+                    aria-current={isActive ? 'page' : undefined}
                     style={{
                       width: '100%', display: 'flex', alignItems: 'center', gap: 10,
-                      padding: '9px 12px', borderRadius: 14, border: 'none', cursor: 'pointer',
-                      background: isActive ? (isDarkMode ? 'rgba(249,115,22,0.18)' : '#fff7ed') : 'transparent',
-                      fontFamily: F, transition: 'background 0.15s',
+                      padding: '8px 10px', borderRadius: 10, border: 'none', cursor: 'pointer',
+                      background: isActive ? 'var(--cat-soft)' : 'transparent',
+                      fontFamily: F, textAlign: 'left', marginBottom: 1,
                     }}
                   >
-                    <div style={{
-                      width: 30, height: 30, borderRadius: 10, flexShrink: 0,
-                      background: isActive ? ACCENT_G : (isDarkMode ? 'rgba(255,255,255,0.04)' : '#f5f0ec'),
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      boxShadow: isActive ? `0 3px 8px ${TAB_SHADOW}` : 'none',
-                    }}>
-                      {(() => { const I = Icon; return <I size={15} color={isActive ? '#fff' : col.muted} strokeWidth={isActive ? 2.5 : 2} />; })()}
-                    </div>
-                    <span style={{ fontSize: 13, fontWeight: isActive ? 800 : 600, color: isActive ? col.accent : col.body, flex: 1, textAlign: 'left' }}>
+                    <Icon size={17} strokeWidth={isActive ? 2.1 : 1.8} color="var(--cat)" style={{ flexShrink: 0 }} />
+                    <span style={{ flex: 1, fontSize: 13, fontWeight: isActive ? 800 : 600, color: isActive ? 'var(--cat-ink)' : col.body }}>
                       {item.label}
                     </span>
-                    {isActive && <div style={{ width: 4, height: 4, borderRadius: '50%', background: col.accent, flexShrink: 0 }} />}
                   </button>
                 );
               })}
@@ -254,69 +290,63 @@ export default function SunshineShell() {
         </nav>
 
         {/* Footer actions */}
-        <div style={{ padding: '10px 8px 16px', borderTop: `2px solid ${col.border}` }}>
-          <button className="sa-nav" onClick={toggleDarkMode}
-            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 14, border: 'none', cursor: 'pointer', background: 'transparent', fontFamily: F }}>
-            <div style={{ width: 30, height: 30, borderRadius: 10, flexShrink: 0, background: isDarkMode ? 'rgba(255,255,255,0.04)' : '#f5f0ec', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              {isDarkMode ? <Sun size={15} color={col.muted} /> : <Moon size={15} color={col.muted} />}
-            </div>
+        <div style={{ padding: '8px 8px 16px', borderTop: `1px solid ${col.border}` }}>
+          <button className="sa-nav" onClick={toggleDarkMode} role="switch" aria-checked={isDarkMode} style={footerBtn}>
+            {isDarkMode ? <Sun size={17} color={col.muted} /> : <Moon size={17} color={col.muted} />}
             <span style={{ fontSize: 13, fontWeight: 600, color: col.body }}>{isDarkMode ? t('subAdmin.lightMode') : t('subAdmin.darkMode')}</span>
           </button>
           <LanguageSwitcher col={col} fontFamily={F} />
-          <button className="sa-nav" onClick={() => setShowDevices(true)}
-            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 14, border: 'none', cursor: 'pointer', background: 'transparent', fontFamily: F, marginTop: 2 }}>
-            <div style={{ width: 30, height: 30, borderRadius: 10, flexShrink: 0, background: isDarkMode ? 'rgba(255,255,255,0.04)' : '#f5f0ec', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Smartphone size={15} color={col.muted} />
-            </div>
+          <button className="sa-nav" onClick={() => setShowDevices(true)} style={footerBtn}>
+            <Smartphone size={17} color={col.muted} />
             <span style={{ fontSize: 13, fontWeight: 600, color: col.body }}>{t('subAdmin.myDevices')}</span>
           </button>
-          <button className="sa-nav" onClick={handleLogout}
-            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 14, border: 'none', cursor: 'pointer', background: 'transparent', fontFamily: F, marginTop: 2 }}>
-            <div style={{ width: 30, height: 30, borderRadius: 10, flexShrink: 0, background: isDarkMode ? 'rgba(239,68,68,0.08)' : '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <LogOut size={15} color="#ef4444" />
-            </div>
-            <span style={{ fontSize: 13, fontWeight: 600, color: '#ef4444' }}>{t('subAdmin.logout')}</span>
+          <button className="sa-nav" onClick={handleLogout} style={footerBtn}>
+            <LogOut size={17} color="#dc2626" />
+            <span style={{ fontSize: 13, fontWeight: 600, color: '#dc2626' }}>{t('subAdmin.logout')}</span>
           </button>
         </div>
       </aside>
       <SessionManagement isOpen={showDevices} onClose={() => setShowDevices(false)} />
 
       {/* ── MAIN CONTENT ─────────────────────────────────────────────────────────── */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
+        {!noPadding && <SunsetGlow />}
+
         {/* Top bar */}
         <header style={{
           height: 60, flexShrink: 0,
           background: col.sidebar,
-          borderBottom: `2px solid ${col.border}`,
+          borderBottom: `1px solid ${col.border}`,
           display: 'flex', alignItems: 'center',
-          padding: '0 24px', gap: 16, zIndex: 50,
+          padding: '0 24px', gap: 12, zIndex: 50, position: 'relative',
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <Shield size={18} color={col.accent} />
-            <span style={{ fontSize: 15, fontWeight: 800, color: col.heading }}>{activeLabel}</span>
+          <div className={`cat-${activeCat}`} style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
+            <ActiveIcon size={18} color="var(--cat)" strokeWidth={2.1} />
+            <h1 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: col.heading, letterSpacing: '-0.01em', fontFamily: F }}>{activeLabel}</h1>
           </div>
 
-          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
-            {subAdminInfo?.assignmentType && (
-              <div style={{ background: isDarkMode ? 'rgba(249,115,22,0.12)' : '#fff7ed', border: `1.5px solid ${isDarkMode ? 'rgba(249,115,22,0.25)' : '#fed7aa'}`, borderRadius: 20, padding: '4px 12px', fontSize: 11.5, fontWeight: 700, color: col.accent }}>
-                {subAdminInfo.assignmentType === 'region'
-                  ? `🌍 ${t('subAdmin.region', { region: subAdminInfo.region?.charAt(0).toUpperCase() + subAdminInfo.region?.slice(1) })}`
-                  : `👥 ${t('subAdmin.teachersAssigned', { count: subAdminInfo.teacherScope?.length || 0 })}`}
-              </div>
-            )}
-            <div style={{ width: 34, height: 34, borderRadius: 12, background: ACCENT_G, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 900, fontSize: 14, boxShadow: `0 3px 8px ${TAB_SHADOW}` }}>
-              {(subAdminInfo?.firstName?.[0] || 'S').toUpperCase()}
+          {subAdminInfo?.assignmentType && (
+            <div style={{ background: 'var(--a-surface)', border: `1px solid ${col.border}`, borderRadius: 999, padding: '5px 12px', fontSize: 12, fontWeight: 700, color: col.heading }}>
+              {subAdminInfo.assignmentType === 'region'
+                ? `🌍 ${t('subAdmin.region', { region: subAdminInfo.region?.charAt(0).toUpperCase() + subAdminInfo.region?.slice(1) })}`
+                : `👥 ${t('subAdmin.teachersAssigned', { count: subAdminInfo.teacherScope?.length || 0 })}`}
             </div>
+          )}
+          <div style={{ width: 34, height: 34, borderRadius: 10, background: ACCENT_FILL, boxShadow: ACCENT_SHADOW, display: 'flex', alignItems: 'center', justifyContent: 'center', color: ON_ACCENT, fontWeight: 800, fontSize: 14, flexShrink: 0 }}>
+            {initial}
           </div>
         </header>
 
-        {/* Page content */}
-        <main style={{ flex: 1, overflowY: 'auto', padding: noPadding ? 0 : '28px 28px 40px', background: col.bg }}>
-          <TabErrorBoundary key={shownTab}>
-            <Suspense fallback={<div style={{ padding: 40, textAlign: "center", color: col.muted }}>…</div>}>
-              {tabContent}
-            </Suspense>
-          </TabErrorBoundary>
+        {/* Page content — sunrise behind the top, content floats on it */}
+        <main style={{ flex: 1, overflowY: 'auto', padding: noPadding ? 0 : '28px 28px 40px', position: 'relative' }}>
+          {!noPadding && <SunriseBackdrop />}
+          <div style={{ position: 'relative', height: noPadding ? '100%' : undefined }}>
+            <TabErrorBoundary key={shownTab}>
+              <Suspense fallback={<div style={{ padding: 40, textAlign: 'center', color: col.muted }}>…</div>}>
+                {tabContent}
+              </Suspense>
+            </TabErrorBoundary>
+          </div>
         </main>
       </div>
     </div>

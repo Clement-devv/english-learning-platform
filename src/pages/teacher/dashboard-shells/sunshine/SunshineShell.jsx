@@ -1,7 +1,7 @@
 // src/pages/teacher/dashboard-shells/sunshine/SunshineShell.jsx
-// Teacher dashboard — Sunshine Explorer design.
-// Warm amber/orange palette · rounded cards · Nunito font · grouped sidebar nav.
-// Mirrors the student SunshineShell pattern, adapted for teacher content.
+// Teacher dashboard — Sunshine Explorer design (same look as the admin / sub-admin shells).
+// Admin tokens via .as-root (warm neutrals + the center accent) · topic-coloured sidebar ·
+// sunrise banner + backdrop + sunset · Nunito font · dark mode · mobile bottom nav.
 
 import React, { useState, lazy, Suspense } from 'react';
 import { useViewMode } from '../../../../hooks/useViewMode';
@@ -10,6 +10,7 @@ import {
   Home, Calendar, CheckCircle2, Users, BookOpen, MessageCircle, NotebookPen,
   DollarSign, Star, User, CalendarDays, FileText, Layers, ClipboardList,
   Settings, LogOut, Plus, RefreshCw, Video, Bell, BarChart2, PhoneMissed, X, Clock4, Library,
+  CheckCircle, AlertCircle, Repeat, Radio,
 } from 'lucide-react';
 import { useBranding }              from '../../../../context/BrandingContext';
 import { useTeacherDashboardData }  from '../useTeacherDashboardData';
@@ -30,31 +31,34 @@ import UpcomingClasses              from '../../components/dashboard/UpcomingCla
 import LanguageSwitcher             from '../../../../components/LanguageSwitcher';
 import { useTranslation }           from 'react-i18next';
 import DashboardAlertsBar from "../../../../components/DashboardAlertsBar";
+import { adminAccent, adminOnAccent } from '../../../../utils/adminAccent';
+import { SunriseBackdrop, SunsetGlow, BannerArt } from '../../../../components/dashboard/SunriseArt';
 
 // Only needed once the teacher joins a class — load it then.
 const Classroom = lazyTab(() => import('../../../Classroom'));
 
 // ── Palette ────────────────────────────────────────────────────────────────────
-const palette = (dark) => ({
-  bg:       dark ? '#0f1117' : '#fff8f0',
-  card:     dark ? '#1a1d2e' : '#ffffff',
-  cardAlt:  dark ? '#1f2235' : '#fffbf5',
-  border:   dark ? '#2a2d40' : '#ffe8cc',
-  heading:  dark ? '#f0f4ff' : '#3d2e20',
-  body:     dark ? '#c8cce0' : '#5a4a3a',
-  muted:    dark ? '#6b7090' : '#a89480',
-  accent:   dark ? '#fbbf24' : '#f97316',
-  sidebar:  dark ? '#13111a' : '#ffffff',
+// Values live in src/index.css (.as-root) — same palette as the admin dashboard.
+const palette = () => ({
+  bg:       'var(--a-bg)',
+  card:     'var(--a-surface)',
+  cardAlt:  'var(--a-raised)',
+  border:   'var(--a-line)',
+  heading:  'var(--a-ink)',
+  body:     'var(--a-ink-2)',
+  muted:    'var(--a-muted)',
+  accent:   'var(--a-accent)',
+  sidebar:  'var(--a-surface)',
 });
 
-// ── Nav groups ─────────────────────────────────────────────────────────────────
+// ── Nav groups (each group has a topic colour, as in the admin) ───────────────
 const makeNavGroups = (t) => [
   {
-    label: null,
+    label: null, cat: 'accent',
     items: [{ key: 'dashboard', icon: '🏠', label: t('teacher.nav.dashboard'), lucide: Home }],
   },
   {
-    label: t('teacher.navGroup.teaching'),
+    label: t('teacher.navGroup.teaching'), cat: 'amber',
     items: [
       { key: 'classes',           icon: '📅', label: t('teacher.nav.myClasses'),    lucide: CalendarDays  },
       { key: 'group-classes',     icon: '👥', label: t('teacher.nav.groupClasses'), lucide: Users         },
@@ -64,14 +68,14 @@ const makeNavGroups = (t) => [
     ],
   },
   {
-    label: t('teacher.navGroup.students'),
+    label: t('teacher.navGroup.students'), cat: 'teal',
     items: [
       { key: 'students', icon: '👥', label: t('teacher.nav.students'), lucide: Users         },
       { key: 'bookings', icon: '📖', label: t('teacher.nav.bookings'), lucide: ClipboardList },
     ],
   },
   {
-    label: t('teacher.navGroup.content'),
+    label: t('teacher.navGroup.content'), cat: 'sky',
     items: [
       { key: 'homework', icon: '📚', label: t('teacher.nav.homework'),   lucide: BookOpen },
       { key: 'quiz',     icon: '📝', label: t('teacher.nav.quizzes'),    lucide: FileText },
@@ -80,7 +84,7 @@ const makeNavGroups = (t) => [
     ],
   },
   {
-    label: t('teacher.navGroup.more'),
+    label: t('teacher.navGroup.more'), cat: 'rose',
     items: [
       { key: 'messages',         icon: '💬', label: t('teacher.nav.messages'),        lucide: MessageCircle },
       { key: 'payment',          icon: '💰', label: t('teacher.nav.payment'),         lucide: DollarSign    },
@@ -93,6 +97,25 @@ const makeNavGroups = (t) => [
 ];
 const F = "'Nunito','Inter',sans-serif";
 const FONT_IMPORT = 'https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap';
+const ACCENT_FILL   = 'var(--a-accent-grad)';
+const ON_ACCENT     = 'var(--a-on-accent)';
+const ACCENT_SHADOW = '0 4px 14px -4px color-mix(in srgb, var(--a-accent) 55%, transparent)';
+
+// Topic tile (same as the admin stat tiles): solid icon in the topic colour + corner wash
+function TopicTile({ cat, icon: Icon, value, label, sub }) {
+  return (
+    <div className={`cat-${cat}`} style={{ position: 'relative', overflow: 'hidden', background: 'radial-gradient(120% 90% at 100% 0%, var(--cat-soft) 0%, transparent 55%), var(--a-surface)', border: '1px solid var(--a-line)', borderRadius: 16, padding: '16px 18px', display: 'flex', alignItems: 'center', gap: 14, boxShadow: 'var(--a-shadow)' }}>
+      <div style={{ width: 44, height: 44, borderRadius: 12, background: 'var(--cat)', boxShadow: '0 6px 14px -6px var(--cat)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <Icon size={20} color="#fff" strokeWidth={2.2} />
+      </div>
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--a-muted)', textTransform: 'uppercase', letterSpacing: '.06em' }}>{label}</div>
+        <div style={{ fontSize: 24, fontWeight: 900, color: 'var(--a-ink)', lineHeight: 1.1, fontVariantNumeric: 'tabular-nums', fontFamily: F }}>{value}</div>
+        {sub && <div style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--a-ink-2)' }}>{sub}</div>}
+      </div>
+    </div>
+  );
+}
 
 // ── Missed Calls Banner ────────────────────────────────────────────────────────
 const ROLE_LABEL = { teacher: 'Teacher', student: 'Student', admin: 'Admin', subAdmin: 'Sub-Admin' };
@@ -106,16 +129,16 @@ function MissedCallsBanner({ missedCalls, clearMissedCalls, col, isDarkMode }) {
 
   return (
     <div style={{
-      background: isDarkMode ? 'rgba(239,68,68,0.1)' : '#fff5f5',
-      border: `2px solid ${isDarkMode ? 'rgba(239,68,68,0.3)' : '#fecaca'}`,
-      borderRadius: 20,
-      padding: '16px 20px',
+      background: isDarkMode ? 'rgba(239,68,68,0.1)' : '#fef2f2',
+      border: `1px solid ${isDarkMode ? 'rgba(239,68,68,0.3)' : '#fecaca'}`,
+      borderRadius: 16,
+      padding: '14px 18px',
       display: 'flex',
-      gap: 16,
+      gap: 14,
       alignItems: 'flex-start',
     }}>
-      <div style={{ width: 44, height: 44, borderRadius: 14, background: 'linear-gradient(135deg,#ef4444,#dc2626)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 4px 12px rgba(239,68,68,0.35)' }}>
-        <PhoneMissed size={20} color='#fff' />
+      <div style={{ width: 38, height: 38, borderRadius: 11, background: '#dc2626', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <PhoneMissed size={18} color='#fff' />
       </div>
 
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -129,11 +152,11 @@ function MissedCallsBanner({ missedCalls, clearMissedCalls, col, isDarkMode }) {
           {missedCalls.map((mc, i) => (
             <div key={i} style={{
               display: 'flex', alignItems: 'center', gap: 8,
-              background: isDarkMode ? 'rgba(255,255,255,0.06)' : '#fff',
+              background: 'var(--a-surface)',
               border: `1px solid ${isDarkMode ? 'rgba(239,68,68,0.2)' : '#fecaca'}`,
               borderRadius: 12, padding: '7px 12px',
             }}>
-              <div style={{ width: 30, height: 30, borderRadius: 10, background: 'linear-gradient(135deg,#ef4444,#f97316)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 900, color: '#fff', flexShrink: 0 }}>
+              <div style={{ width: 30, height: 30, borderRadius: 10, background: 'var(--a-raised)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 800, color: col.heading, flexShrink: 0 }}>
                 {(mc.callerName?.[0] || '?').toUpperCase()}
               </div>
               <div>
@@ -148,7 +171,7 @@ function MissedCallsBanner({ missedCalls, clearMissedCalls, col, isDarkMode }) {
       <button
         onClick={clearMissedCalls}
         title='Mark all as seen'
-        style={{ background: isDarkMode ? 'rgba(255,255,255,0.08)' : '#fff', border: `1px solid ${isDarkMode ? 'rgba(255,255,255,0.12)' : '#fecaca'}`, borderRadius: 10, padding: '6px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 700, color: col.muted, flexShrink: 0, fontFamily: F }}
+        style={{ background: 'var(--a-surface)', border: `1px solid ${isDarkMode ? 'rgba(255,255,255,0.12)' : '#fecaca'}`, borderRadius: 10, padding: '6px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 700, color: col.muted, flexShrink: 0, fontFamily: F }}
       >
         <X size={12} /> {t('teacher.missedCalls.markSeen')}
       </button>
@@ -161,7 +184,8 @@ export default function SunshineShell() {
   const { t } = useTranslation();
   const { branding, center } = useBranding();
   const d   = useTeacherDashboardData();
-  const col = palette(d.isDarkMode);
+  const col = palette();
+  const accent = adminAccent(branding);
   const { missedCalls, missedCallCount, clearMissedCalls } = useRing();
   const centerName = center?.centerName || t('teacher.sidebar.portal');
   const NAV_GROUPS = makeNavGroups(t);
@@ -171,14 +195,21 @@ export default function SunshineShell() {
   const { isMobile, forcedMode, setViewMode, isSmallScreen } = useViewMode();
   const [showMobileMenu, setShowMobileMenu] = useState(false);
 
+  // Theme root: admin tokens (.as-root) + this center's accent; data-theme flips the tokens
+  const rootProps = {
+    className: 'as-root',
+    'data-theme': d.isDarkMode ? 'dark' : 'light',
+  };
+  const rootVars = { '--a-accent': accent, '--a-on-accent': adminOnAccent(accent) };
+
   // ── Loading ──────────────────────────────────────────────────────────────
   if (d.loading) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: col.bg, fontFamily: F }}>
+      <div {...rootProps} style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: col.bg, fontFamily: F, ...rootVars }}>
         <style>{`@import url('${FONT_IMPORT}'); @keyframes bounce{to{transform:translateY(-16px)}}`}</style>
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontSize: '64px', animation: 'bounce 0.8s infinite alternate' }}>👨‍🏫</div>
-          <p style={{ color: col.accent, fontWeight: 700, fontSize: '18px', marginTop: '16px', fontFamily: F }}>Loading your classes...</p>
+          <p style={{ color: 'var(--a-accent-ink)', fontWeight: 700, fontSize: '18px', marginTop: '16px', fontFamily: F }}>Loading your classes...</p>
         </div>
       </div>
     );
@@ -187,9 +218,6 @@ export default function SunshineShell() {
   // ── Classroom overlay ────────────────────────────────────────────────────
   if (d.isClassroomOpen && d.activeClass)
     return <Classroom classData={d.activeClass} userRole="teacher" onLeave={d.handleLeaveClassroom} />;
-
-  const accentGradient = 'linear-gradient(135deg,#f97316,#fbbf24)';
-  const tabShadow      = 'rgba(249,115,22,0.35)';
 
   // Badge helper
   const getBadge = (key) => {
@@ -200,55 +228,87 @@ export default function SunshineShell() {
     return null;
   };
 
+  const initial = (d.teacherInfo?.firstName?.[0] || 'T').toUpperCase();
+  const card = { background: col.card, border: `1px solid ${col.border}`, borderRadius: 20, boxShadow: 'var(--a-shadow)' };
+  const sectionTitle = { margin: '0 0 14px', fontSize: 16, fontWeight: 900, color: col.heading, fontFamily: F, display: 'flex', alignItems: 'center', gap: 8 };
+
   return (
-    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', fontFamily: F, background: col.bg }}>
+    <div {...rootProps} style={{ display: 'flex', height: '100vh', overflow: 'hidden', fontFamily: F, background: col.bg, ...rootVars }}>
       <style>{`
         @import url('${FONT_IMPORT}');
         * { box-sizing: border-box; }
-        .ts-nav { transition: all 0.18s; }
-        .ts-nav:hover { background: ${d.isDarkMode ? 'rgba(249,115,22,0.12)' : 'rgba(249,115,22,0.08)'} !important; }
-        .ts-card { transition: transform 0.2s, box-shadow 0.2s; }
-        .ts-card:hover { transform: translateY(-3px); box-shadow: 0 10px 28px rgba(0,0,0,0.10) !important; }
-        .ts-btn { transition: transform 0.15s; }
-        .ts-btn:hover { transform: scale(1.04); }
-        .ts-btn:active { transform: scale(0.97); }
+        .ts-nav { transition: background-color 150ms ease, color 150ms ease, transform 120ms ease-out; }
+        .ts-nav:active { transform: scale(0.98); }
+        .ts-btn { transition: transform 120ms ease-out, background-color 150ms ease, border-color 150ms ease, box-shadow 150ms ease; }
+        .ts-btn:not(:disabled):active { transform: scale(0.97); }
+        @media (hover: hover) and (pointer: fine) {
+          .ts-nav:not([aria-current="page"]):hover { background: var(--a-raised) !important; }
+          .ts-quick:hover { border-color: var(--a-accent-line) !important; background: var(--a-accent-soft) !important; }
+        }
+        .as-root button:focus-visible, .as-root input:focus-visible, .as-root textarea:focus-visible {
+          outline: 2px solid var(--a-accent); outline-offset: 2px;
+        }
+        .as-root ::selection { background: var(--a-accent-soft); }
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: ${d.isDarkMode ? '#2a2d40' : '#ffd0a8'}; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb { background: var(--a-line-strong); border-radius: 10px; }
       `}</style>
 
       {/* ── SIDEBAR ──────────────────────────────────────────────────────── */}
       <aside style={{
         width: 220, flexShrink: 0,
         background: col.sidebar,
-        borderRight: `2px solid ${col.border}`,
+        borderRight: `1px solid ${col.border}`,
         display: isMobile ? 'none' : 'flex', flexDirection: 'column',
         overflowY: 'auto', overflowX: 'hidden',
         zIndex: 100,
       }}>
-        {/* Brand */}
-        <div style={{ padding: '20px 16px 14px', borderBottom: `2px solid ${col.border}` }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ width: 40, height: 40, borderRadius: 14, background: accentGradient, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, boxShadow: `0 4px 12px ${tabShadow}`, flexShrink: 0 }}>
-              👨‍🏫
-            </div>
-            <div>
-              <div style={{ fontSize: 14, fontWeight: 900, color: col.heading, lineHeight: 1.1 }}>{centerName}</div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: col.muted }}>{t('teacher.sidebar.portal')}</div>
+        {/* Brand — center logo if it has one, otherwise its initial; small sunrise glow */}
+        <div style={{ position: 'relative', overflow: 'hidden', flexShrink: 0, padding: '18px 16px 16px', borderBottom: `1px solid ${col.border}` }}>
+          <div aria-hidden="true" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: [
+            'radial-gradient(60% 120% at 12% 40%, rgba(249,115,22,0.22) 0%, transparent 70%)',
+            'radial-gradient(70% 140% at 100% 0%, color-mix(in srgb, var(--a-accent) 20%, transparent) 0%, transparent 70%)',
+          ].join(', ') }} />
+          <svg aria-hidden="true" width="120" height="120" viewBox="0 0 120 120" style={{ position: 'absolute', right: -44, top: -52, pointerEvents: 'none' }}>
+            <defs>
+              <linearGradient id="ts-brand-ring" x1="0" y1="1" x2="1" y2="0">
+                <stop offset="0%" stopColor="#f97316" />
+                <stop offset="100%" stopColor="var(--a-accent)" />
+              </linearGradient>
+            </defs>
+            {[30, 50].map((r, i) => (
+              <circle key={r} cx="60" cy="60" r={r} fill="none" stroke="url(#ts-brand-ring)" strokeOpacity={0.45 - i * 0.15} strokeWidth="1.5" />
+            ))}
+          </svg>
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 10 }}>
+            {branding?.logo ? (
+              <img src={branding.logo} alt="" style={{ width: 38, height: 38, borderRadius: 11, objectFit: 'cover', flexShrink: 0, boxShadow: `0 0 0 1px ${col.border}` }} />
+            ) : (
+              <div style={{ width: 38, height: 38, borderRadius: 11, background: ACCENT_FILL, color: ON_ACCENT, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 17, fontWeight: 900, flexShrink: 0, boxShadow: ACCENT_SHADOW }}>
+                {(centerName?.[0] || 'T').toUpperCase()}
+              </div>
+            )}
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 800, color: col.heading, lineHeight: 1.25, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{centerName}</div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: col.muted }}>{t('teacher.sidebar.portal')}</div>
               {branding?.partnershipText && (
-                <div style={{ fontSize: 10, color: col.muted, opacity: 0.75, marginTop: 2, fontStyle: 'italic' }}>{branding.partnershipText}</div>
+                <div style={{ fontSize: 10, color: col.muted, marginTop: 2, fontStyle: 'italic' }}>{branding.partnershipText}</div>
               )}
             </div>
           </div>
         </div>
 
         {/* Teacher card */}
-        <div style={{ margin: '12px 10px', background: d.isDarkMode ? 'rgba(249,115,22,0.1)' : '#fff7ed', border: `2px solid ${d.isDarkMode ? 'rgba(249,115,22,0.2)' : '#fed7aa'}`, borderRadius: 16, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ width: 36, height: 36, borderRadius: 12, background: accentGradient, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 900, fontSize: 16, flexShrink: 0 }}>
-            {(d.teacherInfo?.firstName?.[0] || 'T').toUpperCase()}
-          </div>
+        <div style={{ margin: '12px 10px 8px', background: 'var(--a-raised)', borderRadius: 14, padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 10 }}>
+          {d.teacherInfo?.photo ? (
+            <img src={d.teacherInfo.photo} alt="" style={{ width: 32, height: 32, borderRadius: 10, objectFit: 'cover', flexShrink: 0 }} />
+          ) : (
+            <div style={{ width: 32, height: 32, borderRadius: 10, background: 'var(--a-accent-soft)', color: 'var(--a-accent-ink)', boxShadow: 'inset 0 0 0 1px var(--a-accent-line)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 14, flexShrink: 0 }}>
+              {initial}
+            </div>
+          )}
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 13, fontWeight: 800, color: col.heading, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.teacherInfo?.firstName}</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: col.heading, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.teacherInfo?.firstName}</div>
             <div style={{ fontSize: 11, fontWeight: 600, color: col.muted }}>{d.students.length} students</div>
           </div>
         </div>
@@ -256,32 +316,32 @@ export default function SunshineShell() {
         {/* Nav */}
         <nav style={{ flex: 1, padding: '4px 8px' }}>
           {NAV_GROUPS.map((group, gi) => (
-            <div key={gi} style={{ marginBottom: 4 }}>
+            <div key={gi} className={`cat-${group.cat}`} style={{ marginBottom: 6 }}>
               {group.label && (
-                <div style={{ fontSize: 10, fontWeight: 800, color: col.muted, letterSpacing: '0.08em', textTransform: 'uppercase', padding: '8px 8px 4px' }}>
+                <div style={{ fontSize: 10, fontWeight: 800, color: col.muted, letterSpacing: '0.08em', textTransform: 'uppercase', padding: '10px 10px 4px' }}>
                   {group.label}
                 </div>
               )}
               {group.items.map(item => {
                 const isActive = d.activeTab === item.key;
                 const badge    = getBadge(item.key);
+                const LI = item.lucide;
                 return (
                   <button key={item.key} className="ts-nav"
                     onClick={() => d.setActiveTab(item.key)}
+                    aria-current={isActive ? 'page' : undefined}
                     style={{
                       width: '100%', display: 'flex', alignItems: 'center', gap: 10,
-                      padding: '9px 12px', borderRadius: 14, border: 'none', cursor: 'pointer',
-                      background: isActive ? (d.isDarkMode ? 'rgba(249,115,22,0.18)' : '#fff7ed') : 'transparent',
-                      fontFamily: F, textAlign: 'left',
-                      borderLeft: isActive ? `3px solid ${col.accent}` : '3px solid transparent',
-                      marginBottom: 1,
+                      padding: '8px 10px', borderRadius: 10, border: 'none', cursor: 'pointer',
+                      background: isActive ? 'var(--cat-soft)' : 'transparent',
+                      fontFamily: F, textAlign: 'left', marginBottom: 1,
                     }}>
-                    {(() => { const LI = item.lucide; return <LI size={17} strokeWidth={1.8} color={isActive ? col.accent : col.body} style={{ flexShrink: 0 }} />; })()}
-                    <span style={{ flex: 1, fontSize: 13, fontWeight: isActive ? 800 : 600, color: isActive ? col.accent : col.body }}>
+                    <LI size={17} strokeWidth={isActive ? 2.1 : 1.8} color="var(--cat)" style={{ flexShrink: 0 }} />
+                    <span style={{ flex: 1, fontSize: 13, fontWeight: isActive ? 800 : 600, color: isActive ? 'var(--cat-ink)' : col.body }}>
                       {item.label}
                     </span>
                     {badge != null && (
-                      <span style={{ background: isActive ? col.accent : (d.isDarkMode ? 'rgba(249,115,22,0.3)' : '#fff7ed'), color: isActive ? '#fff' : col.accent, borderRadius: 999, fontSize: 10, fontWeight: 900, minWidth: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 5px', flexShrink: 0 }}>
+                      <span style={{ background: ACCENT_FILL, color: ON_ACCENT, borderRadius: 999, fontSize: 10, fontWeight: 800, minWidth: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 6px', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>
                         {badge}
                       </span>
                     )}
@@ -293,100 +353,104 @@ export default function SunshineShell() {
         </nav>
 
         {/* Bottom */}
-        <div style={{ padding: '8px 8px 16px', borderTop: `2px solid ${col.border}` }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', marginBottom: 4 }}>
+        <div style={{ padding: '8px 8px 16px', borderTop: `1px solid ${col.border}` }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 10px', marginBottom: 4 }}>
             <span style={{ fontSize: 12, fontWeight: 700, color: col.muted }}>{d.isDarkMode ? t('teacher.sidebar.darkMode') : t('teacher.sidebar.lightMode')}</span>
-            <button onClick={d.toggleDarkMode}
-              style={{ width: 40, height: 22, borderRadius: 999, border: 'none', cursor: 'pointer', background: d.isDarkMode ? col.accent : col.border, position: 'relative', transition: 'background .2s', flexShrink: 0 }}>
-              <div style={{ width: 16, height: 16, borderRadius: '50%', background: '#fff', position: 'absolute', top: 3, left: d.isDarkMode ? 21 : 3, transition: 'left .2s' }} />
+            <button onClick={d.toggleDarkMode} role="switch" aria-checked={d.isDarkMode} aria-label={t('teacher.sidebar.darkMode')}
+              style={{ width: 40, height: 22, borderRadius: 999, border: 'none', cursor: 'pointer', background: d.isDarkMode ? 'var(--a-accent)' : 'var(--a-line-strong)', position: 'relative', transition: 'background-color 200ms ease', flexShrink: 0 }}>
+              <div style={{ width: 16, height: 16, borderRadius: '50%', background: '#fff', position: 'absolute', top: 3, left: 3, transform: `translateX(${d.isDarkMode ? 18 : 0}px)`, transition: 'transform 200ms cubic-bezier(0.23, 1, 0.32, 1)', boxShadow: '0 1px 2px rgba(0,0,0,0.2)' }} />
             </button>
           </div>
           <button className="ts-nav" onClick={() => d.setShowSettingsSidebar(true)}
-            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 14, border: 'none', cursor: 'pointer', background: 'transparent', fontFamily: F, marginBottom: 1 }}>
+            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 10, border: 'none', cursor: 'pointer', background: 'transparent', fontFamily: F, marginBottom: 1 }}>
             <Settings size={17} color={col.muted} />
             <span style={{ fontSize: 13, fontWeight: 600, color: col.body }}>{t('teacher.sidebar.settings')}</span>
           </button>
           <LanguageSwitcher col={col} fontFamily={F} />
           <button className="ts-nav" onClick={d.handleLogout}
-            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 14, border: 'none', cursor: 'pointer', background: 'transparent', fontFamily: F }}>
+            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 10, border: 'none', cursor: 'pointer', background: 'transparent', fontFamily: F }}>
             <LogOut size={17} color={col.muted} />
             <span style={{ fontSize: 13, fontWeight: 600, color: col.body }}>{t('teacher.sidebar.signOut')}</span>
           </button>
           {isSmallScreen && !isMobile && (
             <button className="ts-nav" onClick={() => setViewMode('mobile')}
-              style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 14, border: 'none', cursor: 'pointer', background: d.isDarkMode ? 'rgba(249,115,22,0.1)' : '#fff7ed', fontFamily: F, marginTop: 4 }}>
+              style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 10, border: 'none', cursor: 'pointer', background: 'var(--a-accent-soft)', fontFamily: F, marginTop: 4 }}>
               <span style={{ fontSize: 15 }}>📱</span>
-              <span style={{ fontSize: 13, fontWeight: 700, color: col.accent }}>{t('teacher.sidebar.mobileView')}</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--a-accent-ink)' }}>{t('teacher.sidebar.mobileView')}</span>
             </button>
           )}
         </div>
       </aside>
 
       {/* ── MAIN ─────────────────────────────────────────────────────────── */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
+        {!isMobile && d.activeTab !== 'messages' && <SunsetGlow />}
 
         {/* ── TOP BAR ── */}
-        <header style={{ height: 64, background: col.sidebar, borderBottom: `2px solid ${col.border}`, display: 'flex', alignItems: 'center', padding: isMobile ? '0 12px' : '0 24px', gap: isMobile ? 8 : 14, flexShrink: 0 }}>
-          <h1 style={{ margin: 0, fontSize: 18, fontWeight: 900, color: col.heading, flex: 1, fontFamily: F }}>
+        <header style={{ height: 60, background: col.sidebar, borderBottom: `1px solid ${col.border}`, display: 'flex', alignItems: 'center', padding: isMobile ? '0 12px' : '0 24px', gap: isMobile ? 8 : 12, flexShrink: 0, position: 'relative', zIndex: 2 }}>
+          <h1 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: col.heading, flex: 1, fontFamily: F, letterSpacing: '-0.01em' }}>
             {PAGE_LABEL[d.activeTab] || t('teacher.nav.dashboard')}
           </h1>
 
           {/* ── Notification chips — desktop only ── */}
           {!isMobile && d.unreadMessages > 0 && (
-            <button onClick={() => { d.setActiveTab('messages'); d.setUnreadMessages(0); }} title="Go to messages"
-              style={{ display: 'flex', alignItems: 'center', gap: 6, background: d.isDarkMode ? 'rgba(139,92,246,0.15)' : '#f5f3ff', border: `2px solid ${d.isDarkMode ? 'rgba(139,92,246,0.3)' : '#ddd6fe'}`, borderRadius: 999, padding: '5px 14px', cursor: 'pointer', fontFamily: F }}>
-              <span style={{ fontSize: 14 }}>💬</span>
-              <span style={{ fontSize: 13, fontWeight: 800, color: d.isDarkMode ? '#a78bfa' : '#7c3aed' }}>{d.unreadMessages} new</span>
+            <button className="ts-btn" onClick={() => { d.setActiveTab('messages'); d.setUnreadMessages(0); }} title="Go to messages"
+              style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'var(--a-surface)', border: `1px solid ${col.border}`, borderRadius: 999, padding: '5px 12px 5px 10px', cursor: 'pointer', fontFamily: F }}>
+              <MessageCircle size={14} color="var(--a-accent)" />
+              <span style={{ fontSize: 12, fontWeight: 700, color: col.heading }}>{d.unreadMessages} new</span>
             </button>
           )}
           {!isMobile && missedCallCount > 0 && (
-            <button onClick={clearMissedCalls} title="Clear missed calls"
-              style={{ display: 'flex', alignItems: 'center', gap: 6, background: d.isDarkMode ? 'rgba(239,68,68,0.12)' : '#fff5f5', border: `2px solid ${d.isDarkMode ? 'rgba(239,68,68,0.3)' : '#fecaca'}`, borderRadius: 999, padding: '5px 14px', cursor: 'pointer', fontFamily: F }}>
-              <span style={{ fontSize: 14 }}>📞</span>
-              <span style={{ fontSize: 13, fontWeight: 800, color: '#ef4444' }}>{missedCallCount} missed</span>
+            <button className="ts-btn" onClick={clearMissedCalls} title="Clear missed calls"
+              style={{ display: 'flex', alignItems: 'center', gap: 7, background: d.isDarkMode ? 'rgba(239,68,68,0.12)' : '#fef2f2', border: `1px solid ${d.isDarkMode ? 'rgba(239,68,68,0.3)' : '#fecaca'}`, borderRadius: 999, padding: '5px 12px 5px 10px', cursor: 'pointer', fontFamily: F }}>
+              <PhoneMissed size={14} color={d.isDarkMode ? '#fca5a5' : '#dc2626'} />
+              <span style={{ fontSize: 12, fontWeight: 700, color: d.isDarkMode ? '#fca5a5' : '#b91c1c' }}>{missedCallCount} missed</span>
             </button>
           )}
 
           {/* Student count pill — desktop only */}
           {!isMobile && (
-            <div style={{ background: d.isDarkMode ? 'rgba(249,115,22,0.12)' : '#fff7ed', border: `2px solid ${d.isDarkMode ? 'rgba(249,115,22,0.25)' : '#fed7aa'}`, borderRadius: 999, padding: '5px 14px', display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ fontSize: 14 }}>👨‍🎓</span>
-              <span style={{ fontSize: 13, fontWeight: 800, color: col.accent }}>{d.students.length} students</span>
+            <div className="cat-teal" style={{ background: 'var(--a-surface)', border: `1px solid ${col.border}`, borderRadius: 999, padding: '5px 12px 5px 10px', display: 'flex', alignItems: 'center', gap: 7 }}>
+              <Users size={14} color="var(--cat)" />
+              <span style={{ fontSize: 12, fontWeight: 700, color: col.heading }}>{d.students.length} students</span>
             </div>
           )}
 
           {/* Pending bookings pill — desktop only */}
           {!isMobile && d.pendingBookings > 0 && (
-            <div onClick={() => d.setActiveTab('bookings')} style={{ background: d.isDarkMode ? 'rgba(239,68,68,0.1)' : '#fef2f2', border: `2px solid ${d.isDarkMode ? 'rgba(239,68,68,0.25)' : '#fecaca'}`, borderRadius: 999, padding: '5px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ fontSize: 14 }}>🔔</span>
-              <span style={{ fontSize: 13, fontWeight: 800, color: '#ef4444' }}>{d.pendingBookings} pending</span>
-            </div>
+            <button className="ts-btn" onClick={() => d.setActiveTab('bookings')} style={{ background: d.isDarkMode ? 'rgba(239,68,68,0.1)' : '#fef2f2', border: `1px solid ${d.isDarkMode ? 'rgba(239,68,68,0.25)' : '#fecaca'}`, borderRadius: 999, padding: '5px 12px 5px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7, fontFamily: F }}>
+              <Bell size={14} color={d.isDarkMode ? '#fca5a5' : '#dc2626'} />
+              <span style={{ fontSize: 12, fontWeight: 700, color: d.isDarkMode ? '#fca5a5' : '#b91c1c' }}>{d.pendingBookings} pending</span>
+            </button>
           )}
 
           {/* Push toggle — desktop only */}
           {!isMobile && d.pushSupported() && (
-            <button onClick={d.togglePush} title={d.pushEnabled ? 'Disable push notifications' : 'Enable push notifications'}
-              style={{ width: 38, height: 38, borderRadius: 12, border: `2px solid ${col.border}`, background: d.pushEnabled ? '#16a34a' : col.cardAlt, cursor: 'pointer', color: d.pushEnabled ? '#fff' : col.muted, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <button className="ts-btn" onClick={d.togglePush} title={d.pushEnabled ? 'Disable push notifications' : 'Enable push notifications'}
+              style={{ width: 36, height: 36, borderRadius: 10, border: `1px solid ${col.border}`, background: d.pushEnabled ? '#16a34a' : col.cardAlt, cursor: 'pointer', color: d.pushEnabled ? '#fff' : col.muted, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Bell size={16} fill={d.pushEnabled ? 'currentColor' : 'none'} />
             </button>
           )}
 
           {/* New Class button */}
           <button className="ts-btn" onClick={() => d.setIsModalOpen(true)}
-            style={{ background: accentGradient, color: 'white', border: 'none', borderRadius: 12, padding: isMobile ? '8px 12px' : '9px 16px', fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: F, display: 'flex', alignItems: 'center', gap: 6, boxShadow: `0 4px 14px ${tabShadow}` }}>
+            style={{ background: ACCENT_FILL, color: ON_ACCENT, border: 'none', borderRadius: 12, padding: isMobile ? '8px 12px' : '9px 16px', fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: F, display: 'flex', alignItems: 'center', gap: 6, boxShadow: ACCENT_SHADOW }}>
             <Plus size={14} />{isMobile ? '' : ' New Class'}
           </button>
         </header>
 
-        {/* ── SCROLL AREA ── */}
-        <main style={{ flex: 1, overflowY: 'auto', padding: isMobile ? `16px 14px calc(80px + env(safe-area-inset-bottom, 0px))` : 24 }}>
+        {/* ── SCROLL AREA ── sunrise behind the top, content floats on it */}
+        <main style={{ flex: 1, overflowY: 'auto', padding: isMobile ? `16px 14px calc(80px + env(safe-area-inset-bottom, 0px))` : 24, position: 'relative' }}>
+          {d.activeTab !== 'messages' && <SunriseBackdrop />}
+          <div style={{ position: 'relative' }}>
           {/* Missed calls & new messages while away */}
           <DashboardAlertsBar isDark={d.isDarkMode} onOpenMessages={() => d.setActiveTab("messages")} />
 
           {/* Toast */}
           {d.toast && (
-            <div style={{ position: 'fixed', top: 20, right: 20, zIndex: 99999, padding: '12px 22px', borderRadius: 20, fontWeight: 700, fontSize: 14, background: d.toast.type === 'error' ? '#ef4444' : '#10b981', color: '#fff', fontFamily: F, boxShadow: '0 8px 24px rgba(0,0,0,0.15)' }}>
-              {d.toast.type === 'error' ? '😬' : '✅'} {d.toast.message}
+            <div className="ui-toast-in" role="status" style={{ position: 'fixed', top: 20, right: 20, zIndex: 99999, padding: '11px 16px 11px 14px', borderRadius: 14, fontWeight: 700, fontSize: 13, background: 'var(--a-surface)', color: col.heading, border: `1px solid ${col.border}`, fontFamily: F, boxShadow: 'var(--a-shadow-pop)', display: 'flex', alignItems: 'center', gap: 9 }}>
+              {d.toast.type === 'error' ? <AlertCircle size={17} color="#dc2626" /> : <CheckCircle size={17} color="#16a34a" />}
+              {d.toast.message}
             </div>
           )}
 
@@ -394,68 +458,57 @@ export default function SunshineShell() {
           {d.activeTab === 'dashboard' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
-              {/* Welcome hero */}
-              <div style={{ background: 'linear-gradient(135deg,#f97316 0%,#f43f5e 100%)', borderRadius: isMobile ? 22 : 28, padding: isMobile ? '18px 20px' : '28px 32px', color: '#fff', position: 'relative', overflow: 'hidden', boxShadow: '0 12px 40px rgba(249,115,22,0.3)' }}>
-                <div style={{ position: 'absolute', top: -30, right: -30, width: 160, height: 160, borderRadius: '50%', background: 'rgba(255,255,255,0.07)' }} />
-                <div style={{ position: 'absolute', bottom: -20, right: 60, width: 100, height: 100, borderRadius: '50%', background: 'rgba(255,255,255,0.05)' }} />
-                <div style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 20 }}>
-                  <div>
-                    <p style={{ margin: '0 0 4px', fontSize: 12, fontWeight: 700, opacity: 0.85, letterSpacing: '.08em', textTransform: 'uppercase' }}>Welcome back 🎉</p>
-                    <h1 style={{ margin: '0 0 10px', fontSize: 26, fontWeight: 900, fontFamily: F }}>Hey, {d.teacherInfo?.firstName}! 👋</h1>
-                    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                      <span style={{ background: 'rgba(255,255,255,0.2)', borderRadius: 999, padding: '4px 12px', fontSize: 13, fontWeight: 700 }}>
-                        👥 {d.students.length} students
-                      </span>
-                      <span style={{ background: 'rgba(255,255,255,0.2)', borderRadius: 999, padding: '4px 12px', fontSize: 13, fontWeight: 700 }}>
-                        📅 {d.classes.length} classes
-                      </span>
-                      {d.pendingBookings > 0 && (
-                        <span style={{ background: 'rgba(255,255,255,0.25)', borderRadius: 999, padding: '4px 12px', fontSize: 13, fontWeight: 700 }}>
-                          🔔 {d.pendingBookings} pending
+              {/* Welcome banner — same sunrise art as the admin overview */}
+              <section style={{ position: 'relative', overflow: 'hidden', borderRadius: 20, padding: isMobile ? '18px 20px' : '26px 28px', background: 'var(--a-surface)', border: `1px solid ${col.border}`, boxShadow: 'var(--a-shadow)' }}>
+                <BannerArt ringId="ts-banner-ring" />
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 20 }}>
+                  <div style={{ minWidth: 0 }}>
+                    <p style={{ margin: '0 0 6px', background: ACCENT_FILL, WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent', display: 'inline-block', fontWeight: 800, fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                      {new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}
+                    </p>
+                    <h2 style={{ margin: '0 0 10px', fontSize: isMobile ? 21 : 24, fontWeight: 900, color: col.heading, fontFamily: F, letterSpacing: '-0.015em' }}>Hey, {d.teacherInfo?.firstName}! 👋</h2>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      {[
+                        { cat: 'teal',  Icon: Users,        text: `${d.students.length} students` },
+                        { cat: 'amber', Icon: CalendarDays, text: `${d.classes.length} classes` },
+                        ...(d.pendingBookings > 0 ? [{ cat: 'rose', Icon: Bell, text: `${d.pendingBookings} pending` }] : []),
+                      ].map(({ cat, Icon, text }) => (
+                        <span key={text} className={`cat-${cat}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'color-mix(in srgb, var(--a-surface) 82%, transparent)', backdropFilter: 'blur(6px)', border: `1px solid ${col.border}`, borderRadius: 999, padding: '5px 12px 5px 9px', fontSize: 12.5, fontWeight: 700, color: col.heading }}>
+                          <Icon size={14} color="var(--cat)" /> {text}
                         </span>
-                      )}
+                      ))}
                     </div>
                   </div>
                   {d.teacherInfo?.photo ? (
                     <img
                       src={d.teacherInfo.photo}
                       alt={d.teacherInfo.firstName}
-                      style={{ width: 80, height: 80, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: '3px solid rgba(255,255,255,0.4)', boxShadow: '0 4px 20px rgba(0,0,0,0.25)' }}
+                      style={{ width: isMobile ? 60 : 76, height: isMobile ? 60 : 76, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: '3px solid var(--a-surface)', boxShadow: '0 0 0 2px var(--a-accent-line), var(--a-shadow-pop)' }}
                     />
                   ) : (
-                    <div style={{ width: 80, height: 80, borderRadius: '50%', flexShrink: 0, background: 'rgba(255,255,255,0.2)', border: '3px solid rgba(255,255,255,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 36, fontWeight: 900, color: '#fff', boxShadow: '0 4px 20px rgba(0,0,0,0.2)' }}>
-                      {(d.teacherInfo?.firstName?.[0] || 'T').toUpperCase()}
+                    <div style={{ width: isMobile ? 60 : 76, height: isMobile ? 60 : 76, borderRadius: '50%', flexShrink: 0, background: ACCENT_FILL, border: '3px solid var(--a-surface)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: isMobile ? 26 : 32, fontWeight: 900, color: ON_ACCENT, boxShadow: '0 0 0 2px var(--a-accent-line), var(--a-shadow-pop)' }}>
+                      {initial}
                     </div>
                   )}
                 </div>
-              </div>
+              </section>
 
               {/* Missed calls alert */}
               {missedCallCount > 0 && (
                 <MissedCallsBanner missedCalls={missedCalls} clearMissedCalls={clearMissedCalls} col={col} isDarkMode={d.isDarkMode} />
               )}
 
-              {/* 4-stat strip */}
+              {/* 4-stat strip — topic tiles */}
               <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2,1fr)' : 'repeat(4,1fr)', gap: 12 }}>
-                {[
-                  { lucide: Users,        n: d.students.length,  l: 'Students',    grad: 'linear-gradient(135deg,#f97316,#fb923c)' },
-                  { lucide: CalendarDays, n: d.classes.length,   l: 'Classes',     grad: 'linear-gradient(135deg,#f97316,#f43f5e)' },
-                  { lucide: CheckCircle2, n: d.completedCount,   l: 'Completed',   grad: 'linear-gradient(135deg,#10b981,#34d399)' },
-                  { lucide: BookOpen,     n: d.homeworkToGrade,  l: 'To Grade',    grad: 'linear-gradient(135deg,#f43f5e,#fb7185)' },
-                ].map(({ lucide: LI, n, l, grad }) => (
-                  <div key={l} className="ts-card" style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: 20, padding: '16px', textAlign: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-                    <div style={{ width: 44, height: 44, borderRadius: 14, background: grad, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 10px', boxShadow: '0 4px 10px rgba(249,115,22,0.25)' }}>
-                      <LI size={20} color="#fff" strokeWidth={2} />
-                    </div>
-                    <div style={{ fontSize: 26, fontWeight: 900, color: col.heading, marginBottom: 2, fontFamily: F }}>{n}</div>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: col.muted, textTransform: 'uppercase', letterSpacing: '.05em' }}>{l}</div>
-                  </div>
-                ))}
+                <TopicTile cat="teal"  icon={Users}        value={d.students.length} label="Students" />
+                <TopicTile cat="amber" icon={CalendarDays} value={d.classes.length}  label="Classes" />
+                <TopicTile cat="green" icon={CheckCircle2} value={d.completedCount}  label="Completed" />
+                <TopicTile cat="rose"  icon={BookOpen}     value={d.homeworkToGrade} label="To Grade" />
               </div>
 
               {/* Class video links — Google Meet + Zoom in one collapsible */}
               {d.teacherInfo?._id && (
-                <div className="ts-card" style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: 24, overflow: 'hidden' }}>
+                <div style={{ ...card, overflow: 'hidden' }}>
                   <button onClick={() => d.setShowGoogleMeetSettings(!d.showGoogleMeetSettings)}
                     style={{ width: '100%', padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'transparent', border: 'none', cursor: 'pointer', fontFamily: F }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -476,13 +529,13 @@ export default function SunshineShell() {
                       </div>
                     </div>
                     <div style={{ transform: d.showGoogleMeetSettings ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>
-                      <svg style={{ width: 18, height: 18 }} fill="none" stroke={col.muted} viewBox="0 0 24 24">
+                      <svg style={{ width: 18, height: 18 }} fill="none" stroke="var(--a-muted)" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                       </svg>
                     </div>
                   </button>
                   {d.showGoogleMeetSettings && (
-                    <div style={{ padding: '16px 20px 20px', borderTop: `2px solid ${col.border}`, display: 'flex', flexDirection: 'column', gap: 16 }}>
+                    <div style={{ padding: '16px 20px 20px', borderTop: `1px solid ${col.border}`, display: 'flex', flexDirection: 'column', gap: 16 }}>
                       <GoogleMeetSettings
                         platform="google-meet"
                         teacherId={d.teacherInfo._id}
@@ -505,15 +558,15 @@ export default function SunshineShell() {
               {/* Classes area */}
               <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 300px', gap: 18 }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                  <div className="ts-card" style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: 24, padding: 20 }}>
-                    <h2 style={{ margin: '0 0 14px', fontSize: 17, fontWeight: 900, color: col.heading, fontFamily: F, display: 'flex', alignItems: 'center', gap: 8 }}>
-                      🔴 Live Classes
-                      {d.liveClasses.length > 0 && <span style={{ background: '#ef4444', color: '#fff', borderRadius: 999, padding: '2px 10px', fontSize: 12, fontWeight: 900 }}>{d.liveClasses.length}</span>}
+                  <div style={{ ...card, padding: 20 }}>
+                    <h2 style={sectionTitle}>
+                      <Radio size={16} color="#dc2626" /> Live Classes
+                      {d.liveClasses.length > 0 && <span style={{ background: '#dc2626', color: '#fff', borderRadius: 999, padding: '2px 10px', fontSize: 12, fontWeight: 900 }}>{d.liveClasses.length}</span>}
                     </h2>
                     <LiveClasses classes={d.liveClasses} onJoin={d.handleJoinClass} isDarkMode={d.isDarkMode} />
                   </div>
-                  <div className="ts-card" style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: 24, padding: 20 }}>
-                    <h2 style={{ margin: '0 0 14px', fontSize: 17, fontWeight: 900, color: col.heading, fontFamily: F }}>📅 Upcoming Classes</h2>
+                  <div style={{ ...card, padding: 20 }}>
+                    <h2 style={sectionTitle}><CalendarDays size={16} color="#d97706" /> Upcoming Classes</h2>
                     <UpcomingClasses
                       classes={d.upcomingClasses}
                       students={d.students}
@@ -527,19 +580,21 @@ export default function SunshineShell() {
                 {/* Right column */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                   {/* Quick actions */}
-                  <div className="ts-card" style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: 24, padding: 20 }}>
-                    <h2 style={{ margin: '0 0 14px', fontSize: 16, fontWeight: 900, color: col.heading, fontFamily: F }}>⚡ Quick Actions</h2>
+                  <div style={{ ...card, padding: 20 }}>
+                    <h2 style={sectionTitle}>⚡ Quick Actions</h2>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                       {[
-                        { icon: '➕', label: 'New Class',        action: () => d.setIsModalOpen(true)       },
-                        { icon: '🔄', label: 'Recurring Classes', action: () => setShowRecurringLocal(true)  },
-                        { icon: '📖', label: 'View Bookings',     action: () => d.setActiveTab('bookings')  },
-                        { icon: '👥', label: 'View Students',     action: () => d.setActiveTab('students')  },
-                        { icon: '🔃', label: 'Refresh Data',      action: d.fetchTeacherData                },
-                      ].map(({ icon, label, action }) => (
-                        <button key={label} className="ts-btn" onClick={action}
-                          style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 14, border: `2px solid ${col.border}`, background: col.cardAlt, cursor: 'pointer', fontFamily: F, textAlign: 'left' }}>
-                          <span style={{ fontSize: 16 }}>{icon}</span>
+                        { cat: 'accent', Icon: Plus,          label: 'New Class',         action: () => d.setIsModalOpen(true)       },
+                        { cat: 'amber',  Icon: Repeat,        label: 'Recurring Classes', action: () => setShowRecurringLocal(true)  },
+                        { cat: 'teal',   Icon: ClipboardList, label: 'View Bookings',     action: () => d.setActiveTab('bookings')  },
+                        { cat: 'sky',    Icon: Users,         label: 'View Students',     action: () => d.setActiveTab('students')  },
+                        { cat: 'stone',  Icon: RefreshCw,     label: 'Refresh Data',      action: d.fetchTeacherData                },
+                      ].map(({ cat, Icon, label, action }) => (
+                        <button key={label} className={`ts-btn ts-quick cat-${cat}`} onClick={action}
+                          style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 12, border: `1px solid ${col.border}`, background: col.cardAlt, cursor: 'pointer', fontFamily: F, textAlign: 'left' }}>
+                          <span style={{ width: 28, height: 28, borderRadius: 8, background: 'var(--cat-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            <Icon size={15} color="var(--cat)" strokeWidth={2.2} />
+                          </span>
                           <span style={{ fontSize: 13, fontWeight: 700, color: col.body }}>{label}</span>
                         </button>
                       ))}
@@ -548,21 +603,21 @@ export default function SunshineShell() {
 
                   {/* Homework / Quiz badges */}
                   {(d.homeworkToGrade > 0 || d.quizAttempted > 0) && (
-                    <div className="ts-card" style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: 24, padding: 20 }}>
-                      <h2 style={{ margin: '0 0 12px', fontSize: 16, fontWeight: 900, color: col.heading, fontFamily: F }}>📬 Needs Attention</h2>
+                    <div style={{ ...card, padding: 20 }}>
+                      <h2 style={sectionTitle}>📬 Needs Attention</h2>
                       {d.homeworkToGrade > 0 && (
-                        <div onClick={() => d.setActiveTab('homework')} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 14, background: d.isDarkMode ? 'rgba(236,72,153,0.1)' : '#fdf2f8', border: `2px solid ${d.isDarkMode ? 'rgba(236,72,153,0.2)' : '#fbcfe8'}`, cursor: 'pointer', marginBottom: 8 }}>
-                          <span style={{ fontSize: 20 }}>📚</span>
+                        <div className="cat-rose" onClick={() => d.setActiveTab('homework')} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 14, background: 'var(--cat-soft)', border: '1px solid var(--cat-line)', cursor: 'pointer', marginBottom: 8 }}>
+                          <BookOpen size={18} color="var(--cat)" />
                           <div style={{ flex: 1 }}>
-                            <p style={{ margin: 0, fontSize: 13, fontWeight: 800, color: col.heading }}>{d.homeworkToGrade} homework to grade</p>
+                            <p style={{ margin: 0, fontSize: 13, fontWeight: 800, color: 'var(--cat-ink)' }}>{d.homeworkToGrade} homework to grade</p>
                           </div>
                         </div>
                       )}
                       {d.quizAttempted > 0 && (
-                        <div onClick={() => d.setActiveTab('quiz')} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 14, background: d.isDarkMode ? 'rgba(249,115,22,0.1)' : '#fff7ed', border: `2px solid ${d.isDarkMode ? 'rgba(249,115,22,0.2)' : '#fed7aa'}`, cursor: 'pointer' }}>
-                          <span style={{ fontSize: 20 }}>📝</span>
+                        <div className="cat-amber" onClick={() => d.setActiveTab('quiz')} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 14, background: 'var(--cat-soft)', border: '1px solid var(--cat-line)', cursor: 'pointer' }}>
+                          <FileText size={18} color="var(--cat)" />
                           <div style={{ flex: 1 }}>
-                            <p style={{ margin: 0, fontSize: 13, fontWeight: 800, color: col.heading }}>{d.quizAttempted} quiz attempts to review</p>
+                            <p style={{ margin: 0, fontSize: 13, fontWeight: 800, color: 'var(--cat-ink)' }}>{d.quizAttempted} quiz attempts to review</p>
                           </div>
                         </div>
                       )}
@@ -572,29 +627,12 @@ export default function SunshineShell() {
                 </div>
               </div>
 
-              {/* Summary stats — full width below classes */}
+              {/* Summary stats — topic tiles (no top stripes) */}
               <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2,1fr)' : 'repeat(4,1fr)', gap: 14 }}>
-                {[
-                  { lucide: Users,        value: d.students.length,   label: 'Total Students',    sub: '+2 this month',       grad: 'linear-gradient(135deg,#3b82f6,#6366f1)' },
-                  { lucide: CalendarDays, value: d.classes.length,    label: 'Scheduled Classes', sub: 'Next 7 days',          grad: 'linear-gradient(135deg,#a855f7,#ec4899)' },
-                  { lucide: Clock4,       value: d.pendingBookings,   label: 'Pending Requests',  sub: 'Needs attention',      grad: 'linear-gradient(135deg,#f59e0b,#f97316)' },
-                  { lucide: CheckCircle2, value: d.completedCount,    label: 'Completed Today',   sub: 'Great progress!',      grad: 'linear-gradient(135deg,#10b981,#34d399)' },
-                ].map(({ lucide: LI, value, label, sub, grad }) => (
-                  <div key={label} className="ts-card" style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: 20, overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
-                    <div style={{ height: 4, background: grad }} />
-                    <div style={{ padding: '18px 18px 16px' }}>
-                      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14 }}>
-                        <div style={{ width: 42, height: 42, borderRadius: 12, background: grad, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 10px rgba(0,0,0,0.15)' }}>
-                          <LI size={20} color="#fff" strokeWidth={2} />
-                        </div>
-                        <span style={{ fontSize: 32, fontWeight: 900, color: col.heading, lineHeight: 1, fontFamily: F }}>{value}</span>
-                      </div>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: col.body, marginBottom: 3 }}>{label}</div>
-                      <div style={{ fontSize: 11, color: col.muted }}>{sub}</div>
-                    </div>
-                    <div style={{ height: 3, background: grad, transform: 'scaleX(0)', transformOrigin: 'left', transition: 'transform 0.3s' }} />
-                  </div>
-                ))}
+                <TopicTile cat="teal"  icon={Users}        value={d.students.length}  label="Total Students"    sub="+2 this month" />
+                <TopicTile cat="sky"   icon={CalendarDays} value={d.classes.length}   label="Scheduled Classes" sub="Next 7 days" />
+                <TopicTile cat="amber" icon={Clock4}       value={d.pendingBookings}  label="Pending Requests"  sub="Needs attention" />
+                <TopicTile cat="green" icon={CheckCircle2} value={d.completedCount}   label="Completed Today"   sub="Great progress!" />
               </div>
             </div>
           )}
@@ -613,12 +651,13 @@ export default function SunshineShell() {
             <TabErrorBoundary key={d.activeTab}>
               <TeacherTabContent
                 d={d}
-                wrapStyle={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: 24, padding: 24 }}
-                msgStyle={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: 24, overflow: 'hidden' }}
+                wrapStyle={{ background: col.card, border: `1px solid ${col.border}`, borderRadius: 20, padding: 24, boxShadow: 'var(--a-shadow)' }}
+                msgStyle={{ background: col.card, border: `1px solid ${col.border}`, borderRadius: 20, overflow: 'hidden' }}
                 onUnreadCount={d.setUnreadMessages}
               />
             </TabErrorBoundary>
           )}
+          </div>
         </main>
       </div>
 
@@ -630,20 +669,20 @@ export default function SunshineShell() {
         students={d.students}
         isDarkMode={d.isDarkMode}
         theme={{
-          accent:         '#f97316',
-          accentGradient: 'linear-gradient(135deg,#f97316,#fbbf24)',
-          softBg:         '#fff7ed',
-          softBorder:     '#fed7aa',
-          softText:       '#9a3412',
-          softBgDark:     'rgba(249,115,22,0.18)',
-          softBorderDark: 'rgba(249,115,22,0.4)',
-          softTextDark:   '#fed7aa',
+          accent:         'var(--a-accent)',
+          accentGradient: 'var(--a-accent-grad)',
+          softBg:         'var(--a-accent-soft)',
+          softBorder:     'var(--a-accent-line)',
+          softText:       'var(--a-accent-ink)',
+          softBgDark:     'var(--a-accent-soft)',
+          softBorderDark: 'var(--a-accent-line)',
+          softTextDark:   'var(--a-accent-ink)',
         }}
       />
 
       {(d.showRecurringForm || showRecurringLocal) && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 16 }}>
-          <div style={{ background: '#fff', borderRadius: 24, maxWidth: 900, width: '100%', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 24px 64px rgba(0,0,0,0.25)' }}>
+        <div className="ui-fade-in" style={{ position: 'fixed', inset: 0, background: 'rgba(28,20,15,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 16 }}>
+          <div className="ui-pop-in" style={{ background: 'var(--a-surface)', borderRadius: 20, maxWidth: 900, width: '100%', maxHeight: '90vh', overflowY: 'auto', boxShadow: 'var(--a-shadow-pop)' }}>
             <RecurringClassForm
               students={d.students}
               teacherInfo={d.teacherInfo}
@@ -692,15 +731,15 @@ export default function SunshineShell() {
 
       {/* Floating pill — switch to mobile view on small screens showing desktop layout */}
       {isSmallScreen && !isMobile && (
-        <button onClick={() => setViewMode('mobile')}
-          style={{ position: 'fixed', bottom: 16, right: 16, zIndex: 9999, display: 'flex', alignItems: 'center', gap: 6, padding: '10px 16px', borderRadius: 999, background: col.accent, color: '#fff', border: 'none', cursor: 'pointer', fontFamily: F, fontSize: 13, fontWeight: 800, boxShadow: '0 4px 18px rgba(249,115,22,0.45)' }}>
+        <button className="ts-btn" onClick={() => setViewMode('mobile')}
+          style={{ position: 'fixed', bottom: 16, right: 16, zIndex: 9999, display: 'flex', alignItems: 'center', gap: 6, padding: '10px 16px', borderRadius: 999, background: ACCENT_FILL, color: ON_ACCENT, border: 'none', cursor: 'pointer', fontFamily: F, fontSize: 13, fontWeight: 800, boxShadow: ACCENT_SHADOW }}>
           📱 Mobile View
         </button>
       )}
 
       {/* ── MOBILE BOTTOM NAV ── */}
       {isMobile && (
-        <nav style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: d.isDarkMode ? '#13111a' : '#fff', borderTop: `2px solid ${col.border}`, display: 'flex', zIndex: 200, boxShadow: '0 -4px 20px rgba(0,0,0,0.12)', paddingBottom: 'env(safe-area-inset-bottom,0px)' }}>
+        <nav style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: 'var(--a-surface)', borderTop: `1px solid ${col.border}`, display: 'flex', zIndex: 200, boxShadow: '0 -4px 20px rgba(90,45,15,0.10)', paddingBottom: 'env(safe-area-inset-bottom,0px)' }}>
           {[
             { key: 'dashboard', Icon: Home,          label: t('teacher.nav.dashboard') },
             { key: 'classes',   Icon: CalendarDays,  label: t('teacher.nav.myClasses') },
@@ -713,17 +752,17 @@ export default function SunshineShell() {
                         : 0;
             return (
               <button key={key} onClick={() => d.setActiveTab(key)}
-                style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: F, color: isActive ? col.accent : col.muted, position: 'relative', height: 62, paddingBottom: 6 }}>
+                style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: F, color: isActive ? 'var(--a-accent-ink)' : col.muted, position: 'relative', height: 62, paddingBottom: 6 }}>
                 <div style={{ position: 'relative' }}>
                   <Icon size={22} strokeWidth={isActive ? 2.4 : 1.8} />
                   {badge > 0 && (
-                    <span style={{ position: 'absolute', top: -7, right: -10, background: '#ef4444', color: '#fff', borderRadius: 999, minWidth: 18, height: 18, fontSize: 10, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px', border: `2px solid ${d.isDarkMode ? '#13111a' : '#fff'}` }}>
+                    <span style={{ position: 'absolute', top: -7, right: -10, background: '#dc2626', color: '#fff', borderRadius: 999, minWidth: 18, height: 18, fontSize: 10, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px', border: '2px solid var(--a-surface)' }}>
                       {badge > 99 ? '99+' : badge}
                     </span>
                   )}
                 </div>
                 <span style={{ fontSize: 10, fontWeight: isActive ? 800 : 600 }}>{label}</span>
-                {isActive && <span style={{ position: 'absolute', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: 28, height: 3, borderRadius: '3px 3px 0 0', background: col.accent }} />}
+                {isActive && <span style={{ position: 'absolute', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: 28, height: 3, borderRadius: '3px 3px 0 0', background: ACCENT_FILL }} />}
               </button>
             );
           })}
@@ -737,38 +776,38 @@ export default function SunshineShell() {
 
       {/* ── MOBILE MENU SHEET ── */}
       {isMobile && showMobileMenu && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 9500 }} onClick={() => setShowMobileMenu(false)}>
-          <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: d.isDarkMode ? '#13111a' : '#fff', borderRadius: '20px 20px 0 0', padding: '12px 16px 40px', maxHeight: '75vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
-            <div style={{ width: 36, height: 4, background: col.border, borderRadius: 999, margin: '0 auto 16px' }} />
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(28,20,15,0.5)', zIndex: 9500 }} onClick={() => setShowMobileMenu(false)}>
+          <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'var(--a-surface)', borderRadius: '20px 20px 0 0', padding: '12px 16px 40px', maxHeight: '75vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+            <div style={{ width: 36, height: 4, background: 'var(--a-line-strong)', borderRadius: 999, margin: '0 auto 16px' }} />
             <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              {NAV_GROUPS.flatMap(g => g.items)
+              {NAV_GROUPS.flatMap(g => g.items.map(item => ({ ...item, cat: g.cat })))
                 .filter(item => !['dashboard', 'classes', 'students', 'messages'].includes(item.key))
                 .map(item => {
                   const LI = item.lucide;
                   const isActive = d.activeTab === item.key;
                   return (
-                    <button key={item.key} onClick={() => { d.setActiveTab(item.key); setShowMobileMenu(false); }}
-                      style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', borderRadius: 14, border: 'none', background: isActive ? (d.isDarkMode ? 'rgba(249,115,22,0.18)' : '#fff7ed') : 'transparent', color: isActive ? col.accent : col.body, cursor: 'pointer', fontFamily: F, width: '100%' }}>
-                      <LI size={18} color={isActive ? col.accent : col.muted} strokeWidth={1.8} />
+                    <button key={item.key} className={`cat-${item.cat}`} onClick={() => { d.setActiveTab(item.key); setShowMobileMenu(false); }}
+                      style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', borderRadius: 12, border: 'none', background: isActive ? 'var(--cat-soft)' : 'transparent', color: isActive ? 'var(--cat-ink)' : col.body, cursor: 'pointer', fontFamily: F, width: '100%' }}>
+                      <LI size={18} color="var(--cat)" strokeWidth={1.8} />
                       <span style={{ fontSize: 14, fontWeight: isActive ? 800 : 600 }}>{item.label}</span>
                     </button>
                   );
                 })}
               <div style={{ borderTop: `1px solid ${col.border}`, margin: '8px 0 4px' }} />
               <button onClick={() => { setShowMobileMenu(false); d.setShowSettingsSidebar(true); }}
-                style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', borderRadius: 14, border: 'none', background: 'transparent', color: col.body, cursor: 'pointer', fontFamily: F, width: '100%' }}>
+                style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', borderRadius: 12, border: 'none', background: 'transparent', color: col.body, cursor: 'pointer', fontFamily: F, width: '100%' }}>
                 <Settings size={18} color={col.muted} strokeWidth={1.8} />
                 <span style={{ fontSize: 14, fontWeight: 600 }}>{t('teacher.sidebar.settings')}</span>
               </button>
               <LanguageSwitcher col={col} fontFamily={F} />
               <button onClick={() => setViewMode('desktop')}
-                style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', borderRadius: 14, border: 'none', background: 'transparent', color: col.body, cursor: 'pointer', fontFamily: F, width: '100%' }}>
+                style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', borderRadius: 12, border: 'none', background: 'transparent', color: col.body, cursor: 'pointer', fontFamily: F, width: '100%' }}>
                 <span style={{ fontSize: 18 }}>🖥️</span>
                 <span style={{ fontSize: 14, fontWeight: 600 }}>{t('teacher.sidebar.desktopView')}</span>
               </button>
               <button onClick={d.handleLogout}
-                style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', borderRadius: 14, border: 'none', background: 'transparent', color: '#ef4444', cursor: 'pointer', fontFamily: F, width: '100%' }}>
-                <LogOut size={18} color="#ef4444" strokeWidth={1.8} />
+                style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', borderRadius: 12, border: 'none', background: 'transparent', color: '#dc2626', cursor: 'pointer', fontFamily: F, width: '100%' }}>
+                <LogOut size={18} color="#dc2626" strokeWidth={1.8} />
                 <span style={{ fontSize: 14, fontWeight: 600 }}>{t('teacher.sidebar.signOut')}</span>
               </button>
             </div>

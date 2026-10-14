@@ -32,6 +32,7 @@ import ChangeEmail               from '../../../../components/admin/auth/ChangeE
 import AnalyticsPinSettings      from '../../../../components/admin/auth/AnalyticsPinSettings';
 import { dateLocale } from "../../../../i18n/dateLocale.js";
 import { adminAccent, adminOnAccent } from "../../../../utils/adminAccent";
+import { SunriseBackdrop, SunsetGlow } from "../../../../components/dashboard/SunriseArt";
 
 // Tab components — lazy loaded
 const OverviewTab        = lazy(() => import('../../tabs/OverviewTab'));
@@ -165,96 +166,6 @@ function TabLoader() {
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '300px', fontFamily: F }}>
       <style>{`@keyframes as-spin{to{transform:rotate(360deg)}}`}</style>
       <div style={{ width: 28, height: 28, borderRadius: '50%', border: '3px solid var(--a-line)', borderTopColor: 'var(--a-accent)', animation: 'as-spin .7s linear infinite' }} />
-    </div>
-  );
-}
-
-// ── Sunrise backdrop ─────────────────────────────────────────────────────────
-// Page-wide version of the overview banner: orange glow with a golden core, the
-// accent/pink corner, orange→pink rings and twinkling sparkles. Softer than the
-// banner so tables and forms stay easy to read; fades out down the page.
-// Sits first inside <main>; content follows in a positioned wrapper (no z-index,
-// so modals keep their existing stacking).
-const BACKDROP_SPARKLES = [
-  { left: '24%', top: 54, size: 7, color: '#f97316', delay: '0s' },
-  { left: '47%', top: 22, size: 5, color: '#fbbf24', delay: '0.9s' },
-  { left: '66%', top: 96, size: 6, color: 'var(--a-accent)', delay: '1.7s' },
-  { left: '83%', top: 190, size: 5, color: '#fb923c', delay: '2.5s' },
-];
-
-function SunriseBackdrop() {
-  return (
-    <div aria-hidden="true" style={{
-      position: 'absolute', top: 0, left: 0, right: 0, height: 560, pointerEvents: 'none', overflow: 'hidden',
-      WebkitMaskImage: 'linear-gradient(to bottom, #000 40%, transparent 100%)',
-      maskImage: 'linear-gradient(to bottom, #000 40%, transparent 100%)',
-    }}>
-      <div style={{ position: 'absolute', inset: 0, background: [
-        'radial-gradient(10% 22% at 52% 0%, rgba(255,214,102,0.5) 0%, transparent 100%)',
-        'radial-gradient(34% 62% at 52% -8%, rgba(249,115,22,0.36) 0%, rgba(251,146,60,0.15) 45%, transparent 75%)',
-        'radial-gradient(40% 72% at 100% -5%, color-mix(in srgb, var(--a-accent) 32%, transparent) 0%, color-mix(in srgb, var(--a-pink) 13%, transparent) 45%, transparent 75%)',
-        'radial-gradient(26% 52% at 0% 0%, color-mix(in srgb, var(--a-pink) 18%, transparent) 0%, transparent 75%)',
-      ].join(', ') }} />
-      <svg width="440" height="440" viewBox="0 0 440 440" style={{ position: 'absolute', right: -150, top: -180, filter: 'drop-shadow(0 0 6px rgba(249,115,22,0.3))' }}>
-        <defs>
-          <linearGradient id="as-bg-ring" x1="0" y1="1" x2="1" y2="0">
-            <stop offset="0%" stopColor="#f97316" />
-            <stop offset="100%" stopColor="var(--a-accent)" />
-          </linearGradient>
-        </defs>
-        {[75, 125, 175].map((r, i) => (
-          <circle key={r} cx="220" cy="220" r={r} fill="none" stroke="url(#as-bg-ring)" strokeOpacity={0.5 - i * 0.12} strokeWidth={i === 0 ? 2.5 : 1.75} />
-        ))}
-      </svg>
-      <svg width="200" height="200" viewBox="0 0 200 200" style={{ position: 'absolute', left: '32%', top: -128, filter: 'drop-shadow(0 0 5px rgba(249,115,22,0.35))' }}>
-        {[45, 80].map((r, i) => (
-          <circle key={r} cx="100" cy="100" r={r} fill="none" stroke="#f97316" strokeOpacity={0.38 - i * 0.12} strokeWidth="1.75" />
-        ))}
-      </svg>
-      {BACKDROP_SPARKLES.map((d, i) => (
-        <span key={i} className="as-sparkle" style={{ position: 'absolute', left: d.left, top: d.top, width: d.size, height: d.size, borderRadius: '50%', background: d.color, boxShadow: `0 0 10px 2px ${d.color}`, animationDelay: d.delay }} />
-      ))}
-    </div>
-  );
-}
-
-// ── Sunset footer glow ───────────────────────────────────────────────────────
-// Mirror of the sunrise, pinned to the bottom of the visible page (it does not
-// scroll), so long and short pages both end in colour instead of plain blush.
-// Pink rises from the lower-left, orange/amber glows lower-right.
-const SUNSET_SPARKLES = [
-  { left: '14%', bottom: 96, size: 6, color: 'var(--a-accent)', delay: '0.4s' },
-  { left: '41%', bottom: 40, size: 5, color: '#fbbf24', delay: '1.5s' },
-  { left: '72%', bottom: 120, size: 7, color: '#f97316', delay: '2.3s' },
-  { left: '90%', bottom: 58, size: 5, color: '#fb923c', delay: '0.9s' },
-];
-
-function SunsetGlow() {
-  return (
-    <div aria-hidden="true" style={{
-      position: 'absolute', left: 0, right: 0, bottom: 0, height: 340, pointerEvents: 'none', overflow: 'hidden',
-      WebkitMaskImage: 'linear-gradient(to top, #000 35%, transparent 100%)',
-      maskImage: 'linear-gradient(to top, #000 35%, transparent 100%)',
-    }}>
-      <div style={{ position: 'absolute', inset: 0, background: [
-        'radial-gradient(38% 80% at 0% 105%, color-mix(in srgb, var(--a-accent) 34%, transparent) 0%, color-mix(in srgb, var(--a-pink) 14%, transparent) 45%, transparent 75%)',
-        'radial-gradient(34% 70% at 74% 112%, rgba(249,115,22,0.34) 0%, rgba(251,146,60,0.14) 45%, transparent 75%)',
-        'radial-gradient(10% 24% at 74% 100%, rgba(255,214,102,0.45) 0%, transparent 100%)',
-        'radial-gradient(28% 60% at 100% 100%, color-mix(in srgb, var(--a-pink) 20%, transparent) 0%, transparent 75%)',
-      ].join(', ') }} />
-      <svg width="420" height="420" viewBox="0 0 420 420" style={{ position: 'absolute', left: -150, bottom: -180, filter: 'drop-shadow(0 0 6px rgba(249,115,22,0.3))' }}>
-        {[75, 125, 175].map((r, i) => (
-          <circle key={r} cx="210" cy="210" r={r} fill="none" stroke="url(#as-bg-ring)" strokeOpacity={0.5 - i * 0.12} strokeWidth={i === 0 ? 2.5 : 1.75} />
-        ))}
-      </svg>
-      <svg width="200" height="200" viewBox="0 0 200 200" style={{ position: 'absolute', right: '18%', bottom: -120, filter: 'drop-shadow(0 0 5px rgba(249,115,22,0.35))' }}>
-        {[45, 80].map((r, i) => (
-          <circle key={r} cx="100" cy="100" r={r} fill="none" stroke="#f97316" strokeOpacity={0.38 - i * 0.12} strokeWidth="1.75" />
-        ))}
-      </svg>
-      {SUNSET_SPARKLES.map((d, i) => (
-        <span key={i} className="as-sparkle" style={{ position: 'absolute', left: d.left, bottom: d.bottom, width: d.size, height: d.size, borderRadius: '50%', background: d.color, boxShadow: `0 0 10px 2px ${d.color}`, animationDelay: d.delay }} />
-      ))}
     </div>
   );
 }
@@ -529,14 +440,6 @@ export default function SunshineShell() {
           outline: 2px solid var(--a-accent); outline-offset: 2px;
         }
         .as-root ::selection { background: var(--a-accent-soft); }
-        /* Overview banner: one light sweep on open + slow sparkle twinkle (both off for reduced motion) */
-        .as-hero-shine { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
-        .as-hero-shine::before { content: ""; position: absolute; top: -20%; bottom: -20%; width: 40%; left: 0;
-          background: linear-gradient(100deg, transparent 0%, rgba(255,255,255,0.6) 50%, transparent 100%);
-          transform: translateX(-120%) skewX(-12deg); animation: as-shine 1.6s cubic-bezier(0.23, 1, 0.32, 1) 0.25s both; }
-        @keyframes as-shine { to { transform: translateX(320%) skewX(-12deg); } }
-        .as-sparkle { animation: as-twinkle 3.2s ease-in-out infinite; }
-        @keyframes as-twinkle { 0%, 100% { opacity: 0.95; transform: scale(1); } 50% { opacity: 0.45; transform: scale(0.7); } }
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: var(--a-line-strong); border-radius: 10px; }

@@ -12,8 +12,8 @@ import Pagination from "../../../components/Pagination";
 import { downloadQuizResultPdf } from "../../../utils/quizPdf";
 
 // Center brand colour (set by utils/branding.js) — never hard-code a theme colour here
-const BRAND  = "var(--brand-primary, #2563eb)";
-const brandA = (a) => `rgba(var(--brand-primary-rgb, 37, 99, 235), ${a})`;
+const BRAND  = "var(--as-accent, var(--brand-primary, #2563eb))";
+const brandA = (a) => `color-mix(in srgb, var(--as-accent, var(--brand-primary, #2563eb)) calc(${a} * 100%), transparent)`;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const STATUS_CONFIG = {
@@ -43,7 +43,7 @@ function ScoreBar({ percentage }) {
   const color = percentage >= 80 ? "#10b981" : percentage >= 60 ? "#f59e0b" : "#ef4444";
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-      <div style={{ flex: 1, height: 8, background: "#e5e7eb", borderRadius: 4, overflow: "hidden" }}>
+      <div style={{ flex: 1, height: 8, background: "var(--as-raised, #e5e7eb)", borderRadius: 4, overflow: "hidden" }}>
         <div style={{ width: `${percentage}%`, height: "100%", background: color, borderRadius: 4, transition: "width 0.5s" }} />
       </div>
       <span style={{ fontWeight: 800, fontSize: 14, color }}>{percentage}%</span>
@@ -53,9 +53,9 @@ function ScoreBar({ percentage }) {
 
 // ── Question builder ──────────────────────────────────────────────────────────
 function QuestionBuilder({ questions, setQuestions, isDarkMode }) {
-  const bg    = isDarkMode ? "#0f172a" : "#f8fafc";
-  const bdr   = isDarkMode ? "#334155" : "#e2e8f0";
-  const txtcl = isDarkMode ? "#f1f5f9" : "#1e293b";
+  const bg    = isDarkMode ? "var(--as-surface, #0f172a)" : "var(--as-raised, #f8fafc)";
+  const bdr   = isDarkMode ? "var(--as-ink-2, #334155)" : "var(--as-ink, #e2e8f0)";
+  const txtcl = isDarkMode ? "var(--as-ink, #f1f5f9)" : "var(--as-ink, #1e293b)";
 
   const addQuestion  = () => { if (questions.length < 50) setQuestions(p => [...p, blankQuestion()]); };
   const removeQuestion = (i) => setQuestions(p => p.filter((_, j) => j !== i));
@@ -80,7 +80,7 @@ function QuestionBuilder({ questions, setQuestions, isDarkMode }) {
             </span>
             <input value={q.question} onChange={e => updateQ(qi, "question", e.target.value)}
               placeholder={`Question ${qi + 1}…`} maxLength={1000}
-              style={{ flex: 1, padding: "8px 12px", borderRadius: 8, border: `1.5px solid ${bdr}`, fontSize: 13, background: isDarkMode ? "#1e293b" : "#fff", color: txtcl }} />
+              style={{ flex: 1, padding: "8px 12px", borderRadius: 8, border: `1.5px solid ${bdr}`, fontSize: 13, background: isDarkMode ? "var(--as-raised, #1e293b)" : "var(--as-surface, #fff)", color: txtcl }} />
             <button type="button" onClick={() => removeQuestion(qi)}
               style={{ background: "none", border: "none", cursor: "pointer", color: "#ef4444", padding: 4, flexShrink: 0 }}>
               <Trash2 size={15} />
@@ -91,16 +91,16 @@ function QuestionBuilder({ questions, setQuestions, isDarkMode }) {
             {q.options.map((opt, oi) => (
               <div key={oi} style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <button type="button" onClick={() => updateQ(qi, "correctIndex", oi)} title="Mark correct"
-                  style={{ width: 22, height: 22, borderRadius: "50%", border: `2px solid ${q.correctIndex === oi ? "#10b981" : bdr}`, background: q.correctIndex === oi ? "#10b981" : isDarkMode ? "#1e293b" : "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
+                  style={{ width: 22, height: 22, borderRadius: "50%", border: `2px solid ${q.correctIndex === oi ? "#10b981" : bdr}`, background: q.correctIndex === oi ? "#10b981" : isDarkMode ? "var(--as-raised, #1e293b)" : "var(--as-surface, #fff)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
                   {q.correctIndex === oi && <Check size={12} color="#fff" />}
                 </button>
-                <span style={{ fontSize: 11, fontWeight: 700, color: "#64748b", width: 14, flexShrink: 0 }}>{String.fromCharCode(65 + oi)}.</span>
+                <span style={{ fontSize: 11, fontWeight: 700, color: "var(--as-ink-2, #64748b)", width: 14, flexShrink: 0 }}>{String.fromCharCode(65 + oi)}.</span>
                 <input value={opt.text} onChange={e => updateOption(qi, oi, e.target.value)}
                   placeholder={`Option ${String.fromCharCode(65 + oi)}`} maxLength={500}
-                  style={{ flex: 1, padding: "6px 10px", borderRadius: 8, border: `1.5px solid ${q.correctIndex === oi ? "#86efac" : bdr}`, fontSize: 13, background: q.correctIndex === oi ? (isDarkMode ? "#1a3a2a" : "#f0fdf4") : (isDarkMode ? "#1e293b" : "#fff"), color: txtcl }} />
+                  style={{ flex: 1, padding: "6px 10px", borderRadius: 8, border: `1.5px solid ${q.correctIndex === oi ? "#86efac" : bdr}`, fontSize: 13, background: q.correctIndex === oi ? (isDarkMode ? "#1a3a2a" : "#f0fdf4") : (isDarkMode ? "var(--as-raised, #1e293b)" : "var(--as-surface, #fff)"), color: txtcl }} />
                 {q.options.length > 2 && (
                   <button type="button" onClick={() => removeOption(qi, oi)}
-                    style={{ background: "none", border: "none", cursor: "pointer", color: "#94a3b8", padding: 2, flexShrink: 0 }}>
+                    style={{ background: "none", border: "none", cursor: "pointer", color: "var(--as-muted, #94a3b8)", padding: 2, flexShrink: 0 }}>
                     <X size={12} />
                   </button>
                 )}
@@ -114,7 +114,7 @@ function QuestionBuilder({ questions, setQuestions, isDarkMode }) {
             )}
             <input value={q.explanation} onChange={e => updateQ(qi, "explanation", e.target.value)}
               placeholder="Explanation (shown after submission, optional)" maxLength={500}
-              style={{ marginTop: 4, padding: "6px 10px", borderRadius: 8, border: `1.5px solid ${bdr}`, fontSize: 12, color: "#64748b", background: isDarkMode ? "#1e293b" : "#fff" }} />
+              style={{ marginTop: 4, padding: "6px 10px", borderRadius: 8, border: `1.5px solid ${bdr}`, fontSize: 12, color: "var(--as-ink-2, #64748b)", background: isDarkMode ? "var(--as-raised, #1e293b)" : "var(--as-surface, #fff)" }} />
           </div>
         </div>
       ))}
@@ -158,13 +158,13 @@ function ResultViewer({ quiz, attempt, c }) {
               Q{i + 1}: {q.question}
             </div>
             {q.options.map((opt, oi) => (
-              <div key={oi} style={{ padding: "5px 10px", borderRadius: 6, marginBottom: 3, fontSize: 12, background: oi === q.correctIndex ? "#dcfce7" : oi === studentAns && !correct ? "#fee2e2" : "transparent", fontWeight: oi === q.correctIndex || oi === studentAns ? 700 : 400, color: oi === q.correctIndex ? "#166534" : oi === studentAns && !correct ? "#991b1b" : "#475569" }}>
+              <div key={oi} style={{ padding: "5px 10px", borderRadius: 6, marginBottom: 3, fontSize: 12, background: oi === q.correctIndex ? "#dcfce7" : oi === studentAns && !correct ? "#fee2e2" : "transparent", fontWeight: oi === q.correctIndex || oi === studentAns ? 700 : 400, color: oi === q.correctIndex ? "#166534" : oi === studentAns && !correct ? "#991b1b" : "var(--as-ink-2, #475569)" }}>
                 {String.fromCharCode(65 + oi)}. {opt.text}
                 {oi === q.correctIndex && " ✓"}
                 {oi === studentAns && !correct && " ← student's answer"}
               </div>
             ))}
-            {q.explanation && <div style={{ marginTop: 6, fontSize: 12, color: "#475569", fontStyle: "italic" }}>💡 {q.explanation}</div>}
+            {q.explanation && <div style={{ marginTop: 6, fontSize: 12, color: "var(--as-ink-2, #475569)", fontStyle: "italic" }}>💡 {q.explanation}</div>}
           </div>
         );
       })}
@@ -181,9 +181,9 @@ function TemplatePicker({ templates, onLoad, onClose, isDarkMode }) {
     t.name.toLowerCase().includes(search.toLowerCase())
   );
 
-  const bg  = isDarkMode ? "#1e293b" : "#fff";
-  const bdr = isDarkMode ? "#334155" : "#e2e8f0";
-  const txt = isDarkMode ? "#f1f5f9" : "#1e293b";
+  const bg  = isDarkMode ? "var(--as-raised, #1e293b)" : "var(--as-surface, #fff)";
+  const bdr = isDarkMode ? "var(--as-ink-2, #334155)" : "var(--as-ink, #e2e8f0)";
+  const txt = isDarkMode ? "var(--as-ink, #f1f5f9)" : "var(--as-ink, #1e293b)";
 
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 9000, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
@@ -192,14 +192,14 @@ function TemplatePicker({ templates, onLoad, onClose, isDarkMode }) {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div>
             <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: txt }}>📁 Load Template</h2>
-            <p style={{ margin: "4px 0 0", fontSize: 13, color: "#64748b" }}>{templates.length} saved template{templates.length !== 1 ? "s" : ""}</p>
+            <p style={{ margin: "4px 0 0", fontSize: 13, color: "var(--as-ink-2, #64748b)" }}>{templates.length} saved template{templates.length !== 1 ? "s" : ""}</p>
           </div>
-          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "#94a3b8", padding: 4 }}><X size={20} /></button>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--as-muted, #94a3b8)", padding: 4 }}><X size={20} /></button>
         </div>
 
         {/* Shuffle toggle */}
         <label style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderRadius: 10, border: `1.5px solid ${doShuffle ? BRAND : bdr}`, background: doShuffle ? (isDarkMode ? brandA(0.15) : brandA(0.07)) : "transparent", cursor: "pointer", userSelect: "none" }}>
-          <input type="checkbox" checked={doShuffle} onChange={e => setDoShuffle(e.target.checked)} style={{ accentColor: "var(--brand-primary, #2563eb)", width: 16, height: 16 }} />
+          <input type="checkbox" checked={doShuffle} onChange={e => setDoShuffle(e.target.checked)} style={{ accentColor: "var(--as-accent, var(--brand-primary, #2563eb))", width: 16, height: 16 }} />
           <Shuffle size={15} color={BRAND} />
           <span style={{ fontWeight: 700, fontSize: 13, color: txt }}>Shuffle question order when loading</span>
         </label>
@@ -207,17 +207,17 @@ function TemplatePicker({ templates, onLoad, onClose, isDarkMode }) {
         {/* Search */}
         <input value={search} onChange={e => setSearch(e.target.value)}
           placeholder="Search templates…"
-          style={{ padding: "9px 14px", borderRadius: 10, border: `1.5px solid ${bdr}`, fontSize: 13, background: isDarkMode ? "#0f172a" : "#f8fafc", color: txt }} />
+          style={{ padding: "9px 14px", borderRadius: 10, border: `1.5px solid ${bdr}`, fontSize: 13, background: isDarkMode ? "var(--as-surface, #0f172a)" : "var(--as-raised, #f8fafc)", color: txt }} />
 
         {/* List */}
         <div style={{ overflowY: "auto", display: "flex", flexDirection: "column", gap: 8 }}>
           {shown.length === 0 ? (
-            <div style={{ textAlign: "center", padding: 40, color: "#94a3b8" }}>No templates found</div>
+            <div style={{ textAlign: "center", padding: 40, color: "var(--as-muted, #94a3b8)" }}>No templates found</div>
           ) : shown.map(t => (
             <button key={t._id} onClick={() => onLoad(t, doShuffle)}
-              style={{ textAlign: "left", padding: "14px 16px", borderRadius: 12, border: `1.5px solid ${bdr}`, background: isDarkMode ? "#0f172a" : "#f8fafc", cursor: "pointer", fontFamily: "inherit" }}>
+              style={{ textAlign: "left", padding: "14px 16px", borderRadius: 12, border: `1.5px solid ${bdr}`, background: isDarkMode ? "var(--as-surface, #0f172a)" : "var(--as-raised, #f8fafc)", cursor: "pointer", fontFamily: "inherit" }}>
               <div style={{ fontWeight: 700, fontSize: 14, color: txt, marginBottom: 4 }}>{t.name}</div>
-              <div style={{ fontSize: 12, color: "#64748b", display: "flex", gap: 12 }}>
+              <div style={{ fontSize: 12, color: "var(--as-ink-2, #64748b)", display: "flex", gap: 12 }}>
                 <span>📋 {t.questions.length} questions</span>
                 <span>⏱ {t.timeLimit} min</span>
                 <span>🔄 Used {t.usageCount} time{t.usageCount !== 1 ? "s" : ""}</span>
@@ -234,21 +234,21 @@ function TemplatePicker({ templates, onLoad, onClose, isDarkMode }) {
 // ── Save-as-template modal ────────────────────────────────────────────────────
 function SaveTemplateModal({ onSave, onClose, isDarkMode, defaultName }) {
   const [name, setName] = useState(defaultName || "");
-  const bg  = isDarkMode ? "#1e293b" : "#fff";
-  const bdr = isDarkMode ? "#334155" : "#e2e8f0";
-  const txt = isDarkMode ? "#f1f5f9" : "#1e293b";
+  const bg  = isDarkMode ? "var(--as-raised, #1e293b)" : "var(--as-surface, #fff)";
+  const bdr = isDarkMode ? "var(--as-ink-2, #334155)" : "var(--as-ink, #e2e8f0)";
+  const txt = isDarkMode ? "var(--as-ink, #f1f5f9)" : "var(--as-ink, #1e293b)";
 
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 9000, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
       <div style={{ background: bg, borderRadius: 20, padding: 28, width: "100%", maxWidth: 420, boxShadow: "0 20px 60px rgba(0,0,0,0.3)" }}>
         <h2 style={{ margin: "0 0 6px", fontSize: 18, fontWeight: 800, color: txt }}>💾 Save as Template</h2>
-        <p style={{ margin: "0 0 18px", fontSize: 13, color: "#64748b" }}>Give this set of questions a name so you can reuse it later.</p>
-        <label style={{ fontSize: 12, fontWeight: 700, color: "#64748b", display: "block", marginBottom: 6 }}>Template Name *</label>
+        <p style={{ margin: "0 0 18px", fontSize: 13, color: "var(--as-ink-2, #64748b)" }}>Give this set of questions a name so you can reuse it later.</p>
+        <label style={{ fontSize: 12, fontWeight: 700, color: "var(--as-ink-2, #64748b)", display: "block", marginBottom: 6 }}>Template Name *</label>
         <input autoFocus value={name} onChange={e => setName(e.target.value)} maxLength={200}
           placeholder="e.g. Unit 3 – Past Simple (v1)"
-          style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: `1.5px solid ${bdr}`, fontSize: 14, background: isDarkMode ? "#0f172a" : "#f8fafc", color: txt, boxSizing: "border-box", marginBottom: 18 }} />
+          style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: `1.5px solid ${bdr}`, fontSize: 14, background: isDarkMode ? "var(--as-surface, #0f172a)" : "var(--as-raised, #f8fafc)", color: txt, boxSizing: "border-box", marginBottom: 18 }} />
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-          <button onClick={onClose} style={{ padding: "9px 20px", borderRadius: 10, border: `1.5px solid ${bdr}`, background: "transparent", color: "#64748b", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>Cancel</button>
+          <button onClick={onClose} style={{ padding: "9px 20px", borderRadius: 10, border: `1.5px solid ${bdr}`, background: "transparent", color: "var(--as-ink-2, #64748b)", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>Cancel</button>
           <button onClick={() => name.trim() && onSave(name.trim())}
             disabled={!name.trim()}
             style={{ padding: "9px 24px", borderRadius: 10, border: "none", background: BRAND, color: "#fff", fontWeight: 700, fontSize: 13, cursor: name.trim() ? "pointer" : "not-allowed", opacity: name.trim() ? 1 : 0.5 }}>
@@ -274,7 +274,7 @@ function TemplatesPanel({ templates, onLoad, onDelete, isDarkMode, c }) {
         </div>
         <input value={search} onChange={e => setSearch(e.target.value)}
           placeholder="Search…"
-          style={{ padding: "7px 12px", borderRadius: 8, border: `1.5px solid ${c.border}`, fontSize: 13, background: c.input || "#fff", color: c.heading, width: 180 }} />
+          style={{ padding: "7px 12px", borderRadius: 8, border: `1.5px solid ${c.border}`, fontSize: 13, background: c.input || "var(--as-surface, #fff)", color: c.heading, width: 180 }} />
       </div>
 
       {shown.length === 0 ? (
@@ -284,7 +284,7 @@ function TemplatesPanel({ templates, onLoad, onDelete, isDarkMode, c }) {
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {shown.map(t => (
-            <div key={t._id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", borderRadius: 12, border: `1.5px solid ${c.border}`, background: isDarkMode ? "#0f172a" : "#f8fafc" }}>
+            <div key={t._id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", borderRadius: 12, border: `1.5px solid ${c.border}`, background: isDarkMode ? "var(--as-surface, #0f172a)" : "var(--as-raised, #f8fafc)" }}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontWeight: 700, fontSize: 14, color: c.heading, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.name}</div>
                 <div style={{ fontSize: 12, color: c.body, marginTop: 2, display: "flex", gap: 10, flexWrap: "wrap" }}>
@@ -319,8 +319,8 @@ function TemplatesPanel({ templates, onLoad, onDelete, isDarkMode, c }) {
 // ── Main component ────────────────────────────────────────────────────────────
 export default function QuizTab({ teacherInfo, students, isDarkMode }) {
   const c = isDarkMode
-    ? { bg: "#0f172a", card: "#1e293b", border: "#334155", heading: "#f1f5f9", body: "#94a3b8", input: "#0f172a", inputBorder: "#475569" }
-    : { bg: "#f8fafc", card: "#ffffff", border: "#e2e8f0", heading: "#1e293b", body: "#64748b", input: "#fff", inputBorder: "#e2e8f0" };
+    ? { bg: "var(--as-surface, #0f172a)", card: "var(--as-raised, #1e293b)", border: "var(--as-line, #334155)", heading: "var(--as-ink, #f1f5f9)", body: "var(--as-muted, #94a3b8)", input: "var(--as-surface, #0f172a)", inputBorder: "var(--as-line, #475569)" }
+    : { bg: "var(--as-raised, #f8fafc)", card: "var(--as-surface, #ffffff)", border: "var(--as-line, #e2e8f0)", heading: "var(--as-ink, #1e293b)", body: "var(--as-ink-2, #64748b)", input: "var(--as-surface, #fff)", inputBorder: "var(--as-line, #e2e8f0)" };
 
   const [quizzes,          setQuizzes]          = useState([]);
   const [templates,        setTemplates]        = useState([]);
@@ -674,7 +674,7 @@ export default function QuizTab({ teacherInfo, students, isDarkMode }) {
               </button>
               {/* AI Generate */}
               <button type="button" onClick={() => setShowAI(v => !v)}
-                style={{ padding: "7px 14px", borderRadius: 9, border: `1.5px solid ${showAI ? "#f97316" : "#f97316"}`, background: showAI ? "linear-gradient(135deg,#f97316,#fb923c)" : (isDarkMode ? "rgba(249,115,22,0.1)" : "#fff7ed"), color: showAI ? "#fff" : "#f97316", fontWeight: 700, fontSize: 12, cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}>
+                style={{ padding: "7px 14px", borderRadius: 9, border: `1.5px solid ${showAI ? "var(--as-accent, #f97316)" : "var(--as-accent, #f97316)"}`, background: showAI ? "linear-gradient(135deg,var(--as-accent, #f97316),var(--as-accent, #fb923c))" : (isDarkMode ? "rgba(249,115,22,0.1)" : "var(--as-accent-soft, #fff7ed)"), color: showAI ? "#fff" : "var(--as-accent-ink, #f97316)", fontWeight: 700, fontSize: 12, cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}>
                 <Sparkles size={13} /> ✨ AI Generate
               </button>
             </div>
@@ -682,14 +682,14 @@ export default function QuizTab({ teacherInfo, students, isDarkMode }) {
 
           {/* ── AI Generator Panel ──────────────────────────────────────────── */}
           {showAI && (
-            <div style={{ background: isDarkMode ? "rgba(249,115,22,0.08)" : "#fff7ed", border: "2px solid #fed7aa", borderRadius: 14, padding: 18, marginBottom: 4 }}>
+            <div style={{ background: isDarkMode ? "rgba(249,115,22,0.08)" : "var(--as-accent-soft, #fff7ed)", border: "2px solid var(--as-accent-line, #fed7aa)", borderRadius: 14, padding: 18, marginBottom: 4 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
-                <Sparkles size={16} color="#f97316" />
+                <Sparkles size={16} color="var(--as-accent-ink, #f97316)" />
                 <span style={{ fontWeight: 800, fontSize: 14, color: c.heading }}>Generate Questions with AI</span>
               </div>
 
               {/* Mode tabs */}
-              <div style={{ display: "flex", gap: 4, marginBottom: 16, background: isDarkMode ? "#1a1d2e" : "#fff", borderRadius: 10, padding: 4, width: "fit-content", border: `1.5px solid #fed7aa` }}>
+              <div style={{ display: "flex", gap: 4, marginBottom: 16, background: isDarkMode ? "var(--as-raised, #1a1d2e)" : "var(--as-surface, #fff)", borderRadius: 10, padding: 4, width: "fit-content", border: `1.5px solid var(--as-accent-line, #fed7aa)` }}>
                 {[
                   { key: "topic", label: "📝 From Topic", sub: "Gemini · Free" },
                   { key: "notes", label: "📄 From Lesson Notes", sub: "Claude · Smarter" },
@@ -697,7 +697,7 @@ export default function QuizTab({ teacherInfo, students, isDarkMode }) {
                   <button key={m.key} type="button" onClick={() => setAiMode(m.key)}
                     style={{
                       padding: "7px 14px", borderRadius: 8, border: "none",
-                      background: aiMode === m.key ? "linear-gradient(135deg,#f97316,#fb923c)" : "transparent",
+                      background: aiMode === m.key ? "linear-gradient(135deg,var(--as-accent, #f97316),var(--as-accent, #fb923c))" : "transparent",
                       color: aiMode === m.key ? "#fff" : c.body,
                       fontWeight: 700, fontSize: 12, cursor: "pointer",
                       display: "flex", flexDirection: "column", alignItems: "center", gap: 1,
@@ -713,24 +713,24 @@ export default function QuizTab({ teacherInfo, students, isDarkMode }) {
                 <>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 100px 140px", gap: 10, marginBottom: 12 }}>
                     <div>
-                      <label style={{ fontSize: 11, fontWeight: 700, color: "#f97316", display: "block", marginBottom: 5 }}>Topic *</label>
+                      <label style={{ fontSize: 11, fontWeight: 700, color: "var(--as-accent-ink, #f97316)", display: "block", marginBottom: 5 }}>Topic *</label>
                       <input value={aiTopic} onChange={e => setAiTopic(e.target.value)}
                         onKeyDown={e => e.key === "Enter" && !aiLoading && handleAIGenerate()}
                         placeholder='e.g. "past tense verbs"'
                         maxLength={200}
-                        style={{ width: "100%", padding: "9px 12px", borderRadius: 9, border: "1.5px solid #fed7aa", background: c.input, color: c.heading, fontSize: 13, boxSizing: "border-box" }} />
+                        style={{ width: "100%", padding: "9px 12px", borderRadius: 9, border: "1.5px solid var(--as-accent-line, #fed7aa)", background: c.input, color: c.heading, fontSize: 13, boxSizing: "border-box" }} />
                     </div>
                     <div>
-                      <label style={{ fontSize: 11, fontWeight: 700, color: "#f97316", display: "block", marginBottom: 5 }}>Questions</label>
+                      <label style={{ fontSize: 11, fontWeight: 700, color: "var(--as-accent-ink, #f97316)", display: "block", marginBottom: 5 }}>Questions</label>
                       <select value={aiCount} onChange={e => setAiCount(e.target.value)}
-                        style={{ width: "100%", padding: "9px 10px", borderRadius: 9, border: "1.5px solid #fed7aa", background: c.input, color: c.heading, fontSize: 13 }}>
+                        style={{ width: "100%", padding: "9px 10px", borderRadius: 9, border: "1.5px solid var(--as-accent-line, #fed7aa)", background: c.input, color: c.heading, fontSize: 13 }}>
                         {[5, 8, 10, 15, 20].map(n => <option key={n} value={n}>{n} Qs</option>)}
                       </select>
                     </div>
                     <div>
-                      <label style={{ fontSize: 11, fontWeight: 700, color: "#f97316", display: "block", marginBottom: 5 }}>Level</label>
+                      <label style={{ fontSize: 11, fontWeight: 700, color: "var(--as-accent-ink, #f97316)", display: "block", marginBottom: 5 }}>Level</label>
                       <select value={aiDifficulty} onChange={e => setAiDifficulty(e.target.value)}
-                        style={{ width: "100%", padding: "9px 10px", borderRadius: 9, border: "1.5px solid #fed7aa", background: c.input, color: c.heading, fontSize: 13 }}>
+                        style={{ width: "100%", padding: "9px 10px", borderRadius: 9, border: "1.5px solid var(--as-accent-line, #fed7aa)", background: c.input, color: c.heading, fontSize: 13 }}>
                         <option value="beginner">Beginner</option>
                         <option value="intermediate">Intermediate</option>
                         <option value="advanced">Advanced</option>
@@ -739,10 +739,10 @@ export default function QuizTab({ teacherInfo, students, isDarkMode }) {
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                     <button type="button" onClick={handleAIGenerate} disabled={aiLoading || !aiTopic.trim()}
-                      style={{ padding: "9px 22px", borderRadius: 10, border: "none", background: aiLoading || !aiTopic.trim() ? "#e5e7eb" : "linear-gradient(135deg,#f97316,#fb923c)", color: aiLoading || !aiTopic.trim() ? "#9ca3af" : "#fff", fontWeight: 700, fontSize: 13, cursor: aiLoading || !aiTopic.trim() ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: 7 }}>
+                      style={{ padding: "9px 22px", borderRadius: 10, border: "none", background: aiLoading || !aiTopic.trim() ? "var(--as-raised, #e5e7eb)" : "linear-gradient(135deg,var(--as-accent, #f97316),var(--as-accent, #fb923c))", color: aiLoading || !aiTopic.trim() ? "var(--as-muted, #9ca3af)" : "#fff", fontWeight: 700, fontSize: 13, cursor: aiLoading || !aiTopic.trim() ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: 7 }}>
                       {aiLoading ? <><Loader size={13} style={{ animation: "spin 1s linear infinite" }} /> Generating…</> : <><Sparkles size={13} /> Generate Questions</>}
                     </button>
-                    <span style={{ fontSize: 12, color: "#94a3b8" }}>
+                    <span style={{ fontSize: 12, color: "var(--as-muted, #94a3b8)" }}>
                       {questions.length > 0 && questions[0].question ? "⚠️ This will replace your current questions" : "Questions will appear below"}
                     </span>
                   </div>
@@ -753,8 +753,8 @@ export default function QuizTab({ teacherInfo, students, isDarkMode }) {
               {aiMode === "notes" && (
                 <>
                   <div style={{ marginBottom: 12 }}>
-                    <label style={{ fontSize: 11, fontWeight: 700, color: "#f97316", display: "block", marginBottom: 5 }}>
-                      Upload PDF <span style={{ fontWeight: 500, color: "#94a3b8" }}>— or paste notes below (or both)</span>
+                    <label style={{ fontSize: 11, fontWeight: 700, color: "var(--as-accent-ink, #f97316)", display: "block", marginBottom: 5 }}>
+                      Upload PDF <span style={{ fontWeight: 500, color: "var(--as-muted, #94a3b8)" }}>— or paste notes below (or both)</span>
                     </label>
 
                     {/* PDF drop zone */}
@@ -763,9 +763,9 @@ export default function QuizTab({ teacherInfo, students, isDarkMode }) {
                       onDragOver={e => e.preventDefault()}
                       onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f?.type === "application/pdf") setAiPdfFile(f); }}
                       style={{
-                        border: `2px dashed ${aiPdfFile ? "#f97316" : "#fed7aa"}`,
+                        border: `2px dashed ${aiPdfFile ? "var(--as-accent, #f97316)" : "var(--as-accent-line, #fed7aa)"}`,
                         borderRadius: 10, padding: "14px 16px", cursor: "pointer",
-                        background: aiPdfFile ? (isDarkMode ? "rgba(249,115,22,0.1)" : "#fff7ed") : "transparent",
+                        background: aiPdfFile ? (isDarkMode ? "rgba(249,115,22,0.1)" : "var(--as-accent-soft, #fff7ed)") : "transparent",
                         display: "flex", alignItems: "center", gap: 10, marginBottom: 10,
                       }}>
                       <span style={{ fontSize: 22 }}>{aiPdfFile ? "📄" : "⬆️"}</span>
@@ -773,7 +773,7 @@ export default function QuizTab({ teacherInfo, students, isDarkMode }) {
                         <div style={{ fontSize: 13, fontWeight: 700, color: c.heading }}>
                           {aiPdfFile ? aiPdfFile.name : "Click or drag a PDF here"}
                         </div>
-                        <div style={{ fontSize: 11, color: "#94a3b8" }}>
+                        <div style={{ fontSize: 11, color: "var(--as-muted, #94a3b8)" }}>
                           {aiPdfFile ? `${(aiPdfFile.size / 1024).toFixed(0)} KB` : "Max 10 MB · PDF only"}
                         </div>
                       </div>
@@ -786,7 +786,7 @@ export default function QuizTab({ teacherInfo, students, isDarkMode }) {
                       onChange={e => { if (e.target.files[0]) setAiPdfFile(e.target.files[0]); e.target.value = ""; }} />
 
                     {/* Paste notes */}
-                    <label style={{ fontSize: 11, fontWeight: 700, color: "#f97316", display: "block", marginBottom: 5 }}>
+                    <label style={{ fontSize: 11, fontWeight: 700, color: "var(--as-accent-ink, #f97316)", display: "block", marginBottom: 5 }}>
                       Paste lesson notes
                     </label>
                     <textarea
@@ -795,22 +795,22 @@ export default function QuizTab({ teacherInfo, students, isDarkMode }) {
                       placeholder="Paste your lesson notes, vocabulary lists, grammar rules, or any text you taught this session…"
                       rows={5}
                       maxLength={20000}
-                      style={{ width: "100%", padding: "9px 12px", borderRadius: 9, border: "1.5px solid #fed7aa", background: c.input, color: c.heading, fontSize: 13, resize: "vertical", fontFamily: "inherit", lineHeight: 1.5, boxSizing: "border-box" }}
+                      style={{ width: "100%", padding: "9px 12px", borderRadius: 9, border: "1.5px solid var(--as-accent-line, #fed7aa)", background: c.input, color: c.heading, fontSize: 13, resize: "vertical", fontFamily: "inherit", lineHeight: 1.5, boxSizing: "border-box" }}
                     />
-                    <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 3, textAlign: "right" }}>
+                    <div style={{ fontSize: 11, color: "var(--as-muted, #94a3b8)", marginTop: 3, textAlign: "right" }}>
                       {aiNotes.length.toLocaleString()} / 20,000 chars
                     </div>
                   </div>
 
                   <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
                     <div>
-                      <label style={{ fontSize: 11, fontWeight: 700, color: "#f97316", display: "block", marginBottom: 5 }}>Questions</label>
+                      <label style={{ fontSize: 11, fontWeight: 700, color: "var(--as-accent-ink, #f97316)", display: "block", marginBottom: 5 }}>Questions</label>
                       <select value={aiCount} onChange={e => setAiCount(e.target.value)}
-                        style={{ padding: "9px 10px", borderRadius: 9, border: "1.5px solid #fed7aa", background: c.input, color: c.heading, fontSize: 13 }}>
+                        style={{ padding: "9px 10px", borderRadius: 9, border: "1.5px solid var(--as-accent-line, #fed7aa)", background: c.input, color: c.heading, fontSize: 13 }}>
                         {[5, 8, 10, 15, 20].map(n => <option key={n} value={n}>{n} Qs</option>)}
                       </select>
                     </div>
-                    <div style={{ fontSize: 12, color: "#94a3b8", paddingTop: 20, flex: 1 }}>
+                    <div style={{ fontSize: 12, color: "var(--as-muted, #94a3b8)", paddingTop: 20, flex: 1 }}>
                       🤖 Claude will read your notes and write questions about exactly what you taught
                     </div>
                   </div>
@@ -820,8 +820,8 @@ export default function QuizTab({ teacherInfo, students, isDarkMode }) {
                       disabled={aiLoading || (!aiNotes.trim() && !aiPdfFile)}
                       style={{
                         padding: "9px 22px", borderRadius: 10, border: "none",
-                        background: aiLoading || (!aiNotes.trim() && !aiPdfFile) ? "#e5e7eb" : BRAND,
-                        color: aiLoading || (!aiNotes.trim() && !aiPdfFile) ? "#9ca3af" : "#fff",
+                        background: aiLoading || (!aiNotes.trim() && !aiPdfFile) ? "var(--as-raised, #e5e7eb)" : BRAND,
+                        color: aiLoading || (!aiNotes.trim() && !aiPdfFile) ? "var(--as-muted, #9ca3af)" : "#fff",
                         fontWeight: 700, fontSize: 13,
                         cursor: aiLoading || (!aiNotes.trim() && !aiPdfFile) ? "not-allowed" : "pointer",
                         display: "flex", alignItems: "center", gap: 7,
@@ -830,7 +830,7 @@ export default function QuizTab({ teacherInfo, students, isDarkMode }) {
                         ? <><Loader size={13} style={{ animation: "spin 1s linear infinite" }} /> Reading notes…</>
                         : <><Sparkles size={13} /> Generate from Notes</>}
                     </button>
-                    <span style={{ fontSize: 12, color: "#94a3b8" }}>
+                    <span style={{ fontSize: 12, color: "var(--as-muted, #94a3b8)" }}>
                       {questions.length > 0 && questions[0].question ? "⚠️ This will replace current questions" : ""}
                     </span>
                   </div>
@@ -1004,7 +1004,7 @@ export default function QuizTab({ teacherInfo, students, isDarkMode }) {
                         )}
                         <ResultViewer quiz={quiz} attempt={quiz.attempt} c={c} />
                         <button type="button" onClick={() => handleDownloadPdf(quiz)} disabled={pdfBusy === quiz._id}
-                          style={{ marginTop: 12, display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 8, border: `1px solid ${brandA(0.4)}`, background: isDarkMode ? "transparent" : "#fff", color: BRAND, fontWeight: 700, fontSize: 12, cursor: pdfBusy === quiz._id ? "not-allowed" : "pointer", fontFamily: "inherit" }}>
+                          style={{ marginTop: 12, display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 8, border: `1px solid ${brandA(0.4)}`, background: isDarkMode ? "transparent" : "var(--as-surface, #fff)", color: BRAND, fontWeight: 700, fontSize: 12, cursor: pdfBusy === quiz._id ? "not-allowed" : "pointer", fontFamily: "inherit" }}>
                           <Download size={13} /> {pdfBusy === quiz._id ? "Creating PDF…" : "Download PDF for parent"}
                         </button>
                       </div>
@@ -1015,7 +1015,7 @@ export default function QuizTab({ teacherInfo, students, isDarkMode }) {
                         )}
                         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                           {quiz.questions.map((q, i) => (
-                            <div key={i} style={{ padding: "10px 12px", background: isDarkMode ? "#0f172a" : "#f8fafc", borderRadius: 10, border: `1px solid ${c.border}` }}>
+                            <div key={i} style={{ padding: "10px 12px", background: isDarkMode ? "var(--as-surface, #0f172a)" : "var(--as-raised, #f8fafc)", borderRadius: 10, border: `1px solid ${c.border}` }}>
                               <div style={{ fontWeight: 700, fontSize: 13, color: c.heading, marginBottom: 6 }}>Q{i + 1}: {q.question}</div>
                               {q.options.map((opt, oi) => (
                                 <div key={oi} style={{ fontSize: 12, padding: "3px 8px", borderRadius: 6, marginBottom: 2, background: oi === q.correctIndex ? "#dcfce7" : "transparent", color: oi === q.correctIndex ? "#166534" : c.body, fontWeight: oi === q.correctIndex ? 700 : 400 }}>

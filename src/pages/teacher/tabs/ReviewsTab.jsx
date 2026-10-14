@@ -22,11 +22,11 @@ function StatBar({ label, count, total, color }) {
   const pct = total > 0 ? Math.round((count / total) * 100) : 0;
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
-      <span style={{ width: 36, fontSize: 12, color: "#64748b", textAlign: "right" }}>{label}</span>
-      <div style={{ flex: 1, height: 8, background: "#e2e8f0", borderRadius: 4, overflow: "hidden" }}>
+      <span style={{ width: 36, fontSize: 12, color: "var(--as-ink-2, #64748b)", textAlign: "right" }}>{label}</span>
+      <div style={{ flex: 1, height: 8, background: "var(--as-raised, #e2e8f0)", borderRadius: 4, overflow: "hidden" }}>
         <div style={{ width: `${pct}%`, height: "100%", background: color, borderRadius: 4, transition: "width 0.4s" }} />
       </div>
-      <span style={{ width: 24, fontSize: 12, color: "#64748b" }}>{count}</span>
+      <span style={{ width: 24, fontSize: 12, color: "var(--as-ink-2, #64748b)" }}>{count}</span>
     </div>
   );
 }
@@ -37,11 +37,11 @@ export default function ReviewsTab({ teacherInfo, isDarkMode }) {
   const [filter,  setFilter]  = useState(0);    // 0 = all stars
   const [page,    setPage]    = useState(1);
 
-  const bg    = isDarkMode ? "#0f172a" : "#f8fafc";
-  const card  = isDarkMode ? "#1e293b" : "#ffffff";
-  const border= isDarkMode ? "#334155" : "#e2e8f0";
-  const text  = isDarkMode ? "#e2e8f0" : "#1e293b";
-  const muted = isDarkMode ? "#94a3b8" : "#64748b";
+  const bg    = isDarkMode ? "var(--as-surface, #0f172a)" : "var(--as-raised, #f8fafc)";
+  const card  = isDarkMode ? "var(--as-raised, #1e293b)" : "var(--as-surface, #ffffff)";
+  const border= isDarkMode ? "var(--as-line, #334155)" : "var(--as-line, #e2e8f0)";
+  const text  = isDarkMode ? "var(--as-ink, #e2e8f0)" : "var(--as-ink, #1e293b)";
+  const muted = isDarkMode ? "var(--as-muted, #94a3b8)" : "var(--as-ink-2, #64748b)";
 
   async function load(quiet = false) {
     if (!teacherInfo?._id) return;
@@ -68,7 +68,7 @@ export default function ReviewsTab({ teacherInfo, isDarkMode }) {
   const displayed = reviews; // already filtered + paged by the server
   const pager     = data?.pagination ?? { total: 0, totalPages: 1, limit: 10 };
 
-  const distColors = ["#ef4444","#f97316","#eab308","#84cc16","#16a34a"];
+  const distColors = ["#ef4444","var(--as-accent-ink, #f97316)","#eab308","#84cc16","#16a34a"];
 
   return (
     <div style={{ padding: 24, background: bg, minHeight: "100vh" }}>

@@ -32,14 +32,14 @@ const STATUS_COLOR = {
   open:         '#10b981',
   full:         '#f59e0b',
   'in-progress':'#3b82f6',
-  completed:    '#6b7280',
+  completed:    'var(--as-ink-2, #6b7280)',
   cancelled:    '#ef4444',
-  missed:       '#ea580c', // time passed, never held — refunded
+  missed:       'var(--as-accent-ink, #ea580c)', // time passed, never held — refunded
 };
 
 function Badge({ status }) {
   return (
-    <span style={{ background: STATUS_COLOR[status] + '22', color: STATUS_COLOR[status], borderRadius: 999, padding: '3px 10px', fontSize: 12, fontWeight: 700 }}>
+    <span style={{ background: `color-mix(in srgb, ${STATUS_COLOR[status]} 13%, transparent)`, color: STATUS_COLOR[status], borderRadius: 999, padding: '3px 10px', fontSize: 12, fontWeight: 700 }}>
       {status}
     </span>
   );
@@ -58,14 +58,14 @@ const BLANK_FORM = {
 export default function GroupClassesTab({ isDarkMode }) {
   const sym = useCurrencySymbol();
   const col = {
-    bg:      isDarkMode ? '#0f1117' : '#fff8f0',
-    card:    isDarkMode ? '#1a1d2e' : '#ffffff',
-    border:  isDarkMode ? '#2a2d40' : '#ffe8cc',
-    heading: isDarkMode ? '#f0f4ff' : '#3d2e20',
-    body:    isDarkMode ? '#c8cce0' : '#5a4a3a',
-    muted:   isDarkMode ? '#6b7090' : '#a89480',
-    accent:  isDarkMode ? '#fbbf24' : '#f97316',
-    input:   isDarkMode ? '#0f1117' : '#fff8f0',
+    bg:      isDarkMode ? 'var(--as-bg, #0f1117)' : 'var(--as-raised, #fff8f0)',
+    card:    isDarkMode ? 'var(--as-raised, #1a1d2e)' : 'var(--as-surface, #ffffff)',
+    border:  isDarkMode ? 'var(--as-line, #2a2d40)' : 'var(--as-line, #ffe8cc)',
+    heading: isDarkMode ? 'var(--as-ink, #f0f4ff)' : 'var(--as-ink, #3d2e20)',
+    body:    isDarkMode ? 'var(--as-ink-2, #c8cce0)' : 'var(--as-ink-2, #5a4a3a)',
+    muted:   isDarkMode ? 'var(--as-ink-2, #6b7090)' : 'var(--as-muted, #a89480)',
+    accent:  isDarkMode ? 'var(--as-accent, #fbbf24)' : 'var(--as-accent, #f97316)',
+    input:   isDarkMode ? 'var(--as-bg, #0f1117)' : 'var(--as-raised, #fff8f0)',
   };
 
   const [classes,      setClasses]      = useState([]);
@@ -238,8 +238,8 @@ export default function GroupClassesTab({ isDarkMode }) {
           <option value="">All statuses</option>
           {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
         </select>
-        <button onClick={load} style={{ ...btn('#f5f0ec', col.body), padding: '9px 12px' }}><RefreshCw size={15} /></button>
-        <button onClick={() => setShowCreate(true)} style={{ ...btn('linear-gradient(135deg,#f97316,#f43f5e)'), display: 'flex', alignItems: 'center', gap: 6 }}>
+        <button onClick={load} style={{ ...btn('var(--as-ink, #f5f0ec)', col.body), padding: '9px 12px' }}><RefreshCw size={15} /></button>
+        <button onClick={() => setShowCreate(true)} style={{ ...btn('linear-gradient(135deg,var(--as-accent, #f97316),#f43f5e)'), display: 'flex', alignItems: 'center', gap: 6 }}>
           <Plus size={14} /> New Group Class
         </button>
       </div>
@@ -273,10 +273,10 @@ export default function GroupClassesTab({ isDarkMode }) {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                     <span style={{ fontSize: 15, fontWeight: 800, color: col.heading }}>{gc.title}</span>
                     <Badge status={gc.status} />
-                    {gc.status === 'missed' && gc.missedReason && <span style={{ fontSize: 12, color: '#ea580c', fontWeight: 600 }}>{gc.missedReason}</span>}
-                    <span style={{ fontSize: 12, color: col.muted, background: isDarkMode ? '#2a2d40' : '#fff7ed', borderRadius: 999, padding: '2px 8px' }}>{gc.level}</span>
+                    {gc.status === 'missed' && gc.missedReason && <span style={{ fontSize: 12, color: 'var(--as-accent-ink, #ea580c)', fontWeight: 600 }}>{gc.missedReason}</span>}
+                    <span style={{ fontSize: 12, color: col.muted, background: isDarkMode ? 'var(--as-raised, #2a2d40)' : 'var(--as-accent-soft, #fff7ed)', borderRadius: 999, padding: '2px 8px' }}>{gc.level}</span>
                     {gc.enrollmentMode === 'invite-only' && (
-                      <span style={{ fontSize: 11, background: '#6366f122', color: '#6366f1', borderRadius: 999, padding: '2px 8px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 3 }}>
+                      <span style={{ fontSize: 11, background: '#6366f122', color: 'var(--as-accent-ink, #6366f1)', borderRadius: 999, padding: '2px 8px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 3 }}>
                         <Lock size={10} /> Invite-Only
                       </span>
                     )}
@@ -332,7 +332,7 @@ export default function GroupClassesTab({ isDarkMode }) {
                           ? `${e.studentId.firstName} ${e.studentId.lastName}`
                           : 'Student';
                         return (
-                          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, background: isDarkMode ? '#0f1117' : '#fff8f0', borderRadius: 10, padding: '7px 12px' }}>
+                          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, background: isDarkMode ? 'var(--as-bg, #0f1117)' : 'var(--as-raised, #fff8f0)', borderRadius: 10, padding: '7px 12px' }}>
                             <span style={{ flex: 1, fontSize: 13, fontWeight: 700, color: col.body }}>{sName}</span>
                             <span style={{ fontSize: 12, color: STATUS_COLOR[e.attendance] || col.muted }}>{e.attendance}</span>
                           </div>
@@ -348,13 +348,13 @@ export default function GroupClassesTab({ isDarkMode }) {
                       </button>
                     )}
                     {['open','full','in-progress'].includes(gc.status) && (
-                      <button onClick={() => handleComplete(gc._id)} style={btn('linear-gradient(135deg,#f97316,#f43f5e)')}>
+                      <button onClick={() => handleComplete(gc._id)} style={btn('linear-gradient(135deg,var(--as-accent, #f97316),#f43f5e)')}>
                         Mark Complete
                       </button>
                     )}
                     {gc.enrollmentMode === 'invite-only' && ['open','full'].includes(gc.status) && (
                       <button onClick={() => { setInviteTarget(gc); setInviteSearch(''); setInviteResults([]); }}
-                        style={{ ...btn('linear-gradient(135deg,#6366f1,#8b5cf6)'), display: 'flex', alignItems: 'center', gap: 5 }}>
+                        style={{ ...btn('linear-gradient(135deg,var(--as-accent, #6366f1),var(--as-accent, #8b5cf6))'), display: 'flex', alignItems: 'center', gap: 5 }}>
                         <Lock size={13} /> Manage Invites ({(gc.invitedStudents || []).length})
                       </button>
                     )}
@@ -434,7 +434,7 @@ export default function GroupClassesTab({ isDarkMode }) {
                   ].map(m => (
                     <button key={m.val} onClick={() => setForm(p => ({ ...p, enrollmentMode: m.val }))} style={{
                       flex: 1, border: `2px solid ${form.enrollmentMode === m.val ? col.accent : col.border}`,
-                      background: form.enrollmentMode === m.val ? col.accent + '18' : 'transparent',
+                      background: form.enrollmentMode === m.val ? `color-mix(in srgb, ${col.accent} 9%, transparent)` : 'transparent',
                       borderRadius: 12, padding: '10px 12px', cursor: 'pointer', textAlign: 'left', fontFamily: F,
                     }}>
                       <div style={{ fontWeight: 800, fontSize: 13, color: form.enrollmentMode === m.val ? col.accent : col.heading }}>{m.label}</div>
@@ -457,8 +457,8 @@ export default function GroupClassesTab({ isDarkMode }) {
               </div>
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
-              <button onClick={() => setShowCreate(false)} style={btn(isDarkMode ? '#2a2d40' : '#f5f0ec', col.body)}>Cancel</button>
-              <button onClick={handleCreate} disabled={saving} style={btn('linear-gradient(135deg,#f97316,#f43f5e)')}>
+              <button onClick={() => setShowCreate(false)} style={btn(isDarkMode ? 'var(--as-ink, #2a2d40)' : 'var(--as-ink, #f5f0ec)', col.body)}>Cancel</button>
+              <button onClick={handleCreate} disabled={saving} style={btn('linear-gradient(135deg,var(--as-accent, #f97316),#f43f5e)')}>
                 {saving ? 'Creating...' : 'Create Class'}
               </button>
             </div>
@@ -522,7 +522,7 @@ export default function GroupClassesTab({ isDarkMode }) {
                   const id   = entry._id || entry;
                   const name = entry.firstName ? `${entry.firstName} ${entry.lastName}` : String(id).slice(-6);
                   return (
-                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', background: isDarkMode ? '#0f1117' : '#fff8f0', borderRadius: 10, marginBottom: 6 }}>
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', background: isDarkMode ? 'var(--as-bg, #0f1117)' : 'var(--as-raised, #fff8f0)', borderRadius: 10, marginBottom: 6 }}>
                       <span style={{ flex: 1, fontSize: 13, fontWeight: 700, color: col.body }}>{name}</span>
                       <button onClick={() => removeInvite(id)} title="Remove invite" style={{ background: '#ef444420', border: 'none', borderRadius: 8, padding: '4px 10px', cursor: 'pointer', color: '#ef4444', display: 'flex', alignItems: 'center', gap: 4 }}>
                         <UserMinus size={13} /> Remove
@@ -533,7 +533,7 @@ export default function GroupClassesTab({ isDarkMode }) {
             }
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
-              <button onClick={() => setInviteTarget(null)} style={btn('linear-gradient(135deg,#6366f1,#8b5cf6)')}>Done</button>
+              <button onClick={() => setInviteTarget(null)} style={btn('linear-gradient(135deg,var(--as-accent, #6366f1),var(--as-accent, #8b5cf6))')}>Done</button>
             </div>
           </div>
         </div>
@@ -564,7 +564,7 @@ export default function GroupClassesTab({ isDarkMode }) {
               );
             })}
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }}>
-              <button onClick={() => setAttTarget(null)} style={btn(isDarkMode ? '#2a2d40' : '#f5f0ec', col.body)}>Cancel</button>
+              <button onClick={() => setAttTarget(null)} style={btn(isDarkMode ? 'var(--as-ink, #2a2d40)' : 'var(--as-ink, #f5f0ec)', col.body)}>Cancel</button>
               <button onClick={saveAttendance} style={btn('linear-gradient(135deg,#3b82f6,#60a5fa)')}>Save Attendance</button>
             </div>
           </div>

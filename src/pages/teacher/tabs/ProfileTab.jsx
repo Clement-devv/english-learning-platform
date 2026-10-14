@@ -21,8 +21,8 @@ function Section({ icon: Icon, title, children, c }) {
   return (
     <div style={{ background: c.card, border: `1px solid ${c.border}`, borderRadius: 16, padding: "20px 24px" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
-        <div style={{ width: 32, height: 32, borderRadius: 10, background: "rgba(var(--brand-primary-rgb),0.12)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <Icon size={16} color="var(--brand-primary)" />
+        <div style={{ width: 32, height: 32, borderRadius: 10, background: "color-mix(in srgb, var(--as-accent, var(--brand-primary)) 12%, transparent)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <Icon size={16} color="var(--as-accent, var(--brand-primary))" />
         </div>
         <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: c.muted }}>
           {title}
@@ -49,9 +49,9 @@ function Chip({ label, color = "brand" }) {
     <span style={{
       display: "inline-flex", alignItems: "center",
       padding: "3px 10px", borderRadius: 20, fontSize: 12, fontWeight: 600,
-      background: color === "brand" ? "rgba(var(--brand-primary-rgb),0.1)" : "rgba(16,185,129,0.1)",
-      color: color === "brand" ? "var(--brand-primary)" : "#10b981",
-      border: color === "brand" ? "1px solid rgba(var(--brand-primary-rgb),0.2)" : "1px solid rgba(16,185,129,0.2)",
+      background: color === "brand" ? "color-mix(in srgb, var(--as-accent, var(--brand-primary)) 10%, transparent)" : "rgba(16,185,129,0.1)",
+      color: color === "brand" ? "var(--as-accent, var(--brand-primary))" : "#10b981",
+      border: color === "brand" ? "1px solid color-mix(in srgb, var(--as-accent, var(--brand-primary)) 20%, transparent)" : "1px solid rgba(16,185,129,0.2)",
     }}>
       {label}
     </span>
@@ -62,14 +62,14 @@ export default function ProfileTab({ teacherInfo, isDarkMode, onUpdate }) {
   const sym = useCurrencySymbol();
   const rate = `${sym}${Number(teacherInfo.ratePerClass ?? 0).toLocaleString("en-US")}`;
   const c = {
-    bg:          isDarkMode ? "#0f1117" : "#f8f9ff",
-    card:        isDarkMode ? "#1a1f2e" : "#ffffff",
-    border:      isDarkMode ? "#1e2235" : "#e8ecf8",
-    heading:     isDarkMode ? "#e2e8f0" : "#1a1d2e",
-    muted:       isDarkMode ? "#64748b" : "#6b7280",
-    input:       isDarkMode ? "#0f1117" : "#f8f9ff",
-    inputBorder: isDarkMode ? "#2d3347" : "#e2e8f0",
-    lockBg:      isDarkMode ? "#1a1f2e" : "#f1f5f9",
+    bg:          isDarkMode ? "var(--as-bg, #0f1117)" : "#f8f9ff",
+    card:        isDarkMode ? "#1a1f2e" : "var(--as-surface, #ffffff)",
+    border:      isDarkMode ? "var(--as-line, #1e2235)" : "#e8ecf8",
+    heading:     isDarkMode ? "var(--as-ink, #e2e8f0)" : "var(--as-ink, #1a1d2e)",
+    muted:       isDarkMode ? "var(--as-ink-2, #64748b)" : "var(--as-ink-2, #6b7280)",
+    input:       isDarkMode ? "var(--as-bg, #0f1117)" : "#f8f9ff",
+    inputBorder: isDarkMode ? "#2d3347" : "var(--as-line, #e2e8f0)",
+    lockBg:      isDarkMode ? "#1a1f2e" : "var(--as-raised, #f1f5f9)",
   };
 
   const [editing, setEditing] = useState(false);
@@ -233,12 +233,12 @@ export default function ProfileTab({ teacherInfo, isDarkMode, onUpdate }) {
               <button onClick={() => { setEditing(false); setError(""); }} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 10, border: `1px solid ${c.border}`, background: c.card, color: c.muted, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
                 <X size={14} /> Cancel
               </button>
-              <button onClick={handleSave} disabled={saving} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 10, border: "none", background: "var(--brand-primary)", color: "#fff", fontSize: 13, fontWeight: 700, cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.7 : 1, fontFamily: "inherit" }}>
+              <button onClick={handleSave} disabled={saving} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 10, border: "none", background: "var(--as-accent, var(--brand-primary))", color: "#fff", fontSize: 13, fontWeight: 700, cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.7 : 1, fontFamily: "inherit" }}>
                 <Save size={14} /> {saving ? "Saving…" : "Save Changes"}
               </button>
             </>
           ) : (
-            <button onClick={() => setEditing(true)} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 10, border: `1px solid rgba(var(--brand-primary-rgb),0.3)`, background: "rgba(var(--brand-primary-rgb),0.08)", color: "var(--brand-primary)", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+            <button onClick={() => setEditing(true)} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 10, border: `1px solid color-mix(in srgb, var(--as-accent, var(--brand-primary)) 30%, transparent)`, background: "color-mix(in srgb, var(--as-accent, var(--brand-primary)) 8%, transparent)", color: "var(--as-accent, var(--brand-primary))", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
               <Edit2 size={14} /> Edit Profile
             </button>
           )}
@@ -254,8 +254,8 @@ export default function ProfileTab({ teacherInfo, isDarkMode, onUpdate }) {
       {/* ── Profile Photo Card ── */}
       <div style={{ background: c.card, border: `1px solid ${c.border}`, borderRadius: 16, padding: "20px 24px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
-          <div style={{ width: 32, height: 32, borderRadius: 10, background: "rgba(var(--brand-primary-rgb),0.12)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <Camera size={16} color="var(--brand-primary)" />
+          <div style={{ width: 32, height: 32, borderRadius: 10, background: "color-mix(in srgb, var(--as-accent, var(--brand-primary)) 12%, transparent)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <Camera size={16} color="var(--as-accent, var(--brand-primary))" />
           </div>
           <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: c.muted }}>Profile Photo</span>
         </div>
@@ -266,7 +266,7 @@ export default function ProfileTab({ teacherInfo, isDarkMode, onUpdate }) {
             {photoPreview ? (
               <img src={photoPreview} alt="Profile" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
             ) : (
-              <span style={{ fontSize: 32, fontWeight: 800, color: "var(--brand-primary)" }}>
+              <span style={{ fontSize: 32, fontWeight: 800, color: "var(--as-accent, var(--brand-primary))" }}>
                 {(teacherInfo.firstName?.[0] || "T").toUpperCase()}
               </span>
             )}
@@ -285,7 +285,7 @@ export default function ProfileTab({ teacherInfo, isDarkMode, onUpdate }) {
               type="button"
               disabled={photoUploading}
               onClick={() => photoInputRef.current?.click()}
-              style={{ display: "flex", alignItems: "center", gap: 7, padding: "8px 16px", borderRadius: 10, border: "none", background: "var(--brand-primary)", color: "#fff", fontSize: 13, fontWeight: 700, cursor: photoUploading ? "not-allowed" : "pointer", opacity: photoUploading ? 0.6 : 1, fontFamily: "inherit" }}
+              style={{ display: "flex", alignItems: "center", gap: 7, padding: "8px 16px", borderRadius: 10, border: "none", background: "var(--as-accent, var(--brand-primary))", color: "#fff", fontSize: 13, fontWeight: 700, cursor: photoUploading ? "not-allowed" : "pointer", opacity: photoUploading ? 0.6 : 1, fontFamily: "inherit" }}
             >
               <Camera size={14} />
               {photoPreview ? "Change Photo" : "Upload Photo"}
@@ -308,7 +308,7 @@ export default function ProfileTab({ teacherInfo, isDarkMode, onUpdate }) {
       </div>
 
       {/* ── Hero banner ── */}
-      <div style={{ background: `linear-gradient(135deg, var(--brand-primary), var(--brand-secondary))`, borderRadius: 16, padding: "20px 24px", display: "flex", alignItems: "center", gap: 20 }}>
+      <div style={{ background: `linear-gradient(135deg, var(--as-accent, var(--brand-primary)), var(--brand-secondary))`, borderRadius: 16, padding: "20px 24px", display: "flex", alignItems: "center", gap: 20 }}>
         <div style={{ width: 60, height: 60, borderRadius: 16, overflow: "hidden", border: "2px solid rgba(255,255,255,0.4)", flexShrink: 0, background: "rgba(255,255,255,0.15)", display: "flex", alignItems: "center", justifyContent: "center" }}>
           {photoPreview ? (
             <img src={photoPreview} alt={displayedName} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
@@ -450,9 +450,9 @@ export default function ProfileTab({ teacherInfo, isDarkMode, onUpdate }) {
                 {SPECIALIZATIONS.map((s) => (
                   <button key={s} type="button" onClick={() => toggleChip("specializations", s)} style={{
                     padding: "5px 12px", borderRadius: 20, fontSize: 12.5, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", transition: "all 0.15s",
-                    background: form.specializations.includes(s) ? "var(--brand-primary)" : c.input,
+                    background: form.specializations.includes(s) ? "var(--as-accent, var(--brand-primary))" : c.input,
                     color:      form.specializations.includes(s) ? "#fff" : c.muted,
-                    border:     form.specializations.includes(s) ? "1px solid var(--brand-primary)" : `1px solid ${c.inputBorder}`,
+                    border:     form.specializations.includes(s) ? "1px solid var(--as-accent, var(--brand-primary))" : `1px solid ${c.inputBorder}`,
                   }}>
                     {s}
                   </button>
@@ -465,9 +465,9 @@ export default function ProfileTab({ teacherInfo, isDarkMode, onUpdate }) {
                 {CERTIFICATIONS.map((cert) => (
                   <button key={cert} type="button" onClick={() => toggleChip("certifications", cert)} style={{
                     padding: "5px 12px", borderRadius: 20, fontSize: 12.5, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", transition: "all 0.15s",
-                    background: form.certifications.includes(cert) ? "var(--brand-primary)" : c.input,
+                    background: form.certifications.includes(cert) ? "var(--as-accent, var(--brand-primary))" : c.input,
                     color:      form.certifications.includes(cert) ? "#fff" : c.muted,
-                    border:     form.certifications.includes(cert) ? "1px solid var(--brand-primary)" : `1px solid ${c.inputBorder}`,
+                    border:     form.certifications.includes(cert) ? "1px solid var(--as-accent, var(--brand-primary))" : `1px solid ${c.inputBorder}`,
                   }}>
                     {cert}
                   </button>
@@ -547,7 +547,7 @@ export default function ProfileTab({ teacherInfo, isDarkMode, onUpdate }) {
                       const pct = Math.min(100, Math.max(0, (reviewStats.avgRating - (n - 1)) * 100));
                       return (
                         <div key={n} style={{ position: "relative", fontSize: 18, lineHeight: 1 }}>
-                          <span style={{ color: isDarkMode ? "#374151" : "#d1d5db" }}>★</span>
+                          <span style={{ color: isDarkMode ? "var(--as-ink-2, #374151)" : "var(--as-ink-2, #d1d5db)" }}>★</span>
                           <span style={{ position: "absolute", inset: 0, overflow: "hidden", width: `${pct}%`, color: "#f59e0b" }}>★</span>
                         </div>
                       );
@@ -564,7 +564,7 @@ export default function ProfileTab({ teacherInfo, isDarkMode, onUpdate }) {
                     return (
                       <div key={star} style={{ display: "flex", alignItems: "center", gap: 8 }}>
                         <span style={{ fontSize: 11, color: c.muted, width: 20, textAlign: "right" }}>{star}★</span>
-                        <div style={{ flex: 1, height: 6, borderRadius: 3, background: isDarkMode ? "#1e2235" : "#f1f5f9", overflow: "hidden" }}>
+                        <div style={{ flex: 1, height: 6, borderRadius: 3, background: isDarkMode ? "var(--as-raised, #1e2235)" : "var(--as-raised, #f1f5f9)", overflow: "hidden" }}>
                           <div style={{ width: `${pct}%`, height: "100%", background: "#f59e0b", borderRadius: 3, transition: "width 0.4s ease" }} />
                         </div>
                         <span style={{ fontSize: 11, color: c.muted, width: 28 }}>{pct}%</span>
@@ -583,7 +583,7 @@ export default function ProfileTab({ teacherInfo, isDarkMode, onUpdate }) {
                       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: r.comment ? 6 : 0 }}>
                         <div style={{ display: "flex", gap: 1 }}>
                           {[1,2,3,4,5].map((n) => (
-                            <span key={n} style={{ fontSize: 13, color: n <= r.rating ? "#f59e0b" : (isDarkMode ? "#374151" : "#d1d5db") }}>★</span>
+                            <span key={n} style={{ fontSize: 13, color: n <= r.rating ? "#f59e0b" : (isDarkMode ? "var(--as-ink-2, #374151)" : "var(--as-ink-2, #d1d5db)") }}>★</span>
                           ))}
                         </div>
                         <span style={{ fontSize: 12, color: c.muted }}>
