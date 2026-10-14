@@ -2,11 +2,12 @@
 // Sub-admin dashboard — Sunshine Explorer design.
 // Warm amber/orange palette · permission-gated sidebar nav · Nunito font · dark mode support.
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, lazy, Suspense } from 'react';
 import {
   TrendingUp, Video, Users, Calendar,
   DollarSign, Film, BarChart2, Star, CheckSquare,
   MessageCircle, Shield, LogOut, Moon, Sun,
+  ClipboardList, GraduationCap, CalendarPlus, FileCheck, ShieldCheck, Link2,
 } from 'lucide-react';
 import { useNavigate }      from 'react-router-dom';
 import { useTranslation }   from 'react-i18next';
@@ -22,6 +23,17 @@ import {
 import LanguageSwitcher from '../../../../components/LanguageSwitcher';
 import SessionManagement from '../../../../components/SessionManagement';
 import { Smartphone } from 'lucide-react';
+import api from '../../../../api';
+
+// Admin pages the admin can give this sub-admin (Sub-Admins → permissions). Loaded
+// only when opened; the server limits them to this sub-admin's own teachers.
+const adminPage = (name) => lazy(() => import('../../SubAdminAdminPages.jsx').then((m) => ({ default: m[name] })));
+const ClassReportTab   = adminPage('ClassReportTab');
+const GroupClassesPage = adminPage('SubAdminGroupClasses');
+const BookingsPage     = adminPage('SubAdminBookings');
+const LoggedClassesTab = adminPage('LoggedClassesTab');
+const ParentChecksTab  = adminPage('ParentChecksTab');
+const ShareLinksTab    = adminPage('ShareLinksTab');
 
 // ── Design tokens ──────────────────────────────────────────────────────────────
 const palette = (dark) => ({
@@ -44,7 +56,7 @@ const TAB_SHADOW     = 'rgba(249,115,22,0.35)';
 export default function SunshineShell() {
   const navigate = useNavigate();
   const { t } = useTranslation();
-  const { user: subAdminInfo, logout: authLogout } = useAuth();
+  const { user: subAdminInfo, logout: authLogout, setUser } = useAuth();
   const { isDarkMode, toggleDarkMode } = useDarkMode();
   const col        = palette(isDarkMode);
   const centerName = getCachedCenter()?.centerName || t('subAdmin.panelFallback');
@@ -52,6 +64,13 @@ export default function SunshineShell() {
 
   const [activeTab, setActiveTab] = useState('overview');
   const [showDevices, setShowDevices] = useState(false);
+
+  // Permissions saved at login go stale when the admin changes them — refresh on open
+  useEffect(() => {
+    api.get('/sub-admin-scope/me')
+      .then(({ data }) => { if (data?.subAdmin?.permissions) setUser({ permissions: data.subAdmin.permissions }); })
+      .catch(() => {});
+  }, [setUser]);
 
   const handleLogout = () => {
     // authLogout() handles BOTH the server-side /auth/logout-session call AND
@@ -83,6 +102,17 @@ export default function SunshineShell() {
         { key: 'recordings', label: t('subAdmin.nav.recordings'), icon: Film     },
         { key: 'reports',    label: t('subAdmin.nav.reports'), icon: BarChart2 },
         { key: 'reviews',    label: t('subAdmin.nav.reviews'), icon: Star      },
+        ...(perms.canViewClassReport    ? [{ key: 'class-report',   label: t('subAdmin.nav.classReport'),   icon: ClipboardList }] : []),
+        ...(perms.canManageGroupClasses ? [{ key: 'group-classes',  label: t('subAdmin.nav.groupClasses'),  icon: GraduationCap }] : []),
+        ...(perms.canCreateBookings     ? [{ key: 'book-class',     label: t('subAdmin.nav.bookAClass'),    icon: CalendarPlus  }] : []),
+        ...(perms.canViewLoggedClasses  ? [{ key: 'logged-classes', label: t('subAdmin.nav.loggedClasses'), icon: FileCheck     }] : []),
+      ],
+    },
+    {
+      label: t('subAdmin.navGroup.parents'),
+      items: [
+        ...(perms.canManageParentChecks ? [{ key: 'parent-checks', label: t('subAdmin.nav.parentChecks'), icon: ShieldCheck }] : []),
+        ...(perms.canViewParentLinks    ? [{ key: 'parent-links',  label: t('subAdmin.nav.parentLinks'),  icon: Link2       }] : []),
       ],
     },
     {
@@ -100,10 +130,12 @@ export default function SunshineShell() {
   ].filter(g => g.items.length > 0), [perms, t]);
 
   const ALL_ITEMS  = NAV_GROUPS.flatMap(g => g.items);
-  const activeLabel = ALL_ITEMS.find(i => i.key === activeTab)?.label || t('subAdmin.nav.overview');
+  // A page the admin has just switched off falls back to the overview
+  const shownTab = ALL_ITEMS.some(i => i.key === activeTab) ? activeTab : 'overview';
+  const activeLabel = ALL_ITEMS.find(i => i.key === shownTab)?.label || t('subAdmin.nav.overview');
 
   const tabContent = useMemo(() => {
-    switch (activeTab) {
+    switch (shownTab) {
       case 'overview':    return <OverviewPanel    isDarkMode={isDarkMode} />;
       case 'teachers':    return <TeachersPanel    isDarkMode={isDarkMode} />;
       case 'students':    return <StudentsPanel    isDarkMode={isDarkMode} />;
@@ -114,11 +146,17 @@ export default function SunshineShell() {
       case 'reviews':     return <ReviewsPanel     isDarkMode={isDarkMode} />;
       case 'payments':    return <PaymentsPanel    isDarkMode={isDarkMode} />;
       case 'messages':    return <MessagesTab userRole="sub-admin" />;
+      case 'class-report':   return <ClassReportTab   isDarkMode={isDarkMode} />;
+      case 'group-classes':  return <GroupClassesPage isDarkMode={isDarkMode} />;
+      case 'book-class':     return <BookingsPage     isDarkMode={isDarkMode} />;
+      case 'logged-classes': return <LoggedClassesTab isDarkMode={isDarkMode} canApprove={!!perms.canApproveLoggedClasses} />;
+      case 'parent-checks':  return <ParentChecksTab  isDarkMode={isDarkMode} />;
+      case 'parent-links':   return <ShareLinksTab    isDarkMode={isDarkMode} />;
       default:            return <OverviewPanel    isDarkMode={isDarkMode} />;
     }
-  }, [activeTab, isDarkMode, perms.canMarkLessons]);
+  }, [shownTab, isDarkMode, perms.canMarkLessons, perms.canApproveLoggedClasses]);
 
-  const noPadding = activeTab === 'messages';
+  const noPadding = shownTab === 'messages';
 
   return (
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', fontFamily: F, background: col.bg }}>
@@ -184,7 +222,7 @@ export default function SunshineShell() {
                 </div>
               )}
               {group.items.map(item => {
-                const isActive = activeTab === item.key;
+                const isActive = shownTab === item.key;
                 const Icon = item.icon;
                 return (
                   <button key={item.key} className="sa-nav"
@@ -274,8 +312,10 @@ export default function SunshineShell() {
 
         {/* Page content */}
         <main style={{ flex: 1, overflowY: 'auto', padding: noPadding ? 0 : '28px 28px 40px', background: col.bg }}>
-          <TabErrorBoundary key={activeTab}>
-            {tabContent}
+          <TabErrorBoundary key={shownTab}>
+            <Suspense fallback={<div style={{ padding: 40, textAlign: "center", color: col.muted }}>…</div>}>
+              {tabContent}
+            </Suspense>
           </TabErrorBoundary>
         </main>
       </div>

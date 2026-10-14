@@ -33,6 +33,14 @@ export const subAdminSchema = new mongoose.Schema(
       canSendMessages: { type: Boolean, default: true  },
       canViewBookings: { type: Boolean, default: true  },
       canViewClasses:  { type: Boolean, default: true  },
+      // Admin pages a sub-admin can be given (middleware/staffAccess.js) — off until the admin enables them
+      canViewClassReport:      { type: Boolean, default: false },
+      canManageGroupClasses:   { type: Boolean, default: false },
+      canCreateBookings:       { type: Boolean, default: false },
+      canManageParentChecks:   { type: Boolean, default: false },
+      canViewParentLinks:      { type: Boolean, default: false },
+      canViewLoggedClasses:    { type: Boolean, default: false },
+      canApproveLoggedClasses: { type: Boolean, default: false }, // pays the teacher + uses a student credit
     },
     ringEnabled:          { type: Boolean, default: true },  // false = do not ring this sub-admin
     twoFactorEnabled:     { type: Boolean, default: false },

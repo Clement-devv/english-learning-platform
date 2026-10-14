@@ -35,7 +35,8 @@ function familyAnswer(b) {
   }
 }
 
-export default function LoggedClassesTab({ isDarkMode }) {
+// canApprove: sub-admins need a separate permission (approving pays the teacher)
+export default function LoggedClassesTab({ isDarkMode, canApprove = true }) {
   const { t: tr } = useTranslation("admin");
   const [filter, setFilter]   = useState("pending");
   const [list, setList]       = useState([]);
@@ -96,7 +97,7 @@ export default function LoggedClassesTab({ isDarkMode }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
       {toast && (
-        <div role="status" style={{ position: "fixed", top: 24, right: 24, zIndex: 9999, padding: "12px 18px", borderRadius: 12, fontWeight: 600, fontSize: 14, maxWidth: 380,
+        <div className="ui-toast-in" role="status" style={{ position: "fixed", top: 24, right: 24, zIndex: 9999, padding: "12px 18px", borderRadius: 12, fontWeight: 600, fontSize: 14, maxWidth: 380,
           background: toast.type === "error" ? "#fee2e2" : "#dcfce7", color: toast.type === "error" ? "#b91c1c" : "#15803d", boxShadow: "0 4px 20px rgba(0,0,0,.12)" }}>
           {toast.msg}
         </div>
@@ -194,7 +195,7 @@ export default function LoggedClassesTab({ isDarkMode }) {
                   <p style={{ margin: "10px 0 0", fontSize: 12, color: c.body }}>{tr("loggedClassesTab.adminNote", { note: b.offline.approval.note })}</p>
                 )}
 
-                {pending && !isActing && (
+                {pending && !isActing && canApprove && (
                   <div style={{ marginTop: 14, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
                     <button type="button" style={btn("#16a34a", "#fff")} onClick={() => { setActing({ id: b._id, kind: "approve" }); setNote(""); }}><Check size={14} /> {tr("loggedClassesTab.approvePay")}</button>
                     <button type="button" style={btn(c.card, "#b91c1c", `1px solid ${c.border}`)} onClick={() => { setActing({ id: b._id, kind: "reject" }); setNote(""); }}><X size={14} /> {tr("loggedClassesTab.reject")}</button>

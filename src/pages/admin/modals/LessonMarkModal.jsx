@@ -249,7 +249,7 @@ export default function LessonMarkModal({
         {step < 4 && (
           <div className={`h-1 ${isDarkMode ? "bg-gray-700" : "bg-gray-100"}`}>
             <div
-              className={`h-full transition-all duration-500 ${isMarkMode ? "bg-emerald-500" : "bg-rose-500"}`}
+              className={`h-full transition-[width] duration-300 ease-out ${isMarkMode ? "bg-emerald-500" : "bg-rose-500"}`}
               style={{ width: `${progress * 100}%` }}
             />
           </div>
@@ -314,7 +314,7 @@ export default function LessonMarkModal({
                         <button
                           key={s._id}
                           onClick={() => setSelectedStudent(s)}
-                          className={`w-full text-left px-4 py-3 rounded-xl border transition-all ${
+                          className={`w-full text-left px-4 py-3 rounded-xl border transition ${
                             selectedStudent?._id === s._id ? selectedCard : `${cardBg} ${hoverCard}`
                           }`}
                         >
@@ -355,7 +355,7 @@ export default function LessonMarkModal({
                         <button
                           key={t._id}
                           onClick={() => setSelectedTeacher(t)}
-                          className={`w-full text-left px-4 py-3 rounded-xl border transition-all ${
+                          className={`w-full text-left px-4 py-3 rounded-xl border transition ${
                             selectedTeacher?._id === t._id ? selectedCard : `${cardBg} ${hoverCard}`
                           }`}
                         >
@@ -406,7 +406,7 @@ export default function LessonMarkModal({
                     <button
                       key={b._id}
                       onClick={() => setSelectedBooking(b)}
-                      className={`w-full text-left px-4 py-3 rounded-xl border transition-all ${
+                      className={`w-full text-left px-4 py-3 rounded-xl border transition ${
                         selectedBooking?._id === b._id ? selectedCard : `${cardBg} ${hoverCard}`
                       }`}
                     >
@@ -618,7 +618,7 @@ export default function LessonMarkModal({
               </p>
               <button
                 onClick={onClose}
-                className={`px-6 py-2.5 rounded-xl text-white font-semibold text-sm ${modeColor.btn} transition-all`}
+                className={`px-6 py-2.5 rounded-xl text-white font-semibold text-sm ${modeColor.btn} transition`}
               >
                 {tr("lessonMarkModal.done")}
               </button>
@@ -633,7 +633,7 @@ export default function LessonMarkModal({
             <button
               onClick={() => { setError(""); setStep((s) => Math.max(0, s - 1)); }}
               disabled={step === 0 || (preTeacher && step <= 1) || (preStudent && step <= 1)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition ${
                 step === 0 || (preTeacher && step <= 1) || (preStudent && step <= 1)
                   ? "opacity-30 cursor-not-allowed"
                   : isDarkMode
@@ -655,7 +655,7 @@ export default function LessonMarkModal({
                   (step === 1 && !selectedTeacher && startWith === "student") ||
                   (step === 2 && !selectedBooking)
                 }
-                className={`flex items-center gap-2 px-5 py-2 rounded-xl text-white text-sm font-semibold transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed ${modeColor.btn}`}
+                className={`flex items-center gap-2 px-5 py-2 rounded-xl text-white text-sm font-semibold transition active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed ${modeColor.btn}`}
               >
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                 {tr("lessonMarkModal.continue")}
@@ -665,7 +665,7 @@ export default function LessonMarkModal({
               <button
                 onClick={handleSubmit}
                 disabled={submitting || !selectedBooking}
-                className={`flex items-center gap-2 px-5 py-2 rounded-xl text-white text-sm font-semibold transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed ${modeColor.btn}`}
+                className={`flex items-center gap-2 px-5 py-2 rounded-xl text-white text-sm font-semibold transition active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed ${modeColor.btn}`}
               >
                 {submitting ? (
                   <Loader2 className="w-4 h-4 animate-spin" />

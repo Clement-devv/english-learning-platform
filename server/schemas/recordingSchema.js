@@ -1,7 +1,9 @@
 import mongoose from 'mongoose';
 
 export const recordingSchema = new mongoose.Schema({
-  bookingId:        { type: mongoose.Schema.Types.ObjectId, ref: 'Booking', required: true },
+  // A recording belongs to a one-to-one class (bookingId) or a group class (groupClassId)
+  bookingId:        { type: mongoose.Schema.Types.ObjectId, ref: 'Booking', required: function () { return !this.groupClassId; } },
+  groupClassId:     { type: mongoose.Schema.Types.ObjectId, ref: 'GroupClass' },
   teacherId:        { type: mongoose.Schema.Types.ObjectId, ref: 'Teacher', required: true },
   studentId:        { type: mongoose.Schema.Types.ObjectId, ref: 'Student' },
   title:            { type: String, default: '' },
@@ -27,5 +29,6 @@ export const recordingSchema = new mongoose.Schema({
 recordingSchema.index({ teacherId: 1, createdAt: -1 });
 recordingSchema.index({ studentId: 1, createdAt: -1 });
 recordingSchema.index({ bookingId: 1 });
+recordingSchema.index({ groupClassId: 1 });
 recordingSchema.index({ autoDeleteAt: 1 });
 recordingSchema.index({ sessionId: 1, partNumber: 1 });

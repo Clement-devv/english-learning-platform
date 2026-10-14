@@ -37,14 +37,6 @@ export default function AgoraClassroom({ classData, userRole, onLeave, googleMee
     return () => window.removeEventListener("resize", handler);
   }, []);
 
-  // Block browser tab close / refresh while VideoCall is recording or uploading
-  useEffect(() => {
-    if (!vcIsRecording && !vcUploading) return;
-    const handler = (e) => { e.preventDefault(); e.returnValue = ""; };
-    window.addEventListener("beforeunload", handler);
-    return () => window.removeEventListener("beforeunload", handler);
-  }, [vcIsRecording, vcUploading]);
-
   const { isDarkMode } = useDarkMode();
   const dm = isDarkMode;
 
@@ -80,6 +72,14 @@ export default function AgoraClassroom({ classData, userRole, onLeave, googleMee
   const [notifyOpen,      setNotifyOpen]       = useState(false); // teacher: notify dropdown open
   const [vcIsRecording,   setVcIsRecording]    = useState(false); // VideoCall recording active
   const [vcUploading,     setVcUploading]      = useState(false); // VideoCall recording uploading
+
+  // Block browser tab close / refresh while VideoCall is recording or uploading
+  useEffect(() => {
+    if (!vcIsRecording && !vcUploading) return;
+    const handler = (e) => { e.preventDefault(); e.returnValue = ""; };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [vcIsRecording, vcUploading]);
   const extendRef     = useRef(null);
   const platformRef   = useRef(null);
   const notifyRef     = useRef(null);

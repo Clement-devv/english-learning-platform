@@ -63,7 +63,7 @@ function CheckGroup({ options, selected, onChange }) {
           key={opt}
           type="button"
           onClick={() => toggle(opt)}
-          className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
+          className={`px-3 py-1.5 rounded-full text-xs font-medium border transition ${
             selected.includes(opt)
               ? "bg-brand-primary text-white border-brand-primary"
               : "bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-600 hover:border-brand-primary hover:text-brand-primary"

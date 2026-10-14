@@ -13,7 +13,8 @@
 //         GET  /api/v1/parent-checks/link/:token          (X-Share-Access)
 //         POST /api/v1/parent-checks/link/:token/respond  { attended, comment } (X-Share-Access)
 import express from "express";
-import { verifyToken, verifyAdmin } from "../middleware/authMiddleware.js";
+import { verifyToken } from "../middleware/authMiddleware.js";
+import { verifyAdminOrSubAdmin, scopeFilter, inScope } from "../middleware/staffAccess.js";
 import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
 import { validateObjectId } from "../middleware/validateObjectId.js";
 import { loginLimiter } from "../middleware/rateLimiter.js";
@@ -43,13 +44,13 @@ const PAGE_SIZE = 20;
 // ─────────────────────────────────────────────────────────────────────────────
 // Admin
 // ─────────────────────────────────────────────────────────────────────────────
-router.get("/", verifyToken, verifyAdmin, async (req, res) => {
+router.get("/", verifyToken, verifyAdminOrSubAdmin("canManageParentChecks"), async (req, res) => {
   try {
     getStudent(req.db); getTeacher(req.db);
     const Booking = getBooking(req.db);
     // Teacher-confirmed classes of managed students: completed, or teacher-logged and
     // awaiting approval. (Real students confirm logged classes in their dashboard — autoConfirmAt.)
-    const base = { attendanceConfirmedBy: "teacher", status: { $in: ["completed", "pending_confirmation"] }, autoConfirmAt: { $exists: false } };
+    const base = { attendanceConfirmedBy: "teacher", status: { $in: ["completed", "pending_confirmation"] }, autoConfirmAt: { $exists: false }, ...scopeFilter(req) };
     const DISPUTED  = { "parentCheck.status": "denied", disputeStatus: "pending" };
     const WAITING   = { "parentCheck.status": { $in: ["waiting", null] } };           // null also matches "no check yet"
     const ANSWERED  = { $or: [{ "parentCheck.status": { $in: ["confirmed", "no_reply"] } }, { "parentCheck.status": "denied", disputeStatus: { $ne: "pending" } }] };
@@ -95,14 +96,14 @@ router.get("/", verifyToken, verifyAdmin, async (req, res) => {
   }
 });
 
-router.post("/:bookingId/link", verifyToken, verifyAdmin, validateObjectId("bookingId"), async (req, res) => {
+router.post("/:bookingId/link", verifyToken, verifyAdminOrSubAdmin("canManageParentChecks"), validateObjectId("bookingId"), async (req, res) => {
   try {
     getStudent(req.db); getTeacher(req.db);
     const booking = await getBooking(req.db).findById(req.params.bookingId)
       .select("+shareLink.tokenEnc")
       .populate("studentId", "firstName lastName phone")
       .populate("teacherId", "firstName lastName displayName");
-    if (!booking) return notFound(res, "Class not found");
+    if (!booking || !inScope(req, booking.teacherId)) return notFound(res, "Class not found");
     if (booking.attendanceConfirmedBy !== "teacher" || !["completed", "pending_confirmation"].includes(booking.status))
       return badRequest(res, "Parent checks are only for classes a teacher confirmed for a managed student");
     if (booking.parentCheck?.status && booking.parentCheck.status !== "waiting")

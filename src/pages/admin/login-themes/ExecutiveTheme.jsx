@@ -506,8 +506,8 @@ const css = `
   box-shadow:0 6px 22px rgba(34,211,238,.2);
   transition:opacity .2s, transform .15s, box-shadow .2s;
 }
-.ex-btn:hover:not(:disabled) { opacity:.9; transform:translateY(-1px); box-shadow:0 10px 32px rgba(34,211,238,.3); }
-.ex-btn:active:not(:disabled) { transform:translateY(0); }
+@media (hover:hover) and (pointer:fine) { .ex-btn:hover:not(:disabled) { opacity:.9; transform:translateY(-1px); box-shadow:0 10px 32px rgba(34,211,238,.3); } }
+.ex-btn:active:not(:disabled) { transform:scale(0.97); }
 .ex-btn:disabled { opacity:.5; cursor:not-allowed; }
 .ex-btn-row { display:flex; align-items:center; justify-content:center; gap:8px; }
 .ex-spin { display:inline-block; width:16px; height:16px; border:2px solid rgba(255,255,255,.25); border-top-color:white; border-radius:50%; animation:ex-rot .7s linear infinite; }

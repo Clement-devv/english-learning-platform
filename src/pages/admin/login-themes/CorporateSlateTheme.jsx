@@ -384,8 +384,8 @@ const css = `
   box-shadow:0 6px 20px rgba(129,140,248,.25);
   transition:opacity .2s, transform .15s, box-shadow .2s;
 }
-.cs-btn:hover:not(:disabled) { opacity:.9; transform:translateY(-1px); box-shadow:0 10px 30px rgba(129,140,248,.35); }
-.cs-btn:active:not(:disabled) { transform:translateY(0); }
+@media (hover:hover) and (pointer:fine) { .cs-btn:hover:not(:disabled) { opacity:.9; transform:translateY(-1px); box-shadow:0 10px 30px rgba(129,140,248,.35); } }
+.cs-btn:active:not(:disabled) { transform:scale(0.97); }
 .cs-btn:disabled { opacity:.5; cursor:not-allowed; }
 .cs-btn-row { display:flex; align-items:center; justify-content:center; gap:8px; }
 .cs-spin { display:inline-block; width:15px; height:15px; border:2px solid rgba(255,255,255,.25); border-top-color:white; border-radius:50%; animation:cs-rot .7s linear infinite; }

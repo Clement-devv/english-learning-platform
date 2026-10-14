@@ -70,7 +70,7 @@ function DeleteConfirmModal({ teacher, onConfirm, onCancel, isDarkMode }) {
         <div className="flex gap-3">
           <button
             onClick={onCancel}
-            className={`flex-1 py-2.5 rounded-xl text-sm font-semibold border transition-all ${
+            className={`flex-1 py-2.5 rounded-xl text-sm font-semibold border transition ${
               isDarkMode
                 ? "border-gray-600 text-gray-300 hover:bg-gray-700"
                 : "border-gray-300 text-gray-700 hover:bg-gray-50"
@@ -80,7 +80,7 @@ function DeleteConfirmModal({ teacher, onConfirm, onCancel, isDarkMode }) {
           </button>
           <button
             onClick={onConfirm}
-            className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-red-600 hover:bg-red-700 text-white transition-all"
+            className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-red-600 hover:bg-red-700 text-white transition"
           >
             {tr("teachersTab.yesScheduleDeletion")}
           </button>
@@ -139,7 +139,7 @@ function PayConfirmModal({ teacher, onConfirm, onCancel, isDarkMode }) {
         <div className="flex gap-3">
           <button
             onClick={onCancel}
-            className={`flex-1 py-2.5 rounded-xl text-sm font-semibold border transition-all ${
+            className={`flex-1 py-2.5 rounded-xl text-sm font-semibold border transition ${
               isDarkMode
                 ? "border-gray-600 text-gray-300 hover:bg-gray-700"
                 : "border-gray-300 text-gray-700 hover:bg-gray-50"
@@ -149,7 +149,7 @@ function PayConfirmModal({ teacher, onConfirm, onCancel, isDarkMode }) {
           </button>
           <button
             onClick={onConfirm}
-            className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-emerald-600 hover:bg-emerald-700 text-white transition-all"
+            className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-emerald-600 hover:bg-emerald-700 text-white transition"
           >
             {tr("teachersTab.confirmPayment")}
           </button>
@@ -211,7 +211,7 @@ function PayAllConfirmModal({ teachers, onConfirm, onCancel, isDarkMode }) {
         <div className="flex gap-3">
           <button
             onClick={onCancel}
-            className={`flex-1 py-2.5 rounded-xl text-sm font-semibold border transition-all ${
+            className={`flex-1 py-2.5 rounded-xl text-sm font-semibold border transition ${
               isDarkMode
                 ? "border-gray-600 text-gray-300 hover:bg-gray-700"
                 : "border-gray-300 text-gray-700 hover:bg-gray-50"
@@ -221,7 +221,7 @@ function PayAllConfirmModal({ teachers, onConfirm, onCancel, isDarkMode }) {
           </button>
           <button
             onClick={onConfirm}
-            className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-emerald-600 hover:bg-emerald-700 text-white transition-all"
+            className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-emerald-600 hover:bg-emerald-700 text-white transition"
           >{tr("teachersTab.payAll", { sym, total })}
           </button>
         </div>
@@ -669,7 +669,7 @@ export default function TeachersTab({ onNotify, isDarkMode = false }) {
       {/* ── Toast ── */}
       {toast && (
         <div
-          className={`fixed top-4 right-4 z-50 flex items-center gap-2 px-4 py-3 rounded-xl shadow-xl text-sm font-medium text-white transition-all ${
+          className={`fixed top-4 right-4 z-50 flex items-center gap-2 px-4 py-3 rounded-xl shadow-xl text-sm font-medium text-white ui-toast-in ${
             toastType === "error"
               ? "bg-red-500"
               : toastType === "info"
@@ -705,7 +705,7 @@ export default function TeachersTab({ onNotify, isDarkMode = false }) {
           <button
             onClick={() => downloadTeacherRoster(filteredTeachers).catch(err => { console.error(err); showToast(`Could not create the PDF: ${err?.message || "unknown error"}`, "error"); })}
             title={tr("teachersTab.downloadVisibleTeachersAsPdf")}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-all ${
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition ${
               isDarkMode
                 ? "border-gray-600 text-gray-300 hover:bg-gray-700"
                 : "border-gray-200 text-gray-600 hover:bg-gray-50"
@@ -720,7 +720,7 @@ export default function TeachersTab({ onNotify, isDarkMode = false }) {
               setEditIndex(null);
               setIsModalOpen(true);
             }}
-            className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold text-sm shadow-md transition-all duration-150 active:scale-95 flex-shrink-0"
+            className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold text-sm shadow-md transition duration-150 active:scale-95 flex-shrink-0"
           >
             <Plus className="w-4 h-4" />
             {tr("teachersTab.addTeacher")}
@@ -796,7 +796,7 @@ export default function TeachersTab({ onNotify, isDarkMode = false }) {
             <button
               key={key}
               onClick={() => setView(key)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 ${tabBtnCls(key)}`}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition duration-150 ${tabBtnCls(key)}`}
             >
               {label}
             </button>
@@ -873,7 +873,7 @@ export default function TeachersTab({ onNotify, isDarkMode = false }) {
                 setEditIndex(null);
                 setIsModalOpen(true);
               }}
-              className="mt-2 flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold transition-all"
+              className="mt-2 flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold transition"
             >
               <Plus className="w-4 h-4" />
               {tr("teachersTab.addFirstTeacher")}
@@ -891,7 +891,7 @@ export default function TeachersTab({ onNotify, isDarkMode = false }) {
             {searchQuery && tr("teachersTab.matching", { searchQuery })}
           </p>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4">
             {pagedTeachers.map((teacher) => {
               const realIndex = teachers.findIndex((t) => t._id === teacher._id);
               const days = daysUntilDeletion(teacher.scheduledDeletionAt);
@@ -907,7 +907,7 @@ export default function TeachersTab({ onNotify, isDarkMode = false }) {
                       </span>
                       <button
                         onClick={() => handleRestoreTeacher(teacher)}
-                        className="flex items-center gap-1 px-2 py-0.5 bg-white/20 hover:bg-white/30 rounded-lg transition-all"
+                        className="flex items-center gap-1 px-2 py-0.5 bg-white/20 hover:bg-white/30 rounded-lg transition"
                       >
                         <RotateCcw className="w-3 h-3" />
                         {tr("teachersTab.restore")}

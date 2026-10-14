@@ -233,7 +233,7 @@ export default function TeacherPaymentHistoryModal({ teacher, onClose, isDarkMod
           </p>
           <button
             onClick={onClose}
-            className={`px-5 py-2 rounded-xl text-sm font-semibold border transition-all ${
+            className={`px-5 py-2 rounded-xl text-sm font-semibold border transition ${
               isDarkMode ? "border-gray-600 text-gray-300 hover:bg-gray-700" : "border-gray-300 text-gray-700 hover:bg-gray-50"
             }`}
           >

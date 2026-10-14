@@ -140,7 +140,7 @@ export default function VideoCall({
     isRecording, uploadingRecording, recSeconds,
     recordingError, setRecordingError,
     startRecording, stopRecording, formatRecTime,
-  } = useRecording(bookingId);
+  } = useRecording(bookingId, { captureThisTab: true }); // Agora: record this classroom tab itself
 
   // ── Recording safety bridge ───────────────────────────────────────────────
 

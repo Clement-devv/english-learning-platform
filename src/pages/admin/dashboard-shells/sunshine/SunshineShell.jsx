@@ -401,15 +401,31 @@ export default function SunshineShell() {
 
   const showHero = activeTab === 'overview';
 
+  // Escape closes the broadcast modal (unless a send is in flight)
+  useEffect(() => {
+    if (!broadcastModal) return;
+    const onKey = (e) => { if (e.key === 'Escape' && !broadcasting) setBroadcastModal(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [broadcastModal, broadcasting]);
+
   return (
-    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', fontFamily: F, background: col.bg }}>
+    <div className="as-root" style={{ display: 'flex', height: '100vh', overflow: 'hidden', fontFamily: F, background: col.bg }}>
       <style>{`
         @import url('${FONT_IMPORT}');
         * { box-sizing: border-box; }
-        .as-nav { transition: all 0.18s; }
-        .as-nav:hover { background: ${isDarkMode ? 'rgba(249,115,22,0.12)' : 'rgba(249,115,22,0.08)'} !important; }
+        .as-nav { transition: background-color 150ms ease, transform 120ms ease-out; }
+        .as-nav:active { transform: scale(0.98); }
+        .as-press { transition: transform 120ms ease-out, background-color 150ms ease, border-color 150ms ease, color 150ms ease, box-shadow 150ms ease; }
+        .as-press:not(:disabled):active { transform: scale(0.97); }
         .as-card { transition: transform 0.2s, box-shadow 0.2s; }
-        .as-card:hover { transform: translateY(-3px); box-shadow: 0 10px 28px rgba(0,0,0,0.10) !important; }
+        @media (hover: hover) and (pointer: fine) {
+          .as-nav:hover { background: ${isDarkMode ? 'rgba(249,115,22,0.12)' : 'rgba(249,115,22,0.08)'} !important; }
+          .as-card:hover { transform: translateY(-3px); box-shadow: 0 10px 28px rgba(0,0,0,0.10) !important; }
+        }
+        .as-root button:focus-visible, .as-root [role="button"]:focus-visible, .as-root input:focus-visible, .as-root textarea:focus-visible {
+          outline: 2px solid ${col.accent}; outline-offset: 2px;
+        }
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: ${isDarkMode ? '#2a2d40' : '#ffd0a8'}; border-radius: 10px; }
@@ -499,9 +515,9 @@ export default function SunshineShell() {
         <div style={{ padding: '8px 8px 16px', borderTop: `2px solid ${col.border}` }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', marginBottom: 4 }}>
             <span style={{ fontSize: 12, fontWeight: 700, color: col.muted }}>{isDarkMode ? t('admin.sidebar.darkMode') : t('admin.sidebar.lightMode')}</span>
-            <button onClick={toggleDarkMode}
-              style={{ width: 40, height: 22, borderRadius: 999, border: 'none', cursor: 'pointer', background: isDarkMode ? col.accent : col.border, position: 'relative', transition: 'background .2s', flexShrink: 0 }}>
-              <div style={{ width: 16, height: 16, borderRadius: '50%', background: '#fff', position: 'absolute', top: 3, left: isDarkMode ? 21 : 3, transition: 'left .2s' }} />
+            <button onClick={toggleDarkMode} role="switch" aria-checked={isDarkMode} aria-label={t('admin.sidebar.darkMode')}
+              style={{ width: 40, height: 22, borderRadius: 999, border: 'none', cursor: 'pointer', background: isDarkMode ? col.accent : col.border, position: 'relative', transition: 'background-color 200ms ease', flexShrink: 0 }}>
+              <div style={{ width: 16, height: 16, borderRadius: '50%', background: '#fff', position: 'absolute', top: 3, left: 3, transform: `translateX(${isDarkMode ? 18 : 0}px)`, transition: 'transform 200ms cubic-bezier(0.23, 1, 0.32, 1)', boxShadow: '0 1px 2px rgba(0,0,0,0.2)' }} />
             </button>
           </div>
           <button className="as-nav" onClick={openBroadcast}
@@ -549,7 +565,7 @@ export default function SunshineShell() {
           )}
 
           {/* Notification bell */}
-          <button onClick={() => setActiveTab('notifications')}
+          <button className="as-nav" onClick={() => setActiveTab('notifications')} aria-label={t('admin.nav.notifications')}
             style={{ position: 'relative', background: 'none', border: 'none', cursor: 'pointer', color: col.muted, padding: 6, borderRadius: 10, display: 'flex', alignItems: 'center' }}>
             <Bell size={19} color={col.muted} />
             {unreadNotif > 0 && (
@@ -558,10 +574,10 @@ export default function SunshineShell() {
           </button>
 
           {/* Avatar */}
-          <div onClick={() => setShowSettingsSidebar(true)}
-            style={{ width: 36, height: 36, borderRadius: 12, background: ACCENT_GRADIENT, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 900, fontSize: 15, cursor: 'pointer', flexShrink: 0 }}>
+          <button className="as-press" onClick={() => setShowSettingsSidebar(true)} aria-label={t('admin.sidebar.settings')}
+            style={{ width: 36, height: 36, borderRadius: 12, border: 'none', background: ACCENT_GRADIENT, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 900, fontSize: 15, fontFamily: F, cursor: 'pointer', flexShrink: 0 }}>
             {(adminInfo?.firstName?.[0] || 'A').toUpperCase()}
-          </div>
+          </button>
         </header>
 
         {/* Scroll area */}
@@ -569,7 +585,7 @@ export default function SunshineShell() {
 
           {/* Toast */}
           {toast && (
-            <div style={{ position: 'fixed', top: 20, right: 20, zIndex: 99999, padding: '12px 22px', borderRadius: 20, fontWeight: 700, fontSize: 14, background: '#10b981', color: '#fff', fontFamily: F, boxShadow: '0 8px 24px rgba(0,0,0,0.15)' }}>
+            <div className="ui-toast-in" role="status" style={{ position: 'fixed', top: 20, right: 20, zIndex: 99999, padding: '12px 22px', borderRadius: 20, fontWeight: 700, fontSize: 14, background: '#10b981', color: '#fff', fontFamily: F, boxShadow: '0 8px 24px rgba(0,0,0,0.15)' }}>
               ✅ {toast}
             </div>
           )}
@@ -681,8 +697,8 @@ export default function SunshineShell() {
         const lbl = { display: 'block', fontSize: 11, fontWeight: 800, color: col.muted, marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.07em' };
 
         return (
-          <div style={ov} onClick={e => e.target === e.currentTarget && !broadcasting && setBroadcastModal(false)}>
-            <div style={box}>
+          <div className="ui-fade-in" style={ov} onClick={e => e.target === e.currentTarget && !broadcasting && setBroadcastModal(false)}>
+            <div className="ui-pop-in" role="dialog" aria-modal="true" aria-label={tr("sunshineShell.broadcastEmail")} style={box}>
 
               {/* Header */}
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 22px', borderBottom: `2px solid ${col.border}` }}>
@@ -720,8 +736,8 @@ export default function SunshineShell() {
                             flex: 1, padding: '10px 6px', borderRadius: 14, cursor: 'pointer', textAlign: 'center', fontFamily: F,
                             border: t.enabled ? `2px solid ${col.accent}` : `2px solid ${col.border}`,
                             background: t.enabled ? (isDarkMode ? 'rgba(249,115,22,0.15)' : '#fff7ed') : 'transparent',
-                            transition: 'all 0.15s',
-                          }}>
+                            transition: 'border-color 150ms ease, background-color 150ms ease, transform 120ms ease-out',
+                          }} className="as-press">
                             <div style={{ fontSize: 22, marginBottom: 3 }}>{g.emoji}</div>
                             <div style={{ fontSize: 12, fontWeight: 800, color: t.enabled ? col.accent : col.body }}>{g.label}</div>
                             <div style={{ fontSize: 10, color: col.muted, marginTop: 2 }}>
@@ -763,7 +779,7 @@ export default function SunshineShell() {
                                 border: t.mode === opt.mode ? `2px solid ${col.accent}` : `2px solid ${col.border}`,
                                 background: t.mode === opt.mode ? (isDarkMode ? 'rgba(249,115,22,0.18)' : '#fff7ed') : 'transparent',
                                 color: t.mode === opt.mode ? col.accent : col.muted,
-                                transition: 'all 0.12s',
+                                transition: 'border-color 150ms ease, background-color 150ms ease, color 150ms ease',
                               }}>{opt.label}</button>
                             ))}
                           </div>
@@ -831,8 +847,8 @@ export default function SunshineShell() {
 
                     {/* ── Actions ── */}
                     <div style={{ display: 'flex', gap: 10 }}>
-                      <button onClick={() => setBroadcastModal(false)} disabled={broadcasting} style={{ flex: 1, padding: '11px', borderRadius: 14, border: `2px solid ${col.border}`, background: 'transparent', color: col.body, fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: F }}>{tr("sunshineShell.cancel")}</button>
-                      <button disabled={!canSend || broadcasting} onClick={handleBroadcast} style={{ flex: 2, padding: '11px', borderRadius: 14, border: 'none', background: canSend && !broadcasting ? ACCENT_GRADIENT : (isDarkMode ? '#2a2d40' : '#f5f0ec'), color: canSend && !broadcasting ? '#fff' : col.muted, fontWeight: 800, fontSize: 13, cursor: canSend && !broadcasting ? 'pointer' : 'not-allowed', fontFamily: F, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, boxShadow: canSend && !broadcasting ? `0 4px 14px ${TAB_SHADOW}` : 'none', transition: 'all 0.15s' }}>
+                      <button className="as-press" onClick={() => setBroadcastModal(false)} disabled={broadcasting} style={{ flex: 1, padding: '11px', borderRadius: 14, border: `2px solid ${col.border}`, background: 'transparent', color: col.body, fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: F }}>{tr("sunshineShell.cancel")}</button>
+                      <button className="as-press" disabled={!canSend || broadcasting} onClick={handleBroadcast} style={{ flex: 2, padding: '11px', borderRadius: 14, border: 'none', background: canSend && !broadcasting ? ACCENT_GRADIENT : (isDarkMode ? '#2a2d40' : '#f5f0ec'), color: canSend && !broadcasting ? '#fff' : col.muted, fontWeight: 800, fontSize: 13, cursor: canSend && !broadcasting ? 'pointer' : 'not-allowed', fontFamily: F, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, boxShadow: canSend && !broadcasting ? `0 4px 14px ${TAB_SHADOW}` : 'none' }}>
                         <Send size={14} />
                         {broadcasting ? tr("sunshineShell.sending") : tr("sunshineShell.sendTo", { enabledLabel })}
                       </button>

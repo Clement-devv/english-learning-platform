@@ -425,17 +425,20 @@ export default function ZoomClassroom({ classData, userRole, onLeave, zoomLink, 
               <ZoomIcon size={20} />
             </CtrlBtn>
           )}
-          <CtrlBtn
-            label={uploadingRecording ? "Saving recording…" : isRecording ? "Stop recording" : "Record"}
-            tone={isRecording ? "red" : "default"}
-            wide={isRecording}
-            disabled={uploadingRecording}
-            onClick={isRecording ? stopRecording : startRecording}
-          >
-            {uploadingRecording ? <Loader className="w-5 h-5 animate-spin" />
-              : isRecording ? (<><Square className="w-3.5 h-3.5 fill-current" /><span className="text-xs font-bold tabular-nums">{formatRecTime(recSeconds)}</span></>)
-              : <Circle className="w-5 h-5" />}
-          </CtrlBtn>
+          {/* Only teachers record — the server accepts recordings from teachers only */}
+          {userRole === "teacher" && (
+            <CtrlBtn
+              label={uploadingRecording ? "Saving recording…" : isRecording ? "Stop recording" : "Record"}
+              tone={isRecording ? "red" : "default"}
+              wide={isRecording}
+              disabled={uploadingRecording}
+              onClick={isRecording ? stopRecording : startRecording}
+            >
+              {uploadingRecording ? <Loader className="w-5 h-5 animate-spin" />
+                : isRecording ? (<><Square className="w-3.5 h-3.5 fill-current" /><span className="text-xs font-bold tabular-nums">{formatRecTime(recSeconds)}</span></>)
+                : <Circle className="w-5 h-5" />}
+            </CtrlBtn>
+          )}
           <CtrlBtn label="Refresh" onClick={handleRefresh}>
             <RefreshCw className="w-5 h-5" />
           </CtrlBtn>

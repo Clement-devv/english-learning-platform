@@ -1,5 +1,6 @@
 // server/routes/groupClassRoutes.js
 import express from "express";
+import mongoose from "mongoose";
 import { verifyToken, verifyAdmin, verifyAdminOrTeacher } from "../middleware/authMiddleware.js";
 import { tenantMiddleware }       from "../middleware/tenantMiddleware.js";
 import { groupClassSchema }       from "../schemas/groupClassSchema.js";
@@ -10,6 +11,9 @@ import { ok, created, badRequest, forbidden, notFound, conflict, serverError } f
 import { validateObjectId }  from "../middleware/validateObjectId.js";
 import { parsePagination }   from "../utils/pagination.js";
 import { toStr, toObjectId } from "../utils/inputSanitizer.js";
+import { subAdminNeeds, isSubAdmin, inScope, scopeFilter, scopedStudentIds } from "../middleware/staffAccess.js";
+import { classPricingSchema } from "../schemas/classPricingSchema.js";
+import { usesPoints, spendPoints, refundEnrollment, payGroupClassFee } from "../utils/groupPoints.js";
 
 const router = express.Router();
 router.use(tenantMiddleware);
@@ -17,10 +21,49 @@ router.use(tenantMiddleware);
 const getGroupClass = (db) => db.models.GroupClass || db.model("GroupClass", groupClassSchema);
 const getTeacher    = (db) => db.models.Teacher    || db.model("Teacher",    teacherSchema);
 const getStudent    = (db) => db.models.Student    || db.model("Student",    studentSchema);
+const getPricing    = (db) => db.models.ClassPricing || db.model("ClassPricing", classPricingSchema);
+
+// Seat price in group points / teacher fee from a request body
+const wholeNumber = (v, min, max) => { const n = Number(v); return Number.isInteger(n) && n >= min && n <= max ? n : null; };
+const moneyValue  = (v) => { const n = Number(v); return Number.isFinite(n) && n >= 0 ? Math.round(n * 100) / 100 : null; };
+
+// ── Class platform: Agora (in the app), Google Meet or Zoom ──────────────────
+const PLATFORMS = { agora: "agora", googlemeet: "googleMeet", zoom: "zoom" }; // → center.features key
+const LINK_HOSTS = { googlemeet: /(^|\.)meet\.google\.com$/i, zoom: /(^|\.)zoom\.(us|com)$/i };
+const PLATFORM_NAMES = { googlemeet: "Google Meet", zoom: "Zoom" };
+const teacherLinkFor = (teacher, platform) => (platform === "googlemeet" ? teacher?.googleMeetLink : platform === "zoom" ? teacher?.zoomLink : "") || "";
+function validLink(platform, link) {
+  try {
+    const u = new URL(String(link).trim());
+    return u.protocol === "https:" && LINK_HOSTS[platform].test(u.hostname);
+  } catch { return false; }
+}
+/** { platform, meetingLink } from a request body, or { error } */
+function readPlatform(req, body, teacher, current = {}) {
+  const platform = body.platform === undefined ? (current.platform || "agora") : body.platform;
+  if (!PLATFORMS[platform]) return { error: "Platform must be agora, googlemeet or zoom" };
+  if (req.center?.features?.[PLATFORMS[platform]] === false) return { error: "This platform is turned off for your center" };
+  if (platform === "agora") return { platform, meetingLink: "" };
+  const typed = typeof body.meetingLink === "string" ? body.meetingLink.trim() : undefined;
+  const meetingLink = typed !== undefined ? typed : (current.platform === platform ? current.meetingLink || "" : "");
+  if (meetingLink && !validLink(platform, meetingLink))
+    return { error: `Paste a valid ${PLATFORM_NAMES[platform]} link (https://…)` };
+  if (!meetingLink && !validLink(platform, teacherLinkFor(teacher, platform)))
+    return { error: `Add a ${PLATFORM_NAMES[platform]} link for this class, or save one on the teacher's profile` };
+  return { platform, meetingLink };
+}
+
+// Sub-admins with "Group classes" manage the classes of their own teachers.
+// subAdminNeeds() checks the permission and loads req.teacherScope for them.
+const staffOrTeacher = (req, res, next) => (isSubAdmin(req) ? next() : verifyAdminOrTeacher(req, res, next));
+// Admin, the class's own teacher, or a sub-admin covering that teacher
+const canStaff = (req, gc) => req.user.role === "admin"
+  || (req.user.role === "teacher" && String(gc.teacherId?._id || gc.teacherId) === req.user.id)
+  || (isSubAdmin(req) && inScope(req, gc.teacherId));
 
 // ─── GET / — list group classes ───────────────────────────────────────────────
 // admin: all | teacher: own | student: enrolled + open
-router.get("/", verifyToken, async (req, res) => {
+router.get("/", verifyToken, subAdminNeeds("canManageGroupClasses"), async (req, res) => {
   try {
     const { status, teacherId: qTeacherId } = req.query;
     const { limit, skip } = parsePagination(req.query, 50, 200);
@@ -38,15 +81,19 @@ router.get("/", verifyToken, async (req, res) => {
         { status: "open", enrollmentMode: "invite-only", invitedStudents: req.user.id },
       ];
     } else if (req.user.role === "admin" || req.user.role === "sub-admin") {
-      if (typeof qTeacherId === "string") filter.teacherId = qTeacherId;
+      filter = scopeFilter(req); // sub-admin: own teachers only
+      if (typeof qTeacherId === "string" && inScope(req, qTeacherId)) filter.teacherId = qTeacherId;
     } else {
       return forbidden(res, "Not authorized to view group classes");
     }
 
-    if (status) filter.status = status;
+    // "active" = not finished yet (finished ones live in class history: Completed / Not completed)
+    if (status === "active") filter.status = { $in: ["open", "full", "in-progress"] };
+    else if (typeof status === "string" && status) filter.status = status;
 
     const [classes, total] = await Promise.all([
       getGroupClass(req.db).find(filter)
+        .select(req.user.role === "student" ? "-teacherFee -feePaid -meetingLink" : "") // staff-only: the teacher's pay; the link comes from /:id/join
         .populate("teacherId", "firstName lastName email")
         .sort({ scheduledTime: -1 }).skip(skip).limit(limit).lean(),
       getGroupClass(req.db).countDocuments(filter),
@@ -59,7 +106,7 @@ router.get("/", verifyToken, async (req, res) => {
 });
 
 // ─── POST / — create ──────────────────────────────────────────────────────────
-router.post("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
+router.post("/", verifyToken, subAdminNeeds("canManageGroupClasses"), staffOrTeacher, async (req, res) => {
   try {
     const {
       scheduledTime, duration, maxSeats, pricePerSeat,
@@ -74,10 +121,35 @@ router.post("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
     if (!scheduledTime) return badRequest(res, "scheduledTime is required");
 
     const teacher = await getTeacher(req.db).findById(teacherId);
-    if (!teacher) return notFound(res, "Teacher not found");
+    if (!teacher || !inScope(req, teacher._id)) return notFound(res, "Teacher not found");
 
     const enrollmentMode = ["open", "invite-only"].includes(req.body.enrollmentMode)
       ? req.body.enrollmentMode : "open";
+
+    // Students picked in the create window (invite-only classes). Only real students —
+    // and for a sub-admin only their own teachers' students.
+    let invitedStudents = [];
+    if (enrollmentMode === "invite-only" && Array.isArray(req.body.invitedStudents)) {
+      const wanted = [...new Set(req.body.invitedStudents.map(String))].filter(id => mongoose.isValidObjectId(id)).slice(0, 100);
+      const allowed = await scopedStudentIds(req);
+      const found = await getStudent(req.db).find({ _id: { $in: wanted } }).select("_id").lean();
+      invitedStudents = found.map(s => String(s._id)).filter(id => !allowed || allowed.has(id));
+    }
+
+    const where = readPlatform(req, req.body, teacher);
+    if (where.error) return badRequest(res, where.error);
+
+    // New group classes are paid with group points (not class credits)
+    const pointsPerSeat = req.body.pointsPerSeat === undefined ? 1 : wholeNumber(req.body.pointsPerSeat, 1, 1000);
+    if (pointsPerSeat === null) return badRequest(res, "Points per student must be a whole number from 1 to 1000");
+    // Teacher fee: the admin sets it; teacher- and sub-admin-created classes get the center default
+    let teacherFee;
+    if (req.user.role === "admin" && req.body.teacherFee !== undefined && req.body.teacherFee !== "") {
+      teacherFee = moneyValue(req.body.teacherFee);
+      if (teacherFee === null) return badRequest(res, "Teacher fee must be 0 or more");
+    } else {
+      teacherFee = (await getPricing(req.db).findOne().select("defaultGroupFee").lean())?.defaultGroupFee || 0;
+    }
 
     const groupClass = await getGroupClass(req.db).create({
       teacherId,
@@ -86,15 +158,31 @@ router.post("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
       level:           level || "Mixed",
       maxSeats:        maxSeats || 8,
       pricePerSeat:    pricePerSeat || 1,
+      paymentType:     "points",
+      pointsPerSeat,
+      teacherFee,
+      platform:        where.platform,
+      meetingLink:     where.meetingLink,
       scheduledTime:   new Date(scheduledTime),
       teacherTimezone: teacher.timezone || "",
       duration:        duration || 60,
       enrollmentMode,
-      invitedStudents: [],
+      invitedStudents,
       notes:           notes || "",
       tags:            Array.isArray(tags) ? tags : [],
-      createdBy:       req.user.role === "admin" ? "admin" : "teacher",
+      createdBy:       req.user.role === "teacher" ? "teacher" : "admin", // sub-admins act for the admin
     });
+
+    // Tell the invited students (live, if they are online)
+    if (invitedStudents.length) {
+      try {
+        const io = req.app.get("io");
+        for (const sid of invitedStudents) io?.to(`student-room:${req.center.slug}:${sid}`).emit("group-class-update", {
+          type: "invited", title: "📩 You've been invited to a group class",
+          message: `You can now enroll in "${groupClass.title}"`, groupClassId: groupClass._id,
+        });
+      } catch (_) {}
+    }
 
     res.status(201).json({ success: true, message: "Group class created", groupClass });
   } catch (err) {
@@ -105,16 +193,17 @@ router.post("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
 
 // ─── GET /students/search — teacher searches students for inviting ─────────────
 // Must be defined before /:id to avoid ObjectId match on "students"
-router.get("/students/search", verifyToken, verifyAdminOrTeacher, async (req, res) => {
+router.get("/students/search", verifyToken, subAdminNeeds("canManageGroupClasses"), staffOrTeacher, async (req, res) => {
   try {
     // Escape + cap the search text: a raw RegExp from the query string lets a
     // caller send a catastrophic pattern like (a+)+$ and stall the server (ReDoS).
     const q = typeof req.query.q === "string" ? req.query.q.trim().slice(0, 100) : "";
     if (!q) return res.json({ success: true, students: [] });
     const regex = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+    const allowed = await scopedStudentIds(req); // sub-admin: their teachers' students only
     const students = await getStudent(req.db)
-      .find({ $or: [{ firstName: regex }, { lastName: regex }, { email: regex }] })
-      .select("firstName lastName email _id classCredits")
+      .find({ $or: [{ firstName: regex }, { lastName: regex }, { email: regex }], ...(allowed ? { _id: { $in: [...allowed] } } : {}) })
+      .select("firstName lastName email _id classCredits groupPoints")
       .limit(20).lean();
     res.json({ success: true, students });
   } catch (err) {
@@ -123,19 +212,57 @@ router.get("/students/search", verifyToken, verifyAdminOrTeacher, async (req, re
   }
 });
 
+// ─── GET /:id/join — where to join: { platform, link } ───────────────────────
+// Agora: no link (the app's own room). Meet / Zoom: the class link, else the
+// teacher's saved one. Students: only when enrolled and the class has started.
+router.get("/:id/join", verifyToken, subAdminNeeds("canManageGroupClasses"), validateObjectId("id"), async (req, res) => {
+  try {
+    const gc = await getGroupClass(req.db).findById(req.params.id).select("teacherId status enrollments platform meetingLink title").lean();
+    if (!gc) return notFound(res, "Group class not found");
+    const { role, id } = req.user;
+    if (role === "student") {
+      if (!gc.enrollments.some(e => String(e.studentId) === id)) return forbidden(res, "You are not enrolled in this class");
+      if (gc.status !== "in-progress") return badRequest(res, "The teacher hasn't started this class yet");
+    } else if (!canStaff(req, gc)) {
+      return forbidden(res, "Not authorized to join this class");
+    }
+    // Who actually came — the auto-close after class time (utils/groupClassSweep.js) uses it
+    const now = new Date();
+    if (role === "student") {
+      await getGroupClass(req.db).updateOne(
+        { _id: gc._id, enrollments: { $elemMatch: { studentId: new mongoose.Types.ObjectId(id), joinedAt: { $exists: false } } } },
+        { $set: { "enrollments.$.joinedAt": now } },
+      );
+    } else if (role === "teacher") {
+      await getGroupClass(req.db).updateOne({ _id: gc._id, teacherJoinedAt: { $exists: false } }, { $set: { teacherJoinedAt: now } });
+    }
+
+    const platform = gc.platform || "agora";
+    if (platform === "agora") return res.json({ success: true, platform });
+    const teacher = await getTeacher(req.db).findById(gc.teacherId).select("googleMeetLink zoomLink").lean();
+    const link = gc.meetingLink || teacherLinkFor(teacher, platform);
+    if (!validLink(platform, link)) return badRequest(res, `This class has no ${PLATFORM_NAMES[platform]} link yet — ask the teacher`);
+    res.json({ success: true, platform, link });
+  } catch (err) {
+    logger.error("Group class join error:", { error: err?.message });
+    serverError(res, "Could not open the class");
+  }
+});
+
 // ─── GET /:id — single ────────────────────────────────────────────────────────
-router.get("/:id", verifyToken, validateObjectId("id"), async (req, res) => {
+router.get("/:id", verifyToken, subAdminNeeds("canManageGroupClasses"), validateObjectId("id"), async (req, res) => {
   try {
     getTeacher(req.db);
     getStudent(req.db);
     const gc = await getGroupClass(req.db).findById(req.params.id)
+      .select(req.user.role === "student" ? "-teacherFee -feePaid -meetingLink" : "") // staff-only: the teacher's pay; the link comes from /:id/join
       .populate("teacherId", "firstName lastName email")
-      .populate("enrollments.studentId", "firstName lastName email classCredits");
+      .populate("enrollments.studentId", "firstName lastName email classCredits groupPoints");
     if (!gc) return notFound(res, "Group class not found");
 
     const { role, id } = req.user;
     if (
-      role !== "admin" && role !== "sub-admin" &&
+      role !== "admin" && !(role === "sub-admin" && inScope(req, gc.teacherId)) &&
       !(role === "teacher" && gc.teacherId._id.toString() === id) &&
       !(role === "student" && gc.enrollments.some(e => e.studentId?._id?.toString() === id)) &&
       gc.status !== "open"
@@ -149,18 +276,36 @@ router.get("/:id", verifyToken, validateObjectId("id"), async (req, res) => {
 });
 
 // ─── PATCH /:id — update metadata ────────────────────────────────────────────
-router.patch("/:id", verifyToken, verifyAdminOrTeacher, validateObjectId("id"), async (req, res) => {
+router.patch("/:id", verifyToken, subAdminNeeds("canManageGroupClasses"), staffOrTeacher, validateObjectId("id"), async (req, res) => {
   try {
     const gc = await getGroupClass(req.db).findById(req.params.id);
     if (!gc) return notFound(res, "Group class not found");
 
-    if (req.user.role === "teacher" && gc.teacherId.toString() !== req.user.id)
+    if (!canStaff(req, gc))
       return forbidden(res, "You can only edit your own group classes");
     if (["completed", "cancelled"].includes(gc.status))
       return badRequest(res, "Cannot edit a completed or cancelled class");
 
     const allowed = ["title", "description", "level", "maxSeats", "pricePerSeat",
                      "scheduledTime", "duration", "notes", "tags", "enrollmentMode"];
+    if (req.body.pointsPerSeat !== undefined && usesPoints(gc)) {
+      const p = wholeNumber(req.body.pointsPerSeat, 1, 1000);
+      if (p === null) return badRequest(res, "Points per student must be a whole number from 1 to 1000");
+      gc.pointsPerSeat = p; // students already enrolled keep what they paid
+    }
+    if (req.body.platform !== undefined || req.body.meetingLink !== undefined) {
+      const teacher = await getTeacher(req.db).findById(gc.teacherId).select("googleMeetLink zoomLink").lean();
+      const where = readPlatform(req, req.body, teacher, gc);
+      if (where.error) return badRequest(res, where.error);
+      gc.platform = where.platform;
+      gc.meetingLink = where.meetingLink;
+    }
+    if (req.body.teacherFee !== undefined) {
+      if (req.user.role !== "admin") return forbidden(res, "Only the admin can change the teacher fee");
+      const fee = moneyValue(req.body.teacherFee);
+      if (fee === null) return badRequest(res, "Teacher fee must be 0 or more");
+      gc.teacherFee = fee;
+    }
     allowed.forEach(field => {
       if (req.body[field] !== undefined) gc[field] = req.body[field];
     });
@@ -179,7 +324,10 @@ router.delete("/:id", verifyToken, verifyAdmin, validateObjectId("id"), async (r
   try {
     const gc = await getGroupClass(req.db).findById(req.params.id);
     if (!gc) return notFound(res, "Group class not found");
+    const unfinished = !["completed", "cancelled"].includes(gc.status);
     await gc.deleteOne();
+    // Students in a class that never happened get their points / credits back
+    if (unfinished) for (const e of gc.enrollments) await refundEnrollment(req.db, gc, e, { user: req.user, note: "Class deleted" });
     res.json({ success: true, message: "Group class deleted" });
   } catch (err) {
     logger.error("Error deleting group class:", { error: err?.message });
@@ -189,16 +337,11 @@ router.delete("/:id", verifyToken, verifyAdmin, validateObjectId("id"), async (r
 
 // Staff who may manage a group class's roster: admins, the class's own teacher,
 // and sub-admins whose teacher scope includes that teacher.
-const canManageRoster = (user, gc) => {
-  if (user.role === "admin") return true;
-  if (user.role === "teacher") return String(gc.teacherId) === String(user.id);
-  if (user.role === "sub-admin") return (user.teacherScope || []).map(String).includes(String(gc.teacherId));
-  return false;
-};
+const canManageRoster = (req, gc) => canStaff(req, gc);
 
 // ─── POST /:id/enroll — add a student ────────────────────────────────────────
 // Admin passes { studentId }; student self-enrolls (no body needed beyond auth)
-router.post("/:id/enroll", verifyToken, validateObjectId("id"), async (req, res) => {
+router.post("/:id/enroll", verifyToken, subAdminNeeds("canManageGroupClasses"), validateObjectId("id"), async (req, res) => {
   try {
     const { role, id: userId } = req.user;
 
@@ -216,9 +359,11 @@ router.post("/:id/enroll", verifyToken, validateObjectId("id"), async (req, res)
       getStudent(req.db).findById(studentId),
     ]);
     if (!gc)      return notFound(res, "Group class not found");
-    if (role !== "student" && !canManageRoster(req.user, gc))
+    if (role !== "student" && !canManageRoster(req, gc))
       return forbidden(res, "You can only enroll students in your own classes");
     if (!student) return notFound(res, "Student not found");
+    if (isSubAdmin(req) && !(await scopedStudentIds(req)).has(String(student._id)))
+      return notFound(res, "Student not found");
 
     if (gc.status !== "open") return badRequest(res, `Class is ${gc.status} — enrollment is closed`);
 
@@ -234,19 +379,29 @@ router.post("/:id/enroll", verifyToken, validateObjectId("id"), async (req, res)
     if (alreadyEnrolled) return conflict(res, "Student is already enrolled");
     if (gc.enrollments.length >= gc.maxSeats) return conflict(res, "Class is full");
 
-    const price = gc.pricePerSeat || 1;
     const Student = getStudent(req.db);
     const GroupClass = getGroupClass(req.db);
+    const points = usesPoints(gc);
+    const price = points ? (gc.pointsPerSeat || 1) : (gc.pricePerSeat || 1);
 
-    // 1) Take the credits atomically — only if the student still has enough right now
-    //    (two enrollments at once can't both spend the same credit)
-    const charged = await Student.findOneAndUpdate(
-      { _id: studentId, classCredits: { $gte: price } },
-      { $inc: { classCredits: -price } },
-      { new: true },
-    ).select("classCredits").lean();
-    if (!charged)
-      return badRequest(res, `Student needs ${price} credit(s) but only has ${student.classCredits || 0}`);
+    // 1) Take the price atomically — only if the student still has enough right now
+    //    (two enrollments at once can't both spend the same points / credit)
+    let remaining;
+    if (points) {
+      remaining = await spendPoints(req.db, studentId, price, { groupClassId: gc._id, classTitle: gc.title, user: req.user });
+      if (remaining === null)
+        return badRequest(res, `Student needs ${price} group point(s) but only has ${student.groupPoints || 0}`);
+    } else {
+      const charged = await Student.findOneAndUpdate(
+        { _id: studentId, classCredits: { $gte: price } },
+        { $inc: { classCredits: -price } },
+        { new: true },
+      ).select("classCredits").lean();
+      if (!charged)
+        return badRequest(res, `Student needs ${price} credit(s) but only has ${student.classCredits || 0}`);
+      remaining = charged.classCredits;
+    }
+    const enrollment = points ? { studentId, pointsCharged: price } : { studentId, creditCharged: price };
 
     // 2) Claim the seat atomically — still open, not already enrolled, a seat left
     const seated = await GroupClass.findOneAndUpdate(
@@ -255,12 +410,12 @@ router.post("/:id/enroll", verifyToken, validateObjectId("id"), async (req, res)
         "enrollments.studentId": { $ne: studentId },
         $expr: { $lt: [{ $size: "$enrollments" }, "$maxSeats"] },
       },
-      { $push: { enrollments: { studentId, creditCharged: price } } },
+      { $push: { enrollments: enrollment } },
       { new: true },
     );
     if (!seated) {
-      // Lost the race (enrolled twice at once, last seat taken, class closed) — give the credits back
-      await Student.updateOne({ _id: studentId }, { $inc: { classCredits: price } });
+      // Lost the race (enrolled twice at once, last seat taken, class closed) — give it back
+      await refundEnrollment(req.db, gc, enrollment, { user: req.user, note: "Seat not available" });
       const now = await GroupClass.findById(gc._id).select("status enrollments maxSeats").lean();
       if (now?.enrollments?.some(e => String(e.studentId) === String(studentId))) return conflict(res, "Student is already enrolled");
       if (now?.status !== "open") return badRequest(res, `Class is ${now?.status} — enrollment is closed`);
@@ -269,7 +424,6 @@ router.post("/:id/enroll", verifyToken, validateObjectId("id"), async (req, res)
     if (seated.enrollments.length >= seated.maxSeats) {
       await GroupClass.updateOne({ _id: gc._id, status: "open" }, { $set: { status: "full" } });
     }
-    student.classCredits = charged.classCredits; // for the response below
     gc.enrollments = seated.enrollments;
 
     // Notify via socket
@@ -286,7 +440,7 @@ router.post("/:id/enroll", verifyToken, validateObjectId("id"), async (req, res)
     res.json({
       success: true,
       message: "Student enrolled successfully",
-      creditsRemaining: student.classCredits,
+      ...(points ? { pointsRemaining: remaining } : { creditsRemaining: remaining }),
       seatsLeft: gc.maxSeats - gc.enrollments.length,
     });
   } catch (err) {
@@ -296,7 +450,7 @@ router.post("/:id/enroll", verifyToken, validateObjectId("id"), async (req, res)
 });
 
 // ─── DELETE /:id/enroll/:studentId — remove enrollment + refund ───────────────
-router.delete("/:id/enroll/:studentId", verifyToken, validateObjectId("id"), validateObjectId("studentId"), async (req, res) => {
+router.delete("/:id/enroll/:studentId", verifyToken, subAdminNeeds("canManageGroupClasses"), validateObjectId("id"), validateObjectId("studentId"), async (req, res) => {
   try {
     const { role, id: userId } = req.user;
     const { studentId } = req.params;
@@ -308,7 +462,7 @@ router.delete("/:id/enroll/:studentId", verifyToken, validateObjectId("id"), val
     const GroupClass = getGroupClass(req.db);
     const gc = await GroupClass.findById(req.params.id);
     if (!gc) return notFound(res, "Group class not found");
-    if (role !== "student" && !canManageRoster(req.user, gc))
+    if (role !== "student" && !canManageRoster(req, gc))
       return forbidden(res, "You can only manage enrollments in your own classes");
     if (["completed", "cancelled"].includes(gc.status))
       return badRequest(res, "Cannot remove enrollment from a completed or cancelled class");
@@ -330,15 +484,14 @@ router.delete("/:id/enroll/:studentId", verifyToken, validateObjectId("id"), val
       { $set: { status: "open" } },
     );
 
-    // Refund credits (atomic)
-    if (creditCharged > 0) {
-      await getStudent(req.db).updateOne({ _id: studentId }, { $inc: { classCredits: creditCharged } });
-    }
+    // Refund what this enrollment paid — points or (older classes) credits
+    await refundEnrollment(req.db, gc, removed, { user: req.user, note: "Left the class" });
 
     res.json({
       success: true,
-      message: "Enrollment removed and credits refunded",
+      message: removed?.pointsCharged ? "Enrollment removed and points refunded" : "Enrollment removed and credits refunded",
       creditsRefunded: creditCharged,
+      pointsRefunded: removed?.pointsCharged || 0,
     });
   } catch (err) {
     logger.error("Error removing enrollment:", { error: err?.message });
@@ -348,14 +501,14 @@ router.delete("/:id/enroll/:studentId", verifyToken, validateObjectId("id"), val
 
 // ─── PATCH /:id/attendance — teacher marks per-student attendance ─────────────
 // Body: { attendance: [{ studentId, status: 'attended'|'absent' }] }
-router.patch("/:id/attendance", verifyToken, validateObjectId("id"), async (req, res) => {
+router.patch("/:id/attendance", verifyToken, subAdminNeeds("canManageGroupClasses"), validateObjectId("id"), async (req, res) => {
   try {
     const gc = await getGroupClass(req.db).findById(req.params.id);
     if (!gc) return notFound(res, "Group class not found");
 
     const { role, id: userId } = req.user;
     const isTeacher = role === "teacher" && gc.teacherId.toString() === userId;
-    if (!isTeacher && role !== "admin") return forbidden(res, "Not authorized to mark attendance");
+    if (!isTeacher && !canStaff(req, gc)) return forbidden(res, "Not authorized to mark attendance");
     if (!["in-progress", "completed"].includes(gc.status))
       return badRequest(res, "Can only mark attendance for in-progress or completed classes");
 
@@ -371,7 +524,14 @@ router.patch("/:id/attendance", verifyToken, validateObjectId("id"), async (req,
     }
     await gc.save();
 
-    res.json({ success: true, message: "Attendance updated", enrollments: gc.enrollments });
+    // Attendance marked after completing — the fee becomes due once someone attended
+    let feePaid = 0;
+    if (gc.status === "completed") {
+      feePaid = await payGroupClassFee(req.db, gc._id)
+        .catch(err => { logger.error("Group class fee error:", { error: err?.message }); return 0; });
+    }
+
+    res.json({ success: true, message: "Attendance updated", enrollments: gc.enrollments, feePaid });
   } catch (err) {
     logger.error("Error marking attendance:", { error: err?.message });
     serverError(res, "Error marking attendance");
@@ -379,14 +539,14 @@ router.patch("/:id/attendance", verifyToken, validateObjectId("id"), async (req,
 });
 
 // ─── PATCH /:id/complete — teacher/admin marks class as done ─────────────────
-router.patch("/:id/complete", verifyToken, validateObjectId("id"), async (req, res) => {
+router.patch("/:id/complete", verifyToken, subAdminNeeds("canManageGroupClasses"), validateObjectId("id"), async (req, res) => {
   try {
     const gc = await getGroupClass(req.db).findById(req.params.id);
     if (!gc) return notFound(res, "Group class not found");
 
     const { role, id: userId } = req.user;
     const isTeacher = role === "teacher" && gc.teacherId.toString() === userId;
-    if (!isTeacher && role !== "admin") return forbidden(res, "Not authorized to complete this class");
+    if (!isTeacher && !canStaff(req, gc)) return forbidden(res, "Not authorized to complete this class");
     if (!["open", "full", "in-progress"].includes(gc.status))
       return badRequest(res, `Cannot complete a class with status: ${gc.status}`);
 
@@ -423,7 +583,11 @@ router.patch("/:id/complete", verifyToken, validateObjectId("id"), async (req, r
       }
     } catch (_) {}
 
-    res.json({ success: true, message: "Group class completed", groupClass: gc });
+    // Teacher fee → their earnings + salary record (once; needs at least one attended student)
+    const feePaid = await payGroupClassFee(req.db, gc._id)
+      .catch(err => { logger.error("Group class fee error:", { error: err?.message }); return 0; });
+
+    res.json({ success: true, message: "Group class completed", groupClass: gc, feePaid });
   } catch (err) {
     logger.error("Error completing group class:", { error: err?.message });
     serverError(res, "Error completing group class");
@@ -431,14 +595,14 @@ router.patch("/:id/complete", verifyToken, validateObjectId("id"), async (req, r
 });
 
 // ─── PATCH /:id/cancel — admin or teacher cancels + full refund ───────────────
-router.patch("/:id/cancel", verifyToken, validateObjectId("id"), async (req, res) => {
+router.patch("/:id/cancel", verifyToken, subAdminNeeds("canManageGroupClasses"), validateObjectId("id"), async (req, res) => {
   try {
     const gc = await getGroupClass(req.db).findById(req.params.id);
     if (!gc) return notFound(res, "Group class not found");
 
     const { role, id: userId } = req.user;
     const isTeacher = role === "teacher" && gc.teacherId.toString() === userId;
-    if (!isTeacher && role !== "admin") return forbidden(res, "Not authorized to cancel this class");
+    if (!isTeacher && !canStaff(req, gc)) return forbidden(res, "Not authorized to cancel this class");
     if (["completed", "cancelled"].includes(gc.status))
       return badRequest(res, `Class is already ${gc.status}`);
 
@@ -454,10 +618,7 @@ router.patch("/:id/cancel", verifyToken, validateObjectId("id"), async (req, res
     ).lean();
     if (!claimed) return badRequest(res, "Class is already cancelled or completed");
 
-    const Student = getStudent(req.db);
-    await Promise.all(claimed.enrollments
-      .filter(e => (e.creditCharged || 0) > 0)
-      .map(e => Student.updateOne({ _id: e.studentId }, { $inc: { classCredits: e.creditCharged } })));
+    for (const e of claimed.enrollments) await refundEnrollment(req.db, claimed, e, { user: req.user, note: "Class cancelled" });
     gc.enrollments = claimed.enrollments;
     Object.assign(gc, { status: "cancelled", cancelReason: reason });
 
@@ -469,7 +630,7 @@ router.patch("/:id/cancel", verifyToken, validateObjectId("id"), async (req, res
         io.to(`student-room:${slug}:${enr.studentId}`).emit("group-class-update", {
           type: "cancelled",
           title: "❌ Group Class Cancelled",
-          message: `"${gc.title}" was cancelled. Your credits have been refunded.`,
+          message: `"${gc.title}" was cancelled. You have been refunded.`,
           groupClassId: gc._id,
         });
       }
@@ -477,7 +638,7 @@ router.patch("/:id/cancel", verifyToken, validateObjectId("id"), async (req, res
 
     res.json({
       success: true,
-      message: `Group class cancelled. ${gc.enrollments.filter(e => e.creditCharged > 0).length} student(s) refunded.`,
+      message: `Group class cancelled. ${gc.enrollments.filter(e => e.creditCharged > 0 || e.pointsCharged > 0).length} student(s) refunded.`,
     });
   } catch (err) {
     logger.error("Error cancelling group class:", { error: err?.message });
@@ -486,14 +647,14 @@ router.patch("/:id/cancel", verifyToken, validateObjectId("id"), async (req, res
 });
 
 // ─── PATCH /:id/start — begin class (changes status to in-progress) ───────────
-router.patch("/:id/start", verifyToken, validateObjectId("id"), async (req, res) => {
+router.patch("/:id/start", verifyToken, subAdminNeeds("canManageGroupClasses"), validateObjectId("id"), async (req, res) => {
   try {
     const gc = await getGroupClass(req.db).findById(req.params.id);
     if (!gc) return notFound(res, "Group class not found");
 
     const { role, id: userId } = req.user;
     const isTeacher = role === "teacher" && gc.teacherId.toString() === userId;
-    if (!isTeacher && role !== "admin") return forbidden(res, "Not authorized to start this class");
+    if (!isTeacher && !canStaff(req, gc)) return forbidden(res, "Not authorized to start this class");
     if (!["open", "full"].includes(gc.status))
       return badRequest(res, `Cannot start a class with status: ${gc.status}`);
 
@@ -507,12 +668,12 @@ router.patch("/:id/start", verifyToken, validateObjectId("id"), async (req, res)
 });
 
 // ─── PATCH /:id/invite — teacher adds/removes invited students ────────────────
-router.patch("/:id/invite", verifyToken, verifyAdminOrTeacher, validateObjectId("id"), async (req, res) => {
+router.patch("/:id/invite", verifyToken, subAdminNeeds("canManageGroupClasses"), staffOrTeacher, validateObjectId("id"), async (req, res) => {
   try {
     const gc = await getGroupClass(req.db).findById(req.params.id);
     if (!gc) return notFound(res, "Group class not found");
 
-    if (req.user.role === "teacher" && gc.teacherId.toString() !== req.user.id)
+    if (!canStaff(req, gc))
       return forbidden(res, "You can only manage your own group classes");
 
     const { add, remove } = req.body;

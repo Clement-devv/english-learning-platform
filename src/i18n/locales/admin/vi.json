@@ -19,6 +19,16 @@
     "backToLogin": "← Quay lại đăng nhập"
   },
   "studentCard": {
+    "disable": "Vô hiệu hóa",
+    "enable": "Kích hoạt",
+    "moreActions": "Thêm thao tác",
+    "markLessonShort": "Ghi buổi học",
+    "addPayment": "Thêm thanh toán",
+    "groupLessons": "Buổi học",
+    "groupPayments": "Thanh toán & điểm",
+    "groupAccount": "Tài khoản",
+    "disableStudent": "Vô hiệu hóa học viên",
+    "enableStudent": "Kích hoạt học viên",
     "noClassesLeft": "Hết buổi học",
     "classLeft": "Còn {{count}} buổi",
     "classesLeft": "Còn {{count}} buổi",
@@ -49,7 +59,9 @@
     "temporaryPassword": "🔑 Mật khẩu tạm thời",
     "copyPassword2": "Sao chép mật khẩu",
     "profileDetails": "Thông tin hồ sơ",
-    "edit": "Sửa"
+    "edit": "Sửa",
+    "sellGroupPoints": "Bán điểm lớp nhóm",
+    "groupPoints_other": "{{count}} điểm lớp nhóm"
   },
   "studentTable": {
     "firstName": "Tên",
@@ -73,6 +85,14 @@
     "enable": "Kích hoạt"
   },
   "teacherCard": {
+    "disable": "Vô hiệu hóa",
+    "enable": "Kích hoạt",
+    "moreActions": "Thêm thao tác",
+    "markLessonShort": "Ghi buổi học",
+    "groupLessonsPay": "Buổi học & thanh toán",
+    "groupAccount": "Tài khoản",
+    "disableTeacher": "Vô hiệu hóa giáo viên",
+    "enableTeacher": "Kích hoạt giáo viên",
     "unknown": "Không rõ",
     "review": "({{totalRatings}} đánh giá)",
     "unnamedTeacher": "Giáo viên chưa có tên",
@@ -1000,7 +1020,13 @@
       "TRY": "TRY — Lira Thổ Nhĩ Kỳ",
       "ZAR": "ZAR — Rand Nam Phi",
       "other": "Khác / Tùy chỉnh"
-    }
+    },
+    "groupClasses": "Lớp nhóm",
+    "groupClassesHint": "Lớp nhóm được thanh toán bằng điểm lớp nhóm, tách biệt với số buổi học. Bán điểm từ thẻ học viên (Học viên → ⋮ → Bán điểm lớp nhóm).",
+    "pricePerPoint": "Giá mỗi điểm ({{symbol}})",
+    "defaultGroupFee": "Thù lao giáo viên mặc định ({{symbol}})",
+    "defaultGroupFeeHint": "Áp dụng cho lớp nhóm do giáo viên hoặc quản trị viên phụ tạo. Bạn có thể đặt mức khác khi tạo lớp.",
+    "groupValuesInvalid": "Giá điểm và thù lao giáo viên phải từ 0 trở lên"
   },
   "domainTab": {
     "failedToSubmitDomain": "Gửi tên miền thất bại",
@@ -1084,7 +1110,38 @@
     "pending": "Chờ",
     "attended": "Có mặt",
     "absent": "Vắng mặt",
-    "saveAttendance": "Lưu điểm danh"
+    "saveAttendance": "Lưu điểm danh",
+    "pointsPerStudent": "Điểm / học viên",
+    "teacherFee": "Thù lao giáo viên",
+    "teacherFeePlaceholder": "Mặc định của trung tâm",
+    "teacherFeeDefault": "Mặc định của trung tâm (do quản trị viên đặt)",
+    "teacherFeeHint": "Được cộng vào thu nhập của giáo viên khi lớp hoàn thành và có ít nhất một học viên tham gia.",
+    "pointsSeat_other": "🎟 {{count}} điểm/học viên",
+    "feeLabel": "💰 Thù lao {{fee}}",
+    "feePaid": "💰 Thù lao {{fee}} ✓",
+    "feePaidHint": "Đã cộng vào thu nhập của giáo viên",
+    "feeDueHint": "Được trả khi lớp hoàn thành và có ít nhất một học viên được điểm danh có mặt",
+    "pts_other": "{{count}} điểm",
+    "studentPoints_other": "{{firstName}} {{lastName}} ({{count}} điểm)",
+    "completedFeePaid": "Lớp đã hoàn thành — đã cộng thù lao {{fee}} cho giáo viên",
+    "attendanceFeePaid": "Đã lưu điểm danh — đã cộng thù lao {{fee}} cho giáo viên",
+    "whoCanJoin": "Ai có thể tham gia",
+    "joinOpen": "🌐 Mọi học viên",
+    "joinOpenHint": "Học viên nào đủ điểm lớp nhóm đều có thể ghi danh",
+    "joinSelected": "🔒 Chỉ học viên được chọn",
+    "joinSelectedHint": "Chỉ những học viên bạn chọn mới thấy và ghi danh được",
+    "searchStudentsPicker": "Tìm học viên…",
+    "noStudentsFoundPicker": "Không tìm thấy học viên nào",
+    "studentsSelected": "Đã chọn {{count}}",
+    "pickerPoints": "{{count}} điểm",
+    "invitedHint": "Học viên được chọn sẽ thấy lớp này trong mục Lớp nhóm và ghi danh bằng điểm lớp nhóm của họ.",
+    "pickAtLeastOneStudent": "Hãy chọn ít nhất một học viên, hoặc chọn Mọi học viên",
+    "classPlatform": "Nền tảng lớp học",
+    "agoraHint": "Trong ứng dụng — học viên vào lớp tại đây",
+    "externalHint": "Mở trong thẻ mới",
+    "linkPlaceholder": "Dán liên kết cho lớp này (không bắt buộc)",
+    "linkHint": "Để trống để dùng liên kết đã lưu trong hồ sơ giáo viên.",
+    "activeStatuses": "Sắp tới & đang diễn ra"
   },
   "loggedClassesTab": {
     "confirmedItHappened": "{{who}} đã xác nhận buổi học diễn ra",
@@ -1660,7 +1717,8 @@
     "deletesIn": "Sẽ xóa sau",
     "day": "ngày",
     "restore2": "Khôi phục",
-    "paymentHistoryIsLocked": "Lịch sử thanh toán đang bị khóa"
+    "paymentHistoryIsLocked": "Lịch sử thanh toán đang bị khóa",
+    "pointsAdded_other": "Đã cộng {{count}} điểm lớp nhóm — số dư {{balance}}"
   },
   "subAdminsTab": {
     "failedToLoadSubAdmins": "Không tải được quản trị viên phụ",
@@ -1744,7 +1802,21 @@
     "copied": "Đã sao chép!",
     "copy": "Sao chép",
     "subAdminReactivated": "Đã kích hoạt lại quản trị viên phụ",
-    "subAdminSuspended": "Đã tạm ngưng quản trị viên phụ"
+    "subAdminSuspended": "Đã tạm ngưng quản trị viên phụ",
+    "permClassReport": "Báo cáo buổi học",
+    "permClassReportDesc": "Xem, tải và gửi email báo cáo buổi học hằng ngày",
+    "permGroupClasses": "Lớp nhóm",
+    "permGroupClassesDesc": "Tạo và quản lý lớp nhóm, ghi danh học viên, điểm danh",
+    "permBookings": "Đặt lịch học",
+    "permBookingsDesc": "Gửi yêu cầu buổi học tới giáo viên của họ",
+    "permParentChecks": "Xác nhận của phụ huynh",
+    "permParentChecksDesc": "Xem xác nhận tham gia của phụ huynh và gửi liên kết xác nhận",
+    "permParentLinks": "Liên kết cho phụ huynh",
+    "permParentLinksDesc": "Xem và sao chép liên kết bài tập / bài kiểm tra cho phụ huynh",
+    "permLoggedClasses": "Buổi học ghi nhận ngoài ứng dụng",
+    "permLoggedClassesDesc": "Xem các buổi học giáo viên ghi nhận ngoài ứng dụng",
+    "permApproveLogged": "Duyệt buổi học ghi nhận",
+    "permApproveLoggedDesc": "Duyệt (trả tiền cho giáo viên, trừ một buổi của học viên) hoặc từ chối. Cần quyền Buổi học ghi nhận."
   },
   "teacherScheduleTab": {
     "active": "Đang hoạt động",
@@ -1919,5 +1991,34 @@
     "invalid2faCode": "Mã 2FA không hợp lệ",
     "somethingWentWrong": "Đã xảy ra lỗi.",
     "failedToSendResetEmail": "Gửi email đặt lại thất bại."
+  },
+  "sellPointsModal": {
+    "title": "Bán điểm lớp nhóm",
+    "onlyForGroup": "chỉ dùng cho lớp nhóm",
+    "close": "Đóng",
+    "couldNotLoad": "Không tải được số dư điểm",
+    "couldNotSave": "Không cộng được điểm",
+    "pointsRange": "Nhập số điểm nguyên từ 1 đến 10000",
+    "balance": "Số dư hiện tại",
+    "points": "Số điểm",
+    "amountPaid": "Số tiền đã trả {{sym}}",
+    "pricePerPoint": "{{price}} mỗi điểm (Giá buổi học)",
+    "method": "Phương thức thanh toán",
+    "note": "Ghi chú (không bắt buộc)",
+    "methods": {
+      "cash": "Tiền mặt",
+      "bank_transfer": "Chuyển khoản",
+      "card": "Thẻ",
+      "online": "Thanh toán trực tuyến",
+      "other": "Khác"
+    },
+    "cancel": "Hủy",
+    "addPoints_other": "Cộng {{count}} điểm",
+    "addPointsEmpty": "Cộng điểm",
+    "history": "Lịch sử điểm gần đây",
+    "kindPurchase": "Mua",
+    "kindSpend": "Lớp nhóm",
+    "kindRefund": "Hoàn lại",
+    "kindAdjust": "Điều chỉnh"
   }
 }

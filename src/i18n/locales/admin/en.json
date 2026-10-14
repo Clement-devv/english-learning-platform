@@ -19,6 +19,16 @@
     "backToLogin": "← Back to login"
   },
   "studentCard": {
+    "disable": "Disable",
+    "enable": "Enable",
+    "moreActions": "More actions",
+    "markLessonShort": "Mark lesson",
+    "addPayment": "Add payment",
+    "groupLessons": "Lessons",
+    "groupPayments": "Payments & points",
+    "groupAccount": "Account",
+    "disableStudent": "Disable student",
+    "enableStudent": "Enable student",
     "noClassesLeft": "No classes left",
     "classLeft": "{{count}} class{{value}} left",
     "classesLeft": "{{count}} classes left",
@@ -49,7 +59,10 @@
     "temporaryPassword": "🔑 Temporary Password",
     "copyPassword2": "Copy password",
     "profileDetails": "Profile Details",
-    "edit": "Edit"
+    "edit": "Edit",
+    "sellGroupPoints": "Sell Group Points",
+    "groupPoints_one": "{{count}} group point",
+    "groupPoints_other": "{{count}} group points"
   },
   "studentTable": {
     "firstName": "First Name",
@@ -73,6 +86,14 @@
     "enable": "Enable"
   },
   "teacherCard": {
+    "disable": "Disable",
+    "enable": "Enable",
+    "moreActions": "More actions",
+    "markLessonShort": "Mark lesson",
+    "groupLessonsPay": "Lessons & pay",
+    "groupAccount": "Account",
+    "disableTeacher": "Disable teacher",
+    "enableTeacher": "Enable teacher",
     "unknown": "Unknown",
     "review": "({{totalRatings}} review{{value}})",
     "unnamedTeacher": "Unnamed Teacher",
@@ -1000,7 +1021,13 @@
       "TRY": "TRY — Turkish Lira",
       "ZAR": "ZAR — South African Rand",
       "other": "Other / Custom"
-    }
+    },
+    "groupClasses": "Group classes",
+    "groupClassesHint": "Group classes are paid with group points, separate from class credits. Sell points from a student’s card (Students → ⋮ → Sell Group Points).",
+    "pricePerPoint": "Price per point ({{symbol}})",
+    "defaultGroupFee": "Default teacher fee ({{symbol}})",
+    "defaultGroupFeeHint": "Used for group classes created by teachers or sub-admins. You can set a different fee when you create a class.",
+    "groupValuesInvalid": "Group point price and teacher fee must be 0 or more"
   },
   "domainTab": {
     "failedToSubmitDomain": "Failed to submit domain",
@@ -1084,7 +1111,41 @@
     "pending": "Pending",
     "attended": "Attended",
     "absent": "Absent",
-    "saveAttendance": "Save Attendance"
+    "saveAttendance": "Save Attendance",
+    "pointsPerStudent": "Points / Student",
+    "teacherFee": "Teacher fee",
+    "teacherFeePlaceholder": "Center default",
+    "teacherFeeDefault": "Center default (set by the admin)",
+    "teacherFeeHint": "Added to the teacher’s earnings when the class is completed with at least one student attended.",
+    "pointsSeat_one": "🎟 {{count}} point/student",
+    "pointsSeat_other": "🎟 {{count}} points/student",
+    "feeLabel": "💰 Fee {{fee}}",
+    "feePaid": "💰 Fee {{fee}} ✓",
+    "feePaidHint": "Added to the teacher’s earnings",
+    "feeDueHint": "Paid when the class is completed with at least one student marked attended",
+    "pts_one": "{{count}} pt",
+    "pts_other": "{{count}} pts",
+    "studentPoints_one": "{{firstName}} {{lastName}} ({{count}} point)",
+    "studentPoints_other": "{{firstName}} {{lastName}} ({{count}} points)",
+    "completedFeePaid": "Class completed — teacher fee {{fee}} added to their earnings",
+    "attendanceFeePaid": "Attendance saved — teacher fee {{fee}} added to their earnings",
+    "whoCanJoin": "Who can join",
+    "joinOpen": "🌐 Everyone",
+    "joinOpenHint": "Any student with enough group points can enroll",
+    "joinSelected": "🔒 Only selected students",
+    "joinSelectedHint": "Only the students you pick can see and enroll",
+    "searchStudentsPicker": "Search students…",
+    "noStudentsFoundPicker": "No students found",
+    "studentsSelected": "{{count}} selected",
+    "pickerPoints": "{{count}} pts",
+    "invitedHint": "Picked students see this class in their Group Classes and enroll with their group points.",
+    "pickAtLeastOneStudent": "Pick at least one student, or choose Everyone",
+    "classPlatform": "Class platform",
+    "agoraHint": "In the app — students join here",
+    "externalHint": "Opens in a new tab",
+    "linkPlaceholder": "Paste a link for this class (optional)",
+    "linkHint": "Leave empty to use the link saved on the teacher's profile.",
+    "activeStatuses": "Upcoming & running"
   },
   "loggedClassesTab": {
     "confirmedItHappened": "{{who}} confirmed it happened",
@@ -1660,7 +1721,9 @@
     "deletesIn": "Deletes in",
     "day": "day",
     "restore2": "Restore",
-    "paymentHistoryIsLocked": "Payment history is locked"
+    "paymentHistoryIsLocked": "Payment history is locked",
+    "pointsAdded_one": "{{count}} group point added — balance {{balance}}",
+    "pointsAdded_other": "{{count}} group points added — balance {{balance}}"
   },
   "subAdminsTab": {
     "failedToLoadSubAdmins": "Failed to load sub-admins",
@@ -1744,7 +1807,21 @@
     "copied": "Copied!",
     "copy": "Copy",
     "subAdminReactivated": "Sub-admin reactivated",
-    "subAdminSuspended": "Sub-admin suspended"
+    "subAdminSuspended": "Sub-admin suspended",
+    "permClassReport": "Class Report",
+    "permClassReportDesc": "View, download and email the daily class report",
+    "permGroupClasses": "Group Classes",
+    "permGroupClassesDesc": "Create and run group classes, enroll students, take attendance",
+    "permBookings": "Book Classes",
+    "permBookingsDesc": "Send class requests to their teachers",
+    "permParentChecks": "Parent Checks",
+    "permParentChecksDesc": "See parent attendance checks and send check links",
+    "permParentLinks": "Parent Links",
+    "permParentLinksDesc": "See and copy homework / quiz links for parents",
+    "permLoggedClasses": "Logged Classes",
+    "permLoggedClassesDesc": "See classes teachers logged outside the app",
+    "permApproveLogged": "Approve Logged Classes",
+    "permApproveLoggedDesc": "Approve (pays the teacher, uses a student class) or reject. Needs Logged Classes."
   },
   "teacherScheduleTab": {
     "active": "Active",
@@ -1919,5 +1996,35 @@
     "invalid2faCode": "Invalid 2FA code",
     "somethingWentWrong": "Something went wrong.",
     "failedToSendResetEmail": "Failed to send reset email."
+  },
+  "sellPointsModal": {
+    "title": "Sell group points",
+    "onlyForGroup": "used only for group classes",
+    "close": "Close",
+    "couldNotLoad": "Could not load the points balance",
+    "couldNotSave": "Could not add the points",
+    "pointsRange": "Enter a whole number of points from 1 to 10000",
+    "balance": "Current balance",
+    "points": "Points",
+    "amountPaid": "Amount paid {{sym}}",
+    "pricePerPoint": "{{price}} per point (Class Pricing)",
+    "method": "Payment method",
+    "note": "Note (optional)",
+    "methods": {
+      "cash": "Cash",
+      "bank_transfer": "Bank transfer",
+      "card": "Card",
+      "online": "Online payment",
+      "other": "Other"
+    },
+    "cancel": "Cancel",
+    "addPoints_one": "Add {{count}} point",
+    "addPoints_other": "Add {{count}} points",
+    "addPointsEmpty": "Add points",
+    "history": "Recent points history",
+    "kindPurchase": "Bought",
+    "kindSpend": "Group class",
+    "kindRefund": "Refund",
+    "kindAdjust": "Adjustment"
   }
 }

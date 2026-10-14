@@ -4,10 +4,12 @@
 // separate recordings started during the same class (Record pressed again).
 // Everything is ordered the way it was recorded, so "Part 1" is the start.
 
+const idOf = (v) => (v && typeof v === "object" ? v._id : v);
 const bookingKey = (rec) => {
-  const b = rec.bookingId;
-  const id = b && typeof b === "object" ? b._id : b;
-  return id ? `b:${id}` : `s:${rec.sessionId || rec._id}`;
+  const id = idOf(rec.bookingId);
+  if (id) return `b:${id}`;
+  const g = idOf(rec.groupClassId); // group class recordings: one entry per group class
+  return g ? `g:${g}` : `s:${rec.sessionId || rec._id}`;
 };
 
 const time = (d) => new Date(d || 0).getTime();
@@ -41,9 +43,12 @@ export function groupRecordingSessions(recordings) {
 
     const first = parts[0];
     const b = first.bookingId && typeof first.bookingId === "object" ? first.bookingId : null;
+    const g = first.groupClassId && typeof first.groupClassId === "object" ? first.groupClassId : null;
     return {
       key,
-      bookingId:        b?._id || (typeof first.bookingId === "string" ? first.bookingId : null),
+      // Group classes: the group class id — the class-wide show/hide and delete accept it too
+      bookingId:        b?._id || (typeof first.bookingId === "string" ? first.bookingId : null) || idOf(first.groupClassId) || null,
+      isGroupClass:     !!first.groupClassId,
       sessionId:        first.sessionId || null,
       parts,
       first,
@@ -53,7 +58,7 @@ export function groupRecordingSessions(recordings) {
       hasExternal:      parts.some(p => p.source === "external"),
       createdAt:        first.createdAt,
       // When the class took place (falls back to when it was recorded)
-      classDate:        b?.scheduledTime || first.createdAt,
+      classDate:        b?.scheduledTime || g?.scheduledTime || first.createdAt,
     };
   }).sort((a, b) => time(b.classDate) - time(a.classDate));
 }

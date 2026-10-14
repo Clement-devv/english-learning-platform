@@ -51,7 +51,9 @@ export function UploadQueueProvider({ children }) {
     const { id, blob, bookingId, duration, ext, sessionId, partNumber, startOffset } = item;
     const form = new FormData();
     form.append('recording', blob, `recording${ext}`);
-    form.append('bookingId', bookingId);
+    // Group class recordings are queued as "group:<groupClassId>" (useRecording)
+    if (String(bookingId).startsWith('group:')) form.append('groupClassId', String(bookingId).slice(6));
+    else form.append('bookingId', bookingId);
     form.append('duration',  String(duration));
     if (sessionId) {
       form.append('sessionId',   sessionId);

@@ -9,6 +9,10 @@ export const classPricingSchema = new Schema(
     currency:       { type: String, default: "USD", trim: true },
     currencySymbol: { type: String, default: "$",   trim: true },
     notes:          { type: String, default: "" },
+    // Group classes: price of one group point (shown when selling points) and the
+    // teacher fee a teacher-created group class gets (the admin can change it per class)
+    pricePerPoint:   { type: Number, min: 0, default: 0 },
+    defaultGroupFee: { type: Number, min: 0, default: 0 },
   },
   { timestamps: true }
 );

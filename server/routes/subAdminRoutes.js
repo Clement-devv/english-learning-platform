@@ -9,6 +9,7 @@ import { subAdminSchema } from "../schemas/subAdminSchema.js";
 import { teacherSchema }  from "../schemas/teacherSchema.js";
 import { studentSchema }  from "../schemas/studentSchema.js";
 import logger from "../utils/logger.js";
+import { SUB_ADMIN_PAGE_PERMISSIONS } from "../middleware/staffAccess.js";
 import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
 
 const router = express.Router();
@@ -74,6 +75,7 @@ router.post("/invite", async (req, res) => {
         canSendMessages: permissions?.canSendMessages ?? true,
         canViewBookings: permissions?.canViewBookings ?? true,
         canViewClasses:  permissions?.canViewClasses  ?? true,
+        ...Object.fromEntries(SUB_ADMIN_PAGE_PERMISSIONS.map(k => [k, permissions?.[k] === true])),
       },
       notes: notes || "",
       inviteToken,
@@ -137,7 +139,13 @@ router.put("/:id", async (req, res) => {
     if (assignmentType) subAdmin.assignmentType = assignmentType;
     if (region !== undefined) subAdmin.region = region;
     if (assignedTeachers !== undefined) subAdmin.assignedTeachers = assignedTeachers;
-    if (permissions) subAdmin.permissions = { ...subAdmin.permissions.toObject(), ...permissions };
+    if (permissions && typeof permissions === "object") {
+      // Only known keys, as real booleans ("false" must not turn a permission on)
+      const known = Object.keys(subAdmin.permissions.toObject());
+      const clean = Object.fromEntries(Object.entries(permissions)
+        .filter(([k]) => known.includes(k)).map(([k, v]) => [k, v === true]));
+      subAdmin.permissions = { ...subAdmin.permissions.toObject(), ...clean };
+    }
     if (notes !== undefined) subAdmin.notes = notes;
     if (status && ["active", "suspended"].includes(status)) subAdmin.status = status;
 

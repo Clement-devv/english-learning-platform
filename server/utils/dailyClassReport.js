@@ -285,6 +285,15 @@ export function teachersInReport(report) {
   return [...map.entries()].map(([teacherId, teacherName]) => ({ teacherId, teacherName }));
 }
 
+/** The same report narrowed to a set of teachers (a sub-admin's scope) */
+export function reportForTeachers(report, teacherIds) {
+  const ids = new Set((teacherIds || []).map(String));
+  const keep = (groups) => groups.filter(g => ids.has(String(g.teacherId)));
+  const completed = keep(report.completed);
+  const notCompleted = keep(report.notCompleted);
+  return { ...report, completed, notCompleted, counts: countGroups(completed, notCompleted) };
+}
+
 /** The same report narrowed to one teacher's classes */
 export function reportForTeacher(report, teacherId) {
   const keep = (groups) => groups.filter(g => String(g.teacherId) === String(teacherId));

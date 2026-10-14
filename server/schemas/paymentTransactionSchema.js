@@ -5,6 +5,8 @@ export const paymentTransactionSchema = new mongoose.Schema({
   studentId:  { type: mongoose.Schema.Types.ObjectId, ref: 'Student', index: true },
   // No default: manual transactions omit it entirely (the unique sparse index indexes null)
   bookingId:  { type: mongoose.Schema.Types.ObjectId, ref: 'Booking' },
+  // Teacher fee for a group class (one per class — unique index below)
+  groupClassId: { type: mongoose.Schema.Types.ObjectId, ref: 'GroupClass' },
   amount:     { type: Number, required: true, min: 0 },
   type: {
     type: String,
@@ -31,6 +33,7 @@ export const paymentTransactionSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 paymentTransactionSchema.index({ bookingId: 1 }, { unique: true, sparse: true });
+paymentTransactionSchema.index({ groupClassId: 1 }, { unique: true, sparse: true });
 paymentTransactionSchema.index({ teacherId: 1, status: 1 });
 paymentTransactionSchema.index({ completedAt: -1 });
 paymentTransactionSchema.index({ paidAt: -1 });

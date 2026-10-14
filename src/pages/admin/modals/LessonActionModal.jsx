@@ -67,7 +67,7 @@ function Steps({ steps, current, isDarkMode }) {
         <React.Fragment key={i}>
           <div className="flex flex-col items-center">
             <div
-              className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all ${
+              className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border-2 transition ${
                 i < current
                   ? "bg-emerald-500 border-emerald-500 text-white"
                   : i === current
@@ -110,7 +110,7 @@ function SelectRow({ label, sub, onClick, isDarkMode, disabled }) {
     <button
       onClick={onClick}
       disabled={disabled}
-      className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border text-left transition-all ${
+      className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border text-left transition ${
         disabled
           ? isDarkMode ? "opacity-40 cursor-not-allowed border-gray-700" : "opacity-40 cursor-not-allowed border-gray-200"
           : isDarkMode
@@ -389,7 +389,7 @@ export default function LessonActionModal({
                   <button
                     key={b._id}
                     onClick={() => { setSelectedBooking(b); setStep("confirm"); }}
-                    className={`w-full text-left px-4 py-3 rounded-xl border transition-all ${
+                    className={`w-full text-left px-4 py-3 rounded-xl border transition ${
                       isDarkMode
                         ? "border-gray-700 hover:border-blue-500 hover:bg-blue-900/20"
                         : "border-gray-200 hover:border-blue-400 hover:bg-blue-50"
@@ -536,7 +536,7 @@ export default function LessonActionModal({
               <button
                 onClick={handleSubmit}
                 disabled={submitting}
-                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-all active:scale-95 disabled:opacity-60 ${
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition active:scale-95 disabled:opacity-60 ${
                   isMarking
                     ? "bg-emerald-600 hover:bg-emerald-700"
                     : "bg-rose-600 hover:bg-rose-700"
@@ -557,7 +557,7 @@ export default function LessonActionModal({
           <div className={`px-6 py-4 border-t flex-shrink-0 ${isDarkMode ? "border-gray-700" : "border-gray-100"}`}>
             <button
               onClick={onClose}
-              className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm transition-all"
+              className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm transition"
             >
               {tr("lessonActionModal.done")}
             </button>

@@ -10,7 +10,10 @@ const newSessionId = () =>
   (crypto.randomUUID?.() || `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 12)}`)
     .replace(/[^A-Za-z0-9_-]/g, "");
 
-export function useRecording(bookingId) {
+// options.captureThisTab — record THIS tab (the Agora classroom: video, Content,
+// Whiteboard…). Chrome / Edge then offer only "Share this tab" instead of the full
+// picker. Off for Google Meet / Zoom, whose meeting runs in another tab or app.
+export function useRecording(bookingId, { captureThisTab = false } = {}) {
   const [isRecording,    setIsRecording]    = useState(false);
   const [recSeconds,     setRecSeconds]     = useState(0);
   const [recordingError, setRecordingError] = useState(null);
@@ -129,14 +132,31 @@ export function useRecording(bookingId) {
     // Use ref to get the latest value without recreating this callback.
     if (hasActiveUploadsRef.current) setMemoryWarning(true);
     try {
-      // 1. Capture the browser tab (video + tab audio output = student's voice)
-      //    No preferCurrentTab — we want the full picker so the user can select
-      //    the Google Meet tab (which opens in a separate tab).
-      const tabStream = await navigator.mediaDevices.getDisplayMedia({
-        video: { frameRate: 15 },
-        audio: true,
-      });
+      // 1. Capture a browser tab (video + tab audio output = the students' voices)
+      //    Agora: this tab only — the classroom itself, whatever is on screen in it.
+      //    Meet / Zoom: the full picker, so the teacher can choose the meeting tab.
+      const tabStream = await navigator.mediaDevices.getDisplayMedia(captureThisTab
+        ? {
+            video: { frameRate: 15, displaySurface: "browser" },
+            audio: true,
+            preferCurrentTab: true,      // Chrome / Edge: "Share this tab" only
+            selfBrowserSurface: "include",
+            surfaceSwitching: "exclude",
+            monitorTypeSurfaces: "exclude", // no whole-screen option
+            systemAudio: "exclude",
+          }
+        : { video: { frameRate: 15 }, audio: true });
       tabStreamRef.current = tabStream;
+
+      // Browsers without "this tab" support still show a picker — never record a
+      // window or the whole screen for an in-app class
+      if (captureThisTab && tabStream.getVideoTracks()[0]?.getSettings?.().displaySurface
+          && tabStream.getVideoTracks()[0].getSettings().displaySurface !== "browser") {
+        tabStream.getTracks().forEach(t => t.stop());
+        tabStreamRef.current = null;
+        setRecordingError("Please choose this classroom tab (not a window or the whole screen) so the class itself is recorded.");
+        return;
+      }
 
       // 2. Mix in the teacher's microphone so both voices end up in the recording
       const audioCtx   = new AudioContext();
@@ -188,7 +208,7 @@ export function useRecording(bookingId) {
       clearTimeout(partTimerRef.current);
       releaseStreams();
     }
-  }, [startPart, schedulePartRotation, releaseStreams]);
+  }, [startPart, schedulePartRotation, releaseStreams, captureThisTab]);
 
   const stopRecording = useCallback(() => {
     clearInterval(recTimerRef.current);

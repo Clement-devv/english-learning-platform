@@ -281,7 +281,7 @@ export default function StudentCompletedTab({ studentId, isDarkMode }) {
                 <div className="flex-1">
                   {/* Title + status chip */}
                   <div className="flex items-start justify-between gap-2 flex-wrap">
-                    <h3 className={`font-semibold ${textPrimary}`}>{cls.title}</h3>
+                    <h3 className={`font-semibold ${textPrimary}`}>{cls.title}{cls.isGroupClass && <span className="ml-2 inline-block text-xs font-semibold px-2 py-0.5 rounded-full bg-sky-100 text-sky-700">{tr("studentCompletedTab.groupClass")}</span>}</h3>
                     {tab === "completed" ? (
                       <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700 border border-emerald-200">
                         <CheckCircle className="w-3 h-3" /> {tr("studentCompletedTab.completed")}

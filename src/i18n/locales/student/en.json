@@ -944,7 +944,14 @@
     "enrolling": "Enrolling…",
     "notEnoughCredits": "Not enough credits",
     "enroll": "Enroll",
-    "leaveClass": "Leave Class"
+    "leaveClass": "Leave Class",
+    "groupPoints": "🎟 Group points:",
+    "buyPointsFromSchool": "— buy points from your school to join group classes",
+    "points_one": "🎟 {{count}} point",
+    "points_other": "🎟 {{count}} points",
+    "notEnoughPoints": "Not enough points",
+    "enrolledPointsDeducted_one": "Enrolled in \"{{title}}\" — {{count}} point used",
+    "enrolledPointsDeducted_other": "Enrolled in \"{{title}}\" — {{count}} points used"
   },
   "homeworkTab": {
     "toDo": "To Do",
@@ -1299,7 +1306,8 @@
     "attendanceNotMet": "Attendance Not Met",
     "topic": "Topic:",
     "min": "min",
-    "pageOf": "Page {{currentPage}} of {{totalPages}}"
+    "pageOf": "Page {{currentPage}} of {{totalPages}}",
+    "groupClass": "👥 Group class"
   },
   "studentScheduleTab": {
     "yourRequest": "Your request",

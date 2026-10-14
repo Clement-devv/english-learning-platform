@@ -89,7 +89,7 @@ router.get("/", verifyToken, verifyAdminOrTeacher, sharedSnapshot("students-dire
                  : {};
     const students = await Student
       .find(filter)
-      .select("studentId firstName lastName email active classCredits age lastPaymentDate showTempPassword status createdAt phone country rank dateOfBirth scheduledDeletionAt isManaged")
+      .select("studentId firstName lastName email active classCredits groupPoints age lastPaymentDate showTempPassword status createdAt phone country rank dateOfBirth scheduledDeletionAt isManaged")
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)

@@ -10,6 +10,7 @@ import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
 import { recordingSchema }  from "../schemas/recordingSchema.js";
 import { bookingSchema }    from "../schemas/bookingSchema.js";
 import { studentSchema }    from "../schemas/studentSchema.js";
+import { groupClassSchema } from "../schemas/groupClassSchema.js";
 import { readPaging, pageMeta, oid } from "../utils/paging.js";
 import logger from "../utils/logger.js";
 import { badRequest, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
@@ -153,6 +154,7 @@ function cleanExternalUrl(raw) {
 
 const populateRecording = (query) => query
   .populate("bookingId", "classTitle scheduledTime")
+  .populate("groupClassId", "title scheduledTime")
   .populate("teacherId", "firstName lastName")
   .populate("studentId", "firstName lastName");
 
@@ -187,23 +189,28 @@ router.post("/external", verifyToken, async (req, res) => {
     const { role, id: teacherId } = req.user;
     if (role !== "teacher") return forbidden(res, "Teachers only");
 
-    const { bookingId, url, note, durationMinutes } = req.body || {};
-    if (!mongoose.isValidObjectId(bookingId)) return badRequest(res, "Please choose a class");
+    const { url, note, durationMinutes } = req.body || {};
+    const groupClassId = req.body?.groupClassId || null;
+    const bookingId = groupClassId ? null : req.body?.bookingId;
+    if (!mongoose.isValidObjectId(groupClassId || bookingId)) return badRequest(res, "Please choose a class");
     const externalUrl = cleanExternalUrl(url);
     if (!externalUrl) return badRequest(res, "Please paste a valid link starting with https://");
 
-    const booking = await getBooking(req.db).findOne({ _id: bookingId, teacherId }).select("studentId classTitle");
+    const booking = groupClassId
+      ? await getGroupClassModel(req.db).findOne({ _id: groupClassId, teacherId }).select("title")
+      : await getBooking(req.db).findOne({ _id: bookingId, teacherId }).select("studentId classTitle");
     if (!booking) return notFound(res, "Class not found");
+    const classRef = groupClassId ? { groupClassId } : { bookingId };
 
     const Recording = getRecording(req.db);
-    const duplicate = await Recording.findOne({ bookingId, teacherId, source: "external", externalUrl });
+    const duplicate = await Recording.findOne({ ...classRef, teacherId, source: "external", externalUrl });
     if (duplicate) return conflict(res, "This link is already saved for this class");
 
-    const classmate = await Recording.findOne({ bookingId, teacherId }).sort({ createdAt: 1 }).select("visibleToStudent");
+    const classmate = await Recording.findOne({ ...classRef, teacherId }).sort({ createdAt: 1 }).select("visibleToStudent");
     const minutes   = Math.min(Math.max(parseFloat(durationMinutes) || 0, 0), 600);
 
     const rec = await Recording.create({
-      bookingId, teacherId,
+      ...classRef, teacherId,
       studentId:        booking.studentId || null,
       source:           "external",
       externalUrl,
@@ -261,13 +268,21 @@ router.post("/upload", verifyToken, wrapUpload(upload.single("recording")), asyn
     if (role !== "teacher") { await discardUploadedFile(req.file); return forbidden(res, "Teachers only"); }
     if (!req.file)          return badRequest(res, "No file uploaded");
 
-    const { bookingId, duration, title } = req.body;
-    if (!bookingId) { await discardUploadedFile(req.file); return badRequest(res, "bookingId is required"); }
+    const { duration, title } = req.body;
+    const groupClassId = req.body.groupClassId || null;
+    const bookingId = groupClassId ? null : req.body.bookingId;
+    if (!bookingId && !groupClassId) { await discardUploadedFile(req.file); return badRequest(res, "bookingId is required"); }
+    // Group class recording: only that class's own teacher
+    if (groupClassId && (!mongoose.isValidObjectId(groupClassId) ||
+        !(await getGroupClassModel(req.db).exists({ _id: groupClassId, teacherId })))) {
+      await discardUploadedFile(req.file);
+      return forbidden(res, "You can only upload recordings for your own classes");
+    }
     // Only the class's own teacher may attach a recording to it — otherwise a
     // teacher could push videos onto another teacher's student. (Recording is
     // only offered in 1:1 classes, so bookingId is always a Booking.)
-    if (!mongoose.isValidObjectId(bookingId) ||
-        !(await getBooking(req.db).exists({ _id: bookingId, teacherId }))) {
+    if (bookingId && (!mongoose.isValidObjectId(bookingId) ||
+        !(await getBooking(req.db).exists({ _id: bookingId, teacherId })))) {
       await discardUploadedFile(req.file);
       return forbidden(res, "You can only upload recordings for your own classes");
     }
@@ -301,11 +316,11 @@ router.post("/upload", verifyToken, wrapUpload(upload.single("recording")), asyn
         .select("autoDeleteAt visibleToStudent");
     }
     // Any earlier video from the same class sets the visibility for new ones
-    const classmate = await Recording.findOne({ bookingId, teacherId }).sort({ createdAt: 1 })
+    const classmate = await Recording.findOne({ ...(groupClassId ? { groupClassId } : { bookingId }), teacherId }).sort({ createdAt: 1 })
       .select("visibleToStudent");
 
-    const booking   = await getBooking(req.db).findById(bookingId).select("studentId");
-    const studentId = booking?.studentId || null;
+    const booking   = bookingId ? await getBooking(req.db).findById(bookingId).select("studentId") : null;
+    const studentId = booking?.studentId || null; // group classes: shared with every enrolled student
 
     // All parts of one class share the same expiry and visibility
     let autoDeleteAt = sibling?.autoDeleteAt;
@@ -319,7 +334,7 @@ router.post("/upload", verifyToken, wrapUpload(upload.single("recording")), asyn
     if (!filename) return serverError(res, "File storage error — no filename assigned");
 
     rec = await Recording.create({
-      bookingId, teacherId, studentId,
+      ...(groupClassId ? { groupClassId } : { bookingId }), teacherId, studentId,
       title:    title?.trim() || "",
       filename,
       duration: parseFloat(duration) || 0,
@@ -344,14 +359,19 @@ router.post("/upload", verifyToken, wrapUpload(upload.single("recording")), asyn
 // Record pressed twice) always lands on the same page.
 const LEGACY_MAX = 500;
 const UNASSIGNED = "__unassigned__";
-const classKey = { $ifNull: ["$bookingId", { $ifNull: ["$sessionId", "$_id"] }] };
+const GROUP = "__group__"; // group class recordings (shared by the class, no single student)
+const classKey = { $ifNull: ["$bookingId", { $ifNull: ["$groupClassId", { $ifNull: ["$sessionId", "$_id"] }] }] };
 const getStudentModel = (db) => db.models.Student || db.model("Student", studentSchema);
+const getGroupClassModel = (db) => db.models.GroupClass || db.model("GroupClass", groupClassSchema);
+/** Group classes this student is enrolled in (to show their shared group recordings) */
+const myGroupClassIds = (db, studentId) => getGroupClassModel(db).distinct("_id", { "enrollments.studentId": oid(studentId) });
 
 /** Who can see what: teacher → own, student → own + shared, admin → all (or ?teacherId). */
-function scopeFor(req) {
+async function scopeFor(req) {
   const { role, id } = req.user;
   if (role === "teacher") return { teacherId: oid(id) };
-  if (role === "student") return { studentId: oid(id), visibleToStudent: true };
+  // Students: their own one-to-one recordings + recordings of group classes they're in, once shared
+  if (role === "student") return { visibleToStudent: true, $or: [{ studentId: oid(id) }, { groupClassId: { $in: await myGroupClassIds(req.db, id) } }] };
   if (role === "admin") {
     const t = req.query.teacherId;
     if (t && !mongoose.isValidObjectId(t)) return null;
@@ -363,12 +383,14 @@ function scopeFor(req) {
 function withStudent(req, filter) {
   const sid = req.query.studentId;
   if (!sid || req.user.role === "student") return filter;
-  if (sid === UNASSIGNED) return { ...filter, studentId: null };
+  if (sid === UNASSIGNED) return { ...filter, studentId: null, groupClassId: null };
+  if (sid === GROUP) return { ...filter, groupClassId: { $ne: null } };
   if (!mongoose.isValidObjectId(sid)) return null;
   return { ...filter, studentId: oid(sid) };
 }
 const populateList = (q) => q
   .populate("bookingId", "classTitle scheduledTime")
+  .populate("groupClassId", "title scheduledTime")
   .populate("teacherId", "firstName lastName")
   .populate("studentId", "firstName lastName email")
   .sort({ createdAt: -1 })
@@ -388,10 +410,12 @@ async function listRecordings(req, res, scope) {
   const { page: want, limit } = readPaging(req.query, { defaultLimit: 10, maxLimit: 30 });
   const [agg] = await Recording.aggregate([
     { $match: filter },
-    { $group: { _id: classKey, bookingId: { $first: "$bookingId" }, firstAt: { $min: "$createdAt" } } },
+    { $group: { _id: classKey, bookingId: { $first: "$bookingId" }, groupClassId: { $first: "$groupClassId" }, firstAt: { $min: "$createdAt" } } },
     { $lookup: { from: getBooking(req.db).collection.name, localField: "bookingId", foreignField: "_id", as: "b",
                  pipeline: [{ $project: { scheduledTime: 1 } }] } },
-    { $addFields: { classDate: { $ifNull: [{ $arrayElemAt: ["$b.scheduledTime", 0] }, "$firstAt"] } } },
+    { $lookup: { from: getGroupClassModel(req.db).collection.name, localField: "groupClassId", foreignField: "_id", as: "g",
+                 pipeline: [{ $project: { scheduledTime: 1 } }] } },
+    { $addFields: { classDate: { $ifNull: [{ $arrayElemAt: ["$b.scheduledTime", 0] }, { $ifNull: [{ $arrayElemAt: ["$g.scheduledTime", 0] }, "$firstAt"] }] } } },
     { $sort: { classDate: -1, _id: -1 } },
     { $facet: { keys: [{ $skip: (Math.max(want, 1) - 1) * limit }, { $limit: limit }, { $project: { _id: 1 } }], total: [{ $count: "n" }] } },
   ]);
@@ -399,11 +423,12 @@ async function listRecordings(req, res, scope) {
   const pagination = pageMeta(want, limit, total);
   const keys = (agg?.keys || []).map(k => k._id);
   const recordings = keys.length
-    ? await populateList(Recording.find({ ...filter, $or: [
+    ? await populateList(Recording.find({ $and: [filter, { $or: [ // $and: the filter may have its own $or
         { bookingId: { $in: keys.filter(k => k instanceof mongoose.Types.ObjectId) } },
+        { groupClassId: { $in: keys.filter(k => k instanceof mongoose.Types.ObjectId) } },
         { sessionId: { $in: keys.filter(k => typeof k === "string") } },
         { _id: { $in: keys.filter(k => k instanceof mongoose.Types.ObjectId) } },
-      ] }))
+      ] }] }))
     : [];
   res.json({ success: true, recordings, pagination });
 }
@@ -413,11 +438,11 @@ async function listRecordings(req, res, scope) {
 router.get("/students", verifyToken, async (req, res) => {
   try {
     if (!["teacher", "admin"].includes(req.user.role)) return forbidden(res, "Access denied");
-    const scope = scopeFor(req);
+    const scope = await scopeFor(req);
     if (!scope) return badRequest(res, "Invalid filter");
     const rows = await getRecording(req.db).aggregate([
       { $match: scope },
-      { $group: { _id: { s: "$studentId", k: classKey }, latest: { $max: "$createdAt" },
+      { $group: { _id: { s: { $cond: [{ $ifNull: ["$groupClassId", false] }, GROUP, "$studentId"] }, k: classKey }, latest: { $max: "$createdAt" },
                   links: { $sum: { $cond: [{ $eq: ["$source", "external"] }, 1, 0] } } } },
       { $group: { _id: "$_id.s", count: { $sum: 1 }, latest: { $max: "$latest" }, links: { $sum: "$links" } } },
       { $lookup: { from: getStudentModel(req.db).collection.name, localField: "_id", foreignField: "_id", as: "st",
@@ -425,6 +450,7 @@ router.get("/students", verifyToken, async (req, res) => {
       { $sort: { latest: -1 } },
     ]);
     const students = rows.map(r => {
+      if (r._id === GROUP) return { id: GROUP, name: "Group classes", email: "", count: r.count, links: r.links, latest: r.latest ? new Date(r.latest).getTime() : 0 };
       const st = r.st?.[0];
       return {
         id: r._id ? String(r._id) : UNASSIGNED,
@@ -445,7 +471,7 @@ router.get("/students", verifyToken, async (req, res) => {
 //   ?page=&limit= (classes per page)  ?studentId= (teacher/admin)  ?teacherId= (admin)
 router.get("/", verifyToken, async (req, res) => {
   try {
-    const scope = scopeFor(req);
+    const scope = await scopeFor(req);
     if (!scope) return req.user.role === "admin" ? badRequest(res, "Invalid filter") : forbidden(res, "Access denied");
     await listRecordings(req, res, scope);
   } catch (err) {
@@ -498,10 +524,13 @@ router.get("/:id/stream", verifyToken, async (req, res) => {
 
     // Allow-list: admin, the recording's teacher, or its student once shared.
     // (Sub-admins use /sub-admin-scope/recordings; parents have no access.)
+    const inMyGroupClass = role === "student" && rec.groupClassId && rec.visibleToStudent &&
+      !!(await getGroupClassModel(req.db).exists({ _id: rec.groupClassId, "enrollments.studentId": oid(userId) }));
     const allowed =
       role === "admin" ||
       (role === "teacher" && rec.teacherId.toString() === userId) ||
-      (role === "student" && rec.studentId?.toString() === userId && rec.visibleToStudent);
+      (role === "student" && rec.studentId?.toString() === userId && rec.visibleToStudent) ||
+      inMyGroupClass;
     if (!allowed) return forbidden(res, "Access denied");
 
     // Recorded elsewhere — hand back the saved link
@@ -600,7 +629,8 @@ router.patch("/booking/:bookingId/visibility", verifyToken, async (req, res) => 
 
     const { visibleToStudent } = req.body;
     const result = await getRecording(req.db).updateMany(
-      { bookingId: req.params.bookingId, teacherId },
+      // :bookingId may also be a group class id (all of that group class's videos)
+      { $or: [{ bookingId: req.params.bookingId }, { groupClassId: req.params.bookingId }], teacherId },
       { $set: { visibleToStudent } },
     );
     if (result.matchedCount === 0) return notFound(res, "Recording not found");
@@ -618,7 +648,7 @@ router.delete("/booking/:bookingId", verifyToken, async (req, res) => {
     if (role !== "teacher" && role !== "admin") return forbidden(res, "Access denied");
     if (!mongoose.isValidObjectId(req.params.bookingId)) return badRequest(res, "Invalid bookingId");
 
-    const filter = { bookingId: req.params.bookingId };
+    const filter = { $or: [{ bookingId: req.params.bookingId }, { groupClassId: req.params.bookingId }] }; // or a group class
     if (role === "teacher") filter.teacherId = userId;
 
     const parts = await getRecording(req.db).find(filter);

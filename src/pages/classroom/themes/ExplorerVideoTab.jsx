@@ -363,32 +363,35 @@ export default function ExplorerVideoTab({
             </button>
           )}
 
-          <button
-            onClick={isRecording ? stopRecording : startRecording}
-            disabled={uploadingRecording}
-            style={{
-              flex: 1, padding: "11px 16px", borderRadius: 14,
-              background: uploadingRecording ? "rgba(255,255,255,0.06)"
-                : isRecording ? `linear-gradient(135deg,#ef4444,#dc2626)`
-                : `linear-gradient(135deg,${PURPLE},#7c3aed)`,
-              color: uploadingRecording ? "#374151" : "#fff",
-              border: "none", cursor: uploadingRecording ? "not-allowed" : "pointer",
-              fontWeight: 900, fontSize: 13,
-              display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-              boxShadow: uploadingRecording ? "none" : isRecording ? "0 4px 14px rgba(239,68,68,0.4)" : `0 4px 14px ${PURPLE}50`,
-              transition: "transform 0.15s",
-            }}
-            onMouseEnter={e => { if (!uploadingRecording) e.currentTarget.style.transform = "scale(1.03)"; }}
-            onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; }}
-          >
-            {uploadingRecording ? (
-              <><Loader style={{ width: 14, height: 14, animation: "spin 1s linear infinite" }} /> Saving…</>
-            ) : isRecording ? (
-              <><Square style={{ width: 13, height: 13, fill: "white" }} /> End Rec <span style={{ fontFamily: "monospace", fontSize: 11, background: "rgba(0,0,0,0.25)", padding: "1px 6px", borderRadius: 6 }}>{formatRecTime(recSeconds)}</span></>
-            ) : (
-              <><span style={{ fontSize: 12 }}>🔴</span> Record Mission</>
-            )}
-          </button>
+          {/* Only teachers record — the server accepts recordings from teachers only */}
+          {userRole === "teacher" && (
+            <button
+              onClick={isRecording ? stopRecording : startRecording}
+              disabled={uploadingRecording}
+              style={{
+                flex: 1, padding: "11px 16px", borderRadius: 14,
+                background: uploadingRecording ? "rgba(255,255,255,0.06)"
+                  : isRecording ? `linear-gradient(135deg,#ef4444,#dc2626)`
+                  : `linear-gradient(135deg,${PURPLE},#7c3aed)`,
+                color: uploadingRecording ? "#374151" : "#fff",
+                border: "none", cursor: uploadingRecording ? "not-allowed" : "pointer",
+                fontWeight: 900, fontSize: 13,
+                display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                boxShadow: uploadingRecording ? "none" : isRecording ? "0 4px 14px rgba(239,68,68,0.4)" : `0 4px 14px ${PURPLE}50`,
+                transition: "transform 0.15s",
+              }}
+              onMouseEnter={e => { if (!uploadingRecording) e.currentTarget.style.transform = "scale(1.03)"; }}
+              onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; }}
+            >
+              {uploadingRecording ? (
+                <><Loader style={{ width: 14, height: 14, animation: "spin 1s linear infinite" }} /> Saving…</>
+              ) : isRecording ? (
+                <><Square style={{ width: 13, height: 13, fill: "white" }} /> End Rec <span style={{ fontFamily: "monospace", fontSize: 11, background: "rgba(0,0,0,0.25)", padding: "1px 6px", borderRadius: 6 }}>{formatRecTime(recSeconds)}</span></>
+              ) : (
+                <><span style={{ fontSize: 12 }}>🔴</span> Record Mission</>
+              )}
+            </button>
+          )}
         </div>
 
         {/* Recording error */}

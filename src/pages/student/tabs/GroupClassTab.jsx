@@ -5,6 +5,8 @@ import { Users, Video, RefreshCw, Loader2, LogIn } from 'lucide-react';
 import api from '../../../api';
 import { useOnDataChanged } from '../../../hooks/useLiveData';
 import Classroom from '../../Classroom';
+import { joinGroupClass } from '../../../components/groupClass/joinGroupClass';
+import { PLATFORM_META } from '../../../components/groupClass/platforms';
 import { formatDateInTZ, getUserTimezone, dualTime } from '../../../utils/timezone';
 import { useTranslation } from "react-i18next";
 
@@ -35,6 +37,7 @@ const STATUS_COLOR = {
   'in-progress':'#3b82f6',
   completed:    '#6b7280',
   cancelled:    '#ef4444',
+  missed:       '#ea580c', // time passed, never held — refunded
 };
 
 function Badge({ status }) {
@@ -74,6 +77,12 @@ export default function GroupClassTab({ isDarkMode, studentInfo }) {
   const [enrolling,   setEnrolling]   = useState({});
   const [activeClass, setActiveClass] = useState(null);
   const [myCredits,   setMyCredits]   = useState(null);
+  const [myPoints,    setMyPoints]    = useState(null); // group points (new group classes)
+
+  // New group classes are paid with group points; older ones with class credits
+  const usesPoints = (gc) => gc.paymentType === 'points';
+  const priceOf    = (gc) => (usesPoints(gc) ? (gc.pointsPerSeat || 1) : (gc.pricePerSeat || 1));
+  const canAfford  = (gc) => (usesPoints(gc) ? (myPoints ?? 0) : (myCredits ?? 0)) >= priceOf(gc);
 
   const flash = (m) => { setMsg(m); setTimeout(() => setMsg(''), 4000); };
 
@@ -84,7 +93,9 @@ export default function GroupClassTab({ isDarkMode, studentInfo }) {
       const all = res.data.classes || [];
       const studentId = studentInfo?.id || studentInfo?._id;
       setAllClasses(all.filter(gc => gc.status === 'open' && !gc.enrollments?.some(e => (e.studentId?._id || e.studentId)?.toString() === studentId?.toString())));
-      setMyClasses(all.filter(gc => gc.enrollments?.some(e => (e.studentId?._id || e.studentId)?.toString() === studentId?.toString())));
+      // Finished classes move to My Classes → Completed / Not completed
+      setMyClasses(all.filter(gc => !["completed", "missed", "cancelled"].includes(gc.status)
+        && gc.enrollments?.some(e => (e.studentId?._id || e.studentId)?.toString() === studentId?.toString())));
     } catch {
       flash(tr("groupClassTab.failedToLoadClasses"));
     } finally {
@@ -105,12 +116,21 @@ export default function GroupClassTab({ isDarkMode, studentInfo }) {
     }).catch(() => {});
   }, [studentInfo?.id, studentInfo?._id]);
 
+  const loadPoints = useCallback(() => {
+    api.get('/group-points/me').then(r => setMyPoints(r.data?.balance ?? 0)).catch(() => {});
+  }, []);
+  useEffect(() => { loadPoints(); }, [loadPoints]);
+  useOnDataChanged(['students'], loadPoints); // live: the admin sold points
+
   const handleEnroll = async (gc) => {
     setEnrolling(p => ({ ...p, [gc._id]: true }));
     try {
       const res = await api.post(`/group-classes/${gc._id}/enroll`);
       if (res.data.creditsRemaining !== undefined) setMyCredits(res.data.creditsRemaining);
-      flash(tr("groupClassTab.enrolledInCreditSDeducted", { title: gc.title, pricePerSeat: gc.pricePerSeat }));
+      if (res.data.pointsRemaining !== undefined) setMyPoints(res.data.pointsRemaining);
+      flash(usesPoints(gc)
+        ? tr("groupClassTab.enrolledPointsDeducted", { title: gc.title, count: priceOf(gc) })
+        : tr("groupClassTab.enrolledInCreditSDeducted", { title: gc.title, pricePerSeat: gc.pricePerSeat }));
       load();
     } catch (e) {
       flash(e.response?.data?.message || tr("groupClassTab.enrollmentFailed"));
@@ -125,12 +145,14 @@ export default function GroupClassTab({ isDarkMode, studentInfo }) {
       await api.delete(`/group-classes/${gc._id}/enroll/${studentInfo.id || studentInfo._id}`);
       flash(tr("groupClassTab.youHaveLeftTheClass"));
       load();
+      loadPoints(); // refunded
     } catch (e) {
       flash(e.response?.data?.message || tr("groupClassTab.failedToUnenroll"));
     }
   };
 
-  const handleJoin = (gc) => setActiveClass(gc);
+  // Agora → the in-app classroom; Google Meet / Zoom → the class link in a new tab
+  const handleJoin = (gc) => joinGroupClass(gc, { onAgora: (c) => setActiveClass(c), onError: (m) => flash(m) });
 
   if (activeClass) {
     return (
@@ -181,11 +203,14 @@ export default function GroupClassTab({ isDarkMode, studentInfo }) {
         </div>
       )}
 
-      {/* Credits balance */}
-      {myCredits !== null && (
+      {/* Group points balance (+ class credits while older credit-paid classes are still listed) */}
+      {myPoints !== null && (
         <div style={{ background: isDarkMode ? 'rgba(249,115,22,0.08)' : '#fff7ed', border: `1.5px solid ${isDarkMode ? 'rgba(249,115,22,0.2)' : '#fed7aa'}`, borderRadius: 14, padding: '10px 16px', marginBottom: 16, fontSize: 13, fontWeight: 700, color: col.accent }}>
-          {tr("groupClassTab.classCredits")} <strong>{myCredits}</strong>
-          {myCredits === 0 && <span style={{ marginLeft: 8, color: '#ef4444', fontWeight: 600 }}>{tr("groupClassTab.contactYourSchoolToTop")}</span>}
+          {tr("groupClassTab.groupPoints")} <strong>{myPoints}</strong>
+          {myPoints === 0 && <span style={{ marginLeft: 8, color: '#ef4444', fontWeight: 600 }}>{tr("groupClassTab.buyPointsFromSchool")}</span>}
+          {myCredits !== null && [...allClasses, ...myClasses].some(gc => !usesPoints(gc)) && (
+            <span style={{ marginLeft: 14, color: col.muted, fontWeight: 600 }}>{tr("groupClassTab.classCredits")} {myCredits}</span>
+          )}
         </div>
       )}
 
@@ -215,6 +240,7 @@ export default function GroupClassTab({ isDarkMode, studentInfo }) {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}>
                     <span style={{ fontSize: 15, fontWeight: 800, color: col.heading }}>{gc.title}</span>
                     <Badge status={gc.status} />
+                    {gc.status === 'missed' && gc.missedReason && <span style={{ fontSize: 12, color: '#ea580c', fontWeight: 600 }}>{gc.missedReason}</span>}
                     <LevelBadge level={gc.level} />
                     {gc.enrollmentMode === 'invite-only' && (
                       <span style={{ fontSize: 11, background: '#6366f118', color: '#6366f1', borderRadius: 999, padding: '2px 8px', fontWeight: 700 }}>{tr("groupClassTab.inviteOnly")}</span>
@@ -225,7 +251,10 @@ export default function GroupClassTab({ isDarkMode, studentInfo }) {
                     <span>👨‍🏫 {gc.teacherId?.firstName ? `${gc.teacherId.firstName} ${gc.teacherId.lastName}` : tr("groupClassTab.teacher2")}</span>
                     <GCTime scheduledTime={gc.scheduledTime} teacherTimezone={gc.teacherTimezone} />
                     <span>{tr("groupClassTab.min", { duration: gc.duration })}</span>
-                    <span>{tr("groupClassTab.credit", { pricePerSeat: gc.pricePerSeat, value: gc.pricePerSeat !== 1 ? 's' : '' })}</span>
+                    <span>{PLATFORM_META[gc.platform || "agora"].icon} {PLATFORM_META[gc.platform || "agora"].name}</span>
+                    <span>{usesPoints(gc)
+                      ? tr("groupClassTab.points", { count: priceOf(gc) })
+                      : tr("groupClassTab.credit", { pricePerSeat: gc.pricePerSeat, value: gc.pricePerSeat !== 1 ? 's' : '' })}</span>
                     {tab === 'browse' && <span style={{ color: seatsLeft <= 2 ? '#f59e0b' : col.muted }}>{tr("groupClassTab.seatLeft", { seatsLeft, value: seatsLeft !== 1 ? 's' : '' })}</span>}
                   </div>
 
@@ -246,13 +275,13 @@ export default function GroupClassTab({ isDarkMode, studentInfo }) {
                   {tab === 'browse' && gc.status === 'open' && (
                     <button
                       onClick={() => handleEnroll(gc)}
-                      disabled={enrolling[gc._id] || (myCredits ?? 0) < gc.pricePerSeat}
-                      style={btn('linear-gradient(135deg,#f97316,#f43f5e)', '#fff', enrolling[gc._id] || (myCredits ?? 0) < gc.pricePerSeat)}>
+                      disabled={enrolling[gc._id] || !canAfford(gc)}
+                      style={btn('linear-gradient(135deg,#f97316,#f43f5e)', '#fff', enrolling[gc._id] || !canAfford(gc))}>
                       <LogIn size={13} style={{ display: 'inline', marginRight: 4 }} />
-                      {enrolling[gc._id] ? tr("groupClassTab.enrolling") : (myCredits ?? 0) < gc.pricePerSeat ? tr("groupClassTab.notEnoughCredits") : tr("groupClassTab.enroll")}
+                      {enrolling[gc._id] ? tr("groupClassTab.enrolling") : !canAfford(gc) ? (usesPoints(gc) ? tr("groupClassTab.notEnoughPoints") : tr("groupClassTab.notEnoughCredits")) : tr("groupClassTab.enroll")}
                     </button>
                   )}
-                  {tab === 'enrolled' && !['completed','cancelled'].includes(gc.status) && (
+                  {tab === 'enrolled' && !['completed','cancelled','missed'].includes(gc.status) && (
                     <button onClick={() => handleUnenroll(gc)} style={btn('#fef2f2', '#dc2626')}>
                       {tr("groupClassTab.leaveClass")}
                     </button>

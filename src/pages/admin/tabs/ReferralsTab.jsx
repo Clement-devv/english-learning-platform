@@ -105,7 +105,7 @@ export default function ReferralsTab({ isDarkMode }) {
 
       {/* Toast */}
       {toast && (
-        <div style={{
+        <div className="ui-toast-in" role="status" style={{
           position: "fixed", top: 20, right: 24, zIndex: 9999,
           background: toast.ok ? "#16a34a" : "#dc2626",
           color: "#fff", padding: "10px 18px", borderRadius: 8,

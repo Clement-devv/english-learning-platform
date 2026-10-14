@@ -305,7 +305,7 @@ export default function AssignStudentsTab({ teachers = [], students = [], onNoti
 
       {/* ── Toast ──────────────────────────────────────────────────────────── */}
       {toast.msg && (
-        <div className={`fixed top-5 right-5 z-50 px-5 py-3 rounded-xl shadow-lg text-sm font-medium transition-all
+        <div className={`fixed top-5 right-5 z-50 px-5 py-3 rounded-xl shadow-lg text-sm font-medium ui-toast-in
           ${toast.type === "error" ? "bg-red-500 text-white" : "bg-emerald-500 text-white"}`}>
           {toast.msg}
         </div>

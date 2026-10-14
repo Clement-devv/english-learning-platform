@@ -1,13 +1,14 @@
 // src/pages/admin/components/StudentCard.jsx
 import React, { useState, useRef, useEffect } from "react";
 import {
-  MoreVertical,
+  MoreHorizontal,
   Edit3,
   Trash2,
   UserX,
   UserCheck,
   BookOpen,
   DollarSign,
+  Ticket,
   Copy,
   RotateCcw,
   Mail,
@@ -37,20 +38,22 @@ function getInitials(firstName = "", lastName = "") {
   return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
 }
 
-function getAvatarColor(name = "") {
-  const colors = [
-    "from-sky-500 to-blue-600",
-    "from-fuchsia-500 to-purple-600",
-    "from-teal-500 to-emerald-600",
-    "from-orange-500 to-amber-600",
-    "from-rose-500 to-pink-600",
-    "from-indigo-500 to-violet-600",
-  ];
+// Soft tile + dark initials (same palette as TeacherCard)
+const AVATAR_TINTS = [
+  { light: "bg-orange-50 text-orange-700 ring-orange-100",   dark: "bg-orange-500/15 text-orange-300 ring-orange-400/20" },
+  { light: "bg-sky-50 text-sky-700 ring-sky-100",            dark: "bg-sky-500/15 text-sky-300 ring-sky-400/20" },
+  { light: "bg-emerald-50 text-emerald-700 ring-emerald-100", dark: "bg-emerald-500/15 text-emerald-300 ring-emerald-400/20" },
+  { light: "bg-rose-50 text-rose-700 ring-rose-100",         dark: "bg-rose-500/15 text-rose-300 ring-rose-400/20" },
+  { light: "bg-amber-50 text-amber-700 ring-amber-100",      dark: "bg-amber-500/15 text-amber-300 ring-amber-400/20" },
+  { light: "bg-slate-100 text-slate-700 ring-slate-200",     dark: "bg-slate-500/20 text-slate-200 ring-slate-400/20" },
+];
+function getAvatarTint(name = "", isDarkMode) {
   let hash = 0;
   for (let i = 0; i < name.length; i++) {
     hash = name.charCodeAt(i) + ((hash << 5) - hash);
   }
-  return colors[Math.abs(hash) % colors.length];
+  const tint = AVATAR_TINTS[Math.abs(hash) % AVATAR_TINTS.length];
+  return isDarkMode ? tint.dark : tint.light;
 }
 
 function formatLastPayment(dateStr) {
@@ -114,16 +117,16 @@ function ClassesBadge({ count, isDarkMode }) {
   );
 }
 
-function StatPill({ label, value, color, isDarkMode }) {
-  const colorMap = {
-    blue: isDarkMode ? "bg-blue-900/40 text-blue-300" : "bg-blue-50 text-blue-700",
-    amber: isDarkMode ? "bg-amber-900/40 text-amber-300" : "bg-amber-50 text-amber-700",
-    purple: isDarkMode ? "bg-purple-900/40 text-purple-300" : "bg-purple-50 text-purple-700",
-  };
+// One cell of the stats strip — the number carries the weight, the label stays quiet
+function Stat({ label, value, isDarkMode }) {
   return (
-    <div className={`flex flex-col items-center px-3 py-2 rounded-lg ${colorMap[color]}`}>
-      <span className="text-xs font-medium opacity-70">{label}</span>
-      <span className="text-sm font-bold">{value}</span>
+    <div className="flex flex-col gap-0.5 px-3 py-2.5 min-w-0">
+      <span className={`text-[11px] font-medium uppercase tracking-wide ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
+        {label}
+      </span>
+      <span className={`text-sm font-semibold tabular-nums truncate ${isDarkMode ? "text-gray-100" : "text-gray-900"}`}>
+        {value}
+      </span>
     </div>
   );
 }
@@ -138,6 +141,7 @@ export default function StudentCard({
   onMarkLesson,
   onUnmarkLesson,
   onManualPayment,
+  onSellPoints,
   onViewPayment,
   onViewLessons,
   onResetPassword,
@@ -151,59 +155,81 @@ export default function StudentCard({
   const [showPassword, setShowPassword] = useState(false);
   const [profileExpanded, setProfileExpanded] = useState(false);
   const menuRef = useRef(null);
+  const triggerRef = useRef(null);
 
   const fullName = `${student.firstName || ""} ${student.lastName || ""}`.trim();
   const initials = getInitials(student.firstName, student.lastName);
-  const avatarGradient = getAvatarColor(fullName);
+  const avatarTint = getAvatarTint(fullName, isDarkMode);
   const isActive = student.active;
   const urgency = getClassesUrgency(student.classCredits ?? 0);
 
+  // Close dropdown on outside click / Escape; focus the first item when it opens
   useEffect(() => {
+    if (!menuOpen) return;
     function handleClickOutside(e) {
       if (menuRef.current && !menuRef.current.contains(e.target)) {
         setMenuOpen(false);
       }
     }
-    if (menuOpen) document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    function handleKey(e) {
+      if (e.key === "Escape") { setMenuOpen(false); triggerRef.current?.focus(); }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleKey);
+    menuRef.current?.querySelector('[role="menuitem"]')?.focus();
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleKey);
+    };
   }, [menuOpen]);
+
+  // Arrow keys / Home / End move through the menu; Tab closes it
+  const onMenuKeyDown = (e) => {
+    const items = [...menuRef.current.querySelectorAll('[role="menuitem"]')];
+    const i = items.indexOf(document.activeElement);
+    const go = (n) => { e.preventDefault(); items[(n + items.length) % items.length]?.focus(); };
+    if (e.key === "ArrowDown") go(i + 1);
+    else if (e.key === "ArrowUp") go(i - 1);
+    else if (e.key === "Home") go(0);
+    else if (e.key === "End") go(items.length - 1);
+    else if (e.key === "Tab") setMenuOpen(false);
+  };
+  const run = (fn) => () => { setMenuOpen(false); fn?.(); };
+
+  // The main button is whatever this student most likely needs next:
+  // finish the invite → re-enable → top up when running low → otherwise log a lesson
+  const isPendingInvite = student.status === "pending" && !student.isManaged && !!onResendInvite;
+  const primary = isPendingInvite
+    ? { key: "invite",  icon: Mail,       label: tr("studentCard.resendInvite"), onClick: onResendInvite }
+    : !isActive
+    ? { key: "enable",  icon: UserCheck,  label: tr("studentCard.enable"),       onClick: onToggle }
+    : urgency === "empty" || urgency === "critical"
+    ? { key: "payment", icon: DollarSign, label: tr("studentCard.addPayment"),   onClick: onManualPayment }
+    : { key: "lesson",  icon: BookOpen,   label: tr("studentCard.markLessonShort"), onClick: onMarkLesson };
 
   const cardBase = isDarkMode
     ? "bg-gray-800 border-gray-700 hover:border-gray-600"
-    : "bg-white border-gray-200 hover:border-gray-300";
+    : "bg-white border-gray-200 hover:border-gray-300 shadow-[0_1px_2px_rgba(16,24,40,0.04)]";
 
   const menuBg = isDarkMode
     ? "bg-gray-900 border-gray-700 shadow-2xl"
     : "bg-white border-gray-200 shadow-xl";
 
-  // Top stripe color
-  const stripeColor =
-    urgency === "empty"
-      ? "bg-gradient-to-r from-red-400 to-rose-500"
-      : urgency === "critical"
-      ? "bg-gradient-to-r from-orange-400 to-amber-500"
-      : isActive
-      ? "bg-gradient-to-r from-sky-400 to-blue-500"
-      : "bg-gradient-to-r from-gray-300 to-gray-400";
-
   return (
     <div
-      className={`relative rounded-2xl border transition-all duration-200 hover:shadow-lg ${cardBase} ${
+      className={`relative rounded-2xl border transition-colors duration-150 ${cardBase} ${
         !isActive ? "opacity-70" : ""
       }`}
     >
-      {/* Status stripe */}
-      <div className={`absolute top-0 left-0 right-0 h-1 rounded-t-2xl ${stripeColor}`} />
-
-      <div className="p-5 pt-6">
+      <div className="p-5">
         {/* ── Header: avatar + name + menu ── */}
-        <div className="flex items-start justify-between gap-3 mb-3">
-          <div className="flex items-center gap-3 min-w-0">
+        <div className="flex items-start justify-between gap-2 mb-3">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
             {/* Avatar */}
             <div
-              className={`relative w-12 h-12 rounded-xl bg-gradient-to-br ${avatarGradient} flex items-center justify-center flex-shrink-0 shadow-md`}
+              className={`relative w-11 h-11 rounded-xl ring-1 ring-inset ${avatarTint} flex items-center justify-center flex-shrink-0`}
             >
-              <span className="text-white font-bold text-sm">{initials}</span>
+              <span className="font-semibold text-sm">{initials}</span>
               <span
                 className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 ${
                   isDarkMode ? "border-gray-800" : "border-white"
@@ -214,12 +240,16 @@ export default function StudentCard({
             {/* Name + email */}
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <h3
-                  className={`font-semibold text-sm leading-tight truncate ${
-                    isDarkMode ? "text-white" : "text-gray-900"
-                  }`}
-                >
-                  {fullName || tr("studentCard.unnamedStudent")}
+                <h3 className="font-semibold text-sm leading-tight truncate min-w-0">
+                  <button
+                    type="button"
+                    onClick={onEdit}
+                    className={`max-w-full truncate text-left hover:underline underline-offset-2 ${
+                      isDarkMode ? "text-white" : "text-gray-900"
+                    }`}
+                  >
+                    {fullName || tr("studentCard.unnamedStudent")}
+                  </button>
                 </h3>
                 {student.status === "pending" && (
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-700 border border-amber-300 flex-shrink-0">
@@ -238,8 +268,8 @@ export default function StudentCard({
                 )}
               </div>
               {student.studentId && (
-                <p className={`text-[10px] font-mono font-semibold mt-0.5 ${
-                  isDarkMode ? "text-indigo-400" : "text-indigo-500"
+                <p className={`text-[10px] font-mono font-medium mt-0.5 ${
+                  isDarkMode ? "text-gray-500" : "text-gray-400"
                 }`}>
                   {student.studentId}
                 </p>
@@ -261,173 +291,25 @@ export default function StudentCard({
             </div>
           </div>
 
-          {/* 3-dot menu */}
-          <div className="relative flex-shrink-0" ref={menuRef}>
-            <button
-              onClick={() => setMenuOpen((v) => !v)}
-              className={`p-1.5 rounded-lg transition-colors ${
-                isDarkMode
-                  ? "hover:bg-gray-700 text-gray-400 hover:text-gray-200"
-                  : "hover:bg-gray-100 text-gray-400 hover:text-gray-700"
-              }`}
-            >
-              <MoreVertical className="w-4 h-4" />
-            </button>
-
-            {menuOpen && (
-              <div
-                className={`absolute right-0 top-full mt-1 z-50 min-w-[185px] rounded-xl border ${menuBg} py-1.5 overflow-hidden`}
-              >
-                {/* History group */}
-                <div
-                  className={`px-3 py-1 text-[10px] font-semibold uppercase tracking-wider ${
-                    isDarkMode ? "text-gray-500" : "text-gray-400"
-                  }`}
-                >
-                  {tr("studentCard.history")}
-                </div>
-                <DropdownItem
-                  icon={Receipt}
-                  label={tr("studentCard.paymentHistory")}
-                  color="green"
-                  isDarkMode={isDarkMode}
-                  onClick={() => { onViewPayment(); setMenuOpen(false); }}
-                />
-                <DropdownItem
-                  icon={History}
-                  label={tr("studentCard.lessonHistory")}
-                  color="blue"
-                  isDarkMode={isDarkMode}
-                  onClick={() => { onViewLessons(); setMenuOpen(false); }}
-                />
-                {onNotifications && (
-                  <DropdownItem
-                    icon={BellRing}
-                    label={tr("studentCard.notificationsReminders")}
-                    color="blue"
-                    isDarkMode={isDarkMode}
-                    onClick={() => { onNotifications(); setMenuOpen(false); }}
-                  />
-                )}
-
-                <div className={`my-1 h-px ${isDarkMode ? "bg-gray-700" : "bg-gray-100"}`} />
-
-                {/* Actions group */}
-                <div
-                  className={`px-3 py-1 text-[10px] font-semibold uppercase tracking-wider ${
-                    isDarkMode ? "text-gray-500" : "text-gray-400"
-                  }`}
-                >
-                  {tr("studentCard.actions")}
-                </div>
-                <DropdownItem
-                  icon={DollarSign}
-                  label={tr("studentCard.manualPayment")}
-                  color="emerald"
-                  isDarkMode={isDarkMode}
-                  onClick={() => { onManualPayment(); setMenuOpen(false); }}
-                />
-                <DropdownItem
-                  icon={BookOpen}
-                  label={tr("studentCard.markLesson")}
-                  color="purple"
-                  isDarkMode={isDarkMode}
-                  onClick={() => { onMarkLesson(); setMenuOpen(false); }}
-                />
-                <DropdownItem
-                  icon={MinusCircle}
-                  label={tr("studentCard.unmarkLesson")}
-                  color="rose"
-                  isDarkMode={isDarkMode}
-                  onClick={() => { onUnmarkLesson(); setMenuOpen(false); }}
-                />
-                {!student.isManaged && (
-                  <DropdownItem
-                    icon={RotateCcw}
-                    label={tr("studentCard.resetPassword")}
-                    color="amber"
-                    isDarkMode={isDarkMode}
-                    onClick={() => { onResetPassword(); setMenuOpen(false); }}
-                  />
-                )}
-                {student.tempPassword && !student.isManaged && (
-                  <DropdownItem
-                    icon={Copy}
-                    label={tr("studentCard.copyPassword")}
-                    color="indigo"
-                    isDarkMode={isDarkMode}
-                    onClick={() => { onCopyPassword(); setMenuOpen(false); }}
-                  />
-                )}
-
-                <DropdownItem
-                  icon={FileDown}
-                  label={tr("studentCard.downloadPdf")}
-                  color="indigo"
-                  isDarkMode={isDarkMode}
-                  onClick={() => { downloadStudentCard(student).catch(console.error); setMenuOpen(false); }}
-                />
-
-                {student.status === "pending" && !student.isManaged && (
-                  <DropdownItem
-                    icon={Mail}
-                    label={tr("studentCard.resendInvite")}
-                    color="blue"
-                    isDarkMode={isDarkMode}
-                    onClick={() => { onResendInvite(); setMenuOpen(false); }}
-                  />
-                )}
-
-                {student.isManaged && onConvert && (
-                  <DropdownItem
-                    icon={KeyRound}
-                    label={tr("studentCard.giveLoginAccess")}
-                    color="blue"
-                    isDarkMode={isDarkMode}
-                    onClick={() => { onConvert(); setMenuOpen(false); }}
-                  />
-                )}
-
-                <div className={`my-1 h-px ${isDarkMode ? "bg-gray-700" : "bg-gray-100"}`} />
-
-                {/* Danger zone */}
-                <DropdownItem
-                  icon={Trash2}
-                  label={tr("studentCard.deleteStudent")}
-                  color="red"
-                  isDarkMode={isDarkMode}
-                  onClick={() => { onDelete(); setMenuOpen(false); }}
-                />
-              </div>
-            )}
-          </div>
         </div>
 
         {/* ── Classes remaining badge ── */}
         <div className="mb-4">
           <ClassesBadge count={student.classCredits ?? 0} isDarkMode={isDarkMode} />
+          {(student.groupPoints ?? 0) > 0 && (
+            <span className={`ml-2 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold ${isDarkMode ? "bg-sky-900/30 text-sky-300" : "bg-sky-50 text-sky-700"}`}>
+              <Ticket size={12} /> {tr("studentCard.groupPoints", { count: student.groupPoints })}
+            </span>
+          )}
         </div>
 
-        {/* ── Stats row ── */}
-        <div className="grid grid-cols-3 gap-2 mb-4">
-          <StatPill
-            label={tr("studentCard.age")}
-            value={student.age ? `${student.age}y` : "—"}
-            color="blue"
-            isDarkMode={isDarkMode}
-          />
-          <StatPill
-            label={tr("studentCard.classes2")}
-            value={student.classCredits ?? 0}
-            color="amber"
-            isDarkMode={isDarkMode}
-          />
-          <StatPill
-            label={tr("studentCard.lastPay")}
-            value={formatLastPayment(student.lastPaymentDate)}
-            color="purple"
-            isDarkMode={isDarkMode}
-          />
+        {/* ── Stats strip ── */}
+        <div className={`grid grid-cols-3 mb-4 rounded-xl border divide-x ${
+          isDarkMode ? "border-gray-700 divide-gray-700" : "border-gray-100 divide-gray-100 bg-gray-50/60"
+        }`}>
+          <Stat label={tr("studentCard.age")} value={student.age ? `${student.age}y` : "—"} isDarkMode={isDarkMode} />
+          <Stat label={tr("studentCard.classes2")} value={student.classCredits ?? 0} isDarkMode={isDarkMode} />
+          <Stat label={tr("studentCard.lastPay")} value={formatLastPayment(student.lastPaymentDate)} isDarkMode={isDarkMode} />
         </div>
 
         {/* ── No-classes warning banner ── */}
@@ -547,63 +429,141 @@ export default function StudentCard({
           </div>
         )}
 
-        {/* ── Primary action buttons ── */}
+        {/* ── Actions: most-likely-next action · Edit · everything else ── */}
         <div className="flex gap-2">
           <button
-            onClick={onEdit}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-semibold transition-all duration-150 shadow-sm ${
+            onClick={primary.onClick}
+            title={primary.label}
+            className={`flex-1 min-w-0 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-semibold transition duration-150 active:scale-[0.97] ${
               isDarkMode
-                ? "bg-sky-600 hover:bg-sky-500 text-white"
-                : "bg-sky-600 hover:bg-sky-700 text-white"
+                ? "bg-white hover:bg-gray-200 text-gray-900"
+                : "bg-gray-900 hover:bg-gray-800 text-white"
             }`}
           >
-            <Edit3 className="w-3.5 h-3.5" />
-            {tr("studentCard.edit")}
+            <primary.icon className="w-3.5 h-3.5 flex-shrink-0" />
+            <span className="truncate">{primary.label}</span>
           </button>
 
           <button
-            onClick={onToggle}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-semibold transition-all duration-150 shadow-sm ${
-              isActive
-                ? isDarkMode
-                  ? "bg-gray-700 hover:bg-gray-600 text-gray-200"
-                  : "bg-gray-100 hover:bg-gray-200 text-gray-700"
-                : isDarkMode
-                ? "bg-emerald-700 hover:bg-emerald-600 text-white"
-                : "bg-emerald-600 hover:bg-emerald-700 text-white"
+            onClick={onEdit}
+            aria-label={tr("studentCard.edit")}
+            title={tr("studentCard.edit")}
+            className={`flex-shrink-0 flex items-center justify-center px-2.5 rounded-xl border transition duration-150 active:scale-[0.97] ${
+              isDarkMode
+                ? "border-gray-600 hover:bg-gray-700 text-gray-300"
+                : "border-gray-200 hover:bg-gray-50 text-gray-500 hover:text-gray-700"
             }`}
           >
-            {isActive ? (
-              <><UserX className="w-3.5 h-3.5" />Disable</>
-            ) : (
-              <><UserCheck className="w-3.5 h-3.5" />Enable</>
-            )}
+            <Edit3 className="w-4 h-4" />
           </button>
+
+          <div className="relative flex-shrink-0" ref={menuRef}>
+            <button
+              ref={triggerRef}
+              onClick={() => setMenuOpen((v) => !v)}
+              aria-label={tr("studentCard.moreActions")}
+              aria-haspopup="menu"
+              aria-expanded={menuOpen}
+              className={`h-full px-2.5 rounded-xl border transition duration-150 active:scale-[0.97] ${
+                isDarkMode
+                  ? `border-gray-600 text-gray-300 hover:bg-gray-700 ${menuOpen ? "bg-gray-700" : ""}`
+                  : `border-gray-200 text-gray-500 hover:bg-gray-50 hover:text-gray-700 ${menuOpen ? "bg-gray-50 text-gray-700" : ""}`
+              }`}
+            >
+              <MoreHorizontal className="w-4 h-4" />
+            </button>
+
+            {/* Opens upward from the action row so it never runs off the bottom of the page */}
+            {menuOpen && (
+              <div
+                role="menu"
+                onKeyDown={onMenuKeyDown}
+                className={`ui-pop-in origin-bottom-right absolute right-0 bottom-full mb-1.5 z-50 min-w-[210px] rounded-xl border ${menuBg} py-1.5 overflow-hidden`}
+              >
+                <MenuLabel isDarkMode={isDarkMode}>{tr("studentCard.groupLessons")}</MenuLabel>
+                {primary.key !== "lesson" && (
+                  <DropdownItem icon={BookOpen} label={tr("studentCard.markLesson")} isDarkMode={isDarkMode} onClick={run(onMarkLesson)} />
+                )}
+                <DropdownItem icon={MinusCircle} label={tr("studentCard.unmarkLesson")} isDarkMode={isDarkMode} onClick={run(onUnmarkLesson)} />
+                <DropdownItem icon={History} label={tr("studentCard.lessonHistory")} isDarkMode={isDarkMode} onClick={run(onViewLessons)} />
+                {onNotifications && (
+                  <DropdownItem icon={BellRing} label={tr("studentCard.notificationsReminders")} isDarkMode={isDarkMode} onClick={run(onNotifications)} />
+                )}
+
+                <MenuDivider isDarkMode={isDarkMode} />
+                <MenuLabel isDarkMode={isDarkMode}>{tr("studentCard.groupPayments")}</MenuLabel>
+                {primary.key !== "payment" && (
+                  <DropdownItem icon={DollarSign} label={tr("studentCard.manualPayment")} isDarkMode={isDarkMode} onClick={run(onManualPayment)} />
+                )}
+                {onSellPoints && (
+                  <DropdownItem icon={Ticket} label={tr("studentCard.sellGroupPoints")} isDarkMode={isDarkMode} onClick={run(onSellPoints)} />
+                )}
+                <DropdownItem icon={Receipt} label={tr("studentCard.paymentHistory")} isDarkMode={isDarkMode} onClick={run(onViewPayment)} />
+
+                <MenuDivider isDarkMode={isDarkMode} />
+                <MenuLabel isDarkMode={isDarkMode}>{tr("studentCard.groupAccount")}</MenuLabel>
+                {student.status === "pending" && !student.isManaged && primary.key !== "invite" && onResendInvite && (
+                  <DropdownItem icon={Mail} label={tr("studentCard.resendInvite")} isDarkMode={isDarkMode} onClick={run(onResendInvite)} />
+                )}
+                {student.isManaged && onConvert && (
+                  <DropdownItem icon={KeyRound} label={tr("studentCard.giveLoginAccess")} isDarkMode={isDarkMode} onClick={run(onConvert)} />
+                )}
+                {!student.isManaged && (
+                  <DropdownItem icon={RotateCcw} label={tr("studentCard.resetPassword")} isDarkMode={isDarkMode} onClick={run(onResetPassword)} />
+                )}
+                {student.tempPassword && !student.isManaged && (
+                  <DropdownItem icon={Copy} label={tr("studentCard.copyPassword")} isDarkMode={isDarkMode} onClick={run(onCopyPassword)} />
+                )}
+                <DropdownItem icon={FileDown} label={tr("studentCard.downloadPdf")} isDarkMode={isDarkMode} onClick={run(() => downloadStudentCard(student).catch(console.error))} />
+
+                <MenuDivider isDarkMode={isDarkMode} />
+                {primary.key !== "enable" && (
+                  <DropdownItem
+                    icon={isActive ? UserX : UserCheck}
+                    label={isActive ? tr("studentCard.disableStudent") : tr("studentCard.enableStudent")}
+                    isDarkMode={isDarkMode}
+                    onClick={run(onToggle)}
+                  />
+                )}
+                <DropdownItem icon={Trash2} label={tr("studentCard.deleteStudent")} color="red" isDarkMode={isDarkMode} onClick={run(onDelete)} />
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-// ── Dropdown item ─────────────────────────────────────────────────────────────
+// ── Menu pieces ───────────────────────────────────────────────────────────────
+function MenuLabel({ isDarkMode, children }) {
+  return (
+    <div className={`px-3.5 pt-1.5 pb-1 text-[10px] font-semibold uppercase tracking-wider ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
+      {children}
+    </div>
+  );
+}
+
+function MenuDivider({ isDarkMode }) {
+  return <div role="separator" className={`my-1 h-px ${isDarkMode ? "bg-gray-700" : "bg-gray-100"}`} />;
+}
+
+// Menu items are neutral; only destructive actions get colour
 function DropdownItem({ icon: Icon, label, color, isDarkMode, onClick }) {
-  const colorMap = {
-    green: isDarkMode ? "text-green-400 hover:bg-green-900/40" : "text-green-600 hover:bg-green-50",
-    blue: isDarkMode ? "text-blue-400 hover:bg-blue-900/40" : "text-blue-600 hover:bg-blue-50",
-    emerald: isDarkMode ? "text-emerald-400 hover:bg-emerald-900/40" : "text-emerald-600 hover:bg-emerald-50",
-    purple: isDarkMode ? "text-purple-400 hover:bg-purple-900/40" : "text-purple-600 hover:bg-purple-50",
-    amber: isDarkMode ? "text-amber-400 hover:bg-amber-900/40" : "text-amber-600 hover:bg-amber-50",
-    indigo: isDarkMode ? "text-indigo-400 hover:bg-indigo-900/40" : "text-indigo-600 hover:bg-indigo-50",
-    red: isDarkMode ? "text-red-400 hover:bg-red-900/40" : "text-red-600 hover:bg-red-50",
-    rose: isDarkMode ? "text-rose-400 hover:bg-rose-900/40" : "text-rose-600 hover:bg-rose-50",
-  };
+  const tone = color === "red"
+    ? (isDarkMode ? "text-red-400 hover:bg-red-500/10" : "text-red-600 hover:bg-red-50")
+    : (isDarkMode ? "text-gray-200 hover:bg-gray-800" : "text-gray-700 hover:bg-gray-50");
+  const iconTone = color === "red" ? "" : (isDarkMode ? "text-gray-500" : "text-gray-400");
 
   return (
     <button
+      role="menuitem"
       onClick={onClick}
-      className={`w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium transition-colors ${colorMap[color]}`}
+      className={`w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-left transition-colors outline-none ${tone} ${
+        isDarkMode ? "focus-visible:bg-gray-800" : "focus-visible:bg-gray-50"
+      }`}
     >
-      <Icon className="w-3.5 h-3.5 flex-shrink-0" />
+      <Icon className={`w-3.5 h-3.5 flex-shrink-0 ${iconTone}`} />
       {label}
     </button>
   );

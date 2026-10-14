@@ -22,6 +22,9 @@ export const studentSchema = new mongoose.Schema({
   password: { type: String, required: false },
   active: { type: Boolean, default: false },
   classCredits: { type: Number, default: 0 },
+  // Group-class points — bought from the admin, spent only on group class seats
+  // (separate from classCredits). History: groupPointsLedgerSchema.
+  groupPoints:  { type: Number, default: 0, min: 0 },
   lastPaymentDate: Date,
   showTempPassword: { type: Boolean, default: false },
   age: { type: Number },

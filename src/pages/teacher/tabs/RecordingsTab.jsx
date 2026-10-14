@@ -154,7 +154,7 @@ export default function RecordingsTab({ isDarkMode }) {
 
   // ── Delete a whole class (all parts) ──────────────────────────────────────
   const handleDeleteSession = async (session) => {
-    const title = session.first.title || session.first.bookingId?.classTitle || "this recording";
+    const title = session.first.title || session.first.bookingId?.classTitle || session.first.groupClassId?.title || "this recording";
     const what  = session.parts.length > 1 ? `all ${session.parts.length} videos of "${title}"` : `"${title}"`;
     if (!confirm(`Delete ${what}? This cannot be undone.`)) return;
     try {
@@ -215,7 +215,7 @@ export default function RecordingsTab({ isDarkMode }) {
       } else {
         const { data: blob } = await api.get(`/recordings/${rec._id}/download`, { responseType: 'blob' });
         const ext  = rec.mimeType === "video/mp4" ? ".mp4" : ".webm";
-        const base = (rec.title || rec.bookingId?.classTitle || "recording") + (rec.sessionId ? ` part ${rec.partNumber || 1}` : "");
+        const base = (rec.title || rec.bookingId?.classTitle || rec.groupClassId?.title || "recording") + (rec.sessionId ? ` part ${rec.partNumber || 1}` : "");
         const name = base.replace(/[^a-z0-9\s-]/gi, "").trim() + ext;
         const url  = URL.createObjectURL(new Blob([blob]));
         const a    = document.createElement("a");
@@ -240,7 +240,7 @@ export default function RecordingsTab({ isDarkMode }) {
           <X size={16} /> Back
         </button>
         <h2 style={{ margin: 0, fontSize: "18px", fontWeight: 900, color: col.text, flex: 1 }}>
-          {playingRec.title || playingRec.bookingId?.classTitle || "Class Recording"}
+          {playingRec.title || playingRec.bookingId?.classTitle || playingRec.groupClassId?.title || "Class Recording"}
           {total > 1 && (
             <span style={{ marginLeft: "10px", fontSize: "13px", fontWeight: 700, color: col.muted }}>
               Part {playing.index + 1} of {total}
@@ -361,7 +361,7 @@ export default function RecordingsTab({ isDarkMode }) {
                       {/* Info */}
                       <div style={{ flex: 1, minWidth: "180px" }}>
                         <p style={{ margin: "0 0 4px", fontSize: "15px", fontWeight: 800, color: col.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {rec.title || rec.bookingId?.classTitle || "Class Recording"}
+                          {rec.title || rec.bookingId?.classTitle || rec.groupClassId?.title || "Class Recording"}
                         </p>
                         <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
                           <span style={{ fontSize: "12px", color: col.muted, display: "flex", alignItems: "center", gap: "4px" }}>

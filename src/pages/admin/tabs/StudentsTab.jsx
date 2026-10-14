@@ -27,6 +27,7 @@ import PaymentHistoryModal from "../modals/PaymentHistoryModal";
 import ManualPaymentModal from "../modals/ManualPaymentModal";
 import LessonHistoryModal from "../modals/LessonHistoryModal";
 import StudentNotifyModal from "../modals/StudentNotifyModal";
+import SellPointsModal from "../modals/SellPointsModal";
 import LessonMarkModal from "../modals/LessonMarkModal";
 import AnalyticsPinPrompt from "../../../components/admin/analytics/AnalyticsPinPrompt";
 import { isAnalyticsLocked } from "../../../utils/analyticsPin";
@@ -123,7 +124,7 @@ function DeleteConfirmModal({ student, onConfirm, onCancel, isDarkMode }) {
         <div className="flex gap-3">
           <button
             onClick={onCancel}
-            className={`flex-1 py-2.5 rounded-xl font-semibold text-sm transition-all ${
+            className={`flex-1 py-2.5 rounded-xl font-semibold text-sm transition ${
               isDarkMode
                 ? "bg-gray-700 hover:bg-gray-600 text-gray-200"
                 : "bg-gray-100 hover:bg-gray-200 text-gray-700"
@@ -133,7 +134,7 @@ function DeleteConfirmModal({ student, onConfirm, onCancel, isDarkMode }) {
           </button>
           <button
             onClick={onConfirm}
-            className="flex-1 py-2.5 rounded-xl font-semibold text-sm bg-red-600 hover:bg-red-700 text-white transition-all"
+            className="flex-1 py-2.5 rounded-xl font-semibold text-sm bg-red-600 hover:bg-red-700 text-white transition"
           >
             {tr("studentsTab.scheduleDeletion")}
           </button>
@@ -277,6 +278,7 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
   const [deleteTarget, setDeleteTarget] = useState(null); // student scheduled for deletion confirm
   const [convertTarget, setConvertTarget] = useState(null); // managed student getting login access
   const [notifyTarget, setNotifyTarget]   = useState(null); // notification email + join reminders
+  const [pointsTarget, setPointsTarget]   = useState(null); // sell group-class points
   const [lessonModal, setLessonModal] = useState(null);
 
   // History data
@@ -699,7 +701,7 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
       {/* ── Toast ── */}
       {toast && (
         <div
-          className={`fixed top-4 right-4 z-50 flex items-center gap-2 px-4 py-3 rounded-xl shadow-xl text-sm font-medium text-white transition-all ${
+          className={`fixed top-4 right-4 z-50 flex items-center gap-2 px-4 py-3 rounded-xl shadow-xl text-sm font-medium text-white ui-toast-in ${
             toastType === "error"
               ? "bg-red-500"
               : toastType === "info"
@@ -731,7 +733,7 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
         <div className="flex items-center gap-2 flex-wrap">
           <button
             onClick={() => { setSelectedStudent(null); setIsPaymentModalOpen(true); }}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-all ${
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition ${
               isDarkMode
                 ? "border-gray-600 text-gray-300 hover:bg-gray-700"
                 : "border-gray-200 text-gray-600 hover:bg-gray-50"
@@ -742,7 +744,7 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
           </button>
           <button
             onClick={() => { setSelectedStudent(null); setIsLessonModalOpen(true); }}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-all ${
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition ${
               isDarkMode
                 ? "border-gray-600 text-gray-300 hover:bg-gray-700"
                 : "border-gray-200 text-gray-600 hover:bg-gray-50"
@@ -755,7 +757,7 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
           <button
             onClick={() => downloadStudentRoster(filteredStudents).catch(console.error)}
             title={tr("studentsTab.downloadVisibleStudentsAsPdf")}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-all ${
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition ${
               isDarkMode
                 ? "border-gray-600 text-gray-300 hover:bg-gray-700"
                 : "border-gray-200 text-gray-600 hover:bg-gray-50"
@@ -768,7 +770,7 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
           {canCreate && (
             <button
               onClick={openCreate}
-              className={`flex items-center gap-2 px-5 py-2.5 text-white rounded-xl font-semibold text-sm shadow-md transition-all duration-150 active:scale-95 ${
+              className={`flex items-center gap-2 px-5 py-2.5 text-white rounded-xl font-semibold text-sm shadow-md transition duration-150 active:scale-95 ${
                 accountType === "managed" ? "bg-amber-500 hover:bg-amber-600" : "bg-sky-600 hover:bg-sky-700"
               }`}
             >
@@ -810,7 +812,7 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
               role="tab"
               aria-selected={selected}
               onClick={() => setAccountType(key)}
-              className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-all ${
+              className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition ${
                 selected
                   ? isDarkMode ? "bg-gray-900 shadow-sm" : "bg-white shadow-sm"
                   : isDarkMode ? "hover:bg-gray-700/60" : "hover:bg-white/60"
@@ -890,7 +892,7 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
             <button
               key={key}
               onClick={() => setView(key)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 ${tabBtnCls(key)}`}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition duration-150 ${tabBtnCls(key)}`}
             >
               {label}
             </button>
@@ -947,7 +949,7 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
           {!searchQuery && view === "active" && canCreate && (
             <button
               onClick={openCreate}
-              className={`mt-2 flex items-center gap-2 px-4 py-2 text-white rounded-xl text-sm font-semibold transition-all ${
+              className={`mt-2 flex items-center gap-2 px-4 py-2 text-white rounded-xl text-sm font-semibold transition ${
                 accountType === "managed" ? "bg-amber-500 hover:bg-amber-600" : "bg-sky-600 hover:bg-sky-700"
               }`}
             >
@@ -967,7 +969,7 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
             {searchQuery && tr("studentsTab.matching", { searchQuery })}
           </p>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4">
             {pagedStudents.map((student) => {
               const days = daysUntilDeletion(student.scheduledDeletionAt);
               const isPendingDeletion = days !== null;
@@ -1005,6 +1007,7 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
                       onMarkLesson={() => handleMarkLesson(student._id)}
                       onUnmarkLesson={() => handleUnmarkLesson(student._id)}
                       onManualPayment={() => handleOpenManualPayment(student._id)}
+                      onSellPoints={() => setPointsTarget(student)}
                       onViewPayment={() => handleViewPayment(student._id)}
                       onViewLessons={() => handleViewLessons(student._id)}
                       onResetPassword={() => handleResetPassword(student._id)}
@@ -1092,6 +1095,17 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
 
       {notifyTarget && (
         <StudentNotifyModal student={notifyTarget} isDarkMode={isDarkMode} onClose={() => setNotifyTarget(null)} notify={(m) => showToast(m)} />
+      )}
+      {pointsTarget && (
+        <SellPointsModal
+          student={pointsTarget}
+          isDarkMode={isDarkMode}
+          onClose={() => setPointsTarget(null)}
+          onSold={async (balance, count) => {
+            showToast(tr("studentsTab.pointsAdded", { count, balance }));
+            try { setStudents(await getStudents()); } catch { /* live update refreshes it */ }
+          }}
+        />
       )}
 
       <LessonHistoryModal

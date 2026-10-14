@@ -337,32 +337,35 @@ export default function SunshineVideoTab({
             </button>
           )}
 
-          <button
-            onClick={isRecording ? stopRecording : startRecording}
-            disabled={uploadingRecording}
-            style={{
-              flex: 1, padding: "11px 16px", borderRadius: 16,
-              background: uploadingRecording ? "#f3f4f6"
-                : isRecording ? "linear-gradient(135deg,#ef4444,#dc2626)"
-                : "linear-gradient(135deg,#f97316,#ea580c)",
-              color: uploadingRecording ? "#9ca3af" : "#fff",
-              border: "none", cursor: uploadingRecording ? "not-allowed" : "pointer",
-              fontWeight: 900, fontSize: 13,
-              display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-              boxShadow: uploadingRecording ? "none" : isRecording ? "0 4px 16px rgba(239,68,68,0.4)" : "0 4px 16px rgba(249,115,22,0.4)",
-              transition: "transform 0.15s",
-            }}
-            onMouseEnter={e => { if (!uploadingRecording) e.currentTarget.style.transform = "scale(1.03)"; }}
-            onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; }}
-          >
-            {uploadingRecording ? (
-              <><Loader style={{ width: 14, height: 14, animation: "spin 1s linear infinite" }} /> Saving… 💾</>
-            ) : isRecording ? (
-              <><Square style={{ width: 13, height: 13, fill: "white" }} /> Stop ⏹ <span style={{ fontFamily: "monospace", fontSize: 11, background: "rgba(0,0,0,0.2)", padding: "1px 6px", borderRadius: 6 }}>{formatRecTime(recSeconds)}</span></>
-            ) : (
-              <><Circle style={{ width: 13, height: 13 }} /> 🔴 Record</>
-            )}
-          </button>
+          {/* Only teachers record — the server accepts recordings from teachers only */}
+          {userRole === "teacher" && (
+            <button
+              onClick={isRecording ? stopRecording : startRecording}
+              disabled={uploadingRecording}
+              style={{
+                flex: 1, padding: "11px 16px", borderRadius: 16,
+                background: uploadingRecording ? "#f3f4f6"
+                  : isRecording ? "linear-gradient(135deg,#ef4444,#dc2626)"
+                  : "linear-gradient(135deg,#f97316,#ea580c)",
+                color: uploadingRecording ? "#9ca3af" : "#fff",
+                border: "none", cursor: uploadingRecording ? "not-allowed" : "pointer",
+                fontWeight: 900, fontSize: 13,
+                display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                boxShadow: uploadingRecording ? "none" : isRecording ? "0 4px 16px rgba(239,68,68,0.4)" : "0 4px 16px rgba(249,115,22,0.4)",
+                transition: "transform 0.15s",
+              }}
+              onMouseEnter={e => { if (!uploadingRecording) e.currentTarget.style.transform = "scale(1.03)"; }}
+              onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; }}
+            >
+              {uploadingRecording ? (
+                <><Loader style={{ width: 14, height: 14, animation: "spin 1s linear infinite" }} /> Saving… 💾</>
+              ) : isRecording ? (
+                <><Square style={{ width: 13, height: 13, fill: "white" }} /> Stop ⏹ <span style={{ fontFamily: "monospace", fontSize: 11, background: "rgba(0,0,0,0.2)", padding: "1px 6px", borderRadius: 6 }}>{formatRecTime(recSeconds)}</span></>
+              ) : (
+                <><Circle style={{ width: 13, height: 13 }} /> 🔴 Record</>
+              )}
+            </button>
+          )}
         </div>
 
         {/* Recording error */}

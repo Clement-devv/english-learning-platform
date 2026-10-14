@@ -47,6 +47,18 @@ body {
   @apply inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-sm;
 }
 
+/* Entrance motion — toasts slide down from where they sit, dialogs scale up
+   slightly from centre. Short ease-out so feedback feels immediate. */
+:root {
+  --ease-out-strong: cubic-bezier(0.23, 1, 0.32, 1);
+}
+@keyframes ui-toast-in { from { opacity: 0; transform: translateY(-8px) scale(0.98); } }
+@keyframes ui-fade-in  { from { opacity: 0; } }
+@keyframes ui-pop-in   { from { opacity: 0; transform: scale(0.96); } }
+.ui-toast-in { animation: ui-toast-in 220ms var(--ease-out-strong); }
+.ui-fade-in  { animation: ui-fade-in 180ms ease-out; }
+.ui-pop-in   { animation: ui-pop-in 220ms var(--ease-out-strong); }
+
 /* Respect prefers-reduced-motion */
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }

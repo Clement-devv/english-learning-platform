@@ -15,7 +15,8 @@
 // Admin:   GET  /api/v1/offline-classes        POST /:id/approve   POST /:id/reject
 import express from "express";
 import mongoose from "mongoose";
-import { verifyToken, verifyAdmin } from "../middleware/authMiddleware.js";
+import { verifyToken } from "../middleware/authMiddleware.js";
+import { verifyAdminOrSubAdmin, scopeFilter, inScope } from "../middleware/staffAccess.js";
 import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
 import { validateObjectId } from "../middleware/validateObjectId.js";
 import { bookingSchema } from "../schemas/bookingSchema.js";
@@ -185,11 +186,12 @@ router.get("/mine", verifyToken, async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // Admin
 // ─────────────────────────────────────────────────────────────────────────────
-router.get("/", verifyToken, verifyAdmin, async (req, res) => {
+router.get("/", verifyToken, verifyAdminOrSubAdmin("canViewLoggedClasses"), async (req, res) => {
   try {
     const status = ["pending", "approved", "rejected"].includes(req.query.status) ? req.query.status : null;
-    const byStatus = (s) => ({ loggedByTeacher: true, "offline.approval.status": s === "pending" ? { $in: ["pending", "processing"] } : s });
-    const filter = status ? byStatus(status) : { loggedByTeacher: true };
+    const scope = scopeFilter(req); // a sub-admin sees only their own teachers' classes
+    const byStatus = (s) => ({ loggedByTeacher: true, "offline.approval.status": s === "pending" ? { $in: ["pending", "processing"] } : s, ...scope });
+    const filter = status ? byStatus(status) : { loggedByTeacher: true, ...scope };
     const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || PAGE_SIZE, 1), 50);
     const Booking = getBooking(req.db);
     const [total, pending, approved, rejected] = await Promise.all([
@@ -224,13 +226,14 @@ router.get("/", verifyToken, verifyAdmin, async (req, res) => {
   }
 });
 
-router.post("/:id/approve", verifyToken, verifyAdmin, validateObjectId("id"), async (req, res) => {
+// Approving pays the teacher and uses one of the student's classes — a separate sub-admin permission
+router.post("/:id/approve", verifyToken, verifyAdminOrSubAdmin(["canViewLoggedClasses", "canApproveLoggedClasses"]), validateObjectId("id"), async (req, res) => {
   const Booking = getBooking(req.db);
   let claimed = null;
   try {
     const note = toStr(req.body?.note, "note", { maxLen: 500 });
     const current = await Booking.findById(req.params.id).populate("studentId", "classCredits firstName");
-    if (!current || !current.loggedByTeacher) return notFound(res, "Logged class not found");
+    if (!current || !current.loggedByTeacher || !inScope(req, current.teacherId)) return notFound(res, "Logged class not found");
     if (current.offline?.approval?.status !== "pending" || current.status !== "pending_confirmation")
       return badRequest(res, "This class has already been reviewed");
     if (!current.isTrial && (current.studentId?.classCredits || 0) <= 0)
@@ -251,7 +254,7 @@ router.post("/:id/approve", verifyToken, verifyAdmin, validateObjectId("id"), as
 
     const set = {
       status: "completed", completedAt: now, markedBy: "admin",
-      "offline.approval": { status: "approved", decidedAt: now, decidedBy: req.user.id, note },
+      "offline.approval": { status: "approved", decidedAt: now, decidedBy: req.user.id, decidedByRole: req.user.role, note },
     };
     // Approving over a parent's open "No" settles that dispute for the teacher
     const parentNoOpen = claimed.parentCheck?.status === "denied" && claimed.disputeStatus === "pending";
@@ -276,16 +279,16 @@ router.post("/:id/approve", verifyToken, verifyAdmin, validateObjectId("id"), as
   }
 });
 
-router.post("/:id/reject", verifyToken, verifyAdmin, validateObjectId("id"), async (req, res) => {
+router.post("/:id/reject", verifyToken, verifyAdminOrSubAdmin(["canViewLoggedClasses", "canApproveLoggedClasses"]), validateObjectId("id"), async (req, res) => {
   try {
     const reason = toStr(req.body?.reason, "reason", { required: true, maxLen: 500 });
     const now = new Date();
     const updated = await getBooking(req.db).findOneAndUpdate(
-      { _id: req.params.id, loggedByTeacher: true, status: "pending_confirmation", "offline.approval.status": "pending" },
+      { _id: req.params.id, loggedByTeacher: true, status: "pending_confirmation", "offline.approval.status": "pending", ...scopeFilter(req) },
       {
         $set: {
           status: "rejected", rejectionReason: `Logged class not approved: ${reason}`,
-          "offline.approval": { status: "rejected", decidedAt: now, decidedBy: req.user.id, note: reason },
+          "offline.approval": { status: "rejected", decidedAt: now, decidedBy: req.user.id, decidedByRole: req.user.role, note: reason },
         },
         $unset: { shareLink: 1 },
       },

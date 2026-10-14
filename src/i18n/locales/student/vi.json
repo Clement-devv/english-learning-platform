@@ -944,7 +944,12 @@
     "enrolling": "Đang ghi danh…",
     "notEnoughCredits": "Không đủ lượt",
     "enroll": "Ghi danh",
-    "leaveClass": "Rời lớp"
+    "leaveClass": "Rời lớp",
+    "groupPoints": "🎟 Điểm lớp nhóm:",
+    "buyPointsFromSchool": "— hãy mua điểm từ trường để tham gia lớp nhóm",
+    "points_other": "🎟 {{count}} điểm",
+    "notEnoughPoints": "Không đủ điểm",
+    "enrolledPointsDeducted_other": "Đã ghi danh vào \"{{title}}\" — đã dùng {{count}} điểm"
   },
   "homeworkTab": {
     "toDo": "Cần làm",
@@ -1299,7 +1304,8 @@
     "attendanceNotMet": "Chưa đạt yêu cầu tham gia",
     "topic": "Chủ đề:",
     "min": "phút",
-    "pageOf": "Trang {{currentPage}}/{{totalPages}}"
+    "pageOf": "Trang {{currentPage}}/{{totalPages}}",
+    "groupClass": "👥 Lớp nhóm"
   },
   "studentScheduleTab": {
     "yourRequest": "Yêu cầu của bạn",

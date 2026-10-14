@@ -30,6 +30,7 @@ import { completeClass }          from "../services/classCompletionService.js";
 import { issueShareLink }         from "./shareLink.js";
 import { logger } from '../utils/logger.js';
 import { trackJob } from "./monitor.js";
+import { sweepGroupClasses } from "./groupClassSweep.js";
 
 const getBooking          = (db) => db.models.Booking          || db.model("Booking",          bookingSchema);
 const getClassroomSession = (db) => db.models.ClassroomSession || db.model("ClassroomSession", classroomSessionSchema);
@@ -77,6 +78,37 @@ function buildMissedReason(session) {
     ? Math.round(((session.bothActiveTime || 0) / session.requiredTime) * 100)
     : 0;
   return `Insufficient attendance: ${bothMins}m of ${requiredMins}m required (${pct}% — need ≥83%).`;
+}
+
+/**
+ * Class requests the teacher never accepted, whose time is over → missed. Nothing
+ * was charged for a request, so nothing is refunded. (Before, these stayed
+ * "pending" forever and kept showing as upcoming.)
+ */
+export async function expirePendingRequests(db, now = new Date()) {
+  const Booking = getBooking(db);
+  const stale = await Booking.find({
+    status: "pending",
+    scheduledTime: { $lt: new Date(now.getTime() - GRACE_PERIOD_MS) },
+  }).select("_id scheduledTime duration classTitle").lean();
+  let expired = 0;
+  for (const b of stale) {
+    if (now.getTime() - GRACE_PERIOD_MS < new Date(b.scheduledTime).getTime() + (b.duration || 60) * 60000) continue;
+    const r = await Booking.updateOne(
+      { _id: b._id, status: "pending" },
+      { $set: { status: "missed", markedBy: "system", completedAt: now,
+                missedReason: "The teacher didn't accept the class request before the class time." } },
+    );
+    if (r.modifiedCount) { expired++; logger.info(`[MissedClassSweep] Request "${b.classTitle}" (${b._id}) → missed (never accepted)`); }
+  }
+  return expired;
+}
+
+/** Everything the 5-minute sweep closes: unaccepted requests, missed / attended classes, group classes. */
+export async function sweepEndedClasses(db) {
+  await expirePendingRequests(db);
+  await sweepMissedClasses(db);
+  await sweepGroupClasses(db);
 }
 
 export async function sweepMissedClasses(db) {
@@ -171,12 +203,12 @@ export async function sweepMissedClasses(db) {
  */
 export function startMissedClassScheduler(db) {
   // Run once immediately on startup to catch anything that was missed during downtime
-  sweepMissedClasses(db).catch(err =>
+  sweepEndedClasses(db).catch(err =>
     logger.error("[MissedClassSweep] Initial sweep error:", { error: err?.message })
   );
 
   const id = setInterval(trackJob("Missed-class check", db.name, INTERVAL_MS, () =>
-    sweepMissedClasses(db).catch(err => {
+    sweepEndedClasses(db).catch(err => {
       logger.error("[MissedClassSweep] Sweep error:", { error: err?.message });
       throw err; // → App Health
     })

@@ -108,7 +108,7 @@ export default function RecordingsTab({ isDarkMode }) {
           <X size={16} /> {tr("recordingsTab.back")}
         </button>
         <h2 style={{ margin: 0, fontSize: "17px", fontWeight: 900, color: col.text, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          {rec.title || rec.bookingId?.classTitle || tr("recordingsTab.classRecording")}
+          {rec.title || rec.bookingId?.classTitle || rec.groupClassId?.title || tr("recordingsTab.classRecording")}
           {total > 1 && <span style={{ marginLeft: "8px", fontSize: "13px", fontWeight: 700, color: col.muted }}>{tr("recordingsTab.partOf", { value: index + 1, total })}</span>}
         </h2>
       </div>
@@ -172,7 +172,7 @@ export default function RecordingsTab({ isDarkMode }) {
                   {loadingId === s.key ? <Loader2 size={12} color="white" style={{ animation: "spin 1s linear infinite" }} /> : <Play size={10} fill="white" color="white" />}
                 </div>
                 <span style={{ fontSize: "13px", fontWeight: 700, color: col.text, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {s.first.title || s.first.bookingId?.classTitle || tr("recordingsTab.classRecording")}
+                  {s.first.title || s.first.bookingId?.classTitle || s.first.groupClassId?.title || tr("recordingsTab.classRecording")}
                 </span>
                 <span style={{ fontSize: "11px", color: col.muted, flexShrink: 0 }}>{formatDate(s.createdAt)}</span>
               </button>
@@ -221,7 +221,7 @@ export default function RecordingsTab({ isDarkMode }) {
               {/* Info */}
               <div style={{ flex: 1, minWidth: 0 }}>
                 <p style={{ margin: "0 0 4px", fontSize: "15px", fontWeight: 800, color: col.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {rec.title || rec.bookingId?.classTitle || tr("recordingsTab.classRecording")}
+                  {rec.title || rec.bookingId?.classTitle || rec.groupClassId?.title || tr("recordingsTab.classRecording")}
                 </p>
                 <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", alignItems: "center" }}>
                   <span style={{ fontSize: "12px", color: col.muted, display: "flex", alignItems: "center", gap: "3px" }}>

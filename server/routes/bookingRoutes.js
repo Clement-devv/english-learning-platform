@@ -1,6 +1,7 @@
 // server/routes/bookingRoutes.js
 import express from "express";
-import { verifyToken, verifyAdmin, verifyAdminOrTeacher } from "../middleware/authMiddleware.js";
+import { verifyToken, verifyAdmin, verifyAdminOrTeacher } from "../middleware/authMiddleware.js";
+import { subAdminNeeds, isSubAdmin, inScope, scopedStudentIds } from "../middleware/staffAccess.js";
 import {
   sendBookingRequestToTeacher, sendBookingAcceptedToStudent,
   sendBookingRejectedToStudent, sendBookingCreatedToStudent,
@@ -41,6 +42,8 @@ const ADMIN_DELETABLE   = ["pending", "accepted", "rejected", "cancelled", "miss
 const canCreateBooking = (req, createdBy) => {
   const { role, id } = req.user;
   if (role === "admin"   && createdBy === "admin")   return true;
+  // Sub-admin with "Bookings": sends the same request to the teacher as the admin would
+  if (role === "sub-admin" && createdBy === "admin") return !!req.subAdmin;
   if (role === "teacher" && createdBy === "teacher") return req.body.teacherId === id;
   return false;
 };
@@ -71,7 +74,7 @@ router.get("/:id", verifyToken, validateObjectId("id"), async (req, res) => {
 });
 
 // ─── POST create booking ──────────────────────────────────────────────────────
-router.post("/", verifyToken, async (req, res) => {
+router.post("/", verifyToken, subAdminNeeds("canCreateBookings"), async (req, res) => {
   try {
     const { scheduledTime, duration, createdBy = "admin" } = req.body;
     const isTrial = !!req.body.isTrial;
@@ -93,8 +96,10 @@ router.post("/", verifyToken, async (req, res) => {
       getTeacher(req.db).findById(teacherId),
       getStudent(req.db).findById(studentId),
     ]);
-    if (!teacher) return notFound(res, "Teacher not found");
+    if (!teacher || !inScope(req, teacher._id)) return notFound(res, "Teacher not found");
     if (!student) return notFound(res, "Student not found");
+    if (isSubAdmin(req) && !(await scopedStudentIds(req)).has(String(student._id)))
+      return notFound(res, "Student not found");
     if (!isTrial && student.classCredits <= 0)
       return res.status(400).json({ success: false, message: `Student ${student.firstName} ${student.lastName} has no classes remaining` });
 
@@ -108,7 +113,7 @@ router.post("/", verifyToken, async (req, res) => {
       status: initialStatus, createdBy,
       isTrial,
       createdByUserId: req.user.id,
-      createdByUserModel: createdBy === "admin" ? "Admin" : "Teacher",
+      createdByUserModel: isSubAdmin(req) ? "SubAdmin" : createdBy === "admin" ? "Admin" : "Teacher",
       teacherTimezone: teacher.timezone || "",
       studentTimezone: student.timezone || "",
     });

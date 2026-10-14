@@ -4,16 +4,22 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Users, Plus, X, ChevronDown, ChevronUp, Video, RefreshCw, Loader2, Lock, Globe, Search, UserMinus } from 'lucide-react';
 import api from '../../../api';
 import Pagination from '../../../components/Pagination';
+import StudentPicker from '../../../components/groupClass/StudentPicker';
+import PlatformPicker from '../../../components/groupClass/PlatformPicker';
+import { PLATFORM_META } from '../../../components/groupClass/platforms';
+import { joinGroupClass } from '../../../components/groupClass/joinGroupClass';
+import GroupClassRecorder from '../../../components/groupClass/GroupClassRecorder';
 
 const GC_PAGE = 20;
 import Classroom from '../../Classroom';
 import DateTimePicker from '../../../components/DateTimePicker';
 import { formatDateInTZ, getUserTimezone, tzAbbr } from '../../../utils/timezone';
 import { visibleEmail } from "../../../utils/managedStudent.js";
+import { useCurrencySymbol, fmtMoney } from "../../../hooks/useCurrencySymbol";
 
 const F = "'Nunito','Inter',sans-serif";
 const LEVELS   = ['A1','A2','B1','B2','C1','C2','Mixed'];
-const STATUSES = ['open','full','in-progress','completed','cancelled'];
+const STATUSES = ['open','full','in-progress','completed','cancelled','missed'];
 const myTZ = getUserTimezone();
 
 const fmtDate = (iso) => {
@@ -28,6 +34,7 @@ const STATUS_COLOR = {
   'in-progress':'#3b82f6',
   completed:    '#6b7280',
   cancelled:    '#ef4444',
+  missed:       '#ea580c', // time passed, never held — refunded
 };
 
 function Badge({ status }) {
@@ -42,9 +49,14 @@ const BLANK_FORM = {
   title: '', description: '', level: 'Mixed', maxSeats: 8,
   pricePerSeat: 1, scheduledTime: '', duration: 60, notes: '', tags: '',
   enrollmentMode: 'open',
+  pointsPerSeat: 1, // group points each student pays (your fee is set by the admin)
+  invitedStudents: [], // invite-only: students picked in the create window
+  platform: 'agora',   // agora (in the app), googlemeet or zoom
+  meetingLink: '',     // Meet / Zoom link for this class; empty = your saved profile link
 };
 
 export default function GroupClassesTab({ isDarkMode }) {
+  const sym = useCurrencySymbol();
   const col = {
     bg:      isDarkMode ? '#0f1117' : '#fff8f0',
     card:    isDarkMode ? '#1a1d2e' : '#ffffff',
@@ -59,7 +71,7 @@ export default function GroupClassesTab({ isDarkMode }) {
   const [classes,      setClasses]      = useState([]);
   const [loading,      setLoading]      = useState(true);
   const [msg,          setMsg]          = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('active'); // upcoming + running; finished ones are in My Classes history
   const [gcPage,  setGcPage]  = useState(1);
   const [gcTotal, setGcTotal] = useState(0);
   const [expanded,     setExpanded]     = useState({});
@@ -104,6 +116,7 @@ export default function GroupClassesTab({ isDarkMode }) {
         ...form,
         tags: form.tags ? form.tags.split(',').map(t => t.trim()).filter(Boolean) : [],
         enrollmentMode: form.enrollmentMode || 'open',
+        invitedStudents: form.enrollmentMode === 'invite-only' ? form.invitedStudents : [],
       });
       flash('Group class created');
       setShowCreate(false);
@@ -155,23 +168,21 @@ export default function GroupClassesTab({ isDarkMode }) {
     } catch (e) { flash(e.response?.data?.message || 'Failed to remove'); }
   };
 
-  const handleStart = async (gc) => {
-    try {
-      await api.patch(`/group-classes/${gc._id}/start`);
-      setActiveClass(gc);
-    } catch (e) {
-      flash(e.response?.data?.message || 'Failed to start');
-    }
-  };
+  // Agora → the in-app classroom; Google Meet / Zoom → the class link in a new tab
+  const handleStart = (gc) => joinGroupClass(gc, {
+    before: () => api.patch(`/group-classes/${gc._id}/start`),
+    onAgora: (c) => setActiveClass(c),
+    onError: (m) => flash(m),
+  }).then(() => { if ((gc.platform || 'agora') !== 'agora') load(); });
 
-  const handleJoin = (gc) => setActiveClass(gc);
+  const handleJoin = (gc) => joinGroupClass(gc, { onAgora: (c) => setActiveClass(c), onError: (m) => flash(m) });
 
   const handleComplete = async (gcId) => {
     if (!window.confirm('Mark this class as completed?')) return;
     const attendance = Object.entries(attMap).map(([studentId, status]) => ({ studentId, status }));
     try {
-      await api.patch(`/group-classes/${gcId}/complete`, { attendance });
-      flash('Class completed');
+      const { data } = await api.patch(`/group-classes/${gcId}/complete`, { attendance });
+      flash(data?.feePaid > 0 ? `Class completed — ${fmtMoney(data.feePaid, sym)} added to your earnings` : 'Class completed');
       setAttTarget(null);
       load();
     } catch (e) {
@@ -223,6 +234,7 @@ export default function GroupClassesTab({ isDarkMode }) {
           <p style={{ margin: '2px 0 0', fontSize: 13, color: col.muted }}>{gcTotal} class{gcTotal !== 1 ? 'es' : ''}</p>
         </div>
         <select value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setGcPage(1); }} style={{ ...inp, width: 140 }}>
+          <option value="active">Upcoming & running</option>
           <option value="">All statuses</option>
           {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
         </select>
@@ -261,6 +273,7 @@ export default function GroupClassesTab({ isDarkMode }) {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                     <span style={{ fontSize: 15, fontWeight: 800, color: col.heading }}>{gc.title}</span>
                     <Badge status={gc.status} />
+                    {gc.status === 'missed' && gc.missedReason && <span style={{ fontSize: 12, color: '#ea580c', fontWeight: 600 }}>{gc.missedReason}</span>}
                     <span style={{ fontSize: 12, color: col.muted, background: isDarkMode ? '#2a2d40' : '#fff7ed', borderRadius: 999, padding: '2px 8px' }}>{gc.level}</span>
                     {gc.enrollmentMode === 'invite-only' && (
                       <span style={{ fontSize: 11, background: '#6366f122', color: '#6366f1', borderRadius: 999, padding: '2px 8px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 3 }}>
@@ -270,9 +283,15 @@ export default function GroupClassesTab({ isDarkMode }) {
                   </div>
                   <div style={{ fontSize: 13, color: col.muted, marginTop: 4, display: 'flex', gap: 14, flexWrap: 'wrap' }}>
                     <span>📅 {fmtDate(gc.scheduledTime)}</span>
+                    <span>{PLATFORM_META[gc.platform || 'agora'].icon} {PLATFORM_META[gc.platform || 'agora'].name}</span>
                     <span>⏱ {gc.duration}min</span>
                     <span>👥 {gc.enrollments?.length || 0}/{gc.maxSeats} enrolled</span>
-                    <span>💳 {gc.pricePerSeat} cr/seat</span>
+                    <span>{gc.paymentType === 'points' ? `🎟 ${gc.pointsPerSeat || 1} point${(gc.pointsPerSeat || 1) === 1 ? '' : 's'}/student` : `💳 ${gc.pricePerSeat} cr/seat`}</span>
+                    {gc.teacherFee > 0 && (
+                      <span title={gc.feePaid?.at ? 'Added to your earnings' : 'Paid when the class is completed with at least one student marked attended'}>
+                        💰 Your fee {fmtMoney(gc.teacherFee, sym)}{gc.feePaid?.at ? ' ✓' : ''}
+                      </span>
+                    )}
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
@@ -291,6 +310,13 @@ export default function GroupClassesTab({ isDarkMode }) {
                   </button>
                 </div>
               </div>
+
+              {/* Meet / Zoom: record from here while the class runs (Agora records inside the room), or save the meeting's own recording link */}
+              {(gc.platform || 'agora') !== 'agora' && ['in-progress', 'completed'].includes(gc.status) && (
+                <div style={{ marginTop: 10 }}>
+                  <GroupClassRecorder groupClassId={gc._id} allowLink canRecord={gc.status === 'in-progress'} />
+                </div>
+              )}
 
               {isOpen && (
                 <div style={{ borderTop: `1.5px solid ${col.border}`, marginTop: 14, paddingTop: 14 }}>
@@ -373,8 +399,8 @@ export default function GroupClassesTab({ isDarkMode }) {
                   <input type="number" min={2} max={20} value={form.maxSeats} onChange={e => setForm(p => ({ ...p, maxSeats: +e.target.value }))} style={{ ...inp, marginTop: 4 }} />
                 </div>
                 <div>
-                  <label style={{ fontSize: 12, fontWeight: 800, color: col.muted, textTransform: 'uppercase', letterSpacing: '.06em' }}>Credits/Seat</label>
-                  <input type="number" min={1} value={form.pricePerSeat} onChange={e => setForm(p => ({ ...p, pricePerSeat: +e.target.value }))} style={{ ...inp, marginTop: 4 }} />
+                  <label style={{ fontSize: 12, fontWeight: 800, color: col.muted, textTransform: 'uppercase', letterSpacing: '.06em' }}>Points / Student</label>
+                  <input type="number" min={1} step={1} value={form.pointsPerSeat} onChange={e => setForm(p => ({ ...p, pointsPerSeat: +e.target.value }))} style={{ ...inp, marginTop: 4 }} />
                 </div>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 10 }}>
@@ -394,11 +420,17 @@ export default function GroupClassesTab({ isDarkMode }) {
                 </div>
               </div>
               <div>
+                <label style={{ fontSize: 12, fontWeight: 800, color: col.muted, textTransform: 'uppercase', letterSpacing: '.06em' }}>Class Platform</label>
+                <PlatformPicker platform={form.platform} link={form.meetingLink} col={col}
+                  onChange={({ platform, link }) => setForm(p => ({ ...p, platform, meetingLink: link }))}
+                  labels={{ linkHint: 'Leave empty to use the link saved on your profile.' }} />
+              </div>
+              <div>
                 <label style={{ fontSize: 12, fontWeight: 800, color: col.muted, textTransform: 'uppercase', letterSpacing: '.06em' }}>Enrollment Mode</label>
                 <div style={{ display: 'flex', gap: 10, marginTop: 6 }}>
                   {[
-                    { val: 'open',         label: '🌐 Open',         hint: 'Any student with credits can join' },
-                    { val: 'invite-only',  label: '🔒 Invite-Only',  hint: 'Only students you invite can enroll' },
+                    { val: 'open',         label: '🌐 Open',         hint: 'Any student with enough group points can join' },
+                    { val: 'invite-only',  label: '🔒 Only selected students',  hint: 'Only the students you pick can enroll' },
                   ].map(m => (
                     <button key={m.val} onClick={() => setForm(p => ({ ...p, enrollmentMode: m.val }))} style={{
                       flex: 1, border: `2px solid ${form.enrollmentMode === m.val ? col.accent : col.border}`,
@@ -410,6 +442,14 @@ export default function GroupClassesTab({ isDarkMode }) {
                     </button>
                   ))}
                 </div>
+                {form.enrollmentMode === 'invite-only' && (
+                  <div style={{ marginTop: 10 }}>
+                    <StudentPicker
+                      search={async (q) => (await api.get(`/group-classes/students/search?q=${encodeURIComponent(q)}`)).data?.students || []}
+                      value={form.invitedStudents} onChange={ids => setForm(p => ({ ...p, invitedStudents: ids }))} col={col} />
+                    <p style={{ fontSize: 11.5, color: col.muted, margin: '6px 0 0' }}>Picked students see this class and can enroll with their group points. You can invite more later.</p>
+                  </div>
+                )}
               </div>
               <div>
                 <label style={{ fontSize: 12, fontWeight: 800, color: col.muted, textTransform: 'uppercase', letterSpacing: '.06em' }}>Tags (comma-separated)</label>
@@ -460,7 +500,7 @@ export default function GroupClassesTab({ isDarkMode }) {
                     <div key={s._id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderBottom: `1px solid ${col.border}` }}>
                       <div style={{ flex: 1 }}>
                         <div style={{ fontSize: 13, fontWeight: 700, color: col.heading }}>{s.firstName} {s.lastName}</div>
-                        <div style={{ fontSize: 11, color: col.muted }}>{visibleEmail(s.email) || "Managed student"} · {s.classCredits ?? 0} credits</div>
+                        <div style={{ fontSize: 11, color: col.muted }}>{visibleEmail(s.email) || "Managed student"} · {s.groupPoints ?? 0} group points</div>
                       </div>
                       {alreadyInvited
                         ? <span style={{ fontSize: 11, color: '#10b981', fontWeight: 700 }}>✓ Invited</span>

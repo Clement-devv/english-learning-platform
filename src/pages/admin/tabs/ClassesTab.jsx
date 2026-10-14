@@ -144,7 +144,7 @@ function LiveTimer({ booking }) {
           {tr("classesTab.left", { fmtTime: fmtTime(remaining) })}</span>
       </div>
       <div className="w-full h-1.5 rounded-full bg-slate-700/30 overflow-hidden">
-        <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${pct}%` }} />
+        <div className={`h-full rounded-full transition-[width] duration-300 ease-out ${barColor}`} style={{ width: `${pct}%` }} />
       </div>
     </div>
   );

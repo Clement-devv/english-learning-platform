@@ -39,6 +39,10 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
       canSendMessages: true,
       canViewBookings: true,
       canViewClasses:  true,
+      // Admin pages (off until the admin turns them on)
+      canViewClassReport: false, canManageGroupClasses: false, canCreateBookings: false,
+      canManageParentChecks: false, canViewParentLinks: false,
+      canViewLoggedClasses: false, canApproveLoggedClasses: false,
     },
   };
   const [form, setForm] = useState(blankForm);
@@ -235,6 +239,14 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
     { key: "canSendMessages", label: tr("subAdminsTab.sendMessages"),  desc: tr("subAdminsTab.canMessageTeachersAndStudents") },
     { key: "canViewBookings", label: tr("subAdminsTab.viewBookings"),  desc: tr("subAdminsTab.canSeeClassBookings") },
     { key: "canViewClasses",  label: tr("subAdminsTab.viewClasses"),   desc: tr("subAdminsTab.canSeeClassDetails") },
+    // Admin pages — always limited to the sub-admin's own teachers and their students
+    { key: "canViewClassReport",      label: tr("subAdminsTab.permClassReport"),      desc: tr("subAdminsTab.permClassReportDesc") },
+    { key: "canManageGroupClasses",   label: tr("subAdminsTab.permGroupClasses"),     desc: tr("subAdminsTab.permGroupClassesDesc") },
+    { key: "canCreateBookings",       label: tr("subAdminsTab.permBookings"),         desc: tr("subAdminsTab.permBookingsDesc") },
+    { key: "canManageParentChecks",   label: tr("subAdminsTab.permParentChecks"),     desc: tr("subAdminsTab.permParentChecksDesc") },
+    { key: "canViewParentLinks",      label: tr("subAdminsTab.permParentLinks"),      desc: tr("subAdminsTab.permParentLinksDesc") },
+    { key: "canViewLoggedClasses",    label: tr("subAdminsTab.permLoggedClasses"),    desc: tr("subAdminsTab.permLoggedClassesDesc") },
+    { key: "canApproveLoggedClasses", label: tr("subAdminsTab.permApproveLogged"),    desc: tr("subAdminsTab.permApproveLoggedDesc") },
   ];
 
   return (

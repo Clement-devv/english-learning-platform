@@ -7,6 +7,9 @@ AgoraRTC.setLogLevel(import.meta.env.DEV ? 0 : 3);
 import { io } from "socket.io-client";
 import api from "../../api";
 import { useDarkMode } from "../../hooks/useDarkMode";
+import { getStoredToken, getStoredUser, detectActiveRole } from "../../utils/authStorage";
+import { decodeJwtPayload } from "../../utils/jwt";
+import GroupClassRecorder from "../../components/groupClass/GroupClassRecorder";
 import {
   Mic, MicOff, Video, VideoOff, PhoneOff,
   Hand, Users, Crown, UserCheck, UserX,
@@ -14,6 +17,7 @@ import {
 } from "lucide-react";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const JOIN_TIMEOUT_MS = 25000; // give up waiting for the video connection after this
 
 // ── Video tile for a single stream ───────────────────────────────────────────
 function VideoTile({ videoTrack, audioTrack, isLocal, label, isTeacher, hasHand }) {
@@ -164,6 +168,12 @@ export default function GroupAgoraClassroom({ classData, userRole, onLeave }) {
   const [error,        setError]        = useState(null);
   const [myUid,        setMyUid]        = useState(null);
   const [myName,       setMyName]       = useState("Me");
+  const [mediaError,   setMediaError]   = useState(""); // camera / mic blocked — still in the class
+  const [attempt,      setAttempt]      = useState(0);  // "Try again" re-runs the join
+  // Teacher recording: leaving waits until the last part has uploaded
+  const recorderRef = useRef(null);
+  const [rec, setRec] = useState({ isRecording: false, uploadingRecording: false });
+  const [pendingLeave, setPendingLeave] = useState(false);
 
   // ── Timer ──────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -209,15 +219,22 @@ export default function GroupAgoraClassroom({ classData, userRole, onLeave }) {
   useEffect(() => {
     const join = async () => {
       try {
+        // Fail with a clear message instead of an endless "Joining…"
+        const timeout = setTimeout(() => {
+          if (!joinedRef.current && !destroyedRef.current) setError("The video connection is taking too long. Check your internet and try again.");
+        }, JOIN_TIMEOUT_MS);
         const { data } = await api.get(`/agora/token?channel=${channelName}&role=publisher`);
-        if (destroyedRef.current) return;
+        if (destroyedRef.current) { clearTimeout(timeout); return; }
 
         // `channel` is the server-issued, center-scoped Agora channel for this class
         const { token, uid, appId, channel: agoraChannel } = data;
         setMyUid(uid);
 
-        const storedName = localStorage.getItem("userName") || (userRole === "teacher" ? "Teacher" : "Student");
-        const storedId   = localStorage.getItem("userId") || String(uid);
+        // Who I am — from the signed-in session (the live connection identifies people the same way)
+        const sessionRole = ["teacher", "student"].includes(userRole) ? userRole : detectActiveRole();
+        const me = decodeJwtPayload(getStoredToken(sessionRole)) || {};
+        const storedName = getStoredUser(sessionRole)?.firstName || (userRole === "teacher" ? "Teacher" : "Student");
+        const storedId   = me.id ? String(me.id) : String(uid);
         setMyName(storedName);
         myUserIdRef.current = storedId;
 
@@ -253,8 +270,11 @@ export default function GroupAgoraClassroom({ classData, userRole, onLeave }) {
         });
 
         await c.join(appId, agoraChannel || channelName, token, uid);
+        clearTimeout(timeout);
         if (destroyedRef.current) return;
         joinedRef.current = true;
+        setError(null);
+        setJoined(true); // show the class now — camera / mic permission comes after
 
         // Usage tracking — teacher only (prevents double-counting per class)
         if (userRole === "teacher" && !trackingStartedRef.current) {
@@ -275,7 +295,11 @@ export default function GroupAgoraClassroom({ classData, userRole, onLeave }) {
               AgoraRTC.createCameraVideoTrack(),
             ]);
           } catch (_) {
-            audioTrack = await AgoraRTC.createMicrophoneAudioTrack({ encoderConfig: "speech_standard" });
+            try {
+              audioTrack = await AgoraRTC.createMicrophoneAudioTrack({ encoderConfig: "speech_standard" });
+            } catch (_) {
+              setMediaError("Your camera and microphone are blocked. Allow them in the browser (address bar → site settings), then rejoin.");
+            }
           }
           if (destroyedRef.current) {
             audioTrack?.stop(); audioTrack?.close();
@@ -286,24 +310,11 @@ export default function GroupAgoraClassroom({ classData, userRole, onLeave }) {
           localVideoTrackRef.current = videoTrack || null;
           const toPublish = [audioTrack, videoTrack].filter(Boolean);
           await c.publish(toPublish);
-        } else {
-          // Pre-create mic track so promotion is instant
-          try {
-            const warm = await navigator.mediaDevices.getUserMedia({ audio: true });
-            warm.getTracks().forEach(t => t.stop());
-          } catch (_) {}
-          try {
-            const audioTrack = await AgoraRTC.createMicrophoneAudioTrack({ encoderConfig: "speech_standard" });
-            if (!destroyedRef.current) localAudioTrackRef.current = audioTrack;
-            else { audioTrack.stop(); audioTrack.close(); }
-          } catch (_) {}
         }
-
-        setJoined(true);
+        // Students only watch and listen — their microphone is asked for when the teacher lets them speak
 
         // ── Socket ──
-        const authToken = localStorage.getItem("token");
-        const sock = io(API_URL, { auth: { token: authToken }, transports: ["websocket"] });
+        const sock = io(API_URL, { auth: { token: getStoredToken(sessionRole) }, transports: ["websocket"] });
         socketRef.current = sock;
 
         sock.on("connect", () => {
@@ -339,7 +350,15 @@ export default function GroupAgoraClassroom({ classData, userRole, onLeave }) {
           if (targetUserId === myUserIdRef.current) {
             try {
               await c.setClientRole("host");
-              const audio = localAudioTrackRef.current;
+              let audio = localAudioTrackRef.current;
+              if (!audio) {
+                try {
+                  audio = await AgoraRTC.createMicrophoneAudioTrack({ encoderConfig: "speech_standard" });
+                  localAudioTrackRef.current = audio;
+                } catch (_) {
+                  setMediaError("Your microphone is blocked. Allow it in the browser to speak.");
+                }
+              }
               if (audio) await c.publish([audio]);
               setIsSpeaking(true);
               setHandRaised(prev => { const s = new Set(prev); s.delete(targetUserId); return s; });
@@ -384,13 +403,14 @@ export default function GroupAgoraClassroom({ classData, userRole, onLeave }) {
 
       } catch (err) {
         console.error("[GroupAgoraClassroom] join error:", err);
-        if (!destroyedRef.current) setError(err?.message || "Failed to join group class");
+        if (!destroyedRef.current && !joinedRef.current) setError(err?.response?.data?.message || err?.message || "Failed to join group class");
       }
     };
 
+    destroyedRef.current = false;
     join();
     return () => { doCleanup(false); };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [attempt]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Controls ───────────────────────────────────────────────────────────────
   const toggleMic = async () => {
@@ -435,9 +455,15 @@ export default function GroupAgoraClassroom({ classData, userRole, onLeave }) {
   };
 
   const handleLeave = async () => {
+    if (rec.isRecording) { recorderRef.current?.stop(); setPendingLeave(true); return; }
+    if (rec.uploadingRecording) { setPendingLeave(true); return; }
     await doCleanup(userRole === "teacher");
     if (onLeave) onLeave();
   };
+  // Leave once the recording has finished saving
+  useEffect(() => {
+    if (pendingLeave && !rec.isRecording && !rec.uploadingRecording) { setPendingLeave(false); handleLeave(); }
+  }, [pendingLeave, rec.isRecording, rec.uploadingRecording]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Loading / error screens ────────────────────────────────────────────────
   if (error) {
@@ -447,9 +473,14 @@ export default function GroupAgoraClassroom({ classData, userRole, onLeave }) {
           <div style={{ fontSize: 48, marginBottom: 12 }}>😕</div>
           <h2 style={{ color: "#f87171", marginBottom: 8 }}>Could not join class</h2>
           <p style={{ color: "#94a3b8", marginBottom: 20, fontSize: 14 }}>{error}</p>
-          <button onClick={onLeave} style={{ background: "#6366f1", color: "#fff", border: "none", borderRadius: 10, padding: "10px 24px", cursor: "pointer", fontWeight: 700 }}>
-            Go Back
-          </button>
+          <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
+            <button onClick={() => { setError(null); setJoined(false); joinedRef.current = false; setAttempt(a => a + 1); }} style={{ background: "#10b981", color: "#fff", border: "none", borderRadius: 10, padding: "10px 24px", cursor: "pointer", fontWeight: 700 }}>
+              Try again
+            </button>
+            <button onClick={onLeave} style={{ background: "#6366f1", color: "#fff", border: "none", borderRadius: 10, padding: "10px 24px", cursor: "pointer", fontWeight: 700 }}>
+              Go Back
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -500,6 +531,12 @@ export default function GroupAgoraClassroom({ classData, userRole, onLeave }) {
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "#0f0f1a", display: "flex", flexDirection: "column", fontFamily: "'Inter',sans-serif" }}>
+      {mediaError && (
+        <div role="alert" style={{ position: "absolute", top: 64, left: "50%", transform: "translateX(-50%)", zIndex: 20, maxWidth: 520, background: "#7f1d1d", color: "#fff", padding: "10px 14px", borderRadius: 12, fontSize: 13, display: "flex", gap: 10, alignItems: "center" }}>
+          <span style={{ flex: 1 }}>{mediaError}</span>
+          <button onClick={() => setMediaError("")} aria-label="Dismiss" style={{ background: "none", border: "none", color: "#fff", cursor: "pointer", fontSize: 16 }}>×</button>
+        </div>
+      )}
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.15); } }
@@ -631,9 +668,15 @@ export default function GroupAgoraClassroom({ classData, userRole, onLeave }) {
           />
         )}
 
+        {/* Record (teacher) — same recorder as one-to-one classes */}
+        {userRole === "teacher" && (
+          <GroupClassRecorder groupClassId={groupClassId} dark captureThisTab commandsRef={recorderRef} onStateChange={setRec} />
+        )}
+
         {/* Leave */}
         <CtrlBtn
-          title="Leave class"
+          title={pendingLeave ? "Saving the recording…" : "Leave class"}
+          disabled={pendingLeave}
           onClick={handleLeave}
           icon={<PhoneOff size={20} />}
           color="#ef4444"

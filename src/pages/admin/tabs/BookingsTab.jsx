@@ -138,7 +138,8 @@ function SearchableSelect({ options, value, onChange, placeholder, isDarkMode, g
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
-export default function BookingsTab({ teachers = [], students = [], onNotify, isDarkMode }) {
+// allowRecurring: false for sub-admins (recurring series are admin-only)
+export default function BookingsTab({ teachers = [], students = [], onNotify, isDarkMode, allowRecurring = true }) {
   const { t: tr } = useTranslation("admin");
   const [teacherId, setTeacherId]       = useState("");
   const [studentId, setStudentId]       = useState("");
@@ -246,7 +247,7 @@ export default function BookingsTab({ teachers = [], students = [], onNotify, is
 
       {/* ── Toast ────────────────────────────────────────────────────────────── */}
       {toast.message && (
-        <div className={`fixed top-5 right-5 z-50 px-5 py-3 rounded-xl shadow-lg text-sm font-medium flex items-center gap-2
+        <div className={`fixed top-5 right-5 z-50 px-5 py-3 rounded-xl shadow-lg text-sm font-medium flex items-center gap-2 ui-toast-in
           ${toast.type === "error" ? "bg-red-500 text-white" : "bg-emerald-500 text-white"}`}>
           {toast.type === "error" ? <AlertCircle size={16} /> : <BookOpen size={16} />}
           {toast.message}
@@ -259,6 +260,7 @@ export default function BookingsTab({ teachers = [], students = [], onNotify, is
           <h2 className="text-2xl font-bold text-violet-500">{tr("bookingsTab.sendBookingRequest")}</h2>
           <p className={`text-sm mt-1 ${th.muted}`}>{tr("bookingsTab.createAClassRequestFor")}</p>
         </div>
+        {allowRecurring && (
         <button
           onClick={() => setShowRecurringForm(true)}
           className="flex items-center gap-2 px-4 py-2.5 bg-sky-600 hover:bg-sky-700 text-white text-sm font-semibold rounded-xl transition shadow-sm"
@@ -266,6 +268,7 @@ export default function BookingsTab({ teachers = [], students = [], onNotify, is
           <Repeat size={15} />
           {tr("bookingsTab.recurringClasses")}
         </button>
+        )}
       </div>
 
       {/* ── Two-column layout ─────────────────────────────────────────────────── */}
@@ -452,7 +455,7 @@ export default function BookingsTab({ teachers = [], students = [], onNotify, is
                 </div>
               </div>
               <div className={`w-10 h-5 rounded-full flex-shrink-0 transition-colors relative ${isTrial ? "bg-amber-500" : dm ? "bg-slate-700" : "bg-slate-300"}`}>
-                <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${isTrial ? "left-5" : "left-0.5"}`} />
+                <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-[left] duration-200 ease-out ${isTrial ? "left-5" : "left-0.5"}`} />
               </div>
             </div>
 

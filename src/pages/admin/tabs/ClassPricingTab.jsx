@@ -38,6 +38,9 @@ export default function ClassPricingTab({ isDarkMode }) {
   const [currency, setCurrency] = useState("USD");
   const [symbol,   setSymbol]   = useState("$");
   const [notes,    setNotes]    = useState("");
+  // Group classes: price of one group point + default teacher fee for teacher-created classes
+  const [pointPrice, setPointPrice] = useState("");
+  const [groupFee,   setGroupFee]   = useState("");
   const [saving,   setSaving]   = useState(false);
   const [loading,  setLoading]  = useState(true);
   const [msg,      setMsg]      = useState(null); // { type: 'success'|'error', text }
@@ -61,6 +64,8 @@ export default function ClassPricingTab({ isDarkMode }) {
           setCurrency(r.data.currency || "USD");
           setSymbol(r.data.currencySymbol || "$");
           setNotes(r.data.notes || "");
+          setPointPrice(r.data.pricePerPoint ? String(r.data.pricePerPoint) : "");
+          setGroupFee(r.data.defaultGroupFee ? String(r.data.defaultGroupFee) : "");
         }
       })
       .catch(() => {})
@@ -75,6 +80,10 @@ export default function ClassPricingTab({ isDarkMode }) {
   };
 
   const handleSave = async () => {
+    if ([pointPrice, groupFee].some(v => v !== "" && (isNaN(Number(v)) || Number(v) < 0))) {
+      setMsg({ type: "error", text: tr("classPricingTab.groupValuesInvalid") });
+      return;
+    }
     if (!price || isNaN(Number(price)) || Number(price) < 0) {
       setMsg({ type: "error", text: tr("classPricingTab.pleaseEnterAValidPrice") });
       return;
@@ -87,6 +96,8 @@ export default function ClassPricingTab({ isDarkMode }) {
         currency,
         currencySymbol: symbol,
         notes,
+        pricePerPoint:   pointPrice === "" ? 0 : Number(pointPrice),
+        defaultGroupFee: groupFee === "" ? 0 : Number(groupFee),
       });
       setMsg({ type: "success", text: tr("classPricingTab.pricingSavedSuccessfully") });
       invalidateCurrencyCache();
@@ -183,6 +194,23 @@ export default function ClassPricingTab({ isDarkMode }) {
               rows={2}
               style={{ ...inp, resize: "vertical", lineHeight: "1.5" }}
             />
+          </div>
+
+          {/* Group classes — paid with group points (separate from class credits) */}
+          <div style={{ marginBottom: "20px", paddingTop: "16px", borderTop: `1px solid ${dm ? "#2a2d40" : "#e2e8f0"}` }}>
+            <p style={{ fontSize: "14px", fontWeight: "800", color: textPri, margin: "0 0 4px" }}>{tr("classPricingTab.groupClasses")}</p>
+            <p style={{ fontSize: "12px", color: textSec, margin: "0 0 12px" }}>{tr("classPricingTab.groupClassesHint")}</p>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+              <div>
+                <label style={lbl}>{tr("classPricingTab.pricePerPoint", { symbol })}</label>
+                <input style={inp} type="number" min="0" step="0.01" value={pointPrice} onChange={e => setPointPrice(e.target.value)} placeholder="0" />
+              </div>
+              <div>
+                <label style={lbl}>{tr("classPricingTab.defaultGroupFee", { symbol })}</label>
+                <input style={inp} type="number" min="0" step="0.01" value={groupFee} onChange={e => setGroupFee(e.target.value)} placeholder="0" />
+              </div>
+            </div>
+            <p style={{ fontSize: "11px", color: textSec, marginTop: "6px" }}>{tr("classPricingTab.defaultGroupFeeHint")}</p>
           </div>
 
           {/* Feedback message */}

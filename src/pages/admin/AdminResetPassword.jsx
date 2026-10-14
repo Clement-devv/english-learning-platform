@@ -186,11 +186,11 @@ const s = {
   errorText:   { color: '#f87171', fontSize: '13px', fontWeight: '500' },
   fieldGroup:  { display: 'flex', flexDirection: 'column', gap: '8px' },
   label:       { fontSize: '11.5px', fontWeight: '600', color: '#6b7280', letterSpacing: '0.08em', textTransform: 'uppercase' },
-  inputWrap:   { display: 'flex', alignItems: 'center', gap: '10px', padding: '0 14px', height: '50px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', transition: 'all 0.2s' },
+  inputWrap:   { display: 'flex', alignItems: 'center', gap: '10px', padding: '0 14px', height: '50px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', transition: 'border-color 0.2s, background-color 0.2s, box-shadow 0.2s' },
   inputFocused:{ border: '1px solid rgba(34,211,238,0.5)', boxShadow: '0 0 0 3px rgba(34,211,238,0.08)', background: 'rgba(34,211,238,0.03)' },
   input:       { flex: 1, background: 'transparent', border: 'none', outline: 'none', fontSize: '14.5px', color: '#e2e8f0', fontFamily: 'inherit' },
   eyeBtn:      { background: 'none', border: 'none', cursor: 'pointer', color: '#374151', padding: 0, display: 'flex', alignItems: 'center' },
-  submitBtn:   { width: '100%', height: '52px', background: 'linear-gradient(135deg, #0e7490, #22d3ee)', color: '#020617', border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: '700', cursor: 'pointer', fontFamily: 'inherit', boxShadow: '0 6px 24px rgba(34,211,238,0.25)', transition: 'all 0.2s' },
+  submitBtn:   { width: '100%', height: '52px', background: 'linear-gradient(135deg, #0e7490, #22d3ee)', color: '#020617', border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: '700', cursor: 'pointer', fontFamily: 'inherit', boxShadow: '0 6px 24px rgba(34,211,238,0.25)', transition: 'transform 0.15s ease-out, opacity 0.2s, box-shadow 0.2s' },
 };
 
 const css = `

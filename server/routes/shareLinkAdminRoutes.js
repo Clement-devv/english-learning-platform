@@ -8,7 +8,8 @@
 // utils/shareLink.js withShareInfo). Links are never created or changed here.
 import express from "express";
 import mongoose from "mongoose";
-import { verifyToken, verifyAdmin } from "../middleware/authMiddleware.js";
+import { verifyToken } from "../middleware/authMiddleware.js";
+import { verifyAdminOrSubAdmin, scopeFilter } from "../middleware/staffAccess.js";
 import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
 import { homeworkSchema } from "../schemas/homeworkSchema.js";
 import { quizSchema } from "../schemas/quizSchema.js";
@@ -31,7 +32,7 @@ const getTeacher = (db) => db.models.Teacher || db.model("Teacher", teacherSchem
 const escapeRx = (s) => s.replace(/[.*+?^$(){}|[\]\\]/g, "\\$&");
 const DAY = 86400000;
 
-router.get("/", verifyToken, verifyAdmin, async (req, res) => {
+router.get("/", verifyToken, verifyAdminOrSubAdmin("canViewParentLinks"), async (req, res) => {
   try {
     const kind = req.query.kind === "quiz" ? "quiz" : req.query.kind === "homework" ? "homework" : null;
     if (!kind) return badRequest(res, "kind must be homework or quiz");
@@ -39,7 +40,7 @@ router.get("/", verifyToken, verifyAdmin, async (req, res) => {
     const Model = MODELS[kind](req.db);
     const Student = getStudent(req.db), Teacher = getTeacher(req.db);
 
-    const filter = { "shareLink.tokenHash": { $exists: true, $ne: null } };
+    const filter = { "shareLink.tokenHash": { $exists: true, $ne: null }, ...scopeFilter(req) }; // sub-admin: own teachers only
     // Links expire at the end of the due day in the center's timezone. Narrow by
     // due date in the database (±1 day covers every timezone), then decide exactly below.
     if (view === "active") filter.dueDate = { $gte: new Date(Date.now() - 1.5 * DAY) };

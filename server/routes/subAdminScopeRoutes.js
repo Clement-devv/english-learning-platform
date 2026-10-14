@@ -211,6 +211,29 @@ router.get("/me", verifyToken, requireSubAdmin, async (req, res) => {
   }
 });
 
+// GET /api/sub-admin-scope/directory — this sub-admin's teachers + those teachers'
+// students (assigned or booked), for the admin pages they can be given (booking a
+// class, group classes). Same scope the server enforces (middleware/staffAccess.js).
+router.get("/directory", verifyToken, requireSubAdmin, async (req, res) => {
+  try {
+    const teacherIds = await getScopedTeacherIds(req.subAdmin, req.db);
+    const [assigned, booked] = await Promise.all([
+      getAssignment(req.db).distinct("studentId", { teacherId: { $in: teacherIds } }),
+      getBooking(req.db).distinct("studentId", { teacherId: { $in: teacherIds } }),
+    ]);
+    const [teachers, students] = await Promise.all([
+      getTeacher(req.db).find({ _id: { $in: teacherIds } })
+        .select("firstName lastName displayName email continent timezone active ratePerClass").sort({ firstName: 1 }).lean(),
+      getStudent(req.db).find({ _id: { $in: [...assigned, ...booked] } })
+        .select("firstName lastName email classCredits groupPoints isManaged active timezone").sort({ firstName: 1 }).lean(),
+    ]);
+    res.json({ success: true, teachers, students });
+  } catch (err) {
+    logger.error("Sub-admin directory error:", { error: err?.message });
+    serverError(res, "Failed to load your teachers and students");
+  }
+});
+
 // GET /api/sub-admin-scope/classes
 router.get("/classes", verifyToken, requireSubAdmin, async (req, res) => {
   try {

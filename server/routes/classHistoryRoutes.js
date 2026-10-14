@@ -15,6 +15,7 @@ import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
 import { bookingSchema } from "../schemas/bookingSchema.js";
 import { studentSchema } from "../schemas/studentSchema.js";
 import { teacherSchema } from "../schemas/teacherSchema.js";
+import { groupClassSchema } from "../schemas/groupClassSchema.js";
 import { readPaging, pageMeta, oid } from "../utils/paging.js";
 import logger from "../utils/logger.js";
 import { badRequest, forbidden, serverError } from "../utils/apiResponse.js";
@@ -25,6 +26,7 @@ router.use(tenantMiddleware);
 const getBooking = (db) => db.models.Booking || db.model("Booking", bookingSchema);
 const getStudent = (db) => db.models.Student || db.model("Student", studentSchema);
 const getTeacher = (db) => db.models.Teacher || db.model("Teacher", teacherSchema);
+const getGroupClass = (db) => db.models.GroupClass || db.model("GroupClass", groupClassSchema);
 
 const EXPORT_MAX = 2000;
 const HOUR = 3600000;
@@ -127,6 +129,23 @@ router.get("/teacher/:teacherId/history", verifyToken, async (req, res) => {
       } },
       { $addFields: { notCompleted: { $or: ["$isMissed", "$adminRejected"] } } },
       ...(rx ? [{ $match: { $or: [{ title: rx }, { topic: rx }, { students: rx }] } }] : []),
+      // Finished group classes: completed → Completed tab, missed → Not completed
+      { $unionWith: { coll: getGroupClass(req.db).collection.name, pipeline: [
+        { $match: { teacherId: oid(teacherId), status: { $in: ["completed", "missed"] }, ...(range ? { scheduledTime: range } : {}) } },
+        { $lookup: { from: getStudent(req.db).collection.name, localField: "enrollments.studentId", foreignField: "_id", as: "st",
+                     pipeline: [{ $project: { firstName: 1, lastName: 1 } }] } },
+        { $project: {
+          _id: 0, id: "$_id", scheduledTime: 1, title: 1, duration: 1, missedReason: 1, platform: 1,
+          topic: { $ifNull: ["$description", ""] },
+          students: { $map: { input: "$st", as: "x", in: { $trim: { input: { $concat: [{ $ifNull: ["$$x.firstName", ""] }, " ", { $ifNull: ["$$x.lastName", ""] }] } } } } },
+          attended: { $size: { $filter: { input: { $ifNull: ["$enrollments", []] }, cond: { $eq: ["$$this.attendance", "attended"] } } } },
+          isGroupClass: { $literal: true },
+          isMissed: { $eq: ["$status", "missed"] },
+          officiallyCompleted: { $eq: ["$status", "completed"] },
+          notCompleted: { $eq: ["$status", "missed"] },
+        } },
+        ...(rx ? [{ $match: { $or: [{ title: rx }, { topic: rx }, { students: rx }] } }] : []),
+      ] } },
       facet(view, paging, { _id: 0, disputes: 0 }),
     ]);
 
@@ -165,9 +184,36 @@ router.get("/student/:studentId/history", verifyToken, async (req, res) => {
         { $trim: { input: { $concat: [{ $ifNull: ["$tt.firstName", ""] }, " ", { $ifNull: ["$tt.lastName", ""] }] } } },
       ] } } },
       ...(rx ? [{ $match: { $or: [{ title: rx }, { topic: rx }, { teacher: rx }] } }] : []),
+      // Finished group classes I was in: missed, or marked absent → Not completed
+      { $unionWith: { coll: getGroupClass(req.db).collection.name, pipeline: [
+        { $match: { "enrollments.studentId": oid(studentId), status: { $in: ["completed", "missed"] }, ...(range ? { scheduledTime: range } : {}) } },
+        { $lookup: { from: getTeacher(req.db).collection.name, localField: "teacherId", foreignField: "_id", as: "t",
+                     pipeline: [{ $project: { firstName: 1, lastName: 1, displayName: 1 } }] } },
+        { $addFields: {
+          tt: { $arrayElemAt: ["$t", 0] },
+          mine: { $arrayElemAt: [{ $filter: { input: "$enrollments", cond: { $eq: ["$$this.studentId", oid(studentId)] } } }, 0] },
+        } },
+        { $addFields: {
+          id: "$_id", isGroupClass: true,
+          topic: { $ifNull: ["$description", ""] },
+          absent: { $and: [{ $eq: ["$status", "completed"] }, { $eq: ["$mine.attendance", "absent"] }] },
+          teacher: { $cond: [
+            { $gt: [{ $strLenCP: { $trim: { input: { $ifNull: ["$tt.displayName", ""] } } } }, 0] },
+            { $trim: { input: "$tt.displayName" } },
+            { $trim: { input: { $concat: [{ $ifNull: ["$tt.firstName", ""] }, " ", { $ifNull: ["$tt.lastName", ""] }] } } },
+          ] },
+        } },
+        { $addFields: {
+          notCompleted: { $or: [{ $eq: ["$status", "missed"] }, "$absent"] },
+          missedReason: { $cond: ["$absent", "You were marked absent.", { $ifNull: ["$missedReason", ""] }] },
+          status: { $cond: ["$absent", "missed", "$status"] },
+        } },
+        ...(rx ? [{ $match: { $or: [{ title: rx }, { topic: rx }, { teacher: rx }] } }] : []),
+      ] } },
       facet(view, paging, {
         _id: 0, id: 1, status: 1, title: 1, topic: 1, teacher: 1, scheduledTime: 1, completedAt: 1, duration: 1,
         adminRejected: 1, adminRejectedReason: 1, adminRejectedAt: 1, missedReason: 1, teacherTimezone: 1,
+        isGroupClass: 1, platform: 1,
       }),
     ]);
 

@@ -3,8 +3,12 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Users, Plus, X, ChevronDown, ChevronUp, RefreshCw, Loader2 } from 'lucide-react';
 import api from '../../../api';
+import { useCurrencySymbol, fmtMoney } from "../../../hooks/useCurrencySymbol";
 import { useOnDataChanged } from "../../../hooks/useLiveData";
 import Pagination from '../../../components/Pagination';
+import StudentPicker from '../../../components/groupClass/StudentPicker';
+import PlatformPicker from '../../../components/groupClass/PlatformPicker';
+import { PLATFORM_META } from '../../../components/groupClass/platforms';
 
 const GC_PAGE = 20;
 import { formatDateInTZ, getUserTimezone, tzAbbr } from '../../../utils/timezone';
@@ -14,7 +18,7 @@ const F = "'Nunito','Inter',sans-serif";
 const adminTZ = getUserTimezone();
 
 const LEVELS   = ['A1','A2','B1','B2','C1','C2','Mixed'];
-const STATUSES = ['open','full','in-progress','completed','cancelled'];
+const STATUSES = ['open','full','in-progress','completed','cancelled','missed'];
 
 // Show the time in the teacher's stored timezone (if available) + admin's local time
 const fmtDate = (iso, teacherTimezone) => {
@@ -34,6 +38,7 @@ const STATUS_COLOR = {
   'in-progress':'#3b82f6',
   completed:   '#6b7280',
   cancelled:   '#ef4444',
+  missed:       '#ea580c', // time passed, never held — refunded
 };
 
 function Badge({ status }) {
@@ -48,9 +53,27 @@ const BLANK_FORM = {
   title: '', description: '', level: 'Mixed', maxSeats: 8,
   pricePerSeat: 1, scheduledTime: '', duration: 60, notes: '', tags: '',
   teacherId: '',
+  pointsPerSeat: 1,  // group points each student pays
+  teacherFee: '',    // teacher's pay for the class (admin only; empty = center default)
+  enrollmentMode: 'open', // 'invite-only' → only the students picked below can enroll
+  invitedStudents: [],
+  platform: 'agora',      // agora (in the app), googlemeet or zoom
+  meetingLink: '',        // Meet / Zoom link for this class; empty = the teacher's saved link
 };
 
-export default function GroupClassesTab({ isDarkMode }) {
+// loadPeople: where the teacher / student pickers come from. Admins: everyone;
+// sub-admins pass their own scoped list (SubAdminPanels).
+const loadAllPeople = async () => {
+  const [tRes, sRes] = await Promise.all([
+    api.get('/teachers', { params: { limit: 5000 } }),
+    api.get('/students', { params: { limit: 5000 } }),
+  ]);
+  return { teachers: tRes.data?.teachers || tRes.data || [], students: sRes.data?.students || sRes.data || [] };
+};
+
+// canSetFee: only the admin sets a class's teacher fee (sub-admins get the center default)
+export default function GroupClassesTab({ isDarkMode, loadPeople = loadAllPeople, canSetFee = true }) {
+  const sym = useCurrencySymbol();
   const { t: tr } = useTranslation("admin");
   const col = {
     bg:      isDarkMode ? '#0f1117' : '#fff8f0',
@@ -68,7 +91,7 @@ export default function GroupClassesTab({ isDarkMode }) {
   const [students,   setStudents]   = useState([]);
   const [loading,    setLoading]    = useState(true);
   const [msg,        setMsg]        = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('active'); // upcoming + running by default
   const [gcPage,  setGcPage]  = useState(1);
   const [gcTotal, setGcTotal] = useState(0);
   const [expanded,   setExpanded]   = useState({});
@@ -99,21 +122,20 @@ export default function GroupClassesTab({ isDarkMode }) {
     try {
       // One page at a time (server returns the total)
       const params = `?skip=${(gcPage - 1) * GC_PAGE}&limit=${GC_PAGE}${statusFilter ? `&status=${statusFilter}` : ''}`;
-      const [gcRes, tRes, sRes] = await Promise.all([
+      const [gcRes, people] = await Promise.all([
         api.get(`/group-classes${params}`),
-        api.get('/teachers', { params: { limit: 5000 } }),
-        api.get('/students', { params: { limit: 5000 } }),
+        loadPeople(),
       ]);
       setClasses(gcRes.data.classes || []);
       setGcTotal(gcRes.data.total ?? 0);
-      setTeachers(tRes.data?.teachers || tRes.data || []);
-      setStudents(sRes.data?.students || sRes.data || []);
+      setTeachers(people.teachers || []);
+      setStudents(people.students || []);
     } catch (e) {
       flash(tr("groupClassesTab.failedToLoadGroupClasses"));
     } finally {
       setLoading(false);
     }
-  }, [gcPage, statusFilter, tr]);
+  }, [gcPage, statusFilter, tr, loadPeople]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -126,10 +148,15 @@ export default function GroupClassesTab({ isDarkMode }) {
     if (!form.title || !form.scheduledTime || !form.teacherId) {
       return flash(tr("groupClassesTab.titleTeacherAndScheduledTime"));
     }
+    if (form.enrollmentMode === 'invite-only' && form.invitedStudents.length === 0) {
+      return flash(tr("groupClassesTab.pickAtLeastOneStudent"));
+    }
     setSaving(true);
     try {
+      const { teacherFee, ...rest } = form;
       await api.post('/group-classes', {
-        ...form,
+        ...rest,
+        ...(canSetFee && teacherFee !== '' ? { teacherFee: Number(teacherFee) } : {}),
         tags: form.tags ? form.tags.split(',').map(t => t.trim()).filter(Boolean) : [],
       });
       flash(tr("groupClassesTab.groupClassCreated"));
@@ -173,8 +200,8 @@ export default function GroupClassesTab({ isDarkMode }) {
   const handleComplete = async (gcId) => {
     if (!window.confirm(tr("groupClassesTab.markThisClassAsCompleted"))) return;
     try {
-      await api.patch(`/group-classes/${gcId}/complete`);
-      flash(tr("groupClassesTab.classCompleted"));
+      const { data } = await api.patch(`/group-classes/${gcId}/complete`);
+      flash(data?.feePaid > 0 ? tr("groupClassesTab.completedFeePaid", { fee: fmtMoney(data.feePaid, sym) }) : tr("groupClassesTab.classCompleted"));
       load();
     } catch (e) {
       flash(e.response?.data?.message || tr("groupClassesTab.failed"));
@@ -206,8 +233,8 @@ export default function GroupClassesTab({ isDarkMode }) {
   const saveAttendance = async () => {
     const attendance = Object.entries(attMap).map(([studentId, status]) => ({ studentId, status }));
     try {
-      await api.patch(`/group-classes/${attTarget._id}/attendance`, { attendance });
-      flash(tr("groupClassesTab.attendanceSaved"));
+      const { data } = await api.patch(`/group-classes/${attTarget._id}/attendance`, { attendance });
+      flash(data?.feePaid > 0 ? tr("groupClassesTab.attendanceFeePaid", { fee: fmtMoney(data.feePaid, sym) }) : tr("groupClassesTab.attendanceSaved"));
       setAttTarget(null);
       load();
     } catch (e) {
@@ -228,6 +255,7 @@ export default function GroupClassesTab({ isDarkMode }) {
           <p style={{ margin: '2px 0 0', fontSize: 13, color: col.muted }}>{tr("groupClassesTab.class", { gcTotal, value: gcTotal !== 1 ? 'es' : '' })}</p>
         </div>
         <select value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setGcPage(1); }} style={{ ...inp, width: 140 }}>
+          <option value="active">{tr("groupClassesTab.activeStatuses")}</option>
           <option value="">{tr("groupClassesTab.allStatuses")}</option>
           {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
         </select>
@@ -263,14 +291,23 @@ export default function GroupClassesTab({ isDarkMode }) {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                     <span style={{ fontSize: 15, fontWeight: 800, color: col.heading }}>{gc.title}</span>
                     <Badge status={gc.status} />
+                    {gc.status === 'missed' && gc.missedReason && <span style={{ fontSize: 12, color: '#ea580c', fontWeight: 600 }}>{gc.missedReason}</span>}
                     <span style={{ fontSize: 12, color: col.muted, background: isDarkMode ? '#2a2d40' : '#fff7ed', borderRadius: 999, padding: '2px 8px' }}>{gc.level}</span>
                   </div>
                   <div style={{ fontSize: 13, color: col.muted, marginTop: 4, display: 'flex', gap: 16, flexWrap: 'wrap' }}>
                     <span>👨‍🏫 {teacherName(gc.teacherId?._id || gc.teacherId)}</span>
                     <span>📅 {fmtDate(gc.scheduledTime, gc.teacherTimezone)}</span>
+                    <span>{PLATFORM_META[gc.platform || 'agora'].icon} {PLATFORM_META[gc.platform || 'agora'].name}</span>
                     <span>{tr("groupClassesTab.min", { duration: gc.duration })}</span>
                     <span>{tr("groupClassesTab.seats", { value: gc.enrollments?.length || 0, maxSeats: gc.maxSeats })}</span>
-                    <span>{tr("groupClassesTab.creditSeat", { pricePerSeat: gc.pricePerSeat })}</span>
+                    <span>{gc.paymentType === 'points'
+                      ? tr("groupClassesTab.pointsSeat", { count: gc.pointsPerSeat || 1 })
+                      : tr("groupClassesTab.creditSeat", { pricePerSeat: gc.pricePerSeat })}</span>
+                    {gc.teacherFee > 0 && (
+                      <span title={gc.feePaid?.at ? tr("groupClassesTab.feePaidHint") : tr("groupClassesTab.feeDueHint")}>
+                        {gc.feePaid?.at ? tr("groupClassesTab.feePaid", { fee: fmtMoney(gc.teacherFee, sym) }) : tr("groupClassesTab.feeLabel", { fee: fmtMoney(gc.teacherFee, sym) })}
+                      </span>
+                    )}
                   </div>
                 </div>
                 {isOpen ? <ChevronUp size={18} color={col.muted} /> : <ChevronDown size={18} color={col.muted} />}
@@ -297,8 +334,8 @@ export default function GroupClassesTab({ isDarkMode }) {
                           <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, background: isDarkMode ? '#0f1117' : '#fff8f0', borderRadius: 10, padding: '7px 12px' }}>
                             <span style={{ flex: 1, fontSize: 13, fontWeight: 700, color: col.body }}>{sName}</span>
                             <span style={{ fontSize: 12, color: STATUS_COLOR[e.attendance] || col.muted }}>{e.attendance}</span>
-                            <span style={{ fontSize: 12, color: col.muted }}>{tr("groupClassesTab.cr", { creditCharged: e.creditCharged })}</span>
-                            {!['completed','cancelled'].includes(gc.status) && (
+                            <span style={{ fontSize: 12, color: col.muted }}>{e.pointsCharged > 0 ? tr("groupClassesTab.pts", { count: e.pointsCharged }) : tr("groupClassesTab.cr", { creditCharged: e.creditCharged })}</span>
+                            {!['completed','cancelled','missed'].includes(gc.status) && (
                               <button onClick={() => handleRemoveEnrollment(gc._id, sid)}
                                 style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: 0 }}>
                                 <X size={14} />
@@ -330,7 +367,7 @@ export default function GroupClassesTab({ isDarkMode }) {
                         {tr("groupClassesTab.complete")}
                       </button>
                     )}
-                    {!['completed','cancelled'].includes(gc.status) && (
+                    {!['completed','cancelled','missed'].includes(gc.status) && (
                       <button onClick={() => handleCancel(gc._id)}
                         style={btn('#fef2f2', '#dc2626')}>
                         {tr("groupClassesTab.cancel")}
@@ -385,9 +422,18 @@ export default function GroupClassesTab({ isDarkMode }) {
                   <input type="number" min={2} max={20} value={form.maxSeats} onChange={e => setForm(p => ({ ...p, maxSeats: +e.target.value }))} style={{ ...inp, marginTop: 4 }} />
                 </div>
                 <div>
-                  <label style={{ fontSize: 12, fontWeight: 800, color: col.muted, textTransform: 'uppercase', letterSpacing: '.06em' }}>{tr("groupClassesTab.creditsSeat")}</label>
-                  <input type="number" min={1} value={form.pricePerSeat} onChange={e => setForm(p => ({ ...p, pricePerSeat: +e.target.value }))} style={{ ...inp, marginTop: 4 }} />
+                  <label style={{ fontSize: 12, fontWeight: 800, color: col.muted, textTransform: 'uppercase', letterSpacing: '.06em' }}>{tr("groupClassesTab.pointsPerStudent")}</label>
+                  <input type="number" min={1} step={1} value={form.pointsPerSeat} onChange={e => setForm(p => ({ ...p, pointsPerSeat: +e.target.value }))} style={{ ...inp, marginTop: 4 }} />
                 </div>
+              </div>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 800, color: col.muted, textTransform: 'uppercase', letterSpacing: '.06em' }}>{tr("groupClassesTab.teacherFee")}</label>
+                {canSetFee ? (
+                  <input type="number" min={0} step="0.01" value={form.teacherFee} placeholder={tr("groupClassesTab.teacherFeePlaceholder")} onChange={e => setForm(p => ({ ...p, teacherFee: e.target.value }))} style={{ ...inp, marginTop: 4 }} />
+                ) : (
+                  <p style={{ fontSize: 13, color: col.body, margin: '6px 0 0' }}>{tr("groupClassesTab.teacherFeeDefault")}</p>
+                )}
+                <p style={{ fontSize: 11.5, color: col.muted, margin: '4px 0 0' }}>{tr("groupClassesTab.teacherFeeHint")}</p>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 10 }}>
                 <div>
@@ -398,6 +444,37 @@ export default function GroupClassesTab({ isDarkMode }) {
                   <label style={{ fontSize: 12, fontWeight: 800, color: col.muted, textTransform: 'uppercase', letterSpacing: '.06em' }}>{tr("groupClassesTab.durationMin")}</label>
                   <input type="number" min={15} max={300} value={form.duration} onChange={e => setForm(p => ({ ...p, duration: +e.target.value }))} style={{ ...inp, marginTop: 4 }} />
                 </div>
+              </div>
+              {/* Where the class happens */}
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 800, color: col.muted, textTransform: 'uppercase', letterSpacing: '.06em' }}>{tr("groupClassesTab.classPlatform")}</label>
+                <PlatformPicker platform={form.platform} link={form.meetingLink} col={col}
+                  onChange={({ platform, link }) => setForm(p => ({ ...p, platform, meetingLink: link }))}
+                  labels={{ agoraHint: tr("groupClassesTab.agoraHint"), externalHint: tr("groupClassesTab.externalHint"), linkPlaceholder: tr("groupClassesTab.linkPlaceholder"), linkHint: tr("groupClassesTab.linkHint") }} />
+              </div>
+              {/* Who can join: everyone, or only the students picked here */}
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 800, color: col.muted, textTransform: 'uppercase', letterSpacing: '.06em' }}>{tr("groupClassesTab.whoCanJoin")}</label>
+                <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+                  {[
+                    { val: 'open',        label: tr("groupClassesTab.joinOpen"),     hint: tr("groupClassesTab.joinOpenHint") },
+                    { val: 'invite-only', label: tr("groupClassesTab.joinSelected"), hint: tr("groupClassesTab.joinSelectedHint") },
+                  ].map(m => (
+                    <button type="button" key={m.val} onClick={() => setForm(p => ({ ...p, enrollmentMode: m.val }))}
+                      style={{ flex: 1, textAlign: 'left', padding: '10px 12px', borderRadius: 12, cursor: 'pointer', fontFamily: F,
+                        border: `2px solid ${form.enrollmentMode === m.val ? col.accent : col.border}`, background: form.enrollmentMode === m.val ? col.accent + '18' : 'transparent' }}>
+                      <div style={{ fontWeight: 800, fontSize: 13, color: form.enrollmentMode === m.val ? col.accent : col.heading }}>{m.label}</div>
+                      <div style={{ fontSize: 11.5, color: col.muted, marginTop: 2 }}>{m.hint}</div>
+                    </button>
+                  ))}
+                </div>
+                {form.enrollmentMode === 'invite-only' && (
+                  <div style={{ marginTop: 10 }}>
+                    <StudentPicker options={students} value={form.invitedStudents} onChange={ids => setForm(p => ({ ...p, invitedStudents: ids }))} col={col}
+                      labels={{ placeholder: tr("groupClassesTab.searchStudentsPicker"), none: tr("groupClassesTab.noStudentsFoundPicker"), selected: tr("groupClassesTab.studentsSelected", { count: "{{count}}" }), points: tr("groupClassesTab.pickerPoints", { count: "{{count}}" }) }} />
+                    <p style={{ fontSize: 11.5, color: col.muted, margin: '6px 0 0' }}>{tr("groupClassesTab.invitedHint")}</p>
+                  </div>
+                )}
               </div>
               <div>
                 <label style={{ fontSize: 12, fontWeight: 800, color: col.muted, textTransform: 'uppercase', letterSpacing: '.06em' }}>{tr("groupClassesTab.tagsCommaSeparated")}</label>
@@ -428,7 +505,9 @@ export default function GroupClassesTab({ isDarkMode }) {
               <option value="">{tr("groupClassesTab.selectStudent")}</option>
               {students
                 .filter(s => !enrollTarget.enrollments?.some(e => (e.studentId?._id || e.studentId)?.toString() === s._id?.toString()))
-                .map(s => <option key={s._id} value={s._id}>{tr("groupClassesTab.credits", { firstName: s.firstName, lastName: s.lastName, classCredits: s.classCredits })}</option>)}
+                .map(s => <option key={s._id} value={s._id}>{enrollTarget.paymentType === 'points'
+                  ? tr("groupClassesTab.studentPoints", { firstName: s.firstName, lastName: s.lastName, count: s.groupPoints || 0 })
+                  : tr("groupClassesTab.credits", { firstName: s.firstName, lastName: s.lastName, classCredits: s.classCredits })}</option>)}
             </select>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
               <button onClick={() => setEnrollTarget(null)} style={btn(isDarkMode ? '#2a2d40' : '#f5f0ec', col.body)}>{tr("groupClassesTab.cancel")}</button>

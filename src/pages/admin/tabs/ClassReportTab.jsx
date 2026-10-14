@@ -286,7 +286,7 @@ ${r.summary}`;
       )}
 
       {toast && (
-        <div style={{ position: "fixed", bottom: 24, right: 24, padding: "12px 20px", background: "#1a1d2e", color: "#fff", borderRadius: 12, fontWeight: 700, zIndex: 9999 }}>
+        <div className="ui-toast-in" role="status" style={{ position: "fixed", bottom: 24, right: 24, padding: "12px 20px", background: "#1a1d2e", color: "#fff", borderRadius: 12, fontWeight: 700, zIndex: 9999 }}>
           {toast}
         </div>
       )}

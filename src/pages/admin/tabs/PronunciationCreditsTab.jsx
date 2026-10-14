@@ -124,7 +124,7 @@ export default function PronunciationCreditsTab({ isDarkMode }) {
 
       {/* Toast */}
       {toast && (
-        <div style={{
+        <div className="ui-toast-in" role="status" style={{
           position: "fixed", top: 24, right: 24, zIndex: 9999,
           padding: "12px 22px", borderRadius: 14, fontWeight: 700, fontSize: 14,
           background: toast.type === "error" ? "#fee2e2" : "#dcfce7",

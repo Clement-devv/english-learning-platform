@@ -70,13 +70,13 @@ function PayAllModal({ target, onConfirm, onCancel, isDarkMode }) {
         <div className="flex gap-3">
           <button
             onClick={onCancel}
-            className={`flex-1 py-2.5 rounded-xl text-sm font-semibold border transition-all ${isDarkMode ? "border-gray-600 text-gray-300 hover:bg-gray-700" : "border-gray-300 text-gray-700 hover:bg-gray-50"}`}
+            className={`flex-1 py-2.5 rounded-xl text-sm font-semibold border transition ${isDarkMode ? "border-gray-600 text-gray-300 hover:bg-gray-700" : "border-gray-300 text-gray-700 hover:bg-gray-50"}`}
           >
             {tr("paymentTab.cancel")}
           </button>
           <button
             onClick={onConfirm}
-            className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-emerald-600 hover:bg-emerald-700 text-white transition-all"
+            className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-emerald-600 hover:bg-emerald-700 text-white transition"
           >{tr("paymentTab.pay", { fmtMoney: fmtMoney(pendingAmount, sym) })}
           </button>
         </div>
@@ -262,7 +262,7 @@ export default function PaymentsTab({ isDarkMode }) {
 
       {/* Toast */}
       {toast && (
-        <div className="fixed top-4 right-4 bg-green-600 text-white px-6 py-3 rounded-lg shadow-lg z-50 animate-fade-in">
+        <div className="fixed top-4 right-4 bg-green-600 text-white px-6 py-3 rounded-lg shadow-lg z-50 ui-toast-in" role="status">
           {toast}
         </div>
       )}

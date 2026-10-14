@@ -16,7 +16,7 @@ export const bookingSchema = new mongoose.Schema({
   notes:              { type: String, default: '' },
   createdBy:          { type: String, enum: ['admin', 'teacher', 'student'], default: 'admin' },
   createdByUserId:    { type: mongoose.Schema.Types.ObjectId, refPath: 'createdByUserModel' },
-  createdByUserModel: { type: String, enum: ['Admin', 'Teacher', 'Student'] },
+  createdByUserModel: { type: String, enum: ['Admin', 'Teacher', 'Student', 'SubAdmin'] },
   rejectionReason:    { type: String, default: '' },
   markedBy:           { type: String, enum: ['admin', 'classroom', 'system', 'teacher'], default: null },
   missedReason:       { type: String, default: '' },
@@ -92,6 +92,7 @@ export const bookingSchema = new mongoose.Schema({
       status:    { type: String, enum: ['pending', 'processing', 'approved', 'rejected'] },
       decidedAt: Date,
       decidedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin' },
+      decidedByRole: { type: String, enum: ['admin', 'sub-admin'] }, // who reviewed it (decidedBy is that person's id)
       note:      { type: String, maxlength: 500, default: '' },
     },
   },

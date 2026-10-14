@@ -123,7 +123,7 @@ export default function ParentChecksTab({ isDarkMode }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
       {toast && (
-        <div role="status" style={{ position: "fixed", top: 24, right: 24, zIndex: 9999, padding: "12px 18px", borderRadius: 12, fontWeight: 600, fontSize: 14,
+        <div className="ui-toast-in" role="status" style={{ position: "fixed", top: 24, right: 24, zIndex: 9999, padding: "12px 18px", borderRadius: 12, fontWeight: 600, fontSize: 14,
           background: toast.type === "error" ? "#fee2e2" : "#dcfce7", color: toast.type === "error" ? "#b91c1c" : "#15803d", boxShadow: "0 4px 20px rgba(0,0,0,.12)" }}>
           {toast.msg}
         </div>

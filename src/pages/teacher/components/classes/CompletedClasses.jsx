@@ -397,7 +397,7 @@ export default function CompletedClassesTab({ teacherInfo, isDarkMode, students 
                     <div className="flex-1">
                       {/* Title + status badge */}
                       <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className={`font-semibold ${text}`}>{cls.title}</h3>
+                        <h3 className={`font-semibold ${text}`}>{cls.title}{cls.isGroupClass && <span className="ml-2 inline-block text-xs font-semibold px-2 py-0.5 rounded-full bg-sky-100 text-sky-700">👥 Group class{cls.officiallyCompleted ? ` · ${cls.attended || 0} attended` : ""}</span>}</h3>
                         {isNotCompleted ? (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-700 border border-red-200">
                             <XCircle className="w-3 h-3" />
@@ -467,7 +467,7 @@ export default function CompletedClassesTab({ teacherInfo, isDarkMode, students 
                   </div>
 
                   {/* Raise Dispute button — only for not-completed classes */}
-                  {isNotCompleted && (
+                  {isNotCompleted && !cls.isGroupClass && (
                     <div className="flex-shrink-0">
                       {alreadyDisputed ? (
                         <span className={`text-xs px-3 py-1.5 rounded-lg border ${
