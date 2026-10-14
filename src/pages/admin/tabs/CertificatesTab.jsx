@@ -14,13 +14,13 @@ const fmtDate = (iso) =>
 export default function CertificatesTab({ isDarkMode }) {
   const { t: tr } = useTranslation("admin");
   const col = {
-    card:    isDarkMode ? '#1a1d2e' : '#ffffff',
-    border:  isDarkMode ? '#2a2d40' : '#ffe8cc',
-    heading: isDarkMode ? '#f0f4ff' : '#3d2e20',
-    body:    isDarkMode ? '#c8cce0' : '#5a4a3a',
-    muted:   isDarkMode ? '#6b7090' : '#a89480',
-    accent:  isDarkMode ? '#fbbf24' : '#f97316',
-    input:   isDarkMode ? '#0f1117' : '#fff8f0',
+    card:    'var(--a-surface)',
+    border:  'var(--a-line)',
+    heading: 'var(--a-ink)',
+    body:    'var(--a-ink-2)',
+    muted:   'var(--a-muted)',
+    accent:  'var(--a-accent-ink)',
+    input:   'var(--a-raised)',
   };
 
   const [certs,       setCerts]       = useState([]);
@@ -100,7 +100,7 @@ export default function CertificatesTab({ isDarkMode }) {
   };
 
   const inp  = { width: '100%', background: col.input, border: `1.5px solid ${col.border}`, borderRadius: 12, padding: '9px 12px', fontSize: 14, color: col.body, fontFamily: F, outline: 'none' };
-  const btn  = (grad, text='#fff', disabled=false) => ({ background: disabled ? (isDarkMode ? '#2a2d40' : '#f5f0ec') : grad, color: disabled ? col.muted : text, border: 'none', borderRadius: 12, padding: '8px 16px', fontSize: 13, fontWeight: 800, cursor: disabled ? 'default' : 'pointer', fontFamily: F, display: 'flex', alignItems: 'center', gap: 5 });
+  const btn  = (grad, text='#fff', disabled=false) => ({ background: disabled ? ('var(--a-raised)') : grad, color: disabled ? col.muted : text, border: 'none', borderRadius: 12, padding: '8px 16px', fontSize: 13, fontWeight: 800, cursor: disabled ? 'default' : 'pointer', fontFamily: F, display: 'flex', alignItems: 'center', gap: 5 });
 
   const filtered = certs.filter(c => {
     if (!search) return true;
@@ -123,8 +123,8 @@ export default function CertificatesTab({ isDarkMode }) {
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder={tr("certificatesTab.searchStudentOrCert")}
             style={{ ...inp, paddingLeft: 30, width: 220 }} />
         </div>
-        <button onClick={load} style={{ ...btn(isDarkMode ? '#2a2d40' : '#f5f0ec', col.body), padding: '8px 10px' }}><RefreshCw size={14} /></button>
-        <button onClick={() => setShowAward(true)} style={btn('linear-gradient(135deg,#f97316,#f43f5e)')}>
+        <button onClick={load} style={{ ...btn('var(--a-ink)', col.body), padding: '8px 10px' }}><RefreshCw size={14} /></button>
+        <button onClick={() => setShowAward(true)} style={btn('var(--a-accent)')}>
           <Plus size={14} /> {tr("certificatesTab.awardCertificate")}
         </button>
       </div>
@@ -147,7 +147,7 @@ export default function CertificatesTab({ isDarkMode }) {
       ) : (
         <div style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: 20, overflow: 'hidden' }}>
           {/* Table header */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr 1fr 100px 90px 80px', gap: 12, padding: '10px 18px', background: isDarkMode ? 'rgba(255,255,255,0.03)' : '#fff8f0', borderBottom: `1.5px solid ${col.border}`, fontSize: 11, fontWeight: 800, color: col.muted, textTransform: 'uppercase', letterSpacing: '.06em' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr 1fr 100px 90px 80px', gap: 12, padding: '10px 18px', background: 'var(--a-raised)', borderBottom: `1.5px solid ${col.border}`, fontSize: 11, fontWeight: 800, color: col.muted, textTransform: 'uppercase', letterSpacing: '.06em' }}>
             <span>{tr("certificatesTab.student")}</span><span>{tr("certificatesTab.certificate")}</span><span>{tr("certificatesTab.cert")}</span><span>{tr("certificatesTab.issued2")}</span><span>{tr("certificatesTab.type")}</span><span>{tr("certificatesTab.actions")}</span>
           </div>
           {filtered.map(cert => {
@@ -164,7 +164,7 @@ export default function CertificatesTab({ isDarkMode }) {
                 </div>
                 <span style={{ fontSize: 11, fontFamily: 'monospace', color: col.muted }}>{cert.certificateNumber}</span>
                 <span style={{ fontSize: 12, color: col.muted }}>{fmtDate(cert.issuedAt)}</span>
-                <span style={{ fontSize: 11, fontWeight: 700, background: cert.type === 'manual' ? (isDarkMode ? 'rgba(139,92,246,0.15)' : '#f3e8ff') : (isDarkMode ? 'rgba(16,185,129,0.12)' : '#f0fdf4'), color: cert.type === 'manual' ? '#8b5cf6' : '#16a34a', borderRadius: 999, padding: '3px 8px', textAlign: 'center' }}>
+                <span style={{ fontSize: 11, fontWeight: 700, background: cert.type === 'manual' ? ('var(--a-accent-soft)') : (isDarkMode ? 'rgba(16,185,129,0.12)' : '#f0fdf4'), color: cert.type === 'manual' ? 'var(--a-accent-ink)' : '#16a34a', borderRadius: 999, padding: '3px 8px', textAlign: 'center' }}>
                   {cert.type}
                 </span>
                 <div style={{ display: 'flex', gap: 4 }}>
@@ -214,8 +214,8 @@ export default function CertificatesTab({ isDarkMode }) {
               </div>
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
-              <button onClick={() => setShowAward(false)} style={btn(isDarkMode ? '#2a2d40' : '#f5f0ec', col.body)}>{tr("certificatesTab.cancel")}</button>
-              <button onClick={handleAward} disabled={awarding} style={btn('linear-gradient(135deg,#f97316,#f43f5e)')}>
+              <button onClick={() => setShowAward(false)} style={btn('var(--a-ink)', col.body)}>{tr("certificatesTab.cancel")}</button>
+              <button onClick={handleAward} disabled={awarding} style={btn('var(--a-accent)')}>
                 {awarding ? tr("certificatesTab.awarding") : tr("certificatesTab.awardCertificate")}
               </button>
             </div>

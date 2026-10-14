@@ -268,8 +268,8 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
       {/* ── Setup link banner (shown after invite / resend when email may not deliver) ── */}
       {setupLink && (
         <div style={{
-          background: isDarkMode ? "#1a1d27" : "#fff",
-          border: `1.5px solid ${isDarkMode ? "#2d3a5e" : "#c7d2fe"}`,
+          background: 'var(--a-surface)',
+          border: `1.5px solid ${'var(--a-accent-line)'}`,
           borderRadius: "14px", padding: "18px 20px",
           boxShadow: "0 4px 20px rgba(107,130,240,0.15)",
         }}>
@@ -277,7 +277,7 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
             <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
               <div style={{
                 width: "36px", height: "36px", borderRadius: "10px", flexShrink: 0,
-                background: "linear-gradient(135deg, #4f63d2, #6b82f0)",
+                background: "var(--a-accent-grad)",
                 display: "flex", alignItems: "center", justifyContent: "center",
               }}>
                 <Link size={16} color="white" />
@@ -311,11 +311,11 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
           }}>
             <div style={{
               flex: 1, padding: "10px 14px",
-              background: isDarkMode ? "#0f1117" : "#f0f4ff",
-              border: `1px solid ${isDarkMode ? "#1e2235" : "#dde3f8"}`,
+              background: 'var(--a-raised)',
+              border: `1px solid ${'var(--a-line)'}`,
               borderRadius: "10px",
               fontFamily: "monospace", fontSize: "12.5px",
-              color: isDarkMode ? "#a5b4fc" : "#4f46e5",
+              color: 'var(--a-accent-ink)',
               overflowX: "auto", whiteSpace: "nowrap",
               userSelect: "all",
             }}>
@@ -340,7 +340,7 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
           onClick={() => { setShowForm(!showForm); setEditTarget(null); setForm(blankForm); }}
           style={{
             display: "flex", alignItems: "center", gap: "8px",
-            background: showForm ? (isDarkMode ? "#1e2235" : "#eef1ff") : "linear-gradient(135deg, #4f63d2, #6b82f0)",
+            background: showForm ? ('var(--a-accent-soft)') : "var(--a-accent-grad)",
             color: showForm ? c.heading : "white",
             border: "none", borderRadius: "12px", padding: "10px 18px",
             fontSize: "14px", fontWeight: "700", cursor: "pointer",
@@ -407,8 +407,8 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
                     style={{
                       flex: 1, padding: "10px", borderRadius: "10px", border: "none", cursor: "pointer",
                       background: form.assignmentType === type
-                        ? "linear-gradient(135deg, #4f63d2, #6b82f0)"
-                        : (isDarkMode ? "#1e2235" : "#f0f4ff"),
+                        ? "var(--a-accent)"
+                        : ('var(--a-raised)'),
                       color: form.assignmentType === type ? "white" : c.text,
                       fontFamily: "inherit", fontSize: "13.5px", fontWeight: "700",
                       display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
@@ -434,8 +434,8 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
                       style={{
                         padding: "8px 16px", borderRadius: "20px", border: "none", cursor: "pointer",
                         background: form.region === r
-                          ? "linear-gradient(135deg, #4f63d2, #6b82f0)"
-                          : (isDarkMode ? "#1e2235" : "#f0f4ff"),
+                          ? "var(--a-accent)"
+                          : ('var(--a-raised)'),
                         color: form.region === r ? "white" : c.text,
                         fontFamily: "inherit", fontSize: "13px", fontWeight: "700",
                         textTransform: "capitalize",
@@ -455,7 +455,7 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
                 <div style={{
                   border: `1.5px solid ${c.border}`, borderRadius: "12px",
                   maxHeight: "200px", overflowY: "auto", padding: "8px",
-                  background: isDarkMode ? "#0f1117" : "#f8faff",
+                  background: 'var(--a-raised)',
                 }} className="sa-scroll">
                   {allTeachers.length === 0 ? (
                     <p style={{ padding: "12px", fontSize: "13px", color: c.muted, textAlign: "center" }}>
@@ -472,14 +472,14 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
                           style={{
                             display: "flex", alignItems: "center", gap: "10px",
                             padding: "8px 10px", borderRadius: "8px", cursor: "pointer",
-                            background: selected ? (isDarkMode ? "#1e2540" : "#eef1ff") : "transparent",
+                            background: selected ? ('var(--a-accent-soft)') : "transparent",
                             marginBottom: "2px",
                           }}
                         >
                           <div style={{
                             width: "18px", height: "18px", borderRadius: "5px", flexShrink: 0,
-                            background: selected ? "#6b82f0" : "transparent",
-                            border: `2px solid ${selected ? "#6b82f0" : c.border}`,
+                            background: selected ? "var(--a-accent-grad)" : "transparent",
+                            border: `2px solid ${selected ? "var(--a-accent)" : c.border}`,
                             display: "flex", alignItems: "center", justifyContent: "center",
                           }}>
                             {selected && <CheckCircle size={12} color="white" />}
@@ -512,15 +512,15 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
                       display: "flex", alignItems: "center", gap: "10px",
                       padding: "12px", borderRadius: "10px", cursor: "pointer",
                       background: form.permissions[key]
-                        ? (isDarkMode ? "#1e2540" : "#eef1ff")
-                        : (isDarkMode ? "#0f1117" : "#f8faff"),
-                      border: `1.5px solid ${form.permissions[key] ? "#6b82f0" : c.border}`,
+                        ? ('var(--a-accent-soft)')
+                        : ('var(--a-raised)'),
+                      border: `1.5px solid ${form.permissions[key] ? "var(--a-accent)" : c.border}`,
                     }}
                   >
                     <div style={{
                       width: "20px", height: "20px", borderRadius: "6px", flexShrink: 0,
-                      background: form.permissions[key] ? "#6b82f0" : "transparent",
-                      border: `2px solid ${form.permissions[key] ? "#6b82f0" : c.border}`,
+                      background: form.permissions[key] ? "var(--a-accent-grad)" : "transparent",
+                      border: `2px solid ${form.permissions[key] ? "var(--a-accent)" : c.border}`,
                       display: "flex", alignItems: "center", justifyContent: "center",
                     }}>
                       {form.permissions[key] && <CheckCircle size={13} color="white" />}
@@ -551,7 +551,7 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
               type="submit"
               disabled={actionLoading["form"]}
               style={{
-                background: "linear-gradient(135deg, #4f63d2, #6b82f0)",
+                background: "var(--a-accent-grad)",
                 color: "white", border: "none", borderRadius: "12px",
                 padding: "14px", fontSize: "15px", fontWeight: "700",
                 cursor: "pointer", fontFamily: "inherit",
@@ -574,7 +574,7 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
       {/* ── Search ── */}
       <div style={{
         display: "flex", alignItems: "center", gap: "8px",
-        background: isDarkMode ? "#1a1d2e" : "#f0f4ff",
+        background: 'var(--a-raised)',
         border: `1.5px solid ${c.border}`, borderRadius: "12px", padding: "0 14px",
       }}>
         <Search size={15} color={c.muted} />
@@ -593,7 +593,7 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
       {/* ── Stats row ── */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "12px" }}>
         {[
-          { label: tr("subAdminsTab.total"),     value: subAdmins.length,                                    color: "#6b82f0" },
+          { label: tr("subAdminsTab.total"),     value: subAdmins.length,                                    color: "var(--a-accent-ink)" },
           { label: tr("subAdminsTab.active"),    value: subAdmins.filter((s) => s.status === "active").length,  color: "#10b981" },
           { label: tr("subAdminsTab.pending"),   value: subAdmins.filter((s) => s.status === "pending").length, color: "#f59e0b" },
         ].map(({ label, value, color }) => (
@@ -611,16 +611,16 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
       {/* ── List ── */}
       {loading ? (
         <div style={{ textAlign: "center", padding: "60px 0" }}>
-          <div className="sa-spin" style={{ width: "32px", height: "32px", border: `3px solid ${c.border}`, borderTopColor: "#6b82f0", borderRadius: "50%", margin: "0 auto 12px" }} />
+          <div className="sa-spin" style={{ width: "32px", height: "32px", border: `3px solid ${c.border}`, borderTopColor: "var(--a-accent)", borderRadius: "50%", margin: "0 auto 12px" }} />
           <p style={{ fontSize: "13px", color: c.muted }}>{tr("subAdminsTab.loading")}</p>
         </div>
       ) : filtered.length === 0 ? (
         <div style={{ textAlign: "center", padding: "60px 0" }}>
-          <Shield size={40} color={isDarkMode ? "#1e2235" : "#e2e8f0"} style={{ margin: "0 auto 12px" }} />
+          <Shield size={40} color={'var(--a-ink)'} style={{ margin: "0 auto 12px" }} />
           <p style={{ fontSize: "15px", fontWeight: "600", color: c.muted, margin: "0 0 6px" }}>
             {searchQuery ? tr("subAdminsTab.noResultsFound") : tr("subAdminsTab.noSubAdminsYet")}
           </p>
-          <p style={{ fontSize: "13px", color: isDarkMode ? "#252840" : "#d0d5ea", margin: 0 }}>
+          <p style={{ fontSize: "13px", color: 'var(--a-ink-2)', margin: 0 }}>
             {searchQuery ? tr("subAdminsTab.tryADifferentSearch") : tr("subAdminsTab.clickInviteSubAdminTo")}
           </p>
         </div>
@@ -644,7 +644,7 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
                   {/* Avatar */}
                   <div style={{
                     width: "44px", height: "44px", borderRadius: "13px", flexShrink: 0,
-                    background: "linear-gradient(135deg, #4f63d2, #6b82f0)",
+                    background: "var(--a-accent-grad)",
                     display: "flex", alignItems: "center", justifyContent: "center",
                     fontSize: "15px", fontWeight: "800", color: "white",
                     boxShadow: "0 4px 12px rgba(107,130,240,0.3)",
@@ -673,7 +673,7 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
                         onClick={() => handleResendInvite(sa)}
                         loading={actionLoading[sa._id + "_resend"]}
                         title={tr("subAdminsTab.resendInvite")}
-                        color="#6b82f0"
+                        color="var(--a-accent-ink)"
                         isDarkMode={isDarkMode}
                       >
                         <Send size={14} />
@@ -728,7 +728,7 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
                   <div style={{
                     borderTop: `1px solid ${c.border}`,
                     padding: "16px 20px",
-                    background: isDarkMode ? "#0f1117" : "#f8faff",
+                    background: 'var(--a-raised)',
                   }}>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
 
@@ -749,7 +749,7 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
                               <div key={t._id} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                                 <div style={{
                                   width: "28px", height: "28px", borderRadius: "8px",
-                                  background: "linear-gradient(135deg, #3b82f6, #6b82f0)",
+                                  background: "var(--a-accent-grad)",
                                   display: "flex", alignItems: "center", justifyContent: "center",
                                   fontSize: "11px", fontWeight: "700", color: "white",
                                 }}>
@@ -788,7 +788,7 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
                       <p style={{
                         margin: "12px 0 0", fontSize: "13px", color: c.muted,
                         padding: "10px 14px",
-                        background: isDarkMode ? "#1a1d2e" : "#eef0ff",
+                        background: 'var(--a-accent-soft)',
                         borderRadius: "10px",
                         fontStyle: "italic",
                       }}>
@@ -826,7 +826,7 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
             onClick={() => setAssignModal(null)}
           >
             <div style={{
-              background: isDarkMode ? "#1a1d27" : "#ffffff",
+              background: 'var(--a-surface)',
               border: `1px solid ${c.border}`,
               borderRadius: "20px", width: "100%", maxWidth: "480px",
               boxShadow: "0 24px 64px rgba(0,0,0,0.35)",
@@ -860,7 +860,7 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
               <div style={{ padding: "14px 24px 0" }}>
                 <div style={{
                   display: "flex", alignItems: "center", gap: "8px",
-                  background: isDarkMode ? "#0f1117" : "#f0f4ff",
+                  background: 'var(--a-raised)',
                   border: `1.5px solid ${c.border}`, borderRadius: "10px",
                   padding: "0 12px",
                 }}>
@@ -901,7 +901,7 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
                         display: "flex", alignItems: "center", gap: "12px",
                         padding: "10px 12px", borderRadius: "10px", cursor: "pointer",
                         background: isSelected
-                          ? (isDarkMode ? "#1e2540" : "#eef1ff")
+                          ? ('var(--a-accent-soft)')
                           : "transparent",
                         marginBottom: "2px",
                         transition: "background 0.12s",
@@ -910,8 +910,8 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
                       {/* Checkbox */}
                       <div style={{
                         width: "20px", height: "20px", borderRadius: "6px", flexShrink: 0,
-                        background: isSelected ? "#6b82f0" : "transparent",
-                        border: `2px solid ${isSelected ? "#6b82f0" : c.border}`,
+                        background: isSelected ? "var(--a-accent-grad)" : "transparent",
+                        border: `2px solid ${isSelected ? "var(--a-accent)" : c.border}`,
                         display: "flex", alignItems: "center", justifyContent: "center",
                         transition: "all 0.12s",
                       }}>
@@ -921,7 +921,7 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
                       {/* Avatar */}
                       <div style={{
                         width: "36px", height: "36px", borderRadius: "10px", flexShrink: 0,
-                        background: "linear-gradient(135deg, #3b82f6, #6b82f0)",
+                        background: "var(--a-accent-grad)",
                         display: "flex", alignItems: "center", justifyContent: "center",
                         fontSize: "12px", fontWeight: "700", color: "white",
                       }}>
@@ -962,7 +962,7 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
                   disabled={actionLoading[sa._id + "_assign"]}
                   style={{
                     flex: 2, padding: "11px",
-                    background: "linear-gradient(135deg, #4f63d2, #6b82f0)",
+                    background: "var(--a-accent-grad)",
                     border: "none", borderRadius: "10px", cursor: "pointer",
                     color: "white", fontSize: "13.5px", fontWeight: "700", fontFamily: "inherit",
                     boxShadow: "0 4px 14px rgba(107,130,240,0.35)",
@@ -986,7 +986,7 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
         .sa-spin { animation: sa-rotate 0.8s linear infinite; }
         @keyframes sa-rotate { to { transform: rotate(360deg); } }
         .sa-scroll::-webkit-scrollbar { width: 4px; }
-        .sa-scroll::-webkit-scrollbar-thumb { background: ${isDarkMode ? "#1e2235" : "#dde3f8"}; border-radius: 4px; }
+        .sa-scroll::-webkit-scrollbar-thumb { background: ${'var(--a-raised)'}; border-radius: 4px; }
       `}</style>
     </div>
   );
@@ -1001,7 +1001,7 @@ function ActionBtn({ onClick, loading, title, color, isDarkMode, children }) {
       style={{
         width: "32px", height: "32px", borderRadius: "8px", border: "none",
         cursor: loading ? "not-allowed" : "pointer",
-        background: isDarkMode ? "#1a1d2e" : "#f0f4ff",
+        background: 'var(--a-raised)',
         color, display: "flex", alignItems: "center", justifyContent: "center",
         opacity: loading ? 0.6 : 1, transition: "background 0.15s",
       }}
@@ -1032,7 +1032,7 @@ function CopyBtn({ url, isDarkMode }) {
         padding: "10px 16px", border: "none", borderRadius: "10px", cursor: "pointer",
         background: copied
           ? (isDarkMode ? "rgba(16,185,129,0.15)" : "#d1fae5")
-          : "linear-gradient(135deg, #4f63d2, #6b82f0)",
+          : "var(--a-accent)",
         color: copied ? "#10b981" : "white",
         fontSize: "13px", fontWeight: "700", fontFamily: "inherit",
         flexShrink: 0, transition: "all 0.2s",
@@ -1048,26 +1048,26 @@ function CopyBtn({ url, isDarkMode }) {
 const s = {
   label: (dark) => ({
     display: "block", fontSize: "11.5px", fontWeight: "700",
-    color: dark ? "#6b7280" : "#64748b",
+    color: 'var(--a-ink-2)',
     textTransform: "uppercase", letterSpacing: "0.07em",
     marginBottom: "8px",
   }),
   input: (dark) => ({
     width: "100%", padding: "11px 14px",
-    background: dark ? "#0f1117" : "#f8faff",
-    border: `1.5px solid ${dark ? "#1e2235" : "#e2e8f0"}`,
+    background: 'var(--a-raised)',
+    border: `1.5px solid ${'var(--a-line)'}`,
     borderRadius: "12px", fontSize: "14px",
-    color: dark ? "#e2e8f0" : "#1e293b",
+    color: 'var(--a-ink)',
     fontFamily: "inherit", outline: "none",
   }),
 };
 
 function palette(dark) {
   return {
-    card:    dark ? "#1a1d27" : "#ffffff",
-    border:  dark ? "#1e2235" : "#e8ecf4",
-    heading: dark ? "#e2e8f0" : "#1e293b",
-    text:    dark ? "#94a3b8" : "#475569",
-    muted:   dark ? "#374151" : "#94a3b8",
+    card:    'var(--a-surface)',
+    border:  'var(--a-line)',
+    heading: 'var(--a-ink)',
+    text:    'var(--a-ink-2)',
+    muted:   'var(--a-muted)',
   };
 }

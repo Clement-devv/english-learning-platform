@@ -10,7 +10,7 @@ import api from "../../../api";
 import { useTranslation } from "react-i18next";
 import { dateLocale } from "../../../i18n/dateLocale.js";
 
-const BRAND = "var(--brand-primary, #2563eb)";
+const BRAND = "var(--a-accent)";
 const fmtWhen = (d) => new Date(d).toLocaleString(dateLocale(), { weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
 
 export default function StudentNotifyModal({ student, isDarkMode, onClose, notify }) {
@@ -22,8 +22,8 @@ export default function StudentNotifyModal({ student, isDarkMode, onClose, notif
   const [error, setError]       = useState("");
 
   const c = isDarkMode
-    ? { card: "#1a1d2e", border: "#2a2d40", heading: "#f0f4ff", body: "#c8cce0", muted: "#8b91b8", input: "#0f1117", soft: "#141620" }
-    : { card: "#ffffff", border: "#e2e8f0", heading: "#1e293b", body: "#475569", muted: "#94a3b8", input: "#f8faff", soft: "#f8fafc" };
+    ? { card: "var(--a-raised)", border: "var(--a-line)", heading: "var(--a-ink)", body: "var(--a-ink-2)", muted: "var(--a-muted)", input: "var(--a-bg)", soft: "var(--a-surface)" }
+    : { card: "var(--a-surface)", border: "var(--a-line)", heading: "var(--a-ink)", body: "var(--a-ink-2)", muted: "var(--a-muted)", input: "var(--a-raised)", soft: "var(--a-raised)" };
 
   const load = () => api.get(`/students/${student._id}/notify-settings`)
     .then(({ data }) => { setSettings(data.settings); setEmail(data.settings.notifyEmail || ""); })

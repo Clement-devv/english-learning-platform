@@ -19,7 +19,7 @@ const STATUS_META = {
   pending:  { get label() { return ta("referralsTab.status.pending"); },  color: "#f59e0b", bg: "#fef3c7" },
   invited:  { get label() { return ta("referralsTab.status.invited"); },  color: "#3b82f6", bg: "#eff6ff" },
   active:   { get label() { return ta("referralsTab.status.active"); },   color: "#16a34a", bg: "#f0fdf4" },
-  rejected: { get label() { return ta("referralsTab.status.rejected"); }, color: "#94a3b8", bg: "#f1f5f9" },
+  rejected: { get label() { return ta("referralsTab.status.rejected"); }, color: "var(--a-muted)", bg: "var(--a-raised)" },
 };
 
 export default function ReferralsTab({ isDarkMode }) {
@@ -30,11 +30,11 @@ export default function ReferralsTab({ isDarkMode }) {
   const [busy,      setBusy]      = useState({});
   const [toast,     setToast]     = useState(null);
 
-  const bg    = isDarkMode ? "#0f172a" : "#f8fafc";
-  const card  = isDarkMode ? "#1e293b" : "#ffffff";
-  const border= isDarkMode ? "#334155" : "#e2e8f0";
-  const text  = isDarkMode ? "#e2e8f0" : "#1e293b";
-  const muted = isDarkMode ? "#94a3b8" : "#64748b";
+  const bg    = 'var(--a-raised)';
+  const card  = 'var(--a-surface)';
+  const border= 'var(--a-line)';
+  const text  = 'var(--a-ink)';
+  const muted = 'var(--a-ink-2)';
 
   function showToast(msg, ok = true) {
     setToast({ msg, ok });

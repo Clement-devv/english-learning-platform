@@ -53,15 +53,15 @@ function SearchableSelect({ options, value, onChange, placeholder, isDarkMode, g
 
   const dm = isDarkMode;
   const triggerCls = dm
-    ? "bg-[#13161f] border-[#2a2f45] text-slate-100 hover:border-violet-500"
-    : "bg-white border-slate-300 text-slate-900 hover:border-violet-500";
-  const dropdownCls = dm ? "bg-[#1a1d27] border-[#2a2f45]" : "bg-white border-slate-200";
-  const searchCls   = dm ? "bg-[#13161f] border-[#2a2f45] text-slate-100 placeholder-slate-500"
-                         : "bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400";
-  const mutedCls    = dm ? "text-slate-400" : "text-slate-500";
-  const hoverCls    = dm ? "hover:bg-[#252d4a]" : "hover:bg-slate-50";
-  const activeCls   = dm ? "bg-violet-900/40 text-violet-300" : "bg-violet-50 text-violet-700";
-  const avatarCls   = dm ? "bg-violet-900/50 text-violet-300" : "bg-violet-100 text-violet-600";
+    ? "bg-[var(--a-surface)] border-[var(--a-line)] text-stone-100 hover:border-ad-accent"
+    : "bg-white border-stone-300 text-stone-900 hover:border-ad-accent";
+  const dropdownCls = dm ? "bg-[var(--a-surface)] border-[var(--a-line)]" : "bg-white border-stone-200";
+  const searchCls   = dm ? "bg-[var(--a-surface)] border-[var(--a-line)] text-stone-100 placeholder-stone-500"
+                         : "bg-stone-50 border-stone-200 text-stone-900 placeholder-stone-400";
+  const mutedCls    = dm ? "text-stone-400" : "text-stone-500";
+  const hoverCls    = dm ? "hover:bg-[var(--a-raised)]" : "hover:bg-stone-50";
+  const activeCls   = dm ? "bg-ad-accent-soft text-ad-accent-ink" : "bg-ad-accent-soft text-ad-accent-ink";
+  const avatarCls   = dm ? "bg-ad-accent-soft text-ad-accent-ink" : "bg-ad-accent-soft text-ad-accent-ink";
 
   return (
     <div ref={containerRef} className="relative w-full">
@@ -69,7 +69,7 @@ function SearchableSelect({ options, value, onChange, placeholder, isDarkMode, g
         type="button"
         onClick={() => !disabled && setOpen((p) => !p)}
         disabled={disabled}
-        className={`w-full flex items-center justify-between rounded-lg border px-3 py-2.5 text-sm transition focus:outline-none focus:ring-2 focus:ring-violet-500/30 disabled:opacity-50 disabled:cursor-not-allowed ${triggerCls}`}
+        className={`w-full flex items-center justify-between rounded-lg border px-3 py-2.5 text-sm transition focus:outline-none focus:ring-2 focus:ring-ad-accent disabled:opacity-50 disabled:cursor-not-allowed ${triggerCls}`}
       >
         <span className={selected ? "" : mutedCls}>
           {selected ? getLabel(selected) : placeholder}
@@ -86,7 +86,7 @@ function SearchableSelect({ options, value, onChange, placeholder, isDarkMode, g
 
       {open && (
         <div className={`absolute z-50 mt-1 w-full rounded-xl border shadow-xl overflow-hidden ${dropdownCls}`}>
-          <div className={`p-2 border-b ${dm ? "border-[#2a2f45]" : "border-slate-100"}`}>
+          <div className={`p-2 border-b ${dm ? "border-[var(--a-line)]" : "border-stone-100"}`}>
             <div className={`flex items-center gap-2 rounded-lg border px-2.5 py-1.5 ${searchCls}`}>
               <Search size={13} className={mutedCls} />
               <input
@@ -128,7 +128,7 @@ function SearchableSelect({ options, value, onChange, placeholder, isDarkMode, g
             )}
           </div>
 
-          <div className={`px-3 py-1.5 text-xs border-t ${mutedCls} ${dm ? "border-[#2a2f45]" : "border-slate-100"}`}>
+          <div className={`px-3 py-1.5 text-xs border-t ${mutedCls} ${dm ? "border-[var(--a-line)]" : "border-stone-100"}`}>
             {tr("bookingsTab.of", { filteredCount: filtered.length, optionsCount: options.length })}
           </div>
         </div>
@@ -157,21 +157,21 @@ export default function BookingsTab({ teachers = [], students = [], onNotify, is
   // ── theme ───────────────────────────────────────────────────────────────────
   const dm = isDarkMode;
   const th = {
-    page:       dm ? "bg-[#0f1117] text-slate-100"          : "bg-slate-50 text-slate-900",
-    card:       dm ? "bg-[#1a1d27] border-[#1e2235]"        : "bg-white border-slate-200",
-    cardHead:   dm ? "bg-[#13161f] border-[#1e2235]"        : "bg-slate-50 border-slate-200",
-    input:      dm ? "bg-[#13161f] border-[#2a2f45] text-slate-100 placeholder-slate-500 focus:border-violet-500"
-                   : "bg-white border-slate-300 text-slate-900 placeholder-slate-400 focus:border-violet-500",
+    page:       dm ? "bg-[var(--a-bg)] text-stone-100"          : "bg-stone-50 text-stone-900",
+    card:       dm ? "bg-[var(--a-surface)] border-[var(--a-line)]"        : "bg-white border-stone-200",
+    cardHead:   dm ? "bg-[var(--a-surface)] border-[var(--a-line)]"        : "bg-stone-50 border-stone-200",
+    input:      dm ? "bg-[var(--a-surface)] border-[var(--a-line)] text-stone-100 placeholder-stone-500 focus:border-ad-accent"
+                   : "bg-white border-stone-300 text-stone-900 placeholder-stone-400 focus:border-ad-accent",
     inputErr:   dm ? "border-red-500" : "border-red-400",
-    label:      dm ? "text-slate-300" : "text-slate-700",
-    muted:      dm ? "text-slate-400" : "text-slate-500",
-    divider:    dm ? "border-[#1e2235]" : "border-slate-200",
+    label:      dm ? "text-stone-300" : "text-stone-700",
+    muted:      dm ? "text-stone-400" : "text-stone-500",
+    divider:    dm ? "border-[var(--a-line)]" : "border-stone-200",
     infoCard:   dm ? "bg-blue-900/20 border-blue-800/40 text-blue-300" : "bg-blue-50 border-blue-200 text-blue-800",
     infoHeading:dm ? "text-blue-300" : "text-blue-900",
     warningBg:  dm ? "bg-amber-900/20 border-amber-800/40 text-amber-300" : "bg-amber-50 border-amber-200 text-amber-800",
-    modalBg:    dm ? "bg-[#1a1d27] border-[#1e2235]" : "bg-white border-slate-200",
-    modalHead:  dm ? "bg-[#13161f] border-[#1e2235]" : "bg-slate-50 border-slate-200",
-    clearBtn:   dm ? "border-[#2a2f45] text-slate-300 hover:bg-[#1e2235]" : "border-slate-300 text-slate-700 hover:bg-slate-50",
+    modalBg:    dm ? "bg-[var(--a-surface)] border-[var(--a-line)]" : "bg-white border-stone-200",
+    modalHead:  dm ? "bg-[var(--a-surface)] border-[var(--a-line)]" : "bg-stone-50 border-stone-200",
+    clearBtn:   dm ? "border-[var(--a-line)] text-stone-300 hover:bg-[var(--a-raised)]" : "border-stone-300 text-stone-700 hover:bg-stone-50",
   };
 
   const showToast = (message, type = "success") => {
@@ -240,7 +240,7 @@ export default function BookingsTab({ teachers = [], students = [], onNotify, is
   const noClassesLeft   = !isTrial && selectedStudent && selectedStudent.classCredits <= 0;
 
   const fieldCls = (key) =>
-    `w-full rounded-lg border px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 transition ${th.input} ${errors[key] ? th.inputErr : ""}`;
+    `w-full rounded-lg border px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ad-accent transition ${th.input} ${errors[key] ? th.inputErr : ""}`;
 
   return (
     <div className={`min-h-full p-6 ${th.page}`}>
@@ -257,7 +257,7 @@ export default function BookingsTab({ teachers = [], students = [], onNotify, is
       {/* ── Header ───────────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h2 className="text-2xl font-bold text-violet-500">{tr("bookingsTab.sendBookingRequest")}</h2>
+          <h2 className="text-2xl font-bold text-ad-accent-ink">{tr("bookingsTab.sendBookingRequest")}</h2>
           <p className={`text-sm mt-1 ${th.muted}`}>{tr("bookingsTab.createAClassRequestFor")}</p>
         </div>
         {allowRecurring && (
@@ -277,7 +277,7 @@ export default function BookingsTab({ teachers = [], students = [], onNotify, is
         {/* ── LEFT: Form ───────────────────────────────────────────────────── */}
         <div className={`flex-1 min-w-0 rounded-xl border overflow-hidden ${th.card}`}>
           <div className={`px-5 py-4 border-b flex items-center gap-2 ${th.cardHead} ${th.divider}`}>
-            <Plus size={16} className="text-violet-500" />
+            <Plus size={16} className="text-ad-accent-ink" />
             <span className="font-semibold text-sm">{tr("bookingsTab.bookingDetails")}</span>
           </div>
 
@@ -302,7 +302,7 @@ export default function BookingsTab({ teachers = [], students = [], onNotify, is
                     <div className={`text-sm ${isSelected ? "font-medium" : ""}`}>
                       {o.firstName} {o.lastName}
                     </div>
-                    <div className={`text-xs truncate ${dark ? "text-slate-500" : "text-slate-400"}`}>
+                    <div className={`text-xs truncate ${dark ? "text-stone-500" : "text-stone-400"}`}>
                       {o.email} · {o.continent}
                     </div>
                   </div>
@@ -331,7 +331,7 @@ export default function BookingsTab({ teachers = [], students = [], onNotify, is
                       <div className={`text-sm ${isSelected ? "font-medium" : ""}`}>
                         {o.firstName} {o.lastName}
                       </div>
-                      <div className={`text-xs ${dark ? "text-slate-500" : "text-slate-400"}`}>
+                      <div className={`text-xs ${dark ? "text-stone-500" : "text-stone-400"}`}>
                         {tr("bookingsTab.classRemaining", { classCredits: o.classCredits, value: o.classCredits !== 1 ? "es" : "" })}</div>
                     </div>
                     {o.classCredits <= 0 && (
@@ -440,21 +440,21 @@ export default function BookingsTab({ teachers = [], students = [], onNotify, is
               className={`flex items-center justify-between gap-3 px-4 py-3 rounded-xl border cursor-pointer select-none transition
                 ${isTrial
                   ? dm ? "bg-amber-900/20 border-amber-700/50" : "bg-amber-50 border-amber-300"
-                  : dm ? "bg-[#13161f] border-[#2a2f45] hover:border-amber-600/40" : "bg-white border-slate-200 hover:border-amber-300"
+                  : dm ? "bg-[var(--a-surface)] border-[var(--a-line)] hover:border-amber-600/40" : "bg-white border-stone-200 hover:border-amber-300"
                 }`}
             >
               <div className="flex items-center gap-3 min-w-0">
-                <FlaskConical size={16} className={isTrial ? "text-amber-500" : dm ? "text-slate-500" : "text-slate-400"} />
+                <FlaskConical size={16} className={isTrial ? "text-amber-500" : dm ? "text-stone-500" : "text-stone-400"} />
                 <div className="min-w-0">
-                  <div className={`text-sm font-semibold ${isTrial ? "text-amber-500" : dm ? "text-slate-200" : "text-slate-700"}`}>
+                  <div className={`text-sm font-semibold ${isTrial ? "text-amber-500" : dm ? "text-stone-200" : "text-stone-700"}`}>
                     {tr("bookingsTab.trialLesson")}
                   </div>
-                  <div className={`text-xs ${dm ? "text-slate-500" : "text-slate-400"}`}>
+                  <div className={`text-xs ${dm ? "text-stone-500" : "text-stone-400"}`}>
                     {tr("bookingsTab.noCreditDeductedNoPayment")}
                   </div>
                 </div>
               </div>
-              <div className={`w-10 h-5 rounded-full flex-shrink-0 transition-colors relative ${isTrial ? "bg-amber-500" : dm ? "bg-slate-700" : "bg-slate-300"}`}>
+              <div className={`w-10 h-5 rounded-full flex-shrink-0 transition-colors relative ${isTrial ? "bg-amber-500" : dm ? "bg-stone-700" : "bg-stone-300"}`}>
                 <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-[left] duration-200 ease-out ${isTrial ? "left-5" : "left-0.5"}`} />
               </div>
             </div>
@@ -464,7 +464,7 @@ export default function BookingsTab({ teachers = [], students = [], onNotify, is
               <button
                 onClick={handleSendBooking}
                 disabled={loading}
-                className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold transition"
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-ad-accent hover:bg-ad-accent-hover disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold transition"
               >
                 {loading ? (
                   <><Loader2 size={15} className="animate-spin" /> Sending…</>
@@ -488,7 +488,7 @@ export default function BookingsTab({ teachers = [], students = [], onNotify, is
         {/* ── RIGHT: Info card ─────────────────────────────────────────────── */}
         <div className="w-72 flex-shrink-0 space-y-4">
           {/* How it works */}
-          <div className={`rounded-xl border p-5 ${dm ? "bg-[#1a1d27] border-[#1e2235]" : "bg-white border-slate-200"}`}>
+          <div className={`rounded-xl border p-5 ${dm ? "bg-[var(--a-surface)] border-[var(--a-line)]" : "bg-white border-stone-200"}`}>
             <div className={`flex items-center gap-2 font-semibold text-sm mb-4 ${dm ? "text-blue-300" : "text-blue-700"}`}>
               <Info size={15} />
               {tr("bookingsTab.howItWorks")}
@@ -502,7 +502,7 @@ export default function BookingsTab({ teachers = [], students = [], onNotify, is
               ].map((step, i) => (
                 <li key={i} className="flex items-start gap-3">
                   <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5
-                    ${dm ? "bg-violet-900/50 text-violet-300" : "bg-violet-100 text-violet-600"}`}>
+                    ${dm ? "bg-ad-accent-soft text-ad-accent-ink" : "bg-ad-accent-soft text-ad-accent-ink"}`}>
                     {i + 1}
                   </span>
                   <span className={`text-xs leading-relaxed ${th.muted}`}>{step}</span>
@@ -512,7 +512,7 @@ export default function BookingsTab({ teachers = [], students = [], onNotify, is
           </div>
 
           {/* Quick tips */}
-          <div className={`rounded-xl border p-5 ${dm ? "bg-[#1a1d27] border-[#1e2235]" : "bg-white border-slate-200"}`}>
+          <div className={`rounded-xl border p-5 ${dm ? "bg-[var(--a-surface)] border-[var(--a-line)]" : "bg-white border-stone-200"}`}>
             <div className={`flex items-center gap-2 font-semibold text-sm mb-3 ${dm ? "text-amber-300" : "text-amber-700"}`}>
               <AlertCircle size={15} />
               {tr("bookingsTab.tips")}
@@ -539,7 +539,7 @@ export default function BookingsTab({ teachers = [], students = [], onNotify, is
               </div>
               <button
                 onClick={() => setShowRecurringForm(false)}
-                className={`p-2 rounded-lg transition ${dm ? "hover:bg-[#252d4a] text-slate-400" : "hover:bg-slate-100 text-slate-500"}`}
+                className={`p-2 rounded-lg transition ${dm ? "hover:bg-[var(--a-raised)] text-stone-400" : "hover:bg-stone-100 text-stone-500"}`}
               >
                 <X size={18} />
               </button>

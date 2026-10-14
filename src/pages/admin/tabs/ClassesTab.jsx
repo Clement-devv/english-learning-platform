@@ -67,7 +67,7 @@ function PresenceBadge({ session, dm }) {
     return (
       <div className="flex items-center gap-2 flex-wrap">
         <span className={`flex items-center gap-1.5 text-xs px-2 py-1 rounded-full
-          ${dm ? "bg-slate-800 text-slate-500" : "bg-slate-100 text-slate-400"}`}>
+          ${dm ? "bg-stone-800 text-stone-500" : "bg-stone-100 text-stone-400"}`}>
           <WifiOff size={11} /> {tr("classesTab.classroomNotOpenedYet")}
         </span>
       </div>
@@ -90,7 +90,7 @@ function PresenceBadge({ session, dm }) {
       : dm ? "bg-sky-900/40 text-sky-300 border border-sky-800/40"
            : "bg-sky-100 text-sky-700 border border-sky-200";
 
-    const colorAbsent   = dm ? "bg-slate-800 text-slate-500" : "bg-slate-100 text-slate-400";
+    const colorAbsent   = dm ? "bg-stone-800 text-stone-500" : "bg-stone-100 text-stone-400";
     const colorUncertain = dm ? "bg-amber-900/40 text-amber-300 border border-amber-800/40"
                               : "bg-amber-100 text-amber-700 border border-amber-200";
 
@@ -109,8 +109,8 @@ function PresenceBadge({ session, dm }) {
       {badge("student", studentStatus)}
       {both && (
         <span className={`flex items-center gap-1.5 text-xs px-2 py-1 rounded-full font-medium
-          ${dm ? "bg-violet-900/40 text-violet-300 border border-violet-800/40"
-               : "bg-violet-100 text-violet-700 border border-violet-200"}`}>
+          ${dm ? "bg-ad-accent-soft text-ad-accent-ink border border-ad-accent-line"
+               : "bg-ad-accent-soft text-ad-accent-ink border border-ad-accent-line"}`}>
           <CheckCircle2 size={11} /> {tr("classesTab.bothInClass")}
         </span>
       )}
@@ -139,11 +139,11 @@ function LiveTimer({ booking }) {
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between text-xs">
-        <span className="text-slate-400">{tr("classesTab.elapsed", { fmtTime: fmtTime(elapsed) })}</span>
-        <span className={`font-medium ${remaining < 300 ? "text-red-400" : "text-slate-400"}`}>
+        <span className="text-stone-400">{tr("classesTab.elapsed", { fmtTime: fmtTime(elapsed) })}</span>
+        <span className={`font-medium ${remaining < 300 ? "text-red-400" : "text-stone-400"}`}>
           {tr("classesTab.left", { fmtTime: fmtTime(remaining) })}</span>
       </div>
-      <div className="w-full h-1.5 rounded-full bg-slate-700/30 overflow-hidden">
+      <div className="w-full h-1.5 rounded-full bg-stone-700/30 overflow-hidden">
         <div className={`h-full rounded-full transition-[width] duration-300 ease-out ${barColor}`} style={{ width: `${pct}%` }} />
       </div>
     </div>
@@ -155,7 +155,7 @@ const PLATFORM_LABEL = { zoom: "Zoom", googlemeet: "Google Meet", agora: "Agora"
 const PLATFORM_COLOR = {
   zoom:       { bg: dm => dm ? "bg-blue-900/40 text-blue-300 border-blue-800/40"       : "bg-blue-100 text-blue-700 border-blue-200" },
   googlemeet: { bg: dm => dm ? "bg-emerald-900/40 text-emerald-300 border-emerald-800/40" : "bg-emerald-100 text-emerald-700 border-emerald-200" },
-  agora:      { bg: dm => dm ? "bg-violet-900/40 text-violet-300 border-violet-800/40"   : "bg-violet-100 text-violet-700 border-violet-200" },
+  agora:      { bg: dm => dm ? "bg-ad-accent-soft text-ad-accent-ink border-ad-accent-line"   : "bg-ad-accent-soft text-ad-accent-ink border-ad-accent-line" },
 };
 
 // ── Single live class card ────────────────────────────────────────────────────
@@ -179,9 +179,9 @@ function LiveClassCard({ booking, session, onJoinAgora, onJoinMeet, dm }) {
   const agoraActive = activeProvider === "agora";
 
   return (
-    <div className={`rounded-xl border overflow-hidden flex flex-col ${dm ? "bg-[#1a1d27] border-[#1e2235]" : "bg-white border-slate-200"}`}>
+    <div className={`rounded-xl border overflow-hidden flex flex-col ${dm ? "bg-[var(--a-surface)] border-[var(--a-line)]" : "bg-white border-stone-200"}`}>
       {/* Card header */}
-      <div className={`px-5 py-3 border-b flex items-center justify-between ${dm ? "bg-[#13161f] border-[#1e2235]" : "bg-slate-50 border-slate-100"}`}>
+      <div className={`px-5 py-3 border-b flex items-center justify-between ${dm ? "bg-[var(--a-surface)] border-[var(--a-line)]" : "bg-stone-50 border-stone-100"}`}>
         <div className="flex items-center gap-2.5">
           <span className="relative flex h-2.5 w-2.5">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
@@ -193,7 +193,7 @@ function LiveClassCard({ booking, session, onJoinAgora, onJoinMeet, dm }) {
               ? dm ? "bg-emerald-900/40 text-emerald-300" : "bg-emerald-100 text-emerald-700"
               : session
               ? dm ? "bg-amber-900/40 text-amber-300"     : "bg-amber-100 text-amber-700"
-              : dm ? "bg-slate-800 text-slate-500"        : "bg-slate-100 text-slate-500"}`}>
+              : dm ? "bg-stone-800 text-stone-500"        : "bg-stone-100 text-stone-500"}`}>
             {both ? tr("classesTab.bothPresent") : session ? tr("classesTab.waiting") : tr("classesTab.notOpened")}
           </span>
         </div>
@@ -205,7 +205,7 @@ function LiveClassCard({ booking, session, onJoinAgora, onJoinMeet, dm }) {
               {PLATFORM_LABEL[activeProvider]}
             </span>
           )}
-          <span className={`text-xs ${dm ? "text-slate-500" : "text-slate-400"}`}>{tr("classesTab.min", { duration: booking.duration })}</span>
+          <span className={`text-xs ${dm ? "text-stone-500" : "text-stone-400"}`}>{tr("classesTab.min", { duration: booking.duration })}</span>
         </div>
       </div>
 
@@ -214,7 +214,7 @@ function LiveClassCard({ booking, session, onJoinAgora, onJoinMeet, dm }) {
         <div>
           <h3 className="font-bold text-base leading-snug">{booking.classTitle}</h3>
           {booking.topic && (
-            <p className={`text-xs mt-0.5 ${dm ? "text-slate-400" : "text-slate-500"}`}>{booking.topic}</p>
+            <p className={`text-xs mt-0.5 ${dm ? "text-stone-400" : "text-stone-500"}`}>{booking.topic}</p>
           )}
         </div>
 
@@ -222,12 +222,12 @@ function LiveClassCard({ booking, session, onJoinAgora, onJoinMeet, dm }) {
         <div className="grid grid-cols-2 gap-2">
           {[
             { label: tr("classesTab.teacher"), name: teacherName,
-              bg: dm ? "bg-violet-900/50 text-violet-300" : "bg-violet-100 text-violet-600" },
+              bg: dm ? "bg-ad-accent-soft text-ad-accent-ink" : "bg-ad-accent-soft text-ad-accent-ink" },
             { label: tr("classesTab.student"), name: studentName,
               bg: dm ? "bg-emerald-900/50 text-emerald-300" : "bg-emerald-100 text-emerald-600" },
           ].map(({ label, name, bg }) => (
-            <div key={label} className={`rounded-lg p-3 ${dm ? "bg-[#13161f]" : "bg-slate-50"}`}>
-              <div className={`text-xs mb-1 ${dm ? "text-slate-500" : "text-slate-400"}`}>{label}</div>
+            <div key={label} className={`rounded-lg p-3 ${dm ? "bg-[var(--a-surface)]" : "bg-stone-50"}`}>
+              <div className={`text-xs mb-1 ${dm ? "text-stone-500" : "text-stone-400"}`}>{label}</div>
               <div className="flex items-center gap-2">
                 <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${bg}`}>
                   {name[0]?.toUpperCase()}
@@ -260,7 +260,7 @@ function LiveClassCard({ booking, session, onJoinAgora, onJoinMeet, dm }) {
             className={`flex items-center justify-center gap-2 py-2.5 rounded-xl text-white text-sm font-semibold transition
               ${zoomLink
                 ? "bg-[#2D8CFF] hover:bg-[#1a7de8] cursor-pointer"
-                : dm ? "bg-slate-700 text-slate-400 cursor-not-allowed" : "bg-slate-200 text-slate-400 cursor-not-allowed"}
+                : dm ? "bg-stone-700 text-stone-400 cursor-not-allowed" : "bg-stone-200 text-stone-400 cursor-not-allowed"}
               ${zoomActive ? "ring-2 ring-offset-1 ring-[#2D8CFF]" : ""}`}
           >
             <ExternalLink size={14} />
@@ -284,8 +284,8 @@ function LiveClassCard({ booking, session, onJoinAgora, onJoinMeet, dm }) {
         {/* Agora spectate row */}
         <button
           onClick={() => onJoinAgora(booking)}
-          className={`flex items-center justify-center gap-2 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold transition
-            ${agoraActive ? "ring-2 ring-offset-1 ring-violet-400" : ""}`}
+          className={`flex items-center justify-center gap-2 py-2.5 rounded-xl bg-ad-accent hover:bg-ad-accent-hover text-white text-sm font-semibold transition
+            ${agoraActive ? "ring-2 ring-offset-1 ring-ad-accent" : ""}`}
         >
           <Video size={14} />
           {agoraActive ? tr("classesTab.joinAgoraActive") : tr("classesTab.spectateViaAgora")}
@@ -293,7 +293,7 @@ function LiveClassCard({ booking, session, onJoinAgora, onJoinMeet, dm }) {
 
         {/* Fallback when no external links and provider not yet chosen */}
         {!zoomLink && !meetLink && !zoomActive && !meetActive && !activeProvider && (
-          <p className={`text-center text-xs mt-1 ${dm ? "text-slate-500" : "text-slate-400"}`}>
+          <p className={`text-center text-xs mt-1 ${dm ? "text-stone-500" : "text-stone-400"}`}>
             {tr("classesTab.noMeetZoomLinkSet")}
           </p>
         )}
@@ -324,21 +324,21 @@ function UpcomingRow({ booking, dm }) {
 
   return (
     <div className={`flex items-center gap-4 px-5 py-3.5 border-b last:border-b-0 transition
-      ${dm ? "border-[#1e2235] hover:bg-[#1e2235]" : "border-slate-100 hover:bg-slate-50"}`}>
-      <div className={`p-2 rounded-lg flex-shrink-0 ${dm ? "bg-violet-900/30 text-violet-400" : "bg-violet-100 text-violet-600"}`}>
+      ${dm ? "border-[var(--a-line)] hover:bg-[var(--a-raised)]" : "border-stone-100 hover:bg-stone-50"}`}>
+      <div className={`p-2 rounded-lg flex-shrink-0 ${dm ? "bg-ad-accent-soft text-ad-accent-ink" : "bg-ad-accent-soft text-ad-accent-ink"}`}>
         <BookOpen size={14} />
       </div>
       <div className="flex-1 min-w-0">
         <div className="font-medium text-sm truncate">{booking.classTitle}</div>
-        <div className={`text-xs mt-0.5 ${dm ? "text-slate-400" : "text-slate-500"}`}>
+        <div className={`text-xs mt-0.5 ${dm ? "text-stone-400" : "text-stone-500"}`}>
           {teacherName} → {studentName}
         </div>
       </div>
       <div className="text-right flex-shrink-0">
         <div className={`text-xs font-semibold ${dm ? "text-sky-400" : "text-sky-600"}`}>{tr("classesTab.in", { countdown })}</div>
-        <div className={`text-xs ${dm ? "text-slate-500" : "text-slate-400"}`}>{fmtDate(booking.scheduledTime)}</div>
+        <div className={`text-xs ${dm ? "text-stone-500" : "text-stone-400"}`}>{fmtDate(booking.scheduledTime)}</div>
       </div>
-      <span className={`text-xs px-2 py-1 rounded-full flex-shrink-0 ${dm ? "bg-slate-800 text-slate-400" : "bg-slate-100 text-slate-500"}`}>
+      <span className={`text-xs px-2 py-1 rounded-full flex-shrink-0 ${dm ? "bg-stone-800 text-stone-400" : "bg-stone-100 text-stone-500"}`}>
         {booking.duration}m
       </span>
     </div>
@@ -420,7 +420,7 @@ function AgoraModal({ booking, onClose, dm }) {
     <div className="fixed inset-0 bg-black/80 z-50 flex flex-col">
       {/* Header */}
       <div className={`flex items-center justify-between px-5 py-3 border-b flex-shrink-0
-        ${dm ? "bg-[#13161f] border-[#1e2235]" : "bg-slate-900 border-slate-700"}`}>
+        ${dm ? "bg-[var(--a-surface)] border-[var(--a-line)]" : "bg-stone-900 border-stone-700"}`}>
         <div className="flex items-center gap-3">
           <span className="relative flex h-2.5 w-2.5">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
@@ -428,18 +428,18 @@ function AgoraModal({ booking, onClose, dm }) {
           </span>
           <span className="text-white font-semibold text-sm">{tr("classesTab.monitoring", { classTitle: booking.classTitle })}
           </span>
-          <span className="text-slate-400 text-xs">{tr("classesTab.spectatorOnly", { firstName: booking.teacherId?.firstName, firstName2: booking.studentId?.firstName })}</span>
+          <span className="text-stone-400 text-xs">{tr("classesTab.spectatorOnly", { firstName: booking.teacherId?.firstName, firstName2: booking.studentId?.firstName })}</span>
         </div>
         <div className="flex items-center gap-3">
           <span className={`text-xs font-mono font-bold px-2.5 py-1 rounded-lg border
             ${timerWarn
               ? "bg-red-900/40 border-red-700/50 text-red-300 animate-pulse"
-              : "bg-slate-800 border-slate-700 text-slate-300"}`}>
+              : "bg-stone-800 border-stone-700 text-stone-300"}`}>
             ⏱ {timerMm}:{timerSs}
           </span>
           <button
             onClick={onClose}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-red-600 text-white text-sm transition"
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-stone-700 hover:bg-red-600 text-white text-sm transition"
           >
             <X size={14} /> {tr("classesTab.leave")}
           </button>
@@ -453,21 +453,21 @@ function AgoraModal({ booking, onClose, dm }) {
       <div className="flex-1 flex flex-col items-center justify-center gap-4 p-6 overflow-auto">
         {phase === "connecting" && (
           <>
-            <Loader2 size={36} className="text-violet-400 animate-spin" />
-            <p className="text-slate-300 text-sm">{tr("classesTab.joiningAsSpectator")}</p>
+            <Loader2 size={36} className="text-ad-accent-ink animate-spin" />
+            <p className="text-stone-300 text-sm">{tr("classesTab.joiningAsSpectator")}</p>
           </>
         )}
         {phase === "error" && (
           <>
             <AlertCircle size={36} className="text-red-400" />
             <p className="text-red-400 font-semibold text-sm">{tr("classesTab.failedToConnect")}</p>
-            <p className="text-slate-400 text-xs">{errorMsg}</p>
+            <p className="text-stone-400 text-xs">{errorMsg}</p>
           </>
         )}
         {phase === "connected" && remoteUsers.length === 0 && (
           <>
-            <Monitor size={36} className="text-slate-500" />
-            <p className="text-slate-400 text-sm">{tr("classesTab.connectedWaitingForVideoFrom")}</p>
+            <Monitor size={36} className="text-stone-500" />
+            <p className="text-stone-400 text-sm">{tr("classesTab.connectedWaitingForVideoFrom")}</p>
           </>
         )}
         {remoteUsers.length > 0 && (
@@ -492,7 +492,7 @@ function RemoteVideoTile({ uid, videoTrack }) {
     }
   }, [videoTrack]);
   return (
-    <div className="relative rounded-xl overflow-hidden bg-slate-900 border border-slate-700"
+    <div className="relative rounded-xl overflow-hidden bg-stone-900 border border-stone-700"
       style={{ width: "480px", maxWidth: "100%", aspectRatio: "16/9" }}>
       <div ref={ref} className="w-full h-full" />
       <span className="absolute bottom-2 left-2 text-xs bg-black/60 text-white px-2 py-0.5 rounded-full">{tr("classesTab.uid", { uid })}
@@ -519,12 +519,12 @@ export default function ClassesTab({ isDarkMode }) {
   const liveIdsRef         = useRef([]);
 
   const th = {
-    page:     dm ? "bg-[#0f1117] text-slate-100"       : "bg-slate-50 text-slate-900",
-    card:     dm ? "bg-[#1a1d27] border-[#1e2235]"     : "bg-white border-slate-200",
-    cardHead: dm ? "bg-[#13161f] border-[#1e2235]"     : "bg-slate-50 border-slate-200",
-    muted:    dm ? "text-slate-400"                    : "text-slate-500",
-    divider:  dm ? "border-[#1e2235]"                  : "border-slate-200",
-    statCard: dm ? "bg-[#13161f] border-[#1e2235]"     : "bg-white border-slate-200",
+    page:     dm ? "bg-[var(--a-bg)] text-stone-100"       : "bg-stone-50 text-stone-900",
+    card:     dm ? "bg-[var(--a-surface)] border-[var(--a-line)]"     : "bg-white border-stone-200",
+    cardHead: dm ? "bg-[var(--a-surface)] border-[var(--a-line)]"     : "bg-stone-50 border-stone-200",
+    muted:    dm ? "text-stone-400"                    : "text-stone-500",
+    divider:  dm ? "border-[var(--a-line)]"                  : "border-stone-200",
+    statCard: dm ? "bg-[var(--a-surface)] border-[var(--a-line)]"     : "bg-white border-stone-200",
   };
 
   // ── fetch sessions for currently live bookings ───────────────────────────────
@@ -614,9 +614,9 @@ export default function ClassesTab({ isDarkMode }) {
 
   if (loading) {
     return (
-      <div className={`flex items-center justify-center h-64 ${dm ? "text-slate-400" : "text-slate-500"}`}>
+      <div className={`flex items-center justify-center h-64 ${dm ? "text-stone-400" : "text-stone-500"}`}>
         <div className="flex items-center gap-3">
-          <Loader2 size={20} className="animate-spin text-violet-500" />
+          <Loader2 size={20} className="animate-spin text-ad-accent-ink" />
           {tr("classesTab.loadingClasses")}
         </div>
       </div>
@@ -634,7 +634,7 @@ export default function ClassesTab({ isDarkMode }) {
       {/* ── Header ───────────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h2 className="text-2xl font-bold text-violet-500">{tr("classesTab.liveClasses")}</h2>
+          <h2 className="text-2xl font-bold text-ad-accent-ink">{tr("classesTab.liveClasses")}</h2>
           <p className={`text-sm mt-1 ${th.muted}`}>{tr("classesTab.monitorAndJoinOngoingClasses")}</p>
         </div>
         <div className="flex items-center gap-3">
@@ -644,7 +644,7 @@ export default function ClassesTab({ isDarkMode }) {
           <button
             onClick={fetchBookings}
             className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-sm font-medium transition
-              ${dm ? "border-[#2a2f45] text-slate-300 hover:bg-[#1e2235]" : "border-slate-300 text-slate-600 hover:bg-slate-50"}`}
+              ${dm ? "border-[var(--a-line)] text-stone-300 hover:bg-[var(--a-raised)]" : "border-stone-300 text-stone-600 hover:bg-stone-50"}`}
           >
             <RefreshCw size={14} />
             {tr("classesTab.refresh")}
@@ -667,7 +667,7 @@ export default function ClassesTab({ isDarkMode }) {
           { icon: Calendar,     label: tr("classesTab.upcomingAccepted"), value: upcomingClasses.length,
             cls: dm ? "bg-sky-900/30 text-sky-400" : "bg-sky-100 text-sky-600" },
           { icon: CheckCircle2, label: tr("classesTab.totalAccepted"),      value: acceptedTotal,
-            cls: dm ? "bg-violet-900/30 text-violet-400" : "bg-violet-100 text-violet-600" },
+            cls: dm ? "bg-ad-accent-soft text-ad-accent-ink" : "bg-ad-accent-soft text-ad-accent-ink" },
         ].map(({ icon: Icon, label, value, cls }) => (
           <div key={label} className={`rounded-xl border p-4 flex items-center gap-4 ${th.statCard}`}>
             <div className={`p-2.5 rounded-lg ${cls}`}><Icon size={18} /></div>

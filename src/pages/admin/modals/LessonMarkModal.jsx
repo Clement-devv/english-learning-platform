@@ -80,16 +80,16 @@ export default function LessonMarkModal({
   const [bookingList, setBookingList] = useState([]);
 
   // ── Dark mode tokens ───────────────────────────────────────────────────────
-  const bg = isDarkMode ? "bg-gray-900" : "bg-white";
-  const cardBg = isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200";
-  const hoverCard = isDarkMode ? "hover:bg-gray-700" : "hover:bg-gray-50";
-  const selectedCard = isDarkMode ? "bg-purple-900/40 border-purple-500" : "bg-purple-50 border-purple-500";
-  const textPrimary = isDarkMode ? "text-white" : "text-gray-900";
-  const textSecondary = isDarkMode ? "text-gray-400" : "text-gray-500";
-  const divider = isDarkMode ? "border-gray-700" : "border-gray-200";
+  const bg = isDarkMode ? "bg-stone-900" : "bg-white";
+  const cardBg = isDarkMode ? "bg-stone-800 border-stone-700" : "bg-white border-stone-200";
+  const hoverCard = isDarkMode ? "hover:bg-stone-700" : "hover:bg-stone-50";
+  const selectedCard = isDarkMode ? "bg-ad-accent-soft border-ad-accent" : "bg-ad-accent-soft border-ad-accent";
+  const textPrimary = isDarkMode ? "text-white" : "text-stone-900";
+  const textSecondary = isDarkMode ? "text-stone-400" : "text-stone-500";
+  const divider = isDarkMode ? "border-stone-700" : "border-stone-200";
   const inputCls = isDarkMode
-    ? "bg-gray-700 border-gray-600 text-white placeholder-gray-500"
-    : "bg-gray-50 border-gray-300 text-gray-900";
+    ? "bg-stone-700 border-stone-600 text-white placeholder-stone-500"
+    : "bg-stone-50 border-stone-300 text-stone-900";
 
   // ── Fetch helpers ──────────────────────────────────────────────────────────
   const fetchStudentsForTeacher = useCallback(async (teacherId) => {
@@ -221,7 +221,7 @@ export default function LessonMarkModal({
       <div className={`w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden ${bg}`}>
 
         {/* ── Modal header ── */}
-        <div className={`flex items-center justify-between px-6 py-4 border-b ${divider} ${isDarkMode ? "bg-gray-800" : "bg-gray-50"}`}>
+        <div className={`flex items-center justify-between px-6 py-4 border-b ${divider} ${isDarkMode ? "bg-stone-800" : "bg-stone-50"}`}>
           <div className="flex items-center gap-3">
             <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${modeColor.badge}`}>
               <ModeIcon className="w-4 h-4" />
@@ -239,7 +239,7 @@ export default function LessonMarkModal({
           </div>
           <button
             onClick={onClose}
-            className={`p-2 rounded-lg transition-colors ${isDarkMode ? "hover:bg-gray-700" : "hover:bg-gray-100"}`}
+            className={`p-2 rounded-lg transition-colors ${isDarkMode ? "hover:bg-stone-700" : "hover:bg-stone-100"}`}
           >
             <X className="w-5 h-5" />
           </button>
@@ -247,7 +247,7 @@ export default function LessonMarkModal({
 
         {/* ── Progress bar (only for non-done steps) ── */}
         {step < 4 && (
-          <div className={`h-1 ${isDarkMode ? "bg-gray-700" : "bg-gray-100"}`}>
+          <div className={`h-1 ${isDarkMode ? "bg-stone-700" : "bg-stone-100"}`}>
             <div
               className={`h-full transition-[width] duration-300 ease-out ${isMarkMode ? "bg-emerald-500" : "bg-rose-500"}`}
               style={{ width: `${progress * 100}%` }}
@@ -302,7 +302,7 @@ export default function LessonMarkModal({
                   />
                   {loading ? (
                     <div className="flex justify-center py-8">
-                      <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
+                      <Loader2 className="w-8 h-8 animate-spin text-ad-accent-ink" />
                     </div>
                   ) : studentList.length === 0 ? (
                     <p className={`text-sm text-center py-8 ${textSecondary}`}>
@@ -343,7 +343,7 @@ export default function LessonMarkModal({
                   />
                   {loading ? (
                     <div className="flex justify-center py-8">
-                      <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
+                      <Loader2 className="w-8 h-8 animate-spin text-ad-accent-ink" />
                     </div>
                   ) : teacherList.length === 0 ? (
                     <p className={`text-sm text-center py-8 ${textSecondary}`}>
@@ -389,7 +389,7 @@ export default function LessonMarkModal({
               />
               {loading ? (
                 <div className="flex justify-center py-8">
-                  <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
+                  <Loader2 className="w-8 h-8 animate-spin text-ad-accent-ink" />
                 </div>
               ) : bookingList.length === 0 ? (
                 <div className={`text-center py-8 ${textSecondary}`}>
@@ -628,7 +628,7 @@ export default function LessonMarkModal({
 
         {/* ── Footer actions (not shown on done screen) ── */}
         {step < 4 && (
-          <div className={`flex items-center justify-between px-6 py-4 border-t ${divider} ${isDarkMode ? "bg-gray-800" : "bg-gray-50"}`}>
+          <div className={`flex items-center justify-between px-6 py-4 border-t ${divider} ${isDarkMode ? "bg-stone-800" : "bg-stone-50"}`}>
             {/* Back button */}
             <button
               onClick={() => { setError(""); setStep((s) => Math.max(0, s - 1)); }}
@@ -637,8 +637,8 @@ export default function LessonMarkModal({
                 step === 0 || (preTeacher && step <= 1) || (preStudent && step <= 1)
                   ? "opacity-30 cursor-not-allowed"
                   : isDarkMode
-                  ? "text-gray-300 hover:bg-gray-700"
-                  : "text-gray-600 hover:bg-gray-100"
+                  ? "text-stone-300 hover:bg-stone-700"
+                  : "text-stone-600 hover:bg-stone-100"
               }`}
             >
               <ChevronLeft className="w-4 h-4" />

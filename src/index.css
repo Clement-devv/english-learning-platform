@@ -47,6 +47,140 @@ body {
   @apply inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-sm;
 }
 
+/* ── Admin dashboard palette ─────────────────────────────────────────────────
+   Warm neutrals + ONE accent. The accent comes from the center's brand colour
+   (set inline on .as-root by the shell via --a-accent / --a-on-accent); every
+   other shade is derived from it so a center's colour change restyles the
+   whole dashboard. Status colours (green/amber/red/sky) stay semantic only.
+   Defaults are on :root too so admin components reused elsewhere (e.g. the
+   sub-admin dashboard) still resolve every token. */
+:root, .as-root {
+  --a-bg:            #fdf8f4;   /* warm peach cream */
+  --a-surface:       #ffffff;
+  --a-raised:        #faf1ea;   /* subtle fills, hover rows, inset panels */
+  --a-line:          #f1e5da;   /* default border */
+  --a-line-strong:   #e5d3c4;
+  --a-ink:           #2b211c;   /* headings + body — warm near-black */
+  --a-ink-2:         #5c4a3f;   /* secondary text */
+  --a-muted:         #7d6858;   /* captions, labels (4.9:1 on white, 4.7:1 on canvas) */
+  --a-accent:        #cf4b08;
+  --a-on-accent:     #ffffff;
+  --a-pink:          #fb7185;   /* warm coral companion for glows and rings (not purple) */
+  --a-peach:         #f97316;
+  /* "sunset": the accent brightening into vivid orange */
+  --a-accent-grad:   linear-gradient(135deg, var(--a-accent) 0%, color-mix(in srgb, var(--a-accent) 72%, var(--a-peach)) 100%);
+  --a-pink-soft:     color-mix(in srgb, var(--a-pink) 10%, #fff);
+  --a-accent-hover:  color-mix(in srgb, var(--a-accent) 86%, #000);
+  --a-accent-soft:   color-mix(in srgb, var(--a-accent) 9%, #fff);
+  --a-accent-line:   color-mix(in srgb, var(--a-accent) 28%, #fff);
+  --a-accent-ink:    color-mix(in srgb, var(--a-accent) 78%, #000);
+  --a-shadow:        0 1px 2px rgba(90, 45, 15, 0.06);
+  --a-shadow-pop:    0 12px 32px -8px rgba(90, 45, 15, 0.20), 0 2px 6px rgba(90, 45, 15, 0.07);
+}
+.as-root {
+  background: var(--a-bg);
+  color: var(--a-ink);
+  /* Shared components (Messages, Library, Sessions…) read these with their old
+     colour as fallback, so they turn orange only inside the admin dashboard. */
+  --as-accent:      var(--a-accent);
+  --as-accent-soft: var(--a-accent-soft);
+  --as-accent-ink:  var(--a-accent-ink);
+  --as-accent-line: var(--a-accent-line);
+  --as-accent-2:    color-mix(in srgb, var(--a-accent) 72%, var(--a-peach));
+}
+.as-root[data-theme="dark"] {
+  --a-bg:            #16120f;
+  --a-surface:       #1f1915;
+  --a-raised:        #29211b;
+  --a-line:          #362b23;
+  --a-line-strong:   #483a2f;
+  --a-ink:           #f8f1ea;
+  --a-ink-2:         #d8c8b9;
+  --a-muted:         #a3907f;
+  --a-accent-hover:  color-mix(in srgb, var(--a-accent) 86%, #fff);
+  --a-accent-soft:   color-mix(in srgb, var(--a-accent) 20%, #1f1915);
+  --a-accent-line:   color-mix(in srgb, var(--a-accent) 40%, #1f1915);
+  --a-accent-ink:    color-mix(in srgb, var(--a-accent) 62%, #fff);
+  --a-pink-soft:     color-mix(in srgb, var(--a-pink) 16%, #1f1915);
+  --a-shadow:        0 1px 2px rgba(0, 0, 0, 0.3);
+  --a-shadow-pop:    0 16px 40px -8px rgba(0, 0, 0, 0.6), 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+/* ── Admin category colours ──────────────────────────────────────────────────
+   A small warm-friendly set (no purple) used by TOPIC so colour carries meaning:
+   people = teal, analytics = sky, classes = amber, finance = green, alerts = rose,
+   general = the center accent. Put .cat-<name> on an element, then read
+   var(--cat) / var(--cat-soft) / var(--cat-ink) / var(--cat-line) inside it. */
+.cat-accent { --cat: var(--a-accent); }
+.cat-teal   { --cat: #0d9488; }
+.cat-sky    { --cat: #0284c7; }
+.cat-amber  { --cat: #d97706; }
+.cat-green  { --cat: #16a34a; }
+.cat-rose   { --cat: #e11d48; }
+.cat-pink   { --cat: #db2777; }
+.cat-peach  { --cat: #ea580c; }
+.cat-stone  { --cat: #78716c; }
+[class*="cat-"] {
+  --cat-soft: color-mix(in srgb, var(--cat) 11%, var(--a-surface));
+  --cat-line: color-mix(in srgb, var(--cat) 26%, var(--a-surface));
+  --cat-ink:  color-mix(in srgb, var(--cat) 82%, var(--a-ink));
+}
+.as-root[data-theme="dark"] [class*="cat-"],
+.as-root[data-theme="dark"][class*="cat-"] {
+  --cat-soft: color-mix(in srgb, var(--cat) 20%, var(--a-surface));
+  --cat-line: color-mix(in srgb, var(--cat) 38%, var(--a-surface));
+  --cat-ink:  color-mix(in srgb, var(--cat) 55%, #fff);
+}
+
+/* Solid accent fills (buttons, active filters, badges) get the orange→pink sunset.
+   Hover darkens slightly instead of swapping to a flat colour. */
+.as-root .bg-ad-accent,
+.as-root .as-accent-fill { background-image: var(--a-accent-grad); }
+.as-root .bg-ad-accent:hover,
+.as-root .hover:bg-ad-accent-hover:hover { background-image: var(--a-accent-grad); filter: brightness(0.94); }
+
+/* ── Colour inside panels ────────────────────────────────────────────────────
+   Every white panel inside the admin gets the sunrise colours (no rings): a pink
+   wash from the top-right corner, a warm orange glow from the bottom-left and a
+   faint gold touch top-left. Background layers only (no pseudo-elements, no
+   overflow change), so dropdowns inside cards are never clipped. Applied to
+   .as-panel and, automatically, to the panel styles the tabs already use. */
+.as-root {
+  --a-panel-art:
+    radial-gradient(55% 80% at 100% 0%, color-mix(in srgb, var(--a-accent) 13%, transparent) 0%, transparent 72%),
+    radial-gradient(50% 75% at 0% 100%, rgba(249, 115, 22, 0.10) 0%, transparent 72%),
+    radial-gradient(30% 45% at 0% 0%, rgba(251, 191, 36, 0.08) 0%, transparent 72%);
+}
+.as-root[data-theme="dark"] {
+  --a-panel-art:
+    radial-gradient(55% 80% at 100% 0%, color-mix(in srgb, var(--a-accent) 20%, transparent) 0%, transparent 72%),
+    radial-gradient(50% 75% at 0% 100%, rgba(249, 115, 22, 0.12) 0%, transparent 72%),
+    radial-gradient(30% 45% at 0% 0%, rgba(251, 191, 36, 0.07) 0%, transparent 72%);
+}
+.as-root .as-panel,
+.as-root main :is([style*="border-radius: 14px"], [style*="border-radius: 16px"], [style*="border-radius: 18px"], [style*="border-radius: 20px"], [style*="border-radius: 24px"]):is([style*="background: var(--a-surface)"], [style*="background-color: var(--a-surface)"]):not(section),
+.as-root main :is(.rounded-xl, .rounded-2xl).border:is(.bg-white, .bg-ad-surface, .bg-stone-800):not(input, select, textarea, button, label) {
+  background-image: var(--a-panel-art) !important;
+  background-repeat: no-repeat !important;
+  background-position: 0 0 !important;
+  background-size: 100% 100% !important;
+}
+
+/* Shared Settings / Sessions panels use Tailwind indigo; inside the admin only,
+   map those utilities onto the accent (other dashboards are untouched). */
+.as-root .bg-gradient-to-r.from-blue-600.to-indigo-600 { background-image: var(--a-accent-grad) !important; }
+.as-root .bg-indigo-600 { background-color: var(--a-accent); }
+.as-root :is(.bg-purple-600, .bg-brand-primary) { background-color: var(--a-accent); }
+.as-root .hover\:bg-purple-700:hover { background-color: var(--a-accent-hover); }
+.as-root :is(.text-purple-600, .text-brand-primary) { color: var(--a-accent-ink); }
+.as-root :is(.border-brand-primary, .ring-brand-primary) { border-color: var(--a-accent); --tw-ring-color: var(--a-accent); }
+.as-root :is(.bg-indigo-50, .bg-indigo-50\/60) { background-color: var(--a-accent-soft); }
+.as-root :is(.border-indigo-100, .border-indigo-200) { border-color: var(--a-accent-line); }
+.as-root :is(.text-indigo-600, .text-indigo-700) { color: var(--a-accent-ink); }
+.as-root[data-theme="dark"] :is(.dark\:bg-indigo-900\/20, .dark\:bg-indigo-900\/30) { background-color: var(--a-accent-soft); }
+.as-root[data-theme="dark"] :is(.dark\:border-indigo-800, .dark\:border-indigo-800\/60) { border-color: var(--a-accent-line); }
+.as-root[data-theme="dark"] :is(.dark\:text-indigo-300, .dark\:text-indigo-200) { color: var(--a-accent-ink); }
+
 /* Entrance motion — toasts slide down from where they sit, dialogs scale up
    slightly from centre. Short ease-out so feedback feels immediate. */
 :root {

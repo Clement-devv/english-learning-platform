@@ -90,23 +90,23 @@ export default function TeacherPaymentHistoryModal({ teacher, onClose, isDarkMod
     URL.revokeObjectURL(url);
   };
 
-  const bg = isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white";
-  const textPrimary = isDarkMode ? "text-white" : "text-gray-900";
-  const textSecondary = isDarkMode ? "text-gray-400" : "text-gray-500";
-  const cardBg = isDarkMode ? "bg-gray-700/60" : "bg-gray-50";
+  const bg = isDarkMode ? "bg-stone-800 border-stone-700" : "bg-white";
+  const textPrimary = isDarkMode ? "text-white" : "text-stone-900";
+  const textSecondary = isDarkMode ? "text-stone-400" : "text-stone-500";
+  const cardBg = isDarkMode ? "bg-stone-700/60" : "bg-stone-50";
   const inputCls = isDarkMode
-    ? "bg-gray-700 border-gray-600 text-white"
-    : "bg-white border-gray-300 text-gray-900";
-  const thCls = isDarkMode ? "bg-gray-700 text-gray-300" : "bg-gray-50 text-gray-500";
-  const trHover = isDarkMode ? "hover:bg-gray-700/50" : "hover:bg-gray-50";
-  const tdCls = isDarkMode ? "border-gray-700 text-gray-300" : "border-gray-100 text-gray-700";
+    ? "bg-stone-700 border-stone-600 text-white"
+    : "bg-white border-stone-300 text-stone-900";
+  const thCls = isDarkMode ? "bg-stone-700 text-stone-300" : "bg-stone-50 text-stone-500";
+  const trHover = isDarkMode ? "hover:bg-stone-700/50" : "hover:bg-stone-50";
+  const tdCls = isDarkMode ? "border-stone-700 text-stone-300" : "border-stone-100 text-stone-700";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
       <div className={`w-full max-w-3xl rounded-2xl shadow-2xl border flex flex-col max-h-[90vh] ${bg}`}>
 
         {/* Header */}
-        <div className={`flex items-center justify-between px-6 py-4 border-b ${isDarkMode ? "border-gray-700" : "border-gray-100"}`}>
+        <div className={`flex items-center justify-between px-6 py-4 border-b ${isDarkMode ? "border-stone-700" : "border-stone-100"}`}>
           <div>
             <h3 className={`text-lg font-bold ${textPrimary}`}>{tr("teacherPaymentHistoryModal.paymentHistory")}</h3>
             <p className={`text-sm ${textSecondary}`}>
@@ -115,7 +115,7 @@ export default function TeacherPaymentHistoryModal({ teacher, onClose, isDarkMod
           </div>
           <button
             onClick={onClose}
-            className={`p-2 rounded-lg transition-colors ${isDarkMode ? "hover:bg-gray-700 text-gray-400" : "hover:bg-gray-100 text-gray-500"}`}
+            className={`p-2 rounded-lg transition-colors ${isDarkMode ? "hover:bg-stone-700 text-stone-400" : "hover:bg-stone-100 text-stone-500"}`}
           >
             <X className="w-5 h-5" />
           </button>
@@ -123,7 +123,7 @@ export default function TeacherPaymentHistoryModal({ teacher, onClose, isDarkMod
 
         {/* Summary strip */}
         {summary && (
-          <div className={`grid grid-cols-3 gap-3 px-6 py-4 border-b ${isDarkMode ? "border-gray-700" : "border-gray-100"}`}>
+          <div className={`grid grid-cols-3 gap-3 px-6 py-4 border-b ${isDarkMode ? "border-stone-700" : "border-stone-100"}`}>
             <div className={`rounded-xl p-3 ${cardBg}`}>
               <p className={`text-xs font-medium ${textSecondary}`}>{tr("teacherPaymentHistoryModal.totalPending")}</p>
               <p className="text-lg font-bold text-amber-500">{fmtMoney(summary.totalPending, sym)}</p>
@@ -143,7 +143,7 @@ export default function TeacherPaymentHistoryModal({ teacher, onClose, isDarkMod
         )}
 
         {/* Filters + export */}
-        <div className={`flex flex-wrap gap-3 items-center px-6 py-3 border-b ${isDarkMode ? "border-gray-700" : "border-gray-100"}`}>
+        <div className={`flex flex-wrap gap-3 items-center px-6 py-3 border-b ${isDarkMode ? "border-stone-700" : "border-stone-100"}`}>
           <div className="flex items-center gap-2">
             <label className={`text-xs font-medium ${textSecondary}`}>{tr("teacherPaymentHistoryModal.from")}</label>
             <input
@@ -182,7 +182,7 @@ export default function TeacherPaymentHistoryModal({ teacher, onClose, isDarkMod
             </div>
           ) : filtered.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 gap-2">
-              <FileText className={`w-10 h-10 ${isDarkMode ? "text-gray-600" : "text-gray-300"}`} />
+              <FileText className={`w-10 h-10 ${isDarkMode ? "text-stone-600" : "text-stone-300"}`} />
               <p className={`text-sm font-medium ${textPrimary}`}>{tr("teacherPaymentHistoryModal.noTransactionsFound")}</p>
               <p className={`text-xs ${textSecondary}`}>
                 {fromDate || toDate ? tr("teacherPaymentHistoryModal.tryAdjustingTheDateRange") : tr("teacherPaymentHistoryModal.noPaymentRecordsForThis")}
@@ -200,7 +200,7 @@ export default function TeacherPaymentHistoryModal({ teacher, onClose, isDarkMod
                   <th className="px-3 py-2 text-left font-semibold">{tr("teacherPaymentHistoryModal.paidOn")}</th>
                 </tr>
               </thead>
-              <tbody className={`divide-y ${isDarkMode ? "divide-gray-700" : "divide-gray-100"}`}>
+              <tbody className={`divide-y ${isDarkMode ? "divide-stone-700" : "divide-stone-100"}`}>
                 {filtered.map((tx) => (
                   <tr key={tx._id} className={`${trHover} transition-colors`}>
                     <td className={`px-3 py-3 whitespace-nowrap ${tdCls}`}>{fmt(tx.completedAt)}</td>
@@ -227,14 +227,14 @@ export default function TeacherPaymentHistoryModal({ teacher, onClose, isDarkMod
         </div>
 
         {/* Footer */}
-        <div className={`flex items-center justify-between px-6 py-4 border-t ${isDarkMode ? "border-gray-700" : "border-gray-100"}`}>
+        <div className={`flex items-center justify-between px-6 py-4 border-t ${isDarkMode ? "border-stone-700" : "border-stone-100"}`}>
           <p className={`text-xs ${textSecondary}`}>
             {tr("teacherPaymentHistoryModal.record", { filteredCount: filtered.length, value: filtered.length !== 1 ? "s" : "", value2: (fromDate || toDate) && " (filtered)" })}
           </p>
           <button
             onClick={onClose}
             className={`px-5 py-2 rounded-xl text-sm font-semibold border transition ${
-              isDarkMode ? "border-gray-600 text-gray-300 hover:bg-gray-700" : "border-gray-300 text-gray-700 hover:bg-gray-50"
+              isDarkMode ? "border-stone-600 text-stone-300 hover:bg-stone-700" : "border-stone-300 text-stone-700 hover:bg-stone-50"
             }`}
           >
             {tr("teacherPaymentHistoryModal.close")}

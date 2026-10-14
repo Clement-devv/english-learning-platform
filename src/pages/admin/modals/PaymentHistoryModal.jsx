@@ -94,7 +94,7 @@ export default function PaymentHistoryModal({ isOpen, onClose, history }) {
 
         <div className="max-h-96 overflow-y-auto border rounded">
           <table className="w-full text-sm border-collapse">
-            <thead className="bg-gray-100">
+            <thead className="bg-stone-100">
               <tr>
                 <th className="border p-2">{tr("paymentHistoryModal.date")}</th>
                 <th className="border p-2">{tr("paymentHistoryModal.student")}</th>
@@ -107,7 +107,7 @@ export default function PaymentHistoryModal({ isOpen, onClose, history }) {
             <tbody>
               {filtered.length > 0 ? (
                 filtered.map((row, i) => (
-                  <tr key={i} className="hover:bg-gray-50">
+                  <tr key={i} className="hover:bg-stone-50">
                     <td className="border p-2">
                       {new Date(row.date).toLocaleDateString()}
                     </td>
@@ -120,7 +120,7 @@ export default function PaymentHistoryModal({ isOpen, onClose, history }) {
                 ))
               ) : (
                 <tr>
-                  <td colSpan="6" className="text-center p-4 text-gray-500">
+                  <td colSpan="6" className="text-center p-4 text-stone-500">
                     {tr("paymentHistoryModal.noPaymentRecordsFound")}
                   </td>
                 </tr>
@@ -132,7 +132,7 @@ export default function PaymentHistoryModal({ isOpen, onClose, history }) {
         <div className="flex justify-end mt-4">
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
+            className="px-4 py-2 bg-stone-300 rounded hover:bg-stone-400"
           >
             {tr("paymentHistoryModal.close")}
           </button>

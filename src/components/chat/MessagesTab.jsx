@@ -39,7 +39,7 @@ export default function MessagesTab({ userRole, onUnreadCount, compact = false }
     sidebar:    dark ? "#16191f" : "#f8f9ff",
     border:     dark ? "rgba(255,255,255,0.06)" : "#eff0f6",
     tabBg:      dark ? "#111318" : "#ffffff",
-    tabActive:  "#6366f1",
+    tabActive:  "var(--as-accent, #6366f1)",
     tabText:    dark ? "#8b91b8" : "#9ea3be",
     tabTextOn:  dark ? "#e8eaf6" : "#1a1d2e",
   };
@@ -152,13 +152,13 @@ export default function MessagesTab({ userRole, onUnreadCount, compact = false }
             <div style={{
               width: "88px", height: "88px", borderRadius: "28px",
               background: dark
-                ? "linear-gradient(135deg,#6366f1,#8b5cf6)"
-                : "linear-gradient(135deg,#e0e7ff,#ede9fe)",
+                ? "linear-gradient(135deg,var(--as-accent, #6366f1),var(--as-accent, #8b5cf6))"
+                : "linear-gradient(135deg,var(--as-accent-soft, #e0e7ff),var(--as-accent-soft, #ede9fe))",
               display: "flex", alignItems: "center", justifyContent: "center",
               boxShadow: dark ? "0 16px 40px rgba(99,102,241,.35)" : "0 8px 24px rgba(99,102,241,.15)",
               marginBottom: "16px",
             }}>
-              <Phone size={36} color={dark ? "#fff" : "#6366f1"} strokeWidth={1.5} />
+              <Phone size={36} color={dark ? "#fff" : "var(--as-accent, #6366f1)"} strokeWidth={1.5} />
             </div>
             <h3 style={{ margin: "0 0 6px", fontSize: "16px", fontWeight: "700", color: dark ? "#e4e6ef" : "#1e1f2e" }}>
               Ring a Contact
@@ -185,12 +185,12 @@ function EmptyState({ dark }) {
       <div className="msg-empty-orb" style={{
         width: "88px", height: "88px", borderRadius: "28px",
         background: dark
-          ? "linear-gradient(135deg,#6366f1 0%,#8b5cf6 100%)"
-          : "linear-gradient(135deg,#e0e7ff 0%,#ede9fe 100%)",
+          ? "linear-gradient(135deg,var(--as-accent, #6366f1) 0%,var(--as-accent, #8b5cf6) 100%)"
+          : "linear-gradient(135deg,var(--as-accent-soft, #e0e7ff) 0%,var(--as-accent-soft, #ede9fe) 100%)",
         display: "flex", alignItems: "center", justifyContent: "center",
         boxShadow: dark ? "0 16px 40px rgba(99,102,241,.35)" : "0 8px 24px rgba(99,102,241,.15)",
       }}>
-        <MessageSquare size={38} color={dark ? "#fff" : "#6366f1"} strokeWidth={1.5} />
+        <MessageSquare size={38} color={dark ? "#fff" : "var(--as-accent, #6366f1)"} strokeWidth={1.5} />
       </div>
       <div style={{ textAlign: "center" }}>
         <h3 style={{ margin: "0 0 6px", fontSize: "17px", fontWeight: "700", color: dark ? "#e4e6ef" : "#1e1f2e" }}>

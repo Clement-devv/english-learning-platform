@@ -10,7 +10,7 @@ import {
   BookOpen, Shield, CalendarDays, FileText, Star, Palette, Globe,
   Settings, LogOut, CheckCircle2, ClipboardList, Award,
   Megaphone, Send, X, CheckCircle,
-  ShieldCheck, ClipboardCheck, Link2, Library,
+  ShieldCheck, ClipboardCheck, Link2, Library, PhoneMissed,
 } from 'lucide-react';
 import { useNavigate }            from 'react-router-dom';
 import { useAuth }                from '../../../../context/AuthContext.jsx';
@@ -31,6 +31,7 @@ import ChangePassword             from '../../../../components/admin/auth/Change
 import ChangeEmail               from '../../../../components/admin/auth/ChangeEmail';
 import AnalyticsPinSettings      from '../../../../components/admin/auth/AnalyticsPinSettings';
 import { dateLocale } from "../../../../i18n/dateLocale.js";
+import { adminAccent, adminOnAccent } from "../../../../utils/adminAccent";
 
 // Tab components — lazy loaded
 const OverviewTab        = lazy(() => import('../../tabs/OverviewTab'));
@@ -72,28 +73,30 @@ const TICK_NOTIF  = 2;   // every 60s — unread notification count
 const TICK_PEOPLE = 6;   // every 3 min — teachers + students lists
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
-const palette = (dark) => ({
-  bg:      dark ? '#0f1117' : '#fff8f0',
-  card:    dark ? '#1a1d2e' : '#ffffff',
-  cardAlt: dark ? '#1f2235' : '#fffbf5',
-  border:  dark ? '#2a2d40' : '#ffe8cc',
-  heading: dark ? '#f0f4ff' : '#3d2e20',
-  body:    dark ? '#c8cce0' : '#5a4a3a',
-  muted:   dark ? '#6b7090' : '#a89480',
-  accent:  dark ? '#fbbf24' : '#f97316',
-  sidebar: dark ? '#13111a' : '#ffffff',
+// Values live in src/index.css (.as-root) — warm neutrals + one accent taken from
+// the center's brand colour — so light/dark and brand changes need no JS here.
+const palette = () => ({
+  bg:      'var(--a-bg)',
+  card:    'var(--a-surface)',
+  cardAlt: 'var(--a-raised)',
+  border:  'var(--a-line)',
+  heading: 'var(--a-ink)',
+  body:    'var(--a-ink-2)',
+  muted:   'var(--a-muted)',
+  accent:  'var(--a-accent)',
+  sidebar: 'var(--a-surface)',
 });
 
 // ── Nav groups ────────────────────────────────────────────────────────────────
 const makeNavGroups = (t) => [
   {
-    label: null,
+    label: null, cat: 'accent',
     items: [
       { key: 'overview',  label: t('admin.nav.overview'),  lucide: TrendingUp },
     ],
   },
   {
-    label: t('admin.navGroup.analytics'),
+    label: t('admin.navGroup.analytics'), cat: 'rose',
     items: [
       { key: 'analytics',     label: t('admin.nav.analytics'),     lucide: BarChart3       },
       { key: 'notifications', label: t('admin.nav.notifications'), lucide: Bell            },
@@ -102,7 +105,7 @@ const makeNavGroups = (t) => [
     ],
   },
   {
-    label: t('admin.navGroup.people'),
+    label: t('admin.navGroup.people'), cat: 'teal',
     items: [
       { key: 'teachers',          label: t('admin.nav.teachers'),         lucide: Video        },
       { key: 'teacher-schedules', label: t('admin.nav.teacherSchedules'), lucide: CalendarDays },
@@ -113,7 +116,7 @@ const makeNavGroups = (t) => [
     ],
   },
   {
-    label: t('admin.navGroup.classes'),
+    label: t('admin.navGroup.classes'), cat: 'amber',
     items: [
       { key: 'classes',       label: t('admin.nav.allClasses'),      lucide: BookOpen     },
       { key: 'class-report',  label: t('admin.nav.classReport'),     lucide: ClipboardCheck },
@@ -131,7 +134,7 @@ const makeNavGroups = (t) => [
     ],
   },
   {
-    label: t('admin.navGroup.finance'),
+    label: t('admin.navGroup.finance'), cat: 'green',
     items: [
       { key: 'payments',              label: t('admin.nav.payments'),             lucide: DollarSign    },
       { key: 'class-pricing',         label: t('admin.nav.classPricing'),         lucide: DollarSign    },
@@ -141,7 +144,7 @@ const makeNavGroups = (t) => [
     ],
   },
   {
-    label: t('admin.navGroup.settings'),
+    label: t('admin.navGroup.settings'), cat: 'stone',
     items: [
       { key: 'branding',      label: t('admin.nav.branding'),      lucide: Palette },
       { key: 'domain',        label: t('admin.nav.customDomain'),  lucide: Globe   },
@@ -151,14 +154,107 @@ const makeNavGroups = (t) => [
 ];
 const F = "'Nunito','Inter',sans-serif";
 const FONT_IMPORT = 'https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap';
-const ACCENT_GRADIENT = 'linear-gradient(135deg,#f97316 0%,#f43f5e 100%)';
-const TAB_SHADOW = 'rgba(249,115,22,0.35)';
+const ACCENT = 'var(--a-accent)';
+// Large accent fills use the orange→pink sunset gradient (background shorthand)
+const ACCENT_FILL = 'var(--a-accent-grad)';
+const ON_ACCENT = 'var(--a-on-accent)';
+const ACCENT_SHADOW = '0 4px 14px -4px color-mix(in srgb, var(--a-accent) 55%, transparent)';
 
 function TabLoader() {
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '300px', fontFamily: F }}>
       <style>{`@keyframes as-spin{to{transform:rotate(360deg)}}`}</style>
-      <div style={{ width: 32, height: 32, borderRadius: '50%', border: '3px solid #ffe8cc', borderTopColor: '#f97316', animation: 'as-spin .75s linear infinite' }} />
+      <div style={{ width: 28, height: 28, borderRadius: '50%', border: '3px solid var(--a-line)', borderTopColor: 'var(--a-accent)', animation: 'as-spin .7s linear infinite' }} />
+    </div>
+  );
+}
+
+// ── Sunrise backdrop ─────────────────────────────────────────────────────────
+// Page-wide version of the overview banner: orange glow with a golden core, the
+// accent/pink corner, orange→pink rings and twinkling sparkles. Softer than the
+// banner so tables and forms stay easy to read; fades out down the page.
+// Sits first inside <main>; content follows in a positioned wrapper (no z-index,
+// so modals keep their existing stacking).
+const BACKDROP_SPARKLES = [
+  { left: '24%', top: 54, size: 7, color: '#f97316', delay: '0s' },
+  { left: '47%', top: 22, size: 5, color: '#fbbf24', delay: '0.9s' },
+  { left: '66%', top: 96, size: 6, color: 'var(--a-accent)', delay: '1.7s' },
+  { left: '83%', top: 190, size: 5, color: '#fb923c', delay: '2.5s' },
+];
+
+function SunriseBackdrop() {
+  return (
+    <div aria-hidden="true" style={{
+      position: 'absolute', top: 0, left: 0, right: 0, height: 560, pointerEvents: 'none', overflow: 'hidden',
+      WebkitMaskImage: 'linear-gradient(to bottom, #000 40%, transparent 100%)',
+      maskImage: 'linear-gradient(to bottom, #000 40%, transparent 100%)',
+    }}>
+      <div style={{ position: 'absolute', inset: 0, background: [
+        'radial-gradient(10% 22% at 52% 0%, rgba(255,214,102,0.5) 0%, transparent 100%)',
+        'radial-gradient(34% 62% at 52% -8%, rgba(249,115,22,0.36) 0%, rgba(251,146,60,0.15) 45%, transparent 75%)',
+        'radial-gradient(40% 72% at 100% -5%, color-mix(in srgb, var(--a-accent) 32%, transparent) 0%, color-mix(in srgb, var(--a-pink) 13%, transparent) 45%, transparent 75%)',
+        'radial-gradient(26% 52% at 0% 0%, color-mix(in srgb, var(--a-pink) 18%, transparent) 0%, transparent 75%)',
+      ].join(', ') }} />
+      <svg width="440" height="440" viewBox="0 0 440 440" style={{ position: 'absolute', right: -150, top: -180, filter: 'drop-shadow(0 0 6px rgba(249,115,22,0.3))' }}>
+        <defs>
+          <linearGradient id="as-bg-ring" x1="0" y1="1" x2="1" y2="0">
+            <stop offset="0%" stopColor="#f97316" />
+            <stop offset="100%" stopColor="var(--a-accent)" />
+          </linearGradient>
+        </defs>
+        {[75, 125, 175].map((r, i) => (
+          <circle key={r} cx="220" cy="220" r={r} fill="none" stroke="url(#as-bg-ring)" strokeOpacity={0.5 - i * 0.12} strokeWidth={i === 0 ? 2.5 : 1.75} />
+        ))}
+      </svg>
+      <svg width="200" height="200" viewBox="0 0 200 200" style={{ position: 'absolute', left: '32%', top: -128, filter: 'drop-shadow(0 0 5px rgba(249,115,22,0.35))' }}>
+        {[45, 80].map((r, i) => (
+          <circle key={r} cx="100" cy="100" r={r} fill="none" stroke="#f97316" strokeOpacity={0.38 - i * 0.12} strokeWidth="1.75" />
+        ))}
+      </svg>
+      {BACKDROP_SPARKLES.map((d, i) => (
+        <span key={i} className="as-sparkle" style={{ position: 'absolute', left: d.left, top: d.top, width: d.size, height: d.size, borderRadius: '50%', background: d.color, boxShadow: `0 0 10px 2px ${d.color}`, animationDelay: d.delay }} />
+      ))}
+    </div>
+  );
+}
+
+// ── Sunset footer glow ───────────────────────────────────────────────────────
+// Mirror of the sunrise, pinned to the bottom of the visible page (it does not
+// scroll), so long and short pages both end in colour instead of plain blush.
+// Pink rises from the lower-left, orange/amber glows lower-right.
+const SUNSET_SPARKLES = [
+  { left: '14%', bottom: 96, size: 6, color: 'var(--a-accent)', delay: '0.4s' },
+  { left: '41%', bottom: 40, size: 5, color: '#fbbf24', delay: '1.5s' },
+  { left: '72%', bottom: 120, size: 7, color: '#f97316', delay: '2.3s' },
+  { left: '90%', bottom: 58, size: 5, color: '#fb923c', delay: '0.9s' },
+];
+
+function SunsetGlow() {
+  return (
+    <div aria-hidden="true" style={{
+      position: 'absolute', left: 0, right: 0, bottom: 0, height: 340, pointerEvents: 'none', overflow: 'hidden',
+      WebkitMaskImage: 'linear-gradient(to top, #000 35%, transparent 100%)',
+      maskImage: 'linear-gradient(to top, #000 35%, transparent 100%)',
+    }}>
+      <div style={{ position: 'absolute', inset: 0, background: [
+        'radial-gradient(38% 80% at 0% 105%, color-mix(in srgb, var(--a-accent) 34%, transparent) 0%, color-mix(in srgb, var(--a-pink) 14%, transparent) 45%, transparent 75%)',
+        'radial-gradient(34% 70% at 74% 112%, rgba(249,115,22,0.34) 0%, rgba(251,146,60,0.14) 45%, transparent 75%)',
+        'radial-gradient(10% 24% at 74% 100%, rgba(255,214,102,0.45) 0%, transparent 100%)',
+        'radial-gradient(28% 60% at 100% 100%, color-mix(in srgb, var(--a-pink) 20%, transparent) 0%, transparent 75%)',
+      ].join(', ') }} />
+      <svg width="420" height="420" viewBox="0 0 420 420" style={{ position: 'absolute', left: -150, bottom: -180, filter: 'drop-shadow(0 0 6px rgba(249,115,22,0.3))' }}>
+        {[75, 125, 175].map((r, i) => (
+          <circle key={r} cx="210" cy="210" r={r} fill="none" stroke="url(#as-bg-ring)" strokeOpacity={0.5 - i * 0.12} strokeWidth={i === 0 ? 2.5 : 1.75} />
+        ))}
+      </svg>
+      <svg width="200" height="200" viewBox="0 0 200 200" style={{ position: 'absolute', right: '18%', bottom: -120, filter: 'drop-shadow(0 0 5px rgba(249,115,22,0.35))' }}>
+        {[45, 80].map((r, i) => (
+          <circle key={r} cx="100" cy="100" r={r} fill="none" stroke="#f97316" strokeOpacity={0.38 - i * 0.12} strokeWidth="1.75" />
+        ))}
+      </svg>
+      {SUNSET_SPARKLES.map((d, i) => (
+        <span key={i} className="as-sparkle" style={{ position: 'absolute', left: d.left, bottom: d.bottom, width: d.size, height: d.size, borderRadius: '50%', background: d.color, boxShadow: `0 0 10px 2px ${d.color}`, animationDelay: d.delay }} />
+      ))}
     </div>
   );
 }
@@ -171,7 +267,8 @@ export default function SunshineShell() {
   const { user: adminInfo, logout: authLogout } = useAuth();
   const { branding, center } = useBranding();
   const { isDarkMode, toggleDarkMode } = useDarkMode();
-  const col = palette(isDarkMode);
+  const col = palette();
+  const accent = adminAccent(branding);
   const centerName = center?.centerName || 'Admin Panel';
 
   const NAV_GROUPS = makeNavGroups(t);
@@ -393,10 +490,10 @@ export default function SunshineShell() {
   }, [activeTab, isDarkMode, loading, teachers, students, analyticsPinVersion]);
 
   const STATS = [
-    { label: tr("sunshineShell.teachers"),  value: teachers.length,       icon: Video,         g: 'linear-gradient(135deg,#f97316,#fbbf24)' },
-    { label: tr("sunshineShell.students"),  value: students.length,       icon: Users,         g: 'linear-gradient(135deg,#f43f5e,#fb7185)' },
-    { label: tr("sunshineShell.messages"),  value: unreadMessages || 0,   icon: MessageCircle, g: 'linear-gradient(135deg,#8b5cf6,#a78bfa)' },
-    { label: tr("sunshineShell.alerts"),    value: unreadNotif || 0,      icon: Bell,          g: 'linear-gradient(135deg,#06b6d4,#67e8f9)' },
+    { label: tr("sunshineShell.teachers"),  value: teachers.length,       icon: Video, cat: 'teal' },
+    { label: tr("sunshineShell.students"),  value: students.length,       icon: Users, cat: 'sky' },
+    { label: tr("sunshineShell.messages"),  value: unreadMessages || 0,   icon: MessageCircle, cat: 'sky' },
+    { label: tr("sunshineShell.alerts"),    value: unreadNotif || 0,      icon: Bell, cat: 'rose' },
   ];
 
   const showHero = activeTab === 'overview';
@@ -410,59 +507,87 @@ export default function SunshineShell() {
   }, [broadcastModal, broadcasting]);
 
   return (
-    <div className="as-root" style={{ display: 'flex', height: '100vh', overflow: 'hidden', fontFamily: F, background: col.bg }}>
+    <div
+      className="as-root"
+      data-theme={isDarkMode ? 'dark' : 'light'}
+      style={{ display: 'flex', height: '100vh', overflow: 'hidden', fontFamily: F, background: col.bg, '--a-accent': accent, '--a-on-accent': adminOnAccent(accent) }}
+    >
       <style>{`
         @import url('${FONT_IMPORT}');
         * { box-sizing: border-box; }
-        .as-nav { transition: background-color 150ms ease, transform 120ms ease-out; }
+        .as-nav { transition: background-color 150ms ease, color 150ms ease, transform 120ms ease-out; }
         .as-nav:active { transform: scale(0.98); }
         .as-press { transition: transform 120ms ease-out, background-color 150ms ease, border-color 150ms ease, color 150ms ease, box-shadow 150ms ease; }
         .as-press:not(:disabled):active { transform: scale(0.97); }
         .as-card { transition: transform 0.2s, box-shadow 0.2s; }
         @media (hover: hover) and (pointer: fine) {
-          .as-nav:hover { background: ${isDarkMode ? 'rgba(249,115,22,0.12)' : 'rgba(249,115,22,0.08)'} !important; }
+          .as-nav:not([aria-current="page"]):hover { background: var(--a-raised) !important; }
           .as-card:hover { transform: translateY(-3px); box-shadow: 0 10px 28px rgba(0,0,0,0.10) !important; }
+          .as-accent-btn:not(:disabled):hover { background: var(--a-accent-hover) !important; }
         }
         .as-root button:focus-visible, .as-root [role="button"]:focus-visible, .as-root input:focus-visible, .as-root textarea:focus-visible {
-          outline: 2px solid ${col.accent}; outline-offset: 2px;
+          outline: 2px solid var(--a-accent); outline-offset: 2px;
         }
+        .as-root ::selection { background: var(--a-accent-soft); }
+        /* Overview banner: one light sweep on open + slow sparkle twinkle (both off for reduced motion) */
+        .as-hero-shine { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+        .as-hero-shine::before { content: ""; position: absolute; top: -20%; bottom: -20%; width: 40%; left: 0;
+          background: linear-gradient(100deg, transparent 0%, rgba(255,255,255,0.6) 50%, transparent 100%);
+          transform: translateX(-120%) skewX(-12deg); animation: as-shine 1.6s cubic-bezier(0.23, 1, 0.32, 1) 0.25s both; }
+        @keyframes as-shine { to { transform: translateX(320%) skewX(-12deg); } }
+        .as-sparkle { animation: as-twinkle 3.2s ease-in-out infinite; }
+        @keyframes as-twinkle { 0%, 100% { opacity: 0.95; transform: scale(1); } 50% { opacity: 0.45; transform: scale(0.7); } }
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: ${isDarkMode ? '#2a2d40' : '#ffd0a8'}; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb { background: var(--a-line-strong); border-radius: 10px; }
       `}</style>
 
       {/* ── SIDEBAR ──────────────────────────────────────────────────────────── */}
       <aside style={{
         width: 224, flexShrink: 0,
         background: col.sidebar,
-        borderRight: `2px solid ${col.border}`,
+        borderRight: `1px solid ${col.border}`,
         display: 'flex', flexDirection: 'column',
         overflowY: 'auto', overflowX: 'hidden',
         zIndex: 100,
       }}>
-        {/* Brand */}
-        <div style={{ padding: '20px 16px 14px', borderBottom: `2px solid ${col.border}` }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ width: 40, height: 40, borderRadius: 14, background: ACCENT_GRADIENT, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, boxShadow: `0 4px 12px ${TAB_SHADOW}`, flexShrink: 0 }}>
-              🛡️
-            </div>
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 900, color: col.heading, lineHeight: 1.2 }}>{centerName}</div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: col.muted }}>{t('admin.sidebar.portal')}</div>
+        {/* Brand — center logo if it has one, otherwise its initial on the accent */}
+        <div style={{ position: 'relative', overflow: 'hidden', flexShrink: 0, padding: '18px 16px 16px', borderBottom: `1px solid ${col.border}` }}>
+          {/* same sunrise, small: glow behind the logo + one gradient ring */}
+          <div aria-hidden="true" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: [
+            'radial-gradient(60% 120% at 12% 40%, rgba(249,115,22,0.22) 0%, transparent 70%)',
+            'radial-gradient(70% 140% at 100% 0%, color-mix(in srgb, var(--a-accent) 20%, transparent) 0%, transparent 70%)',
+          ].join(', ') }} />
+          <svg aria-hidden="true" width="120" height="120" viewBox="0 0 120 120" style={{ position: 'absolute', right: -44, top: -52, pointerEvents: 'none' }}>
+            {[30, 50].map((r, i) => (
+              <circle key={r} cx="60" cy="60" r={r} fill="none" stroke="url(#as-bg-ring)" strokeOpacity={0.45 - i * 0.15} strokeWidth="1.5" />
+            ))}
+          </svg>
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 10 }}>
+            {branding?.logo ? (
+              <img src={branding.logo} alt="" style={{ width: 38, height: 38, borderRadius: 11, objectFit: 'cover', flexShrink: 0, boxShadow: `0 0 0 1px ${col.border}` }} />
+            ) : (
+              <div style={{ width: 38, height: 38, borderRadius: 11, background: ACCENT_FILL, color: ON_ACCENT, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 17, fontWeight: 900, flexShrink: 0, boxShadow: ACCENT_SHADOW }}>
+                {(centerName?.[0] || 'A').toUpperCase()}
+              </div>
+            )}
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 800, color: col.heading, lineHeight: 1.25, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{centerName}</div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: col.muted }}>{t('admin.sidebar.portal')}</div>
               {branding?.partnershipText && (
-                <div style={{ fontSize: 10, color: col.muted, opacity: 0.75, marginTop: 2, fontStyle: 'italic' }}>{branding.partnershipText}</div>
+                <div style={{ fontSize: 10, color: col.muted, marginTop: 2, fontStyle: 'italic' }}>{branding.partnershipText}</div>
               )}
             </div>
           </div>
         </div>
 
         {/* Admin info card */}
-        <div style={{ margin: '12px 10px', background: isDarkMode ? 'rgba(249,115,22,0.1)' : '#fff7ed', border: `2px solid ${isDarkMode ? 'rgba(249,115,22,0.2)' : '#fed7aa'}`, borderRadius: 16, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ width: 36, height: 36, borderRadius: 12, background: ACCENT_GRADIENT, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 900, fontSize: 16, flexShrink: 0 }}>
+        <div style={{ margin: '12px 10px 8px', background: 'var(--a-raised)', borderRadius: 14, padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ width: 32, height: 32, borderRadius: 10, background: 'var(--a-accent-soft)', color: 'var(--a-accent-ink)', boxShadow: 'inset 0 0 0 1px var(--a-accent-line)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 14, flexShrink: 0 }}>
             {(adminInfo?.firstName?.[0] || 'A').toUpperCase()}
           </div>
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 13, fontWeight: 800, color: col.heading, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: col.heading, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {adminInfo?.firstName || tr("sunshineShell.admin")}
             </div>
             <div style={{ fontSize: 11, fontWeight: 600, color: col.muted }}>{tr("sunshineShell.teachers2", { teachersCount: teachers.length })}</div>
@@ -472,9 +597,9 @@ export default function SunshineShell() {
         {/* Nav */}
         <nav style={{ flex: 1, padding: '4px 8px' }}>
           {NAV_GROUPS.map((group, gi) => (
-            <div key={gi} style={{ marginBottom: 4 }}>
+            <div key={gi} className={`cat-${group.cat}`} style={{ marginBottom: 6 }}>
               {group.label && (
-                <div style={{ fontSize: 10, fontWeight: 800, color: col.muted, letterSpacing: '0.08em', textTransform: 'uppercase', padding: '8px 8px 4px' }}>
+                <div style={{ fontSize: 10, fontWeight: 800, color: col.muted, letterSpacing: '0.08em', textTransform: 'uppercase', padding: '10px 10px 4px' }}>
                   {group.label}
                 </div>
               )}
@@ -487,20 +612,20 @@ export default function SunshineShell() {
                 return (
                   <button key={item.key} className="as-nav"
                     onClick={() => setActiveTab(item.key)}
+                    aria-current={isActive ? 'page' : undefined}
                     style={{
                       width: '100%', display: 'flex', alignItems: 'center', gap: 10,
-                      padding: '9px 12px', borderRadius: 14, border: 'none', cursor: 'pointer',
-                      background: isActive ? (isDarkMode ? 'rgba(249,115,22,0.18)' : '#fff7ed') : 'transparent',
+                      padding: '8px 10px', borderRadius: 10, border: 'none', cursor: 'pointer',
+                      background: isActive ? 'var(--cat-soft)' : 'transparent',
                       fontFamily: F, textAlign: 'left',
-                      borderLeft: isActive ? `3px solid ${col.accent}` : '3px solid transparent',
                       marginBottom: 1,
                     }}>
-                    {(() => { const LI = item.lucide; return <LI size={17} strokeWidth={1.8} color={isActive ? col.accent : col.body} style={{ flexShrink: 0 }} />; })()}
-                    <span style={{ flex: 1, fontSize: 13, fontWeight: isActive ? 800 : 600, color: isActive ? col.accent : col.body }}>
+                    {(() => { const LI = item.lucide; return <LI size={17} strokeWidth={isActive ? 2.1 : 1.8} color='var(--cat)' style={{ flexShrink: 0 }} />; })()}
+                    <span style={{ flex: 1, fontSize: 13, fontWeight: isActive ? 800 : 600, color: isActive ? 'var(--cat-ink)' : col.body }}>
                       {item.label}
                     </span>
                     {badge != null && (
-                      <span style={{ background: isActive ? col.accent : (isDarkMode ? 'rgba(249,115,22,0.3)' : '#fff7ed'), color: isActive ? '#fff' : col.accent, borderRadius: 999, fontSize: 10, fontWeight: 900, minWidth: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 5px', flexShrink: 0 }}>
+                      <span style={{ background: ACCENT_FILL, color: ON_ACCENT, borderRadius: 999, fontSize: 10, fontWeight: 800, minWidth: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 6px', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>
                         {badge}
                       </span>
                     )}
@@ -512,18 +637,18 @@ export default function SunshineShell() {
         </nav>
 
         {/* Bottom controls */}
-        <div style={{ padding: '8px 8px 16px', borderTop: `2px solid ${col.border}` }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', marginBottom: 4 }}>
+        <div style={{ padding: '8px 8px 16px', borderTop: `1px solid ${col.border}` }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 10px', marginBottom: 4 }}>
             <span style={{ fontSize: 12, fontWeight: 700, color: col.muted }}>{isDarkMode ? t('admin.sidebar.darkMode') : t('admin.sidebar.lightMode')}</span>
             <button onClick={toggleDarkMode} role="switch" aria-checked={isDarkMode} aria-label={t('admin.sidebar.darkMode')}
-              style={{ width: 40, height: 22, borderRadius: 999, border: 'none', cursor: 'pointer', background: isDarkMode ? col.accent : col.border, position: 'relative', transition: 'background-color 200ms ease', flexShrink: 0 }}>
+              style={{ width: 40, height: 22, borderRadius: 999, border: 'none', cursor: 'pointer', background: isDarkMode ? ACCENT : 'var(--a-line-strong)', position: 'relative', transition: 'background-color 200ms ease', flexShrink: 0 }}>
               <div style={{ width: 16, height: 16, borderRadius: '50%', background: '#fff', position: 'absolute', top: 3, left: 3, transform: `translateX(${isDarkMode ? 18 : 0}px)`, transition: 'transform 200ms cubic-bezier(0.23, 1, 0.32, 1)', boxShadow: '0 1px 2px rgba(0,0,0,0.2)' }} />
             </button>
           </div>
           <button className="as-nav" onClick={openBroadcast}
-            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 14, border: 'none', cursor: 'pointer', background: isDarkMode ? 'rgba(249,115,22,0.1)' : '#fff7ed', fontFamily: F, marginBottom: 1 }}>
-            <Megaphone size={17} color={col.accent} />
-            <span style={{ fontSize: 13, fontWeight: 700, color: col.accent }}>{t('admin.sidebar.broadcastEmail')}</span>
+            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 10, border: 'none', cursor: 'pointer', background: 'transparent', fontFamily: F, marginBottom: 1 }}>
+            <Megaphone size={17} color="var(--a-accent)" />
+            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--a-accent-ink)' }}>{t('admin.sidebar.broadcastEmail')}</span>
           </button>
           <button className="as-nav" onClick={() => setShowSettingsSidebar(true)}
             style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 14, border: 'none', cursor: 'pointer', background: 'transparent', fontFamily: F, marginBottom: 1 }}>
@@ -540,90 +665,132 @@ export default function SunshineShell() {
       </aside>
 
       {/* ── MAIN ─────────────────────────────────────────────────────────────── */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
+        <SunsetGlow />
 
         {/* Top bar */}
-        <header style={{ height: 64, background: col.sidebar, borderBottom: `2px solid ${col.border}`, display: 'flex', alignItems: 'center', padding: '0 24px', gap: 14, flexShrink: 0 }}>
-          <h1 style={{ margin: 0, fontSize: 18, fontWeight: 900, color: col.heading, flex: 1, fontFamily: F }}>
+        <header style={{ height: 60, background: col.sidebar, borderBottom: `1px solid ${col.border}`, display: 'flex', alignItems: 'center', padding: '0 24px', gap: 12, flexShrink: 0 }}>
+          <h1 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: col.heading, flex: 1, fontFamily: F, letterSpacing: '-0.01em' }}>
             {PAGE_LABEL[activeTab] || tr("sunshineShell.overview")}
           </h1>
 
           {/* ── Notification chips ── */}
           {unreadMessages > 0 && (
-            <button onClick={() => { setActiveTab('messages'); setUnreadMessages(0); }} title={tr("sunshineShell.goToMessages")}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, background: isDarkMode ? 'rgba(139,92,246,0.15)' : '#f5f3ff', border: `2px solid ${isDarkMode ? 'rgba(139,92,246,0.3)' : '#ddd6fe'}`, borderRadius: 999, padding: '5px 14px', cursor: 'pointer', fontFamily: F }}>
-              <span style={{ fontSize: 13 }}>💬</span>
-              <span style={{ fontSize: 13, fontWeight: 800, color: isDarkMode ? '#a78bfa' : '#7c3aed' }}>{tr("sunshineShell.new", { unreadMessages })}</span>
+            <button className="as-press" onClick={() => { setActiveTab('messages'); setUnreadMessages(0); }} title={tr("sunshineShell.goToMessages")}
+              style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'var(--a-surface)', border: `1px solid ${col.border}`, borderRadius: 999, padding: '5px 12px 5px 10px', cursor: 'pointer', fontFamily: F }}>
+              <MessageCircle size={14} color="var(--a-accent)" />
+              <span style={{ fontSize: 12, fontWeight: 700, color: col.heading }}>{tr("sunshineShell.new", { unreadMessages })}</span>
             </button>
           )}
           {missedCallCount > 0 && (
-            <button onClick={clearMissedCalls} title={tr("sunshineShell.clearMissedCalls")}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, background: isDarkMode ? 'rgba(239,68,68,0.12)' : '#fff5f5', border: `2px solid ${isDarkMode ? 'rgba(239,68,68,0.3)' : '#fecaca'}`, borderRadius: 999, padding: '5px 14px', cursor: 'pointer', fontFamily: F }}>
-              <span style={{ fontSize: 13 }}>📞</span>
-              <span style={{ fontSize: 13, fontWeight: 800, color: '#ef4444' }}>{tr("sunshineShell.missed", { missedCallCount })}</span>
+            <button className="as-press" onClick={clearMissedCalls} title={tr("sunshineShell.clearMissedCalls")}
+              style={{ display: 'flex', alignItems: 'center', gap: 7, background: isDarkMode ? 'rgba(239,68,68,0.12)' : '#fef2f2', border: `1px solid ${isDarkMode ? 'rgba(239,68,68,0.3)' : '#fecaca'}`, borderRadius: 999, padding: '5px 12px 5px 10px', cursor: 'pointer', fontFamily: F }}>
+              <PhoneMissed size={14} color={isDarkMode ? '#fca5a5' : '#dc2626'} />
+              <span style={{ fontSize: 12, fontWeight: 700, color: isDarkMode ? '#fca5a5' : '#b91c1c' }}>{tr("sunshineShell.missed", { missedCallCount })}</span>
             </button>
           )}
 
           {/* Notification bell */}
           <button className="as-nav" onClick={() => setActiveTab('notifications')} aria-label={t('admin.nav.notifications')}
-            style={{ position: 'relative', background: 'none', border: 'none', cursor: 'pointer', color: col.muted, padding: 6, borderRadius: 10, display: 'flex', alignItems: 'center' }}>
-            <Bell size={19} color={col.muted} />
+            style={{ position: 'relative', background: 'none', border: 'none', cursor: 'pointer', color: col.muted, padding: 7, borderRadius: 10, display: 'flex', alignItems: 'center' }}>
+            <Bell size={19} color={col.body} strokeWidth={1.8} />
             {unreadNotif > 0 && (
-              <span style={{ position: 'absolute', top: 2, right: 2, width: 8, height: 8, borderRadius: '50%', background: '#ef4444' }} />
+              <span style={{ position: 'absolute', top: 5, right: 5, width: 8, height: 8, borderRadius: '50%', background: ACCENT, boxShadow: `0 0 0 2px ${col.sidebar}` }} />
             )}
           </button>
 
           {/* Avatar */}
           <button className="as-press" onClick={() => setShowSettingsSidebar(true)} aria-label={t('admin.sidebar.settings')}
-            style={{ width: 36, height: 36, borderRadius: 12, border: 'none', background: ACCENT_GRADIENT, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 900, fontSize: 15, fontFamily: F, cursor: 'pointer', flexShrink: 0 }}>
+            style={{ width: 34, height: 34, borderRadius: 10, border: 'none', background: ACCENT_FILL, boxShadow: ACCENT_SHADOW, display: 'flex', alignItems: 'center', justifyContent: 'center', color: ON_ACCENT, fontWeight: 800, fontSize: 14, fontFamily: F, cursor: 'pointer', flexShrink: 0 }}>
             {(adminInfo?.firstName?.[0] || 'A').toUpperCase()}
           </button>
         </header>
 
         {/* Scroll area */}
-        <main style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
+        <main style={{ flex: 1, overflowY: 'auto', padding: 24, position: 'relative' }}>
+          <SunriseBackdrop />
+          <div style={{ position: 'relative' }}>
 
           {/* Toast */}
           {toast && (
-            <div className="ui-toast-in" role="status" style={{ position: 'fixed', top: 20, right: 20, zIndex: 99999, padding: '12px 22px', borderRadius: 20, fontWeight: 700, fontSize: 14, background: '#10b981', color: '#fff', fontFamily: F, boxShadow: '0 8px 24px rgba(0,0,0,0.15)' }}>
-              ✅ {toast}
+            <div className="ui-toast-in" role="status" style={{ position: 'fixed', top: 20, right: 20, zIndex: 99999, padding: '11px 16px 11px 14px', borderRadius: 14, fontWeight: 700, fontSize: 13, background: 'var(--a-surface)', color: col.heading, border: `1px solid ${col.border}`, fontFamily: F, boxShadow: 'var(--a-shadow-pop)', display: 'flex', alignItems: 'center', gap: 9 }}>
+              <CheckCircle size={17} color="#16a34a" />
+              {toast}
             </div>
           )}
 
-          {/* Hero — only on overview */}
+          {/* Hero — only on overview. Bright orange sunrise glow between the greeting and the
+              stats, pink on the right, amber underneath; rings drawn in an orange→pink line. */}
           {showHero && (
-            <div style={{ position: 'relative', borderRadius: 28, overflow: 'hidden', marginBottom: 28, padding: '32px 36px', background: ACCENT_GRADIENT }}>
-              <div style={{ position: 'absolute', top: -40, right: -40, width: 180, height: 180, borderRadius: '50%', background: 'rgba(255,255,255,0.07)' }} />
-              <div style={{ position: 'absolute', bottom: -30, right: 60, width: 120, height: 120, borderRadius: '50%', background: 'rgba(255,255,255,0.05)' }} />
-              <div style={{ position: 'relative', zIndex: 1 }}>
-                <p style={{ margin: '0 0 4px', color: 'rgba(255,255,255,0.8)', fontWeight: 700, fontSize: 13, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
-                  {centerName}
-                </p>
-                <h2 style={{ margin: '0 0 20px', color: '#fff', fontWeight: 900, fontSize: 26, fontFamily: F }}>
-                  {tr("sunshineShell.welcomeBack")} {adminInfo?.firstName || tr("sunshineShell.admin")} 👋
-                </h2>
-                <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
-                  {STATS.map(({ label, value, icon: Icon, g }) => (
-                    <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(4px)', borderRadius: 16, padding: '10px 18px' }}>
-                      <div style={{ width: 34, height: 34, borderRadius: 10, background: 'rgba(255,255,255,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                        <Icon size={16} color="#fff" strokeWidth={2} />
+            <section style={{ position: 'relative', borderRadius: 20, overflow: 'hidden', marginBottom: 24, padding: '26px 28px', background: 'var(--a-surface)', border: `1px solid ${col.border}`, boxShadow: 'var(--a-shadow)' }}>
+              <div aria-hidden="true" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: [
+                // golden-hot core inside the orange so it reads as light, not paint
+                'radial-gradient(14% 70% at 50% -5%, rgba(255,214,102,0.85) 0%, rgba(253,186,116,0.4) 55%, transparent 100%)',
+                'radial-gradient(36% 160% at 50% -20%, rgba(249,115,22,0.88) 0%, rgba(251,146,60,0.48) 40%, rgba(253,186,116,0.15) 62%, transparent 76%)',
+                'radial-gradient(44% 160% at 100% 0%, color-mix(in srgb, var(--a-accent) 52%, transparent) 0%, color-mix(in srgb, var(--a-pink) 26%, transparent) 45%, transparent 76%)',
+                'radial-gradient(32% 130% at 68% 130%, rgba(251,191,36,0.45) 0%, transparent 70%)',
+                'radial-gradient(28% 120% at 0% 120%, color-mix(in srgb, var(--a-pink) 30%, transparent) 0%, transparent 70%)',
+              ].join(', ') }} />
+              {/* one-time light sweep when the overview opens */}
+              <div aria-hidden="true" className="as-hero-shine" />
+              {/* decorative rings — orange→pink gradient line, clearly visible */}
+              <svg aria-hidden="true" width="320" height="320" viewBox="0 0 320 320" style={{ position: 'absolute', right: -90, top: -120, pointerEvents: 'none', filter: 'drop-shadow(0 0 6px rgba(249,115,22,0.45))' }}>
+                <defs>
+                  <linearGradient id="as-hero-ring" x1="0" y1="1" x2="1" y2="0">
+                    <stop offset="0%" stopColor="#f97316" />
+                    <stop offset="100%" stopColor="var(--a-accent)" />
+                  </linearGradient>
+                </defs>
+                {[50, 90, 130].map((r, i) => (
+                  <circle key={r} cx="160" cy="160" r={r} fill="none" stroke="url(#as-hero-ring)" strokeOpacity={0.8 - i * 0.16} strokeWidth={i === 0 ? 3 : 2} />
+                ))}
+              </svg>
+              <svg aria-hidden="true" width="140" height="140" viewBox="0 0 140 140" style={{ position: 'absolute', left: '44%', bottom: -70, pointerEvents: 'none', filter: 'drop-shadow(0 0 5px rgba(249,115,22,0.5))' }}>
+                {[30, 55].map((r, i) => (
+                  <circle key={r} cx="70" cy="70" r={r} fill="none" stroke="#f97316" strokeOpacity={0.65 - i * 0.18} strokeWidth="2" />
+                ))}
+              </svg>
+              {/* a few small floating accents */}
+              {[
+                { left: '38%', top: 18, size: 9, color: '#f97316', delay: '0s' },
+                { left: '56%', top: 46, size: 6, color: 'var(--a-accent)', delay: '1.1s' },
+                { left: '48%', bottom: 22, size: 7, color: '#fbbf24', delay: '2.2s' },
+                { left: '63%', top: 14, size: 5, color: '#fb923c', delay: '0.6s' },
+              ].map((d, i) => (
+                <span key={i} aria-hidden="true" className="as-sparkle" style={{ position: 'absolute', left: d.left, top: d.top, bottom: d.bottom, width: d.size, height: d.size, borderRadius: '50%', background: d.color, boxShadow: `0 0 10px 2px ${d.color}`, animationDelay: d.delay }} />
+              ))}
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 24, flexWrap: 'wrap' }}>
+                <div style={{ minWidth: 0 }}>
+                  <p style={{ margin: '0 0 6px', background: ACCENT_FILL, WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent', display: 'inline-block', fontWeight: 800, fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                    {new Date().toLocaleDateString(dateLocale(), { weekday: 'long', day: 'numeric', month: 'long' })}
+                  </p>
+                  <h2 style={{ margin: '0 0 4px', color: col.heading, fontWeight: 900, fontSize: 24, fontFamily: F, letterSpacing: '-0.015em' }}>
+                    {tr("sunshineShell.welcomeBack")} {adminInfo?.firstName || tr("sunshineShell.admin")}
+                  </h2>
+                  <p style={{ margin: 0, color: col.body, fontSize: 13, fontWeight: 600 }}>{centerName}</p>
+                </div>
+                <div style={{ position: 'relative', display: 'flex', background: 'color-mix(in srgb, var(--a-surface) 82%, transparent)', backdropFilter: 'blur(6px)', border: `1px solid ${col.border}`, borderRadius: 14, boxShadow: 'var(--a-shadow)' }}>
+                  {STATS.map(({ label, value, icon: Icon, cat }, i) => (
+                    <div key={label} className={`cat-${cat}`} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 18px', borderLeft: i ? `1px solid ${col.border}` : 'none' }}>
+                      <div style={{ width: 32, height: 32, borderRadius: 9, background: 'var(--cat-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <Icon size={16} color="var(--cat)" strokeWidth={2} />
                       </div>
                       <div>
-                        <div style={{ fontSize: 18, fontWeight: 900, color: '#fff', lineHeight: 1 }}>{value}</div>
-                        <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.8)' }}>{label}</div>
+                        <div style={{ fontSize: 19, fontWeight: 800, color: col.heading, lineHeight: 1.05, fontVariantNumeric: 'tabular-nums' }}>{value}</div>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: col.muted }}>{label}</div>
                       </div>
                     </div>
                   ))}
                 </div>
               </div>
-            </div>
+            </section>
           )}
 
           {/* Missed calls alert — visible on overview */}
           {showHero && missedCallCount > 0 && (
-            <div style={{ background: isDarkMode ? 'rgba(239,68,68,0.1)' : '#fff5f5', border: `2px solid ${isDarkMode ? 'rgba(239,68,68,0.3)' : '#fecaca'}`, borderRadius: 20, padding: '16px 20px', display: 'flex', gap: 16, alignItems: 'flex-start', marginBottom: 24 }}>
-              <div style={{ width: 44, height: 44, borderRadius: 14, background: 'linear-gradient(135deg,#ef4444,#dc2626)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 4px 12px rgba(239,68,68,0.35)' }}>
-                <AlertTriangle size={20} color='#fff' />
+            <div style={{ background: isDarkMode ? 'rgba(239,68,68,0.1)' : '#fef2f2', border: `1px solid ${isDarkMode ? 'rgba(239,68,68,0.3)' : '#fecaca'}`, borderRadius: 16, padding: '14px 18px', display: 'flex', gap: 14, alignItems: 'flex-start', marginBottom: 24 }}>
+              <div style={{ width: 38, height: 38, borderRadius: 11, background: '#dc2626', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <PhoneMissed size={18} color='#fff' />
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
@@ -635,7 +802,7 @@ export default function SunshineShell() {
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                   {missedCalls.map((mc, i) => (
                     <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, background: isDarkMode ? 'rgba(255,255,255,0.06)' : '#fff', border: `1px solid ${isDarkMode ? 'rgba(239,68,68,0.2)' : '#fecaca'}`, borderRadius: 12, padding: '7px 12px' }}>
-                      <div style={{ width: 30, height: 30, borderRadius: 10, background: 'linear-gradient(135deg,#ef4444,#f97316)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 900, color: '#fff', flexShrink: 0 }}>
+                      <div style={{ width: 30, height: 30, borderRadius: 10, background: 'var(--a-raised)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 800, color: col.heading, flexShrink: 0 }}>
                         {(mc.callerName?.[0] || '?').toUpperCase()}
                       </div>
                       <div>
@@ -660,6 +827,7 @@ export default function SunshineShell() {
               {tabContent}
             </TabErrorBoundary>
           </Suspense>
+          </div>
         </main>
       </div>
 
@@ -692,8 +860,8 @@ export default function SunshineShell() {
           .join(' & ') || '—';
 
         const ov  = { position: 'fixed', inset: 0, zIndex: 9000, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 };
-        const box = { background: isDarkMode ? '#1a1d2e' : '#ffffff', border: `2px solid ${col.border}`, borderRadius: 24, width: '100%', maxWidth: 540, maxHeight: '92vh', overflowY: 'auto', boxShadow: '0 24px 60px rgba(0,0,0,0.4)', fontFamily: F };
-        const inp = { width: '100%', boxSizing: 'border-box', padding: '9px 13px', background: isDarkMode ? 'rgba(255,255,255,0.05)' : '#fff8f0', border: `2px solid ${col.border}`, borderRadius: 10, color: col.heading, fontSize: 13, fontFamily: F, outline: 'none' };
+        const box = { background: 'var(--a-surface)', border: `1px solid ${col.border}`, borderRadius: 20, width: '100%', maxWidth: 540, maxHeight: '92vh', overflowY: 'auto', boxShadow: 'var(--a-shadow-pop)', fontFamily: F };
+        const inp = { width: '100%', boxSizing: 'border-box', padding: '9px 13px', background: 'var(--a-raised)', border: `1px solid ${col.border}`, borderRadius: 10, color: col.heading, fontSize: 13, fontFamily: F, outline: 'none' };
         const lbl = { display: 'block', fontSize: 11, fontWeight: 800, color: col.muted, marginBottom: 5, textTransform: 'uppercase', letterSpacing: '0.07em' };
 
         return (
@@ -701,10 +869,10 @@ export default function SunshineShell() {
             <div className="ui-pop-in" role="dialog" aria-modal="true" aria-label={tr("sunshineShell.broadcastEmail")} style={box}>
 
               {/* Header */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 22px', borderBottom: `2px solid ${col.border}` }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 22px', borderBottom: `1px solid ${col.border}` }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <div style={{ width: 36, height: 36, borderRadius: 12, background: ACCENT_GRADIENT, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <Megaphone size={18} color="#fff" />
+                  <div style={{ width: 36, height: 36, borderRadius: 11, background: 'var(--a-accent-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Megaphone size={18} color="var(--a-accent)" />
                   </div>
                   <span style={{ fontSize: 16, fontWeight: 900, color: col.heading }}>{tr("sunshineShell.broadcastEmail")}</span>
                 </div>
@@ -715,14 +883,14 @@ export default function SunshineShell() {
                 {broadcastResult ? (
                   /* ── Success ── */
                   <div style={{ textAlign: 'center', padding: '24px 0' }}>
-                    <CheckCircle size={44} color="#10b981" style={{ marginBottom: 14 }} />
+                    <CheckCircle size={44} color="#10b981" style={{ margin: '0 auto 14px' }} />
                     <p style={{ margin: '0 0 6px', fontSize: 18, fontWeight: 900, color: col.heading }}>{tr("sunshineShell.sent")}</p>
                     <p style={{ margin: '0 0 4px', fontSize: 13, color: col.body }}>
                       <strong style={{ color: '#10b981' }}>{broadcastResult.sent}</strong> {tr("sunshineShell.email")}{broadcastResult.sent !== 1 ? 's' : ''} {tr("sunshineShell.delivered")}
                       {broadcastResult.failed > 0 && <>, <strong style={{ color: '#ef4444' }}>{broadcastResult.failed}</strong> failed</>}
                     </p>
                     <p style={{ margin: '0 0 24px', fontSize: 12, color: col.muted }}>{tr("sunshineShell.total", { total: broadcastResult.total })}</p>
-                    <button onClick={() => setBroadcastModal(false)} style={{ padding: '10px 32px', borderRadius: 14, border: 'none', background: ACCENT_GRADIENT, color: '#fff', fontWeight: 800, fontSize: 14, cursor: 'pointer', fontFamily: F }}>{tr("sunshineShell.done")}</button>
+                    <button onClick={() => setBroadcastModal(false)} style={{ padding: '10px 32px', borderRadius: 14, border: 'none', background: ACCENT_FILL, color: ON_ACCENT, fontWeight: 800, fontSize: 14, cursor: 'pointer', fontFamily: F }}>{tr("sunshineShell.done")}</button>
                   </div>
                 ) : (
                   <>
@@ -734,8 +902,8 @@ export default function SunshineShell() {
                         return (
                           <button key={g.key} onClick={() => !broadcasting && toggleGroup(g.key)} style={{
                             flex: 1, padding: '10px 6px', borderRadius: 14, cursor: 'pointer', textAlign: 'center', fontFamily: F,
-                            border: t.enabled ? `2px solid ${col.accent}` : `2px solid ${col.border}`,
-                            background: t.enabled ? (isDarkMode ? 'rgba(249,115,22,0.15)' : '#fff7ed') : 'transparent',
+                            border: t.enabled ? `1px solid ${col.accent}` : `1px solid ${col.border}`,
+                            background: t.enabled ? 'var(--a-accent-soft)' : 'transparent',
                             transition: 'border-color 150ms ease, background-color 150ms ease, transform 120ms ease-out',
                           }} className="as-press">
                             <div style={{ fontSize: 22, marginBottom: 3 }}>{g.emoji}</div>
@@ -745,7 +913,7 @@ export default function SunshineShell() {
                             </div>
                             {t.enabled && (
                               <div style={{ width: 18, height: 18, borderRadius: '50%', background: col.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '5px auto 0' }}>
-                                <CheckCircle2 size={11} color="#fff" />
+                                <CheckCircle2 size={11} color="var(--a-on-accent)" />
                               </div>
                             )}
                           </button>
@@ -761,7 +929,7 @@ export default function SunshineShell() {
                         `${p.firstName || ''} ${p.lastName || ''} ${p.email || ''}`.toLowerCase().includes(search.toLowerCase())
                       );
                       return (
-                        <div key={g.key} style={{ background: isDarkMode ? 'rgba(249,115,22,0.06)' : '#fffbf5', border: `2px solid ${isDarkMode ? 'rgba(249,115,22,0.2)' : '#fed7aa'}`, borderRadius: 14, padding: 14, marginBottom: 12 }}>
+                        <div key={g.key} style={{ background: 'var(--a-raised)', border: `1px solid ${col.border}`, borderRadius: 14, padding: 14, marginBottom: 12 }}>
                           {/* Group header */}
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
                             <span style={{ fontSize: 14 }}>{g.emoji}</span>
@@ -776,8 +944,8 @@ export default function SunshineShell() {
                             ].map(opt => (
                               <button key={opt.mode} onClick={() => setGroupMode(g.key, opt.mode)} style={{
                                 flex: 1, padding: '7px 10px', borderRadius: 10, cursor: 'pointer', fontFamily: F, fontSize: 12, fontWeight: 700,
-                                border: t.mode === opt.mode ? `2px solid ${col.accent}` : `2px solid ${col.border}`,
-                                background: t.mode === opt.mode ? (isDarkMode ? 'rgba(249,115,22,0.18)' : '#fff7ed') : 'transparent',
+                                border: t.mode === opt.mode ? `1px solid ${col.accent}` : `1px solid ${col.border}`,
+                                background: t.mode === opt.mode ? 'var(--a-accent-soft)' : 'transparent',
                                 color: t.mode === opt.mode ? col.accent : col.muted,
                                 transition: 'border-color 150ms ease, background-color 150ms ease, color 150ms ease',
                               }}>{opt.label}</button>
@@ -797,19 +965,19 @@ export default function SunshineShell() {
                                 />
                                 <button
                                   onClick={() => selectAllInGroup(g.key, filtered)}
-                                  style={{ padding: '7px 11px', borderRadius: 10, border: `2px solid ${col.border}`, background: 'transparent', color: col.accent, fontWeight: 700, fontSize: 11, cursor: 'pointer', fontFamily: F, whiteSpace: 'nowrap' }}
+                                  style={{ padding: '7px 11px', borderRadius: 10, border: `1px solid ${col.border}`, background: 'transparent', color: col.accent, fontWeight: 700, fontSize: 11, cursor: 'pointer', fontFamily: F, whiteSpace: 'nowrap' }}
                                 >{tr("sunshineShell.selectAll")}</button>
                               </div>
 
                               {/* Scrollable list */}
-                              <div style={{ maxHeight: 170, overflowY: 'auto', borderRadius: 10, border: `2px solid ${col.border}`, background: isDarkMode ? 'rgba(255,255,255,0.03)' : '#fff' }}>
+                              <div style={{ maxHeight: 170, overflowY: 'auto', borderRadius: 10, border: `1px solid ${col.border}`, background: 'var(--a-surface)' }}>
                                 {filtered.length === 0 ? (
                                   <div style={{ padding: 16, textAlign: 'center', fontSize: 12, color: col.muted }}>{tr("sunshineShell.noResults")}</div>
                                 ) : filtered.map(p => {
                                   const id      = p._id || p.id;
                                   const checked = t.ids.includes(id);
                                   return (
-                                    <label key={id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', cursor: 'pointer', borderBottom: `1px solid ${col.border}`, background: checked ? (isDarkMode ? 'rgba(249,115,22,0.08)' : '#fff7ed') : 'transparent' }}>
+                                    <label key={id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', cursor: 'pointer', borderBottom: `1px solid ${col.border}`, background: checked ? 'var(--a-accent-soft)' : 'transparent' }}>
                                       <input type="checkbox" checked={checked} onChange={() => togglePersonId(g.key, id)} style={{ accentColor: col.accent, width: 15, height: 15, flexShrink: 0 }} />
                                       <div style={{ flex: 1, minWidth: 0 }}>
                                         <div style={{ fontSize: 13, fontWeight: 700, color: col.heading, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -832,7 +1000,7 @@ export default function SunshineShell() {
 
                     {/* ── Recipient summary ── */}
                     {anyEnabled && (
-                      <div style={{ background: isDarkMode ? 'rgba(249,115,22,0.07)' : '#fff7ed', border: `2px solid ${isDarkMode ? 'rgba(249,115,22,0.2)' : '#fed7aa'}`, borderRadius: 12, padding: '8px 13px', marginBottom: 14, fontSize: 12, color: col.body }}>
+                      <div style={{ background: 'var(--a-accent-soft)', border: `1px solid var(--a-accent-line)`, borderRadius: 12, padding: '8px 13px', marginBottom: 14, fontSize: 12, color: col.body }}>
                         {tr("sunshineShell.thisWillEmail")} <strong style={{ color: col.accent }}>{recipientSummary}</strong>.
                       </div>
                     )}
@@ -847,8 +1015,8 @@ export default function SunshineShell() {
 
                     {/* ── Actions ── */}
                     <div style={{ display: 'flex', gap: 10 }}>
-                      <button className="as-press" onClick={() => setBroadcastModal(false)} disabled={broadcasting} style={{ flex: 1, padding: '11px', borderRadius: 14, border: `2px solid ${col.border}`, background: 'transparent', color: col.body, fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: F }}>{tr("sunshineShell.cancel")}</button>
-                      <button className="as-press" disabled={!canSend || broadcasting} onClick={handleBroadcast} style={{ flex: 2, padding: '11px', borderRadius: 14, border: 'none', background: canSend && !broadcasting ? ACCENT_GRADIENT : (isDarkMode ? '#2a2d40' : '#f5f0ec'), color: canSend && !broadcasting ? '#fff' : col.muted, fontWeight: 800, fontSize: 13, cursor: canSend && !broadcasting ? 'pointer' : 'not-allowed', fontFamily: F, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, boxShadow: canSend && !broadcasting ? `0 4px 14px ${TAB_SHADOW}` : 'none' }}>
+                      <button className="as-press" onClick={() => setBroadcastModal(false)} disabled={broadcasting} style={{ flex: 1, padding: '11px', borderRadius: 14, border: `1px solid ${col.border}`, background: 'transparent', color: col.body, fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: F }}>{tr("sunshineShell.cancel")}</button>
+                      <button className="as-press as-accent-btn" disabled={!canSend || broadcasting} onClick={handleBroadcast} style={{ flex: 2, padding: '11px', borderRadius: 12, border: 'none', background: canSend && !broadcasting ? ACCENT_FILL : 'var(--a-raised)', color: canSend && !broadcasting ? ON_ACCENT : col.muted, fontWeight: 800, fontSize: 13, cursor: canSend && !broadcasting ? 'pointer' : 'not-allowed', fontFamily: F, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, boxShadow: canSend && !broadcasting ? ACCENT_SHADOW : 'none' }}>
                         <Send size={14} />
                         {broadcasting ? tr("sunshineShell.sending") : tr("sunshineShell.sendTo", { enabledLabel })}
                       </button>

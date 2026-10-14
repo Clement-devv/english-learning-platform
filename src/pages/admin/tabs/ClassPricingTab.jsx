@@ -47,13 +47,13 @@ export default function ClassPricingTab({ isDarkMode }) {
   const [calc,     setCalc]     = useState("");   // calculator input
 
   const dm = isDarkMode;
-  const bg      = dm ? "#1e293b" : "#ffffff";
-  const pageBg  = dm ? "#0f172a" : "#f8fafc";
-  const border  = dm ? "#334155" : "#e2e8f0";
-  const textPri = dm ? "#f1f5f9" : "#1e293b";
-  const textSec = dm ? "#94a3b8" : "#64748b";
-  const inputBg = dm ? "#0f172a" : "#ffffff";
-  const lbl     = { display: "block", fontSize: "12px", fontWeight: "700", color: dm ? "#94a3b8" : "#374151", marginBottom: "5px", textTransform: "uppercase", letterSpacing: "0.05em" };
+  const bg      = 'var(--a-surface)';
+  const pageBg  = 'var(--a-raised)';
+  const border  = 'var(--a-line)';
+  const textPri = 'var(--a-ink)';
+  const textSec = 'var(--a-ink-2)';
+  const inputBg = 'var(--a-surface)';
+  const lbl     = { display: "block", fontSize: "12px", fontWeight: "700", color: 'var(--a-ink-2)', marginBottom: "5px", textTransform: "uppercase", letterSpacing: "0.05em" };
   const inp     = { width: "100%", padding: "10px 13px", borderRadius: "10px", border: `1.5px solid ${border}`, background: inputBg, color: textPri, fontSize: "14px", outline: "none", boxSizing: "border-box", fontFamily: "inherit" };
 
   useEffect(() => {
@@ -115,14 +115,14 @@ export default function ClassPricingTab({ isDarkMode }) {
   if (loading) {
     return (
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "300px", background: pageBg }}>
-        <RefreshCw size={24} color="#6366f1" style={{ animation: "spin 1s linear infinite" }} />
+        <RefreshCw size={24} color="var(--a-accent)" style={{ animation: "spin 1s linear infinite" }} />
         <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
       </div>
     );
   }
 
   return (
-    <div style={{ background: pageBg, minHeight: "100vh", padding: "28px 24px", fontFamily: "var(--font-body)" }}>
+    <div>
 
       {/* Page heading */}
       <div style={{ marginBottom: "28px" }}>
@@ -137,7 +137,7 @@ export default function ClassPricingTab({ isDarkMode }) {
         {/* ── Pricing config card ── */}
         <div style={{ background: bg, borderRadius: "16px", border: `1px solid ${border}`, padding: "24px", boxShadow: dm ? "none" : "0 2px 12px rgba(0,0,0,0.06)" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "20px" }}>
-            <div style={{ background: "linear-gradient(135deg,#6366f1,#818cf8)", borderRadius: "10px", padding: "8px", display: "flex" }}>
+            <div style={{ background: "var(--a-accent-grad)", borderRadius: "10px", padding: "8px", display: "flex" }}>
               <DollarSign size={16} color="#fff" />
             </div>
             <h2 style={{ fontSize: "15px", fontWeight: "700", color: textPri, margin: 0 }}>{tr("classPricingTab.pricingSettings")}</h2>
@@ -197,7 +197,7 @@ export default function ClassPricingTab({ isDarkMode }) {
           </div>
 
           {/* Group classes — paid with group points (separate from class credits) */}
-          <div style={{ marginBottom: "20px", paddingTop: "16px", borderTop: `1px solid ${dm ? "#2a2d40" : "#e2e8f0"}` }}>
+          <div style={{ marginBottom: "20px", paddingTop: "16px", borderTop: `1px solid ${'var(--a-line)'}` }}>
             <p style={{ fontSize: "14px", fontWeight: "800", color: textPri, margin: "0 0 4px" }}>{tr("classPricingTab.groupClasses")}</p>
             <p style={{ fontSize: "12px", color: textSec, margin: "0 0 12px" }}>{tr("classPricingTab.groupClassesHint")}</p>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
@@ -229,7 +229,7 @@ export default function ClassPricingTab({ isDarkMode }) {
           <button
             onClick={handleSave}
             disabled={saving}
-            style={{ width: "100%", padding: "12px", borderRadius: "10px", border: "none", background: saving ? "#94a3b8" : "linear-gradient(135deg,#6366f1,#818cf8)", color: "#fff", fontSize: "14px", fontWeight: "700", cursor: saving ? "not-allowed" : "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}
+            style={{ width: "100%", padding: "12px", borderRadius: "10px", border: "none", background: saving ? "var(--a-raised)" : "var(--a-accent-grad)", color: "#fff", fontSize: "14px", fontWeight: "700", cursor: saving ? "not-allowed" : "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}
           >
             <Save size={15} />
             {saving ? tr("classPricingTab.saving") : tr("classPricingTab.savePricing")}
@@ -246,10 +246,10 @@ export default function ClassPricingTab({ isDarkMode }) {
           </div>
 
           {/* Current rate display */}
-          <div style={{ background: dm ? "#0f172a" : "#f8fafc", borderRadius: "12px", padding: "16px", marginBottom: "20px", border: `1px solid ${border}` }}>
+          <div style={{ background: 'var(--a-raised)', borderRadius: "12px", padding: "16px", marginBottom: "20px", border: `1px solid ${border}` }}>
             <p style={{ fontSize: "12px", color: textSec, margin: "0 0 4px", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: "700" }}>{tr("classPricingTab.currentRate")}</p>
             {price && Number(price) > 0 ? (
-              <p style={{ fontSize: "24px", fontWeight: "800", color: "#6366f1", margin: 0 }}>
+              <p style={{ fontSize: "24px", fontWeight: "800", color: "var(--a-accent-ink)", margin: 0 }}>
                 {symbol}{Number(price).toLocaleString()} <span style={{ fontSize: "14px", color: textSec, fontWeight: "600" }}>{tr("classPricingTab.perClass")}</span>
               </p>
             ) : (
@@ -271,9 +271,9 @@ export default function ClassPricingTab({ isDarkMode }) {
           </div>
 
           {/* Result */}
-          <div style={{ background: dm ? "#0f172a" : "#f0f7ff", borderRadius: "12px", padding: "16px", border: `1px solid ${dm ? border : "#bfdbfe"}` }}>
+          <div style={{ background: 'var(--a-raised)', borderRadius: "12px", padding: "16px", border: `1px solid ${dm ? border : "#bfdbfe"}` }}>
             <p style={{ fontSize: "12px", color: textSec, margin: "0 0 4px", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: "700" }}>{tr("classPricingTab.totalCost")}</p>
-            <p style={{ fontSize: "28px", fontWeight: "800", color: dm ? "#818cf8" : "#4f46e5", margin: 0 }}>
+            <p style={{ fontSize: "28px", fontWeight: "800", color: 'var(--a-accent-ink)', margin: 0 }}>
               {calcTotal != null
                 ? `${symbol}${Number(calcTotal).toLocaleString()}`
                 : <span style={{ fontSize: "16px", color: textSec, fontWeight: "600" }}>{tr("classPricingTab.enterClassesAbove")}</span>
@@ -287,10 +287,10 @@ export default function ClassPricingTab({ isDarkMode }) {
           </div>
 
           {/* Usage tip */}
-          <div style={{ marginTop: "16px", padding: "12px 14px", borderRadius: "10px", background: dm ? "rgba(99,102,241,0.08)" : "#f5f3ff", border: `1px solid ${dm ? "#312e81" : "#e9d5ff"}` }}>
+          <div style={{ marginTop: "16px", padding: "12px 14px", borderRadius: "10px", background: 'var(--a-accent-soft)', border: `1px solid ${'var(--a-accent-line)'}` }}>
             <div style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
-              <BookOpen size={14} color={dm ? "#818cf8" : "#7c3aed"} style={{ flexShrink: 0, marginTop: "1px" }} />
-              <p style={{ fontSize: "12px", color: dm ? "#a5b4fc" : "#6d28d9", margin: 0, lineHeight: "1.5" }}>
+              <BookOpen size={14} color={'var(--a-accent-ink)'} style={{ flexShrink: 0, marginTop: "1px" }} />
+              <p style={{ fontSize: "12px", color: 'var(--a-accent-ink)', margin: 0, lineHeight: "1.5" }}>
                 {tr("classPricingTab.whenYouRecordAPayment")}
               </p>
             </div>

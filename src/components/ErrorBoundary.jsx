@@ -139,7 +139,7 @@ const styles = {
     lineHeight: 1.7,
   },
   primaryBtn: {
-    background: "var(--brand-primary, #4f46e5)",
+    background: "var(--as-accent, var(--brand-primary, #4f46e5))",
     color: "#fff",
     border: "none",
     borderRadius: "10px",
@@ -267,7 +267,7 @@ const tabStyles = {
     width: "100%",
   },
   btn: {
-    background: "var(--brand-primary, #4f46e5)",
+    background: "var(--as-accent, var(--brand-primary, #4f46e5))",
     color: "#fff",
     border: "none",
     borderRadius: "8px",

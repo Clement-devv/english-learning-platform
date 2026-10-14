@@ -30,13 +30,13 @@ export default function ManualPaymentModal({ isOpen, onClose, onSave, student, i
   if (!isOpen) return null;
 
   const dm       = isDarkMode;
-  const bg       = dm ? "#1e293b" : "#ffffff";
-  const border   = dm ? "#334155" : "#e2e8f0";
-  const textPri  = dm ? "#f1f5f9" : "#1e293b";
-  const textSec  = dm ? "#94a3b8" : "#64748b";
-  const inputBg  = dm ? "#0f172a" : "#f8fafc";
-  const inputCol = dm ? "#f1f5f9" : "#1e293b";
-  const lbl      = { display: "block", fontSize: "12px", fontWeight: "700", color: dm ? "#94a3b8" : "#374151", marginBottom: "5px", textTransform: "uppercase", letterSpacing: "0.05em" };
+  const bg       = 'var(--a-surface)';
+  const border   = 'var(--a-line)';
+  const textPri  = 'var(--a-ink)';
+  const textSec  = 'var(--a-ink-2)';
+  const inputBg  = 'var(--a-raised)';
+  const inputCol = 'var(--a-ink)';
+  const lbl      = { display: "block", fontSize: "12px", fontWeight: "700", color: 'var(--a-ink-2)', marginBottom: "5px", textTransform: "uppercase", letterSpacing: "0.05em" };
   const inp      = { width: "100%", padding: "10px 13px", borderRadius: "10px", border: `1.5px solid ${border}`, background: inputBg, color: inputCol, fontSize: "13.5px", outline: "none", boxSizing: "border-box", fontFamily: "inherit" };
   const inpErr   = { ...inp, border: "1.5px solid #ef4444", background: dm ? "rgba(239,68,68,0.05)" : "#fff5f5" };
 
@@ -228,7 +228,7 @@ export default function ManualPaymentModal({ isOpen, onClose, onSave, student, i
             />
             {ppc && classes && !hasError && (
               <p style={{ fontSize: "11.5px", color: textSec, marginTop: "5px" }}>
-                {classes} × {currSym}{ppc} = <strong style={{ color: dm ? "#818cf8" : "#4f46e5" }}>{currSym}{expectedAmount} {curr}</strong>
+                {classes} × {currSym}{ppc} = <strong style={{ color: 'var(--a-accent-ink)' }}>{currSym}{expectedAmount} {curr}</strong>
               </p>
             )}
           </div>
@@ -267,7 +267,7 @@ export default function ManualPaymentModal({ isOpen, onClose, onSave, student, i
               disabled={loading || hasError || !canSave}
               style={{
                 flex: 2, padding: "11px", borderRadius: "10px", border: "none",
-                background: (loading || hasError || !canSave) ? "#94a3b8" : "linear-gradient(135deg,#10b981,#059669)",
+                background: (loading || hasError || !canSave) ? "var(--a-raised)" : "linear-gradient(135deg,#10b981,#059669)",
                 color: "#fff", fontSize: "14px", fontWeight: "700",
                 cursor: (loading || hasError || !canSave) ? "not-allowed" : "pointer",
                 fontFamily: "inherit",

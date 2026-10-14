@@ -49,11 +49,11 @@ function StatusBadge({ status }) {
     accepted: "bg-blue-100 text-blue-700",
     completed: "bg-green-100 text-green-700",
     pending: "bg-amber-100 text-amber-700",
-    cancelled: "bg-gray-100 text-gray-600",
+    cancelled: "bg-stone-100 text-stone-600",
     rejected: "bg-red-100 text-red-700",
   };
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold capitalize ${map[status] || "bg-gray-100 text-gray-600"}`}>
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold capitalize ${map[status] || "bg-stone-100 text-stone-600"}`}>
       {status}
     </span>
   );
@@ -73,8 +73,8 @@ function Steps({ steps, current, isDarkMode }) {
                   : i === current
                   ? "bg-blue-600 border-blue-600 text-white"
                   : isDarkMode
-                  ? "border-gray-600 text-gray-500"
-                  : "border-gray-300 text-gray-400"
+                  ? "border-stone-600 text-stone-500"
+                  : "border-stone-300 text-stone-400"
               }`}
             >
               {i < current ? <CheckCircle className="w-3.5 h-3.5" /> : i + 1}
@@ -83,7 +83,7 @@ function Steps({ steps, current, isDarkMode }) {
               className={`text-[10px] mt-1 font-medium whitespace-nowrap ${
                 i === current
                   ? isDarkMode ? "text-blue-400" : "text-blue-600"
-                  : isDarkMode ? "text-gray-500" : "text-gray-400"
+                  : isDarkMode ? "text-stone-500" : "text-stone-400"
               }`}
             >
               {label}
@@ -94,7 +94,7 @@ function Steps({ steps, current, isDarkMode }) {
               className={`flex-1 h-0.5 mx-1 mb-4 ${
                 i < current
                   ? "bg-emerald-400"
-                  : isDarkMode ? "bg-gray-700" : "bg-gray-200"
+                  : isDarkMode ? "bg-stone-700" : "bg-stone-200"
               }`}
             />
           )}
@@ -112,17 +112,17 @@ function SelectRow({ label, sub, onClick, isDarkMode, disabled }) {
       disabled={disabled}
       className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border text-left transition ${
         disabled
-          ? isDarkMode ? "opacity-40 cursor-not-allowed border-gray-700" : "opacity-40 cursor-not-allowed border-gray-200"
+          ? isDarkMode ? "opacity-40 cursor-not-allowed border-stone-700" : "opacity-40 cursor-not-allowed border-stone-200"
           : isDarkMode
-          ? "border-gray-700 hover:border-blue-500 hover:bg-blue-900/20"
-          : "border-gray-200 hover:border-blue-400 hover:bg-blue-50"
+          ? "border-stone-700 hover:border-blue-500 hover:bg-blue-900/20"
+          : "border-stone-200 hover:border-blue-400 hover:bg-blue-50"
       }`}
     >
       <div>
-        <p className={`text-sm font-medium ${isDarkMode ? "text-white" : "text-gray-900"}`}>{label}</p>
-        {sub && <p className={`text-xs mt-0.5 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>{sub}</p>}
+        <p className={`text-sm font-medium ${isDarkMode ? "text-white" : "text-stone-900"}`}>{label}</p>
+        {sub && <p className={`text-xs mt-0.5 ${isDarkMode ? "text-stone-400" : "text-stone-500"}`}>{sub}</p>}
       </div>
-      <ChevronRight className={`w-4 h-4 flex-shrink-0 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`} />
+      <ChevronRight className={`w-4 h-4 flex-shrink-0 ${isDarkMode ? "text-stone-500" : "text-stone-400"}`} />
     </button>
   );
 }
@@ -214,10 +214,10 @@ export default function LessonActionModal({
   };
 
   // ── Colour theme ──
-  const bg = isDarkMode ? "bg-gray-900" : "bg-white";
-  const cardBg = isDarkMode ? "bg-gray-800 border-gray-700" : "bg-gray-50 border-gray-200";
-  const textPrimary = isDarkMode ? "text-white" : "text-gray-900";
-  const textSecondary = isDarkMode ? "text-gray-400" : "text-gray-500";
+  const bg = isDarkMode ? "bg-stone-900" : "bg-white";
+  const cardBg = isDarkMode ? "bg-stone-800 border-stone-700" : "bg-stone-50 border-stone-200";
+  const textPrimary = isDarkMode ? "text-white" : "text-stone-900";
+  const textSecondary = isDarkMode ? "text-stone-400" : "text-stone-500";
   const headerGradient = isMarking
     ? "from-emerald-600 to-teal-600"
     : "from-rose-600 to-orange-600";
@@ -316,8 +316,8 @@ export default function LessonActionModal({
           {step === "student" && (
             <div className="space-y-3">
               <div className="flex items-center gap-2 mb-4">
-                <div className={`p-2 rounded-lg ${isDarkMode ? "bg-purple-900/30" : "bg-purple-50"}`}>
-                  <User className="w-4 h-4 text-purple-500" />
+                <div className={`p-2 rounded-lg ${isDarkMode ? "bg-ad-accent-soft" : "bg-ad-accent-soft"}`}>
+                  <User className="w-4 h-4 text-ad-accent-ink" />
                 </div>
                 <div>
                   <p className={`text-sm font-semibold ${textPrimary}`}>{tr("lessonActionModal.selectStudent")}</p>
@@ -391,8 +391,8 @@ export default function LessonActionModal({
                     onClick={() => { setSelectedBooking(b); setStep("confirm"); }}
                     className={`w-full text-left px-4 py-3 rounded-xl border transition ${
                       isDarkMode
-                        ? "border-gray-700 hover:border-blue-500 hover:bg-blue-900/20"
-                        : "border-gray-200 hover:border-blue-400 hover:bg-blue-50"
+                        ? "border-stone-700 hover:border-blue-500 hover:bg-blue-900/20"
+                        : "border-stone-200 hover:border-blue-400 hover:bg-blue-50"
                     }`}
                   >
                     <div className="flex items-start justify-between gap-2">
@@ -466,7 +466,7 @@ export default function LessonActionModal({
                 <p className={`text-xs font-semibold mb-2 ${isMarking ? "text-emerald-600" : "text-rose-600"}`}>
                   {tr("lessonActionModal.whatWillHappen")}
                 </p>
-                <ul className={`text-xs space-y-1 ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
+                <ul className={`text-xs space-y-1 ${isDarkMode ? "text-stone-300" : "text-stone-700"}`}>
                   {isMarking ? (
                     <>
                       <li>{tr("lessonActionModal.booking")} <strong>{tr("lessonActionModal.completed2")}</strong></li>
@@ -522,11 +522,11 @@ export default function LessonActionModal({
 
         {/* ── Footer ── */}
         {step !== "done" && (
-          <div className={`flex items-center justify-between px-6 py-4 border-t flex-shrink-0 ${isDarkMode ? "border-gray-700" : "border-gray-100"}`}>
+          <div className={`flex items-center justify-between px-6 py-4 border-t flex-shrink-0 ${isDarkMode ? "border-stone-700" : "border-stone-100"}`}>
             <button
               onClick={step === "confirm" ? () => setStep("class") : onClose}
               className={`text-sm font-medium px-4 py-2 rounded-xl transition-colors ${
-                isDarkMode ? "text-gray-300 hover:bg-gray-700" : "text-gray-600 hover:bg-gray-100"
+                isDarkMode ? "text-stone-300 hover:bg-stone-700" : "text-stone-600 hover:bg-stone-100"
               }`}
             >
               {step === "confirm" ? tr("lessonActionModal.back") : tr("lessonActionModal.cancel")}
@@ -554,7 +554,7 @@ export default function LessonActionModal({
         )}
 
         {step === "done" && (
-          <div className={`px-6 py-4 border-t flex-shrink-0 ${isDarkMode ? "border-gray-700" : "border-gray-100"}`}>
+          <div className={`px-6 py-4 border-t flex-shrink-0 ${isDarkMode ? "border-stone-700" : "border-stone-100"}`}>
             <button
               onClick={onClose}
               className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm transition"
@@ -572,10 +572,10 @@ export default function LessonActionModal({
 function InfoRow({ label, value, isDarkMode }) {
   return (
     <div className="flex items-start gap-3">
-      <span className={`text-xs font-medium w-20 flex-shrink-0 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+      <span className={`text-xs font-medium w-20 flex-shrink-0 ${isDarkMode ? "text-stone-400" : "text-stone-500"}`}>
         {label}
       </span>
-      <span className={`text-xs font-semibold ${isDarkMode ? "text-gray-200" : "text-gray-800"}`}>{value}</span>
+      <span className={`text-xs font-semibold ${isDarkMode ? "text-stone-200" : "text-stone-800"}`}>{value}</span>
     </div>
   );
 }

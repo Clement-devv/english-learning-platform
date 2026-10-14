@@ -44,8 +44,8 @@ const TYPE_META = {
 function getTypeMeta(type) {
   return TYPE_META[type] || {
     icon: Bell,
-    color:  "#6366f1",
-    bgLight: "#e0e7ff",
+    color:  "var(--a-accent-ink)",
+    bgLight: "var(--a-accent-soft)",
     bgDark:  "rgba(99,102,241,0.12)",
     label:  ta("notificationsTab.type.activity"),
   };
@@ -134,12 +134,12 @@ export default function NotificationsTab({ isDarkMode, onUnreadCount }) {
   });
 
   // ── Styles ────────────────────────────────────────────────────────────────
-  const bg      = dark ? "#0f1117" : "#f4f6fb";
-  const card    = dark ? "#1a1d27" : "#ffffff";
-  const border  = dark ? "#1e2235" : "#e8ecf4";
-  const text    = dark ? "#e2e8f0" : "#1e293b";
-  const muted   = dark ? "#6b7280" : "#94a3b8";
-  const inputBg = dark ? "#13161f" : "#f8fafc";
+  const bg      = 'var(--a-raised)';
+  const card    = 'var(--a-surface)';
+  const border  = 'var(--a-line)';
+  const text    = 'var(--a-ink)';
+  const muted   = 'var(--a-muted)';
+  const inputBg = 'var(--a-raised)';
 
   return (
     <div style={{ fontFamily: "var(--font-body)", color: text }}>
@@ -149,7 +149,7 @@ export default function NotificationsTab({ isDarkMode, onUnreadCount }) {
         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
           <div style={{
             width: "44px", height: "44px", borderRadius: "14px",
-            background: "linear-gradient(135deg,#6366f1,#8b5cf6)",
+            background: "var(--a-accent-grad)",
             display: "flex", alignItems: "center", justifyContent: "center",
             boxShadow: "0 6px 20px rgba(99,102,241,0.3)",
           }}>
@@ -192,7 +192,7 @@ export default function NotificationsTab({ isDarkMode, onUnreadCount }) {
               style={{
                 display: "flex", alignItems: "center", gap: "6px",
                 padding: "8px 14px", borderRadius: "10px", border: "none",
-                background: "linear-gradient(135deg,#6366f1,#8b5cf6)",
+                background: "var(--a-accent-grad)",
                 color: "white", fontSize: "13px", fontWeight: "700",
                 cursor: "pointer", boxShadow: "0 4px 14px rgba(99,102,241,0.3)",
               }}
@@ -228,14 +228,14 @@ export default function NotificationsTab({ isDarkMode, onUnreadCount }) {
             type="checkbox"
             checked={filterUnread}
             onChange={(e) => setFilterUnread(e.target.checked)}
-            style={{ accentColor: "#6366f1" }}
+            style={{ accentColor: "var(--a-accent-ink)" }}
           />
           {tr("notificationsTab.unreadOnly")}
         </label>
         {(filterDate || filterUnread) && (
           <button
             onClick={() => { setFilterDate(""); setFilterUnread(false); }}
-            style={{ fontSize: "12px", color: "#6366f1", background: "none", border: "none", cursor: "pointer", fontWeight: "600" }}
+            style={{ fontSize: "12px", color: "var(--a-accent-ink)", background: "none", border: "none", cursor: "pointer", fontWeight: "600" }}
           >
             {tr("notificationsTab.clear")}
           </button>
@@ -247,7 +247,7 @@ export default function NotificationsTab({ isDarkMode, onUnreadCount }) {
         <div style={{ textAlign: "center", padding: "60px 0" }}>
           <div style={{
             width: "32px", height: "32px", borderRadius: "50%", margin: "0 auto",
-            border: "3px solid #e5e7eb", borderTopColor: "#6366f1",
+            border: "3px solid var(--a-line)", borderTopColor: "var(--a-accent)",
             animation: "spin 0.75s linear infinite",
           }} />
           <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
@@ -257,7 +257,9 @@ export default function NotificationsTab({ isDarkMode, onUnreadCount }) {
           textAlign: "center", padding: "60px 20px",
           background: card, borderRadius: "16px", border: `1px solid ${border}`,
         }}>
-          <Bell size={40} color={muted} style={{ marginBottom: "12px" }} />
+          <div style={{ width: 64, height: 64, margin: "0 auto 14px", borderRadius: "50%", background: "var(--a-accent-soft)", boxShadow: "inset 0 0 0 1px var(--a-accent-line)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <Bell size={28} color="var(--a-accent)" />
+          </div>
           <p style={{ margin: 0, fontSize: "15px", fontWeight: "700", color: text }}>{tr("notificationsTab.noNotifications")}</p>
           <p style={{ margin: "6px 0 0", fontSize: "13px", color: muted }}>
             {filterDate || filterUnread ? tr("notificationsTab.tryClearingYourFilters") : tr("notificationsTab.subAdminActivitiesWillAppear")}
@@ -274,8 +276,8 @@ export default function NotificationsTab({ isDarkMode, onUnreadCount }) {
                 onClick={() => !n.read && markOneRead(n._id)}
                 style={{
                   display: "flex", gap: "14px", alignItems: "flex-start",
-                  background: n.read ? card : (dark ? "rgba(99,102,241,0.08)" : "#f0f4ff"),
-                  border: `1px solid ${n.read ? border : (dark ? "rgba(99,102,241,0.25)" : "#c7d2fe")}`,
+                  background: n.read ? card : ('var(--a-raised)'),
+                  border: `1px solid ${n.read ? border : ('var(--a-accent-line)')}`,
                   borderRadius: "14px", padding: "14px 16px",
                   cursor: n.read ? "default" : "pointer",
                   transition: "background 0.15s, border 0.15s",
@@ -287,7 +289,7 @@ export default function NotificationsTab({ isDarkMode, onUnreadCount }) {
                   <div style={{
                     position: "absolute", top: "14px", right: "14px",
                     width: "8px", height: "8px", borderRadius: "50%",
-                    background: "#6366f1",
+                    background: "var(--a-accent-grad)",
                   }} />
                 )}
 

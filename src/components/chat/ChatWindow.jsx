@@ -288,11 +288,11 @@ export default function ChatWindow({ chat, chatType = "group", userRole, onClose
     inputBg:  isDark ? "#1a1e2c" : "#ffffff",
     inputBdr: isDark ? "rgba(255,255,255,0.12)" : "#e2e4f0",
     footer:   isDark ? "#13151c" : "#ffffff",
-    accent:   "#6366f1",
+    accent:   "var(--as-accent, #6366f1)",
   };
 
   const roleStyle = {
-    admin:      { grad: "linear-gradient(135deg,#7c3aed,#a855f7)", bubble: "linear-gradient(135deg,#7c3aed,#8b5cf6)", badge: "#7c3aed" },
+    admin:      { grad: "linear-gradient(135deg,var(--as-accent, #7c3aed),var(--as-accent-2, #a855f7))", bubble: "linear-gradient(135deg,var(--as-accent, #7c3aed),var(--as-accent-2, #8b5cf6))", badge: "var(--as-accent, #7c3aed)" },
     teacher:    { grad: "linear-gradient(135deg,#1d4ed8,#0891b2)", bubble: "linear-gradient(135deg,#2563eb,#06b6d4)", badge: "#1d4ed8" },
     student:    { grad: "linear-gradient(135deg,#047857,#10b981)", bubble: "linear-gradient(135deg,#059669,#10b981)", badge: "#047857" },
     "sub-admin":{ grad: "linear-gradient(135deg,#b45309,#f59e0b)", bubble: "linear-gradient(135deg,#d97706,#f59e0b)", badge: "#b45309" },
@@ -336,7 +336,7 @@ export default function ChatWindow({ chat, chatType = "group", userRole, onClose
 
           <div style={{
             width: "42px", height: "42px", borderRadius: "13px",
-            background: isDM ? "linear-gradient(135deg,#7c3aed,#a855f7)" : myStyle.grad,
+            background: isDM ? "linear-gradient(135deg,var(--as-accent, #7c3aed),var(--as-accent-2, #a855f7))" : myStyle.grad,
             flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center",
             fontSize: "14px", fontWeight: "700", color: "white", boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
           }}>
@@ -624,7 +624,7 @@ export default function ChatWindow({ chat, chatType = "group", userRole, onClose
               }}
               onFocus={() => {
                 if (inputWrapRef.current) {
-                  inputWrapRef.current.style.borderColor = "#6366f1";
+                  inputWrapRef.current.style.borderColor = "var(--as-accent, #6366f1)";
                   inputWrapRef.current.style.boxShadow   = "0 0 0 3px rgba(99,102,241,0.12)";
                 }
               }}
@@ -648,7 +648,7 @@ export default function ChatWindow({ chat, chatType = "group", userRole, onClose
               style={{
                 background: "none", border: "none", cursor: "pointer",
                 padding: "2px 0 2px 8px", flexShrink: 0,
-                color: showEmoji ? "#6366f1" : C.sub,
+                color: showEmoji ? "var(--as-accent, #6366f1)" : C.sub,
                 display: "flex", alignItems: "center",
                 transition: "color 0.15s",
               }}

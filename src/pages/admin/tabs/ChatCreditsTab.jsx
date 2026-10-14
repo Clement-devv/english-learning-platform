@@ -20,8 +20,8 @@ function StatCard({ label, value, emoji, color, bg }) {
 export default function ChatCreditsTab({ isDarkMode }) {
   const { t: tr } = useTranslation("admin");
   const col = isDarkMode
-    ? { bg: "#0f1117", card: "#1a1d2e", border: "#2a2d40", heading: "#f0f4ff", body: "#c8cce0", muted: "#6b7090", input: "#1a1d2e" }
-    : { bg: "#f8fafc", card: "#ffffff", border: "#e2e8f0", heading: "#1e293b", body: "#475569", muted: "#94a3b8", input: "#fff" };
+    ? { bg: "var(--a-bg)", card: "var(--a-raised)", border: "var(--a-line)", heading: "var(--a-ink)", body: "var(--a-ink-2)", muted: "var(--a-ink-2)", input: "var(--a-raised)" }
+    : { bg: "var(--a-raised)", card: "var(--a-surface)", border: "var(--a-line)", heading: "var(--a-ink)", body: "var(--a-ink-2)", muted: "var(--a-muted)", input: "#fff" };
 
   const [students,   setStudents]   = useState([]);
   const [loading,    setLoading]    = useState(true);
@@ -200,7 +200,7 @@ export default function ChatCreditsTab({ isDarkMode }) {
 
       {/* Stats */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 14 }}>
-        <StatCard label={tr("chatCreditsTab.activeCredits")}     value={totalCredits}          emoji="⚡" color="#7c3aed" bg={isDarkMode ? "#1a1230" : "#f5f3ff"} />
+        <StatCard label={tr("chatCreditsTab.activeCredits")}     value={totalCredits}          emoji="⚡" color="var(--a-accent-ink)" bg={'var(--a-accent-soft)'} />
         <StatCard label={tr("chatCreditsTab.totalMessagesSent")} value={totalUsed}            emoji="💬" color="#059669" bg={isDarkMode ? "#0d2318" : "#ecfdf5"} />
         <StatCard label={tr("chatCreditsTab.studentsWCredits")} value={studentsWithCredits}  emoji="👤" color="#2563eb" bg={isDarkMode ? "#0d1a2e" : "#eff6ff"} />
         <StatCard label={tr("chatCreditsTab.lowCredit10")}    value={lowCreditStudents}    emoji="⚠️" color="#d97706" bg={isDarkMode ? "#2a1a06" : "#fffbeb"} />
@@ -225,7 +225,7 @@ export default function ChatCreditsTab({ isDarkMode }) {
       {/* Table */}
       {loading ? (
         <div style={{ textAlign: "center", padding: 60, color: col.muted }}>
-          <RefreshCw size={28} style={{ animation: "spin 1s linear infinite" }} />
+          <RefreshCw size={28} style={{ animation: "spin 1s linear infinite", margin: "0 auto" }} />
           <p style={{ marginTop: 12, fontWeight: 700 }}>{tr("chatCreditsTab.loadingStudents")}</p>
         </div>
       ) : (
@@ -257,7 +257,7 @@ export default function ChatCreditsTab({ isDarkMode }) {
                   display: "grid", gridTemplateColumns: "1fr 1.2fr auto auto auto",
                   padding: "14px 20px", gap: 12, alignItems: "center",
                   borderBottom: i < filtered.length - 1 ? `1px solid ${col.border}` : "none",
-                  background: i % 2 === 0 ? "transparent" : (isDarkMode ? "#ffffff08" : "#f8fafc"),
+                  background: i % 2 === 0 ? "transparent" : (isDarkMode ? "#ffffff08" : "var(--a-raised)"),
                 }}>
                   <div>
                     <div style={{ fontWeight: 700, fontSize: 14, color: col.heading }}>
@@ -287,7 +287,7 @@ export default function ChatCreditsTab({ isDarkMode }) {
                       style={{
                         display: "inline-flex", alignItems: "center", gap: 5,
                         padding: "7px 16px", borderRadius: 10, border: "none",
-                        background: "linear-gradient(135deg,#7c3aed,#a855f7)", color: "#fff",
+                        background: "var(--a-accent-grad)", color: "#fff",
                         fontSize: 13, fontWeight: 700, cursor: "pointer",
                         boxShadow: "0 2px 8px #7c3aed30",
                       }}>
@@ -317,7 +317,7 @@ export default function ChatCreditsTab({ isDarkMode }) {
             </h2>
             <p style={{ margin: "0 0 20px", fontSize: 13, color: col.muted }}>
               {tr("chatCreditsTab.student2")} <strong style={{ color: col.body }}>{modal.student.firstName} {modal.student.lastName}</strong>
-              {tr("chatCreditsTab.currentBalance")} <strong style={{ color: "#7c3aed" }}>{tr("chatCreditsTab.credits", { credits: modal.student.credits })}</strong>
+              {tr("chatCreditsTab.currentBalance")} <strong style={{ color: "var(--a-accent-ink)" }}>{tr("chatCreditsTab.credits", { credits: modal.student.credits })}</strong>
             </p>
 
             {/* Preset amounts */}
@@ -329,9 +329,9 @@ export default function ChatCreditsTab({ isDarkMode }) {
                 {PRESET_AMOUNTS.map(a => (
                   <button key={a} onClick={() => { setAmount(a); setCustomAmt(""); }}
                     style={{
-                      padding: "7px 16px", borderRadius: 10, border: `2px solid ${amount === a && !customAmt ? "#7c3aed" : col.border}`,
-                      background: amount === a && !customAmt ? "#f5f3ff" : col.card,
-                      color: amount === a && !customAmt ? "#7c3aed" : col.body,
+                      padding: "7px 16px", borderRadius: 10, border: `2px solid ${amount === a && !customAmt ? "var(--a-accent)" : col.border}`,
+                      background: amount === a && !customAmt ? "var(--a-accent-soft)" : col.card,
+                      color: amount === a && !customAmt ? "var(--a-accent-ink)" : col.body,
                       fontSize: 13, fontWeight: 700, cursor: "pointer",
                     }}>
                     {a}
@@ -353,7 +353,7 @@ export default function ChatCreditsTab({ isDarkMode }) {
                 min={1} max={10000}
                 style={{
                   width: "100%", padding: "10px 14px", borderRadius: 10,
-                  border: `2px solid ${customAmt ? "#7c3aed" : col.border}`,
+                  border: `2px solid ${customAmt ? "var(--a-accent)" : col.border}`,
                   background: col.input, color: col.heading, fontSize: 14,
                   fontFamily: "inherit", boxSizing: "border-box",
                 }}
@@ -380,12 +380,12 @@ export default function ChatCreditsTab({ isDarkMode }) {
 
             {/* Summary */}
             <div style={{
-              background: isDarkMode ? "#1f2235" : "#f5f3ff",
+              background: 'var(--a-accent-soft)',
               borderRadius: 12, padding: "12px 16px", marginBottom: 20,
               fontSize: 13, color: col.body, display: "flex", justifyContent: "space-between",
             }}>
               <span>{tr("chatCreditsTab.creditsAfterGrant")}</span>
-              <strong style={{ color: "#7c3aed", fontSize: 15 }}>
+              <strong style={{ color: "var(--a-accent-ink)", fontSize: 15 }}>
                 {tr("chatCreditsTab.credits2", { value: modal.student.credits + (customAmt ? parseInt(customAmt) || 0 : amount) })}</strong>
             </div>
 
@@ -403,7 +403,7 @@ export default function ChatCreditsTab({ isDarkMode }) {
                 disabled={!!granting}
                 style={{
                   flex: 2, padding: "11px", borderRadius: 12, border: "none",
-                  background: "linear-gradient(135deg,#7c3aed,#a855f7)", color: "#fff",
+                  background: "var(--a-accent-grad)", color: "#fff",
                   fontWeight: 800, fontSize: 14, cursor: granting ? "not-allowed" : "pointer",
                   opacity: granting ? 0.7 : 1,
                   display: "flex", alignItems: "center", justifyContent: "center", gap: 7,

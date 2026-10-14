@@ -22,8 +22,8 @@ const ta = (key, opts) => i18n.t(`admin:${key}`, opts);
 
 
 // Center brand colour (set by utils/branding.js)
-const BRAND  = "var(--brand-primary, #2563eb)";
-const brandA = (a) => `rgba(var(--brand-primary-rgb, 37, 99, 235), ${a})`;
+const BRAND  = "var(--a-accent)";
+const brandA = (a) => `color-mix(in srgb, var(--a-accent) ${Math.round(a * 100)}%, transparent)`;
 
 const fmtWhen = (d) => new Date(d).toLocaleString(dateLocale("en-GB"), { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 const nameOf  = (p) => `${p?.firstName || ""} ${p?.lastName || ""}`.trim();
@@ -44,10 +44,10 @@ function stateOf(c) {
 const STATE = {
   waiting:   { get label() { return ta("parentChecksTab.state.waiting"); },             icon: Clock,         color: "#b45309", bg: "#fef3c7" },
   confirmed: { get label() { return ta("parentChecksTab.state.confirmed"); },               icon: CheckCircle2,  color: "#047857", bg: "#d1fae5" },
-  noreply:   { get label() { return ta("parentChecksTab.state.noreply"); }, icon: CheckCircle2,  color: "#4b5563", bg: "#e5e7eb" },
+  noreply:   { get label() { return ta("parentChecksTab.state.noreply"); }, icon: CheckCircle2,  color: "var(--a-ink-2)", bg: "var(--a-raised)" },
   disputed:  { get label() { return ta("parentChecksTab.state.disputed"); },                 icon: XCircle,       color: "#b91c1c", bg: "#fee2e2" },
-  settled:   { get label() { return ta("parentChecksTab.state.settled"); },                icon: AlertTriangle, color: "#6b7280", bg: "#f3f4f6" },
-  nolink:    { get label() { return ta("parentChecksTab.state.nolink"); },                        icon: Link2,         color: "#6b7280", bg: "#f3f4f6" },
+  settled:   { get label() { return ta("parentChecksTab.state.settled"); },                icon: AlertTriangle, color: "var(--a-ink-2)", bg: "var(--a-raised)" },
+  nolink:    { get label() { return ta("parentChecksTab.state.nolink"); },                        icon: Link2,         color: "var(--a-ink-2)", bg: "var(--a-raised)" },
 };
 
 export default function ParentChecksTab({ isDarkMode }) {
@@ -62,8 +62,8 @@ export default function ParentChecksTab({ isDarkMode }) {
   const [counts, setCounts]   = useState({ waiting: 0, confirmed: 0, disputed: 0 });
 
   const c = isDarkMode
-    ? { card: "#1e293b", border: "#334155", heading: "#f1f5f9", body: "#94a3b8" }
-    : { card: "#ffffff", border: "#e2e8f0", heading: "#1e293b", body: "#64748b" };
+    ? { card: "var(--a-raised)", border: "var(--a-line)", heading: "var(--a-ink)", body: "var(--a-muted)" }
+    : { card: "var(--a-surface)", border: "var(--a-line)", heading: "var(--a-ink)", body: "var(--a-ink-2)" };
 
   const notify = (msg, type = "success") => { setToast({ msg, type }); setTimeout(() => setToast(null), 3500); };
 
@@ -166,7 +166,9 @@ export default function ParentChecksTab({ isDarkMode }) {
         <p style={{ color: c.body, textAlign: "center", padding: 40 }}>{tr("parentChecksTab.loading")}</p>
       ) : shown.length === 0 ? (
         <div style={{ textAlign: "center", padding: "40px 20px", background: c.card, border: `1px dashed ${c.border}`, borderRadius: 16, color: c.body }}>
-          <ShieldCheck size={36} style={{ opacity: .4 }} />
+          <div style={{ width: 60, height: 60, margin: "0 auto 12px", borderRadius: "50%", background: "var(--a-accent-soft)", boxShadow: "inset 0 0 0 1px var(--a-accent-line)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <ShieldCheck size={26} color="var(--a-accent)" />
+          </div>
           <p style={{ margin: "10px 0 0", fontWeight: 600 }}>
             {filter === "all" ? tr("parentChecksTab.noTeacherConfirmedClassesYet") : tr("parentChecksTab.nothingHere")}
           </p>

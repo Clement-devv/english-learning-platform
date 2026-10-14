@@ -18,7 +18,7 @@ import { saveCustomToneUrl, saveCustomToneIDB, loadCustomTone, clearCustomTone }
 const ROLE_COLOR = {
   teacher:  { grad: "linear-gradient(135deg,#1d4ed8,#0891b2)", badge: "#1d4ed8", light: "#dbeafe" },
   student:  { grad: "linear-gradient(135deg,#047857,#10b981)", badge: "#047857", light: "#d1fae5" },
-  admin:    { grad: "linear-gradient(135deg,#7c3aed,#a855f7)", badge: "#7c3aed", light: "#ede9fe" },
+  admin:    { grad: "linear-gradient(135deg,var(--as-accent, #7c3aed),var(--as-accent-2, #a855f7))", badge: "var(--as-accent, #7c3aed)", light: "var(--as-accent-soft, #ede9fe)" },
   subAdmin: { grad: "linear-gradient(135deg,#b45309,#f59e0b)", badge: "#b45309", light: "#fef3c7" },
 };
 
@@ -152,7 +152,7 @@ export default function RingTab({ isDark }) {
     text:    isDark ? "#e8eaf6" : "#1a1d2e",
     sub:     isDark ? "#8b91b8" : "#9ea3be",
     input:   isDark ? "#1e2235" : "#eef0f8",
-    accent:  "#6366f1",
+    accent:  "var(--as-accent, #6366f1)",
   };
 
   // ── Fetch contacts from the backend (role-aware, booking-based) ──────────
@@ -782,7 +782,7 @@ export default function RingTab({ isDark }) {
                           width: "40px", height: "40px", borderRadius: "50%",
                           background: (ringingId || socketConnected === false || isMuted)
                             ? (isDark ? "#1e2235" : "#f1f5f9")
-                            : "linear-gradient(135deg,#6366f1,#8b5cf6)",
+                            : "linear-gradient(135deg,var(--as-accent, #6366f1),var(--as-accent-2, #8b5cf6))",
                           border: "none",
                           cursor: (ringingId || socketConnected === false || isMuted) ? "not-allowed" : "pointer",
                           flexShrink: 0,
@@ -828,7 +828,7 @@ export default function RingTab({ isDark }) {
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
             <div style={{
               width: "8px", height: "8px", borderRadius: "50%",
-              background: "#6366f1", animation: "ring-pulse-red 1s ease-in-out infinite",
+              background: "var(--as-accent, #6366f1)", animation: "ring-pulse-red 1s ease-in-out infinite",
             }} />
             <span style={{ fontSize: "12px", fontWeight: "700", color: C.text }}>
               Calling {contacts.find(c => c.id === ringingId)?.name || "…"}

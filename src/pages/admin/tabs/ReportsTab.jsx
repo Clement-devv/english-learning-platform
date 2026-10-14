@@ -35,12 +35,12 @@ export default function ReportsTab({ students = [], isDarkMode }) {
   const [busy,   setBusy]   = useState(false);
   const [toast,  setToast]  = useState(null);
 
-  const bg      = isDarkMode ? "#0f172a" : "#f8fafc";
-  const card    = isDarkMode ? "#1e293b" : "#ffffff";
-  const border  = isDarkMode ? "#334155" : "#e2e8f0";
-  const text    = isDarkMode ? "#e2e8f0" : "#1e293b";
-  const muted   = isDarkMode ? "#94a3b8" : "#64748b";
-  const inputBg = isDarkMode ? "#0f172a" : "#f8fafc";
+  const bg      = 'var(--a-raised)';
+  const card    = 'var(--a-surface)';
+  const border  = 'var(--a-line)';
+  const text    = 'var(--a-ink)';
+  const muted   = 'var(--a-ink-2)';
+  const inputBg = 'var(--a-raised)';
 
   function showToast(msg, ok = true) {
     setToast({ msg, ok });

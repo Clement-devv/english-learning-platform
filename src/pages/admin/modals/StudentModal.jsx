@@ -137,27 +137,27 @@ export default function StudentModal({ isOpen, onClose, onSave, initialData, isD
   if (!isOpen) return null;
 
   const dm = isDarkMode;
-  const modalBg  = dm ? "#1e293b" : "#fff";
-  const textPri  = dm ? "#f1f5f9" : "#1e293b";
-  const textSec  = dm ? "#94a3b8" : "#64748b";
-  const textMut  = dm ? "#64748b" : "#94a3b8";
-  const borderC  = dm ? "#334155" : "#e2e8f0";
-  const inputBg  = dm ? "#0f172a" : "#fff";
-  const inputCol = dm ? "#f1f5f9" : "#1e293b";
-  const labelCol = dm ? "#94a3b8" : "#374151";
-  const infoBg   = dm ? "rgba(59,130,246,0.1)" : "#f0f7ff";
+  const modalBg  = 'var(--a-surface)';
+  const textPri  = 'var(--a-ink)';
+  const textSec  = 'var(--a-ink-2)';
+  const textMut  = 'var(--a-muted)';
+  const borderC  = 'var(--a-line)';
+  const inputBg  = 'var(--a-surface)';
+  const inputCol = 'var(--a-ink)';
+  const labelCol = 'var(--a-ink-2)';
+  const infoBg   = 'var(--a-raised)';
   const infoBdr  = dm ? "#1e40af" : "#bfdbfe";
-  const badgeBg1 = dm ? "rgba(59,130,246,0.15)" : "#f0f7ff";
+  const badgeBg1 = 'var(--a-raised)';
   const badgeBg2 = dm ? "rgba(5,150,105,0.15)"  : "#f0fdf4";
-  const badgeBg3 = dm ? "rgba(124,58,237,0.15)" : "#faf5ff";
-  const dialBg   = dm ? "#1e293b" : "#f8fafc";
+  const badgeBg3 = 'var(--a-raised)';
+  const dialBg   = 'var(--a-raised)';
 
   const lbl = { display: "block", fontSize: "12px", fontWeight: "700", color: labelCol, marginBottom: "5px", textTransform: "uppercase", letterSpacing: "0.05em" };
   const inp = { width: "100%", padding: "10px 13px", borderRadius: "10px", border: `1.5px solid ${borderC}`, background: inputBg, color: inputCol, fontFamily: "var(--font-body)", fontSize: "13.5px", outline: "none", boxSizing: "border-box" };
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999, padding: "20px" }}>
-      <div style={{ background: modalBg, borderRadius: "20px", width: "100%", maxWidth: "520px", maxHeight: "90vh", display: "flex", flexDirection: "column", boxShadow: "0 24px 80px rgba(0,0,0,0.3)", fontFamily: "var(--font-body)", overflow: "hidden", border: dm ? "1px solid #334155" : "none" }}>
+      <div style={{ background: modalBg, borderRadius: "20px", width: "100%", maxWidth: "520px", maxHeight: "90vh", display: "flex", flexDirection: "column", boxShadow: "0 24px 80px rgba(0,0,0,0.3)", fontFamily: "var(--font-body)", overflow: "hidden", border: dm ? "1px solid var(--a-line)" : "none" }}>
 
         {/* ── INVITE SENT SUCCESS ── */}
         {invited ? (
@@ -184,11 +184,11 @@ export default function StudentModal({ isOpen, onClose, onSave, initialData, isD
                   🌏 {formData.country}
                 </div>
               )}
-              <div style={{ background: badgeBg3, border: "1px solid #e9d5ff", borderRadius: "20px", padding: "5px 14px", fontSize: "12px", fontWeight: "700", color: "#7c3aed" }}>
+              <div style={{ background: badgeBg3, border: "1px solid var(--a-accent-line)", borderRadius: "20px", padding: "5px 14px", fontSize: "12px", fontWeight: "700", color: "var(--a-accent-ink)" }}>
                 {tr("studentModal.pendingActivation")}
               </div>
             </div>
-            <button onClick={onClose} style={{ padding: "12px 32px", borderRadius: "12px", border: "none", background: "linear-gradient(135deg,#3b82f6,#6366f1)", color: "#fff", fontSize: "14px", fontWeight: "700", cursor: "pointer", fontFamily: "inherit" }}>
+            <button onClick={onClose} style={{ padding: "12px 32px", borderRadius: "12px", border: "none", background: "var(--a-accent-grad)", color: "#fff", fontSize: "14px", fontWeight: "700", cursor: "pointer", fontFamily: "inherit" }}>
               {tr("studentModal.done")}
             </button>
           </div>
@@ -258,7 +258,7 @@ export default function StudentModal({ isOpen, onClose, onSave, initialData, isD
                 <label style={lbl}>{tr("studentModal.phoneNumber")}</label>
                 <div style={{ display: "flex", gap: "8px" }}>
                   {/* Dial code badge */}
-                  <div style={{ display: "flex", alignItems: "center", padding: "0 12px", borderRadius: "10px", border: `1.5px solid ${borderC}`, background: dialBg, fontSize: "13px", fontWeight: "600", color: dm ? "#94a3b8" : "#475569", whiteSpace: "nowrap", minWidth: "70px", justifyContent: "center" }}>
+                  <div style={{ display: "flex", alignItems: "center", padding: "0 12px", borderRadius: "10px", border: `1.5px solid ${borderC}`, background: dialBg, fontSize: "13px", fontWeight: "600", color: 'var(--a-ink-2)', whiteSpace: "nowrap", minWidth: "70px", justifyContent: "center" }}>
                     {formData.dialCode || "—"}
                   </div>
                   <input
@@ -321,10 +321,10 @@ export default function StudentModal({ isOpen, onClose, onSave, initialData, isD
 
               {/* Buttons */}
               <div style={{ display: "flex", gap: "10px" }}>
-                <button type="button" onClick={onClose} style={{ flex: 1, padding: "11px", borderRadius: "10px", border: `1.5px solid ${borderC}`, background: "transparent", color: dm ? "#94a3b8" : "#475569", fontSize: "14px", fontWeight: "600", cursor: "pointer", fontFamily: "inherit" }}>
+                <button type="button" onClick={onClose} style={{ flex: 1, padding: "11px", borderRadius: "10px", border: `1.5px solid ${borderC}`, background: "transparent", color: 'var(--a-ink-2)', fontSize: "14px", fontWeight: "600", cursor: "pointer", fontFamily: "inherit" }}>
                   {tr("studentModal.cancel")}
                 </button>
-                <button type="submit" disabled={loading} style={{ flex: 2, padding: "11px", borderRadius: "10px", border: "none", background: loading ? "#94a3b8" : "linear-gradient(135deg,#3b82f6,#6366f1)", color: "#fff", fontSize: "14px", fontWeight: "700", cursor: loading ? "not-allowed" : "pointer", fontFamily: "inherit" }}>
+                <button type="submit" disabled={loading} style={{ flex: 2, padding: "11px", borderRadius: "10px", border: "none", background: loading ? "var(--a-raised)" : "var(--a-accent-grad)", color: "#fff", fontSize: "14px", fontWeight: "700", cursor: loading ? "not-allowed" : "pointer", fontFamily: "inherit" }}>
                   {loading ? tr("studentModal.saving") : isEdit ? tr("studentModal.saveChanges") : tr("studentModal.createSendInvite")}
                 </button>
               </div>

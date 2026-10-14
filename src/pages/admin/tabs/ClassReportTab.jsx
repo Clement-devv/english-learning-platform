@@ -50,13 +50,13 @@ ${r.summary}`;
   };
 
   const col = {
-    card:   isDarkMode ? "#1a1d2e" : "#ffffff",
-    border: isDarkMode ? "#2a2d40" : "#e8edf5",
-    text:   isDarkMode ? "#e8eaf6" : "#1a1d2e",
-    muted:  isDarkMode ? "#8b91b8" : "#6b7280",
-    input:  isDarkMode ? "#1e2235" : "#f3f4f6",
-    head:   isDarkMode ? "#20243a" : "#eef2ff",
-    accent: "#6366f1",
+    card:   'var(--a-surface)',
+    border: 'var(--a-line)',
+    text:   'var(--a-ink)',
+    muted:  'var(--a-ink-2)',
+    input:  'var(--a-raised)',
+    head:   'var(--a-accent-soft)',
+    accent: "var(--a-accent-ink)",
   };
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(""), 3500); };
@@ -152,7 +152,7 @@ ${r.summary}`;
                       <tr key={`${r.id}-sum`}>
                         <td colSpan={6} style={{ padding: "0 12px 10px 15px" }}>
                           {r.summary ? (
-                            <div style={{ display: "flex", gap: 10, alignItems: "flex-start", background: isDarkMode ? "rgba(99,102,241,0.08)" : "#f5f7ff", border: `1px solid ${col.border}`, borderRadius: 10, padding: "8px 10px" }}>
+                            <div style={{ display: "flex", gap: 10, alignItems: "flex-start", background: 'var(--a-raised)', border: `1px solid ${col.border}`, borderRadius: 10, padding: "8px 10px" }}>
                               <NotebookText size={14} color={col.accent} style={{ flexShrink: 0, marginTop: 2 }} />
                               <div style={{ flex: 1, minWidth: 0, fontSize: 12.5, color: col.text, lineHeight: 1.55, whiteSpace: "pre-wrap",
                                 ...(openSummary[r.id] ? {} : { display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }) }}>
@@ -212,7 +212,7 @@ ${r.summary}`;
             {busy === "pdf" ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />} {tr("classReportTab.downloadPdf")}
           </button>
           <button onClick={emailMe} disabled={!report || !!busy}
-            style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 14px", borderRadius: 10, border: "none", background: "linear-gradient(135deg,#6366f1,#8b5cf6)", color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 800, fontFamily: "inherit" }}>
+            style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 14px", borderRadius: 10, border: "none", background: "var(--a-accent-grad)", color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 800, fontFamily: "inherit" }}>
             {busy === "email" ? <Loader2 size={15} className="animate-spin" /> : <Mail size={15} />} {tr("classReportTab.emailMe")}
           </button>
         </div>
@@ -286,7 +286,7 @@ ${r.summary}`;
       )}
 
       {toast && (
-        <div className="ui-toast-in" role="status" style={{ position: "fixed", bottom: 24, right: 24, padding: "12px 20px", background: "#1a1d2e", color: "#fff", borderRadius: 12, fontWeight: 700, zIndex: 9999 }}>
+        <div className="ui-toast-in" role="status" style={{ position: "fixed", bottom: 24, right: 24, padding: "12px 20px", background: "var(--a-raised)", color: "#fff", borderRadius: 12, fontWeight: 700, zIndex: 9999 }}>
           {toast}
         </div>
       )}

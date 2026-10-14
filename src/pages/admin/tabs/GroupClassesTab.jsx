@@ -36,9 +36,9 @@ const STATUS_COLOR = {
   open:        '#10b981',
   full:        '#f59e0b',
   'in-progress':'#3b82f6',
-  completed:   '#6b7280',
+  completed:   'var(--a-ink-2)',
   cancelled:   '#ef4444',
-  missed:       '#ea580c', // time passed, never held — refunded
+  missed:       'var(--a-accent-ink)', // time passed, never held — refunded
 };
 
 function Badge({ status }) {
@@ -76,14 +76,14 @@ export default function GroupClassesTab({ isDarkMode, loadPeople = loadAllPeople
   const sym = useCurrencySymbol();
   const { t: tr } = useTranslation("admin");
   const col = {
-    bg:      isDarkMode ? '#0f1117' : '#fff8f0',
-    card:    isDarkMode ? '#1a1d2e' : '#ffffff',
-    border:  isDarkMode ? '#2a2d40' : '#ffe8cc',
-    heading: isDarkMode ? '#f0f4ff' : '#3d2e20',
-    body:    isDarkMode ? '#c8cce0' : '#5a4a3a',
-    muted:   isDarkMode ? '#6b7090' : '#a89480',
-    accent:  isDarkMode ? '#fbbf24' : '#f97316',
-    input:   isDarkMode ? '#0f1117' : '#fff8f0',
+    bg:      'var(--a-raised)',
+    card:    'var(--a-surface)',
+    border:  'var(--a-line)',
+    heading: 'var(--a-ink)',
+    body:    'var(--a-ink-2)',
+    muted:   'var(--a-muted)',
+    accent:  'var(--a-accent-ink)',
+    input:   'var(--a-raised)',
   };
 
   const [classes,    setClasses]    = useState([]);
@@ -259,8 +259,8 @@ export default function GroupClassesTab({ isDarkMode, loadPeople = loadAllPeople
           <option value="">{tr("groupClassesTab.allStatuses")}</option>
           {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
         </select>
-        <button onClick={load} style={{ ...btn('#f5f0ec', col.body), padding: '9px 12px' }}><RefreshCw size={15} /></button>
-        <button onClick={() => setShowCreate(true)} style={{ ...btn('linear-gradient(135deg,#f97316,#f43f5e)'), display: 'flex', alignItems: 'center', gap: 6 }}>
+        <button onClick={load} style={{ ...btn('var(--a-ink)', col.body), padding: '9px 12px' }}><RefreshCw size={15} /></button>
+        <button onClick={() => setShowCreate(true)} style={{ ...btn('var(--a-accent)'), display: 'flex', alignItems: 'center', gap: 6 }}>
           <Plus size={14} /> {tr("groupClassesTab.newClass")}
         </button>
       </div>
@@ -291,8 +291,8 @@ export default function GroupClassesTab({ isDarkMode, loadPeople = loadAllPeople
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                     <span style={{ fontSize: 15, fontWeight: 800, color: col.heading }}>{gc.title}</span>
                     <Badge status={gc.status} />
-                    {gc.status === 'missed' && gc.missedReason && <span style={{ fontSize: 12, color: '#ea580c', fontWeight: 600 }}>{gc.missedReason}</span>}
-                    <span style={{ fontSize: 12, color: col.muted, background: isDarkMode ? '#2a2d40' : '#fff7ed', borderRadius: 999, padding: '2px 8px' }}>{gc.level}</span>
+                    {gc.status === 'missed' && gc.missedReason && <span style={{ fontSize: 12, color: 'var(--a-accent-ink)', fontWeight: 600 }}>{gc.missedReason}</span>}
+                    <span style={{ fontSize: 12, color: col.muted, background: 'var(--a-accent-soft)', borderRadius: 999, padding: '2px 8px' }}>{gc.level}</span>
                   </div>
                   <div style={{ fontSize: 13, color: col.muted, marginTop: 4, display: 'flex', gap: 16, flexWrap: 'wrap' }}>
                     <span>👨‍🏫 {teacherName(gc.teacherId?._id || gc.teacherId)}</span>
@@ -331,7 +331,7 @@ export default function GroupClassesTab({ isDarkMode, loadPeople = loadAllPeople
                             ? `${students.find(s => s._id?.toString() === sid?.toString()).firstName} ${students.find(s => s._id?.toString() === sid?.toString()).lastName}`
                             : sid;
                         return (
-                          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, background: isDarkMode ? '#0f1117' : '#fff8f0', borderRadius: 10, padding: '7px 12px' }}>
+                          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'var(--a-raised)', borderRadius: 10, padding: '7px 12px' }}>
                             <span style={{ flex: 1, fontSize: 13, fontWeight: 700, color: col.body }}>{sName}</span>
                             <span style={{ fontSize: 12, color: STATUS_COLOR[e.attendance] || col.muted }}>{e.attendance}</span>
                             <span style={{ fontSize: 12, color: col.muted }}>{e.pointsCharged > 0 ? tr("groupClassesTab.pts", { count: e.pointsCharged }) : tr("groupClassesTab.cr", { creditCharged: e.creditCharged })}</span>
@@ -363,7 +363,7 @@ export default function GroupClassesTab({ isDarkMode, loadPeople = loadAllPeople
                     )}
                     {['open','full','in-progress'].includes(gc.status) && (
                       <button onClick={() => handleComplete(gc._id)}
-                        style={btn('linear-gradient(135deg,#f97316,#f43f5e)')}>
+                        style={btn('var(--a-accent)')}>
                         {tr("groupClassesTab.complete")}
                       </button>
                     )}
@@ -483,8 +483,8 @@ export default function GroupClassesTab({ isDarkMode, loadPeople = loadAllPeople
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
-              <button onClick={() => setShowCreate(false)} style={btn(isDarkMode ? '#2a2d40' : '#f5f0ec', col.body)}>{tr("groupClassesTab.cancel")}</button>
-              <button onClick={handleCreate} disabled={saving} style={btn('linear-gradient(135deg,#f97316,#f43f5e)')}>
+              <button onClick={() => setShowCreate(false)} style={btn('var(--a-ink)', col.body)}>{tr("groupClassesTab.cancel")}</button>
+              <button onClick={handleCreate} disabled={saving} style={btn('var(--a-accent)')}>
                 {saving ? tr("groupClassesTab.creating") : tr("groupClassesTab.createClass")}
               </button>
             </div>
@@ -510,7 +510,7 @@ export default function GroupClassesTab({ isDarkMode, loadPeople = loadAllPeople
                   : tr("groupClassesTab.credits", { firstName: s.firstName, lastName: s.lastName, classCredits: s.classCredits })}</option>)}
             </select>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-              <button onClick={() => setEnrollTarget(null)} style={btn(isDarkMode ? '#2a2d40' : '#f5f0ec', col.body)}>{tr("groupClassesTab.cancel")}</button>
+              <button onClick={() => setEnrollTarget(null)} style={btn('var(--a-ink)', col.body)}>{tr("groupClassesTab.cancel")}</button>
               <button onClick={handleEnroll} disabled={enrolling} style={btn('linear-gradient(135deg,#10b981,#34d399)')}>
                 {enrolling ? tr("groupClassesTab.enrolling") : tr("groupClassesTab.enroll")}
               </button>
@@ -548,7 +548,7 @@ export default function GroupClassesTab({ isDarkMode, loadPeople = loadAllPeople
               );
             })}
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }}>
-              <button onClick={() => setAttTarget(null)} style={btn(isDarkMode ? '#2a2d40' : '#f5f0ec', col.body)}>{tr("groupClassesTab.cancel")}</button>
+              <button onClick={() => setAttTarget(null)} style={btn('var(--a-ink)', col.body)}>{tr("groupClassesTab.cancel")}</button>
               <button onClick={saveAttendance} style={btn('linear-gradient(135deg,#3b82f6,#60a5fa)')}>{tr("groupClassesTab.saveAttendance")}</button>
             </div>
           </div>

@@ -33,7 +33,7 @@ function DeleteConfirmModal({ teacher, onConfirm, onCancel, isDarkMode }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
       <div
         className={`w-full max-w-md rounded-2xl shadow-2xl p-6 ${
-          isDarkMode ? "bg-gray-800 border border-gray-700" : "bg-white"
+          isDarkMode ? "bg-stone-800 border border-stone-700" : "bg-white"
         }`}
       >
         <div className="flex items-center gap-3 mb-4">
@@ -41,10 +41,10 @@ function DeleteConfirmModal({ teacher, onConfirm, onCancel, isDarkMode }) {
             <Trash2 className="w-5 h-5 text-red-600" />
           </div>
           <div>
-            <h3 className={`text-lg font-bold ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+            <h3 className={`text-lg font-bold ${isDarkMode ? "text-white" : "text-stone-900"}`}>
               {tr("teachersTab.scheduleTeacherForDeletion")}
             </h3>
-            <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+            <p className={`text-sm ${isDarkMode ? "text-stone-400" : "text-stone-500"}`}>
               {tr("teachersTab.thisCannotBeUndoneAfter")}
             </p>
           </div>
@@ -62,7 +62,7 @@ function DeleteConfirmModal({ teacher, onConfirm, onCancel, isDarkMode }) {
           </ul>
         </div>
 
-        <p className={`text-sm mb-5 ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>
+        <p className={`text-sm mb-5 ${isDarkMode ? "text-stone-300" : "text-stone-600"}`}>
           {tr("teachersTab.areYouSureYouWant")}{" "}
           <strong>{teacher.firstName} {teacher.lastName}</strong> {tr("teachersTab.forDeletion")}
         </p>
@@ -72,8 +72,8 @@ function DeleteConfirmModal({ teacher, onConfirm, onCancel, isDarkMode }) {
             onClick={onCancel}
             className={`flex-1 py-2.5 rounded-xl text-sm font-semibold border transition ${
               isDarkMode
-                ? "border-gray-600 text-gray-300 hover:bg-gray-700"
-                : "border-gray-300 text-gray-700 hover:bg-gray-50"
+                ? "border-stone-600 text-stone-300 hover:bg-stone-700"
+                : "border-stone-300 text-stone-700 hover:bg-stone-50"
             }`}
           >
             {tr("teachersTab.cancel")}
@@ -100,7 +100,7 @@ function PayConfirmModal({ teacher, onConfirm, onCancel, isDarkMode }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
       <div
         className={`w-full max-w-md rounded-2xl shadow-2xl p-6 ${
-          isDarkMode ? "bg-gray-800 border border-gray-700" : "bg-white"
+          isDarkMode ? "bg-stone-800 border border-stone-700" : "bg-white"
         }`}
       >
         <div className="flex items-center gap-3 mb-4">
@@ -108,10 +108,10 @@ function PayConfirmModal({ teacher, onConfirm, onCancel, isDarkMode }) {
             <DollarSign className="w-5 h-5 text-emerald-600" />
           </div>
           <div>
-            <h3 className={`text-lg font-bold ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+            <h3 className={`text-lg font-bold ${isDarkMode ? "text-white" : "text-stone-900"}`}>
               {tr("teachersTab.confirmPayment")}
             </h3>
-            <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+            <p className={`text-sm ${isDarkMode ? "text-stone-400" : "text-stone-500"}`}>
               {tr("teachersTab.thisWillResetTheTeacher")}
             </p>
           </div>
@@ -122,7 +122,7 @@ function PayConfirmModal({ teacher, onConfirm, onCancel, isDarkMode }) {
             <span className={`text-sm font-medium ${isDarkMode ? "text-emerald-300" : "text-emerald-700"}`}>
               {tr("teachersTab.teacher")}
             </span>
-            <span className={`text-sm font-bold ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+            <span className={`text-sm font-bold ${isDarkMode ? "text-white" : "text-stone-900"}`}>
               {teacher.displayName?.trim() || `${teacher.firstName} ${teacher.lastName}`}
             </span>
           </div>
@@ -141,8 +141,8 @@ function PayConfirmModal({ teacher, onConfirm, onCancel, isDarkMode }) {
             onClick={onCancel}
             className={`flex-1 py-2.5 rounded-xl text-sm font-semibold border transition ${
               isDarkMode
-                ? "border-gray-600 text-gray-300 hover:bg-gray-700"
-                : "border-gray-300 text-gray-700 hover:bg-gray-50"
+                ? "border-stone-600 text-stone-300 hover:bg-stone-700"
+                : "border-stone-300 text-stone-700 hover:bg-stone-50"
             }`}
           >
             {tr("teachersTab.cancel")}
@@ -169,7 +169,7 @@ function PayAllConfirmModal({ teachers, onConfirm, onCancel, isDarkMode }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
       <div
         className={`w-full max-w-md rounded-2xl shadow-2xl p-6 ${
-          isDarkMode ? "bg-gray-800 border border-gray-700" : "bg-white"
+          isDarkMode ? "bg-stone-800 border border-stone-700" : "bg-white"
         }`}
       >
         <div className="flex items-center gap-3 mb-4">
@@ -177,19 +177,19 @@ function PayAllConfirmModal({ teachers, onConfirm, onCancel, isDarkMode }) {
             <CheckCircle className="w-5 h-5 text-emerald-600" />
           </div>
           <div>
-            <h3 className={`text-lg font-bold ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+            <h3 className={`text-lg font-bold ${isDarkMode ? "text-white" : "text-stone-900"}`}>
               {tr("teachersTab.markAllAsPaid")}
             </h3>
-            <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+            <p className={`text-sm ${isDarkMode ? "text-stone-400" : "text-stone-500"}`}>
               {tr("teachersTab.thisWillResetEarningsTo")}
             </p>
           </div>
         </div>
 
-        <div className={`rounded-xl p-4 mb-4 max-h-52 overflow-y-auto ${isDarkMode ? "bg-gray-900/50 border border-gray-700" : "bg-gray-50 border border-gray-200"}`}>
+        <div className={`rounded-xl p-4 mb-4 max-h-52 overflow-y-auto ${isDarkMode ? "bg-stone-900/50 border border-stone-700" : "bg-stone-50 border border-stone-200"}`}>
           {teachers.map((t) => (
-            <div key={t._id} className="flex justify-between items-center py-1.5 border-b last:border-0 border-gray-200/30">
-              <span className={`text-sm ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
+            <div key={t._id} className="flex justify-between items-center py-1.5 border-b last:border-0 border-stone-200/30">
+              <span className={`text-sm ${isDarkMode ? "text-stone-300" : "text-stone-700"}`}>
                 {t.displayName?.trim() || `${t.firstName} ${t.lastName}`}
               </span>
               <span className={`text-sm font-bold ${isDarkMode ? "text-emerald-300" : "text-emerald-600"}`}>
@@ -200,7 +200,7 @@ function PayAllConfirmModal({ teachers, onConfirm, onCancel, isDarkMode }) {
         </div>
 
         <div className={`flex justify-between items-center px-1 mb-5`}>
-          <span className={`text-sm font-semibold ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>
+          <span className={`text-sm font-semibold ${isDarkMode ? "text-stone-300" : "text-stone-600"}`}>
             {tr("teachersTab.totalPayout")}
           </span>
           <span className={`text-xl font-bold ${isDarkMode ? "text-emerald-300" : "text-emerald-600"}`}>
@@ -213,8 +213,8 @@ function PayAllConfirmModal({ teachers, onConfirm, onCancel, isDarkMode }) {
             onClick={onCancel}
             className={`flex-1 py-2.5 rounded-xl text-sm font-semibold border transition ${
               isDarkMode
-                ? "border-gray-600 text-gray-300 hover:bg-gray-700"
-                : "border-gray-300 text-gray-700 hover:bg-gray-50"
+                ? "border-stone-600 text-stone-300 hover:bg-stone-700"
+                : "border-stone-300 text-stone-700 hover:bg-stone-50"
             }`}
           >
             {tr("teachersTab.cancel")}
@@ -231,54 +231,27 @@ function PayAllConfirmModal({ teachers, onConfirm, onCancel, isDarkMode }) {
 }
 
 // ─── Small summary stat card ──────────────────────────────────────────────────
-function SummaryCard({ icon: Icon, label, value, sub, color, isDarkMode }) {
-  const colors = {
-    blue: {
-      bg: isDarkMode ? "bg-blue-900/30" : "bg-blue-50",
-      icon: isDarkMode ? "bg-blue-700/60 text-blue-300" : "bg-blue-100 text-blue-600",
-      value: isDarkMode ? "text-blue-300" : "text-blue-700",
-      border: isDarkMode ? "border-blue-800/40" : "border-blue-100",
-    },
-    emerald: {
-      bg: isDarkMode ? "bg-emerald-900/30" : "bg-emerald-50",
-      icon: isDarkMode ? "bg-emerald-700/60 text-emerald-300" : "bg-emerald-100 text-emerald-600",
-      value: isDarkMode ? "text-emerald-300" : "text-emerald-700",
-      border: isDarkMode ? "border-emerald-800/40" : "border-emerald-100",
-    },
-    amber: {
-      bg: isDarkMode ? "bg-amber-900/30" : "bg-amber-50",
-      icon: isDarkMode ? "bg-amber-700/60 text-amber-300" : "bg-amber-100 text-amber-600",
-      value: isDarkMode ? "text-amber-300" : "text-amber-700",
-      border: isDarkMode ? "border-amber-800/40" : "border-amber-100",
-    },
-    purple: {
-      bg: isDarkMode ? "bg-purple-900/30" : "bg-purple-50",
-      icon: isDarkMode ? "bg-purple-700/60 text-purple-300" : "bg-purple-100 text-purple-600",
-      value: isDarkMode ? "text-purple-300" : "text-purple-700",
-      border: isDarkMode ? "border-purple-800/40" : "border-purple-100",
-    },
-    red: {
-      bg: isDarkMode ? "bg-red-900/30" : "bg-red-50",
-      icon: isDarkMode ? "bg-red-700/60 text-red-300" : "bg-red-100 text-red-600",
-      value: isDarkMode ? "text-red-300" : "text-red-700",
-      border: isDarkMode ? "border-red-800/40" : "border-red-100",
-    },
-  };
-  const c = colors[color] || colors.blue;
+// Colour by topic (see .cat-* in index.css): people = teal/sky, classes = amber,
+// active = green, needs attention = rose. Solid icon tile + a faint corner wash.
+const SUMMARY_CAT = { emerald: "green", red: "rose", blue: "sky", purple: "accent" };
+function SummaryCard({ icon: Icon, label, value, sub, color }) {
+  const cat = SUMMARY_CAT[color] || color || "accent";
 
   return (
-    <div className={`rounded-xl border p-4 flex items-center gap-4 ${c.bg} ${c.border}`}>
-      <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${c.icon}`}>
-        <Icon className="w-5 h-5" />
+    <div
+      className={`cat-${cat} relative overflow-hidden rounded-xl border border-ad-line p-4 flex items-center gap-3.5 shadow-[var(--a-shadow)]`}
+      style={{ background: "radial-gradient(120% 100% at 100% 0%, var(--cat-soft) 0%, transparent 60%), var(--a-surface)" }}
+    >
+      <div
+        className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 text-white"
+        style={{ background: "var(--cat)", boxShadow: "0 6px 14px -6px var(--cat)" }}
+      >
+        <Icon className="w-5 h-5" strokeWidth={2.2} />
       </div>
-      <div>
-        <p className={`text-xs font-medium ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
-          {label}
-        </p>
-        <p className={`text-xl font-bold ${c.value}`}>{value}</p>
-        {sub && (
-          <p className={`text-xs ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>{sub}</p>
-        )}
+      <div className="min-w-0">
+        <p className="text-xs font-semibold text-ad-muted">{label}</p>
+        <p className="text-xl font-bold tabular-nums text-ad-ink">{value}</p>
+        {sub && <p className="text-xs text-ad-muted">{sub}</p>}
       </div>
     </div>
   );
@@ -607,29 +580,29 @@ export default function TeachersTab({ onNotify, isDarkMode = false }) {
   useEffect(() => { setPage(1); }, [searchQuery, continentFilter, view]);
 
   // ── UI helpers ──────────────────────────────────────────────────────────────
-  const base = isDarkMode ? "bg-gray-900" : "bg-gray-50";
-  const cardBg = isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200";
-  const textPrimary = isDarkMode ? "text-white" : "text-gray-900";
-  const textSecondary = isDarkMode ? "text-gray-400" : "text-gray-500";
+  const base = isDarkMode ? "bg-stone-900" : "bg-stone-50";
+  const cardBg = isDarkMode ? "bg-stone-800 border-stone-700" : "bg-white border-stone-200";
+  const textPrimary = isDarkMode ? "text-white" : "text-stone-900";
+  const textSecondary = isDarkMode ? "text-stone-400" : "text-stone-500";
   const inputCls = isDarkMode
-    ? "bg-gray-700 border-gray-600 text-white placeholder-gray-500 focus:ring-blue-500 focus:border-blue-500"
-    : "bg-white border-gray-300 text-gray-900 placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500";
+    ? "bg-stone-700 border-stone-600 text-white placeholder-stone-500 focus:ring-ad-accent focus:border-ad-accent"
+    : "bg-white border-stone-300 text-stone-900 placeholder-stone-400 focus:ring-ad-accent focus:border-ad-accent";
   const selectCls = isDarkMode
-    ? "bg-gray-700 border-gray-600 text-white focus:ring-blue-500"
-    : "bg-white border-gray-300 text-gray-900 focus:ring-blue-500";
+    ? "bg-stone-700 border-stone-600 text-white focus:ring-ad-accent"
+    : "bg-white border-stone-300 text-stone-900 focus:ring-ad-accent";
 
   const tabBtnCls = (key) =>
     view === key
       ? key === "pending_deletion"
         ? "bg-red-600 text-white shadow-sm"
-        : "bg-blue-600 text-white shadow-sm"
+        : "bg-ad-accent text-white shadow-sm"
       : isDarkMode
-      ? "text-gray-400 hover:text-gray-200 hover:bg-gray-700"
-      : "text-gray-500 hover:text-gray-700 hover:bg-gray-100";
+      ? "text-stone-400 hover:text-stone-200 hover:bg-stone-700"
+      : "text-stone-500 hover:text-stone-700 hover:bg-stone-100";
 
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
-    <div className={`min-h-[60vh] ${base} rounded-2xl p-6`}>
+    <div className="min-h-[60vh]">
 
       {/* ── Delete confirm modal ── */}
       <DeleteConfirmModal
@@ -673,7 +646,7 @@ export default function TeachersTab({ onNotify, isDarkMode = false }) {
             toastType === "error"
               ? "bg-red-500"
               : toastType === "info"
-              ? "bg-blue-500"
+              ? "bg-ad-accent"
               : "bg-emerald-500"
           }`}
         >
@@ -707,8 +680,8 @@ export default function TeachersTab({ onNotify, isDarkMode = false }) {
             title={tr("teachersTab.downloadVisibleTeachersAsPdf")}
             className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition ${
               isDarkMode
-                ? "border-gray-600 text-gray-300 hover:bg-gray-700"
-                : "border-gray-200 text-gray-600 hover:bg-gray-50"
+                ? "border-stone-600 text-stone-300 hover:bg-stone-700"
+                : "border-stone-200 text-stone-600 hover:bg-stone-50"
             }`}
           >
             <Download className="w-3.5 h-3.5" />
@@ -720,7 +693,7 @@ export default function TeachersTab({ onNotify, isDarkMode = false }) {
               setEditIndex(null);
               setIsModalOpen(true);
             }}
-            className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold text-sm shadow-md transition duration-150 active:scale-95 flex-shrink-0"
+            className="flex items-center gap-2 px-5 py-2.5 bg-ad-accent hover:bg-ad-accent-hover text-white rounded-xl font-semibold text-sm shadow-md transition duration-150 active:scale-95 flex-shrink-0"
           >
             <Plus className="w-4 h-4" />
             {tr("teachersTab.addTeacher")}
@@ -734,7 +707,7 @@ export default function TeachersTab({ onNotify, isDarkMode = false }) {
           icon={Users}
           label={tr("teachersTab.totalTeachers")}
           value={teachers.length}
-          color="blue"
+          color="teal"
           isDarkMode={isDarkMode}
         />
         <SummaryCard
@@ -754,15 +727,15 @@ export default function TeachersTab({ onNotify, isDarkMode = false }) {
         />
 
         {/* Pending Payout card with Mark All as Paid button */}
-        <div className={`rounded-xl border p-4 flex items-center gap-4 ${isDarkMode ? "bg-purple-900/30 border-purple-800/40" : "bg-purple-50 border-purple-100"}`}>
-          <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${isDarkMode ? "bg-purple-700/60 text-purple-300" : "bg-purple-100 text-purple-600"}`}>
-            <DollarSign className="w-5 h-5" />
+        <div className="cat-green relative overflow-hidden rounded-xl border border-ad-line p-4 flex items-center gap-3.5 shadow-[var(--a-shadow)]" style={{ background: "radial-gradient(120% 100% at 100% 0%, var(--cat-soft) 0%, transparent 60%), var(--a-surface)" }}>
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 text-white" style={{ background: "var(--cat)", boxShadow: "0 6px 14px -6px var(--cat)" }}>
+            <DollarSign className="w-5 h-5" strokeWidth={2.2} />
           </div>
           <div className="flex-1 min-w-0">
-            <p className={`text-xs font-medium ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+            <p className="text-xs font-semibold text-ad-muted">
               {tr("teachersTab.pendingPayout")}
             </p>
-            <p className={`text-xl font-bold ${isDarkMode ? "text-purple-300" : "text-purple-700"}`}>
+            <p className="text-xl font-bold tabular-nums text-ad-ink">
               {sym}{totalEarned.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </p>
             {unpaidTeachers.length > 0 && (
@@ -783,7 +756,7 @@ export default function TeachersTab({ onNotify, isDarkMode = false }) {
         className={`rounded-xl border p-4 mb-6 ${cardBg} flex flex-col sm:flex-row gap-3 items-start sm:items-center`}
       >
         {/* View tabs */}
-        <div className={`flex gap-1 p-1 rounded-lg flex-wrap ${isDarkMode ? "bg-gray-900" : "bg-gray-100"}`}>
+        <div className={`flex gap-1 p-1 rounded-lg flex-wrap ${isDarkMode ? "bg-stone-900" : "bg-stone-100"}`}>
           {[
             { key: "all", label: tr("teachersTab.all", { teachersCount: teachers.length }) },
             { key: "active", label: tr("teachersTab.active2", { activeTeachersCount: activeTeachers.length }) },
@@ -842,7 +815,7 @@ export default function TeachersTab({ onNotify, isDarkMode = false }) {
       {/* ── Loading state ── */}
       {loading && (
         <div className="flex flex-col items-center justify-center py-20 gap-3">
-          <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+          <div className="w-10 h-10 border-4 border-ad-accent border-t-transparent rounded-full animate-spin" />
           <p className={`text-sm ${textSecondary}`}>{tr("teachersTab.loadingTeachers")}</p>
         </div>
       )}
@@ -852,7 +825,7 @@ export default function TeachersTab({ onNotify, isDarkMode = false }) {
         <div className="flex flex-col items-center justify-center py-20 gap-3">
           <div
             className={`w-16 h-16 rounded-2xl flex items-center justify-center ${
-              isDarkMode ? "bg-gray-800" : "bg-gray-100"
+              isDarkMode ? "bg-stone-800" : "bg-stone-100"
             }`}
           >
             <Users className={`w-8 h-8 ${textSecondary}`} />
@@ -873,7 +846,7 @@ export default function TeachersTab({ onNotify, isDarkMode = false }) {
                 setEditIndex(null);
                 setIsModalOpen(true);
               }}
-              className="mt-2 flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold transition"
+              className="mt-2 flex items-center gap-2 px-4 py-2 bg-ad-accent hover:bg-ad-accent-hover text-white rounded-xl text-sm font-semibold transition"
             >
               <Plus className="w-4 h-4" />
               {tr("teachersTab.addFirstTeacher")}

@@ -6,7 +6,7 @@ export default function ApplicationsTab() {
   return (
     <div>
       <h2 className="text-2xl font-bold mb-2">{tr("applicationsTab.applicationsTab")}</h2>
-      <p className="text-gray-600">{tr("applicationsTab.pendingApplicationsGoHere")}</p>
+      <p className="text-stone-600">{tr("applicationsTab.pendingApplicationsGoHere")}</p>
     </div>
   );
 }

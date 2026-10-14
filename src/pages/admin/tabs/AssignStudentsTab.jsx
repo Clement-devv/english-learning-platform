@@ -50,22 +50,22 @@ function SearchableSelect({ options, value, onChange, placeholder, isDarkMode, g
   };
 
   const triggerClass = isDarkMode
-    ? "bg-[#13161f] border-[#2a2f45] text-slate-100 hover:border-violet-500"
-    : "bg-white border-slate-300 text-slate-900 hover:border-violet-500";
+    ? "bg-[var(--a-surface)] border-[var(--a-line)] text-stone-100 hover:border-ad-accent"
+    : "bg-white border-stone-300 text-stone-900 hover:border-ad-accent";
 
   const dropdownClass = isDarkMode
-    ? "bg-[#1a1d27] border-[#2a2f45] shadow-xl"
-    : "bg-white border-slate-200 shadow-xl";
+    ? "bg-[var(--a-surface)] border-[var(--a-line)] shadow-xl"
+    : "bg-white border-stone-200 shadow-xl";
 
   const searchClass = isDarkMode
-    ? "bg-[#13161f] border-[#2a2f45] text-slate-100 placeholder-slate-500"
-    : "bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400";
+    ? "bg-[var(--a-surface)] border-[var(--a-line)] text-stone-100 placeholder-stone-500"
+    : "bg-stone-50 border-stone-200 text-stone-900 placeholder-stone-400";
 
   const itemBase   = "px-3 py-2 text-sm rounded-lg cursor-pointer flex items-center gap-2.5 transition";
-  const itemActive = isDarkMode ? "bg-violet-900/40 text-violet-300" : "bg-violet-50 text-violet-700";
-  const itemHover  = isDarkMode ? "hover:bg-[#252d4a]"               : "hover:bg-slate-100";
-  const mutedCls   = isDarkMode ? "text-slate-400"                   : "text-slate-500";
-  const avatarCls  = isDarkMode ? "bg-violet-900/50 text-violet-300" : "bg-violet-100 text-violet-600";
+  const itemActive = isDarkMode ? "bg-ad-accent-soft text-ad-accent-ink" : "bg-ad-accent-soft text-ad-accent-ink";
+  const itemHover  = isDarkMode ? "hover:bg-[var(--a-raised)]"               : "hover:bg-stone-100";
+  const mutedCls   = isDarkMode ? "text-stone-400"                   : "text-stone-500";
+  const avatarCls  = isDarkMode ? "bg-ad-accent-soft text-ad-accent-ink" : "bg-ad-accent-soft text-ad-accent-ink";
 
   return (
     <div ref={containerRef} className="relative w-full">
@@ -73,7 +73,7 @@ function SearchableSelect({ options, value, onChange, placeholder, isDarkMode, g
       <button
         type="button"
         onClick={() => setOpen((p) => !p)}
-        className={`w-full flex items-center justify-between rounded-lg border px-3 py-2.5 text-sm transition focus:outline-none focus:ring-2 focus:ring-violet-500/30 ${triggerClass}`}
+        className={`w-full flex items-center justify-between rounded-lg border px-3 py-2.5 text-sm transition focus:outline-none focus:ring-2 focus:ring-ad-accent ${triggerClass}`}
       >
         <span className={selected ? "" : mutedCls}>
           {selected ? getLabel(selected) : placeholder}
@@ -96,7 +96,7 @@ function SearchableSelect({ options, value, onChange, placeholder, isDarkMode, g
       {open && (
         <div className={`absolute z-50 mt-1 w-full rounded-xl border overflow-hidden ${dropdownClass}`}>
           {/* Search input */}
-          <div className={`p-2 border-b ${isDarkMode ? "border-[#2a2f45]" : "border-slate-100"}`}>
+          <div className={`p-2 border-b ${isDarkMode ? "border-[var(--a-line)]" : "border-stone-100"}`}>
             <div className={`flex items-center gap-2 rounded-lg border px-2.5 py-1.5 ${searchClass}`}>
               <Search size={13} className={mutedCls} />
               <input
@@ -143,7 +143,7 @@ function SearchableSelect({ options, value, onChange, placeholder, isDarkMode, g
           </div>
 
           {/* Count footer */}
-          <div className={`px-3 py-1.5 text-xs border-t ${mutedCls} ${isDarkMode ? "border-[#2a2f45]" : "border-slate-100"}`}>
+          <div className={`px-3 py-1.5 text-xs border-t ${mutedCls} ${isDarkMode ? "border-[var(--a-line)]" : "border-stone-100"}`}>
             {tr("assignStudentsTab.of", { filteredCount: filtered.length, optionsCount: options.length })}
           </div>
         </div>
@@ -179,20 +179,20 @@ export default function AssignStudentsTab({ teachers = [], students = [], onNoti
 
   // ── theme helpers ────────────────────────────────────────────────────────────
   const t = {
-    page:        isDarkMode ? "bg-[#0f1117] text-slate-100"            : "bg-slate-50 text-slate-900",
-    card:        isDarkMode ? "bg-[#1a1d27] border-[#1e2235]"          : "bg-white border-slate-200",
-    cardHeader:  isDarkMode ? "bg-[#13161f] border-[#1e2235]"          : "bg-slate-50 border-slate-200",
-    input:       isDarkMode ? "bg-[#13161f] border-[#2a2f45] text-slate-100 placeholder-slate-500 focus:border-violet-500"
-                            : "bg-white border-slate-300 text-slate-900 placeholder-slate-400 focus:border-violet-500",
-    label:       isDarkMode ? "text-slate-300"                         : "text-slate-700",
-    muted:       isDarkMode ? "text-slate-400"                         : "text-slate-500",
-    tableHead:   isDarkMode ? "bg-[#13161f] text-slate-400"            : "bg-slate-50 text-slate-500",
-    tableRow:    isDarkMode ? "border-[#1e2235] hover:bg-[#1e2235]"    : "border-slate-100 hover:bg-slate-50",
-    badge:       isDarkMode ? "bg-violet-900/40 text-violet-300"       : "bg-violet-100 text-violet-700",
+    page:        isDarkMode ? "bg-[var(--a-bg)] text-stone-100"            : "bg-stone-50 text-stone-900",
+    card:        isDarkMode ? "bg-[var(--a-surface)] border-[var(--a-line)]"          : "bg-white border-stone-200",
+    cardHeader:  isDarkMode ? "bg-[var(--a-surface)] border-[var(--a-line)]"          : "bg-stone-50 border-stone-200",
+    input:       isDarkMode ? "bg-[var(--a-surface)] border-[var(--a-line)] text-stone-100 placeholder-stone-500 focus:border-ad-accent"
+                            : "bg-white border-stone-300 text-stone-900 placeholder-stone-400 focus:border-ad-accent",
+    label:       isDarkMode ? "text-stone-300"                         : "text-stone-700",
+    muted:       isDarkMode ? "text-stone-400"                         : "text-stone-500",
+    tableHead:   isDarkMode ? "bg-[var(--a-surface)] text-stone-400"            : "bg-stone-50 text-stone-500",
+    tableRow:    isDarkMode ? "border-[var(--a-line)] hover:bg-[var(--a-raised)]"    : "border-stone-100 hover:bg-stone-50",
+    badge:       isDarkMode ? "bg-ad-accent-soft text-ad-accent-ink"       : "bg-ad-accent-soft text-ad-accent-ink",
     badgeGreen:  isDarkMode ? "bg-emerald-900/40 text-emerald-300"     : "bg-emerald-100 text-emerald-700",
-    divider:     isDarkMode ? "border-[#1e2235]"                       : "border-slate-200",
-    statCard:    isDarkMode ? "bg-[#13161f] border-[#1e2235]"          : "bg-white border-slate-200",
-    searchBg:    isDarkMode ? "bg-[#13161f] border-[#2a2f45]"          : "bg-white border-slate-200",
+    divider:     isDarkMode ? "border-[var(--a-line)]"                       : "border-stone-200",
+    statCard:    isDarkMode ? "bg-[var(--a-surface)] border-[var(--a-line)]"          : "bg-white border-stone-200",
+    searchBg:    isDarkMode ? "bg-[var(--a-surface)] border-[var(--a-line)]"          : "bg-white border-stone-200",
   };
 
   const showToast = (msg, type = "success") => {
@@ -291,9 +291,9 @@ export default function AssignStudentsTab({ teachers = [], students = [], onNoti
 
   if (loading) {
     return (
-      <div className={`flex items-center justify-center h-64 ${isDarkMode ? "text-slate-400" : "text-slate-500"}`}>
+      <div className={`flex items-center justify-center h-64 ${isDarkMode ? "text-stone-400" : "text-stone-500"}`}>
         <div className="flex items-center gap-3">
-          <div className="w-5 h-5 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
+          <div className="w-5 h-5 border-2 border-ad-accent border-t-transparent rounded-full animate-spin" />
           {tr("assignStudentsTab.loadingAssignments")}
         </div>
       </div>
@@ -313,7 +313,7 @@ export default function AssignStudentsTab({ teachers = [], students = [], onNoti
 
       {/* ── Page header ────────────────────────────────────────────────────── */}
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-violet-500">{tr("assignStudentsTab.assignStudents")}</h2>
+        <h2 className="text-2xl font-bold text-ad-accent-ink">{tr("assignStudentsTab.assignStudents")}</h2>
         <p className={`text-sm mt-1 ${t.muted}`}>{tr("assignStudentsTab.linkStudentsToTheirAssigned")}</p>
       </div>
 
@@ -326,7 +326,7 @@ export default function AssignStudentsTab({ teachers = [], students = [], onNoti
         ].map(({ icon: Icon, label, value, color }) => (
           <div key={label} className={`rounded-xl border p-4 flex items-center gap-4 ${t.statCard}`}>
             <div className={`p-2.5 rounded-lg
-              ${color === "violet"  ? isDarkMode ? "bg-violet-900/40 text-violet-400"  : "bg-violet-100 text-violet-600"  : ""}
+              ${color === "violet"  ? isDarkMode ? "bg-ad-accent-soft text-ad-accent-ink"  : "bg-ad-accent-soft text-ad-accent-ink"  : ""}
               ${color === "sky"     ? isDarkMode ? "bg-sky-900/40 text-sky-400"        : "bg-sky-100 text-sky-600"        : ""}
               ${color === "emerald" ? isDarkMode ? "bg-emerald-900/40 text-emerald-400": "bg-emerald-100 text-emerald-600": ""}
             `}>
@@ -346,7 +346,7 @@ export default function AssignStudentsTab({ teachers = [], students = [], onNoti
         {/* ── Assignment form ──────────────────────────────────────────────── */}
         <div className={`w-72 flex-shrink-0 rounded-xl border overflow-hidden ${t.card}`}>
           <div className={`px-5 py-4 border-b flex items-center gap-2 ${t.cardHeader} ${t.divider}`}>
-            <Plus size={16} className="text-violet-500" />
+            <Plus size={16} className="text-ad-accent-ink" />
             <span className="font-semibold text-sm">{tr("assignStudentsTab.newAssignment")}</span>
           </div>
 
@@ -380,7 +380,7 @@ export default function AssignStudentsTab({ teachers = [], students = [], onNoti
                   <div className="min-w-0">
                     <p className={`text-sm leading-tight ${isSelected ? "font-semibold" : "font-medium"}`}>{o.firstName} {o.lastName}{o.isManaged && <ManagedTag isDarkMode={isDarkMode} />}</p>
                     {o.studentId && (
-                      <p className={`text-[10px] font-mono font-semibold ${isDarkMode ? "text-indigo-400" : "text-indigo-500"}`}>{o.studentId}</p>
+                      <p className={`text-[10px] font-mono font-semibold ${isDarkMode ? "text-ad-accent-ink" : "text-ad-accent-ink"}`}>{o.studentId}</p>
                     )}
                   </div>
                 )}
@@ -389,17 +389,17 @@ export default function AssignStudentsTab({ teachers = [], students = [], onNoti
 
             {/* Preview */}
             {(selectedTeacher || selectedStudent) && (
-              <div className={`rounded-lg p-3 text-xs space-y-1 ${isDarkMode ? "bg-violet-900/20 border border-violet-800/30" : "bg-violet-50 border border-violet-100"}`}>
+              <div className={`rounded-lg p-3 text-xs space-y-1 ${isDarkMode ? "bg-ad-accent-soft border border-ad-accent-line" : "bg-ad-accent-soft border border-ad-accent-line"}`}>
                 {selectedStudent && (
                   <div className={t.muted}>
-                    {tr("assignStudentsTab.student2")} <span className={`font-medium ${isDarkMode ? "text-violet-300" : "text-violet-700"}`}>
+                    {tr("assignStudentsTab.student2")} <span className={`font-medium ${isDarkMode ? "text-ad-accent-ink" : "text-ad-accent-ink"}`}>
                       {selectedStudent.firstName} {selectedStudent.lastName}
                     </span>
                   </div>
                 )}
                 {selectedTeacher && (
                   <div className={t.muted}>
-                    {tr("assignStudentsTab.teacher2")} <span className={`font-medium ${isDarkMode ? "text-violet-300" : "text-violet-700"}`}>
+                    {tr("assignStudentsTab.teacher2")} <span className={`font-medium ${isDarkMode ? "text-ad-accent-ink" : "text-ad-accent-ink"}`}>
                       {selectedTeacher.displayName?.trim() || `${selectedTeacher.firstName} ${selectedTeacher.lastName}`}
                     </span>
                   </div>
@@ -410,7 +410,7 @@ export default function AssignStudentsTab({ teachers = [], students = [], onNoti
             <button
               onClick={handleAssign}
               disabled={assigning || !teacherId || !studentId}
-              className="w-full py-2.5 rounded-lg bg-violet-600 hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold flex items-center justify-center gap-2 transition"
+              className="w-full py-2.5 rounded-lg bg-ad-accent hover:bg-ad-accent-hover disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold flex items-center justify-center gap-2 transition"
             >
               {assigning ? (
                 <>
@@ -432,7 +432,7 @@ export default function AssignStudentsTab({ teachers = [], students = [], onNoti
           {/* List header + filters */}
           <div className={`px-5 py-4 border-b flex flex-wrap items-center gap-3 ${t.cardHeader} ${t.divider}`}>
             <div className="flex items-center gap-2 flex-1 min-w-0">
-              <Users size={16} className="text-violet-500 flex-shrink-0" />
+              <Users size={16} className="text-ad-accent-ink flex-shrink-0" />
               <span className="font-semibold text-sm">
                 {tr("assignStudentsTab.currentAssignments")}
                 <span className={`ml-2 px-2 py-0.5 rounded-full text-xs font-medium ${t.badge}`}>
@@ -449,7 +449,7 @@ export default function AssignStudentsTab({ teachers = [], students = [], onNoti
                 placeholder={tr("assignStudentsTab.searchName")}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className={`text-sm bg-transparent outline-none w-full ${isDarkMode ? "text-slate-100 placeholder-slate-500" : "text-slate-800 placeholder-slate-400"}`}
+                className={`text-sm bg-transparent outline-none w-full ${isDarkMode ? "text-stone-100 placeholder-stone-500" : "text-stone-800 placeholder-stone-400"}`}
               />
             </div>
 
@@ -458,7 +458,7 @@ export default function AssignStudentsTab({ teachers = [], students = [], onNoti
               <select
                 value={filterTeacher}
                 onChange={(e) => setFilterTeacher(e.target.value)}
-                className={`rounded-lg border px-3 py-1.5 text-sm appearance-none pr-7 focus:outline-none focus:ring-2 focus:ring-violet-500/30 transition ${t.input}`}
+                className={`rounded-lg border px-3 py-1.5 text-sm appearance-none pr-7 focus:outline-none focus:ring-2 focus:ring-ad-accent transition ${t.input}`}
                 style={{ minWidth: 140 }}
               >
                 <option value="">{tr("assignStudentsTab.allTeachers")}</option>
@@ -472,7 +472,7 @@ export default function AssignStudentsTab({ teachers = [], students = [], onNoti
             </div>
 
             {/* View toggle */}
-            <div className={`flex rounded-lg border overflow-hidden ${isDarkMode ? "border-[#2a2f45]" : "border-slate-200"}`}>
+            <div className={`flex rounded-lg border overflow-hidden ${isDarkMode ? "border-[var(--a-line)]" : "border-stone-200"}`}>
               {[
                 { mode: "grouped", Icon: Grid3X3,   title: tr("assignStudentsTab.groupedByTeacher") },
                 { mode: "table",   Icon: LayoutList, title: tr("assignStudentsTab.flatTable") },
@@ -482,8 +482,8 @@ export default function AssignStudentsTab({ teachers = [], students = [], onNoti
                   title={title}
                   onClick={() => setViewMode(mode)}
                   className={`p-2 transition ${viewMode === mode
-                    ? "bg-violet-600 text-white"
-                    : isDarkMode ? "bg-[#13161f] text-slate-400 hover:text-slate-200" : "bg-white text-slate-400 hover:text-slate-600"
+                    ? "bg-ad-accent text-white"
+                    : isDarkMode ? "bg-[var(--a-surface)] text-stone-400 hover:text-stone-200" : "bg-white text-stone-400 hover:text-stone-600"
                   }`}
                 >
                   <Icon size={14} />
@@ -509,14 +509,14 @@ export default function AssignStudentsTab({ teachers = [], students = [], onNoti
                 const teacherDisplayName = teacher?.displayName?.trim() || `${teacher?.firstName ?? ""} ${teacher?.lastName ?? ""}`.trim() || "Unknown Teacher";
                 const initial = teacherDisplayName[0]?.toUpperCase() ?? "?";
                 return (
-                  <div key={tid} className={`rounded-xl border overflow-hidden ${isDarkMode ? "border-[#2a2f45] bg-[#13161f]" : "border-slate-200 bg-slate-50"}`}>
+                  <div key={tid} className={`rounded-xl border overflow-hidden ${isDarkMode ? "border-[var(--a-line)] bg-[var(--a-surface)]" : "border-stone-200 bg-stone-50"}`}>
                     {/* Teacher header row */}
                     <button
                       type="button"
                       onClick={() => setCollapsed((prev) => ({ ...prev, [tid]: !isOpen }))}
-                      className={`w-full flex items-center gap-3 px-4 py-3 text-left transition ${isDarkMode ? "hover:bg-[#1a1d27]" : "hover:bg-slate-100"}`}
+                      className={`w-full flex items-center gap-3 px-4 py-3 text-left transition ${isDarkMode ? "hover:bg-[var(--a-surface)]" : "hover:bg-stone-100"}`}
                     >
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${isDarkMode ? "bg-violet-900/50 text-violet-300" : "bg-violet-100 text-violet-600"}`}>
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${isDarkMode ? "bg-ad-accent-soft text-ad-accent-ink" : "bg-ad-accent-soft text-ad-accent-ink"}`}>
                         {initial}
                       </div>
                       <span className="font-semibold text-sm flex-1">{teacherDisplayName}</span>
@@ -526,13 +526,13 @@ export default function AssignStudentsTab({ teachers = [], students = [], onNoti
 
                     {/* Students list */}
                     {isOpen && (
-                      <div className={`border-t ${isDarkMode ? "border-[#2a2f45]" : "border-slate-200"}`}>
+                      <div className={`border-t ${isDarkMode ? "border-[var(--a-line)]" : "border-stone-200"}`}>
                         {rows.map((a, idx) => (
                           <div
                             key={a._id}
                             className={`flex items-center gap-3 px-4 py-2.5 text-sm transition
-                              ${idx < rows.length - 1 ? (isDarkMode ? "border-b border-[#1e2235]" : "border-b border-slate-100") : ""}
-                              ${isDarkMode ? "hover:bg-[#1e2235]" : "hover:bg-white"}`}
+                              ${idx < rows.length - 1 ? (isDarkMode ? "border-b border-[var(--a-line)]" : "border-b border-stone-100") : ""}
+                              ${isDarkMode ? "hover:bg-[var(--a-raised)]" : "hover:bg-white"}`}
                           >
                             <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${isDarkMode ? "bg-emerald-900/50 text-emerald-300" : "bg-emerald-100 text-emerald-600"}`}>
                               {(a.studentId?.firstName?.[0] ?? "?").toUpperCase()}
@@ -540,7 +540,7 @@ export default function AssignStudentsTab({ teachers = [], students = [], onNoti
                             <div className="flex-1 min-w-0">
                               <span className="font-medium">{a.studentId?.firstName} {a.studentId?.lastName}</span>{a.studentId?.isManaged && <ManagedTag isDarkMode={isDarkMode} />}
                               {a.studentId?.studentId && (
-                                <p className={`text-[10px] font-mono font-semibold ${isDarkMode ? "text-indigo-400" : "text-indigo-500"}`}>{a.studentId.studentId}</p>
+                                <p className={`text-[10px] font-mono font-semibold ${isDarkMode ? "text-ad-accent-ink" : "text-ad-accent-ink"}`}>{a.studentId.studentId}</p>
                               )}
                             </div>
                             <span className={`text-xs ${t.muted}`}>
@@ -573,7 +573,7 @@ export default function AssignStudentsTab({ teachers = [], students = [], onNoti
                     <th className="px-5 py-3 text-right font-medium text-xs uppercase tracking-wide">{tr("assignStudentsTab.action")}</th>
                   </tr>
                 </thead>
-                <tbody className={`divide-y ${isDarkMode ? "divide-[#1e2235]" : "divide-slate-100"}`}>
+                <tbody className={`divide-y ${isDarkMode ? "divide-[var(--a-ink)]" : "divide-stone-100"}`}>
                   {filtered.map((a) => (
                     <tr key={a._id} className={`transition ${t.tableRow}`}>
                       <td className="px-5 py-3">
@@ -585,7 +585,7 @@ export default function AssignStudentsTab({ teachers = [], students = [], onNoti
                           <div className="min-w-0">
                             <span className="font-medium">{a.studentId?.firstName} {a.studentId?.lastName}</span>{a.studentId?.isManaged && <ManagedTag isDarkMode={isDarkMode} />}
                             {a.studentId?.studentId && (
-                              <p className={`text-[10px] font-mono font-semibold ${isDarkMode ? "text-indigo-400" : "text-indigo-500"}`}>{a.studentId.studentId}</p>
+                              <p className={`text-[10px] font-mono font-semibold ${isDarkMode ? "text-ad-accent-ink" : "text-ad-accent-ink"}`}>{a.studentId.studentId}</p>
                             )}
                           </div>
                         </div>
@@ -593,7 +593,7 @@ export default function AssignStudentsTab({ teachers = [], students = [], onNoti
                       <td className="px-5 py-3">
                         <div className="flex items-center gap-2.5">
                           <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0
-                            ${isDarkMode ? "bg-violet-900/50 text-violet-300" : "bg-violet-100 text-violet-600"}`}>
+                            ${isDarkMode ? "bg-ad-accent-soft text-ad-accent-ink" : "bg-ad-accent-soft text-ad-accent-ink"}`}>
                             {(a.teacherId?.firstName?.[0] ?? "?").toUpperCase()}
                           </div>
                           <span className="font-medium truncate">

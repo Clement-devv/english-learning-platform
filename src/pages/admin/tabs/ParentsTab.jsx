@@ -10,13 +10,13 @@ const F = "'Nunito','Inter',sans-serif";
 export default function ParentsTab({ isDarkMode }) {
   const { t: tr } = useTranslation("admin");
   const col = {
-    card:    isDarkMode ? '#1a1d2e' : '#ffffff',
-    border:  isDarkMode ? '#2a2d40' : '#ffe8cc',
-    heading: isDarkMode ? '#f0f4ff' : '#3d2e20',
-    body:    isDarkMode ? '#c8cce0' : '#5a4a3a',
-    muted:   isDarkMode ? '#6b7090' : '#a89480',
-    accent:  isDarkMode ? '#fbbf24' : '#f97316',
-    input:   isDarkMode ? '#0f1117' : '#fff8f0',
+    card:    'var(--a-surface)',
+    border:  'var(--a-line)',
+    heading: 'var(--a-ink)',
+    body:    'var(--a-ink-2)',
+    muted:   'var(--a-muted)',
+    accent:  'var(--a-accent-ink)',
+    input:   'var(--a-raised)',
   };
 
   const [parents,       setParents]       = useState([]);
@@ -112,7 +112,7 @@ export default function ParentsTab({ isDarkMode }) {
   };
 
   const inp = { width: '100%', background: col.input, border: `1.5px solid ${col.border}`, borderRadius: 12, padding: '9px 12px', fontSize: 14, color: col.body, fontFamily: F, outline: 'none' };
-  const btn = (grad, text = '#fff', disabled = false) => ({ background: disabled ? (isDarkMode ? '#2a2d40' : '#f5f0ec') : grad, color: disabled ? col.muted : text, border: 'none', borderRadius: 12, padding: '8px 16px', fontSize: 13, fontWeight: 800, cursor: disabled ? 'default' : 'pointer', fontFamily: F, display: 'flex', alignItems: 'center', gap: 5 });
+  const btn = (grad, text = '#fff', disabled = false) => ({ background: disabled ? ('var(--a-raised)') : grad, color: disabled ? col.muted : text, border: 'none', borderRadius: 12, padding: '8px 16px', fontSize: 13, fontWeight: 800, cursor: disabled ? 'default' : 'pointer', fontFamily: F, display: 'flex', alignItems: 'center', gap: 5 });
 
   const filtered = parents.filter(p => {
     if (!search) return true;
@@ -144,8 +144,8 @@ export default function ParentsTab({ isDarkMode }) {
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder={tr("parentsTab.searchParents")}
             style={{ ...inp, paddingLeft: 30, width: 210 }} />
         </div>
-        <button onClick={load} style={{ ...btn(isDarkMode ? '#2a2d40' : '#f5f0ec', col.body), padding: '8px 10px' }}><RefreshCw size={14} /></button>
-        <button onClick={openCreate} style={btn('linear-gradient(135deg,#f97316,#f43f5e)')}>
+        <button onClick={load} style={{ ...btn('var(--a-ink)', col.body), padding: '8px 10px' }}><RefreshCw size={14} /></button>
+        <button onClick={openCreate} style={btn('var(--a-accent)')}>
           <Plus size={14} /> {tr("parentsTab.addParent")}
         </button>
       </div>
@@ -169,7 +169,7 @@ export default function ParentsTab({ isDarkMode }) {
       ) : (
         <div style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: 20, overflow: 'hidden' }}>
           {/* Table header */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1.5fr 1fr 80px 110px', gap: 12, padding: '10px 18px', background: isDarkMode ? 'rgba(255,255,255,0.03)' : '#fff8f0', borderBottom: `1.5px solid ${col.border}`, fontSize: 11, fontWeight: 800, color: col.muted, textTransform: 'uppercase', letterSpacing: '.06em' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1.5fr 1fr 80px 110px', gap: 12, padding: '10px 18px', background: 'var(--a-raised)', borderBottom: `1.5px solid ${col.border}`, fontSize: 11, fontWeight: 800, color: col.muted, textTransform: 'uppercase', letterSpacing: '.06em' }}>
             <span>{tr("parentsTab.parent")}</span><span>{tr("parentsTab.email")}</span><span>{tr("parentsTab.children")}</span><span>{tr("parentsTab.status")}</span><span>{tr("parentsTab.actions")}</span>
           </div>
           {filtered.map(p => (
@@ -180,7 +180,7 @@ export default function ParentsTab({ isDarkMode }) {
                 {(p.children || []).length === 0
                   ? <span style={{ fontSize: 11, color: col.muted }}>{tr("parentsTab.none")}</span>
                   : (p.children || []).map(c => (
-                    <span key={c._id || c} style={{ fontSize: 11, fontWeight: 700, background: isDarkMode ? 'rgba(249,115,22,0.12)' : '#fff7ed', color: col.accent, borderRadius: 999, padding: '2px 8px' }}>
+                    <span key={c._id || c} style={{ fontSize: 11, fontWeight: 700, background: 'var(--a-accent-soft)', color: col.accent, borderRadius: 999, padding: '2px 8px' }}>
                       {c.firstName || '?'}
                     </span>
                   ))}
@@ -258,7 +258,7 @@ export default function ParentsTab({ isDarkMode }) {
                       const s = students.find(st => st._id === id);
                       if (!s) return null;
                       return (
-                        <span key={id} style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'linear-gradient(135deg,#f97316,#f43f5e)', color: '#fff', borderRadius: 999, padding: '3px 10px', fontSize: 12, fontWeight: 700 }}>
+                        <span key={id} style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'var(--a-accent-grad)', color: '#fff', borderRadius: 999, padding: '3px 10px', fontSize: 12, fontWeight: 700 }}>
                           {s.firstName} {s.lastName}
                           <button type="button" onClick={() => toggleChild(id)}
                             style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.8)', cursor: 'pointer', padding: 0, fontSize: 13, lineHeight: 1, marginTop: 1 }}>
@@ -292,7 +292,7 @@ export default function ParentsTab({ isDarkMode }) {
                     .map(s => {
                       const selected = form.children.includes(s._id);
                       return (
-                        <label key={s._id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', cursor: 'pointer', borderBottom: `1px solid ${col.border}`, background: selected ? (isDarkMode ? 'rgba(249,115,22,0.1)' : '#fff7ed') : 'transparent' }}>
+                        <label key={s._id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', cursor: 'pointer', borderBottom: `1px solid ${col.border}`, background: selected ? ('var(--a-accent-soft)') : 'transparent' }}>
                           <input type="checkbox" checked={selected} onChange={() => toggleChild(s._id)}
                             style={{ width: 15, height: 15, accentColor: col.accent, cursor: 'pointer', flexShrink: 0 }} />
                           <span style={{ fontSize: 13, fontWeight: selected ? 800 : 600, color: selected ? col.accent : col.body }}>
@@ -317,14 +317,14 @@ export default function ParentsTab({ isDarkMode }) {
             </div>
 
             {!editParent && (
-              <p style={{ fontSize: 12, color: col.muted, marginTop: 14, background: isDarkMode ? 'rgba(249,115,22,0.08)' : '#fff7ed', border: `1px solid ${isDarkMode ? 'rgba(249,115,22,0.2)' : '#fed7aa'}`, borderRadius: 10, padding: '10px 14px' }}>
+              <p style={{ fontSize: 12, color: col.muted, marginTop: 14, background: 'var(--a-accent-soft)', border: `1px solid ${'var(--a-accent-line)'}`, borderRadius: 10, padding: '10px 14px' }}>
                 {tr("parentsTab.anInviteEmailWillBe")}
               </p>
             )}
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
-              <button onClick={() => setShowModal(false)} style={btn(isDarkMode ? '#2a2d40' : '#f5f0ec', col.body)}>{tr("parentsTab.cancel")}</button>
-              <button onClick={handleSave} disabled={saving} style={btn('linear-gradient(135deg,#f97316,#f43f5e)', '#fff', saving)}>
+              <button onClick={() => setShowModal(false)} style={btn('var(--a-ink)', col.body)}>{tr("parentsTab.cancel")}</button>
+              <button onClick={handleSave} disabled={saving} style={btn('var(--a-accent)', '#fff', saving)}>
                 {saving ? tr("parentsTab.saving") : editParent ? tr("parentsTab.saveChanges") : tr("parentsTab.createSendInvite")}
               </button>
             </div>

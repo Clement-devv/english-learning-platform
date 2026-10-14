@@ -19,9 +19,9 @@ export default function StudentTable({
   const { t: tr } = useTranslation("admin");
   return (
     <div className="mt-4 overflow-x-auto">
-      <table className="w-full border-collapse border border-gray-300">
+      <table className="w-full border-collapse border border-stone-300">
         <thead>
-          <tr className="bg-gray-100 text-left">
+          <tr className="bg-stone-100 text-left">
             <th className="border p-2">{tr("studentTable.firstName")}</th>
             <th className="border p-2">{tr("studentTable.surname")}</th>
             <th className="border p-2">{tr("studentTable.email")}</th>
@@ -33,13 +33,13 @@ export default function StudentTable({
         <tbody>
           {students.length === 0 ? (
             <tr>
-              <td colSpan="6" className="text-center p-4 text-gray-500">
+              <td colSpan="6" className="text-center p-4 text-stone-500">
                 {tr("studentTable.noStudentsFound")}
               </td>
             </tr>
           ) : (
             students.map((s) => (
-              <tr key={s._id} className="hover:bg-gray-50">
+              <tr key={s._id} className="hover:bg-stone-50">
                 <td className="border p-2">{s.firstName}</td>
                 <td className="border p-2">{s.lastName}</td>
                 <td className="border p-2">{visibleEmail(s.email) || tr("studentTable.noLoginManaged")}</td>
@@ -48,18 +48,18 @@ export default function StudentTable({
                 <td className="border p-2">
                   {s.showTempPassword && s.tempPassword ? (
                     <div className="flex items-center gap-2">
-                      <span className="font-mono bg-gray-100 px-2 py-1 rounded text-sm">
+                      <span className="font-mono bg-stone-100 px-2 py-1 rounded text-sm">
                         {s.tempPassword}
                       </span>
                       <button
                         onClick={() => onCopyPassword(s._id)}
-                        className="px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
+                        className="px-2 py-1 text-xs bg-ad-accent text-white rounded hover:bg-ad-accent-hover"
                       >
                         {tr("studentTable.copy")}
                       </button>
                     </div>
                   ) : (
-                    <span className="italic text-gray-400 text-sm">••••••••</span>
+                    <span className="italic text-stone-400 text-sm">••••••••</span>
                   )}
                   <div className="mt-1">
                     <button
@@ -110,14 +110,14 @@ export default function StudentTable({
 
                     <button
                       onClick={() => onViewLessons(s._id)}
-                      className="px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-xs"
+                      className="px-2 py-1 bg-ad-accent text-white rounded hover:bg-ad-accent-hover text-xs"
                     >
                       {tr("studentTable.viewLessons")}
                     </button>
 
                     <button
                       onClick={() => onEdit(s._id)}
-                      className="px-2 py-1 bg-indigo-500 text-white rounded hover:bg-indigo-600 text-xs"
+                      className="px-2 py-1 bg-ad-accent text-white rounded hover:bg-ad-accent-hover text-xs"
                     >
                       {tr("studentTable.edit")}
                     </button>
@@ -133,7 +133,7 @@ export default function StudentTable({
                       onClick={() => onToggle(s._id, !s.active)}
                       className={`px-2 py-1 text-xs rounded text-white ${
                         s.active
-                          ? "bg-gray-500 hover:bg-gray-600"
+                          ? "bg-stone-500 hover:bg-stone-600"
                           : "bg-green-600 hover:bg-green-700"
                       }`}
                     >

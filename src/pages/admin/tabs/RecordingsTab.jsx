@@ -32,13 +32,13 @@ export default function RecordingsTab({ teachers = [], isDarkMode }) {
   const [toast,           setToast]           = useState("");
 
   const col = {
-    card:   isDarkMode ? "#1a1d2e" : "#ffffff",
-    border: isDarkMode ? "#2a2d40" : "#e8edf5",
-    text:   isDarkMode ? "#e8eaf6" : "#1a1d2e",
-    muted:  isDarkMode ? "#8b91b8" : "#6b7280",
-    input:  isDarkMode ? "#1e2235" : "#f3f4f6",
+    card:   'var(--a-surface)',
+    border: 'var(--a-line)',
+    text:   'var(--a-ink)',
+    muted:  'var(--a-ink-2)',
+    input:  'var(--a-raised)',
     hover:  isDarkMode ? "rgba(255,255,255,0.04)" : "rgba(99,102,241,0.04)",
-    accent: "#6366f1",
+    accent: "var(--a-accent-ink)",
   };
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(""), 3000); };
@@ -161,7 +161,7 @@ export default function RecordingsTab({ teachers = [], isDarkMode }) {
     : "";
 
   const toastEl = toast && (
-    <div style={{ position: "fixed", bottom: "24px", right: "24px", padding: "12px 20px", background: "#1a1d2e", color: "#fff", borderRadius: "12px", fontWeight: 700, zIndex: 9999, border: "1px solid #2a2d40" }}>
+    <div style={{ position: "fixed", bottom: "24px", right: "24px", padding: "12px 20px", background: "var(--a-raised)", color: "#fff", borderRadius: "12px", fontWeight: 700, zIndex: 9999, border: "1px solid var(--a-line)" }}>
       {toast}
     </div>
   );
@@ -285,7 +285,7 @@ export default function RecordingsTab({ teachers = [], isDarkMode }) {
                 return (
                   <div key={session.key} style={{ background: col.card, border: `1px solid ${col.border}`, borderRadius: "16px", overflow: "hidden" }}>
                     <div style={{ padding: "14px 18px", display: "flex", alignItems: "center", gap: "14px", flexWrap: "wrap" }}>
-                      <div style={{ width: "58px", height: "42px", borderRadius: "10px", background: isExternal(rec) && total === 1 ? "linear-gradient(135deg,#0ea5e9,#6366f1)" : "linear-gradient(135deg,#6366f1,#8b5cf6)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                      <div style={{ width: "58px", height: "42px", borderRadius: "10px", background: isExternal(rec) && total === 1 ? "var(--a-accent-grad)" : "var(--a-accent)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                         {isExternal(rec) && total === 1 ? <ExternalLink size={18} color="white" /> : <Video size={18} color="white" />}
                       </div>
 
@@ -316,7 +316,7 @@ export default function RecordingsTab({ teachers = [], isDarkMode }) {
 
                       <div style={{ display: "flex", gap: "6px", flexShrink: 0, alignItems: "center" }}>
                         <button onClick={() => loadVideo(session, 0)} title={isExternal(rec) ? tr("recordingsTab.opensTheTeacherSLink") : total > 1 ? tr("recordingsTab.playsAllPartsInOrder") : tr("recordingsTab.watchRecording")}
-                          style={{ padding: "8px 14px", borderRadius: "10px", background: isExternal(rec) ? "linear-gradient(135deg,#0ea5e9,#6366f1)" : "linear-gradient(135deg,#6366f1,#8b5cf6)", color: "#fff", border: "none", cursor: "pointer", fontSize: "12px", fontWeight: 800, display: "flex", alignItems: "center", gap: "5px" }}>
+                          style={{ padding: "8px 14px", borderRadius: "10px", background: isExternal(rec) ? "var(--a-accent-grad)" : "var(--a-accent)", color: "#fff", border: "none", cursor: "pointer", fontSize: "12px", fontWeight: 800, display: "flex", alignItems: "center", gap: "5px" }}>
                           {isExternal(rec)
                             ? <><ExternalLink size={13} /> {total > 1 ? tr("recordingsTab.openPart1") : tr("recordingsTab.openLink")}</>
                             : <><Play size={13} fill="white" /> {total > 1 ? tr("recordingsTab.watchPart1") : tr("recordingsTab.watch")}</>}
@@ -354,7 +354,7 @@ export default function RecordingsTab({ teachers = [], isDarkMode }) {
                             </div>
                             {!isExternal(p) && p.fileSize > 0 && <span style={{ fontSize: "11px", color: col.muted }}>{formatSize(p.fileSize)}</span>}
                             <button onClick={() => loadVideo(session, i)} title={isExternal(p) ? tr("recordingsTab.openTheSavedLink") : tr("recordingsTab.watchThisPart")}
-                              style={{ padding: "6px 10px", borderRadius: "8px", background: isExternal(p) ? "linear-gradient(135deg,#0ea5e9,#6366f1)" : "linear-gradient(135deg,#6366f1,#8b5cf6)", color: "#fff", border: "none", cursor: "pointer", fontSize: "11px", fontWeight: 800, display: "flex", alignItems: "center", gap: "4px" }}>
+                              style={{ padding: "6px 10px", borderRadius: "8px", background: isExternal(p) ? "var(--a-accent-grad)" : "var(--a-accent)", color: "#fff", border: "none", cursor: "pointer", fontSize: "11px", fontWeight: 800, display: "flex", alignItems: "center", gap: "4px" }}>
                               {isExternal(p) ? <><ExternalLink size={11} /> Open</> : <><Play size={11} fill="white" /> Watch</>}
                             </button>
                             {!isExternal(p) && (
@@ -424,7 +424,7 @@ export default function RecordingsTab({ teachers = [], isDarkMode }) {
               style={{ display: "flex", alignItems: "center", gap: "14px", padding: "14px 18px", background: col.card, border: `1px solid ${col.border}`, borderRadius: "14px", cursor: "pointer", textAlign: "left", width: "100%", fontFamily: "inherit" }}
               onMouseEnter={e => e.currentTarget.style.background = col.hover}
               onMouseLeave={e => e.currentTarget.style.background = col.card}>
-              <div style={{ width: "44px", height: "44px", borderRadius: "12px", background: "linear-gradient(135deg,#6366f1,#8b5cf6)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <div style={{ width: "44px", height: "44px", borderRadius: "12px", background: "var(--a-accent-grad)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                 <span style={{ fontSize: "16px", fontWeight: 900, color: "#fff" }}>{initials}</span>
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -471,7 +471,7 @@ export default function RecordingsTab({ teachers = [], isDarkMode }) {
               style={{ display: "flex", alignItems: "center", gap: "14px", padding: "14px 18px", background: col.card, border: `1px solid ${col.border}`, borderRadius: "14px", cursor: "pointer", textAlign: "left", width: "100%", fontFamily: "inherit" }}
               onMouseEnter={e => e.currentTarget.style.background = col.hover}
               onMouseLeave={e => e.currentTarget.style.background = col.card}>
-              <div style={{ width: "44px", height: "44px", borderRadius: "12px", background: "linear-gradient(135deg,#6366f1,#8b5cf6)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <div style={{ width: "44px", height: "44px", borderRadius: "12px", background: "var(--a-accent-grad)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                 <span style={{ fontSize: "16px", fontWeight: 900, color: "#fff" }}>{t.firstName?.[0]}{t.lastName?.[0]}</span>
               </div>
               <div style={{ flex: 1 }}>

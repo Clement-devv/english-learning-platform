@@ -72,8 +72,8 @@ function DeleteConfirmModal({ student, onConfirm, onCancel, isDarkMode }) {
 
   const overlay = "fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm";
   const box = isDarkMode
-    ? "bg-gray-800 border border-gray-700 text-white"
-    : "bg-white border border-gray-200 text-gray-900";
+    ? "bg-stone-800 border border-stone-700 text-white"
+    : "bg-white border border-stone-200 text-stone-900";
 
   return (
     <div className={overlay}>
@@ -87,7 +87,7 @@ function DeleteConfirmModal({ student, onConfirm, onCancel, isDarkMode }) {
 
         {/* Heading */}
         <h2 className="text-xl font-bold text-center mb-2">{tr("studentsTab.scheduleAccountDeletion")}</h2>
-        <p className={`text-center text-sm mb-5 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+        <p className={`text-center text-sm mb-5 ${isDarkMode ? "text-stone-400" : "text-stone-500"}`}>
           {tr("studentsTab.youAreAboutToSchedule")}{" "}
           <span className="font-semibold text-red-500">
             {student.firstName} {student.lastName}
@@ -126,8 +126,8 @@ function DeleteConfirmModal({ student, onConfirm, onCancel, isDarkMode }) {
             onClick={onCancel}
             className={`flex-1 py-2.5 rounded-xl font-semibold text-sm transition ${
               isDarkMode
-                ? "bg-gray-700 hover:bg-gray-600 text-gray-200"
-                : "bg-gray-100 hover:bg-gray-200 text-gray-700"
+                ? "bg-stone-700 hover:bg-stone-600 text-stone-200"
+                : "bg-stone-100 hover:bg-stone-200 text-stone-700"
             }`}
           >
             {tr("studentsTab.cancel")}
@@ -156,9 +156,9 @@ function ConvertModal({ student, onConfirm, onCancel, isDarkMode }) {
   if (!student) return null;
 
   const box = isDarkMode
-    ? "bg-gray-800 border border-gray-700 text-white"
-    : "bg-white border border-gray-200 text-gray-900";
-  const muted = isDarkMode ? "text-gray-400" : "text-gray-500";
+    ? "bg-stone-800 border border-stone-700 text-white"
+    : "bg-white border border-stone-200 text-stone-900";
+  const muted = isDarkMode ? "text-stone-400" : "text-stone-500";
 
   const submit = async (e) => {
     e.preventDefault();
@@ -186,7 +186,7 @@ function ConvertModal({ student, onConfirm, onCancel, isDarkMode }) {
           onChange={(e) => setEmail(e.target.value)}
           placeholder={tr("studentsTab.studentEmailCom")}
           className={`w-full px-3 py-2.5 rounded-xl border text-sm ${
-            isDarkMode ? "bg-gray-900 border-gray-600 text-white" : "bg-white border-gray-300 text-gray-900"
+            isDarkMode ? "bg-stone-900 border-stone-600 text-white" : "bg-white border-stone-300 text-stone-900"
           }`}
         />
         {error && <p className="text-xs text-red-500 mt-2">{error}</p>}
@@ -196,7 +196,7 @@ function ConvertModal({ student, onConfirm, onCancel, isDarkMode }) {
             type="button"
             onClick={onCancel}
             className={`flex-1 py-2.5 rounded-xl font-semibold text-sm ${
-              isDarkMode ? "bg-gray-700 hover:bg-gray-600 text-gray-200" : "bg-gray-100 hover:bg-gray-200 text-gray-700"
+              isDarkMode ? "bg-stone-700 hover:bg-stone-600 text-stone-200" : "bg-stone-100 hover:bg-stone-200 text-stone-700"
             }`}
           >
             {tr("studentsTab.cancel")}
@@ -204,7 +204,7 @@ function ConvertModal({ student, onConfirm, onCancel, isDarkMode }) {
           <button
             type="submit"
             disabled={saving}
-            className="flex-1 py-2.5 rounded-xl font-semibold text-sm bg-sky-600 hover:bg-sky-700 disabled:opacity-60 text-white"
+            className="flex-1 py-2.5 rounded-xl font-semibold text-sm bg-ad-accent hover:bg-ad-accent-hover disabled:opacity-60 text-white"
           >
             {saving ? tr("studentsTab.sending") : tr("studentsTab.sendInvite")}
           </button>
@@ -215,48 +215,28 @@ function ConvertModal({ student, onConfirm, onCancel, isDarkMode }) {
 }
 
 // ── Summary stat card ─────────────────────────────────────────────────────────
-function SummaryCard({ icon: Icon, label, value, sub, color, isDarkMode }) {
-  const colors = {
-    sky: {
-      bg: isDarkMode ? "bg-sky-900/30" : "bg-sky-50",
-      icon: isDarkMode ? "bg-sky-700/60 text-sky-300" : "bg-sky-100 text-sky-600",
-      value: isDarkMode ? "text-sky-300" : "text-sky-700",
-      border: isDarkMode ? "border-sky-800/40" : "border-sky-100",
-    },
-    emerald: {
-      bg: isDarkMode ? "bg-emerald-900/30" : "bg-emerald-50",
-      icon: isDarkMode ? "bg-emerald-700/60 text-emerald-300" : "bg-emerald-100 text-emerald-600",
-      value: isDarkMode ? "text-emerald-300" : "text-emerald-700",
-      border: isDarkMode ? "border-emerald-800/40" : "border-emerald-100",
-    },
-    red: {
-      bg: isDarkMode ? "bg-red-900/30" : "bg-red-50",
-      icon: isDarkMode ? "bg-red-700/60 text-red-300" : "bg-red-100 text-red-600",
-      value: isDarkMode ? "text-red-300" : "text-red-700",
-      border: isDarkMode ? "border-red-800/40" : "border-red-100",
-    },
-    purple: {
-      bg: isDarkMode ? "bg-purple-900/30" : "bg-purple-50",
-      icon: isDarkMode ? "bg-purple-700/60 text-purple-300" : "bg-purple-100 text-purple-600",
-      value: isDarkMode ? "text-purple-300" : "text-purple-700",
-      border: isDarkMode ? "border-purple-800/40" : "border-purple-100",
-    },
-  };
-  const c = colors[color] || colors.sky;
+// ─── Small summary stat card ──────────────────────────────────────────────────
+// Colour by topic (see .cat-* in index.css): people = teal/sky, classes = amber,
+// active = green, needs attention = rose. Solid icon tile + a faint corner wash.
+const SUMMARY_CAT = { emerald: "green", red: "rose", blue: "sky", purple: "accent" };
+function SummaryCard({ icon: Icon, label, value, sub, color }) {
+  const cat = SUMMARY_CAT[color] || color || "accent";
 
   return (
-    <div className={`rounded-xl border p-4 flex items-center gap-4 ${c.bg} ${c.border}`}>
-      <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${c.icon}`}>
-        <Icon className="w-5 h-5" />
+    <div
+      className={`cat-${cat} relative overflow-hidden rounded-xl border border-ad-line p-4 flex items-center gap-3.5 shadow-[var(--a-shadow)]`}
+      style={{ background: "radial-gradient(120% 100% at 100% 0%, var(--cat-soft) 0%, transparent 60%), var(--a-surface)" }}
+    >
+      <div
+        className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 text-white"
+        style={{ background: "var(--cat)", boxShadow: "0 6px 14px -6px var(--cat)" }}
+      >
+        <Icon className="w-5 h-5" strokeWidth={2.2} />
       </div>
-      <div>
-        <p className={`text-xs font-medium ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
-          {label}
-        </p>
-        <p className={`text-xl font-bold ${c.value}`}>{value}</p>
-        {sub && (
-          <p className={`text-xs ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>{sub}</p>
-        )}
+      <div className="min-w-0">
+        <p className="text-xs font-semibold text-ad-muted">{label}</p>
+        <p className="text-xl font-bold tabular-nums text-ad-ink">{value}</p>
+        {sub && <p className="text-xs text-ad-muted">{sub}</p>}
       </div>
     </div>
   );
@@ -679,25 +659,25 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
   const selectedStudentObj = students.find((s) => s._id === selectedStudent);
 
   // ── UI helpers ───────────────────────────────────────────────────────────────
-  const base = isDarkMode ? "bg-gray-900" : "bg-gray-50";
-  const cardBg = isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200";
-  const textPrimary = isDarkMode ? "text-white" : "text-gray-900";
-  const textSecondary = isDarkMode ? "text-gray-400" : "text-gray-500";
+  const base = isDarkMode ? "bg-stone-900" : "bg-stone-50";
+  const cardBg = isDarkMode ? "bg-stone-800 border-stone-700" : "bg-white border-stone-200";
+  const textPrimary = isDarkMode ? "text-white" : "text-stone-900";
+  const textSecondary = isDarkMode ? "text-stone-400" : "text-stone-500";
   const inputCls = isDarkMode
-    ? "bg-gray-700 border-gray-600 text-white placeholder-gray-500 focus:ring-sky-500 focus:border-sky-500"
-    : "bg-white border-gray-300 text-gray-900 placeholder-gray-400 focus:ring-sky-500 focus:border-sky-500";
+    ? "bg-stone-700 border-stone-600 text-white placeholder-stone-500 focus:ring-ad-accent focus:border-ad-accent"
+    : "bg-white border-stone-300 text-stone-900 placeholder-stone-400 focus:ring-ad-accent focus:border-ad-accent";
 
   const tabBtnCls = (key) =>
     view === key
       ? key === "pending_deletion"
         ? "bg-red-600 text-white shadow-sm"
-        : "bg-sky-600 text-white shadow-sm"
+        : "bg-ad-accent text-white shadow-sm"
       : isDarkMode
-      ? "text-gray-400 hover:text-gray-200 hover:bg-gray-700"
-      : "text-gray-500 hover:text-gray-700 hover:bg-gray-100";
+      ? "text-stone-400 hover:text-stone-200 hover:bg-stone-700"
+      : "text-stone-500 hover:text-stone-700 hover:bg-stone-100";
 
   return (
-    <div className={`min-h-[60vh] ${base} rounded-2xl p-6`}>
+    <div className="min-h-[60vh]">
       {/* ── Toast ── */}
       {toast && (
         <div
@@ -705,7 +685,7 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
             toastType === "error"
               ? "bg-red-500"
               : toastType === "info"
-              ? "bg-sky-500"
+              ? "bg-ad-accent"
               : "bg-emerald-500"
           }`}
         >
@@ -735,8 +715,8 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
             onClick={() => { setSelectedStudent(null); setIsPaymentModalOpen(true); }}
             className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition ${
               isDarkMode
-                ? "border-gray-600 text-gray-300 hover:bg-gray-700"
-                : "border-gray-200 text-gray-600 hover:bg-gray-50"
+                ? "border-stone-600 text-stone-300 hover:bg-stone-700"
+                : "border-stone-200 text-stone-600 hover:bg-stone-50"
             }`}
           >
             <Receipt className="w-3.5 h-3.5" />
@@ -746,8 +726,8 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
             onClick={() => { setSelectedStudent(null); setIsLessonModalOpen(true); }}
             className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition ${
               isDarkMode
-                ? "border-gray-600 text-gray-300 hover:bg-gray-700"
-                : "border-gray-200 text-gray-600 hover:bg-gray-50"
+                ? "border-stone-600 text-stone-300 hover:bg-stone-700"
+                : "border-stone-200 text-stone-600 hover:bg-stone-50"
             }`}
           >
             <BookOpen className="w-3.5 h-3.5" />
@@ -759,8 +739,8 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
             title={tr("studentsTab.downloadVisibleStudentsAsPdf")}
             className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition ${
               isDarkMode
-                ? "border-gray-600 text-gray-300 hover:bg-gray-700"
-                : "border-gray-200 text-gray-600 hover:bg-gray-50"
+                ? "border-stone-600 text-stone-300 hover:bg-stone-700"
+                : "border-stone-200 text-stone-600 hover:bg-stone-50"
             }`}
           >
             <Download className="w-3.5 h-3.5" />
@@ -771,7 +751,7 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
             <button
               onClick={openCreate}
               className={`flex items-center gap-2 px-5 py-2.5 text-white rounded-xl font-semibold text-sm shadow-md transition duration-150 active:scale-95 ${
-                accountType === "managed" ? "bg-amber-500 hover:bg-amber-600" : "bg-sky-600 hover:bg-sky-700"
+                accountType === "managed" ? "bg-amber-500 hover:bg-amber-600" : "bg-ad-accent hover:bg-ad-accent-hover"
               }`}
             >
               <Plus className="w-4 h-4" />
@@ -799,7 +779,7 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
         aria-label={tr("studentsTab.studentAccountType")}
         className={`grid gap-1 p-1 rounded-xl ${
           visibleTypes.length > 1 ? "grid-cols-2 max-w-md" : "grid-cols-1 max-w-[15rem]"
-        } ${hiddenModeNote ? "mb-3" : "mb-6"} ${isDarkMode ? "bg-gray-800" : "bg-gray-200/70"}`}
+        } ${hiddenModeNote ? "mb-3" : "mb-6"} ${isDarkMode ? "bg-stone-800" : "bg-stone-200/70"}`}
       >
         {[
           { key: "real",  icon: BadgeCheck, label: tr("studentsTab.studentAccounts2"), count: realCount,    hint: tr("studentsTab.logInThemselves") },
@@ -814,12 +794,12 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
               onClick={() => setAccountType(key)}
               className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition ${
                 selected
-                  ? isDarkMode ? "bg-gray-900 shadow-sm" : "bg-white shadow-sm"
-                  : isDarkMode ? "hover:bg-gray-700/60" : "hover:bg-white/60"
+                  ? isDarkMode ? "bg-stone-900 shadow-sm" : "bg-white shadow-sm"
+                  : isDarkMode ? "hover:bg-stone-700/60" : "hover:bg-white/60"
               }`}
             >
               <Icon className={`w-4 h-4 flex-shrink-0 ${
-                selected ? (key === "managed" ? "text-amber-500" : "text-sky-500") : textSecondary
+                selected ? (key === "managed" ? "text-amber-500" : "text-ad-accent-ink") : textSecondary
               }`} />
               <span className="min-w-0">
                 <span className={`block text-sm font-semibold ${selected ? textPrimary : textSecondary}`}>
@@ -872,7 +852,7 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
           label={tr("studentsTab.totalClasses")}
           value={totalClasses}
           sub={tr("studentsTab.acrossAllStudents")}
-          color="purple"
+          color="amber"
           isDarkMode={isDarkMode}
         />
       </div>
@@ -882,7 +862,7 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
         className={`rounded-xl border p-4 mb-6 ${cardBg} flex flex-col sm:flex-row gap-3 items-start sm:items-center`}
       >
         {/* View tabs */}
-        <div className={`flex gap-1 p-1 rounded-lg flex-wrap ${isDarkMode ? "bg-gray-900" : "bg-gray-100"}`}>
+        <div className={`flex gap-1 p-1 rounded-lg flex-wrap ${isDarkMode ? "bg-stone-900" : "bg-stone-100"}`}>
           {[
             { key: "all",             label: tr("studentsTab.all", { typedStudentsCount: typedStudents.length }) },
             { key: "active",          label: tr("studentsTab.active2", { activeStudentsCount: activeStudents.length }) },
@@ -919,7 +899,7 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
       {/* ── Loading ── */}
       {loading && (
         <div className="flex flex-col items-center justify-center py-20 gap-3">
-          <div className="w-10 h-10 border-4 border-sky-500 border-t-transparent rounded-full animate-spin" />
+          <div className="w-10 h-10 border-4 border-ad-accent border-t-transparent rounded-full animate-spin" />
           <p className={`text-sm ${textSecondary}`}>{tr("studentsTab.loadingStudents")}</p>
         </div>
       )}
@@ -929,7 +909,7 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
         <div className="flex flex-col items-center justify-center py-20 gap-3">
           <div
             className={`w-16 h-16 rounded-2xl flex items-center justify-center ${
-              isDarkMode ? "bg-gray-800" : "bg-gray-100"
+              isDarkMode ? "bg-stone-800" : "bg-stone-100"
             }`}
           >
             <GraduationCap className={`w-8 h-8 ${textSecondary}`} />
@@ -950,7 +930,7 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
             <button
               onClick={openCreate}
               className={`mt-2 flex items-center gap-2 px-4 py-2 text-white rounded-xl text-sm font-semibold transition ${
-                accountType === "managed" ? "bg-amber-500 hover:bg-amber-600" : "bg-sky-600 hover:bg-sky-700"
+                accountType === "managed" ? "bg-amber-500 hover:bg-amber-600" : "bg-ad-accent hover:bg-ad-accent-hover"
               }`}
             >
               <Plus className="w-4 h-4" />

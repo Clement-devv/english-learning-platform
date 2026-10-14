@@ -21,7 +21,7 @@ const AVATAR_TINTS = [
   { light: "bg-emerald-50 text-emerald-700 ring-emerald-100", dark: "bg-emerald-500/15 text-emerald-300 ring-emerald-400/20" },
   { light: "bg-rose-50 text-rose-700 ring-rose-100",         dark: "bg-rose-500/15 text-rose-300 ring-rose-400/20" },
   { light: "bg-amber-50 text-amber-700 ring-amber-100",      dark: "bg-amber-500/15 text-amber-300 ring-amber-400/20" },
-  { light: "bg-slate-100 text-slate-700 ring-slate-200",     dark: "bg-slate-500/20 text-slate-200 ring-slate-400/20" },
+  { light: "bg-stone-100 text-stone-700 ring-stone-200",     dark: "bg-stone-500/20 text-stone-200 ring-stone-400/20" },
 ];
 function getAvatarTint(name = "", isDarkMode) {
   let hash = 0;
@@ -36,7 +36,7 @@ function ContinentBadge({ continent, isDarkMode }) {
   const { t: tr } = useTranslation("admin");
   return (
     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium ${
-      isDarkMode ? "bg-gray-700/60 text-gray-300" : "bg-gray-100 text-gray-600"
+      isDarkMode ? "bg-stone-700/60 text-stone-300" : "bg-stone-100 text-stone-600"
     }`}>
       <Globe className="w-3 h-3" />
       {continent || tr("teacherCard.unknown")}
@@ -52,7 +52,7 @@ function StarRating({ rating, totalRatings, isDarkMode }) {
     <div className="flex items-center gap-1.5">
       <div className="relative inline-flex" style={{ fontSize: 13, lineHeight: 1 }}>
         {/* Empty stars */}
-        <span style={{ color: isDarkMode ? "#4b5563" : "#d1d5db", letterSpacing: 1 }}>★★★★★</span>
+        <span style={{ color: 'var(--a-line-strong)', letterSpacing: 1 }}>★★★★★</span>
         {/* Filled stars overlay */}
         <span
           className="absolute inset-0 overflow-hidden"
@@ -64,7 +64,7 @@ function StarRating({ rating, totalRatings, isDarkMode }) {
       <span className={`text-xs font-bold ${isDarkMode ? "text-amber-400" : "text-amber-500"}`}>
         {rating.toFixed(1)}
       </span>
-      <span className={`text-xs ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>{tr("teacherCard.review", { totalRatings, value: totalRatings !== 1 ? "s" : "" })}</span>
+      <span className={`text-xs ${isDarkMode ? "text-stone-500" : "text-stone-400"}`}>{tr("teacherCard.review", { totalRatings, value: totalRatings !== 1 ? "s" : "" })}</span>
     </div>
   );
 }
@@ -72,11 +72,11 @@ function StarRating({ rating, totalRatings, isDarkMode }) {
 // One cell of the stats strip — the number carries the weight, the label stays quiet
 function Stat({ label, value, isDarkMode }) {
   return (
-    <div className="flex flex-col gap-0.5 px-3 py-2.5 min-w-0">
-      <span className={`text-[11px] font-medium uppercase tracking-wide ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
+    <div className="flex flex-col gap-0.5 px-2.5 py-2.5 min-w-0">
+      <span className={`text-[11px] font-medium uppercase tracking-wide ${isDarkMode ? "text-stone-500" : "text-stone-400"}`}>
         {label}
       </span>
-      <span className={`text-sm font-semibold tabular-nums truncate ${isDarkMode ? "text-gray-100" : "text-gray-900"}`}>
+      <span className={`text-sm font-semibold tabular-nums truncate ${isDarkMode ? "text-stone-100" : "text-stone-900"}`}>
         {value}
       </span>
     </div>
@@ -154,12 +154,12 @@ export default function TeacherCard({
     : { key: "lesson", icon: BookOpen,  label: tr("teacherCard.markLessonShort"), onClick: onMarkLesson };
 
   const cardBase = isDarkMode
-    ? "bg-gray-800 border-gray-700 hover:border-gray-600"
-    : "bg-white border-gray-200 hover:border-gray-300 shadow-[0_1px_2px_rgba(16,24,40,0.04)]";
+    ? "bg-stone-800 border-stone-700 hover:border-stone-600"
+    : "bg-white border-stone-200 hover:border-stone-300 shadow-[0_1px_2px_rgba(16,24,40,0.04)]";
 
   const menuBg = isDarkMode
-    ? "bg-gray-900 border-gray-700 shadow-2xl"
-    : "bg-white border-gray-200 shadow-xl";
+    ? "bg-stone-900 border-stone-700 shadow-2xl"
+    : "bg-white border-stone-200 shadow-xl";
 
   return (
     <div
@@ -200,8 +200,8 @@ export default function TeacherCard({
               {/* Status dot */}
               <span
                 className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 ${
-                  isDarkMode ? "border-gray-800" : "border-white"
-                } ${isActive ? "bg-emerald-400" : "bg-gray-400"}`}
+                  isDarkMode ? "border-stone-800" : "border-white"
+                } ${isActive ? "bg-emerald-400" : "bg-stone-400"}`}
               />
             </div>
 
@@ -212,20 +212,20 @@ export default function TeacherCard({
                   type="button"
                   onClick={onEdit}
                   className={`max-w-full truncate text-left hover:underline underline-offset-2 ${
-                    isDarkMode ? "text-white" : "text-gray-900"
+                    isDarkMode ? "text-white" : "text-stone-900"
                   }`}
                 >
                   {displayName || fullName || tr("teacherCard.unnamedTeacher")}
                 </button>
               </h3>
               {displayName && (
-                <p className={`text-xs truncate mt-0.5 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
+                <p className={`text-xs truncate mt-0.5 ${isDarkMode ? "text-stone-500" : "text-stone-400"}`}>
                   {fullName}
                 </p>
               )}
               <p
                 className={`text-xs truncate flex items-center gap-1 mt-0.5 ${
-                  isDarkMode ? "text-gray-400" : "text-gray-500"
+                  isDarkMode ? "text-stone-400" : "text-stone-500"
                 }`}
               >
                 <Mail className="w-3 h-3 flex-shrink-0" />
@@ -254,15 +254,15 @@ export default function TeacherCard({
           {teacher.avgRating != null && teacher.totalRatings > 0 ? (
             <StarRating rating={teacher.avgRating} totalRatings={teacher.totalRatings} isDarkMode={isDarkMode} />
           ) : (
-            <span className={`text-xs italic ${isDarkMode ? "text-gray-600" : "text-gray-400"}`}>
+            <span className={`text-xs italic ${isDarkMode ? "text-stone-600" : "text-stone-400"}`}>
               {tr("teacherCard.noReviewsYet")}
             </span>
           )}
         </div>
 
         {/* Stats strip */}
-        <div className={`grid grid-cols-3 mb-4 rounded-xl border divide-x ${
-          isDarkMode ? "border-gray-700 divide-gray-700" : "border-gray-100 divide-gray-100 bg-gray-50/60"
+        <div className={`grid grid-cols-[minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,1.4fr)] mb-4 rounded-xl border divide-x ${
+          isDarkMode ? "border-stone-700 divide-stone-700" : "border-stone-100 divide-stone-100 bg-stone-50/60"
         }`}>
           <Stat label={tr("teacherCard.rate")} value={`${sym}${teacher.ratePerClass || 0}`} isDarkMode={isDarkMode} />
           <Stat label={tr("teacherCard.lessons")} value={teacher.lessonsCompleted || 0} isDarkMode={isDarkMode} />
@@ -271,14 +271,14 @@ export default function TeacherCard({
 
         {/* Professional profile extras */}
         {(teacher.bio || teacher.specializations?.length > 0 || teacher.certifications?.length > 0 || teacher.timezone || teacher.yearsOfExperience > 0) && (
-          <div className={`mb-4 rounded-xl overflow-hidden ${isDarkMode ? "bg-gray-700/40" : "bg-gray-50"}`}>
+          <div className={`mb-4 rounded-xl overflow-hidden ${isDarkMode ? "bg-stone-700/40" : "bg-stone-50"}`}>
 
             {/* Toggle header */}
             <button
               type="button"
               onClick={() => setProfileExpanded(v => !v)}
               className={`w-full flex items-center justify-between px-3 py-2 text-xs font-semibold transition-colors ${
-                isDarkMode ? "text-gray-400 hover:text-gray-200" : "text-gray-500 hover:text-gray-700"
+                isDarkMode ? "text-stone-400 hover:text-stone-200" : "text-stone-500 hover:text-stone-700"
               }`}
             >
               <span>{tr("teacherCard.profileDetails")}</span>
@@ -293,7 +293,7 @@ export default function TeacherCard({
 
             {/* Bio */}
             {teacher.bio && (
-              <p className={`text-xs leading-relaxed line-clamp-2 ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>
+              <p className={`text-xs leading-relaxed line-clamp-2 ${isDarkMode ? "text-stone-300" : "text-stone-600"}`}>
                 {teacher.bio}
               </p>
             )}
@@ -302,12 +302,12 @@ export default function TeacherCard({
             {(teacher.timezone || teacher.yearsOfExperience > 0) && (
               <div className="flex flex-wrap gap-1.5">
                 {teacher.timezone && (
-                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${isDarkMode ? "bg-blue-900/40 text-blue-300" : "bg-blue-50 text-blue-700"}`}>
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${isDarkMode ? "bg-stone-700/60 text-stone-300" : "bg-stone-100 text-stone-600"}`}>
                     <Clock className="w-3 h-3" />{teacher.timezone}
                   </span>
                 )}
                 {teacher.yearsOfExperience > 0 && (
-                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${isDarkMode ? "bg-purple-900/40 text-purple-300" : "bg-purple-50 text-purple-700"}`}>
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${isDarkMode ? "bg-stone-700/60 text-stone-300" : "bg-stone-100 text-stone-600"}`}>
                     <TrendingUp className="w-3 h-3" />{teacher.yearsOfExperience} {tr("teacherCard.yrsExp")}
                   </span>
                 )}
@@ -317,17 +317,17 @@ export default function TeacherCard({
             {/* Specializations */}
             {teacher.specializations?.length > 0 && (
               <div>
-                <p className={`text-xs font-semibold mb-1.5 flex items-center gap-1 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+                <p className={`text-xs font-semibold mb-1.5 flex items-center gap-1 ${isDarkMode ? "text-stone-400" : "text-stone-500"}`}>
                   <BookOpen className="w-3 h-3" /> {tr("teacherCard.specializations")}
                 </p>
                 <div className="flex flex-wrap gap-1">
                   {teacher.specializations.slice(0, 4).map((s) => (
-                    <span key={s} className={`px-2 py-0.5 rounded-full text-xs font-medium ${isDarkMode ? "bg-brand-primary/20 text-brand-primary" : "bg-violet-50 text-violet-700"}`}>
+                    <span key={s} className={`px-2 py-0.5 rounded-full text-xs font-medium ${"bg-ad-accent-soft text-ad-accent-ink"}`}>
                       {s}
                     </span>
                   ))}
                   {teacher.specializations.length > 4 && (
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${isDarkMode ? "bg-gray-600 text-gray-300" : "bg-gray-100 text-gray-500"}`}>{tr("teacherCard.more", { value: teacher.specializations.length - 4 })}</span>
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${isDarkMode ? "bg-stone-600 text-stone-300" : "bg-stone-100 text-stone-500"}`}>{tr("teacherCard.more", { value: teacher.specializations.length - 4 })}</span>
                   )}
                 </div>
               </div>
@@ -336,12 +336,12 @@ export default function TeacherCard({
             {/* Certifications */}
             {teacher.certifications?.length > 0 && (
               <div>
-                <p className={`text-xs font-semibold mb-1.5 flex items-center gap-1 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+                <p className={`text-xs font-semibold mb-1.5 flex items-center gap-1 ${isDarkMode ? "text-stone-400" : "text-stone-500"}`}>
                   <Award className="w-3 h-3" /> {tr("teacherCard.certifications")}
                 </p>
                 <div className="flex flex-wrap gap-1">
                   {teacher.certifications.map((c) => (
-                    <span key={c} className={`px-2 py-0.5 rounded-full text-xs font-medium ${isDarkMode ? "bg-emerald-900/40 text-emerald-300" : "bg-emerald-50 text-emerald-700"}`}>
+                    <span key={c} className={`px-2 py-0.5 rounded-full text-xs font-medium ${isDarkMode ? "bg-stone-700/60 text-stone-300" : "bg-stone-100 text-stone-600"}`}>
                       {c}
                     </span>
                   ))}
@@ -366,7 +366,7 @@ export default function TeacherCard({
                 href={teacher.zoomLink}
                 target="_blank"
                 rel="noopener noreferrer"
-                className={`inline-flex items-center gap-1.5 text-xs font-medium hover:underline ${isDarkMode ? "text-blue-400" : "text-blue-600"}`}
+                className={`inline-flex items-center gap-1.5 text-xs font-medium hover:underline ${isDarkMode ? "text-ad-accent-ink" : "text-ad-accent-ink"}`}
               >
                 <span style={{ fontWeight: 900, fontSize: 11, fontFamily: "Arial,sans-serif" }}>Z</span> {tr("teacherCard.zoomLink")}
               </a>
@@ -396,7 +396,7 @@ export default function TeacherCard({
               <code
                 className={`flex-1 text-xs font-mono px-2 py-1 rounded-lg ${
                   isDarkMode
-                    ? "bg-gray-900 text-amber-300"
+                    ? "bg-stone-900 text-amber-300"
                     : "bg-white text-amber-800 border border-amber-200"
                 }`}
               >
@@ -436,11 +436,7 @@ export default function TeacherCard({
           <button
             onClick={primary.onClick}
             title={primary.label}
-            className={`flex-1 min-w-0 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-semibold transition duration-150 active:scale-[0.97] ${
-              isDarkMode
-                ? "bg-white hover:bg-gray-200 text-gray-900"
-                : "bg-gray-900 hover:bg-gray-800 text-white"
-            }`}
+            className="flex-1 min-w-0 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-bold transition duration-150 active:scale-[0.97] bg-ad-accent-soft text-ad-accent-ink ring-1 ring-inset ring-ad-accent-line hover:bg-ad-accent-line"
           >
             <primary.icon className="w-3.5 h-3.5 flex-shrink-0" />
             <span className="truncate">{primary.label}</span>
@@ -452,8 +448,8 @@ export default function TeacherCard({
             title={tr("teacherCard.edit")}
             className={`flex-shrink-0 flex items-center justify-center px-2.5 rounded-xl border transition duration-150 active:scale-[0.97] ${
               isDarkMode
-                ? "border-gray-600 hover:bg-gray-700 text-gray-300"
-                : "border-gray-200 hover:bg-gray-50 text-gray-500 hover:text-gray-700"
+                ? "border-stone-600 hover:bg-stone-700 text-stone-300"
+                : "border-stone-200 hover:bg-stone-50 text-stone-500 hover:text-stone-700"
             }`}
           >
             <Edit3 className="w-4 h-4" />
@@ -468,8 +464,8 @@ export default function TeacherCard({
               aria-expanded={menuOpen}
               className={`h-full px-2.5 rounded-xl border transition duration-150 active:scale-[0.97] ${
                 isDarkMode
-                  ? `border-gray-600 text-gray-300 hover:bg-gray-700 ${menuOpen ? "bg-gray-700" : ""}`
-                  : `border-gray-200 text-gray-500 hover:bg-gray-50 hover:text-gray-700 ${menuOpen ? "bg-gray-50 text-gray-700" : ""}`
+                  ? `border-stone-600 text-stone-300 hover:bg-stone-700 ${menuOpen ? "bg-stone-700" : ""}`
+                  : `border-stone-200 text-stone-500 hover:bg-stone-50 hover:text-stone-700 ${menuOpen ? "bg-stone-50 text-stone-700" : ""}`
               }`}
             >
               <MoreHorizontal className="w-4 h-4" />
@@ -527,29 +523,29 @@ export default function TeacherCard({
 
 function MenuLabel({ isDarkMode, children }) {
   return (
-    <div className={`px-3.5 pt-1.5 pb-1 text-[10px] font-semibold uppercase tracking-wider ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
+    <div className={`px-3.5 pt-1.5 pb-1 text-[10px] font-semibold uppercase tracking-wider ${isDarkMode ? "text-stone-500" : "text-stone-400"}`}>
       {children}
     </div>
   );
 }
 
 function MenuDivider({ isDarkMode }) {
-  return <div role="separator" className={`my-1 h-px ${isDarkMode ? "bg-gray-700" : "bg-gray-100"}`} />;
+  return <div role="separator" className={`my-1 h-px ${isDarkMode ? "bg-stone-700" : "bg-stone-100"}`} />;
 }
 
 // Menu items are neutral; only destructive actions get colour
 function DropdownItem({ icon: Icon, label, color, isDarkMode, onClick }) {
   const tone = color === "red"
     ? (isDarkMode ? "text-red-400 hover:bg-red-500/10" : "text-red-600 hover:bg-red-50")
-    : (isDarkMode ? "text-gray-200 hover:bg-gray-800" : "text-gray-700 hover:bg-gray-50");
-  const iconTone = color === "red" ? "" : (isDarkMode ? "text-gray-500" : "text-gray-400");
+    : (isDarkMode ? "text-stone-200 hover:bg-stone-800" : "text-stone-700 hover:bg-stone-50");
+  const iconTone = color === "red" ? "" : (isDarkMode ? "text-stone-500" : "text-stone-400");
 
   return (
     <button
       role="menuitem"
       onClick={onClick}
       className={`w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-left transition-colors outline-none ${tone} ${
-        isDarkMode ? "focus-visible:bg-gray-800" : "focus-visible:bg-gray-50"
+        isDarkMode ? "focus-visible:bg-stone-800" : "focus-visible:bg-stone-50"
       }`}
     >
       <Icon className={`w-3.5 h-3.5 flex-shrink-0 ${iconTone}`} />

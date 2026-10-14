@@ -18,8 +18,8 @@ import { dateLocale } from "../../../i18n/dateLocale.js";
 const ta = (key, opts) => i18n.t(`admin:${key}`, opts);
 
 
-const BRAND  = "var(--brand-primary, #2563eb)";
-const brandA = (a) => `rgba(var(--brand-primary-rgb, 37, 99, 235), ${a})`;
+const BRAND  = "var(--a-accent)";
+const brandA = (a) => `color-mix(in srgb, var(--a-accent) ${Math.round(a * 100)}%, transparent)`;
 const KINDS = {
   homework: { path: "hw", noun: "Homework", icon: BookOpen,      resource: "homework" },
   quiz:     { path: "q",  noun: "Quiz",     icon: ClipboardList, resource: "quizzes" },
@@ -46,8 +46,8 @@ export default function ShareLinksTab({ isDarkMode }) {
   const quietRef = useRef(false);
 
   const c = isDarkMode
-    ? { card: "#1e293b", border: "#334155", heading: "#f1f5f9", body: "#94a3b8", soft: "#0f172a", input: "#0f172a" }
-    : { card: "#ffffff", border: "#e2e8f0", heading: "#1e293b", body: "#64748b", soft: "#f8fafc", input: "#ffffff" };
+    ? { card: "var(--a-raised)", border: "var(--a-line)", heading: "var(--a-ink)", body: "var(--a-muted)", soft: "var(--a-surface)", input: "var(--a-surface)" }
+    : { card: "var(--a-surface)", border: "var(--a-line)", heading: "var(--a-ink)", body: "var(--a-ink-2)", soft: "var(--a-raised)", input: "var(--a-surface)" };
   const notify = (msg, type = "success") => { setToast({ msg, type }); setTimeout(() => setToast(null), 3500); };
 
   useEffect(() => { const t = setTimeout(() => setDQ(q.trim()), 300); return () => clearTimeout(t); }, [q]);
@@ -134,7 +134,9 @@ export default function ShareLinksTab({ isDarkMode }) {
         <p style={{ color: c.body, textAlign: "center", padding: 40 }}>{tr("shareLinksTab.loading")}</p>
       ) : items.length === 0 ? (
         <div style={{ textAlign: "center", padding: "40px 20px", background: c.card, border: `1px dashed ${c.border}`, borderRadius: 16, color: c.body }}>
-          <Link2 size={32} style={{ opacity: .4 }} />
+          <div style={{ width: 60, height: 60, margin: "0 auto 12px", borderRadius: "50%", background: "var(--a-accent-soft)", boxShadow: "inset 0 0 0 1px var(--a-accent-line)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <Link2 size={26} color="var(--a-accent)" />
+          </div>
           <p style={{ margin: "10px 0 0", fontWeight: 600 }}>
             {debouncedQ ? tr("shareLinksTab.noLinksMatchYourSearch") : view === "active" ? tr("shareLinksTab.noOpenLinksRightNow", { value: KINDS[kind].noun.toLowerCase() }) : tr("shareLinksTab.nothingHere")}
           </p>

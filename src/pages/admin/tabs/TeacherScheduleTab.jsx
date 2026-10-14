@@ -17,14 +17,14 @@ const HALF_HOURS = Array.from({ length: 49 }, (_, i) => `${String(Math.floor(i /
 // ── Palette ────────────────────────────────────────────────────────────────
 function pal(dark) {
   return {
-    bg:      dark ? "#0f1117" : "#f4f6fb",
-    card:    dark ? "#1a1d27" : "#ffffff",
-    border:  dark ? "#1e2235" : "#e8ecf4",
-    heading: dark ? "#e2e8f0" : "#1e293b",
-    text:    dark ? "#94a3b8" : "#475569",
-    muted:   dark ? "#4b5563" : "#94a3b8",
-    line:    dark ? "#1e2235" : "#f1f5f9",
-    input:   dark ? "#141620" : "#f8faff",
+    bg:      'var(--a-raised)',
+    card:    'var(--a-surface)',
+    border:  'var(--a-line)',
+    heading: 'var(--a-ink)',
+    text:    'var(--a-ink-2)',
+    muted:   'var(--a-muted)',
+    line:    'var(--a-line)',
+    input:   'var(--a-raised)',
     hover:   dark ? "rgba(255,255,255,0.015)" : "rgba(99,102,241,0.03)",
   };
 }
@@ -44,14 +44,14 @@ function TeacherCard({ teacher, onClick, isDarkMode }) {
         cursor: "pointer", transition: "all 0.18s",
         display: "flex", flexDirection: "column", gap: "12px",
       }}
-      onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = isDarkMode ? "0 8px 24px rgba(0,0,0,0.3)" : "0 8px 24px rgba(99,102,241,0.15)"; e.currentTarget.style.borderColor = "#7c3aed"; }}
+      onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = isDarkMode ? "0 8px 24px rgba(0,0,0,0.3)" : "0 8px 24px rgba(99,102,241,0.15)"; e.currentTarget.style.borderColor = "var(--a-accent-ink)"; }}
       onMouseLeave={e => { e.currentTarget.style.transform = ""; e.currentTarget.style.boxShadow = ""; e.currentTarget.style.borderColor = c.border; }}
     >
       {/* Avatar + name */}
       <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
         <div style={{
           width: "44px", height: "44px", borderRadius: "50%", flexShrink: 0,
-          background: "linear-gradient(135deg,#7c3aed,#6d28d9)",
+          background: "var(--a-accent-grad)",
           display: "flex", alignItems: "center", justifyContent: "center",
         }}>
           <span style={{ color: "#fff", fontWeight: "800", fontSize: "15px" }}>{initials}</span>
@@ -68,7 +68,7 @@ function TeacherCard({ teacher, onClick, isDarkMode }) {
 
       {/* Meta pills */}
       <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
-        <span style={{ fontSize: "11px", fontWeight: "700", padding: "3px 8px", borderRadius: "6px", background: isDarkMode ? "rgba(124,58,237,0.15)" : "#f5f3ff", color: "#7c3aed" }}>
+        <span style={{ fontSize: "11px", fontWeight: "700", padding: "3px 8px", borderRadius: "6px", background: 'var(--a-accent-soft)', color: "var(--a-accent-ink)" }}>
           {teacher.continent || "—"}
         </span>
         {teacher.timezone && (
@@ -84,7 +84,7 @@ function TeacherCard({ teacher, onClick, isDarkMode }) {
       {/* View schedule button */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "2px" }}>
         <span style={{ fontSize: "12px", color: c.muted }}>{tr("teacherScheduleTab.lessonsDone", { value: teacher.lessonsCompleted || 0 })}</span>
-        <span style={{ fontSize: "12px", fontWeight: "700", color: "#7c3aed", display: "flex", alignItems: "center", gap: "4px" }}>
+        <span style={{ fontSize: "12px", fontWeight: "700", color: "var(--a-accent-ink)", display: "flex", alignItems: "center", gap: "4px" }}>
           {tr("teacherScheduleTab.viewSchedule")} <ChevronRight size={13} />
         </span>
       </div>
@@ -160,7 +160,7 @@ export default function TeacherScheduleTab({ teachers = [], isDarkMode }) {
   const resultRow = (r, extra) => (
     <button key={r._id} type="button" onClick={() => openFromSearch(r)}
       style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 12px", borderRadius: 12, border: `1px solid ${c.border}`, background: c.card, cursor: "pointer", textAlign: "left", fontFamily: "inherit", width: "100%" }}>
-      <div style={{ width: 36, height: 36, borderRadius: "50%", background: "linear-gradient(135deg,#7c3aed,#6d28d9)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, flexShrink: 0, overflow: "hidden" }}>
+      <div style={{ width: 36, height: 36, borderRadius: "50%", background: "var(--a-accent-grad)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, flexShrink: 0, overflow: "hidden" }}>
         {r.photo ? <img src={r.photo} alt="" style={{ width: 36, height: 36, objectFit: "cover" }} /> : (r.name?.[0] || "T").toUpperCase()}
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -191,7 +191,7 @@ export default function TeacherScheduleTab({ teachers = [], isDarkMode }) {
         {/* ── Free-time finder ── */}
         <div style={{ background: c.card, border: `1px solid ${c.border}`, borderRadius: 16, padding: 16, display: "flex", flexDirection: "column", gap: 12 }}>
           <div>
-            <div style={{ fontSize: 15, fontWeight: 800, color: c.heading, display: "flex", alignItems: "center", gap: 6 }}><Clock size={15} color="#7c3aed" /> {tr("teacherScheduleTab.findAFreeTeacher")}</div>
+            <div style={{ fontSize: 15, fontWeight: 800, color: c.heading, display: "flex", alignItems: "center", gap: 6 }}><Clock size={15} color="var(--a-accent-ink)" /> {tr("teacherScheduleTab.findAFreeTeacher")}</div>
             <div style={{ fontSize: 12.5, color: c.text }}>{tr("teacherScheduleTab.timesAreInYourTime", { tzName: tzName(myTz) })}</div>
           </div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
@@ -211,7 +211,7 @@ export default function TeacherScheduleTab({ teachers = [], isDarkMode }) {
               </select>
             </label>
             <button type="button" onClick={findFree} disabled={finding}
-              style={{ padding: "10px 18px", borderRadius: 10, border: "none", background: "#7c3aed", color: "#fff", fontWeight: 800, fontSize: 13.5, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: 6 }}>
+              style={{ padding: "10px 18px", borderRadius: 10, border: "none", background: "var(--a-accent-grad)", color: "#fff", fontWeight: 800, fontSize: 13.5, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: 6 }}>
               {finding ? <Loader size={14} /> : <Search size={14} />} {tr("teacherScheduleTab.findFreeTeachers")}
             </button>
           </div>
@@ -302,11 +302,11 @@ export default function TeacherScheduleTab({ teachers = [], isDarkMode }) {
     <div style={{ display: "flex", flexDirection: "column", gap: "16px", fontFamily: "var(--font-body)" }}>
       <div style={{ display: "flex", alignItems: "center", gap: "16px", flexWrap: "wrap" }}>
         <button type="button" onClick={() => { setSelected(null); setDetail(null); setCal({ free: [], blocks: [], hasHours: false }); }}
-          style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 14px", background: isDarkMode ? "#1e2235" : "#f1f5f9", border: `1px solid ${c.border}`, borderRadius: "10px", cursor: "pointer", color: c.heading, fontSize: "13px", fontWeight: "700", fontFamily: "inherit" }}>
+          style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 14px", background: 'var(--a-raised)', border: `1px solid ${c.border}`, borderRadius: "10px", cursor: "pointer", color: c.heading, fontSize: "13px", fontWeight: "700", fontFamily: "inherit" }}>
           <ChevronLeft size={15} /> {tr("teacherScheduleTab.allTeachers")}
         </button>
         <div style={{ display: "flex", alignItems: "center", gap: "12px", flex: 1, minWidth: 0 }}>
-          <div style={{ width: "42px", height: "42px", borderRadius: "50%", flexShrink: 0, background: "linear-gradient(135deg,#7c3aed,#6d28d9)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ width: "42px", height: "42px", borderRadius: "50%", flexShrink: 0, background: "var(--a-accent-grad)", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <span style={{ color: "#fff", fontWeight: "800", fontSize: "14px" }}>{initials}</span>
           </div>
           <div style={{ minWidth: 0 }}>
@@ -315,7 +315,7 @@ export default function TeacherScheduleTab({ teachers = [], isDarkMode }) {
           </div>
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          {[["Free this week", cal.hasHours ? `${Math.round(freeMins / 6) / 10}h` : "—", "#059669"], ["Booked", count("booked"), "#7c3aed"], ["Pending", count("pending"), "#d97706"]].map(([l, v, col]) => (
+          {[["Free this week", cal.hasHours ? `${Math.round(freeMins / 6) / 10}h` : "—", "#059669"], ["Booked", count("booked"), "var(--a-accent-ink)"], ["Pending", count("pending"), "#d97706"]].map(([l, v, col]) => (
             <span key={l} style={{ padding: "5px 12px", borderRadius: 10, border: `1px solid ${c.border}`, background: c.card, fontSize: 12.5, color: c.text }}><strong style={{ color: col }}>{v}</strong> {l}</span>
           ))}
         </div>

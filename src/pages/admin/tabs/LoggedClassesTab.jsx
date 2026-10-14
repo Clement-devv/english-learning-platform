@@ -17,8 +17,8 @@ import { dateLocale } from "../../../i18n/dateLocale.js";
 const ta = (key, opts) => i18n.t(`admin:${key}`, opts);
 
 
-const BRAND  = "var(--brand-primary, #2563eb)";
-const brandA = (a) => `rgba(var(--brand-primary-rgb, 37, 99, 235), ${a})`;
+const BRAND  = "var(--a-accent)";
+const brandA = (a) => `color-mix(in srgb, var(--a-accent) ${Math.round(a * 100)}%, transparent)`;
 const PLATFORM = { googlemeet: "Google Meet", zoom: "Zoom", other: "Other" };
 const fmtWhen = (d) => new Date(d).toLocaleString(dateLocale("en-GB"), { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 const nameOf = (p) => `${p?.firstName || ""} ${p?.lastName || ""}`.trim();
@@ -29,7 +29,7 @@ function familyAnswer(b) {
   switch (b.parentCheck?.status) {
     case "confirmed": return { text: ta("loggedClassesTab.family.confirmed", { who }), color: "#047857" };
     case "denied":    return { text: ta("loggedClassesTab.family.denied", { who }) + (b.parentCheck?.comment ? `: “${b.parentCheck.comment}”` : ""), color: "#b91c1c" };
-    case "no_reply":  return { text: ta("loggedClassesTab.family.noReply", { who }), color: "#4b5563" };
+    case "no_reply":  return { text: ta("loggedClassesTab.family.noReply", { who }), color: "var(--a-ink-2)" };
     case "waiting":   return { text: ta(b.studentId?.isManaged ? "loggedClassesTab.family.waitingParent" : "loggedClassesTab.family.waitingStudent"), color: "#b45309" };
     default:          return null;
   }
@@ -50,8 +50,8 @@ export default function LoggedClassesTab({ isDarkMode, canApprove = true }) {
   const [counts, setCounts]   = useState({});
 
   const c = isDarkMode
-    ? { card: "#1e293b", border: "#334155", heading: "#f1f5f9", body: "#94a3b8", soft: "#0f172a" }
-    : { card: "#ffffff", border: "#e2e8f0", heading: "#1e293b", body: "#64748b", soft: "#f8fafc" };
+    ? { card: "var(--a-raised)", border: "var(--a-line)", heading: "var(--a-ink)", body: "var(--a-muted)", soft: "var(--a-surface)" }
+    : { card: "var(--a-surface)", border: "var(--a-line)", heading: "var(--a-ink)", body: "var(--a-ink-2)", soft: "var(--a-raised)" };
   const notify = (msg, type = "success") => { setToast({ msg, type }); setTimeout(() => setToast(null), 4000); };
 
   // Live: refresh quietly (no spinner) when the server says this data changed
@@ -130,7 +130,9 @@ export default function LoggedClassesTab({ isDarkMode, canApprove = true }) {
         <p style={{ color: c.body, textAlign: "center", padding: 40 }}>{tr("loggedClassesTab.loading")}</p>
       ) : list.length === 0 ? (
         <div style={{ textAlign: "center", padding: "40px 20px", background: c.card, border: `1px dashed ${c.border}`, borderRadius: 16, color: c.body }}>
-          <ClipboardCheck size={36} style={{ opacity: .4 }} />
+          <div style={{ width: 60, height: 60, margin: "0 auto 12px", borderRadius: "50%", background: "var(--a-accent-soft)", boxShadow: "inset 0 0 0 1px var(--a-accent-line)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <ClipboardCheck size={26} color="var(--a-accent)" />
+          </div>
           <p style={{ margin: "10px 0 0", fontWeight: 600 }}>{filter === "pending" ? tr("loggedClassesTab.nothingWaitingForApproval") : tr("loggedClassesTab.nothingHere")}</p>
         </div>
       ) : (

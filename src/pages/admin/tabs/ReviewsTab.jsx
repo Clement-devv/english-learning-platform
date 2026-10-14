@@ -22,7 +22,7 @@ function Stars({ rating, size = 13 }) {
 }
 
 function avgColor(avg) {
-  if (!avg) return "#94a3b8";
+  if (!avg) return "var(--a-muted)";
   if (avg >= 4.5) return "#16a34a";
   if (avg >= 3.5) return "#84cc16";
   if (avg >= 2.5) return "#f59e0b";
@@ -41,12 +41,12 @@ export default function ReviewsTab({ isDarkMode }) {
   const [toast,         setToast]         = useState(null);
   const [busy,          setBusy]          = useState({});
 
-  const bg      = isDarkMode ? "#0f172a" : "#f8fafc";
-  const card    = isDarkMode ? "#1e293b" : "#ffffff";
-  const border  = isDarkMode ? "#334155" : "#e2e8f0";
-  const text    = isDarkMode ? "#e2e8f0" : "#1e293b";
-  const muted   = isDarkMode ? "#94a3b8" : "#64748b";
-  const inputBg = isDarkMode ? "#0f172a" : "#f8fafc";
+  const bg      = 'var(--a-raised)';
+  const card    = 'var(--a-surface)';
+  const border  = 'var(--a-line)';
+  const text    = 'var(--a-ink)';
+  const muted   = 'var(--a-ink-2)';
+  const inputBg = 'var(--a-raised)';
 
   function showToast(msg, ok = true) {
     setToast({ msg, ok });
@@ -134,7 +134,7 @@ export default function ReviewsTab({ isDarkMode }) {
   }
 
   return (
-    <div style={{ padding: 24, background: bg, minHeight: "100vh" }}>
+    <div>
 
       {/* Toast */}
       {toast && (
@@ -255,10 +255,10 @@ export default function ReviewsTab({ isDarkMode }) {
         <div style={{ textAlign: "center", padding: "48px 24px" }}>
           <div style={{
             width: 64, height: 64, borderRadius: 20,
-            background: isDarkMode ? "#1e1730" : "#f5f0ff",
+            background: 'var(--a-accent-soft)',
             display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px",
           }}>
-            <Flag size={28} color="#7c3aed" />
+            <Flag size={28} color="var(--a-accent-ink)" />
           </div>
           <p style={{ fontSize: 16, fontWeight: 700, color: text, margin: "0 0 8px" }}>{tr("reviewsTab.noReviewsFound")}</p>
           <p style={{ fontSize: 13.5, color: muted, margin: 0 }}>{tr("reviewsTab.reviewsWillAppearHereOnce")}</p>
@@ -315,8 +315,8 @@ export default function ReviewsTab({ isDarkMode }) {
                     style={{
                       display: "flex", alignItems: "center", gap: 5,
                       padding: "5px 12px", borderRadius: 7, border: "none",
-                      background: r.flagged ? "#fef2f2" : "#fff7ed",
-                      color: r.flagged ? "#ef4444" : "#f97316",
+                      background: r.flagged ? "#fef2f2" : "var(--a-accent-soft)",
+                      color: r.flagged ? "#ef4444" : "var(--a-accent-ink)",
                       cursor: "pointer", fontSize: 12, fontWeight: 700, fontFamily: "inherit",
                     }}
                   >
@@ -371,11 +371,11 @@ export default function ReviewsTab({ isDarkMode }) {
                   <button key={n} onClick={() => setPage(n)}
                     style={{
                       width: 36, height: 36, borderRadius: 8,
-                      background: n === safePage ? "#7c3aed" : card,
+                      background: n === safePage ? "var(--a-accent-grad)" : card,
                       color: n === safePage ? "#fff" : text,
                       fontWeight: n === safePage ? 900 : 600,
                       cursor: "pointer", fontSize: 13, fontFamily: "inherit",
-                      border: `1px solid ${n === safePage ? "#7c3aed" : border}`,
+                      border: `1px solid ${n === safePage ? "var(--a-accent)" : border}`,
                       boxShadow: n === safePage ? "0 2px 8px rgba(124,58,237,0.3)" : "none",
                     }}>
                     {n}

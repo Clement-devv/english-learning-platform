@@ -291,7 +291,7 @@ export default function DisputeReview({ isDarkMode }) {
       {/* ── SECTION 2: Classroom Complaints ──────────────────────────────────── */}
       <div>
         <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "14px" }}>
-          <div style={{ width: "4px", height: "20px", borderRadius: "2px", background: "#7c3aed" }} />
+          <div style={{ width: "4px", height: "20px", borderRadius: "2px", background: "var(--a-accent)" }} />
           <h3 style={{ margin: 0, fontSize: "15px", fontWeight: "800", color: col.heading }}>Classroom Complaints</h3>
         </div>
 
@@ -299,7 +299,7 @@ export default function DisputeReview({ isDarkMode }) {
         <div style={{ display: "flex", gap: "8px", marginBottom: "16px", flexWrap: "wrap" }}>
           {["pending", "under_review", "approved", "rejected", "all"].map(f => (
             <button key={f} onClick={() => setFilter(f)}
-              style={{ padding: "6px 14px", borderRadius: "20px", border: `2px solid ${filter === f ? "#7c3aed" : col.border}`, background: filter === f ? "#7c3aed" : col.card, color: filter === f ? "#fff" : col.text, fontSize: "12px", fontWeight: "700", cursor: "pointer", textTransform: "capitalize" }}>
+              style={{ padding: "6px 14px", borderRadius: "20px", border: `2px solid ${filter === f ? "var(--a-accent)" : col.border}`, background: filter === f ? "var(--a-accent)" : col.card, color: filter === f ? "#fff" : col.text, fontSize: "12px", fontWeight: "700", cursor: "pointer", textTransform: "capitalize" }}>
               {f === "all" ? "All" : STATUS_COLORS[f]?.label || f}
             </button>
           ))}
@@ -389,7 +389,7 @@ export default function DisputeReview({ isDarkMode }) {
                           {!isActioning ? (
                             <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
                               <button onClick={() => { setReviewing(c._id); setAdminNotes(""); }}
-                                style={{ padding: "9px 18px", background: "#7c3aed", color: "#fff", border: "none", borderRadius: "20px", cursor: "pointer", fontSize: "13px", fontWeight: "700" }}>
+                                style={{ padding: "9px 18px", background: "var(--a-accent)", color: "#fff", border: "none", borderRadius: "20px", cursor: "pointer", fontSize: "13px", fontWeight: "700" }}>
                                 Review & Action
                               </button>
                               <button onClick={() => updateComplaint(c._id, "under_review", null, "")}
@@ -398,7 +398,7 @@ export default function DisputeReview({ isDarkMode }) {
                               </button>
                             </div>
                           ) : (
-                            <div style={{ border: `2px solid #7c3aed`, borderRadius: "14px", padding: "16px" }}>
+                            <div style={{ border: `2px solid var(--a-accent)`, borderRadius: "14px", padding: "16px" }}>
                               <p style={{ margin: "0 0 10px", fontWeight: "700", fontSize: "13px", color: col.heading }}>Admin Notes (optional)</p>
                               <textarea
                                 value={adminNotes}

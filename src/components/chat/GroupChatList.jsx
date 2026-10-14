@@ -32,7 +32,7 @@ export default function GroupChatList({ userRole, onSelectChat, selectedChatId, 
     inputTxt:   isDark ? "#e8eaf6" : "#1a1d2e",
     hover:      isDark ? "rgba(255,255,255,0.05)" : "rgba(99,102,241,0.05)",
     active:     isDark ? "rgba(99,102,241,0.18)"  : "rgba(99,102,241,0.09)",
-    accent:     "#6366f1",
+    accent:     "var(--as-accent, #6366f1)",
     sectionTxt: isDark ? "#6b72a0" : "#b0b5d0",
   };
 
@@ -216,8 +216,8 @@ export default function GroupChatList({ userRole, onSelectChat, selectedChatId, 
       }
       // Sub-admin ↔ admin: show "Admin"
       return { name: "Admin", initials: "AD", roleBadge: "Admin",
-        avatarBg: "linear-gradient(135deg,#7c3aed,#a855f7)",
-        badgeColor: isDark ? "#e9d5ff" : "#7c3aed", badgeBg: isDark ? "rgba(124,58,237,0.25)" : "rgba(124,58,237,0.10)" };
+        avatarBg: "linear-gradient(135deg,var(--as-accent, #7c3aed),var(--as-accent-2, #a855f7))",
+        badgeColor: isDark ? "var(--as-accent-ink, #e9d5ff)" : "var(--as-accent, #7c3aed)", badgeBg: isDark ? "color-mix(in srgb, var(--as-accent, #7c3aed) 25%, transparent)" : "color-mix(in srgb, var(--as-accent, #7c3aed) 10%, transparent)" };
     }
 
     // Teacher viewing sub-admin-teacher DM: show sub-admin name
@@ -230,11 +230,11 @@ export default function GroupChatList({ userRole, onSelectChat, selectedChatId, 
 
     const name = dm.chatName || "Admin";
     return { name, initials: getInitials(name), roleBadge: null,
-      avatarBg: "linear-gradient(135deg,#7c3aed,#a855f7)", badgeColor: null, badgeBg: null };
+      avatarBg: "linear-gradient(135deg,var(--as-accent, #7c3aed),var(--as-accent-2, #a855f7))", badgeColor: null, badgeBg: null };
   };
 
   const roleGrad = {
-    admin:   "linear-gradient(135deg,#7c3aed,#a855f7)",
+    admin:   "linear-gradient(135deg,var(--as-accent, #7c3aed),var(--as-accent-2, #a855f7))",
     teacher: "linear-gradient(135deg,#1d4ed8,#0891b2)",
     student: "linear-gradient(135deg,#047857,#10b981)",
   };

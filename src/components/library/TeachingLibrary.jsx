@@ -11,7 +11,8 @@ import api from '../../api';
 import Pagination from '../Pagination';
 import { useOnDataChanged } from '../../hooks/useLiveData';
 
-const BRAND = 'var(--brand-primary, #be185d)';
+// Inside the admin dashboard follow its accent (--as-accent); elsewhere the center brand colour
+const BRAND = 'var(--as-accent, var(--brand-primary, #be185d))';
 const API_ORIGIN = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 const MAX_MB = 25;
 
@@ -212,7 +213,7 @@ export default function TeachingLibrary({ isDarkMode = false, canManage = false 
         <p style={{ color: c.muted, textAlign: 'center', padding: 40 }}>Loading…</p>
       ) : files.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '48px 20px', background: c.card, border: `1px dashed ${c.border}`, borderRadius: 16, color: c.muted }}>
-          <FileText size={34} style={{ opacity: 0.4 }} />
+          <FileText size={34} style={{ opacity: 0.4, margin: "0 auto" }} />
           <p style={{ margin: '10px 0 0', fontWeight: 600 }}>
             {filtersOn ? 'No files match your search.' : canManage ? 'Your library is empty. Upload your first PDF.' : 'No teaching materials have been shared yet.'}
           </p>

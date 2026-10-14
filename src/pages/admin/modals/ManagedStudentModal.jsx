@@ -57,18 +57,18 @@ export default function ManagedStudentModal({ isOpen, onClose, onSave, initialDa
   if (!isOpen) return null;
 
   const dm = isDarkMode;
-  const modalBg = dm ? "#1e293b" : "#fff";
-  const textPri = dm ? "#f1f5f9" : "#1e293b";
-  const textSec = dm ? "#94a3b8" : "#64748b";
-  const textMut = dm ? "#64748b" : "#94a3b8";
-  const borderC = dm ? "#334155" : "#e2e8f0";
+  const modalBg = 'var(--a-surface)';
+  const textPri = 'var(--a-ink)';
+  const textSec = 'var(--a-ink-2)';
+  const textMut = 'var(--a-muted)';
+  const borderC = 'var(--a-line)';
 
-  const lbl = { display: "block", fontSize: "12px", fontWeight: "700", color: dm ? "#94a3b8" : "#374151", marginBottom: "5px", textTransform: "uppercase", letterSpacing: "0.05em" };
-  const inp = { width: "100%", padding: "10px 13px", borderRadius: "10px", border: `1.5px solid ${borderC}`, background: dm ? "#0f172a" : "#fff", color: dm ? "#f1f5f9" : "#1e293b", fontFamily: "var(--font-body)", fontSize: "13.5px", outline: "none", boxSizing: "border-box" };
+  const lbl = { display: "block", fontSize: "12px", fontWeight: "700", color: 'var(--a-ink-2)', marginBottom: "5px", textTransform: "uppercase", letterSpacing: "0.05em" };
+  const inp = { width: "100%", padding: "10px 13px", borderRadius: "10px", border: `1.5px solid ${borderC}`, background: 'var(--a-surface)', color: 'var(--a-ink)', fontFamily: "var(--font-body)", fontSize: "13.5px", outline: "none", boxSizing: "border-box" };
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999, padding: "20px" }}>
-      <div style={{ background: modalBg, borderRadius: "20px", width: "100%", maxWidth: "460px", maxHeight: "90vh", display: "flex", flexDirection: "column", boxShadow: "0 24px 80px rgba(0,0,0,0.3)", fontFamily: "var(--font-body)", overflow: "hidden", border: dm ? "1px solid #334155" : "none" }}>
+      <div style={{ background: modalBg, borderRadius: "20px", width: "100%", maxWidth: "460px", maxHeight: "90vh", display: "flex", flexDirection: "column", boxShadow: "0 24px 80px rgba(0,0,0,0.3)", fontFamily: "var(--font-body)", overflow: "hidden", border: dm ? "1px solid var(--a-line)" : "none" }}>
 
         {/* ── HEADER ── */}
         <div style={{ padding: "22px 26px 18px", borderBottom: `1px solid ${borderC}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -125,10 +125,10 @@ export default function ManagedStudentModal({ isOpen, onClose, onSave, initialDa
           )}
 
           <div style={{ display: "flex", gap: "10px" }}>
-            <button type="button" onClick={onClose} style={{ flex: 1, padding: "11px", borderRadius: "10px", border: `1.5px solid ${borderC}`, background: "transparent", color: dm ? "#94a3b8" : "#475569", fontSize: "14px", fontWeight: "600", cursor: "pointer", fontFamily: "inherit" }}>
+            <button type="button" onClick={onClose} style={{ flex: 1, padding: "11px", borderRadius: "10px", border: `1.5px solid ${borderC}`, background: "transparent", color: 'var(--a-ink-2)', fontSize: "14px", fontWeight: "600", cursor: "pointer", fontFamily: "inherit" }}>
               {tr("managedStudentModal.cancel")}
             </button>
-            <button type="submit" disabled={loading} style={{ flex: 2, padding: "11px", borderRadius: "10px", border: "none", background: loading ? "#94a3b8" : "linear-gradient(135deg,#f59e0b,#d97706)", color: "#fff", fontSize: "14px", fontWeight: "700", cursor: loading ? "not-allowed" : "pointer", fontFamily: "inherit" }}>
+            <button type="submit" disabled={loading} style={{ flex: 2, padding: "11px", borderRadius: "10px", border: "none", background: loading ? "var(--a-raised)" : "linear-gradient(135deg,#f59e0b,#d97706)", color: "#fff", fontSize: "14px", fontWeight: "700", cursor: loading ? "not-allowed" : "pointer", fontFamily: "inherit" }}>
               {loading ? tr("managedStudentModal.saving") : isEdit ? tr("managedStudentModal.saveChanges") : tr("managedStudentModal.createManagedStudent")}
             </button>
           </div>

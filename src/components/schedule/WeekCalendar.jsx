@@ -9,7 +9,7 @@ import { ChevronLeft, ChevronRight, Loader, Repeat } from "lucide-react";
 import { DAY_SHORT, weekDays, sameDay, addDays, segmentOnDay, fmtRange, fmtTime } from "../../utils/scheduleView";
 
 const HOUR_PX = 52;
-const BRAND = "var(--brand-primary, #7c3aed)";
+const BRAND = "var(--as-accent, var(--brand-primary, #7c3aed))";
 
 const KIND_STYLE = (dark) => ({
   free:     { bg: dark ? "rgba(16,185,129,0.14)" : "rgba(16,185,129,0.10)", border: "#10b981", text: dark ? "#6ee7b7" : "#047857", label: "Free" },

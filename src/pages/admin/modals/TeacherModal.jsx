@@ -25,10 +25,10 @@ function Section({ icon: Icon, title, children }) {
   return (
     <div>
       <div className="flex items-center gap-2 mb-3">
-        <div className="w-7 h-7 rounded-lg bg-brand-primary bg-opacity-10 dark:bg-opacity-20 flex items-center justify-center flex-shrink-0">
-          <Icon size={14} className="text-brand-primary" />
+        <div className="w-7 h-7 rounded-lg bg-ad-accent-soft flex items-center justify-center flex-shrink-0">
+          <Icon size={14} className="text-ad-accent-ink" />
         </div>
-        <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">{title}</h3>
+        <h3 className="text-xs font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wider">{title}</h3>
       </div>
       <div className="space-y-3 pl-9">{children}</div>
     </div>
@@ -38,20 +38,20 @@ function Section({ icon: Icon, title, children }) {
 function Field({ label, required, children, hint }) {
   return (
     <div>
-      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+      <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">
         {label} {required && <span className="text-red-500">*</span>}
       </label>
       {children}
-      {hint && <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">{hint}</p>}
+      {hint && <p className="text-xs text-stone-400 dark:text-stone-500 mt-1">{hint}</p>}
     </div>
   );
 }
 
 const inputCls =
-  "w-full border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 text-sm " +
-  "bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 " +
-  "placeholder-gray-400 dark:placeholder-gray-500 " +
-  "focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent transition";
+  "w-full border border-stone-200 dark:border-stone-600 rounded-lg px-3 py-2 text-sm " +
+  "bg-white dark:bg-stone-700 text-stone-900 dark:text-stone-100 " +
+  "placeholder-stone-400 dark:placeholder-stone-500 " +
+  "focus:outline-none focus:ring-2 focus:ring-ad-accent focus:border-transparent transition";
 
 function CheckGroup({ options, selected, onChange }) {
   const toggle = (val) =>
@@ -65,8 +65,8 @@ function CheckGroup({ options, selected, onChange }) {
           onClick={() => toggle(opt)}
           className={`px-3 py-1.5 rounded-full text-xs font-medium border transition ${
             selected.includes(opt)
-              ? "bg-brand-primary text-white border-brand-primary"
-              : "bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-600 hover:border-brand-primary hover:text-brand-primary"
+              ? "bg-ad-accent text-ad-on-accent border-ad-accent"
+              : "bg-white dark:bg-stone-700 text-stone-600 dark:text-stone-300 border-stone-200 dark:border-stone-600 hover:border-ad-accent hover:text-ad-accent-ink"
           }`}
         >
           {opt}
@@ -144,15 +144,15 @@ export default function TeacherModal({ isOpen, onClose, onSave, initialData }) {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+      <div className="bg-white dark:bg-stone-800 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
 
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700 flex-shrink-0">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-stone-100 dark:border-stone-700 flex-shrink-0">
           <div>
-            <h2 className="text-lg font-bold text-gray-900 dark:text-white">
+            <h2 className="text-lg font-bold text-stone-900 dark:text-white">
               {isEdit ? tr("teacherModal.editTeacher") : tr("teacherModal.addNewTeacher")}
             </h2>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+            <p className="text-xs text-stone-500 dark:text-stone-400 mt-0.5">
               {isEdit
                 ? tr("teacherModal.updateTeacherProfileDetails")
                 : tr("teacherModal.fillInTheDetailsAn")}
@@ -160,7 +160,7 @@ export default function TeacherModal({ isOpen, onClose, onSave, initialData }) {
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-600 dark:hover:text-gray-300 transition"
+            className="p-1.5 rounded-lg text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-700 hover:text-stone-600 dark:hover:text-stone-300 transition"
           >
             <X size={18} />
           </button>
@@ -204,13 +204,13 @@ export default function TeacherModal({ isOpen, onClose, onSave, initialData }) {
                     <option value="">{tr("teacherModal.selectContinent")}</option>
                     {CONTINENTS.map((c) => <option key={c} value={c}>{c}</option>)}
                   </select>
-                  <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                  <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 pointer-events-none" />
                 </div>
               </Field>
             </div>
           </Section>
 
-          <div className="border-t border-gray-100 dark:border-gray-700" />
+          <div className="border-t border-stone-100 dark:border-stone-700" />
 
           {/* Professional Details */}
           <Section icon={DollarSign} title={tr("teacherModal.professionalDetails")}>
@@ -230,7 +230,7 @@ export default function TeacherModal({ isOpen, onClose, onSave, initialData }) {
                     <option key={tz.value} value={tz.value}>{tz.label}</option>
                   ))}
                 </select>
-                <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 pointer-events-none" />
               </div>
             </Field>
             <div className="grid grid-cols-2 gap-3">
@@ -243,7 +243,7 @@ export default function TeacherModal({ isOpen, onClose, onSave, initialData }) {
             </div>
           </Section>
 
-          <div className="border-t border-gray-100 dark:border-gray-700" />
+          <div className="border-t border-stone-100 dark:border-stone-700" />
 
           {/* Teaching Profile */}
           <Section icon={BookOpen} title={tr("teacherModal.teachingProfile")}>
@@ -259,14 +259,14 @@ export default function TeacherModal({ isOpen, onClose, onSave, initialData }) {
                 className={inputCls + " resize-none"}
                 placeholder={tr("teacherModal.eGExperiencedIeltsCoach")}
               />
-              <p className="text-xs text-gray-400 dark:text-gray-500 mt-1 text-right">{form.bio.length}/500</p>
+              <p className="text-xs text-stone-400 dark:text-stone-500 mt-1 text-right">{form.bio.length}/500</p>
             </Field>
           </Section>
 
           {/* Bank Details — read-only, shown when editing */}
           {isEdit && (
             <>
-              <div className="border-t border-gray-100 dark:border-gray-700" />
+              <div className="border-t border-stone-100 dark:border-stone-700" />
               <Section icon={Banknote} title={tr("teacherModal.bankDetails")}>
                 {initialData?.bankName || initialData?.accountNumber ? (
                   <div className="space-y-3">
@@ -276,14 +276,14 @@ export default function TeacherModal({ isOpen, onClose, onSave, initialData }) {
                       { label: tr("teacherModal.accountNumber"),       value: initialData?.accountNumber },
                     ].map(({ label, value }) => (
                       <Field key={label} label={label}>
-                        <div className={inputCls + " opacity-70 cursor-default bg-gray-50 dark:bg-gray-700/50"}>
-                          {value || <span className="text-gray-400">—</span>}
+                        <div className={inputCls + " opacity-70 cursor-default bg-stone-50 dark:bg-stone-700/50"}>
+                          {value || <span className="text-stone-400">—</span>}
                         </div>
                       </Field>
                     ))}
                   </div>
                 ) : (
-                  <p className="text-sm text-gray-400 dark:text-gray-500">
+                  <p className="text-sm text-stone-400 dark:text-stone-500">
                     {tr("teacherModal.teacherHasNotAddedBank")}
                   </p>
                 )}
@@ -294,7 +294,7 @@ export default function TeacherModal({ isOpen, onClose, onSave, initialData }) {
           {/* Account — create only */}
           {!isEdit && (
             <>
-              <div className="border-t border-gray-100 dark:border-gray-700" />
+              <div className="border-t border-stone-100 dark:border-stone-700" />
               <Section icon={Award} title={tr("teacherModal.account")}>
                 <Field label={tr("teacherModal.temporaryPassword")} hint={tr("teacherModal.leaveBlankTeacherSetsTheir")}>
                   <input value={form.password} onChange={set("password")} type="text" className={inputCls} placeholder={tr("teacherModal.optionalOverride")} />
@@ -305,20 +305,20 @@ export default function TeacherModal({ isOpen, onClose, onSave, initialData }) {
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 dark:border-gray-700 flex-shrink-0 bg-gray-50 dark:bg-gray-800/50 rounded-b-2xl">
-          <p className="text-xs text-gray-400 dark:text-gray-500">
+        <div className="flex items-center justify-between px-6 py-4 border-t border-stone-100 dark:border-stone-700 flex-shrink-0 bg-stone-50 dark:bg-stone-800/50 rounded-b-2xl">
+          <p className="text-xs text-stone-400 dark:text-stone-500">
             {isEdit ? tr("teacherModal.changesSaveImmediately") : tr("teacherModal.anInviteEmailWillBe")}
           </p>
           <div className="flex gap-3">
             <button
               type="button" onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 transition"
+              className="px-4 py-2 text-sm font-medium text-stone-600 dark:text-stone-300 bg-white dark:bg-stone-700 border border-stone-200 dark:border-stone-600 rounded-lg hover:bg-stone-50 dark:hover:bg-stone-600 transition"
             >
               {tr("teacherModal.cancel")}
             </button>
             <button
               type="button" onClick={handleSubmit} disabled={saving}
-              className="px-5 py-2 text-sm font-medium bg-brand-primary text-white rounded-lg hover:opacity-90 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-5 py-2 text-sm font-medium bg-ad-accent text-ad-on-accent rounded-lg hover:opacity-90 transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {saving
                 ? (isEdit ? tr("teacherModal.saving") : tr("teacherModal.sendingInvite"))
