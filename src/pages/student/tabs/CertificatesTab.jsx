@@ -14,12 +14,12 @@ const fmtDate = (iso) =>
 function CertCard({ cert, isDarkMode, onDownload, downloading }) {
   const { t: tr } = useTranslation("student");
   const col = {
-    card:    isDarkMode ? '#1a1d2e' : '#ffffff',
-    border:  isDarkMode ? '#2a2d40' : '#ffe8cc',
-    heading: isDarkMode ? '#f0f4ff' : '#3d2e20',
-    body:    isDarkMode ? '#c8cce0' : '#5a4a3a',
-    muted:   isDarkMode ? '#6b7090' : '#a89480',
-    accent:  isDarkMode ? '#fbbf24' : '#f97316',
+    card:    isDarkMode ? 'var(--as-raised, #1a1d2e)' : 'var(--as-surface, #ffffff)',
+    border:  isDarkMode ? 'var(--as-line, #2a2d40)' : 'var(--as-line, #ffe8cc)',
+    heading: isDarkMode ? 'var(--as-ink, #f0f4ff)' : 'var(--as-ink, #3d2e20)',
+    body:    isDarkMode ? 'var(--as-ink-2, #c8cce0)' : 'var(--as-ink-2, #5a4a3a)',
+    muted:   isDarkMode ? 'var(--as-ink-2, #6b7090)' : 'var(--as-muted, #a89480)',
+    accent:  isDarkMode ? '#fbbf24' : 'var(--as-accent-ink, #f97316)',
   };
 
   return (
@@ -30,11 +30,11 @@ function CertCard({ cert, isDarkMode, onDownload, downloading }) {
       fontFamily: F, position: 'relative', overflow: 'hidden',
     }}>
       {/* Accent bar */}
-      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 4, background: 'linear-gradient(90deg,#f97316,#f43f5e)' }} />
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 4, background: 'linear-gradient(90deg,var(--as-accent, #f97316),#f43f5e)' }} />
 
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, paddingTop: 6 }}>
         {/* Icon */}
-        <div style={{ width: 52, height: 52, borderRadius: 16, background: 'linear-gradient(135deg,#f97316,#f43f5e)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <div style={{ width: 52, height: 52, borderRadius: 16, background: 'linear-gradient(135deg,var(--as-accent, #f97316),#f43f5e)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
           <Award size={26} color="#fff" />
         </div>
 
@@ -54,7 +54,7 @@ function CertCard({ cert, isDarkMode, onDownload, downloading }) {
           onClick={() => onDownload(cert)}
           disabled={downloading === cert._id}
           style={{
-            background: 'linear-gradient(135deg,#f97316,#f43f5e)',
+            background: 'linear-gradient(135deg,var(--as-accent, #f97316),#f43f5e)',
             color: '#fff', border: 'none', borderRadius: 12,
             padding: '8px 16px', fontSize: 13, fontWeight: 800,
             cursor: downloading === cert._id ? 'default' : 'pointer',
@@ -74,11 +74,11 @@ function CertCard({ cert, isDarkMode, onDownload, downloading }) {
 export default function CertificatesTab({ isDarkMode }) {
   const { t: tr } = useTranslation("student");
   const col = {
-    heading: isDarkMode ? '#f0f4ff' : '#3d2e20',
-    muted:   isDarkMode ? '#6b7090' : '#a89480',
-    accent:  isDarkMode ? '#fbbf24' : '#f97316',
-    card:    isDarkMode ? '#1a1d2e' : '#ffffff',
-    border:  isDarkMode ? '#2a2d40' : '#ffe8cc',
+    heading: isDarkMode ? 'var(--as-ink, #f0f4ff)' : 'var(--as-ink, #3d2e20)',
+    muted:   isDarkMode ? 'var(--as-ink-2, #6b7090)' : 'var(--as-muted, #a89480)',
+    accent:  isDarkMode ? '#fbbf24' : 'var(--as-accent-ink, #f97316)',
+    card:    isDarkMode ? 'var(--as-raised, #1a1d2e)' : 'var(--as-surface, #ffffff)',
+    border:  isDarkMode ? 'var(--as-line, #2a2d40)' : 'var(--as-line, #ffe8cc)',
   };
 
   const [certs,       setCerts]       = useState([]);
@@ -168,7 +168,7 @@ export default function CertificatesTab({ isDarkMode }) {
 
       {/* Upcoming milestones hint */}
       {certs.length > 0 && (
-        <div style={{ marginTop: 24, background: isDarkMode ? 'rgba(249,115,22,0.06)' : '#fff7ed', border: `1.5px solid ${isDarkMode ? 'rgba(249,115,22,0.18)' : '#fed7aa'}`, borderRadius: 16, padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ marginTop: 24, background: isDarkMode ? 'rgba(249,115,22,0.06)' : 'var(--as-accent-soft, #fff7ed)', border: `1.5px solid ${isDarkMode ? 'rgba(249,115,22,0.18)' : 'var(--as-accent-line, #fed7aa)'}`, borderRadius: 16, padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 12 }}>
           <Shield size={18} color={col.accent} />
           <p style={{ margin: 0, fontSize: 13, color: col.muted, fontWeight: 600 }}>
             {tr("certificatesTab.allCertificatesAreDigitallySigned")}

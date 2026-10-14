@@ -115,7 +115,7 @@ const STATUS = {
   correct: { bg: "rgba(34,197,94,0.18)",  color: "#15803d", border: "rgba(34,197,94,0.45)"  },
   close:   { bg: "rgba(234,179,8,0.18)",   color: "#b45309", border: "rgba(234,179,8,0.45)"  },
   wrong:   { bg: "rgba(239,68,68,0.18)",   color: "#dc2626", border: "rgba(239,68,68,0.45)"  },
-  missed:  { bg: "rgba(148,163,184,0.18)", color: "#64748b", border: "rgba(148,163,184,0.4)" },
+  missed:  { bg: "rgba(148,163,184,0.18)", color: "var(--as-ink-2, #64748b)", border: "rgba(148,163,184,0.4)" },
 };
 
 const DIFF_LABELS = {
@@ -168,15 +168,15 @@ export default function PronunciationTab({ isDarkMode }) {
   const sentence = pool[sentenceIdx];
 
   const col = {
-    card:    isDarkMode ? "#1e293b" : "#ffffff",
-    border:  isDarkMode ? "#334155" : "#fed7aa",
-    heading: isDarkMode ? "#f8fafc" : "#1e293b",
-    body:    isDarkMode ? "#cbd5e1" : "#475569",
-    sub:     isDarkMode ? "#94a3b8" : "#9ca3af",
-    tip:     isDarkMode ? "rgba(139,92,246,0.12)" : "#faf5ff",
-    tipBdr:  isDarkMode ? "#4c1d95"               : "#e9d5ff",
-    progBg:  isDarkMode ? "#0f172a"               : "#f1f5f9",
-    ipaBg:   isDarkMode ? "rgba(255,255,255,0.04)" : "#f8faff",
+    card:    isDarkMode ? "var(--as-raised, #1e293b)" : "var(--as-surface, #ffffff)",
+    border:  isDarkMode ? "var(--as-line, #334155)" : "var(--as-accent-line, #fed7aa)",
+    heading: isDarkMode ? "var(--as-ink, #f8fafc)" : "var(--as-ink, #1e293b)",
+    body:    isDarkMode ? "var(--as-ink-2, #cbd5e1)" : "var(--as-ink-2, #475569)",
+    sub:     isDarkMode ? "var(--as-muted, #94a3b8)" : "var(--as-muted, #9ca3af)",
+    tip:     isDarkMode ? "color-mix(in srgb, var(--as-accent, #8b5cf6) 12%, transparent)" : "var(--as-accent-soft, #faf5ff)",
+    tipBdr:  isDarkMode ? "#4c1d95"               : "var(--as-accent-line, #e9d5ff)",
+    progBg:  isDarkMode ? "var(--as-surface, #0f172a)"               : "var(--as-raised, #f1f5f9)",
+    ipaBg:   isDarkMode ? "rgba(255,255,255,0.04)" : "var(--as-raised, #f8faff)",
   };
 
   // ── Text-to-speech ─────────────────────────────────────────────────────────
@@ -385,7 +385,7 @@ export default function PronunciationTab({ isDarkMode }) {
 
   const ringGrad = result
     ? result.percentage >= 80 ? "linear-gradient(135deg,#22c55e,#4ade80)"
-    : result.percentage >= 50 ? "linear-gradient(135deg,#f97316,#fb923c)"
+    : result.percentage >= 50 ? "linear-gradient(135deg,var(--as-accent, #f97316),var(--as-accent, #fb923c))"
     : "linear-gradient(135deg,#ef4444,#f87171)"
     : "";
 
@@ -406,7 +406,7 @@ export default function PronunciationTab({ isDarkMode }) {
         {tr("pronunciationTab.pleaseAllowMicrophoneAccessIn")}
       </p>
       <button onClick={() => setNoMicPermission(false)}
-        style={{ background: "linear-gradient(135deg,#f97316,#fb923c)", border: "none", borderRadius: "12px", padding: "10px 24px", color: "#fff", fontWeight: 800, cursor: "pointer", fontFamily: "Nunito, sans-serif", fontSize: "14px" }}>
+        style={{ background: "linear-gradient(135deg,var(--as-accent, #f97316),var(--as-accent, #fb923c))", border: "none", borderRadius: "12px", padding: "10px 24px", color: "#fff", fontWeight: 800, cursor: "pointer", fontFamily: "Nunito, sans-serif", fontSize: "14px" }}>
         {tr("pronunciationTab.tryAgain")}
       </button>
     </div>
@@ -437,7 +437,7 @@ export default function PronunciationTab({ isDarkMode }) {
         {credits !== null && (
           <div style={{ display: "inline-flex", alignItems: "center", gap: 6, marginTop: 10, padding: "5px 14px", borderRadius: 999, fontSize: 13, fontWeight: 800,
             background: credits === 0 ? "rgba(239,68,68,0.12)" : credits <= 5 ? "rgba(234,179,8,0.12)" : "rgba(249,115,22,0.12)",
-            color: credits === 0 ? "#dc2626" : credits <= 5 ? "#b45309" : "#ea580c",
+            color: credits === 0 ? "#dc2626" : credits <= 5 ? "#b45309" : "var(--as-accent-ink, #ea580c)",
             border: `1.5px solid ${credits === 0 ? "rgba(239,68,68,0.3)" : credits <= 5 ? "rgba(234,179,8,0.3)" : "rgba(249,115,22,0.3)"}`,
           }}>
             🎤 {credits === 0 ? tr("pronunciationTab.noCreditsAskYourAdmin") : tr("pronunciationTab.analysisCreditRemaining", { credits, value: credits === 1 ? "" : "s" })}
@@ -466,9 +466,9 @@ export default function PronunciationTab({ isDarkMode }) {
       {scores.length > 0 && (
         <div style={{ display: "flex", gap: "12px", justifyContent: "center", flexWrap: "wrap" }}>
           {[
-            { label: tr("pronunciationTab.attempts"),  value: scores.length,  grad: "linear-gradient(135deg,#f97316,#fb923c)" },
+            { label: tr("pronunciationTab.attempts"),  value: scores.length,  grad: "linear-gradient(135deg,var(--as-accent, #f97316),var(--as-accent, #fb923c))" },
             { label: tr("pronunciationTab.avgScore"), value: `${avgScore}%`, grad: "linear-gradient(135deg,#22c55e,#4ade80)" },
-            { label: "80%+ Runs", value: greatCount,     grad: "linear-gradient(135deg,#8b5cf6,#a78bfa)" },
+            { label: "80%+ Runs", value: greatCount,     grad: "linear-gradient(135deg,var(--as-accent, #8b5cf6),var(--as-accent, #a78bfa))" },
           ].map(({ label, value, grad }) => (
             <div key={label} style={{ background: grad, borderRadius: "16px", padding: "10px 22px", color: "#fff", textAlign: "center", minWidth: "86px", boxShadow: "0 4px 12px rgba(0,0,0,0.12)" }}>
               <div style={{ fontSize: "22px", fontWeight: 900 }}>{value}</div>
@@ -485,8 +485,8 @@ export default function PronunciationTab({ isDarkMode }) {
           return (
             <button key={key} onClick={() => changeDifficulty(key)} style={{
               padding: "8px 20px", borderRadius: "20px",
-              border: `2px solid ${active ? "#f97316" : col.border}`,
-              background: active ? "linear-gradient(135deg,#f97316,#fb923c)" : col.card,
+              border: `2px solid ${active ? "var(--as-accent, #f97316)" : col.border}`,
+              background: active ? "linear-gradient(135deg,var(--as-accent, #f97316),var(--as-accent, #fb923c))" : col.card,
               color: active ? "#fff" : col.body,
               fontWeight: 800, cursor: "pointer", fontFamily: "Nunito, sans-serif",
               fontSize: "13px", transition: "all 0.2s",
@@ -502,10 +502,10 @@ export default function PronunciationTab({ isDarkMode }) {
             {tr("pronunciationTab.sentence")} {sentenceIdx + 1} {tr("pronunciationTab.of")} {pool.length}
             {pool.length > LOCAL_SENTENCES[difficulty].length && tr("pronunciationTab.inclAiSentences")}
           </span>
-          <span style={{ fontSize: "12px", fontWeight: 700, color: "#f97316" }}>{tr("pronunciationTab.throughSet", { progress })}</span>
+          <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--as-accent-ink, #f97316)" }}>{tr("pronunciationTab.throughSet", { progress })}</span>
         </div>
         <div style={{ background: col.progBg, borderRadius: "99px", height: "8px", overflow: "hidden" }}>
-          <div style={{ background: "linear-gradient(90deg,#f97316,#fb923c)", height: "100%", width: `${progress}%`, borderRadius: "99px", transition: "width 0.4s ease" }} />
+          <div style={{ background: "linear-gradient(90deg,var(--as-accent, #f97316),var(--as-accent, #fb923c))", height: "100%", width: `${progress}%`, borderRadius: "99px", transition: "width 0.4s ease" }} />
         </div>
       </div>
 
@@ -513,7 +513,7 @@ export default function PronunciationTab({ isDarkMode }) {
       <div style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: "24px", padding: "32px 28px", boxShadow: "0 4px 20px rgba(0,0,0,0.06)", textAlign: "center" }}>
 
         {/* Focus label */}
-        <div style={{ fontSize: "12px", fontWeight: 700, color: "#f97316", marginBottom: "12px", letterSpacing: "0.8px", textTransform: "uppercase" }}>
+        <div style={{ fontSize: "12px", fontWeight: 700, color: "var(--as-accent-ink, #f97316)", marginBottom: "12px", letterSpacing: "0.8px", textTransform: "uppercase" }}>
           {sentence.focus}
         </div>
 
@@ -563,7 +563,7 @@ export default function PronunciationTab({ isDarkMode }) {
               <>
                 <button
                   onClick={startRecording}
-                  style={{ background: "linear-gradient(135deg,#f97316,#fb923c)", border: "none", borderRadius: "50%", width: "84px", height: "84px", fontSize: "34px", cursor: "pointer", boxShadow: "0 6px 24px rgba(249,115,22,0.45)", transition: "transform 0.15s, box-shadow 0.15s" }}
+                  style={{ background: "linear-gradient(135deg,var(--as-accent, #f97316),var(--as-accent, #fb923c))", border: "none", borderRadius: "50%", width: "84px", height: "84px", fontSize: "34px", cursor: "pointer", boxShadow: "0 6px 24px rgba(249,115,22,0.45)", transition: "transform 0.15s, box-shadow 0.15s" }}
                   onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.1)"; e.currentTarget.style.boxShadow = "0 8px 28px rgba(249,115,22,0.55)"; }}
                   onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)";   e.currentTarget.style.boxShadow = "0 6px 24px rgba(249,115,22,0.45)"; }}
                 >🎤</button>
@@ -619,7 +619,7 @@ export default function PronunciationTab({ isDarkMode }) {
             <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", justifyContent: "center" }}>
               <button onClick={speakSentence} style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: "12px", padding: "10px 18px", color: col.body, cursor: "pointer", fontWeight: 800, fontFamily: "Nunito, sans-serif", fontSize: "14px" }}>{tr("pronunciationTab.hearItAgain")}</button>
               <button onClick={tryAgain}      style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: "12px", padding: "10px 18px", color: col.body, cursor: "pointer", fontWeight: 800, fontFamily: "Nunito, sans-serif", fontSize: "14px" }}>{tr("pronunciationTab.tryAgain2")}</button>
-              <button onClick={nextSentence}  style={{ background: "linear-gradient(135deg,#f97316,#fb923c)", border: "none", borderRadius: "12px", padding: "10px 22px", color: "#fff", cursor: "pointer", fontWeight: 800, fontFamily: "Nunito, sans-serif", fontSize: "14px", boxShadow: "0 4px 14px rgba(249,115,22,0.35)" }}>
+              <button onClick={nextSentence}  style={{ background: "linear-gradient(135deg,var(--as-accent, #f97316),var(--as-accent, #fb923c))", border: "none", borderRadius: "12px", padding: "10px 22px", color: "#fff", cursor: "pointer", fontWeight: 800, fontFamily: "Nunito, sans-serif", fontSize: "14px", boxShadow: "0 4px 14px rgba(249,115,22,0.35)" }}>
                 {sentenceIdx >= pool.length - 1 ? tr("pronunciationTab.getNewSentences") : tr("pronunciationTab.nextSentence")}
               </button>
             </div>
@@ -661,10 +661,10 @@ export default function PronunciationTab({ isDarkMode }) {
           {pool.map((_, i) => {
             const done  = wordResults[i] !== undefined;
             const score = wordResults[i];
-            const bg = i === sentenceIdx ? "#f97316"
+            const bg = i === sentenceIdx ? "var(--as-accent, #f97316)"
               : done ? score >= 80 ? "rgba(34,197,94,0.25)" : score >= 50 ? "rgba(234,179,8,0.25)" : "rgba(239,68,68,0.2)"
               : col.card;
-            const borderC = i === sentenceIdx ? "#f97316"
+            const borderC = i === sentenceIdx ? "var(--as-accent, #f97316)"
               : done ? score >= 80 ? "#22c55e" : score >= 50 ? "#eab308" : "#ef4444"
               : col.border;
             return (
@@ -678,7 +678,7 @@ export default function PronunciationTab({ isDarkMode }) {
 
       {/* ── Tips ───────────────────────────────────────────────────────────── */}
       <div style={{ background: col.tip, border: `2px solid ${col.tipBdr}`, borderRadius: "16px", padding: "16px 20px" }}>
-        <div style={{ fontWeight: 900, color: "#7c3aed", marginBottom: "8px", fontSize: "14px" }}>{tr("pronunciationTab.tipsForBetterScores")}</div>
+        <div style={{ fontWeight: 900, color: "var(--as-accent-ink, #7c3aed)", marginBottom: "8px", fontSize: "14px" }}>{tr("pronunciationTab.tipsForBetterScores")}</div>
         <ul style={{ margin: 0, paddingLeft: "18px", color: col.body, fontSize: "13px", lineHeight: 1.9 }}>
           <li>{tr("pronunciationTab.tap")} <strong>{tr("pronunciationTab.hearIt")}</strong> {tr("pronunciationTab.firstToLearnTheCorrect")}</li>
           <li>{tr("pronunciationTab.speakAtA")} <strong>{tr("pronunciationTab.naturalPace")}</strong> {tr("pronunciationTab.notTooFastNotToo")}</li>

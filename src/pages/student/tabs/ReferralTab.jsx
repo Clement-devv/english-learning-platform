@@ -19,7 +19,7 @@ const STATUS_META = {
   pending:  { get label() { return ta("referralTab.statusMetaPending"); },  color: "#f59e0b", bg: "#fef3c7" },
   invited:  { get label() { return ta("referralTab.statusMetaInvited"); },  color: "#3b82f6", bg: "#eff6ff" },
   active:   { get label() { return ta("referralTab.statusMetaJoined"); },  color: "#16a34a", bg: "#f0fdf4" },
-  rejected: { get label() { return ta("referralTab.statusMetaDeclined"); }, color: "#94a3b8", bg: "#f1f5f9" },
+  rejected: { get label() { return ta("referralTab.statusMetaDeclined"); }, color: "var(--as-muted, #94a3b8)", bg: "var(--as-raised, #f1f5f9)" },
 };
 
 export default function ReferralTab({ isDarkMode }) {
@@ -28,11 +28,11 @@ export default function ReferralTab({ isDarkMode }) {
   const [loading, setLoading] = useState(true);
   const [copied,  setCopied]  = useState(false);
 
-  const bg    = isDarkMode ? "#0f172a" : "#f8fafc";
-  const card  = isDarkMode ? "#1e293b" : "#ffffff";
-  const border= isDarkMode ? "#334155" : "#e2e8f0";
-  const text  = isDarkMode ? "#e2e8f0" : "#1e293b";
-  const muted = isDarkMode ? "#94a3b8" : "#64748b";
+  const bg    = isDarkMode ? "var(--as-surface, #0f172a)" : "var(--as-raised, #f8fafc)";
+  const card  = isDarkMode ? "var(--as-raised, #1e293b)" : "var(--as-surface, #ffffff)";
+  const border= isDarkMode ? "var(--as-line, #334155)" : "var(--as-line, #e2e8f0)";
+  const text  = isDarkMode ? "var(--as-ink, #e2e8f0)" : "var(--as-ink, #1e293b)";
+  const muted = isDarkMode ? "var(--as-muted, #94a3b8)" : "var(--as-ink-2, #64748b)";
 
   async function load() {
     setLoading(true);
@@ -60,7 +60,7 @@ export default function ReferralTab({ isDarkMode }) {
     { icon: Users, label: tr("referralTab.friendsInvited"), value: data.stats.total,   color: "#3b82f6" },
     { icon: Check, label: tr("referralTab.joined2"),          value: data.stats.active,  color: "#16a34a" },
     { icon: Clock, label: tr("referralTab.pendingReview"),  value: data.stats.pending, color: "#f59e0b" },
-    { icon: Gift,  label: tr("referralTab.freeClassesWon"),value: data.stats.credits, color: "#8b5cf6" },
+    { icon: Gift,  label: tr("referralTab.freeClassesWon"),value: data.stats.credits, color: "var(--as-accent-ink, #8b5cf6)" },
   ] : [];
 
   return (
@@ -86,9 +86,9 @@ export default function ReferralTab({ isDarkMode }) {
           {/* Referral link card */}
           <div style={{
             background: isDarkMode
-              ? "linear-gradient(135deg, #1e3a5f 0%, #1e293b 100%)"
+              ? "linear-gradient(135deg, #1e3a5f 0%, var(--as-raised, #1e293b) 100%)"
               : "linear-gradient(135deg, #eff6ff 0%, #f0fdf4 100%)",
-            border: `1px solid ${isDarkMode ? "#334155" : "#bfdbfe"}`,
+            border: `1px solid ${isDarkMode ? "var(--as-line, #334155)" : "#bfdbfe"}`,
             borderRadius: 16, padding: 24, marginBottom: 20,
           }}>
             <p style={{ margin: "0 0 10px", fontSize: 13, fontWeight: 700, color: muted, textTransform: "uppercase", letterSpacing: 1 }}>
@@ -98,7 +98,7 @@ export default function ReferralTab({ isDarkMode }) {
             <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
               <div style={{
                 flex: 1, padding: "10px 14px", borderRadius: 10,
-                background: isDarkMode ? "#0f172a" : "#fff",
+                background: isDarkMode ? "var(--as-surface, #0f172a)" : "var(--as-surface, #fff)",
                 border: `1px solid ${border}`,
                 fontSize: 13, color: text, fontFamily: "monospace",
                 wordBreak: "break-all", minWidth: 0,
@@ -124,7 +124,7 @@ export default function ReferralTab({ isDarkMode }) {
               <span style={{ fontSize: 12, color: muted }}>{tr("referralTab.yourCode")}</span>
               <span style={{
                 padding: "4px 12px", borderRadius: 6,
-                background: isDarkMode ? "#0f172a" : "#fff",
+                background: isDarkMode ? "var(--as-surface, #0f172a)" : "var(--as-surface, #fff)",
                 border: `1px solid ${border}`,
                 fontFamily: "monospace", fontSize: 15, fontWeight: 800,
                 color: "#3b82f6", letterSpacing: 3,
@@ -196,7 +196,7 @@ export default function ReferralTab({ isDarkMode }) {
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                       {r.creditAwarded && (
-                        <span style={{ fontSize: 11, fontWeight: 700, color: "#8b5cf6" }}>{tr("referralTab.t1Class")}</span>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: "var(--as-accent-ink, #8b5cf6)" }}>{tr("referralTab.t1Class")}</span>
                       )}
                       <span style={{
                         padding: "3px 10px", borderRadius: 20, fontSize: 12, fontWeight: 700,

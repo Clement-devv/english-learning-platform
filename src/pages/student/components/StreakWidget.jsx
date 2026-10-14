@@ -57,16 +57,16 @@ function DayDot({ active, isToday, label, isDarkMode }) {
         display: "flex", alignItems: "center", justifyContent: "center",
         background: active
           ? "linear-gradient(135deg,#f59e0b,#ef4444)"
-          : isDarkMode ? "#1e2235" : "#f1f5f9",
+          : isDarkMode ? "var(--as-raised, #1e2235)" : "var(--as-raised, #f1f5f9)",
         boxShadow: isToday ? "0 0 0 2px #f59e0b" : "none",
         transition: "all 0.2s",
       }}>
         {active
           ? <span style={{ fontSize: 14 }}>🔥</span>
-          : <span style={{ width: 8, height: 8, borderRadius: "50%", background: isDarkMode ? "#374151" : "#d1d5db", display: "block" }} />
+          : <span style={{ width: 8, height: 8, borderRadius: "50%", background: isDarkMode ? "var(--as-raised, #374151)" : "var(--as-raised, #d1d5db)", display: "block" }} />
         }
       </div>
-      <span style={{ fontSize: 10, fontWeight: 600, color: isDarkMode ? "#6b7280" : "#9ca3af" }}>{label}</span>
+      <span style={{ fontSize: 10, fontWeight: 600, color: isDarkMode ? "var(--as-ink-2, #6b7280)" : "var(--as-muted, #9ca3af)" }}>{label}</span>
     </div>
   );
 }
@@ -89,11 +89,11 @@ export default function StreakWidget({ isDarkMode, onLoad }) {
   }, []);
 
   const c = {
-    card:    isDarkMode ? "#1a1f2e" : "#ffffff",
-    border:  isDarkMode ? "#1e2235" : "#e8ecf8",
-    text:    isDarkMode ? "#e2e8f0" : "#1a1d2e",
-    muted:   isDarkMode ? "#64748b" : "#6b7280",
-    subCard: isDarkMode ? "#0f1117" : "#f8f9ff",
+    card:    isDarkMode ? "#1a1f2e" : "var(--as-surface, #ffffff)",
+    border:  isDarkMode ? "var(--as-line, #1e2235)" : "#e8ecf8",
+    text:    isDarkMode ? "var(--as-ink, #e2e8f0)" : "var(--as-ink, #1a1d2e)",
+    muted:   isDarkMode ? "var(--as-ink-2, #64748b)" : "var(--as-ink-2, #6b7280)",
+    subCard: isDarkMode ? "var(--as-bg, #0f1117)" : "#f8f9ff",
   };
 
   if (loading) {
@@ -150,7 +150,7 @@ export default function StreakWidget({ isDarkMode, onLoad }) {
           width: 72, height: 72, borderRadius: 20, flexShrink: 0,
           background: current > 0
             ? "linear-gradient(135deg,#f59e0b,#ef4444)"
-            : isDarkMode ? "#1e2235" : "#f1f5f9",
+            : isDarkMode ? "var(--as-raised, #1e2235)" : "var(--as-raised, #f1f5f9)",
           display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
           boxShadow: current > 0 ? "0 4px 16px rgba(245,158,11,0.3)" : "none",
           animation: current > 0 ? "streakPulse 2.4s ease-in-out infinite" : "none",

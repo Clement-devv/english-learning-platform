@@ -89,7 +89,7 @@ export default function StreakToast({ data, onDone }) {
 
       <div style={{
         background: isBig
-          ? "linear-gradient(135deg, #f59e0b, #ef4444, #f97316)"
+          ? "linear-gradient(135deg, #f59e0b, #ef4444, var(--as-accent, #f97316))"
           : "linear-gradient(135deg, #1e2235ee, #111827ee)",
         backdropFilter: "blur(12px)",
         border: isBig ? "2px solid rgba(255,255,255,0.3)" : "1.5px solid rgba(245,158,11,0.4)",
@@ -128,7 +128,7 @@ export default function StreakToast({ data, onDone }) {
               </div>
               <div style={{
                 fontSize: 22, fontWeight: 900, color: "#fff",
-                background: "linear-gradient(90deg,#fff,#ffe,#fff)",
+                background: "linear-gradient(90deg,var(--as-surface, #fff),#ffe,var(--as-surface, #fff))",
                 backgroundSize: "200% auto",
                 WebkitBackgroundClip: "text",
                 WebkitTextFillColor: "transparent",
@@ -138,7 +138,7 @@ export default function StreakToast({ data, onDone }) {
             </>
           ) : (
             <>
-              <div style={{ fontSize: 11, fontWeight: 600, color: "#9ca3af", marginBottom: 1 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: "var(--as-muted, #9ca3af)", marginBottom: 1 }}>
                 {usedFreeze ? tr("streakToast.streakSavedByFreeze") : tr("streakToast.keepItUp")}
               </div>
               <div style={{ fontSize: 18, fontWeight: 900, color: "#f59e0b" }}>{tr("streakToast.dayStreak2", { newStreak })}</div>

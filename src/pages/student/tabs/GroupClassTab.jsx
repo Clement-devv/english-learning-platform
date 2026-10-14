@@ -35,14 +35,14 @@ const STATUS_COLOR = {
   open:         '#10b981',
   full:         '#f59e0b',
   'in-progress':'#3b82f6',
-  completed:    '#6b7280',
+  completed:    'var(--as-ink-2, #6b7280)',
   cancelled:    '#ef4444',
-  missed:       '#ea580c', // time passed, never held — refunded
+  missed:       'var(--as-accent-ink, #ea580c)', // time passed, never held — refunded
 };
 
 function Badge({ status }) {
   return (
-    <span style={{ background: STATUS_COLOR[status] + '22', color: STATUS_COLOR[status], borderRadius: 999, padding: '3px 10px', fontSize: 12, fontWeight: 700 }}>
+    <span style={{ background: `color-mix(in srgb, ${STATUS_COLOR[status]} 13%, transparent)`, color: STATUS_COLOR[status], borderRadius: 999, padding: '3px 10px', fontSize: 12, fontWeight: 700 }}>
       {status}
     </span>
   );
@@ -50,7 +50,7 @@ function Badge({ status }) {
 
 function LevelBadge({ level }) {
   return (
-    <span style={{ background: '#f97316' + '18', color: '#f97316', borderRadius: 999, padding: '3px 10px', fontSize: 12, fontWeight: 700 }}>
+    <span style={{ background: 'color-mix(in srgb, var(--as-accent, #f97316) 9%, transparent)', color: 'var(--as-accent-ink, #f97316)', borderRadius: 999, padding: '3px 10px', fontSize: 12, fontWeight: 700 }}>
       {level}
     </span>
   );
@@ -59,14 +59,14 @@ function LevelBadge({ level }) {
 export default function GroupClassTab({ isDarkMode, studentInfo }) {
   const { t: tr } = useTranslation("student");
   const col = {
-    bg:      isDarkMode ? '#0f1117' : '#fff8f0',
-    card:    isDarkMode ? '#1a1d2e' : '#ffffff',
-    border:  isDarkMode ? '#2a2d40' : '#ffe8cc',
-    heading: isDarkMode ? '#f0f4ff' : '#3d2e20',
-    body:    isDarkMode ? '#c8cce0' : '#5a4a3a',
-    muted:   isDarkMode ? '#6b7090' : '#a89480',
-    accent:  isDarkMode ? '#fbbf24' : '#f97316',
-    input:   isDarkMode ? '#0f1117' : '#fff8f0',
+    bg:      isDarkMode ? 'var(--as-bg, #0f1117)' : 'var(--as-raised, #fff8f0)',
+    card:    isDarkMode ? 'var(--as-raised, #1a1d2e)' : 'var(--as-surface, #ffffff)',
+    border:  isDarkMode ? 'var(--as-line, #2a2d40)' : 'var(--as-line, #ffe8cc)',
+    heading: isDarkMode ? 'var(--as-ink, #f0f4ff)' : 'var(--as-ink, #3d2e20)',
+    body:    isDarkMode ? 'var(--as-ink-2, #c8cce0)' : 'var(--as-ink-2, #5a4a3a)',
+    muted:   isDarkMode ? 'var(--as-ink-2, #6b7090)' : 'var(--as-muted, #a89480)',
+    accent:  isDarkMode ? '#fbbf24' : 'var(--as-accent-ink, #f97316)',
+    input:   isDarkMode ? 'var(--as-bg, #0f1117)' : 'var(--as-raised, #fff8f0)',
   };
 
   const [tab,         setTab]         = useState('browse');   // 'browse' | 'enrolled'
@@ -166,7 +166,7 @@ export default function GroupClassTab({ isDarkMode, studentInfo }) {
 
   const card = { background: col.card, border: `2px solid ${col.border}`, borderRadius: 20, padding: 20, marginBottom: 12, fontFamily: F };
   const btn  = (grad, text='#fff', disabled=false) => ({
-    background: disabled ? (isDarkMode ? '#2a2d40' : '#f5f0ec') : grad,
+    background: disabled ? (isDarkMode ? 'var(--as-raised, #2a2d40)' : 'var(--as-raised, #f5f0ec)') : grad,
     color: disabled ? col.muted : text,
     border: 'none', borderRadius: 12, padding: '9px 18px', fontSize: 13,
     fontWeight: 800, cursor: disabled ? 'default' : 'pointer', fontFamily: F,
@@ -183,7 +183,7 @@ export default function GroupClassTab({ isDarkMode, studentInfo }) {
           { key: 'enrolled', label: tr("groupClassTab.myClasses"),  count: myClasses.length  },
         ].map(t => (
           <button key={t.key} onClick={() => setTab(t.key)} style={{
-            background: tab === t.key ? 'linear-gradient(135deg,#f97316,#f43f5e)' : (isDarkMode ? '#1a1d2e' : '#ffffff'),
+            background: tab === t.key ? 'linear-gradient(135deg,var(--as-accent, #f97316),#f43f5e)' : (isDarkMode ? 'var(--as-raised, #1a1d2e)' : 'var(--as-surface, #ffffff)'),
             color: tab === t.key ? '#fff' : col.body,
             border: `2px solid ${tab === t.key ? 'transparent' : col.border}`,
             borderRadius: 14, padding: '8px 18px', fontSize: 13, fontWeight: 800,
@@ -192,7 +192,7 @@ export default function GroupClassTab({ isDarkMode, studentInfo }) {
             {t.label} <span style={{ opacity: 0.75 }}>({t.count})</span>
           </button>
         ))}
-        <button onClick={load} style={{ marginLeft: 'auto', ...btn(isDarkMode ? '#2a2d40' : '#f5f0ec', col.body), padding: '8px 12px' }}>
+        <button onClick={load} style={{ marginLeft: 'auto', ...btn(isDarkMode ? 'var(--as-ink, #2a2d40)' : 'var(--as-ink, #f5f0ec)', col.body), padding: '8px 12px' }}>
           <RefreshCw size={15} />
         </button>
       </div>
@@ -205,7 +205,7 @@ export default function GroupClassTab({ isDarkMode, studentInfo }) {
 
       {/* Group points balance (+ class credits while older credit-paid classes are still listed) */}
       {myPoints !== null && (
-        <div style={{ background: isDarkMode ? 'rgba(249,115,22,0.08)' : '#fff7ed', border: `1.5px solid ${isDarkMode ? 'rgba(249,115,22,0.2)' : '#fed7aa'}`, borderRadius: 14, padding: '10px 16px', marginBottom: 16, fontSize: 13, fontWeight: 700, color: col.accent }}>
+        <div style={{ background: isDarkMode ? 'rgba(249,115,22,0.08)' : 'var(--as-accent-soft, #fff7ed)', border: `1.5px solid ${isDarkMode ? 'rgba(249,115,22,0.2)' : 'var(--as-accent-line, #fed7aa)'}`, borderRadius: 14, padding: '10px 16px', marginBottom: 16, fontSize: 13, fontWeight: 700, color: col.accent }}>
           {tr("groupClassTab.groupPoints")} <strong>{myPoints}</strong>
           {myPoints === 0 && <span style={{ marginLeft: 8, color: '#ef4444', fontWeight: 600 }}>{tr("groupClassTab.buyPointsFromSchool")}</span>}
           {myCredits !== null && [...allClasses, ...myClasses].some(gc => !usesPoints(gc)) && (
@@ -240,10 +240,10 @@ export default function GroupClassTab({ isDarkMode, studentInfo }) {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}>
                     <span style={{ fontSize: 15, fontWeight: 800, color: col.heading }}>{gc.title}</span>
                     <Badge status={gc.status} />
-                    {gc.status === 'missed' && gc.missedReason && <span style={{ fontSize: 12, color: '#ea580c', fontWeight: 600 }}>{gc.missedReason}</span>}
+                    {gc.status === 'missed' && gc.missedReason && <span style={{ fontSize: 12, color: 'var(--as-accent-ink, #ea580c)', fontWeight: 600 }}>{gc.missedReason}</span>}
                     <LevelBadge level={gc.level} />
                     {gc.enrollmentMode === 'invite-only' && (
-                      <span style={{ fontSize: 11, background: '#6366f118', color: '#6366f1', borderRadius: 999, padding: '2px 8px', fontWeight: 700 }}>{tr("groupClassTab.inviteOnly")}</span>
+                      <span style={{ fontSize: 11, background: '#6366f118', color: 'var(--as-accent-ink, #6366f1)', borderRadius: 999, padding: '2px 8px', fontWeight: 700 }}>{tr("groupClassTab.inviteOnly")}</span>
                     )}
                   </div>
 
@@ -276,7 +276,7 @@ export default function GroupClassTab({ isDarkMode, studentInfo }) {
                     <button
                       onClick={() => handleEnroll(gc)}
                       disabled={enrolling[gc._id] || !canAfford(gc)}
-                      style={btn('linear-gradient(135deg,#f97316,#f43f5e)', '#fff', enrolling[gc._id] || !canAfford(gc))}>
+                      style={btn('linear-gradient(135deg,var(--as-accent, #f97316),#f43f5e)', '#fff', enrolling[gc._id] || !canAfford(gc))}>
                       <LogIn size={13} style={{ display: 'inline', marginRight: 4 }} />
                       {enrolling[gc._id] ? tr("groupClassTab.enrolling") : !canAfford(gc) ? (usesPoints(gc) ? tr("groupClassTab.notEnoughPoints") : tr("groupClassTab.notEnoughCredits")) : tr("groupClassTab.enroll")}
                     </button>

@@ -20,13 +20,13 @@ export default function RecordingsTab({ isDarkMode }) {
   const sessions = useMemo(() => groupRecordingSessions(recordings), [recordings]);
 
   const col = {
-    bg:      isDarkMode ? "#0f1117" : "#fff8f0",
-    card:    isDarkMode ? "#1a1d2e" : "#ffffff",
-    border:  isDarkMode ? "#2a2d40" : "#ffe8cc",
-    text:    isDarkMode ? "#e8eaf6" : "#1a1d2e",
-    muted:   isDarkMode ? "#8b91b8" : "#6b7280",
-    accent:  "#6366f1",
-    inputBg: isDarkMode ? "#1e2235" : "#f3f4f6",
+    bg:      isDarkMode ? "var(--as-bg, #0f1117)" : "var(--as-raised, #fff8f0)",
+    card:    isDarkMode ? "var(--as-raised, #1a1d2e)" : "var(--as-surface, #ffffff)",
+    border:  isDarkMode ? "var(--as-line, #2a2d40)" : "var(--as-line, #ffe8cc)",
+    text:    isDarkMode ? "var(--as-ink, #e8eaf6)" : "var(--as-ink, #1a1d2e)",
+    muted:   isDarkMode ? "var(--as-muted, #8b91b8)" : "var(--as-ink-2, #6b7280)",
+    accent:  "var(--as-accent-ink, #6366f1)",
+    inputBg: isDarkMode ? "var(--as-raised, #1e2235)" : "var(--as-raised, #f3f4f6)",
   };
 
   // Paged by class on the server (10 classes per page)
@@ -132,7 +132,7 @@ export default function RecordingsTab({ isDarkMode }) {
             const active = i === index;
             return (
               <button key={p._id} onClick={() => openVideo(session, i)} disabled={loadingId === session.key}
-                style={{ padding: "7px 12px", borderRadius: "10px", border: `1px solid ${active ? col.accent : col.border}`, background: active ? "rgba(99,102,241,0.12)" : col.card, color: active ? col.accent : col.text, cursor: "pointer", fontSize: "12px", fontWeight: 800, fontFamily: "inherit" }}>
+                style={{ padding: "7px 12px", borderRadius: "10px", border: `1px solid ${active ? col.accent : col.border}`, background: active ? "color-mix(in srgb, var(--as-accent, #6366f1) 12%, transparent)" : col.card, color: active ? col.accent : col.text, cursor: "pointer", fontSize: "12px", fontWeight: 800, fontFamily: "inherit" }}>
                 {partLabel(p, total, i)}
               </button>
             );
@@ -168,7 +168,7 @@ export default function RecordingsTab({ isDarkMode }) {
             {sessions.filter(s => s.key !== session.key).map(s => (
               <button key={s.key} onClick={() => openVideo(s)} disabled={loadingId === s.key}
                 style={{ display: "flex", alignItems: "center", gap: "12px", padding: "10px 14px", background: col.card, border: `1px solid ${col.border}`, borderRadius: "12px", cursor: "pointer", textAlign: "left", width: "100%", opacity: loadingId === s.key ? 0.6 : 1 }}>
-                <div style={{ width: "36px", height: "24px", borderRadius: "6px", background: "linear-gradient(135deg,#6366f1,#8b5cf6)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <div style={{ width: "36px", height: "24px", borderRadius: "6px", background: "linear-gradient(135deg,var(--as-accent, #6366f1),var(--as-accent, #8b5cf6))", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                   {loadingId === s.key ? <Loader2 size={12} color="white" style={{ animation: "spin 1s linear infinite" }} /> : <Play size={10} fill="white" color="white" />}
                 </div>
                 <span style={{ fontSize: "13px", fontWeight: 700, color: col.text, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -211,7 +211,7 @@ export default function RecordingsTab({ isDarkMode }) {
             <div key={session.key} style={{ background: col.card, border: `1px solid ${col.border}`, borderRadius: "16px", padding: "16px 20px", display: "flex", alignItems: "center", gap: "16px" }}>
 
               {/* Thumbnail */}
-              <div style={{ width: "72px", height: "48px", borderRadius: "10px", background: "linear-gradient(135deg,#6366f1,#8b5cf6)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <div style={{ width: "72px", height: "48px", borderRadius: "10px", background: "linear-gradient(135deg,var(--as-accent, #6366f1),var(--as-accent, #8b5cf6))", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                 {isLoading
                   ? <Loader2 size={20} color="white" style={{ animation: "spin 1s linear infinite" }} />
                   : <Video size={22} color="white" />
@@ -233,7 +233,7 @@ export default function RecordingsTab({ isDarkMode }) {
                     </span>
                   )}
                   {total > 1 && (
-                    <span style={{ fontSize: "11px", fontWeight: 800, padding: "2px 8px", borderRadius: "20px", background: "rgba(99,102,241,0.12)", color: col.accent }}>
+                    <span style={{ fontSize: "11px", fontWeight: 800, padding: "2px 8px", borderRadius: "20px", background: "color-mix(in srgb, var(--as-accent, #6366f1) 12%, transparent)", color: col.accent }}>
                       {tr("recordingsTab.parts", { total })}</span>
                   )}
                   {rec.teacherId && (
@@ -246,7 +246,7 @@ export default function RecordingsTab({ isDarkMode }) {
 
               {/* Watch button */}
               <button onClick={() => openVideo(session)} disabled={isLoading}
-                style={{ display: "flex", alignItems: "center", gap: "8px", padding: "10px 18px", borderRadius: "12px", background: isLoading ? col.inputBg : "linear-gradient(135deg,#6366f1,#8b5cf6)", color: isLoading ? col.muted : "#fff", border: "none", cursor: isLoading ? "not-allowed" : "pointer", fontSize: "13px", fontWeight: 800, flexShrink: 0, minWidth: "88px", justifyContent: "center", transition: "opacity 0.2s" }}>
+                style={{ display: "flex", alignItems: "center", gap: "8px", padding: "10px 18px", borderRadius: "12px", background: isLoading ? col.inputBg : "linear-gradient(135deg,var(--as-accent, #6366f1),var(--as-accent, #8b5cf6))", color: isLoading ? col.muted : "#fff", border: "none", cursor: isLoading ? "not-allowed" : "pointer", fontSize: "13px", fontWeight: 800, flexShrink: 0, minWidth: "88px", justifyContent: "center", transition: "opacity 0.2s" }}>
                 {isLoading
                   ? <><Loader2 size={13} style={{ animation: "spin 1s linear infinite" }} /> Loading</>
                   : isExternal(rec) ? <>🔗 Open</> : <><Play size={14} fill="white" /> Watch</>

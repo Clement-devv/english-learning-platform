@@ -62,8 +62,8 @@ function Countdown({ secondsLeft, totalSeconds }) {
 function QuizScreen({ quiz, onComplete, isDarkMode }) {
   const { t: tr } = useTranslation("student");
   const col = isDarkMode
-    ? { bg: "#0f1117", card: "#1a1d2e", border: "#2a2d40", heading: "#f0f4ff", body: "#c8cce0", muted: "#6b7090" }
-    : { bg: "#fff8f0", card: "#ffffff", border: "#e5e7ef", heading: "#2d1f6e", body: "#4a4060", muted: "#9b8ab0" };
+    ? { bg: "var(--as-bg, #0f1117)", card: "var(--as-raised, #1a1d2e)", border: "var(--as-line, #2a2d40)", heading: "var(--as-ink, #f0f4ff)", body: "var(--as-ink-2, #c8cce0)", muted: "var(--as-ink-2, #6b7090)" }
+    : { bg: "var(--as-raised, #fff8f0)", card: "var(--as-surface, #ffffff)", border: "#e5e7ef", heading: "#2d1f6e", body: "#4a4060", muted: "#9b8ab0" };
 
   const totalSeconds = quiz.timeLimit * 60;
 
@@ -146,22 +146,22 @@ function QuizScreen({ quiz, onComplete, isDarkMode }) {
   return (
     <div style={{
       position: "fixed", inset: 0, zIndex: 1000,
-      background: isDarkMode ? "#0f1117" : "#f3f0ff",
+      background: isDarkMode ? "var(--as-bg, #0f1117)" : "#f3f0ff",
       display: "flex", flexDirection: "column",
       fontFamily: "'Nunito', sans-serif",
     }}>
       {/* Top bar */}
       <div style={{
-        background: isDarkMode ? "#1a1d2e" : "#fff",
-        borderBottom: `2px solid ${isDarkMode ? "#2a2d40" : "#e9d5ff"}`,
+        background: isDarkMode ? "var(--as-raised, #1a1d2e)" : "var(--as-surface, #fff)",
+        borderBottom: `2px solid ${isDarkMode ? "var(--as-line, #2a2d40)" : "var(--as-accent-line, #e9d5ff)"}`,
         padding: "12px 24px",
         display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12,
       }}>
         <div>
-          <div style={{ fontWeight: 900, fontSize: 18, color: isDarkMode ? "#f0f4ff" : "#2d1f6e" }}>
+          <div style={{ fontWeight: 900, fontSize: 18, color: isDarkMode ? "var(--as-ink, #f0f4ff)" : "#2d1f6e" }}>
             📝 {quiz.title}
           </div>
-          <div style={{ fontSize: 12, color: isDarkMode ? "#6b7090" : "#9b8ab0", marginTop: 2 }}>{tr("quizTab.questionOfAnswered", { value: current + 1, total, answered })}</div>
+          <div style={{ fontSize: 12, color: isDarkMode ? "var(--as-ink-2, #6b7090)" : "#9b8ab0", marginTop: 2 }}>{tr("quizTab.questionOfAnswered", { value: current + 1, total, answered })}</div>
         </div>
 
         {/* Timer */}
@@ -169,10 +169,10 @@ function QuizScreen({ quiz, onComplete, isDarkMode }) {
       </div>
 
       {/* Progress bar */}
-      <div style={{ height: 5, background: isDarkMode ? "#2a2d40" : "#e9d5ff" }}>
+      <div style={{ height: 5, background: isDarkMode ? "var(--as-raised, #2a2d40)" : "var(--as-accent-line, #e9d5ff)" }}>
         <div style={{
           height: "100%", width: `${((current + 1) / total) * 100}%`,
-          background: "linear-gradient(90deg,#7c3aed,#a855f7)", transition: "width 0.3s",
+          background: "linear-gradient(90deg,var(--as-accent, #7c3aed),var(--as-accent, #a855f7))", transition: "width 0.3s",
         }} />
       </div>
 
@@ -184,11 +184,11 @@ function QuizScreen({ quiz, onComplete, isDarkMode }) {
               width: 32, height: 32, borderRadius: "50%", border: "none", cursor: "pointer",
               flexShrink: 0, fontWeight: 800, fontSize: 12,
               background: i === current
-                ? "linear-gradient(135deg,#7c3aed,#a855f7)"
+                ? "linear-gradient(135deg,var(--as-accent, #7c3aed),var(--as-accent, #a855f7))"
                 : answers[i] !== -1
                   ? (isDarkMode ? "#1e3a2f" : "#dcfce7")
-                  : (isDarkMode ? "#2a2d40" : "#f3f0ff"),
-              color: i === current ? "#fff" : answers[i] !== -1 ? "#166534" : isDarkMode ? "#6b7090" : "#7c3aed",
+                  : (isDarkMode ? "var(--as-raised, #2a2d40)" : "#f3f0ff"),
+              color: i === current ? "#fff" : answers[i] !== -1 ? "#166534" : isDarkMode ? "var(--as-ink-2, #6b7090)" : "var(--as-accent-ink, #7c3aed)",
               boxShadow: i === current ? "0 2px 10px #7c3aed50" : "none",
             }}>
             {answers[i] !== -1 ? "✓" : i + 1}
@@ -200,13 +200,13 @@ function QuizScreen({ quiz, onComplete, isDarkMode }) {
       <div style={{ flex: 1, overflowY: "auto", padding: "16px 24px 24px" }}>
         <div style={{
           maxWidth: 700, margin: "0 auto",
-          background: isDarkMode ? "#1a1d2e" : "#fff",
+          background: isDarkMode ? "var(--as-raised, #1a1d2e)" : "var(--as-surface, #fff)",
           borderRadius: 20, padding: "24px 28px",
-          border: `2px solid ${isDarkMode ? "#2a2d40" : "#e9d5ff"}`,
-          boxShadow: "0 4px 24px rgba(124,58,237,0.1)",
+          border: `2px solid ${isDarkMode ? "var(--as-line, #2a2d40)" : "var(--as-accent-line, #e9d5ff)"}`,
+          boxShadow: "0 4px 24px color-mix(in srgb, var(--as-accent, #7c3aed) 10%, transparent)",
         }}>
           <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, marginBottom: 20 }}>
-            <div style={{ fontWeight: 800, fontSize: 17, color: isDarkMode ? "#f0f4ff" : "#2d1f6e", lineHeight: 1.5, flex: 1 }}>
+            <div style={{ fontWeight: 800, fontSize: 17, color: isDarkMode ? "var(--as-ink, #f0f4ff)" : "#2d1f6e", lineHeight: 1.5, flex: 1 }}>
               {q.question}
             </div>
             <ListenButton text={q.question} style={{ marginTop: 2 }} />
@@ -220,11 +220,11 @@ function QuizScreen({ quiz, onComplete, isDarkMode }) {
                   style={{
                     width: "100%", textAlign: "left", padding: "14px 18px",
                     borderRadius: 14,
-                    border: `2.5px solid ${selected ? "#7c3aed" : isDarkMode ? "#2a2d40" : "#e9d5ff"}`,
+                    border: `2.5px solid ${selected ? "var(--as-accent, #7c3aed)" : isDarkMode ? "var(--as-line, #2a2d40)" : "var(--as-accent-line, #e9d5ff)"}`,
                     background: selected
-                      ? (isDarkMode ? "#2d1f4a" : "#f5f0ff")
-                      : (isDarkMode ? "#1f2235" : "#fafafa"),
-                    color: selected ? (isDarkMode ? "#a78bfa" : "#7c3aed") : (isDarkMode ? "#c8cce0" : "#4a4060"),
+                      ? (isDarkMode ? "#2d1f4a" : "var(--as-accent-soft, #f5f0ff)")
+                      : (isDarkMode ? "var(--as-raised, #1f2235)" : "var(--as-raised, #fafafa)"),
+                    color: selected ? (isDarkMode ? "var(--as-accent-ink, #a78bfa)" : "var(--as-accent-ink, #7c3aed)") : (isDarkMode ? "var(--as-ink-2, #c8cce0)" : "#4a4060"),
                     fontWeight: selected ? 800 : 600, fontSize: 14,
                     cursor: "pointer", transition: "all 0.15s",
                     fontFamily: "'Nunito', sans-serif",
@@ -235,8 +235,8 @@ function QuizScreen({ quiz, onComplete, isDarkMode }) {
                     width: 30, height: 30, borderRadius: "50%", flexShrink: 0,
                     display: "flex", alignItems: "center", justifyContent: "center",
                     fontWeight: 900, fontSize: 13,
-                    background: selected ? "#7c3aed" : (isDarkMode ? "#2a2d40" : "#f3f0ff"),
-                    color: selected ? "#fff" : (isDarkMode ? "#a78bfa" : "#7c3aed"),
+                    background: selected ? "var(--as-accent, #7c3aed)" : (isDarkMode ? "var(--as-raised, #2a2d40)" : "#f3f0ff"),
+                    color: selected ? "#fff" : (isDarkMode ? "var(--as-accent-ink, #a78bfa)" : "var(--as-accent-ink, #7c3aed)"),
                   }}>
                     {String.fromCharCode(65 + oi)}
                   </span>
@@ -250,15 +250,15 @@ function QuizScreen({ quiz, onComplete, isDarkMode }) {
 
       {/* Bottom nav */}
       <div style={{
-        background: isDarkMode ? "#1a1d2e" : "#fff",
-        borderTop: `2px solid ${isDarkMode ? "#2a2d40" : "#e9d5ff"}`,
+        background: isDarkMode ? "var(--as-raised, #1a1d2e)" : "var(--as-surface, #fff)",
+        borderTop: `2px solid ${isDarkMode ? "var(--as-line, #2a2d40)" : "var(--as-accent-line, #e9d5ff)"}`,
         padding: "14px 24px",
         display: "flex", justifyContent: "space-between", alignItems: "center",
       }}>
         <button onClick={() => setCurrent(c => Math.max(c - 1, 0))} disabled={current === 0}
           style={{
-            padding: "10px 20px", borderRadius: 12, border: `2px solid ${isDarkMode ? "#2a2d40" : "#e9d5ff"}`,
-            background: "transparent", color: isDarkMode ? "#6b7090" : "#9b8ab0",
+            padding: "10px 20px", borderRadius: 12, border: `2px solid ${isDarkMode ? "var(--as-line, #2a2d40)" : "var(--as-accent-line, #e9d5ff)"}`,
+            background: "transparent", color: isDarkMode ? "var(--as-ink-2, #6b7090)" : "#9b8ab0",
             fontWeight: 700, fontSize: 14, cursor: current === 0 ? "not-allowed" : "pointer",
             display: "flex", alignItems: "center", gap: 6, opacity: current === 0 ? 0.4 : 1,
             fontFamily: "'Nunito', sans-serif",
@@ -266,14 +266,14 @@ function QuizScreen({ quiz, onComplete, isDarkMode }) {
           <ArrowLeft size={16} /> {tr("quizTab.prev")}
         </button>
 
-        <div style={{ fontSize: 13, fontWeight: 700, color: isDarkMode ? "#6b7090" : "#9b8ab0" }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: isDarkMode ? "var(--as-ink-2, #6b7090)" : "#9b8ab0" }}>
           {tr("quizTab.answered", { answered, total })}</div>
 
         {current < total - 1 ? (
           <button onClick={() => setCurrent(c => Math.min(c + 1, total - 1))}
             style={{
               padding: "10px 20px", borderRadius: 12, border: "none",
-              background: "linear-gradient(135deg,#7c3aed,#a855f7)", color: "#fff",
+              background: "linear-gradient(135deg,var(--as-accent, #7c3aed),var(--as-accent, #a855f7))", color: "#fff",
               fontWeight: 800, fontSize: 14, cursor: "pointer",
               display: "flex", alignItems: "center", gap: 6,
               fontFamily: "'Nunito', sans-serif",
@@ -350,7 +350,7 @@ function ResultScreen({ quiz, attempt, col, onDone }) {
             const correct    = studentAns === q.correctIndex;
             return (
               <div key={i} style={{
-                background: correct ? (col.heading === "#f0f4ff" ? "#1e3a2f" : "#f0fdf4") : (col.heading === "#f0f4ff" ? "#3a1e1e" : "#fef2f2"),
+                background: correct ? (col.heading === "var(--as-raised, #f0f4ff)" ? "#1e3a2f" : "#f0fdf4") : (col.heading === "var(--as-raised, #f0f4ff)" ? "#3a1e1e" : "#fef2f2"),
                 border: `2px solid ${correct ? "#86efac" : "#fca5a5"}`,
                 borderRadius: 14, padding: "14px 16px",
               }}>
@@ -392,7 +392,7 @@ function ResultScreen({ quiz, attempt, col, onDone }) {
       <button onClick={onDone}
         style={{
           padding: "12px", borderRadius: 14, border: "none",
-          background: "linear-gradient(135deg,#7c3aed,#a855f7)", color: "#fff",
+          background: "linear-gradient(135deg,var(--as-accent, #7c3aed),var(--as-accent, #a855f7))", color: "#fff",
           fontWeight: 800, fontSize: 15, cursor: "pointer", fontFamily: "'Nunito', sans-serif",
         }}>
         {tr("quizTab.backToQuizList")}
@@ -405,8 +405,8 @@ function ResultScreen({ quiz, attempt, col, onDone }) {
 function StartQuizModal({ quiz, onConfirm, onCancel, isDarkMode }) {
   const { t: tr } = useTranslation("student");
   const col = isDarkMode
-    ? { bg: "#1a1d2e", border: "#2a2d40", heading: "#f0f4ff", body: "#c8cce0", muted: "#6b7090" }
-    : { bg: "#ffffff", border: "#e9d5ff", heading: "#2d1f6e", body: "#4a4060", muted: "#9b8ab0" };
+    ? { bg: "var(--as-raised, #1a1d2e)", border: "var(--as-line, #2a2d40)", heading: "var(--as-ink, #f0f4ff)", body: "var(--as-ink-2, #c8cce0)", muted: "var(--as-ink-2, #6b7090)" }
+    : { bg: "var(--as-surface, #ffffff)", border: "var(--as-accent-line, #e9d5ff)", heading: "#2d1f6e", body: "#4a4060", muted: "#9b8ab0" };
 
   if (!quiz) return null;
 
@@ -435,7 +435,7 @@ function StartQuizModal({ quiz, onConfirm, onCancel, isDarkMode }) {
 
         {/* Quiz info */}
         <div style={{
-          background: isDarkMode ? "#1f2235" : "#f5f0ff",
+          background: isDarkMode ? "var(--as-raised, #1f2235)" : "var(--as-accent-soft, #f5f0ff)",
           borderRadius: 16, padding: "16px 18px", marginBottom: 20,
           display: "flex", flexDirection: "column", gap: 8,
         }}>
@@ -473,7 +473,7 @@ function StartQuizModal({ quiz, onConfirm, onCancel, isDarkMode }) {
           <button onClick={onConfirm}
             style={{
               flex: 2, padding: "12px", borderRadius: 14, border: "none",
-              background: "linear-gradient(135deg,#7c3aed,#a855f7)", color: "#fff",
+              background: "linear-gradient(135deg,var(--as-accent, #7c3aed),var(--as-accent, #a855f7))", color: "#fff",
               fontWeight: 900, fontSize: 14, cursor: "pointer",
               fontFamily: "'Nunito', sans-serif",
               display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
@@ -490,9 +490,9 @@ function StartQuizModal({ quiz, onConfirm, onCancel, isDarkMode }) {
 export default function StudentQuizTab({ studentInfo, isDarkMode }) {
   const { t: tr } = useTranslation("student");
   const col = isDarkMode
-    ? { bg: "#0f1117", card: "#1a1d2e", border: "#2a2d40", heading: "#f0f4ff", body: "#c8cce0", muted: "#6b7090" }
-    : { bg: "#fff8f0", card: "#ffffff", border: "#ffe8cc", heading: "#3d2e20", body: "#5a4a3a", muted: "#a89480" };
-  const accent = isDarkMode ? "#fb923c" : "#f97316";
+    ? { bg: "var(--as-bg, #0f1117)", card: "var(--as-raised, #1a1d2e)", border: "var(--as-line, #2a2d40)", heading: "var(--as-ink, #f0f4ff)", body: "var(--as-ink-2, #c8cce0)", muted: "var(--as-ink-2, #6b7090)" }
+    : { bg: "var(--as-raised, #fff8f0)", card: "var(--as-surface, #ffffff)", border: "var(--as-line, #ffe8cc)", heading: "var(--as-ink, #3d2e20)", body: "var(--as-ink-2, #5a4a3a)", muted: "var(--as-muted, #a89480)" };
+  const accent = isDarkMode ? "var(--as-accent-ink, #fb923c)" : "var(--as-accent-ink, #f97316)";
 
   const [quizzes,      setQuizzes]      = useState([]);
   const [loading,      setLoading]      = useState(true);
@@ -634,7 +634,7 @@ export default function StudentQuizTab({ studentInfo, isDarkMode }) {
       {!loading && nextQuiz && (() => {
         const bannerOverdue = nextQuiz.dueDate && daysUntil(nextQuiz.dueDate) < 0;
         return (
-          <div style={{ background: "linear-gradient(135deg,#f97316,#f43f5e)", borderRadius: 24, padding: "22px 26px", color: "#fff", display: "flex", alignItems: "center", gap: 20, boxShadow: "0 16px 40px rgba(249,115,22,0.28)", position: "relative", overflow: "hidden" }}>
+          <div style={{ background: "linear-gradient(135deg,var(--as-accent, #f97316),#f43f5e)", borderRadius: 24, padding: "22px 26px", color: "#fff", display: "flex", alignItems: "center", gap: 20, boxShadow: "0 16px 40px rgba(249,115,22,0.28)", position: "relative", overflow: "hidden" }}>
             <div style={{ position: "absolute", right: -20, top: -30, width: 180, height: 180, borderRadius: "50%", background: "rgba(255,255,255,0.12)" }}/>
             <div style={{ width: 60, height: 60, borderRadius: 18, background: "rgba(255,255,255,0.2)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, position: "relative" }}>
               <BookOpen size={28} stroke="#fff" strokeWidth={2.2}/>
@@ -654,7 +654,7 @@ export default function StudentQuizTab({ studentInfo, isDarkMode }) {
               </div>
             ) : (
               <button onClick={() => handleStartQuiz(nextQuiz)}
-                style={{ position: "relative", display: "inline-flex", alignItems: "center", gap: 6, padding: "12px 22px", borderRadius: 999, border: "none", background: "#fff", color: "#c2410c", fontSize: 14, fontWeight: 900, cursor: "pointer", fontFamily: "inherit", boxShadow: "0 8px 20px rgba(0,0,0,0.15)", flexShrink: 0 }}>
+                style={{ position: "relative", display: "inline-flex", alignItems: "center", gap: 6, padding: "12px 22px", borderRadius: 999, border: "none", background: "var(--as-surface, #fff)", color: "#c2410c", fontSize: 14, fontWeight: 900, cursor: "pointer", fontFamily: "inherit", boxShadow: "0 8px 20px rgba(0,0,0,0.15)", flexShrink: 0 }}>
                 {tr("quizTab.startQuiz2")} <ArrowRight size={14} stroke="#c2410c"/>
               </button>
             )}
@@ -665,13 +665,13 @@ export default function StudentQuizTab({ studentInfo, isDarkMode }) {
       {/* Stats strip */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12 }}>
         {[
-          { key: "all",       label: tr("quizTab.total"),        emoji: "📝", color: "#f97316", bg: "#fff7ed" },
+          { key: "all",       label: tr("quizTab.total"),        emoji: "📝", color: "var(--as-accent-ink, #f97316)", bg: "var(--as-accent-soft, #fff7ed)" },
           { key: "assigned",  label: tr("quizTab.readyToTake2"), emoji: "⏳", color: "#a16207", bg: "#fef3c7" },
           { key: "attempted", label: tr("quizTab.completed"),    emoji: "🏆", color: "#059669", bg: "#ecfdf5" },
           { key: "_avg",      label: tr("quizTab.avgScore2"),    emoji: "⭐", color: "#be185d", bg: "#fce7f3" },
         ].map(({ key, label, emoji, color, bg }) => (
           <div key={key} onClick={() => key !== "_avg" && changeFilter(key)}
-            style={{ background: col.card, border: `2px solid ${filter === key ? color : col.border}`, borderRadius: 18, padding: "14px 16px", cursor: key !== "_avg" ? "pointer" : "default", display: "flex", alignItems: "center", gap: 12, transition: "all 0.2s", boxShadow: filter === key ? `0 4px 16px ${color}25` : "none" }}>
+            style={{ background: col.card, border: `2px solid ${filter === key ? color : col.border}`, borderRadius: 18, padding: "14px 16px", cursor: key !== "_avg" ? "pointer" : "default", display: "flex", alignItems: "center", gap: 12, transition: "all 0.2s", boxShadow: filter === key ? `0 4px 16px color-mix(in srgb, ${color} 15%, transparent)` : "none" }}>
             <div style={{ width: 40, height: 40, borderRadius: 12, background: filter === key ? bg : (isDarkMode ? "rgba(255,255,255,0.05)" : "#f9f9f9"), display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>{emoji}</div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 22, fontWeight: 900, color, letterSpacing: "-0.3px", lineHeight: 1.1 }}>
@@ -693,7 +693,7 @@ export default function StudentQuizTab({ studentInfo, isDarkMode }) {
           const isActive = filter === f.k;
           return (
             <button key={f.k} onClick={() => changeFilter(f.k)}
-              style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 10, border: "none", cursor: "pointer", fontFamily: "inherit", fontSize: 12.5, fontWeight: 800, background: isActive ? `linear-gradient(135deg,${accent},#fb923c)` : "transparent", color: isActive ? "#fff" : col.body, boxShadow: isActive ? `0 4px 12px ${accent}55` : "none", transition: "all 0.15s" }}>
+              style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 10, border: "none", cursor: "pointer", fontFamily: "inherit", fontSize: 12.5, fontWeight: 800, background: isActive ? `linear-gradient(135deg,${accent},var(--as-accent, #fb923c))` : "transparent", color: isActive ? "#fff" : col.body, boxShadow: isActive ? `0 4px 12px color-mix(in srgb, ${accent} 33%, transparent)` : "none", transition: "all 0.15s" }}>
               {f.l}
               <span style={{ padding: "1px 7px", borderRadius: 999, fontSize: 10.5, fontWeight: 900, background: isActive ? "rgba(255,255,255,0.28)" : (isDarkMode ? "rgba(255,255,255,0.1)" : "#fff3e6"), color: isActive ? "#fff" : col.muted }}>{counts[f.k]}</span>
             </button>
@@ -725,7 +725,7 @@ export default function StudentQuizTab({ studentInfo, isDarkMode }) {
             return (
               <div key={quiz._id} style={{
                 background: col.card,
-                border: `2.5px solid ${isExpanded ? "#7c3aed" : col.border}`,
+                border: `2.5px solid ${isExpanded ? "var(--as-accent, #7c3aed)" : col.border}`,
                 borderRadius: 18, overflow: "hidden",
                 boxShadow: isExpanded ? "0 4px 20px #7c3aed20" : "none",
               }}>
@@ -736,7 +736,7 @@ export default function StudentQuizTab({ studentInfo, isDarkMode }) {
                       width: 48, height: 48, borderRadius: 14, flexShrink: 0,
                       background: quiz.status === "attempted"
                         ? "linear-gradient(135deg,#10b981,#059669)"
-                        : "linear-gradient(135deg,#f97316,#fb923c)",
+                        : "linear-gradient(135deg,var(--as-accent, #f97316),var(--as-accent, #fb923c))",
                       display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22,
                     }}>
                       {quiz.status === "attempted" ? "🏆" : "📝"}
@@ -775,8 +775,8 @@ export default function StudentQuizTab({ studentInfo, isDarkMode }) {
                           title={tr("quizTab.thisQuizIsPastIts")}
                           style={{
                             padding: "8px 20px", borderRadius: 999, border: "none",
-                            background: isDarkMode ? "#2a2d40" : "#f3f4f6",
-                            color: isDarkMode ? "#6b7090" : "#9ca3af",
+                            background: isDarkMode ? "var(--as-raised, #2a2d40)" : "var(--as-raised, #f3f4f6)",
+                            color: isDarkMode ? "var(--as-ink-2, #6b7090)" : "var(--as-muted, #9ca3af)",
                             fontWeight: 700, fontSize: 13, cursor: "not-allowed",
                             fontFamily: "'Nunito', sans-serif",
                           }}>
@@ -786,7 +786,7 @@ export default function StudentQuizTab({ studentInfo, isDarkMode }) {
                         <button onClick={() => handleStartQuiz(quiz)}
                           style={{
                             padding: "8px 20px", borderRadius: 999, border: "none",
-                            background: "linear-gradient(135deg,#f97316,#f43f5e)", color: "#fff",
+                            background: "linear-gradient(135deg,var(--as-accent, #f97316),#f43f5e)", color: "#fff",
                             fontWeight: 900, fontSize: 13, cursor: "pointer",
                             boxShadow: "0 4px 14px rgba(249,115,22,0.4)", fontFamily: "'Nunito', sans-serif",
                           }}>
@@ -804,9 +804,9 @@ export default function StudentQuizTab({ studentInfo, isDarkMode }) {
 
                 {/* Instructions panel for assigned quizzes */}
                 {quiz.status === "assigned" && quiz.instructions && (
-                  <div style={{ borderTop: `2px solid ${col.border}`, padding: "14px 20px", background: isDarkMode ? "#1f2235" : "#faf5ff" }}>
+                  <div style={{ borderTop: `2px solid ${col.border}`, padding: "14px 20px", background: isDarkMode ? "var(--as-raised, #1f2235)" : "var(--as-accent-soft, #faf5ff)" }}>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-                      <div style={{ fontSize: 11, fontWeight: 800, color: "#7c3aed", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                      <div style={{ fontSize: 11, fontWeight: 800, color: "var(--as-accent-ink, #7c3aed)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
                         {tr("quizTab.instructions")}
                       </div>
                       <ListenButton text={quiz.instructions} />

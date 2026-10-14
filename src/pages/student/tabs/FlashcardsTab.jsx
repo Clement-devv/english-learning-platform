@@ -5,12 +5,12 @@ import StreakToast from "../components/StreakToast";
 import { Layers, CheckCircle2, Clock, Trophy, ChevronLeft, ArrowRight } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-const HEADING = "#3d2e20";
-const MUTED   = "#a89480";
-const ACCENT  = "#f97316";
-const BORDER  = "#ffe8cc";
-const HEROG   = "linear-gradient(135deg,#f97316,#f43f5e)";
-const DECK_COLORS = ["#f97316", "#f43f5e", "#f59e0b", "#fb923c", "#ef4444"];
+const HEADING = "var(--as-ink, #3d2e20)";
+const MUTED   = "var(--as-muted, #a89480)";
+const ACCENT  = "var(--as-accent-ink, #f97316)";
+const BORDER  = "var(--as-line, #ffe8cc)";
+const HEROG   = "linear-gradient(135deg,var(--as-accent, #f97316),#f43f5e)";
+const DECK_COLORS = ["var(--as-accent-ink, #f97316)", "#f43f5e", "#f59e0b", "var(--as-accent-ink, #fb923c)", "#ef4444"];
 
 function ProgressRing({ pct, color, size = 80 }) {
   const r    = size / 2 - 7;
@@ -86,7 +86,7 @@ export default function FlashcardsTab({ isDarkMode }) {
       </p>
       <div style={{ marginTop: 24, display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "center" }}>
         <button onClick={() => setMode("home")} style={{ padding: "12px 22px", borderRadius: 999, background: HEROG, color: "#fff", border: "none", cursor: "pointer", fontSize: 14, fontWeight: 900, boxShadow: "0 8px 18px rgba(249,115,22,0.35)", fontFamily: "inherit" }}>{tr("flashcardsTab.backToDecks")}</button>
-        <button onClick={startReview}            style={{ padding: "12px 22px", borderRadius: 999, background: "#fff", color: "#5a4a3a", border: `2px solid ${BORDER}`, cursor: "pointer", fontSize: 14, fontWeight: 900, fontFamily: "inherit" }}>{tr("flashcardsTab.reviewAgain")}</button>
+        <button onClick={startReview}            style={{ padding: "12px 22px", borderRadius: 999, background: "var(--as-surface, #fff)", color: "var(--as-ink-2, #5a4a3a)", border: `2px solid ${BORDER}`, cursor: "pointer", fontSize: 14, fontWeight: 900, fontFamily: "inherit" }}>{tr("flashcardsTab.reviewAgain")}</button>
       </div>
     </div>
   );
@@ -106,8 +106,8 @@ export default function FlashcardsTab({ isDarkMode }) {
 
         {/* Progress header */}
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
-          <button onClick={() => setMode("home")} style={{ width: 38, height: 38, borderRadius: "50%", border: `2px solid ${BORDER}`, background: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-            <ChevronLeft size={16} stroke="#5a4a3a"/>
+          <button onClick={() => setMode("home")} style={{ width: 38, height: 38, borderRadius: "50%", border: `2px solid ${BORDER}`, background: "var(--as-surface, #fff)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <ChevronLeft size={16} stroke="var(--as-ink-2, #5a4a3a)"/>
           </button>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
@@ -131,12 +131,12 @@ export default function FlashcardsTab({ isDarkMode }) {
               <p style={{ margin: "28px 0 0", fontSize: 12.5, color: "rgba(255,255,255,0.75)", fontWeight: 700, position: "relative" }}>{tr("flashcardsTab.tapToFlip")}</p>
             </div>
           ) : (
-            <div className="sfc-face" style={{ borderRadius: 28, background: "#fff", border: `2px solid ${BORDER}`, padding: "40px 32px", textAlign: "center", boxShadow: "0 20px 40px rgba(61,46,32,0.08)", minHeight: 280, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16 }}>
+            <div className="sfc-face" style={{ borderRadius: 28, background: "var(--as-surface, #fff)", border: `2px solid ${BORDER}`, padding: "40px 32px", textAlign: "center", boxShadow: "0 20px 40px rgba(61,46,32,0.08)", minHeight: 280, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16 }}>
               <p style={{ margin: 0, fontSize: 12, fontWeight: 800, color: ACCENT, textTransform: "uppercase", letterSpacing: "0.12em" }}>{tr("flashcardsTab.definition")}</p>
               <p style={{ margin: 0, fontSize: 20, fontWeight: 800, color: HEADING, lineHeight: 1.4, maxWidth: 420 }}>{card?.definition}</p>
               {card?.example && (
-                <div style={{ padding: "12px 18px", background: "#fff8f0", borderLeft: "3px solid #f97316", borderRadius: "8px 14px 14px 8px", maxWidth: 420 }}>
-                  <p style={{ margin: 0, fontSize: 13, color: "#5a4a3a", fontStyle: "italic", fontWeight: 600, lineHeight: 1.5 }}>"{card.example}"</p>
+                <div style={{ padding: "12px 18px", background: "var(--as-raised, #fff8f0)", borderLeft: "3px solid var(--as-accent, #f97316)", borderRadius: "8px 14px 14px 8px", maxWidth: 420 }}>
+                  <p style={{ margin: 0, fontSize: 13, color: "var(--as-ink-2, #5a4a3a)", fontStyle: "italic", fontWeight: 600, lineHeight: 1.5 }}>"{card.example}"</p>
                 </div>
               )}
             </div>
@@ -149,12 +149,12 @@ export default function FlashcardsTab({ isDarkMode }) {
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8 }}>
               {[
                 { q: 0, l: "Forgot", sub: tr("flashcardsTab.t1Day"),  bg: "#ef4444" },
-                { q: 1, l: "Hard",   sub: "1–2 days", bg: "#f97316" },
+                { q: 1, l: "Hard",   sub: "1–2 days", bg: "var(--as-accent, #f97316)" },
                 { q: 2, l: "Good",   sub: "4 days",   bg: "#3b82f6" },
                 { q: 3, l: "Easy",   sub: "1 week+",  bg: "#059669" },
               ].map(btn => (
                 <button key={btn.q} onClick={() => submitRating(btn.q)}
-                  style={{ padding: "12px 6px", borderRadius: 14, background: btn.bg, color: "#fff", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 900, boxShadow: `0 6px 14px ${btn.bg}55`, fontFamily: "inherit", lineHeight: 1.2, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+                  style={{ padding: "12px 6px", borderRadius: 14, background: btn.bg, color: "#fff", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 900, boxShadow: `0 6px 14px color-mix(in srgb, ${btn.bg} 33%, transparent)`, fontFamily: "inherit", lineHeight: 1.2, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
                   {btn.l}
                   <span style={{ fontSize: 10, fontWeight: 700, opacity: 0.85 }}>{btn.sub}</span>
                 </button>
@@ -190,7 +190,7 @@ export default function FlashcardsTab({ isDarkMode }) {
           <div style={{ position: "relative", width: 80, height: 100, flexShrink: 0 }}>
             <div style={{ position: "absolute", inset: 0, borderRadius: 12, background: "rgba(255,255,255,0.2)", transform: "rotate(-8deg) translateX(-6px)" }}/>
             <div style={{ position: "absolute", inset: 0, borderRadius: 12, background: "rgba(255,255,255,0.35)", transform: "rotate(4deg) translateX(4px)" }}/>
-            <div style={{ position: "absolute", inset: 0, borderRadius: 12, background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 8px 20px rgba(0,0,0,0.15)" }}>
+            <div style={{ position: "absolute", inset: 0, borderRadius: 12, background: "var(--as-surface, #fff)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 8px 20px rgba(0,0,0,0.15)" }}>
               <span style={{ fontSize: 28, fontWeight: 900, color: ACCENT, letterSpacing: "-1px" }}>{tr("flashcardsTab.aa")}</span>
             </div>
           </div>
@@ -204,7 +204,7 @@ export default function FlashcardsTab({ isDarkMode }) {
             </div>
           </div>
           {totalDue > 0 && (
-            <button onClick={startReview} style={{ position: "relative", display: "inline-flex", alignItems: "center", gap: 6, padding: "14px 24px", borderRadius: 999, border: "none", background: "#fff", color: "#c2410c", fontSize: 15, fontWeight: 900, cursor: "pointer", fontFamily: "inherit", boxShadow: "0 10px 24px rgba(0,0,0,0.15)", flexShrink: 0 }}>
+            <button onClick={startReview} style={{ position: "relative", display: "inline-flex", alignItems: "center", gap: 6, padding: "14px 24px", borderRadius: 999, border: "none", background: "var(--as-surface, #fff)", color: "#c2410c", fontSize: 15, fontWeight: 900, cursor: "pointer", fontFamily: "inherit", boxShadow: "0 10px 24px rgba(0,0,0,0.15)", flexShrink: 0 }}>
               {tr("flashcardsTab.startReview")} <ArrowRight size={14} stroke="#c2410c"/>
             </button>
           )}
@@ -219,7 +219,7 @@ export default function FlashcardsTab({ isDarkMode }) {
           { icon: <Clock size={20} stroke="#a16207" strokeWidth={2.2}/>,        n: loading ? "—" : totalDue,      l: "Due today",    bg: "#fef3c7", fg: "#a16207" },
           { icon: <Trophy size={20} stroke="#be185d" strokeWidth={2.2}/>,       n: loading ? "—" : stats.length,  l: "Word decks",   bg: "#fce7f3", fg: "#be185d" },
         ].map((s, i) => (
-          <div key={i} style={{ background: "#fff", borderRadius: 18, padding: "14px 16px", border: `2px solid ${BORDER}`, display: "flex", alignItems: "center", gap: 12 }}>
+          <div key={i} style={{ background: "var(--as-surface, #fff)", borderRadius: 18, padding: "14px 16px", border: `2px solid ${BORDER}`, display: "flex", alignItems: "center", gap: 12 }}>
             <div style={{ width: 40, height: 40, borderRadius: 12, background: s.bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{s.icon}</div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 22, fontWeight: 900, color: HEADING, letterSpacing: "-0.3px", lineHeight: 1.1 }}>{s.n}</div>
@@ -231,7 +231,7 @@ export default function FlashcardsTab({ isDarkMode }) {
 
       {/* Overall mastery callout */}
       {!loading && stats.length > 0 && (
-        <div style={{ background: "#fff", borderRadius: 20, border: `2px solid ${BORDER}`, padding: 20, display: "flex", alignItems: "center", gap: 20 }}>
+        <div style={{ background: "var(--as-surface, #fff)", borderRadius: 20, border: `2px solid ${BORDER}`, padding: 20, display: "flex", alignItems: "center", gap: 20 }}>
           <ProgressRing pct={overallPct} color={ACCENT} size={80}/>
           <div style={{ flex: 1, minWidth: 0 }}>
             <h3 style={{ margin: 0, fontSize: 16, fontWeight: 900, color: HEADING, letterSpacing: "-0.3px" }}>{tr("flashcardsTab.overallVocabularyMastery")}</h3>
@@ -242,7 +242,7 @@ export default function FlashcardsTab({ isDarkMode }) {
                 { l: "Learning", v: Math.max(0, totalWords - totalMastered - totalNew),                  c: "#f59e0b" },
                 { l: "New",      v: totalNew,                                                            c: "#3b82f6" },
               ].map(x => (
-                <div key={x.l} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 700, color: "#5a4a3a" }}>
+                <div key={x.l} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 700, color: "var(--as-ink-2, #5a4a3a)" }}>
                   <span style={{ width: 10, height: 10, borderRadius: "50%", background: x.c }}/>
                   {x.l}: <b style={{ color: x.c }}>{x.v}</b>
                 </div>
@@ -263,9 +263,9 @@ export default function FlashcardsTab({ isDarkMode }) {
               const pct   = d.total ? Math.round((d.mastered / d.total) * 100) : 0;
               const color = DECK_COLORS[i % DECK_COLORS.length];
               return (
-                <div key={d.listId} style={{ background: "#fff", borderRadius: 20, border: `2px solid ${BORDER}`, padding: 18, display: "flex", flexDirection: "column", gap: 14 }}>
+                <div key={d.listId} style={{ background: "var(--as-surface, #fff)", borderRadius: 20, border: `2px solid ${BORDER}`, padding: 18, display: "flex", flexDirection: "column", gap: 14 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    <div style={{ width: 46, height: 46, borderRadius: 13, background: `${color}18`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <div style={{ width: 46, height: 46, borderRadius: 13, background: `color-mix(in srgb, ${color} 9%, transparent)`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                       <Layers size={22} stroke={color} strokeWidth={2.2}/>
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
@@ -282,7 +282,7 @@ export default function FlashcardsTab({ isDarkMode }) {
                       { l: "Mastered", v: d.mastered,        c: "#059669" },
                       { l: "New",      v: d.newCards || 0,   c: "#f59e0b" },
                     ].map(s => (
-                      <div key={s.l} style={{ background: "#fffbf5", borderRadius: 10, padding: "8px 4px", textAlign: "center" }}>
+                      <div key={s.l} style={{ background: "var(--as-raised, #fffbf5)", borderRadius: 10, padding: "8px 4px", textAlign: "center" }}>
                         <div style={{ fontSize: 16, fontWeight: 900, color: s.c }}>{s.v}</div>
                         <div style={{ fontSize: 9.5, fontWeight: 800, color: MUTED, textTransform: "uppercase", letterSpacing: "0.05em" }}>{s.l}</div>
                       </div>
@@ -295,7 +295,7 @@ export default function FlashcardsTab({ isDarkMode }) {
                       <span style={{ fontSize: 12, fontWeight: 900, color }}>{pct}%</span>
                     </div>
                     <div style={{ height: 7, borderRadius: 999, background: BORDER, overflow: "hidden" }}>
-                      <div style={{ width: `${pct}%`, height: "100%", borderRadius: 999, background: `linear-gradient(90deg,${color},#fb923c)` }}/>
+                      <div style={{ width: `${pct}%`, height: "100%", borderRadius: 999, background: `linear-gradient(90deg,${color},var(--as-accent, #fb923c))` }}/>
                     </div>
                   </div>
 
@@ -311,7 +311,7 @@ export default function FlashcardsTab({ isDarkMode }) {
       )}
 
       {!loading && stats.length === 0 && (
-        <div style={{ background: "#fff", borderRadius: 20, border: `2px dashed ${BORDER}`, padding: 48, textAlign: "center" }}>
+        <div style={{ background: "var(--as-surface, #fff)", borderRadius: 20, border: `2px dashed ${BORDER}`, padding: 48, textAlign: "center" }}>
           <div style={{ width: 60, height: 60, margin: "0 auto 14px", borderRadius: 20, background: "#fff3e6", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <Layers size={28} stroke="#c2410c"/>
           </div>

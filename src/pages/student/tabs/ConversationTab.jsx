@@ -41,7 +41,7 @@ function Message({ msg, isDarkMode, onSpeak, isSpeaking }) {
       {!isUser && (
         <div style={{
           width: 34, height: 34, borderRadius: "50%", flexShrink: 0,
-          background: isSpeaking ? "linear-gradient(135deg,#10b981,#059669)" : "linear-gradient(135deg,#7c3aed,#a855f7)",
+          background: isSpeaking ? "linear-gradient(135deg,#10b981,#059669)" : "linear-gradient(135deg,var(--as-accent, #7c3aed),var(--as-accent, #a855f7))",
           display: "flex", alignItems: "center", justifyContent: "center",
           fontSize: 18, marginRight: 10, alignSelf: "flex-end",
           transition: "background 0.3s",
@@ -55,9 +55,9 @@ function Message({ msg, isDarkMode, onSpeak, isSpeaking }) {
           padding: "12px 16px",
           borderRadius: isUser ? "20px 20px 4px 20px" : "20px 20px 20px 4px",
           background: isUser
-            ? "linear-gradient(135deg,#7c3aed,#a855f7)"
-            : isDarkMode ? "#1f2235" : "#f3f0ff",
-          color: isUser ? "#fff" : isDarkMode ? "#e2e8f0" : "#2d1f6e",
+            ? "linear-gradient(135deg,var(--as-accent, #7c3aed),var(--as-accent, #a855f7))"
+            : isDarkMode ? "var(--as-raised, #1f2235)" : "#f3f0ff",
+          color: isUser ? "#fff" : isDarkMode ? "var(--as-ink, #e2e8f0)" : "#2d1f6e",
           fontSize: 14, lineHeight: 1.6, fontWeight: 500,
           boxShadow: isUser ? "0 2px 12px #7c3aed30" : "none",
           whiteSpace: "pre-wrap", wordBreak: "break-word",
@@ -73,7 +73,7 @@ function Message({ msg, isDarkMode, onSpeak, isSpeaking }) {
               position: "absolute", bottom: -8, right: 8,
               width: 26, height: 26, borderRadius: "50%", border: "none",
               background: isSpeaking ? "#10b981" : "#7c3aed20",
-              color: isSpeaking ? "#fff" : "#7c3aed",
+              color: isSpeaking ? "#fff" : "var(--as-accent-ink, #7c3aed)",
               cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
               fontSize: 11, transition: "all 0.15s",
             }}>
@@ -84,7 +84,7 @@ function Message({ msg, isDarkMode, onSpeak, isSpeaking }) {
       {isUser && (
         <div style={{
           width: 34, height: 34, borderRadius: "50%", flexShrink: 0,
-          background: "linear-gradient(135deg,#f97316,#ec4899)",
+          background: "linear-gradient(135deg,var(--as-accent, #f97316),#ec4899)",
           display: "flex", alignItems: "center", justifyContent: "center",
           fontSize: 18, marginLeft: 10, alignSelf: "flex-end",
         }}>🧑‍🎓</div>
@@ -96,10 +96,10 @@ function Message({ msg, isDarkMode, onSpeak, isSpeaking }) {
 function TypingIndicator({ isDarkMode }) {
   return (
     <div style={{ display: "flex", alignItems: "flex-end", gap: 10, marginBottom: 12 }}>
-      <div style={{ width: 34, height: 34, borderRadius: "50%", background: "linear-gradient(135deg,#7c3aed,#a855f7)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>🤖</div>
-      <div style={{ padding: "12px 18px", borderRadius: "20px 20px 20px 4px", background: isDarkMode ? "#1f2235" : "#f3f0ff", display: "flex", gap: 6, alignItems: "center" }}>
+      <div style={{ width: 34, height: 34, borderRadius: "50%", background: "linear-gradient(135deg,var(--as-accent, #7c3aed),var(--as-accent, #a855f7))", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>🤖</div>
+      <div style={{ padding: "12px 18px", borderRadius: "20px 20px 20px 4px", background: isDarkMode ? "var(--as-raised, #1f2235)" : "#f3f0ff", display: "flex", gap: 6, alignItems: "center" }}>
         {[0, 1, 2].map(i => (
-          <div key={i} style={{ width: 8, height: 8, borderRadius: "50%", background: "#7c3aed", animation: "bounce 1.2s ease-in-out infinite", animationDelay: `${i * 0.2}s` }} />
+          <div key={i} style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--as-accent, #7c3aed)", animation: "bounce 1.2s ease-in-out infinite", animationDelay: `${i * 0.2}s` }} />
         ))}
       </div>
     </div>
@@ -109,8 +109,8 @@ function TypingIndicator({ isDarkMode }) {
 export default function ConversationTab({ studentInfo, isDarkMode }) {
   const { t: tr } = useTranslation("student");
   const col = isDarkMode
-    ? { bg: "#0f1117", card: "#1a1d2e", border: "#2a2d40", heading: "#f0f4ff", body: "#c8cce0", muted: "#6b7090", input: "#0f1117" }
-    : { bg: "#fff8f0", card: "#ffffff", border: "#ffe8cc", heading: "#2d1f6e", body: "#4a4060", muted: "#9b8ab0", input: "#fff" };
+    ? { bg: "var(--as-bg, #0f1117)", card: "var(--as-raised, #1a1d2e)", border: "var(--as-line, #2a2d40)", heading: "var(--as-ink, #f0f4ff)", body: "var(--as-ink-2, #c8cce0)", muted: "var(--as-ink-2, #6b7090)", input: "var(--as-bg, #0f1117)" }
+    : { bg: "var(--as-raised, #fff8f0)", card: "var(--as-surface, #ffffff)", border: "var(--as-line, #ffe8cc)", heading: "#2d1f6e", body: "#4a4060", muted: "#9b8ab0", input: "var(--as-surface, #fff)" };
 
   const [messages,   setMessages]   = useState([]);
   const [credits,    setCredits]    = useState(null);
@@ -338,8 +338,8 @@ export default function ConversationTab({ studentInfo, isDarkMode }) {
         <p style={{ margin: 0, fontSize: 14, color: col.muted, maxWidth: 360, lineHeight: 1.7 }}>
           {tr("conversationTab.youVeUsedAllYour")}
         </p>
-        <div style={{ background: isDarkMode ? "#1f2235" : "#f5f3ff", border: `2px solid #7c3aed40`, borderRadius: 16, padding: "16px 24px", fontSize: 13, color: col.body, lineHeight: 1.8, maxWidth: 340 }}>
-          <strong style={{ color: "#7c3aed" }}>{tr("conversationTab.howCreditsWork")}</strong><br />
+        <div style={{ background: isDarkMode ? "var(--as-raised, #1f2235)" : "var(--as-accent-soft, #f5f3ff)", border: `2px solid #7c3aed40`, borderRadius: 16, padding: "16px 24px", fontSize: 13, color: col.body, lineHeight: 1.8, maxWidth: 340 }}>
+          <strong style={{ color: "var(--as-accent-ink, #7c3aed)" }}>{tr("conversationTab.howCreditsWork")}</strong><br />
           {tr("conversationTab.eachMessage1Credit")}<br />
           {tr("conversationTab.yourTeacherGrantsCreditsWhen")}<br />
           {tr("conversationTab.creditsNeverExpire")}
@@ -362,7 +362,7 @@ export default function ConversationTab({ studentInfo, isDarkMode }) {
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <div style={{
             width: 44, height: 44, borderRadius: "50%",
-            background: speakingId ? "linear-gradient(135deg,#10b981,#059669)" : "linear-gradient(135deg,#7c3aed,#a855f7)",
+            background: speakingId ? "linear-gradient(135deg,#10b981,#059669)" : "linear-gradient(135deg,var(--as-accent, #7c3aed),var(--as-accent, #a855f7))",
             display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22,
             boxShadow: speakingId ? "0 0 16px #10b98150" : "none",
             transition: "all 0.3s",
@@ -400,9 +400,9 @@ export default function ConversationTab({ studentInfo, isDarkMode }) {
               title={autoSpeak ? tr("conversationTab.autoReadOnClickTo") : tr("conversationTab.autoReadOffClickTo")}
               style={{
                 display: "flex", alignItems: "center", gap: 5, padding: "6px 12px",
-                borderRadius: 10, border: `2px solid ${autoSpeak ? "#7c3aed" : col.border}`,
-                background: autoSpeak ? "#f5f3ff" : col.card,
-                color: autoSpeak ? "#7c3aed" : col.muted,
+                borderRadius: 10, border: `2px solid ${autoSpeak ? "var(--as-accent, #7c3aed)" : col.border}`,
+                background: autoSpeak ? "var(--as-accent-soft, #f5f3ff)" : col.card,
+                color: autoSpeak ? "var(--as-accent-ink, #7c3aed)" : col.muted,
                 fontSize: 12, fontWeight: 700, cursor: "pointer",
               }}>
               {autoSpeak ? <Volume2 size={13} /> : <VolumeX size={13} />}
@@ -427,7 +427,7 @@ export default function ConversationTab({ studentInfo, isDarkMode }) {
           height: 240, flexShrink: 0, borderRadius: 16, overflow: "hidden",
           margin: "12px 0 0",
           background: isDarkMode
-            ? "linear-gradient(180deg,#0f1117 0%,#1a1d2e 100%)"
+            ? "linear-gradient(180deg,var(--as-bg, #0f1117) 0%,var(--as-raised, #1a1d2e) 100%)"
             : "linear-gradient(180deg,#ecfdf5 0%,#d1fae5 100%)",
           border: `2px solid ${isDarkMode ? "#134e4a" : "#6ee7b7"}`,
           position: "relative",
@@ -450,9 +450,9 @@ export default function ConversationTab({ studentInfo, isDarkMode }) {
           height: 240, flexShrink: 0, borderRadius: 16, overflow: "hidden",
           margin: "12px 0 0",
           background: isDarkMode
-            ? "linear-gradient(180deg,#1a1d2e 0%,#0f1117 100%)"
-            : "linear-gradient(180deg,#f0ecff 0%,#e9d5ff 100%)",
-          border: `2px solid ${isDarkMode ? "#2a2d40" : "#ddd6fe"}`,
+            ? "linear-gradient(180deg,var(--as-raised, #1a1d2e) 0%,var(--as-bg, #0f1117) 100%)"
+            : "linear-gradient(180deg,#f0ecff 0%,var(--as-accent-line, #e9d5ff) 100%)",
+          border: `2px solid ${isDarkMode ? "var(--as-line, #2a2d40)" : "var(--as-accent-line, #ddd6fe)"}`,
           position: "relative",
         }}>
           {/* Speaking glow ring */}
@@ -465,7 +465,7 @@ export default function ConversationTab({ studentInfo, isDarkMode }) {
             }} />
           )}
           <Suspense fallback={
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "#7c3aed", fontWeight: 700, fontSize: 13 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "var(--as-accent-ink, #7c3aed)", fontWeight: 700, fontSize: 13 }}>
               {tr("conversationTab.loading3dAvatar")}
             </div>
           }>
@@ -478,7 +478,7 @@ export default function ConversationTab({ studentInfo, isDarkMode }) {
             backdropFilter: "blur(8px)",
             padding: "4px 14px", borderRadius: 20,
             fontSize: 11, fontWeight: 700,
-            color: speakingId ? "#059669" : isDarkMode ? "#a78bfa" : "#7c3aed",
+            color: speakingId ? "#059669" : isDarkMode ? "var(--as-accent-ink, #a78bfa)" : "var(--as-accent-ink, #7c3aed)",
             zIndex: 3,
           }}>
             {listening ? tr("conversationTab.listening") : speakingId ? tr("conversationTab.speaking") : tr("conversationTab.aiCoachReady")}
@@ -503,7 +503,7 @@ export default function ConversationTab({ studentInfo, isDarkMode }) {
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "center", marginTop: 20 }}>
               {["👋 Hello! How are you?", "Tell me about yourself", "What should I talk about?", "Let's practise past tense"].map(s => (
                 <button key={s} onClick={() => { setText(s); inputRef.current?.focus(); }}
-                  style={{ padding: "8px 14px", borderRadius: 20, border: `2px solid #7c3aed40`, background: isDarkMode ? "#1f2235" : "#f5f3ff", color: "#7c3aed", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "'Nunito', sans-serif" }}>{s}</button>
+                  style={{ padding: "8px 14px", borderRadius: 20, border: `2px solid #7c3aed40`, background: isDarkMode ? "var(--as-raised, #1f2235)" : "var(--as-accent-soft, #f5f3ff)", color: "var(--as-accent-ink, #7c3aed)", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "'Nunito', sans-serif" }}>{s}</button>
               ))}
             </div>
           </div>
@@ -546,8 +546,8 @@ export default function ConversationTab({ studentInfo, isDarkMode }) {
               width: 48, height: 48, borderRadius: 14, border: "none", flexShrink: 0,
               background: listening
                 ? "linear-gradient(135deg,#ef4444,#dc2626)"
-                : (isDarkMode ? "#2a2d40" : "#f5f3ff"),
-              color: listening ? "#fff" : "#7c3aed",
+                : (isDarkMode ? "var(--as-raised, #2a2d40)" : "var(--as-accent-soft, #f5f3ff)"),
+              color: listening ? "#fff" : "var(--as-accent-ink, #7c3aed)",
               cursor: sending || credits === 0 ? "not-allowed" : "pointer",
               display: "flex", alignItems: "center", justifyContent: "center",
               boxShadow: listening ? "0 0 16px #ef444460" : "none",
@@ -575,7 +575,7 @@ export default function ConversationTab({ studentInfo, isDarkMode }) {
           rows={1}
           style={{
             flex: 1, padding: "12px 16px", borderRadius: 16,
-            border: `2px solid ${listening ? "#ef4444" : isDarkMode ? "#2a2d40" : "#ddd6fe"}`,
+            border: `2px solid ${listening ? "#ef4444" : isDarkMode ? "var(--as-line, #2a2d40)" : "var(--as-accent-line, #ddd6fe)"}`,
             background: col.input, color: col.heading, fontSize: 14,
             fontFamily: "'Nunito', sans-serif", lineHeight: 1.5,
             resize: "none", boxSizing: "border-box",
@@ -595,8 +595,8 @@ export default function ConversationTab({ studentInfo, isDarkMode }) {
           style={{
             width: 48, height: 48, borderRadius: 14, border: "none", flexShrink: 0,
             background: sending || !text.trim() || credits === 0 || listening
-              ? (isDarkMode ? "#2a2d40" : "#e9d5ff")
-              : "linear-gradient(135deg,#7c3aed,#a855f7)",
+              ? (isDarkMode ? "var(--as-raised, #2a2d40)" : "var(--as-accent-line, #e9d5ff)")
+              : "linear-gradient(135deg,var(--as-accent, #7c3aed),var(--as-accent, #a855f7))",
             color: sending || !text.trim() || credits === 0 || listening ? col.muted : "#fff",
             cursor: sending || !text.trim() || credits === 0 || listening ? "not-allowed" : "pointer",
             display: "flex", alignItems: "center", justifyContent: "center",

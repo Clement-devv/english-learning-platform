@@ -219,6 +219,8 @@ body {
 .as-root .bg-gray-800 { background-color: #292524; }
 .as-root .bg-gray-800\/80 { background-color: rgb(41 37 36 / 80%); }
 .as-root .bg-gray-900 { background-color: #1c1917; }
+.as-root .bg-indigo-50 { background-color: var(--a-accent-soft); }
+.as-root .bg-indigo-600 { background-color: var(--a-accent); }
 .as-root .bg-purple-100 { background-color: var(--a-accent-soft); }
 .as-root .bg-purple-50 { background-color: var(--a-accent-soft); }
 .as-root .bg-purple-600 { background-color: var(--a-accent); }
@@ -231,10 +233,21 @@ body {
 .as-root .border-gray-300 { border-color: #d6d3d1; }
 .as-root .border-gray-600 { border-color: #57534e; }
 .as-root .border-gray-700 { border-color: #44403c; }
+.as-root .border-indigo-300 { border-color: var(--a-accent-line); }
 .as-root .border-purple-200 { border-color: var(--a-accent-line); }
 .as-root .border-purple-500 { border-color: var(--a-accent); }
 .as-root .border-purple-700\/50 { border-color: color-mix(in srgb, var(--a-accent) 50%, transparent); }
+.as-root[data-theme="dark"] .dark\:bg-gray-700 { background-color: #44403c; }
 .as-root[data-theme="dark"] .dark\:bg-gray-800 { background-color: #292524; }
+.as-root[data-theme="dark"] .dark\:bg-indigo-500 { background-color: var(--a-accent); }
+.as-root[data-theme="dark"] .dark\:border-gray-700 { border-color: #44403c; }
+.as-root[data-theme="dark"] .dark\:hover\:bg-indigo-600:hover { background-color: var(--a-accent-hover); }
+.as-root[data-theme="dark"] .dark\:text-gray-100 { color: #f5f5f4; }
+.as-root[data-theme="dark"] .dark\:text-gray-200 { color: #e7e5e4; }
+.as-root[data-theme="dark"] .dark\:text-gray-300 { color: #d6d3d1; }
+.as-root[data-theme="dark"] .dark\:text-gray-400 { color: #a8a29e; }
+.as-root[data-theme="dark"] .dark\:text-gray-500 { color: #78716c; }
+.as-root[data-theme="dark"] .dark\:text-indigo-400 { color: var(--a-accent-ink); }
 .as-root .disabled\:bg-gray-400:disabled { background-color: #a8a29e; }
 .as-root .divide-gray-100 > :not([hidden]) ~ :not([hidden]) { border-color: #f5f5f4; }
 .as-root .divide-gray-700 > :not([hidden]) ~ :not([hidden]) { border-color: #44403c; }
@@ -253,6 +266,7 @@ body {
 .as-root .hover\:bg-gray-700:hover { background-color: #44403c; }
 .as-root .hover\:bg-gray-700\/50:hover { background-color: rgb(68 64 60 / 50%); }
 .as-root .hover\:bg-gray-750:hover { background-color: #78716c; }
+.as-root .hover\:bg-indigo-700:hover { background-color: var(--a-accent-hover); }
 .as-root .hover\:bg-purple-700:hover { background-color: var(--a-accent-hover); }
 .as-root .hover\:text-gray-200:hover { color: #e7e5e4; }
 .as-root .hover\:text-gray-600:hover { color: #57534e; }
@@ -270,13 +284,22 @@ body {
 .as-root .text-gray-700 { color: #44403c; }
 .as-root .text-gray-800 { color: #292524; }
 .as-root .text-gray-900 { color: #1c1917; }
+.as-root .text-indigo-500 { color: var(--a-accent-ink); }
 .as-root .text-purple-300 { color: var(--a-accent-ink); }
 .as-root .text-purple-400 { color: var(--a-accent-ink); }
 .as-root .text-purple-500 { color: var(--a-accent-ink); }
 .as-root .text-purple-600 { color: var(--a-accent-ink); }
 .as-root .text-purple-700 { color: var(--a-accent-ink); }
 .as-root .to-indigo-600 { --tw-gradient-to: var(--a-accent) var(--tw-gradient-to-position); }
+.as-root .to-purple-500 { --tw-gradient-to: var(--a-accent) var(--tw-gradient-to-position); }
 /* ── END generated ── */
+
+/* Student stickers (components/dashboard/DoodleArt.jsx, student Sunshine): each
+   sticker pops in once with a small overshoot and sits on a soft shadow. With reduced
+   motion the global rule below removes the animation and the sticker is just shown. */
+.as-sticker { filter: drop-shadow(0 3px 4px rgba(90, 45, 15, 0.16)); animation: as-sticker-in 520ms cubic-bezier(0.34, 1.56, 0.64, 1) both; transform-origin: center; }
+.as-root[data-theme="dark"] .as-sticker { filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.45)); }
+@keyframes as-sticker-in { from { opacity: 0; transform: scale(0.6) translateY(6px); } }
 
 /* Entrance motion — toasts slide down from where they sit, dialogs scale up
    slightly from centre. Short ease-out so feedback feels immediate. */

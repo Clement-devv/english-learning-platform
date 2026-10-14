@@ -20,12 +20,12 @@ const DURATIONS = [30, 45, 60, 90];
 export default function BookingCalendarTab({ isDarkMode }) {
   const { t: tr } = useTranslation("student");
   const col = {
-    card:    isDarkMode ? '#1a1d2e' : '#ffffff',
-    border:  isDarkMode ? '#2a2d40' : '#ffe8cc',
-    heading: isDarkMode ? '#f0f4ff' : '#3d2e20',
-    body:    isDarkMode ? '#c8cce0' : '#5a4a3a',
-    muted:   isDarkMode ? '#6b7090' : '#a89480',
-    accent:  isDarkMode ? '#fbbf24' : '#f97316',
+    card:    isDarkMode ? 'var(--as-raised, #1a1d2e)' : 'var(--as-surface, #ffffff)',
+    border:  isDarkMode ? 'var(--as-line, #2a2d40)' : 'var(--as-line, #ffe8cc)',
+    heading: isDarkMode ? 'var(--as-ink, #f0f4ff)' : 'var(--as-ink, #3d2e20)',
+    body:    isDarkMode ? 'var(--as-ink-2, #c8cce0)' : 'var(--as-ink-2, #5a4a3a)',
+    muted:   isDarkMode ? 'var(--as-ink-2, #6b7090)' : 'var(--as-muted, #a89480)',
+    accent:  isDarkMode ? '#fbbf24' : 'var(--as-accent-ink, #f97316)',
   };
   const myTz = viewerTz();
 
@@ -125,14 +125,14 @@ export default function BookingCalendarTab({ isDarkMode }) {
   };
 
   // ── Styles ─────────────────────────────────────────────────────────────────
-  const inp = { width: '100%', background: isDarkMode ? '#0f1117' : '#fff8f0', border: `1.5px solid ${col.border}`, borderRadius: 12, padding: '9px 12px',
+  const inp = { width: '100%', background: isDarkMode ? 'var(--as-bg, #0f1117)' : 'var(--as-raised, #fff8f0)', border: `1.5px solid ${col.border}`, borderRadius: 12, padding: '9px 12px',
     fontSize: 14, color: col.body, fontFamily: F, outline: 'none', boxSizing: 'border-box', colorScheme: isDarkMode ? 'dark' : 'light' };
-  const btn = (grad, txt = '#fff', dis = false) => ({ background: dis ? (isDarkMode ? '#2a2d40' : '#f5f0ec') : grad, color: dis ? col.muted : txt, border: 'none',
+  const btn = (grad, txt = '#fff', dis = false) => ({ background: dis ? (isDarkMode ? 'var(--as-raised, #2a2d40)' : 'var(--as-raised, #f5f0ec)') : grad, color: dis ? col.muted : txt, border: 'none',
     borderRadius: 12, padding: '9px 18px', fontSize: 13, fontWeight: 800, cursor: dis ? 'default' : 'pointer', fontFamily: F });
   const lbl = { display: 'block', fontSize: 11, fontWeight: 800, color: col.muted, textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 5 };
-  const chip = (active) => ({ padding: '7px 12px', borderRadius: 999, border: `1.5px solid ${active ? col.accent : col.border}`, background: active ? (isDarkMode ? 'rgba(249,115,22,0.15)' : '#fff7ed') : 'transparent',
+  const chip = (active) => ({ padding: '7px 12px', borderRadius: 999, border: `1.5px solid ${active ? col.accent : col.border}`, background: active ? (isDarkMode ? 'rgba(249,115,22,0.15)' : 'var(--as-accent-soft, #fff7ed)') : 'transparent',
     color: active ? col.accent : col.body, fontSize: 12.5, fontWeight: 800, cursor: 'pointer', fontFamily: F });
-  const ORANGE = 'linear-gradient(135deg,#f97316,#f43f5e)';
+  const ORANGE = 'linear-gradient(135deg,var(--as-accent, #f97316),#f43f5e)';
 
   return (
     <div style={{ fontFamily: F }}>
@@ -173,7 +173,7 @@ export default function BookingCalendarTab({ isDarkMode }) {
                   {t.bio && <p style={{ fontSize: 12, color: col.body, margin: '0 0 10px', lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{t.bio}</p>}
                   {t.specializations?.length > 0 && (
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 10 }}>
-                      {t.specializations.slice(0, 3).map(s => <span key={s} style={{ fontSize: 11, fontWeight: 700, background: isDarkMode ? 'rgba(249,115,22,0.12)' : '#fff7ed', color: col.accent, borderRadius: 999, padding: '2px 8px' }}>{s}</span>)}
+                      {t.specializations.slice(0, 3).map(s => <span key={s} style={{ fontSize: 11, fontWeight: 700, background: isDarkMode ? 'rgba(249,115,22,0.12)' : 'var(--as-accent-soft, #fff7ed)', color: col.accent, borderRadius: 999, padding: '2px 8px' }}>{s}</span>)}
                     </div>
                   )}
                   <div style={{ fontSize: 12, fontWeight: 700, color: col.accent }}>{tr("bookingCalendarTab.seeFreeTimes")}</div>
@@ -188,7 +188,7 @@ export default function BookingCalendarTab({ isDarkMode }) {
       {step === 'calendar' && selectedTeacher && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-            <button type="button" onClick={() => setStep('pick-teacher')} style={{ ...btn(isDarkMode ? '#2a2d40' : '#f5f0ec', col.body), display: 'flex', alignItems: 'center', gap: 5 }}>
+            <button type="button" onClick={() => setStep('pick-teacher')} style={{ ...btn(isDarkMode ? 'var(--as-ink, #2a2d40)' : 'var(--as-ink, #f5f0ec)', col.body), display: 'flex', alignItems: 'center', gap: 5 }}>
               <ChevronLeft size={14} /> {tr("bookingCalendarTab.teachers")}
             </button>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -312,7 +312,7 @@ export default function BookingCalendarTab({ isDarkMode }) {
 
             <p style={{ fontSize: 12, color: col.muted, margin: 0, fontWeight: 600 }}>{tr("bookingCalendarTab.theTeacherWillAcceptOr")}</p>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-              <button type="button" onClick={() => setModal(null)} style={btn(isDarkMode ? '#2a2d40' : '#f5f0ec', col.body)}>{tr("bookingCalendarTab.cancel")}</button>
+              <button type="button" onClick={() => setModal(null)} style={btn(isDarkMode ? 'var(--as-ink, #2a2d40)' : 'var(--as-ink, #f5f0ec)', col.body)}>{tr("bookingCalendarTab.cancel")}</button>
               <button type="button" onClick={handleSubmit} disabled={submitting || !formTitle.trim() || !formTopic.trim() || !!timeError}
                 style={btn(ORANGE, '#fff', submitting || !formTitle.trim() || !formTopic.trim() || !!timeError)}>
                 {submitting ? tr("bookingCalendarTab.sending") : tr("bookingCalendarTab.sendRequest")}

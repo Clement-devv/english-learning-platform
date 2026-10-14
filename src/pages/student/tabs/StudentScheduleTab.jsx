@@ -12,8 +12,8 @@ import { useTranslation } from "react-i18next";
 
 function pal(dark) {
   return {
-    card: dark ? "#1a1d2e" : "#ffffff", border: dark ? "#2a2d40" : "#ede9fe",
-    heading: dark ? "#f0f4ff" : "#1e1b4b", text: dark ? "#c8cce0" : "#4b5563", muted: dark ? "#6b7090" : "#9ca3af",
+    card: dark ? "var(--as-raised, #1a1d2e)" : "var(--as-surface, #ffffff)", border: dark ? "var(--as-line, #2a2d40)" : "var(--as-accent-soft, #ede9fe)",
+    heading: dark ? "var(--as-ink, #f0f4ff)" : "#1e1b4b", text: dark ? "var(--as-ink-2, #c8cce0)" : "var(--as-ink-2, #4b5563)", muted: dark ? "var(--as-ink-2, #6b7090)" : "var(--as-muted, #9ca3af)",
   };
 }
 
@@ -101,7 +101,7 @@ export default function StudentScheduleTab({ studentId, isDarkMode }) {
           </button>
         )}
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div style={{ width: 40, height: 40, borderRadius: "50%", background: "linear-gradient(135deg,#7c3aed,#ec4899)", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", color: "#fff", fontWeight: 800 }}>
+          <div style={{ width: 40, height: 40, borderRadius: "50%", background: "linear-gradient(135deg,var(--as-accent, #7c3aed),#ec4899)", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", color: "#fff", fontWeight: 800 }}>
             {teacher.photo ? <img src={teacher.photo} alt="" style={{ width: 40, height: 40, objectFit: "cover" }} /> : teacherName(teacher)[0]}
           </div>
           <div>

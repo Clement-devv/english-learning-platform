@@ -25,7 +25,7 @@ function StarPicker({ value, onChange }) {
           onMouseLeave={() => setHover(0)}
           style={{
             background: "none", border: "none", cursor: "pointer", padding: 2,
-            color: n <= (hover || value) ? "#f59e0b" : "#d1d5db", fontSize: 28, lineHeight: 1,
+            color: n <= (hover || value) ? "#f59e0b" : "var(--as-ink-2, #d1d5db)", fontSize: 28, lineHeight: 1,
           }}
         >
           ★
@@ -52,11 +52,11 @@ function ReviewForm({ booking, isDarkMode, onSubmitted }) {
   const [busy,    setBusy]    = useState(false);
   const [err,     setErr]     = useState("");
 
-  const card   = isDarkMode ? "#1e293b" : "#ffffff";
-  const border = isDarkMode ? "#334155" : "#e2e8f0";
-  const text   = isDarkMode ? "#e2e8f0" : "#1e293b";
-  const muted  = isDarkMode ? "#94a3b8" : "#64748b";
-  const inputBg= isDarkMode ? "#0f172a" : "#f8fafc";
+  const card   = isDarkMode ? "var(--as-raised, #1e293b)" : "var(--as-surface, #ffffff)";
+  const border = isDarkMode ? "var(--as-line, #334155)" : "var(--as-line, #e2e8f0)";
+  const text   = isDarkMode ? "var(--as-ink, #e2e8f0)" : "var(--as-ink, #1e293b)";
+  const muted  = isDarkMode ? "var(--as-muted, #94a3b8)" : "var(--as-ink-2, #64748b)";
+  const inputBg= isDarkMode ? "var(--as-surface, #0f172a)" : "var(--as-raised, #f8fafc)";
 
   async function submit() {
     if (!rating) { setErr("Please pick a star rating."); return; }
@@ -141,11 +141,11 @@ export default function ReviewsTab({ isDarkMode }) {
   const [loading,   setLoading]   = useState(true);
   const [view,      setView]      = useState("pending"); // "pending" | "submitted"
 
-  const bg    = isDarkMode ? "#0f172a" : "#f8fafc";
-  const card  = isDarkMode ? "#1e293b" : "#ffffff";
-  const border= isDarkMode ? "#334155" : "#e2e8f0";
-  const text  = isDarkMode ? "#e2e8f0" : "#1e293b";
-  const muted = isDarkMode ? "#94a3b8" : "#64748b";
+  const bg    = isDarkMode ? "var(--as-surface, #0f172a)" : "var(--as-raised, #f8fafc)";
+  const card  = isDarkMode ? "var(--as-raised, #1e293b)" : "var(--as-surface, #ffffff)";
+  const border= isDarkMode ? "var(--as-line, #334155)" : "var(--as-line, #e2e8f0)";
+  const text  = isDarkMode ? "var(--as-ink, #e2e8f0)" : "var(--as-ink, #1e293b)";
+  const muted = isDarkMode ? "var(--as-muted, #94a3b8)" : "var(--as-ink-2, #64748b)";
 
   async function load(quiet = false) {
     const studentId = getStudentId();

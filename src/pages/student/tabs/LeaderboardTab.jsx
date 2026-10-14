@@ -31,12 +31,12 @@ export default function LeaderboardTab({ isDarkMode }) {
   const [loading,  setLoading]  = useState(true);
   const [category, setCategory] = useState('streak');
 
-  const bg     = isDarkMode ? '#0f1117' : '#fff8f0';
-  const card   = isDarkMode ? '#1a1d2e' : '#ffffff';
-  const border = isDarkMode ? '#2a2d40' : '#ffe8cc';
-  const text   = isDarkMode ? '#f0f4ff' : '#3d2e20';
-  const muted  = isDarkMode ? '#6b7090' : '#a89480';
-  const accent = isDarkMode ? '#fbbf24' : '#f97316';
+  const bg     = isDarkMode ? 'var(--as-bg, #0f1117)' : 'var(--as-raised, #fff8f0)';
+  const card   = isDarkMode ? 'var(--as-raised, #1a1d2e)' : 'var(--as-surface, #ffffff)';
+  const border = isDarkMode ? 'var(--as-line, #2a2d40)' : 'var(--as-line, #ffe8cc)';
+  const text   = isDarkMode ? 'var(--as-ink, #f0f4ff)' : 'var(--as-ink, #3d2e20)';
+  const muted  = isDarkMode ? 'var(--as-ink-2, #6b7090)' : 'var(--as-muted, #a89480)';
+  const accent = isDarkMode ? '#fbbf24' : 'var(--as-accent-ink, #f97316)';
   const F      = "'Nunito','Inter',sans-serif";
 
   useEffect(() => {
@@ -66,7 +66,7 @@ export default function LeaderboardTab({ isDarkMode }) {
             <button key={c.key} onClick={() => setCategory(c.key)} style={{
               padding: '8px 18px', borderRadius: 999, fontSize: 13, fontWeight: 800,
               border: `2px solid ${active ? accent : border}`,
-              background: active ? 'linear-gradient(135deg,#f97316,#fbbf24)' : 'transparent',
+              background: active ? 'linear-gradient(135deg,var(--as-accent, #f97316),#fbbf24)' : 'transparent',
               color: active ? '#fff' : text,
               cursor: 'pointer', fontFamily: F,
               boxShadow: active ? '0 4px 14px rgba(249,115,22,0.3)' : 'none',
@@ -96,9 +96,9 @@ export default function LeaderboardTab({ isDarkMode }) {
                 background: top3
                   ? (isDarkMode
                       ? 'linear-gradient(135deg,rgba(249,115,22,0.15),rgba(251,191,36,0.10))'
-                      : 'linear-gradient(135deg,#fff7ed,#fef3c7)')
+                      : 'linear-gradient(135deg,var(--as-accent-soft, #fff7ed),#fef3c7)')
                   : card,
-                border: `2px solid ${top3 ? accent + '80' : border}`,
+                border: `2px solid ${top3 ? `color-mix(in srgb, ${accent} 50%, transparent)` : border}`,
                 borderRadius: 20,
                 padding: '16px 20px',
                 display: 'flex',
@@ -113,8 +113,8 @@ export default function LeaderboardTab({ isDarkMode }) {
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontSize: top3 ? 24 : 14, fontWeight: 900,
                   background: top3
-                    ? 'linear-gradient(135deg,#f97316,#fbbf24)'
-                    : (isDarkMode ? 'rgba(255,255,255,0.05)' : '#f3f4f6'),
+                    ? 'linear-gradient(135deg,var(--as-accent, #f97316),#fbbf24)'
+                    : (isDarkMode ? 'rgba(255,255,255,0.05)' : 'var(--as-raised, #f3f4f6)'),
                   color: top3 ? '#fff' : muted,
                   boxShadow: top3 ? '0 4px 12px rgba(249,115,22,0.3)' : 'none',
                 }}>
@@ -124,7 +124,7 @@ export default function LeaderboardTab({ isDarkMode }) {
                 {/* Avatar */}
                 <div style={{
                   width: 40, height: 40, borderRadius: 12, flexShrink: 0,
-                  background: 'linear-gradient(135deg,#f97316,#fbbf24)',
+                  background: 'linear-gradient(135deg,var(--as-accent, #f97316),#fbbf24)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   color: '#fff', fontWeight: 900, fontSize: 16,
                 }}>
