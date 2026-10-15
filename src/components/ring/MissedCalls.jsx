@@ -20,11 +20,11 @@ export default function MissedCalls({ isDark }) {
   const [clearing, setClearing] = useState(false);
 
   const C = {
-    bg:     isDark ? "#13151c" : "#f8f9ff",
-    card:   isDark ? "#1a1d2e" : "#ffffff",
-    border: isDark ? "rgba(255,255,255,0.08)" : "#eef0f8",
-    text:   isDark ? "#e8eaf6" : "#1a1d2e",
-    sub:    isDark ? "#8b91b8" : "#9ea3be",
+    bg:     isDark ? "var(--as-surface, #13151c)" : "var(--as-raised, #f8f9ff)",
+    card:   isDark ? "var(--as-raised, #1a1d2e)" : "var(--as-surface, #ffffff)",
+    border: isDark ? "rgba(255,255,255,0.08)" : "var(--as-line, #eef0f8)",
+    text:   isDark ? "var(--as-ink, #e8eaf6)" : "var(--as-ink, #1a1d2e)",
+    sub:    isDark ? "var(--as-muted, #8b91b8)" : "var(--as-muted, #9ea3be)",
   };
 
   const fetch = useCallback(async () => {

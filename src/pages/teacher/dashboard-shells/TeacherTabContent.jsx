@@ -36,10 +36,11 @@ preloadWhenIdle([
 /**
  * wrapStyle  – CSS object applied to the outer card container for non-messages tabs
  * msgStyle   – CSS object applied to the messages container (no padding by default)
+ * msgClassName – optional class for the messages container (e.g. "as-pink")
  * headStyle  – CSS object for page headings inside the wrapper
  * mutedStyle – CSS object for page sub-headings
  */
-export default function TeacherTabContent({ d, wrapStyle = {}, msgStyle = {}, headStyle = {}, mutedStyle = {}, onUnreadCount }) {
+export default function TeacherTabContent({ d, wrapStyle = {}, msgStyle = {}, msgClassName, headStyle = {}, mutedStyle = {}, onUnreadCount }) {
   const { activeTab, isDarkMode } = d;
 
   // ── SCHEDULE ──────────────────────────────────────────────────────────────
@@ -146,7 +147,7 @@ export default function TeacherTabContent({ d, wrapStyle = {}, msgStyle = {}, he
   // ── MESSAGES ──────────────────────────────────────────────────────────────
   if (activeTab === 'messages') {
     return (
-      <div style={msgStyle}>
+      <div className={msgClassName} style={msgStyle}>
         <MessagesTab userRole="teacher" onUnreadCount={onUnreadCount} />
       </div>
     );

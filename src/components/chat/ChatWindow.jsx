@@ -276,18 +276,18 @@ export default function ChatWindow({ chat, chatType = "group", userRole, onClose
 
   // ── Colour tokens ─────────────────────────────────────────────────────────
   const C = {
-    bg:       isDark ? "#0f1117" : "#f5f6fb",
-    header:   isDark ? "#13151c" : "#ffffff",
-    border:   isDark ? "rgba(255,255,255,0.10)" : "#eef0f8",
-    text:     isDark ? "#e8eaf6" : "#1a1d2e",
-    sub:      isDark ? "#8b91b8" : "#9ea3be",    // was #4a4f6a — unreadable
-    inBubble: isDark ? "#1e2235" : "#ffffff",
-    inText:   isDark ? "#dde0f0" : "#2d3048",
-    dateBg:   isDark ? "#1a1e2c" : "#eef0f8",
-    dateTxt:  isDark ? "#8b91b8" : "#9ea3be",
-    inputBg:  isDark ? "#1a1e2c" : "#ffffff",
-    inputBdr: isDark ? "rgba(255,255,255,0.12)" : "#e2e4f0",
-    footer:   isDark ? "#13151c" : "#ffffff",
+    bg:       isDark ? "var(--as-bg, #0f1117)" : "var(--as-raised, #f5f6fb)",
+    header:   isDark ? "var(--as-surface, #13151c)" : "var(--as-surface, #ffffff)",
+    border:   isDark ? "rgba(255,255,255,0.10)" : "var(--as-line, #eef0f8)",
+    text:     isDark ? "var(--as-ink, #e8eaf6)" : "var(--as-ink, #1a1d2e)",
+    sub:      isDark ? "var(--as-muted, #8b91b8)" : "var(--as-muted, #9ea3be)",    // was var(--as-ink-2, #4a4f6a) — unreadable
+    inBubble: isDark ? "var(--as-raised, #1e2235)" : "var(--as-surface, #ffffff)",
+    inText:   isDark ? "var(--as-ink-2, #dde0f0)" : "var(--as-ink, #2d3048)",
+    dateBg:   isDark ? "var(--as-raised, #1a1e2c)" : "var(--as-raised, #eef0f8)",
+    dateTxt:  isDark ? "var(--as-muted, #8b91b8)" : "var(--as-muted, #9ea3be)",
+    inputBg:  isDark ? "var(--as-raised, #1a1e2c)" : "var(--as-surface, #ffffff)",
+    inputBdr: isDark ? "rgba(255,255,255,0.12)" : "var(--as-line, #e2e4f0)",
+    footer:   isDark ? "var(--as-surface, #13151c)" : "var(--as-surface, #ffffff)",
     accent:   "var(--as-accent, #6366f1)",
   };
 
@@ -298,7 +298,9 @@ export default function ChatWindow({ chat, chatType = "group", userRole, onClose
     "sub-admin":{ grad: "linear-gradient(135deg,#b45309,#f59e0b)", bubble: "linear-gradient(135deg,#d97706,#f59e0b)", badge: "#b45309" },
   };
 
-  const myStyle = roleStyle[userRole] || roleStyle.student;
+  const baseStyle = roleStyle[userRole] || roleStyle.student;
+  // --as-own-* (set by the .as-pink scope) recolours only the viewer's own messages
+  const myStyle = { grad: `var(--as-own-grad, ${baseStyle.grad})`, bubble: `var(--as-own-bubble, ${baseStyle.bubble})`, badge: `var(--as-own-badge, ${baseStyle.badge})` };
 
   const grouped = messages.reduce((acc, m) => {
     const key = fmtDate(m.createdAt);
@@ -390,7 +392,7 @@ export default function ChatWindow({ chat, chatType = "group", userRole, onClose
       <div
         ref={scrollBoxRef}
         onScroll={handleScroll}
-        style={{ flex: 1, overflowY: "auto", padding: "14px 18px", display: "flex", flexDirection: "column" }}
+        style={{ flex: 1, overflowY: "auto", padding: "14px 18px", display: "flex", flexDirection: "column", backgroundImage: "var(--as-chat-wall, none)", backgroundSize: "140px 140px" }}
         className="msg-scrollbar"
       >
         {loading && messages.length === 0 ? (
@@ -478,7 +480,7 @@ export default function ChatWindow({ chat, chatType = "group", userRole, onClose
                           ? (isLast ? "18px 18px 5px 18px" : "18px")
                           : (isLast ? "18px 18px 18px 5px" : "18px"),
                         boxShadow: isOwn
-                          ? "0 4px 14px rgba(99,102,241,0.28)"
+                          ? "0 4px 14px color-mix(in srgb, var(--as-accent, #6366f1) 28%, transparent)"
                           : isDark ? "0 2px 8px rgba(0,0,0,0.3)" : "0 2px 8px rgba(0,0,0,0.06)",
                         border: !isOwn ? `1px solid ${C.border}` : "none",
                       }} className="msg-bubble">
@@ -538,7 +540,7 @@ export default function ChatWindow({ chat, chatType = "group", userRole, onClose
               padding: "7px 16px", borderRadius: "20px", border: "none",
               background: C.accent, color: "white",
               fontSize: "12px", fontWeight: "700", cursor: "pointer",
-              boxShadow: "0 4px 16px rgba(99,102,241,0.45)",
+              boxShadow: "0 4px 16px color-mix(in srgb, var(--as-accent, #6366f1) 45%, transparent)",
               zIndex: 10, whiteSpace: "nowrap",
             }}
           >
@@ -625,7 +627,7 @@ export default function ChatWindow({ chat, chatType = "group", userRole, onClose
               onFocus={() => {
                 if (inputWrapRef.current) {
                   inputWrapRef.current.style.borderColor = "var(--as-accent, #6366f1)";
-                  inputWrapRef.current.style.boxShadow   = "0 0 0 3px rgba(99,102,241,0.12)";
+                  inputWrapRef.current.style.boxShadow   = "0 0 0 3px color-mix(in srgb, var(--as-accent, #6366f1) 12%, transparent)";
                 }
               }}
               onBlur={() => {
@@ -664,11 +666,11 @@ export default function ChatWindow({ chat, chatType = "group", userRole, onClose
             className="msg-send-btn"
             style={{
               width: "44px", height: "44px", borderRadius: "13px", border: "none",
-              background: newMsg.trim() ? myStyle.bubble : (isDark ? "#1e2235" : "#eef0f8"),
+              background: newMsg.trim() ? myStyle.bubble : (isDark ? "var(--as-raised, #1e2235)" : "var(--as-raised, #eef0f8)"),
               cursor: newMsg.trim() ? "pointer" : "default",
               display: "flex", alignItems: "center", justifyContent: "center",
               flexShrink: 0, transition: "all 0.2s",
-              boxShadow: newMsg.trim() ? "0 4px 14px rgba(99,102,241,0.35)" : "none",
+              boxShadow: newMsg.trim() ? "0 4px 14px color-mix(in srgb, var(--as-accent, #6366f1) 35%, transparent)" : "none",
             }}
           >
             {sending
@@ -682,8 +684,8 @@ export default function ChatWindow({ chat, chatType = "group", userRole, onClose
       <style>{`
         .msg-scrollbar::-webkit-scrollbar { width: 4px; }
         .msg-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .msg-scrollbar::-webkit-scrollbar-thumb { background: rgba(99,102,241,0.25); border-radius: 4px; }
-        .msg-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(99,102,241,0.45); }
+        .msg-scrollbar::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--as-accent, #6366f1) 25%, transparent); border-radius: 4px; }
+        .msg-scrollbar::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--as-accent, #6366f1) 45%, transparent); }
         .msg-back-btn { display: none !important; }
         @media(max-width:768px) { .msg-back-btn { display: flex !important; } }
         .msg-bubble-wrap { animation: msg-bubble-in 0.2s cubic-bezier(0.34,1.56,0.64,1) both; }

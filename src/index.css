@@ -98,6 +98,29 @@ body {
   --as-ink-2:       var(--a-ink-2);
   --as-muted:       var(--a-muted);
 }
+/* Pink scope — wrap a shared screen (e.g. the student Messages tab) to make its
+   accent pink instead of the dashboard orange. #db2777 keeps white text ≥ 4.5:1. */
+.as-root .as-pink {
+  --as-accent:      #db2777;
+  --as-accent-2:    #f472b6;
+  --as-accent-soft: #fdf2f8;
+  --as-accent-ink:  #be185d;
+  --as-accent-line: #fbcfe8;
+  /* the student's own chat bubbles (green elsewhere) */
+  --as-own-grad:    linear-gradient(135deg, #be185d, #ec4899);
+  --as-own-bubble:  linear-gradient(135deg, #db2777, #e0457f);
+  --as-own-badge:   #be185d;
+  /* soft hearts/stars wallpaper behind the chat messages */
+  --as-chat-wall:   url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140' viewBox='0 0 140 140'%3E%3Cg fill='%23ec4899' fill-opacity='0.09'%3E%3Cpath d='M24 30c-3-5-11-3-10 3 1 4 10 10 10 10s9-6 10-10c1-6-7-8-10-3z'/%3E%3Cpath d='M98 18l2.5 6 6.5.5-5 4 1.6 6.4L98 31.5 92.4 35l1.6-6.4-5-4 6.5-.5z'/%3E%3Ccircle cx='70' cy='70' r='3'/%3E%3Ccircle cx='122' cy='84' r='2.2'/%3E%3Ccircle cx='16' cy='104' r='2.2'/%3E%3Cpath d='M88 96h22a6 6 0 0 1 6 6v8a6 6 0 0 1-6 6h-14l-6 5v-5h-2a6 6 0 0 1-6-6v-8a6 6 0 0 1 6-6z'/%3E%3Cpath d='M44 112c-2-3.4-7.4-2-6.7 2 .6 2.8 6.7 6.7 6.7 6.7s6-3.9 6.7-6.7c.7-4-4.7-5.4-6.7-2z'/%3E%3Cpath d='M52 52l1.6 3.8 4 .4-3 2.5 1 4L52 60.6l-3.6 2.1 1-4-3-2.5 4-.4z'/%3E%3C/g%3E%3C/svg%3E");
+}
+.as-root[data-theme="dark"] .as-pink {
+  --as-accent:      #db2777;
+  --as-accent-2:    #ec4899;
+  --as-accent-soft: color-mix(in srgb, #ec4899 18%, var(--a-surface));
+  --as-accent-ink:  #f9a8d4;
+  --as-accent-line: color-mix(in srgb, #ec4899 40%, var(--a-surface));
+  --as-chat-wall:   url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140' viewBox='0 0 140 140'%3E%3Cg fill='%23ec4899' fill-opacity='0.14'%3E%3Cpath d='M24 30c-3-5-11-3-10 3 1 4 10 10 10 10s9-6 10-10c1-6-7-8-10-3z'/%3E%3Cpath d='M98 18l2.5 6 6.5.5-5 4 1.6 6.4L98 31.5 92.4 35l1.6-6.4-5-4 6.5-.5z'/%3E%3Ccircle cx='70' cy='70' r='3'/%3E%3Ccircle cx='122' cy='84' r='2.2'/%3E%3Ccircle cx='16' cy='104' r='2.2'/%3E%3Cpath d='M88 96h22a6 6 0 0 1 6 6v8a6 6 0 0 1-6 6h-14l-6 5v-5h-2a6 6 0 0 1-6-6v-8a6 6 0 0 1 6-6z'/%3E%3Cpath d='M44 112c-2-3.4-7.4-2-6.7 2 .6 2.8 6.7 6.7 6.7 6.7s6-3.9 6.7-6.7c.7-4-4.7-5.4-6.7-2z'/%3E%3Cpath d='M52 52l1.6 3.8 4 .4-3 2.5 1 4L52 60.6l-3.6 2.1 1-4-3-2.5 4-.4z'/%3E%3C/g%3E%3C/svg%3E");
+}
 .as-root[data-theme="dark"] {
   --a-bg:            #16120f;
   --a-surface:       #1f1915;
@@ -201,6 +224,35 @@ body {
 @keyframes as-shine { to { transform: translateX(320%) skewX(-12deg); } }
 .as-sparkle { animation: as-twinkle 3.2s ease-in-out infinite; }
 @keyframes as-twinkle { 0%, 100% { opacity: 0.95; transform: scale(1); } 50% { opacity: 0.45; transform: scale(0.7); } }
+
+/* ── Liquid glass (teacher + student Sunshine shells) ─────────────────────────
+   Root gets .as-glass; any pane whose inline background is var(--as-glass-card)
+   becomes frosted glass; .as-glass-ring draws the gradient border. */
+/* ── Liquid glass ── panes are translucent white over the colour glows */
+.as-glass { --as-glass-card: rgba(255,255,255,0.55); --as-glass-edge: rgba(255,255,255,0.85); --as-glass-frame: rgba(255,255,255,0.28); --as-glass-glow: color-mix(in srgb, var(--a-pink) 40%, transparent); }
+.as-glass[data-theme="dark"] { --as-glass-card: rgba(255,255,255,0.065); --as-glass-edge: rgba(255,255,255,0.13); --as-glass-frame: rgba(20,14,12,0.35); --as-glass-glow: rgba(0,0,0,0.55); }
+.as-glass [style*="var(--as-glass-card)"] {
+  -webkit-backdrop-filter: blur(18px) saturate(175%); backdrop-filter: blur(18px) saturate(175%);
+  border-color: var(--as-glass-edge) !important;
+  box-shadow: inset 0 1px 0 var(--as-glass-edge), 0 14px 32px -18px var(--as-glass-glow) !important;
+}
+/* Coloured border around the glass sidebar + page frame (gradient ring, keeps the radius) */
+.as-glass-ring::before {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 3px; pointer-events: none; z-index: 3;
+  background: linear-gradient(150deg, var(--a-pink) 0%, var(--a-accent) 48%, #fbbf24 100%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+          mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+}
+.as-glass[data-theme="dark"] .as-glass-ring::before { opacity: 0.85; }
+.as-glass header[style*="var(--as-glass-card)"] { box-shadow: inset 0 -1px 0 var(--as-glass-edge) !important; }
+/* Tab panels (the ones that get the colour wash above) turn into glass as well —
+   but never inside a pop-up / fixed overlay, where they must stay solid to read. */
+.as-glass main :is([style*="border-radius: 14px"], [style*="border-radius: 16px"], [style*="border-radius: 18px"], [style*="border-radius: 20px"], [style*="border-radius: 24px"]):is([style*="background: var(--a-surface)"], [style*="background-color: var(--a-surface)"], [style*="background: var(--as-surface"], [style*="background-color: var(--as-surface"]):not(section):not(:is(.fixed, [style*="position: fixed"]) *),
+.as-glass main :is(.rounded-xl, .rounded-2xl).border:is(.bg-white, .bg-ad-surface, .bg-stone-800):not(input, select, textarea, button, label):not(:is(.fixed, [style*="position: fixed"]) *) {
+  background-color: var(--as-glass-card) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(175%); backdrop-filter: blur(18px) saturate(175%);
+  border-color: var(--as-glass-edge) !important;
+}
 
 /* ── BEGIN generated: Sunshine overrides for shared Tailwind screens ── */
 /* Generated by tw-overrides.cjs from the teacher screens (shared with the Playful

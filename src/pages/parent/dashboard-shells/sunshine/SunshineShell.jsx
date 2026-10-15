@@ -8,24 +8,32 @@ import api from '../../../../api';
 import ClassReportsList from '../../../../components/ClassReportsList';
 import LanguageSwitcher from '../../../../components/LanguageSwitcher';
 import { useAuth } from '../../../../context/AuthContext.jsx';
+import { useBranding } from '../../../../context/BrandingContext';
+import { adminAccent, adminOnAccent } from '../../../../utils/adminAccent';
+import { SunriseBackdrop, SunsetGlow } from '../../../../components/dashboard/SunriseArt';
 
 const F = "'Nunito','Inter',sans-serif";
-const ACCENT  = 'linear-gradient(135deg,#f97316,#f43f5e)';
+const ACCENT  = 'var(--a-accent-grad)';
+
+// Whole-page look: true = liquid glass (frosted panes over colour glows, gradient
+// border — same as the admin / teacher / student shells); false = solid panels.
+const GLASS_PAGE = true;
 const FONT_URL = 'https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap';
 
 const fmtDate    = (iso) => iso ? new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
 const fmtTime    = (iso) => iso ? new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '';
 const isUpcoming = (iso) => iso && new Date(iso) > new Date();
 
+// Values live in src/index.css (.as-root) — same palette as the other dashboards.
 const col = {
-  bg:      '#fff8f0',
-  card:    '#ffffff',
-  border:  '#ffe8cc',
-  heading: '#3d2e20',
-  body:    '#5a4a3a',
-  muted:   '#a89480',
-  accent:  '#f97316',
-  sidebar: '#ffffff',
+  bg:      'var(--a-bg)',
+  card:    GLASS_PAGE ? 'var(--as-glass-card)' : 'var(--a-surface)',
+  border:  'var(--a-line)',
+  heading: 'var(--a-ink)',
+  body:    'var(--a-ink-2)',
+  muted:   'var(--a-muted)',
+  accent:  'var(--a-accent)',
+  sidebar: GLASS_PAGE ? 'var(--as-glass-card)' : 'var(--a-surface)',
 };
 
 function StatusBadge({ status }) {
@@ -52,11 +60,11 @@ function OverviewTab({ child, classes, homework, certs }) {
   const nextClass = upcoming[0];
 
   const STATS = [
-    { Icon: BookOpen,      label: 'Class Credits', value: child?.classCredits ?? '—', sub: 'remaining',   grad: 'linear-gradient(135deg,#f97316,#fb923c)', shadow: 'rgba(249,115,22,0.3)'  },
-    { Icon: CheckCircle2,  label: 'Classes Done',  value: completed,                  sub: 'all time',    grad: 'linear-gradient(135deg,#10b981,#34d399)', shadow: 'rgba(16,185,129,0.3)'  },
-    { Icon: Calendar,      label: 'Upcoming',      value: upcoming.length,             sub: 'classes',     grad: 'linear-gradient(135deg,#3b82f6,#60a5fa)', shadow: 'rgba(59,130,246,0.3)'  },
-    { Icon: ClipboardList, label: 'Homework Due',  value: hwDue,                       sub: 'assignments', grad: 'linear-gradient(135deg,#8b5cf6,#a78bfa)', shadow: 'rgba(139,92,246,0.3)'  },
-    { Icon: Award,         label: 'Certificates',  value: certs?.length ?? 0,          sub: 'earned',      grad: 'linear-gradient(135deg,#f59e0b,#fbbf24)', shadow: 'rgba(245,158,11,0.3)'  },
+    { Icon: BookOpen,      label: 'Class Credits', value: child?.classCredits ?? '—', sub: 'remaining',   cat: 'accent' },
+    { Icon: CheckCircle2,  label: 'Classes Done',  value: completed,                  sub: 'all time',    cat: 'green'  },
+    { Icon: Calendar,      label: 'Upcoming',      value: upcoming.length,             sub: 'classes',     cat: 'sky'    },
+    { Icon: ClipboardList, label: 'Homework Due',  value: hwDue,                       sub: 'assignments', cat: 'rose'   },
+    { Icon: Award,         label: 'Certificates',  value: certs?.length ?? 0,          sub: 'earned',      cat: 'amber'  },
   ];
 
   return (
@@ -66,9 +74,9 @@ function OverviewTab({ child, classes, homework, certs }) {
       </h3>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(160px,1fr))', gap: 14, marginBottom: 28 }}>
-        {STATS.map(({ Icon, label, value, sub, grad, shadow }) => (
-          <div key={label} style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: 20, padding: '20px 22px' }}>
-            <div style={{ width: 44, height: 44, borderRadius: 14, background: grad, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12, boxShadow: `0 4px 12px ${shadow}` }}>
+        {STATS.map(({ Icon, label, value, sub, cat }) => (
+          <div key={label} className={`cat-${cat}`} style={{ background: `radial-gradient(120% 90% at 100% 0%, var(--cat-soft) 0%, transparent 55%), ${col.card}`, border: `1px solid ${col.border}`, borderRadius: 20, padding: '20px 22px' }}>
+            <div style={{ width: 44, height: 44, borderRadius: 14, background: 'var(--cat)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12, boxShadow: '0 6px 14px -6px var(--cat)' }}>
               <Icon size={22} color="#fff" strokeWidth={2} />
             </div>
             <div style={{ fontSize: 26, fontWeight: 900, color: col.heading }}>{value}</div>
@@ -79,7 +87,7 @@ function OverviewTab({ child, classes, homework, certs }) {
       </div>
 
       {nextClass && (
-        <div style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: 20, padding: 22, marginBottom: 20 }}>
+        <div style={{ background: col.card, border: `1px solid ${col.border}`, borderRadius: 20, padding: 22, marginBottom: 20 }}>
           <div style={{ fontSize: 12, fontWeight: 800, color: col.muted, textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 10 }}>Next Class</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             <div style={{ width: 50, height: 50, borderRadius: 16, background: ACCENT, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -97,7 +105,7 @@ function OverviewTab({ child, classes, homework, certs }) {
       )}
 
       {homework?.length > 0 && (
-        <div style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: 20, padding: 22 }}>
+        <div style={{ background: col.card, border: `1px solid ${col.border}`, borderRadius: 20, padding: 22 }}>
           <div style={{ fontSize: 12, fontWeight: 800, color: col.muted, textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 14 }}>Recent Homework</div>
           {homework.slice(0, 4).map(hw => (
             <div key={hw._id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: `1px solid ${col.border}` }}>
@@ -129,7 +137,7 @@ function ClassesTab({ classes, loading }) {
       <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
         {['upcoming','past'].map(v => (
           <button key={v} onClick={() => setView(v)}
-            style={{ background: view === v ? 'linear-gradient(135deg,#f97316,#f43f5e)' : col.card, color: view === v ? '#fff' : col.body, border: `2px solid ${view === v ? 'transparent' : col.border}`, borderRadius: 12, padding: '7px 18px', fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: F, textTransform: 'capitalize' }}>
+            style={{ background: view === v ? ACCENT : col.card, color: view === v ? 'var(--a-on-accent)' : col.body, border: `2px solid ${view === v ? 'transparent' : col.border}`, borderRadius: 12, padding: '7px 18px', fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: F, textTransform: 'capitalize' }}>
             {v}
           </button>
         ))}
@@ -140,13 +148,13 @@ function ClassesTab({ classes, loading }) {
           <Loader2 size={28} color={col.accent} style={{ animation: 'spin 1s linear infinite' }} />
         </div>
       ) : filtered.length === 0 ? (
-        <div style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: 20, padding: 60, textAlign: 'center', color: col.muted, fontWeight: 700 }}>
+        <div style={{ background: col.card, border: `1px solid ${col.border}`, borderRadius: 20, padding: 60, textAlign: 'center', color: col.muted, fontWeight: 700 }}>
           No {view} classes
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {filtered.map(b => (
-            <div key={b._id} style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: 18, padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
+            <div key={b._id} style={{ background: col.card, border: `1px solid ${col.border}`, borderRadius: 18, padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
               <div style={{ width: 44, height: 44, borderRadius: 14, background: ACCENT, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 <Calendar size={20} color="#fff" />
               </div>
@@ -175,7 +183,7 @@ function HomeworkTab({ homework, loading }) {
           <Loader2 size={28} color={col.accent} style={{ animation: 'spin 1s linear infinite' }} />
         </div>
       ) : !homework?.length ? (
-        <div style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: 20, padding: 60, textAlign: 'center', color: col.muted, fontWeight: 700 }}>
+        <div style={{ background: col.card, border: `1px solid ${col.border}`, borderRadius: 20, padding: 60, textAlign: 'center', color: col.muted, fontWeight: 700 }}>
           No homework assigned yet
         </div>
       ) : (
@@ -221,7 +229,7 @@ function CertificatesTab({ certs, loading }) {
           <Loader2 size={28} color={col.accent} style={{ animation: 'spin 1s linear infinite' }} />
         </div>
       ) : !certs?.length ? (
-        <div style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: 20, padding: 60, textAlign: 'center' }}>
+        <div style={{ background: col.card, border: `1px solid ${col.border}`, borderRadius: 20, padding: 60, textAlign: 'center' }}>
           <Award size={48} color={col.muted} style={{ margin: '0 auto 16px' }} />
           <p style={{ fontSize: 15, fontWeight: 800, color: col.heading, margin: '0 0 6px' }}>No certificates yet</p>
           <p style={{ fontSize: 13, color: col.muted }}>Certificates are awarded at 10, 25, 50, and 100 completed classes.</p>
@@ -229,7 +237,7 @@ function CertificatesTab({ certs, loading }) {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {certs.map(cert => (
-            <div key={cert._id} style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: 20, padding: 20, position: 'relative', overflow: 'hidden' }}>
+            <div key={cert._id} style={{ background: col.card, border: `1px solid ${col.border}`, borderRadius: 20, padding: 20, position: 'relative', overflow: 'hidden' }}>
               <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 4, background: ACCENT }} />
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, paddingTop: 6 }}>
                 <div style={{ width: 50, height: 50, borderRadius: 16, background: ACCENT, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -254,15 +262,18 @@ function CertificatesTab({ certs, loading }) {
 }
 
 const NAV = [
-  { key: 'overview',     label: 'Overview',     icon: LayoutDashboard },
-  { key: 'classes',      label: 'Classes',       icon: Calendar        },
-  { key: 'reports',      label: 'Class reports', icon: ClipboardList   },
-  { key: 'homework',     label: 'Homework',      icon: BookOpen        },
-  { key: 'certificates', label: 'Certificates',  icon: Award           },
+  { key: 'overview',     label: 'Overview',     icon: LayoutDashboard, cat: 'accent' },
+  { key: 'classes',      label: 'Classes',       icon: Calendar,        cat: 'amber'  },
+  { key: 'reports',      label: 'Class reports', icon: ClipboardList,   cat: 'teal'   },
+  { key: 'homework',     label: 'Homework',      icon: BookOpen,        cat: 'sky'    },
+  { key: 'certificates', label: 'Certificates',  icon: Award,           cat: 'rose'   },
 ];
 
 export default function SunshineShell() {
   const navigate = useNavigate();
+  const { branding } = useBranding();
+  const accent = adminAccent(branding);
+  const rootVars = { '--a-accent': accent, '--a-on-accent': adminOnAccent(accent) };
   const { logout: authLogout } = useAuth();
 
   const [parent,      setParent]      = useState(null);
@@ -335,7 +346,7 @@ export default function SunshineShell() {
 
   if (authLoading) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: col.bg }}>
+      <div className="as-root" data-theme="light" style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: col.bg, ...rootVars }}>
         <Loader2 size={36} color={col.accent} style={{ animation: 'spin 1s linear infinite' }} />
         <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
       </div>
@@ -366,19 +377,48 @@ export default function SunshineShell() {
   };
 
   return (
-    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', fontFamily: F, background: col.bg }}>
+    <div className={GLASS_PAGE ? 'as-root as-glass' : 'as-root'} data-theme="light" style={{ display: 'flex', height: '100vh', overflow: 'hidden', position: 'relative', fontFamily: F, background: col.bg, ...rootVars }}>
       <style>{`
         @import url('${FONT_URL}');
         * { box-sizing: border-box; }
         @keyframes spin { to { transform: rotate(360deg); } }
-        .p-nav:hover { background: rgba(249,115,22,0.08) !important; }
+        .p-nav { transition: background-color 150ms ease, color 150ms ease, transform 120ms ease-out; }
+        .p-nav:active { transform: scale(0.98); }
+        @media (hover: hover) and (pointer: fine) {
+          .p-nav:not([aria-current="page"]):hover { background: ${GLASS_PAGE ? 'color-mix(in srgb, var(--a-surface) 50%, transparent)' : 'var(--a-raised)'} !important; }
+        }
+        .as-root button:focus-visible { outline: 2px solid var(--a-accent); outline-offset: 2px; }
         ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-thumb { background: #ffe8cc; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb { background: var(--a-line-strong); border-radius: 10px; }
+        .p-navscroll { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--a-pink) 45%, transparent) transparent; }
+        .p-navscroll::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--a-pink) 45%, transparent); border-radius: 999px; }
       `}</style>
 
+      {/* Colour glows across the page — what the glass panes blur */}
+      {GLASS_PAGE && (
+        <div aria-hidden="true" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 0, overflow: 'hidden' }}>
+          {[
+            { l: '-6%',  t: '-12%', s: 420, c: 'color-mix(in srgb, var(--a-pink) 55%, transparent)' },
+            { l: '8%',   t: '45%',  s: 380, c: 'rgba(56,189,248,0.40)' },
+            { l: '38%',  t: '-18%', s: 520, c: 'color-mix(in srgb, var(--a-accent) 42%, transparent)' },
+            { l: '72%',  t: '8%',   s: 440, c: 'rgba(251,191,36,0.45)' },
+            { l: '55%',  t: '60%',  s: 480, c: 'rgba(45,212,191,0.32)' },
+            { l: '-4%',  t: '78%',  s: 360, c: 'rgba(251,191,36,0.40)' },
+            { l: '85%',  t: '70%',  s: 380, c: 'color-mix(in srgb, var(--a-pink) 45%, transparent)' },
+          ].map((g, i) => (
+            <div key={i} style={{ position: 'absolute', left: g.l, top: g.t, width: g.s, height: g.s, borderRadius: '50%', background: `radial-gradient(circle, ${g.c} 0%, transparent 68%)` }} />
+          ))}
+        </div>
+      )}
+
       {/* SIDEBAR */}
-      <aside style={{ width: 228, flexShrink: 0, background: col.sidebar, borderRight: `2px solid ${col.border}`, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
-        <div style={{ padding: '20px 16px 14px', borderBottom: `2px solid ${col.border}` }}>
+      <aside className={GLASS_PAGE ? 'as-glass-ring' : undefined} style={{
+        width: 228, flexShrink: 0, background: col.sidebar, display: 'flex', flexDirection: 'column', zIndex: 100,
+        ...(GLASS_PAGE
+          ? { margin: '12px 0 12px 12px', borderRadius: 26, position: 'relative', border: 'none', overflow: 'hidden' }
+          : { borderRight: `1px solid ${col.border}`, overflowY: 'auto' }),
+      }}>
+        <div style={{ flexShrink: 0, padding: '16px 16px 12px', borderBottom: `1px solid ${col.border}` }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{ width: 40, height: 40, borderRadius: 14, background: ACCENT, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               <Users size={20} color="#fff" />
@@ -391,17 +431,17 @@ export default function SunshineShell() {
         </div>
 
         {children.length > 0 && (
-          <div style={{ padding: '14px 10px 8px', borderBottom: `2px solid ${col.border}` }}>
+          <div style={{ flexShrink: 0, padding: '12px 10px 6px', borderBottom: `1px solid ${col.border}` }}>
             <div style={{ fontSize: 10, fontWeight: 800, color: col.muted, letterSpacing: '.08em', textTransform: 'uppercase', padding: '0 6px 6px' }}>Your Children</div>
             {children.map(child => (
               <button key={child._id} className="p-nav"
                 onClick={() => { setSelectedId(child._id); setActiveTab('overview'); }}
-                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 14, border: 'none', cursor: 'pointer', fontFamily: F, textAlign: 'left', background: selectedId === child._id ? 'rgba(249,115,22,0.12)' : 'transparent', borderLeft: selectedId === child._id ? '3px solid #f97316' : '3px solid transparent', marginBottom: 2 }}>
+                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 14, border: 'none', cursor: 'pointer', fontFamily: F, textAlign: 'left', background: selectedId === child._id ? 'color-mix(in srgb, var(--a-accent) 14%, rgba(255,255,255,0.45))' : 'transparent', boxShadow: selectedId === child._id && GLASS_PAGE ? 'inset 0 0 0 1px var(--as-glass-edge)' : 'none', marginBottom: 2 }}>
                 <div style={{ width: 30, height: 30, borderRadius: 10, background: ACCENT, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 900, fontSize: 13, flexShrink: 0 }}>
                   {child.firstName?.[0]?.toUpperCase()}
                 </div>
                 <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 800, color: selectedId === child._id ? '#f97316' : col.heading, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: selectedId === child._id ? 'var(--a-accent-ink)' : col.heading, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {child.firstName} {child.lastName}
                   </div>
                   <div style={{ fontSize: 10, color: col.muted, fontWeight: 600 }}>{child.classCredits ?? 0} credits</div>
@@ -411,23 +451,26 @@ export default function SunshineShell() {
           </div>
         )}
 
-        <nav style={{ flex: 1, padding: '8px 8px' }}>
+        <nav className="p-navscroll" style={{ flex: 1, minHeight: 0, overflowY: GLASS_PAGE ? 'auto' : 'visible', overflowX: 'hidden', padding: '8px 8px' }}>
           <div style={{ fontSize: 10, fontWeight: 800, color: col.muted, letterSpacing: '.08em', textTransform: 'uppercase', padding: '6px 8px 4px' }}>Dashboard</div>
           {NAV.map(item => {
             const active = activeTab === item.key;
             const Icon = item.icon;
             return (
-              <button key={item.key} className="p-nav"
+              <button key={item.key} className={`p-nav cat-${item.cat}`}
                 onClick={() => setActiveTab(item.key)}
-                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 14, border: 'none', cursor: 'pointer', fontFamily: F, textAlign: 'left', background: active ? 'rgba(249,115,22,0.12)' : 'transparent', borderLeft: active ? '3px solid #f97316' : '3px solid transparent', marginBottom: 2 }}>
-                <Icon size={17} strokeWidth={1.8} color={active ? '#f97316' : col.body} />
-                <span style={{ fontSize: 13, fontWeight: active ? 800 : 600, color: active ? '#f97316' : col.body }}>{item.label}</span>
+                aria-current={active ? 'page' : undefined}
+                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 10, border: 'none', cursor: 'pointer', fontFamily: F, textAlign: 'left', marginBottom: 1,
+                  background: active ? (GLASS_PAGE ? 'color-mix(in srgb, var(--cat) 16%, rgba(255,255,255,0.45))' : 'var(--cat-soft)') : 'transparent',
+                  boxShadow: active && GLASS_PAGE ? 'inset 0 0 0 1px var(--as-glass-edge)' : 'none' }}>
+                <Icon size={17} strokeWidth={active ? 2.1 : 1.8} color="var(--cat)" style={{ flexShrink: 0 }} />
+                <span style={{ fontSize: 13, fontWeight: active ? 800 : 600, color: active ? 'var(--cat-ink)' : col.body }}>{item.label}</span>
               </button>
             );
           })}
         </nav>
 
-        <div style={{ padding: '8px 8px 16px', borderTop: `2px solid ${col.border}` }}>
+        <div style={{ flexShrink: 0, padding: '2px 8px 4px', borderTop: `1px solid ${col.border}` }}>
           <LanguageSwitcher col={col} fontFamily={F} />
           <button className="p-nav" onClick={() => setShowDevices(true)}
             style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 14, border: 'none', cursor: 'pointer', background: 'transparent', fontFamily: F }}>
@@ -444,8 +487,16 @@ export default function SunshineShell() {
       <SessionManagement isOpen={showDevices} onClose={() => setShowDevices(false)} />
 
       {/* MAIN */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        <header style={{ height: 64, background: col.sidebar, borderBottom: `2px solid ${col.border}`, display: 'flex', alignItems: 'center', padding: '0 24px', gap: 14, flexShrink: 0 }}>
+      <div className={GLASS_PAGE ? 'as-glass-ring' : undefined} style={{
+        flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative',
+        ...(GLASS_PAGE ? {
+          margin: 12, borderRadius: 26,
+          background: 'var(--as-glass-frame)',
+          boxShadow: 'inset 0 1px 0 var(--as-glass-edge), 0 24px 48px -24px var(--as-glass-glow)',
+        } : null),
+      }}>
+        <SunsetGlow />
+        <header style={{ height: 64, background: col.sidebar, borderBottom: `1px solid ${col.border}`, display: 'flex', alignItems: 'center', padding: '0 24px', gap: 14, flexShrink: 0, position: 'relative', zIndex: 2 }}>
           <div style={{ flex: 1 }}>
             <h1 style={{ margin: 0, fontSize: 17, fontWeight: 900, color: col.heading, fontFamily: F }}>
               {NAV.find(n => n.key === activeTab)?.label || 'Overview'}
@@ -457,17 +508,19 @@ export default function SunshineShell() {
             )}
           </div>
           <button onClick={() => fetchTabData(selectedId, activeTab)}
-            style={{ background: 'none', border: `1.5px solid ${col.border}`, borderRadius: 10, padding: '7px 10px', cursor: 'pointer' }}>
+            aria-label="Refresh" style={{ background: 'none', border: `1px solid ${col.border}`, borderRadius: 10, padding: '7px 10px', cursor: 'pointer' }}>
             <RefreshCw size={15} color={col.muted} />
           </button>
-          <div style={{ width: 36, height: 36, borderRadius: 12, background: ACCENT, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 900, fontSize: 15, flexShrink: 0 }}>
+          <div style={{ width: 36, height: 36, borderRadius: 12, background: ACCENT, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--a-on-accent)', fontWeight: 900, fontSize: 15, flexShrink: 0 }}>
             {parent?.firstName?.[0]?.toUpperCase() || 'P'}
           </div>
         </header>
 
-        <main style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
+        <main style={{ flex: 1, overflowY: 'auto', padding: 24, position: 'relative' }}>
+          <SunriseBackdrop />
+          <div style={{ position: 'relative' }}>
           {children.length === 0 ? (
-            <div style={{ background: col.card, border: `2px solid ${col.border}`, borderRadius: 20, padding: 60, textAlign: 'center' }}>
+            <div style={{ background: col.card, border: `1px solid ${col.border}`, borderRadius: 20, padding: 60, textAlign: 'center' }}>
               <Users size={48} color={col.muted} style={{ margin: '0 auto 16px' }} />
               <p style={{ fontSize: 16, fontWeight: 800, color: col.heading, margin: '0 0 6px' }}>No children linked yet</p>
               <p style={{ fontSize: 13, color: col.muted }}>Contact your child's school to link your account.</p>
@@ -475,6 +528,7 @@ export default function SunshineShell() {
           ) : (
             tabContent()
           )}
+          </div>
         </main>
       </div>
     </div>

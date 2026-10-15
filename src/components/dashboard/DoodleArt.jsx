@@ -173,7 +173,41 @@ const STICKERS = {
       <ellipse cx="38" cy="58" rx="4" ry="2.2" fill={C.orange} />
     </>
   ),
+  // Three stacked books (pink / sky / amber) with a bookmark — "classes remaining"
+  bookStack: (
+    <>
+      <rect x="8" y="44" width="48" height="12" rx="3" fill={C.amber} />
+      <rect x="11" y="47" width="40" height="2.4" rx="1.2" fill="#fde68a" />
+      <rect x="52" y="44" width="4" height="12" fill={C.gold} />
+      <rect x="12" y="31" width="42" height="12" rx="3" fill={C.sky} transform="rotate(-4 33 37)" />
+      <rect x="15" y="34" width="34" height="2.4" rx="1.2" fill={C.skyLight} transform="rotate(-4 33 37)" />
+      <rect x="10" y="18" width="44" height="12" rx="3" fill="#ec4899" transform="rotate(3 32 24)" />
+      <rect x="13" y="21" width="36" height="2.4" rx="1.2" fill="#f9a8d4" transform="rotate(3 32 24)" />
+      <path d="M40 15 L 46 15 L 46 29 L 43 26 L 40 29 Z" fill={C.coral} />
+      <path d="M23 8 L 25 12.5 L 29.5 13 L 26 16 L 27 20.5 L 23 18 L 19 20.5 L 20 16 L 16.5 13 L 21 12.5 Z" fill="#fde68a" />
+    </>
+  ),
+  // Layered flame (red-orange → orange → amber → yellow core) — "streak"
+  flame: (
+    <>
+      <path d="M32 3 C 36 13, 50 20, 50 38 C 50 51, 42 60, 32 60 C 22 60, 14 51, 14 38 C 14 29, 19 23, 23 18 C 24 25, 27 28, 30 28 C 28 20, 29 10, 32 3 Z" fill="#ef4444" />
+      <path d="M33 16 C 36 24, 45 29, 45 41 C 45 51, 39 57, 32 57 C 25 57, 19 51, 19 42 C 19 36, 22 32, 25 29 C 26 34, 28 36, 31 36 C 30 29, 31 22, 33 16 Z" fill={C.orange} />
+      <path d="M32 31 C 35 37, 40 40, 40 47 C 40 53, 36 56, 32 56 C 28 56, 24 53, 24 47 C 24 43, 26 40, 28 38 C 29 41, 31 42, 32 42 C 31 38, 31 34, 32 31 Z" fill={C.amber} />
+      <ellipse cx="32" cy="50" rx="4.5" ry="5.5" fill="#fef3c7" />
+      <ellipse cx="22" cy="40" rx="2.6" ry="5" fill="#fff" opacity="0.35" transform="rotate(20 22 40)" />
+    </>
+  ),
 };
+
+// Inline sticker for use inside cards / tiles (not absolutely positioned, no pop-in).
+export function StickerIcon({ name, size = 40, style }) {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 64 64" width={size} height={size}
+      style={{ display: 'block', flexShrink: 0, filter: 'drop-shadow(0 3px 4px rgba(90, 45, 15, 0.18))', ...style }}>
+      {STICKERS[name]}
+    </svg>
+  );
+}
 
 // One sticker. `size` in px; `rotate` tilts it; `delay` staggers the pop-in.
 function Sticker({ name, size, style, rotate = 0, delay = 0, opacity = 1 }) {

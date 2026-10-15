@@ -92,6 +92,10 @@ const NAV_GROUPS = [
 ];
 
 // Topic colour per nav group (see .cat-* in index.css)
+// Whole-page look: true = liquid glass (frosted translucent panes over colour glows,
+// gradient border — same as the teacher shell); false = solid panels, thick pink border.
+const GLASS_PAGE = true;
+
 const GROUP_CAT = { "nav.learning": "sky", "nav.practice": "teal", "nav.classes": "amber", "nav.progress": "green", "nav.more": "rose" };
 
 // ── BadgesTab (unchanged logic, same as before) ───────────────────────────────
@@ -231,8 +235,8 @@ export default function SunshineShell() {
     tabShadow:       "color-mix(in srgb, var(--a-accent) 45%, transparent)",
     scrollbarThumb:  () => "var(--a-line-strong)",
     palette: () => ({
-      bg: "var(--a-bg)", card: "var(--a-surface)", cardAlt: "var(--a-raised)", border: "var(--a-line)",
-      heading: "var(--a-ink)", body: "var(--a-ink-2)", muted: "var(--a-muted)", accent: "var(--a-accent)", sidebar: "var(--a-surface)",
+      bg: "var(--a-bg)", card: GLASS_PAGE ? "var(--as-glass-card)" : "var(--a-surface)", cardAlt: "var(--a-raised)", border: "var(--a-line)",
+      heading: "var(--a-ink)", body: "var(--a-ink-2)", muted: "var(--a-muted)", accent: "var(--a-accent)", sidebar: GLASS_PAGE ? "var(--as-glass-card)" : "var(--a-surface)",
     }),
   };
   const accent = adminAccent(branding);
@@ -260,14 +264,18 @@ export default function SunshineShell() {
     return <Classroom classData={d.activeClass} userRole="student" onLeave={d.handleLeaveClassroom} />;
 
   return (
-    <div className="as-root" data-theme={d.isDarkMode ? "dark" : "light"} style={{ display: "flex", height: "100vh", overflow: "hidden", fontFamily: F, background: col.bg, "--a-accent": accent, "--a-on-accent": adminOnAccent(accent) }}>
+    <div className={GLASS_PAGE ? "as-root as-glass" : "as-root"} data-theme={d.isDarkMode ? "dark" : "light"} style={{ display: "flex", height: "100vh", overflow: "hidden", position: "relative", fontFamily: F, background: col.bg, "--a-accent": accent, "--a-on-accent": adminOnAccent(accent) }}>
       <style>{`
         @import url('${dashTheme.fontImport}');
         * { box-sizing: border-box; }
         .ss-navitem { transition: background-color 150ms ease, color 150ms ease, transform 120ms ease-out; }
         .ss-navitem:active { transform: scale(0.98); }
-        @media (hover: hover) and (pointer: fine) { .ss-navitem:not([aria-current="page"]):hover { background: var(--a-raised) !important; } }
+        @media (hover: hover) and (pointer: fine) { .ss-navitem:not([aria-current="page"]):hover { background: ${GLASS_PAGE ? "color-mix(in srgb, var(--a-surface) 55%, transparent)" : "var(--a-raised)"} !important; } }
         .as-root button:focus-visible { outline: 2px solid var(--a-accent); outline-offset: 2px; }
+        .ss-navscroll { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--a-pink) 45%, transparent) transparent; }
+        .ss-navscroll::-webkit-scrollbar { width: 6px; }
+        .ss-navscroll::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--a-pink) 45%, transparent); border-radius: 999px; }
+        .ss-navscroll::-webkit-scrollbar-track { background: transparent; }
         .kid-card { transition: transform 0.2s, box-shadow 0.2s; }
         
         .kid-btn { transition: transform 0.15s; }
@@ -312,17 +320,56 @@ export default function SunshineShell() {
         </div>
       )}
 
+      {/* Colour glows across the page — what the glass panes blur */}
+      {GLASS_PAGE && (
+        <div aria-hidden="true" style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 0, overflow: "hidden", opacity: d.isDarkMode ? 0.5 : 1 }}>
+          {[
+            { l: "-6%",  t: "-12%", s: 420, c: "color-mix(in srgb, var(--a-pink) 55%, transparent)" },
+            { l: "8%",   t: "45%",  s: 380, c: "rgba(56,189,248,0.40)" },
+            { l: "38%",  t: "-18%", s: 520, c: "color-mix(in srgb, var(--a-accent) 42%, transparent)" },
+            { l: "72%",  t: "8%",   s: 440, c: "rgba(251,191,36,0.45)" },
+            { l: "55%",  t: "60%",  s: 480, c: "rgba(45,212,191,0.32)" },
+            { l: "-4%",  t: "78%",  s: 360, c: "rgba(251,191,36,0.40)" },
+            { l: "85%",  t: "70%",  s: 380, c: "color-mix(in srgb, var(--a-pink) 45%, transparent)" },
+          ].map((g, i) => (
+            <div key={i} style={{ position: "absolute", left: g.l, top: g.t, width: g.s, height: g.s, borderRadius: "50%", background: `radial-gradient(circle, ${g.c} 0%, transparent 68%)` }} />
+          ))}
+        </div>
+      )}
+
       {/* ── SIDEBAR ──────────────────────────────────────────────────────────── */}
-      <aside style={{
+      <aside className={GLASS_PAGE ? "as-glass-ring" : undefined} style={{
         width: 220, flexShrink: 0,
-        background: "var(--a-surface)",
-        borderRight: `1px solid ${col.border}`,
+        // Floating rounded panel — liquid glass, or solid with a thick pink border
+        margin: "12px 0 12px 12px",
+        borderRadius: 26,
+        position: "relative",
+        ...(GLASS_PAGE ? {
+          background: d.isDarkMode
+            ? "linear-gradient(160deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.04) 45%, rgba(255,255,255,0.07) 100%)"
+            : "linear-gradient(160deg, rgba(255,255,255,0.62) 0%, rgba(255,255,255,0.30) 45%, rgba(255,255,255,0.46) 100%)",
+          backdropFilter: "blur(24px) saturate(185%)",
+          WebkitBackdropFilter: "blur(24px) saturate(185%)",
+          border: "none",
+          boxShadow: d.isDarkMode
+            ? "inset 0 1px 0 rgba(255,255,255,0.18), inset 0 -1px 0 rgba(255,255,255,0.05), 0 24px 48px -20px rgba(0,0,0,0.6), 0 0 0 1px color-mix(in srgb, var(--a-pink) 22%, transparent)"
+            : "inset 0 1px 0 rgba(255,255,255,0.95), inset 0 -1px 0 rgba(255,255,255,0.4), inset 0 0 24px rgba(255,255,255,0.35), 0 24px 48px -22px color-mix(in srgb, var(--a-pink) 55%, transparent), 0 0 0 1px color-mix(in srgb, var(--a-pink) 22%, transparent)",
+        } : {
+          background: "color-mix(in srgb, var(--a-pink) 7%, var(--a-surface))",
+          border: "3px solid color-mix(in srgb, var(--a-pink) 70%, var(--a-surface))",
+          boxShadow: "0 10px 30px -12px color-mix(in srgb, var(--a-pink) 45%, transparent)",
+        }),
         display: isMobile ? "none" : "flex", flexDirection: "column",
-        overflowY: "auto", overflowX: "hidden",
+        overflow: "hidden",
         zIndex: 100,
       }}>
+        {/* Glass sheen — light catching the top edge */}
+        {GLASS_PAGE && (
+          <div aria-hidden="true" style={{ position: "absolute", inset: 0, borderRadius: "inherit", pointerEvents: "none",
+            background: "linear-gradient(180deg, " + "rgba(255,255,255," + (d.isDarkMode ? 0.1 : 0.55) + ")" + " 0%, rgba(255,255,255,0) 22%), radial-gradient(120% 50% at 0% 0%, " + "rgba(255,255,255," + (d.isDarkMode ? 0.08 : 0.4) + ")" + " 0%, transparent 60%)" }} />
+        )}
         {/* Brand */}
-        <div style={{ padding: "20px 16px 14px", borderBottom: `2px solid ${col.border}` }}>
+        <div style={{ flexShrink: 0, position: "relative", padding: "16px 16px 12px", borderBottom: GLASS_PAGE ? "1px solid " + "rgba(255,255,255," + (d.isDarkMode ? 0.1 : 0.7) + ")" : `2px solid ${col.border}` }}>
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
             {branding?.logo ? (
               <img src={branding.logo} alt="" style={{ width: 38, height: 38, borderRadius: 11, objectFit: "cover", flexShrink: 0, boxShadow: `0 0 0 1px ${col.border}` }} />
@@ -340,7 +387,7 @@ export default function SunshineShell() {
         </div>
 
         {/* Student card */}
-        <div style={{ margin: "12px 10px 8px", background: "var(--a-raised)", borderRadius: 14, padding: "10px 12px", display: "flex", alignItems: "center", gap: 10 }}>
+        <div style={{ flexShrink: 0, margin: "10px 10px 6px", position: "relative", background: GLASS_PAGE ? "rgba(255,255,255," + (d.isDarkMode ? 0.06 : 0.5) + ")" : "var(--a-raised)", boxShadow: GLASS_PAGE ? "inset 0 0 0 1px " + "rgba(255,255,255," + (d.isDarkMode ? 0.1 : 0.8) + ")" : "none", borderRadius: 14, padding: "10px 12px", display: "flex", alignItems: "center", gap: 10 }}>
           <div style={{ width: 34, height: 34, borderRadius: 10, background: "var(--a-accent-soft)", boxShadow: "inset 0 0 0 1px var(--a-accent-line)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--a-accent-ink)", fontWeight: 900, fontSize: 15, flexShrink: 0 }}>
             {(d.student.firstName?.[0] || "S").toUpperCase()}
           </div>
@@ -354,7 +401,7 @@ export default function SunshineShell() {
         </div>
 
         {/* Nav groups — each group has a topic colour (same idea as the admin) */}
-        <nav style={{ flex: 1, padding: "4px 8px" }}>
+        <nav className="ss-navscroll" style={{ position: "relative", flex: 1, minHeight: 0, overflowY: "auto", overflowX: "hidden", padding: "4px 8px" }}>
           {NAV_GROUPS.map((group, gi) => (
             <div key={gi} className={`cat-${GROUP_CAT[group.labelKey] || "accent"}`} style={{ marginBottom: 6 }}>
               {group.labelKey && (
@@ -377,8 +424,8 @@ export default function SunshineShell() {
                     style={{
                       width: "100%", display: "flex", alignItems: "center", gap: 10,
                       padding: "8px 10px", borderRadius: 10, border: "none", cursor: "pointer",
-                      background: isActive ? "var(--cat-soft)" : "transparent",
-                      fontFamily: F, textAlign: "left", marginBottom: 1,
+                      background: isActive ? (GLASS_PAGE ? `color-mix(in srgb, var(--cat) ${d.isDarkMode ? 22 : 16}%, rgba(255,255,255,${d.isDarkMode ? 0.06 : 0.45}))` : "var(--cat-soft)") : "transparent",
+                      boxShadow: isActive && GLASS_PAGE ? `inset 0 0 0 1px rgba(255,255,255,${d.isDarkMode ? 0.1 : 0.6})` : "none",                      fontFamily: F, textAlign: "left", marginBottom: 1,
                     }}>
                     <LI size={17} strokeWidth={isActive ? 2.1 : 1.8} color="var(--cat)" style={{ flexShrink: 0 }} />
                     <span style={{ flex: 1, fontSize: 13, fontWeight: isActive ? 800 : 600, color: isActive ? "var(--cat-ink)" : col.body }}>
@@ -397,9 +444,9 @@ export default function SunshineShell() {
         </nav>
 
         {/* Bottom actions */}
-        <div style={{ padding: "8px 8px 16px", borderTop: `2px solid ${col.border}` }}>
+        <div style={{ flexShrink: 0, position: "relative", padding: "2px 8px 4px", borderTop: GLASS_PAGE ? "1px solid " + "rgba(255,255,255," + (d.isDarkMode ? 0.1 : 0.7) + ")" : `2px solid ${col.border}` }}>
           {/* Dark mode toggle */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 12px", marginBottom: 4 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 12px", marginBottom: 0 }}>
             <span style={{ fontSize: 12, fontWeight: 700, color: col.muted }}>{d.isDarkMode ? t('sidebar.darkMode') : t('sidebar.lightMode')}</span>
             <button onClick={() => d.setIsDarkMode(v => !v)} role="switch" aria-checked={d.isDarkMode} aria-label={t('sidebar.darkMode')}
               style={{ width: 40, height: 22, borderRadius: 999, border: "none", cursor: "pointer", background: d.isDarkMode ? "var(--a-accent)" : "var(--a-line-strong)", position: "relative", transition: "background-color 200ms ease", flexShrink: 0 }}>
@@ -408,7 +455,7 @@ export default function SunshineShell() {
           </div>
 
           <button className="ss-navitem" onClick={() => d.setShowSettingsSidebar(true)}
-            style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", borderRadius: 14, border: "none", cursor: "pointer", background: "transparent", fontFamily: F, marginBottom: 1 }}>
+            style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "7px 12px", borderRadius: 14, border: "none", cursor: "pointer", background: "transparent", fontFamily: F, marginBottom: 1 }}>
             <Settings size={17} color={col.muted} />
             <span style={{ fontSize: 13, fontWeight: 600, color: col.body }}>{t('sidebar.settings')}</span>
           </button>
@@ -416,7 +463,7 @@ export default function SunshineShell() {
           <LanguageSwitcher col={col} fontFamily={dashTheme.font} />
 
           <button className="ss-navitem" onClick={d.handleLogout}
-            style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", borderRadius: 14, border: "none", cursor: "pointer", background: "transparent", fontFamily: F }}>
+            style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "7px 12px", borderRadius: 14, border: "none", cursor: "pointer", background: "transparent", fontFamily: F }}>
             <LogOut size={17} color={col.muted} />
             <span style={{ fontSize: 13, fontWeight: 600, color: col.body }}>{t('sidebar.signOut')}</span>
           </button>
@@ -433,11 +480,26 @@ export default function SunshineShell() {
       </aside>
 
       {/* ── MAIN ─────────────────────────────────────────────────────────────── */}
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", position: "relative" }}>
+      <div className={GLASS_PAGE && !isMobile ? "as-glass-ring" : undefined} style={{
+        flex: 1, minWidth: 0, display: "flex", flexDirection: "column", overflow: "hidden", position: "relative",
+        // Desktop: rounded panel matching the sidebar
+        ...(isMobile ? null : {
+          margin: 12, borderRadius: 26,
+          ...(GLASS_PAGE ? {
+            background: "var(--as-glass-frame)",
+            border: "none",
+            boxShadow: "inset 0 1px 0 var(--as-glass-edge), 0 24px 48px -24px var(--as-glass-glow)",
+          } : {
+            background: col.bg,
+            border: "3px solid color-mix(in srgb, var(--a-pink) 70%, var(--a-surface))",
+            boxShadow: "0 10px 30px -12px color-mix(in srgb, var(--a-pink) 45%, transparent)",
+          }),
+        }),
+      }}>
         {!isMobile && d.activeTab !== "messages" && <DoodleSunset />}
 
         {/* ── TOP BAR ── */}
-        <header style={{ height: 60, position: "relative", zIndex: 2, background: "var(--a-surface)", borderBottom: `1px solid ${col.border}`, display: "flex", alignItems: "center", padding: isMobile ? "0 12px" : "0 24px", gap: isMobile ? 8 : 16, flexShrink: 0 }}>
+        <header style={{ height: 60, position: "relative", zIndex: 2, background: col.sidebar, borderBottom: `1px solid ${col.border}`, display: "flex", alignItems: "center", padding: isMobile ? "0 12px" : "0 24px", gap: isMobile ? 8 : 16, flexShrink: 0 }}>
           {/* Page title */}
           <h1 style={{ margin: 0, fontSize: 18, fontWeight: 900, color: col.heading, flex: 1, display: 'flex', alignItems: 'center', gap: 8 }}>
             {(() => { const it = NAV_GROUPS.flatMap(g => g.items).find(i => i.key === d.activeTab); const LI = it?.lucide || Home; return <LI size={20} strokeWidth={2.2} color={col.accent} />; })()}
@@ -518,7 +580,7 @@ export default function SunshineShell() {
             <div style={{ display: "flex", flexDirection: "column", gap: 22, fontFamily: F }}>
 
               {/* Welcome banner — bright sunrise glow + the student's own crayon doodles */}
-              <section className="fade-up" style={{ position: "relative", overflow: "hidden", background: "var(--a-surface)", border: `1px solid ${col.border}`, borderRadius: isMobile ? 20 : 24, padding: isMobile ? "16px 18px" : "26px 30px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: isMobile ? 12 : 24, boxShadow: "var(--a-shadow)" }}>
+              <section className="fade-up" style={{ position: "relative", overflow: "hidden", background: col.card, border: `1px solid ${col.border}`, borderRadius: isMobile ? 20 : 24, padding: isMobile ? "16px 18px" : "26px 30px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: isMobile ? 12 : 24, boxShadow: "var(--a-shadow)" }}>
                 <DoodleBannerArt />
                 <div style={{ position: "relative", flex: 1, minWidth: 0 }}>
                   <p style={{ margin: "0 0 4px", background: "var(--a-accent-grad)", WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent", display: "inline-block", fontSize: isMobile ? 12 : 14, fontWeight: 800 }}>{t('dashboard.greeting', { name: d.student.firstName })}</p>
@@ -577,7 +639,7 @@ export default function SunshineShell() {
                   { Icon: Award,        n: d.badges.length,             l: t('dashboard.stats.badgesEarned'), cat: "rose"  },
                   { Icon: Star,         n: d.progress.weeklyCompleted,  l: t('dashboard.stats.thisWeek'),     cat: "amber" },
                 ].map((s, i) => (
-                  <div key={i} className={`stat-card cat-${s.cat}`} style={{ position: "relative", overflow: "hidden", background: "radial-gradient(120% 90% at 100% 0%, var(--cat-soft) 0%, transparent 55%), var(--a-surface)", borderRadius: 18, padding: isMobile ? "14px" : "16px 18px", border: `1px solid ${col.border}`, display: "flex", alignItems: "center", gap: 14, boxShadow: "var(--a-shadow)" }}>
+                  <div key={i} className={`stat-card cat-${s.cat}`} style={{ position: "relative", overflow: "hidden", background: `radial-gradient(120% 90% at 100% 0%, var(--cat-soft) 0%, transparent 55%), ${col.card}`, borderRadius: 18, padding: isMobile ? "14px" : "16px 18px", border: `1px solid ${col.border}`, display: "flex", alignItems: "center", gap: 14, boxShadow: "var(--a-shadow)" }}>
                     <div style={{ width: 44, height: 44, borderRadius: 13, background: "var(--cat)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 6px 14px -6px var(--cat)", flexShrink: 0 }}>
                       <s.Icon size={20} color="#fff" strokeWidth={2.2} />
                     </div>
@@ -626,7 +688,7 @@ export default function SunshineShell() {
                     <h3 style={{ margin: "0 0 12px", fontSize: 16, fontWeight: 900, color: col.heading, display: "flex", alignItems: "center", gap: 8 }}>
                       <Target size={17} color={col.accent} strokeWidth={2} /> {t('dashboard.myProgress')}
                     </h3>
-                    <ProgressCard progress={d.progress} />
+                    <ProgressCard progress={d.progress} sunshine />
                   </div>
 
                   <StreakWidget isDarkMode={d.isDarkMode} onLoad={d.handleStreakLoaded} />
@@ -708,7 +770,7 @@ export default function SunshineShell() {
           )}
 
           {/* ══ MESSAGES ══ */}
-          {d.activeTab === "messages" && <div style={{ background: col.card, border: `1px solid ${col.border}`, borderRadius: "24px", overflow: "hidden" }}><MessagesTab userRole="student" onUnreadCount={d.setUnreadMessages} /></div>}
+          {d.activeTab === "messages" && <div className="as-pink" style={{ background: col.card, border: `1px solid ${col.border}`, borderRadius: "24px", overflow: "hidden" }}><MessagesTab userRole="student" onUnreadCount={d.setUnreadMessages} /></div>}
 
           {/* ══ COMPLETED ══ */}
           {d.activeTab === "completed-classes" && (

@@ -7,7 +7,7 @@
 // recipient's screen until they answer, decline, or it times out (30 s).
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Phone, PhoneOff, PhoneMissed, Search, RefreshCw, Bell, BellOff } from "lucide-react";
+import { Phone, PhoneOff, PhoneMissed, Search, RefreshCw, Bell, BellOff, Music } from "lucide-react";
 import api from "../../api";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { useRing } from "../../context/RingContext";
@@ -146,12 +146,12 @@ export default function RingTab({ isDark }) {
   }, [ringtoneId, setRingtoneId, stopPreview]);
 
   const C = {
-    bg:      isDark ? "#13151c" : "#f8f9ff",
-    card:    isDark ? "#1a1d2e" : "#ffffff",
-    border:  isDark ? "rgba(255,255,255,0.08)" : "#eef0f8",
-    text:    isDark ? "#e8eaf6" : "#1a1d2e",
-    sub:     isDark ? "#8b91b8" : "#9ea3be",
-    input:   isDark ? "#1e2235" : "#eef0f8",
+    bg:      isDark ? "var(--as-surface, #13151c)" : "var(--as-raised, #f8f9ff)",
+    card:    isDark ? "var(--as-raised, #1a1d2e)" : "var(--as-surface, #ffffff)",
+    border:  isDark ? "rgba(255,255,255,0.08)" : "var(--as-line, #eef0f8)",
+    text:    isDark ? "var(--as-ink, #e8eaf6)" : "var(--as-ink, #1a1d2e)",
+    sub:     isDark ? "var(--as-muted, #8b91b8)" : "var(--as-muted, #9ea3be)",
+    input:   isDark ? "var(--as-raised, #1e2235)" : "var(--as-raised, #eef0f8)",
     accent:  "var(--as-accent, #6366f1)",
   };
 
@@ -277,7 +277,7 @@ export default function RingTab({ isDark }) {
     ? (customFileName
         ? `📁 ${customFileName.length > 18 ? customFileName.slice(0, 16) + "…" : customFileName}`
         : "📁 Custom")
-    : (_activeTone ? `${_activeTone.emoji} ${_activeTone.label}` : "");
+    : (_activeTone ? _activeTone.label : "");
 
   // Custom chip state — pre-computed so they can be used inline without an IIFE
   const customIsSelected   = ringtoneId   === CUSTOM_RINGTONE_ID;
@@ -300,7 +300,7 @@ export default function RingTab({ isDark }) {
           50%      { box-shadow: 0 0 0 8px rgba(34,197,94,0); }
         }
         @keyframes ring-fadein { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:none} }
-        .ring-contact-card:hover { background: ${isDark ? "rgba(255,255,255,0.04)" : "rgba(99,102,241,0.04)"} !important; }
+        .ring-contact-card:hover { background: ${isDark ? "rgba(255,255,255,0.04)" : "color-mix(in srgb, var(--as-accent, #6366f1) 4%, transparent)"} !important; }
       `}</style>
 
       {/* ── Session expired warning ── */}
@@ -328,14 +328,14 @@ export default function RingTab({ isDark }) {
       <div style={{
         padding: "16px 20px 12px",
         borderBottom: `1px solid ${C.border}`,
-        background: isDark ? "#16191f" : "#fff",
+        background: isDark ? "var(--as-surface, #16191f)" : "var(--as-surface, #fff)",
         flexShrink: 0,
       }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
             <div>
               <h3 style={{ margin: 0, fontSize: "15px", fontWeight: "800", color: C.text }}>
-                📞 Ring
+                <Phone size={15} color={C.accent} strokeWidth={2.4} style={{ display: "inline-block", verticalAlign: "-2px", marginRight: 6 }} />Ring
               </h3>
               <p style={{ margin: "2px 0 0", fontSize: "11px", color: C.sub }}>
                 {contacts.length} contact{contacts.length !== 1 ? "s" : ""} available
@@ -407,7 +407,7 @@ export default function RingTab({ isDark }) {
               display: "flex", alignItems: "center", justifyContent: "space-between",
               padding: "9px 12px",
               background: tonesOpen
-                ? (isDark ? "rgba(99,102,241,0.1)" : "rgba(99,102,241,0.05)")
+                ? (isDark ? "color-mix(in srgb, var(--as-accent, #6366f1) 10%, transparent)" : "color-mix(in srgb, var(--as-accent, #6366f1) 5%, transparent)")
                 : (isDark ? "rgba(255,255,255,0.03)" : "#fafbff"),
               border: "none", cursor: "pointer",
               transition: "background 0.15s",
@@ -416,7 +416,7 @@ export default function RingTab({ isDark }) {
           >
             {/* Left: label */}
             <div style={{ display: "flex", alignItems: "center", gap: "7px" }}>
-              <span style={{ fontSize: "13px" }}>🎵</span>
+              <Music size={14} color={C.accent} strokeWidth={2.2} />
               <span style={{ fontSize: "11.5px", fontWeight: "800",
                 textTransform: "uppercase", letterSpacing: "0.07em", color: C.sub }}>
                 Ringtone
@@ -443,7 +443,7 @@ export default function RingTab({ isDark }) {
             <div style={{
               padding: "10px 12px 12px",
               borderTop: `1px solid ${C.border}`,
-              background: isDark ? "rgba(255,255,255,0.015)" : "#fff",
+              background: isDark ? "rgba(255,255,255,0.015)" : "var(--as-surface, #fff)",
             }}>
           <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
             {/* ── Synthetic tones ── */}
@@ -459,17 +459,17 @@ export default function RingTab({ isDark }) {
                     padding: "5px 10px", borderRadius: "20px",
                     border: isSelected
                       ? `2px solid ${C.accent}`
-                      : `2px solid ${isDark ? "rgba(255,255,255,0.1)" : "#e2e8f0"}`,
+                      : `2px solid ${isDark ? "rgba(255,255,255,0.1)" : "var(--as-line, #e2e8f0)"}`,
                     background: isSelected
-                      ? (isDark ? "rgba(99,102,241,0.18)" : "rgba(99,102,241,0.08)")
-                      : (isDark ? "rgba(255,255,255,0.04)" : "#f8fafc"),
+                      ? (isDark ? "color-mix(in srgb, var(--as-accent, #6366f1) 18%, transparent)" : "color-mix(in srgb, var(--as-accent, #6366f1) 8%, transparent)")
+                      : (isDark ? "rgba(255,255,255,0.04)" : "var(--as-raised, #f8fafc)"),
                     cursor: "pointer",
                     fontSize: "11.5px", fontWeight: isSelected ? "800" : "600",
                     color: isSelected ? C.accent : C.sub,
                     transition: "all 0.15s", fontFamily: "inherit",
                   }}
                 >
-                  <span style={{ fontSize: "13px" }}>{tone.emoji}</span>
+                  <Music size={13} color={C.accent} strokeWidth={2.2} />
                   {tone.label}
                   <span
                     role="button"
@@ -477,7 +477,7 @@ export default function RingTab({ isDark }) {
                     title={isPreviewing ? "Stop preview" : "Preview"}
                     style={{
                       marginLeft: "3px", fontSize: "10px",
-                      background: isPreviewing ? "#ef4444" : (isDark ? "rgba(255,255,255,0.12)" : "#e2e8f0"),
+                      background: isPreviewing ? "#ef4444" : (isDark ? "rgba(255,255,255,0.12)" : "var(--as-raised, #e2e8f0)"),
                       color: isPreviewing ? "#fff" : C.sub,
                       borderRadius: "50%", width: "16px", height: "16px",
                       display: "inline-flex", alignItems: "center", justifyContent: "center",
@@ -506,10 +506,10 @@ export default function RingTab({ isDark }) {
                 padding: "5px 10px", borderRadius: "20px",
                 border: customIsSelected
                   ? `2px solid ${C.accent}`
-                  : `2px solid ${isDark ? "rgba(255,255,255,0.1)" : "#e2e8f0"}`,
+                  : `2px solid ${isDark ? "rgba(255,255,255,0.1)" : "var(--as-line, #e2e8f0)"}`,
                 background: customIsSelected
-                  ? (isDark ? "rgba(99,102,241,0.18)" : "rgba(99,102,241,0.08)")
-                  : (isDark ? "rgba(255,255,255,0.04)" : "#f8fafc"),
+                  ? (isDark ? "color-mix(in srgb, var(--as-accent, #6366f1) 18%, transparent)" : "color-mix(in srgb, var(--as-accent, #6366f1) 8%, transparent)")
+                  : (isDark ? "rgba(255,255,255,0.04)" : "var(--as-raised, #f8fafc)"),
                 cursor: "pointer",
                 fontSize: "11.5px", fontWeight: customIsSelected ? "800" : "600",
                 color: customIsSelected ? C.accent : C.sub,
@@ -532,7 +532,7 @@ export default function RingTab({ isDark }) {
                   title={customIsPreviewing ? "Stop preview" : "Preview"}
                   style={{
                     marginLeft: "2px", fontSize: "10px",
-                    background: customIsPreviewing ? "#ef4444" : (isDark ? "rgba(255,255,255,0.12)" : "#e2e8f0"),
+                    background: customIsPreviewing ? "#ef4444" : (isDark ? "rgba(255,255,255,0.12)" : "var(--as-raised, #e2e8f0)"),
                     color: customIsPreviewing ? "#fff" : C.sub,
                     borderRadius: "50%", width: "16px", height: "16px",
                     display: "inline-flex", alignItems: "center", justifyContent: "center",
@@ -568,7 +568,7 @@ export default function RingTab({ isDark }) {
                 style={{
                   display: "flex", alignItems: "center", gap: "5px",
                   padding: "5px 12px", borderRadius: "8px", border: "none",
-                  background: isDark ? "rgba(99,102,241,0.2)" : "rgba(99,102,241,0.1)",
+                  background: isDark ? "color-mix(in srgb, var(--as-accent, #6366f1) 20%, transparent)" : "color-mix(in srgb, var(--as-accent, #6366f1) 10%, transparent)",
                   color: C.accent, cursor: uploading ? "wait" : "pointer",
                   fontSize: "11.5px", fontWeight: "700", fontFamily: "inherit",
                   opacity: uploading ? 0.7 : 1, transition: "opacity 0.2s",
@@ -675,7 +675,7 @@ export default function RingTab({ isDark }) {
                       padding: "10px 20px", gap: "13px",
                       transition: "background 0.12s",
                       background: isRing
-                        ? (isDark ? "rgba(99,102,241,0.12)" : "rgba(99,102,241,0.06)")
+                        ? (isDark ? "color-mix(in srgb, var(--as-accent, #6366f1) 12%, transparent)" : "color-mix(in srgb, var(--as-accent, #6366f1) 6%, transparent)")
                         : "transparent",
                       opacity: isMuted ? 0.65 : 1,
                     }}
@@ -686,7 +686,7 @@ export default function RingTab({ isDark }) {
                       background: rc.grad, flexShrink: 0,
                       display: "flex", alignItems: "center", justifyContent: "center",
                       fontSize: "13px", fontWeight: "800", color: "#fff",
-                      boxShadow: `0 4px 12px ${rc.badge}40`,
+                      boxShadow: `0 4px 12px color-mix(in srgb, ${rc.badge} 25%, transparent)`,
                     }}>
                       {getInitials(contact.name)}
                     </div>
@@ -702,7 +702,7 @@ export default function RingTab({ isDark }) {
                       <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "3px", flexWrap: "wrap" }}>
                         <span style={{
                           fontSize: "10px", fontWeight: "700", color: rc.badge,
-                          background: isDark ? `${rc.badge}25` : rc.light,
+                          background: isDark ? `color-mix(in srgb, ${rc.badge} 15%, transparent)` : rc.light,
                           padding: "1px 7px", borderRadius: "6px", textTransform: "capitalize",
                         }}>
                           {contact.role}
@@ -738,7 +738,7 @@ export default function RingTab({ isDark }) {
                           </span>
                         )}
                         {status === "offline" && (
-                          <span style={{ fontSize: "10px", color: "#94a3b8", fontWeight: "600" }}>
+                          <span style={{ fontSize: "10px", color: "var(--as-muted, #94a3b8)", fontWeight: "600" }}>
                             📴 Offline
                           </span>
                         )}
@@ -781,7 +781,7 @@ export default function RingTab({ isDark }) {
                         style={{
                           width: "40px", height: "40px", borderRadius: "50%",
                           background: (ringingId || socketConnected === false || isMuted)
-                            ? (isDark ? "#1e2235" : "#f1f5f9")
+                            ? (isDark ? "var(--as-raised, #1e2235)" : "var(--as-raised, #f1f5f9)")
                             : "linear-gradient(135deg,var(--as-accent, #6366f1),var(--as-accent-2, #8b5cf6))",
                           border: "none",
                           cursor: (ringingId || socketConnected === false || isMuted) ? "not-allowed" : "pointer",
@@ -789,7 +789,7 @@ export default function RingTab({ isDark }) {
                           display: "flex", alignItems: "center", justifyContent: "center",
                           opacity: (ringingId || socketConnected === false || isMuted) ? 0.35 : 1,
                           transition: "all 0.15s",
-                          boxShadow: (ringingId || socketConnected === false || isMuted) ? "none" : "0 4px 14px rgba(99,102,241,0.4)",
+                          boxShadow: (ringingId || socketConnected === false || isMuted) ? "none" : "0 4px 14px color-mix(in srgb, var(--as-accent, #6366f1) 40%, transparent)",
                           color: "#fff", fontSize: "16px",
                         }}
                         title={isMuted ? "This user has calls muted" : socketConnected === false ? "Session expired — please log out and back in" : `Ring ${contact.name}`}
@@ -821,7 +821,7 @@ export default function RingTab({ isDark }) {
         <div style={{
           padding: "12px 20px",
           borderTop: `1px solid ${C.border}`,
-          background: isDark ? "#16191f" : "#fff",
+          background: isDark ? "var(--as-surface, #16191f)" : "var(--as-surface, #fff)",
           display: "flex", alignItems: "center", justifyContent: "space-between",
           flexShrink: 0, animation: "ring-fadein 0.2s ease",
         }}>

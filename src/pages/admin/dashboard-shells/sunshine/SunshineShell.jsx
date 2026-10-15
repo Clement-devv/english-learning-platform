@@ -76,16 +76,20 @@ const TICK_PEOPLE = 6;   // every 3 min — teachers + students lists
 // ── Design tokens ─────────────────────────────────────────────────────────────
 // Values live in src/index.css (.as-root) — warm neutrals + one accent taken from
 // the center's brand colour — so light/dark and brand changes need no JS here.
+// Whole-page look: true = liquid glass (frosted panes over colour glows, gradient
+// border — same as the teacher / student shells); false = the original solid layout.
+const GLASS_PAGE = true;
+
 const palette = () => ({
   bg:      'var(--a-bg)',
-  card:    'var(--a-surface)',
+  card:    GLASS_PAGE ? 'var(--as-glass-card)' : 'var(--a-surface)',
   cardAlt: 'var(--a-raised)',
   border:  'var(--a-line)',
   heading: 'var(--a-ink)',
   body:    'var(--a-ink-2)',
   muted:   'var(--a-muted)',
   accent:  'var(--a-accent)',
-  sidebar: 'var(--a-surface)',
+  sidebar: GLASS_PAGE ? 'var(--as-glass-card)' : 'var(--a-surface)',
 });
 
 // ── Nav groups ────────────────────────────────────────────────────────────────
@@ -419,9 +423,9 @@ export default function SunshineShell() {
 
   return (
     <div
-      className="as-root"
+      className={GLASS_PAGE ? 'as-root as-glass' : 'as-root'}
       data-theme={isDarkMode ? 'dark' : 'light'}
-      style={{ display: 'flex', height: '100vh', overflow: 'hidden', fontFamily: F, background: col.bg, '--a-accent': accent, '--a-on-accent': adminOnAccent(accent) }}
+      style={{ display: 'flex', height: '100vh', overflow: 'hidden', position: 'relative', fontFamily: F, background: col.bg, '--a-accent': accent, '--a-on-accent': adminOnAccent(accent) }}
     >
       <style>{`
         @import url('${FONT_IMPORT}');
@@ -432,7 +436,7 @@ export default function SunshineShell() {
         .as-press:not(:disabled):active { transform: scale(0.97); }
         .as-card { transition: transform 0.2s, box-shadow 0.2s; }
         @media (hover: hover) and (pointer: fine) {
-          .as-nav:not([aria-current="page"]):hover { background: var(--a-raised) !important; }
+          .as-nav:not([aria-current="page"]):hover { background: ${GLASS_PAGE ? 'color-mix(in srgb, var(--a-surface) 50%, transparent)' : 'var(--a-raised)'} !important; }
           .as-card:hover { transform: translateY(-3px); box-shadow: 0 10px 28px rgba(0,0,0,0.10) !important; }
           .as-accent-btn:not(:disabled):hover { background: var(--a-accent-hover) !important; }
         }
@@ -443,15 +447,35 @@ export default function SunshineShell() {
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: var(--a-line-strong); border-radius: 10px; }
+        .as-navscroll { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--a-pink) 45%, transparent) transparent; }
+        .as-navscroll::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--a-pink) 45%, transparent); border-radius: 999px; }
       `}</style>
 
+      {/* Colour glows across the page — what the glass panes blur */}
+      {GLASS_PAGE && (
+        <div aria-hidden="true" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 0, overflow: 'hidden', opacity: isDarkMode ? 0.5 : 1 }}>
+          {[
+            { l: '-6%',  t: '-12%', s: 420, c: 'color-mix(in srgb, var(--a-pink) 55%, transparent)' },
+            { l: '8%',   t: '45%',  s: 380, c: 'rgba(56,189,248,0.40)' },
+            { l: '38%',  t: '-18%', s: 520, c: 'color-mix(in srgb, var(--a-accent) 42%, transparent)' },
+            { l: '72%',  t: '8%',   s: 440, c: 'rgba(251,191,36,0.45)' },
+            { l: '55%',  t: '60%',  s: 480, c: 'rgba(45,212,191,0.32)' },
+            { l: '-4%',  t: '78%',  s: 360, c: 'rgba(251,191,36,0.40)' },
+            { l: '85%',  t: '70%',  s: 380, c: 'color-mix(in srgb, var(--a-pink) 45%, transparent)' },
+          ].map((g, i) => (
+            <div key={i} style={{ position: 'absolute', left: g.l, top: g.t, width: g.s, height: g.s, borderRadius: '50%', background: `radial-gradient(circle, ${g.c} 0%, transparent 68%)` }} />
+          ))}
+        </div>
+      )}
+
       {/* ── SIDEBAR ──────────────────────────────────────────────────────────── */}
-      <aside style={{
+      <aside className={GLASS_PAGE ? 'as-glass-ring' : undefined} style={{
         width: 224, flexShrink: 0,
         background: col.sidebar,
-        borderRight: `1px solid ${col.border}`,
+        ...(GLASS_PAGE
+          ? { margin: '12px 0 12px 12px', borderRadius: 26, position: 'relative', border: 'none', overflow: 'hidden' }
+          : { borderRight: `1px solid ${col.border}`, overflowY: 'auto', overflowX: 'hidden' }),
         display: 'flex', flexDirection: 'column',
-        overflowY: 'auto', overflowX: 'hidden',
         zIndex: 100,
       }}>
         {/* Brand — center logo if it has one, otherwise its initial on the accent */}
@@ -485,7 +509,7 @@ export default function SunshineShell() {
         </div>
 
         {/* Admin info card */}
-        <div style={{ margin: '12px 10px 8px', background: 'var(--a-raised)', borderRadius: 14, padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ flexShrink: 0, margin: '10px 10px 6px', background: GLASS_PAGE ? 'color-mix(in srgb, var(--a-surface) 45%, transparent)' : 'var(--a-raised)', boxShadow: GLASS_PAGE ? 'inset 0 0 0 1px var(--as-glass-edge)' : 'none', borderRadius: 14, padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{ width: 32, height: 32, borderRadius: 10, background: 'var(--a-accent-soft)', color: 'var(--a-accent-ink)', boxShadow: 'inset 0 0 0 1px var(--a-accent-line)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 14, flexShrink: 0 }}>
             {(adminInfo?.firstName?.[0] || 'A').toUpperCase()}
           </div>
@@ -498,7 +522,7 @@ export default function SunshineShell() {
         </div>
 
         {/* Nav */}
-        <nav style={{ flex: 1, padding: '4px 8px' }}>
+        <nav className="as-navscroll" style={{ flex: 1, minHeight: 0, overflowY: GLASS_PAGE ? 'auto' : 'visible', overflowX: 'hidden', padding: '4px 8px' }}>
           {NAV_GROUPS.map((group, gi) => (
             <div key={gi} className={`cat-${group.cat}`} style={{ marginBottom: 6 }}>
               {group.label && (
@@ -519,7 +543,8 @@ export default function SunshineShell() {
                     style={{
                       width: '100%', display: 'flex', alignItems: 'center', gap: 10,
                       padding: '8px 10px', borderRadius: 10, border: 'none', cursor: 'pointer',
-                      background: isActive ? 'var(--cat-soft)' : 'transparent',
+                      background: isActive ? (GLASS_PAGE ? `color-mix(in srgb, var(--cat) ${isDarkMode ? 22 : 16}%, rgba(255,255,255,${isDarkMode ? 0.06 : 0.45}))` : 'var(--cat-soft)') : 'transparent',
+                      boxShadow: isActive && GLASS_PAGE ? 'inset 0 0 0 1px var(--as-glass-edge)' : 'none',
                       fontFamily: F, textAlign: 'left',
                       marginBottom: 1,
                     }}>
@@ -540,8 +565,8 @@ export default function SunshineShell() {
         </nav>
 
         {/* Bottom controls */}
-        <div style={{ padding: '8px 8px 16px', borderTop: `1px solid ${col.border}` }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 10px', marginBottom: 4 }}>
+        <div style={{ flexShrink: 0, padding: GLASS_PAGE ? '2px 8px 4px' : '8px 8px 16px', borderTop: `1px solid ${col.border}` }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: GLASS_PAGE ? '6px 10px' : '8px 10px', marginBottom: GLASS_PAGE ? 0 : 4 }}>
             <span style={{ fontSize: 12, fontWeight: 700, color: col.muted }}>{isDarkMode ? t('admin.sidebar.darkMode') : t('admin.sidebar.lightMode')}</span>
             <button onClick={toggleDarkMode} role="switch" aria-checked={isDarkMode} aria-label={t('admin.sidebar.darkMode')}
               style={{ width: 40, height: 22, borderRadius: 999, border: 'none', cursor: 'pointer', background: isDarkMode ? ACCENT : 'var(--a-line-strong)', position: 'relative', transition: 'background-color 200ms ease', flexShrink: 0 }}>
@@ -568,7 +593,14 @@ export default function SunshineShell() {
       </aside>
 
       {/* ── MAIN ─────────────────────────────────────────────────────────────── */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
+      <div className={GLASS_PAGE ? 'as-glass-ring' : undefined} style={{
+        flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative',
+        ...(GLASS_PAGE ? {
+          margin: 12, borderRadius: 26,
+          background: 'var(--as-glass-frame)',
+          boxShadow: 'inset 0 1px 0 var(--as-glass-edge), 0 24px 48px -24px var(--as-glass-glow)',
+        } : null),
+      }}>
         <SunsetGlow />
 
         {/* Top bar */}
@@ -625,7 +657,7 @@ export default function SunshineShell() {
           {/* Hero — only on overview. Bright orange sunrise glow between the greeting and the
               stats, pink on the right, amber underneath; rings drawn in an orange→pink line. */}
           {showHero && (
-            <section style={{ position: 'relative', borderRadius: 20, overflow: 'hidden', marginBottom: 24, padding: '26px 28px', background: 'var(--a-surface)', border: `1px solid ${col.border}`, boxShadow: 'var(--a-shadow)' }}>
+            <section style={{ position: 'relative', borderRadius: 20, overflow: 'hidden', marginBottom: 24, padding: '26px 28px', background: col.card, border: `1px solid ${col.border}`, boxShadow: 'var(--a-shadow)' }}>
               <div aria-hidden="true" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: [
                 // golden-hot core inside the orange so it reads as light, not paint
                 'radial-gradient(14% 70% at 50% -5%, rgba(255,214,102,0.85) 0%, rgba(253,186,116,0.4) 55%, transparent 100%)',

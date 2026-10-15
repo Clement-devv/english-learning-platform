@@ -24,16 +24,16 @@ export default function GroupChatList({ userRole, onSelectChat, selectedChatId, 
   const { lastChatEvent, socketConnected } = useRing();
 
   const C = {
-    bg:         isDark ? "#13151c" : "#f8f9ff",
-    text:       isDark ? "#e8eaf6" : "#1a1d2e",
-    sub:        isDark ? "#8b91b8" : "#9ea3be",
-    border:     isDark ? "rgba(255,255,255,0.09)" : "#eef0f8",
-    inputBg:    isDark ? "#1e2235" : "#eef0f8",
-    inputTxt:   isDark ? "#e8eaf6" : "#1a1d2e",
-    hover:      isDark ? "rgba(255,255,255,0.05)" : "rgba(99,102,241,0.05)",
-    active:     isDark ? "rgba(99,102,241,0.18)"  : "rgba(99,102,241,0.09)",
+    bg:         isDark ? "var(--as-surface, #13151c)" : "var(--as-raised, #f8f9ff)",
+    text:       isDark ? "var(--as-ink, #e8eaf6)" : "var(--as-ink, #1a1d2e)",
+    sub:        isDark ? "var(--as-muted, #8b91b8)" : "var(--as-muted, #9ea3be)",
+    border:     isDark ? "rgba(255,255,255,0.09)" : "var(--as-line, #eef0f8)",
+    inputBg:    isDark ? "var(--as-raised, #1e2235)" : "var(--as-raised, #eef0f8)",
+    inputTxt:   isDark ? "var(--as-ink, #e8eaf6)" : "var(--as-ink, #1a1d2e)",
+    hover:      isDark ? "rgba(255,255,255,0.05)" : "color-mix(in srgb, var(--as-accent, #6366f1) 5%, transparent)",
+    active:     isDark ? "color-mix(in srgb, var(--as-accent, #6366f1) 18%, transparent)"  : "color-mix(in srgb, var(--as-accent, #6366f1) 9%, transparent)",
     accent:     "var(--as-accent, #6366f1)",
-    sectionTxt: isDark ? "#6b72a0" : "#b0b5d0",
+    sectionTxt: isDark ? "var(--as-muted, #6b72a0)" : "var(--as-muted, #b0b5d0)",
   };
 
   const fetchAll = useCallback(async () => {
@@ -283,7 +283,7 @@ export default function GroupChatList({ userRole, onSelectChat, selectedChatId, 
     <>
       <style>{`
         .gc-search::placeholder { color: ${C.sub}; opacity: 1; }
-        .gc-search:focus { outline: none; box-shadow: 0 0 0 2px rgba(99,102,241,0.3); }
+        .gc-search:focus { outline: none; box-shadow: 0 0 0 2px color-mix(in srgb, var(--as-accent, #6366f1) 30%, transparent); }
       `}</style>
 
       {/* flex:1 + minHeight:0 (not height:100%) so only the list below scrolls,
@@ -309,7 +309,7 @@ export default function GroupChatList({ userRole, onSelectChat, selectedChatId, 
                 style={{
                   marginLeft: "auto", marginRight: "8px", display: "flex", alignItems: "center", gap: "5px",
                   padding: "8px 11px", borderRadius: "11px", border: "none", cursor: "pointer",
-                  background: pickerOpen ? C.accent : (isDark ? "rgba(99,102,241,0.18)" : "rgba(99,102,241,0.10)"),
+                  background: pickerOpen ? C.accent : (isDark ? "color-mix(in srgb, var(--as-accent, #6366f1) 18%, transparent)" : "color-mix(in srgb, var(--as-accent, #6366f1) 10%, transparent)"),
                   color: pickerOpen ? "#fff" : C.accent, fontSize: "12px", fontWeight: "800", fontFamily: "inherit",
                 }}>
                 <Plus size={14} /> New
@@ -317,7 +317,7 @@ export default function GroupChatList({ userRole, onSelectChat, selectedChatId, 
             )}
             <div style={{
               width: "38px", height: "38px", borderRadius: "12px",
-              background: isDark ? "rgba(99,102,241,0.18)" : "rgba(99,102,241,0.10)",
+              background: isDark ? "color-mix(in srgb, var(--as-accent, #6366f1) 18%, transparent)" : "color-mix(in srgb, var(--as-accent, #6366f1) 10%, transparent)",
               display: "flex", alignItems: "center", justifyContent: "center",
               position: "relative",
             }}>
@@ -391,7 +391,7 @@ export default function GroupChatList({ userRole, onSelectChat, selectedChatId, 
 
         {/* Admin: pick someone to message */}
         {pickerOpen && (
-          <div style={{ borderBottom: `1px solid ${C.border}`, padding: "10px 16px 12px", background: isDark ? "rgba(99,102,241,0.06)" : "rgba(99,102,241,0.03)" }}>
+          <div style={{ borderBottom: `1px solid ${C.border}`, padding: "10px 16px 12px", background: isDark ? "color-mix(in srgb, var(--as-accent, #6366f1) 6%, transparent)" : "color-mix(in srgb, var(--as-accent, #6366f1) 3%, transparent)" }}>
             <p style={{ margin: "0 0 8px", fontSize: "12px", fontWeight: "800", color: C.text }}>New private message</p>
             <input
               className="gc-search"
@@ -472,15 +472,15 @@ export default function GroupChatList({ userRole, onSelectChat, selectedChatId, 
                     style={{
                       width: "100%", display: "flex", alignItems: "center", gap: "10px",
                       padding: "10px 14px", borderRadius: "12px",
-                      border: `1.5px dashed ${isDark ? "rgba(99,102,241,0.4)" : "rgba(99,102,241,0.3)"}`,
-                      background: isDark ? "rgba(99,102,241,0.08)" : "rgba(99,102,241,0.04)",
+                      border: `1.5px dashed ${isDark ? "color-mix(in srgb, var(--as-accent, #6366f1) 40%, transparent)" : "color-mix(in srgb, var(--as-accent, #6366f1) 30%, transparent)"}`,
+                      background: isDark ? "color-mix(in srgb, var(--as-accent, #6366f1) 8%, transparent)" : "color-mix(in srgb, var(--as-accent, #6366f1) 4%, transparent)",
                       cursor: startingDm ? "wait" : "pointer", color: C.accent,
                       fontSize: "13px", fontWeight: "600", fontFamily: "inherit",
                     }}
                   >
                     <div style={{
                       width: "32px", height: "32px", borderRadius: "10px", flexShrink: 0,
-                      background: isDark ? "rgba(99,102,241,0.2)" : "rgba(99,102,241,0.12)",
+                      background: isDark ? "color-mix(in srgb, var(--as-accent, #6366f1) 20%, transparent)" : "color-mix(in srgb, var(--as-accent, #6366f1) 12%, transparent)",
                       display: "flex", alignItems: "center", justifyContent: "center",
                     }}>
                       <Plus size={15} color={C.accent} />
@@ -512,7 +512,7 @@ export default function GroupChatList({ userRole, onSelectChat, selectedChatId, 
                     C={C}
                     onSelect={onSelectChat}
                     formatTime={formatTime}
-                    avatarBg={roleGrad[userRole] || roleGrad.student}
+                    avatarBg={`var(--as-own-grad, ${roleGrad[userRole] || roleGrad.student})`}
                     initials={getInitials(chat.chatName || "")}
                   />
                 ))
@@ -628,7 +628,7 @@ function DmRow({ chat, isSelected, unread, isDark, C, onSelect, formatTime, info
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <p style={{
             margin: 0, fontSize: "12px",
-            color: unread ? (isDark ? "#c8ccec" : "#4a4f6a") : C.sub,
+            color: unread ? (isDark ? "var(--as-ink-2, #c8ccec)" : "var(--as-ink-2, #4a4f6a)") : C.sub,
             overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
             fontWeight: unread ? "600" : "400", flex: 1,
           }}>
@@ -701,7 +701,7 @@ function ChatRow({ chat, isSelected, unread, isDark, C, onSelect, formatTime, av
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <p style={{
             margin: 0, fontSize: "12px",
-            color: unread ? (isDark ? "#c8ccec" : "#4a4f6a") : C.sub,
+            color: unread ? (isDark ? "var(--as-ink-2, #c8ccec)" : "var(--as-ink-2, #4a4f6a)") : C.sub,
             overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
             fontWeight: unread ? "600" : "400", flex: 1,
           }}>
@@ -757,9 +757,9 @@ function InactiveChatRow({ chat, isSelected, isDark, C, onSelect, formatTime, in
         {/* Avatar — greyed out */}
         <div style={{
           width: "46px", height: "46px", borderRadius: "14px",
-          background: isDark ? "#2a2d40" : "#d1d5db", flexShrink: 0,
+          background: isDark ? "var(--as-raised, #2a2d40)" : "var(--as-raised, #d1d5db)", flexShrink: 0,
           display: "flex", alignItems: "center", justifyContent: "center",
-          fontSize: "14px", fontWeight: "700", color: isDark ? "#6b72a0" : "#9ca3af",
+          fontSize: "14px", fontWeight: "700", color: isDark ? "var(--as-muted, #6b72a0)" : "var(--as-muted, #9ca3af)",
         }}>
           {initials}
         </div>

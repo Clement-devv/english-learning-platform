@@ -36,12 +36,12 @@ export default function MessagesTab({ userRole, onUnreadCount, compact = false }
   const dark = isDarkMode;
 
   const C = {
-    sidebar:    dark ? "#16191f" : "#f8f9ff",
-    border:     dark ? "rgba(255,255,255,0.06)" : "#eff0f6",
-    tabBg:      dark ? "#111318" : "#ffffff",
+    sidebar:    dark ? "var(--as-surface, #16191f)" : "var(--as-raised, #f8f9ff)",
+    border:     dark ? "rgba(255,255,255,0.06)" : "var(--as-line, #eff0f6)",
+    tabBg:      dark ? "var(--as-bg, #111318)" : "var(--as-surface, #ffffff)",
     tabActive:  "var(--as-accent, #6366f1)",
-    tabText:    dark ? "#8b91b8" : "#9ea3be",
-    tabTextOn:  dark ? "#e8eaf6" : "#1a1d2e",
+    tabText:    dark ? "var(--as-muted, #8b91b8)" : "var(--as-muted, #9ea3be)",
+    tabTextOn:  dark ? "var(--as-ink, #e8eaf6)" : "var(--as-ink, #1a1d2e)",
   };
 
   return (
@@ -56,8 +56,8 @@ export default function MessagesTab({ userRole, onUnreadCount, compact = false }
           borderRadius: "20px",
           overflow: "hidden",
           boxShadow: dark ? "0 24px 64px rgba(0,0,0,0.5)" : "0 8px 40px rgba(0,0,0,0.10)",
-          background: dark ? "#111318" : "#ffffff",
-          border: dark ? "1px solid rgba(255,255,255,0.06)" : "1px solid #e8eaf0",
+          background: dark ? "var(--as-bg, #111318)" : "var(--as-surface, #ffffff)",
+          border: dark ? "1px solid rgba(255,255,255,0.06)" : "1px solid var(--as-line, #e8eaf0)",
           fontFamily: "var(--font-body)",
         }}
       >
@@ -146,24 +146,24 @@ export default function MessagesTab({ userRole, onUnreadCount, compact = false }
             flex: 1, display: "flex", flexDirection: "column",
             alignItems: "center", justifyContent: "center",
             background: dark
-              ? "radial-gradient(ellipse at 50% 40%,rgba(99,102,241,.06) 0%,transparent 65%)"
-              : "radial-gradient(ellipse at 50% 40%,rgba(99,102,241,.04) 0%,transparent 65%)",
+              ? "radial-gradient(ellipse at 50% 40%,color-mix(in srgb, var(--as-accent, #6366f1) 6%, transparent) 0%,transparent 65%)"
+              : "radial-gradient(ellipse at 50% 40%,color-mix(in srgb, var(--as-accent, #6366f1) 4%, transparent) 0%,transparent 65%)",
           }} className="msg-ring-main">
             <div style={{
               width: "88px", height: "88px", borderRadius: "28px",
               background: dark
-                ? "linear-gradient(135deg,var(--as-accent, #6366f1),var(--as-accent, #8b5cf6))"
+                ? "linear-gradient(135deg,var(--as-accent, #6366f1),var(--as-accent-2, #8b5cf6))"
                 : "linear-gradient(135deg,var(--as-accent-soft, #e0e7ff),var(--as-accent-soft, #ede9fe))",
               display: "flex", alignItems: "center", justifyContent: "center",
-              boxShadow: dark ? "0 16px 40px rgba(99,102,241,.35)" : "0 8px 24px rgba(99,102,241,.15)",
+              boxShadow: dark ? "0 16px 40px color-mix(in srgb, var(--as-accent, #6366f1) 35%, transparent)" : "0 8px 24px color-mix(in srgb, var(--as-accent, #6366f1) 15%, transparent)",
               marginBottom: "16px",
             }}>
               <Phone size={36} color={dark ? "#fff" : "var(--as-accent, #6366f1)"} strokeWidth={1.5} />
             </div>
-            <h3 style={{ margin: "0 0 6px", fontSize: "16px", fontWeight: "700", color: dark ? "#e4e6ef" : "#1e1f2e" }}>
+            <h3 style={{ margin: "0 0 6px", fontSize: "16px", fontWeight: "700", color: dark ? "var(--as-ink-2, #e4e6ef)" : "var(--as-ink, #1e1f2e)" }}>
               Ring a Contact
             </h3>
-            <p style={{ margin: 0, fontSize: "13px", color: dark ? "#4e5370" : "#a0a5be", textAlign: "center", maxWidth: "200px", lineHeight: 1.6 }}>
+            <p style={{ margin: 0, fontSize: "13px", color: dark ? "var(--as-ink-2, #4e5370)" : "var(--as-muted, #a0a5be)", textAlign: "center", maxWidth: "200px", lineHeight: 1.6 }}>
               Pick someone from the list to send them a ring notification
             </p>
           </div>
@@ -179,24 +179,24 @@ function EmptyState({ dark }) {
       flex: 1, display: "flex", flexDirection: "column",
       alignItems: "center", justifyContent: "center", gap: "20px",
       background: dark
-        ? "radial-gradient(ellipse at 50% 40%,rgba(99,102,241,.07) 0%,transparent 65%)"
-        : "radial-gradient(ellipse at 50% 40%,rgba(99,102,241,.04) 0%,transparent 65%)",
+        ? "radial-gradient(ellipse at 50% 40%,color-mix(in srgb, var(--as-accent, #6366f1) 7%, transparent) 0%,transparent 65%)"
+        : "radial-gradient(ellipse at 50% 40%,color-mix(in srgb, var(--as-accent, #6366f1) 4%, transparent) 0%,transparent 65%)",
     }}>
       <div className="msg-empty-orb" style={{
         width: "88px", height: "88px", borderRadius: "28px",
         background: dark
-          ? "linear-gradient(135deg,var(--as-accent, #6366f1) 0%,var(--as-accent, #8b5cf6) 100%)"
+          ? "linear-gradient(135deg,var(--as-accent, #6366f1) 0%,var(--as-accent-2, #8b5cf6) 100%)"
           : "linear-gradient(135deg,var(--as-accent-soft, #e0e7ff) 0%,var(--as-accent-soft, #ede9fe) 100%)",
         display: "flex", alignItems: "center", justifyContent: "center",
-        boxShadow: dark ? "0 16px 40px rgba(99,102,241,.35)" : "0 8px 24px rgba(99,102,241,.15)",
+        boxShadow: dark ? "0 16px 40px color-mix(in srgb, var(--as-accent, #6366f1) 35%, transparent)" : "0 8px 24px color-mix(in srgb, var(--as-accent, #6366f1) 15%, transparent)",
       }}>
         <MessageSquare size={38} color={dark ? "#fff" : "var(--as-accent, #6366f1)"} strokeWidth={1.5} />
       </div>
       <div style={{ textAlign: "center" }}>
-        <h3 style={{ margin: "0 0 6px", fontSize: "17px", fontWeight: "700", color: dark ? "#e4e6ef" : "#1e1f2e" }}>
+        <h3 style={{ margin: "0 0 6px", fontSize: "17px", fontWeight: "700", color: dark ? "var(--as-ink-2, #e4e6ef)" : "var(--as-ink, #1e1f2e)" }}>
           Your Messages
         </h3>
-        <p style={{ margin: 0, fontSize: "13px", color: dark ? "#4e5370" : "#a0a5be", lineHeight: "1.7", maxWidth: "210px" }}>
+        <p style={{ margin: 0, fontSize: "13px", color: dark ? "var(--as-ink-2, #4e5370)" : "var(--as-muted, #a0a5be)", lineHeight: "1.7", maxWidth: "210px" }}>
           Pick a conversation from the sidebar to start chatting
         </p>
       </div>

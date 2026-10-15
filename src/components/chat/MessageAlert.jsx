@@ -45,8 +45,8 @@ export default function MessageAlert() {
           to   { opacity: 1; transform: translateY(0)    scale(1); }
         }
         @keyframes mca-pulse-blue {
-          0%,100% { box-shadow: 0 0 0 0 rgba(99,102,241,0.45); }
-          50%      { box-shadow: 0 0 0 8px rgba(99,102,241,0); }
+          0%,100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--as-accent, #6366f1) 45%, transparent); }
+          50%      { box-shadow: 0 0 0 8px color-mix(in srgb, var(--as-accent, #6366f1) 0%, transparent); }
         }
       `}</style>
 
@@ -78,7 +78,7 @@ export default function MessageAlert() {
           width: "36px",
           height: "36px",
           borderRadius: "50%",
-          background: "linear-gradient(135deg,#6366f1,#8b5cf6)",
+          background: "linear-gradient(135deg,var(--as-accent, #6366f1),var(--as-accent-2, #8b5cf6))",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
