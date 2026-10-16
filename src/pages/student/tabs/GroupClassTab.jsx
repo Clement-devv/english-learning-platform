@@ -192,7 +192,7 @@ export default function GroupClassTab({ isDarkMode, studentInfo }) {
             {t.label} <span style={{ opacity: 0.75 }}>({t.count})</span>
           </button>
         ))}
-        <button onClick={load} style={{ marginLeft: 'auto', ...btn(isDarkMode ? 'var(--as-ink, #2a2d40)' : 'var(--as-ink, #f5f0ec)', col.body), padding: '8px 12px' }}>
+        <button onClick={load} style={{ marginLeft: 'auto', ...btn(isDarkMode ? 'var(--as-raised, #2a2d40)' : 'var(--as-raised, #f5f0ec)', col.body), padding: '8px 12px' }}>
           <RefreshCw size={15} />
         </button>
       </div>

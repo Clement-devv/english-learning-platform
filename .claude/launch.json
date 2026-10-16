@@ -40,6 +40,18 @@
         "preview"
       ],
       "port": 4173
+    },
+    {
+      "name": "dev-phone",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "vite",
+        "--host",
+        "--port",
+        "5173",
+        "--strictPort"
+      ],
+      "port": 5173
     }
   ]
 }

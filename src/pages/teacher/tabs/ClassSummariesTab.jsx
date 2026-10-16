@@ -38,7 +38,7 @@ export default function ClassSummariesTab({ isDarkMode }) {
 
   const c = isDarkMode
     ? { card: "var(--as-raised, #1a1d2e)", border: "var(--as-line, #2a2d40)", heading: "var(--as-ink, #f0f4ff)", body: "var(--as-ink-2, #c8cce0)", muted: "var(--as-muted, #8b91b8)", input: "var(--as-bg, #0f1117)", soft: "var(--as-ink, #141620)" }
-    : { card: "var(--as-surface, #ffffff)", border: "var(--as-line, #e2e8f0)", heading: "var(--as-ink, #1e293b)", body: "var(--as-ink-2, #475569)", muted: "var(--as-muted, #94a3b8)", input: "var(--as-raised, #f8faff)", soft: "var(--as-ink, #f8fafc)" };
+    : { card: "var(--as-surface, #ffffff)", border: "var(--as-line, #e2e8f0)", heading: "var(--as-ink, #1e293b)", body: "var(--as-ink-2, #475569)", muted: "var(--as-muted, #94a3b8)", input: "var(--as-raised, #f8faff)", soft: "var(--as-raised, #f8fafc)" };
   const notify = (msg, type = "success") => { setToast({ msg, type }); setTimeout(() => setToast(null), 3000); };
 
   useEffect(() => { const t = setTimeout(() => setDq(q.trim()), 300); return () => clearTimeout(t); }, [q]);

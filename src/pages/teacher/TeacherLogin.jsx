@@ -5,15 +5,15 @@ import React, { lazy, Suspense } from 'react';
 import { useBranding } from '../../context/BrandingContext';
 
 const THEMES = {
-  'classroom-space':  lazy(() => import('./login-themes/ClassroomSpaceTheme')),
+  'classroom-space':  lazy(() => import('./login-themes/SunshineTeacherTheme')),   // 'Sunshine Login' — the default slot
   'ocean-current':    lazy(() => import('./login-themes/OceanCurrentTheme')),
   'enchanted-grove':  lazy(() => import('./login-themes/EnchantedGroveTheme')),
 };
 
 // Fallback shown while the theme chunk loads
 const LoadingScreen = () => (
-  <div style={{ minHeight: '100vh', background: '#06091a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-    <div style={{ width: 36, height: 36, border: '4px solid rgba(255,255,255,.15)', borderTopColor: '#22d3ee', borderRadius: '50%', animation: 'spin .7s linear infinite' }} />
+  <div style={{ minHeight: '100vh', background: '#fdf8f4', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+    <div style={{ width: 36, height: 36, border: '4px solid rgba(207,75,8,.18)', borderTopColor: '#cf4b08', borderRadius: '50%', animation: 'spin .7s linear infinite' }} />
     <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
   </div>
 );

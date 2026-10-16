@@ -1,4 +1,5 @@
 // @ts-check
+import { isIP } from 'net';
 import { setRequestCenter } from './requestMonitor.js';
 import Center from '../models/master/Center.js';
 import { getDb } from '../config/dbManager.js';
@@ -42,8 +43,10 @@ export const tenantMiddleware = async (req, res, next) => {
 
     // 2. Try subdomain: greenfield.yourapp.com -> slug = "greenfield"
     let slug = null;
+    // An IP address (e.g. 192.168.0.36 when testing on a phone over Wi-Fi) has no
+    // subdomain — without this check it would be read as center "192".
     const parts = host.split('.');
-    if (parts.length >= 3) {
+    if (parts.length >= 3 && !isIP(host)) {
       slug = parts[0];
     }
 

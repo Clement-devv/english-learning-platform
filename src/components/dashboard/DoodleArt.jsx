@@ -210,7 +210,7 @@ export function StickerIcon({ name, size = 40, style }) {
 }
 
 // One sticker. `size` in px; `rotate` tilts it; `delay` staggers the pop-in.
-function Sticker({ name, size, style, rotate = 0, delay = 0, opacity = 1 }) {
+export function Sticker({ name, size, style, rotate = 0, delay = 0, opacity = 1 }) {
   return (
     <svg aria-hidden="true" viewBox="0 0 64 64" width={size} height={size} className="as-sticker"
       style={{ position: 'absolute', pointerEvents: 'none', overflow: 'visible', opacity, animationDelay: `${delay}s`, ...style }}>

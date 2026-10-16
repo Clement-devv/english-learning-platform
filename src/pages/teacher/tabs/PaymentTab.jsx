@@ -94,19 +94,19 @@ function StatCard({ icon: Icon, label, value, sub, accent, isDarkMode }) {
   const c = accents[accent] || accents.blue;
 
   return (
-    <div className={`rounded-2xl border p-5 ${c.bg} ${c.ring} shadow-sm`}>
-      <div className="flex items-start justify-between gap-3">
-        <div>
+    <div className={`rounded-2xl border p-3.5 sm:p-5 ${c.bg} ${c.ring} shadow-sm min-w-0`}>
+      <div className="flex items-start justify-between gap-2 sm:gap-3">
+        <div className="min-w-0">
           <p className={`text-xs font-medium mb-1 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
             {label}
           </p>
-          <p className={`text-2xl font-bold tracking-tight ${c.val}`}>{value}</p>
+          <p className={`text-xl sm:text-2xl font-bold tracking-tight break-words ${c.val}`}>{value}</p>
           {sub && (
             <p className={`text-xs mt-1 ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>{sub}</p>
           )}
         </div>
-        <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${c.iconBg}`}>
-          <Icon className="w-5 h-5" />
+        <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl flex items-center justify-center flex-shrink-0 ${c.iconBg}`}>
+          <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
         </div>
       </div>
     </div>
@@ -212,7 +212,7 @@ function TxRow({ tx, isDarkMode }) {
   const sym = useCurrencySymbol();
   const [open, setOpen] = useState(false);
 
-  const tdCls = `px-4 py-3.5 text-sm border-t ${isDarkMode ? "border-gray-700 text-gray-300" : "border-gray-100 text-gray-700"}`;
+  const tdCls = `px-2 sm:px-4 py-3 sm:py-3.5 text-sm border-t ${isDarkMode ? "border-gray-700 text-gray-300" : "border-gray-100 text-gray-700"}`;
 
   return (
     <>
@@ -223,7 +223,7 @@ function TxRow({ tx, isDarkMode }) {
         onClick={() => setOpen((v) => !v)}
       >
         {/* Date */}
-        <td className={tdCls}>
+        <td className={`${tdCls} hidden sm:table-cell`}>
           <div className="flex items-center gap-1.5">
             <Calendar className="w-3.5 h-3.5 opacity-40 flex-shrink-0" />
             <span>{fmtDate(tx.completedAt)}</span>
@@ -232,16 +232,19 @@ function TxRow({ tx, isDarkMode }) {
 
         {/* Class */}
         <td className={tdCls}>
-          <p className="font-medium truncate max-w-[160px]">{tx.classTitle || "—"}</p>
+          <p className="font-medium truncate max-w-[110px] sm:max-w-[160px]">{tx.classTitle || "—"}</p>
+          <p className={`sm:hidden text-xs truncate max-w-[110px] ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>
+            {fmtDate(tx.completedAt)}{tx.studentName ? ` · ${tx.studentName}` : ""}
+          </p>
           {tx.description && (
-            <p className={`text-xs truncate ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
+            <p className={`hidden sm:block text-xs truncate ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
               {tx.description}
             </p>
           )}
         </td>
 
         {/* Student */}
-        <td className={tdCls}>
+        <td className={`${tdCls} hidden sm:table-cell`}>
           <div className="flex items-center gap-1.5">
             <User className="w-3.5 h-3.5 opacity-40 flex-shrink-0" />
             <span className="truncate max-w-[120px]">{tx.studentName || "—"}</span>
@@ -270,7 +273,7 @@ function TxRow({ tx, isDarkMode }) {
         </td>
 
         {/* Expand chevron */}
-        <td className={tdCls}>
+        <td className={`${tdCls} hidden sm:table-cell`}>
           <div className={`flex justify-end ${isDarkMode ? "text-gray-500" : "text-gray-400"}`}>
             {open ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </div>
@@ -280,7 +283,7 @@ function TxRow({ tx, isDarkMode }) {
       {/* Expanded detail row */}
       {open && (
         <tr className={isDarkMode ? "bg-gray-800/80" : "bg-blue-50/30"}>
-          <td colSpan={6} className={`px-6 py-4 border-t ${isDarkMode ? "border-gray-700" : "border-gray-100"}`}>
+          <td colSpan={6} className={`px-3 sm:px-6 py-4 border-t ${isDarkMode ? "border-gray-700" : "border-gray-100"}`}>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
               <Detail label="Completed At" value={fmtDateTime(tx.completedAt)} isDarkMode={isDarkMode} />
               <Detail
@@ -330,7 +333,7 @@ function Detail({ label, value, isDarkMode }) {
 function PendingHero({ amount, count, isDarkMode }) {
   const sym = useCurrencySymbol();
   return (
-    <div className={`rounded-2xl p-6 ${
+    <div className={`rounded-2xl p-4 sm:p-6 ${
       isDarkMode
         ? "bg-gradient-to-br from-amber-900/60 to-amber-800/30 border border-amber-700/40"
         : "bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200"
@@ -340,7 +343,7 @@ function PendingHero({ amount, count, isDarkMode }) {
           <p className={`text-sm font-medium mb-1 ${isDarkMode ? "text-amber-400" : "text-amber-700"}`}>
             💰 Current Pending Balance
           </p>
-          <p className={`text-4xl font-bold tracking-tight ${isDarkMode ? "text-amber-300" : "text-amber-800"}`}>
+          <p className={`text-3xl sm:text-4xl font-bold tracking-tight ${isDarkMode ? "text-amber-300" : "text-amber-800"}`}>
             {fmtMoney(amount, sym)}
           </p>
           <p className={`text-sm mt-2 ${isDarkMode ? "text-amber-500" : "text-amber-600"}`}>
@@ -421,8 +424,8 @@ function BankDetailsCard({ teacher, isDarkMode }) {
     : "bg-white border-gray-300 text-gray-900 placeholder-gray-400 focus:ring-purple-400 focus:border-purple-400";
 
   return (
-    <div className={`rounded-2xl border p-5 shadow-sm ${cardBg}`}>
-      <div className="flex items-center justify-between mb-4">
+    <div className={`rounded-2xl border p-4 sm:p-5 shadow-sm ${cardBg}`}>
+      <div className="flex items-center justify-between gap-3 mb-4">
         <div className="flex items-center gap-2">
           <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${
             isDarkMode ? "bg-blue-900/50 text-blue-300" : "bg-blue-100 text-blue-600"
@@ -437,7 +440,7 @@ function BankDetailsCard({ teacher, isDarkMode }) {
         {!editing && (
           <button
             onClick={() => setEditing(true)}
-            className={`text-xs font-semibold px-3 py-1.5 rounded-lg border transition-colors ${
+            className={`whitespace-nowrap flex-shrink-0 text-xs font-semibold px-3 py-1.5 rounded-lg border transition-colors ${
               isDarkMode
                 ? "border-gray-600 text-gray-300 hover:bg-gray-700"
                 : "border-gray-200 text-gray-600 hover:bg-gray-50"
@@ -602,7 +605,7 @@ export default function PaymentTab({ teacher, isDarkMode }) {
   const inputCls = isDarkMode
     ? "bg-gray-700 border-gray-600 text-white placeholder-gray-500 focus:ring-purple-500 focus:border-purple-500"
     : "bg-white border-gray-300 text-gray-900 placeholder-gray-400 focus:ring-purple-400 focus:border-purple-400";
-  const thCls = `px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide ${
+  const thCls = `px-2 sm:px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide ${
     isDarkMode ? "text-gray-400 bg-gray-700/60" : "text-gray-500 bg-gray-50"
   }`;
 
@@ -623,12 +626,12 @@ export default function PaymentTab({ teacher, isDarkMode }) {
   }
 
   return (
-    <div className={`${pageBg} rounded-2xl p-6 space-y-6`}>
+    <div className={`${pageBg} rounded-2xl p-1 sm:p-6 space-y-4 sm:space-y-6`}>
 
       {/* ── Page header ── */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h2 className={`text-2xl font-bold ${textPrimary}`}>Salary & Earnings</h2>
+          <h2 className={`text-xl sm:text-2xl font-bold ${textPrimary}`}>Salary & Earnings</h2>
           <p className={`text-sm mt-0.5 ${textSecondary}`}>
             Track your completed classes and payment history
           </p>
@@ -648,7 +651,7 @@ export default function PaymentTab({ teacher, isDarkMode }) {
       </div>
 
       {/* ── Pending hero + stats ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
         <div className="lg:col-span-1">
           <PendingHero
             amount={summary.totalPending}
@@ -656,7 +659,7 @@ export default function PaymentTab({ teacher, isDarkMode }) {
             isDarkMode={isDarkMode}
           />
         </div>
-        <div className="lg:col-span-2 grid grid-cols-2 sm:grid-cols-2 gap-4">
+        <div className="lg:col-span-2 grid grid-cols-2 sm:grid-cols-2 gap-3 sm:gap-4">
           <StatCard
             icon={Award}
             label="Rate Per Class"
@@ -703,14 +706,14 @@ export default function PaymentTab({ teacher, isDarkMode }) {
       {/* ── Transaction table ── */}
       <div className={`rounded-2xl border overflow-hidden ${cardBg} shadow-sm`}>
         {/* Table toolbar */}
-        <div className={`flex flex-col sm:flex-row gap-3 items-start sm:items-center p-4 border-b ${isDarkMode ? "border-gray-700" : "border-gray-100"}`}>
+        <div className={`flex flex-col sm:flex-row gap-3 items-stretch sm:items-center p-3 sm:p-4 border-b ${isDarkMode ? "border-gray-700" : "border-gray-100"}`}>
           {/* Filter tabs */}
-          <div className={`flex gap-1 p-1 rounded-lg ${isDarkMode ? "bg-gray-900" : "bg-gray-100"}`}>
+          <div className={`grid grid-cols-4 sm:flex w-full sm:w-auto gap-1 p-1 rounded-lg ${isDarkMode ? "bg-gray-900" : "bg-gray-100"}`}>
             {filterTabs.map(({ key, label, count }) => (
               <button
                 key={key}
                 onClick={() => setFilter(key)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                className={`flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 px-1 sm:px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
                   filter === key
                     ? "bg-purple-600 text-white shadow-sm"
                     : isDarkMode
@@ -751,12 +754,12 @@ export default function PaymentTab({ teacher, isDarkMode }) {
           <table className="w-full">
             <thead>
               <tr>
-                <th className={thCls}>Date Completed</th>
+                <th className={`${thCls} hidden sm:table-cell`}>Date Completed</th>
                 <th className={thCls}>Class</th>
-                <th className={thCls}>Student</th>
+                <th className={`${thCls} hidden sm:table-cell`}>Student</th>
                 <th className={thCls}>Amount</th>
                 <th className={thCls}>Status</th>
-                <th className={thCls} />
+                <th className={`${thCls} hidden sm:table-cell`} />
               </tr>
             </thead>
             <tbody>

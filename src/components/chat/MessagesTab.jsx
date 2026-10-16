@@ -15,7 +15,9 @@ const TABS = [
 // compact: a small preview embedded on a dashboard home page — it must not mark
 // messages as seen (that would hide the "new messages" alerts the moment the
 // dashboard loads).
-export default function MessagesTab({ userRole, onUnreadCount, compact = false }) {
+// fill: size to the parent (a flex column) instead of the viewport — used by the
+// student phone layout so the chat sits exactly between the top bar and the tab bar.
+export default function MessagesTab({ userRole, onUnreadCount, compact = false, fill = false }) {
   const [selectedChat, setSelectedChat] = useState(null);
   const [activeTab,    setActiveTab]    = useState("messages");
   const { isDarkMode } = useDarkMode();
@@ -48,11 +50,10 @@ export default function MessagesTab({ userRole, onUnreadCount, compact = false }
     <>
       <style>{css}</style>
       <div
-        className="msg-shell"
+        className={`msg-shell${fill ? " msg-shell--fill" : ""}`}
         style={{
           display: "flex",
-          height: "calc(100vh - 180px)",
-          minHeight: "520px",
+          ...(fill ? { flex: 1, height: "100%", minHeight: 0 } : { height: "calc(100vh - 180px)", minHeight: "520px" }),
           borderRadius: "20px",
           overflow: "hidden",
           boxShadow: dark ? "0 24px 64px rgba(0,0,0,0.5)" : "0 8px 40px rgba(0,0,0,0.10)",
@@ -125,7 +126,7 @@ export default function MessagesTab({ userRole, onUnreadCount, compact = false }
 
         {/* ── Main panel (only shown for messages tab) ── */}
         {activeTab === "messages" && (
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
+          <div className={`msg-main${selectedChat ? "" : " msg-main--idle"}`} style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, minHeight: 0 }}>
             {selectedChat ? (
               <ChatWindow
                 chat={selectedChat}
@@ -211,6 +212,10 @@ const css = `
   @media(max-width:768px){
     .msg-sidebar--hidden { display: none !important; }
     .msg-ring-main { display: none !important; }
+    /* phones: one pane at a time, full width — the list, or the open conversation */
+    .msg-sidebar { width: 100% !important; border-right: none !important; }
+    .msg-sidebar:not(.msg-sidebar--hidden) ~ .msg-main--idle { display: none !important; }
+    .msg-shell--fill { border-radius: 20px !important; }
   }
   @media(min-width:769px){
     .msg-sidebar { display: flex !important; }

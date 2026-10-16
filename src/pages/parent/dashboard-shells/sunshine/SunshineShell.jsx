@@ -18,7 +18,7 @@ const ACCENT  = 'var(--a-accent-grad)';
 // Whole-page look: true = liquid glass (frosted panes over colour glows, gradient
 // border — same as the admin / teacher / student shells); false = solid panels.
 const GLASS_PAGE = true;
-const FONT_URL = 'https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap';
+// Font: Nunito is loaded once from index.html (early, parallel to the bundle).
 
 const fmtDate    = (iso) => iso ? new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
 const fmtTime    = (iso) => iso ? new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '';
@@ -377,9 +377,8 @@ export default function SunshineShell() {
   };
 
   return (
-    <div className={GLASS_PAGE ? 'as-root as-glass' : 'as-root'} data-theme="light" style={{ display: 'flex', height: '100vh', overflow: 'hidden', position: 'relative', fontFamily: F, background: col.bg, ...rootVars }}>
+    <div className={GLASS_PAGE ? 'as-root as-glass as-shine' : 'as-root'} data-theme="light" style={{ display: 'flex', height: '100vh', overflow: 'hidden', position: 'relative', fontFamily: F, background: col.bg, ...rootVars }}>
       <style>{`
-        @import url('${FONT_URL}');
         * { box-sizing: border-box; }
         @keyframes spin { to { transform: rotate(360deg); } }
         .p-nav { transition: background-color 150ms ease, color 150ms ease, transform 120ms ease-out; }

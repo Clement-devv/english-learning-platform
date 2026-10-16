@@ -33,6 +33,9 @@ export const studentSchema = new mongoose.Schema({
   phone: { type: String, default: '' },
   country: { type: String, default: '' },
   timezone: { type: String, default: '' },
+  // Language of the emails this student receives. English for everyone by default; the
+  // student switches it in their Settings. Add a language here + in server/emails/i18n.js.
+  emailLanguage: { type: String, enum: ['en', 'vi'], default: 'en' },
   status: {
     type: String,
     enum: ['pending', 'active', 'suspended'],

@@ -1,6 +1,6 @@
 // server/routes/bookingRoutes.js
 import express from "express";
-import { verifyToken, verifyAdmin, verifyAdminOrTeacher } from "../middleware/authMiddleware.js";
+import { verifyToken, verifyAdmin, verifyAdminOrTeacher } from "../middleware/authMiddleware.js";
 import { subAdminNeeds, isSubAdmin, inScope, scopedStudentIds } from "../middleware/staffAccess.js";
 import {
   sendBookingRequestToTeacher, sendBookingAcceptedToStudent,
@@ -55,8 +55,8 @@ router.get("/:id", verifyToken, validateObjectId("id"), async (req, res) => {
     getTeacher(req.db);
     getStudent(req.db);
     const booking = await getBooking(req.db).findById(req.params.id)
-      .populate("teacherId", "firstName lastName email continent googleMeetLink zoomLink")
-      .populate("studentId", "firstName lastName email classCredits isManaged");
+      .populate("teacherId", "firstName lastName email continent googleMeetLink zoomLink timezone")
+      .populate("studentId", "firstName lastName email classCredits isManaged emailLanguage timezone");
     if (!booking) return notFound(res, "Booking not found");
 
     const isAuthorized =
@@ -119,8 +119,8 @@ router.post("/", verifyToken, subAdminNeeds("canCreateBookings"), async (req, re
     });
 
     const populatedBooking = await Booking.findById(booking._id)
-      .populate("teacherId", "firstName lastName email")
-      .populate("studentId", "firstName lastName email classCredits isManaged");
+      .populate("teacherId", "firstName lastName email timezone")
+      .populate("studentId", "firstName lastName email classCredits isManaged emailLanguage timezone");
 
     if (createdBy === "admin") {
       sendBookingRequestToTeacher(teacher, student, populatedBooking, req.center?.centerName || "", req.center).catch(e => logger.error("Teacher booking email failed:", { error: e?.message }));
@@ -232,8 +232,8 @@ router.patch("/:id/accept", verifyToken, validateObjectId("id"), async (req, res
     getStudent(req.db);
     const Booking = getBooking(req.db);
     const booking = await Booking.findById(req.params.id)
-      .populate("teacherId", "firstName lastName email")
-      .populate("studentId", "firstName lastName email classCredits isManaged");
+      .populate("teacherId", "firstName lastName email timezone")
+      .populate("studentId", "firstName lastName email classCredits isManaged emailLanguage timezone");
     if (!booking) return notFound(res, "Booking not found");
 
     const isTeacher = req.user.role === "teacher" && booking.teacherId._id.toString() === req.user.id;
@@ -307,8 +307,8 @@ router.patch("/:id/reject", verifyToken, validateObjectId("id"), async (req, res
     const { reason } = req.body;
     const Booking = getBooking(req.db);
     const booking = await Booking.findById(req.params.id)
-      .populate("teacherId", "firstName lastName email")
-      .populate("studentId", "firstName lastName email isManaged");
+      .populate("teacherId", "firstName lastName email timezone")
+      .populate("studentId", "firstName lastName email isManaged emailLanguage timezone");
     if (!booking) return notFound(res, "Booking not found");
 
     const isTeacher = req.user.role === "teacher" && booking.teacherId._id.toString() === req.user.id;
@@ -382,8 +382,8 @@ router.patch("/:id/complete", verifyToken, verifyAdmin, validateObjectId("id"), 
       return conflict(res, "This class was already completed — please refresh");
 
     const booking = await Booking.findById(req.params.id)
-      .populate("teacherId", "firstName lastName email googleMeetLink zoomLink")
-      .populate("studentId", "firstName lastName email classCredits isManaged");
+      .populate("teacherId", "firstName lastName email googleMeetLink zoomLink timezone")
+      .populate("studentId", "firstName lastName email classCredits isManaged emailLanguage timezone");
 
     try { await sendClassCompletedNotification(booking.teacherId, booking.studentId, booking, req.center?.centerName || "", req.center); }
     catch (e) { logger.error("Email notification failed:", { error: e?.message }); }
@@ -448,8 +448,8 @@ router.get("/", verifyToken, verifyAdmin, async (req, res) => {
     const order = active ? { scheduledTime: 1 } : sort === "recent" ? { createdAt: -1 } : { scheduledTime: -1 };
     const [bookings, total, acceptedTotal] = await Promise.all([
       getBooking(req.db).find(filter)
-        .populate("teacherId", "firstName lastName email googleMeetLink zoomLink")
-        .populate("studentId", "firstName lastName email isManaged")
+        .populate("teacherId", "firstName lastName email googleMeetLink zoomLink timezone")
+        .populate("studentId", "firstName lastName email isManaged emailLanguage timezone")
         .sort(order).skip(skip).limit(limit).lean(),
       getBooking(req.db).countDocuments(filter),
       active ? getBooking(req.db).countDocuments({ status: "accepted" }) : undefined,
@@ -493,7 +493,7 @@ router.get("/teacher/:teacherId", verifyToken, async (req, res) => {
 
     getStudent(req.db);
     const bookings = await getBooking(req.db).find(filter)
-      .populate("studentId", "firstName lastName email classCredits isManaged")
+      .populate("studentId", "firstName lastName email classCredits isManaged emailLanguage timezone")
       .sort({ scheduledTime: -1 }).skip(skip).limit(limit).lean();
     res.json(bookings);
   } catch (err) {
@@ -527,7 +527,7 @@ router.get("/student/:studentId", verifyToken, async (req, res) => {
     else if (status) filter.status = status;
 
     const bookings = await getBooking(req.db).find(filter)
-      .populate("teacherId", "firstName lastName email continent googleMeetLink zoomLink")
+      .populate("teacherId", "firstName lastName email continent googleMeetLink zoomLink timezone")
       // Past classes newest first (otherwise the cap keeps the OLDEST ones); upcoming soonest first
       .sort({ scheduledTime: status === "completed" ? -1 : 1 }).skip(skip).limit(limit).lean();
     res.json(bookings);
@@ -561,8 +561,8 @@ router.patch("/:id/cancel", verifyToken, validateObjectId("id"), async (req, res
     await booking.save();
 
     const populatedBooking = await Booking.findById(booking._id)
-      .populate("teacherId", "firstName lastName email")
-      .populate("studentId", "firstName lastName email isManaged");
+      .populate("teacherId", "firstName lastName email timezone")
+      .populate("studentId", "firstName lastName email isManaged emailLanguage timezone");
     res.json({ success: true, message: "Booking cancelled", booking: populatedBooking });
   } catch (err) {
     logger.error("Error cancelling booking:", { error: err?.message });
@@ -587,7 +587,7 @@ router.post("/student-request", verifyToken, async (req, res) => {
 
     const [teacher, student] = await Promise.all([
       getTeacher(req.db).findById(teacherId).select("firstName lastName email timezone active status workingHours workingHoursTz"),
-      getStudent(req.db).findById(req.user.id).select("firstName lastName email classCredits timezone"),
+      getStudent(req.db).findById(req.user.id).select("firstName lastName email classCredits timezone emailLanguage"),
     ]);
     if (!teacher || !teacher.active || teacher.status !== "active")
       return notFound(res, "Teacher not found or unavailable");
@@ -654,8 +654,8 @@ router.post("/student-request", verifyToken, async (req, res) => {
     });
 
     const populated = await Booking.findById(booking._id)
-      .populate("teacherId", "firstName lastName email")
-      .populate("studentId", "firstName lastName email isManaged");
+      .populate("teacherId", "firstName lastName email timezone")
+      .populate("studentId", "firstName lastName email isManaged emailLanguage timezone");
 
     sendBookingRequestToTeacher(teacher, student, populated, req.center?.centerName || "", req.center)
       .catch(e => logger.error("Teacher booking email failed:", { error: e?.message }));

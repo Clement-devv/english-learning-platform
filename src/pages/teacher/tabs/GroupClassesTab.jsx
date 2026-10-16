@@ -228,8 +228,31 @@ export default function GroupClassesTab({ isDarkMode }) {
 
   return (
     <div style={{ fontFamily: F }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
-        <div style={{ flex: 1 }}>
+      {/* Phone layout: title on its own row, filter + refresh, then a full-width New button */}
+      <style>{`
+        @media (max-width: 640px) {
+          .gct-head { flex-wrap: wrap; gap: 10px !important; }
+          .gct-head > div:first-child { flex-basis: 100% !important; }
+          .gct-head > select { flex: 1; width: auto !important; min-width: 0; }
+          .gct-head > button:last-child { flex-basis: 100%; justify-content: center; }
+          .gct-head h2 { font-size: 18px !important; }
+          /* class cards: smaller, actions drop under the details */
+          .gct-card { padding: 14px !important; border-radius: 16px !important; border-width: 1.5px !important; margin-bottom: 10px !important; }
+          .gct-row { flex-wrap: wrap; gap: 10px !important; }
+          .gct-row > div:first-child { flex-basis: calc(100% - 34px) !important; min-width: 0; }
+          .gct-title { font-size: 14px !important; }
+          .gct-meta { font-size: 12px !important; gap: 4px 10px !important; }
+          .gct-actions { width: 100%; }
+          .gct-actions > button:not(:last-child) { flex: 1; justify-content: center; padding: 8px 12px !important; }
+          .gct-actions > button:last-child { margin-left: auto; }
+          .gct-actions:has(> button:only-child) { position: absolute; top: 12px; right: 10px; width: auto; }
+          .gct-more button { padding: 8px 12px !important; font-size: 12px !important; }
+          .gct-modal { padding: 18px !important; border-radius: 20px !important; }
+          .gct-modal label { font-size: 11px !important; letter-spacing: .03em !important; }
+        }
+      `}</style>
+      <div className="gct-head" style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
           <h2 style={{ margin: 0, fontSize: 20, fontWeight: 900, color: col.heading }}>My Group Classes</h2>
           <p style={{ margin: '2px 0 0', fontSize: 13, color: col.muted }}>{gcTotal} class{gcTotal !== 1 ? 'es' : ''}</p>
         </div>
@@ -238,7 +261,7 @@ export default function GroupClassesTab({ isDarkMode }) {
           <option value="">All statuses</option>
           {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
         </select>
-        <button onClick={load} style={{ ...btn('var(--as-ink, #f5f0ec)', col.body), padding: '9px 12px' }}><RefreshCw size={15} /></button>
+        <button onClick={load} aria-label="Refresh" style={{ ...btn('var(--as-raised, #f5f0ec)', col.body), padding: '9px 12px' }}><RefreshCw size={15} /></button>
         <button onClick={() => setShowCreate(true)} style={{ ...btn('linear-gradient(135deg,var(--as-accent, #f97316),#f43f5e)'), display: 'flex', alignItems: 'center', gap: 6 }}>
           <Plus size={14} /> New Group Class
         </button>
@@ -267,11 +290,11 @@ export default function GroupClassesTab({ isDarkMode }) {
           const canStart = gc.status === 'open' || gc.status === 'full';
 
           return (
-            <div key={gc._id} style={card}>
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
+            <div key={gc._id} className="gct-card" style={{ ...card, position: 'relative' }}>
+              <div className="gct-row" style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
                 <div style={{ flex: 1, cursor: 'pointer' }} onClick={() => setExpanded(p => ({ ...p, [gc._id]: !p[gc._id] }))}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: 15, fontWeight: 800, color: col.heading }}>{gc.title}</span>
+                    <span className="gct-title" style={{ fontSize: 15, fontWeight: 800, color: col.heading }}>{gc.title}</span>
                     <Badge status={gc.status} />
                     {gc.status === 'missed' && gc.missedReason && <span style={{ fontSize: 12, color: 'var(--as-accent-ink, #ea580c)', fontWeight: 600 }}>{gc.missedReason}</span>}
                     <span style={{ fontSize: 12, color: col.muted, background: isDarkMode ? 'var(--as-raised, #2a2d40)' : 'var(--as-accent-soft, #fff7ed)', borderRadius: 999, padding: '2px 8px' }}>{gc.level}</span>
@@ -281,7 +304,7 @@ export default function GroupClassesTab({ isDarkMode }) {
                       </span>
                     )}
                   </div>
-                  <div style={{ fontSize: 13, color: col.muted, marginTop: 4, display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+                  <div className="gct-meta" style={{ fontSize: 13, color: col.muted, marginTop: 4, display: 'flex', gap: 14, flexWrap: 'wrap' }}>
                     <span>📅 {fmtDate(gc.scheduledTime)}</span>
                     <span>{PLATFORM_META[gc.platform || 'agora'].icon} {PLATFORM_META[gc.platform || 'agora'].name}</span>
                     <span>⏱ {gc.duration}min</span>
@@ -294,7 +317,7 @@ export default function GroupClassesTab({ isDarkMode }) {
                     )}
                   </div>
                 </div>
-                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <div className="gct-actions" style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                   {canStart && (
                     <button onClick={() => handleStart(gc)} style={{ ...btn('linear-gradient(135deg,#3b82f6,#60a5fa)'), display: 'flex', alignItems: 'center', gap: 5 }}>
                       <Video size={13} /> Start
@@ -341,7 +364,7 @@ export default function GroupClassesTab({ isDarkMode }) {
                     </div>
                   )}
 
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <div className="gct-more" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                     {['in-progress','open','full'].includes(gc.status) && (
                       <button onClick={() => openAttendance(gc)} style={btn('linear-gradient(135deg,#3b82f6,#60a5fa)')}>
                         Mark Attendance
@@ -373,7 +396,7 @@ export default function GroupClassesTab({ isDarkMode }) {
       {/* ── Create Modal ── */}
       {showCreate && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: 16 }}>
-          <div style={{ background: col.card, borderRadius: 24, padding: 28, width: '100%', maxWidth: 520, maxHeight: '90vh', overflowY: 'auto', fontFamily: F }}>
+          <div className="gct-modal" style={{ background: col.card, borderRadius: 24, padding: 28, width: '100%', maxWidth: 520, maxHeight: '90vh', overflowY: 'auto', fontFamily: F }}>
             <div style={{ display: 'flex', alignItems: 'center', marginBottom: 20 }}>
               <h3 style={{ margin: 0, fontSize: 18, fontWeight: 900, color: col.heading, flex: 1 }}>New Group Class</h3>
               <button onClick={() => setShowCreate(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} color={col.muted} /></button>
@@ -457,7 +480,7 @@ export default function GroupClassesTab({ isDarkMode }) {
               </div>
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
-              <button onClick={() => setShowCreate(false)} style={btn(isDarkMode ? 'var(--as-ink, #2a2d40)' : 'var(--as-ink, #f5f0ec)', col.body)}>Cancel</button>
+              <button onClick={() => setShowCreate(false)} style={btn(isDarkMode ? 'var(--as-raised, #2a2d40)' : 'var(--as-raised, #f5f0ec)', col.body)}>Cancel</button>
               <button onClick={handleCreate} disabled={saving} style={btn('linear-gradient(135deg,var(--as-accent, #f97316),#f43f5e)')}>
                 {saving ? 'Creating...' : 'Create Class'}
               </button>
@@ -564,7 +587,7 @@ export default function GroupClassesTab({ isDarkMode }) {
               );
             })}
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }}>
-              <button onClick={() => setAttTarget(null)} style={btn(isDarkMode ? 'var(--as-ink, #2a2d40)' : 'var(--as-ink, #f5f0ec)', col.body)}>Cancel</button>
+              <button onClick={() => setAttTarget(null)} style={btn(isDarkMode ? 'var(--as-raised, #2a2d40)' : 'var(--as-raised, #f5f0ec)', col.body)}>Cancel</button>
               <button onClick={saveAttendance} style={btn('linear-gradient(135deg,#3b82f6,#60a5fa)')}>Save Attendance</button>
             </div>
           </div>

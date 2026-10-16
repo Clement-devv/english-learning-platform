@@ -79,5 +79,6 @@ export function useParentLoginLogic() {
     handle2FAVerification,
     handleCancel2FA,
     navigate,
+    forgotPath: '/parent/forgot-password',   // themes send the 'Forgot password?' link here
   };
 }

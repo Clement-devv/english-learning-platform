@@ -2639,7 +2639,7 @@ export default function SuperAdminDashboard() {
               {loginThemeModal.branding?.loginTheme && (
                 <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid var(--sa-w06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <span style={{ fontSize: '13px', color: '#6b7280' }}>
-                    Remove login theme from this center → falls back to default (Space Explorer)
+                    Remove login theme from this center → falls back to default (Sunshine Login)
                   </span>
                   <button
                     onClick={handleUnassignLoginTheme}
@@ -2945,7 +2945,7 @@ export default function SuperAdminDashboard() {
               {teacherThemeModal.branding?.teacherLoginTheme && (
                 <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid var(--sa-w06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <span style={{ fontSize: '13px', color: '#6b7280' }}>
-                    Remove teacher login theme from this center → falls back to default
+                    Remove teacher login theme from this center → falls back to default (Sunshine Login)
                   </span>
                   <button
                     onClick={handleUnassignTeacherTheme}
@@ -2976,7 +2976,7 @@ export default function SuperAdminDashboard() {
 
             <div style={{ padding: '20px 24px 28px' }}>
               <p style={{ ...s.stepDesc, marginBottom: '6px' }}>
-                Each admin login theme is <strong>exclusive</strong> — only one center can hold it. Admins see this page when they sign in. <em>Executive Command</em> is the default for all centers.
+                Each admin login theme is <strong>exclusive</strong> — only one center can hold it. Admins see this page when they sign in. <em>Sunshine Login</em> is the default for all centers.
               </p>
               {adminLoginThemeMsg && (
                 <div style={{ padding: '8px 14px', borderRadius: '10px', fontSize: '13px', fontWeight: '600', marginBottom: '14px',
@@ -3032,7 +3032,7 @@ export default function SuperAdminDashboard() {
 
               {adminLoginThemeModal.branding?.adminLoginTheme && (
                 <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid var(--sa-w06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: '13px', color: '#6b7280' }}>Remove custom theme → falls back to Executive Command (default)</span>
+                  <span style={{ fontSize: '13px', color: '#6b7280' }}>Remove custom theme → falls back to Sunshine Login (default)</span>
                   <button onClick={handleUnassignAdminLoginTheme} disabled={assigningAdminLoginTheme === '__unassign__'}
                     style={{ padding: '7px 16px', borderRadius: '8px', border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.08)', color: '#ef4444', fontSize: '12px', fontWeight: '700', cursor: 'pointer', fontFamily: 'inherit' }}>
                     {assigningAdminLoginTheme === '__unassign__' ? 'Removing…' : 'Unassign'}

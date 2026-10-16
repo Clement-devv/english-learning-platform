@@ -610,19 +610,47 @@ export function useDashboardData() {
       return count >= b.requirement;
     });
 
+  // Celebrate only what is NEW for this student. Badges are recomputed from scratch on every
+  // load, so without a memory every login replayed the confetti for badges already earned
+  // (and for a 5-day streak every day it stayed at 5). Seen badges / milestones are kept per
+  // student on this device; the very first visit records them quietly.
   const checkForCelebrationAndBadges = () => {
     const earned = checkEarnedBadges(completedTotal, progress.streakDays, progress.weeklyCompleted, completedClasses);
-    const newOnes = earned.filter(b => !badges.some(x => x.id === b.id));
-    if (newOnes.length) { setNewBadge(newOnes[newOnes.length - 1]); triggerCelebration(newOnes[newOnes.length - 1].name, newOnes[newOnes.length - 1].icon); }
     setBadges(earned);
+    if (!dataReady) return;                       // don't judge before the real numbers arrive
+
     const n = completedTotal;
-    if (progress.streakDays === 5)  triggerCelebration("🔥 Amazing! 5-Day Streak!", "🔥");
-    else if (progress.streakDays === 10) triggerCelebration("⚡ 10-Day Streak Master!", "⚡");
-    else if (n === 25) triggerCelebration("🎓 25 Classes Done!", "🎓");
-    else if (n === 50) triggerCelebration("🏆 50 Classes!", "🏆");
+    const milestone =
+      progress.streakDays === 5  ? { id: 'streak:5',   msg: '🔥 Amazing! 5-Day Streak!', emoji: '🔥' } :
+      progress.streakDays === 10 ? { id: 'streak:10',  msg: '⚡ 10-Day Streak Master!',  emoji: '⚡' } :
+      n === 25                   ? { id: 'classes:25', msg: '🎓 25 Classes Done!',       emoji: '🎓' } :
+      n === 50                   ? { id: 'classes:50', msg: '🏆 50 Classes!',            emoji: '🏆' } : null;
+
+    const key = `celebrated:${student?.id || student?._id || 'me'}`;
+    let seen = null;
+    try { seen = JSON.parse(localStorage.getItem(key) || 'null'); } catch { /* private mode / bad JSON */ }
+    const firstVisit = !Array.isArray(seen);
+    const seenSet = new Set(firstVisit ? [] : seen);
+
+    const newBadges = earned.filter(b => !seenSet.has('badge:' + b.id));
+    const newMilestone = milestone && !seenSet.has(milestone.id) ? milestone : null;
+
+    if (!firstVisit) {
+      if (newBadges.length) {
+        const latest = newBadges[newBadges.length - 1];
+        setNewBadge(latest);
+        triggerCelebration(latest.name, latest.icon);
+      } else if (newMilestone) {
+        triggerCelebration(newMilestone.msg, newMilestone.emoji);
+      }
+    }
+
+    earned.forEach(b => seenSet.add('badge:' + b.id));
+    if (milestone) seenSet.add(milestone.id);
+    try { localStorage.setItem(key, JSON.stringify([...seenSet])); } catch { /* storage full / blocked */ }
   };
 
-  useEffect(() => { checkForCelebrationAndBadges(); }, [completedClasses, completedTotal, progress.streakDays]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { checkForCelebrationAndBadges(); }, [completedClasses, completedTotal, progress.streakDays, dataReady]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const STREAK_MILESTONES = [3, 7, 14, 30, 50, 100];
   const handleStreakLoaded = (currentStreak) => {
@@ -732,7 +760,7 @@ export function useDashboardData() {
     unreadMessages, setUnreadMessages,
     loading, isDarkMode, setIsDarkMode,
     toast, showToast,
-    showCelebration, celebrationMessage, celebrationEmoji, newBadge,
+    showCelebration, setShowCelebration, celebrationMessage, celebrationEmoji, newBadge,
     badges,
     showShareModal, setShowShareModal, shareData,
     notificationsEnabled, notificationPermission,

@@ -360,7 +360,7 @@ async function loadOwnHomework(req, res) {
   getStudent(req.db);
   const hw = await getHomework(req.db).findById(req.params.id)
     .select("+shareLink.tokenEnc")
-    .populate("studentId", "firstName lastName email isManaged");
+    .populate("studentId", "firstName lastName email isManaged emailLanguage timezone");
   if (!hw) { notFound(res, "Homework not found"); return null; }
   if (hw.teacherId.toString() !== req.user.id) { forbidden(res, "Access denied"); return null; }
   return hw;
@@ -470,7 +470,7 @@ router.get("/my", verifyToken, async (req, res) => {
     const pagination = pageMeta(want, limit, status ? counts[status] : counts.all);
     const list = await Homework.find({ teacherId: req.user.id, ...(status ? { status } : {}) })
       .select("+shareLink.tokenEnc")
-      .populate("studentId", "firstName lastName email isManaged")
+      .populate("studentId", "firstName lastName email isManaged emailLanguage timezone")
       .sort({ createdAt: -1, _id: -1 })
       .skip((pagination.page - 1) * limit)
       .limit(limit)
@@ -496,7 +496,7 @@ router.get("/assigned", verifyToken, async (req, res) => {
     // To-do first (soonest due), then the rest (most recent first)
     const ids = await todoFirstIds(Homework, { ...mine, ...(status ? { status } : {}) }, "assigned", pagination);
     const list = inOrder(await Homework.find({ _id: { $in: ids } })
-      .populate("teacherId", "firstName lastName email")
+      .populate("teacherId", "firstName lastName email timezone")
       .lean(), ids);
     res.json({ success: true, homework: list, pagination, counts });
   } catch (err) {
@@ -510,8 +510,8 @@ router.get("/assigned", verifyToken, async (req, res) => {
 router.get("/:id", verifyToken, validateObjectId("id"), async (req, res) => {
   try {
     const hw = await getHomework(req.db).findById(req.params.id)
-      .populate("teacherId", "firstName lastName email")
-      .populate("studentId", "firstName lastName email");
+      .populate("teacherId", "firstName lastName email timezone")
+      .populate("studentId", "firstName lastName email emailLanguage timezone");
     if (!hw) return notFound(res, "Homework not found");
 
     const isTeacher = req.user.role === "teacher" && hw.teacherId._id.toString() === req.user.id;

@@ -392,7 +392,7 @@ export default function ChatWindow({ chat, chatType = "group", userRole, onClose
       <div
         ref={scrollBoxRef}
         onScroll={handleScroll}
-        style={{ flex: 1, overflowY: "auto", padding: "14px 18px", display: "flex", flexDirection: "column", backgroundImage: "var(--as-chat-wall, none)", backgroundSize: "140px 140px" }}
+        style={{ flex: 1, overflowY: "auto", padding: "14px 18px", display: "flex", flexDirection: "column", backgroundImage: "var(--as-chat-wall, none)", backgroundSize: "140px 140px", overscrollBehavior: "contain", minHeight: 0 }}
         className="msg-scrollbar"
       >
         {loading && messages.length === 0 ? (
@@ -602,6 +602,7 @@ export default function ChatWindow({ chat, chatType = "group", userRole, onClose
             <textarea
               ref={textareaRef}
               className="msg-textarea"
+              enterKeyHint="send"
               value={newMsg}
               onChange={e => {
                 setNewMsg(e.target.value);

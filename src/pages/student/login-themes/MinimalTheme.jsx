@@ -14,7 +14,7 @@ export default function MinimalTheme({ loginHook } = {}) {
     showPassword, setShowPassword,
     error, loading, requires2FA,
     focusedField, setFocusedField,
-    handleInitialLogin, handle2FAVerification, handleCancel2FA, navigate,
+    handleInitialLogin, handle2FAVerification, handleCancel2FA, navigate, forgotPath = '/student/forgot-password',
   } = (loginHook || useLoginLogic)();
 
   const { branding, center } = useBranding();
@@ -86,7 +86,7 @@ export default function MinimalTheme({ loginHook } = {}) {
             <div className="mn-field">
               <div className="mn-label-row">
                 <label className="mn-label"><Lock size={13} /> {tr("minimalTheme.password")}</label>
-                <button type="button" onClick={() => navigate('/student/forgot-password')} className="mn-forgot">
+                <button type="button" onClick={() => navigate(forgotPath)} className="mn-forgot">
                   {tr("minimalTheme.forgotPassword")}
                 </button>
               </div>

@@ -61,8 +61,8 @@ async function checkClassReminders(db, centerSlug) {
       $lt: new Date(Date.now() + 70 * 60 * 1000),
     },
   })
-    .populate("teacherId", "firstName lastName email")
-    .populate("studentId", "firstName lastName email");
+    .populate("teacherId", "firstName lastName email timezone")
+    .populate("studentId", "firstName lastName email emailLanguage timezone");
 
   for (const booking of bookings) {
     const teacher = booking.teacherId;
@@ -115,7 +115,7 @@ async function checkHomeworkReminders(db, centerSlug) {
       $gt: new Date(Date.now() + 24 * 60 * 1000),
       $lt: new Date(Date.now() + 36 * 60 * 1000),
     },
-  }).populate("studentId", "firstName email");
+  }).populate("studentId", "firstName email emailLanguage timezone");
 
   for (const hw of homeworks) {
     const student = hw.studentId;
@@ -139,7 +139,7 @@ async function checkQuizReminders(db, centerSlug) {
       $gt: new Date(Date.now() + 24 * 60 * 1000),
       $lt: new Date(Date.now() + 36 * 60 * 1000),
     },
-  }).populate("studentId", "firstName email");
+  }).populate("studentId", "firstName email emailLanguage timezone");
 
   for (const quiz of quizzes) {
     const student = quiz.studentId;

@@ -20,7 +20,7 @@ const HALF_HOURS = Array.from({ length: 49 }, (_, i) => `${String(Math.floor(i /
 
 function pal(dark) {
   return {
-    card: dark ? "var(--as-surface, #111827)" : "var(--as-surface, #ffffff)", border: dark ? "var(--as-line, #1f2937)" : "var(--as-line, #e5e7eb)", soft: dark ? "#0b1220" : "var(--as-ink, #f8fafc)",
+    card: dark ? "var(--as-surface, #111827)" : "var(--as-surface, #ffffff)", border: dark ? "var(--as-line, #1f2937)" : "var(--as-line, #e5e7eb)", soft: dark ? "#0b1220" : "var(--as-raised, #f8fafc)",
     heading: dark ? "var(--as-ink, #f1f5f9)" : "var(--as-ink, #0f172a)", text: dark ? "var(--as-ink-2, #cbd5e1)" : "var(--as-ink-2, #475569)", muted: dark ? "var(--as-ink-2, #64748b)" : "var(--as-muted, #94a3b8)",
     input: dark ? "#0b1220" : "var(--as-surface, #ffffff)",
   };

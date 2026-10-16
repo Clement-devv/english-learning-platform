@@ -39,11 +39,29 @@ export default function UpcomingClasses({ classes, onCancel, onDelete, isDarkMod
   const scheduled = sortedClasses.filter(c => c.status === 'scheduled');
 
   return (
-    <div className={`${
+    <div className={`uc-root ${
       isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
     } rounded-2xl border shadow-xl overflow-hidden`}>
+      {/* Phones: the dashboard section already has the "Upcoming Classes" title,
+          so the list sits flat in it — no gradient header, no extra card frame. */}
+      <style>{`@media (max-width: 640px) {
+        .uc-root { border: 0 !important; box-shadow: none !important; background: transparent !important; border-radius: 0 !important; }
+        .uc-head { display: none; }
+        .uc-list { padding: 0 !important; }
+        .uc-list > * + * { margin-top: 10px !important; }
+        .uc-card { padding: 14px !important; border-width: 1px !important; }
+        .uc-row { flex-direction: column; gap: 10px !important; }
+        .uc-row > .flex-1 { width: 100%; }
+        .uc-title { font-size: 16px !important; line-height: 1.3; }
+        .uc-meta { grid-template-columns: 1fr 1fr !important; gap: 8px !important; margin-bottom: 10px !important; }
+        .uc-meta > :nth-child(3) { display: none; }
+        .uc-actions { flex-direction: row !important; width: 100%; }
+        .uc-actions > button { padding: 10px 14px !important; justify-content: center; }
+        .uc-actions > button:first-child { flex: 1; }
+        .uc-start { display: inline !important; }
+      }`}</style>
       {/* Header */}
-      <div className="bg-gradient-to-r from-blue-500 to-indigo-600 p-6">
+      <div className="uc-head bg-gradient-to-r from-blue-500 to-indigo-600 p-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className={`${
@@ -73,7 +91,7 @@ export default function UpcomingClasses({ classes, onCancel, onDelete, isDarkMod
       </div>
 
       {/* Classes List */}
-      <div className="p-6 space-y-4">
+      <div className="uc-list p-6 space-y-4">
         {/* Upcoming Soon Alert */}
         {upcomingSoon.length > 0 && (
           <div className={`${
@@ -117,15 +135,15 @@ export default function UpcomingClasses({ classes, onCancel, onDelete, isDarkMod
                   : isUpcomingSoon
                     ? 'bg-yellow-50 border-yellow-300'
                     : 'bg-gray-50 border-gray-200'
-              } border-2 rounded-xl p-5 hover:shadow-lg transition-all duration-300 group`}
+              } uc-card border-2 rounded-xl p-5 hover:shadow-lg transition-all duration-300 group`}
             >
-              <div className="flex items-start justify-between gap-4">
+              <div className="uc-row flex items-start justify-between gap-4">
                 {/* Left: Class Info */}
                 <div className="flex-1 min-w-0">
                   {/* Title and Time Until */}
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex-1">
-                      <h3 className={`text-lg font-bold mb-1 ${
+                      <h3 className={`uc-title text-lg font-bold mb-1 ${
                         isDarkMode ? 'text-white' : 'text-gray-900'
                       }`}>
                         {classItem.title}
@@ -151,7 +169,7 @@ export default function UpcomingClasses({ classes, onCancel, onDelete, isDarkMod
                   </div>
 
                   {/* Meta Information */}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
+                  <div className="uc-meta grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
                     <div className="flex items-center gap-2">
                       <div className={`${
                         isDarkMode ? 'bg-blue-900/30' : 'bg-blue-100'
@@ -237,7 +255,7 @@ export default function UpcomingClasses({ classes, onCancel, onDelete, isDarkMod
                 </div>
 
                 {/* Right: Actions */}
-                <div className="flex flex-col gap-2 flex-shrink-0">
+                <div className="uc-actions flex flex-col gap-2 flex-shrink-0">
                   <button
                     onClick={() => onCancel && onCancel(classItem.id)}
                     className={`${
@@ -247,7 +265,7 @@ export default function UpcomingClasses({ classes, onCancel, onDelete, isDarkMod
                     } text-white px-6 py-3 rounded-xl font-semibold transition-all duration-200 flex items-center gap-2 shadow-lg hover:shadow-xl group-hover:scale-105`}
                   >
                     <Video className="w-5 h-5" />
-                    <span className="hidden sm:inline">Start</span>
+                    <span className="uc-start hidden sm:inline">Start</span>
                   </button>
                   <button
                     onClick={() => onDelete && onDelete(classItem)}

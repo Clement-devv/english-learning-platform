@@ -209,19 +209,19 @@ export default function CompletedClassesTab({ teacherInfo, isDarkMode, students 
       />
 
       {/* Header card */}
-      <div className={`${bg} rounded-xl shadow-md p-5`}>
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
+      <div className={`${bg} rounded-xl shadow-md p-4 sm:p-5`}>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-4 mb-4">
           <div>
             <h2 className={`text-xl font-bold ${text}`}>Completed Classes</h2>
             <p className={`text-sm mt-0.5 ${subText}`}>
               {completedCount} completed · {notCompletedCount} not completed
             </p>
           </div>
-          <div className="flex gap-2 flex-wrap">
+          <div className="grid grid-cols-2 sm:flex gap-2 sm:flex-wrap">
             <button
               type="button"
               onClick={() => setLogOpen(true)}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white transition-opacity hover:opacity-90"
+              className="flex items-center justify-center gap-2 px-3 sm:px-4 py-2.5 sm:py-2 rounded-lg text-sm font-semibold text-white transition-opacity hover:opacity-90"
               style={{ background: "var(--as-accent, var(--brand-primary, #2563eb))" }}
               title="For a class that happened outside the app (site down, Meet/Zoom directly…)"
             >
@@ -231,7 +231,7 @@ export default function CompletedClassesTab({ teacherInfo, isDarkMode, students 
             <button
               onClick={generatePDF}
               disabled={isGenerating || pager.total === 0}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors ${
+              className={`flex items-center justify-center gap-2 px-3 sm:px-4 py-2.5 sm:py-2 rounded-lg text-sm font-medium text-white transition-colors ${
                 isGenerating || pager.total === 0
                   ? "bg-gray-400 cursor-not-allowed"
                   : "bg-purple-600 hover:bg-purple-700"
@@ -296,16 +296,16 @@ export default function CompletedClassesTab({ teacherInfo, isDarkMode, students 
         )}
 
         {/* Status filter tabs */}
-        <div className={`flex gap-1 p-1 rounded-lg mb-4 w-fit ${isDarkMode ? "bg-gray-700" : "bg-gray-100"}`}>
+        <div className={`grid grid-cols-3 sm:flex gap-1 p-1 rounded-lg mb-4 sm:w-fit ${isDarkMode ? "bg-gray-700" : "bg-gray-100"}`}>
           {[
-            { key: "all", label: `All (${counts.all})` },
-            { key: "completed", label: `Completed (${completedCount})` },
-            { key: "not_completed", label: `Not Completed (${notCompletedCount})` },
-          ].map(({ key, label }) => (
+            { key: "all", label: "All", count: counts.all },
+            { key: "completed", label: "Completed", count: completedCount },
+            { key: "not_completed", label: "Not Completed", short: "Missed", count: notCompletedCount },
+          ].map(({ key, label, short, count }) => (
             <button
               key={key}
               onClick={() => setStatusFilter(key)}
-              className={`px-4 py-1.5 rounded-md text-sm font-semibold transition-all ${
+              className={`px-1.5 sm:px-4 py-1.5 rounded-md text-[13px] sm:text-sm font-semibold whitespace-nowrap transition-all ${
                 statusFilter === key
                   ? key === "not_completed"
                     ? "bg-rose-600 text-white"
@@ -315,14 +315,14 @@ export default function CompletedClassesTab({ teacherInfo, isDarkMode, students 
                   : "text-gray-500 hover:text-gray-700"
               }`}
             >
-              {label}
+              {short ? <><span className="sm:hidden">{short}</span><span className="hidden sm:inline">{label}</span></> : label} ({count ?? 0})
             </button>
           ))}
         </div>
 
         {/* Search + date filters */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <div className="relative">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-2 sm:gap-3">
+          <div className="relative col-span-2 md:col-span-1">
             <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${subText}`} />
             <input
               type="text"
@@ -336,13 +336,13 @@ export default function CompletedClassesTab({ teacherInfo, isDarkMode, students 
             type="date"
             value={startDate}
             onChange={(e) => setStartDate(e.target.value)}
-            className={`px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-purple-400 focus:outline-none ${inputCls}`}
+            className={`min-w-0 px-2 sm:px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-purple-400 focus:outline-none ${inputCls}`}
           />
           <input
             type="date"
             value={endDate}
             onChange={(e) => setEndDate(e.target.value)}
-            className={`px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-purple-400 focus:outline-none ${inputCls}`}
+            className={`min-w-0 px-2 sm:px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-purple-400 focus:outline-none ${inputCls}`}
           />
         </div>
 
@@ -380,9 +380,9 @@ export default function CompletedClassesTab({ teacherInfo, isDarkMode, students 
             const parentDispute = !isNotCompleted && cls.parentDispute;
             return (
               <div key={cls.id || idx}
-                className={`p-5 ${hoverRow} transition-colors ${parentDispute ? `${DISPUTE_GLOW_CLASS} rounded-xl relative ${isDarkMode ? "bg-red-950/30" : "bg-red-50"}` : ""}`}>
+                className={`p-4 sm:p-5 ${hoverRow} transition-colors ${parentDispute ? `${DISPUTE_GLOW_CLASS} rounded-xl relative ${isDarkMode ? "bg-red-950/30" : "bg-red-50"}` : ""}`}>
                 <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-                  <div className="flex gap-3 flex-1">
+                  <div className="flex gap-3 flex-1 min-w-0">
                     {/* Index badge */}
                     <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0 ${
                       isNotCompleted
@@ -394,7 +394,7 @@ export default function CompletedClassesTab({ teacherInfo, isDarkMode, students 
                       {startIndex + idx + 1}
                     </div>
 
-                    <div className="flex-1">
+                    <div className="flex-1 min-w-0">
                       {/* Title + status badge */}
                       <div className="flex items-center gap-2 flex-wrap">
                         <h3 className={`font-semibold ${text}`}>{cls.title}{cls.isGroupClass && <span className="ml-2 inline-block text-xs font-semibold px-2 py-0.5 rounded-full bg-sky-100 text-sky-700">👥 Group class{cls.officiallyCompleted ? ` · ${cls.attended || 0} attended` : ""}</span>}</h3>
@@ -425,7 +425,7 @@ export default function CompletedClassesTab({ teacherInfo, isDarkMode, students 
                       )}
 
                       {/* Meta row */}
-                      <div className={`flex flex-wrap items-center gap-4 mt-2 text-sm ${subText}`}>
+                      <div className={`flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-sm ${subText}`}>
                         <span className="flex items-center gap-1">
                           <Calendar className="w-4 h-4" />
                           {fmtScheduled(cls.scheduledTime)}

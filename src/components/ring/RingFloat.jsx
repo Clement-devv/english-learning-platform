@@ -6,7 +6,7 @@
 // IMPORTANT: All hooks must be declared before any conditional return (React rules).
 // The isDashboardPath / !user guards are placed AFTER all hooks for this reason.
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { useRing } from "../../context/RingContext";
@@ -107,7 +107,9 @@ export default function RingFloat() {
     setTimeout(() => setToastMsg(""), 3200);
   }
 
-  const handleRing = useCallback((contact) => {
+  // Plain function (not useCallback): it sits after the early returns above, and a hook
+  // there would change the hook count when the route switches → React crash.
+  function handleRing(contact) {
     if (ringing || contact.ringEnabled === false) return;
     const callerName = user
       ? `${user.firstName || ""} ${user.lastName || ""}`.trim() || "Someone"
@@ -122,7 +124,7 @@ export default function RingFloat() {
       setRinging(null);
       showToast("No answer");
     }, 30_000);
-  }, [ringing, user, ringUser]);
+  }
 
   function handleCancelRing() {
     clearTimeout(ringTimerRef.current);

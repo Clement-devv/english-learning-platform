@@ -1,129 +1,118 @@
-import { config } from "../config/config.js";
-import { sendEmail, getCenterBaseUrl } from "./core.js";
+// Quiz emails. Student emails follow the student's emailLanguage (i18n.js).
+import { sendEmail } from "./core.js";
+import { renderEmail, p, details, callout, esc } from "./layout.js";
+import { langOf, fmtDate, fmtTime, brandOf, pick } from "./i18n.js";
 
+const fullName = (u) => esc(`${u?.firstName || ""} ${u?.lastName || ""}`.trim());
+
+const ASSIGNED = {
+  en: {
+    subject: (t) => `New quiz – ${t}`, eyebrow: "New quiz",
+    intro: (n, t) => `Hi ${n}, <strong>${t}</strong> has set you a quiz.`,
+    labels: ["Questions", "Time limit", "Due", "Teacher"], minutes: "minutes",
+    note: "<strong>One attempt only.</strong> Once you start, the timer can't be paused — start when you're ready.",
+    cta: "Take the quiz",
+  },
+  vi: {
+    subject: (t) => `Bài kiểm tra mới – ${t}`, eyebrow: "Bài kiểm tra mới",
+    intro: (n, t) => `Chào ${n}, <strong>${t}</strong> vừa giao cho em một bài kiểm tra.`,
+    labels: ["Số câu hỏi", "Thời gian làm bài", "Hạn nộp", "Giáo viên"], minutes: "phút",
+    note: "<strong>Chỉ được làm một lần.</strong> Khi đã bắt đầu, đồng hồ không thể tạm dừng — hãy bắt đầu khi em đã sẵn sàng.",
+    cta: "Làm bài kiểm tra",
+  },
+};
 export const sendQuizAssigned = async (student, teacher, quiz, centerName = "", center = null) => {
-  const { baseUrl } = getCenterBaseUrl(center);
-  const dueDate = new Date(quiz.dueDate).toLocaleDateString('en-US', {
-    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
-  });
-
+  const b = brandOf(center, centerName);
+  const lang = langOf(student), s = pick(ASSIGNED, lang), tz = student?.timezone, L = s.labels;
+  const due = fmtDate(quiz.dueDate, lang, tz);
   return sendEmail({
-    centerName,
+    centerName: b.centerName,
     to: student.email,
-    subject: `📝 New Quiz – ${quiz.title}`,
-    html: `<!DOCTYPE html><html><head><style>
-      body{font-family:Arial,sans-serif;line-height:1.6;color:#333}
-      .container{max-width:600px;margin:0 auto;padding:20px}
-      .header{background:linear-gradient(135deg,#7c3aed,#6d28d9);color:#fff;padding:30px;text-align:center;border-radius:10px 10px 0 0}
-      .content{background:#f9f9f9;padding:30px;border-radius:0 0 10px 10px}
-      .card{background:#fff;padding:20px;border-radius:8px;margin:20px 0;box-shadow:0 2px 4px rgba(0,0,0,0.1)}
-      .row{margin:10px 0;padding:10px 0;border-bottom:1px solid #eee}
-      .label{font-weight:bold;color:#7c3aed}
-      .warning{background:#fef3c7;border-left:4px solid #f59e0b;padding:14px;border-radius:4px;margin:16px 0}
-      .due{background:#ede9fe;border-left:4px solid #7c3aed;padding:14px;border-radius:4px;margin:16px 0}
-      .btn{display:inline-block;padding:12px 30px;background:#7c3aed;color:#fff;text-decoration:none;border-radius:5px;font-weight:bold}
-      .footer{text-align:center;margin-top:30px;color:#999;font-size:12px}
-    </style></head><body><div class="container">
-      <div class="header"><h1>📝 New Quiz Assigned!</h1><p>You have a new test to complete</p></div>
-      <div class="content">
-        <p>Hi ${student.firstName},</p>
-        <p><strong>${teacher.firstName} ${teacher.lastName}</strong> has assigned you a quiz.</p>
-        <div class="card">
-          <div class="row"><span class="label">Quiz:</span> ${quiz.title}</div>
-          <div class="row"><span class="label">Questions:</span> ${quiz.questions.length}</div>
-          <div class="row"><span class="label">Time Limit:</span> ${quiz.timeLimit} minutes</div>
-          <div class="row"><span class="label">Teacher:</span> ${teacher.firstName} ${teacher.lastName}</div>
-        </div>
-        <div class="due"><strong>📅 Due Date:</strong> ${dueDate}</div>
-        <div class="warning"><strong>⚠️ Note:</strong> You only have <strong>one attempt</strong>. Once started, the timer cannot be paused.</div>
-        <div style="text-align:center;margin-top:20px">
-          <a href="${baseUrl}/student/dashboard" class="btn">Take Quiz</a>
-        </div>
-      </div>
-      <div class="footer"><p>Automated message from ${config.appName}</p></div>
-    </div></body></html>`,
+    subject: s.subject(quiz.title),
+    html: renderEmail({
+      ...b, lang, tone: "blue",
+      preheader: `${L[2]}: ${due}`,
+      eyebrow: s.eyebrow,
+      title: quiz.title,
+      body:
+        p(s.intro(esc(student.firstName), fullName(teacher))) +
+        details([
+          [L[0], String(quiz.questions?.length ?? "")],
+          [L[1], `${quiz.timeLimit} ${s.minutes}`],
+          [L[2], due],
+          [L[3], fullName(teacher)],
+        ]) +
+        callout(s.note, "amber"),
+      cta: { label: s.cta, href: `${b.baseUrl}/student/dashboard?tab=quiz`, tone: "blue" },
+    }),
   });
 };
 
+// Teacher (English)
 export const sendQuizCompleted = async (teacher, student, quiz, attempt, centerName = "", center = null) => {
-  const { baseUrl } = getCenterBaseUrl(center);
-  const scoreColor = attempt.percentage >= 80 ? '#10b981' : attempt.percentage >= 60 ? '#f59e0b' : '#ef4444';
-  const trophy     = attempt.percentage >= 90 ? '🏆' : attempt.percentage >= 75 ? '🥇' : attempt.percentage >= 60 ? '🥈' : '🥉';
-
+  const b = brandOf(center, centerName);
+  const pct = attempt.percentage;
+  const tone = pct >= 80 ? "green" : pct >= 60 ? "amber" : "red";
+  const trophy = pct >= 90 ? "🏆" : pct >= 75 ? "🥇" : pct >= 60 ? "🥈" : "🥉";
+  const took = attempt.timeTaken ? `${Math.floor(attempt.timeTaken / 60)}m ${attempt.timeTaken % 60}s` : "";
   return sendEmail({
-    centerName,
+    centerName: b.centerName,
     to: teacher.email,
-    subject: `📝 Quiz Completed – ${quiz.title} – ${student.firstName} ${student.lastName} scored ${attempt.percentage}%`,
-    html: `<!DOCTYPE html><html><head><style>
-      body{font-family:Arial,sans-serif;line-height:1.6;color:#333}
-      .container{max-width:600px;margin:0 auto;padding:20px}
-      .header{background:linear-gradient(135deg,#10b981,#059669);color:#fff;padding:30px;text-align:center;border-radius:10px 10px 0 0}
-      .content{background:#f9f9f9;padding:30px;border-radius:0 0 10px 10px}
-      .score-box{background:#fff;padding:24px;border-radius:8px;margin:20px 0;text-align:center;box-shadow:0 2px 4px rgba(0,0,0,0.1)}
-      .score{font-size:48px;font-weight:bold;color:${scoreColor}}
-      .card{background:#fff;padding:20px;border-radius:8px;margin:20px 0;box-shadow:0 2px 4px rgba(0,0,0,0.1)}
-      .row{margin:10px 0;padding:10px 0;border-bottom:1px solid #eee}
-      .label{font-weight:bold;color:#10b981}
-      .btn{display:inline-block;padding:12px 30px;background:#10b981;color:#fff;text-decoration:none;border-radius:5px;font-weight:bold}
-      .footer{text-align:center;margin-top:30px;color:#999;font-size:12px}
-    </style></head><body><div class="container">
-      <div class="header"><h1>📝 Quiz Completed!</h1><p>A student has finished their quiz</p></div>
-      <div class="content">
-        <p>Hi ${teacher.firstName},</p>
-        <p><strong>${student.firstName} ${student.lastName}</strong> has completed the quiz.</p>
-        <div class="score-box">
-          <div style="font-size:48px">${trophy}</div>
-          <div class="score">${attempt.percentage}%</div>
-          <p style="font-size:18px;color:#666">${attempt.score} out of ${attempt.totalQuestions} correct</p>
-          ${attempt.timeTaken ? `<p style="color:#999">Completed in ${Math.floor(attempt.timeTaken / 60)}m ${attempt.timeTaken % 60}s</p>` : ''}
-        </div>
-        <div class="card">
-          <div class="row"><span class="label">Quiz:</span> ${quiz.title}</div>
-          <div class="row"><span class="label">Student:</span> ${student.firstName} ${student.lastName}</div>
-          <div class="row"><span class="label">Score:</span> ${attempt.score}/${attempt.totalQuestions} (${attempt.percentage}%)</div>
-        </div>
-        <div style="text-align:center;margin-top:20px">
-          <a href="${baseUrl}/teacher/dashboard" class="btn">View Results</a>
-        </div>
-      </div>
-      <div class="footer"><p>Automated message from ${config.appName}</p></div>
-    </div></body></html>`,
+    subject: `Quiz completed – ${quiz.title} – ${student.firstName} ${student.lastName} scored ${pct}%`,
+    html: renderEmail({
+      ...b, tone,
+      preheader: `${student.firstName} scored ${pct}% (${attempt.score}/${attempt.totalQuestions})`,
+      eyebrow: "Quiz completed",
+      title: `${trophy} ${student.firstName} scored ${pct}%`,
+      body:
+        p(`Hi ${esc(teacher.firstName)}, <strong>${fullName(student)}</strong> has finished the quiz.`) +
+        details([
+          ["Quiz", esc(quiz.title)],
+          ["Score", `${attempt.score} / ${attempt.totalQuestions} correct (${pct}%)`],
+          ["Time taken", took],
+        ]),
+      cta: { label: "View results", href: `${b.baseUrl}/teacher/dashboard?tab=quiz`, tone: tone === "red" ? "accent" : tone },
+    }),
   });
 };
 
+const DUE = {
+  en: {
+    subject: (t, m) => `Quiz due in ${m} minutes – ${t}`, eyebrow: "Due soon",
+    intro: (n) => `Hi ${n}, your quiz is due very soon.`,
+    labels: ["Quiz", "Due at", "Time left"], left: (m) => `${m} minutes`,
+    note: (l) => `<strong>One attempt only.</strong> Once you start, the ${l}-minute timer begins straight away.`,
+    cta: "Take the quiz now",
+  },
+  vi: {
+    subject: (t, m) => `Bài kiểm tra hết hạn sau ${m} phút – ${t}`, eyebrow: "Sắp hết hạn",
+    intro: (n) => `Chào ${n}, bài kiểm tra của em sắp hết hạn.`,
+    labels: ["Bài kiểm tra", "Hạn nộp lúc", "Còn lại"], left: (m) => `${m} phút`,
+    note: (l) => `<strong>Chỉ được làm một lần.</strong> Khi bắt đầu, đồng hồ ${l} phút sẽ chạy ngay.`,
+    cta: "Làm bài ngay",
+  },
+};
 export const sendQuizDueReminder = async (student, quiz, minutesLeft, centerName = "", center = null) => {
-  const { baseUrl } = getCenterBaseUrl(center);
-  const dueTime = new Date(quiz.dueDate).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-
+  const b = brandOf(center, centerName);
+  const lang = langOf(student), s = pick(DUE, lang), tz = student?.timezone;
   return sendEmail({
-    centerName,
+    centerName: b.centerName,
     to: student.email,
-    subject: `⚡ Quiz Due Soon – ${quiz.title} – ${minutesLeft} minutes left!`,
-    html: `<!DOCTYPE html><html><head><style>
-      body{font-family:Arial,sans-serif;line-height:1.6;color:#333}
-      .container{max-width:600px;margin:0 auto;padding:20px}
-      .header{background:linear-gradient(135deg,#7c3aed,#6d28d9);color:#fff;padding:30px;text-align:center;border-radius:10px 10px 0 0}
-      .content{background:#f9f9f9;padding:30px;border-radius:0 0 10px 10px}
-      .urgent{background:#ede9fe;border-left:4px solid #7c3aed;padding:16px;border-radius:4px;margin:16px 0;font-size:16px}
-      .warning{background:#fee2e2;border-left:4px solid #ef4444;padding:14px;border-radius:4px;margin:16px 0}
-      .btn{display:inline-block;padding:14px 40px;background:#7c3aed;color:#fff;text-decoration:none;border-radius:5px;font-weight:bold;font-size:16px}
-      .footer{text-align:center;margin-top:30px;color:#999;font-size:12px}
-    </style></head><body><div class="container">
-      <div class="header"><h1>⚡ Quiz Due Soon!</h1><p>Only ${minutesLeft} minutes left</p></div>
-      <div class="content">
-        <p>Hi ${student.firstName},</p>
-        <div class="urgent">
-          <strong>📝 ${quiz.title}</strong> is due at <strong>${dueTime}</strong> — only <strong>${minutesLeft} minutes</strong> remaining!
-        </div>
-        <div class="warning">
-          <strong>⚠️ Remember:</strong> You have <strong>one attempt only</strong>. Once you start, the ${quiz.timeLimit}-minute timer begins immediately.
-        </div>
-        <p>If you haven't started yet, log in now and complete the quiz before the deadline.</p>
-        <div style="text-align:center;margin-top:20px">
-          <a href="${baseUrl}/student/dashboard" class="btn">Take Quiz Now</a>
-        </div>
-      </div>
-      <div class="footer"><p>Automated reminder from ${config.appName}</p></div>
-    </div></body></html>`,
+    subject: s.subject(quiz.title, minutesLeft),
+    html: renderEmail({
+      ...b, lang, tone: "amber",
+      preheader: s.intro(student.firstName),
+      eyebrow: s.eyebrow,
+      title: quiz.title,
+      body:
+        p(s.intro(esc(student.firstName))) +
+        details([
+          [s.labels[0], esc(quiz.title)],
+          [s.labels[1], fmtTime(quiz.dueDate, lang, tz)],
+          [s.labels[2], `<span style="color:#b45309;">${s.left(minutesLeft)}</span>`],
+        ]) +
+        callout(s.note(quiz.timeLimit), "amber"),
+      cta: { label: s.cta, href: `${b.baseUrl}/student/dashboard?tab=quiz`, tone: "amber" },
+    }),
   });
 };

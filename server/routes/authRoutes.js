@@ -606,7 +606,8 @@ router.post("/student/forgot-password", tenantMiddleware, passwordResetLimiter, 
       `${student.firstName} ${student.lastName}`,
       resetToken,
       req.center,
-      req.center?.centerName || ""
+      req.center?.centerName || "",
+      student.emailLanguage
     );
 
     if (!emailResult.success) {

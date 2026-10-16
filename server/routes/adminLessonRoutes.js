@@ -6,6 +6,7 @@ import express from "express";
 import { verifyToken, verifyAdmin } from "../middleware/authMiddleware.js";
 import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
 import { sendEmail } from "../utils/emailService.js";
+import { sendLessonMarkedEmails as sendMarked, sendLessonUnmarkedEmails as sendUnmarked } from "../emails/lessonEmails.js";
 import { completeClass } from "../services/classCompletionService.js";
 import { bookingSchema }            from "../schemas/bookingSchema.js";
 import { teacherSchema }            from "../schemas/teacherSchema.js";
@@ -27,93 +28,7 @@ const getAssignment         = (db) => db.models.Assignment         || db.model("
 const getPaymentTransaction = (db) => db.models.PaymentTransaction || db.model("PaymentTransaction", paymentTransactionSchema);
 const getParent             = (db) => db.models.Parent             || db.model("Parent",             parentSchema);
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Email helpers
-// ─────────────────────────────────────────────────────────────────────────────
-
-async function sendLessonMarkedEmails(teacher, student, booking, centerName = "") {
-  try {
-    const teacherHtml = `
-      <!DOCTYPE html><html><body style="font-family:Arial,sans-serif;background:#f9fafb;padding:24px">
-      <div style="max-width:500px;margin:auto;background:#fff;border-radius:12px;padding:32px;box-shadow:0 2px 8px rgba(0,0,0,.08)">
-        <h2 style="color:#16a34a;margin-bottom:8px">✅ Lesson Marked Completed</h2>
-        <p style="color:#374151">Hi <strong>${teacher.firstName}</strong>,</p>
-        <p style="color:#374151">An admin has marked your lesson as completed:</p>
-        <div style="background:#f0fdf4;border-left:4px solid #16a34a;padding:16px;border-radius:6px;margin:16px 0">
-          <p style="margin:4px 0;color:#15803d"><strong>Class:</strong> ${booking.classTitle}</p>
-          <p style="margin:4px 0;color:#15803d"><strong>Student:</strong> ${student.firstName} ${student.lastName}</p>
-          <p style="margin:4px 0;color:#15803d"><strong>Date:</strong> ${new Date(booking.scheduledTime).toLocaleString()}</p>
-          <p style="margin:4px 0;color:#15803d"><strong>Amount added:</strong> $${teacher.ratePerClass}</p>
-        </div>
-        <p style="color:#374151">Your earnings have been updated. Check your salary dashboard for details.</p>
-      </div></body></html>`;
-
-    const studentHtml = `
-      <!DOCTYPE html><html><body style="font-family:Arial,sans-serif;background:#f9fafb;padding:24px">
-      <div style="max-width:500px;margin:auto;background:#fff;border-radius:12px;padding:32px;box-shadow:0 2px 8px rgba(0,0,0,.08)">
-        <h2 style="color:#2563eb;margin-bottom:8px">📚 Lesson Marked Completed</h2>
-        <p style="color:#374151">Hi <strong>${student.firstName}</strong>,</p>
-        <p style="color:#374151">An admin has marked your lesson as completed:</p>
-        <div style="background:#eff6ff;border-left:4px solid #2563eb;padding:16px;border-radius:6px;margin:16px 0">
-          <p style="margin:4px 0;color:#1d4ed8"><strong>Class:</strong> ${booking.classTitle}</p>
-          <p style="margin:4px 0;color:#1d4ed8"><strong>Teacher:</strong> ${teacher.firstName} ${teacher.lastName}</p>
-          <p style="margin:4px 0;color:#1d4ed8"><strong>Date:</strong> ${new Date(booking.scheduledTime).toLocaleString()}</p>
-          <p style="margin:4px 0;color:#1d4ed8"><strong>Classes remaining:</strong> ${student.classCredits}</p>
-        </div>
-        <p style="color:#374151">This class has been added to your completed classes. Keep up the great work! 🎓</p>
-      </div></body></html>`;
-
-    await Promise.all([
-      sendEmail({ centerName, to: teacher.email, subject: "Lesson Marked Completed ✅", html: teacherHtml }),
-      sendEmail({ centerName, to: student.email, subject: "Lesson Marked Completed 📚", html: studentHtml }),
-    ]);
-  } catch (err) {
-    logger.error("📧 Mark notification email failed:", { error: err?.message });
-  }
-}
-
-async function sendLessonUnmarkedEmails(teacher, student, booking, reason, centerName = "") {
-  try {
-    const teacherHtml = `
-      <!DOCTYPE html><html><body style="font-family:Arial,sans-serif;background:#f9fafb;padding:24px">
-      <div style="max-width:500px;margin:auto;background:#fff;border-radius:12px;padding:32px;box-shadow:0 2px 8px rgba(0,0,0,.08)">
-        <h2 style="color:#dc2626;margin-bottom:8px">⚠️ Lesson Marked as Not Completed</h2>
-        <p style="color:#374151">Hi <strong>${teacher.firstName}</strong>,</p>
-        <p style="color:#374151">An admin has reversed a lesson completion:</p>
-        <div style="background:#fef2f2;border-left:4px solid #dc2626;padding:16px;border-radius:6px;margin:16px 0">
-          <p style="margin:4px 0;color:#b91c1c"><strong>Class:</strong> ${booking.classTitle}</p>
-          <p style="margin:4px 0;color:#b91c1c"><strong>Student:</strong> ${student.firstName} ${student.lastName}</p>
-          <p style="margin:4px 0;color:#b91c1c"><strong>Date:</strong> ${new Date(booking.scheduledTime).toLocaleString()}</p>
-          <p style="margin:4px 0;color:#b91c1c"><strong>Amount deducted:</strong> $${teacher.ratePerClass}</p>
-          ${reason ? `<p style="margin:4px 0;color:#b91c1c"><strong>Reason:</strong> ${reason}</p>` : ""}
-        </div>
-        <p style="color:#374151">Your earnings have been adjusted accordingly. Contact admin if you have questions.</p>
-      </div></body></html>`;
-
-    const studentHtml = `
-      <!DOCTYPE html><html><body style="font-family:Arial,sans-serif;background:#f9fafb;padding:24px">
-      <div style="max-width:500px;margin:auto;background:#fff;border-radius:12px;padding:32px;box-shadow:0 2px 8px rgba(0,0,0,.08)">
-        <h2 style="color:#ea580c;margin-bottom:8px">⚠️ Lesson Status Updated</h2>
-        <p style="color:#374151">Hi <strong>${student.firstName}</strong>,</p>
-        <p style="color:#374151">An admin has reviewed and rejected a lesson completion:</p>
-        <div style="background:#fff7ed;border-left:4px solid #ea580c;padding:16px;border-radius:6px;margin:16px 0">
-          <p style="margin:4px 0;color:#c2410c"><strong>Class:</strong> ${booking.classTitle}</p>
-          <p style="margin:4px 0;color:#c2410c"><strong>Teacher:</strong> ${teacher.firstName} ${teacher.lastName}</p>
-          <p style="margin:4px 0;color:#c2410c"><strong>Date:</strong> ${new Date(booking.scheduledTime).toLocaleString()}</p>
-          <p style="margin:4px 0;color:#c2410c"><strong>1 class has been restored</strong> to your account</p>
-          ${reason ? `<p style="margin:4px 0;color:#c2410c"><strong>Reason:</strong> ${reason}</p>` : ""}
-        </div>
-        <p style="color:#374151">Your class balance has been updated. Contact admin if you have questions.</p>
-      </div></body></html>`;
-
-    await Promise.all([
-      sendEmail({ centerName, to: teacher.email, subject: "Lesson Completion Reversed ⚠️", html: teacherHtml }),
-      sendEmail({ centerName, to: student.email, subject: "Lesson Status Updated ⚠️", html: studentHtml }),
-    ]);
-  } catch (err) {
-    logger.error("📧 Unmark notification email failed:", { error: err?.message });
-  }
-}
+// Lesson marked / reversed emails: server/emails/lessonEmails.js
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /api/admin/lessons/teacher/:teacherId/students
@@ -242,10 +157,10 @@ router.post("/mark", verifyToken, verifyAdmin, async (req, res) => {
     setImmediate(async () => {
       try {
         const booking = await getBooking(db).findById(bookingId)
-          .populate("teacherId", "firstName lastName email ratePerClass")
-          .populate("studentId", "firstName lastName email classCredits");
+          .populate("teacherId", "firstName lastName email ratePerClass timezone")
+          .populate("studentId", "firstName lastName email classCredits emailLanguage timezone");
         if (booking) {
-          await sendLessonMarkedEmails(booking.teacherId, booking.studentId, booking, centerName);
+          await sendMarked(booking.teacherId, booking.studentId, booking, centerName).catch(e => logger.error("📧 Mark notification email failed:", { error: e?.message }));
         }
       } catch (emailErr) {
         logger.error("📧 Admin mark email failed:", emailErr.message);
@@ -322,7 +237,7 @@ router.post("/unmark", verifyToken, verifyAdmin, async (req, res) => {
       try {
         const updatedStudent = await getStudent(db).findById(studentId);
         const updatedTeacher = await getTeacher(db).findById(teacherId);
-        await sendLessonUnmarkedEmails(updatedTeacher, updatedStudent, booking, reason, centerName);
+        await sendUnmarked(updatedTeacher, updatedStudent, booking, reason, centerName).catch(e => logger.error("📧 Unmark notification email failed:", { error: e?.message }));
       } catch (emailErr) {
         logger.error("📧 Unmark email failed:", emailErr.message);
       }

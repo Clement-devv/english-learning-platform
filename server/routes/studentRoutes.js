@@ -139,7 +139,7 @@ router.get("/:id", verifyToken, async (req, res) => {
     if (!allowed) return forbidden(res, "You can only view your own data");
     const student = await getStudent(req.db)
       .findById(req.params.id)
-      .select("studentId firstName lastName email active classCredits age lastPaymentDate showTempPassword status twoFactorEnabled createdAt isManaged")
+      .select("studentId firstName lastName email active classCredits age lastPaymentDate showTempPassword status twoFactorEnabled createdAt isManaged emailLanguage")
       .lean();
     if (!student) return notFound(res, "Student not found");
     res.json(student);
@@ -539,6 +539,22 @@ router.patch("/:id/timezone", verifyToken, async (req, res) => {
   }
 });
 
+// ─── PATCH email language ─────────────────────────────────────────────────────
+// The student picks the language of the emails they get (Settings → Email language).
+router.patch("/:id/email-language", verifyToken, async (req, res) => {
+  try {
+    const isSelf = req.user.role === "student" && req.user.id === req.params.id;
+    if (req.user.role !== "admin" && !isSelf) return forbidden(res, "You can only change your own email language");
+    const { emailLanguage } = req.body;
+    if (!["en", "vi"].includes(emailLanguage)) return badRequest(res, "emailLanguage must be 'en' or 'vi'");
+    const s = await getStudent(req.db).findByIdAndUpdate(req.params.id, { emailLanguage }, { new: true, projection: { emailLanguage: 1 } });
+    if (!s) return notFound(res, "Student not found");
+    res.json({ success: true, data: { emailLanguage: s.emailLanguage }, message: "Email language updated" });
+  } catch {
+    serverError(res, "Error updating email language");
+  }
+});
+
 // ─── PUT update student ───────────────────────────────────────────────────────
 // Admin only — this can change a student's email, credits and password.
 router.put("/:id", verifyToken, verifyAdmin, async (req, res) => {
@@ -567,7 +583,7 @@ router.put("/:id", verifyToken, verifyAdmin, async (req, res) => {
         await student.save();
         notifySessionsRevoked(req.app.get("io"), req.center.slug, student._id, endedSessions);
       }
-      try { await sendPasswordResetEmail(student.email, `${student.firstName} ${student.lastName}`, password, "student", req.center?.centerName || "", req.center); }
+      try { await sendPasswordResetEmail(student.email, `${student.firstName} ${student.lastName}`, password, "student", req.center?.centerName || "", req.center, student.emailLanguage); }
       catch (e) { logger.error("Failed to send password reset email:", { error: e?.message }); }
     }
 
@@ -656,7 +672,7 @@ router.post("/:id/reset-password", verifyToken, verifyAdmin, strictLimiter, asyn
     await student.save();
     notifySessionsRevoked(req.app.get("io"), req.center.slug, student._id, endedSessions);
 
-    try { await sendPasswordResetEmail(student.email, `${student.firstName} ${student.lastName}`, newPass, "student", req.center?.centerName || "", req.center); }
+    try { await sendPasswordResetEmail(student.email, `${student.firstName} ${student.lastName}`, newPass, "student", req.center?.centerName || "", req.center, student.emailLanguage); }
     catch (e) { logger.error("Failed to send password reset email:", { error: e?.message }); }
 
     res.json({ message: "Password reset successfully", tempPassword: newPass });

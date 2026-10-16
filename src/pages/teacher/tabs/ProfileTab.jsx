@@ -19,7 +19,7 @@ const CERTIFICATIONS = ["CELTA", "TEFL", "TESOL", "PGCE", "Delta", "Trinity Cert
 
 function Section({ icon: Icon, title, children, c }) {
   return (
-    <div style={{ background: c.card, border: `1px solid ${c.border}`, borderRadius: 16, padding: "20px 24px" }}>
+    <div className="tpf-card" style={{ background: c.card, border: `1px solid ${c.border}`, borderRadius: 16, padding: "20px 24px", minWidth: 0 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
         <div style={{ width: 32, height: 32, borderRadius: 10, background: "color-mix(in srgb, var(--as-accent, var(--brand-primary)) 12%, transparent)", display: "flex", alignItems: "center", justifyContent: "center" }}>
           <Icon size={16} color="var(--as-accent, var(--brand-primary))" />
@@ -35,9 +35,9 @@ function Section({ icon: Icon, title, children, c }) {
 
 function InfoRow({ label, value, c }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
       <span style={{ fontSize: 11, fontWeight: 600, color: c.muted, textTransform: "uppercase", letterSpacing: "0.07em" }}>{label}</span>
-      <span style={{ fontSize: 14, color: value ? c.heading : c.muted, fontStyle: value ? "normal" : "italic" }}>
+      <span style={{ fontSize: 14, color: value ? c.heading : c.muted, fontStyle: value ? "normal" : "italic", overflowWrap: "anywhere" }}>
         {value || "Not set"}
       </span>
     </div>
@@ -49,9 +49,10 @@ function Chip({ label, color = "brand" }) {
     <span style={{
       display: "inline-flex", alignItems: "center",
       padding: "3px 10px", borderRadius: 20, fontSize: 12, fontWeight: 600,
-      background: color === "brand" ? "color-mix(in srgb, var(--as-accent, var(--brand-primary)) 10%, transparent)" : "rgba(16,185,129,0.1)",
-      color: color === "brand" ? "var(--as-accent, var(--brand-primary))" : "#10b981",
-      border: color === "brand" ? "1px solid color-mix(in srgb, var(--as-accent, var(--brand-primary)) 20%, transparent)" : "1px solid rgba(16,185,129,0.2)",
+      background: color === "light" ? "rgba(255,255,255,0.2)" : color === "brand" ? "color-mix(in srgb, var(--as-accent, var(--brand-primary)) 10%, transparent)" : "rgba(16,185,129,0.1)",
+      color: color === "light" ? "#fff" : color === "brand" ? "var(--as-accent, var(--brand-primary))" : "#10b981",
+      border: color === "light" ? "1px solid rgba(255,255,255,0.35)" : color === "brand" ? "1px solid color-mix(in srgb, var(--as-accent, var(--brand-primary)) 20%, transparent)" : "1px solid rgba(16,185,129,0.2)",
+      maxWidth: "100%", overflowWrap: "anywhere",
     }}>
       {label}
     </span>
@@ -210,10 +211,23 @@ export default function ProfileTab({ teacherInfo, isDarkMode, onUpdate }) {
     : `${teacherInfo.firstName || ""} ${teacherInfo.lastName || ""}`.trim();
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+    <div className="tpf" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      {/* Phone layout (desktop unchanged) */}
+      <style>{`@media (max-width: 640px) {
+        .tpf { gap: 14px !important; }
+        .tpf-card { padding: 16px !important; }
+        .tpf-photo { gap: 16px !important; }
+        .tpf-photo > div:first-child { width: 72px !important; height: 72px !important; border-radius: 20px !important; }
+        .tpf-photo > div:last-child { min-width: 0; flex: 1; }
+        .tpf-hero { padding: 16px !important; gap: 14px !important; align-items: flex-start !important; }
+        .tpf-hero > div:first-child { width: 52px !important; height: 52px !important; border-radius: 14px !important; }
+        .tpf-hero > div:last-child > p:first-child { font-size: 18px !important; line-height: 1.25; }
+        .tpf-g2 { grid-template-columns: minmax(0, 1fr) !important; gap: 12px !important; }
+        .tpf-head > div:last-child { flex-wrap: wrap; }
+      }`}</style>
 
       {/* Page header */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
+      <div className="tpf-head" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
         <div>
           <h1 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: c.heading, fontFamily: "var(--font-display)" }}>
             My Profile
@@ -252,7 +266,7 @@ export default function ProfileTab({ teacherInfo, isDarkMode, onUpdate }) {
       )}
 
       {/* ── Profile Photo Card ── */}
-      <div style={{ background: c.card, border: `1px solid ${c.border}`, borderRadius: 16, padding: "20px 24px" }}>
+      <div className="tpf-card" style={{ background: c.card, border: `1px solid ${c.border}`, borderRadius: 16, padding: "20px 24px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
           <div style={{ width: 32, height: 32, borderRadius: 10, background: "color-mix(in srgb, var(--as-accent, var(--brand-primary)) 12%, transparent)", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <Camera size={16} color="var(--as-accent, var(--brand-primary))" />
@@ -260,7 +274,7 @@ export default function ProfileTab({ teacherInfo, isDarkMode, onUpdate }) {
           <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: c.muted }}>Profile Photo</span>
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
+        <div className="tpf-photo" style={{ display: "flex", alignItems: "center", gap: 24 }}>
           {/* Photo circle */}
           <div style={{ position: "relative", width: 88, height: 88, borderRadius: 24, overflow: "hidden", flexShrink: 0, background: c.lockBg, border: `2px solid ${c.border}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
             {photoPreview ? (
@@ -308,7 +322,7 @@ export default function ProfileTab({ teacherInfo, isDarkMode, onUpdate }) {
       </div>
 
       {/* ── Hero banner ── */}
-      <div style={{ background: `linear-gradient(135deg, var(--as-accent, var(--brand-primary)), var(--brand-secondary))`, borderRadius: 16, padding: "20px 24px", display: "flex", alignItems: "center", gap: 20 }}>
+      <div className="tpf-hero" style={{ background: `linear-gradient(135deg, var(--as-accent, var(--brand-primary)), var(--brand-secondary))`, borderRadius: 16, padding: "20px 24px", display: "flex", alignItems: "center", gap: 20 }}>
         <div style={{ width: 60, height: 60, borderRadius: 16, overflow: "hidden", border: "2px solid rgba(255,255,255,0.4)", flexShrink: 0, background: "rgba(255,255,255,0.15)", display: "flex", alignItems: "center", justifyContent: "center" }}>
           {photoPreview ? (
             <img src={photoPreview} alt={displayedName} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
@@ -318,19 +332,19 @@ export default function ProfileTab({ teacherInfo, isDarkMode, onUpdate }) {
             </span>
           )}
         </div>
-        <div>
-          <p style={{ margin: 0, fontSize: 20, fontWeight: 800, color: "#fff" }}>{displayedName}</p>
+        <div style={{ minWidth: 0 }}>
+          <p style={{ margin: 0, fontSize: 20, fontWeight: 800, color: "#fff", overflowWrap: "anywhere" }}>{displayedName}</p>
           {teacherInfo.displayName && (
             <p style={{ margin: "2px 0 0", fontSize: 12, color: "rgba(255,255,255,0.65)" }}>
               {teacherInfo.firstName} {teacherInfo.lastName}
             </p>
           )}
-          <p style={{ margin: "3px 0 0", fontSize: 13, color: "rgba(255,255,255,0.75)" }}>{teacherInfo.email}</p>
+          <p style={{ margin: "3px 0 0", fontSize: 13, color: "rgba(255,255,255,0.75)", overflowWrap: "anywhere" }}>{teacherInfo.email}</p>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
-            {teacherInfo.continent && <Chip label={teacherInfo.continent} />}
-            {teacherInfo.timezone && <Chip label={teacherInfo.timezone} />}
+            {teacherInfo.continent && <Chip label={teacherInfo.continent} color="light" />}
+            {teacherInfo.timezone && <Chip label={teacherInfo.timezone} color="light" />}
             {typeof teacherInfo.ratePerClass === "number" && (
-              <Chip label={`${rate}/class`} color="green" />
+              <Chip label={`${rate}/class`} color="light" />
             )}
           </div>
         </div>
@@ -339,7 +353,7 @@ export default function ProfileTab({ teacherInfo, isDarkMode, onUpdate }) {
       {/* ── Personal Info ── */}
       <Section icon={User} title="Personal Information" c={c}>
         {editing ? (
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+          <div className="tpf-g2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
 
             {/* Display name — teacher can set */}
             <div style={{ gridColumn: "1 / -1" }}>
@@ -380,7 +394,7 @@ export default function ProfileTab({ teacherInfo, isDarkMode, onUpdate }) {
             ))}
           </div>
         ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 18 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(180px, 100%), 1fr))", gap: 18 }}>
             {teacherInfo.displayName && <InfoRow label="Display Name" value={teacherInfo.displayName} c={c} />}
             <InfoRow label="First Name"  value={teacherInfo.firstName}  c={c} />
             <InfoRow label="Last Name"   value={teacherInfo.lastName}   c={c} />
@@ -395,7 +409,7 @@ export default function ProfileTab({ teacherInfo, isDarkMode, onUpdate }) {
       {/* ── Professional Details ── */}
       <Section icon={DollarSign} title="Professional Details" c={c}>
         {editing ? (
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+          <div className="tpf-g2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
             <div>
               <label style={{ display: "block", fontSize: 11.5, fontWeight: 600, color: c.muted, marginBottom: 5, textTransform: "uppercase", letterSpacing: "0.07em" }}>Years of Experience</label>
               <input value={form.yearsOfExperience} onChange={set("yearsOfExperience")} type="number" min="0" max="50" placeholder="e.g. 3" style={inputStyle} />
@@ -428,7 +442,7 @@ export default function ProfileTab({ teacherInfo, isDarkMode, onUpdate }) {
             </div>
           </div>
         ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 18 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(200px, 100%), 1fr))", gap: 18 }}>
             <InfoRow label="Rate per Class"      value={rate} c={c} />
             <InfoRow label="Years of Experience" value={teacherInfo.yearsOfExperience ? `${teacherInfo.yearsOfExperience} yrs` : null} c={c} />
             <InfoRow label="Timezone"
@@ -514,7 +528,7 @@ export default function ProfileTab({ teacherInfo, isDarkMode, onUpdate }) {
       {/* ── Account Info (view only) ── */}
       {!editing && (
         <Section icon={Award} title="Account Info" c={c}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 18 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(180px, 100%), 1fr))", gap: 18 }}>
             <InfoRow label="Status"             value={teacherInfo.status}    c={c} />
             <InfoRow label="Lessons Completed"  value={teacherInfo.lessonsCompleted?.toString()} c={c} />
             <InfoRow label="Unpaid Balance"      value={teacherInfo.earned != null ? `${sym}${Number(teacherInfo.earned).toLocaleString("en-US")}` : null} c={c} />

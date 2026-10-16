@@ -188,7 +188,7 @@ export default function BookingCalendarTab({ isDarkMode }) {
       {step === 'calendar' && selectedTeacher && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-            <button type="button" onClick={() => setStep('pick-teacher')} style={{ ...btn(isDarkMode ? 'var(--as-ink, #2a2d40)' : 'var(--as-ink, #f5f0ec)', col.body), display: 'flex', alignItems: 'center', gap: 5 }}>
+            <button type="button" onClick={() => setStep('pick-teacher')} style={{ ...btn(isDarkMode ? 'var(--as-raised, #2a2d40)' : 'var(--as-raised, #f5f0ec)', col.body), display: 'flex', alignItems: 'center', gap: 5 }}>
               <ChevronLeft size={14} /> {tr("bookingCalendarTab.teachers")}
             </button>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -312,7 +312,7 @@ export default function BookingCalendarTab({ isDarkMode }) {
 
             <p style={{ fontSize: 12, color: col.muted, margin: 0, fontWeight: 600 }}>{tr("bookingCalendarTab.theTeacherWillAcceptOr")}</p>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-              <button type="button" onClick={() => setModal(null)} style={btn(isDarkMode ? 'var(--as-ink, #2a2d40)' : 'var(--as-ink, #f5f0ec)', col.body)}>{tr("bookingCalendarTab.cancel")}</button>
+              <button type="button" onClick={() => setModal(null)} style={btn(isDarkMode ? 'var(--as-raised, #2a2d40)' : 'var(--as-raised, #f5f0ec)', col.body)}>{tr("bookingCalendarTab.cancel")}</button>
               <button type="button" onClick={handleSubmit} disabled={submitting || !formTitle.trim() || !formTopic.trim() || !!timeError}
                 style={btn(ORANGE, '#fff', submitting || !formTitle.trim() || !formTopic.trim() || !!timeError)}>
                 {submitting ? tr("bookingCalendarTab.sending") : tr("bookingCalendarTab.sendRequest")}

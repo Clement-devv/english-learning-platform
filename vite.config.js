@@ -46,6 +46,10 @@ export default defineConfig({
   },
 
   server: {
+    // Listen on the local network too (not just localhost) so phones / iPads on the
+    // same Wi-Fi can open the dev app at http://<this computer's IP>:5173.
+    // Only affects `vite dev` — production builds are unaffected.
+    host: true,
     proxy: {
       '/api': {
         target: 'http://localhost:5000',

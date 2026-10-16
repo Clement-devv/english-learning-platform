@@ -169,10 +169,10 @@ export default function StudentCompletedTab({ studentId, isDarkMode }) {
         </div>
 
         {/* ── Tab switcher ── */}
-        <div className={`flex gap-1 p-1 rounded-xl w-fit mb-5 ${isDarkMode ? "bg-gray-900" : "bg-gray-100"}`}>
+        <div className={`grid grid-cols-2 sm:flex gap-1 p-1 rounded-xl w-full sm:w-fit mb-5 ${isDarkMode ? "bg-gray-900" : "bg-gray-100"}`}>
           <button
             onClick={() => setTab("completed")}
-            className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold transition-all ${
+            className={`flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-5 py-2 rounded-lg text-sm font-semibold whitespace-nowrap min-w-0 transition-all ${
               tab === "completed"
                 ? "bg-emerald-600 text-white shadow-sm"
                 : isDarkMode ? "text-gray-400 hover:text-gray-200" : "text-gray-500 hover:text-gray-700"
@@ -188,7 +188,7 @@ export default function StudentCompletedTab({ studentId, isDarkMode }) {
           </button>
           <button
             onClick={() => setTab("not_completed")}
-            className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-semibold transition-all ${
+            className={`flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-5 py-2 rounded-lg text-sm font-semibold whitespace-nowrap min-w-0 transition-all ${
               tab === "not_completed"
                 ? "bg-red-600 text-white shadow-sm"
                 : isDarkMode ? "text-gray-400 hover:text-gray-200" : "text-gray-500 hover:text-gray-700"

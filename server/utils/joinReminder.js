@@ -12,7 +12,7 @@ import mongoose from "mongoose";
 import { bookingSchema } from "../schemas/bookingSchema.js";
 import { studentSchema } from "../schemas/studentSchema.js";
 import { teacherSchema } from "../schemas/teacherSchema.js";
-import { sendEmail, getCenterBaseUrl } from "./emailService.js";
+import { sendJoinReminderEmail } from "../emails/lessonEmails.js";
 import logger from "./logger.js";
 
 export const COOLDOWN_MS = 3 * 60_000;
@@ -21,7 +21,6 @@ export const EARLY_MS = 30 * 60_000;
 const getBooking = (db) => db.models.Booking || db.model("Booking", bookingSchema);
 const getStudent = (db) => db.models.Student || db.model("Student", studentSchema);
 const getTeacher = (db) => db.models.Teacher || db.model("Teacher", teacherSchema);
-const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
 export class ReminderError extends Error {
   constructor(status, message) { super(message); this.status = status; }
@@ -51,7 +50,7 @@ export async function sendJoinReminder(db, center, bookingId, by) {
   const Booking = getBooking(db);
   const b = await Booking.findById(bookingId)
     .populate("teacherId", "firstName lastName displayName googleMeetLink zoomLink")
-    .populate({ path: "studentId", model: getStudent(db), select: "firstName lastName email isManaged +notifyEmail joinReminderTeacherAllowed" })
+    .populate({ path: "studentId", model: getStudent(db), select: "firstName lastName email isManaged +notifyEmail joinReminderTeacherAllowed emailLanguage" })
     .lean();
   if (!b) throw new ReminderError(404, "Class not found");
   if (by.role === "teacher" && String(b.teacherId?._id) !== String(by.id)) throw new ReminderError(403, "This is not your class");
@@ -82,24 +81,10 @@ export async function sendJoinReminder(db, center, bookingId, by) {
   const teacherName = t.displayName?.trim() || `${t.firstName || ""} ${t.lastName || ""}`.trim() || "your teacher";
   const start = new Date(b.scheduledTime);
   const started = Date.now() >= start.getTime();
-  const { baseUrl } = getCenterBaseUrl(center);
   const meetLink = t.googleMeetLink || t.zoomLink || "";
-  const joinHtml = s.isManaged
-    ? (meetLink
-        ? `<p style="margin:20px 0"><a href="${esc(meetLink)}" style="background:#be185d;color:#fff;padding:12px 22px;border-radius:10px;text-decoration:none;font-weight:700">Join the class</a></p>`
-        : `<p>Please join using the class link your teacher shared with you.</p>`)
-    : `<p style="margin:20px 0"><a href="${esc(baseUrl)}/student/dashboard" style="background:#be185d;color:#fff;padding:12px 22px;border-radius:10px;text-decoration:none;font-weight:700">Open my classes</a></p>`;
 
   try {
-    const result = await sendEmail({
-      centerName: center?.centerName, to,
-      subject: started ? `Your class has started — please join now` : `Your class starts soon — please get ready to join`,
-      html: `<p>Hello ${esc(s.firstName || "")},</p>
-<p>${started ? "Your class has <strong>already started</strong> and" : "Your class starts soon and"} ${esc(teacherName)} is waiting for you:</p>
-<ul><li><strong>Class:</strong> ${esc(b.classTitle || "Class")}</li><li><strong>Length:</strong> ${b.duration || 60} minutes</li></ul>
-${joinHtml}
-<p style="color:#64748b;font-size:13px">You're receiving this because your ${by.role === "teacher" ? "teacher" : "school"} sent a reminder from ${esc(center?.centerName || "your school")}.</p>`,
-    });
+    const result = await sendJoinReminderEmail({ to, student: s, booking: b, teacherName, meetLink, started, byRole: by.role, center });
     // sendEmail reports failures in its result instead of throwing
     if (result && result.success === false) throw new Error(result.error || "send failed");
   } catch (err) {

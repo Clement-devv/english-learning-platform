@@ -3,14 +3,14 @@
 // Admin tokens via .as-root (warm neutrals + the center accent) · topic-coloured sidebar ·
 // sunrise banner + backdrop + sunset · Nunito font · dark mode · mobile bottom nav.
 
-import React, { useState, lazy, Suspense } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { useViewMode } from '../../../../hooks/useViewMode';
 const GroupClassesTab = lazy(() => import('../../tabs/GroupClassesTab'));
 import {
   Home, Calendar, CheckCircle2, Users, BookOpen, MessageCircle, NotebookPen,
   DollarSign, Star, User, CalendarDays, FileText, Layers, ClipboardList,
   Settings, LogOut, Plus, RefreshCw, Video, Bell, BarChart2, PhoneMissed, X, Clock4, Library,
-  CheckCircle, AlertCircle, Repeat, Radio,
+  CheckCircle, AlertCircle, Repeat, Radio, LayoutGrid, Moon, Sun, ChevronRight,
 } from 'lucide-react';
 import { useBranding }              from '../../../../context/BrandingContext';
 import { useTeacherDashboardData }  from '../useTeacherDashboardData';
@@ -100,7 +100,7 @@ const makeNavGroups = (t) => [
   },
 ];
 const F = "'Nunito','Inter',sans-serif";
-const FONT_IMPORT = 'https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap';
+// Font: Nunito is loaded once from index.html (early, parallel to the bundle).
 const ACCENT_FILL   = 'var(--a-accent-grad)';
 const ON_ACCENT     = 'var(--a-on-accent)';
 const ACCENT_SHADOW = '0 4px 14px -4px color-mix(in srgb, var(--a-accent) 55%, transparent)';
@@ -196,12 +196,23 @@ export default function SunshineShell() {
   const PAGE_LABEL = NAV_GROUPS.flatMap(g => g.items).reduce((m, i) => ({ ...m, [i.key]: i.label }), {});
 
   const [showRecurringLocal, setShowRecurringLocal] = useState(false);
-  const { isMobile, forcedMode, setViewMode, isSmallScreen } = useViewMode();
+  // Phones + iPad portrait open in the touch layout; the layout is changed only in
+  // Settings → Display Mode (no shortcut buttons on the dashboard).
+  const { isMobile, setViewMode, viewportWidth } = useViewMode({ phoneDefault: true });
+  const wideTouch = isMobile && viewportWidth >= 700;   // iPad portrait: touch layout, more room
+  const compact   = isMobile && !wideTouch;              // phone-sized
+  const chatFill  = isMobile && d.activeTab === 'messages';
   const [showMobileMenu, setShowMobileMenu] = useState(false);
+  useEffect(() => {
+    if (!showMobileMenu) return;
+    const onKey = (e) => { if (e.key === 'Escape') setShowMobileMenu(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [showMobileMenu]);
 
   // Theme root: admin tokens (.as-root) + this center's accent; data-theme flips the tokens
   const rootProps = {
-    className: GLASS_PAGE ? 'as-root as-glass' : 'as-root',
+    className: GLASS_PAGE ? 'as-root as-glass as-shine' : 'as-root',
     'data-theme': d.isDarkMode ? 'dark' : 'light',
   };
   const rootVars = { '--a-accent': accent, '--a-on-accent': adminOnAccent(accent) };
@@ -210,7 +221,7 @@ export default function SunshineShell() {
   if (d.loading) {
     return (
       <div {...rootProps} style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: col.bg, fontFamily: F, ...rootVars }}>
-        <style>{`@import url('${FONT_IMPORT}'); @keyframes bounce{to{transform:translateY(-16px)}}`}</style>
+        <style>{`@keyframes bounce{to{transform:translateY(-16px)}}`}</style>
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontSize: '64px', animation: 'bounce 0.8s infinite alternate' }}>👨‍🏫</div>
           <p style={{ color: 'var(--a-accent-ink)', fontWeight: 700, fontSize: '18px', marginTop: '16px', fontFamily: F }}>Loading your classes...</p>
@@ -237,9 +248,8 @@ export default function SunshineShell() {
   const sectionTitle = { margin: '0 0 14px', fontSize: 16, fontWeight: 900, color: col.heading, fontFamily: F, display: 'flex', alignItems: 'center', gap: 8 };
 
   return (
-    <div {...rootProps} style={{ display: 'flex', height: '100vh', overflow: 'hidden', position: 'relative', fontFamily: F, background: col.bg, ...rootVars }}>
+    <div {...rootProps} style={{ display: 'flex', height: '100dvh', overflow: 'hidden', position: 'relative', fontFamily: F, background: col.bg, ...rootVars }}>
       <style>{`
-        @import url('${FONT_IMPORT}');
         * { box-sizing: border-box; }
         .ts-nav { transition: background-color 150ms ease, color 150ms ease, transform 120ms ease-out; }
         .ts-nav:active { transform: scale(0.98); }
@@ -405,13 +415,6 @@ export default function SunshineShell() {
             <LogOut size={17} color={col.muted} />
             <span style={{ fontSize: 13, fontWeight: 600, color: col.body }}>{t('teacher.sidebar.signOut')}</span>
           </button>
-          {isSmallScreen && !isMobile && (
-            <button className="ts-nav" onClick={() => setViewMode('mobile')}
-              style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 10, border: 'none', cursor: 'pointer', background: 'var(--a-accent-soft)', fontFamily: F, marginTop: 4 }}>
-              <span style={{ fontSize: 15 }}>📱</span>
-              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--a-accent-ink)' }}>{t('teacher.sidebar.mobileView')}</span>
-            </button>
-          )}
         </div>
       </aside>
 
@@ -488,11 +491,14 @@ export default function SunshineShell() {
         </header>
 
         {/* ── SCROLL AREA ── sunrise behind the top, content floats on it */}
-        <main style={{ flex: 1, overflowY: 'auto', padding: isMobile ? `16px 14px calc(80px + env(safe-area-inset-bottom, 0px))` : 24, position: 'relative' }}>
+        <main style={{ flex: 1, minWidth: 0, overflowX: 'hidden', overscrollBehavior: 'contain', position: 'relative',
+          overflowY: chatFill ? 'hidden' : 'auto', display: chatFill ? 'flex' : undefined, flexDirection: chatFill ? 'column' : undefined,
+          padding: chatFill ? `10px ${wideTouch ? 20 : 10}px calc(74px + env(safe-area-inset-bottom, 0px))`
+                 : isMobile ? `14px ${wideTouch ? 20 : 12}px calc(86px + env(safe-area-inset-bottom, 0px))` : 24 }}>
           {d.activeTab !== 'messages' && <SunriseBackdrop />}
-          <div style={{ position: 'relative' }}>
+          <div style={chatFill ? { position: 'relative', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' } : { position: 'relative' }}>
           {/* Missed calls & new messages while away */}
-          <DashboardAlertsBar isDark={d.isDarkMode} onOpenMessages={() => d.setActiveTab("messages")} />
+          {!chatFill && <DashboardAlertsBar isDark={d.isDarkMode} onOpenMessages={() => d.setActiveTab("messages")} />}
 
           {/* Toast */}
           {d.toast && (
@@ -547,7 +553,7 @@ export default function SunshineShell() {
               )}
 
               {/* 4-stat strip — topic tiles */}
-              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2,1fr)' : 'repeat(4,1fr)', gap: 12 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: compact ? 'repeat(2,minmax(0,1fr))' : 'repeat(4,minmax(0,1fr))', gap: 12 }}>
                 <TopicTile cat="teal"  icon={Users}        value={d.students.length} label="Students" />
                 <TopicTile cat="amber" icon={CalendarDays} value={d.classes.length}  label="Classes" />
                 <TopicTile cat="green" icon={CheckCircle2} value={d.completedCount}  label="Completed" />
@@ -604,17 +610,19 @@ export default function SunshineShell() {
               )}
 
               {/* Classes area */}
-              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 300px', gap: 18 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 300px', gap: 18, minWidth: 0 }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                  <div style={{ ...card, padding: 20 }}>
+                  {d.liveClasses.length > 0 && <div style={{ ...card, padding: compact ? 14 : 20 }}>
                     <h2 style={sectionTitle}>
                       <Radio size={16} color="#dc2626" /> Live Classes
                       {d.liveClasses.length > 0 && <span style={{ background: '#dc2626', color: '#fff', borderRadius: 999, padding: '2px 10px', fontSize: 12, fontWeight: 900 }}>{d.liveClasses.length}</span>}
                     </h2>
                     <LiveClasses classes={d.liveClasses} onJoin={d.handleJoinClass} isDarkMode={d.isDarkMode} />
-                  </div>
-                  <div style={{ ...card, padding: 20 }}>
-                    <h2 style={sectionTitle}><CalendarDays size={16} color="#d97706" /> Upcoming Classes</h2>
+                  </div>}
+                  <div style={{ ...card, padding: compact ? 14 : 20 }}>
+                    <h2 style={sectionTitle}><CalendarDays size={16} color="#d97706" /> Upcoming Classes
+                      {compact && d.upcomingClasses?.length > 0 && <span style={{ background: 'var(--a-accent-soft)', color: 'var(--a-accent-ink)', borderRadius: 999, padding: '2px 10px', fontSize: 12, fontWeight: 900 }}>{d.upcomingClasses.length}</span>}
+                    </h2>
                     <UpcomingClasses
                       classes={d.upcomingClasses}
                       students={d.students}
@@ -676,7 +684,7 @@ export default function SunshineShell() {
               </div>
 
               {/* Summary stats — topic tiles (no top stripes) */}
-              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2,1fr)' : 'repeat(4,1fr)', gap: 14 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: compact ? 'repeat(2,minmax(0,1fr))' : 'repeat(4,minmax(0,1fr))', gap: 14 }}>
                 <TopicTile cat="teal"  icon={Users}        value={d.students.length}  label="Total Students"    sub="+2 this month" />
                 <TopicTile cat="sky"   icon={CalendarDays} value={d.classes.length}   label="Scheduled Classes" sub="Next 7 days" />
                 <TopicTile cat="amber" icon={Clock4}       value={d.pendingBookings}  label="Pending Requests"  sub="Needs attention" />
@@ -699,9 +707,10 @@ export default function SunshineShell() {
             <TabErrorBoundary key={d.activeTab}>
               <TeacherTabContent
                 d={d}
-                wrapStyle={{ background: col.card, border: `1px solid ${col.border}`, borderRadius: 20, padding: 24, boxShadow: 'var(--a-shadow)' }}
-                msgStyle={{ background: col.card, border: `1px solid ${col.border}`, borderRadius: 20, overflow: 'hidden' }}
+                wrapStyle={{ background: col.card, border: `1px solid ${col.border}`, borderRadius: 20, padding: compact ? 14 : 24, boxShadow: 'var(--a-shadow)', minWidth: 0 }}
+                msgStyle={{ background: col.card, border: `1px solid ${col.border}`, borderRadius: 20, overflow: 'hidden', ...(chatFill ? { flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' } : null) }}
                 msgClassName="as-pink"
+                msgFill={chatFill}
                 onUnreadCount={d.setUnreadMessages}
               />
             </TabErrorBoundary>
@@ -771,6 +780,7 @@ export default function SunshineShell() {
           onManageSessions={() => { d.setShowSettingsSidebar(false); d.setShowSessionManagement(true); }}
           onManage2FA={() => { d.setShowSettingsSidebar(false); d.setShowSettingsModal(true); }}
           userInfo={{ firstName: d.teacherInfo?.firstName, lastName: d.teacherInfo?.lastName, email: d.teacherInfo?.email }}
+          isMobile={isMobile} onSetViewMode={setViewMode} tabletLayout
         />
       )}
 
@@ -778,86 +788,99 @@ export default function SunshineShell() {
         <SettingsModal isOpen={d.showSettingsModal} onClose={() => d.setShowSettingsModal(false)} userType="teacher" />
       )}
 
-      {/* Floating pill — switch to mobile view on small screens showing desktop layout */}
-      {isSmallScreen && !isMobile && (
-        <button className="ts-btn" onClick={() => setViewMode('mobile')}
-          style={{ position: 'fixed', bottom: 16, right: 16, zIndex: 9999, display: 'flex', alignItems: 'center', gap: 6, padding: '10px 16px', borderRadius: 999, background: ACCENT_FILL, color: ON_ACCENT, border: 'none', cursor: 'pointer', fontFamily: F, fontSize: 13, fontWeight: 800, boxShadow: ACCENT_SHADOW }}>
-          📱 Mobile View
-        </button>
-      )}
+      {/* Layout (mobile / desktop) is changed only in Settings → Display Mode. */}
 
-      {/* ── MOBILE BOTTOM NAV ── */}
+      {/* ── MOBILE: floating glass tab bar (shared styles: .ss-tabbar in index.css) ── */}
       {isMobile && (
-        <nav style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: 'var(--a-surface)', borderTop: `1px solid ${col.border}`, display: 'flex', zIndex: 200, boxShadow: '0 -4px 20px rgba(90,45,15,0.10)', paddingBottom: 'env(safe-area-inset-bottom,0px)' }}>
+        <nav className="ss-tabbar" aria-label="Main menu">
           {[
-            { key: 'dashboard', Icon: Home,          label: t('teacher.nav.dashboard') },
-            { key: 'classes',   Icon: CalendarDays,  label: t('teacher.nav.myClasses') },
-            { key: 'students',  Icon: Users,          label: t('teacher.nav.students')  },
-            { key: 'messages',  Icon: MessageCircle, label: t('teacher.nav.messages')  },
-          ].map(({ key, Icon, label }) => {
+            { key: 'dashboard', Icon: Home,          label: t('teacher.nav.dashboard'), cat: 'accent' },
+            { key: 'classes',   Icon: CalendarDays,  label: t('teacher.nav.myClasses'), cat: 'amber' },
+            { key: 'students',  Icon: Users,         label: t('teacher.nav.students'),  cat: 'teal' },
+            { key: 'messages',  Icon: MessageCircle, label: t('teacher.nav.messages'),  cat: 'pink' },
+          ].map(({ key, Icon, label, cat }) => {
             const isActive = d.activeTab === key;
-            const badge = key === 'messages' ? (d.unreadMessages || 0)
-                        : key === 'dashboard' ? missedCallCount
-                        : 0;
+            const badge = key === 'messages' ? (d.unreadMessages || 0) + (missedCallCount || 0) : 0;
             return (
-              <button key={key} onClick={() => d.setActiveTab(key)}
-                style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: F, color: isActive ? 'var(--a-accent-ink)' : col.muted, position: 'relative', height: 62, paddingBottom: 6 }}>
-                <div style={{ position: 'relative' }}>
-                  <Icon size={22} strokeWidth={isActive ? 2.4 : 1.8} />
-                  {badge > 0 && (
-                    <span style={{ position: 'absolute', top: -7, right: -10, background: '#dc2626', color: '#fff', borderRadius: 999, minWidth: 18, height: 18, fontSize: 10, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px', border: '2px solid var(--a-surface)' }}>
-                      {badge > 99 ? '99+' : badge}
-                    </span>
-                  )}
-                </div>
-                <span style={{ fontSize: 10, fontWeight: isActive ? 800 : 600 }}>{label}</span>
-                {isActive && <span style={{ position: 'absolute', bottom: 0, left: '50%', transform: 'translateX(-50%)', width: 28, height: 3, borderRadius: '3px 3px 0 0', background: ACCENT_FILL }} />}
+              <button key={key} type="button" className={`ss-tab cat-${cat}`} aria-current={isActive ? 'page' : undefined}
+                onClick={() => d.setActiveTab(key)}>
+                <Icon size={21} strokeWidth={isActive ? 2.4 : 1.9} aria-hidden="true" />
+                <span>{label}</span>
+                {badge > 0 && <span className="ss-tab-badge">{badge > 99 ? '99+' : badge}</span>}
               </button>
             );
           })}
-          <button onClick={() => setShowMobileMenu(true)}
-            style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: F, color: col.muted, height: 62, paddingBottom: 6 }}>
-            <Settings size={22} strokeWidth={1.8} />
-            <span style={{ fontSize: 10, fontWeight: 600 }}>More</span>
+          <button type="button" className="ss-tab cat-stone" aria-haspopup="dialog" aria-expanded={showMobileMenu}
+            onClick={() => setShowMobileMenu(true)}>
+            <LayoutGrid size={21} strokeWidth={1.9} aria-hidden="true" />
+            <span>More</span>
           </button>
         </nav>
       )}
 
-      {/* ── MOBILE MENU SHEET ── */}
+      {/* ── MOBILE: "More" sheet — every page as a tile + theme / account ── */}
       {isMobile && showMobileMenu && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(28,20,15,0.5)', zIndex: 9500 }} onClick={() => setShowMobileMenu(false)}>
-          <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'var(--a-surface)', borderRadius: '20px 20px 0 0', padding: '12px 16px 40px', maxHeight: '75vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
-            <div style={{ width: 36, height: 4, background: 'var(--a-line-strong)', borderRadius: 999, margin: '0 auto 16px' }} />
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              {NAV_GROUPS.flatMap(g => g.items.map(item => ({ ...item, cat: g.cat })))
-                .filter(item => !['dashboard', 'classes', 'students', 'messages'].includes(item.key))
-                .map(item => {
-                  const LI = item.lucide;
-                  const isActive = d.activeTab === item.key;
-                  return (
-                    <button key={item.key} className={`cat-${item.cat}`} onClick={() => { d.setActiveTab(item.key); setShowMobileMenu(false); }}
-                      style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', borderRadius: 12, border: 'none', background: isActive ? 'var(--cat-soft)' : 'transparent', color: isActive ? 'var(--cat-ink)' : col.body, cursor: 'pointer', fontFamily: F, width: '100%' }}>
-                      <LI size={18} color="var(--cat)" strokeWidth={1.8} />
-                      <span style={{ fontSize: 14, fontWeight: isActive ? 800 : 600 }}>{item.label}</span>
-                    </button>
-                  );
-                })}
-              <div style={{ borderTop: `1px solid ${col.border}`, margin: '8px 0 4px' }} />
-              <button onClick={() => { setShowMobileMenu(false); d.setShowSettingsSidebar(true); }}
-                style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', borderRadius: 12, border: 'none', background: 'transparent', color: col.body, cursor: 'pointer', fontFamily: F, width: '100%' }}>
-                <Settings size={18} color={col.muted} strokeWidth={1.8} />
-                <span style={{ fontSize: 14, fontWeight: 600 }}>{t('teacher.sidebar.settings')}</span>
+        <div className="ss-sheet-wrap" role="dialog" aria-modal="true" aria-label="More">
+          <button type="button" className="ss-sheet-backdrop" aria-label="Close menu" onClick={() => setShowMobileMenu(false)} />
+          <div className="ss-sheet">
+            <div className="ss-sheet-handle" aria-hidden="true" />
+
+            <div className="ss-sheet-top">
+              {d.teacherInfo?.photo
+                ? <img src={d.teacherInfo.photo} alt="" className="ss-sheet-avatar" style={{ objectFit: 'cover' }} />
+                : <div className="ss-sheet-avatar" aria-hidden="true">{initial}</div>}
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 15, fontWeight: 900, color: col.heading, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.teacherInfo?.firstName} {d.teacherInfo?.lastName}</div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: col.muted }}>{t('teacher.sidebar.portal')} · {d.students.length} students</div>
+              </div>
+              <button type="button" className="ss-sheet-close" aria-label="Close menu" onClick={() => setShowMobileMenu(false)}>
+                <X size={18} strokeWidth={2.2} aria-hidden="true" />
               </button>
-              <LanguageSwitcher col={col} fontFamily={F} />
-              <button onClick={() => setViewMode('desktop')}
-                style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', borderRadius: 12, border: 'none', background: 'transparent', color: col.body, cursor: 'pointer', fontFamily: F, width: '100%' }}>
-                <span style={{ fontSize: 18 }}>🖥️</span>
-                <span style={{ fontSize: 14, fontWeight: 600 }}>{t('teacher.sidebar.desktopView')}</span>
+            </div>
+
+            {NAV_GROUPS.map((group, gi) => {
+              const items = group.items.filter(item => !['dashboard', 'classes', 'students', 'messages'].includes(item.key));
+              if (!items.length) return null;
+              return (
+                <section key={gi} aria-label={group.label || undefined}>
+                  {group.label && <p className="ss-sheet-label">{group.label}</p>}
+                  <div className={`ss-sheet-grid cat-${group.cat}`}>
+                    {items.map(item => {
+                      const LI = item.lucide;
+                      const isActive = d.activeTab === item.key;
+                      const badge = getBadge(item.key);
+                      return (
+                        <button key={item.key} type="button" className="ss-sheet-tile" aria-current={isActive ? 'page' : undefined}
+                          onClick={() => { d.setActiveTab(item.key); setShowMobileMenu(false); }} style={{ position: 'relative' }}>
+                          <span className="ss-sheet-chip"><LI size={19} strokeWidth={2.1} aria-hidden="true" /></span>
+                          <span>{item.label}</span>
+                          {badge != null && <span className="ss-tab-badge" style={{ top: 6, left: 'auto', right: 8 }}>{badge}</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </section>
+              );
+            })}
+
+            <p className="ss-sheet-label">Preferences</p>
+            <div className="ss-sheet-card">
+              <button type="button" className="ss-sheet-row" role="switch" aria-checked={d.isDarkMode} onClick={d.toggleDarkMode}>
+                {d.isDarkMode ? <Moon size={18} color={col.muted} aria-hidden="true" /> : <Sun size={18} color={col.muted} aria-hidden="true" />}
+                <span>{t('teacher.sidebar.darkMode')}</span>
+                <span className="ss-switch" aria-hidden="true" style={{ background: d.isDarkMode ? 'var(--a-accent)' : 'var(--a-line-strong)' }}>
+                  <i style={{ transform: `translateX(${d.isDarkMode ? 18 : 0}px)` }} />
+                </span>
               </button>
-              <button onClick={d.handleLogout}
-                style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', borderRadius: 12, border: 'none', background: 'transparent', color: '#dc2626', cursor: 'pointer', fontFamily: F, width: '100%' }}>
-                <LogOut size={18} color="#dc2626" strokeWidth={1.8} />
-                <span style={{ fontSize: 14, fontWeight: 600 }}>{t('teacher.sidebar.signOut')}</span>
+              <div style={{ padding: '0 2px' }}><LanguageSwitcher col={col} fontFamily={F} /></div>
+              <button type="button" className="ss-sheet-row" onClick={() => { setShowMobileMenu(false); d.setShowSettingsSidebar(true); }}>
+                <Settings size={18} color={col.muted} aria-hidden="true" />
+                <span>{t('teacher.sidebar.settings')}</span>
+                <ChevronRight size={16} color={col.muted} style={{ marginLeft: 'auto' }} aria-hidden="true" />
+              </button>
+              <button type="button" className="ss-sheet-row" style={{ color: '#dc2626' }} onClick={d.handleLogout}>
+                <LogOut size={18} aria-hidden="true" />
+                <span>{t('teacher.sidebar.signOut')}</span>
               </button>
             </div>
           </div>

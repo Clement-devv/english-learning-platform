@@ -4,6 +4,7 @@ import { config } from "../config/config.js";
 import logger from "../utils/logger.js";
 import { isManagedEmail } from "../utils/managedStudent.js";
 import { recordEvent, centerForEmail, emailActor } from "../utils/monitor.js";
+import { wrapHtml } from "./layout.js";
 
 // Read by the super admin's App Health checks (utils/monitorChecks.js)
 export const emailHealth = { configured: null, provider: null, detail: "", checkedAt: null };
@@ -81,6 +82,19 @@ export const verifyEmailConfig = async () => {
 // Health tab: which email, which center, sent or failed. Pass `kind` to give an
 // email a clear name there; otherwise the subject (minus numbers) is used.
 export const sendEmail = async (mailOptions) => {
+  // Short emails built inside route files pass a bare HTML fragment — dress them in
+  // the shared Sunshine layout (layout.js), with the subject as the headline. Emails
+  // already built with renderEmail carry data-em-layout and pass through untouched.
+  if (mailOptions?.html && !/data-em-layout|<html/i.test(mailOptions.html)) {
+    mailOptions = {
+      ...mailOptions,
+      html: wrapHtml({
+        title: String(mailOptions.subject || "").replace(/^[^\p{L}\p{N}]+/u, ""),   // drop leading emoji
+        centerName: mailOptions.centerName || config.appName,
+        html: mailOptions.html,
+      }),
+    };
+  }
   const result = await deliver(mailOptions);
   if (!result?.skipped) {
     const first = [].concat(mailOptions?.to || [])[0];

@@ -23,7 +23,7 @@ export default function BookingCard({ booking, onAccept, onReject, isDarkMode, i
       borderBottom: isLast ? 'none' : `1.5px solid ${col.border}`,
     }}>
       {/* Info */}
-      <div style={{ flex: 1, minWidth: 0 }}>
+      <div style={{ flex: '1 1 220px', minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 3 }}>
           <h4 style={{ margin: 0, fontSize: 14, fontWeight: 800, color: col.heading }}>
             {booking.name || booking.studentName}

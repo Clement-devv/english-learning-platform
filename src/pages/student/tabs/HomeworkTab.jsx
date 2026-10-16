@@ -288,7 +288,19 @@ export default function StudentHomeworkTab({ studentInfo, isDarkMode }) {
 
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 20, fontFamily: "'Nunito', sans-serif" }}>
+    <div className="hw-root" style={{ display: "flex", flexDirection: "column", gap: 20, fontFamily: "'Nunito', sans-serif" }}>
+      {/* Phone layout: nothing wider than the screen (no sideways drag), one fixed filter row */}
+      <style>{`
+        @media (max-width: 640px) {
+          .hw-root { gap: 14px !important; min-width: 0; }
+          .hw-title { display: none; }                 /* the top bar already says "Homework" */
+          .hw-head { align-items: center !important; flex-wrap: nowrap !important; }
+          .hw-head p { margin: 0 !important; font-size: 13px !important; }
+          .hw-stats { display: none !important; }      /* same numbers as the filter row */
+          .hw-filters { display: grid !important; grid-template-columns: repeat(4, minmax(0, 1fr)); align-self: stretch !important; flex-wrap: nowrap !important; }
+          .hw-filters button { flex-direction: column; justify-content: center; gap: 3px !important; padding: 7px 2px !important; font-size: 12px !important; min-width: 0; }
+        }
+      `}</style>
 
       <StreakToast data={streakToast} onDone={() => setStreakToast(null)} />
 
@@ -306,10 +318,10 @@ export default function StudentHomeworkTab({ studentInfo, isDarkMode }) {
       )}
 
       {/* Header */}
-      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
-        <div>
-          <div style={{ fontSize: 11.5, fontWeight: 800, color: accent, textTransform: "uppercase", letterSpacing: "0.1em" }}>{tr("homeworkTab.learning")}</div>
-          <h1 style={{ margin: "2px 0 0", fontSize: 28, fontWeight: 900, color: col.heading, letterSpacing: "-0.4px" }}>{tr("homeworkTab.homework")}</h1>
+      <div className="hw-head" style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
+        <div style={{ minWidth: 0 }}>
+          <div className="hw-title" style={{ fontSize: 11.5, fontWeight: 800, color: accent, textTransform: "uppercase", letterSpacing: "0.1em" }}>{tr("homeworkTab.learning")}</div>
+          <h1 className="hw-title" style={{ margin: "2px 0 0", fontSize: 28, fontWeight: 900, color: col.heading, letterSpacing: "-0.4px" }}>{tr("homeworkTab.homework")}</h1>
           <p style={{ margin: "4px 0 0", fontSize: 14, color: col.muted, fontWeight: 600 }}>
             {counts.assigned > 0 ? tr("homeworkTab.assignmentDueSoonKeepThat", { assigned: counts.assigned, value: counts.assigned !== 1 ? "s" : "" }) : tr("homeworkTab.allCaughtUpNoPending")}
           </p>
@@ -323,7 +335,7 @@ export default function StudentHomeworkTab({ studentInfo, isDarkMode }) {
       </div>
 
       {/* Stats strip */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12 }}>
+      <div className="hw-stats" style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12 }}>
         {statsItems.map(({ key, label, emoji, color, bg }) => (
           <div key={key} onClick={() => changeFilter(key)}
             style={{
@@ -342,7 +354,7 @@ export default function StudentHomeworkTab({ studentInfo, isDarkMode }) {
       </div>
 
       {/* Filter chips */}
-      <div style={{ display: "flex", gap: 6, background: col.card, border: `2px solid ${col.border}`, borderRadius: 14, padding: 4, alignSelf: "flex-start", flexWrap: "wrap" }}>
+      <div className="hw-filters" style={{ display: "flex", gap: 6, background: col.card, border: `2px solid ${col.border}`, borderRadius: 14, padding: 4, alignSelf: "flex-start", flexWrap: "wrap" }}>
         {[
           { k: "all",       l: "All",       count: counts.all       },
           { k: "assigned",  l: "To do",     count: counts.assigned  },
@@ -573,7 +585,7 @@ export default function StudentHomeworkTab({ studentInfo, isDarkMode }) {
                               : grammarStatus === "done" && grammarSuggestions.length === 0 ? "#dcfce7"
                               : grammarStatus === "done" ? "#fef3c7"
                               : grammarStatus === "error" ? "#fee2e2"
-                              : "var(--as-ink, #f3f4f6)",
+                              : "var(--as-raised, #f3f4f6)",
                             color: grammarStatus === "loading" ? "#92400e"
                               : grammarStatus === "checking" ? "#1e40af"
                               : grammarStatus === "done" && grammarSuggestions.length === 0 ? "#166534"

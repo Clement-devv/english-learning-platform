@@ -175,8 +175,8 @@ export default function FlashcardsTab({ isDarkMode }) {
 
       {/* Header */}
       <div>
-        <div style={{ fontSize: 11.5, fontWeight: 800, color: ACCENT, textTransform: "uppercase", letterSpacing: "0.1em" }}>{tr("flashcardsTab.learning")}</div>
-        <h1 style={{ margin: "2px 0 0", fontSize: 28, fontWeight: 900, color: HEADING, letterSpacing: "-0.4px" }}>{tr("flashcardsTab.flashcards")}</h1>
+        <div className="fc-title" style={{ fontSize: 11.5, fontWeight: 800, color: ACCENT, textTransform: "uppercase", letterSpacing: "0.1em" }}>{tr("flashcardsTab.learning")}</div>
+        <h1 className="fc-title" style={{ margin: "2px 0 0", fontSize: 28, fontWeight: 900, color: HEADING, letterSpacing: "-0.4px" }}>{tr("flashcardsTab.flashcards")}</h1>
         <div style={{ fontSize: 14, color: MUTED, fontWeight: 600, marginTop: 4 }}>
           {loading ? tr("flashcardsTab.loading") : tr("flashcardsTab.cardsDueOfWordsMastered", { totalDue, totalMastered, totalWords })}
         </div>
@@ -184,7 +184,7 @@ export default function FlashcardsTab({ isDarkMode }) {
 
       {/* Hero start-review banner */}
       {!loading && (
-        <div style={{ background: HEROG, borderRadius: 24, padding: "24px 28px", color: "#fff", display: "flex", alignItems: "center", gap: 22, boxShadow: "0 18px 42px rgba(249,115,22,0.28)", position: "relative", overflow: "hidden" }}>
+        <div className="fc-hero" style={{ background: HEROG, borderRadius: 24, padding: "24px 28px", color: "#fff", display: "flex", alignItems: "center", gap: 22, boxShadow: "0 18px 42px rgba(249,115,22,0.28)", position: "relative", overflow: "hidden" }}>
           <div style={{ position: "absolute", right: -30, top: -40, width: 220, height: 220, borderRadius: "50%", background: "rgba(255,255,255,0.1)" }}/>
           <div style={{ position: "absolute", right: 60, bottom: -50, width: 140, height: 140, borderRadius: "50%", background: "rgba(255,255,255,0.08)" }}/>
           <div style={{ position: "relative", width: 80, height: 100, flexShrink: 0 }}>
@@ -196,7 +196,7 @@ export default function FlashcardsTab({ isDarkMode }) {
           </div>
           <div style={{ flex: 1, minWidth: 0, position: "relative" }}>
             <div style={{ fontSize: 11.5, fontWeight: 800, letterSpacing: "0.1em", opacity: 0.9 }}>{tr("flashcardsTab.todaySReview")}</div>
-            <div style={{ fontSize: 24, fontWeight: 900, marginTop: 2, letterSpacing: "-0.4px" }}>
+            <div className="fc-hero-title" style={{ fontSize: 24, fontWeight: 900, marginTop: 2, letterSpacing: "-0.4px" }}>
               {totalDue > 0 ? tr("flashcardsTab.cardsReadyToReview", { totalDue }) : tr("flashcardsTab.allCaughtUp")}
             </div>
             <div style={{ fontSize: 13, fontWeight: 600, opacity: 0.95, marginTop: 4 }}>
@@ -211,8 +211,21 @@ export default function FlashcardsTab({ isDarkMode }) {
         </div>
       )}
 
+      {/* Phone layout: 2×2 stats, banner wraps (button gets its own full-width row) */}
+      <style>{`
+        @media (max-width: 640px) {
+          .fc-title { display: none; }                                   /* top bar already says "Flashcards" */
+          .fc-stats { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 10px !important; }
+          .fc-stats > div { padding: 12px !important; gap: 10px !important; }
+          .fc-hero { flex-wrap: wrap; padding: 18px !important; gap: 14px !important; }
+          .fc-hero > div:nth-child(3) { width: 56px !important; height: 70px !important; }
+          .fc-hero .fc-hero-title { font-size: 19px !important; }
+          .fc-hero > button { width: 100%; justify-content: center; padding: 12px 18px !important; }
+        }
+      `}</style>
+
       {/* Stats strip */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12 }}>
+      <div className="fc-stats" style={{ display: "grid", gridTemplateColumns: "repeat(4,minmax(0,1fr))", gap: 12 }}>
         {[
           { icon: <Layers size={20} stroke="#c2410c" strokeWidth={2.2}/>,      n: loading ? "—" : totalWords,    l: "Total words",  bg: "#fff3e6", fg: "#c2410c" },
           { icon: <CheckCircle2 size={20} stroke="#059669" strokeWidth={2.2}/>, n: loading ? "—" : totalMastered, l: "Mastered",     bg: "#ecfdf5", fg: "#059669" },

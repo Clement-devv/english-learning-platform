@@ -6,15 +6,17 @@
 
 export const LOGIN_THEMES = [
   {
+    // id stays 'space' so centers already holding this slot keep it; the design is
+    // the Sunshine login (SunshineTheme.jsx). It's also the default when none is assigned.
     id:          'space',
-    name:        'Space Explorer',
-    description: 'Deep purple cosmos · rocket mascot · stars & orbiting books',
+    name:        'Sunshine Login',
+    description: 'Warm glows · frosted glass · student stickers · matches the Sunshine dashboard (default)',
     preview: {
-      bgStart: '#1a0533',
-      bgEnd:   '#ea580c',
-      accent:  '#a855f7',
+      bgStart: '#fdf8f4',
+      bgEnd:   '#fb7185',
+      accent:  '#cf4b08',
     },
-    emoji: '🚀',
+    emoji: '☀️',
   },
   {
     id:          'ocean',
@@ -58,15 +60,17 @@ export const getLoginThemeById = (id) => LOGIN_THEMES.find(t => t.id === id) || 
 
 export const TEACHER_LOGIN_THEMES = [
   {
+    // id stays 'classroom-space' so centers already holding this slot keep it; the
+    // design is the Sunshine teacher login (SunshineTeacherTheme.jsx). Default slot.
     id:          'classroom-space',
-    name:        'Classroom in the Cosmos',
-    description: 'Dark space · floating desk & teacher · orbiting books · cyan glow',
+    name:        'Sunshine Login',
+    description: 'Warm glows · frosted glass · sunrise rings · matches the Sunshine teacher dashboard (default)',
     preview: {
-      bgStart: '#06091a',
-      bgEnd:   '#0d1b4b',
-      accent:  '#22d3ee',
+      bgStart: '#fdf8f4',
+      bgEnd:   '#fb7185',
+      accent:  '#cf4b08',
     },
-    emoji: '🏫',
+    emoji: '☀️',
   },
   {
     id:          'ocean-current',
@@ -100,15 +104,18 @@ export const getTeacherLoginThemeById = (id) => TEACHER_LOGIN_THEMES.find(t => t
 
 export const ADMIN_LOGIN_THEMES = [
   {
+    // id stays 'executive' so centers already holding this slot keep it; the design is
+    // the Sunshine admin login (SunshineAdminTheme.jsx). Default slot. The super admin
+    // login uses the same design (components/auth/SunshineLoginShell.jsx).
     id:          'executive',
-    name:        'Executive Command',
-    description: 'Dark navy · floating dashboard monitor · stat cards · flowing data lines · cyan glow',
+    name:        'Sunshine Login',
+    description: 'Warm glows · frosted glass · sunrise rings · matches the Sunshine admin dashboard (default)',
     preview: {
-      bgStart: '#060a14',
-      bgEnd:   '#0d1b4b',
-      accent:  '#22d3ee',
+      bgStart: '#fdf8f4',
+      bgEnd:   '#fb7185',
+      accent:  '#cf4b08',
     },
-    emoji: '🏛',
+    emoji: '☀️',
   },
   {
     id:          'corporate-slate',

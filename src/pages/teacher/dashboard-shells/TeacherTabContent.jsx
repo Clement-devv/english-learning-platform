@@ -40,7 +40,7 @@ preloadWhenIdle([
  * headStyle  – CSS object for page headings inside the wrapper
  * mutedStyle – CSS object for page sub-headings
  */
-export default function TeacherTabContent({ d, wrapStyle = {}, msgStyle = {}, msgClassName, headStyle = {}, mutedStyle = {}, onUnreadCount }) {
+export default function TeacherTabContent({ d, wrapStyle = {}, msgStyle = {}, msgClassName, msgFill = false, headStyle = {}, mutedStyle = {}, onUnreadCount }) {
   const { activeTab, isDarkMode } = d;
 
   // ── SCHEDULE ──────────────────────────────────────────────────────────────
@@ -65,7 +65,7 @@ export default function TeacherTabContent({ d, wrapStyle = {}, msgStyle = {}, ms
       <div style={wrapStyle}>
         {d.classes.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '60px 0' }}>
-            <Calendar size={36} color={isDarkMode ? 'var(--as-ink, #1e2235)' : 'var(--as-ink, #e2e8f0)'} style={{ margin: '0 auto 10px' }} />
+            <Calendar size={36} color={isDarkMode ? 'var(--as-line-strong, #1e2235)' : 'var(--as-line-strong, #e2e8f0)'} style={{ margin: '0 auto 10px' }} />
             <p style={{ fontSize: '14px', color: isDarkMode ? 'var(--as-ink-2, #6b7090)' : '#9b8ab0', margin: '0 0 4px', fontWeight: '600' }}>No classes scheduled yet</p>
             <p style={{ fontSize: '12px', color: isDarkMode ? 'var(--as-ink-2, #6b7090)' : '#9b8ab0', margin: 0 }}>Accept booking requests to add classes to your schedule</p>
           </div>
@@ -120,7 +120,7 @@ export default function TeacherTabContent({ d, wrapStyle = {}, msgStyle = {}, ms
       <div style={wrapStyle}>
         {d.students.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '60px 0' }}>
-            <Users size={36} color={isDarkMode ? 'var(--as-ink, #1e2235)' : 'var(--as-ink, #e2e8f0)'} style={{ margin: '0 auto 10px' }} />
+            <Users size={36} color={isDarkMode ? 'var(--as-line-strong, #1e2235)' : 'var(--as-line-strong, #e2e8f0)'} style={{ margin: '0 auto 10px' }} />
             <p style={{ fontSize: '14px', color: isDarkMode ? 'var(--as-ink-2, #6b7090)' : '#9b8ab0', margin: 0, fontWeight: '600' }}>No students assigned yet</p>
           </div>
         ) : (
@@ -148,7 +148,7 @@ export default function TeacherTabContent({ d, wrapStyle = {}, msgStyle = {}, ms
   if (activeTab === 'messages') {
     return (
       <div className={msgClassName} style={msgStyle}>
-        <MessagesTab userRole="teacher" onUnreadCount={onUnreadCount} />
+        <MessagesTab userRole="teacher" onUnreadCount={onUnreadCount} fill={msgFill} />
       </div>
     );
   }

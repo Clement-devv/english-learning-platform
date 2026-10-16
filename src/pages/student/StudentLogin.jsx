@@ -5,16 +5,16 @@ import React, { lazy, Suspense } from 'react';
 import { useBranding } from '../../context/BrandingContext';
 
 const THEMES = {
-  space:   lazy(() => import('./login-themes/SpaceTheme')),
+  space:   lazy(() => import('./login-themes/SunshineTheme')),   // 'Sunshine Login' — the default slot
   ocean:   lazy(() => import('./login-themes/OceanTheme')),
   forest:  lazy(() => import('./login-themes/ForestTheme')),
   minimal: lazy(() => import('./login-themes/MinimalTheme')),
 };
 
-// Fallback shown while the theme chunk loads (matches the space theme bg colour)
+// Fallback shown while the theme chunk loads (matches the sunshine theme bg colour)
 const LoadingScreen = () => (
-  <div style={{ minHeight: '100vh', background: '#1a0533', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-    <div style={{ width: 36, height: 36, border: '4px solid rgba(255,255,255,.2)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin .7s linear infinite' }} />
+  <div style={{ minHeight: '100vh', background: '#fdf8f4', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+    <div style={{ width: 36, height: 36, border: '4px solid rgba(207,75,8,.18)', borderTopColor: '#cf4b08', borderRadius: '50%', animation: 'spin .7s linear infinite' }} />
     <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
   </div>
 );

@@ -59,6 +59,8 @@ const QuizLinkPage        = lazy(() => import("./pages/quiz-link/QuizLinkPage"))
 const AttendanceCheckPage = lazy(() => import("./pages/attendance-check/AttendanceCheckPage"));
 const StudentForgotPassword = lazy(() => import("./pages/student/ForgotPassword"));
 const StudentResetPassword  = lazy(() => import("./pages/student/ResetPassword"));
+const ParentForgotPassword  = lazy(() => import("./pages/parent/ParentForgotPassword"));
+const ParentResetPassword   = lazy(() => import("./pages/parent/ParentResetPassword"));
 const Classroom           = lazy(() => import("./pages/Classroom"));
 const Join                = lazy(() => import("./pages/Join"));
 const ParentDashboard     = lazy(() => import("./pages/parent/ParentDashboard"));
@@ -83,6 +85,17 @@ function PageLoader() {
   );
 }
 
+
+// Admin, sub-admin and super-admin are desktop-only. index.html sets the viewport on a full
+// page load; this covers arriving by in-app navigation (e.g. a landing page → admin login).
+const DESKTOP_ONLY = /^\/(admin|sub-admin|super-admin)(\/|$)/;
+function ViewportGuard() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    if (DESKTOP_ONLY.test(pathname) && window.__vpMobile !== false) window.__applyViewport?.(false);
+  }, [pathname]);
+  return null;
+}
 
 function ImpersonationBanner() {
   const location = useLocation();
@@ -164,6 +177,7 @@ function App() {
       <UploadQueueProvider>
       <RingProvider>
       <div className="min-h-screen">
+        <ViewportGuard />
         <ImpersonationBanner />
         <ActiveClassBanner />
         <IncomingRingModal />
@@ -212,6 +226,8 @@ function App() {
             <Route path="/student/setup"                 element={<StudentSetup />} />
 
             <Route path="/parent/login"              element={<ParentLogin />} />
+            <Route path="/parent/forgot-password"    element={<ParentForgotPassword />} />
+            <Route path="/parent/reset-password/:token" element={<ParentResetPassword />} />
             <Route path="/parent/setup/:token"      element={<ParentSetup />} />
             <Route path="/parent/dashboard"         element={<AuthGuard role="parent"><ParentDashboard /></AuthGuard>} />
 

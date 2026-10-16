@@ -616,10 +616,10 @@ export default function StudentQuizTab({ studentInfo, isDarkMode }) {
       )}
 
       {/* Header */}
-      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
-        <div>
-          <div style={{ fontSize: 11.5, fontWeight: 800, color: accent, textTransform: "uppercase", letterSpacing: "0.1em" }}>{tr("quizTab.learning")}</div>
-          <h1 style={{ margin: "2px 0 0", fontSize: 28, fontWeight: 900, color: col.heading, letterSpacing: "-0.4px" }}>{tr("quizTab.quizzes")}</h1>
+      <div className="qz-head" style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+        <div style={{ minWidth: 0 }}>
+          <div className="qz-title" style={{ fontSize: 11.5, fontWeight: 800, color: accent, textTransform: "uppercase", letterSpacing: "0.1em" }}>{tr("quizTab.learning")}</div>
+          <h1 className="qz-title" style={{ margin: "2px 0 0", fontSize: 28, fontWeight: 900, color: col.heading, letterSpacing: "-0.4px" }}>{tr("quizTab.quizzes")}</h1>
           <p style={{ margin: "4px 0 0", fontSize: 14, color: col.muted, fontWeight: 600 }}>
             {counts.assigned > 0 ? tr("quizTab.readyToTake", { assigned: counts.assigned }) : tr("quizTab.allQuizzesDone")}{avgScore != null ? tr("quizTab.avgScore", { avgScore }) : ""}
           </p>
@@ -662,8 +662,28 @@ export default function StudentQuizTab({ studentInfo, isDarkMode }) {
         );
       })()}
 
+      {/* Phone layout: stats as a 2×2 grid, filter row full width — nothing wider than the screen */}
+      <style>{`
+        @media (max-width: 640px) {
+          .qz-stats { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 10px !important; }
+          .qz-stats > div { padding: 12px !important; gap: 10px !important; }
+          .qz-stats > div > div:first-child { width: 34px !important; height: 34px !important; font-size: 17px !important; }
+          .qz-filters { display: grid !important; grid-template-columns: repeat(3, minmax(0, 1fr)); align-self: stretch !important; }
+          .qz-filters button { justify-content: center; padding: 8px 4px !important; min-width: 0; }
+          .qz-title { display: none; }                                   /* top bar already says "Quizzes" */
+          .qz-head { align-items: center !important; flex-wrap: nowrap !important; }
+          .qz-head p { margin: 0 !important; font-size: 13px !important; }
+          .qz-card-head { flex-wrap: wrap; gap: 12px; padding: 14px !important; }
+          .qz-card-main { flex-basis: 100% !important; align-items: flex-start !important; gap: 12px !important; }
+          .qz-card-main > div:first-child { width: 42px !important; height: 42px !important; font-size: 19px !important; }
+          .qz-card-title { white-space: normal !important; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.3; }
+          .qz-card-actions { width: 100%; justify-content: flex-end; }
+          .qz-card-actions > button:last-child, .qz-card-actions > button:only-child { flex: 1; }
+        }
+      `}</style>
+
       {/* Stats strip */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12 }}>
+      <div className="qz-stats" style={{ display: "grid", gridTemplateColumns: "repeat(4,minmax(0,1fr))", gap: 12 }}>
         {[
           { key: "all",       label: tr("quizTab.total"),        emoji: "📝", color: "var(--as-accent-ink, #f97316)", bg: "var(--as-accent-soft, #fff7ed)" },
           { key: "assigned",  label: tr("quizTab.readyToTake2"), emoji: "⏳", color: "#a16207", bg: "#fef3c7" },
@@ -684,7 +704,7 @@ export default function StudentQuizTab({ studentInfo, isDarkMode }) {
       </div>
 
       {/* Filter chips */}
-      <div style={{ display: "flex", gap: 6, background: col.card, border: `2px solid ${col.border}`, borderRadius: 14, padding: 4, alignSelf: "flex-start" }}>
+      <div className="qz-filters" style={{ display: "flex", gap: 6, background: col.card, border: `2px solid ${col.border}`, borderRadius: 14, padding: 4, alignSelf: "flex-start" }}>
         {[
           { k: "all",       l: "All"       },
           { k: "assigned",  l: "To take"   },
@@ -730,8 +750,8 @@ export default function StudentQuizTab({ studentInfo, isDarkMode }) {
                 boxShadow: isExpanded ? "0 4px 20px #7c3aed20" : "none",
               }}>
                 {/* Header */}
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 14, flex: 1, minWidth: 0 }}>
+                <div className="qz-card-head" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px" }}>
+                  <div className="qz-card-main" style={{ display: "flex", alignItems: "center", gap: 14, flex: 1, minWidth: 0 }}>
                     <div style={{
                       width: 48, height: 48, borderRadius: 14, flexShrink: 0,
                       background: quiz.status === "attempted"
@@ -742,7 +762,7 @@ export default function StudentQuizTab({ studentInfo, isDarkMode }) {
                       {quiz.status === "attempted" ? "🏆" : "📝"}
                     </div>
                     <div style={{ minWidth: 0, flex: 1 }}>
-                      <div style={{ fontWeight: 800, fontSize: 15, color: col.heading, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      <div className="qz-card-title" style={{ fontWeight: 800, fontSize: 15, color: col.heading, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         {quiz.title}
                       </div>
                       <div style={{ fontSize: 12, color: col.muted, marginTop: 3, display: "flex", flexWrap: "wrap", gap: 8 }}>
@@ -763,7 +783,7 @@ export default function StudentQuizTab({ studentInfo, isDarkMode }) {
                     </div>
                   </div>
 
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+                  <div className="qz-card-actions" style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
                     {quiz.attempt && (
                       <span style={{ fontWeight: 900, fontSize: 16, color: quiz.attempt.percentage >= 80 ? "#10b981" : quiz.attempt.percentage >= 60 ? "#f59e0b" : "#ef4444" }}>
                         {quiz.attempt.percentage}%

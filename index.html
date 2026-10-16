@@ -13,24 +13,63 @@
         if (isApp) {
           // Phones (screen.width < 768) get device-width so mobile UI renders at actual size.
           // Respect explicit user preference stored in localStorage.
-          var saved = localStorage.getItem('viewMode');
+          var saved = null;
+          try { saved = localStorage.getItem('viewMode'); } catch (e) { /* private mode */ }
           var isPhone = window.screen.width < 768;
-          var isAdmin = /^\/admin/.test(p);
+          // Admin, sub-admin and super-admin are desktop-only — no mobile layout, no toggle
+          var isAdmin = /^\/(admin|sub-admin|super-admin)(\/|$)/.test(p);
+          // iPad / Android tablet (iPadOS reports as a Mac → detect by touch + screen size).
+          // Mirrors isTablet() in src/hooks/useViewMode.js. Only student pages have a
+          // tablet layout so far (student, teacher); others keep the 1280px desktop viewport.
+          var sw = window.screen.width, sh = window.screen.height;
+          var isTablet = !isPhone && navigator.maxTouchPoints > 1 &&
+            Math.min(sw, sh) >= 600 && Math.max(sw, sh) <= 1366;
+          var tabletReady = /^\/(student|teacher)/.test(p);
           // Admin always uses desktop viewport — no mobile layout for admin
-          var useMobile = !isAdmin && isPhone && saved !== 'desktop';
-          document.getElementById('vp').content = useMobile
-            ? 'width=device-width, initial-scale=1.0, viewport-fit=cover'
-            : 'width=1280, viewport-fit=cover';
+          var useMobile = !isAdmin && (isPhone || (isTablet && tabletReady)) && saved !== 'desktop';
+          window.__applyViewport(useMobile);
+          window.addEventListener('orientationchange', function () {
+            setTimeout(function () { window.__applyViewport(window.__vpMobile); }, 150);
+          });
         }
       })();
+
+      // Sets the viewport for the mobile layout (device width) or the 1280px desktop layout.
+      // Also called by useViewMode when the layout is switched in Settings.
+      function __applyViewport(mobile) {
+        var vp = document.getElementById('vp'), root = document.documentElement;
+        window.__vpMobile = mobile;
+        var sw = screen.width, sh = screen.height;
+        var touch = navigator.maxTouchPoints > 0;
+        root.classList.remove('desk-touch');
+        if (mobile) {
+          vp.content = 'width=device-width, initial-scale=1.0, viewport-fit=cover';
+        } else if (!touch || Math.min(sw, sh) > 1280) {
+          vp.content = 'width=1280, viewport-fit=cover';
+        } else {
+          // Desktop page on a phone/tablet. Pin the scale to exactly "fit 1280px" so the page
+          // never loads half-zoomed and can't be zoomed out past its edges (the sideways
+          // wobble). Pinch-zoom IN stays available.
+          // iOS also zooms in on every input tap here (all text is < 16px at this scale) and
+          // stays zoomed; on iOS only, maximum-scale stops that auto-zoom — iOS still lets the
+          // user pinch-zoom regardless. Android doesn't auto-zoom, so it gets no maximum-scale.
+          var iOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (/Mac/.test(navigator.platform) && navigator.maxTouchPoints > 1);
+          var landscape = window.matchMedia('(orientation: landscape)').matches;
+          var s = Math.min(1, (landscape ? Math.max(sw, sh) : Math.min(sw, sh)) / 1280).toFixed(4);
+          vp.content = 'width=1280, initial-scale=' + s + ', minimum-scale=' + s +
+            (iOS ? ', maximum-scale=' + s : '') + ', viewport-fit=cover';
+          root.classList.add('desk-touch');
+        }
+      }
     </script>
     <title>Learning</title>
 
-    <!-- Fonts — loaded here (not via @import in index.css) so the browser fetches
-         them in parallel with the JS/CSS bundle instead of after it. -->
+    <!-- Fonts — loaded here (not via @import in index.css or in components) so the browser fetches
+         them in parallel with the JS/CSS bundle instead of after it. Nunito (variable,
+         one file for all weights) is the Sunshine dashboards + login pages font. -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&display=swap" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=Nunito:wght@400..900&display=swap" />
 
     <!-- PWA manifest -->
     <link rel="manifest" href="/manifest.json" />

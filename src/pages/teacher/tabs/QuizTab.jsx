@@ -54,7 +54,7 @@ function ScoreBar({ percentage }) {
 // ── Question builder ──────────────────────────────────────────────────────────
 function QuestionBuilder({ questions, setQuestions, isDarkMode }) {
   const bg    = isDarkMode ? "var(--as-surface, #0f172a)" : "var(--as-raised, #f8fafc)";
-  const bdr   = isDarkMode ? "var(--as-ink-2, #334155)" : "var(--as-ink, #e2e8f0)";
+  const bdr   = isDarkMode ? "var(--as-line, #334155)" : "var(--as-line, #e2e8f0)";
   const txtcl = isDarkMode ? "var(--as-ink, #f1f5f9)" : "var(--as-ink, #1e293b)";
 
   const addQuestion  = () => { if (questions.length < 50) setQuestions(p => [...p, blankQuestion()]); };
@@ -182,7 +182,7 @@ function TemplatePicker({ templates, onLoad, onClose, isDarkMode }) {
   );
 
   const bg  = isDarkMode ? "var(--as-raised, #1e293b)" : "var(--as-surface, #fff)";
-  const bdr = isDarkMode ? "var(--as-ink-2, #334155)" : "var(--as-ink, #e2e8f0)";
+  const bdr = isDarkMode ? "var(--as-line, #334155)" : "var(--as-line, #e2e8f0)";
   const txt = isDarkMode ? "var(--as-ink, #f1f5f9)" : "var(--as-ink, #1e293b)";
 
   return (
@@ -235,7 +235,7 @@ function TemplatePicker({ templates, onLoad, onClose, isDarkMode }) {
 function SaveTemplateModal({ onSave, onClose, isDarkMode, defaultName }) {
   const [name, setName] = useState(defaultName || "");
   const bg  = isDarkMode ? "var(--as-raised, #1e293b)" : "var(--as-surface, #fff)";
-  const bdr = isDarkMode ? "var(--as-ink-2, #334155)" : "var(--as-ink, #e2e8f0)";
+  const bdr = isDarkMode ? "var(--as-line, #334155)" : "var(--as-line, #e2e8f0)";
   const txt = isDarkMode ? "var(--as-ink, #f1f5f9)" : "var(--as-ink, #1e293b)";
 
   return (
@@ -580,7 +580,39 @@ export default function QuizTab({ teacherInfo, students, isDarkMode }) {
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+    <div className="tqz" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      {/* Phone layout (desktop unchanged) */}
+      <style>{`@media (max-width: 640px) {
+        .tqz { gap: 14px !important; }
+        .tqz-head h1 { font-size: 19px !important; }
+        .tqz-head > div:first-child { flex-basis: 100%; }
+        .tqz-actions { display: grid !important; grid-template-columns: 1fr 1fr; width: 100%; }
+        .tqz-actions > button { justify-content: center; padding: 9px 10px !important; }
+        .tqz-actions > button:last-child { grid-column: 1 / -1; padding: 11px !important; }
+        .tqz-stats { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; gap: 8px !important; }
+        .tqz-stats > div { padding: 10px !important; border-radius: 12px !important; min-width: 0; }
+        .tqz-stats > div > div:first-child { gap: 5px !important; }
+        .tqz-stats > div > div:first-child svg { display: none; }
+        .tqz-stats > div > div:first-child span { font-size: 11px !important; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .tqz-stats > div > div:last-child { font-size: 22px !important; }
+        .tqz-form { padding: 14px !important; }
+        .tqz-formhead > div { flex-wrap: wrap; }
+        .tqz-g2, .tqz-g2t { grid-template-columns: minmax(0, 1fr) !important; gap: 12px !important; }
+        .tqz-g3 { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important; }
+        .tqz-g3 > :first-child { grid-column: 1 / -1; }
+        .tqz-submit { flex-wrap: wrap; }
+        .tqz-submit > button { flex: 1; justify-content: center; padding: 10px 12px !important; }
+        .tqz-filter > button { flex: 1; padding: 7px 8px !important; white-space: nowrap; }
+        .tqz-item { padding: 12px !important; flex-wrap: wrap; row-gap: 8px; }
+        .tqz-item > div:first-child { gap: 10px !important; flex-basis: 100% !important; }
+        .tqz-item > div:first-child > div:last-child > div:first-child { white-space: normal !important; line-height: 1.3; }
+        .tqz-item > div:last-child { width: 100%; padding-left: 44px; }
+        .tqz-item > div:last-child > svg:last-child { margin-left: auto; }
+        .tqz-item > div:first-child > div:first-child { width: 34px !important; height: 34px !important; font-size: 15px !important; }
+        .tqz-item > div:last-child { gap: 6px !important; }
+        .tqz-item > div:last-child > span:last-of-type { padding: 2px 8px !important; font-size: 11px !important; }
+        .tqz-detail { padding: 12px !important; }
+      }`}</style>
 
       {/* Toast */}
       {toast && (
@@ -598,12 +630,12 @@ export default function QuizTab({ teacherInfo, students, isDarkMode }) {
       )}
 
       {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
+      <div className="tqz-head" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
         <div>
           <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: c.heading }}>Quiz / MCQ Tests</h1>
           <p style={{ margin: "4px 0 0", fontSize: 13, color: c.body }}>Create timed tests · save and reuse question templates</p>
         </div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <div className="tqz-actions" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <button onClick={fetchQuizzes}
             style={{ padding: "8px 14px", borderRadius: 10, border: `1.5px solid ${c.border}`, background: c.card, color: c.body, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
             <RefreshCw size={14} /> Refresh
@@ -620,7 +652,7 @@ export default function QuizTab({ teacherInfo, students, isDarkMode }) {
       </div>
 
       {/* Stats */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12 }}>
+      <div className="tqz-stats" style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12 }}>
         {[
           { key: "all",       label: "Total",     icon: BookOpen,     color: BRAND },
           { key: "assigned",  label: "Pending",   icon: Clock,        color: "#f59e0b" },
@@ -650,9 +682,9 @@ export default function QuizTab({ teacherInfo, students, isDarkMode }) {
 
       {/* Create form */}
       {showForm && (
-        <div style={{ background: c.card, border: `2px solid ${BRAND}`, borderRadius: 16, padding: 24 }}>
+        <div className="tqz-form" style={{ background: c.card, border: `2px solid ${BRAND}`, borderRadius: 16, padding: 24 }}>
           {/* Form header with template actions */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18, flexWrap: "wrap", gap: 10 }}>
+          <div className="tqz-formhead" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18, flexWrap: "wrap", gap: 10 }}>
             <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: c.heading }}>Create New Quiz</h3>
             <div style={{ display: "flex", gap: 8 }}>
               {/* Load from template */}
@@ -711,7 +743,7 @@ export default function QuizTab({ teacherInfo, students, isDarkMode }) {
               {/* ── Topic mode ── */}
               {aiMode === "topic" && (
                 <>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 100px 140px", gap: 10, marginBottom: 12 }}>
+                  <div className="tqz-g3" style={{ display: "grid", gridTemplateColumns: "1fr 100px 140px", gap: 10, marginBottom: 12 }}>
                     <div>
                       <label style={{ fontSize: 11, fontWeight: 700, color: "var(--as-accent-ink, #f97316)", display: "block", marginBottom: 5 }}>Topic *</label>
                       <input value={aiTopic} onChange={e => setAiTopic(e.target.value)}
@@ -841,7 +873,7 @@ export default function QuizTab({ teacherInfo, students, isDarkMode }) {
 
           <form onSubmit={handleCreate} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             {/* Row 1: student + due date */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+            <div className="tqz-g2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
               <div>
                 <label style={{ fontSize: 12, fontWeight: 700, color: c.body, display: "block", marginBottom: 6 }}>Student *</label>
                 <select value={form.studentId} onChange={e => setForm(f => ({ ...f, studentId: e.target.value }))} required
@@ -866,7 +898,7 @@ export default function QuizTab({ teacherInfo, students, isDarkMode }) {
             </div>
 
             {/* Row 2: title + time limit */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 130px", gap: 14, alignItems: "end" }}>
+            <div className="tqz-g2t" style={{ display: "grid", gridTemplateColumns: "1fr 130px", gap: 14, alignItems: "end" }}>
               <div>
                 <label style={{ fontSize: 12, fontWeight: 700, color: c.body, display: "block", marginBottom: 6 }}>Quiz Title *</label>
                 <input type="text" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
@@ -910,7 +942,7 @@ export default function QuizTab({ teacherInfo, students, isDarkMode }) {
               <QuestionBuilder questions={questions} setQuestions={setQuestions} isDarkMode={isDarkMode} />
             </div>
 
-            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+            <div className="tqz-submit" style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
               <button type="button" onClick={() => setShowForm(false)}
                 style={{ padding: "9px 20px", borderRadius: 10, border: `1.5px solid ${c.border}`, background: c.card, color: c.body, fontSize: 13, cursor: "pointer", fontWeight: 600 }}>
                 Cancel
@@ -925,7 +957,7 @@ export default function QuizTab({ teacherInfo, students, isDarkMode }) {
       )}
 
       {/* Filter tabs */}
-      <div style={{ display: "flex", gap: 6 }}>
+      <div className="tqz-filter" style={{ display: "flex", gap: 6 }}>
         {["all", "assigned", "attempted"].map(f => (
           <button key={f} onClick={() => changeFilter(f)}
             style={{ padding: "6px 16px", borderRadius: 20, border: "none", fontSize: 13, fontWeight: 600, cursor: "pointer", background: filter === f ? BRAND : c.card, color: filter === f ? "#fff" : c.body, boxShadow: filter === f ? `0 2px 8px ${brandA(0.25)}` : "none" }}>
@@ -956,7 +988,7 @@ export default function QuizTab({ teacherInfo, students, isDarkMode }) {
             return (
               <div key={quiz._id} style={{ background: c.card, border: `2px solid ${isExpanded ? BRAND : c.border}`, borderRadius: 14, overflow: "hidden" }}>
                 <div onClick={() => setExpandedId(isExpanded ? null : quiz._id)}
-                  style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", cursor: "pointer" }}>
+                  className="tqz-item" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", cursor: "pointer" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 0 }}>
                     <div style={{ width: 40, height: 40, borderRadius: "50%", background: quiz.status === "attempted" ? "linear-gradient(135deg,#10b981,#059669)" : BRAND, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>
                       {quiz.status === "attempted" ? "✅" : "📝"}
@@ -988,7 +1020,7 @@ export default function QuizTab({ teacherInfo, students, isDarkMode }) {
                 </div>
 
                 {isExpanded && (
-                  <div style={{ borderTop: `1px solid ${c.border}`, padding: "16px 18px", display: "flex", flexDirection: "column", gap: 14 }}>
+                  <div className="tqz-detail" style={{ borderTop: `1px solid ${c.border}`, padding: "16px 18px", display: "flex", flexDirection: "column", gap: 14 }}>
                     {/* Share link — managed students only, until the quiz is taken */}
                     {student?.isManaged && quiz.status !== "attempted" && (
                       <ShareLinkPanel item={quiz} kind="quiz" isDarkMode={isDarkMode}

@@ -199,6 +199,8 @@ export const alertNewDevice = ({ req, user, role, session, isNewDevice }) => {
       device:     session.deviceInfo,
       ipAddress:  session.ipAddress,
       when:       session.loginTime,
+      lang:       user.emailLanguage,
+      tz:         user.timezone,
     }))
     .catch(err => logger.warn('New-device email failed:', { error: err?.message }));
 };

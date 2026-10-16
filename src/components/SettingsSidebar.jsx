@@ -1,5 +1,7 @@
 // src/components/SettingsSidebar.jsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import api from '../api';
+import { isTablet } from '../hooks/useViewMode';
 import { Settings, X, Key, KeyRound, Shield, Monitor, ChevronRight, Lock, User, Mail, Globe } from 'lucide-react';
 
 export default function SettingsSidebar({
@@ -12,10 +14,32 @@ export default function SettingsSidebar({
   onManageAnalyticsPin = null,
   userInfo = null,
   isMobile = false,
-  forcedMode = null,
   onSetViewMode = null,
+  tabletLayout = false,   // shell has a tablet (iPad) touch layout → offer the toggle on tablets too
+  emailLanguageFor = null, // student id → show the "Email language" switch (students only)
 }) {
   const [activeSection, setActiveSection] = useState(null);
+
+  // Email language (students): load the saved choice when the panel opens; saving is
+  // optimistic and rolls back if the request fails.
+  const [emailLang, setEmailLang] = useState(null);
+  const [langMsg, setLangMsg] = useState('');
+  useEffect(() => {
+    if (!isOpen || !emailLanguageFor) return;
+    let stale = false;
+    api.get(`/students/${emailLanguageFor}`)
+      .then(({ data }) => { if (!stale) setEmailLang(data?.emailLanguage || 'en'); })
+      .catch(() => { if (!stale) setEmailLang('en'); });
+    return () => { stale = true; };
+  }, [isOpen, emailLanguageFor]);
+  const chooseEmailLang = (lang) => {
+    if (lang === emailLang) return;
+    const prev = emailLang;
+    setEmailLang(lang); setLangMsg('');
+    api.patch(`/students/${emailLanguageFor}/email-language`, { emailLanguage: lang })
+      .then(() => setLangMsg(lang === 'vi' ? 'Đã lưu — email sẽ được gửi bằng tiếng Việt.' : 'Saved — emails will come in English.'))
+      .catch(() => { setEmailLang(prev); setLangMsg('Could not save — please try again.'); });
+  };
 
   const menuItems = [
     {
@@ -55,8 +79,9 @@ export default function SettingsSidebar({
     }] : []),
   ];
 
-  // Show view toggle on any small-screen device (phone/tablet) regardless of current mode
-  const showViewToggle = onSetViewMode && window.screen.width < 1024;
+  // Show the layout toggle on phones / small tablets, and on any tablet (incl. the 1024px
+  // iPad Pro) when the shell has a tablet layout — regardless of the current mode.
+  const showViewToggle = onSetViewMode && (window.screen.width < 1024 || (tabletLayout && isTablet()));
 
   if (!isOpen) return null;
 
@@ -141,14 +166,16 @@ export default function SettingsSidebar({
             <div style={{ display: 'flex', background: '#f3f4f6', borderRadius: 14, padding: 4, gap: 4 }}
                  className="dark:bg-gray-800">
               {[
-                { mode: 'auto',    label: '📱 Mobile',  sub: 'App layout'  },
+                { mode: 'mobile',  label: '📱 Mobile',  sub: 'App layout'  },
                 { mode: 'desktop', label: '🖥️ Desktop', sub: 'Full site'   },
               ].map(({ mode, label, sub }) => {
-                const isActive = mode === 'desktop' ? forcedMode === 'desktop' : forcedMode !== 'desktop';
+                // what's on screen right now (auto may resolve either way)
+                const isActive = mode === 'desktop' ? !isMobile : isMobile;
                 return (
                   <button
                     key={mode}
-                    onClick={() => { onSetViewMode(mode); if (mode === 'desktop') onClose(); }}
+                    aria-pressed={isActive}
+                    onClick={() => { onSetViewMode(mode); onClose(); }}
                     style={{
                       flex: 1, border: 'none', cursor: 'pointer', borderRadius: 10, padding: '8px 6px',
                       display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
@@ -163,6 +190,44 @@ export default function SettingsSidebar({
                 );
               })}
             </div>
+          </div>
+        )}
+
+        {/* Email language (students) */}
+        {emailLanguageFor && (
+          <div style={{ padding: '16px', borderBottom: '1px solid #f3f4f6' }}>
+            <p style={{ margin: '0 0 4px', fontSize: 11, fontWeight: 800, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+              Email language
+            </p>
+            <p style={{ margin: '0 0 10px', fontSize: 12, color: '#6b7280' }}>The language of the emails we send you</p>
+            <div role="radiogroup" aria-label="Email language" style={{ display: 'flex', background: '#f3f4f6', borderRadius: 14, padding: 4, gap: 4, opacity: emailLang ? 1 : 0.6 }}
+                 className="dark:bg-gray-800">
+              {[
+                { lang: 'en', flag: '🇬🇧', label: 'English' },
+                { lang: 'vi', flag: '🇻🇳', label: 'Tiếng Việt' },
+              ].map(({ lang, flag, label }) => {
+                const isActive = emailLang === lang;
+                return (
+                  <button
+                    key={lang}
+                    role="radio"
+                    aria-checked={isActive}
+                    disabled={!emailLang}
+                    onClick={() => chooseEmailLang(lang)}
+                    style={{
+                      flex: 1, border: 'none', cursor: emailLang ? 'pointer' : 'wait', borderRadius: 10, padding: '10px 6px',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                      background: isActive ? 'linear-gradient(135deg,#f97316,#ea580c)' : 'transparent',
+                      color: isActive ? '#fff' : '#6b7280', fontSize: 13, fontWeight: 800,
+                      transition: 'all 0.15s',
+                    }}
+                  >
+                    <span aria-hidden="true">{flag}</span>{label}
+                  </button>
+                );
+              })}
+            </div>
+            {langMsg && <p role="status" style={{ margin: '8px 2px 0', fontSize: 12, fontWeight: 600, color: langMsg.startsWith('Could') ? '#dc2626' : '#15803d' }}>{langMsg}</p>}
           </div>
         )}
 

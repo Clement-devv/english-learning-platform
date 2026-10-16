@@ -202,16 +202,26 @@ export default function RecordingsTab({ isDarkMode }) {
         </div>
       )}
 
+      {/* Phone layout: icon + full title on top, details on one line, full-width Watch button */}
+      <style>{`
+        @media (max-width: 640px) {
+          .rec-card { flex-wrap: wrap; gap: 10px 12px !important; padding: 14px !important; }
+          .rec-thumb { width: 44px !important; height: 44px !important; border-radius: 12px !important; }
+          .rec-info { flex: 1 1 calc(100% - 60px) !important; }
+          .rec-title { white-space: normal !important; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.3; }
+          .rec-watch { width: 100%; padding: 11px 18px !important; }
+        }
+      `}</style>
       <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
         {sessions.map(session => {
           const rec       = session.first;
           const total     = session.parts.length;
           const isLoading = loadingId === session.key;
           return (
-            <div key={session.key} style={{ background: col.card, border: `1px solid ${col.border}`, borderRadius: "16px", padding: "16px 20px", display: "flex", alignItems: "center", gap: "16px" }}>
+            <div key={session.key} className="rec-card" style={{ background: col.card, border: `1px solid ${col.border}`, borderRadius: "16px", padding: "16px 20px", display: "flex", alignItems: "center", gap: "16px" }}>
 
               {/* Thumbnail */}
-              <div style={{ width: "72px", height: "48px", borderRadius: "10px", background: "linear-gradient(135deg,var(--as-accent, #6366f1),var(--as-accent, #8b5cf6))", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <div className="rec-thumb" style={{ width: "72px", height: "48px", borderRadius: "10px", background: "linear-gradient(135deg,var(--as-accent, #6366f1),var(--as-accent, #8b5cf6))", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                 {isLoading
                   ? <Loader2 size={20} color="white" style={{ animation: "spin 1s linear infinite" }} />
                   : <Video size={22} color="white" />
@@ -219,8 +229,8 @@ export default function RecordingsTab({ isDarkMode }) {
               </div>
 
               {/* Info */}
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ margin: "0 0 4px", fontSize: "15px", fontWeight: 800, color: col.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              <div className="rec-info" style={{ flex: 1, minWidth: 0 }}>
+                <p className="rec-title" style={{ margin: "0 0 4px", fontSize: "15px", fontWeight: 800, color: col.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {rec.title || rec.bookingId?.classTitle || rec.groupClassId?.title || tr("recordingsTab.classRecording")}
                 </p>
                 <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", alignItems: "center" }}>
@@ -245,7 +255,7 @@ export default function RecordingsTab({ isDarkMode }) {
               </div>
 
               {/* Watch button */}
-              <button onClick={() => openVideo(session)} disabled={isLoading}
+              <button className="rec-watch" onClick={() => openVideo(session)} disabled={isLoading}
                 style={{ display: "flex", alignItems: "center", gap: "8px", padding: "10px 18px", borderRadius: "12px", background: isLoading ? col.inputBg : "linear-gradient(135deg,var(--as-accent, #6366f1),var(--as-accent, #8b5cf6))", color: isLoading ? col.muted : "#fff", border: "none", cursor: isLoading ? "not-allowed" : "pointer", fontSize: "13px", fontWeight: 800, flexShrink: 0, minWidth: "88px", justifyContent: "center", transition: "opacity 0.2s" }}>
                 {isLoading
                   ? <><Loader2 size={13} style={{ animation: "spin 1s linear infinite" }} /> Loading</>

@@ -170,16 +170,9 @@ router.post('/verify', async (req, res) => {
       centerName: center.centerName,
       to: previousEmail,
       subject: `Confirmation: Admin login email for ${center.centerName} changed`,
-      html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px">
-        <div style="background:linear-gradient(135deg,#059669,#047857);color:#fff;padding:24px;border-radius:10px 10px 0 0;text-align:center">
-          <h2 style="margin:0">&#10003; Email Change Completed</h2>
-        </div>
-        <div style="background:#f9f9f9;padding:24px;border-radius:0 0 10px 10px">
-          <p>The admin login email for <strong>${center.centerName}</strong> has been changed to <strong>${newEmail}</strong>.</p>
+      html: `<p>The admin login email for <strong>${center.centerName}</strong> has been changed to <strong>${newEmail}</strong>.</p>
           <p>If you did not authorise this, use the <strong>Cancel This Change</strong> link in the security alert email we sent earlier. That link is still valid.</p>
-          <p style="color:#666;font-size:13px">Need help? Contact support at ${process.env.SUPER_ADMIN_EMAIL || config.emailFrom || 'support'}.</p>
-        </div>
-      </div>`,
+          <p style="color:#666;font-size:13px">Need help? Contact support at ${process.env.SUPER_ADMIN_EMAIL || config.emailFrom || 'support'}.</p>`,
     }).catch(e => logger.warn('Completion confirmation email failed:', { error: e?.message }));
 
     // Silent notification to super admin
@@ -267,16 +260,9 @@ router.post('/cancel', async (req, res) => {
         centerName: center.centerName,
         to: center.adminEmail,
         subject: `Email change request cancelled — ${center.centerName}`,
-        html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px">
-          <div style="background:linear-gradient(135deg,#6366f1,#4f46e5);color:#fff;padding:24px;border-radius:10px 10px 0 0;text-align:center">
-            <h2 style="margin:0">&#10003; Email Change Cancelled</h2>
-          </div>
-          <div style="background:#f9f9f9;padding:24px;border-radius:0 0 10px 10px">
-            <p>Your pending request to change the admin login email for <strong>${center.centerName}</strong> to <em>${pendingNewEmail}</em> has been cancelled.</p>
+        html: `<p>Your pending request to change the admin login email for <strong>${center.centerName}</strong> to <em>${pendingNewEmail}</em> has been cancelled.</p>
             <p>Your email address remains <strong>${center.adminEmail}</strong>. No changes have been made.</p>
-            <p style="color:#666;font-size:13px">If you did not request this cancellation, contact support at ${process.env.SUPER_ADMIN_EMAIL || config.emailFrom || 'support'}.</p>
-          </div>
-        </div>`,
+            <p style="color:#666;font-size:13px">If you did not request this cancellation, contact support at ${process.env.SUPER_ADMIN_EMAIL || config.emailFrom || 'support'}.</p>`,
       }).catch(e => logger.warn('Pending-cancel confirmation email failed:', { error: e?.message }));
 
       await writeAuditLog({

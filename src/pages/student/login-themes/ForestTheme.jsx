@@ -13,7 +13,7 @@ export default function ForestTheme({ loginHook } = {}) {
     showPassword, setShowPassword,
     error, loading, requires2FA,
     focusedField, setFocusedField,
-    handleInitialLogin, handle2FAVerification, handleCancel2FA, navigate,
+    handleInitialLogin, handle2FAVerification, handleCancel2FA, navigate, forgotPath = '/student/forgot-password',
   } = (loginHook || useLoginLogic)();
 
   const { branding, center } = useBranding();
@@ -156,7 +156,7 @@ export default function ForestTheme({ loginHook } = {}) {
               </div>
 
               <div style={{ textAlign: 'right', marginTop: '-6px' }}>
-                <button type="button" onClick={() => navigate('/student/forgot-password')} className="ft-forgot">
+                <button type="button" onClick={() => navigate(forgotPath)} className="ft-forgot">
                   {tr("forestTheme.forgotPassword")}
                 </button>
               </div>

@@ -57,7 +57,7 @@ const palette = () => ({
 });
 
 const F           = "'Nunito','Inter',sans-serif";
-const FONT_IMPORT = 'https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap';
+// Font: Nunito is loaded once from index.html (early, parallel to the bundle).
 const ACCENT_FILL = 'var(--a-accent-grad)';
 const ON_ACCENT   = 'var(--a-on-accent)';
 const ACCENT_SHADOW = '0 4px 14px -4px color-mix(in srgb, var(--a-accent) 55%, transparent)';
@@ -177,12 +177,11 @@ export default function SunshineShell() {
 
   return (
     <div
-      className={GLASS_PAGE ? 'as-root as-glass' : 'as-root'}
+      className={GLASS_PAGE ? 'as-root as-glass as-shine' : 'as-root'}
       data-theme={isDarkMode ? 'dark' : 'light'}
       style={{ display: 'flex', height: '100vh', overflow: 'hidden', position: 'relative', fontFamily: F, background: col.bg, '--a-accent': accent, '--a-on-accent': adminOnAccent(accent) }}
     >
       <style>{`
-        @import url('${FONT_IMPORT}');
         * { box-sizing: border-box; }
         .sa-nav { transition: background-color 150ms ease, color 150ms ease, transform 120ms ease-out; }
         .sa-nav:active { transform: scale(0.98); }

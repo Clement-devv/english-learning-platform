@@ -193,7 +193,8 @@ router.post('/forgot-password', tenantMiddleware, passwordResetLimiter, forgotPa
 // POST /parents/reset-password/:token
 router.post('/reset-password/:token', tenantMiddleware, passwordResetLimiter, resetPasswordRules, validate, async (req, res) => {
   try {
-    const { password } = req.body;
+    // Field is 'newPassword' — the same name resetPasswordRules validates (and the student route uses)
+    const { newPassword: password } = req.body;
     if (!password) return badRequest(res, 'New password is required');
 
     const { isValid, errors } = validatePasswordStrength(password);

@@ -83,10 +83,10 @@ export default function ClassList({ data, onJoin, onDelete, isDarkMode }) {
 
   // View Mode Selector
   const ViewModeSelector = () => (
-    <div className={`flex gap-2 mb-6 p-1 ${isDarkMode ? 'bg-gray-800' : 'bg-gray-100'} rounded-lg w-fit`}>
+    <div className={`flex gap-1 sm:gap-2 mb-4 sm:mb-6 p-1 ${isDarkMode ? 'bg-gray-800' : 'bg-gray-100'} rounded-lg w-full sm:w-fit`}>
       <button
         onClick={() => setViewMode('calendar')}
-        className={`px-4 py-2 rounded-md flex items-center gap-2 transition-all ${
+        className={`flex-1 sm:flex-none justify-center px-2 sm:px-4 py-2 rounded-md flex items-center gap-1.5 sm:gap-2 transition-all ${
           viewMode === 'calendar'
             ? isDarkMode 
               ? 'bg-blue-600 text-white shadow-lg' 
@@ -101,7 +101,7 @@ export default function ClassList({ data, onJoin, onDelete, isDarkMode }) {
       </button>
       <button
         onClick={() => setViewMode('list')}
-        className={`px-4 py-2 rounded-md flex items-center gap-2 transition-all ${
+        className={`flex-1 sm:flex-none justify-center px-2 sm:px-4 py-2 rounded-md flex items-center gap-1.5 sm:gap-2 transition-all ${
           viewMode === 'list'
             ? isDarkMode 
               ? 'bg-blue-600 text-white shadow-lg' 
@@ -116,7 +116,7 @@ export default function ClassList({ data, onJoin, onDelete, isDarkMode }) {
       </button>
       <button
         onClick={() => setViewMode('grid')}
-        className={`px-4 py-2 rounded-md flex items-center gap-2 transition-all ${
+        className={`flex-1 sm:flex-none justify-center px-2 sm:px-4 py-2 rounded-md flex items-center gap-1.5 sm:gap-2 transition-all ${
           viewMode === 'grid'
             ? isDarkMode 
               ? 'bg-blue-600 text-white shadow-lg' 
@@ -174,8 +174,9 @@ export default function ClassList({ data, onJoin, onDelete, isDarkMode }) {
     return (
       <div className="space-y-4">
         {/* Week Navigation */}
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between gap-2 mb-4">
           <button
+            aria-label="Previous week"
             onClick={() => setSelectedWeek(selectedWeek - 1)}
             className={`px-4 py-2 rounded-lg ${
               isDarkMode 
@@ -183,12 +184,13 @@ export default function ClassList({ data, onJoin, onDelete, isDarkMode }) {
                 : 'bg-white hover:bg-gray-50 text-gray-700 border'
             } transition-colors`}
           >
-            ← Previous Week
+            ←<span className="hidden sm:inline"> Previous Week</span>
           </button>
-          <h3 className={`text-lg font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+          <h3 className={`text-base sm:text-lg font-semibold text-center ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
             {selectedWeek === 0 ? 'This Week' : selectedWeek === 1 ? 'Next Week' : `Week of ${weekStart.toLocaleDateString()}`}
           </h3>
           <button
+            aria-label="Next week"
             onClick={() => setSelectedWeek(selectedWeek + 1)}
             className={`px-4 py-2 rounded-lg ${
               isDarkMode 
@@ -196,12 +198,12 @@ export default function ClassList({ data, onJoin, onDelete, isDarkMode }) {
                 : 'bg-white hover:bg-gray-50 text-gray-700 border'
             } transition-colors`}
           >
-            Next Week →
+            <span className="hidden sm:inline">Next Week </span>→
           </button>
         </div>
 
-        {/* Calendar Grid */}
-        <div className="grid grid-cols-7 gap-2">
+        {/* Calendar Grid — phones: one row per day (agenda); sm+: 7-column week */}
+        <div className="grid grid-cols-1 sm:grid-cols-7 gap-2">
           {weekDays.map((dayData, index) => {
             const isToday = dayData.date.toDateString() === new Date().toDateString();
             
@@ -210,10 +212,10 @@ export default function ClassList({ data, onJoin, onDelete, isDarkMode }) {
                 key={index}
                 className={`${
                   isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
-                } border rounded-lg p-3 min-h-[200px]`}
+                } border rounded-lg p-3 flex gap-3 items-start sm:block sm:min-h-[200px]`}
               >
                 {/* Day Header */}
-                <div className={`text-center mb-3 pb-2 border-b ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+                <div className={`text-center w-12 shrink-0 sm:w-auto sm:mb-3 sm:pb-2 sm:border-b ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}>
                   <p className={`text-sm font-semibold ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
                     {dayData.day}
                   </p>
@@ -230,9 +232,9 @@ export default function ClassList({ data, onJoin, onDelete, isDarkMode }) {
                 </div>
 
                 {/* Classes for this day */}
-                <div className="space-y-2">
+                <div className="space-y-2 flex-1 min-w-0">
                   {dayData.classes.length === 0 ? (
-                    <p className={`text-xs text-center ${isDarkMode ? 'text-gray-600' : 'text-gray-400'} mt-4`}>
+                    <p className={`text-xs text-left sm:text-center ${isDarkMode ? 'text-gray-600' : 'text-gray-400'} mt-1.5 sm:mt-4`}>
                       No classes
                     </p>
                   ) : (

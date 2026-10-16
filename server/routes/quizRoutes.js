@@ -273,7 +273,7 @@ async function loadOwnQuiz(req, res) {
   getStudent(req.db);
   const quiz = await getQuiz(req.db).findById(req.params.id)
     .select("+shareLink.tokenEnc")
-    .populate("studentId", "firstName lastName email isManaged");
+    .populate("studentId", "firstName lastName email isManaged emailLanguage timezone");
   if (!quiz) { notFound(res, "Quiz not found"); return null; }
   if (quiz.teacherId.toString() !== req.user.id) { forbidden(res, "Access denied"); return null; }
   return quiz;
@@ -396,7 +396,7 @@ router.get("/my", verifyToken, async (req, res) => {
     const pagination = pageMeta(want, limit, status ? counts[status] : counts.all);
     const quizzes = await Quiz.find({ teacherId: req.user.id, ...(status ? { status } : {}) })
       .select("+shareLink.tokenEnc")
-      .populate("studentId", "firstName lastName email isManaged")
+      .populate("studentId", "firstName lastName email isManaged emailLanguage timezone")
       .sort({ createdAt: -1, _id: -1 })
       .skip((pagination.page - 1) * limit)
       .limit(limit);

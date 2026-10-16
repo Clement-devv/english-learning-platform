@@ -1,808 +1,397 @@
+// Account & sign-in emails — invites, welcomes, password resets, security notices.
+// Built on the shared layout (layout.js). Student emails follow the student's
+// emailLanguage (i18n.js); everyone else gets English.
 import { config } from "../config/config.js";
 import { sendEmail, getCenterBaseUrl } from "./core.js";
+import { renderEmail, p, details, callout, list, code, esc, C } from "./layout.js";
+import { langOf, brandOf, pick, fmtDate, fmtTime } from "./i18n.js";
 
+/** Small "button not working? copy this link" line under a button */
+const linkFallback = (url, lang = "en") => p(
+  `${lang === "vi" ? "Nút không hoạt động? Sao chép liên kết này vào trình duyệt:" : "Button not working? Copy this link into your browser:"}<br>` +
+  `<a href="${esc(url)}" style="color:${C.accent};word-break:break-all;">${esc(url)}</a>`,
+  { size: 12, color: C.muted, mt: 18, mb: 0, align: "center" });
+
+/** Reset link for a role, keeping the ?center= param the old emails used */
+const resetUrlFor = (rolePath, resetToken, center) => {
+  const { baseUrl, needsSlug } = getCenterBaseUrl(center);
+  const slug = typeof center === "string" ? center : center?.slug;
+  return `${baseUrl}/${rolePath}/reset-password/${resetToken}${needsSlug && slug ? `?center=${slug}` : ""}`;
+};
+
+// ── Legacy: account created with a password ─────────────────────────────────────
 export const sendWelcomeEmail = async (email, name, password, centerName = "") => {
+  const b = brandOf(null, centerName);
   return sendEmail({
-    centerName,
+    centerName: b.centerName,
     to: email,
-    subject: `Welcome to ${config.appName}!`,
-    html: `
-      <h2>Welcome ${name}!</h2>
-      <p>Your account has been created successfully.</p>
-      <p><strong>Login Credentials:</strong></p>
-      <p>Email: ${email}</p>
-      <p>Password: ${password}</p>
-      <p>Please change your password after your first login.</p>
-      <p>Login here: <a href="${config.frontendUrl}/login">${config.frontendUrl}/login</a></p>
-    `,
+    subject: `Welcome to ${b.centerName}!`,
+    html: renderEmail({
+      ...b, baseUrl: config.frontendUrl,
+      preheader: "Your account is ready — here are your sign-in details.",
+      eyebrow: "Welcome", title: `Welcome, ${name}!`,
+      body:
+        p("Your account has been created. Sign in with these details:") +
+        details([["Email", esc(email)], ["Password", `<span style="font-family:Menlo,Consolas,monospace;">${esc(password)}</span>`]]) +
+        callout("Please change your password after your first sign-in.", "amber"),
+      cta: { label: "Sign in", href: `${config.frontendUrl}/login` },
+    }),
   });
 };
 
-export const sendPasswordResetEmail = async (email, name, newPassword, role = "teacher", centerName = "", center = null) => {
-  const { baseUrl } = getCenterBaseUrl(center);
+// ── Admin reset a user's password to a new one ──────────────────────────────────
+const ADMIN_RESET = {
+  en: {
+    subject: "Your password has been reset", eyebrow: "Password reset", title: (n) => `Hi ${n}, your password was reset`,
+    intro: "Your school's administrator set a new password for your account:", label: "New password",
+    change: "Please sign in and change it to one only you know.", cta: "Sign in",
+  },
+  vi: {
+    subject: "Mật khẩu của em đã được đặt lại", eyebrow: "Đặt lại mật khẩu", title: (n) => `Chào ${n}, mật khẩu của em đã được đặt lại`,
+    intro: "Quản trị viên của trung tâm đã đặt mật khẩu mới cho tài khoản của em:", label: "Mật khẩu mới",
+    change: "Hãy đăng nhập và đổi sang mật khẩu chỉ em biết.", cta: "Đăng nhập",
+  },
+};
+/** `lang` applies to students only (pass student.emailLanguage). */
+export const sendPasswordResetEmail = async (email, name, newPassword, role = "teacher", centerName = "", center = null, lang = "en") => {
+  const b = brandOf(center, centerName);
+  const l = role === "student" ? langOf({ emailLanguage: lang }) : "en";
+  const s = pick(ADMIN_RESET, l);
   const loginPath = role === "student" ? "/student/login" : role === "admin" ? "/admin/login" : "/teacher/login";
   return sendEmail({
-    centerName,
+    centerName: b.centerName,
     to: email,
-    subject: "Your Password Has Been Reset",
-    html: `
-      <h2>Password Reset</h2>
-      <p>Hi ${name},</p>
-      <p>Your password has been reset by an administrator.</p>
-      <p><strong>New Password:</strong> ${newPassword}</p>
-      <p>Please change this password after logging in.</p>
-      <p>Login here: <a href="${baseUrl}${loginPath}">${baseUrl}${loginPath}</a></p>
-    `,
+    subject: s.subject,
+    html: renderEmail({
+      ...b, lang: l,
+      preheader: s.change,
+      eyebrow: s.eyebrow, title: s.title(name),
+      body:
+        p(s.intro) +
+        details([[s.label, `<span style="font-family:Menlo,Consolas,monospace;font-size:16px;">${esc(newPassword)}</span>`]]) +
+        callout(s.change, "amber"),
+      cta: { label: s.cta, href: `${b.baseUrl}${loginPath}` },
+    }),
   });
 };
 
-export const sendStudentForgotPasswordEmail = async (email, name, resetToken, center = null, centerName = "") => {
-  const { baseUrl, needsSlug } = getCenterBaseUrl(center);
-  const centerSlug  = typeof center === "string" ? center : center?.slug;
-  const centerParam = needsSlug && centerSlug ? `?center=${centerSlug}` : "";
-  const resetUrl    = `${baseUrl}/student/reset-password/${resetToken}${centerParam}`;
-
+// ── Forgot password (self-service reset links) ───────────────────────────────────
+const FORGOT = {
+  en: {
+    subject: "Reset your password", eyebrow: "Password reset", title: "Let's get you back in",
+    intro: (n) => `Hi ${n}, we got a request to reset your password. Tap the button to choose a new one.`,
+    cta: "Choose a new password",
+    after: "This link works for 1 hour. Didn't ask for this? Ignore this email — your password stays the same.",
+  },
+  vi: {
+    subject: "Đặt lại mật khẩu của em", eyebrow: "Đặt lại mật khẩu", title: "Cùng lấy lại tài khoản nhé",
+    intro: (n) => `Chào ${n}, chúng tôi nhận được yêu cầu đặt lại mật khẩu của em. Bấm nút bên dưới để chọn mật khẩu mới.`,
+    cta: "Chọn mật khẩu mới",
+    after: "Liên kết có hiệu lực trong 1 giờ. Nếu em không yêu cầu, hãy bỏ qua email này — mật khẩu sẽ không thay đổi.",
+  },
+};
+const forgotEmail = ({ to, name, url, center, centerName, lang = "en", subject }) => {
+  const b = brandOf(center, centerName);
+  const s = pick(FORGOT, lang);
   return sendEmail({
-    centerName,
-    to: email,
-    subject: "Password Reset Request",
-    html: `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <style>
-          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-          .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                    color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
-          .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
-          .button { display: inline-block; padding: 15px 30px; margin: 20px 0;
-                    background: #667eea; color: white; text-decoration: none;
-                    border-radius: 5px; font-weight: bold; }
-          .warning { background: #fff3cd; border-left: 4px solid #ffc107;
-                     padding: 15px; margin: 20px 0; border-radius: 4px; }
-          .footer { text-align: center; margin-top: 30px; color: #999; font-size: 12px; }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="header"><h1>🔐 Password Reset Request</h1></div>
-          <div class="content">
-            <p>Hi ${name},</p>
-            <p>You requested to reset your password for your student account. Click the button below to reset it:</p>
-            <div style="text-align: center;">
-              <a href="${resetUrl}" class="button">Reset My Password</a>
-            </div>
-            <p style="color: #666; font-size: 14px; margin-top: 20px;">
-              Or copy and paste this link into your browser:<br>
-              <a href="${resetUrl}" style="color: #667eea; word-break: break-all;">${resetUrl}</a>
-            </p>
-            <div class="warning">
-              <strong>⚠️ Important:</strong>
-              <ul style="margin: 10px 0; padding-left: 20px;">
-                <li>This link will expire in <strong>1 hour</strong></li>
-                <li>If you didn't request this, please ignore this email</li>
-                <li>Your password won't change unless you click the link above</li>
-              </ul>
-            </div>
-          </div>
-          <div class="footer">
-            <p>This is an automated message from ${config.appName}</p>
-            <p>Please do not reply to this email</p>
-          </div>
-        </div>
-      </body>
-      </html>
-    `,
+    centerName: b.centerName,
+    to,
+    subject: subject || s.subject,
+    html: renderEmail({
+      ...b, lang,
+      preheader: s.after,
+      eyebrow: s.eyebrow, title: s.title,
+      body: p(s.intro(esc(name || ""))),
+      cta: { label: s.cta, href: url },
+      after: s.after, extra: linkFallback(url, lang),
+    }),
   });
 };
 
-export const sendAdminForgotPasswordEmail = async (email, name, resetToken, center = null, centerName = "") => {
-  const { baseUrl, needsSlug } = getCenterBaseUrl(center);
-  const centerSlug  = typeof center === "string" ? center : center?.slug;
-  const centerParam = needsSlug && centerSlug ? `?center=${centerSlug}` : "";
-  const resetUrl    = `${baseUrl}/admin/reset-password/${resetToken}${centerParam}`;
+/** `lang`: the student's emailLanguage */
+export const sendStudentForgotPasswordEmail = async (email, name, resetToken, center = null, centerName = "", lang = "en") =>
+  forgotEmail({ to: email, name, url: resetUrlFor("student", resetToken, center), center, centerName, lang: langOf({ emailLanguage: lang }) });
 
-  return sendEmail({
-    centerName,
-    to: email,
-    subject: 'Admin Password Reset Request',
-    html: `
-      <h2>Admin Password Reset</h2>
-      <p>Hi ${name || 'Admin'},</p>
-      <p>You requested to reset your admin account password. Click the link below:</p>
-      <p><a href="${resetUrl}" style="background:#4F46E5;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;display:inline-block;font-weight:700;">Reset Password</a></p>
-      <p>This link expires in <strong>1 hour</strong>.</p>
-      <p>If you did not request this, please ignore this email — your password will not change.</p>
-      <p>— The ${config.appName} Team</p>
-    `,
-  });
-};
+export const sendAdminForgotPasswordEmail = async (email, name, resetToken, center = null, centerName = "") =>
+  forgotEmail({ to: email, name: name || "Admin", url: resetUrlFor("admin", resetToken, center), center, centerName, subject: "Admin password reset" });
 
-export const sendForgotPasswordEmail = async (email, name, resetToken, center = null, centerName = "") => {
-  const { baseUrl, needsSlug } = getCenterBaseUrl(center);
-  const centerSlug  = typeof center === "string" ? center : center?.slug;
-  const centerParam = needsSlug && centerSlug ? `?center=${centerSlug}` : "";
-  const resetUrl    = `${baseUrl}/teacher/reset-password/${resetToken}${centerParam}`;
+export const sendForgotPasswordEmail = async (email, name, resetToken, center = null, centerName = "") =>
+  forgotEmail({ to: email, name, url: resetUrlFor("teacher", resetToken, center), center, centerName });
 
-  return sendEmail({
-    centerName,
-    to: email,
-    subject: "Password Reset Request",
-    html: `
-      <h2>Password Reset Request</h2>
-      <p>Hi ${name},</p>
-      <p>You requested to reset your password. Click the link below to reset it:</p>
-      <p><a href="${resetUrl}">Reset Password</a></p>
-      <p>This link will expire in 1 hour.</p>
-      <p>If you didn't request this, please ignore this email.</p>
-    `,
-  });
-};
+export const sendSubAdminForgotPasswordEmail = async (subAdmin, resetToken, center = null, centerName = "") =>
+  forgotEmail({ to: subAdmin.email, name: subAdmin.firstName, url: resetUrlFor("sub-admin", resetToken, center), center, centerName, subject: "Sub-admin password reset" });
 
+// ── Invites (set-up links) ───────────────────────────────────────────────────────
 export const sendSubAdminInviteEmail = async (subAdmin, setupUrl, createdBy, centerName = "") => {
-  const adminName = createdBy
-    ? `${createdBy.firstName} ${createdBy.lastName}`
-    : "The main administrator";
-
+  const b = brandOf(null, centerName);
+  const adminName = createdBy ? `${createdBy.firstName} ${createdBy.lastName}` : "The main administrator";
   return sendEmail({
-    centerName,
+    centerName: b.centerName,
     to: subAdmin.email,
-    subject: `You've been invited to join ${config.appName} as a Sub-Admin`,
-    html: `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <style>
-          * { box-sizing: border-box; margin: 0; padding: 0; }
-          body { font-family: 'Segoe UI', Arial, sans-serif; background: #f0f4ff; padding: 40px 20px; }
-          .wrapper { max-width: 580px; margin: 0 auto; }
-          .card { background: white; border-radius: 20px; overflow: hidden; box-shadow: 0 8px 40px rgba(79,99,210,0.12); }
-          .header { background: linear-gradient(135deg, #1e2540 0%, #2d3a6e 100%); padding: 40px 36px; text-align: center; }
-          .logo-ring { width: 72px; height: 72px; background: linear-gradient(135deg, #4f63d2, #6b82f0); border-radius: 20px; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 16px; font-size: 32px; }
-          .header h1 { color: white; font-size: 22px; font-weight: 700; margin-bottom: 6px; }
-          .header p { color: rgba(255,255,255,0.6); font-size: 14px; }
-          .body { padding: 36px; }
-          .greeting { font-size: 17px; font-weight: 600; color: #1e293b; margin-bottom: 14px; }
-          .text { font-size: 14.5px; color: #64748b; line-height: 1.7; margin-bottom: 12px; }
-          .info-box { background: #f0f4ff; border: 1px solid #dde3f8; border-radius: 14px; padding: 18px 20px; margin: 24px 0; }
-          .info-row { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid #e8ecf8; font-size: 13.5px; }
-          .info-row:last-child { border-bottom: none; }
-          .info-label { color: #94a3b8; font-weight: 500; }
-          .info-value { color: #1e293b; font-weight: 700; }
-          .cta-btn { display: block; width: 100%; padding: 16px; background: linear-gradient(135deg, #4f63d2, #6b82f0); color: white !important; text-decoration: none; border-radius: 14px; text-align: center; font-size: 15px; font-weight: 700; margin: 28px 0 16px; }
-          .expiry { text-align: center; font-size: 12.5px; color: #94a3b8; margin-bottom: 24px; }
-          .warning-box { background: #fef9c3; border: 1px solid #fde68a; border-radius: 12px; padding: 14px 16px; font-size: 13px; color: #92400e; margin-bottom: 24px; }
-          .footer { background: #f8faff; border-top: 1px solid #e8ecf8; padding: 20px 36px; text-align: center; font-size: 12px; color: #94a3b8; line-height: 1.6; }
-          .link-fallback { word-break: break-all; font-size: 12px; color: #4f63d2; }
-        </style>
-      </head>
-      <body>
-        <div class="wrapper">
-          <div class="card">
-            <div class="header">
-              <div class="logo-ring">🛡️</div>
-              <h1>You're Invited!</h1>
-              <p>${config.appName} Sub-Admin Access</p>
-            </div>
-            <div class="body">
-              <p class="greeting">Hi ${subAdmin.firstName} ${subAdmin.lastName},</p>
-              <p class="text">
-                <strong>${adminName}</strong> has invited you to join
-                <strong>${config.appName}</strong> as a <strong>Sub-Administrator</strong>.
-                You will be able to manage assigned teachers and their students on the platform.
-              </p>
-              <div class="info-box">
-                <div class="info-row"><span class="info-label">Your Email</span><span class="info-value">${subAdmin.email}</span></div>
-                <div class="info-row"><span class="info-label">Role</span><span class="info-value">Sub-Administrator</span></div>
-                <div class="info-row"><span class="info-label">Platform</span><span class="info-value">${config.appName}</span></div>
-                <div class="info-row"><span class="info-label">Invited By</span><span class="info-value">${adminName}</span></div>
-              </div>
-              <p class="text">Click the button below to set up your password and activate your account. This link will expire in <strong>48 hours</strong>.</p>
-              <a href="${setupUrl}" class="cta-btn">✅ Set Up My Account</a>
-              <p class="expiry">⏰ This invitation expires in 48 hours</p>
-              <div class="warning-box">⚠️ If you did not expect this invitation, you can safely ignore this email.</div>
-              <p class="text" style="font-size: 12.5px; color: #94a3b8;">
-                If the button above doesn't work, copy and paste this link into your browser:<br />
-                <a href="${setupUrl}" class="link-fallback">${setupUrl}</a>
-              </p>
-            </div>
-            <div class="footer">
-              <p>This is an automated message from <strong>${config.appName}</strong></p>
-              <p>Please do not reply to this email · Contact support for assistance</p>
-            </div>
-          </div>
-        </div>
-      </body>
-      </html>
-    `,
-  });
-};
-
-export const sendSubAdminWelcomeEmail = async (subAdmin, centerName = "", center = null) => {
-  const { baseUrl } = getCenterBaseUrl(center);
-  const loginUrl = `${baseUrl}/sub-admin/login`;
-
-  return sendEmail({
-    centerName,
-    to: subAdmin.email,
-    subject: `Welcome aboard, ${subAdmin.firstName}! Your account is ready 🎉`,
-    html: `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="UTF-8" />
-        <style>
-          * { box-sizing: border-box; margin: 0; padding: 0; }
-          body { font-family: 'Segoe UI', Arial, sans-serif; background: #f0f4ff; padding: 40px 20px; }
-          .wrapper { max-width: 580px; margin: 0 auto; }
-          .card { background: white; border-radius: 20px; overflow: hidden; box-shadow: 0 8px 40px rgba(79,99,210,0.12); }
-          .header { background: linear-gradient(135deg, #059669 0%, #10b981 100%); padding: 40px 36px; text-align: center; }
-          .header h1 { color: white; font-size: 24px; font-weight: 700; margin-top: 12px; }
-          .header p  { color: rgba(255,255,255,0.75); font-size: 14px; margin-top: 6px; }
-          .body { padding: 36px; }
-          .greeting { font-size: 17px; font-weight: 600; color: #1e293b; margin-bottom: 14px; }
-          .text { font-size: 14.5px; color: #64748b; line-height: 1.7; margin-bottom: 14px; }
-          .feature-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 24px 0; }
-          .feature { background: #f0f4ff; border: 1px solid #dde3f8; border-radius: 12px; padding: 14px; text-align: center; }
-          .feature .icon { font-size: 24px; margin-bottom: 6px; }
-          .feature p { font-size: 12.5px; font-weight: 600; color: #475569; }
-          .cta-btn { display: block; padding: 16px; background: linear-gradient(135deg, #4f63d2, #6b82f0); color: white !important; text-decoration: none; border-radius: 14px; text-align: center; font-size: 15px; font-weight: 700; margin: 28px 0; }
-          .footer { background: #f8faff; border-top: 1px solid #e8ecf8; padding: 20px 36px; text-align: center; font-size: 12px; color: #94a3b8; }
-        </style>
-      </head>
-      <body>
-        <div class="wrapper">
-          <div class="card">
-            <div class="header">
-              <div style="font-size: 48px;">🎉</div>
-              <h1>Welcome, ${subAdmin.firstName}!</h1>
-              <p>Your sub-admin account is now active</p>
-            </div>
-            <div class="body">
-              <p class="greeting">Hi ${subAdmin.firstName} ${subAdmin.lastName},</p>
-              <p class="text">Your account has been successfully set up! You now have access to <strong>${config.appName}</strong>'s admin panel where you can manage your assigned teachers and students.</p>
-              <div class="feature-grid">
-                <div class="feature"><div class="icon">👨‍🏫</div><p>Manage Teachers</p></div>
-                <div class="feature"><div class="icon">👩‍🎓</div><p>View Students</p></div>
-                <div class="feature"><div class="icon">💬</div><p>Send Messages</p></div>
-                <div class="feature"><div class="icon">📅</div><p>Track Bookings</p></div>
-              </div>
-              <p class="text">Use your email address <strong>${subAdmin.email}</strong> and the password you just created to log in.</p>
-              <a href="${loginUrl}" class="cta-btn">🚀 Go to My Dashboard</a>
-              <p class="text" style="font-size: 13px; color: #94a3b8;">If you have questions or need help, contact the main administrator who set up your account.</p>
-            </div>
-            <div class="footer">
-              <p>This is an automated message from <strong>${config.appName}</strong></p>
-            </div>
-          </div>
-        </div>
-      </body>
-      </html>
-    `,
-  });
-};
-
-export const sendSubAdminForgotPasswordEmail = async (subAdmin, resetToken, center = null, centerName = "") => {
-  const { baseUrl, needsSlug } = getCenterBaseUrl(center);
-  const centerSlug  = typeof center === "string" ? center : center?.slug;
-  const centerParam = needsSlug && centerSlug ? `?center=${centerSlug}` : "";
-  const resetUrl    = `${baseUrl}/sub-admin/reset-password/${resetToken}${centerParam}`;
-  const name        = `${subAdmin.firstName} ${subAdmin.lastName}`;
-
-  return sendEmail({
-    centerName,
-    to: subAdmin.email,
-    subject: "Sub-Admin Password Reset Request",
-    html: `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="UTF-8" />
-        <style>
-          * { box-sizing: border-box; margin: 0; padding: 0; }
-          body { font-family: 'Segoe UI', Arial, sans-serif; background: #f0f4ff; padding: 40px 20px; }
-          .wrapper { max-width: 580px; margin: 0 auto; }
-          .card { background: white; border-radius: 20px; overflow: hidden; box-shadow: 0 8px 40px rgba(79,99,210,0.12); }
-          .header { background: linear-gradient(135deg, #1e2540 0%, #2d3a6e 100%); padding: 36px; text-align: center; }
-          .logo-ring { width: 64px; height: 64px; background: linear-gradient(135deg, #4f63d2, #6b82f0); border-radius: 18px; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 14px; font-size: 28px; }
-          .header h1 { color: white; font-size: 20px; font-weight: 700; }
-          .header p { color: rgba(255,255,255,0.55); font-size: 13px; margin-top: 4px; }
-          .body { padding: 36px; }
-          .greeting { font-size: 16px; font-weight: 600; color: #1e293b; margin-bottom: 12px; }
-          .text { font-size: 14px; color: #64748b; line-height: 1.7; margin-bottom: 12px; }
-          .cta-btn { display: block; padding: 16px; background: linear-gradient(135deg, #4f63d2, #6b82f0); color: white !important; text-decoration: none; border-radius: 14px; text-align: center; font-size: 15px; font-weight: 700; margin: 24px 0 12px; }
-          .expiry { text-align: center; font-size: 12px; color: #94a3b8; margin-bottom: 20px; }
-          .warning-box { background: #fef9c3; border: 1px solid #fde68a; border-radius: 12px; padding: 12px 16px; font-size: 13px; color: #92400e; margin-bottom: 20px; }
-          .link-fallback { word-break: break-all; font-size: 12px; color: #4f63d2; }
-          .footer { background: #f8faff; border-top: 1px solid #e8ecf8; padding: 18px 36px; text-align: center; font-size: 12px; color: #94a3b8; }
-        </style>
-      </head>
-      <body>
-        <div class="wrapper">
-          <div class="card">
-            <div class="header">
-              <div class="logo-ring">🔐</div>
-              <h1>Password Reset Request</h1>
-              <p>Sub-Admin Portal · ${centerName || config.appName}</p>
-            </div>
-            <div class="body">
-              <p class="greeting">Hi ${name},</p>
-              <p class="text">We received a request to reset the password for your sub-admin account. Click the button below to set a new password.</p>
-              <a href="${resetUrl}" class="cta-btn">🔑 Reset My Password</a>
-              <p class="expiry">⏰ This link expires in 1 hour</p>
-              <div class="warning-box">⚠️ If you did not request a password reset, please ignore this email. Your password will remain unchanged.</div>
-              <p class="text" style="font-size: 12.5px; color: #94a3b8;">
-                If the button above doesn't work, copy and paste this link:<br />
-                <a href="${resetUrl}" class="link-fallback">${resetUrl}</a>
-              </p>
-            </div>
-            <div class="footer">
-              <p>Automated message from <strong>${centerName || config.appName}</strong> · Do not reply</p>
-            </div>
-          </div>
-        </div>
-      </body>
-      </html>
-    `,
+    subject: `You're invited to join ${b.centerName} as a sub-admin`,
+    html: renderEmail({
+      ...b, baseUrl: null,
+      preheader: `${adminName} invited you — set up your account within 48 hours.`,
+      eyebrow: "You're invited", title: `Welcome to the team, ${subAdmin.firstName}!`,
+      body:
+        p(`<strong>${esc(adminName)}</strong> has invited you to help run <strong>${esc(b.centerName)}</strong> as a sub-admin. You'll manage your assigned teachers and their students.`) +
+        details([["Your email", esc(subAdmin.email)], ["Role", "Sub-admin"], ["Invited by", esc(adminName)]]),
+      cta: { label: "Set up my account", href: setupUrl },
+      after: "This invitation expires in 48 hours. Didn't expect it? You can ignore this email.", extra: linkFallback(setupUrl),
+    }),
   });
 };
 
 export const sendTeacherInviteEmail = async (teacher, setupUrl, centerName = "") => {
-  const displayName = centerName || config.appName;
-
+  const b = brandOf(null, centerName);
   return sendEmail({
-    centerName,
+    centerName: b.centerName,
     to: teacher.email,
-    subject: `You've been invited to join ${displayName} as a Teacher 🎓`,
-    html: `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <style>
-          * { box-sizing: border-box; margin: 0; padding: 0; }
-          body { font-family: 'Segoe UI', Arial, sans-serif; background: #f0f7ff; padding: 40px 20px; }
-          .wrapper { max-width: 580px; margin: 0 auto; }
-          .card { background: white; border-radius: 20px; overflow: hidden; box-shadow: 0 8px 40px rgba(59,130,246,0.12); }
-          .header { background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%); padding: 40px 36px; text-align: center; }
-          .logo-ring { width: 72px; height: 72px; background: linear-gradient(135deg, #3b82f6, #60a5fa); border-radius: 20px; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 16px; font-size: 32px; }
-          .header h1 { color: white; font-size: 22px; font-weight: 700; margin-bottom: 6px; }
-          .header p  { color: rgba(255,255,255,0.65); font-size: 14px; }
-          .body { padding: 36px; }
-          .greeting { font-size: 17px; font-weight: 600; color: #1e293b; margin-bottom: 14px; }
-          .text { font-size: 14.5px; color: #64748b; line-height: 1.7; margin-bottom: 12px; }
-          .info-box { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 14px; padding: 18px 20px; margin: 24px 0; }
-          .info-row { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid #dbeafe; font-size: 13.5px; }
-          .info-row:last-child { border-bottom: none; }
-          .info-label { color: #94a3b8; font-weight: 500; }
-          .info-value { color: #1e293b; font-weight: 700; }
-          .cta-btn { display: block; width: 100%; padding: 16px; background: linear-gradient(135deg, #2563eb, #3b82f6); color: white !important; text-decoration: none; border-radius: 14px; text-align: center; font-size: 15px; font-weight: 700; margin: 28px 0 16px; }
-          .expiry { text-align: center; font-size: 12.5px; color: #94a3b8; margin-bottom: 24px; }
-          .warning-box { background: #fef9c3; border: 1px solid #fde68a; border-radius: 12px; padding: 14px 16px; font-size: 13px; color: #92400e; margin-bottom: 24px; }
-          .features { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 20px 0 28px; }
-          .feature { background: #f8faff; border: 1px solid #e0e7ff; border-radius: 12px; padding: 14px; text-align: center; }
-          .feature .icon { font-size: 22px; margin-bottom: 6px; }
-          .feature p { font-size: 12px; font-weight: 600; color: #475569; }
-          .footer { background: #f8faff; border-top: 1px solid #e0e7ff; padding: 20px 36px; text-align: center; font-size: 12px; color: #94a3b8; line-height: 1.6; }
-          .link-fallback { word-break: break-all; font-size: 12px; color: #2563eb; }
-        </style>
-      </head>
-      <body>
-        <div class="wrapper">
-          <div class="card">
-            <div class="header">
-              <div class="logo-ring">👨‍🏫</div>
-              <h1>Welcome to the Team!</h1>
-              <p>${displayName} Teacher Invitation</p>
-            </div>
-            <div class="body">
-              <p class="greeting">Hi ${teacher.firstName} ${teacher.lastName},</p>
-              <p class="text">You've been invited to join <strong>${displayName}</strong> as a <strong>Teacher</strong>. You'll be able to manage your classes, connect with students, and track your earnings — all in one place.</p>
-              <div class="info-box">
-                <div class="info-row"><span class="info-label">Your Email</span><span class="info-value">${teacher.email}</span></div>
-                <div class="info-row"><span class="info-label">Role</span><span class="info-value">English Teacher</span></div>
-                <div class="info-row"><span class="info-label">Region</span><span class="info-value">${teacher.continent}</span></div>
-                <div class="info-row"><span class="info-label">Rate Per Class</span><span class="info-value">$${teacher.ratePerClass || 0}</span></div>
-              </div>
-              <div class="features">
-                <div class="feature"><div class="icon">📅</div><p>Manage Classes</p></div>
-                <div class="feature"><div class="icon">👩‍🎓</div><p>View Students</p></div>
-                <div class="feature"><div class="icon">💬</div><p>Chat &amp; Messaging</p></div>
-                <div class="feature"><div class="icon">💰</div><p>Track Earnings</p></div>
-              </div>
-              <p class="text">Click the button below to set up your password and activate your account. This link will expire in <strong>48 hours</strong>.</p>
-              <a href="${setupUrl}" class="cta-btn">✅ Set Up My Teacher Account</a>
-              <p class="expiry">⏰ This invitation expires in 48 hours</p>
-              <div class="warning-box">⚠️ If you did not expect this invitation, you can safely ignore this email.</div>
-              <p class="text" style="font-size: 12.5px; color: #94a3b8;">
-                If the button doesn't work, copy and paste this link into your browser:<br />
-                <a href="${setupUrl}" class="link-fallback">${setupUrl}</a>
-              </p>
-            </div>
-            <div class="footer">
-              <p>This is an automated message from <strong>${displayName}</strong></p>
-              <p>Please do not reply to this email · Contact support for assistance</p>
-            </div>
-          </div>
-        </div>
-      </body>
-      </html>
-    `,
+    subject: `You're invited to teach at ${b.centerName} 🎓`,
+    html: renderEmail({
+      ...b, baseUrl: null,
+      preheader: "Set up your teacher account within 48 hours.",
+      eyebrow: "Teacher invitation", title: `Welcome to the team, ${teacher.firstName}!`,
+      body:
+        p(`You've been invited to join <strong>${esc(b.centerName)}</strong> as a teacher. Manage your classes, connect with students and track your earnings — all in one place.`) +
+        details([
+          ["Your email", esc(teacher.email)],
+          ["Region", teacher.continent && esc(teacher.continent)],
+          ["Rate per class", `$${esc(teacher.ratePerClass || 0)}`],
+        ]),
+      cta: { label: "Set up my teacher account", href: setupUrl },
+      after: "This invitation expires in 48 hours. Didn't expect it? You can ignore this email.", extra: linkFallback(setupUrl),
+    }),
   });
 };
 
-export const sendTeacherWelcomeEmail = async (teacher, centerName = "", center = null) => {
-  const displayName = centerName || config.appName;
-  const { baseUrl } = getCenterBaseUrl(center);
-  const loginUrl    = `${baseUrl}/teacher/login`;
-
-  return sendEmail({
-    centerName,
-    to: teacher.email,
-    subject: `Your teacher account is ready, ${teacher.firstName}! 🎉`,
-    html: `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="UTF-8" />
-        <style>
-          * { box-sizing: border-box; margin: 0; padding: 0; }
-          body { font-family: 'Segoe UI', Arial, sans-serif; background: #f0f7ff; padding: 40px 20px; }
-          .wrapper { max-width: 580px; margin: 0 auto; }
-          .card { background: white; border-radius: 20px; overflow: hidden; box-shadow: 0 8px 40px rgba(59,130,246,0.12); }
-          .header { background: linear-gradient(135deg, #059669 0%, #10b981 100%); padding: 40px 36px; text-align: center; }
-          .header h1 { color: white; font-size: 24px; font-weight: 700; margin-top: 12px; }
-          .header p  { color: rgba(255,255,255,0.75); font-size: 14px; margin-top: 6px; }
-          .body { padding: 36px; }
-          .greeting { font-size: 17px; font-weight: 600; color: #1e293b; margin-bottom: 14px; }
-          .text { font-size: 14.5px; color: #64748b; line-height: 1.7; margin-bottom: 14px; }
-          .feature-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 24px 0; }
-          .feature { background: #f0f7ff; border: 1px solid #bfdbfe; border-radius: 12px; padding: 14px; text-align: center; }
-          .feature .icon { font-size: 24px; margin-bottom: 6px; }
-          .feature p { font-size: 12.5px; font-weight: 600; color: #475569; }
-          .cta-btn { display: block; padding: 16px; background: linear-gradient(135deg, #2563eb, #3b82f6); color: white !important; text-decoration: none; border-radius: 14px; text-align: center; font-size: 15px; font-weight: 700; margin: 28px 0; }
-          .footer { background: #f8faff; border-top: 1px solid #e0e7ff; padding: 20px 36px; text-align: center; font-size: 12px; color: #94a3b8; }
-        </style>
-      </head>
-      <body>
-        <div class="wrapper">
-          <div class="card">
-            <div class="header">
-              <div style="font-size: 48px;">🎉</div>
-              <h1>You're All Set, ${teacher.firstName}!</h1>
-              <p>Your teacher account is now active</p>
-            </div>
-            <div class="body">
-              <p class="greeting">Hi ${teacher.firstName} ${teacher.lastName},</p>
-              <p class="text">Your account has been successfully activated! You now have full access to <strong>${displayName}</strong>'s teacher dashboard.</p>
-              <div class="feature-grid">
-                <div class="feature"><div class="icon">📅</div><p>Schedule Classes</p></div>
-                <div class="feature"><div class="icon">👩‍🎓</div><p>Manage Students</p></div>
-                <div class="feature"><div class="icon">🎥</div><p>Video Classroom</p></div>
-                <div class="feature"><div class="icon">💰</div><p>Track Earnings</p></div>
-              </div>
-              <p class="text">Log in using your email <strong>${teacher.email}</strong> and the password you just created.</p>
-              <a href="${loginUrl}" class="cta-btn">🚀 Go to My Dashboard</a>
-              <p class="text" style="font-size: 13px; color: #94a3b8;">If you have any questions, contact your administrator for assistance.</p>
-            </div>
-            <div class="footer">
-              <p>This is an automated message from <strong>${displayName}</strong></p>
-            </div>
-          </div>
-        </div>
-      </body>
-      </html>
-    `,
-  });
+const STUDENT_INVITE = {
+  en: {
+    subject: (c) => `You're invited to ${c} — set up your account`, eyebrow: "You're invited",
+    title: (n) => `Welcome, ${n}! 🎓`,
+    intro: (c) => `Your account at <strong>${c}</strong> is ready. Set your password to start learning.`,
+    labels: ["Your email", "Classes", "Age"], classes: (n) => `${n} classes`, years: (n) => `${n} years`,
+    perks: ["Join live classes", "Chat with your teacher", "Earn badges and track your progress"],
+    cta: "Set up my account", after: "This link expires in 48 hours. Didn't expect this? You can ignore it.",
+  },
+  vi: {
+    subject: (c) => `Em được mời tham gia ${c} — thiết lập tài khoản`, eyebrow: "Lời mời tham gia",
+    title: (n) => `Chào mừng ${n}! 🎓`,
+    intro: (c) => `Tài khoản của em tại <strong>${c}</strong> đã sẵn sàng. Hãy đặt mật khẩu để bắt đầu học.`,
+    labels: ["Email của em", "Số buổi học", "Tuổi"], classes: (n) => `${n} buổi`, years: (n) => `${n} tuổi`,
+    perks: ["Tham gia lớp học trực tuyến", "Trò chuyện với giáo viên", "Nhận huy hiệu và theo dõi tiến bộ"],
+    cta: "Thiết lập tài khoản", after: "Liên kết hết hạn sau 48 giờ. Nếu em không mong đợi email này, hãy bỏ qua.",
+  },
 };
-
 export const sendStudentInviteEmail = async (student, setupUrl, centerName = "") => {
-  const displayName = centerName || config.appName;
-
+  const b = brandOf(null, centerName);
+  const lang = langOf(student), s = pick(STUDENT_INVITE, lang), L = s.labels;
   return sendEmail({
-    centerName,
+    centerName: b.centerName,
     to: student.email,
-    subject: `You've been invited to ${displayName} — Set up your account`,
-    html: `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <style>
-          * { box-sizing: border-box; margin: 0; padding: 0; }
-          body { font-family: 'Segoe UI', Arial, sans-serif; background: #f0f4ff; color: #333; }
-          .wrap { max-width: 600px; margin: 32px auto; background: #fff; border-radius: 20px; overflow: hidden; box-shadow: 0 8px 40px rgba(59,130,246,0.12); }
-          .header { background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%); padding: 44px 40px; text-align: center; }
-          .header h1 { color: #fff; font-size: 28px; font-weight: 800; margin-bottom: 8px; }
-          .header p  { color: rgba(255,255,255,0.85); font-size: 15px; }
-          .avatar { width: 72px; height: 72px; border-radius: 50%; background: rgba(255,255,255,0.2); display: inline-flex; align-items: center; justify-content: center; font-size: 32px; margin-bottom: 16px; }
-          .body { padding: 40px; }
-          .body p { font-size: 15px; line-height: 1.7; color: #444; margin-bottom: 16px; }
-          .info-card { background: #f0f7ff; border: 1px solid #bfdbfe; border-radius: 14px; padding: 24px; margin: 24px 0; }
-          .info-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #dbeafe; font-size: 14px; }
-          .info-row:last-child { border-bottom: none; }
-          .info-label { color: #3b82f6; font-weight: 700; }
-          .info-value { color: #1e3a5f; font-weight: 600; }
-          .features { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 24px 0; }
-          .feature { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; text-align: center; }
-          .feature .icon { font-size: 24px; margin-bottom: 6px; }
-          .feature .name { font-size: 13px; font-weight: 700; color: #334155; }
-          .cta { text-align: center; margin: 32px 0; }
-          .btn { display: inline-block; padding: 16px 44px; background: linear-gradient(135deg, #3b82f6, #6366f1); color: #fff; text-decoration: none; border-radius: 50px; font-size: 16px; font-weight: 800; box-shadow: 0 6px 20px rgba(59,130,246,0.35); }
-          .expiry { background: #fff7ed; border: 1px solid #fed7aa; border-radius: 10px; padding: 14px 20px; font-size: 13px; color: #92400e; text-align: center; margin-top: 16px; }
-          .footer { background: #f8fafc; padding: 24px 40px; text-align: center; border-top: 1px solid #e2e8f0; }
-          .footer p { font-size: 12px; color: #94a3b8; margin-bottom: 4px; }
-          .footer a { color: #3b82f6; text-decoration: none; }
-        </style>
-      </head>
-      <body>
-        <div class="wrap">
-          <div class="header">
-            <div class="avatar">🎓</div>
-            <h1>You're invited to learn!</h1>
-            <p>Your admin has set up your account at ${displayName}</p>
-          </div>
-          <div class="body">
-            <p>Hi <strong>${student.firstName}</strong>,</p>
-            <p>Welcome to <strong>${displayName}</strong>! Your account has been created and you're ready to start your learning journey. Just set up your password to get started.</p>
-            <div class="info-card">
-              <div class="info-row"><span class="info-label">📧 Email</span><span class="info-value">${student.email}</span></div>
-              <div class="info-row"><span class="info-label">📚 Classes Purchased</span><span class="info-value">${student.classCredits} classes</span></div>
-              ${student.age ? `<div class="info-row"><span class="info-label">🎂 Age Group</span><span class="info-value">${student.age} years</span></div>` : ""}
-              <div class="info-row"><span class="info-label">🎯 Role</span><span class="info-value">Student</span></div>
-            </div>
-            <div class="features">
-              <div class="feature"><div class="icon">📅</div><div class="name">Join Live Classes</div></div>
-              <div class="feature"><div class="icon">💬</div><div class="name">Chat with Teacher</div></div>
-              <div class="feature"><div class="icon">🏆</div><div class="name">Earn Badges</div></div>
-              <div class="feature"><div class="icon">📊</div><div class="name">Track Progress</div></div>
-            </div>
-            <div class="cta">
-              <a href="${setupUrl}" class="btn">Set Up My Account →</a>
-              <div class="expiry">⏰ This link expires in <strong>48 hours</strong></div>
-            </div>
-            <p style="font-size:13px; color:#94a3b8; text-align:center;">
-              If you didn't expect this email, you can safely ignore it.<br/>
-              Need help? Reply to this email.
-            </p>
-          </div>
-          <div class="footer">
-            <p>© ${new Date().getFullYear()} ${displayName}. All rights reserved.</p>
-            <p>Having trouble? <a href="${setupUrl}">Copy this link</a> into your browser.</p>
-          </div>
-        </div>
-      </body>
-      </html>
-    `,
-  });
-};
-
-export const sendStudentWelcomeEmail = async (student, centerName = "", center = null) => {
-  const displayName = centerName || config.appName;
-  const { baseUrl } = getCenterBaseUrl(center);
-  const loginUrl    = `${baseUrl}/student/login`;
-
-  return sendEmail({
-    centerName,
-    to: student.email,
-    subject: `Welcome to ${displayName} — Your account is ready! 🎉`,
-    html: `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="UTF-8" />
-        <style>
-          * { box-sizing: border-box; margin: 0; padding: 0; }
-          body { font-family: 'Segoe UI', Arial, sans-serif; background: #f0f4ff; color: #333; }
-          .wrap { max-width: 600px; margin: 32px auto; background: #fff; border-radius: 20px; overflow: hidden; box-shadow: 0 8px 40px rgba(16,185,129,0.12); }
-          .header { background: linear-gradient(135deg, #10b981 0%, #3b82f6 100%); padding: 44px 40px; text-align: center; }
-          .header h1 { color: #fff; font-size: 28px; font-weight: 800; margin-bottom: 8px; }
-          .header p  { color: rgba(255,255,255,0.85); font-size: 15px; }
-          .emoji { font-size: 56px; margin-bottom: 12px; }
-          .body { padding: 40px; }
-          .body p { font-size: 15px; line-height: 1.7; color: #444; margin-bottom: 16px; }
-          .steps { background: #f0fdf4; border: 1px solid #a7f3d0; border-radius: 14px; padding: 24px; margin: 24px 0; }
-          .step { display: flex; align-items: center; gap: 14px; padding: 12px 0; border-bottom: 1px solid #d1fae5; font-size: 14px; }
-          .step:last-child { border-bottom: none; }
-          .step-num { width: 30px; height: 30px; background: linear-gradient(135deg, #10b981, #3b82f6); border-radius: 50%; color: white; font-weight: 800; font-size: 13px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-          .step-text { color: #065f46; font-weight: 600; }
-          .cta { text-align: center; margin: 32px 0; }
-          .btn { display: inline-block; padding: 16px 44px; background: linear-gradient(135deg, #10b981, #3b82f6); color: #fff; text-decoration: none; border-radius: 50px; font-size: 16px; font-weight: 800; box-shadow: 0 6px 20px rgba(16,185,129,0.35); }
-          .footer { background: #f8fafc; padding: 24px 40px; text-align: center; border-top: 1px solid #e2e8f0; }
-          .footer p { font-size: 12px; color: #94a3b8; }
-        </style>
-      </head>
-      <body>
-        <div class="wrap">
-          <div class="header">
-            <div class="emoji">🎉</div>
-            <h1>You're all set, ${student.firstName}!</h1>
-            <p>Your account is active and ready to go</p>
-          </div>
-          <div class="body">
-            <p>Hi <strong>${student.firstName}</strong>,</p>
-            <p>Your <strong>${displayName}</strong> account is now fully activated! You can login and start joining your classes right away.</p>
-            <div class="steps">
-              <div class="step"><div class="step-num">1</div><span class="step-text">Log in with your email and the password you just created</span></div>
-              <div class="step"><div class="step-num">2</div><span class="step-text">Check your Dashboard for upcoming live classes</span></div>
-              <div class="step"><div class="step-num">3</div><span class="step-text">Join a class and start learning! 🚀</span></div>
-              <div class="step"><div class="step-num">4</div><span class="step-text">Earn badges as you complete classes and build streaks</span></div>
-            </div>
-            <div class="cta">
-              <a href="${loginUrl}" class="btn">Go to My Dashboard →</a>
-            </div>
-            <p style="font-size:13px; color:#94a3b8; text-align:center;">Questions? Just reply to this email — we're happy to help!</p>
-          </div>
-          <div class="footer">
-            <p>© ${new Date().getFullYear()} ${displayName}. All rights reserved.</p>
-          </div>
-        </div>
-      </body>
-      </html>
-    `,
+    subject: s.subject(b.centerName),
+    html: renderEmail({
+      ...b, baseUrl: null, lang,
+      preheader: s.after,
+      eyebrow: s.eyebrow, title: s.title(student.firstName),
+      body:
+        p(s.intro(esc(b.centerName))) +
+        details([
+          [L[0], esc(student.email)],
+          [L[1], student.classCredits != null && s.classes(student.classCredits)],
+          [L[2], student.age && s.years(student.age)],
+        ]) +
+        list(s.perks),
+      cta: { label: s.cta, href: setupUrl },
+      after: s.after, extra: linkFallback(setupUrl, lang),
+    }),
   });
 };
 
 export const sendParentInviteEmail = async (parent, setupUrl, centerName = "") => {
-  const displayName = centerName || config.appName;
-
+  const b = brandOf(null, centerName);
   return sendEmail({
-    centerName,
+    centerName: b.centerName,
     to: parent.email,
-    subject: `You're invited to monitor your child's progress at ${displayName}`,
-    html: `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <style>
-          * { box-sizing: border-box; margin: 0; padding: 0; }
-          body { font-family: 'Segoe UI', Arial, sans-serif; background: #fff8f0; color: #333; }
-          .wrap { max-width: 600px; margin: 32px auto; background: #fff; border-radius: 20px; overflow: hidden; box-shadow: 0 8px 40px rgba(249,115,22,0.12); }
-          .header { background: linear-gradient(135deg, #f97316 0%, #f43f5e 100%); padding: 44px 40px; text-align: center; }
-          .header h1 { color: #fff; font-size: 26px; font-weight: 800; margin-bottom: 8px; }
-          .header p  { color: rgba(255,255,255,0.88); font-size: 15px; }
-          .avatar { width: 72px; height: 72px; border-radius: 50%; background: rgba(255,255,255,0.2); display: inline-flex; align-items: center; justify-content: center; font-size: 32px; margin-bottom: 16px; }
-          .body { padding: 40px; }
-          .body p { font-size: 15px; line-height: 1.7; color: #444; margin-bottom: 16px; }
-          .features { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 24px 0; }
-          .feature { background: #fff8f0; border: 1px solid #fed7aa; border-radius: 12px; padding: 16px; text-align: center; }
-          .feature .icon { font-size: 24px; margin-bottom: 6px; }
-          .feature .name { font-size: 13px; font-weight: 700; color: #92400e; }
-          .cta { text-align: center; margin: 32px 0; }
-          .btn { display: inline-block; padding: 16px 44px; background: linear-gradient(135deg, #f97316, #f43f5e); color: #fff; text-decoration: none; border-radius: 50px; font-size: 16px; font-weight: 800; box-shadow: 0 6px 20px rgba(249,115,22,0.35); }
-          .expiry { background: #fff7ed; border: 1px solid #fed7aa; border-radius: 10px; padding: 14px 20px; font-size: 13px; color: #92400e; text-align: center; margin-top: 16px; }
-          .footer { background: #fff8f0; padding: 24px 40px; text-align: center; border-top: 1px solid #ffe8cc; }
-          .footer p { font-size: 12px; color: #a89480; margin-bottom: 4px; }
-        </style>
-      </head>
-      <body>
-        <div class="wrap">
-          <div class="header">
-            <div class="avatar">👨‍👩‍👧</div>
-            <h1>You're invited!</h1>
-            <p>Track your child's learning progress at ${displayName}</p>
-          </div>
-          <div class="body">
-            <p>Hi <strong>${parent.firstName}</strong>,</p>
-            <p>Your child's school has created a Parent Portal account for you at <strong>${displayName}</strong>. Set up your password to start monitoring their progress in real time.</p>
-            <div class="features">
-              <div class="feature"><div class="icon">📅</div><div class="name">Class Schedule</div></div>
-              <div class="feature"><div class="icon">📝</div><div class="name">Homework &amp; Grades</div></div>
-              <div class="feature"><div class="icon">✅</div><div class="name">Attendance</div></div>
-              <div class="feature"><div class="icon">🏆</div><div class="name">Certificates</div></div>
-            </div>
-            <div class="cta">
-              <a href="${setupUrl}" class="btn">Set Up Your Account</a>
-            </div>
-            <div class="expiry">⏰ This invite link expires in 48 hours.</div>
-            <p style="margin-top:24px;font-size:13px;color:#a89480;">Can't click the button? Copy this link:<br/><a href="${setupUrl}" style="color:#f97316;word-break:break-all;">${setupUrl}</a></p>
-          </div>
-          <div class="footer">
-            <p>You received this because ${displayName} created a parent account for you.</p>
-            <p>© ${new Date().getFullYear()} ${displayName}</p>
-          </div>
-        </div>
-      </body>
-      </html>
-    `,
+    subject: `You're invited to follow your child's progress at ${b.centerName}`,
+    html: renderEmail({
+      ...b, baseUrl: null,
+      preheader: "Set up your parent account within 48 hours.",
+      eyebrow: "Parent portal", title: `Hi ${parent.firstName}, you're invited!`,
+      body:
+        p(`<strong>${esc(b.centerName)}</strong> has created a parent account for you, so you can follow your child's learning as it happens:`) +
+        list(["Class schedule and attendance", "Homework and grades", "Certificates and progress"]),
+      cta: { label: "Set up my account", href: setupUrl },
+      after: "This invite link expires in 48 hours.", extra: linkFallback(setupUrl),
+    }),
   });
 };
 
-// ── New sign-in on a new device ──────────────────────────────────────────────
-const escapeHtml = (s) => String(s ?? "").replace(/[&<>"']/g, c => (
-  { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+// ── Welcome (after set-up) ───────────────────────────────────────────────────────
+export const sendSubAdminWelcomeEmail = async (subAdmin, centerName = "", center = null) => {
+  const b = brandOf(center, centerName);
+  return sendEmail({
+    centerName: b.centerName,
+    to: subAdmin.email,
+    subject: `Welcome aboard, ${subAdmin.firstName}! Your account is ready 🎉`,
+    html: renderEmail({
+      ...b, tone: "green",
+      preheader: "Your sub-admin account is active.",
+      eyebrow: "Account ready", title: `Welcome aboard, ${subAdmin.firstName}! 🎉`,
+      body:
+        p(`Your sub-admin account at <strong>${esc(b.centerName)}</strong> is active. From your dashboard you can:`) +
+        list(["Manage your teachers", "View their students", "Send messages", "Track bookings"]) +
+        p(`Sign in with <strong>${esc(subAdmin.email)}</strong> and the password you just created.`),
+      cta: { label: "Go to my dashboard", href: `${b.baseUrl}/sub-admin/login`, tone: "green" },
+      after: "Questions? Contact the administrator who set up your account.",
+    }),
+  });
+};
 
+export const sendTeacherWelcomeEmail = async (teacher, centerName = "", center = null) => {
+  const b = brandOf(center, centerName);
+  return sendEmail({
+    centerName: b.centerName,
+    to: teacher.email,
+    subject: `Your teacher account is ready, ${teacher.firstName}! 🎉`,
+    html: renderEmail({
+      ...b, tone: "green",
+      preheader: "Your teacher account is active.",
+      eyebrow: "Account ready", title: `You're all set, ${teacher.firstName}! 🎉`,
+      body:
+        p(`Your teacher account at <strong>${esc(b.centerName)}</strong> is active. From your dashboard you can:`) +
+        list(["Schedule classes", "Manage your students", "Teach in the video classroom", "Track your earnings"]) +
+        p(`Sign in with <strong>${esc(teacher.email)}</strong> and the password you just created.`),
+      cta: { label: "Go to my dashboard", href: `${b.baseUrl}/teacher/login`, tone: "green" },
+      after: "Questions? Contact your administrator.",
+    }),
+  });
+};
+
+const STUDENT_WELCOME = {
+  en: {
+    subject: (c) => `Welcome to ${c} — your account is ready! 🎉`, eyebrow: "Account ready",
+    title: (n) => `You're all set, ${n}! 🎉`,
+    intro: (c) => `Your <strong>${c}</strong> account is active. Here's how to start:`,
+    steps: ["Sign in with your email and the password you just created", "Check your dashboard for upcoming classes", "Join a class and start learning 🚀", "Earn badges as you complete classes"],
+    cta: "Go to my dashboard",
+  },
+  vi: {
+    subject: (c) => `Chào mừng em đến với ${c} — tài khoản đã sẵn sàng! 🎉`, eyebrow: "Tài khoản đã sẵn sàng",
+    title: (n) => `Sẵn sàng rồi, ${n}! 🎉`,
+    intro: (c) => `Tài khoản <strong>${c}</strong> của em đã được kích hoạt. Bắt đầu như sau:`,
+    steps: ["Đăng nhập bằng email và mật khẩu em vừa tạo", "Xem các lớp học sắp tới trên trang của em", "Tham gia lớp học và bắt đầu học 🚀", "Nhận huy hiệu khi hoàn thành các lớp học"],
+    cta: "Vào trang của em",
+  },
+};
+export const sendStudentWelcomeEmail = async (student, centerName = "", center = null) => {
+  const b = brandOf(center, centerName);
+  const lang = langOf(student), s = pick(STUDENT_WELCOME, lang);
+  return sendEmail({
+    centerName: b.centerName,
+    to: student.email,
+    subject: s.subject(b.centerName),
+    html: renderEmail({
+      ...b, lang, tone: "green",
+      preheader: s.steps[1],
+      eyebrow: s.eyebrow, title: s.title(student.firstName),
+      body: p(s.intro(esc(b.centerName))) + list(s.steps.map((x, i) => `<strong>${i + 1}.</strong> ${x}`)).replace("padding-left:20px", "padding-left:0;list-style:none"),
+      cta: { label: s.cta, href: `${b.baseUrl}/student/login`, tone: "green" },
+    }),
+  });
+};
+
+// ── New sign-in on a new device ──────────────────────────────────────────────────
 const LOGIN_PATHS = {
   admin: "/admin/login", teacher: "/teacher/login", student: "/student/login",
   "sub-admin": "/sub-admin/login", parent: "/parent/login",
 };
-
-/**
- * Tell a user their account was just signed in to from a device it hasn't
- * been used on before. Everything from the request (browser, OS, IP) is
- * escaped — the user-agent is attacker-controlled.
- */
-export const sendNewDeviceSignInEmail = async ({ email, name, role, center, centerName = "", device = {}, ipAddress, when = new Date() }) => {
-  const { baseUrl } = getCenterBaseUrl(center);
-  const loginUrl    = `${baseUrl}${LOGIN_PATHS[role] || "/"}`;
-  const what  = escapeHtml([device.browser, device.os].filter(Boolean).join(" on ") || "Unknown browser");
-  const ip    = escapeHtml(ipAddress && ipAddress !== "Unknown" ? ipAddress : "Not available");
-  const time  = escapeHtml(new Date(when).toUTCString());
-  const where = escapeHtml(centerName || config.appName);
-
+const NEW_DEVICE = {
+  en: {
+    subject: (c) => `New sign-in to your ${c} account`, eyebrow: "Security notice", title: "New sign-in on a new device",
+    intro: (n, c) => `Hi ${n}, your ${c} account was just used on a device it hasn't been used on before.`,
+    labels: ["Device", "IP address", "Time"], unknown: "Unknown browser", none: "Not available",
+    ok: "<strong>Was this you?</strong> Then you don't need to do anything.",
+    notYou: "<strong>Not you?</strong> Sign in, open <em>Your devices</em>, log out the device you don't recognise, then change your password straight away.",
+    cta: "Go to sign in", after: "You get this email whenever your account is used on a new device.",
+  },
+  vi: {
+    subject: (c) => `Đăng nhập mới vào tài khoản ${c} của em`, eyebrow: "Thông báo bảo mật", title: "Đăng nhập trên thiết bị mới",
+    intro: (n, c) => `Chào ${n}, tài khoản ${c} của em vừa được đăng nhập trên một thiết bị chưa từng dùng trước đây.`,
+    labels: ["Thiết bị", "Địa chỉ IP", "Thời gian"], unknown: "Trình duyệt không xác định", none: "Không có",
+    ok: "<strong>Đó là em?</strong> Vậy em không cần làm gì cả.",
+    notYou: "<strong>Không phải em?</strong> Hãy đăng nhập, mở <em>Thiết bị của bạn</em>, đăng xuất thiết bị lạ, rồi đổi mật khẩu ngay.",
+    cta: "Đăng nhập", after: "Em nhận email này mỗi khi tài khoản được dùng trên thiết bị mới.",
+  },
+};
+/** `lang` applies to students only (pass user.emailLanguage); `tz` = the user's timezone */
+export const sendNewDeviceSignInEmail = async ({ email, name, role, center, centerName = "", device = {}, ipAddress, when = new Date(), lang = "en", tz }) => {
+  const b = brandOf(center, centerName);
+  const l = role === "student" ? langOf({ emailLanguage: lang }) : "en";
+  const s = pick(NEW_DEVICE, l);
+  const what = [device.browser, device.os].filter(Boolean).join(" · ") || s.unknown;
+  const ip = ipAddress && ipAddress !== "Unknown" ? ipAddress : s.none;
   return sendEmail({
-    centerName,
+    centerName: b.centerName,
     to: email,
-    subject: `New sign-in to your ${centerName || config.appName} account`,
-    html: `
-      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1f2937; max-width: 560px; margin: 0 auto; padding: 24px;">
-        <h2 style="margin: 0 0 12px;">🔐 New sign-in on a new device</h2>
-        <p>Hi ${escapeHtml(name || "there")},</p>
-        <p>Your ${where} account was just signed in to from a device it hasn't been used on before.</p>
-        <table style="border-collapse: collapse; margin: 16px 0; font-size: 14px;">
-          <tr><td style="padding: 4px 16px 4px 0; color: #6b7280;">Device</td><td><strong>${what}</strong></td></tr>
-          <tr><td style="padding: 4px 16px 4px 0; color: #6b7280;">IP address</td><td>${ip}</td></tr>
-          <tr><td style="padding: 4px 16px 4px 0; color: #6b7280;">Time</td><td>${time}</td></tr>
-        </table>
-        <p><strong>Was this you?</strong> Then you don't need to do anything.</p>
-        <div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 12px 16px; border-radius: 4px; margin: 16px 0;">
-          <strong>Not you?</strong> Sign in, open <em>Your devices</em>, log out the device you don't recognise, then change your password straight away.
-        </div>
-        <p><a href="${loginUrl}" style="display: inline-block; padding: 10px 20px; background: #4f46e5; color: #fff; text-decoration: none; border-radius: 8px; font-weight: bold;">Go to sign in</a></p>
-        <p style="color: #9ca3af; font-size: 12px; margin-top: 24px;">You get this email whenever your account is used on a new device. It's an automatic security notice.</p>
-      </div>
-    `,
+    subject: s.subject(b.centerName),
+    html: renderEmail({
+      ...b, lang: l, tone: "amber",
+      preheader: `${what} · ${fmtTime(when, l, tz)}`,
+      eyebrow: s.eyebrow, title: s.title,
+      body:
+        p(s.intro(esc(name || ""), esc(b.centerName))) +
+        details([
+          [s.labels[0], esc(what)],
+          [s.labels[1], esc(ip)],
+          [s.labels[2], `${fmtDate(when, l, tz)} · ${fmtTime(when, l, tz)}${tz ? "" : " UTC"}`],
+        ]) +
+        p(s.ok) +
+        callout(s.notYou, "amber"),
+      cta: { label: s.cta, href: `${b.baseUrl}${LOGIN_PATHS[role] || "/"}`, tone: "amber" },
+      after: s.after,
+    }),
   });
 };
 
-// ── Analytics PIN: email confirmation ────────────────────────────────────────
-
+// ── Analytics PIN (admins, English) ─────────────────────────────────────────────
 /** 6-digit code that must be entered to set, change, reset or remove the PIN */
-export const sendAnalyticsPinCodeEmail = async ({ email, name, code, action, centerName = "", minutes = 15 }) => {
+export const sendAnalyticsPinCodeEmail = async ({ email, name, code: pin, action, centerName = "", minutes = 15 }) => {
+  const b = brandOf(null, centerName);
   const what = action === "remove" ? "remove your analytics PIN" : "set a new analytics PIN";
   return sendEmail({
-    centerName,
+    centerName: b.centerName,
     to: email,
     subject: `Your code to ${action === "remove" ? "remove" : "change"} the analytics PIN`,
-    html: `
-      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1f2937; max-width: 520px; margin: 0 auto; padding: 24px;">
-        <h2 style="margin: 0 0 12px;">🔑 Confirm your analytics PIN change</h2>
-        <p>Hi ${escapeHtml(name || "there")},</p>
-        <p>Someone signed in to your ${escapeHtml(centerName || config.appName)} admin account asked to <strong>${what}</strong>. Enter this code to confirm:</p>
-        <p style="font-size: 32px; font-weight: bold; letter-spacing: 8px; text-align: center; background: #f3f4f6; border-radius: 12px; padding: 16px; margin: 20px 0;">${escapeHtml(code)}</p>
-        <p style="color: #6b7280; font-size: 14px;">The code expires in ${minutes} minutes.</p>
-        <div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 12px 16px; border-radius: 4px; margin: 16px 0;">
-          <strong>Didn't ask for this?</strong> Someone may know your password. Don't share this code — change your password and log out your other devices straight away.
-        </div>
-      </div>
-    `,
+    html: renderEmail({
+      ...b, baseUrl: null,
+      preheader: `Your code expires in ${minutes} minutes.`,
+      eyebrow: "Confirm PIN change", title: "Here's your code",
+      body:
+        p(`Hi ${esc(name || "there")}, someone signed in to your admin account asked to <strong>${what}</strong>. Enter this code to confirm:`) +
+        code(pin) +
+        p(`The code expires in ${minutes} minutes.`, { size: 13, color: C.muted, align: "center" }) +
+        callout("<strong>Didn't ask for this?</strong> Someone may know your password. Don't share this code — change your password and log out your other devices straight away.", "amber"),
+    }),
   });
 };
 
 /** Alert after the PIN was set, changed or removed */
 export const sendAnalyticsPinChangedEmail = async ({ email, name, action, hadPin, centerName = "", when = new Date() }) => {
+  const b = brandOf(null, centerName);
   const what = action === "remove" ? "removed" : hadPin ? "changed" : "set";
   return sendEmail({
-    centerName,
+    centerName: b.centerName,
     to: email,
     subject: `Your analytics PIN was ${what}`,
-    html: `
-      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1f2937; max-width: 520px; margin: 0 auto; padding: 24px;">
-        <h2 style="margin: 0 0 12px;">🔑 Analytics PIN ${what}</h2>
-        <p>Hi ${escapeHtml(name || "there")},</p>
-        <p>The analytics PIN on your ${escapeHtml(centerName || config.appName)} admin account was <strong>${what}</strong> on ${escapeHtml(new Date(when).toUTCString())}.</p>
-        <p>If this was you, you don't need to do anything.</p>
-        <div style="background: #fee2e2; border-left: 4px solid #ef4444; padding: 12px 16px; border-radius: 4px; margin: 16px 0;">
-          <strong>Not you?</strong> Change your password now and log out all other devices.
-        </div>
-      </div>
-    `,
+    html: renderEmail({
+      ...b, baseUrl: null, tone: "amber",
+      preheader: "If this was you, you don't need to do anything.",
+      eyebrow: "Security notice", title: `Analytics PIN ${what}`,
+      body:
+        p(`Hi ${esc(name || "there")}, the analytics PIN on your admin account was <strong>${what}</strong> on ${esc(new Date(when).toUTCString())}.`) +
+        p("If this was you, you don't need to do anything.") +
+        callout("<strong>Not you?</strong> Change your password now and log out all other devices.", "red"),
+    }),
   });
 };

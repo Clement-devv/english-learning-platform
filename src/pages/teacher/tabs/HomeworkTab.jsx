@@ -362,13 +362,25 @@ export default function HomeworkTab({ teacherInfo, students, isDarkMode }) {
         </div>
       )}
 
+      {/* Phone layout: header wraps (actions get a full row), 2×2 stats, even filter row */}
+      <style>{`
+        @media (max-width: 640px) {
+          .thw-head { flex-wrap: wrap; gap: 12px; }
+          .thw-head-actions { width: 100%; }
+          .thw-head-actions > button { flex: 1; justify-content: center; }
+          .thw-stats { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 10px !important; }
+          .thw-filters { display: grid !important; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+          .thw-filters button { padding: 7px 2px !important; font-size: 12px !important; min-width: 0; }
+        }
+      `}</style>
+
       {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div>
+      <div className="thw-head" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ minWidth: 0 }}>
           <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: c.heading }}>Homework</h1>
           <p style={{ margin: "4px 0 0", fontSize: 13, color: c.body }}>Assign, review and grade student work</p>
         </div>
-        <div style={{ display: "flex", gap: 8 }}>
+        <div className="thw-head-actions" style={{ display: "flex", gap: 8 }}>
           <button onClick={fetchHomework}
             style={{ padding: "8px 14px", borderRadius: 10, border: `1.5px solid ${c.border}`, background: c.card, color: c.body, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
             <RefreshCw size={14} /> Refresh
@@ -381,7 +393,7 @@ export default function HomeworkTab({ teacherInfo, students, isDarkMode }) {
       </div>
 
       {/* Stats row */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12 }}>
+      <div className="thw-stats" style={{ display: "grid", gridTemplateColumns: "repeat(4,minmax(0,1fr))", gap: 12 }}>
         {[
           { key: "all",       label: "Total",     icon: BookOpen,     color: BRAND },
           { key: "assigned",  label: "Pending",   icon: Clock,        color: "#f59e0b" },
@@ -512,7 +524,7 @@ export default function HomeworkTab({ teacherInfo, students, isDarkMode }) {
       )}
 
       {/* Filter tabs */}
-      <div style={{ display: "flex", gap: 6 }}>
+      <div className="thw-filters" style={{ display: "flex", gap: 6 }}>
         {["all", "assigned", "submitted", "graded"].map(f => (
           <button key={f} onClick={() => changeFilter(f)}
             style={{

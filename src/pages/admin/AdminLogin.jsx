@@ -5,13 +5,13 @@ import { useBranding }    from '../../context/BrandingContext';
 import { fetchBranding }  from '../../utils/branding';
 
 const THEMES = {
-  executive:         lazy(() => import('./login-themes/ExecutiveTheme')),
+  executive:         lazy(() => import('./login-themes/SunshineAdminTheme')),   // 'Sunshine Login' — the default slot
   'corporate-slate': lazy(() => import('./login-themes/CorporateSlateTheme')),
 };
 
 const LoadingScreen = () => (
-  <div style={{ minHeight: '100vh', background: '#060a14', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-    <div style={{ width: 34, height: 34, border: '3px solid rgba(34,211,238,.15)', borderTopColor: '#22d3ee', borderRadius: '50%', animation: 'spin .7s linear infinite' }} />
+  <div style={{ minHeight: '100vh', background: '#fdf8f4', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+    <div style={{ width: 34, height: 34, border: '3px solid rgba(207,75,8,.18)', borderTopColor: '#cf4b08', borderRadius: '50%', animation: 'spin .7s linear infinite' }} />
     <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
   </div>
 );
