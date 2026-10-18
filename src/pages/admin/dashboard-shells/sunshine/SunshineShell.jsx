@@ -33,6 +33,7 @@ import AnalyticsPinSettings      from '../../../../components/admin/auth/Analyti
 import { dateLocale } from "../../../../i18n/dateLocale.js";
 import { adminAccent, adminOnAccent } from "../../../../utils/adminAccent";
 import { SunriseBackdrop, SunsetGlow } from "../../../../components/dashboard/SunriseArt";
+import FlipBoard from "../../../../components/dashboard/FlipBoard";
 
 // Tab components — lazy loaded
 const OverviewTab        = lazy(() => import('../../tabs/OverviewTab'));
@@ -656,7 +657,8 @@ export default function SunshineShell() {
           {/* Hero — only on overview. Bright orange sunrise glow between the greeting and the
               stats, pink on the right, amber underneath; rings drawn in an orange→pink line. */}
           {showHero && (
-            <section style={{ position: 'relative', borderRadius: 20, overflow: 'hidden', marginBottom: 24, padding: '26px 28px', background: col.card, border: `1px solid ${col.border}`, boxShadow: 'var(--a-shadow)' }}>
+            <FlipBoard role="admin" radius={20} style={{ marginBottom: 24 }}>
+            <section style={{ position: 'relative', borderRadius: 20, overflow: 'hidden', padding: '26px 28px', background: col.card, border: `1px solid ${col.border}`, boxShadow: 'var(--a-shadow)' }}>
               <div aria-hidden="true" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: [
                 // golden-hot core inside the orange so it reads as light, not paint
                 'radial-gradient(14% 70% at 50% -5%, rgba(255,214,102,0.85) 0%, rgba(253,186,116,0.4) 55%, transparent 100%)',
@@ -718,6 +720,7 @@ export default function SunshineShell() {
                 </div>
               </div>
             </section>
+            </FlipBoard>
           )}
 
           {/* Missed calls alert — visible on overview */}

@@ -33,6 +33,7 @@ import { useTranslation }           from 'react-i18next';
 import DashboardAlertsBar from "../../../../components/DashboardAlertsBar";
 import { adminAccent, adminOnAccent } from '../../../../utils/adminAccent';
 import { SunriseBackdrop, SunsetGlow, BannerArt } from '../../../../components/dashboard/SunriseArt';
+import FlipBoard from '../../../../components/dashboard/FlipBoard';
 
 // Only needed once the teacher joins a class — load it then.
 const Classroom = lazyTab(() => import('../../../Classroom'));
@@ -513,6 +514,7 @@ export default function SunshineShell() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
               {/* Welcome banner — same sunrise art as the admin overview */}
+              <FlipBoard role="teacher" radius={20}>
               <section style={{ position: 'relative', overflow: 'hidden', borderRadius: 20, padding: isMobile ? '18px 20px' : '26px 28px', background: 'var(--a-surface)', border: `1px solid ${col.border}`, boxShadow: 'var(--a-shadow)' }}>
                 <BannerArt ringId="ts-banner-ring" />
                 <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 20 }}>
@@ -546,6 +548,7 @@ export default function SunshineShell() {
                   )}
                 </div>
               </section>
+              </FlipBoard>
 
               {/* Missed calls alert */}
               {missedCallCount > 0 && (

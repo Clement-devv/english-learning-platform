@@ -23,6 +23,7 @@ export default function CentersTab({
   setLimitsModal, setLimitsUnlimT, setLimitsUnlimS, setLimitsTeachers, setLimitsStudents, setLimitsMsg,
   setPartnershipModal,
   onEditWebsite,
+  openCenter = null,   // { id, n } — open this center's Manage panel (search / overview)
 }) {
   const [overrideCenter,  setOverrideCenter]  = useState(null);
   const [overrideEmail,   setOverrideEmail]   = useState('');
@@ -85,6 +86,13 @@ export default function CentersTab({
   }, [apiBase, page, status, plan, query]);
   // `centers` changes after every action in the dashboard (approve, plan, theme…) → refresh this page too
   useEffect(() => { loadPage(); }, [loadPage, centers]);
+
+  // Opened from Ctrl/⌘ K search or the overview: show that center's Manage panel straight away
+  useEffect(() => {
+    if (!openCenter?.id) return;
+    const c = (list?.centers || []).find((x) => x._id === openCenter.id) || centers.find((x) => x._id === openCenter.id);
+    if (c) setManage(c);
+  }, [openCenter?.n]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const openOverride = (center) => {
     setOverrideCenter(center);
@@ -158,10 +166,10 @@ export default function CentersTab({
     <div className={styles.card} style={{ padding: 0, overflow: 'hidden' }}>
       {/* Header: title, search, plan filter */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', padding: '18px 20px 14px' }}>
-        <div>
-          <h2 className={styles.sectionTitle}><Building2 size={16} color="#f59e0b" /> Centers</h2>
-          <p style={{ margin: '4px 0 0', fontSize: 12.5, color: '#6b7280' }}>Pending registrations are shown first. Press Manage for everything else.</p>
-        </div>
+        {/* the page header already names this page; this line just says what's listed */}
+        <p style={{ margin: 0, fontSize: 13, color: 'var(--sa-muted)' }}>
+          <strong style={{ color: 'var(--sa-text)', fontVariantNumeric: 'tabular-nums' }}>{(list?.pagination?.total ?? 0)}</strong> center{(list?.pagination?.total ?? 0) === 1 ? '' : 's'} · pending first · press <strong style={{ color: 'var(--sa-text)' }}>Manage</strong> for everything else
+        </p>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <form onSubmit={e => { e.preventDefault(); setQuery(search.trim()); setPage(1); }} style={{ position: 'relative' }}>
             <Search size={14} style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }} />
@@ -208,7 +216,7 @@ export default function CentersTab({
             <p style={{ margin: 0 }}>No centers match these filters.</p>
           ) : (
             <p style={{ margin: 0 }}>No centers yet.{' '}
-              <button onClick={() => setShowModal(true)} style={{ background: 'none', border: 'none', color: '#f59e0b', cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit' }}>Create one →</button>
+              <button onClick={() => setShowModal(true)} style={{ background: 'none', border: 'none', color: 'var(--sa-accent)', cursor: 'pointer', fontWeight: 600, fontFamily: 'inherit' }}>Create one →</button>
             </p>
           )}
         </div>
@@ -261,7 +269,7 @@ export default function CentersTab({
                     </>
                   )}
                   {c.status === 'active' && (
-                    <button onClick={() => handleEnterAsAdmin(c)} disabled={impersonating === c._id} style={ghostBtn('#f472b6')} title="Open this center's admin panel (30 min session)">
+                    <button onClick={() => handleEnterAsAdmin(c)} disabled={impersonating === c._id} style={ghostBtn('#6366f1')} title="Open this center's admin panel (30 min session)">
                       <LogIn size={13} /> {impersonating === c._id ? '…' : 'Enter'}
                     </button>
                   )}
@@ -489,15 +497,15 @@ export default function CentersTab({
 const PAGE_SIZE = 20;
 const ROW = { display: 'grid', gridTemplateColumns: 'minmax(210px,2fr) 72px minmax(140px,1.2fr) minmax(120px,1fr) 64px 196px', gap: 14, alignItems: 'center' };
 const STATUS_TABS = [
-  { key: 'all',       label: 'All',       color: '#f59e0b' },
+  { key: 'all',       label: 'All',       color: '#6366f1' },
   { key: 'active',    label: 'Active',    color: '#10b981' },
   { key: 'pending',   label: 'Pending',   color: '#f59e0b' },
   { key: 'suspended', label: 'Suspended', color: '#ef4444' },
   { key: 'rejected',  label: 'Rejected',  color: '#6b7280' },
 ];
 const STATUS_COLORS = { active: '#10b981', pending: '#f59e0b', suspended: '#ef4444', rejected: '#6b7280' };
-const PLAN_COLORS = { free: '#64748b', basic: '#f472b6', pro: '#34d399', enterprise: '#f59e0b' };
-const AVATAR_COLORS = ['#f59e0b', '#34d399', '#f472b6', '#f472b6', '#22d3ee', '#fb923c', '#f472b6'];
+const PLAN_COLORS = { free: '#64748b', basic: '#3b82f6', pro: '#6366f1', enterprise: '#0f766e' };   // same as the overview's plan chart
+const AVATAR_COLORS = ['#6366f1', '#0ea5e9', '#14b8a6', '#8b5cf6', '#f97316', '#64748b'];
 
 const pillStyle = (color) => ({
   display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 9px', borderRadius: 999,
@@ -525,7 +533,7 @@ function Avatar({ center, size = 38 }) {
 function UsageBar({ label, used = 0, max }) {
   const unlimited = max === -1 || !max;
   const pct = unlimited ? 0 : Math.min(100, Math.round((used / max) * 100));
-  const color = pct >= 100 ? '#ef4444' : pct >= 85 ? '#f59e0b' : '#f472b6';
+  const color = pct >= 100 ? '#ef4444' : pct >= 85 ? '#f59e0b' : '#6366f1';
   return (
     <div title={unlimited ? `${used} ${label.toLowerCase()} (no limit)` : `${used} of ${max} ${label.toLowerCase()} (${pct}%)`}>
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, color: 'var(--sa-muted)' }}>
@@ -661,7 +669,7 @@ function ManagePanel({ center: c, onClose, run, actions }) {
           item('reject', XCircle, 'Reject registration', null, { danger: true }),
         ])}
         {section('Plan and access', [
-          item('plan', Crown, 'Change plan', `Currently ${c.plan || 'free'}`, { color: '#f59e0b' }),
+          item('plan', Crown, 'Change plan', `Currently ${c.plan || 'free'}`, { color: '#6366f1' }),
           item('features', ToggleRight, 'Features', 'Video calling, recording, AI tools…'),
           item('limits', SlidersHorizontal, 'Seat limits', `${c.maxTeachers === -1 ? 'Unlimited' : c.maxTeachers ?? '—'} teachers · ${c.maxStudents === -1 ? 'unlimited' : c.maxStudents ?? '—'} students`),
         ])}
@@ -678,7 +686,7 @@ function ManagePanel({ center: c, onClose, run, actions }) {
           item('partnership', Users, 'Partnership text', 'Co-branding shown on their pages'),
         ])}
         {section('Account', [
-          item('enter', LogIn, 'Enter as admin', 'Opens their admin panel for 30 minutes', { hidden: !isActive, color: '#f472b6' }),
+          item('enter', LogIn, 'Enter as admin', 'Opens their admin panel for 30 minutes', { hidden: !isActive, color: '#6366f1' }),
           item('overrideEmail', KeyRound, 'Override admin email', 'Emergency: admin lost access to their email'),
           item('suspend', PauseCircle, 'Suspend center', 'Blocks all logins until reactivated', { hidden: !isActive, danger: true }),
           item('reactivate', RotateCcw, 'Reactivate center', null, { hidden: !(c.status === 'suspended' || c.status === 'rejected'), color: '#34d399' }),

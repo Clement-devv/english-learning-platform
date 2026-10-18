@@ -3,6 +3,7 @@
 //  • Managed students: optional notification email (never a login).
 //  • Online students: reminders go to their account email.
 //  • Switch: may this student's teachers send join reminders? (teachers never see the address)
+//  • Email language: English / Vietnamese for the emails this student (or their family) gets
 // Server: routes/studentRoutes.js (/:id/notify-settings, /:id/join-reminder), utils/joinReminder.js
 import { useEffect, useState } from "react";
 import { X, Mail, BellRing, Send, Loader2 } from "lucide-react";
@@ -13,7 +14,7 @@ import { dateLocale } from "../../../i18n/dateLocale.js";
 const BRAND = "var(--a-accent)";
 const fmtWhen = (d) => new Date(d).toLocaleString(dateLocale(), { weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
 
-export default function StudentNotifyModal({ student, isDarkMode, onClose, notify }) {
+export default function StudentNotifyModal({ student, isDarkMode, onClose, notify, onEmailLanguage }) {
   const { t: tr } = useTranslation("admin");
   const [settings, setSettings] = useState(null);
   const [email, setEmail]       = useState("");
@@ -35,6 +36,7 @@ export default function StudentNotifyModal({ student, isDarkMode, onClose, notif
     try {
       const { data } = await api.patch(`/students/${student._id}/notify-settings`, patch);
       setSettings(s => ({ ...s, ...data.settings, reminderEmail: s.isManaged ? data.settings.notifyEmail : s.reminderEmail }));
+      if (patch.emailLanguage) onEmailLanguage?.(data.settings.emailLanguage);
       notify?.(data.message || "Saved");
     } catch (err) { setError(err?.response?.data?.message || tr("studentNotifyModal.couldNotSave")); }
     finally { setSaving(false); }
@@ -88,6 +90,28 @@ export default function StudentNotifyModal({ student, isDarkMode, onClose, notif
                 <Mail size={14} /> {tr("studentNotifyModal.remindersGoToTheStudent")}{settings.reminderEmail ? <strong style={{ color: c.heading }}>&nbsp;{settings.reminderEmail}</strong> : null}.
               </div>
             )}
+
+            {/* Email language — which language this student's emails are written in */}
+            <div style={{ padding: "12px 14px", borderRadius: 12, border: `1px solid ${c.border}` }}>
+              <span style={{ display: "block", fontSize: 14, fontWeight: 700, color: c.heading }}>Email language</span>
+              <span style={{ display: "block", fontSize: 12, color: c.muted, marginBottom: 10 }}>
+                Class, homework, quiz and account emails to {student.isManaged ? "this student's family" : "this student"} are written in this language.
+              </span>
+              <div role="radiogroup" aria-label="Email language" style={{ display: "flex", gap: 4, padding: 4, borderRadius: 12, background: c.soft }}>
+                {[{ lang: "en", flag: "🇬🇧", label: "English" }, { lang: "vi", flag: "🇻🇳", label: "Tiếng Việt" }].map(({ lang, flag, label }) => {
+                  const on = (settings.emailLanguage || "en") === lang;
+                  return (
+                    <button key={lang} type="button" role="radio" aria-checked={on} disabled={saving}
+                      onClick={() => { if (!on) save({ emailLanguage: lang }); }}
+                      style={{ flex: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "9px 8px", borderRadius: 9, border: "none",
+                        fontSize: 13, fontWeight: 800, fontFamily: "inherit", cursor: saving ? "wait" : "pointer", transition: "background-color 150ms ease, color 150ms ease",
+                        background: on ? BRAND : "transparent", color: on ? "#fff" : c.body }}>
+                      <span aria-hidden="true">{flag}</span>{label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
 
             {/* Teacher switch */}
             <label style={{ display: "flex", gap: 12, alignItems: "center", padding: "12px 14px", borderRadius: 12, border: `1px solid ${c.border}`, cursor: "pointer" }}>

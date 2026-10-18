@@ -40,6 +40,7 @@ import { ChangePassword, StudentCompletedTab, StudentScheduleTab, StudentHomewor
 import { dateLocale } from "../../../../i18n/dateLocale.js";
 import { adminAccent, adminOnAccent } from "../../../../utils/adminAccent";
 import { DoodleBackdrop, DoodleSunset, DoodleBannerArt } from "../../../../components/dashboard/DoodleArt";
+import FlipBoard from "../../../../components/dashboard/FlipBoard";
 
 // ── Sidebar nav groups ────────────────────────────────────────────────────────
 const NAV_GROUPS = [
@@ -590,6 +591,7 @@ export default function SunshineShell() {
             <div style={{ display: "flex", flexDirection: "column", gap: 22, fontFamily: F }}>
 
               {/* Welcome banner — bright sunrise glow + the student's own crayon doodles */}
+              <FlipBoard role="student" radius={compact ? 20 : 24}>
               <section className="fade-up" style={{ position: "relative", overflow: "hidden", background: col.card, border: `1px solid ${col.border}`, borderRadius: compact ? 20 : 24, padding: compact ? "16px 18px" : "26px 30px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: compact ? 12 : 24, boxShadow: "var(--a-shadow)" }}>
                 {!isMobile && <DoodleBannerArt />}
                 <div style={{ position: "relative", flex: 1, minWidth: 0 }}>
@@ -605,6 +607,7 @@ export default function SunshineShell() {
                   <div style={{ fontSize: compact ? 9 : 11, fontWeight: 800, letterSpacing: "0.1em", color: "var(--cat-ink)" }}>{t('dashboard.dayStreak')}</div>
                 </div>
               </section>
+              </FlipBoard>
 
               {/* Missed calls alert */}
               {missedCallCount > 0 && (
@@ -889,7 +892,6 @@ export default function SunshineShell() {
           onChangePassword={()=>{ d.setShowSettingsSidebar(false); d.setShowChangePassword(true); }}
           onManageSessions={()=>{ d.setShowSettingsSidebar(false); d.setShowSessionManagement(true); }}
           onManage2FA={()=>{ d.setShowSettingsSidebar(false); d.setShowSettingsModal(true); }}
-          emailLanguageFor={d.student._id || d.student.id}
           userInfo={{ firstName: d.student.firstName, lastName: d.student.lastName, email: d.student.email }}
           isMobile={isMobile} forcedMode={forcedMode} onSetViewMode={setViewMode} tabletLayout />
       )}

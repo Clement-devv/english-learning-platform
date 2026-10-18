@@ -615,6 +615,12 @@ export function useTeacherDashboardData() {
 
   const askDeleteClass = (classItem) => {
     const classId = typeof classItem === 'object' ? (classItem.id || classItem.bookingId) : classItem;
+    const cls = classes.find(c => c.id === classId) || (typeof classItem === 'object' ? classItem : null);
+    // Started classes can't be deleted (the server refuses) — they can only be cancelled
+    if (cls?.scheduledTime && new Date(cls.scheduledTime) <= new Date()) {
+      showToast("This class has already started, so it can't be deleted. Cancel it instead.", 'error');
+      return;
+    }
     setConfirmModal({ open: true, type: 'delete', classId });
   };
 
@@ -628,7 +634,7 @@ export function useTeacherDashboardData() {
           await cancelBooking(confirmModal.classId, 'Teacher cancelled class');
         setClasses(prev => prev.map(c => c.id === confirmModal.classId ? { ...c, status: 'cancelled' } : c));
         showToast('Class cancelled successfully');
-      } catch { showToast('Failed to cancel class', 'error'); }
+      } catch (err) { showToast(err.response?.data?.message || 'Failed to cancel class', 'error'); }
     } else if (confirmModal.type === 'delete') {
       try {
         const cls = classes.find(c => c.id === confirmModal.classId);
@@ -638,7 +644,7 @@ export function useTeacherDashboardData() {
           await deleteBooking(confirmModal.classId);
         setClasses(prev => prev.filter(c => c.id !== confirmModal.classId));
         showToast('Class deleted successfully');
-      } catch { showToast('Failed to delete class', 'error'); }
+      } catch (err) { showToast(err.response?.data?.message || 'Failed to delete class', 'error'); }
     }
     setConfirmModal({ open: false, type: null, classId: null });
   };

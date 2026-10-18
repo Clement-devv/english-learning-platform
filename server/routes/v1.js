@@ -65,6 +65,7 @@ import { monitorAdminRoutes, clientErrorRoutes } from "./monitorRoutes.js";
 import { centerInviteAdminRoutes, centerInviteRoutes } from "./centerInviteRoutes.js";
 import libraryRoutes from "./libraryRoutes.js";
 import libraryAdminRoutes from "./libraryAdminRoutes.js";
+import { saBoardRoutes, centerBoardRoutes } from "./boardRoutes.js";
 
 const router = Router();
 
@@ -116,6 +117,8 @@ router.use("/center",               centerConfigRoutes);
 router.use("/super-admin/monitor",  monitorAdminRoutes); // App Health (super admin)
 router.use("/super-admin/center-invites", centerInviteAdminRoutes); // create center by invite
 router.use("/super-admin/library", libraryAdminRoutes); // library storage, billing, takedowns
+router.use("/super-admin/board",   saBoardRoutes);      // ads / info on the dashboard banner
+router.use("/board",               centerBoardRoutes);  // the banner fetches its messages
 router.use("/library",              libraryRoutes);      // center teaching library (PDFs)
 router.use("/center-invite",        centerInviteRoutes); // public invite page (no tenantMiddleware — center not live yet)
 router.use("/client-errors",        clientErrorRoutes);  // browsers report page crashes

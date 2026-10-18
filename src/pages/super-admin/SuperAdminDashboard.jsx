@@ -9,7 +9,7 @@ import {
   Globe, RefreshCw, Trash2, Mail, KeyRound, Palette,
   BarChart2, ChevronDown, ChevronUp, ToggleLeft, ToggleRight, Video, Mic, Film,
   AlertTriangle, RotateCcw, Zap, Send, Activity, Users, UserCheck, LogIn, Megaphone, SlidersHorizontal, Award, Sun, Moon, Menu,
-  HeartPulse, HardDrive,
+  HeartPulse, HardDrive, LayoutDashboard, Link2, Search,
 } from 'lucide-react';
 import api from '../../api';
 import { THEMES } from '../../data/themes';
@@ -33,6 +33,10 @@ import DeletedTab  from './tabs/DeletedTab';
 import CreditsTab             from './tabs/CreditsTab';
 import CertificateTemplatesTab from './tabs/CertificateTemplatesTab';
 import LandingPagesTab         from './tabs/LandingPagesTab';
+import BoardTab                from './tabs/BoardTab';
+import OverviewTab             from './tabs/OverviewTab';
+import CommandPalette          from './CommandPalette';
+import './saShell.css';
 import { studentModesLabel }   from '../../utils/planFeatures';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api/v1';
@@ -66,20 +70,31 @@ export default function SuperAdminDashboard() {
   const [centers,     setCenters]     = useState([]);
   const [domains,     setDomains]     = useState([]);
   const [loading,     setLoading]     = useState(true);
-  const [tab,         setTab]         = useState('centers');
+  const [tab,         setTab]         = useState('overview');
+  const [openCenter,  setOpenCenter]  = useState(null);   // { id, n } → Centers tab opens that center's Manage panel
+  const [cmdOpen,     setCmdOpen]     = useState(false);  // Ctrl/⌘ K search
   const [error,       setError]       = useState('');
-  const [isMobile,    setIsMobile]    = useState(() => window.innerWidth < 768);
+  const [isMobile,    setIsMobile]    = useState(() => window.innerWidth < 900);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('saAdminDark') !== 'false');
 
   useEffect(() => {
     const onResize = () => {
-      const mobile = window.innerWidth < 768;
+      const mobile = window.innerWidth < 900;
       setIsMobile(mobile);
       if (!mobile) setSidebarOpen(false);
     };
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  // Ctrl/⌘ K → search centers, pages and actions from anywhere
+  useEffect(() => {
+    const onKey = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); setCmdOpen(o => !o); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
   }, []);
 
   // ── Create center modal (CreateCenterModal.jsx — invite flow) ──
@@ -1073,91 +1088,128 @@ export default function SuperAdminDashboard() {
   };
 
   const s = buildStyles(darkMode, isMobile, sidebarOpen);
-  const TABS = [
-    { key: 'centers',      label: 'Centers',        icon: Building2  },
-    { key: 'monitor',      label: 'App Health',      icon: HeartPulse },
-    { key: 'health',       label: 'Center Usage',    icon: Activity   },
-    { key: 'domains',      label: 'Custom Domains',  icon: Globe      },
-    { key: 'usage',        label: 'Agora Usage',     icon: BarChart2  },
-    { key: 'people',       label: 'People',          icon: Users      },
-    { key: 'classes',      label: 'Classes',         icon: Video      },
-    { key: 'credits',      label: 'AI Credits',      icon: Zap        },
-    { key: 'library',      label: 'Library Storage', icon: HardDrive  },
-    { key: 'certificates', label: 'Certificates',    icon: Award      },
-    { key: 'websites',     label: 'Websites',        icon: Globe      },
-    { key: 'deleted',      label: 'Deleted',         icon: Trash2     },
+  // ── Navigation: grouped the way the work is done ──────────────────────────
+  const NAV = [
+    { group: null, items: [
+      { key: 'overview',     label: 'Overview',        icon: LayoutDashboard, desc: 'What needs your attention across every center' },
+    ] },
+    { group: 'Centers', items: [
+      { key: 'centers',      label: 'Centers',         icon: Building2,  desc: 'Approve, configure and manage every center' },
+      { key: 'people',       label: 'People',          icon: Users,      desc: 'Teachers and students in each center' },
+      { key: 'board',        label: 'Board',           icon: Megaphone,  desc: 'Ads and announcements on dashboard banners' },
+      { key: 'websites',     label: 'Websites',        icon: Globe,      desc: 'Public websites of each center' },
+      { key: 'domains',      label: 'Custom domains',  icon: Link2,      desc: 'Domains centers asked to use — check DNS and switch them on' },
+    ] },
+    { group: 'Operations', items: [
+      { key: 'monitor',      label: 'App health',      icon: HeartPulse, desc: 'Live checks, errors and alerts' },
+      { key: 'health',       label: 'Center usage',    icon: Activity,   desc: 'How actively each center uses the platform' },
+      { key: 'classes',      label: 'Classes',         icon: Video,      desc: 'Classes held across all centers' },
+      { key: 'usage',        label: 'Video minutes',   icon: BarChart2,  desc: 'Agora video minutes by center and month' },
+    ] },
+    { group: 'Billing', items: [
+      { key: 'credits',      label: 'AI credits',      icon: Zap,        desc: 'Chat and pronunciation credits for each center' },
+      { key: 'library',      label: 'Library storage', icon: HardDrive,  desc: 'Teaching-library storage, limits and billing' },
+    ] },
+    { group: 'Content', items: [
+      { key: 'certificates', label: 'Certificates',    icon: Award,      desc: 'Certificate templates centers can use' },
+    ] },
+    { group: 'Archive', items: [
+      { key: 'deleted',      label: 'Deleted centers', icon: Trash2,     desc: 'Centers waiting for permanent deletion — restore them before the date' },
+    ] },
   ];
+  const TABS = NAV.flatMap(g => g.items.map(i => ({ ...i, group: g.group || '' })));
+  const current = TABS.find(t => t.key === tab) || TABS[0];
+  const pendingCount = centers.filter(c => c.status === 'pending').length;
+  const domainsWaiting = domains.filter(d => !d.domainVerified).length;
+  const badgeFor = (key) => {
+    if (key === 'monitor' && monitorBadge > 0) return <span className="sa2-count sa2-count--alert" title="Problems right now">{monitorBadge}</span>;
+    if (key === 'centers' && pendingCount > 0) return <span className="sa2-count sa2-count--warn" title="Waiting for approval">{pendingCount}</span>;
+    if (key === 'domains' && domainsWaiting > 0) return <span className="sa2-count" title="Waiting for DNS">{domainsWaiting}</span>;
+    if (key === 'deleted' && deleted.length > 0) return <span className="sa2-count">{deleted.length}</span>;
+    return null;
+  };
+  const go = (key) => { setTab(key); setSidebarOpen(false); window.scrollTo({ top: 0 }); };
+  const openCenterManage = (c) => { setOpenCenter({ id: c._id, n: Date.now() }); go('centers'); };
+  const openBroadcast = () => { setBroadcastModal(true); setBroadcastSubject(''); setBroadcastMessage(''); setBroadcastResult(null); setBroadcastTarget('all'); };
+  const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || '');
+  const initialsOf = (a, b) => `${(a || '?')[0]}${(b || '')[0] || ''}`.toUpperCase();
 
   return (
-    <div style={s.root} className={themeStyles.themeRoot} data-sa-theme={darkMode ? "dark" : "light"}>
-
-      {/* ── Mobile sidebar backdrop ── */}
-      <div style={s.sidebarOverlay} onClick={() => setSidebarOpen(false)} />
+    <div className={`${themeStyles.themeRoot} sa2-root`} data-sa-theme={darkMode ? "dark" : "light"} data-drawer={sidebarOpen || undefined}>
+      <div className="sa2-scrim" onClick={() => setSidebarOpen(false)} />
 
       {/* ── Sidebar ── */}
-      <div style={s.sidebar}>
-        {/* Brand */}
-        <div style={s.sidebarBrand}>
-          <div style={s.sidebarLogoWrap}>
-            <Crown size={20} color="#fff" />
-          </div>
-          <div>
-            <div style={s.sidebarBrandName}>SuperAdmin</div>
-            {info?.firstName && <div style={s.sidebarBrandSub}>{info.firstName} {info.lastName}</div>}
+      <aside className="sa2-side" aria-label="Super admin">
+        <div className="sa2-brand">
+          <div className="sa2-logo"><Crown size={18} /></div>
+          <div style={{ minWidth: 0 }}>
+            <div className="sa2-brand-name">Clemify</div>
+            <div className="sa2-brand-sub">Platform admin</div>
           </div>
         </div>
 
-        {/* Nav items */}
-        <nav style={s.sidebarNav}>
-          {TABS.map(({ key, label, icon: Icon }) => (
-            <button key={key} onClick={() => { setTab(key); if (isMobile) setSidebarOpen(false); }} style={{ ...s.navItem, ...(tab === key ? s.navItemActive : {}) }}>
-              <Icon size={16} style={{ flexShrink: 0 }} />
-              <span style={{ flex: 1 }}>{label}</span>
-              {key === 'domains'  && domains.length > 0 && <span style={s.navBadge}>{domains.length}</span>}
-              {key === 'deleted'  && deleted.length > 0 && <span style={{ ...s.navBadge, background: '#ef4444' }}>{deleted.length}</span>}
-              {key === 'monitor'  && monitorBadge > 0 && <span style={{ ...s.navBadge, background: '#ef4444' }} title="Problems right now">{monitorBadge}</span>}
-            </button>
+        <button type="button" className="sa2-search" onClick={() => setCmdOpen(true)} aria-label="Search centers, pages and actions">
+          <Search size={15} /><span>Search…</span><kbd className="sa2-kbd">{isMac ? '⌘' : 'Ctrl'} K</kbd>
+        </button>
+
+        <nav className="sa2-nav" aria-label="Main">
+          {NAV.map(({ group, items }) => (
+            <div key={group || 'top'} role="group" aria-label={group || undefined}>
+              {group && <div className="sa2-group">{group}</div>}
+              {items.map(({ key, label, icon: Icon }) => (
+                <button key={key} type="button" className="sa2-item" aria-current={tab === key ? 'page' : undefined} onClick={() => go(key)}>
+                  <Icon size={16} /><span>{label}</span>{badgeFor(key)}
+                </button>
+              ))}
+            </div>
           ))}
         </nav>
 
-        {/* Footer actions */}
-        <div style={s.sidebarFooter}>
-          <button
-            onClick={() => { setBroadcastModal(true); setBroadcastSubject(''); setBroadcastMessage(''); setBroadcastResult(null); setBroadcastTarget('all'); }}
-            style={s.broadcastBtn}
-          >
-            <Megaphone size={14} /> Broadcast
-          </button>
-          <button onClick={() => setDarkMode(d => !d)} style={s.darkToggleBtn}>
-            {darkMode ? <Sun size={14} /> : <Moon size={14} />}
-            {darkMode ? 'Light Mode' : 'Dark Mode'}
-          </button>
-          <button onClick={handleLogout} style={s.logoutBtn}>
-            <LogOut size={14} /> Logout
-          </button>
-        </div>
-      </div>
-
-      {/* ── Main area ── */}
-      <div style={s.main}>
-
-        {/* Top bar */}
-        <div style={s.topBar}>
-          <div style={{ display: 'flex', alignItems: 'center' }}>
-            <button style={s.hamburgerBtn} onClick={() => setSidebarOpen(o => !o)}>
-              <Menu size={18} />
-            </button>
-            <div>
-              <div style={s.topBarTitle}>{TABS.find(t => t.key === tab)?.label || 'Dashboard'}</div>
-              {error && <p style={{ color: '#ef4444', margin: '4px 0 0', fontSize: 13 }}>{error}</p>}
-            </div>
+        <div className="sa2-foot">
+          <div className="sa2-avatar" aria-hidden="true">{initialsOf(info?.firstName, info?.lastName)}</div>
+          <div className="sa2-who">
+            <b>{[info?.firstName, info?.lastName].filter(Boolean).join(' ') || 'Super admin'}</b>
+            <small>{info?.email || 'Platform owner'}</small>
           </div>
-          <button onClick={() => setShowModal(true)} style={s.createBtn}>
-            <Plus size={15} /> Create Center
+          <button type="button" className="sa2-icon" onClick={() => setDarkMode(d => !d)} aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'} title={darkMode ? 'Light mode' : 'Dark mode'}>
+            {darkMode ? <Sun size={16} /> : <Moon size={16} />}
           </button>
+          <button type="button" className="sa2-icon" onClick={handleLogout} aria-label="Sign out" title="Sign out"><LogOut size={16} /></button>
         </div>
+      </aside>
 
-        <div style={s.content}>
+      {/* ── Main ── */}
+      <div className="sa2-main">
+        <header className="sa2-header">
+          <button type="button" className="sa2-icon sa2-burger" onClick={() => setSidebarOpen(o => !o)} aria-label="Open menu"><Menu size={18} /></button>
+          <div className="sa2-title">
+            <h1>{current.label}</h1>
+            <p>{error ? <span style={{ color: '#dc2626' }}>{error}</span> : current.desc}</p>
+          </div>
+          <button type="button" className="sa2-btn" onClick={openBroadcast} title="Email all or one center">
+            <Send size={15} /><span className="sa2-btn-label">Email centers</span>
+          </button>
+          <button type="button" className="sa2-btn sa2-btn--primary" onClick={() => setShowModal(true)}>
+            <Plus size={16} /><span className="sa2-btn-label">Create center</span>
+          </button>
+        </header>
+
+        <CommandPalette
+          open={cmdOpen} onClose={() => setCmdOpen(false)}
+          centers={centers}
+          pages={TABS}
+          actions={[
+            { key: 'create', label: 'Create a center', icon: Plus, run: () => setShowModal(true) },
+            { key: 'email', label: 'Email centers', icon: Send, run: openBroadcast },
+            { key: 'board', label: 'New board message', icon: Megaphone, run: () => go('board') },
+            { key: 'theme', label: darkMode ? 'Switch to light mode' : 'Switch to dark mode', icon: darkMode ? Sun : Moon, run: () => setDarkMode(d => !d) },
+          ]}
+          onPage={go}
+          onCenter={openCenterManage}
+        />
+
+        <main className="sa2-content">
+
           {/* ── Tab content ── */}
           <TabErrorBoundary key={tab}>
             {tab === 'centers' && (
@@ -1179,7 +1231,19 @@ export default function SuperAdminDashboard() {
                 setLimitsTeachers={setLimitsTeachers} setLimitsStudents={setLimitsStudents} setLimitsMsg={setLimitsMsg}
                 setPartnershipModal={(c) => { setPartnershipModal(c); setPartnershipText(c.branding?.partnershipText || ''); setPartnershipMsg(''); }}
                 onEditWebsite={handleEditWebsite}
+                openCenter={openCenter}
               />
+            )}
+            {tab === 'overview' && (
+              <OverviewTab
+                centers={centers} domains={domains} monitorBadge={monitorBadge}
+                onOpenCenter={openCenterManage} onTab={go}
+                onApprove={handleApprove} onReject={handleReject}
+                onCreate={() => setShowModal(true)} onBroadcast={openBroadcast} onSearch={() => setCmdOpen(true)}
+              />
+            )}
+            {tab === 'board' && (
+              <BoardTab apiBase={API_BASE} authHeaders={authHeaders} centers={centers} />
             )}
             {tab === 'domains' && (
               <DomainsTab
@@ -1247,7 +1311,7 @@ export default function SuperAdminDashboard() {
               />
             )}
           </TabErrorBoundary>
-        </div>
+        </main>
       </div>
 
       {/* ── Plan Editor Modal ── */}

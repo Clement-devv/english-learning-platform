@@ -266,6 +266,16 @@ export default function StudentCard({
                     {tr("studentCard.managed")}
                   </span>
                 )}
+                {student.emailLanguage === "vi" && (
+                  <span
+                    title="Gets emails in Vietnamese"
+                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border flex-shrink-0 ${
+                      isDarkMode ? "bg-red-900/30 text-red-300 border-red-700/50" : "bg-red-50 text-red-700 border-red-200"
+                    }`}
+                  >
+                    <span aria-hidden="true">🇻🇳</span> VI
+                  </span>
+                )}
               </div>
               {student.studentId && (
                 <p className={`text-[10px] font-mono font-medium mt-0.5 ${

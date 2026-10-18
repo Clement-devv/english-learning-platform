@@ -4,12 +4,19 @@
    Set on the dashboard root (data-sa-theme="dark" | "light"). Every tab and
    modal uses these instead of fixed colours, so both modes stay readable. */
 .themeRoot {
-  --sa-text: #f1f5f9;
+  --sa-text: #eef1f6;
+  /* brand accent (Clemify indigo) — the only decorative colour; status colours carry meaning */
+  --sa-accent: #8b93ff;
+  --sa-accent-strong: #6d74f7;
+  --sa-accent-soft: rgba(139, 147, 255, 0.14);
+  --sa-accent-line: rgba(139, 147, 255, 0.34);
+  --sa-bg: #0b0d12;
   --sa-text-2: #d1d5db;
-  --sa-muted: #9ca3af;
-  --sa-panel: #0f1117;
-  --sa-modal: #1a1d2e;
-  --sa-line: #2a2d40;
+  --sa-muted: #8a93a5;
+  --sa-panel: #12151c;
+  --sa-modal: #161a23;
+  --sa-modal-bg: #161a23;
+  --sa-line: #232836;
   --sa-red-text: #fca5a5;
   --sa-amber-text: #fcd34d;
   --sa-accent-text: #f9a8d4;
@@ -28,11 +35,17 @@
 }
 .themeRoot[data-sa-theme="light"] {
   --sa-text: #0f172a;
+  --sa-accent: #4f46e5;
+  --sa-accent-strong: #4338ca;
+  --sa-accent-soft: rgba(79, 70, 229, 0.08);
+  --sa-accent-line: rgba(79, 70, 229, 0.3);
+  --sa-bg: #f6f7f9;
   --sa-text-2: #334155;
   --sa-muted: #64748b;
   --sa-panel: #ffffff;
   --sa-modal: #ffffff;
-  --sa-line: #e2e8f0;
+  --sa-modal-bg: #ffffff;
+  --sa-line: #e6e8ec;
   --sa-red-text: #b91c1c;
   --sa-amber-text: #92400e;
   --sa-accent-text: #9d174d;
@@ -65,7 +78,7 @@
   width: 220px;
   flex-shrink: 0;
   background: var(--sa-panel);
-  border-right: 1px solid rgba(245, 158, 11, 0.08);
+  border-right: 1px solid var(--sa-accent-soft);
   display: flex;
   flex-direction: column;
   height: 100vh;
@@ -90,7 +103,7 @@
   width: 32px;
   height: 32px;
   border-radius: 8px;
-  background: linear-gradient(135deg, #b45309, #f59e0b);
+  background: var(--sa-accent-strong);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -121,7 +134,7 @@
   border-radius: 10px;
   border: 1px solid transparent;
   background: transparent;
-  color: #6b7280;
+  color: var(--sa-muted);
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
@@ -137,17 +150,17 @@
 }
 
 .navItemActive {
-  background: rgba(245, 158, 11, 0.1);
-  border: 1px solid rgba(245, 158, 11, 0.18);
-  color: #f59e0b;
+  background: var(--sa-accent-soft);
+  border: 1px solid var(--sa-accent-line);
+  color: var(--sa-accent);
 }
 
 .navBadge {
   min-width: 18px;
   height: 18px;
   border-radius: 9px;
-  background: #f59e0b;
-  color: #0c0a00;
+  background: var(--sa-accent-strong);
+  color: #fff;
   font-size: 10px;
   font-weight: 800;
   display: inline-flex;
@@ -172,9 +185,9 @@
   gap: 6px;
   padding: 9px 12px;
   border-radius: 10px;
-  background: linear-gradient(135deg, #b45309, #f59e0b);
+  background: var(--sa-accent-strong);
   border: none;
-  color: #0c0a00;
+  color: #fff;
   font-size: 12px;
   font-weight: 700;
   cursor: pointer;
@@ -189,9 +202,9 @@
   gap: 6px;
   padding: 8px 12px;
   border-radius: 10px;
-  background: rgba(245, 158, 11, 0.07);
-  border: 1px solid rgba(245, 158, 11, 0.14);
-  color: #f59e0b;
+  background: var(--sa-accent-soft);
+  border: 1px solid var(--sa-accent-line);
+  color: var(--sa-accent);
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
@@ -236,13 +249,13 @@
 .sidebarUserRole {
   margin: 0;
   font-size: 10px;
-  color: #6b7280;
+  color: var(--sa-muted);
 }
 
 .sidebarLogout {
   background: none;
   border: none;
-  color: #6b7280;
+  color: var(--sa-muted);
   cursor: pointer;
   padding: 4px;
   display: flex;
@@ -295,7 +308,7 @@
 .statLabel {
   margin: 0;
   font-size: 12px;
-  color: #6b7280;
+  color: var(--sa-muted);
 }
 
 /* ── Tab bar ─────────────────────────────────────────────────────────────── */
@@ -315,23 +328,23 @@
   font-weight: 600;
   background: var(--sa-w04);
   border: 1px solid var(--sa-w08);
-  color: #6b7280;
+  color: var(--sa-muted);
   cursor: pointer;
   font-family: inherit;
 }
 
 .tabBtnActive {
-  background: rgba(245, 158, 11, 0.1);
-  border: 1px solid rgba(245, 158, 11, 0.25);
-  color: #f59e0b;
+  background: var(--sa-accent-soft);
+  border: 1px solid var(--sa-accent-line);
+  color: var(--sa-accent);
 }
 
 .tabBadge {
   min-width: 18px;
   height: 18px;
   border-radius: 9px;
-  background: #f59e0b;
-  color: #0c0a00;
+  background: var(--sa-accent-strong);
+  color: #fff;
   font-size: 10px;
   font-weight: 800;
   display: inline-flex;
@@ -362,7 +375,7 @@
   background: var(--sa-w05);
   border: 1px solid var(--sa-w10);
   border-radius: 7px;
-  color: #6b7280;
+  color: var(--sa-muted);
   cursor: pointer;
   padding: 6px;
   display: flex;
@@ -381,7 +394,7 @@
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.08em;
-  color: #6b7280;
+  color: var(--sa-muted);
   text-transform: uppercase;
   border-bottom: 1px solid var(--sa-w06);
 }
@@ -400,8 +413,8 @@
   font-size: 12px;
   padding: 2px 8px;
   border-radius: 6px;
-  background: rgba(245, 158, 11, 0.1);
-  color: #f59e0b;
+  background: var(--sa-accent-soft);
+  color: var(--sa-accent);
   font-family: monospace;
 }
 
@@ -466,9 +479,9 @@
   border-radius: 7px;
   font-size: 12px;
   font-weight: 600;
-  background: rgba(245, 158, 11, 0.1);
-  border: 1px solid rgba(245, 158, 11, 0.2);
-  color: #f59e0b;
+  background: var(--sa-accent-soft);
+  border: 1px solid var(--sa-accent-line);
+  color: var(--sa-accent);
   cursor: pointer;
   font-family: inherit;
 }
@@ -530,8 +543,8 @@
 }
 
 .modal {
-  background: #110f1a;
-  border: 1px solid rgba(245, 158, 11, 0.2);
+  background: var(--sa-modal-bg, #110f1a);
+  border: 1px solid var(--sa-accent-line);
   border-radius: 18px;
   width: 100%;
   max-width: 620px;
@@ -548,7 +561,7 @@
   border-bottom: 1px solid var(--sa-w07);
   position: sticky;
   top: 0;
-  background: #110f1a;
+  background: var(--sa-modal-bg, #110f1a);
   z-index: 1;
 }
 
@@ -561,8 +574,8 @@
 .stepTag {
   font-size: 11px;
   font-weight: 700;
-  background: rgba(245, 158, 11, 0.12);
-  color: #f59e0b;
+  background: var(--sa-accent-soft);
+  color: var(--sa-accent);
   padding: 2px 8px;
   border-radius: 20px;
 }
@@ -570,7 +583,7 @@
 .closeBtn {
   background: none;
   border: none;
-  color: #6b7280;
+  color: var(--sa-muted);
   cursor: pointer;
   padding: 4px;
   display: flex;
@@ -638,7 +651,7 @@
 .eyeBtn {
   background: none;
   border: none;
-  color: #6b7280;
+  color: var(--sa-muted);
   cursor: pointer;
   padding: 0;
   display: flex;
@@ -647,9 +660,9 @@
 
 .modalNote {
   font-size: 12px;
-  color: #6b7280;
-  background: rgba(245, 158, 11, 0.06);
-  border: 1px solid rgba(245, 158, 11, 0.12);
+  color: var(--sa-muted);
+  background: var(--sa-accent-soft);
+  border: 1px solid var(--sa-accent-soft);
   border-radius: 8px;
   padding: 10px 14px;
   line-height: 1.5;
@@ -673,9 +686,9 @@
   gap: 7px;
   padding: 10px 22px;
   border-radius: 10px;
-  background: linear-gradient(135deg, #b45309, #f59e0b);
+  background: var(--sa-accent-strong);
   border: none;
-  color: #0c0a00;
+  color: #fff;
   font-size: 14px;
   font-weight: 700;
   cursor: pointer;
@@ -715,10 +728,10 @@
 .themeRoot[data-sa-theme="light"] [style*="; color: rgb(250, 204, 21)"] { color: #a16207 !important; }
 
 /* Light mode: same darker shades for the shared classes above */
-.themeRoot[data-sa-theme="light"] .navItemActive { color: #b45309; }
-.themeRoot[data-sa-theme="light"] .sidebarBroadcastBtn { color: #b45309; }
-.themeRoot[data-sa-theme="light"] .tabBtnActive { color: #b45309; }
-.themeRoot[data-sa-theme="light"] .slug { color: #b45309; }
+.themeRoot[data-sa-theme="light"] .navItemActive { color: var(--sa-accent-strong); }
+.themeRoot[data-sa-theme="light"] .sidebarBroadcastBtn { color: var(--sa-accent-strong); }
+.themeRoot[data-sa-theme="light"] .tabBtnActive { color: var(--sa-accent-strong); }
+.themeRoot[data-sa-theme="light"] .slug { color: var(--sa-accent-strong); }
 .themeRoot[data-sa-theme="light"] .planBadge { color: #9d174d; }
 .themeRoot[data-sa-theme="light"] .approveBtn { color: #047857; }
 .themeRoot[data-sa-theme="light"] .rejectBtn { color: #b91c1c; }
@@ -726,7 +739,7 @@
 .themeRoot[data-sa-theme="light"] .themeBtn { color: #9d174d; }
 .themeRoot[data-sa-theme="light"] .featuresBtn { color: #047857; }
 .themeRoot[data-sa-theme="light"] .deleteBtn { color: #b91c1c; }
-.themeRoot[data-sa-theme="light"] .stepTag { color: #b45309; }
+.themeRoot[data-sa-theme="light"] .stepTag { color: var(--sa-accent-strong); }
 
 /* Dropdowns: the open option list is drawn by the OS from the option's own colours.
    A see-through select background left it white-on-white in dark mode. */
@@ -738,3 +751,16 @@
 
 @keyframes saSpin { to { transform: rotate(360deg); } }
 .themeRoot :global(.spin) { animation: saSpin .8s linear infinite; }
+
+/* ── 2026 refresh: one brand accent ───────────────────────────────────────────
+   Tabs still pass the old amber to icons in their headings; headings use the
+   brand accent now (amber stays only where it means "pending"). */
+.themeRoot :is(h1, h2, h3) svg[stroke="#f59e0b"],
+.themeRoot :is(h1, h2, h3) svg[color="#f59e0b"] { stroke: var(--sa-accent); color: var(--sa-accent); }
+.themeRoot { font-family: 'DM Sans', 'Segoe UI', system-ui, sans-serif; font-feature-settings: 'tnum' 1, 'cv11' 1; }
+.themeRoot .card { background: var(--sa-panel); border-color: var(--sa-line); box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04); }
+.themeRoot[data-sa-theme="dark"] .card { box-shadow: none; }
+.themeRoot .input:focus { border-color: var(--sa-accent); box-shadow: 0 0 0 3px var(--sa-accent-soft); }
+.themeRoot .submitBtn { transition: background-color 150ms ease, transform 120ms ease-out; }
+.themeRoot .submitBtn:active, .themeRoot .cancelBtn:active { transform: scale(0.97); }
+@media (hover: hover) and (pointer: fine) { .themeRoot .submitBtn:hover { background: var(--sa-accent); } }

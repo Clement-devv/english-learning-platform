@@ -374,7 +374,7 @@ export default function ClassList({ data, onJoin, onDelete, isDarkMode }) {
                           {classItem.status === 'live' ? 'Join Now' : 'Start'}
                         </button>
                         <RemindButton classItem={classItem} />
-                        <button
+                        {new Date(classItem.scheduledTime) > new Date() && <button
                           onClick={() => onDelete(classItem)}
                           className={`px-4 py-2 rounded-lg font-semibold transition-all flex items-center gap-2 ${
                             isDarkMode
@@ -384,7 +384,7 @@ export default function ClassList({ data, onJoin, onDelete, isDarkMode }) {
                         >
                           <Trash2 className="w-4 h-4" />
                           Delete
-                        </button>
+                        </button>}
                       </div>
                     </div>
                   </div>
@@ -480,7 +480,7 @@ export default function ClassList({ data, onJoin, onDelete, isDarkMode }) {
                   {classItem.status === 'live' ? 'Join Now!' : 'Start Class'}
                 </button>
                 <RemindButton classItem={classItem} full />
-                <button
+                {new Date(classItem.scheduledTime) > new Date() && <button
                   onClick={() => onDelete(classItem)}
                   className={`px-4 py-2 rounded-lg transition-all ${
                     isDarkMode
@@ -489,7 +489,7 @@ export default function ClassList({ data, onJoin, onDelete, isDarkMode }) {
                   }`}
                 >
                   <Trash2 className="w-4 h-4" />
-                </button>
+                </button>}
               </div>
             </div>
           ))

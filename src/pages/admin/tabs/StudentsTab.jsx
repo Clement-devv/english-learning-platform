@@ -1074,7 +1074,8 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
       )}
 
       {notifyTarget && (
-        <StudentNotifyModal student={notifyTarget} isDarkMode={isDarkMode} onClose={() => setNotifyTarget(null)} notify={(m) => showToast(m)} />
+        <StudentNotifyModal student={notifyTarget} isDarkMode={isDarkMode} onClose={() => setNotifyTarget(null)} notify={(m) => showToast(m)}
+          onEmailLanguage={(lang) => setStudents((prev) => prev.map((s) => (s._id === notifyTarget._id ? { ...s, emailLanguage: lang } : s)))} />
       )}
       {pointsTarget && (
         <SellPointsModal

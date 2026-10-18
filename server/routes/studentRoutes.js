@@ -89,7 +89,7 @@ router.get("/", verifyToken, verifyAdminOrTeacher, sharedSnapshot("students-dire
                  : {};
     const students = await Student
       .find(filter)
-      .select("studentId firstName lastName email active classCredits groupPoints age lastPaymentDate showTempPassword status createdAt phone country rank dateOfBirth scheduledDeletionAt isManaged")
+      .select("studentId firstName lastName email active classCredits groupPoints age lastPaymentDate showTempPassword status createdAt phone country rank dateOfBirth scheduledDeletionAt isManaged emailLanguage")
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
@@ -139,7 +139,7 @@ router.get("/:id", verifyToken, async (req, res) => {
     if (!allowed) return forbidden(res, "You can only view your own data");
     const student = await getStudent(req.db)
       .findById(req.params.id)
-      .select("studentId firstName lastName email active classCredits age lastPaymentDate showTempPassword status twoFactorEnabled createdAt isManaged emailLanguage")
+      .select("studentId firstName lastName email active classCredits age lastPaymentDate showTempPassword status twoFactorEnabled createdAt isManaged")
       .lean();
     if (!student) return notFound(res, "Student not found");
     res.json(student);
@@ -217,7 +217,7 @@ router.post("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
 router.get("/:id/notify-settings", verifyToken, verifyAdmin, async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) return badRequest(res, "Invalid student");
-    const s = await getStudent(req.db).findById(req.params.id).select("isManaged email +notifyEmail joinReminderTeacherAllowed firstName lastName").lean();
+    const s = await getStudent(req.db).findById(req.params.id).select("isManaged email +notifyEmail joinReminderTeacherAllowed emailLanguage firstName lastName").lean();
     if (!s) return notFound(res, "Student not found");
     const current = await currentClassFor(req.db, s._id);
     res.json({ success: true, settings: {
@@ -225,6 +225,7 @@ router.get("/:id/notify-settings", verifyToken, verifyAdmin, async (req, res) =>
       notifyEmail: s.notifyEmail || "",
       reminderEmail: s.isManaged ? (s.notifyEmail || "") : (s.email || ""), // where reminders go
       joinReminderTeacherAllowed: s.joinReminderTeacherAllowed !== false,
+      emailLanguage: s.emailLanguage || "en",
       currentClass: current ? { id: current._id, title: current.classTitle, scheduledTime: current.scheduledTime, duration: current.duration } : null,
     } });
   } catch (err) {
@@ -244,10 +245,15 @@ router.patch("/:id/notify-settings", verifyToken, verifyAdmin, async (req, res) 
       set.notifyEmail = e;
     }
     if (req.body.joinReminderTeacherAllowed !== undefined) set.joinReminderTeacherAllowed = !!req.body.joinReminderTeacherAllowed;
+    if (req.body.emailLanguage !== undefined) {
+      if (!["en", "vi"].includes(req.body.emailLanguage)) return badRequest(res, "Email language must be English or Vietnamese");
+      set.emailLanguage = req.body.emailLanguage;
+    }
     if (!Object.keys(set).length) return badRequest(res, "Nothing to update");
-    const s = await getStudent(req.db).findByIdAndUpdate(req.params.id, { $set: set }, { new: true, select: "+notifyEmail joinReminderTeacherAllowed" });
+    const s = await getStudent(req.db).findByIdAndUpdate(req.params.id, { $set: set }, { new: true, select: "+notifyEmail joinReminderTeacherAllowed emailLanguage" });
     if (!s) return notFound(res, "Student not found");
-    res.json({ success: true, message: "Notification settings saved", settings: { notifyEmail: s.notifyEmail || "", joinReminderTeacherAllowed: s.joinReminderTeacherAllowed !== false } });
+    const message = Object.keys(set).length === 1 && set.emailLanguage ? (set.emailLanguage === "vi" ? "Emails will be sent in Vietnamese" : "Emails will be sent in English") : "Notification settings saved";
+    res.json({ success: true, message, settings: { notifyEmail: s.notifyEmail || "", joinReminderTeacherAllowed: s.joinReminderTeacherAllowed !== false, emailLanguage: s.emailLanguage || "en" } });
   } catch (err) {
     logger.error("Notify settings save error:", { error: err?.message });
     serverError(res);
@@ -536,22 +542,6 @@ router.patch("/:id/timezone", verifyToken, async (req, res) => {
     res.json({ ok: true });
   } catch {
     serverError(res, "Error updating timezone");
-  }
-});
-
-// ─── PATCH email language ─────────────────────────────────────────────────────
-// The student picks the language of the emails they get (Settings → Email language).
-router.patch("/:id/email-language", verifyToken, async (req, res) => {
-  try {
-    const isSelf = req.user.role === "student" && req.user.id === req.params.id;
-    if (req.user.role !== "admin" && !isSelf) return forbidden(res, "You can only change your own email language");
-    const { emailLanguage } = req.body;
-    if (!["en", "vi"].includes(emailLanguage)) return badRequest(res, "emailLanguage must be 'en' or 'vi'");
-    const s = await getStudent(req.db).findByIdAndUpdate(req.params.id, { emailLanguage }, { new: true, projection: { emailLanguage: 1 } });
-    if (!s) return notFound(res, "Student not found");
-    res.json({ success: true, data: { emailLanguage: s.emailLanguage }, message: "Email language updated" });
-  } catch {
-    serverError(res, "Error updating email language");
   }
 });
 

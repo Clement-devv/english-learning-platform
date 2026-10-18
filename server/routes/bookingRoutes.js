@@ -699,6 +699,8 @@ router.delete("/:id", verifyToken, validateObjectId("id"), async (req, res) => {
         ? "A completed class can't be deleted — it has a payment record. Use \"unmark\" to reverse it instead."
         : booking.disputeStatus === "pending"
         ? "This class has an open dispute and can't be deleted"
+        : booking.status === "accepted"
+        ? "This class has already started, so it can't be deleted. Cancel it instead — the cancellation stays on record."
         : `This class can't be deleted (${booking.status}). Cancel it instead.`);
     }
     res.json({ success: true, message: "Booking deleted successfully" });

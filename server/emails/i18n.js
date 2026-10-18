@@ -2,8 +2,8 @@
 // Language helpers for emails sent to students (and parents of managed students).
 // Teachers, admins and sub-admins get English.
 //
-// A student's language is `student.emailLanguage` ("en" default, "vi"), set by the
-// student in Settings. Make sure the field is loaded where the student comes from —
+// A student's language is `student.emailLanguage` ("en" default, "vi"), set by an
+// admin (Students → ⋯ → Notifications & reminders). Load the field wherever the student comes from —
 // populate("studentId", "… email emailLanguage timezone").
 //
 // To add a language: add it to LANGS, the student schema enum, and a block in every

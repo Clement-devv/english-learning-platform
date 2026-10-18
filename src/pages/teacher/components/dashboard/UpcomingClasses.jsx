@@ -267,7 +267,7 @@ export default function UpcomingClasses({ classes, onCancel, onDelete, isDarkMod
                     <Video className="w-5 h-5" />
                     <span className="uc-start hidden sm:inline">Start</span>
                   </button>
-                  <button
+                  {new Date(classItem.scheduledTime) > new Date() && <button
                     onClick={() => onDelete && onDelete(classItem)}
                     className={`${
                       isDarkMode
@@ -276,7 +276,7 @@ export default function UpcomingClasses({ classes, onCancel, onDelete, isDarkMod
                     } px-6 py-3 rounded-xl font-semibold transition-all duration-200 flex items-center justify-center gap-2`}
                   >
                     <Trash2 className="w-4 h-4" />
-                  </button>
+                  </button>}
                 </div>
               </div>
             </div>

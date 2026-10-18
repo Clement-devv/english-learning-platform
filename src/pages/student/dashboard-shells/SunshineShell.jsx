@@ -490,7 +490,6 @@ export default function SunshineShell() {
           onChangePassword={() => { d.setShowSettingsSidebar(false); d.setShowChangePassword(true); }}
           onManageSessions={() => { d.setShowSettingsSidebar(false); d.setShowSessionManagement(true); }}
           onManage2FA={() => { d.setShowSettingsSidebar(false); d.setShowSettingsModal(true); }}
-          emailLanguageFor={d.student._id || d.student.id}
           userInfo={{ firstName: d.student.firstName, lastName: d.student.lastName, email: d.student.email }} />
       )}
       {d.showSettingsModal && <SettingsModal isOpen onClose={() => d.setShowSettingsModal(false)} userType="student" />}
