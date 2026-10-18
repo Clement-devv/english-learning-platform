@@ -35,7 +35,7 @@ export function clearAnalyticsUnlock() {
 // same routes: analytics, student payments, teacher payroll summary + history).
 export const needsAnalyticsUnlock = (url = "") =>
   url.startsWith("/analytics") || url.startsWith("/admin/analytics-pin") ||
-  url.startsWith("/payments") ||
+  url.startsWith("/payments") || url.startsWith("/payroll/admin") ||
   url.startsWith("/payment-transactions/all") || url.startsWith("/payment-transactions/summary");
 
 /** true when an API error means "enter the analytics PIN first" */

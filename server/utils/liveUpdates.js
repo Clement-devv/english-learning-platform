@@ -21,6 +21,7 @@ import { quizAttemptSchema }         from "../schemas/quizAttemptSchema.js";
 import { recordingSchema }           from "../schemas/recordingSchema.js";
 import { paymentTransactionSchema }  from "../schemas/paymentTransactionSchema.js";
 import { paymentSchema }             from "../schemas/paymentSchema.js";
+import { payslipSchema, teacherPayoutSchema, payrollSettingsSchema } from "../schemas/payrollSchemas.js";
 import { teacherAvailabilitySchema } from "../schemas/teacherAvailabilitySchema.js";
 import { studentSchema }             from "../schemas/studentSchema.js";
 import { teacherSchema }             from "../schemas/teacherSchema.js";
@@ -129,7 +130,10 @@ export function applyLivePlugins() {
   livePlugin(quizAttemptSchema,         { keys: ["quizzes"],   fields: "teacherId studentId", who: tsWho });
   livePlugin(recordingSchema,           { keys: ["recordings"], fields: "teacherId studentId", who: tsWho });
   livePlugin(paymentTransactionSchema,  { keys: ["payments"],  fields: "teacherId studentId", who: tsWho });
-  livePlugin(paymentSchema,             { keys: ["credits", "students"], fields: "studentId", who: (d) => ({ students: ids(d.studentId) }) });
+  livePlugin(payslipSchema,             { keys: ["payments"],  fields: "teacherId", who: (d) => ({ teachers: ids(d.teacherId) }) });
+  livePlugin(teacherPayoutSchema,       { keys: ["payments"],  fields: "teacherId", who: (d) => ({ teachers: ids(d.teacherId) }) });
+  livePlugin(payrollSettingsSchema,     { keys: ["payments"],  fields: "_id", who: () => ({}) }); // admins only
+  livePlugin(paymentSchema,            { keys: ["credits", "students"], fields: "studentId", who: (d) => ({ students: ids(d.studentId) }) });
   livePlugin(teacherAvailabilitySchema, { keys: ["schedule"],  fields: "teacherId", who: (d) => ({ teachers: ids(d.teacherId) }) });
   livePlugin(reviewSchema,              { keys: ["reviews"],   fields: "teacherId studentId", who: tsWho });
   livePlugin(assignmentSchema,          { keys: ["students"],  fields: "teacherId studentId", who: tsWho });

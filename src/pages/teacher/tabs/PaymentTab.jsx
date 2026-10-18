@@ -27,6 +27,7 @@ import api from "../../../api";
 import { useOnDataChanged } from "../../../hooks/useLiveData";
 import Pagination from "../../../components/Pagination";
 import { useCurrencySymbol } from "../../../hooks/useCurrencySymbol";
+import SalaryStatement from "../components/payment/SalaryStatement";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function fmtMoney(n, sym = '$') {
@@ -650,6 +651,9 @@ export default function PaymentTab({ teacher, isDarkMode }) {
         </button>
       </div>
 
+      {/* ── Monthly salary: earnings − charges − loans / part payments = final ── */}
+      <SalaryStatement isDarkMode={isDarkMode} />
+
       {/* ── Pending hero + stats ── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
         <div className="lg:col-span-1">
@@ -810,7 +814,8 @@ export default function PaymentTab({ teacher, isDarkMode }) {
         <span>
           Each completed class automatically adds your rate (
           <strong>{fmtMoney(teacher?.ratePerClass, sym)}</strong>) to your pending balance. 
-          Admin marks transactions as <strong>Paid</strong> once the transfer is sent. 
+          On salary day the center pays your monthly salary (after its charges and any
+          loans / part payments you received) and these classes are marked <strong>Paid</strong>.
           Click any row to see full payment details.
         </span>
       </div>

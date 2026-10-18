@@ -30,6 +30,8 @@ export const paymentTransactionSchema = new mongoose.Schema({
     default: 'bank_transfer',
   },
   notes: { type: String, default: '' },
+  // The monthly salary this was settled in (utils/payroll.js) — counted once, never again
+  payslipId: { type: mongoose.Schema.Types.ObjectId, ref: 'Payslip' },
 }, { timestamps: true });
 
 paymentTransactionSchema.index({ bookingId: 1 }, { unique: true, sparse: true });
@@ -37,6 +39,8 @@ paymentTransactionSchema.index({ groupClassId: 1 }, { unique: true, sparse: true
 paymentTransactionSchema.index({ teacherId: 1, status: 1 });
 paymentTransactionSchema.index({ completedAt: -1 });
 paymentTransactionSchema.index({ paidAt: -1 });
+// Payroll: a teacher's earnings not yet counted in a salary
+paymentTransactionSchema.index({ teacherId: 1, payslipId: 1, completedAt: 1 });
 
 // Deductions are stored as a positive `amount` with type "deduction". Every total
 // must subtract them — use these instead of summing `amount` directly.

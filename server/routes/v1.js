@@ -20,6 +20,7 @@ import classroomRoutes           from "./classroomRoutes.js";
 import groupChatRoutes           from "./groupChatRoutes.js";
 import directMessageRoutes       from "./directMessageRoutes.js";
 import paymentTransactionRoutes  from "./paymentTransactionRoutes.js";
+import payrollRoutes             from "./payrollRoutes.js";
 import recurringBookingsRoutes   from "./recurringBookingsRoutes.js";
 import analyticsRoutes           from "./analyticsRoutes.js";
 import adminLessonRoutes         from "./adminLessonRoutes.js";
@@ -83,6 +84,7 @@ router.use("/classroom",            classroomRoutes);
 router.use("/group-chats",          groupChatRoutes);
 router.use("/direct-messages",      directMessageRoutes);
 router.use("/payment-transactions", paymentTransactionRoutes);
+router.use("/payroll",              payrollRoutes); // monthly teacher salary, charges, loans / part payments
 router.use("/recurring-bookings",   recurringBookingsRoutes);
 router.use("/analytics",            analyticsRoutes);
 router.use("/admin/lessons",        adminLessonRoutes);
