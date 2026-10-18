@@ -8,7 +8,7 @@ import api from "../../../../api";
 import { useOnDataChanged } from "../../../../hooks/useLiveData";
 import { useCurrencySymbol, fmtMoney } from "../../../../hooks/useCurrencySymbol";
 import Pagination from "../../../../components/Pagination";
-import { PAYOUT_METHODS, fmtYmd, periodLabel, todayYmd, inputCls, btnPrimary, btnGhost, card, th, td, methodLabel, errMsg, kindLabel, fmtDateTime } from "./payrollUtils";
+import { PAYOUT_METHODS, fmtYmd, periodLabel, inputCls, btnPrimary, btnGhost, card, th, td, methodLabel, errMsg, kindLabel, fmtDateTime } from "./payrollUtils";
 import { Stat, Breakdown } from "./payrollShared";
 
 function PayModal({ row, period, onClose, onPaid }) {
@@ -18,7 +18,8 @@ function PayModal({ row, period, onClose, onPaid }) {
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const early = period.open && todayYmd() < period.payYmd;
+  // The server decides (center time zone, not this browser's clock)
+  const early = !period.payable;
 
   const pay = async () => {
     setBusy(true); setError("");
@@ -164,14 +165,17 @@ export default function PayrollRunPanel({ onToast, isDarkMode }) {
     ["paid", tr("payroll.statusPaid", "Paid"), counts.paid],
     ["nothing", tr("payroll.filterNothing", "No activity"), counts.nothing],
   ];
-  const today = todayYmd();
-  const dueNow = !period.open || today >= period.payYmd;
+  const dueNow = period.payable;
 
   return (
     <div className="space-y-4">
       {paying && (
         <PayModal row={paying} period={period} onClose={() => setPaying(null)}
-          onPaid={(msg) => { setPaying(null); onToast?.(msg); load(); }} />
+          onPaid={(msg) => {
+            setPaying(null); onToast?.(msg);
+            // Paying on the pay day saves the running period — stay on it, not the next one
+            if (key !== period.key) setKey(period.key); else load();
+          }} />
       )}
 
       <div className="flex flex-col sm:flex-row sm:items-end gap-3 justify-between">
@@ -195,13 +199,13 @@ export default function PayrollRunPanel({ onToast, isDarkMode }) {
         ? "bg-emerald-50 border-emerald-200 text-emerald-800" : "bg-ad-accent-soft border-ad-accent-line text-ad-accent-ink"}`}>
         {dueNow
           ? totals.teachersUnpaid > 0
-            ? tr("payroll.dueBanner", "Salary is due — {{n}} teacher(s) still to pay, {{amount}} in total.", { n: totals.teachersUnpaid, amount: fmtMoney(totals.toPay, sym) })
+            ? tr("payroll.dueBanner", "Salary is due — {{count}} teachers still to pay, {{amount}} in total.", { count: totals.teachersUnpaid, amount: fmtMoney(totals.toPay, sym) })
             : tr("payroll.allPaidBanner", "Every salary for this period has been paid.")
           : tr("payroll.runningBanner", "This period is still running. Figures update as classes are completed; charges are locked in when the period ends. Salary day: {{date}}.", { date: fmtYmd(period.payYmd) })}
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <Stat icon={CalendarClock} cat="cat-teal" label={tr("payroll.classEarningsTotal", "Class earnings")} value={fmtMoney(totals.classEarnings, sym)} sub={tr("payroll.nClasses", "{{n}} classes", { n: totals.classCount })} />
+        <Stat icon={CalendarClock} cat="cat-teal" label={tr("payroll.classEarningsTotal", "Class earnings")} value={fmtMoney(totals.classEarnings, sym)} sub={tr("payroll.nClasses", "{{count}} classes", { count: totals.classCount })} />
         <Stat icon={Percent} cat="cat-accent" label={tr("payroll.chargesCollected", "Charges collected")} value={fmtMoney(totals.chargesTotal, sym)}
           sub={(totals.chargeTotals || []).map((c) => c.name).join(", ") || tr("payroll.noCharges", "No charges set")} />
         <Stat icon={HandCoins} cat="cat-amber" label={tr("payroll.advancesTotal", "Loans / part payments")} value={fmtMoney(totals.advancesTotal, sym)} />

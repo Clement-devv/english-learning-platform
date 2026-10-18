@@ -11,6 +11,7 @@ import { studentSchema }            from "../schemas/studentSchema.js";
 import { adminSchema }              from "../schemas/adminSchema.js";
 import { parsePagination }          from "../utils/pagination.js";
 import { adjustTeacherEarnings }    from "../utils/classPayment.js";
+import { decryptField }             from "../utils/encryption.js";
 import logger from "../utils/logger.js";
 import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
 
@@ -363,7 +364,11 @@ router.get("/summary", verifyToken, verifyAdmin, requireAnalyticsUnlock, async (
       bankName: t.bankName || "", accountNumber: t.accountNumber || "", accountName: t.accountName || "",
     }));
 
-    const summary = [...rows, ...zeroRows];
+    // Bank details are encrypted at rest; aggregate / lean reads skip the schema getter
+    const summary = [...rows, ...zeroRows].map((t) => ({
+      ...t,
+      bankName: decryptField(t.bankName) || "", accountNumber: decryptField(t.accountNumber) || "", accountName: decryptField(t.accountName) || "",
+    }));
 
     const overallTotals = {
       totalPending:  summary.reduce((sum, t) => sum + t.pendingAmount, 0),

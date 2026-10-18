@@ -148,8 +148,8 @@ describe('salary run', () => {
     expect(pay.body.data).toMatchObject({ net: -230, amountPaid: 0, carryForward: 230 })
 
     // A class in the next period: 200 − 20 − 230 debt = −50
-    const nextView = await get('/admin/periods')
-    const next = nextView.body.data.period
+    const list = (await get('/admin/periods')).body.data.periods
+    const next = (await get(`/admin/periods/${list.find((p) => p.open).key}`)).body.data.period
     expect(next.key > key).toBe(true)
     await classTx(200, new Date(new Date(next.startAt).getTime() + 3600_000))
     const row = myRow((await get(`/admin/periods/${next.key}`)).body)
@@ -185,6 +185,30 @@ describe('teacher statement', () => {
   it('is admin-only for the admin routes', async () => {
     const res = await request(app).get('/api/payroll/admin/periods').set('Authorization', `Bearer ${teacherToken}`)
     expect(res.status).toBe(403)
+  })
+})
+
+describe('salary run fixes', () => {
+  it('stays on the period just paid early instead of jumping to the next one', async () => {
+    await classTx(100)
+    const before = await get('/admin/periods')
+    const key = before.body.data.period.key
+    await post(`/admin/periods/${key}/settle`, { teacherId: String(teacher._id), early: true })
+    const after = await get('/admin/periods')
+    expect(after.body.data.period.key).toBe(key) // still running → still the default
+    expect(after.body.data.period.payable).toBe(true)
+  })
+
+  it('shows bank details decrypted', async () => {
+    const t = await Teacher.findById(teacher._id)
+    t.bankName = 'Test Bank'; t.accountNumber = '0123456789'; t.accountName = 'Test Teacher'
+    await t.save()
+    try {
+      await classTx(100)
+      expect(myRow((await get('/admin/periods')).body)).toMatchObject({ bankName: 'Test Bank', accountNumber: '0123456789', accountName: 'Test Teacher' })
+    } finally {
+      await Teacher.updateOne({ _id: teacher._id }, { $set: { bankName: '', accountNumber: '', accountName: '' } })
+    }
   })
 })
 

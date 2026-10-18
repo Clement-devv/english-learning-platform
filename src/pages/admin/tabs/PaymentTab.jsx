@@ -106,7 +106,7 @@ export default function PaymentsTab({ isDarkMode }) {
 
     return (
       <span className={`px-3 py-1 rounded-full text-xs font-semibold ${styles[status] || styles.pending}`}>
-        {status.charAt(0).toUpperCase() + status.slice(1)}
+        {{ pending: tr("payroll.statusPending", "Pending"), paid: tr("payroll.statusPaid", "Paid"), cancelled: tr("payroll.statusCancelled", "Cancelled") }[status] || status}
       </span>
     );
   };
@@ -331,7 +331,10 @@ export default function PaymentsTab({ isDarkMode }) {
               <table className="min-w-full divide-y divide-stone-200 dark:divide-stone-700">
                 <thead className={isDarkMode ? 'bg-stone-700' : 'bg-stone-50'}>
                   <tr>
-                    {['Teacher', 'Account Holder Name', 'Bank Name', 'Account Number', 'Status'].map(h => (
+                    {[
+                      tr("paymentTab.teacher"), tr("payroll.colAccountHolder", "Account Holder Name"), tr("payroll.colBankName", "Bank Name"),
+                      tr("payroll.colAccountNumber", "Account Number"), tr("paymentTab.status"),
+                    ].map(h => (
                       <th key={h} className={`px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider ${isDarkMode ? 'text-stone-300' : 'text-stone-500'}`}>
                         {h}
                       </th>

@@ -96,11 +96,11 @@ export default function PayrollSettingsPanel({ onToast }) {
 
       <section className={`${card} p-4 space-y-3`}>
         <div className="flex items-center justify-between gap-2">
-          <h3 className="font-bold text-ad-ink">{tr("payroll.chargesTitle", "General charges for every teacher")}</h3>
+          <h3 className="font-bold text-ad-ink">{tr("payroll.chargesTitle", "Charges taken from salaries")}</h3>
           <button onClick={addCharge} className={`${btnGhost} inline-flex items-center gap-1 !py-1.5`}><Plus className="w-4 h-4" /> {tr("payroll.addCharge", "Add charge")}</button>
         </div>
         <p className="text-xs text-ad-muted">
-          {tr("payroll.chargesHelp", "Taken automatically from each salary. A percentage is worked out on the teacher's total class earnings for the period — even if part of it was already paid early. A fixed amount is taken from every teacher who taught that period.")}
+          {tr("payroll.chargesHelp", "Taken automatically from each salary. A percentage is worked out on the teacher's total class earnings for the period — even if part of it was already paid early. A fixed amount is taken from each teacher it applies to who taught that period. Each charge can apply to all teachers, some regions or teachers you pick.")}
         </p>
         {form.charges.length === 0 && <p className="text-sm text-ad-muted">{tr("payroll.noCharges", "No charges set")}</p>}
         {form.charges.map((c, i) => (

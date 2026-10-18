@@ -159,7 +159,7 @@ export default function PayoutsPanel({ onToast, isDarkMode }) {
         <div className="p-4 border-b border-ad-line space-y-3">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <h3 className="font-bold text-ad-ink">{tr("payroll.historyTitle", "Payment history — all teachers")}</h3>
-            <p className="text-sm text-ad-muted">{tr("payroll.historyTotal", "{{n}} payments · {{amount}} in total", { n: pager.total, amount: fmtMoney(total, sym) })}</p>
+            <p className="text-sm text-ad-muted">{tr("payroll.historyTotal", "{{count}} payments · {{amount}} in total", { count: pager.total, amount: fmtMoney(total, sym) })}</p>
           </div>
           <div className="grid grid-cols-2 lg:grid-cols-5 gap-2">
             <div className="col-span-2">

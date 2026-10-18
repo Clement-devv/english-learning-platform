@@ -35,7 +35,7 @@ export function Line({ label, amount, sym, fmt, minus, strong, muted }) {
 export function Breakdown({ row, sym, fmt, tr }) {
   return (
     <div>
-      <Line label={tr("payroll.classEarnings", "Class earnings ({{n}} classes)", { n: row.classCount || 0 })} amount={row.classEarnings} sym={sym} fmt={fmt} strong={false} />
+      <Line label={tr("payroll.classEarnings", "Class earnings ({{count}} classes)", { count: row.classCount || 0 })} amount={row.classEarnings} sym={sym} fmt={fmt} strong={false} />
       <Line label={tr("payroll.bonuses", "Bonuses / adjustments")} amount={row.bonuses} sym={sym} fmt={fmt} />
       <Line label={tr("payroll.manualDeductions", "Deductions")} amount={row.manualDeductions} sym={sym} fmt={fmt} minus />
       {(row.charges || []).map((c) => (

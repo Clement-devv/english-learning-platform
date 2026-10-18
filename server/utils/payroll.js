@@ -162,13 +162,31 @@ export async function syncPeriods(db, s, tz, now = new Date()) {
   return { open, saved };
 }
 
-/** A period by key: the open one or a saved one. */
+/**
+ * A period by key: the open one or a saved one. With no key, the one the admin should
+ * see first: the latest saved period while it is still running (paid early on its pay
+ * day) or still has salaries to pay — otherwise the running one.
+ */
 export async function findPeriod(db, s, tz, key, now = new Date()) {
   const { open, saved } = await syncPeriods(db, s, tz, now);
-  if (!key || key === open.key) return { period: open, open, saved };
+  if (!key) {
+    const last = saved[0];
+    if (last && (last.endAt > now || await hasUnsettled(db, last))) return { period: last, open, saved };
+    return { period: open, open, saved };
+  }
+  if (key === open.key) return { period: open, open, saved };
   const period = saved.find((p) => p.key === key);
   if (!period) throw new PayrollError("Pay period not found", 404);
   return { period, open, saved };
+}
+
+/** Any earnings or loans / part payments up to this period's end not yet counted in a salary? */
+async function hasUnsettled(db, period) {
+  const [tx, payout] = await Promise.all([
+    getPaymentTransaction(db).exists({ payslipId: null, status: "pending", completedAt: { $lt: period.endAt } }),
+    getTeacherPayout(db).exists({ payslipId: null, voided: false, kind: { $in: ADVANCE_KINDS }, paidAt: { $lt: period.endAt } }),
+  ]);
+  return !!(tx || payout);
 }
 
 const previousOf = (period, saved) => saved.find((p) => p.endAt < period.endAt) || null;

@@ -23,6 +23,7 @@ import { verifyToken, verifyAdmin, verifyTeacher } from "../middleware/authMiddl
 import { requireAnalyticsUnlock } from "../middleware/analyticsPinMiddleware.js";
 import { parsePagination } from "../utils/pagination.js";
 import { toMoney } from "../utils/classPayment.js";
+import { zonedToUtc } from "../utils/schedule.js";
 import { PAYOUT_METHODS, ADVANCE_KINDS, CHARGE_REGIONS } from "../schemas/payrollSchemas.js";
 import { teacherSchema } from "../schemas/teacherSchema.js";
 import {
@@ -189,14 +190,15 @@ router.post("/admin/payouts/:id/void", ...admin, handle("voiding payment", async
   ok(res, { data: payout, message: "Payment voided" });
 }));
 
-/** ?teacherId= &kind= &from= &to= (YYYY-MM-DD) shared by the two history lists */
+/** ?teacherId= &kind= &from= &to= (YYYY-MM-DD, whole days in the center's time zone) shared by the two history lists */
 function historyFilter(req, dateField) {
+  const tz = centerTz(req.center);
   const q = req.query;
   const filter = {};
   if (mongoose.isValidObjectId(q.teacherId)) filter.teacherId = new mongoose.Types.ObjectId(String(q.teacherId));
   const range = {};
-  if (KEY.test(q.from || "")) range.$gte = new Date(`${q.from}T00:00:00Z`);
-  if (KEY.test(q.to || ""))   range.$lt  = new Date(new Date(`${q.to}T00:00:00Z`).getTime() + 86400000);
+  if (KEY.test(q.from || "")) range.$gte = zonedToUtc(q.from, "00:00", tz);
+  if (KEY.test(q.to || ""))   range.$lt  = zonedToUtc(q.to, "24:00", tz);
   if (Object.keys(range).length) filter[dateField] = range;
   return filter;
 }

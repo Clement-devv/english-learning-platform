@@ -11,10 +11,6 @@ export function fmtDateTime(d) {
   return new Date(d).toLocaleString(dateLocale("en-US"), { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
-export const todayYmd = () => {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-};
 
 export const inputCls = "w-full px-3 py-2 text-sm rounded-lg border border-ad-line bg-ad-surface text-ad-ink placeholder:text-ad-muted focus:outline-none focus:ring-2 focus:ring-[var(--a-accent-line)]";
 export const btnPrimary = "px-4 py-2 rounded-lg text-sm font-semibold bg-ad-accent text-ad-on-accent hover:bg-ad-accent-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
@@ -39,7 +35,7 @@ export const regionName = (r, tr) => tr(`payroll.region${r}`, r);
 
 /** "Asia, Europe" / "3 teachers" / "" (all teachers) — who a charge is taken from */
 export const scopeLabel = (c, tr) => (c.appliesTo === "regions" ? (c.regions || []).map((r) => regionName(r, tr)).join(", ")
-  : c.appliesTo === "teachers" ? tr("payroll.nTeachers", "{{n}} teachers", { n: (c.teacherIds || []).length }) : "");
+  : c.appliesTo === "teachers" ? tr("payroll.nTeachers", "{{count}} teachers", { count: (c.teacherIds || []).length }) : "");
 
 export const teacherLabel = (t) => `${t.firstName || ""} ${t.lastName || ""}`.trim();
 
