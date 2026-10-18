@@ -1,14 +1,15 @@
 // src/pages/admin/tabs/payroll/PayoutsPanel.jsx
 // Pay a teacher any amount on any day (a loan or a part payment of their salary)
 // and the full history of every payment made to every teacher.
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { HandCoins, Ban } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import api from "../../../../api";
 import { useOnDataChanged } from "../../../../hooks/useLiveData";
 import Pagination from "../../../../components/Pagination";
 import { useCurrencySymbol, fmtMoney } from "../../../../hooks/useCurrencySymbol";
-import { PAYOUT_METHODS, inputCls, btnPrimary, btnGhost, card, th, td, kindLabel, methodLabel, fmtDateTime, errMsg } from "./payrollUtils";
+import { PAYOUT_METHODS, inputCls, btnPrimary, btnGhost, card, th, td, kindLabel, methodLabel, fmtDateTime, errMsg, teacherLabel } from "./payrollUtils";
+import TeacherSelect from "./TeacherSelect";
 
 const KIND_STYLE = {
   loan: "bg-amber-50 text-amber-700",
@@ -24,14 +25,26 @@ function AdvanceForm({ teachers, onSaved }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
-  const teacher = teachers.find((t) => String(t.teacherId) === form.teacherId);
+  const teacher = teachers.find((t) => String(t._id) === form.teacherId);
+
+  // The chosen teacher's salary so far this period (their own statement)
+  const [soFar, setSoFar] = useState(null);
+  useEffect(() => {
+    setSoFar(null);
+    if (!form.teacherId) return;
+    let stale = false;
+    api.get(`/payroll/admin/teacher/${form.teacherId}`)
+      .then((r) => { if (!stale) setSoFar(r.data.data.current.find((c) => c.period.open) || null); })
+      .catch(() => {});
+    return () => { stale = true; };
+  }, [form.teacherId]);
 
   const submit = async (e) => {
     e.preventDefault();
     const amount = Number(form.amount);
     if (!form.teacherId || !(amount > 0)) { setError(tr("payroll.fillTeacherAmount", "Choose a teacher and enter an amount")); return; }
     if (!window.confirm(tr("payroll.confirmAdvance", "Record {{kind}} of {{amount}} to {{name}}? It will come off their next salary.", {
-      kind: kindLabel(form.kind, tr).toLowerCase(), amount: fmtMoney(amount, sym), name: teacher?.teacherName || "",
+      kind: kindLabel(form.kind, tr).toLowerCase(), amount: fmtMoney(amount, sym), name: teacher ? teacherLabel(teacher) : "",
     }))) return;
     setBusy(true); setError("");
     try {
@@ -55,14 +68,13 @@ function AdvanceForm({ teachers, onSaved }) {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
         <label className="block lg:col-span-2">
           <span className="block text-xs font-semibold text-ad-muted mb-1">{tr("paymentTab.teacher")}</span>
-          <select value={form.teacherId} onChange={set("teacherId")} className={inputCls} required>
-            <option value="">{tr("payroll.chooseTeacher", "Choose a teacher…")}</option>
-            {teachers.map((t) => (
-              <option key={t.teacherId} value={t.teacherId}>
-                {t.teacherName}{t.status === "unpaid" ? ` — ${tr("payroll.salarySoFar", "salary so far {{amount}}", { amount: fmtMoney(t.amountPaid, sym) })}` : ""}
-              </option>
-            ))}
-          </select>
+          <TeacherSelect teachers={teachers} value={form.teacherId} onChange={(v) => setForm((f) => ({ ...f, teacherId: v }))}
+            emptyLabel={tr("payroll.chooseTeacher", "Choose a teacher…")} required ariaLabel={tr("paymentTab.teacher")} />
+          {soFar && (
+            <span className="block text-xs text-ad-muted mt-1">
+              {tr("payroll.salarySoFarLine", "Salary so far this period: {{amount}}", { amount: fmtMoney(soFar.amountPaid, sym) })}
+            </span>
+          )}
         </label>
         <label className="block">
           <span className="block text-xs font-semibold text-ad-muted mb-1">{tr("payroll.type", "Type")}</span>
@@ -87,7 +99,7 @@ function AdvanceForm({ teachers, onSaved }) {
           placeholder={tr("payroll.notesPlaceholder", "Note (e.g. reason, transfer reference)")} />
         <button type="submit" disabled={busy} className={btnPrimary}>{busy ? tr("payroll.saving", "Saving…") : tr("payroll.recordPayment", "Record payment")}</button>
       </div>
-      {teacher?.status === "unpaid" && Number(form.amount) > teacher.amountPaid && (
+      {soFar && Number(form.amount) > soFar.amountPaid && (
         <p className="text-xs text-amber-700">{tr("payroll.moreThanEarned", "This is more than the teacher's salary so far — the difference will be owed and carried into later salaries.")}</p>
       )}
       {error && <p className="text-sm text-rose-600" role="alert">{error}</p>}
@@ -97,6 +109,8 @@ function AdvanceForm({ teachers, onSaved }) {
 
 export default function PayoutsPanel({ onToast, isDarkMode }) {
   const { t: tr } = useTranslation("admin");
+  const toast = useRef(onToast);
+  toast.current = onToast;
   const sym = useCurrencySymbol();
   const [teachers, setTeachers] = useState([]);
   const [items, setItems] = useState([]);
@@ -107,7 +121,7 @@ export default function PayoutsPanel({ onToast, isDarkMode }) {
   const [loading, setLoading] = useState(true);
 
   const loadTeachers = useCallback(() => {
-    api.get("/payroll/admin/periods").then((r) => setTeachers(r.data.data.rows)).catch(() => {});
+    api.get("/payroll/admin/teachers").then((r) => setTeachers(r.data.data)).catch(() => {});
   }, []);
   const loadHistory = useCallback(async () => {
     try {
@@ -115,9 +129,9 @@ export default function PayoutsPanel({ onToast, isDarkMode }) {
       const r = await api.get("/payroll/admin/payouts", { params });
       setItems(r.data.data.items); setPager(r.data.data.pagination); setTotal(r.data.data.total);
     } catch (err) {
-      onToast?.(errMsg(err, tr("payroll.loadFailed", "Couldn't load payroll")));
+      toast.current?.(errMsg(err, tr("payroll.loadFailed", "Couldn't load payroll")));
     } finally { setLoading(false); }
-  }, [page, filter, onToast, tr]);
+  }, [page, filter, tr]);
 
   useEffect(() => { loadTeachers(); }, [loadTeachers]);
   useEffect(() => { loadHistory(); }, [loadHistory]);
@@ -147,11 +161,11 @@ export default function PayoutsPanel({ onToast, isDarkMode }) {
             <h3 className="font-bold text-ad-ink">{tr("payroll.historyTitle", "Payment history — all teachers")}</h3>
             <p className="text-sm text-ad-muted">{tr("payroll.historyTotal", "{{n}} payments · {{amount}} in total", { n: pager.total, amount: fmtMoney(total, sym) })}</p>
           </div>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
-            <select value={filter.teacherId} onChange={setF("teacherId")} className={inputCls} aria-label={tr("paymentTab.teacher")}>
-              <option value="">{tr("payroll.allTeachers", "All teachers")}</option>
-              {teachers.map((t) => <option key={t.teacherId} value={t.teacherId}>{t.teacherName}</option>)}
-            </select>
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-2">
+            <div className="col-span-2">
+              <TeacherSelect teachers={teachers} value={filter.teacherId} onChange={(v) => { setPage(1); setFilter((f) => ({ ...f, teacherId: v })); }}
+                emptyLabel={tr("payroll.allTeachers", "All teachers")} ariaLabel={tr("paymentTab.teacher")} />
+            </div>
             <select value={filter.kind} onChange={setF("kind")} className={inputCls} aria-label={tr("payroll.type", "Type")}>
               <option value="">{tr("payroll.allTypes", "All types")}</option>
               {["salary", "part_payment", "loan"].map((k) => <option key={k} value={k}>{kindLabel(k, tr)}</option>)}

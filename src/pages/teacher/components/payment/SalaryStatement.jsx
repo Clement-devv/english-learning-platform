@@ -108,10 +108,23 @@ export default function SalaryStatement({ isDarkMode }) {
   const sym = useCurrencySymbol();
   const [data, setData] = useState(null);
   const [failed, setFailed] = useState(false);
+  // Payslips / payments received: the first page comes with /payroll/me, "Load more" fetches the next
+  const [lists, setLists] = useState({ payslips: null, payouts: null });
+  const [loadingMore, setLoadingMore] = useState("");
 
   const load = useCallback(() => {
-    api.get("/payroll/me").then((r) => { setData(r.data.data); setFailed(false); }).catch(() => setFailed(true));
+    api.get("/payroll/me").then((r) => {
+      setData(r.data.data); setFailed(false);
+      setLists({ payslips: r.data.data.payslips, payouts: r.data.data.payouts });
+    }).catch(() => setFailed(true));
   }, []);
+  const loadMore = async (type) => {
+    setLoadingMore(type);
+    try {
+      const r = await api.get("/payroll/me/history", { params: { type, page: lists[type].pagination.page + 1 } });
+      setLists((l) => ({ ...l, [type]: { items: [...l[type].items, ...r.data.data.items], pagination: r.data.data.pagination } }));
+    } catch { /* keep what's shown */ } finally { setLoadingMore(""); }
+  };
   useEffect(() => { load(); }, [load]);
   useOnDataChanged(["payments"], load);
 
@@ -121,6 +134,19 @@ export default function SalaryStatement({ isDarkMode }) {
   const cardCls = `rounded-2xl border overflow-hidden shadow-sm ${isDarkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"}`;
   const head = `text-sm font-bold ${isDarkMode ? "text-white" : "text-gray-900"}`;
   const charges = data.settings.charges || [];
+  const payslips = lists.payslips?.items || [];
+  const payouts = lists.payouts?.items || [];
+  const moreBtn = (type) => {
+    const pg = lists[type]?.pagination;
+    if (!pg || pg.page >= pg.totalPages) return null;
+    return (
+      <button onClick={() => loadMore(type)} disabled={loadingMore === type}
+        className={`w-full py-2.5 text-xs font-semibold border-t transition-colors disabled:opacity-60 ${isDarkMode
+          ? "border-gray-700 text-purple-300 hover:bg-gray-700/40" : "border-gray-100 text-purple-600 hover:bg-gray-50"}`}>
+        {loadingMore === type ? "Loading…" : `Load more (${pg.total - (type === "payslips" ? payslips : payouts).length} older)`}
+      </button>
+    );
+  };
 
   return (
     <div className="space-y-4">
@@ -144,9 +170,10 @@ export default function SalaryStatement({ isDarkMode }) {
             <CheckCircle className={`w-4 h-4 ${isDarkMode ? "text-emerald-300" : "text-emerald-600"}`} />
             <p className={head}>Payslips</p>
           </div>
-          {data.payslips.length === 0
+          {payslips.length === 0
             ? <p className={`px-4 pb-4 text-sm ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>No salary paid yet.</p>
-            : data.payslips.map((p) => <PayslipRow key={p._id} p={p} isDarkMode={isDarkMode} sym={sym} />)}
+            : payslips.map((p) => <PayslipRow key={p._id} p={p} isDarkMode={isDarkMode} sym={sym} />)}
+          {moreBtn("payslips")}
         </div>
 
         <div className={cardCls}>
@@ -154,11 +181,11 @@ export default function SalaryStatement({ isDarkMode }) {
             <HandCoins className={`w-4 h-4 ${isDarkMode ? "text-amber-300" : "text-amber-600"}`} />
             <p className={head}>Payments received</p>
           </div>
-          {data.payouts.length === 0
+          {payouts.length === 0
             ? <p className={`px-4 pb-4 text-sm ${isDarkMode ? "text-gray-400" : "text-gray-500"}`}>No payments yet.</p>
             : (
               <div className="max-h-96 overflow-y-auto">
-                {data.payouts.map((p) => (
+                {payouts.map((p) => (
                   <div key={p._id} className={`flex items-center justify-between gap-3 px-4 py-2.5 border-t text-sm ${isDarkMode ? "border-gray-700" : "border-gray-100"} ${p.voided ? "opacity-50" : ""}`}>
                     <div className="min-w-0">
                       <p className={`font-medium ${isDarkMode ? "text-gray-100" : "text-gray-800"}`}>
@@ -173,6 +200,7 @@ export default function SalaryStatement({ isDarkMode }) {
                     <span className={`tabular-nums font-semibold flex-shrink-0 ${p.voided ? "line-through" : ""} ${isDarkMode ? "text-gray-100" : "text-gray-900"}`}>{fmtMoney(p.amount, sym)}</span>
                   </div>
                 ))}
+                {moreBtn("payouts")}
               </div>
             )}
         </div>

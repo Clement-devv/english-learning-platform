@@ -2,11 +2,12 @@
 // Salary run for one pay period: every teacher's class earnings, general charges,
 // loans / part payments already handed over and the final salary — and "Pay salary".
 import { useState, useEffect, useCallback, Fragment } from "react";
-import { CalendarClock, Wallet, Percent, HandCoins, CheckCircle, ChevronDown, ChevronRight, X } from "lucide-react";
+import { CalendarClock, Wallet, Percent, HandCoins, CheckCircle, ChevronDown, ChevronRight, X, Search } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import api from "../../../../api";
 import { useOnDataChanged } from "../../../../hooks/useLiveData";
 import { useCurrencySymbol, fmtMoney } from "../../../../hooks/useCurrencySymbol";
+import Pagination from "../../../../components/Pagination";
 import { PAYOUT_METHODS, fmtYmd, periodLabel, todayYmd, inputCls, btnPrimary, btnGhost, card, th, td, methodLabel, errMsg, kindLabel, fmtDateTime } from "./payrollUtils";
 import { Stat, Breakdown } from "./payrollShared";
 
@@ -120,7 +121,9 @@ function RowDetail({ row }) {
   );
 }
 
-export default function PayrollRunPanel({ onToast }) {
+const PAGE_SIZE = 25;
+
+export default function PayrollRunPanel({ onToast, isDarkMode }) {
   const { t: tr } = useTranslation("admin");
   const sym = useCurrencySymbol();
   const [key, setKey] = useState("");
@@ -129,22 +132,38 @@ export default function PayrollRunPanel({ onToast }) {
   const [error, setError] = useState("");
   const [open, setOpen] = useState(null);
   const [paying, setPaying] = useState(null);
+  // Paged on the server — totals above the table still cover every teacher
+  const [page, setPage] = useState(1);
+  const [status, setStatus] = useState("");
+  const [search, setSearch] = useState("");
+  const [q, setQ] = useState("");
+  useEffect(() => { const t = setTimeout(() => setQ(search.trim()), 300); return () => clearTimeout(t); }, [search]);
+  useEffect(() => { setPage(1); setOpen(null); }, [key, status, q]);
 
   const load = useCallback(async () => {
     try {
-      const res = await api.get(key ? `/payroll/admin/periods/${key}` : "/payroll/admin/periods");
+      const res = await api.get(key ? `/payroll/admin/periods/${key}` : "/payroll/admin/periods", {
+        params: { page, limit: PAGE_SIZE, status: status || undefined, q: q || undefined },
+      });
       setData(res.data.data); setError("");
     } catch (err) {
       setError(errMsg(err, tr("payroll.loadFailed", "Couldn't load payroll")));
     } finally { setLoading(false); }
-  }, [key, tr]);
+  }, [key, page, status, q, tr]);
   useEffect(() => { load(); }, [load]);
   useOnDataChanged(["payments"], load);
 
   if (loading) return <div className="py-12 flex justify-center"><div className="animate-spin rounded-full h-10 w-10 border-b-2 border-ad-accent" /></div>;
   if (error && !data) return <p className="text-sm text-rose-600">{error}</p>;
 
-  const { period, periods, rows, totals } = data;
+  const { period, periods, rows, totals, counts, pagination } = data;
+  const filters = [
+    ["", tr("payroll.filterAll", "All"), counts.all],
+    ["unpaid", tr("payroll.filterUnpaid", "To pay"), counts.unpaid],
+    ["owes", tr("payroll.filterOwes", "Owes the center"), counts.owes],
+    ["paid", tr("payroll.statusPaid", "Paid"), counts.paid],
+    ["nothing", tr("payroll.filterNothing", "No activity"), counts.nothing],
+  ];
   const today = todayYmd();
   const dueNow = !period.open || today >= period.payYmd;
 
@@ -191,6 +210,22 @@ export default function PayrollRunPanel({ onToast }) {
       </div>
 
       <div className={`${card} overflow-hidden`}>
+        <div className="flex flex-col lg:flex-row gap-2 lg:items-center justify-between p-3 border-b border-ad-line">
+          <div className="flex flex-wrap gap-1" role="tablist" aria-label={tr("payroll.filterLabel", "Show")}>
+            {filters.map(([k, label, n]) => (
+              <button key={k || "all"} role="tab" aria-selected={status === k} onClick={() => setStatus(k)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${status === k
+                  ? "bg-ad-accent-soft border-ad-accent-line text-ad-accent-ink" : "border-transparent text-ad-ink-2 hover:bg-ad-raised"}`}>
+                {label} <span className="opacity-60 tabular-nums">{n}</span>
+              </button>
+            ))}
+          </div>
+          <div className="relative lg:w-72">
+            <Search className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-ad-muted" />
+            <input value={search} onChange={(e) => setSearch(e.target.value)} className={`${inputCls} !pl-8`}
+              placeholder={tr("payroll.searchTeachersEmail", "Search name, ID or email…")} aria-label={tr("payroll.searchTeachersEmail", "Search name, ID or email…")} />
+          </div>
+        </div>
         <div className="overflow-x-auto">
           <table className="min-w-full">
             <thead>
@@ -207,7 +242,7 @@ export default function PayrollRunPanel({ onToast }) {
             </thead>
             <tbody>
               {rows.length === 0 && (
-                <tr><td colSpan={8} className={`${td} text-center text-ad-muted py-10`}>{tr("paymentTab.noTeachersFound")}</td></tr>
+                <tr><td colSpan={8} className={`${td} text-center text-ad-muted py-10`}>{q || status ? tr("payroll.noTeacherMatch", "No teachers match") : tr("paymentTab.noTeachersFound")}</td></tr>
               )}
               {rows.map((r) => {
                 const id = String(r.teacherId);
@@ -246,6 +281,10 @@ export default function PayrollRunPanel({ onToast }) {
               })}
             </tbody>
           </table>
+        </div>
+        <div className="px-4">
+          <Pagination page={pagination.page} totalPages={pagination.totalPages} total={pagination.total} pageSize={pagination.limit}
+            onPage={(p) => { setPage(p); setOpen(null); }} isDarkMode={isDarkMode} />
         </div>
       </div>
       <p className="text-xs text-ad-muted">

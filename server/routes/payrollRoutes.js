@@ -2,16 +2,18 @@
 //
 // Teacher
 //   GET  /me                          — this period's salary so far, payslips, payments received
+//   GET  /me/history?type=payslips|payouts&page= — older payslips / payments
 // Admin (behind the analytics PIN, like the rest of Payments)
 //   GET  /admin/settings              PUT /admin/settings   — pay day, cycle, charges, retention
-//   GET  /admin/periods/:key?         — every teacher's salary for a period ("current" = running one)
+//   GET  /admin/periods/:key?         — teachers' salaries for a period, paged (?page &limit &q &status)
+//   GET  /admin/teachers              — id / name / region of every teacher (pickers)
 //   POST /admin/periods/:key/settle   — pay one teacher's salary for that period
 //   POST /admin/payouts               — loan / part payment to a teacher, any amount, any day
 //   POST /admin/payouts/:id/void      — cancel a mistaken loan / part payment (before it's counted)
 //   GET  /admin/payouts               — every payment made to teachers (history)
 //   GET  /admin/payslips              — settled salaries (history)
 //   GET  /admin/charges               — what the general charges have collected
-//   GET  /admin/teacher/:id           — one teacher's statement, as they see it
+//   GET  /admin/teacher/:id           — one teacher's statement, as they see it (+ /history)
 //
 // The calculation lives in utils/payroll.js.
 import express from "express";
@@ -21,10 +23,11 @@ import { verifyToken, verifyAdmin, verifyTeacher } from "../middleware/authMiddl
 import { requireAnalyticsUnlock } from "../middleware/analyticsPinMiddleware.js";
 import { parsePagination } from "../utils/pagination.js";
 import { toMoney } from "../utils/classPayment.js";
-import { PAYOUT_METHODS, ADVANCE_KINDS } from "../schemas/payrollSchemas.js";
+import { PAYOUT_METHODS, ADVANCE_KINDS, CHARGE_REGIONS } from "../schemas/payrollSchemas.js";
+import { teacherSchema } from "../schemas/teacherSchema.js";
 import {
   PayrollError, centerTz, loadSettings, getPayrollSettings, getPayslip, getTeacherPayout,
-  periodView, teacherStatement, recordAdvance, voidAdvance, settleSalary, applyRetention,
+  periodView, teacherStatement, teacherHistory, chargeApplies, recordAdvance, voidAdvance, settleSalary, applyRetention,
 } from "../utils/payroll.js";
 import logger from "../utils/logger.js";
 import { ok, created, badRequest, serverError } from "../utils/apiResponse.js";
@@ -35,6 +38,11 @@ router.use(tenantMiddleware);
 const MAX_AMOUNT = 1_000_000;
 const admin = [verifyToken, verifyAdmin, requireAnalyticsUnlock];
 const KEY = /^\d{4}-\d{2}-\d{2}$/;
+
+const getTeacher = (db) => db.models.Teacher || db.model("Teacher", teacherSchema);
+/** Teachers a charge can be aimed at (settings page picker) */
+const chargeTeachers = (db) => getTeacher(db).find({ status: { $ne: "suspended" } })
+  .select("firstName lastName teacherCode continent active").sort({ firstName: 1, lastName: 1 }).lean();
 
 const text = (v, max = 500) => (typeof v === "string" ? v.trim().slice(0, max) : "");
 const method = (v) => (PAYOUT_METHODS.includes(v) ? v : null);
@@ -58,9 +66,16 @@ router.get("/me", verifyToken, verifyTeacher, handle("loading salary", async (re
   ok(res, { data: await teacherStatement(req.db, s, centerTz(req.center), req.teacher._id) });
 }));
 
+const HISTORY_TYPES = ["payslips", "payouts"];
+router.get("/me/history", verifyToken, verifyTeacher, handle("loading salary history", async (req, res) => {
+  if (!HISTORY_TYPES.includes(req.query.type)) return badRequest(res, "type must be payslips or payouts");
+  ok(res, { data: await teacherHistory(req.db, req.teacher._id, req.query.type, { page: req.query.page }) });
+}));
+
 // ── Settings ─────────────────────────────────────────────────────────────────
 router.get("/admin/settings", ...admin, handle("loading payroll settings", async (req, res) => {
-  ok(res, { data: { ...(await loadSettings(req.db)), timezone: centerTz(req.center) } });
+  const [settings, teachers] = await Promise.all([loadSettings(req.db), chargeTeachers(req.db)]);
+  ok(res, { data: { ...settings, timezone: centerTz(req.center), teachers, regions: CHARGE_REGIONS } });
 }));
 
 router.put("/admin/settings", ...admin, handle("saving payroll settings", async (req, res) => {
@@ -84,13 +99,28 @@ router.put("/admin/settings", ...admin, handle("saving payroll settings", async 
     if (!(value > 0) || (c.kind === "percent" && value > 100) || value > MAX_AMOUNT) {
       return badRequest(res, `"${name}": ${c.kind === "percent" ? "percent must be between 0.01 and 100" : "enter an amount above 0"}`);
     }
+    // Who pays it: every teacher, the teachers picked, or teachers in the regions picked
+    const appliesTo = ["all", "teachers", "regions"].includes(c.appliesTo) ? c.appliesTo : "all";
+    const teacherIds = appliesTo === "teachers"
+      ? [...new Set((Array.isArray(c.teacherIds) ? c.teacherIds : []).map(String))].filter((id) => mongoose.isValidObjectId(id))
+      : [];
+    const regions = appliesTo === "regions"
+      ? [...new Set((Array.isArray(c.regions) ? c.regions : []).filter((r) => CHARGE_REGIONS.includes(r)))]
+      : [];
+    if (appliesTo === "teachers" && (teacherIds.length === 0 || teacherIds.length > 5000)) return badRequest(res, `"${name}": pick at least one teacher`);
+    if (appliesTo === "regions" && regions.length === 0) return badRequest(res, `"${name}": pick at least one region`);
     charges.push({
       ...(mongoose.isValidObjectId(c._id) ? { _id: c._id } : {}),
-      name, kind: c.kind, value, active: c.active !== false,
+      name, kind: c.kind, value, active: c.active !== false, appliesTo, teacherIds, regions,
     });
   }
-  const totalPercent = charges.filter((c) => c.active && c.kind === "percent").reduce((s, c) => s + c.value, 0);
-  if (totalPercent > 100) return badRequest(res, "Percentage charges add up to more than 100%");
+  // No teacher may lose more than 100% of their class earnings to percentage charges
+  const percent = charges.filter((c) => c.active && c.kind === "percent");
+  const teachers = await chargeTeachers(req.db);
+  const allPct = percent.filter((c) => c.appliesTo === "all").reduce((sum, c) => sum + c.value, 0);
+  if (allPct > 100) return badRequest(res, "Percentage charges add up to more than 100%");
+  const over = teachers.find((t) => percent.filter((c) => chargeApplies(c, t)).reduce((sum, c) => sum + c.value, 0) > 100);
+  if (over) return badRequest(res, `Percentage charges add up to more than 100% for ${over.firstName} ${over.lastName}`);
 
   const before = await loadSettings(req.db);
   const doc = await getPayrollSettings(req.db).findOneAndUpdate(
@@ -101,7 +131,7 @@ router.put("/admin/settings", ...admin, handle("saving payroll settings", async 
   ).lean();
   if (before.retentionMonths !== retentionMonths) await applyRetention(req.db, retentionMonths);
   logger.info(`Payroll settings saved: pay day ${payDay}, ${b.cycle}, ${charges.length} charge(s)`);
-  ok(res, { data: { ...doc, timezone: centerTz(req.center) }, message: "Payroll settings saved" });
+  ok(res, { data: { ...doc, timezone: centerTz(req.center), teachers, regions: CHARGE_REGIONS }, message: "Payroll settings saved" });
 }));
 
 // ── Periods ──────────────────────────────────────────────────────────────────
@@ -109,7 +139,16 @@ const periodKey = (req) => (KEY.test(req.params.key || "") ? req.params.key : nu
 
 router.get(["/admin/periods", "/admin/periods/:key"], ...admin, handle("loading payroll", async (req, res) => {
   const s = await loadSettings(req.db);
-  ok(res, { data: await periodView(req.db, s, centerTz(req.center), periodKey(req)) });
+  const { page, limit, q, status } = req.query;
+  ok(res, { data: await periodView(req.db, s, centerTz(req.center), periodKey(req), new Date(), {
+    page, limit, q: text(q, 100), status: typeof status === "string" ? status : "",
+  }) });
+}));
+
+router.get("/admin/teachers", ...admin, handle("loading teachers", async (req, res) => {
+  const teachers = await getTeacher(req.db).find().select("firstName lastName teacherCode continent active")
+    .sort({ firstName: 1, lastName: 1 }).lean();
+  ok(res, { data: teachers });
 }));
 
 router.post("/admin/periods/:key/settle", ...admin, handle("paying salary", async (req, res) => {
@@ -215,6 +254,12 @@ router.get("/admin/charges", ...admin, handle("loading charges", async (req, res
     byPeriod: byPeriod.map(round).map(({ _id, ...r }) => ({ periodKey: _id, ...r })),
     byRule: byRule.map((r) => ({ name: r._id, amount: toMoney(r.amount) })),
   } });
+}));
+
+router.get("/admin/teacher/:id/history", ...admin, handle("loading salary history", async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) return badRequest(res, "Invalid teacher");
+  if (!HISTORY_TYPES.includes(req.query.type)) return badRequest(res, "type must be payslips or payouts");
+  ok(res, { data: await teacherHistory(req.db, req.params.id, req.query.type, { page: req.query.page }) });
 }));
 
 router.get("/admin/teacher/:id", ...admin, handle("loading teacher salary", async (req, res) => {

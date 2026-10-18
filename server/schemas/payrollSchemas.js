@@ -17,12 +17,22 @@ const { ObjectId } = mongoose.Schema.Types;
 
 export const PAYOUT_METHODS = ['bank_transfer', 'paypal', 'cash', 'check', 'other'];
 export const ADVANCE_KINDS  = ['loan', 'part_payment'];
+// Same regions as Teacher.continent
+export const CHARGE_REGIONS = ['Africa', 'Europe', 'Asia', 'Americas', 'Oceania'];
+
+// Who a charge is taken from: every teacher, the teachers picked, or teachers in the regions picked
+const chargeScope = {
+  appliesTo:  { type: String, enum: ['all', 'teachers', 'regions'], default: 'all' },
+  teacherIds: { type: [ObjectId], default: [] },
+  regions:    { type: [{ type: String, enum: CHARGE_REGIONS }], default: [] },
+};
 
 const chargeRuleSchema = new mongoose.Schema({
   name:   { type: String, required: true, trim: true, maxlength: 60 },
   kind:   { type: String, enum: ['percent', 'fixed'], default: 'percent' },
   value:  { type: Number, required: true, min: 0 },
   active: { type: Boolean, default: true },
+  ...chargeScope,
 }, { _id: true });
 
 export const payrollSettingsSchema = new mongoose.Schema({
@@ -45,6 +55,7 @@ const chargeLineSchema = new mongoose.Schema({
   kind:   { type: String, enum: ['percent', 'fixed'] },
   value:  Number,
   amount: { type: Number, default: 0 },
+  ...chargeScope, // frozen with the period; not stored on payslips (they only list the charges taken)
 }, { _id: false });
 
 export const payrollPeriodSchema = new mongoose.Schema({

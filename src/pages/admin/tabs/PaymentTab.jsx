@@ -229,7 +229,7 @@ export default function PaymentsTab({ isDarkMode }) {
         ))}
       </div>
 
-      {activeTab === "payroll" && <PayrollRunPanel onToast={showToast} />}
+      {activeTab === "payroll" && <PayrollRunPanel onToast={showToast} isDarkMode={isDarkMode} />}
       {activeTab === "payouts" && <PayoutsPanel onToast={showToast} isDarkMode={isDarkMode} />}
       {activeTab === "charges" && <ChargesPanel onOpenSettings={() => setActiveTab("settings")} />}
       {activeTab === "settings" && <PayrollSettingsPanel onToast={showToast} />}

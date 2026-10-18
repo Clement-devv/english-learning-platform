@@ -34,4 +34,13 @@ export const methodLabel = (m, tr) => ({
   check: tr("paymentTab.check"), other: tr("paymentTab.other"),
 }[m] || m);
 
+/** Teacher.continent shown in the admin's language */
+export const regionName = (r, tr) => tr(`payroll.region${r}`, r);
+
+/** "Asia, Europe" / "3 teachers" / "" (all teachers) — who a charge is taken from */
+export const scopeLabel = (c, tr) => (c.appliesTo === "regions" ? (c.regions || []).map((r) => regionName(r, tr)).join(", ")
+  : c.appliesTo === "teachers" ? tr("payroll.nTeachers", "{{n}} teachers", { n: (c.teacherIds || []).length }) : "");
+
+export const teacherLabel = (t) => `${t.firstName || ""} ${t.lastName || ""}`.trim();
+
 export const errMsg = (err, fallback) => err?.response?.data?.message || fallback;

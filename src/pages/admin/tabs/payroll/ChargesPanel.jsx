@@ -7,7 +7,7 @@ import { useTranslation } from "react-i18next";
 import api from "../../../../api";
 import { useOnDataChanged } from "../../../../hooks/useLiveData";
 import { useCurrencySymbol, fmtMoney } from "../../../../hooks/useCurrencySymbol";
-import { card, th, td, periodLabel, errMsg } from "./payrollUtils";
+import { card, th, td, periodLabel, errMsg, scopeLabel } from "./payrollUtils";
 import { Stat } from "./payrollShared";
 
 export default function ChargesPanel({ onOpenSettings }) {
@@ -39,7 +39,7 @@ export default function ChargesPanel({ onOpenSettings }) {
           value={fmtMoney(projected, sym)} sub={tr("payroll.paidAndUnpaid", "Paid + not yet paid salaries")} />
         <Stat icon={Percent} cat="cat-accent" label={tr("payroll.activeCharges", "Charges in use")}
           value={(running.period.charges || []).map((c) => (c.kind === "percent" ? `${c.value}%` : fmtMoney(c.value, sym))).join(" + ") || "—"}
-          sub={(running.period.charges || []).map((c) => c.name).join(", ") || tr("payroll.noCharges", "No charges set")} />
+          sub={(running.period.charges || []).map((c) => (scopeLabel(c, tr) ? `${c.name} (${scopeLabel(c, tr)})` : c.name)).join(", ") || tr("payroll.noCharges", "No charges set")} />
       </div>
 
       {(running.period.charges || []).length === 0 && (

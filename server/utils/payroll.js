@@ -6,7 +6,8 @@
 //   + bonuses / adjustments   (manual, from the old Payments tab)
 //   − manual deductions
 //   − general charges         (e.g. 10% of CLASS EARNINGS — always on the full
-//                              amount, however much was handed over early)
+//                              amount, however much was handed over early; each
+//                              charge is for every teacher, picked teachers or regions)
 //   − loans / part payments   (already handed to the teacher during the period)
 //   − classes already paid one by one outside payroll
 //   − debt brought forward    (last salary came out negative)
@@ -25,6 +26,7 @@
 import mongoose from "mongoose";
 import { zonedToUtc, ymdInTz, isValidTz } from "./schedule.js";
 import { toMoney, adjustTeacherEarnings } from "./classPayment.js";
+import { decryptField } from "./encryption.js";
 import { paymentTransactionSchema, signedAmount } from "../schemas/paymentTransactionSchema.js";
 import { teacherSchema } from "../schemas/teacherSchema.js";
 import {
@@ -107,7 +109,18 @@ export async function loadSettings(db) {
 }
 
 const freezeCharges = (s) => (s.charges || []).filter((c) => c.active !== false)
-  .map((c) => ({ ruleId: c._id, name: c.name, kind: c.kind, value: c.value, amount: 0 }));
+  .map((c) => ({
+    ruleId: c._id, name: c.name, kind: c.kind, value: c.value, amount: 0,
+    appliesTo: c.appliesTo || "all", teacherIds: c.teacherIds || [], regions: c.regions || [],
+  }));
+
+/** Does a charge apply to this teacher ({ _id, continent })? Every teacher / the ones picked / their region. */
+export function chargeApplies(rule, teacher) {
+  if (rule.appliesTo === "teachers") return (rule.teacherIds || []).some((id) => String(id) === String(teacher?._id));
+  if (rule.appliesTo === "regions") return (rule.regions || []).includes(teacher?.continent);
+  return true;
+}
+const chargesFor = (rules, teacher) => (rules || []).filter((r) => chargeApplies(r, teacher));
 
 async function savePeriod(db, p, s) {
   const doc = { ...p, charges: freezeCharges(s), purgeAt: monthsLater(p.endAt, s.retentionMonths + 1) };
@@ -221,6 +234,9 @@ export async function computeUnsettled(db, period, saved, teacherIds) {
   ]);
   const carry = new Map(lastSlips.map((r) => [String(r._id), r.carryForward || 0]));
 
+  const regionOf = new Map((await getTeacher(db).find({ _id: { $in: ids } }).select("continent").lean())
+    .map((t) => [String(t._id), t.continent]));
+
   const out = new Map();
   for (const id of ids) {
     const tid = String(id);
@@ -229,7 +245,7 @@ export async function computeUnsettled(db, period, saved, teacherIds) {
     const adv  = advances.filter((a) => String(a.teacherId) === tid && (!lb || a.paidAt >= lb));
     const broughtForward = lb ? 0 : (carry.get(tid) || 0);
     out.set(tid, {
-      ...calculate({ txs: mine, advances: adv, broughtForward, chargeRules: period.charges || [] }),
+      ...calculate({ txs: mine, advances: adv, broughtForward, chargeRules: chargesFor(period.charges, { _id: id, continent: regionOf.get(tid) }) }),
       advances: adv,
       txIds: mine.map((t) => t._id),
       hasActivity: mine.length > 0 || adv.length > 0 || broughtForward > 0,
@@ -240,8 +256,14 @@ export async function computeUnsettled(db, period, saved, teacherIds) {
 
 const fullName = (t) => `${t?.firstName || ""} ${t?.lastName || ""}`.trim();
 
-/** Admin: every teacher's salary for one period — settled ones from their payslip, the rest live. */
-export async function periodView(db, s, tz, key, now = new Date()) {
+const ROW_STATUSES = ["unpaid", "paid", "owes", "nothing"];
+
+/**
+ * Admin: teachers' salaries for one period — settled ones from their payslip, the rest live.
+ * Totals cover every teacher; `rows` is one page, after the search (name / ID / email) and
+ * status filter (unpaid | paid | owes | nothing).
+ */
+export async function periodView(db, s, tz, key, now = new Date(), { page = 1, limit = 25, q = "", status = "" } = {}) {
   const { period, open, saved } = await findPeriod(db, s, tz, key, now);
   const Teacher = getTeacher(db);
   const [slips, owedIds, advIds] = await Promise.all([
@@ -252,7 +274,7 @@ export async function periodView(db, s, tz, key, now = new Date()) {
   const teachers = await Teacher.find({ $or: [
     { active: true },
     { _id: { $in: [...slips.map((p) => p.teacherId), ...owedIds, ...advIds] } },
-  ] }).select("firstName lastName email ratePerClass teacherCode bankName accountNumber accountName active").lean();
+  ] }).select("firstName lastName email ratePerClass teacherCode continent active").lean();
 
   const slipBy = new Map(slips.map((p) => [String(p.teacherId), p]));
   const live = await computeUnsettled(db, period, saved, teachers.filter((t) => !slipBy.has(String(t._id))).map((t) => t._id));
@@ -262,8 +284,7 @@ export async function periodView(db, s, tz, key, now = new Date()) {
     const tid = String(t._id);
     const base = {
       teacherId: t._id, teacherName: fullName(t), email: t.email, teacherCode: t.teacherCode || "",
-      ratePerClass: t.ratePerClass || 0, active: t.active,
-      bankName: t.bankName || "", accountNumber: t.accountNumber || "", accountName: t.accountName || "",
+      ratePerClass: t.ratePerClass || 0, active: t.active, continent: t.continent || "",
     };
     const slip = slipBy.get(tid);
     if (slip) return { ...base, status: "paid", payslip: slip, ...pickTotals(slip) };
@@ -273,13 +294,38 @@ export async function periodView(db, s, tz, key, now = new Date()) {
   }).filter((r) => r.status !== "nothing" || r.active)
     .sort((a, b) => a.teacherName.localeCompare(b.teacherName));
 
+  // One page of rows (unpaid first, then by name); bank details only for the rows sent
+  const term = String(q || "").trim().toLowerCase();
+  const order = { unpaid: 0, owes: 1, paid: 2, nothing: 3 };
+  const rowStatus = (r) => (r.status === "unpaid" && r.carryForward > 0 ? "owes" : r.status);
+  const matching = rows
+    .filter((r) => !term || `${r.teacherName} ${r.teacherCode} ${r.email}`.toLowerCase().includes(term))
+    .filter((r) => !ROW_STATUSES.includes(status) || rowStatus(r) === status || (status === "unpaid" && rowStatus(r) === "owes"))
+    .sort((a, b) => order[rowStatus(a)] - order[rowStatus(b)] || a.teacherName.localeCompare(b.teacherName));
+  const size = Math.min(Math.max(parseInt(limit, 10) || 25, 1), 200);
+  const totalPages = Math.max(1, Math.ceil(matching.length / size));
+  const pageNo = Math.min(Math.max(parseInt(page, 10) || 1, 1), totalPages);
+  const pageRows = matching.slice((pageNo - 1) * size, pageNo * size);
+  const bank = new Map((await Teacher.find({ _id: { $in: pageRows.map((r) => r.teacherId) } })
+    .select("bankName accountNumber accountName").lean())
+    .map((t) => [String(t._id), { bankName: decryptField(t.bankName) || "", accountNumber: decryptField(t.accountNumber) || "", accountName: decryptField(t.accountName) || "" }]));
+  pageRows.forEach((r) => Object.assign(r, bank.get(String(r.teacherId)) || {}));
+
   const sum = (f, pred = () => true) => toMoney(rows.filter(pred).reduce((acc, r) => acc + (r[f] || 0), 0));
   const chargeTotals = {};
   rows.forEach((r) => (r.charges || []).forEach((c) => { chargeTotals[c.name] = toMoney((chargeTotals[c.name] || 0) + c.amount); }));
   return {
     period: { ...period, status: period.open ? "open" : "ended", payable: today >= period.payYmd || !period.open },
     periods: [open, ...saved].map((p) => ({ key: p.key, startYmd: p.startYmd, endYmd: p.endYmd, payYmd: p.payYmd, open: !!p.open })),
-    rows,
+    rows: pageRows,
+    pagination: { page: pageNo, limit: size, total: matching.length, totalPages },
+    counts: {
+      all: rows.length,
+      unpaid: rows.filter((r) => r.status === "unpaid").length,
+      owes: rows.filter((r) => rowStatus(r) === "owes").length,
+      paid: rows.filter((r) => r.status === "paid").length,
+      nothing: rows.filter((r) => r.status === "nothing").length,
+    },
     totals: {
       classEarnings: sum("classEarnings"), classCount: sum("classCount"),
       chargesTotal: sum("chargesTotal"), advancesTotal: sum("advancesTotal"),
@@ -301,12 +347,14 @@ export async function teacherStatement(db, s, tz, teacherId, now = new Date()) {
   const { open, saved } = await syncPeriods(db, s, tz, now);
   const tid = new mongoose.Types.ObjectId(String(teacherId));
   const Payslip = getPayslip(db);
-  const [slips, payouts] = await Promise.all([
-    Payslip.find({ teacherId: tid, status: "paid" }).sort({ endAt: -1 }).limit(24).lean(),
-    getTeacherPayout(db).find({ teacherId: tid }).sort({ paidAt: -1 }).limit(100).lean(),
-  ]);
-  const settledKeys = new Set(slips.map((p) => p.periodKey));
   const recentSaved = saved.filter((p) => p.endAt > monthsLater(now, -s.retentionMonths));
+  const [payslips, payouts, me, settled] = await Promise.all([
+    teacherHistory(db, tid, "payslips"),
+    teacherHistory(db, tid, "payouts"),
+    getTeacher(db).findById(tid).select("continent").lean(),
+    Payslip.distinct("periodKey", { teacherId: tid, periodKey: { $in: [open, ...recentSaved].map((p) => p.key) } }),
+  ]);
+  const settledKeys = new Set(settled);
 
   // The running period, plus any ended period not paid yet that has something in it
   const current = [];
@@ -320,11 +368,26 @@ export async function teacherStatement(db, s, tz, teacherId, now = new Date()) {
   return {
     settings: {
       payDay: s.payDay, cycle: s.cycle,
-      charges: (s.charges || []).filter((c) => c.active !== false).map((c) => ({ name: c.name, kind: c.kind, value: c.value })),
+      charges: chargesFor((s.charges || []).filter((c) => c.active !== false), { _id: tid, continent: me?.continent }).map((c) => ({ name: c.name, kind: c.kind, value: c.value })),
       retentionMonths: s.retentionMonths,
     },
-    current, payslips: slips, payouts,
+    current, payslips, payouts,
   };
+}
+
+/** One page of a teacher's payslips or payments received: { items, pagination } (newest first). */
+export async function teacherHistory(db, teacherId, type, { page = 1, limit = type === "payslips" ? 10 : 20 } = {}) {
+  const tid = new mongoose.Types.ObjectId(String(teacherId));
+  const [Model, filter, sort] = type === "payslips"
+    ? [getPayslip(db), { teacherId: tid, status: "paid" }, { endAt: -1 }]
+    : [getTeacherPayout(db), { teacherId: tid }, { paidAt: -1 }];
+  const size = Math.min(Math.max(parseInt(limit, 10) || 10, 1), 100);
+  const pageNo = Math.max(parseInt(page, 10) || 1, 1);
+  const [items, total] = await Promise.all([
+    Model.find(filter).sort(sort).skip((pageNo - 1) * size).limit(size).lean(),
+    Model.countDocuments(filter),
+  ]);
+  return { items, pagination: { page: pageNo, limit: size, total, totalPages: Math.max(1, Math.ceil(total / size)) } };
 }
 
 // ── Money out ────────────────────────────────────────────────────────────────
@@ -371,7 +434,7 @@ export async function settleSalary(db, s, tz, { key, teacherId, paymentMethod, n
     throw new PayrollError(`Salary for this period is due on ${period.payYmd}. Use a part payment to pay before then.`);
   }
   const tid = String(teacherId);
-  const teacher = await getTeacher(db).findById(tid).select("firstName lastName").lean();
+  const teacher = await getTeacher(db).findById(tid).select("firstName lastName continent").lean();
   if (!teacher) throw new PayrollError("Teacher not found", 404);
 
   // Pay periods in order — a teacher's older unpaid salary first
@@ -430,7 +493,7 @@ export async function settleSalary(db, s, tz, { key, teacherId, paymentMethod, n
 
     // Classes this salary just paid count as earnings, not as "already paid" before it
     const asCounted = txs.map((t) => (settledNow.includes(t) ? { ...t, status: "pending" } : t));
-    const calc = calculate({ txs: asCounted, advances, broughtForward: before.broughtForward, chargeRules: period.charges || [] });
+    const calc = calculate({ txs: asCounted, advances, broughtForward: before.broughtForward, chargeRules: chargesFor(period.charges, teacher) });
     const purgeAt = calc.carryForward > 0 ? null : monthsLater(paidAt, s.retentionMonths);
     if (calc.amountPaid > 0) {
       await Payout.create({

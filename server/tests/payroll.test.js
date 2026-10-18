@@ -173,13 +173,91 @@ describe('teacher statement', () => {
     expect(res.status).toBe(200)
     const open = res.body.data.current.find((c) => c.period.open)
     expect(open).toMatchObject({ classEarnings: 100, chargesTotal: 10, advancesTotal: 20, net: 70 })
-    expect(res.body.data.payouts).toHaveLength(1)
+    expect(res.body.data.payouts.items).toHaveLength(1)
+    expect(res.body.data.payouts.pagination).toMatchObject({ page: 1, total: 1 })
+
+    const more = await request(app).get('/api/payroll/me/history?type=payouts&page=2').set('Authorization', `Bearer ${teacherToken}`)
+    expect(more.status).toBe(200)
+    expect(more.body.data).toMatchObject({ items: [], pagination: { page: 2, total: 1 } })
     expect(res.body.data.settings.charges).toEqual([{ name: 'Center fee', kind: 'percent', value: 10 }])
   })
 
   it('is admin-only for the admin routes', async () => {
     const res = await request(app).get('/api/payroll/admin/periods').set('Authorization', `Bearer ${teacherToken}`)
     expect(res.status).toBe(403)
+  })
+})
+
+describe('salary run paging', () => {
+  it('pages, searches and filters teachers, with totals over everyone', async () => {
+    const extra = await Teacher.create(Array.from({ length: 3 }, (_, i) => ({
+      firstName: 'Paged', lastName: `Teacher${i}`, email: `paged${i}@test.com`, continent: 'Asia', active: true, status: 'active',
+    })))
+    try {
+      await classTx(100)
+      const page1 = await get('/admin/periods?limit=2&page=1')
+      expect(page1.body.data.rows).toHaveLength(2)
+      expect(page1.body.data.pagination.total).toBeGreaterThanOrEqual(4)
+      expect(String(page1.body.data.rows[0].teacherId)).toBe(String(teacher._id)) // unpaid first
+      expect(page1.body.data.totals.classEarnings).toBe(100)
+
+      const found = await get('/admin/periods?q=teacher1')
+      expect(found.body.data.rows.map((r) => r.teacherName)).toEqual(['Paged Teacher1'])
+
+      const unpaid = await get('/admin/periods?status=unpaid')
+      expect(unpaid.body.data.rows).toHaveLength(1)
+      expect(unpaid.body.data.counts.unpaid).toBe(1)
+
+      const list = await get('/admin/teachers')
+      expect(list.body.data.length).toBeGreaterThanOrEqual(4)
+    } finally {
+      await Teacher.deleteMany({ _id: { $in: extra.map((t) => t._id) } })
+    }
+  })
+})
+
+describe('who a charge applies to', () => {
+  const chargesFor = async (charges) => {
+    expect((await put('/admin/settings', { payDay: 31, cycle: 'calendar_month', charges })).status).toBe(200)
+    await classTx(100)
+    return myRow((await get('/admin/periods')).body).charges.map((c) => c.name).sort()
+  }
+
+  it('takes a charge only from the teachers picked', async () => {
+    const other = new mongoose.Types.ObjectId()
+    expect(await chargesFor([
+      { name: 'Mine', kind: 'percent', value: 5, appliesTo: 'teachers', teacherIds: [String(teacher._id)] },
+      { name: 'Not mine', kind: 'percent', value: 5, appliesTo: 'teachers', teacherIds: [String(other)] },
+    ])).toEqual(['Mine'])
+  })
+
+  it('takes a charge only from teachers in the regions picked', async () => {
+    // The test teacher is in Africa
+    expect(await chargesFor([
+      { name: 'Africa fee', kind: 'fixed', value: 3, appliesTo: 'regions', regions: ['Africa', 'Asia'] },
+      { name: 'Europe fee', kind: 'fixed', value: 3, appliesTo: 'regions', regions: ['Europe'] },
+      { name: 'Everyone', kind: 'percent', value: 10 },
+    ])).toEqual(['Africa fee', 'Everyone'])
+  })
+
+  it('needs at least one teacher / region, and lists teachers for the picker', async () => {
+    expect((await put('/admin/settings', { payDay: 31, cycle: 'calendar_month', charges: [
+      { name: 'x', kind: 'percent', value: 5, appliesTo: 'teachers', teacherIds: [] },
+    ] })).status).toBe(400)
+    expect((await put('/admin/settings', { payDay: 31, cycle: 'calendar_month', charges: [
+      { name: 'x', kind: 'percent', value: 5, appliesTo: 'regions', regions: ['Mars'] },
+    ] })).status).toBe(400)
+    const res = await get('/admin/settings')
+    expect(res.body.data.regions).toContain('Africa')
+    expect(res.body.data.teachers.some((t) => String(t._id) === String(teacher._id))).toBe(true)
+  })
+
+  it('rejects percentages over 100% for any one teacher', async () => {
+    const res = await put('/admin/settings', { payDay: 31, cycle: 'calendar_month', charges: [
+      { name: 'a', kind: 'percent', value: 60 },
+      { name: 'b', kind: 'percent', value: 50, appliesTo: 'regions', regions: ['Africa'] },
+    ] })
+    expect(res.status).toBe(400)
   })
 })
 

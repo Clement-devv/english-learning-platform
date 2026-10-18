@@ -1,12 +1,14 @@
 // src/pages/admin/tabs/payroll/PayrollSettingsPanel.jsx
 // The center's salary day, how the pay period runs, the general charges taken
-// from every teacher's class earnings, and how long payment history is kept.
+// from teachers' class earnings (all of them, picked ones or by region), and how
+// long payment history is kept.
 import { useState, useEffect } from "react";
 import { Plus, Trash2, CalendarCheck } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import api from "../../../../api";
 import { useCurrencySymbol, fmtMoney } from "../../../../hooks/useCurrencySymbol";
 import { inputCls, btnPrimary, btnGhost, card, errMsg } from "./payrollUtils";
+import ChargeScopePicker from "./ChargeScopePicker";
 
 const ordinal = (n) => {
   const s = ["th", "st", "nd", "rd"], v = n % 100;
@@ -31,8 +33,10 @@ export default function PayrollSettingsPanel({ onToast }) {
   if (!form) return <div className="py-12 flex justify-center"><div className="animate-spin rounded-full h-10 w-10 border-b-2 border-ad-accent" /></div>;
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
-  const setCharge = (i, k, v) => setForm((f) => ({ ...f, charges: f.charges.map((c, j) => (j === i ? { ...c, [k]: v } : c)) }));
-  const addCharge = () => setForm((f) => ({ ...f, charges: [...f.charges, { name: "", kind: "percent", value: 10, active: true }] }));
+  const patchCharge = (i, patch) => setForm((f) => ({ ...f, charges: f.charges.map((c, j) => (j === i ? { ...c, ...patch } : c)) }));
+  const setCharge = (i, k, v) => patchCharge(i, { [k]: v });
+  const addCharge = () => setForm((f) => ({ ...f, charges: [...f.charges,
+    { name: "", kind: "percent", value: 10, active: true, appliesTo: "all", teacherIds: [], regions: [] }] }));
   const removeCharge = (i) => setForm((f) => ({ ...f, charges: f.charges.filter((_, j) => j !== i) }));
 
   const last = form.payDay === 31;
@@ -100,7 +104,8 @@ export default function PayrollSettingsPanel({ onToast }) {
         </p>
         {form.charges.length === 0 && <p className="text-sm text-ad-muted">{tr("payroll.noCharges", "No charges set")}</p>}
         {form.charges.map((c, i) => (
-          <div key={c._id || `new-${i}`} className="grid grid-cols-12 gap-2 items-center">
+          <div key={c._id || `new-${i}`} className={`rounded-lg border border-ad-line p-3 space-y-3 ${c.active === false ? "opacity-60" : ""}`}>
+          <div className="grid grid-cols-12 gap-2 items-center">
             <input value={c.name} onChange={(e) => setCharge(i, "name", e.target.value)} maxLength={60}
               placeholder={tr("payroll.chargeName", "Name, e.g. Center fee")} className={`${inputCls} col-span-12 sm:col-span-5`} />
             <select value={c.kind} onChange={(e) => setCharge(i, "kind", e.target.value)} className={`${inputCls} col-span-5 sm:col-span-3`}>
@@ -116,12 +121,15 @@ export default function PayrollSettingsPanel({ onToast }) {
             <button onClick={() => removeCharge(i)} className="col-span-2 sm:col-span-1 p-2 rounded-lg text-ad-muted hover:text-rose-600 hover:bg-ad-raised justify-self-center"
               aria-label={tr("payroll.removeCharge", "Remove charge")}><Trash2 className="w-4 h-4" /></button>
           </div>
+          <ChargeScopePicker charge={c} teachers={form.teachers || []} regions={form.regions || []} onChange={(patch) => patchCharge(i, patch)} />
+          </div>
         ))}
-        {form.charges.some((c) => c.active !== false && c.kind === "percent" && Number(c.value) > 0) && (
+        {form.charges.some((c) => c.active !== false && c.kind === "percent" && (c.appliesTo || "all") === "all" && Number(c.value) > 0) && (
           <p className="text-xs text-ad-ink-2">
-            {tr("payroll.chargeExample", "Example: a teacher who earned {{earned}} this period pays {{charge}} in percentage charges.", {
+            {tr("payroll.chargeExampleAll", "Example: a teacher who earned {{earned}} this period pays {{charge}} in percentage charges that apply to all teachers.", {
               earned: fmtMoney(1000, sym),
-              charge: fmtMoney(form.charges.filter((c) => c.active !== false && c.kind === "percent").reduce((s, c) => s + Number(c.value || 0), 0) * 10, sym),
+              charge: fmtMoney(form.charges.filter((c) => c.active !== false && c.kind === "percent" && (c.appliesTo || "all") === "all")
+                .reduce((s, c) => s + Number(c.value || 0), 0) * 10, sym),
             })}
           </p>
         )}
