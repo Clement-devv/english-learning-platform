@@ -16,7 +16,6 @@ import { Menu, ChevronRight } from "lucide-react";
  * actions      {ReactNode}  Role-specific buttons (stat chips, "New Class", bell, etc.)
  */
 export default function DashboardTopBar({
-  sidebarOpen,
   onToggle,
   roleName,
   activeLabel,

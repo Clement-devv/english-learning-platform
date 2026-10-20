@@ -283,7 +283,7 @@ function BadgesTab({ badges, progress, completedClasses, shareAchievement, P }) 
 // ══════════════════════════════════════════════════════════════════════════════
 export default function CRMShell() {
   const { t: tr } = useTranslation("student");
-  const { branding, center } = useBranding();
+  const { center } = useBranding();
   const d = useDashboardData();
   const { missedCallCount, clearMissedCalls } = useRing();
   const [showSettings, setShowSettings] = useState(false);

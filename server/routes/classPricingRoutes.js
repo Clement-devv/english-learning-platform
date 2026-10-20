@@ -4,7 +4,7 @@ import { verifyToken, verifyAdmin } from "../middleware/authMiddleware.js";
 import { tenantMiddleware }         from "../middleware/tenantMiddleware.js";
 import { classPricingSchema }       from "../schemas/classPricingSchema.js";
 import logger from "../utils/logger.js";
-import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
+import { badRequest, serverError } from '../utils/apiResponse.js';
 
 const router = express.Router();
 router.use(tenantMiddleware);

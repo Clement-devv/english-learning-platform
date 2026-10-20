@@ -106,7 +106,7 @@ function TypingIndicator({ isDarkMode }) {
   );
 }
 
-export default function ConversationTab({ studentInfo, isDarkMode }) {
+export default function ConversationTab({ isDarkMode }) {
   const { t: tr } = useTranslation("student");
   const col = isDarkMode
     ? { bg: "var(--as-bg, #0f1117)", card: "var(--as-raised, #1a1d2e)", border: "var(--as-line, #2a2d40)", heading: "var(--as-ink, #f0f4ff)", body: "var(--as-ink-2, #c8cce0)", muted: "var(--as-ink-2, #6b7090)", input: "var(--as-bg, #0f1117)" }
@@ -142,10 +142,7 @@ export default function ConversationTab({ studentInfo, isDarkMode }) {
       localStorage.setItem("chatAvatarMode", next);
       return next;
     });
-  };
-
-  const toggleAvatarMode = cycleAvatarMode;
-
+  };
   const bottomRef       = useRef(null);
   const inputRef        = useRef(null);
   const recognitionRef  = useRef(null);

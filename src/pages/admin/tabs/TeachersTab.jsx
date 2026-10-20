@@ -580,7 +580,6 @@ export default function TeachersTab({ onNotify, isDarkMode = false }) {
   useEffect(() => { setPage(1); }, [searchQuery, continentFilter, view]);
 
   // ── UI helpers ──────────────────────────────────────────────────────────────
-  const base = isDarkMode ? "bg-stone-900" : "bg-stone-50";
   const cardBg = isDarkMode ? "bg-stone-800 border-stone-700" : "bg-white border-stone-200";
   const textPrimary = isDarkMode ? "text-white" : "text-stone-900";
   const textSecondary = isDarkMode ? "text-stone-400" : "text-stone-500";

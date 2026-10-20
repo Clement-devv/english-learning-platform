@@ -182,7 +182,7 @@ router.delete('/assignments/:aid', tenantMiddleware, verifyToken, verifyAdmin, a
     if (!a) return fail(res, 404, 'Not found');
     notifyChanged(req.center.slug, { teachers: [a.teacherId] }, ['library']);
     res.json({ success: true, message: 'Removed' });
-  } catch (err) {
+  } catch {
     fail(res, 500, 'Could not remove');
   }
 });
@@ -200,7 +200,7 @@ router.post('/assignments/:aid/acknowledge', tenantMiddleware, verifyToken, veri
     if (!a) return fail(res, 404, 'Already acknowledged or not yours');
     notifyChanged(req.center.slug, { teachers: [] }, ['library']); // admins see it as acknowledged
     res.json({ success: true, message: 'Acknowledged' });
-  } catch (err) {
+  } catch {
     fail(res, 500, 'Could not acknowledge');
   }
 });

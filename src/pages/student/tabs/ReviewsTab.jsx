@@ -173,7 +173,7 @@ export default function ReviewsTab({ isDarkMode }) {
     }
   }
 
-  useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); }, []);  
   useOnDataChanged(["reviews", "classes"], () => load(true)); // live: newly completed classes to review
 
   function handleSubmitted(bookingId) {

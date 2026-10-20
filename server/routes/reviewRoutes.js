@@ -8,7 +8,7 @@ import { reviewSchema }  from "../schemas/reviewSchema.js";
 import { bookingSchema } from "../schemas/bookingSchema.js";
 import { teacherSchema } from "../schemas/teacherSchema.js";
 import logger from "../utils/logger.js";
-import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
+import { badRequest, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
 
 const router = express.Router();
 router.use(tenantMiddleware);

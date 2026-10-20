@@ -15,10 +15,10 @@ import {
 import { callGemini, extractJSONArray } from "../utils/geminiHelper.js";
 import { recordActivity } from "../utils/streakService.js";
 import logger from "../utils/logger.js";
-import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
-import { validateObjectId, wrapUpload } from '../middleware/validateObjectId.js';
+import { badRequest, forbidden, notFound, serverError } from '../utils/apiResponse.js';
+import { validateObjectId } from '../middleware/validateObjectId.js';
 import { toStr, toObjectId, toInt, toArray } from '../utils/inputSanitizer.js';
-import { pushToUser, pushToAllAdmins } from '../utils/webPushService.js';
+import { pushToUser } from '../utils/webPushService.js';
 import { loginLimiter } from '../middleware/rateLimiter.js';
 import { readPaging, pageMeta, statusCounts, oid, todoFirstIds, inOrder } from "../utils/paging.js";
 import {
@@ -664,7 +664,7 @@ router.post(
           const pdfText = parsed.text?.trim();
           await parser.destroy();
           if (pdfText) notesText = notesText ? `${notesText}\n\n${pdfText}` : pdfText;
-        } catch (pdfErr) {
+        } catch {
           return badRequest(res, "Could not read PDF — try copying and pasting the text instead");
         }
       }

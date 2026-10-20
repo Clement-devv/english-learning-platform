@@ -238,7 +238,7 @@ export default function BrutalistShell() {
 
         {/* Nav items */}
         <nav style={{ flex: 1, padding: '8px 0' }}>
-          {NAV.map(({ id, label, tabs }) => {
+          {NAV.map(({ id, label }) => {
             const isActive = activeSection === id;
             const hw = id === 'study' && (d.homeworkPending + d.quizPending) > 0 ? d.homeworkPending + d.quizPending : null;
             return (

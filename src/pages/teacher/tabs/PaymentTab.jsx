@@ -52,10 +52,6 @@ function fmtDateTime(d) {
     minute: "2-digit",
   });
 }
-function monthKey(d) {
-  const dt = new Date(d);
-  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}`;
-}
 function monthLabel(key) {
   const [year, month] = key.split("-");
   return new Date(year, month - 1).toLocaleString("en-US", {

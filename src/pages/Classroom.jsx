@@ -485,13 +485,9 @@ const FLOATERS = [
 ];
 
 function WaitingForTeacher() {
-  const [tipIdx, setTipIdx] = useState(0);
-  const [dotCount, setDotCount] = useState(1);
-
+  const [tipIdx, setTipIdx] = useState(0);
   useEffect(() => {
-    const tipTimer = setInterval(() => setTipIdx(i => (i + 1) % TIPS.length), 4000);
-    const dotTimer = setInterval(() => setDotCount(d => (d % 3) + 1), 600);
-    return () => { clearInterval(tipTimer); clearInterval(dotTimer); };
+    const tipTimer = setInterval(() => setTipIdx(i => (i + 1) % TIPS.length), 4000);    return () => clearInterval(tipTimer);
   }, []);
 
   return (

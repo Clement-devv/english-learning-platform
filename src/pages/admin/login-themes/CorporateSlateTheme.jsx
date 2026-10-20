@@ -91,7 +91,7 @@ export default function CorporateSlateTheme() {
                 />
               ))}
               {/* Flow dots on edges */}
-              {edges.map(([a, b], i) => (
+              {edges.map((_, i) => (
                 <circle key={`f${i}`} r="0.9" fill="#818cf8"
                   className={`cs-flow cs-f${i % 3}`}
                   opacity="0.7">

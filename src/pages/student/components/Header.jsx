@@ -5,10 +5,8 @@ import GoogleTranslate from "../../../components/GoogleTranslate";
 import { useBranding } from "../../../context/BrandingContext";
 import { useTranslation } from "react-i18next";
 
-export default function Header({ student, notifications, onLogout }) {
-  const { t: tr } = useTranslation("student");
-  const unreadCount = notifications?.filter(n => n.unread).length || 0;
-  const { branding, center } = useBranding();
+export default function Header({ student, onLogout }) {
+  const { t: tr } = useTranslation("student");  const { branding, center } = useBranding();
   const centerName = center?.centerName || "Student Portal";
 
   return (

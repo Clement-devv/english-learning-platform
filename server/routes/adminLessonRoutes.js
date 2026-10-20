@@ -12,10 +12,9 @@ import { bookingSchema }            from "../schemas/bookingSchema.js";
 import { teacherSchema }            from "../schemas/teacherSchema.js";
 import { studentSchema }            from "../schemas/studentSchema.js";
 import { assignmentSchema }         from "../schemas/assignmentSchema.js";
-import { paymentTransactionSchema } from "../schemas/paymentTransactionSchema.js";
 import { parentSchema }             from "../schemas/parentSchema.js";
 import logger from "../utils/logger.js";
-import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
+import { badRequest, notFound, serverError } from '../utils/apiResponse.js';
 import { reverseCompletedClass } from "../utils/classReversal.js";
 
 const router = express.Router();
@@ -25,7 +24,6 @@ const getBooking            = (db) => db.models.Booking            || db.model("
 const getTeacher            = (db) => db.models.Teacher            || db.model("Teacher",            teacherSchema);
 const getStudent            = (db) => db.models.Student            || db.model("Student",            studentSchema);
 const getAssignment         = (db) => db.models.Assignment         || db.model("Assignment",         assignmentSchema);
-const getPaymentTransaction = (db) => db.models.PaymentTransaction || db.model("PaymentTransaction", paymentTransactionSchema);
 const getParent             = (db) => db.models.Parent             || db.model("Parent",             parentSchema);
 
 // Lesson marked / reversed emails: server/emails/lessonEmails.js

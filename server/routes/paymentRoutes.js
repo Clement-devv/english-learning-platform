@@ -4,11 +4,10 @@ import { verifyToken, verifyAdmin } from "../middleware/authMiddleware.js";
 import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
 import { requireAnalyticsUnlock } from "../middleware/analyticsPinMiddleware.js";
 import { paymentSchema }  from "../schemas/paymentSchema.js";
-import { studentSchema }  from "../schemas/studentSchema.js";
 import { parsePagination } from "../utils/pagination.js";
 import logger from "../utils/logger.js";
 import mongoose from "mongoose";
-import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
+import { badRequest, serverError } from '../utils/apiResponse.js';
 
 const router = express.Router();
 router.use(tenantMiddleware);

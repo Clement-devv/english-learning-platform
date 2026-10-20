@@ -12,7 +12,7 @@ import { certificateSchema } from '../schemas/certificateSchema.js';
 import { tenantMiddleware }              from '../middleware/tenantMiddleware.js';
 import { verifyToken, verifyAdmin, isTokenBlacklisted } from '../middleware/authMiddleware.js';
 import { loginLimiter, passwordResetLimiter } from '../middleware/rateLimiter.js';
-import { config, JWT_STANDARD_CLAIMS, JWT_VERIFY_OPTIONS }  from '../config/config.js';
+import { config, JWT_VERIFY_OPTIONS }  from '../config/config.js';
 import { getCenterSecret } from '../utils/jwtUtils.js';
 import { startSession, alertNewDevice, endSessionsAfterPasswordChange, notifySessionsRevoked } from '../utils/sessionManager.js';
 import { signAccessToken } from '../utils/sessionClaims.js';
@@ -345,7 +345,6 @@ router.get('/me/child/:studentId/certificates', tenantMiddleware, verifyParent, 
 router.get('/', tenantMiddleware, verifyToken, verifyAdmin, async (req, res) => {
   try {
     const Parent  = getParent(req.db);
-    const Student = getStudent(req.db);
 
     // ensure Student is registered so populate works
     if (!req.db.models.Student) req.db.model('Student', studentSchema);
@@ -418,7 +417,7 @@ router.get('/:id', tenantMiddleware, verifyToken, verifyAdmin, async (req, res) 
       .lean();
     if (!parent) return notFound(res, 'Parent not found');
     res.json({ success: true, parent });
-  } catch (err) {
+  } catch {
     serverError(res, 'Server error');
   }
 });
@@ -469,7 +468,7 @@ router.delete('/:id', tenantMiddleware, verifyToken, verifyAdmin, async (req, re
     parent.status = 'pending';
     await parent.save();
     res.json({ success: true, message: 'Parent deactivated' });
-  } catch (err) {
+  } catch {
     serverError(res, 'Server error');
   }
 });

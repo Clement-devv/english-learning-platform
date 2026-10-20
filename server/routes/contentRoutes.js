@@ -8,7 +8,7 @@ import { verifyToken, verifyAdminOrTeacher } from "../middleware/authMiddleware.
 import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
 import { canAccessClass } from "../utils/classAccess.js";
 import logger from "../utils/logger.js";
-import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
+import { badRequest, forbidden, notFound } from '../utils/apiResponse.js';
 import { s3Enabled, uploadToS3, deleteFromS3, getPresignedUrl, s3ObjectExists } from "../utils/s3.js";
 
 const __filename = fileURLToPath(import.meta.url);

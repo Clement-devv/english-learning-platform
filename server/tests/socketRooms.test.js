@@ -25,7 +25,7 @@ const SLUG = 'testcenter'
 const oid = () => new mongoose.Types.ObjectId()
 const ids = { teacher: oid(), student: oid(), otherStudent: oid(), otherTeacher: oid(), admin: oid(), subAdmin: oid() }
 
-let server, io, url, booking, otherBooking, chat, groupClass
+let server, io, url, booking, chat, groupClass
 const sockets = []
 
 const tokenFor = (role, id, extra = {}) => jwt.sign(
@@ -57,7 +57,7 @@ beforeAll(async () => {
   const GroupChat  = db.models.GroupChat  || db.model('GroupChat',  groupChatSchema)
   const GroupClass = db.models.GroupClass || db.model('GroupClass', groupClassSchema)
   booking      = await Booking.create({ teacherId: ids.teacher, studentId: ids.student, classTitle: 'A', scheduledTime: new Date(), status: 'accepted' })
-  otherBooking = await Booking.create({ teacherId: ids.teacher, studentId: ids.otherStudent, classTitle: 'B', scheduledTime: new Date(), status: 'accepted' })
+  await Booking.create({ teacherId: ids.teacher, studentId: ids.otherStudent, classTitle: 'B', scheduledTime: new Date(), status: 'accepted' })
   chat         = await GroupChat.create({ assignmentId: oid(), teacherId: ids.teacher, studentId: ids.student, chatName: 'A' })
   groupClass   = await GroupClass.create({ teacherId: ids.teacher, title: 'G', scheduledTime: new Date(), maxSeats: 5,
     enrollments: [{ studentId: ids.student, creditCharged: 1 }] })

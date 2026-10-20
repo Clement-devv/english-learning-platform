@@ -8,7 +8,7 @@ import { recurringPatternSchema } from "../schemas/recurringPatternSchema.js";
 import { studentSchema }          from "../schemas/studentSchema.js";
 import { teacherSchema }          from "../schemas/teacherSchema.js";
 import logger from "../utils/logger.js";
-import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
+import { forbidden, notFound, serverError } from '../utils/apiResponse.js';
 
 const router = express.Router();
 router.use(tenantMiddleware);
@@ -253,7 +253,7 @@ router.post("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
     let useTransactions = true;
     try {
       await req.db.db.admin().command({ replSetGetStatus: 1 });
-    } catch (error) {
+    } catch {
       logger.warn("⚠️ MongoDB is not running as a replica set. Transactions disabled.");
       useTransactions = false;
     }
@@ -446,7 +446,7 @@ router.patch("/:id/cancel", verifyToken, verifyAdminOrTeacher, async (req, res) 
       await req.db.db.admin().command({ replSetGetStatus: 1 });
       session = await req.db.startSession();
       session.startTransaction();
-    } catch (error) {
+    } catch {
       useTransactions = false;
     }
 
@@ -521,7 +521,7 @@ router.delete("/:id", verifyToken, verifyAdmin, async (req, res) => {
       await req.db.db.admin().command({ replSetGetStatus: 1 });
       session = await req.db.startSession();
       session.startTransaction();
-    } catch (error) {
+    } catch {
       useTransactions = false;
     }
 

@@ -128,7 +128,7 @@ function QuestionBuilder({ questions, setQuestions, isDarkMode }) {
 }
 
 // ── Result viewer ─────────────────────────────────────────────────────────────
-function ResultViewer({ quiz, attempt, c }) {
+function ResultViewer({ quiz, attempt }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <div style={{ background: "#f0fdf4", borderRadius: 12, padding: "14px 18px", border: "1.5px solid #86efac" }}>
@@ -232,7 +232,7 @@ function TemplatePicker({ templates, onLoad, onClose, isDarkMode }) {
 }
 
 // ── Save-as-template modal ────────────────────────────────────────────────────
-function SaveTemplateModal({ onSave, onClose, isDarkMode, defaultName }) {
+function SaveTemplateModal({ onSave, onClose, isDarkMode, defaultName, saving }) {
   const [name, setName] = useState(defaultName || "");
   const bg  = isDarkMode ? "var(--as-raised, #1e293b)" : "var(--as-surface, #fff)";
   const bdr = isDarkMode ? "var(--as-line, #334155)" : "var(--as-line, #e2e8f0)";
@@ -250,7 +250,7 @@ function SaveTemplateModal({ onSave, onClose, isDarkMode, defaultName }) {
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
           <button onClick={onClose} style={{ padding: "9px 20px", borderRadius: 10, border: `1.5px solid ${bdr}`, background: "transparent", color: "var(--as-ink-2, #64748b)", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>Cancel</button>
           <button onClick={() => name.trim() && onSave(name.trim())}
-            disabled={!name.trim()}
+            disabled={!name.trim() || saving}
             style={{ padding: "9px 24px", borderRadius: 10, border: "none", background: BRAND, color: "#fff", fontWeight: 700, fontSize: 13, cursor: name.trim() ? "pointer" : "not-allowed", opacity: name.trim() ? 1 : 0.5 }}>
             Save Template
           </button>
@@ -384,7 +384,7 @@ export default function QuizTab({ teacherInfo, students, isDarkMode }) {
       }
     })();
     return () => { stale = true; };
-  }, [page, filter, reloadKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [page, filter, reloadKey]);  
   const fetchTemplates = async () => {
     try {
       const { data } = await api.get("/quiz-templates");
@@ -626,7 +626,7 @@ export default function QuizTab({ teacherInfo, students, isDarkMode }) {
         <TemplatePicker templates={templates} onLoad={handleLoadTemplate} onClose={() => setShowPicker(false)} isDarkMode={isDarkMode} />
       )}
       {showSaveModal && (
-        <SaveTemplateModal defaultName={form.title} onSave={handleSaveTemplate} onClose={() => setShowSaveModal(false)} isDarkMode={isDarkMode} />
+        <SaveTemplateModal defaultName={form.title} saving={savingTemplate} onSave={handleSaveTemplate} onClose={() => setShowSaveModal(false)} isDarkMode={isDarkMode} />
       )}
 
       {/* Header */}

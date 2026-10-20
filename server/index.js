@@ -42,7 +42,6 @@ import { verifyEmailConfig } from "./utils/emailService.js";
 import { linkPreviewHandler } from "./utils/linkPreview.js";
 import v1Router from "./routes/v1.js";
 import Center from "./models/master/Center.js";
-import SuperAdmin from "./models/master/SuperAdmin.js";
 import { getDb, closeConnection, closeAllConnections } from "./config/dbManager.js";
 import { startCenterJobSync, stopCenterJobs, stopAllCenterJobs, runningCenterJobs } from "./utils/centerJobs.js";
 import { errorHandler, notFoundHandler, registerProcessHandlers } from "./middleware/errorHandler.js";

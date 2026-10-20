@@ -218,9 +218,7 @@ export default function SunshineShell() {
   const [showChangeEmail,      setShowChangeEmail]      = useState(false);
   const [showAnalyticsPin,     setShowAnalyticsPin]     = useState(false);
   // Bumped when the PIN changes so Overview/Analytics re-check their lock state
-  const [analyticsPinVersion,  setAnalyticsPinVersion]  = useState(0);
-  const [notifications,   setNotifications]   = useState([]);
-  const [toast,           setToast]           = useState('');
+  const [analyticsPinVersion,  setAnalyticsPinVersion]  = useState(0);  const [toast,           setToast]           = useState('');
 
   // ── Broadcast ──────────────────────────────────────────────────────────────
   const [broadcastModal,   setBroadcastModal]   = useState(false);
@@ -314,14 +312,7 @@ export default function SunshineShell() {
   useOnDataChanged(['bookings'], refreshAttention);
   useOnDataChanged(['teachers', 'students'], refreshPeople);
 
-  const handleLogout = () => { authLogout(); navigate('/admin/login', { replace: true }); };
-  const handleNotify = (note) => {
-    const full = typeof note === 'string'
-      ? { message: note, date: new Date().toISOString() }
-      : { ...note, date: note.date || new Date().toISOString() };
-    setNotifications(p => [full, ...p]);
-  };
-
+  const handleLogout = () => { authLogout(); navigate('/admin/login', { replace: true }); };
   const toggleGroup = (group) => {
     setBroadcastTargets(prev => ({
       ...prev,
@@ -386,17 +377,17 @@ export default function SunshineShell() {
     switch (activeTab) {
       case 'overview':          return <OverviewTab key={analyticsPinVersion} isDarkMode={isDarkMode} />;
       case 'analytics':         return <AnalyticsDashboard key={analyticsPinVersion} isDarkMode={isDarkMode} />;
-      case 'teachers':          return <TeachersTab onNotify={handleNotify} isDarkMode={isDarkMode} />;
+      case 'teachers':          return <TeachersTab isDarkMode={isDarkMode} />;
       case 'teacher-schedules': return <TeacherScheduleTab teachers={activeTeachers} isDarkMode={isDarkMode} />;
-      case 'students':          return <StudentsTab onNotify={handleNotify} isDarkMode={isDarkMode} />;
+      case 'students':          return <StudentsTab isDarkMode={isDarkMode} />;
       case 'classes':           return <ClassesTab isDarkMode={isDarkMode} />;
       case 'group-classes':     return <GroupClassesTab  isDarkMode={isDarkMode} />;
       case 'certificates':      return <CertificatesTab  isDarkMode={isDarkMode} />;
       case 'parents':           return <ParentsTab        isDarkMode={isDarkMode} />;
       case 'applications':      return <ApplicationsTab isDarkMode={isDarkMode} />;
       case 'notifications':     return <NotificationsTab isDarkMode={isDarkMode} onUnreadCount={setUnreadNotif} />;
-      case 'assign':            return <AssignStudentsTab teachers={activeTeachers} students={students} onNotify={handleNotify} isDarkMode={isDarkMode} />;
-      case 'bookings':          return <BookingsTab teachers={activeTeachers} students={students} onNotify={handleNotify} isDarkMode={isDarkMode} />;
+      case 'assign':            return <AssignStudentsTab teachers={activeTeachers} students={students} isDarkMode={isDarkMode} />;
+      case 'bookings':          return <BookingsTab teachers={activeTeachers} students={students} isDarkMode={isDarkMode} />;
       case 'messages':          return <MessagesTab userRole="admin" onUnreadCount={setUnreadMessages} />;
       case 'payments':          return <PaymentsTab isDarkMode={isDarkMode} />;
       case 'class-pricing':     return <ClassPricingTab isDarkMode={isDarkMode} />;

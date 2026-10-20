@@ -11,7 +11,7 @@ import { bookingSchema }      from '../schemas/bookingSchema.js';
 import Center from '../models/master/Center.js';
 import { getCenterBaseUrl } from '../emails/core.js';
 import logger from '../utils/logger.js';
-import { ok, created, badRequest, forbidden, notFound, serverError } from '../utils/apiResponse.js';
+import { badRequest, forbidden, notFound, serverError } from '../utils/apiResponse.js';
 import { validateObjectId } from '../middleware/validateObjectId.js';
 import { parsePagination }  from '../utils/pagination.js';
 
@@ -246,7 +246,7 @@ router.get('/verify/:certNumber', async (req, res) => {
       student: cert.studentId,
       issuedAt: cert.issuedAt,
     }});
-  } catch (err) {
+  } catch {
     serverError(res, 'Error verifying certificate');
   }
 });
@@ -306,7 +306,7 @@ router.delete('/:id', verifyToken, verifyAdmin, validateObjectId('id'), async (r
     );
     if (!cert) return notFound(res, 'Certificate not found');
     res.json({ success: true, message: 'Certificate revoked' });
-  } catch (err) {
+  } catch {
     serverError(res, 'Error revoking certificate');
   }
 });

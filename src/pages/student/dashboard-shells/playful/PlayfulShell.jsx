@@ -176,7 +176,7 @@ function PlayfulBadgesPanel({ badges, progress, completedClasses, shareAchieveme
 // ══════════════════════════════════════════════════════════════════════════════
 export default function PlayfulShell() {
   const { t: tr } = useTranslation("student");
-  const { branding, center } = useBranding();
+  const { center } = useBranding();
   const d = useDashboardData();
   const { missedCallCount, clearMissedCalls } = useRing();
   const P = d.isDarkMode ? { ...LIGHT, ...DARK } : LIGHT;

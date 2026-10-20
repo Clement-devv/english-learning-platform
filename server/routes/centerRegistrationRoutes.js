@@ -6,7 +6,7 @@ import { config } from '../config/config.js';
 import { sendEmail } from '../utils/emailService.js';
 import { validateCenterRegistration } from '../middleware/validation.js';
 import logger from "../utils/logger.js";
-import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
+import { badRequest, conflict, serverError } from '../utils/apiResponse.js';
 
 const router = express.Router();
 
@@ -38,7 +38,7 @@ router.post('/', validateCenterRegistration, async (req, res) => {
 
     const pendingPasswordHash = await bcrypt.hash(password, config.bcryptRounds);
 
-    const center = await Center.create({
+    await Center.create({
       centerName,
       slug,
       adminEmail,

@@ -17,7 +17,7 @@ const addDays = (dateStr, n) => {
   return d.toISOString().slice(0, 10);
 };
 
-export default function ClassReportTab({ isDarkMode }) {
+export default function ClassReportTab() {
   const { t: tr } = useTranslation("admin");
   const [date,    setDate]    = useState(null);   // null → server picks "today" (school time)
   const [today,   setToday]   = useState(null);

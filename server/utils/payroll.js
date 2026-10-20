@@ -307,7 +307,7 @@ export async function periodView(db, s, tz, key, now = new Date(), { page = 1, l
     const slip = slipBy.get(tid);
     if (slip) return { ...base, status: "paid", payslip: slip, ...pickTotals(slip) };
     const calc = live.get(tid);
-    const { txIds, ...rest } = calc; // eslint-disable-line no-unused-vars
+    const { txIds, ...rest } = calc;  
     return { ...base, status: calc.hasActivity ? "unpaid" : "nothing", ...rest };
   }).filter((r) => r.status !== "nothing" || r.active)
     .sort((a, b) => a.teacherName.localeCompare(b.teacherName));
@@ -380,7 +380,7 @@ export async function teacherStatement(db, s, tz, teacherId, now = new Date()) {
     if (settledKeys.has(p.key)) continue;
     const calc = (await computeUnsettled(db, p, saved, [tid])).get(String(tid));
     if (!p.open && !calc.hasActivity) continue;
-    const { txIds, ...rest } = calc; // eslint-disable-line no-unused-vars
+    const { txIds, ...rest } = calc;  
     current.push({ period: { key: p.key, startYmd: p.startYmd, endYmd: p.endYmd, payYmd: p.payYmd, open: !!p.open }, ...rest });
   }
   return {
@@ -464,7 +464,7 @@ export async function settleSalary(db, s, tz, { key, teacherId, paymentMethod, n
 
   // Paying the running period (on its pay day, or early) freezes its charges now
   if (period.open) {
-    const { open: _o, ...p } = period; // eslint-disable-line no-unused-vars
+    const { open: _o, ...p } = period;  
     period = await savePeriod(db, p, s);
     saved = [period, ...saved.filter((x) => x.key !== period.key)];
   }

@@ -108,7 +108,7 @@ router.patch('/centers/:id/history/:month', async (req, res) => {
     );
     if (!r.matchedCount) return fail(res, 404, 'Month not found');
     res.json({ success: true, message: req.body?.paid !== false ? 'Marked as paid' : 'Marked as unpaid' });
-  } catch (err) {
+  } catch {
     fail(res, 500, 'Could not update');
   }
 });

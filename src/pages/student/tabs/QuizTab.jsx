@@ -61,9 +61,6 @@ function Countdown({ secondsLeft, totalSeconds }) {
 // ── Active quiz screen ────────────────────────────────────────────────────────
 function QuizScreen({ quiz, onComplete, isDarkMode }) {
   const { t: tr } = useTranslation("student");
-  const col = isDarkMode
-    ? { bg: "var(--as-bg, #0f1117)", card: "var(--as-raised, #1a1d2e)", border: "var(--as-line, #2a2d40)", heading: "var(--as-ink, #f0f4ff)", body: "var(--as-ink-2, #c8cce0)", muted: "var(--as-ink-2, #6b7090)" }
-    : { bg: "var(--as-raised, #fff8f0)", card: "var(--as-surface, #ffffff)", border: "#e5e7ef", heading: "#2d1f6e", body: "#4a4060", muted: "#9b8ab0" };
 
   const totalSeconds = quiz.timeLimit * 60;
 
@@ -487,7 +484,7 @@ function StartQuizModal({ quiz, onConfirm, onCancel, isDarkMode }) {
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
-export default function StudentQuizTab({ studentInfo, isDarkMode }) {
+export default function StudentQuizTab({ isDarkMode }) {
   const { t: tr } = useTranslation("student");
   const col = isDarkMode
     ? { bg: "var(--as-bg, #0f1117)", card: "var(--as-raised, #1a1d2e)", border: "var(--as-line, #2a2d40)", heading: "var(--as-ink, #f0f4ff)", body: "var(--as-ink-2, #c8cce0)", muted: "var(--as-ink-2, #6b7090)" }

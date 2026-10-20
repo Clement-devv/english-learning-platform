@@ -1,6 +1,5 @@
 // src/pages/teacher/components/classes/ClassItem.jsx - FIXED
 import React from "react";
-import { motion } from "framer-motion";
 import { Video, Calendar, Clock, Users, Trash2 } from "lucide-react";
 
 export default function ClassItem({ item, onJoin, onDelete }) {

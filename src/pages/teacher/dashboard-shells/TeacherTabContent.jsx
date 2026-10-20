@@ -40,7 +40,7 @@ preloadWhenIdle([
  * headStyle  – CSS object for page headings inside the wrapper
  * mutedStyle – CSS object for page sub-headings
  */
-export default function TeacherTabContent({ d, wrapStyle = {}, msgStyle = {}, msgClassName, msgFill = false, headStyle = {}, mutedStyle = {}, onUnreadCount }) {
+export default function TeacherTabContent({ d, wrapStyle = {}, msgStyle = {}, msgClassName, msgFill = false, onUnreadCount }) {
   const { activeTab, isDarkMode } = d;
 
   // ── SCHEDULE ──────────────────────────────────────────────────────────────

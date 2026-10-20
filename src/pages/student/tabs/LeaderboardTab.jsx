@@ -30,8 +30,6 @@ export default function LeaderboardTab({ isDarkMode }) {
   const [data,     setData]     = useState(null);
   const [loading,  setLoading]  = useState(true);
   const [category, setCategory] = useState('streak');
-
-  const bg     = isDarkMode ? 'var(--as-bg, #0f1117)' : 'var(--as-raised, #fff8f0)';
   const card   = isDarkMode ? 'var(--as-raised, #1a1d2e)' : 'var(--as-surface, #ffffff)';
   const border = isDarkMode ? 'var(--as-line, #2a2d40)' : 'var(--as-line, #ffe8cc)';
   const text   = isDarkMode ? 'var(--as-ink, #f0f4ff)' : 'var(--as-ink, #3d2e20)';

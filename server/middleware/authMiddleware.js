@@ -1,7 +1,7 @@
 // @ts-check
 // middleware/authMiddleware.js
 import jwt from "jsonwebtoken";
-import { config, JWT_VERIFY_OPTIONS } from "../config/config.js";
+import { JWT_VERIFY_OPTIONS } from "../config/config.js";
 import { getCenterSecret } from "../utils/jwtUtils.js";
 import { adminSchema }    from "../schemas/adminSchema.js";
 import { teacherSchema }  from "../schemas/teacherSchema.js";

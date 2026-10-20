@@ -41,7 +41,6 @@ import {
   deleteStudent,
   restoreStudent,
   toggleStudent,
-  recordLesson,
   apiResetPassword,
   resendStudentInvite,
   addPayment,
@@ -415,7 +414,7 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
   const handleRestoreStudent = async (id) => {
     const stu = students.find((s) => s._id === id);
     try {
-      const result = await restoreStudent(id);
+      await restoreStudent(id);
       setStudents((prev) =>
         prev.map((s) =>
           s._id === id
@@ -556,7 +555,6 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
     try {
       const response = await apiResetPassword(id);
       const plainPassword = response.newPassword;
-      const stu = students.find((s) => s._id === id);
 
       setStudents((prev) =>
         prev.map((s) =>
@@ -585,7 +583,7 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
     try {
       await resendStudentInvite(id);
       showToast(tr("studentsTab.inviteEmailResentSuccessfully"), "success");
-    } catch (e) {
+    } catch {
       showToast(tr("studentsTab.couldNotResendInvitePlease"), "error");
     }
   };
@@ -658,9 +656,7 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
 
   const selectedStudentObj = students.find((s) => s._id === selectedStudent);
 
-  // ── UI helpers ───────────────────────────────────────────────────────────────
-  const base = isDarkMode ? "bg-stone-900" : "bg-stone-50";
-  const cardBg = isDarkMode ? "bg-stone-800 border-stone-700" : "bg-white border-stone-200";
+  // ── UI helpers ───────────────────────────────────────────────────────────────  const cardBg = isDarkMode ? "bg-stone-800 border-stone-700" : "bg-white border-stone-200";
   const textPrimary = isDarkMode ? "text-white" : "text-stone-900";
   const textSecondary = isDarkMode ? "text-stone-400" : "text-stone-500";
   const inputCls = isDarkMode

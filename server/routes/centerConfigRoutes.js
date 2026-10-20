@@ -10,7 +10,7 @@ import { isValidDomain, normalizeDomain } from '../utils/domainVerifier.js';
 import { sendDomainInstructionsEmail } from '../utils/emailService.js';
 import { config } from '../config/config.js';
 import logger from "../utils/logger.js";
-import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
+import { badRequest, forbidden, conflict, serverError } from '../utils/apiResponse.js';
 import { invalidateCache } from '../utils/cache.js';
 import { getStudentModes } from '../utils/planFeatures.js';
 import { s3Enabled, uploadToS3, deleteFromS3, s3PublicUrl, isLegacyPath, keyFromValue } from "../utils/s3.js";
@@ -147,7 +147,7 @@ router.get('/domain/status', tenantMiddleware, verifyToken, verifyAdmin, async (
   try {
     const { customDomain, domainVerified, domainRequestedAt, domainInstructions } = req.center;
     res.json({ success: true, customDomain, domainVerified, domainRequestedAt, instructions: domainInstructions });
-  } catch (err) {
+  } catch {
     res.status(500).json({ success: false, message: 'Failed to fetch domain status' });
   }
 });

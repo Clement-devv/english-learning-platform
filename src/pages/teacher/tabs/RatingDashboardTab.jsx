@@ -25,7 +25,7 @@ const SECTIONS = [
   { key: 'feedback', icon: '💬', label: 'Low Ratings'   },
 ];
 
-export default function RatingDashboardTab({ teacherInfo, isDarkMode }) {
+export default function RatingDashboardTab({ isDarkMode }) {
   const [data,    setData]    = useState(null);
   const [loading, setLoading] = useState(true);
   const [section, setSection] = useState('trend');
@@ -50,7 +50,7 @@ export default function RatingDashboardTab({ teacherInfo, isDarkMode }) {
     }
   }
 
-  useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); }, []);  
 
   const bestWeekRating = data?.weeklyTrend?.length
     ? Math.max(...data.weeklyTrend.map(w => w.avgRating))

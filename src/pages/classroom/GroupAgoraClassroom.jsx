@@ -6,7 +6,6 @@ import AgoraRTC from "agora-rtc-sdk-ng";
 AgoraRTC.setLogLevel(import.meta.env.DEV ? 0 : 3);
 import { io } from "socket.io-client";
 import api from "../../api";
-import { useDarkMode } from "../../hooks/useDarkMode";
 import { getStoredToken, getStoredUser, detectActiveRole } from "../../utils/authStorage";
 import { decodeJwtPayload } from "../../utils/jwt";
 import GroupClassRecorder from "../../components/groupClass/GroupClassRecorder";
@@ -143,7 +142,6 @@ function ParticipantRow({ p, isTeacher, canControl, hasHand, onPromote, onDemote
 
 // ── Main component ────────────────────────────────────────────────────────────
 export default function GroupAgoraClassroom({ classData, userRole, onLeave }) {
-  const { isDarkMode: dm } = useDarkMode();
   const groupClassId = classData.id;
   const channelName  = `group-${groupClassId}`;
 
@@ -166,7 +164,6 @@ export default function GroupAgoraClassroom({ classData, userRole, onLeave }) {
   const [showPanel,    setShowPanel]    = useState(true);
   const [elapsedSec,   setElapsedSec]   = useState(0);
   const [error,        setError]        = useState(null);
-  const [myUid,        setMyUid]        = useState(null);
   const [myName,       setMyName]       = useState("Me");
   const [mediaError,   setMediaError]   = useState(""); // camera / mic blocked — still in the class
   const [attempt,      setAttempt]      = useState(0);  // "Try again" re-runs the join
@@ -228,7 +225,6 @@ export default function GroupAgoraClassroom({ classData, userRole, onLeave }) {
 
         // `channel` is the server-issued, center-scoped Agora channel for this class
         const { token, uid, appId, channel: agoraChannel } = data;
-        setMyUid(uid);
 
         // Who I am — from the signed-in session (the live connection identifies people the same way)
         const sessionRole = ["teacher", "student"].includes(userRole) ? userRole : detectActiveRole();
@@ -502,7 +498,6 @@ export default function GroupAgoraClassroom({ classData, userRole, onLeave }) {
 
   // Tiles: local first, then remote users who have video
   const localVideoTrack = localVideoTrackRef.current;
-  const localAudioTrack = localAudioTrackRef.current;
 
   const tiles = [
     {

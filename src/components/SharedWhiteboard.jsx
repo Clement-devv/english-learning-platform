@@ -239,7 +239,7 @@ export default function SharedWhiteboard({
     reader.readAsDataURL(file);
   };
 
-  const handlePdfShared = ({ pdfData, fileName, sharedBy, visibleToStudents }) => {
+  const handlePdfShared = ({ pdfData, visibleToStudents }) => {
     setPdfUrl(pdfData);
     
     // Teacher always sees it, students only if enabled

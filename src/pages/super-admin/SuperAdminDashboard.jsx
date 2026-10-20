@@ -11,7 +11,6 @@ import {
   AlertTriangle, RotateCcw, Zap, Send, Activity, Users, UserCheck, LogIn, Megaphone, SlidersHorizontal, Award, Sun, Moon, Menu,
   HeartPulse, HardDrive, LayoutDashboard, Link2, Search,
 } from 'lucide-react';
-import api from '../../api';
 import { THEMES } from '../../data/themes';
 import { LOGIN_THEMES, TEACHER_LOGIN_THEMES, ADMIN_LOGIN_THEMES } from '../../data/loginThemes';
 import { DASHBOARD_THEMES } from '../../data/dashboardThemes';
@@ -64,7 +63,7 @@ export default function SuperAdminDashboard() {
       throw new Error('Session expired');
     }
     return res;
-  }, [authHeaders, navigate]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [authHeaders, navigate]);  
 
   const [, setStats] = useState(null); // counts now come with the Centers tab's own list
   const [centers,     setCenters]     = useState([]);

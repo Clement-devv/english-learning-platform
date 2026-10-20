@@ -130,7 +130,7 @@ export default function GroupClassesTab({ isDarkMode, loadPeople = loadAllPeople
       setGcTotal(gcRes.data.total ?? 0);
       setTeachers(people.teachers || []);
       setStudents(people.students || []);
-    } catch (e) {
+    } catch {
       flash(tr("groupClassesTab.failedToLoadGroupClasses"));
     } finally {
       setLoading(false);
@@ -237,7 +237,7 @@ export default function GroupClassesTab({ isDarkMode, loadPeople = loadAllPeople
       flash(data?.feePaid > 0 ? tr("groupClassesTab.attendanceFeePaid", { fee: fmtMoney(data.feePaid, sym) }) : tr("groupClassesTab.attendanceSaved"));
       setAttTarget(null);
       load();
-    } catch (e) {
+    } catch {
       flash(tr("groupClassesTab.failedToSaveAttendance"));
     }
   };

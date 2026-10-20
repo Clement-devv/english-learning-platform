@@ -66,7 +66,7 @@ export default function CenterInvitePage() {
     if (!confirmOk) { setError('The two passwords do not match.'); return; }
     setSaving(true);
     try {
-      const { confirm, ...body } = form; // eslint-disable-line no-unused-vars
+      const { confirm, ...body } = form;  
       const r = await fetch(`${API}/center-invite/${encodeURIComponent(token)}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
       });

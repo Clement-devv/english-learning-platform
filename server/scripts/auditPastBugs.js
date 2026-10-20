@@ -47,7 +47,7 @@ async function duplicateAdminEmails() {
 async function auditCenter(slug) {
   const db = await getDb(slug);
   const Booking  = model(db, "Booking", bookingSchema);
-  const Student  = model(db, "Student", studentSchema);
+  model(db, "Student", studentSchema); // registered for populate("studentId")
   const Teacher  = model(db, "Teacher", teacherSchema);
   const Payment  = model(db, "Payment", paymentSchema);
   const PayTx    = model(db, "PaymentTransaction", paymentTransactionSchema);

@@ -6,7 +6,7 @@ import { bookingSchema }            from "../schemas/bookingSchema.js";
 import { studentSchema }            from "../schemas/studentSchema.js";
 import { teacherSchema }            from "../schemas/teacherSchema.js";
 import logger from "../utils/logger.js";
-import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
+import { badRequest, forbidden, notFound, serverError } from '../utils/apiResponse.js';
 import { reverseCompletedClass } from "../utils/classReversal.js";
 import { recordOutcomeChange } from "../utils/classOutcome.js";
 import { payForCompletedClass } from "../utils/classPayment.js";

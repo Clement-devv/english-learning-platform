@@ -96,7 +96,7 @@ export function linkPreviewHandler(frontendPath) {
       res.setHeader("Cache-Control", "public, max-age=300");
       res.setHeader("X-Robots-Tag", "noindex, nofollow");
       res.send(html);
-    } catch (err) {
+    } catch {
       next(); // fall back to the plain SPA page
     }
   };

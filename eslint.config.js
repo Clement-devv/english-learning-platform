@@ -28,7 +28,15 @@ export default defineConfig([
     rules: {
       // Capitalised names are JSX components — including renamed props like
       // ({ icon: Icon }) — which this rule can't see being used in JSX.
-      'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]', argsIgnorePattern: '^[A-Z_]' }],
+      // ignoreRestSiblings: ({ secret, ...rest }) => rest is how a field is left out.
+      'no-unused-vars': ['error', {
+        varsIgnorePattern: '^[A-Z_]',
+        argsIgnorePattern: '^[A-Z_]',
+        caughtErrorsIgnorePattern: '^_',
+        ignoreRestSiblings: true,
+      }],
+      // Best-effort cleanup (stopping media tracks, closing streams) may fail silently.
+      'no-empty': ['error', { allowEmptyCatch: true }],
     },
   },
 
@@ -53,6 +61,7 @@ export default defineConfig([
         argsIgnorePattern: '^_',
         caughtErrors: 'all',
         caughtErrorsIgnorePattern: '^_',
+        ignoreRestSiblings: true,
       }],
       'no-console': ['warn', { allow: ['warn', 'error'] }],
       'no-empty': ['error', { allowEmptyCatch: true }],

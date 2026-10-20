@@ -34,7 +34,7 @@ export default function Join() {
       const json = await res.json();
       if (!res.ok) { setError(json.error || "Something went wrong"); return; }
       setDone(true);
-    } catch (err) {
+    } catch {
       setError("Network error — please try again.");
     } finally {
       setBusy(false);

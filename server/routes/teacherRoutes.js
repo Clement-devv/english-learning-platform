@@ -25,7 +25,7 @@ import { subAdminSchema } from "../schemas/subAdminSchema.js";
 import { parsePagination, DIRECTORY_MAX } from "../utils/pagination.js";
 import logger from "../utils/logger.js";
 import { sharedSnapshot } from "../utils/sharedSnapshot.js";
-import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
+import { badRequest, forbidden, notFound, serverError } from '../utils/apiResponse.js';
 import { cachedQuery, invalidateCache } from '../utils/cache.js';
 import { normaliseWorkingHours, isValidTz } from "../utils/schedule.js";
 import { s3Enabled, uploadToS3, deleteFromS3, s3PublicUrl, isLegacyPath, keyFromValue } from "../utils/s3.js";
@@ -111,7 +111,7 @@ router.get("/:id", verifyToken, async (req, res) => {
       return res.json(teacher);
     }
     res.json(pick(teacher, role === "sub-admin" ? STAFF_TEACHER_FIELDS : PUBLIC_TEACHER_FIELDS));
-  } catch (err) {
+  } catch {
     serverError(res, "Error fetching teacher data");
   }
 });
@@ -208,7 +208,7 @@ router.delete("/:id/photo", verifyToken, requireOwnerOrAdmin, async (req, res) =
       await invalidateCache(teacherCacheKey(req.center?.slug, req.params.id));
     }
     res.json({ message: "Photo removed" });
-  } catch (err) {
+  } catch {
     serverError(res, "Error removing photo");
   }
 });
@@ -226,7 +226,7 @@ router.patch("/:id/schedule-visibility", verifyToken, requireOwnerOrAdmin, async
     );
     if (!teacher) return notFound(res, "Teacher not found");
     res.json({ showScheduleToStudents: teacher.showScheduleToStudents });
-  } catch (err) {
+  } catch {
     serverError(res, "Error updating schedule visibility");
   }
 });
@@ -249,7 +249,7 @@ router.put("/:id/working-hours", verifyToken, requireOwnerOrAdmin, async (req, r
     if (!teacher) return notFound(res, "Teacher not found");
     await invalidateCache(teacherCacheKey(req.center?.slug, req.params.id)).catch(() => {});
     res.json({ success: true, workingHours: teacher.workingHours, timezone: teacher.workingHoursTz, message: "Working hours saved" });
-  } catch (err) {
+  } catch {
     serverError(res, "Error saving working hours");
   }
 });
@@ -264,7 +264,7 @@ router.patch("/:id/timezone", verifyToken, requireOwnerOrAdmin, async (req, res)
     catch { return badRequest(res, "Invalid timezone identifier"); }
     await getTeacher(req.db).findByIdAndUpdate(req.params.id, { timezone });
     res.json({ ok: true });
-  } catch (err) {
+  } catch {
     serverError(res, "Error updating timezone");
   }
 });
@@ -400,7 +400,7 @@ router.get("/verify-invite/:token", async (req, res) => {
       return badRequest(res, "Invalid or expired invite link. Please contact your administrator.");
     }
     res.json({ success: true, teacher: { firstName: teacher.firstName, lastName: teacher.lastName, email: teacher.email, continent: teacher.continent } });
-  } catch (err) {
+  } catch {
     serverError(res);
   }
 });
@@ -470,7 +470,7 @@ router.post("/:id/resend-invite", verifyToken, verifyAdmin, async (req, res) => 
     await sendTeacherInviteEmail(teacher, setupUrl, req.center?.centerName || "");
 
     res.json({ success: true, message: "Invite resent successfully" });
-  } catch (err) {
+  } catch {
     serverError(res, "Failed to resend invite");
   }
 });
@@ -492,7 +492,7 @@ router.patch("/:id/profile", verifyToken, requireOwnerOrAdmin, async (req, res) 
     if (!teacher) return notFound(res, "Teacher not found");
     await invalidateCache(teacherCacheKey(req.center?.slug, req.params.id));
     res.json(teacher);
-  } catch (err) {
+  } catch {
     serverError(res, "Error updating profile");
   }
 });

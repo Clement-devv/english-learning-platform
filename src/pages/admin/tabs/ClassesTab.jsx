@@ -515,7 +515,6 @@ export default function ClassesTab({ isDarkMode }) {
   const [error,        setError]        = useState("");
 
   const bookingIntervalRef = useRef(null);
-  const sessionIntervalRef = useRef(null);
   const liveIdsRef         = useRef([]);
 
   const th = {

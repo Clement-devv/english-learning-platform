@@ -26,9 +26,7 @@ function StudentDetailModal({ student, isDarkMode, onClose }) {
   const modalBg   = dm ? "bg-gray-800"   : "bg-white";
   const text      = dm ? "text-gray-100" : "text-gray-900";
   const subText   = dm ? "text-gray-400" : "text-gray-500";
-  const divider   = dm ? "divide-gray-700" : "divide-gray-100";
-  const rowBg     = dm ? "bg-gray-700/50" : "bg-gray-50";
-
+  const divider   = dm ? "divide-gray-700" : "divide-gray-100";
   const dob     = formatDob(student.dateOfBirth);
   const age     = calcAge(student.dateOfBirth) ?? student.age;
   const initials = student.name
@@ -129,9 +127,7 @@ export default function StudentProgressList({ students, isDarkMode }) {
   const dm = isDarkMode;
 
   // ── colours ──────────────────────────────────────────────────────────────
-  const pageBg    = dm ? "bg-gray-800"   : "bg-white";
-  const cardBg    = dm ? "bg-gray-750 bg-gray-700" : "bg-white";
-  const cardBorder= dm ? "border-gray-600 hover:border-orange-500" : "border-gray-200 hover:border-orange-300";
+  const pageBg    = dm ? "bg-gray-800"   : "bg-white";  const cardBorder= dm ? "border-gray-600 hover:border-orange-500" : "border-gray-200 hover:border-orange-300";
   const text      = dm ? "text-gray-100" : "text-gray-800";
   const subText   = dm ? "text-gray-400" : "text-gray-500";
   const inputCls  = dm
@@ -191,7 +187,7 @@ export default function StudentProgressList({ students, isDarkMode }) {
       ) : (
         /* Grid */
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {currentStudents.map((student, idx) => {
+          {currentStudents.map((student) => {
             const initials = student.name
               ? student.name.split(" ").map((p) => p[0]).slice(0, 2).join("").toUpperCase()
               : "?";

@@ -14,11 +14,6 @@ import { getAssignedStudents } from '../../../services/teacherStudentService';
 import { useLiveRefresh, refreshStale } from '../../../hooks/useLiveData';
 import { useTabSeen } from '../../../hooks/useTabSeen';
 
-// A pending parent dispute on a completed class (managed student): drives the red heartbeat warning
-const parentDisputeOf = (b) =>
-  b.parentCheck?.status === "denied" && b.disputeStatus === "pending"
-    ? { deadline: b.parentCheck.disputeDeadline, comment: b.parentCheck.comment || "" }
-    : null;
 import {
   getTeacherBookings,
   acceptBooking,
@@ -47,7 +42,7 @@ function classStatus(scheduledTime) {
 export function useTeacherDashboardData() {
   const navigate  = useNavigate();
   const location  = useLocation();
-  const { user: authUser, setUser: setAuthUser, logout: authLogout } = useAuth();
+  const { user: authUser, setUser: setAuthUser } = useAuth();
   const { isDarkMode, toggleDarkMode } = useDarkMode();
 
   // ── Core state ─────────────────────────────────────────────────────────────
@@ -137,7 +132,7 @@ export function useTeacherDashboardData() {
       clearTimeout(tid);
       if (socket) { socket.removeAllListeners(); socket.disconnect(); }
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);  
 
   // ── Session guard: re-verify when tab becomes visible (catches force-logout from another device) ──
   useEffect(() => {

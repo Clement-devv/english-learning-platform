@@ -87,8 +87,8 @@ export async function rollLibraryMonth(center, settings) {
 /** Change a center's stored bytes (+ upload / − delete), keep the month's peak, send warnings. */
 export async function changeLibraryUsage(centerId, deltaBytes, deltaFiles) {
   const settings = await getLibrarySettings();
-  let center = await Center.findById(centerId).select('centerName slug plan adminEmail library').lean();
-  center = await rollLibraryMonth(center, settings);
+  const center = await Center.findById(centerId).select('centerName slug plan adminEmail library').lean();
+  await rollLibraryMonth(center, settings);
   const after = await Center.findOneAndUpdate(
     { _id: centerId },
     { $inc: { 'library.usedBytes': deltaBytes, 'library.fileCount': deltaFiles } },

@@ -2,7 +2,6 @@ import express from "express";
 import bcrypt from "../utils/passwordHash.js";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
-import redisClient from "../config/redis.js";
 
 import { config, JWT_STANDARD_CLAIMS, JWT_VERIFY_OPTIONS } from "../config/config.js";
 import { getCenterSecret, getCenter2faPendingSecret } from "../utils/jwtUtils.js";
@@ -23,7 +22,7 @@ import { studentSchema } from "../schemas/studentSchema.js";
 import { subAdminSchema } from "../schemas/subAdminSchema.js";
 import { parentSchema } from "../schemas/parentSchema.js";
 import logger from "../utils/logger.js";
-import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
+import { badRequest, unauthorized, forbidden, notFound, serverError } from '../utils/apiResponse.js';
 import {
   loginRules,
   changePasswordRules,
@@ -215,7 +214,7 @@ const verifyToken = async (req, res, next) => {
 
     req.teacher = teacher;
     next();
-  } catch (err) {
+  } catch {
     return unauthorized(res, "Invalid token");
   }
 };
@@ -529,7 +528,7 @@ router.get("/student/verify", tenantMiddleware, async (req, res) => {
     }
 
     res.json({ success: true, student });
-  } catch (err) {
+  } catch {
     unauthorized(res, "Invalid token");
   }
 });
@@ -727,7 +726,7 @@ router.get("/admin/verify", tenantMiddleware, async (req, res) => {
     }
 
     res.json({ success: true, admin });
-  } catch (err) {
+  } catch {
     unauthorized(res, "Invalid token");
   }
 });

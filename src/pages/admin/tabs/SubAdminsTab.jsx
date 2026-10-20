@@ -1,5 +1,5 @@
 // src/pages/admin/tabs/SubAdminsTab.jsx
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Plus, Users, Shield, Trash2, Edit2,
   ChevronDown, ChevronUp, CheckCircle, XCircle, Clock,
@@ -57,7 +57,7 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
       setLoading(true);
       const res = await api.get("/sub-admins");
       setSubAdmins(res.data.subAdmins || []);
-    } catch (e) {
+    } catch {
       showToast(tr("subAdminsTab.failedToLoadSubAdmins"), "error");
     } finally {
       setLoading(false);
@@ -126,7 +126,7 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
       const { data } = await api.post(`/sub-admins/${sa._id}/resend-invite`);
       showToast(tr("subAdminsTab.invitationResent"));
       if (data.setupUrl) setSetupLink({ name: sa.email, url: data.setupUrl });
-    } catch (e) {
+    } catch {
       showToast(tr("subAdminsTab.failedToResend"), "error");
     } finally {
       setAction(sa._id + "_resend", false);
@@ -139,7 +139,7 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
       const res = await api.patch(`/sub-admins/${sa._id}/toggle-status`);
       showToast(tr(res.data.status === "active" ? "subAdminsTab.subAdminReactivated" : "subAdminsTab.subAdminSuspended"));
       fetchSubAdmins();
-    } catch (e) {
+    } catch {
       showToast(tr("subAdminsTab.failedToToggleStatus"), "error");
     } finally {
       setAction(sa._id + "_toggle", false);
@@ -153,7 +153,7 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
       await api.delete(`/sub-admins/${sa._id}`);
       showToast(tr("subAdminsTab.subAdminDeleted"));
       fetchSubAdmins();
-    } catch (e) {
+    } catch {
       showToast(tr("subAdminsTab.failedToDelete"), "error");
     } finally {
       setAction(sa._id + "_delete", false);
@@ -992,7 +992,7 @@ export default function SubAdminsTab({ isDarkMode, teachers = [] }) {
   );
 }
 
-function ActionBtn({ onClick, loading, title, color, isDarkMode, children }) {
+function ActionBtn({ onClick, loading, title, color, children }) {
   return (
     <button
       onClick={onClick}
@@ -1046,13 +1046,13 @@ function CopyBtn({ url, isDarkMode }) {
 }
 
 const s = {
-  label: (dark) => ({
+  label: () => ({
     display: "block", fontSize: "11.5px", fontWeight: "700",
     color: 'var(--a-ink-2)',
     textTransform: "uppercase", letterSpacing: "0.07em",
     marginBottom: "8px",
   }),
-  input: (dark) => ({
+  input: () => ({
     width: "100%", padding: "11px 14px",
     background: 'var(--a-raised)',
     border: `1.5px solid ${'var(--a-line)'}`,
@@ -1062,7 +1062,7 @@ const s = {
   }),
 };
 
-function palette(dark) {
+function palette() {
   return {
     card:    'var(--a-surface)',
     border:  'var(--a-line)',

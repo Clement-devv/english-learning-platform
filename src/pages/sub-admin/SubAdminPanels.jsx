@@ -449,7 +449,7 @@ export function RemoteVideo({ uid, videoTrack }) {
 // ─────────────────────────────────────────────────────────────────────────────
 const SPECTATE_LIMIT = 300; // 5 minutes
 
-export function AgoraSpectatorModal({ booking, isDarkMode, onClose }) {
+export function AgoraSpectatorModal({ booking, onClose }) {
   const [phase,       setPhase]       = useState("connecting");
   const [errorMsg,    setErrorMsg]    = useState("");
   const [remoteUsers, setRemoteUsers] = useState([]);

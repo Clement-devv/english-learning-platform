@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Monitor, Smartphone, Tablet, MapPin, Clock, AlertCircle, LogOut } from 'lucide-react';
 import api from '../api';
 
-export default function SessionManager({ userRole, onClose }) {
+export default function SessionManager({ onClose }) {
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');

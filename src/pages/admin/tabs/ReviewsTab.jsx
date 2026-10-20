@@ -1,7 +1,7 @@
 // src/pages/admin/tabs/ReviewsTab.jsx
 // Admin: all reviews across all teachers, per-teacher averages, flag/delete controls.
 
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Flag, Trash2, RefreshCw, AlertTriangle, ChevronLeft, ChevronRight } from "lucide-react";
 import api from "../../../api";
 import { useOnDataChanged } from "../../../hooks/useLiveData";
@@ -40,8 +40,6 @@ export default function ReviewsTab({ isDarkMode }) {
   const [page,          setPage]          = useState(1);
   const [toast,         setToast]         = useState(null);
   const [busy,          setBusy]          = useState({});
-
-  const bg      = 'var(--a-raised)';
   const card    = 'var(--a-surface)';
   const border  = 'var(--a-line)';
   const text    = 'var(--a-ink)';

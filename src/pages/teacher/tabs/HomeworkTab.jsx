@@ -199,7 +199,7 @@ export default function HomeworkTab({ teacherInfo, students, isDarkMode }) {
       }
     })();
     return () => { stale = true; };
-  }, [page, filter, reloadKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [page, filter, reloadKey]);  
 
   const filtered = homeworkList; // already filtered + paged by the server
 
@@ -327,18 +327,11 @@ export default function HomeworkTab({ teacherInfo, students, isDarkMode }) {
     try { await downloadGradedHomeworkPdf(hw, teacherInfo); }
     catch (err) { console.error("PDF error:", err); showToast("Could not create PDF", "error"); }
     finally { setPdfBusy(null); }
-  };
-
-  const fileUrl = (type, fileId) =>
-    `${API_BASE}/api/homework/file/${type}/${fileId}`;
-
-  const token = localStorage.getItem("token");
-
-  const openFile = (type, fileId) => {
+  };  const openFile = (type, fileId) => {
     // Open through the authenticated download endpoint using a token in the URL
     // (since we can't set headers on <a> tags, we fetch as blob)
     api.get(`/homework/file/${type}/${fileId}`, { responseType: "blob" })
-      .then(({ data, headers }) => {
+      .then(({ data }) => {
         const url = URL.createObjectURL(data);
         window.open(url, "_blank");
       })

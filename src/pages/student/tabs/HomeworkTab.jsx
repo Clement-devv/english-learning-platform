@@ -169,7 +169,7 @@ function FilePicker({ files, setFiles, accent }) {
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
-export default function StudentHomeworkTab({ studentInfo, isDarkMode }) {
+export default function StudentHomeworkTab({ isDarkMode }) {
   const { t: tr } = useTranslation("student");
   const col = isDarkMode
     ? { bg: "var(--as-bg, #0f1117)", card: "var(--as-raised, #1a1d2e)", cardAlt: "var(--as-raised, #1f2235)", border: "var(--as-line, #2a2d40)", heading: "var(--as-ink, #f0f4ff)", body: "var(--as-ink-2, #c8cce0)", muted: "var(--as-ink-2, #6b7090)", input: "var(--as-bg, #0f1117)", inputBorder: "var(--as-line, #475569)" }

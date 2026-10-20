@@ -52,7 +52,7 @@ router.post("/subscribe", verifyToken, async (req, res) => {
     const subscription = cleanSubscription(req.body?.subscription);
     if (!subscription) return badRequest(res, "Invalid subscription");
 
-    const { user, session } = await loadCurrentSession(req);
+    const { session } = await loadCurrentSession(req);
     if (!session?.isActive) return notFound(res, "This device's session was not found. Please log in again.");
 
     // A browser has one push endpoint, whoever is signed in. Detach it from

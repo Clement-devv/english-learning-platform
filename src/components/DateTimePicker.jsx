@@ -158,7 +158,6 @@ export default function DateTimePicker({ value, onChange, placeholder, inputStyl
   const border  = dm ? "#2a2d40" : "#e5e7eb";
   const text     = dm ? "#e2e8f0" : "#1e293b";
   const muted    = dm ? "#64748b" : "#94a3b8";
-  const dayHover = dm ? "#2d3748" : "#f1f5f9";
 
   const days   = daysInMonth(view.year, view.month);
   const blanks = firstDayOf(view.year, view.month);

@@ -263,7 +263,7 @@ export default function VideoCall({
       document.removeEventListener("click",      tryUnlock);
       document.removeEventListener("touchstart", tryUnlock);
     };
-  }, [resumeAudio]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [resumeAudio]);  
 
   // toggleChat from useVideoChat also needs to close showBgPanel — wrap it
   const handleToggleChat = useCallback(() => {
@@ -340,7 +340,7 @@ export default function VideoCall({
       if (c) { c.removeAllListeners(); c.leave().catch(() => {}); client.current = null; }
       if (customBgUrlRef.current) { URL.revokeObjectURL(customBgUrlRef.current); customBgUrlRef.current = null; }
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);  
 
   // ── Auto-join ─────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -723,7 +723,7 @@ export default function VideoCall({
     }
     if (custom) { try { custom.stop(); custom.close(); } catch (_) {} }
     if (localContainer.current && camTrk) camTrk.play(localContainer.current);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);  
 
   // Start MediaPipe blur: segmenter → canvas compositor → custom Agora track.
   const startMPBlur = useCallback(async (degree) => {
@@ -818,7 +818,7 @@ export default function VideoCall({
       mpActiveRef.current = false;
       return false;
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);  
 
   // ── Virtual background ────────────────────────────────────────────────────
   const applyBackground = useCallback(async (bgKey) => {

@@ -10,7 +10,7 @@ import { pronunciationCreditSchema } from "../schemas/pronunciationCreditSchema.
 import Center from "../models/master/Center.js";
 import { callGemini, extractJSONArray } from "../utils/geminiHelper.js";
 import logger from "../utils/logger.js";
-import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
+import { badRequest, forbidden, serverError } from '../utils/apiResponse.js';
 
 const getPronunciationCredit = (db) =>
   db.models.PronunciationCredit || db.model("PronunciationCredit", pronunciationCreditSchema);

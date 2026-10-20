@@ -75,7 +75,7 @@ export default function SubAdminCorporateSlateTheme() {
                   stroke="rgba(129,140,248,0.18)" strokeWidth="0.6"
                   strokeDasharray="2 2" className={`cs-edge cs-e${i}`} />
               ))}
-              {edges.map(([a, b], i) => (
+              {edges.map((_, i) => (
                 <circle key={`f${i}`} r="0.9" fill="#818cf8" className={`cs-flow cs-f${i % 3}`} opacity="0.7">
                   <animateMotion dur={`${1.8 + i * 0.3}s`} repeatCount="indefinite" begin={`${i * 0.4}s`}>
                     <mpath href={`#ep${i}`} />

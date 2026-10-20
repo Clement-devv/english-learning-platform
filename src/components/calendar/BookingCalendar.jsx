@@ -1,5 +1,5 @@
 // src/components/calendar/BookingCalendar.jsx - CALENDAR VIEW FOR BOOKINGS
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock } from "lucide-react";
 
 /**
@@ -19,9 +19,7 @@ export default function BookingCalendar({
   onDateClick,
   allowCreate = false
 }) {
-  const [currentDate, setCurrentDate] = useState(new Date());
-  const [view, setView] = useState("month"); // month, week, day
-  const [selectedDate, setSelectedDate] = useState(null);
+  const [currentDate, setCurrentDate] = useState(new Date());  const [selectedDate, setSelectedDate] = useState(null);
 
   // Get calendar data
   const year = currentDate.getFullYear();

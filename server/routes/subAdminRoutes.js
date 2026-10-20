@@ -2,7 +2,6 @@
 import express from "express";
 import crypto from "crypto";
 import { verifyToken, verifyAdmin } from "../middleware/authMiddleware.js";
-import { config } from "../config/config.js";
 import { sendSubAdminInviteEmail, getCenterBaseUrl } from "../utils/emailService.js";
 import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
 import { subAdminSchema } from "../schemas/subAdminSchema.js";
@@ -10,7 +9,7 @@ import { teacherSchema }  from "../schemas/teacherSchema.js";
 import { studentSchema }  from "../schemas/studentSchema.js";
 import logger from "../utils/logger.js";
 import { SUB_ADMIN_PAGE_PERMISSIONS } from "../middleware/staffAccess.js";
-import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
+import { badRequest, notFound, conflict } from '../utils/apiResponse.js';
 
 const router = express.Router();
 router.use(tenantMiddleware);

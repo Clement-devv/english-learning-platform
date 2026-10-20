@@ -26,12 +26,11 @@ import redisClient from '../config/redis.js';
 import { config, JWT_STANDARD_CLAIMS, JWT_VERIFY_OPTIONS } from '../config/config.js';
 import { getCenterSecret } from '../utils/jwtUtils.js';
 import { sendEmail, sendCenterDeletionWarningEmail } from '../utils/emailService.js';
-import { verifyDomainDns, isValidDomain, normalizeDomain } from '../utils/domainVerifier.js';
+import { verifyDomainDns } from '../utils/domainVerifier.js';
 import { createSession, pruneSessionsToLimit } from '../utils/sessionManager.js';
 import { addToLocalBlacklist } from '../middleware/authMiddleware.js';
 import { invalidateCache } from '../utils/cache.js';
 import {
-  validate,
   validateSuperAdminLogin,
   validateParamMongoId,
   validateSlugParam,
@@ -48,7 +47,7 @@ import { teacherSchema } from '../schemas/teacherSchema.js';
 import { studentSchema }  from '../schemas/studentSchema.js';
 import { bookingSchema }  from '../schemas/bookingSchema.js';
 import logger from "../utils/logger.js";
-import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
+import { ok, badRequest, unauthorized, notFound, serverError } from '../utils/apiResponse.js';
 
 // OTP store — Redis-backed on production (shared across workers/restarts),
 // in-memory Map fallback for local dev without Redis.

@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { Plus, Trash2, Users, BookOpen, ChevronDown, ChevronUp, X, Check } from "lucide-react";
 import api from "../../../api";
 
-export default function VocabTab({ teacherInfo, students, isDarkMode }) {
+export default function VocabTab({ students, isDarkMode }) {
   const [lists,       setLists]       = useState([]);
   const [loading,     setLoading]     = useState(true);
   const [view,        setView]        = useState("lists"); // "lists" | "create" | "assign"

@@ -7,7 +7,7 @@
 //     Agora fires onUserJoined faster than the DB poll, so it gives real-time detection.
 //   - Setting presence to FALSE: ONLY via Agora onUserLeft callback. Poll never forces false.
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { io } from "socket.io-client";
 import VideoCall from "../VideoCall";
@@ -46,8 +46,8 @@ export default function AgoraClassroom({ classData, userRole, onLeave, googleMee
     isTeacherPresent, setIsTeacherPresent,
     isStudentPresent, setIsStudentPresent,
     teacherPresentRef, studentPresentRef,
-    timeElapsed, bothActiveTime, isTimerRunning, classStarted,
-    timeRemaining, completionPct, requiredTime,
+    timeElapsed, bothActiveTime, classStarted,
+    timeRemaining, completionPct,
     autoCompleting, completionResult,
     showLeaveModal, setShowLeaveModal,
     disputeOpen, setDisputeOpen,

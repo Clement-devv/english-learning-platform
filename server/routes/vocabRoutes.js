@@ -6,7 +6,7 @@ import { vocabListSchema }     from "../schemas/vocabListSchema.js";
 import { vocabProgressSchema } from "../schemas/vocabProgressSchema.js";
 import { recordActivity } from "../utils/streakService.js";
 import logger from "../utils/logger.js";
-import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
+import { badRequest, forbidden, notFound, serverError } from '../utils/apiResponse.js';
 
 const router = express.Router();
 router.use(tenantMiddleware);

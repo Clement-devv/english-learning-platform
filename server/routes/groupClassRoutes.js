@@ -7,7 +7,7 @@ import { groupClassSchema }       from "../schemas/groupClassSchema.js";
 import { teacherSchema }          from "../schemas/teacherSchema.js";
 import { studentSchema }          from "../schemas/studentSchema.js";
 import logger from "../utils/logger.js";
-import { ok, created, badRequest, forbidden, notFound, conflict, serverError } from "../utils/apiResponse.js";
+import { badRequest, forbidden, notFound, conflict, serverError } from "../utils/apiResponse.js";
 import { validateObjectId }  from "../middleware/validateObjectId.js";
 import { parsePagination }   from "../utils/pagination.js";
 import { toStr, toObjectId } from "../utils/inputSanitizer.js";

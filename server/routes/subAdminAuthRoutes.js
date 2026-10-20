@@ -1,25 +1,20 @@
 // server/routes/subAdminAuthRoutes.js
 import express from "express";
-import jwt     from "jsonwebtoken";
 import crypto  from "crypto";
-import { config, JWT_STANDARD_CLAIMS } from "../config/config.js";
-import { getCenterSecret } from "../utils/jwtUtils.js";
 import { loginLimiter, passwordResetLimiter } from "../middleware/rateLimiter.js";
-import { sendSubAdminInviteEmail, sendSubAdminWelcomeEmail, sendSubAdminForgotPasswordEmail } from "../utils/emailService.js";
+import { sendSubAdminWelcomeEmail, sendSubAdminForgotPasswordEmail } from "../utils/emailService.js";
 import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
 import { subAdminSchema }   from "../schemas/subAdminSchema.js";
-import { teacherSchema }    from "../schemas/teacherSchema.js";
 import { startSession, alertNewDevice, endSessionsAfterPasswordChange, notifySessionsRevoked } from "../utils/sessionManager.js";
 import { buildRoleClaims, signAccessToken } from "../utils/sessionClaims.js";
 import logger from "../utils/logger.js";
-import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
-import { loginRules, forgotPasswordRules, resetPasswordRules, changePasswordRules, validate } from '../middleware/validate.js';
+import { badRequest, unauthorized, forbidden, notFound, serverError } from '../utils/apiResponse.js';
+import { loginRules, forgotPasswordRules, resetPasswordRules, validate } from '../middleware/validate.js';
 
 const router = express.Router();
 router.use(tenantMiddleware);
 
 const getSubAdmin = (db) => db.models.SubAdmin || db.model("SubAdmin", subAdminSchema);
-const getTeacher  = (db) => db.models.Teacher  || db.model("Teacher",  teacherSchema);
 
 // POST /api/sub-admin-auth/login
 router.post("/login", loginLimiter, loginRules, validate, async (req, res) => {

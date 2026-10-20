@@ -2,7 +2,7 @@ import express        from "express";
 import { verifyToken } from "../middleware/authMiddleware.js";
 import { tenantMiddleware }    from "../middleware/tenantMiddleware.js";
 import { quizTemplateSchema }  from "../schemas/quizTemplateSchema.js";
-import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
+import { badRequest, forbidden, notFound, serverError } from '../utils/apiResponse.js';
 
 const router = express.Router();
 router.use(tenantMiddleware);

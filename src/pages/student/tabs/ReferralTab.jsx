@@ -46,7 +46,7 @@ export default function ReferralTab({ isDarkMode }) {
     }
   }
 
-  useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); }, []);  
 
   function copyLink() {
     if (!data?.joinUrl) return;

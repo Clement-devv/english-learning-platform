@@ -72,9 +72,7 @@ export default function NotificationsTab({ isDarkMode, onUnreadCount }) {
   const [filterUnread, setFilterUnread]   = useState(false);
   const [markingAll, setMarkingAll]       = useState(false);
 
-  const dark = isDarkMode;
-  const token = sessionStorage.getItem("adminToken") || localStorage.getItem("adminToken");
-
+  const dark = isDarkMode;
   // Live: refresh quietly (no spinner) when the server says this data changed
   const quietRef = useRef(false);
   useOnDataChanged(["notifications"], () => { quietRef.current = true; fetchNotifications(); });
@@ -133,9 +131,7 @@ export default function NotificationsTab({ isDarkMode, onUnreadCount }) {
     return true;
   });
 
-  // ── Styles ────────────────────────────────────────────────────────────────
-  const bg      = 'var(--a-raised)';
-  const card    = 'var(--a-surface)';
+  // ── Styles ────────────────────────────────────────────────────────────────  const card    = 'var(--a-surface)';
   const border  = 'var(--a-line)';
   const text    = 'var(--a-ink)';
   const muted   = 'var(--a-muted)';

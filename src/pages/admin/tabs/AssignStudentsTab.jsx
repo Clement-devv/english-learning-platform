@@ -241,7 +241,7 @@ export default function AssignStudentsTab({ teachers = [], students = [], onNoti
       await deleteAssignment(id);
       setAssignments((prev) => prev.filter((a) => a._id !== id));
       showToast(tr("assignStudentsTab.assignmentRemoved"));
-    } catch (err) {
+    } catch {
       showToast(tr("assignStudentsTab.errorRemovingAssignment"), "error");
     }
   };

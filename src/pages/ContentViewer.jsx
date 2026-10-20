@@ -193,7 +193,7 @@ export default function ContentViewer({ bookingId, userRole, channelName }) {
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [channelName, isTeacher, userRole]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [channelName, isTeacher, userRole]);  
 
   // ── Check for existing PDF on mount ───────────────────────────────────────
   useEffect(() => {
@@ -425,7 +425,7 @@ export default function ContentViewer({ bookingId, userRole, channelName }) {
 
     timer = setTimeout(poll, 1500);
     return () => clearTimeout(timer);
-  }, [isTeacher, bookingId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isTeacher, bookingId]);  
 
   // ── Upload handler ─────────────────────────────────────────────────────────
   const handleFileSelect = async (e) => {

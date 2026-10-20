@@ -13,7 +13,7 @@ import { parsePagination }          from "../utils/pagination.js";
 import { adjustTeacherEarnings }    from "../utils/classPayment.js";
 import { decryptField }             from "../utils/encryption.js";
 import logger from "../utils/logger.js";
-import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
+import { badRequest, forbidden, notFound, serverError } from '../utils/apiResponse.js';
 
 const router = express.Router();
 router.use(tenantMiddleware);

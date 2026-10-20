@@ -209,7 +209,7 @@ function AcademyBadgesPanel({ badges, progress, completedClasses, shareAchieveme
 // ══════════════════════════════════════════════════════════════════════════════
 export default function AcademyShell() {
   const { t: tr } = useTranslation("student");
-  const { branding, center } = useBranding();
+  const { center } = useBranding();
   const d = useDashboardData();
   const { missedCallCount, clearMissedCalls } = useRing();
 

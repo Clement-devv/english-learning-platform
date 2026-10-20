@@ -22,7 +22,7 @@ const STATUS_META = {
   rejected: { get label() { return ta("referralsTab.status.rejected"); }, color: "var(--a-muted)", bg: "var(--a-raised)" },
 };
 
-export default function ReferralsTab({ isDarkMode }) {
+export default function ReferralsTab() {
   const { t: tr } = useTranslation("admin");
   const [referrals, setReferrals] = useState([]);
   const [loading,   setLoading]   = useState(true);

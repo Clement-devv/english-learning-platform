@@ -118,7 +118,7 @@ export default function UpcomingClasses({ classes, onCancel, onDelete, isDarkMod
         )}
 
         {/* Class Cards */}
-        {displayClasses.map((classItem, index) => {
+        {displayClasses.map((classItem) => {
           const isUpcomingSoon = classItem.status === 'upcoming-soon';
           const scheduledDate = new Date(classItem.scheduledTime);
           const now = new Date();

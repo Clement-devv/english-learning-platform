@@ -51,7 +51,6 @@ export default function AvatarPuppet({ isSpeaking = false, isDarkMode = false })
 
   // Colour palette: indigo while listening, emerald while speaking
   const mood    = isSpeaking ? "#10b981" : "#6366f1";
-  const moodDim = isSpeaking ? "#065f46" : "#3730a3";
 
   const head = {
     bg:     isDarkMode ? "#1e293b" : "#f1f5f9",

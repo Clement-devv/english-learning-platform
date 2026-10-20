@@ -1,6 +1,5 @@
 import mongoose from 'mongoose';
 import { hideSecrets } from '../../schemas/shared/hideSecrets.js';
-import bcrypt from '../../utils/passwordHash.js';
 
 const sessionSchema = new mongoose.Schema({
   token:      { type: String, required: true },

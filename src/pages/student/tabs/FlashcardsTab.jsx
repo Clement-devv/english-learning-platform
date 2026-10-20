@@ -27,7 +27,7 @@ function ProgressRing({ pct, color, size = 80 }) {
   );
 }
 
-export default function FlashcardsTab({ isDarkMode }) {
+export default function FlashcardsTab() {
   const { t: tr } = useTranslation("student");
   const [stats,       setStats]       = useState([]);
   const [cards,       setCards]       = useState([]);

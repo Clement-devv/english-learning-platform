@@ -131,7 +131,7 @@ const PAGE_TITLE = {
 };
 
 export default function PlayfulShell() {
-  const { branding, center } = useBranding();
+  const { center } = useBranding();
   const d = useTeacherDashboardData();
   const { missedCallCount, clearMissedCalls } = useRing();
   const P = d.isDarkMode ? { ...LIGHT, ...DARK_OVERRIDES } : LIGHT;
@@ -139,10 +139,8 @@ export default function PlayfulShell() {
 
   const [showSettings,       setShowSettings]       = useState(false);
   const [showRecurringLocal, setShowRecurringLocal] = useState(false);
-  const { isMobile, forcedMode, setViewMode, isSmallScreen } = useViewMode();
+  const { isMobile, setViewMode, isSmallScreen } = useViewMode();
   const [showMobileMenu, setShowMobileMenu] = useState(false);
-
-  const tipStyle = { background: P.card, border: `1px solid ${P.border}`, borderRadius: 12, fontSize: 13, fontFamily: F, color: P.text };
 
   const activeSection = NAV.find(n => SECTION_TABS[n.id]?.includes(d.activeTab))?.id || 'dashboard';
   const subTabs = SUB_TABS[activeSection] || [];

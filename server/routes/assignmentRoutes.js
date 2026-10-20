@@ -8,7 +8,7 @@ import { teacherSchema }    from "../schemas/teacherSchema.js";
 import { studentSchema }    from "../schemas/studentSchema.js";
 import { parsePagination }  from "../utils/pagination.js";
 import logger from "../utils/logger.js";
-import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
+import { badRequest, notFound, serverError } from '../utils/apiResponse.js';
 
 const router = express.Router();
 // Admin-only: assigning students to teachers (used by the admin Assign Students tab).

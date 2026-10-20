@@ -732,7 +732,7 @@ function ChatRow({ chat, isSelected, unread, isDark, C, onSelect, formatTime, av
 }
 
 // Inactive (archived) group chat row — admin only, shows delete controls
-function InactiveChatRow({ chat, isSelected, isDark, C, onSelect, formatTime, initials,
+function InactiveChatRow({ chat, isSelected, isDark, C, onSelect, initials,
   isConfirming, isDeleting, onRequestDelete, onConfirmDelete, onCancelDelete }) {
   const name    = chat.chatName || "Unnamed";
   const lastMsg = chat.lastMessage;

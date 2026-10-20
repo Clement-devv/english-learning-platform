@@ -18,7 +18,6 @@ import ParentLinkModal from "../../../components/recordings/ParentLinkModal.jsx"
 import FamilyEmailSwitch from "../../../components/admin/FamilyEmailSwitch.jsx";
 
 const UNASSIGNED = "__unassigned__";
-const studentKey = (rec) => rec.studentId?._id || rec.studentId?.id || UNASSIGNED;
 
 export default function RecordingsTab({ teachers = [], isDarkMode }) {
   const { t: tr } = useTranslation("admin");

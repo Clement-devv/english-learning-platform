@@ -1,6 +1,6 @@
 // server/routes/bookingRoutes.js
 import express from "express";
-import { verifyToken, verifyAdmin, verifyAdminOrTeacher } from "../middleware/authMiddleware.js";
+import { verifyToken, verifyAdmin } from "../middleware/authMiddleware.js";
 import { subAdminNeeds, isSubAdmin, inScope, scopedStudentIds } from "../middleware/staffAccess.js";
 import {
   sendBookingRequestToTeacher, sendBookingAcceptedToStudent,
@@ -16,12 +16,12 @@ import { freeIntervals, teacherTz, bookingInterval, BUSY_STATUSES } from "../uti
 import { notifyAdmins } from "../utils/adminNotify.js";
 import { sendJoinReminder, ReminderError } from "../utils/joinReminder.js";
 import logger from "../utils/logger.js";
-import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
+import { badRequest, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
 import { checkAndAwardCertificates } from './certificateRoutes.js';
 import { validateObjectId } from '../middleware/validateObjectId.js';
 import { parsePagination } from '../utils/pagination.js';
 import { toStr, toObjectId } from '../utils/inputSanitizer.js';
-import { pushToUser, pushToAllAdmins } from '../utils/webPushService.js';
+import { pushToUser } from '../utils/webPushService.js';
 import { disputeDeadlineFrom, DISPUTE_DAYS } from '../utils/parentCheck.js';
 import { sendEmail, getCenterBaseUrl } from '../utils/emailService.js';
 import { completeClass } from '../services/classCompletionService.js';

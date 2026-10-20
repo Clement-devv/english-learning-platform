@@ -15,7 +15,7 @@ import { sendProgressReport }     from "../utils/emailService.js";
 import { studentSchema } from "../schemas/studentSchema.js";
 import { bookingSchema } from "../schemas/bookingSchema.js";
 import logger from "../utils/logger.js";
-import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
+import { notFound, serverError } from '../utils/apiResponse.js';
 
 const router = express.Router();
 router.use(tenantMiddleware);

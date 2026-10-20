@@ -23,7 +23,7 @@ function buildQuery(period, refDate) {
   return `?period=monthly&month=${yr}-${mo}`;
 }
 
-export default function ReportsTab({ students = [], isDarkMode }) {
+export default function ReportsTab({ students = [] }) {
   const { t: tr } = useTranslation("admin");
   const [selectedStudent, setSelectedStudent] = useState("");
   const [period,   setPeriod]   = useState("monthly");

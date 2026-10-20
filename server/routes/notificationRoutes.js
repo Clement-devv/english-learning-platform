@@ -34,7 +34,7 @@ router.get("/unread-count", verifyToken, verifyAdmin, async (req, res) => {
   try {
     const count = await getNotification(req.db).countDocuments({ read: false });
     res.json({ success: true, count });
-  } catch (err) {
+  } catch {
     res.status(500).json({ success: false, message: "Failed to fetch count" });
   }
 });
@@ -44,7 +44,7 @@ router.patch("/read-all", verifyToken, verifyAdmin, async (req, res) => {
   try {
     await getNotification(req.db).updateMany({ read: false }, { $set: { read: true } });
     res.json({ success: true });
-  } catch (err) {
+  } catch {
     res.status(500).json({ success: false, message: "Failed to mark notifications as read" });
   }
 });
@@ -54,7 +54,7 @@ router.patch("/:id/read", verifyToken, verifyAdmin, async (req, res) => {
   try {
     await getNotification(req.db).findByIdAndUpdate(req.params.id, { $set: { read: true } });
     res.json({ success: true });
-  } catch (err) {
+  } catch {
     res.status(500).json({ success: false, message: "Failed to mark notification as read" });
   }
 });
