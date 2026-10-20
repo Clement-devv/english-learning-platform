@@ -81,7 +81,7 @@ router.post("/subscribe", verifyToken, async (req, res) => {
     res.json({ success: true, subscribed: true });
   } catch (err) {
     logger.error("push subscribe error:", { error: err?.message });
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 
@@ -95,7 +95,7 @@ router.delete("/subscribe", verifyToken, async (req, res) => {
     }
     res.json({ success: true, subscribed: false });
   } catch (err) {
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 
@@ -105,7 +105,7 @@ router.get("/status", verifyToken, async (req, res) => {
     const { session } = await loadCurrentSession(req);
     res.json({ success: true, subscribed: !!session?.pushSubscription?.endpoint });
   } catch (err) {
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 

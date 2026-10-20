@@ -179,7 +179,7 @@ router.get("/mine", verifyToken, async (req, res) => {
       .sort({ scheduledTime: -1 }).lean();
     res.json({ success: true, classes: list });
   } catch (err) {
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 

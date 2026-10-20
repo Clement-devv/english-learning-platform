@@ -237,9 +237,8 @@ export default function SunshineShell() {
 
   // Badge helper
   const getBadge = (key) => {
-    if (key === 'bookings')  return d.pendingBookings > 0 ? d.pendingBookings : null;
-    if (key === 'homework')  return d.homeworkToGrade > 0 ? d.homeworkToGrade : null;
-    if (key === 'quiz')      return d.quizAttempted  > 0 ? d.quizAttempted  : null;
+    // New since the tab was last opened (useTeacherDashboardData → tabBadge)
+    if (key === 'bookings' || key === 'homework' || key === 'quiz') return d.tabBadge?.(key);
     if (key === 'messages')  return d.unreadMessages > 0 ? d.unreadMessages : null;
     return null;
   };

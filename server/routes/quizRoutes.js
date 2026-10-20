@@ -25,6 +25,7 @@ import {
   issueShareLink, withShareInfo, resolveShareLink, checkUnlock, linkExpiresAt,
   signLinkAccess, verifyLinkAccess, ACCESS_HEADER,
 } from '../utils/shareLink.js';
+import { emailShareLinkLater } from "../utils/familyLinkEmails.js";
 
 // Multer — memory storage (no disk writes, PDF buffer passed straight to pdf-parse)
 const upload = multer({
@@ -290,7 +291,9 @@ router.post("/:id/share-link", verifyToken, validateObjectId("id"), async (req, 
       return badRequest(res, "The due date has passed, so a new link would already be expired.");
 
     issueShareLink(quiz);
+    quiz.familyEmail = undefined; // the old link is dead — the new one hasn't been emailed
     await quiz.save();
+    emailShareLinkLater(req.db, req.center, "quiz", quiz._id); // to the family, if the switches allow
     res.json({ success: true, quiz: withShareInfo(quiz, req.center) });
   } catch (err) {
     logger.error("Create quiz share link error:", { error: err?.message });
@@ -353,8 +356,10 @@ router.post("/", verifyToken, async (req, res) => {
     if (student.isManaged) issueShareLink(quiz);
     await quiz.save();
 
-    // Email student about new quiz (non-blocking)
-    getStudent(req.db).findById(studentId).then(studentDoc => {
+    // Managed students: the link goes to the family's address (their login email is a placeholder).
+    // Others: email the student about the new quiz (non-blocking)
+    if (student.isManaged) emailShareLinkLater(req.db, req.center, "quiz", quiz._id);
+    else getStudent(req.db).findById(studentId).then(studentDoc => {
       if (studentDoc) {
         getTeacher(req.db).findById(req.user.id).then(teacherDoc => {
           if (teacherDoc) sendQuizAssigned(studentDoc, teacherDoc, quiz, req.center?.centerName || "", req.center).catch(e => logger.warn("sendQuizAssigned failed:", { error: e?.message }));
@@ -377,7 +382,7 @@ router.post("/", verifyToken, async (req, res) => {
     res.status(201).json({ success: true, quiz: withShareInfo(quiz, req.center) });
   } catch (err) {
     logger.error("Create quiz error:", { error: err?.message });
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 
@@ -414,7 +419,7 @@ router.get("/my", verifyToken, async (req, res) => {
 
     res.json({ success: true, quizzes: result, pagination, counts });
   } catch (err) {
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 
@@ -468,7 +473,7 @@ router.get("/assigned", verifyToken, async (req, res) => {
 
     res.json({ success: true, quizzes: result, pagination, counts, stats });
   } catch (err) {
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 
@@ -533,7 +538,7 @@ router.post("/:id/attempt", verifyToken, validateObjectId("id"), async (req, res
     res.json({ success: true, attempt, quiz: fullQuiz, streak: streakResult });
   } catch (err) {
     logger.error("Submit attempt error:", { error: err?.message });
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 
@@ -552,7 +557,7 @@ router.delete("/:id", verifyToken, validateObjectId("id"), async (req, res) => {
     await quiz.deleteOne();
     res.json({ success: true, message: "Quiz deleted" });
   } catch (err) {
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 
@@ -627,7 +632,7 @@ Return ONLY a valid JSON array in this exact format:
 
   } catch (err) {
     logger.error("Quiz generate error:", { error: err?.message });
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 
@@ -751,7 +756,7 @@ Return ONLY a valid JSON array:
       if (err.message === "Only PDF files are allowed") {
         return res.status(400).json({ message: err.message });
       }
-      serverError(res, err.message);
+      serverError(res, undefined, err);
     }
   }
 );
@@ -776,7 +781,7 @@ router.get("/ai-models", verifyToken, async (req, res) => {
 
     res.json({ success: true, models });
   } catch (err) {
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 

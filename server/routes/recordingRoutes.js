@@ -13,6 +13,7 @@ import { studentSchema }    from "../schemas/studentSchema.js";
 import { groupClassSchema } from "../schemas/groupClassSchema.js";
 import { readPaging, pageMeta, oid } from "../utils/paging.js";
 import logger from "../utils/logger.js";
+import { sendVideoFile, sendVideoDownload } from "../utils/videoFile.js";
 import { badRequest, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
 import { wrapUpload } from '../middleware/validateObjectId.js';
 
@@ -179,7 +180,7 @@ router.get("/classes-for-link", verifyToken, async (req, res) => {
 
     res.json({ success: true, data: classes });
   } catch (err) {
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 
@@ -225,7 +226,7 @@ router.post("/external", verifyToken, async (req, res) => {
     res.status(201).json({ success: true, recording: saved, message: "Recording link saved" });
   } catch (err) {
     logger.error("External recording error:", { error: err?.message });
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 
@@ -253,7 +254,7 @@ router.patch("/:id/external", verifyToken, async (req, res) => {
     const saved = await populateRecording(getRecording(req.db).findById(rec._id)).lean();
     res.json({ success: true, recording: saved, message: "Recording link updated" });
   } catch (err) {
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 
@@ -350,7 +351,7 @@ router.post("/upload", verifyToken, wrapUpload(upload.single("recording")), asyn
     logger.error("Recording upload error:", { error: err?.message });
     // The part is saved: keep its file so a retry finds it as a duplicate
     if (!rec) await discardUploadedFile(req.file);
-    serverError(res, err.message, err);
+    serverError(res, "Upload failed", err);
   }
 });
 
@@ -463,7 +464,7 @@ router.get("/students", verifyToken, async (req, res) => {
     });
     res.json({ success: true, students });
   } catch (err) {
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 
@@ -475,7 +476,7 @@ router.get("/", verifyToken, async (req, res) => {
     if (!scope) return req.user.role === "admin" ? badRequest(res, "Invalid filter") : forbidden(res, "Access denied");
     await listRecordings(req, res, scope);
   } catch (err) {
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 
@@ -486,7 +487,7 @@ router.get("/teacher/:teacherId", verifyToken, async (req, res) => {
     if (!mongoose.isValidObjectId(req.params.teacherId)) return badRequest(res, "Invalid teacher");
     await listRecordings(req, res, { teacherId: oid(req.params.teacherId) });
   } catch (err) {
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 
@@ -511,7 +512,7 @@ router.patch("/:id/visibility", verifyToken, async (req, res) => {
 
     res.json({ success: true, visibleToStudent, sessionId: rec.sessionId || null });
   } catch (err) {
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 
@@ -549,33 +550,10 @@ router.get("/:id/stream", verifyToken, async (req, res) => {
     if (!fs.existsSync(filePath))
       return notFound(res, "File not found on disk");
 
-    const stat     = fs.statSync(filePath);
-    const fileSize = stat.size;
-    const range    = req.headers.range;
-
-    if (range) {
-      const parts     = range.replace(/bytes=/, "").split("-");
-      const start     = parseInt(parts[0], 10);
-      const end       = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
-      const chunkSize = end - start + 1;
-      res.writeHead(206, {
-        "Content-Range":  `bytes ${start}-${end}/${fileSize}`,
-        "Accept-Ranges":  "bytes",
-        "Content-Length": chunkSize,
-        "Content-Type":   rec.mimeType || "video/webm",
-      });
-      fs.createReadStream(filePath, { start, end }).pipe(res);
-    } else {
-      res.writeHead(200, {
-        "Content-Length": fileSize,
-        "Content-Type":   rec.mimeType || "video/webm",
-        "Accept-Ranges":  "bytes",
-      });
-      fs.createReadStream(filePath).pipe(res);
-    }
+    sendVideoFile(req, res, filePath, rec.mimeType || "video/webm");
   } catch (err) {
     logger.error("Recording stream error:", { error: err?.message });
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 
@@ -610,12 +588,10 @@ router.get("/:id/download", verifyToken, async (req, res) => {
     const filePath = path.join(RECORDINGS_DIR, rec.filename);
     if (!fs.existsSync(filePath)) return notFound(res, "File not found");
 
-    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-    res.setHeader("Content-Type", rec.mimeType || "video/webm");
-    fs.createReadStream(filePath).pipe(res);
+    sendVideoDownload(res, filePath, filename, rec.mimeType || "video/webm");
   } catch (err) {
     logger.error("Recording download error:", { error: err?.message });
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 
@@ -637,7 +613,7 @@ router.patch("/booking/:bookingId/visibility", verifyToken, async (req, res) => 
 
     res.json({ success: true, visibleToStudent });
   } catch (err) {
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 
@@ -657,7 +633,7 @@ router.delete("/booking/:bookingId", verifyToken, async (req, res) => {
     await Promise.all(parts.map(rec => purgeRecording(rec)));
     res.json({ success: true, message: `Deleted ${parts.length} video${parts.length !== 1 ? "s" : ""}` });
   } catch (err) {
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 
@@ -677,7 +653,7 @@ router.delete("/session/:sessionId", verifyToken, async (req, res) => {
     await Promise.all(parts.map(rec => purgeRecording(rec)));
     res.json({ success: true, message: `Deleted ${parts.length} part${parts.length !== 1 ? "s" : ""}` });
   } catch (err) {
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 
@@ -695,7 +671,7 @@ router.delete("/:id", verifyToken, async (req, res) => {
     await purgeRecording(rec);
     res.json({ success: true, message: "Recording deleted" });
   } catch (err) {
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 

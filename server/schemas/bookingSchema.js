@@ -43,6 +43,10 @@ export const bookingSchema = new mongoose.Schema({
       at:   { type: Date },
     }],
     comment:     { type: String, maxlength: 500, default: '' },
+    // Link emailed to the managed student's family (utils/familyLinkEmails.js)
+    emailedAt:     Date,
+    emailedTo:     { type: String, default: '' },
+    emailedManual: { type: Boolean, default: false },
   },
   adminRejected:      { type: Boolean, default: false },
   adminRejectedAt:    Date,
@@ -124,3 +128,6 @@ bookingSchema.index({ disputeRaised: 1, disputeStatus: 1 }, { sparse: true });
 bookingSchema.index({ adminRejected: 1 }, { sparse: true });
 // Reminder scheduler queries upcoming bookings by time
 bookingSchema.index({ status: 1, scheduledTime: 1 });
+// Family email sweeps (every 10 min per center): waiting parent checks, recently written summaries
+bookingSchema.index({ 'parentCheck.status': 1, 'parentCheck.emailedAt': 1 });
+bookingSchema.index({ 'classSummary.updatedAt': 1 }, { sparse: true });

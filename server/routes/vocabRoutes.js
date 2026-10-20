@@ -66,7 +66,7 @@ router.get("/lists", verifyToken, async (req, res) => {
     forbidden(res, "Access denied");
   } catch (err) {
     logger.error("GET /vocab/lists:", { error: err?.message });
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 
@@ -85,7 +85,7 @@ router.post("/lists", verifyToken, async (req, res) => {
     res.status(201).json({ success: true, list });
   } catch (err) {
     logger.error("POST /vocab/lists:", { error: err?.message });
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 
@@ -107,7 +107,7 @@ router.put("/lists/:id", verifyToken, async (req, res) => {
     res.json({ success: true, list });
   } catch (err) {
     logger.error("PUT /vocab/lists/:id:", { error: err?.message });
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 
@@ -124,7 +124,7 @@ router.delete("/lists/:id", verifyToken, async (req, res) => {
     res.json({ success: true, message: "List deleted" });
   } catch (err) {
     logger.error("DELETE /vocab/lists/:id:", { error: err?.message });
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 
@@ -154,7 +154,7 @@ router.post("/lists/:id/assign", verifyToken, async (req, res) => {
     res.json({ success: true, list: updated });
   } catch (err) {
     logger.error("POST /vocab/lists/:id/assign:", { error: err?.message });
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 
@@ -171,7 +171,7 @@ router.delete("/lists/:id/assign/:studentId", verifyToken, async (req, res) => {
     await list.save();
     res.json({ success: true, message: "Student unassigned" });
   } catch (err) {
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 
@@ -214,7 +214,7 @@ router.get("/due", verifyToken, async (req, res) => {
     res.json({ success: true, cards });
   } catch (err) {
     logger.error("GET /vocab/due:", { error: err?.message });
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 
@@ -252,7 +252,7 @@ router.post("/review", verifyToken, async (req, res) => {
     res.json({ success: true, nextReviewDate: prog.nextReviewDate, interval: prog.interval, streak: streakResult });
   } catch (err) {
     logger.error("POST /vocab/review:", { error: err?.message });
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 
@@ -282,7 +282,7 @@ router.get("/stats", verifyToken, async (req, res) => {
     res.json({ success: true, stats });
   } catch (err) {
     logger.error("GET /vocab/stats:", { error: err?.message });
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 

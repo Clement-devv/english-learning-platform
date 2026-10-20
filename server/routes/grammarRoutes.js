@@ -60,7 +60,7 @@ Text: ${safeText}`;
     res.json({ success: true, suggestions });
   } catch (err) {
     logger.error("Grammar check error:", { error: err?.message });
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 

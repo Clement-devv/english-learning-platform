@@ -12,6 +12,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Megaphone, X, ExternalLink } from 'lucide-react';
 import api from '../../api';
 import { getStoredToken } from '../../utils/authStorage';
+import './FlipBoard.css';
 
 const AUTO_DELAY = 1100;    // let the dashboard settle before the sign-in flip
 const FLIP_MS = 640;        // keep in sync with .fb-card transition in index.css
@@ -37,6 +38,8 @@ export default function FlipBoard({ role, children, style, radius = 20, classNam
   const [idx, setIdx] = useState(0);
   const [flipped, setFlipped] = useState(false);
   const [paused, setPaused] = useState(false);
+  const [tapped, setTapped] = useState(false);   // the megaphone calls for attention until first tap
+  const touch = typeof window !== 'undefined' && window.matchMedia?.('(hover: none)').matches;
   const [narrow, setNarrow] = useState(false);
   const rootRef = useRef(null);
   const timer = useRef({ id: null, startedAt: 0, left: 0 });
@@ -127,6 +130,7 @@ export default function FlipBoard({ role, children, style, radius = 20, classNam
     if (flipped || !tappable.length) return;
     const m = tappable[clickTurn.current % tappable.length];
     clickTurn.current += 1;
+    setTapped(true);
     play([m]);
   };
 
@@ -154,7 +158,8 @@ export default function FlipBoard({ role, children, style, radius = 20, classNam
         >
           {children}
           {tappable.length > 0 && (
-            <span className="fb-hint" aria-hidden="true">
+            <span className={`fb-hint${tapped ? '' : ' fb-hint--call'}`} aria-hidden="true">
+              {!tapped && <span className="fb-hint-bubble">{touch ? 'Tap me!' : 'Click me!'}</span>}
               <Megaphone size={14} strokeWidth={2.4} />
               {tappable.length > 1 && <span className="fb-hint-count">{tappable.length}</span>}
             </span>

@@ -202,7 +202,8 @@
       "library": "Teaching library",
       "branding": "Branding",
       "customDomain": "Custom Domain",
-      "certTemplate": "Certificate Template"
+      "certTemplate": "Certificate Template",
+      "classSummaries": "Class Summaries"
     },
     "navGroup": {
       "analytics": "Analytics",

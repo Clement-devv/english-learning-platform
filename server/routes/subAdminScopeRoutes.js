@@ -16,6 +16,8 @@ import { recordingSchema }            from "../schemas/recordingSchema.js";
 import { reviewSchema }               from "../schemas/reviewSchema.js";
 import { notificationSchema }         from "../schemas/notificationSchema.js";
 import logger from "../utils/logger.js";
+import { localRecordingPath, localRecordingExists } from "../utils/recordingLinks.js";
+import { sendVideoFile, sendVideoDownload } from "../utils/videoFile.js";
 import { ok, created, badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
 
 const router = express.Router();
@@ -25,6 +27,7 @@ const getSubAdmin            = (db) => db.models.SubAdmin            || db.model
 const getTeacher             = (db) => db.models.Teacher             || db.model("Teacher",             teacherSchema);
 const getStudent             = (db) => db.models.Student             || db.model("Student",             studentSchema);
 const getBooking             = (db) => db.models.Booking             || db.model("Booking",             bookingSchema);
+const getAssignment          = (db) => db.models.Assignment          || db.model("Assignment",          assignmentSchema);
 const getPayment             = (db) => db.models.Payment             || db.model("Payment",             paymentSchema);
 const getRecording           = (db) => db.models.Recording           || db.model("Recording",           recordingSchema);
 const getReview              = (db) => db.models.Review              || db.model("Review",              reviewSchema);
@@ -442,35 +445,17 @@ router.get("/recordings/:id/stream", verifyToken, requireSubAdmin, async (req, r
 
     if (rec.source === "external") return res.json({ url: rec.externalUrl, external: true });
 
-    const { useS3, RECORDINGS_DIR } = await import('./recordingRoutes.js').then(m => ({ useS3: false, RECORDINGS_DIR: null })).catch(() => ({ useS3: false, RECORDINGS_DIR: null }));
     const s3Mod = await import('../utils/s3.js');
     if (s3Mod.s3Enabled()) {
       const url = await s3Mod.getPresignedUrl(rec.filename, 3600);
       return res.redirect(302, url);
     }
 
-    const path = (await import('path')).default;
-    const fs   = (await import('fs')).default;
-    const { fileURLToPath } = await import('url');
-    const __dirname = path.dirname(fileURLToPath(import.meta.url));
-    const filePath  = path.join(__dirname, "../uploads/recordings", rec.filename);
-    if (!fs.existsSync(filePath)) return notFound(res, "File not found");
-
-    const stat = fs.statSync(filePath);
-    const range = req.headers.range;
-    if (range) {
-      const parts = range.replace(/bytes=/, "").split("-");
-      const start = parseInt(parts[0], 10);
-      const end   = parts[1] ? parseInt(parts[1], 10) : stat.size - 1;
-      res.writeHead(206, { "Content-Range": `bytes ${start}-${end}/${stat.size}`, "Accept-Ranges": "bytes", "Content-Length": end - start + 1, "Content-Type": rec.mimeType || "video/webm" });
-      fs.createReadStream(filePath, { start, end }).pipe(res);
-    } else {
-      res.writeHead(200, { "Content-Length": stat.size, "Content-Type": rec.mimeType || "video/webm", "Accept-Ranges": "bytes" });
-      fs.createReadStream(filePath).pipe(res);
-    }
+    if (!localRecordingExists(rec.filename)) return notFound(res, "File not found");
+    sendVideoFile(req, res, localRecordingPath(rec.filename), rec.mimeType || "video/webm");
   } catch (err) {
     logger.error("Sub-admin stream error:", { error: err?.message });
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 
@@ -488,25 +473,18 @@ router.get("/recordings/:id/download", verifyToken, requireSubAdmin, async (req,
     const filename = `recording-${rec._id}${rec.mimeType === "video/mp4" ? ".mp4" : ".webm"}`;
     const s3Mod = await import('../utils/s3.js');
     if (s3Mod.s3Enabled()) {
-      const { S3Client, GetObjectCommand } = await import('@aws-sdk/client-s3');
+      const { GetObjectCommand } = await import('@aws-sdk/client-s3');
       const { getSignedUrl } = await import('@aws-sdk/s3-request-presigner');
       const cmd = new GetObjectCommand({ Bucket: process.env.S3_BUCKET, Key: rec.filename, ResponseContentDisposition: `attachment; filename="${filename}"` });
       const url = await getSignedUrl(s3Mod.s3, cmd, { expiresIn: 300 });
       return res.redirect(302, url);
     }
 
-    const path = (await import('path')).default;
-    const fs   = (await import('fs')).default;
-    const { fileURLToPath } = await import('url');
-    const __dirname = path.dirname(fileURLToPath(import.meta.url));
-    const filePath  = path.join(__dirname, "../uploads/recordings", rec.filename);
-    if (!fs.existsSync(filePath)) return notFound(res, "File not found");
-    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-    res.setHeader("Content-Type", rec.mimeType || "video/webm");
-    fs.createReadStream(filePath).pipe(res);
+    if (!localRecordingExists(rec.filename)) return notFound(res, "File not found");
+    sendVideoDownload(res, localRecordingPath(rec.filename), filename, rec.mimeType || "video/webm");
   } catch (err) {
     logger.error("Sub-admin download error:", { error: err?.message });
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 

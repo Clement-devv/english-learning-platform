@@ -1,9 +1,10 @@
 // src/pages/teacher/tabs/ClassSummariesTab.jsx
 // After each completed class the teacher writes a short summary of what happened.
 // Students see it in "Class reports", parents in their portal, and admins can
-// copy it for the parent from the Class Report. Server: routes/classSummaryRoutes.js
+// copy it for the parent from the Class Report. Families of managed students can get it
+// by email (automatically, or with "Email to family"). Server: routes/classSummaryRoutes.js
 import { useEffect, useRef, useState } from "react";
-import { NotebookPen, Search, X, Check, Clock, Users } from "lucide-react";
+import { NotebookPen, Search, X, Check, Clock, Users, Mail, CheckCircle2 } from "lucide-react";
 import api from "../../../api";
 import { useOnDataChanged } from "../../../hooks/useLiveData";
 import ManagedBadge from "../../../components/ManagedBadge";
@@ -13,6 +14,12 @@ const BRAND  = "var(--as-accent, var(--brand-primary, #2563eb))";
 const brandA = (a) => `color-mix(in srgb, var(--as-accent, var(--brand-primary, #2563eb)) calc(${a} * 100%), transparent)`;
 const MAX = 3000;
 const fmtWhen = (d) => new Date(d).toLocaleString(undefined, { weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
+// "20 Oct, 10:10" — when the family got the summary
+const fmtSent = (d) => new Date(d).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+/** The latest send among a class's students: { at, manual } or null */
+const lastSend = (students) => students.filter(s => s.emailedAt)
+  .map(s => ({ at: s.emailedAt, manual: !!s.emailedManual }))
+  .sort((a, b) => new Date(b.at) - new Date(a.at))[0] || null;
 const PROMPTS = [
   "What we covered today: ",
   "How the student did: ",
@@ -71,6 +78,23 @@ export default function ClassSummariesTab({ isDarkMode }) {
     } catch (err) {
       notify(err?.response?.data?.message || "Could not save", "error");
     } finally { setSaving(false); }
+  };
+
+  // "Email to family" — sends the summary now (server/utils/classSummaryEmails.js)
+  const [emailing, setEmailing] = useState("");
+  const emailFamily = async (cls) => {
+    // Already sent (automatically or by hand)? Ask before sending it again
+    const last = lastSend(cls.students);
+    if (last && !window.confirm(`This summary was already emailed to the family on ${fmtSent(last.at)}${last.manual ? "" : " (sent automatically)"}. Send it again?`)) return;
+    setEmailing(cls.id);
+    try {
+      const { data } = await api.post(cls.group ? `/class-summaries/group/${cls.id}/email` : `/class-summaries/${cls.id}/email`);
+      notify(data.message || "Summary emailed to the family");
+      quietRef.current = true;
+      load();
+    } catch (err) {
+      notify(err?.response?.data?.message || "Could not send the email", "error");
+    } finally { setEmailing(""); }
   };
 
   const pill = (active) => ({ padding: "6px 14px", borderRadius: 999, border: "none", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
@@ -140,14 +164,35 @@ export default function ClassSummariesTab({ isDarkMode }) {
                     <Users size={12} />
                     {cls.students.map((s, i) => (
                       <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-                        <strong style={{ color: c.heading }}>{s.name}</strong>{s.isManaged && <ManagedBadge isDarkMode={isDarkMode} />}{i < cls.students.length - 1 ? "," : ""}
+                        <strong style={{ color: c.heading }}>{s.name}</strong>{s.isManaged && <ManagedBadge isDarkMode={isDarkMode} />}
+                        {s.emailedAt && (
+                          <span title={s.emailedManual ? "Sent with \"Email to family\"" : "Sent automatically"}
+                            style={{ display: "inline-flex", alignItems: "center", gap: 3, fontSize: 11.5, fontWeight: 700, color: "#059669", background: "rgba(16,185,129,0.12)", padding: "1px 8px", borderRadius: 999 }}>
+                            <CheckCircle2 size={12} /> Emailed {fmtSent(s.emailedAt)}{s.emailedManual ? "" : " · auto"}
+                          </span>
+                        )}
+                        {i < cls.students.length - 1 ? "," : ""}
                       </span>
                     ))}
                   </div>
                 </div>
-                <button type="button" onClick={() => open(cls)} style={btn(!cls.summary)}>
-                  <NotebookPen size={14} /> {cls.summary ? "Edit summary" : "Write summary"}
-                </button>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  {/* Send the summary to the family now (managed students with an email address) */}
+                  {cls.summary && cls.students.some(s => s.isManaged) && (() => {
+                    const canEmail = cls.students.some(s => s.hasEmail);
+                    const sentBefore = cls.students.some(s => s.emailedAt);
+                    return (
+                      <button type="button" onClick={() => emailFamily(cls)} disabled={!!emailing || !canEmail}
+                        title={canEmail ? "Email this summary to the family now" : "The family has no email address yet — ask your admin to add one"}
+                        style={{ ...btn(false), opacity: emailing || !canEmail ? 0.55 : 1, cursor: canEmail ? "pointer" : "not-allowed" }}>
+                        <Mail size={14} /> {emailing === cls.id ? "Sending…" : sentBefore ? "Email again" : "Email to family"}
+                      </button>
+                    );
+                  })()}
+                  <button type="button" onClick={() => open(cls)} style={btn(!cls.summary)}>
+                    <NotebookPen size={14} /> {cls.summary ? "Edit summary" : "Write summary"}
+                  </button>
+                </div>
               </div>
               {cls.summary && (
                 <p style={{ margin: "10px 0 0", padding: "10px 12px", borderRadius: 10, background: c.soft, color: c.body, fontSize: 13.5, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>

@@ -41,6 +41,8 @@ export const homeworkSchema = new Schema({
   // the owning teacher copy the link again. Removing shareLink revokes it.
   // Expires at the end of the due date (see utils/shareLink.js).
   shareLink: shareLinkSchemaDef,
+  // Share link emailed to the managed student's family (utils/familyLinkEmails.js)
+  familyEmail: { at: Date, to: { type: String, default: '' }, manual: { type: Boolean, default: false } },
 
   grade: {
     score:    { type: Number, min: 0, max: 100, default: null },

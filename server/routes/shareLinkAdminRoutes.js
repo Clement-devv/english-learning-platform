@@ -3,6 +3,7 @@
 // (managed students), so the admin can copy one and send it to the parent.
 //
 //   GET /share-links?kind=homework|quiz&view=active|expired|all&q=&page=
+//   POST /share-links/:kind/:id/email   — "Email to family" now (utils/familyLinkEmails.js)
 //
 // The token is decrypted only here, for admins (same as the teacher's own view —
 // utils/shareLink.js withShareInfo). Links are never created or changed here.
@@ -18,7 +19,8 @@ import { teacherSchema } from "../schemas/teacherSchema.js";
 import { withShareInfo, linkExpiresAt } from "../utils/shareLink.js";
 import { readPaging, pageMeta } from "../utils/paging.js";
 import logger from "../utils/logger.js";
-import { badRequest, serverError } from "../utils/apiResponse.js";
+import { badRequest, notFound, serverError } from "../utils/apiResponse.js";
+import { emailShareLink } from "../utils/familyLinkEmails.js";
 
 const router = express.Router();
 router.use(tenantMiddleware);
@@ -64,8 +66,8 @@ router.get("/", verifyToken, verifyAdminOrSubAdmin("canViewParentLinks"), async 
     const total = await Model.countDocuments(filter);
     const pagination = pageMeta(want, limit, total);
     const docs = await Model.find(filter)
-      .select("+shareLink.tokenEnc shareLink.createdAt title dueDate status studentId teacherId createdAt")
-      .populate("studentId", "firstName lastName isManaged phone studentId")
+      .select("+shareLink.tokenEnc shareLink.createdAt title dueDate status studentId teacherId createdAt familyEmail")
+      .populate("studentId", "firstName lastName isManaged phone studentId +notifyEmail")
       .populate("teacherId", "firstName lastName displayName teacherCode")
       .sort({ dueDate: view === "expired" ? -1 : 1, _id: 1 })
       .skip((pagination.page - 1) * limit).limit(limit).lean();
@@ -79,7 +81,9 @@ router.get("/", verifyToken, verifyAdminOrSubAdmin("canViewParentLinks"), async 
         _id: d._id, kind, title: d.title, dueDate: d.dueDate, status: d.status,
         shareToken: info.shareToken, createdAt: d.shareLink?.createdAt, expiresAt,
         expired: new Date(expiresAt).getTime() < now,
-        student: s ? { name: `${s.firstName} ${s.lastName || ""}`.trim(), firstName: s.firstName, isManaged: !!s.isManaged, code: s.studentId || "", phone: s.phone || "" } : null,
+        student: s ? { name: `${s.firstName} ${s.lastName || ""}`.trim(), firstName: s.firstName, isManaged: !!s.isManaged, code: s.studentId || "", phone: s.phone || "",
+          hasEmail: !!(s.isManaged && s.notifyEmail) } : null,
+        emailedAt: d.familyEmail?.at || null, emailedManual: !!d.familyEmail?.manual,
         teacher: t ? { name: t.displayName?.trim() || `${t.firstName} ${t.lastName || ""}`.trim(), code: t.teacherCode || "" } : null,
       };
     }).filter(i => i.shareToken && (view === "all" || (view === "active" ? !i.expired : i.expired)));
@@ -88,6 +92,29 @@ router.get("/", verifyToken, verifyAdminOrSubAdmin("canViewParentLinks"), async 
   } catch (err) {
     logger.error("Admin share links error:", { error: err?.message });
     serverError(res);
+  }
+});
+
+// "Email to family": send this homework / quiz link to the managed student's family now
+const EMAIL_RESULT = {
+  sent: [200, "Link emailed to the family"],
+  "no-email": [400, "This student's family has no email address — add one in Students → ⋯ → Notifications & reminders"],
+  expired: [400, "This link has expired"],
+  "no-link": [400, "This link no longer exists"],
+};
+router.post("/:kind/:id/email", verifyToken, verifyAdminOrSubAdmin("canViewParentLinks"), async (req, res) => {
+  try {
+    const kind = req.params.kind === "quiz" ? "quiz" : req.params.kind === "homework" ? "homework" : null;
+    if (!kind || !mongoose.isValidObjectId(req.params.id)) return badRequest(res, "Invalid link");
+    const doc = await MODELS[kind](req.db).findOne({ _id: req.params.id, ...scopeFilter(req) }).select("_id").lean();
+    if (!doc) return notFound(res, "Link not found");
+    const result = await emailShareLink(req.db, req.center, kind, doc._id, { force: true });
+    const [status, message] = EMAIL_RESULT[result] || [400, "Email not sent"];
+    if (status !== 200) return badRequest(res, message);
+    res.json({ success: true, message });
+  } catch (err) {
+    logger.error("Share link email error:", { error: err?.message });
+    serverError(res, "Error sending the email");
   }
 });
 

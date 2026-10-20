@@ -307,9 +307,10 @@ export default function AcademyShell() {
               }}>
               <Icon size={17} style={{ flexShrink:0 }} />
               <span style={{ fontSize:"13px", fontWeight:isActive ? 700 : 500, letterSpacing:"0.1px" }}>{label}</span>
-              {id === "study" && d.homeworkPending > 0 && (
+              {/* New homework + quizzes since those tabs were last opened */}
+              {id === "study" && ((d.tabBadge?.("homework") || 0) + (d.tabBadge?.("quiz") || 0)) > 0 && (
                 <span style={{ marginLeft:"auto", background:P.red, color:"#fff", borderRadius:"999px", fontSize:"10px", fontWeight:700, minWidth:"18px", height:"18px", display:"flex", alignItems:"center", justifyContent:"center", padding:"0 4px" }}>
-                  {d.homeworkPending}
+                  {((d.tabBadge?.("homework") || 0) + (d.tabBadge?.("quiz") || 0))}
                 </span>
               )}
             </button>

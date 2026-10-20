@@ -202,7 +202,8 @@
       "library": "Thư viện giảng dạy",
       "branding": "Thương hiệu",
       "customDomain": "Tên miền riêng",
-      "certTemplate": "Mẫu chứng chỉ"
+      "certTemplate": "Mẫu chứng chỉ",
+      "classSummaries": "Tóm tắt buổi học"
     },
     "navGroup": {
       "analytics": "Phân tích",

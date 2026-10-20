@@ -29,7 +29,9 @@ import { parentCheckExpiresAt, disputeDeadlineFrom, DISPUTE_DAYS } from "../util
 import { sendEmail, getCenterBaseUrl } from "../utils/emailService.js";
 import { toStr } from "../utils/inputSanitizer.js";
 import logger from "../utils/logger.js";
+import { PARENT_CHECK_BASE, PARENT_CHECK_DISPUTED, PARENT_CHECK_WAITING, PARENT_CHECK_ANSWERED } from "../utils/parentCheckFilters.js";
 import { badRequest, forbidden, notFound, serverError } from "../utils/apiResponse.js";
+import { emailParentCheck } from "../utils/familyLinkEmails.js";
 
 const router = express.Router();
 router.use(tenantMiddleware);
@@ -48,12 +50,9 @@ router.get("/", verifyToken, verifyAdminOrSubAdmin("canManageParentChecks"), asy
   try {
     getStudent(req.db); getTeacher(req.db);
     const Booking = getBooking(req.db);
-    // Teacher-confirmed classes of managed students: completed, or teacher-logged and
-    // awaiting approval. (Real students confirm logged classes in their dashboard — autoConfirmAt.)
-    const base = { attendanceConfirmedBy: "teacher", status: { $in: ["completed", "pending_confirmation"] }, autoConfirmAt: { $exists: false }, ...scopeFilter(req) };
-    const DISPUTED  = { "parentCheck.status": "denied", disputeStatus: "pending" };
-    const WAITING   = { "parentCheck.status": { $in: ["waiting", null] } };           // null also matches "no check yet"
-    const ANSWERED  = { $or: [{ "parentCheck.status": { $in: ["confirmed", "no_reply"] } }, { "parentCheck.status": "denied", disputeStatus: { $ne: "pending" } }] };
+    // Teacher-confirmed classes of managed students (utils/parentCheckFilters.js)
+    const base = { ...PARENT_CHECK_BASE, ...scopeFilter(req) };
+    const DISPUTED = PARENT_CHECK_DISPUTED, WAITING = PARENT_CHECK_WAITING, ANSWERED = PARENT_CHECK_ANSWERED;
     const view = ["waiting", "answered", "all"].includes(req.query.view) ? req.query.view : "all";
     const match = view === "waiting" ? { ...base, $or: [WAITING, DISPUTED] } : view === "answered" ? { ...base, ...ANSWERED } : base;
 
@@ -116,6 +115,27 @@ router.post("/:bookingId/link", verifyToken, verifyAdminOrSubAdmin("canManagePar
   } catch (err) {
     logger.error("Parent check link error:", { error: err?.message });
     serverError(res);
+  }
+});
+
+// "Email to family": send this class's parent-check link to the managed student's family now
+const EMAIL_RESULT = {
+  sent: [200, "Link emailed to the family"],
+  "no-email": [400, "This student's family has no email address — add one in Students → ⋯ → Notifications & reminders"],
+  expired: [400, "This link has expired"],
+  answered: [400, "The parent has already answered (or there is no link)"],
+};
+router.post("/:bookingId/email", verifyToken, verifyAdminOrSubAdmin("canManageParentChecks"), validateObjectId("bookingId"), async (req, res) => {
+  try {
+    const booking = await getBooking(req.db).findById(req.params.bookingId).select("teacherId").lean();
+    if (!booking || !inScope(req, booking.teacherId)) return notFound(res, "Class not found");
+    const result = await emailParentCheck(req.db, req.center, booking._id, { force: true });
+    const [status, message] = EMAIL_RESULT[result] || [400, "Email not sent"];
+    if (status !== 200) return badRequest(res, message);
+    res.json({ success: true, message });
+  } catch (err) {
+    logger.error("Parent check email error:", { error: err?.message });
+    serverError(res, "Error sending the email");
   }
 });
 

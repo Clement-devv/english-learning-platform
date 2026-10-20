@@ -414,8 +414,8 @@ export default function CRMShell() {
               )}
               {group.items.map(({ key, Icon, label }) => {
                 const isActive = d.activeTab === key;
-                const badge = key==="homework"&&d.homeworkPending>0?d.homeworkPending
-                            : key==="quiz"&&d.quizPending>0?d.quizPending : null;
+                // New since the tab was last opened (useDashboardData → tabBadge)
+                const badge = ["homework","quiz","badges"].includes(key) ? d.tabBadge?.(key) : null;
                 return (
                   <button key={key} className="ia-nav"
                     onClick={() => d.setActiveTab(key)}

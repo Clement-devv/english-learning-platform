@@ -88,7 +88,7 @@ router.get(
       res.send(pdf);
     } catch (err) {
       logger.error("Report preview error:", { error: err?.message });
-      serverError(res, err.message);
+      serverError(res, undefined, err);
     }
   }
 );
@@ -117,7 +117,7 @@ router.post(
       }
     } catch (err) {
       logger.error("Report send error:", { error: err?.message });
-      serverError(res, err.message);
+      serverError(res, undefined, err);
     }
   }
 );

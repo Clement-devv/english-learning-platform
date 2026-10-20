@@ -4,12 +4,13 @@
 // Server: server/routes/shareLinkAdminRoutes.js. Links are created by teachers
 // (components/ShareLinkPanel.jsx) — this screen only reads them.
 import { useEffect, useRef, useState } from "react";
-import { Link2, Copy, Send, ExternalLink, Search, RefreshCw, BookOpen, ClipboardList } from "lucide-react";
+import { Link2, Copy, Send, ExternalLink, Search, RefreshCw, BookOpen, ClipboardList, Mail, CheckCircle2 } from "lucide-react";
 import api from "../../../api";
 import { useOnDataChanged } from "../../../hooks/useLiveData";
 import { getCachedCenter } from "../../../utils/branding";
 import ManagedBadge from "../../../components/ManagedBadge";
 import Pagination from "../../../components/Pagination";
+import FamilyEmailSwitch from "../../../components/admin/FamilyEmailSwitch.jsx";
 import { useTranslation } from "react-i18next";
 import i18n from "../../../i18n/i18n.js";
 import { dateLocale } from "../../../i18n/dateLocale.js";
@@ -75,6 +76,23 @@ export default function ShareLinksTab({ isDarkMode }) {
       + `Due ${fmtDay(it.dueDate)}\n\nOpen it here: ${urlOf(it)}\n\n`
       + `Type the student's name and the teacher's name to open it.`;
   };
+  // "Email to family" — the homework / quiz link to the managed student's family address
+  // (server/utils/familyLinkEmails.js). Asks first if it was already emailed.
+  const [emailing, setEmailing] = useState("");
+  const fmtSent = (d) => new Date(d).toLocaleString(dateLocale("en-GB"), { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  const emailFamily = async (it) => {
+    if (it.emailedAt && !window.confirm(it.emailedManual
+      ? tr("shareLinksTab.confirmAgain", "This link was already emailed on {{date}}. Send it again?", { date: fmtSent(it.emailedAt) })
+      : tr("shareLinksTab.confirmAgainAuto", "This link was already emailed automatically on {{date}}. Send it again?", { date: fmtSent(it.emailedAt) }))) return;
+    setEmailing(it._id);
+    try {
+      const { data } = await api.post(`/share-links/${it.kind}/${it._id}/email`);
+      notify(data.message || tr("shareLinksTab.emailed", "Link emailed to the family"));
+      load();
+    } catch (err) { notify(err?.response?.data?.message || tr("shareLinksTab.emailFailed", "Couldn't send the email"), "error"); }
+    finally { setEmailing(""); }
+  };
+
   const copy = async (text, what) => {
     try { await navigator.clipboard.writeText(text); notify(tr("shareLinksTab.copiedPasteItIntoWhatsapp", { what })); }
     catch { notify(tr("shareLinksTab.couldNotCopyOpenThe"), "error"); }
@@ -110,6 +128,11 @@ export default function ShareLinksTab({ isDarkMode }) {
         </div>
         <button type="button" onClick={() => load()} style={btn(false)}><RefreshCw size={14} /> {tr("shareLinksTab.refresh")}</button>
       </div>
+
+      {/* Center switch: email homework / quiz links to the family when the teacher assigns them */}
+      <FamilyEmailSwitch kind="shareLinkEmails" onToast={(m) => notify(m)}
+        title={tr("shareLinksTab.autoTitle", "Email homework & quiz links to families automatically")}
+        help={tr("shareLinksTab.autoHelp", "When a teacher assigns homework or a quiz to a managed student, the family gets the link by email straight away.")} />
 
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
         <div role="tablist" aria-label={tr("shareLinksTab.linkType")} style={{ display: "flex", gap: 6 }}>
@@ -177,7 +200,19 @@ export default function ShareLinksTab({ isDarkMode }) {
                         <Send size={13} /> {tr("shareLinksTab.whatsapp")}
                       </button>
                       <a href={urlOf(it)} target="_blank" rel="noopener noreferrer" style={btn(false)} title={tr("shareLinksTab.seeWhatTheParentSees")}><ExternalLink size={13} /> {tr("shareLinksTab.open")}</a>
+                      {it.student?.isManaged && (
+                        <button type="button" onClick={() => emailFamily(it)} disabled={emailing === it._id} style={btn(false)}
+                          title={it.student.hasEmail ? undefined : tr("shareLinksTab.noFamilyEmail", "No family email address yet — add one in Students → ⋯ → Notifications & reminders")}>
+                          <Mail size={13} /> {emailing === it._id ? tr("shareLinksTab.sending", "Sending…") : it.emailedAt ? tr("shareLinksTab.emailAgain", "Email again") : tr("shareLinksTab.emailFamily", "Email to family")}
+                        </button>
+                      )}
                     </div>
+                  )}
+                  {it.emailedAt && (
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, fontWeight: 700, color: "#059669", flexBasis: "100%" }}>
+                      <CheckCircle2 size={13} /> {tr("shareLinksTab.emailedOn", "Emailed to the family {{date}}", { date: fmtSent(it.emailedAt) })}
+                      {it.emailedManual ? "" : ` · ${tr("shareLinksTab.auto", "auto")}`}
+                    </span>
                   )}
                 </div>
               </div>

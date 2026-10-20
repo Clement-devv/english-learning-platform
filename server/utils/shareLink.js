@@ -1,5 +1,6 @@
 // server/utils/shareLink.js
-// Share links for managed students (no login) — used by homework and quizzes.
+// Share links for managed students (no login) — used by homework, quizzes, parent
+// attendance checks and class recordings.
 //
 // How it works:
 //   • A 256-bit random token in the URL is the real key. Only its sha256 hash
@@ -20,7 +21,7 @@ export const MAX_FAILED_ATTEMPTS = 5;
 export const LOCKOUT_MS          = 15 * 60 * 1000;
 const ACCESS_TTL_MS              = 2 * 60 * 60 * 1000;
 export const ACCESS_HEADER       = "x-share-access";
-export const LINK_KINDS          = ["homework", "quiz", "attendance"];
+export const LINK_KINDS          = ["homework", "quiz", "attendance", "recording"];
 
 // ── Schema shape (embed as `shareLink` in any schema) ────────────────────────
 export const shareLinkSchemaDef = {

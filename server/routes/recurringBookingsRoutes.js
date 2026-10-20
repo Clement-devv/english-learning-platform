@@ -357,7 +357,6 @@ router.post("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Error creating recurring bookings",
-      error: err.message,
       details: process.env.NODE_ENV === 'development' ? err.stack : undefined
     });
   }

@@ -165,7 +165,7 @@ router.get("/credits", verifyToken, async (req, res) => {
     const record = await getPronunciationCredit(req.db).findOne({ studentId: req.user.id });
     res.json({ success: true, credits: record?.credits ?? 0, totalUsed: record?.totalUsed ?? 0 });
   } catch (err) {
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 
@@ -176,7 +176,7 @@ router.get("/credits/student/:id", verifyToken, async (req, res) => {
     const record = await getPronunciationCredit(req.db).findOne({ studentId: req.params.id });
     res.json({ success: true, credits: record?.credits ?? 0, totalUsed: record?.totalUsed ?? 0 });
   } catch (err) {
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 
@@ -194,7 +194,7 @@ router.get("/center-credits", verifyToken, async (req, res) => {
       log:            (center?.pronunciationCredits?.log || []).slice(-10).reverse(),
     });
   } catch (err) {
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 
@@ -240,7 +240,7 @@ router.post("/credits/grant", verifyToken, async (req, res) => {
       message:       `${amount} pronunciation credits granted`,
     });
   } catch (err) {
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 

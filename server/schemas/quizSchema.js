@@ -23,6 +23,8 @@ export const quizSchema = new Schema({
 
   // ── Share link (managed students only) — see utils/shareLink.js ───────────
   shareLink: shareLinkSchemaDef,
+  // Share link emailed to the managed student's family (utils/familyLinkEmails.js)
+  familyEmail: { at: Date, to: { type: String, default: '' }, manual: { type: Boolean, default: false } },
   // When the student pressed "Start" on the share link. Set once by the server,
   // so reloading the page can't restart the timer.
   linkStartedAt: { type: Date, default: null },

@@ -235,8 +235,10 @@ export default function PlayfulShell() {
 
         {NAV.map(({ id, Icon, label, tab, dot }) => {
           const isActive = id === activeSection;
-          const badge = id === 'bookings' && d.pendingBookings > 0 ? d.pendingBookings
-                      : id === 'content' && (d.homeworkToGrade + d.quizAttempted) > 0 ? (d.homeworkToGrade + d.quizAttempted)
+          // New since those tabs were last opened (useTeacherDashboardData → tabBadge)
+          const contentNew = (d.tabBadge?.('homework') || 0) + (d.tabBadge?.('quiz') || 0);
+          const badge = id === 'bookings' ? d.tabBadge?.('bookings')
+                      : id === 'content' && contentNew > 0 ? contentNew
                       : id === 'messages' && d.unreadMessages > 0 ? d.unreadMessages
                       : null;
           return (

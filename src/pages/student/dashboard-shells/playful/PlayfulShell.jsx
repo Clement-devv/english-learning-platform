@@ -280,9 +280,10 @@ export default function PlayfulShell() {
               }}>
               <Icon size={20} color={isActive ? dot : P.sideText} strokeWidth={isActive?2.5:1.8}/>
               {isActive && <div style={{width:4,height:4,borderRadius:"50%",background:dot}}/>}
-              {id==="study" && d.homeworkPending>0 && (
+              {/* New homework + quizzes since those tabs were last opened */}
+              {id==="study" && ((d.tabBadge?.("homework") || 0) + (d.tabBadge?.("quiz") || 0))>0 && (
                 <span style={{position:"absolute",top:4,right:4,background:P.coral,color:"#fff",borderRadius:999,fontSize:8,fontWeight:800,minWidth:16,height:16,display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1}}>
-                  {d.homeworkPending}
+                  {((d.tabBadge?.("homework") || 0) + (d.tabBadge?.("quiz") || 0))}
                 </span>
               )}
             </button>

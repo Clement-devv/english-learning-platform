@@ -44,7 +44,7 @@ router.get("/credits", verifyToken, async (req, res) => {
       totalUsed: record?.totalUsed ?? 0,
     });
   } catch (err) {
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 
@@ -61,7 +61,7 @@ router.get("/history", verifyToken, async (req, res) => {
 
     res.json({ success: true, messages: messages.reverse() });
   } catch (err) {
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 
@@ -72,7 +72,7 @@ router.delete("/history", verifyToken, async (req, res) => {
     await getConversationMessage(req.db).deleteMany({ studentId: req.user.id });
     res.json({ success: true });
   } catch (err) {
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 
@@ -153,7 +153,7 @@ router.post("/message", verifyToken, async (req, res) => {
     });
   } catch (err) {
     logger.error("Chat message error:", { error: err?.message });
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 
@@ -171,7 +171,7 @@ router.get("/center-credits", verifyToken, async (req, res) => {
       log:            (center?.chatCredits?.log || []).slice(-10).reverse(),
     });
   } catch (err) {
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 
@@ -222,7 +222,7 @@ router.post("/credits/grant", verifyToken, async (req, res) => {
       message:          `${amount} credits granted to ${student.firstName}`,
     });
   } catch (err) {
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 
@@ -235,7 +235,7 @@ router.get("/credits/student/:id", verifyToken, async (req, res) => {
     const record = await getChatCredit(req.db).findOne({ studentId: req.params.id });
     res.json({ success: true, credits: record?.credits ?? 0, totalUsed: record?.totalUsed ?? 0 });
   } catch (err) {
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 

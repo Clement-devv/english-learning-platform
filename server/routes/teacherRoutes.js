@@ -133,7 +133,7 @@ router.get("/", verifyToken, verifyAdminOrTeacher, sharedSnapshot("teachers-dire
     if (req.user.role !== "admin") return res.json(teachers.map(t => pick(t, PUBLIC_TEACHER_FIELDS)));
     res.json(teachers);
   } catch (err) {
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 
@@ -554,7 +554,7 @@ router.delete("/:id", verifyToken, verifyAdmin, strictLimiter, async (req, res) 
     await invalidateCache(teacherCacheKey(req.center?.slug, req.params.id));
     res.json({ message: "Teacher scheduled for deletion", scheduledDeletionAt: deletionDate, teacher });
   } catch (err) {
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 
@@ -574,7 +574,7 @@ router.post("/:id/restore", verifyToken, verifyAdmin, async (req, res) => {
 
     res.json({ message: "Teacher account restored successfully", teacher });
   } catch (err) {
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 

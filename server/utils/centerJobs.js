@@ -1,6 +1,6 @@
 // server/utils/centerJobs.js
 // Per-center background jobs (reminders, missed-class check, parent checks,
-// daily report, progress reports, recording cleanup) follow the center's status:
+// daily report, progress reports, recording cleanup, class video + summary emails) follow the center's status:
 //   • a center that becomes active (approved, invite accepted, reactivated) gets
 //     its jobs within SYNC_EVERY_MS — no restart needed;
 //   • a center that is suspended / deleted / purged has its jobs stopped, so they
@@ -16,6 +16,9 @@ import { startProgressReportScheduler } from "./progressReportScheduler.js";
 import { startDailyClassReportScheduler } from "./dailyClassReportScheduler.js";
 import { startMissedClassScheduler } from "./missedClassScheduler.js";
 import { startParentCheckScheduler } from "./parentCheck.js";
+import { startRecordingLinkScheduler } from "./recordingLinks.js";
+import { startSummaryEmailScheduler } from "./classSummaryEmails.js";
+import { startFamilyLinkScheduler } from "./familyLinkEmails.js";
 import { backfillTeacherCodes } from "./teacherCode.js";
 import logger from "./logger.js";
 
@@ -39,6 +42,9 @@ export async function startCenterJobs(center) {
       ...startProgressReportScheduler(db),
       ...startMissedClassScheduler(db),
       ...startParentCheckScheduler(db, center),
+      ...startRecordingLinkScheduler(db, center), // email class video links to managed students
+      ...startSummaryEmailScheduler(db, center),  // email teachers' class summaries to families
+      ...startFamilyLinkScheduler(db, center),    // email parent attendance checks to families
       ...startDailyClassReportScheduler(db, center),
     ];
     running.set(slug, { timers });

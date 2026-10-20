@@ -1,8 +1,36 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 
-export default defineConfig({
-  plugins: [react()],
+// ── Phone / tablet testing on the same Wi-Fi (dev only) ─────────────────────────
+// With VITE_DEV_SAME_ORIGIN=true (in .env.local), the app reaches the API through
+// THIS dev server instead of a hardcoded http://<this computer's IP>:5000. The page,
+// the API, uploads and the live socket all share the address the phone opened, and
+// the proxy below forwards them to the API on localhost — so nothing breaks when the
+// computer gets a new IP or joins another network. Open the "Network:" address that
+// `npm run dev` prints.
+const API_TARGET = 'http://localhost:5000'
+function sameOriginApi() {
+  return {
+    name: 'dev-same-origin-api',
+    apply: 'serve',
+    enforce: 'pre',
+    transform(code, id) {
+      if (!/[\\/]src[\\/].*\.(jsx?|tsx?)$/.test(id.split('?')[0]) || !code.includes('import.meta.env.VITE_')) return null
+      return code
+        .replace(/import\.meta\.env\.VITE_API_BASE_URL\b/g, '(window.location.origin + "/api/v1")')
+        .replace(/import\.meta\.env\.VITE_API_URL\b/g, 'window.location.origin')
+        .replace(/import\.meta\.env\.VITE_SOCKET_URL\b/g, 'window.location.origin')
+    },
+  }
+}
+// The API only accepts origins on its list (CORS_ORIGINS). Proxied requests are sent
+// as coming from localhost, so the phone's changing address never needs adding there.
+const proxyTo = (extra = {}) => ({ target: API_TARGET, changeOrigin: true, headers: { origin: 'http://localhost:5173' }, ...extra })
+
+export default defineConfig(({ mode }) => {
+  const sameOrigin = loadEnv(mode, process.cwd(), 'VITE_').VITE_DEV_SAME_ORIGIN === 'true'
+  return {
+  plugins: [react(), ...(sameOrigin ? [sameOriginApi()] : [])],
 
   resolve: {
     // Guarantee a single React instance across all chunks (including @react-three/fiber/drei).
@@ -51,14 +79,9 @@ export default defineConfig({
     // Only affects `vite dev` — production builds are unaffected.
     host: true,
     proxy: {
-      '/api': {
-        target: 'http://localhost:5000',
-        changeOrigin: true,
-      },
-      '/uploads': {
-        target: 'http://localhost:5000',
-        changeOrigin: true,
-      }
+      '/api': proxyTo(),
+      '/uploads': proxyTo(),
+      '/socket.io': proxyTo({ ws: true }), // live updates, chat, classroom
     }
   },
 
@@ -122,4 +145,5 @@ export default defineConfig({
       },
     },
   },
+}
 })

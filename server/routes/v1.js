@@ -24,6 +24,8 @@ import payrollRoutes             from "./payrollRoutes.js";
 import recurringBookingsRoutes   from "./recurringBookingsRoutes.js";
 import analyticsRoutes           from "./analyticsRoutes.js";
 import adminLessonRoutes         from "./adminLessonRoutes.js";
+import attentionRoutes           from "./attentionRoutes.js";
+import recordingLinkRoutes       from "./recordingLinkRoutes.js";
 import subAdminRoutes            from "./subAdminRoutes.js";
 import subAdminAuthRoutes        from "./subAdminAuthRoutes.js";
 import subAdminScopeRoutes       from "./subAdminScopeRoutes.js";
@@ -89,6 +91,7 @@ router.use("/payroll",              payrollRoutes); // monthly teacher salary, c
 router.use("/recurring-bookings",   recurringBookingsRoutes);
 router.use("/analytics",            analyticsRoutes);
 router.use("/admin/lessons",        adminLessonRoutes);
+router.use("/admin/attention",      attentionRoutes); // dashboard banner: logged classes / parent checks / disputes waiting
 router.use("/sub-admins",           subAdminRoutes);
 router.use("/sub-admin-auth",       subAdminAuthRoutes);
 router.use("/sub-admin-scope",      subAdminScopeRoutes);
@@ -107,6 +110,7 @@ router.use("/grammar",              grammarRoutes);
 router.use("/chat",                 chatRoutes);
 router.use("/vocab",                vocabRoutes);
 router.use("/recordings",           recordingRoutes);
+router.use("/recording-links",      recordingLinkRoutes); // parent links to class videos (+ public watch page API)
 router.use("/reports",              reportRoutes);
 router.use("/reviews",              reviewRoutes);
 router.use("/referrals",            referralRoutes);

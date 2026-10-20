@@ -54,7 +54,7 @@ router.post("/", verifyToken, verifyStudent, async (req, res) => {
       return conflict(res, "You already reviewed this class");
     }
     logger.error("Review create error:", { error: err?.message });
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 
@@ -67,7 +67,7 @@ router.get("/my", verifyToken, verifyStudent, async (req, res) => {
       .populate("teacherId", "firstName lastName");
     res.json(reviews);
   } catch (err) {
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 
@@ -148,7 +148,7 @@ router.get("/my-trends", verifyToken, async (req, res) => {
     });
   } catch (err) {
     logger.error("Error fetching teacher rating trends:", { error: err?.message });
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 
@@ -191,7 +191,7 @@ router.get("/teacher/:teacherId", verifyToken, async (req, res) => {
 
     res.json({ reviews, stats: { total, avgRating, dist }, pagination: { page, limit, total: matching, totalPages } });
   } catch (err) {
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 
@@ -223,7 +223,7 @@ router.get("/stats", verifyToken, verifyAdmin, async (req, res) => {
 
     res.json(stats);
   } catch (err) {
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 
@@ -285,7 +285,7 @@ router.get("/", verifyToken, verifyAdmin, async (req, res) => {
 
     res.json({ reviews, teacherStats, totals, pagination: { page, limit, total, totalPages } });
   } catch (err) {
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 
@@ -301,7 +301,7 @@ router.patch("/:id/flag", verifyToken, verifyAdmin, async (req, res) => {
     if (!review) return notFound(res, "Review not found");
     res.json(review);
   } catch (err) {
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 
@@ -312,7 +312,7 @@ router.delete("/:id", verifyToken, verifyAdmin, async (req, res) => {
     if (!review) return notFound(res, "Review not found");
     res.json({ ok: true });
   } catch (err) {
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 

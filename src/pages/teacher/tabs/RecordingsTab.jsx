@@ -10,6 +10,7 @@ import api from "../../../api";
 import { useOnDataChanged } from "../../../hooks/useLiveData";
 import { groupRecordingSessions, groupByDay, partLabel, isExternal, linkSource, openExternal } from "../../../utils/recordingSessions.js";
 import ExternalRecordingModal from "../../../components/ExternalRecordingModal.jsx";
+import ParentLinkModal from "../../../components/recordings/ParentLinkModal.jsx";
 import Pagination from "../../../components/Pagination";
 import { visibleEmail } from "../../../utils/managedStudent.js";
 
@@ -20,6 +21,7 @@ export default function RecordingsTab({ isDarkMode }) {
   const [playing,         setPlaying]         = useState(null); // { key, index } — session key + part index
   const [videoUrls,       setVideoUrls]       = useState({});
   const [toast,           setToast]           = useState("");
+  const [parentLink,      setParentLink]      = useState(null); // session whose "Parent link" window is open
   const [selectedStudent, setSelectedStudent] = useState(null); // { id, name, email, count }
   const [search,          setSearch]          = useState("");
   const [expanded,        setExpanded]        = useState(() => new Set()); // session keys showing all parts
@@ -47,6 +49,15 @@ export default function RecordingsTab({ isDarkMode }) {
     reloadAll();
     showToast(wasEdit ? "Recording link updated ✓" : "Recording link saved ✓");
   };
+
+  const parentLinkEl = parentLink && (
+    <ParentLinkModal
+      isDarkMode={isDarkMode}
+      cls={parentLink.isGroupClass ? { groupClassId: parentLink.bookingId } : { bookingId: parentLink.bookingId }}
+      title={parentLink.first?.title || parentLink.first?.bookingId?.classTitle || parentLink.first?.groupClassId?.title || "Class recording"}
+      onClose={() => setParentLink(null)}
+    />
+  );
 
   const linkModalEl = linkModal && (
     <ExternalRecordingModal
@@ -398,6 +409,12 @@ export default function RecordingsTab({ isDarkMode }) {
 
                       {/* Actions */}
                       <div style={{ display: "flex", gap: "6px", flexShrink: 0, alignItems: "center" }}>
+                        {session.bookingId && (
+                          <button onClick={() => setParentLink(session)} title="Parent link — share this class video with the family"
+                            style={{ padding: "8px", borderRadius: "10px", border: `1px solid ${col.border}`, background: "none", color: col.text, cursor: "pointer" }}>
+                            <Link2 size={15} />
+                          </button>
+                        )}
                         <button onClick={() => toggleVisibility(session)} title={session.visibleToStudent ? "Hide from student" : "Show to student"}
                           style={{ padding: "8px", borderRadius: "10px", border: `1px solid ${col.border}`, background: "none", color: session.visibleToStudent ? "#10b981" : col.muted, cursor: "pointer" }}>
                           {session.visibleToStudent ? <Eye size={15} /> : <EyeOff size={15} />}
@@ -481,6 +498,7 @@ export default function RecordingsTab({ isDarkMode }) {
       )}
 
       {linkModalEl}
+      {parentLinkEl}
 
       {toast && (
         <div style={{ position: "fixed", bottom: "24px", right: "24px", padding: "12px 20px", background: "var(--as-raised, #1a1d2e)", color: "#fff", borderRadius: "12px", fontWeight: 700, zIndex: 9999, border: "1px solid var(--as-line, #2a2d40)" }}>
@@ -569,6 +587,7 @@ export default function RecordingsTab({ isDarkMode }) {
       </div>
 
       {linkModalEl}
+      {parentLinkEl}
 
       {toast && (
         <div style={{ position: "fixed", bottom: "24px", right: "24px", padding: "12px 20px", background: "var(--as-raised, #1a1d2e)", color: "#fff", borderRadius: "12px", fontWeight: 700, zIndex: 9999, border: "1px solid var(--as-line, #2a2d40)" }}>

@@ -6,13 +6,14 @@
 // unsettled by then, it's returned to the student automatically.
 // Server: server/routes/parentCheckRoutes.js, server/utils/parentCheck.js
 import { useState, useEffect, useRef } from "react";
-import { ShieldCheck, Copy, Send, RefreshCw, CheckCircle2, XCircle, Clock, Link2, AlertTriangle } from "lucide-react";
+import { ShieldCheck, Copy, Send, RefreshCw, CheckCircle2, XCircle, Clock, Link2, AlertTriangle, Mail } from "lucide-react";
 import api from "../../../api";
 import { useOnDataChanged } from "../../../hooks/useLiveData";
 import { getCachedCenter } from "../../../utils/branding";
 import ManagedBadge from "../../../components/ManagedBadge";
 import DisputePulse, { DISPUTE_GLOW_CLASS } from "../../../components/DisputePulse";
 import Pagination from "../../../components/Pagination";
+import FamilyEmailSwitch from "../../../components/admin/FamilyEmailSwitch.jsx";
 import { useTranslation } from "react-i18next";
 import i18n from "../../../i18n/i18n.js";
 import { dateLocale } from "../../../i18n/dateLocale.js";
@@ -114,6 +115,23 @@ export default function ParentChecksTab({ isDarkMode }) {
   // Filtering, "disputes first" ordering and paging are done by the server
   const shown = checks;
 
+  // "Email to family" — the parent-check link to the managed student's family address
+  // (server/utils/familyLinkEmails.js). Asks first if it was already emailed.
+  const fmtSent = (d) => new Date(d).toLocaleString(dateLocale("en-GB"), { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  const emailFamily = async (ch) => {
+    const pc = ch.parentCheck || {};
+    if (pc.emailedAt && !window.confirm(pc.emailedManual
+      ? tr("parentChecksTab.confirmAgain", "This link was already emailed on {{date}}. Send it again?", { date: fmtSent(pc.emailedAt) })
+      : tr("parentChecksTab.confirmAgainAuto", "This link was already emailed automatically on {{date}}. Send it again?", { date: fmtSent(pc.emailedAt) }))) return;
+    setBusy(`email-${ch._id}`);
+    try {
+      const { data } = await api.post(`/parent-checks/${ch._id}/email`);
+      notify(data.message || tr("parentChecksTab.emailed", "Link emailed to the family"));
+      load();
+    } catch (err) { notify(err?.response?.data?.message || tr("parentChecksTab.emailFailed", "Couldn't send the email"), "error"); }
+    finally { setBusy(null); }
+  };
+
   const btn = (primary) => ({
     display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", borderRadius: 8, fontSize: 12, fontWeight: 700,
     cursor: "pointer", fontFamily: "inherit",
@@ -140,6 +158,11 @@ export default function ParentChecksTab({ isDarkMode }) {
         </div>
         <button type="button" onClick={() => load()} style={btn(false)}><RefreshCw size={14} /> {tr("parentChecksTab.refresh")}</button>
       </div>
+
+      {/* Center switch: email each new parent check to the family automatically */}
+      <FamilyEmailSwitch kind="parentCheckEmails" onToast={(m) => notify(m)}
+        title={tr("parentChecksTab.autoTitle", "Email parent checks to families automatically")}
+        help={tr("parentChecksTab.autoHelp", "When a teacher confirms a managed student attended, the family gets the \"Did your child attend?\" link by email within about 10 minutes.")} />
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12 }}>
         {[["waiting", "To send / waiting", counts.waiting, STATE.waiting.color],
@@ -235,6 +258,16 @@ export default function ParentChecksTab({ isDarkMode }) {
                       <Send size={13} /> {tr("parentChecksTab.whatsapp")}
                     </button>
                     <button type="button" style={btn(false)} onClick={() => copy(ch)}><Copy size={13} /> {tr("parentChecksTab.copyMessage")}</button>
+                    <button type="button" style={btn(false)} disabled={busy === `email-${ch._id}`} onClick={() => emailFamily(ch)}>
+                      <Mail size={13} /> {busy === `email-${ch._id}` ? tr("parentChecksTab.sending", "Sending…")
+                        : ch.parentCheck?.emailedAt ? tr("parentChecksTab.emailAgain", "Email again") : tr("parentChecksTab.emailFamily", "Email to family")}
+                    </button>
+                    {ch.parentCheck?.emailedAt && (
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, fontWeight: 700, color: "#059669", alignSelf: "center" }}>
+                        <CheckCircle2 size={13} /> {tr("parentChecksTab.emailedOn", "Emailed {{date}}", { date: fmtSent(ch.parentCheck.emailedAt) })}
+                        {ch.parentCheck.emailedManual ? "" : ` · ${tr("parentChecksTab.auto", "auto")}`}
+                      </span>
+                    )}
                   </div>
                 )}
                 {s === "nolink" && (

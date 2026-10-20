@@ -50,7 +50,7 @@ router.post("/", verifyToken, async (req, res) => {
 
     res.status(201).json({ success: true, template: tmpl });
   } catch (err) {
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 
@@ -61,7 +61,7 @@ router.get("/", verifyToken, async (req, res) => {
     const templates = await getQuizTemplate(req.db).find({ teacherId: req.user.id }).sort({ createdAt: -1 });
     res.json({ success: true, templates });
   } catch (err) {
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 
@@ -77,7 +77,7 @@ router.patch("/:id/use", verifyToken, async (req, res) => {
     if (!tmpl) return notFound(res, "Template not found");
     res.json({ success: true, template: tmpl });
   } catch (err) {
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 
@@ -90,7 +90,7 @@ router.delete("/:id", verifyToken, async (req, res) => {
     await tmpl.deleteOne();
     res.json({ success: true });
   } catch (err) {
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 

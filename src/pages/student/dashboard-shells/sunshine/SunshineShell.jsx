@@ -430,9 +430,8 @@ export default function SunshineShell() {
               )}
               {group.items.map(item => {
                 const isActive = d.activeTab === item.key;
-                const badge = item.key === "homework" && d.homeworkPending > 0 ? d.homeworkPending
-                            : item.key === "quiz"     && d.quizPending > 0     ? d.quizPending
-                            : item.key === "badges"   ? (d.badges.length > 0 ? d.badges.length : null)
+                // New since the tab was last opened (useDashboardData → tabBadge)
+                const badge = ["homework", "quiz", "badges"].includes(item.key) ? d.tabBadge?.(item.key)
                             : item.key === "messages" && missedCallCount > 0   ? missedCallCount
                             : null;
                 const LI = item.lucide;

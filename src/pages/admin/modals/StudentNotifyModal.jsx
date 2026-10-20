@@ -113,6 +113,30 @@ export default function StudentNotifyModal({ student, isDarkMode, onClose, notif
               </div>
             </div>
 
+            {/* After-class emails to the family (managed students). The center switches on the
+                Recordings / Class summaries pages set everyone; these adjust this one student. */}
+            {settings.isManaged && [
+              ["recordingLinkEmails", tr("studentNotifyModal.classVideos", "Email class videos"),
+                tr("studentNotifyModal.classVideosHelp", "A link to watch each recorded class, sent after the class.")],
+              ["classSummaryEmails", tr("studentNotifyModal.classSummaries", "Email class summaries"),
+                tr("studentNotifyModal.classSummariesHelp", "The teacher's notes on each class, sent once they're written.")],
+              ["parentCheckEmails", tr("studentNotifyModal.parentChecks", "Email parent checks"),
+                tr("studentNotifyModal.parentChecksHelp", "The \"Did your child attend?\" link, sent after the teacher confirms a class.")],
+              ["shareLinkEmails", tr("studentNotifyModal.shareLinks", "Email homework & quiz links"),
+                tr("studentNotifyModal.shareLinksHelp", "Sent as soon as the teacher assigns homework or a quiz.")],
+            ].map(([kind, title, help]) => (
+              <label key={kind} style={{ display: "flex", gap: 12, alignItems: "center", padding: "12px 14px", borderRadius: 12, border: `1px solid ${c.border}`, cursor: "pointer" }}>
+                <input type="checkbox" checked={!!settings[kind]} disabled={saving}
+                  onChange={e => save({ [kind]: e.target.checked })} style={{ width: 18, height: 18 }} />
+                <span>
+                  <span style={{ display: "block", fontSize: 14, fontWeight: 700, color: c.heading }}>{title}</span>
+                  <span style={{ display: "block", fontSize: 12, color: c.muted }}>
+                    {help}{!settings.notifyEmail ? ` ${tr("studentNotifyModal.needsEmail", "Add a notification email above first.")}` : ""}
+                  </span>
+                </span>
+              </label>
+            ))}
+
             {/* Teacher switch */}
             <label style={{ display: "flex", gap: 12, alignItems: "center", padding: "12px 14px", borderRadius: 12, border: `1px solid ${c.border}`, cursor: "pointer" }}>
               <input type="checkbox" checked={settings.joinReminderTeacherAllowed} disabled={saving}

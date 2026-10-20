@@ -11,6 +11,7 @@ import { getUserTimezone } from "../../../utils/timezone";
 import { pushSupported, enablePush, disablePush, getPushStatus } from "../../../utils/pushNotifications";
 import { getStudentBookings } from "../../../services/bookingService";
 import { useLiveRefresh, refreshStale } from "../../../hooks/useLiveData";
+import { useTabSeen } from "../../../hooks/useTabSeen";
 import { useTranslation } from "react-i18next";
 import i18n from "../../../i18n/i18n.js";
 
@@ -254,6 +255,7 @@ export function useDashboardData() {
         const { data } = await api.get("/homework/assigned", { params: { limit: 1 } }); // counts only
         const pending = data.counts?.assigned ?? 0;
         setHomeworkPending(pending);
+        setBadgeLoaded((l) => (l.homework ? l : { ...l, homework: true }));
         if (prevHomeworkRef.current !== null && pending > prevHomeworkRef.current) {
           const diff = pending - prevHomeworkRef.current;
           if ("Notification" in window && Notification.permission === "granted") {
@@ -271,6 +273,7 @@ export function useDashboardData() {
         const { data } = await api.get("/quiz/assigned", { params: { limit: 1 } }); // counts only
         const pending = data.counts?.assigned ?? 0;
         setQuizPending(pending);
+        setBadgeLoaded((l) => (l.quiz ? l : { ...l, quiz: true }));
         if (prevQuizRef.current !== null && pending > prevQuizRef.current) {
           const diff = pending - prevQuizRef.current;
           if ("Notification" in window && Notification.permission === "granted") {
@@ -457,6 +460,12 @@ export function useDashboardData() {
   };
 
   const [dataReady, setDataReady] = useState(false);
+
+  // ── Tab badges: only what's new since the tab was last opened (hooks/useTabSeen.js) ──
+  // homeworkPending / quizPending stay the real to-do counts for the pages themselves.
+  const [badgeLoaded, setBadgeLoaded] = useState({});
+  const tabBadge = useTabSeen(`student:${student?.id || ""}`, activeTab,
+    { homework: homeworkPending, quiz: quizPending, badges: badges.length }, badgeLoaded);
   useEffect(() => { fetchStudentData(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── fetchStudentDataRef — keeps socket handler pointing at latest fn ───────
@@ -618,6 +627,7 @@ export function useDashboardData() {
     const earned = checkEarnedBadges(completedTotal, progress.streakDays, progress.weeklyCompleted, completedClasses);
     setBadges(earned);
     if (!dataReady) return;                       // don't judge before the real numbers arrive
+    setBadgeLoaded((l) => (l.badges ? l : { ...l, badges: true }));
 
     const n = completedTotal;
     const milestone =
@@ -773,6 +783,7 @@ export function useDashboardData() {
     pendingConfirmations,
     showConfirmationModal, setShowConfirmationModal, selectedConfirmation, setSelectedConfirmation,
     homeworkPending, quizPending,
+    tabBadge, // tabBadge("homework" | "quiz" | "badges") → new since last opened, or null
     showChangePassword, setShowChangePassword,
     showSessionManagement, setShowSessionManagement,
     showSettingsSidebar, setShowSettingsSidebar,

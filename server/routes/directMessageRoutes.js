@@ -155,7 +155,7 @@ router.get("/", verifyToken, async (req, res) => {
     res.json({ success: true, dms });
   } catch (err) {
     logger.error('GET /direct-messages failed:', { error: err?.message, stack: err?.stack, role: req.user?.role });
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 
@@ -187,7 +187,7 @@ router.post("/start", verifyToken, async (req, res) => {
 
     res.json({ success: true, dm });
   } catch (err) {
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 
@@ -222,7 +222,7 @@ router.post("/start-teacher/:teacherId", verifyToken, async (req, res) => {
     }
     res.json({ success: true, dm });
   } catch (err) {
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 
@@ -250,7 +250,7 @@ router.get("/contacts", verifyToken, async (req, res) => {
 
     res.json({ success: true, contacts: [...teachers.map(t => shape(t, "teacher")), ...students.map(s => shape(s, "student"))] });
   } catch (err) {
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 
@@ -293,7 +293,7 @@ router.post("/admin-start", verifyToken, async (req, res) => {
       .populate("subAdminId", "firstName lastName email");
     res.json({ success: true, dm: populated });
   } catch (err) {
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 
@@ -327,7 +327,7 @@ router.delete("/:id/messages/:messageId", verifyToken, async (req, res) => {
 
     res.json({ success: true, message: "Message deleted" });
   } catch (err) {
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 
@@ -342,7 +342,7 @@ router.get("/:id/messages", verifyToken, async (req, res) => {
 
     res.json({ success: true, messages: dm.messages || [] });
   } catch (err) {
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 
@@ -451,7 +451,7 @@ router.post("/:id/messages", verifyToken, async (req, res) => {
 
     res.json({ success: true, data: saved });
   } catch (err) {
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 
@@ -472,7 +472,7 @@ router.patch("/:id/mark-read", verifyToken, async (req, res) => {
     await dm.save();
     res.json({ success: true });
   } catch (err) {
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 

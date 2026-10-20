@@ -27,6 +27,7 @@ import { toStr, toObjectId } from '../utils/inputSanitizer.js';
 import { wrapUpload } from '../middleware/validateObjectId.js';
 import { pushToUser, pushToAllAdmins } from '../utils/webPushService.js';
 import { s3Enabled, uploadToS3, deleteFromS3, getPresignedUrl } from "../utils/s3.js";
+import { emailShareLinkLater } from "../utils/familyLinkEmails.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
@@ -376,7 +377,9 @@ router.post("/:id/share-link", verifyToken, validateObjectId("id"), async (req, 
       return badRequest(res, "The due date has passed, so a new link would already be expired.");
 
     issueShareLink(hw);
+    hw.familyEmail = undefined; // the old link is dead — the new one hasn't been emailed
     await hw.save();
+    emailShareLinkLater(req.db, req.center, "homework", hw._id); // to the family, if the switches allow
     res.json({ success: true, homework: withShareInfo(hw, req.center) });
   } catch (err) {
     logger.error("Create share link error:", { error: err?.message });
@@ -428,7 +431,9 @@ router.post("/", verifyToken, uploadLimiter, wrapUpload(uploadAssignment.array("
     if (student.isManaged) issueShareLink(hw);
     await hw.save();
 
-    getStudent(req.db).findById(studentId).then(studentDoc => {
+    // Managed students: the link goes to the family's address (their login email is a placeholder)
+    if (student.isManaged) emailShareLinkLater(req.db, req.center, "homework", hw._id);
+    else getStudent(req.db).findById(studentId).then(studentDoc => {
       if (studentDoc) {
         getTeacher(req.db).findById(req.user.id).then(teacherDoc => {
           if (teacherDoc) sendHomeworkAssigned(studentDoc, teacherDoc, hw, req.center?.centerName || "", req.center).catch(e => logger.warn("sendHomeworkAssigned failed:", { error: e?.message }));
@@ -450,7 +455,7 @@ router.post("/", verifyToken, uploadLimiter, wrapUpload(uploadAssignment.array("
     res.status(201).json({ success: true, homework: withShareInfo(hw, req.center) });
   } catch (err) {
     logger.error("Create homework error:", { error: err?.message });
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 
@@ -477,7 +482,7 @@ router.get("/my", verifyToken, async (req, res) => {
       .lean();
     res.json({ success: true, homework: list.map(hw => withShareInfo(hw, req.center)), pagination, counts });
   } catch (err) {
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 
@@ -500,7 +505,7 @@ router.get("/assigned", verifyToken, async (req, res) => {
       .lean(), ids);
     res.json({ success: true, homework: list, pagination, counts });
   } catch (err) {
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 
@@ -520,7 +525,7 @@ router.get("/:id", verifyToken, validateObjectId("id"), async (req, res) => {
 
     res.json({ success: true, homework: hw });
   } catch (err) {
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 
@@ -559,7 +564,7 @@ router.post("/:id/submit", verifyToken, uploadLimiter, validateObjectId("id"), w
 
     res.json({ success: true, homework: hw, streak: streakResult });
   } catch (err) {
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 
@@ -588,7 +593,7 @@ router.post("/:id/grade", verifyToken, validateObjectId("id"), async (req, res) 
 
     res.json({ success: true, homework: hw });
   } catch (err) {
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 
@@ -624,7 +629,7 @@ router.delete("/:id", verifyToken, validateObjectId("id"), async (req, res) => {
     await hw.deleteOne();
     res.json({ success: true, message: "Homework deleted" });
   } catch (err) {
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 
@@ -662,7 +667,7 @@ router.post("/:id/audio-feedback", verifyToken, uploadLimiter, validateObjectId(
 
     res.json({ success: true, audioFeedback: hw.grade.audioFeedback });
   } catch (err) {
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 
@@ -697,7 +702,7 @@ router.post("/:id/instruction-audio", verifyToken, uploadLimiter, validateObject
 
     res.json({ success: true, instructionAudio: hw.instructionAudio });
   } catch (err) {
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 
@@ -780,7 +785,7 @@ router.get("/file/:type/:fileId", verifyToken, async (req, res) => {
     res.setHeader("X-Content-Type-Options", "nosniff");
     res.sendFile(filePath);
   } catch (err) {
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 

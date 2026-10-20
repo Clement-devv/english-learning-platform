@@ -12,6 +12,7 @@ import { getUserTimezone } from '../../../utils/timezone';
 import { pushSupported, enablePush, disablePush, getPushStatus } from '../../../utils/pushNotifications';
 import { getAssignedStudents } from '../../../services/teacherStudentService';
 import { useLiveRefresh, refreshStale } from '../../../hooks/useLiveData';
+import { useTabSeen } from '../../../hooks/useTabSeen';
 
 // A pending parent dispute on a completed class (managed student): drives the red heartbeat warning
 const parentDisputeOf = (b) =>
@@ -77,6 +78,7 @@ export function useTeacherDashboardData() {
   // ── Badge counts ───────────────────────────────────────────────────────────
   const [homeworkToGrade,   setHomeworkToGrade]   = useState(0);
   const [quizAttempted,     setQuizAttempted]     = useState(0);
+  const [badgeLoaded,       setBadgeLoaded]       = useState({}); // which tab-badge counts have arrived
   const prevHomeworkRef = useRef(null);
   const prevQuizRef     = useRef(null);
 
@@ -217,6 +219,7 @@ export function useTeacherDashboardData() {
         const { data } = await api.get('/homework/my', { params: { limit: 1 } }); // counts only
         const toGrade = data.counts?.submitted ?? 0;
         setHomeworkToGrade(toGrade);
+        setBadgeLoaded((l) => (l.homework ? l : { ...l, homework: true }));
         if (prevHomeworkRef.current !== null && toGrade > prevHomeworkRef.current) {
           const diff = toGrade - prevHomeworkRef.current;
           if ('Notification' in window && Notification.permission === 'granted') {
@@ -237,6 +240,7 @@ export function useTeacherDashboardData() {
         const { data } = await api.get('/quiz/my', { params: { limit: 1 } }); // counts only
         const attempted = data.counts?.attempted ?? 0;
         setQuizAttempted(attempted);
+        setBadgeLoaded((l) => (l.quiz ? l : { ...l, quiz: true }));
         if (prevQuizRef.current !== null && attempted > prevQuizRef.current) {
           const diff = attempted - prevQuizRef.current;
           if ('Notification' in window && Notification.permission === 'granted') {
@@ -467,6 +471,7 @@ export function useTeacherDashboardData() {
       })));
 
       // Pending bookings
+      setBadgeLoaded((l) => (l.bookings ? l : { ...l, bookings: true }));
       setBookings(pendingData.map(booking => {
         const scheduledDate = new Date(booking.scheduledTime);
         return {
@@ -699,6 +704,12 @@ export function useTeacherDashboardData() {
   const upcomingClasses = classes.filter(c => c.status === 'scheduled' || c.status === 'upcoming-soon');
   const pendingBookings = bookings.length;
 
+  // Tab badges: only what's new since the tab was last opened (hooks/useTabSeen.js).
+  // pendingBookings / homeworkToGrade / quizAttempted stay the real counts for the pages.
+  const teacherKey = teacherInfo?._id || teacherInfo?.id;
+  const tabBadge = useTabSeen(teacherKey ? `teacher:${teacherKey}` : null, activeTab,
+    { bookings: pendingBookings, homework: homeworkToGrade, quiz: quizAttempted }, badgeLoaded);
+
   // Only count classes officially marked 'completed' by the server AND not
   // admin-rejected — i.e. the admin approved the class and the teacher was paid.
   // Excludes: missed classes, stale accepted bookings, admin-rejected completions.
@@ -717,6 +728,7 @@ export function useTeacherDashboardData() {
     zoomLink, setZoomLink,
     // Computed
     pendingBookings, completedCount, homeworkToGrade, quizAttempted,
+    tabBadge, // tabBadge("bookings" | "homework" | "quiz") → new since last opened, or null
     // Push & messages
     pushEnabled, pushSupported, togglePush,
     unreadMessages, setUnreadMessages,

@@ -19,6 +19,13 @@ export const studentSchema = new mongoose.Schema({
   notifyEmail: { type: String, default: '', trim: true, lowercase: true, maxlength: 200, select: false },
   // Admin switch: may this student's teachers send them "join your class" reminders?
   joinReminderTeacherAllowed: { type: Boolean, default: true },
+  // Automatic emails to a managed student's family after class (utils/familyEmailPrefs.js):
+  // the class video link and the teacher's class summary. Unset = follow the center switch;
+  // flipping the center switch sets every managed student, then admins adjust one by one.
+  recordingLinkEmails: { type: Boolean },
+  classSummaryEmails:  { type: Boolean },
+  parentCheckEmails:   { type: Boolean }, // "did your child attend?" link
+  shareLinkEmails:     { type: Boolean }, // homework / quiz links
   password: { type: String, required: false },
   active: { type: Boolean, default: false },
   classCredits: { type: Number, default: 0 },

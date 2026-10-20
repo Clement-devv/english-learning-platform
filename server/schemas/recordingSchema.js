@@ -32,3 +32,4 @@ recordingSchema.index({ bookingId: 1 });
 recordingSchema.index({ groupClassId: 1 });
 recordingSchema.index({ autoDeleteAt: 1 });
 recordingSchema.index({ sessionId: 1, partNumber: 1 });
+recordingSchema.index({ createdAt: -1 }); // class video email sweep (utils/recordingLinks.js)

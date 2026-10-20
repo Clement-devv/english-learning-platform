@@ -57,6 +57,7 @@ const StudentSetup        = lazy(() => import("./pages/student/StudentSetup"));
 const HomeworkLinkPage    = lazy(() => import("./pages/homework-link/HomeworkLinkPage"));
 const QuizLinkPage        = lazy(() => import("./pages/quiz-link/QuizLinkPage"));
 const AttendanceCheckPage = lazy(() => import("./pages/attendance-check/AttendanceCheckPage"));
+const RecordingLinkPage   = lazy(() => import("./pages/recording-link/RecordingLinkPage"));
 const StudentForgotPassword = lazy(() => import("./pages/student/ForgotPassword"));
 const StudentResetPassword  = lazy(() => import("./pages/student/ResetPassword"));
 const ParentForgotPassword  = lazy(() => import("./pages/parent/ParentForgotPassword"));
@@ -89,10 +90,12 @@ function PageLoader() {
 // Admin, sub-admin and super-admin are desktop-only. index.html sets the viewport on a full
 // page load; this covers arriving by in-app navigation (e.g. a landing page → admin login).
 const DESKTOP_ONLY = /^\/(admin|sub-admin|super-admin)(\/|$)/;
+// …but pages opened from an email link stay phone-friendly (same rule as index.html)
+const EMAIL_LINK_PAGE = /^\/(admin|sub-admin)\/(reset-password|email-change|setup)(\/|$)/;
 function ViewportGuard() {
   const { pathname } = useLocation();
   useEffect(() => {
-    if (DESKTOP_ONLY.test(pathname) && window.__vpMobile !== false) window.__applyViewport?.(false);
+    if (DESKTOP_ONLY.test(pathname) && !EMAIL_LINK_PAGE.test(pathname) && window.__vpMobile !== false) window.__applyViewport?.(false);
   }, [pathname]);
   return null;
 }
@@ -236,6 +239,8 @@ function App() {
             <Route path="/hw/:token" element={<HomeworkLinkPage />} />
             <Route path="/q/:token" element={<QuizLinkPage />} />
             <Route path="/ac/:token" element={<AttendanceCheckPage />} />
+            {/* Class video for a managed student's family (no login) */}
+            <Route path="/rv/:token" element={<RecordingLinkPage />} />
 
             <Route path="*" element={<Navigate to="/admin/login" replace />} />
           </Routes>

@@ -17,7 +17,9 @@
           try { saved = localStorage.getItem('viewMode'); } catch (e) { /* private mode */ }
           var isPhone = window.screen.width < 768;
           // Admin, sub-admin and super-admin are desktop-only — no mobile layout, no toggle
-          var isAdmin = /^\/(admin|sub-admin|super-admin)(\/|$)/.test(p);
+          var isAdmin = /^\/(admin|sub-admin|super-admin)(\/|$)/.test(p) &&
+            // …except pages opened from an email link (reset password, confirm email, account setup)
+            !/^\/(admin|sub-admin)\/(reset-password|email-change|setup)(\/|$)/.test(p);
           // iPad / Android tablet (iPadOS reports as a Mac → detect by touch + screen size).
           // Mirrors isTablet() in src/hooks/useViewMode.js. Only student pages have a
           // tablet layout so far (student, teacher); others keep the 1280px desktop viewport.

@@ -23,6 +23,7 @@ import SettingsSidebar            from '../../../../components/SettingsSidebar';
 import SettingsModal              from '../../../../components/SettingsModal';
 import api                        from '../../../../api';
 import { useOnDataChanged } from "../../../../hooks/useLiveData";
+import { useTabSeen } from "../../../../hooks/useTabSeen";
 import { getTeachers }            from '../../../../services/teacherService';
 import { getStudents }            from '../../../../services/studentService';
 import LanguageSwitcher           from '../../../../components/LanguageSwitcher';
@@ -48,6 +49,7 @@ const ParentChecksTab    = lazy(() => import('../../tabs/ParentChecksTab'));
 const ShareLinksTab      = lazy(() => import('../../tabs/ShareLinksTab'));
 const TeachingLibrary    = lazy(() => import('../../../../components/library/TeachingLibrary'));
 const LoggedClassesTab   = lazy(() => import('../../tabs/LoggedClassesTab'));
+const ClassSummariesTab  = lazy(() => import('../../tabs/ClassSummariesTab'));
 const ClassReportTab     = lazy(() => import('../../tabs/ClassReportTab'));
 const MessagesTab        = lazy(() => import('../../../../components/chat/MessagesTab'));
 const PaymentsTab        = lazy(() => import('../../tabs/PaymentTab'));
@@ -126,6 +128,7 @@ const makeNavGroups = (t) => [
     items: [
       { key: 'classes',       label: t('admin.nav.allClasses'),      lucide: BookOpen     },
       { key: 'class-report',  label: t('admin.nav.classReport'),     lucide: ClipboardCheck },
+      { key: 'class-summaries', label: t('admin.nav.classSummaries', 'Class Summaries'), lucide: FileText },
       { key: 'group-classes', label: t('admin.nav.groupClasses'),    lucide: Users        },
       { key: 'bookings',      label: t('admin.nav.bookings'),        lucide: ClipboardList},
       { key: 'parent-checks', label: t('admin.nav.parentChecks'),    lucide: ShieldCheck  },
@@ -205,6 +208,9 @@ export default function SunshineShell() {
   const [loading,         setLoading]         = useState(true);
   const [unreadMessages,  setUnreadMessages]  = useState(0);
   const [unreadNotif,     setUnreadNotif]     = useState(0);
+  const [notifLoaded,     setNotifLoaded]     = useState(false);
+  // Items waiting for the admin (welcome banner): logged classes, parent checks, disputes
+  const [attention,       setAttention]       = useState({ loggedClasses: 0, parentChecks: 0, disputes: 0 });
   const [showSettingsSidebar,  setShowSettingsSidebar]  = useState(false);
   const [showSettingsModal,    setShowSettingsModal]    = useState(false);
   const [showSessionMgmt,      setShowSessionMgmt]      = useState(false);
@@ -265,13 +271,21 @@ export default function SunshineShell() {
     if (activeTab === 'messages') setUnreadMessages(0);
   }, [activeTab]);
 
+  const refreshAttention = useCallback(async () => {
+    if (!sessionStorage.getItem('adminToken')) return;
+    try {
+      const res = await api.get('/admin/attention');
+      if (res.data.success) setAttention(res.data.data);
+    } catch { /* keep the last counts */ }
+  }, []);
+
   const refreshNotif = useCallback(async () => {
     // Skip if the token is missing entirely — avoids a guaranteed 401 when
     // sessionStorage was cleared (tab restore after browser restart, etc.)
     if (!sessionStorage.getItem('adminToken')) return;
     try {
       const res = await api.get('/notifications/unread-count');
-      if (res.data.success) setUnreadNotif(res.data.count);
+      if (res.data.success) { setUnreadNotif(res.data.count); setNotifLoaded(true); }
     } catch (_) {}
   }, []);
 
@@ -288,14 +302,16 @@ export default function SunshineShell() {
   // says they changed (the directory is served from a shared server snapshot),
   // plus a 5-minute safety refresh while the tab is visible.
   useEffect(() => {
-    refreshNotif();
+    refreshNotif(); refreshAttention();
     const id = setInterval(() => {
       if (document.visibilityState === 'hidden') return;
-      refreshNotif(); refreshPeople();
+      refreshNotif(); refreshPeople(); refreshAttention();
     }, 5 * 60_000);
     return () => clearInterval(id);
-  }, [refreshNotif, refreshPeople]);
+  }, [refreshNotif, refreshPeople, refreshAttention]);
   useOnDataChanged(['notifications'], refreshNotif);
+  // Logged classes, parent checks and disputes all live on bookings
+  useOnDataChanged(['bookings'], refreshAttention);
   useOnDataChanged(['teachers', 'students'], refreshPeople);
 
   const handleLogout = () => { authLogout(); navigate('/admin/login', { replace: true }); };
@@ -391,6 +407,7 @@ export default function SunshineShell() {
       case 'share-links':       return <ShareLinksTab isDarkMode={isDarkMode} />;
       case 'library':           return <TeachingLibrary isDarkMode={isDarkMode} canManage />;
       case 'logged-classes':    return <LoggedClassesTab isDarkMode={isDarkMode} />;
+      case 'class-summaries':   return <ClassSummariesTab teachers={teachers} isDarkMode={isDarkMode} />;
       case 'class-report':      return <ClassReportTab isDarkMode={isDarkMode} />;
       case 'recordings':        return <RecordingsTab teachers={teachers} isDarkMode={isDarkMode} />;
       case 'reports':           return <ReportsTab students={students} isDarkMode={isDarkMode} />;
@@ -410,7 +427,17 @@ export default function SunshineShell() {
     { label: tr("sunshineShell.students"),  value: students.length,       icon: Users, cat: 'sky' },
     { label: tr("sunshineShell.messages"),  value: unreadMessages || 0,   icon: MessageCircle, cat: 'sky' },
     { label: tr("sunshineShell.alerts"),    value: unreadNotif || 0,      icon: Bell, cat: 'rose' },
+    // Waiting for the admin — click to open the tab
+    { label: tr("sunshineShell.loggedClasses", "Logged classes"), value: attention.loggedClasses, icon: ClipboardCheck, cat: 'amber', tab: 'logged-classes' },
+    { label: tr("sunshineShell.parentChecks", "Parent checks"),   value: attention.parentChecks,  icon: ShieldCheck,    cat: 'teal',  tab: 'parent-checks' },
+    { label: tr("sunshineShell.disputes", "Disputes"),            value: attention.disputes,      icon: AlertTriangle,  cat: 'rose',  tab: 'disputes' },
   ];
+
+  // Notifications tab badge: only what's new since the tab was last opened (hooks/useTabSeen.js).
+  // The banner's Alerts number stays the real unread count.
+  const adminKey = adminInfo?._id || adminInfo?.id;
+  const tabBadge = useTabSeen(adminKey ? `admin:${adminKey}` : null, activeTab,
+    { notifications: unreadNotif }, { notifications: notifLoaded });
 
   const showHero = activeTab === 'overview';
 
@@ -534,7 +561,7 @@ export default function SunshineShell() {
                 const isActive = activeTab === item.key;
                 const msgBadge = (unreadMessages || 0) + missedCallCount;
                 const badge = item.key === 'messages' ? (msgBadge || null)
-                            : item.key === 'notifications' ? (unreadNotif || null)
+                            : item.key === 'notifications' ? tabBadge('notifications')
                             : null;
                 return (
                   <button key={item.key} className="as-nav"
@@ -629,7 +656,7 @@ export default function SunshineShell() {
           <button className="as-nav" onClick={() => setActiveTab('notifications')} aria-label={t('admin.nav.notifications')}
             style={{ position: 'relative', background: 'none', border: 'none', cursor: 'pointer', color: col.muted, padding: 7, borderRadius: 10, display: 'flex', alignItems: 'center' }}>
             <Bell size={19} color={col.body} strokeWidth={1.8} />
-            {unreadNotif > 0 && (
+            {tabBadge('notifications') && (
               <span style={{ position: 'absolute', top: 5, right: 5, width: 8, height: 8, borderRadius: '50%', background: ACCENT, boxShadow: `0 0 0 2px ${col.sidebar}` }} />
             )}
           </button>
@@ -705,9 +732,13 @@ export default function SunshineShell() {
                   </h2>
                   <p style={{ margin: 0, color: col.body, fontSize: 13, fontWeight: 600 }}>{centerName}</p>
                 </div>
-                <div style={{ position: 'relative', display: 'flex', background: 'color-mix(in srgb, var(--a-surface) 82%, transparent)', backdropFilter: 'blur(6px)', border: `1px solid ${col.border}`, borderRadius: 14, boxShadow: 'var(--a-shadow)' }}>
-                  {STATS.map(({ label, value, icon: Icon, cat }, i) => (
-                    <div key={label} className={`cat-${cat}`} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 18px', borderLeft: i ? `1px solid ${col.border}` : 'none' }}>
+                <div style={{ position: 'relative', display: 'flex', flexWrap: 'wrap', background: 'color-mix(in srgb, var(--a-surface) 82%, transparent)', backdropFilter: 'blur(6px)', border: `1px solid ${col.border}`, borderRadius: 14, boxShadow: 'var(--a-shadow)', overflow: 'hidden' }}>
+                  {STATS.map(({ label, value, icon: Icon, cat, tab }, i) => {
+                    const Tag = tab ? 'button' : 'div';
+                    return (
+                    <Tag key={label} className={`cat-${cat}${tab ? ' as-press' : ''}`}
+                      {...(tab ? { type: 'button', onClick: () => setActiveTab(tab), title: label, 'aria-label': `${label}: ${value}` } : {})}
+                      style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 18px', borderLeft: i ? `1px solid ${col.border}` : 'none', ...(tab ? { background: 'none', border: 'none', borderLeft: `1px solid ${col.border}`, cursor: 'pointer', textAlign: 'left', font: 'inherit' } : {}) }}>
                       <div style={{ width: 32, height: 32, borderRadius: 9, background: 'var(--cat-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                         <Icon size={16} color="var(--cat)" strokeWidth={2} />
                       </div>
@@ -715,8 +746,9 @@ export default function SunshineShell() {
                         <div style={{ fontSize: 19, fontWeight: 800, color: col.heading, lineHeight: 1.05, fontVariantNumeric: 'tabular-nums' }}>{value}</div>
                         <div style={{ fontSize: 11, fontWeight: 700, color: col.muted }}>{label}</div>
                       </div>
-                    </div>
-                  ))}
+                    </Tag>
+                    );
+                  })}
                 </div>
               </div>
             </section>

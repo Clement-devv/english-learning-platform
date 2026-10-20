@@ -7,13 +7,15 @@
 //   4. Video player — plays the parts back-to-back
 // Admins view, download and open links; show/hide stays the teacher's choice.
 import { useState, useEffect, useMemo } from "react";
-import { Play, X, Clock, Calendar, Video, ChevronRight, ArrowLeft, Download, ExternalLink, ChevronDown, ChevronUp, Search } from "lucide-react";
+import { Play, X, Clock, Calendar, Video, ChevronRight, ArrowLeft, Download, ExternalLink, ChevronDown, ChevronUp, Search, Link2 } from "lucide-react";
 import api from "../../../api";
 import { useOnDataChanged } from "../../../hooks/useLiveData";
 import Pagination from "../../../components/Pagination";
 import { groupRecordingSessions, groupByDay, partLabel, isExternal, linkSource, openExternal } from "../../../utils/recordingSessions.js";
 import { useTranslation } from "react-i18next";
 import { dateLocale } from "../../../i18n/dateLocale.js";
+import ParentLinkModal from "../../../components/recordings/ParentLinkModal.jsx";
+import FamilyEmailSwitch from "../../../components/admin/FamilyEmailSwitch.jsx";
 
 const UNASSIGNED = "__unassigned__";
 const studentKey = (rec) => rec.studentId?._id || rec.studentId?.id || UNASSIGNED;
@@ -30,6 +32,7 @@ export default function RecordingsTab({ teachers = [], isDarkMode }) {
   const [studentSearch,   setStudentSearch]   = useState("");
   const [expanded,        setExpanded]        = useState(() => new Set());
   const [toast,           setToast]           = useState("");
+  const [parentLink,      setParentLink]      = useState(null); // session whose "Parent link" window is open
 
   const col = {
     card:   'var(--a-surface)',
@@ -159,6 +162,16 @@ export default function RecordingsTab({ teachers = [], isDarkMode }) {
   const teacherName = selectedTeacher
     ? (selectedTeacher.displayName?.trim() || `${selectedTeacher.firstName} ${selectedTeacher.lastName}`)
     : "";
+
+  const parentLinkEl = parentLink && (
+    <ParentLinkModal
+      ns="admin"
+      isDarkMode={isDarkMode}
+      cls={parentLink.isGroupClass ? { groupClassId: parentLink.bookingId } : { bookingId: parentLink.bookingId }}
+      title={parentLink.first?.title || parentLink.first?.bookingId?.classTitle || parentLink.first?.groupClassId?.title || tr("recordingsTab.classRecording")}
+      onClose={() => setParentLink(null)}
+    />
+  );
 
   const toastEl = toast && (
     <div style={{ position: "fixed", bottom: "24px", right: "24px", padding: "12px 20px", background: "var(--a-raised)", color: "#fff", borderRadius: "12px", fontWeight: 700, zIndex: 9999, border: "1px solid var(--a-line)" }}>
@@ -315,6 +328,12 @@ export default function RecordingsTab({ teachers = [], isDarkMode }) {
                       </div>
 
                       <div style={{ display: "flex", gap: "6px", flexShrink: 0, alignItems: "center" }}>
+                        {session.bookingId && (
+                          <button onClick={() => setParentLink(session)} title={tr("recordingLink.buttonTitle", "Parent link — share this class video with the family")}
+                            style={{ padding: "8px", borderRadius: "10px", border: `1px solid ${col.border}`, background: "none", color: col.text, cursor: "pointer" }}>
+                            <Link2 size={15} />
+                          </button>
+                        )}
                         <button onClick={() => loadVideo(session, 0)} title={isExternal(rec) ? tr("recordingsTab.opensTheTeacherSLink") : total > 1 ? tr("recordingsTab.playsAllPartsInOrder") : tr("recordingsTab.watchRecording")}
                           style={{ padding: "8px 14px", borderRadius: "10px", background: isExternal(rec) ? "var(--a-accent-grad)" : "var(--a-accent)", color: "#fff", border: "none", cursor: "pointer", fontSize: "12px", fontWeight: 800, display: "flex", alignItems: "center", gap: "5px" }}>
                           {isExternal(rec)
@@ -378,6 +397,7 @@ export default function RecordingsTab({ teachers = [], isDarkMode }) {
         <Pagination page={page} totalPages={pager.totalPages} total={pager.total} pageSize={pager.limit}
           onPage={(p) => { setPage(p); setExpanded(new Set()); window.scrollTo({ top: 0, behavior: "smooth" }); }} isDarkMode={isDarkMode} />
       )}
+      {parentLinkEl}
       {toastEl}
     </div>
   );
@@ -452,6 +472,11 @@ export default function RecordingsTab({ teachers = [], isDarkMode }) {
         <h2 style={{ margin: "0 0 4px", fontSize: "22px", fontWeight: 900, color: col.text }}>{tr("recordingsTab.classRecordings")}</h2>
         <p style={{ margin: 0, fontSize: "13px", color: col.muted }}>{tr("recordingsTab.selectATeacherThenA")}</p>
       </div>
+
+      {/* Center switch: email the class video link to managed students after each class */}
+      <FamilyEmailSwitch kind="recordingLinkEmails" onToast={showToast}
+        title={tr("recordingLink.autoTitle", "Email class videos to families automatically")}
+        help={tr("recordingLink.autoHelp", "After each recorded class, managed students with an email address get a link to watch it (kept 30 days). Teachers can switch a link off.")} />
 
       <div style={{ position: "relative" }}>
         <Search size={15} color={col.muted}

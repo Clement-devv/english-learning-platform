@@ -10,6 +10,7 @@ import {
   Type, Eye, MousePointerClick, LogIn, Hand, Search, Monitor, Smartphone, ExternalLink, Loader2,
 } from 'lucide-react';
 import styles from '../SuperAdmin.module.css';
+import '../../../components/dashboard/FlipBoard.css';   // the preview uses the real board styles
 
 const ROLE_LABEL = { admin: 'Admins', teacher: 'Teachers', student: 'Students' };
 const EMPTY = {

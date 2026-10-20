@@ -35,6 +35,7 @@ import { generateSecurePassword } from '../utils/passwordUtils.js';
 import { makeManagedEmail, isManagedEmail } from '../utils/managedStudent.js';
 import { planBlocksStudentMode } from '../utils/planFeatures.js';
 import { endSessionsAfterPasswordChange, notifySessionsRevoked } from '../utils/sessionManager.js';
+import { loadCenterSettings, prefOn, FAMILY_EMAIL_KINDS } from "../utils/familyEmailPrefs.js";
 
 const router = express.Router();
 
@@ -214,18 +215,21 @@ router.post("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
 // ─── Notification settings (admin) ──────────────────────────────────────────
 // notifyEmail: optional address for notifications only (managed students — never a
 // login). joinReminderTeacherAllowed: may teachers send this student join reminders?
+// recordingLinkEmails / classSummaryEmails / parentCheckEmails / shareLinkEmails: automatic emails to the family
+// (utils/familyEmailPrefs.js — the center switch sets everyone; this adjusts one student).
 router.get("/:id/notify-settings", verifyToken, verifyAdmin, async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) return badRequest(res, "Invalid student");
-    const s = await getStudent(req.db).findById(req.params.id).select("isManaged email +notifyEmail joinReminderTeacherAllowed emailLanguage firstName lastName").lean();
+    const s = await getStudent(req.db).findById(req.params.id).select(`isManaged email +notifyEmail joinReminderTeacherAllowed emailLanguage firstName lastName ${FAMILY_EMAIL_KINDS.join(" ")}`).lean();
     if (!s) return notFound(res, "Student not found");
-    const current = await currentClassFor(req.db, s._id);
+    const [current, centerSettings] = await Promise.all([currentClassFor(req.db, s._id), loadCenterSettings(req.db)]);
     res.json({ success: true, settings: {
       isManaged: !!s.isManaged,
       notifyEmail: s.notifyEmail || "",
       reminderEmail: s.isManaged ? (s.notifyEmail || "") : (s.email || ""), // where reminders go
       joinReminderTeacherAllowed: s.joinReminderTeacherAllowed !== false,
       emailLanguage: s.emailLanguage || "en",
+      ...Object.fromEntries(FAMILY_EMAIL_KINDS.map((k) => [k, prefOn(s, centerSettings, k)])),
       currentClass: current ? { id: current._id, title: current.classTitle, scheduledTime: current.scheduledTime, duration: current.duration } : null,
     } });
   } catch (err) {
@@ -245,15 +249,22 @@ router.patch("/:id/notify-settings", verifyToken, verifyAdmin, async (req, res) 
       set.notifyEmail = e;
     }
     if (req.body.joinReminderTeacherAllowed !== undefined) set.joinReminderTeacherAllowed = !!req.body.joinReminderTeacherAllowed;
+    for (const kind of FAMILY_EMAIL_KINDS) {
+      if (req.body[kind] !== undefined) set[kind] = !!req.body[kind];
+    }
     if (req.body.emailLanguage !== undefined) {
       if (!["en", "vi"].includes(req.body.emailLanguage)) return badRequest(res, "Email language must be English or Vietnamese");
       set.emailLanguage = req.body.emailLanguage;
     }
     if (!Object.keys(set).length) return badRequest(res, "Nothing to update");
-    const s = await getStudent(req.db).findByIdAndUpdate(req.params.id, { $set: set }, { new: true, select: "+notifyEmail joinReminderTeacherAllowed emailLanguage" });
+    const s = await getStudent(req.db).findByIdAndUpdate(req.params.id, { $set: set }, { new: true, select: `+notifyEmail joinReminderTeacherAllowed emailLanguage ${FAMILY_EMAIL_KINDS.join(" ")}` });
     if (!s) return notFound(res, "Student not found");
     const message = Object.keys(set).length === 1 && set.emailLanguage ? (set.emailLanguage === "vi" ? "Emails will be sent in Vietnamese" : "Emails will be sent in English") : "Notification settings saved";
-    res.json({ success: true, message, settings: { notifyEmail: s.notifyEmail || "", joinReminderTeacherAllowed: s.joinReminderTeacherAllowed !== false, emailLanguage: s.emailLanguage || "en" } });
+    const centerSettings = await loadCenterSettings(req.db);
+    res.json({ success: true, message, settings: {
+      notifyEmail: s.notifyEmail || "", joinReminderTeacherAllowed: s.joinReminderTeacherAllowed !== false, emailLanguage: s.emailLanguage || "en",
+      ...Object.fromEntries(FAMILY_EMAIL_KINDS.map((k) => [k, prefOn(s, centerSettings, k)])),
+    } });
   } catch (err) {
     logger.error("Notify settings save error:", { error: err?.message });
     serverError(res);

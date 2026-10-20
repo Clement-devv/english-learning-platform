@@ -71,7 +71,7 @@ router.get("/my", verifyToken, verifyStudent, async (req, res) => {
       referrals,
     });
   } catch (err) {
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 
@@ -112,7 +112,7 @@ router.post("/apply", async (req, res) => {
 
     res.status(201).json({ ok: true, referralId: referral._id });
   } catch (err) {
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 
@@ -130,7 +130,7 @@ router.get("/", verifyToken, verifyAdmin, async (req, res) => {
 
     res.json(referrals);
   } catch (err) {
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 
@@ -183,7 +183,7 @@ router.post("/:id/approve", verifyToken, verifyAdmin, async (req, res) => {
 
     res.json({ ok: true, studentId: newStudent._id });
   } catch (err) {
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 
@@ -199,7 +199,7 @@ router.post("/:id/reject", verifyToken, verifyAdmin, async (req, res) => {
     if (!referral) return notFound(res, "Referral not found");
     res.json({ ok: true });
   } catch (err) {
-    serverError(res, err.message);
+    serverError(res, undefined, err);
   }
 });
 
