@@ -3,6 +3,7 @@
 // verify/cancel are token-based (no JWT) so email prefetchers cannot trigger them.
 
 import express from 'express';
+import { esc } from '../emails/layout.js';
 import bcrypt from '../utils/passwordHash.js';
 import crypto from 'crypto';
 import Center from '../models/master/Center.js';
@@ -170,7 +171,7 @@ router.post('/verify', async (req, res) => {
       centerName: center.centerName,
       to: previousEmail,
       subject: `Confirmation: Admin login email for ${center.centerName} changed`,
-      html: `<p>The admin login email for <strong>${center.centerName}</strong> has been changed to <strong>${newEmail}</strong>.</p>
+      html: `<p>The admin login email for <strong>${esc(center.centerName)}</strong> has been changed to <strong>${esc(newEmail)}</strong>.</p>
           <p>If you did not authorise this, use the <strong>Cancel This Change</strong> link in the security alert email we sent earlier. That link is still valid.</p>
           <p style="color:#666;font-size:13px">Need help? Contact support at ${process.env.SUPER_ADMIN_EMAIL || config.emailFrom || 'support'}.</p>`,
     }).catch(e => logger.warn('Completion confirmation email failed:', { error: e?.message }));
@@ -179,7 +180,7 @@ router.post('/verify', async (req, res) => {
     sendEmail({
       to: process.env.SUPER_ADMIN_EMAIL || config.emailFrom || config.emailUser,
       subject: `[${config.appName || 'ELP'}] Admin email changed — ${center.centerName}`,
-      html: `<p>Admin email for <strong>${center.centerName}</strong> changed from <em>${previousEmail}</em> to <em>${newEmail}</em>.</p>`,
+      html: `<p>Admin email for <strong>${esc(center.centerName)}</strong> changed from <em>${esc(previousEmail)}</em> to <em>${esc(newEmail)}</em>.</p>`,
     }).catch(e => logger.warn('SA change notification failed:', { error: e?.message }));
 
     await writeAuditLog({
@@ -260,8 +261,8 @@ router.post('/cancel', async (req, res) => {
         centerName: center.centerName,
         to: center.adminEmail,
         subject: `Email change request cancelled — ${center.centerName}`,
-        html: `<p>Your pending request to change the admin login email for <strong>${center.centerName}</strong> to <em>${pendingNewEmail}</em> has been cancelled.</p>
-            <p>Your email address remains <strong>${center.adminEmail}</strong>. No changes have been made.</p>
+        html: `<p>Your pending request to change the admin login email for <strong>${esc(center.centerName)}</strong> to <em>${esc(pendingNewEmail)}</em> has been cancelled.</p>
+            <p>Your email address remains <strong>${esc(center.adminEmail)}</strong>. No changes have been made.</p>
             <p style="color:#666;font-size:13px">If you did not request this cancellation, contact support at ${process.env.SUPER_ADMIN_EMAIL || config.emailFrom || 'support'}.</p>`,
       }).catch(e => logger.warn('Pending-cancel confirmation email failed:', { error: e?.message }));
 

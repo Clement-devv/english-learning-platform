@@ -1,6 +1,7 @@
 // server/routes/directMessageRoutes.js
 import express from "express";
 import { verifyToken } from "../middleware/authMiddleware.js";
+import { validateObjectId } from "../middleware/validateObjectId.js";
 import { tenantMiddleware }       from "../middleware/tenantMiddleware.js";
 import { directMessageSchema }    from "../schemas/directMessageSchema.js";
 import { teacherSchema }          from "../schemas/teacherSchema.js";
@@ -298,7 +299,7 @@ router.post("/admin-start", verifyToken, async (req, res) => {
 });
 
 // ── DELETE /api/direct-messages/:id/messages/:messageId — delete own message (30 min) ──
-router.delete("/:id/messages/:messageId", verifyToken, async (req, res) => {
+router.delete("/:id/messages/:messageId", verifyToken, validateObjectId("id"), validateObjectId("messageId"), async (req, res) => {
   try {
     const { id: userId, role } = req.user;
     if (!/^[a-f\d]{24}$/i.test(req.params.id) || !/^[a-f\d]{24}$/i.test(req.params.messageId)) {
@@ -332,7 +333,7 @@ router.delete("/:id/messages/:messageId", verifyToken, async (req, res) => {
 });
 
 // ── GET /api/direct-messages/:id/messages ─────────────────────────────────
-router.get("/:id/messages", verifyToken, async (req, res) => {
+router.get("/:id/messages", verifyToken, validateObjectId("id"), async (req, res) => {
   try {
     const { id: userId, role } = req.user;
     const dm = await getDirectMessage(req.db).findById(req.params.id).lean();
@@ -347,7 +348,7 @@ router.get("/:id/messages", verifyToken, async (req, res) => {
 });
 
 // ── POST /api/direct-messages/:id/messages ────────────────────────────────
-router.post("/:id/messages", verifyToken, async (req, res) => {
+router.post("/:id/messages", verifyToken, validateObjectId("id"), async (req, res) => {
   try {
     const { id: userId, role } = req.user;
     const { message } = req.body;
@@ -456,7 +457,7 @@ router.post("/:id/messages", verifyToken, async (req, res) => {
 });
 
 // ── PATCH /api/direct-messages/:id/mark-read ─────────────────────────────
-router.patch("/:id/mark-read", verifyToken, async (req, res) => {
+router.patch("/:id/mark-read", verifyToken, validateObjectId("id"), async (req, res) => {
   try {
     const { id: userId, role } = req.user;
     const dm = await getDirectMessage(req.db).findById(req.params.id);

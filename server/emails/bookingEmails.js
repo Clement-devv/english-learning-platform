@@ -137,6 +137,57 @@ export const sendBookingRejectedToStudent = async (student, teacher, booking, ce
   });
 };
 
+// ── Student or teacher: the other side (or an admin) cancelled the class ─────────
+const CANCELLED = {
+  en: {
+    subject: (c) => `Class cancelled – ${c}`,
+    eyebrow: "Class cancelled",
+    title: "This class won't take place",
+    intro: (n, by, d) => `Hi ${n}, your class on ${d} was cancelled by ${by}.`,
+    by: { student: "the student", teacher: "the teacher", admin: "the school" },
+    note: "Reason", labels: ["Class", "Date", "Time"],
+    more: "Nothing else to do — it has been removed from your schedule.",
+    cta: "Open my dashboard",
+  },
+  vi: {
+    subject: (c) => `Lớp học đã bị hủy – ${c}`,
+    eyebrow: "Lớp học đã hủy",
+    title: "Lớp học này sẽ không diễn ra",
+    intro: (n, by, d) => `Chào ${n}, lớp học của em vào ${d} đã bị ${by} hủy.`,
+    by: { student: "học viên", teacher: "giáo viên", admin: "trung tâm" },
+    note: "Lý do", labels: ["Lớp học", "Ngày", "Giờ"],
+    more: "Em không cần làm gì thêm — lớp đã được xóa khỏi lịch.",
+    cta: "Mở trang của em",
+  },
+};
+/** `to` is the teacher or student being told; `role` is theirs; `byRole` who cancelled. */
+export const sendClassCancelledEmail = async ({ to, role, byRole, booking, reason = "", centerName = "", center = null }) => {
+  const b = brandOf(center, centerName);
+  const lang = role === "student" ? langOf(to) : "en", s = pick(CANCELLED, lang), tz = to?.timezone;
+  const date = fmtDate(booking.scheduledTime, lang, tz);
+  return sendEmail({
+    centerName: b.centerName,
+    to: to.email,
+    subject: s.subject(booking.classTitle),
+    html: renderEmail({
+      ...b, lang,
+      preheader: s.more,
+      eyebrow: s.eyebrow,
+      title: s.title,
+      body:
+        p(s.intro(esc(to.firstName), s.by[byRole] || s.by.admin, date)) +
+        (reason ? callout(`<strong>${s.note}:</strong> ${esc(reason)}`, "blue") : "") +
+        details([
+          [s.labels[0], esc(booking.classTitle)],
+          [s.labels[1], date],
+          [s.labels[2], fmtTime(booking.scheduledTime, lang, tz)],
+        ]) +
+        p(s.more),
+      cta: { label: s.cta, href: `${b.baseUrl}/${role}/dashboard` },
+    }),
+  });
+};
+
 // ── Student or teacher: class is tomorrow ────────────────────────────────────────
 const TOMORROW = {
   en: {

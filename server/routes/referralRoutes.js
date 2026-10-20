@@ -1,6 +1,7 @@
 // server/routes/referralRoutes.js
 
 import express          from "express";
+import { validateObjectId } from "../middleware/validateObjectId.js";
 import crypto           from "crypto";
 import {
   verifyToken,
@@ -135,7 +136,7 @@ router.get("/", verifyToken, verifyAdmin, async (req, res) => {
 });
 
 // ── POST /api/referrals/:id/approve  —  admin approves → creates student + credits referrer ──
-router.post("/:id/approve", verifyToken, verifyAdmin, async (req, res) => {
+router.post("/:id/approve", validateObjectId("id"), verifyToken, verifyAdmin, async (req, res) => {
   try {
     // Approving a referral creates a real (log-in) student account
     const planError = planBlocksStudentMode(req.center, "real");
@@ -188,7 +189,7 @@ router.post("/:id/approve", verifyToken, verifyAdmin, async (req, res) => {
 });
 
 // ── POST /api/referrals/:id/reject  —  admin rejects ─────────────────────────
-router.post("/:id/reject", verifyToken, verifyAdmin, async (req, res) => {
+router.post("/:id/reject", validateObjectId("id"), verifyToken, verifyAdmin, async (req, res) => {
   try {
     const Referral = getReferral(req.db);
     const referral = await Referral.findByIdAndUpdate(

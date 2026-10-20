@@ -5,6 +5,7 @@ import mongoose from "mongoose";
 import { verifyToken } from "../middleware/authMiddleware.js";
 import { completeClass } from "../services/classCompletionService.js";
 import { reverseCompletedClass } from "../utils/classReversal.js";
+import { reinstateUnmarkedClass } from "../utils/classPayment.js";
 import { tenantMiddleware }           from "../middleware/tenantMiddleware.js";
 import { subAdminSchema }             from "../schemas/subAdminSchema.js";
 import { teacherSchema }              from "../schemas/teacherSchema.js";
@@ -279,6 +280,10 @@ router.post("/classes/mark", verifyToken, requireSubAdmin, async (req, res) => {
     const teacherIds = await getScopedTeacherIds(req.subAdmin, req.db);
     if (!teacherIds.map(String).includes(booking.teacherId.toString()))
       return forbidden(res, "This booking's teacher is not in your scope");
+
+    // An admin-un-marked class (completed + adminRejected) can be marked again
+    const reinstated = await reinstateUnmarkedClass(req.db, bookingId, "sub-admin");
+    if (reinstated) return res.json({ success: true, message: "Lesson marked as completed." });
 
     const result = await completeClass(req.db, bookingId, "sub-admin", { skipAttendanceCheck: true });
 

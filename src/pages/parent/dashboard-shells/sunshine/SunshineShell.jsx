@@ -23,6 +23,8 @@ const GLASS_PAGE = true;
 const fmtDate    = (iso) => iso ? new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
 const fmtTime    = (iso) => iso ? new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '';
 const isUpcoming = (iso) => iso && new Date(iso) > new Date();
+// Homework stores status 'assigned' | 'submitted' | 'graded' (and submission.submittedAt)
+const hwDone     = (hw) => hw.status === 'submitted' || hw.status === 'graded' || !!hw.submission?.submittedAt;
 
 // Values live in src/index.css (.as-root) — same palette as the other dashboards.
 const col = {
@@ -113,8 +115,8 @@ function OverviewTab({ child, classes, homework, certs }) {
                 <div style={{ fontSize: 13, fontWeight: 700, color: col.heading }}>{hw.title}</div>
                 <div style={{ fontSize: 11, color: col.muted }}>Due: {hw.dueDate ? fmtDate(hw.dueDate) : 'No deadline'}</div>
               </div>
-              <span style={{ fontSize: 11, fontWeight: 800, background: hw.submittedAt ? '#f0fdf4' : '#fff7ed', color: hw.submittedAt ? '#16a34a' : '#ea580c', borderRadius: 999, padding: '2px 8px' }}>
-                {hw.submittedAt ? 'Submitted' : 'Pending'}
+              <span style={{ fontSize: 11, fontWeight: 800, background: hwDone(hw) ? '#f0fdf4' : '#fff7ed', color: hwDone(hw) ? '#16a34a' : '#ea580c', borderRadius: 999, padding: '2px 8px' }}>
+                {hw.status === 'graded' ? 'Graded' : hwDone(hw) ? 'Submitted' : 'Pending'}
               </span>
             </div>
           ))}
@@ -189,7 +191,7 @@ function HomeworkTab({ homework, loading }) {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {homework.map(hw => {
-            const submitted = !!hw.submittedAt;
+            const submitted = hwDone(hw);
             const overdue   = !submitted && hw.dueDate && new Date(hw.dueDate) < new Date();
             return (
               <div key={hw._id} style={{ background: col.card, border: `2px solid ${overdue ? '#fecaca' : col.border}`, borderRadius: 18, padding: '16px 20px' }}>
@@ -200,15 +202,15 @@ function HomeworkTab({ homework, loading }) {
                     <div style={{ fontSize: 11, color: col.muted, marginTop: 6, display: 'flex', gap: 14, flexWrap: 'wrap' }}>
                       {hw.dueDate && <span>Due: {fmtDate(hw.dueDate)}</span>}
                       {hw.teacherId && <span>{hw.teacherId.firstName} {hw.teacherId.lastName}</span>}
-                      {submitted && <span>Submitted: {fmtDate(hw.submittedAt)}</span>}
+                      {hw.submission?.submittedAt && <span>Submitted: {fmtDate(hw.submission.submittedAt)}</span>}
                     </div>
                   </div>
                   <div style={{ flexShrink: 0, textAlign: 'right' }}>
                     <span style={{ fontSize: 11, fontWeight: 800, background: submitted ? '#f0fdf4' : overdue ? '#fef2f2' : '#fff7ed', color: submitted ? '#16a34a' : overdue ? '#dc2626' : '#ea580c', borderRadius: 999, padding: '3px 10px' }}>
-                      {submitted ? 'Submitted' : overdue ? 'Overdue' : 'Pending'}
+                      {hw.status === 'graded' ? 'Graded' : submitted ? 'Submitted' : overdue ? 'Overdue' : 'Pending'}
                     </span>
-                    {typeof hw.grade === 'number' && (
-                      <div style={{ marginTop: 8, fontSize: 18, fontWeight: 900, color: col.accent }}>{hw.grade}<span style={{ fontSize: 11, color: col.muted }}>/100</span></div>
+                    {typeof hw.grade?.score === 'number' && (
+                      <div style={{ marginTop: 8, fontSize: 18, fontWeight: 900, color: col.accent }}>{hw.grade.score}<span style={{ fontSize: 11, color: col.muted }}>/100</span></div>
                     )}
                   </div>
                 </div>

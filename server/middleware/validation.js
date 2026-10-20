@@ -382,12 +382,18 @@ export const validateSuperAdminLogin = [
 ];
 
 // ── Center registration ───────────────────────────────────────────────────────
+// Text is stored as typed — never .escape()d here. Escaping on input saved names as
+// "Ade &amp; Sons" (shown that way in the app and double-escaped in emails) and turned
+// "Africa/Lagos" into "Africa&#x2F;Lagos", an invalid time zone. Output escapes instead
+// (React does it; email templates use esc()).
+const isValidTimeZone = (tz) => {
+  try { new Intl.DateTimeFormat("en", { timeZone: tz }); return true; } catch { return false; }
+};
 export const validateCenterRegistration = [
   body('centerName')
     .trim()
     .isLength({ min: 2, max: 100 })
-    .withMessage('Center name must be between 2 and 100 characters')
-    .escape(),
+    .withMessage('Center name must be between 2 and 100 characters'),
   body('slug')
     .trim()
     .toLowerCase()
@@ -412,17 +418,16 @@ export const validateCenterRegistration = [
   body('country')
     .optional({ nullable: true, checkFalsy: true })
     .trim()
-    .isLength({ max: 100 })
-    .escape(),
+    .isLength({ max: 100 }),
   body('website')
     .optional({ nullable: true, checkFalsy: true })
     .isURL({ require_protocol: true })
     .withMessage('Website must be a valid URL'),
   body('timezone')
-    .optional()
+    .optional({ nullable: true, checkFalsy: true })
     .trim()
-    .isLength({ max: 60 })
-    .escape(),
+    .custom(isValidTimeZone)
+    .withMessage('Choose a valid time zone'),
   body('maxTeachers')
     .optional({ nullable: true, checkFalsy: true })
     .isInt({ min: 1, max: 10000 })
@@ -472,8 +477,7 @@ export const validateBroadcast = [
   body('subject')
     .trim()
     .isLength({ min: 1, max: 200 })
-    .withMessage('Subject is required and must be under 200 characters')
-    .escape(),
+    .withMessage('Subject is required and must be under 200 characters'),
   body('message')
     .trim()
     .isLength({ min: 1, max: 10000 })
@@ -517,8 +521,7 @@ export const validateChatCredits = [
     .optional()
     .trim()
     .isLength({ max: 200 })
-    .withMessage('Note must be under 200 characters')
-    .escape(),
+    .withMessage('Note must be under 200 characters'),
   validate
 ];
 
@@ -537,7 +540,6 @@ export const validateCenterAction = [
     .optional()
     .trim()
     .isLength({ max: 500 })
-    .withMessage('Reason must be under 500 characters')
-    .escape(),
+    .withMessage('Reason must be under 500 characters'),
   validate
 ];

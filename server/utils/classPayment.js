@@ -110,3 +110,25 @@ export async function payForCompletedClass(db, booking, { description }) {
   }
   return { student, teacher, earned };
 }
+
+/**
+ * Re-mark a class an admin had un-marked (status "completed" + adminRejected) as completed:
+ * claims the flag atomically, then charges the credit and pays the teacher again.
+ * Returns { student, earned } or null when the class isn't an un-marked one.
+ * (completeClass treats any "completed" booking as done, so without this an un-marked
+ * class could never be marked again.)
+ */
+export async function reinstateUnmarkedClass(db, bookingId, by = "admin") {
+  const Booking = db.models.Booking;
+  if (!Booking) return null;
+  const booking = await Booking.findOneAndUpdate(
+    { _id: bookingId, status: "completed", adminRejected: true },
+    { $set: { adminRejected: false, adminRejectedReason: "", markedBy: by } },
+    { new: true },
+  );
+  if (!booking) return null;
+  const { student, earned } = await payForCompletedClass(db, booking, {
+    description: `Re-marked as completed (${by}): ${booking.classTitle}`,
+  });
+  return { student, earned, studentId: booking.studentId };
+}

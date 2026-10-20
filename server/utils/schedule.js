@@ -151,6 +151,26 @@ export const bookingInterval = (bk) => {
 };
 
 /**
+ * Another class of this teacher overlapping [start, start + mins), or null.
+ * Classes run at most 3h, so anything that could overlap starts within 4h before.
+ * Used by the admin booking and accepting a request so neither can double-book them.
+ * `classTitle`: bookings at the same start with the same title are one class taught
+ * to several students (the teacher's "Add class" with more than one student) — not a clash.
+ */
+export async function findTeacherClash(Booking, { teacherId, start, mins, statuses = BUSY_STATUSES, excludeId = null, classTitle = null }) {
+  const startMs = new Date(start).getTime();
+  const end = new Date(startMs + mins * 60000);
+  const nearby = await Booking.find({
+    teacherId,
+    scheduledTime: { $lt: end, $gte: new Date(startMs - 4 * 3600000) },
+    status: { $in: statuses },
+    ...(excludeId ? { _id: { $ne: excludeId } } : {}),
+  }).lean();
+  const sameClass = (b) => classTitle != null && b.classTitle === classTitle && new Date(b.scheduledTime).getTime() === startMs;
+  return nearby.find((b) => bookingInterval(b).end > startMs && !sameClass(b)) || null;
+}
+
+/**
  * Free time for one teacher in [from, to] (ms intervals), never in the past.
  * `teacher` needs { workingHours, timezone }.
  */

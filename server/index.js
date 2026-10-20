@@ -195,6 +195,10 @@ app.use('/uploads/library', (_req, res) => res.status(403).json({ message: 'Acce
 // Body parser with size limits
 app.use(express.json(requestLimits.json));
 app.use(express.urlencoded(requestLimits.urlencoded));
+// Express 5 leaves req.body undefined when a request has no body (Express 4 gave {}),
+// so the many `const { x } = req.body` handlers threw a 500 on a body-less PATCH/POST.
+// (multipart routes still get their body from multer.)
+app.use((req, _res, next) => { if (req.body === undefined) req.body = {}; next(); });
 app.use(sanitizeBody); // strip $-operators now that req.body exists
 
 app.use(compression({
@@ -519,7 +523,11 @@ app.get(["/hw/:token", "/q/:token", "/ac/:token"], linkPreviewHandler(frontendPa
 // this catch-all handles everything else from Vite's public/ directory.
 app.use(express.static(frontendPath));
 
-// SPA fallback — all unmatched routes serve index.html
+// Unknown API paths get a JSON 404 — not the SPA page with a 200 (which hid typos
+// and removed endpoints from API clients and monitoring)
+app.use('/api', notFoundHandler);
+
+// SPA fallback — all other unmatched routes serve index.html
 app.get('/{*path}', (req, res) => {
   res.sendFile(path.join(frontendPath, 'index.html'));
 });

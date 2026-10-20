@@ -112,7 +112,7 @@ router.get("/class", verifyToken, async (req, res) => {
     ok(res, { data: await classView(req, cls) });
   } catch (err) {
     logger.error("Recording links: class", { error: err?.message });
-    serverError(res, "Error loading parent links");
+    serverError(res, "Error loading parent links", err);
   }
 });
 
@@ -131,7 +131,7 @@ router.post("/class", verifyToken, async (req, res) => {
     ok(res, { data: await classView(req, cls) });
   } catch (err) {
     logger.error("Recording links: create", { error: err?.message });
-    serverError(res, "Error creating the parent link");
+    serverError(res, "Error creating the parent link", err);
   }
 });
 
@@ -155,7 +155,7 @@ router.patch("/:id", verifyToken, async (req, res) => {
     ok(res, { data: await classView(req, found.cls), message: req.body.enabled ? "Link switched on" : "Link switched off" });
   } catch (err) {
     logger.error("Recording links: toggle", { error: err?.message });
-    serverError(res, "Error updating the link");
+    serverError(res, "Error updating the link", err);
   }
 });
 
@@ -176,7 +176,7 @@ router.post("/:id/email", verifyToken, async (req, res) => {
     ok(res, { data: await classView(req, found.cls), message });
   } catch (err) {
     logger.error("Recording links: email", { error: err?.message });
-    serverError(res, "Error sending the email");
+    serverError(res, "Error sending the email", err);
   }
 });
 
@@ -193,7 +193,7 @@ router.get("/settings", verifyToken, verifyAdmin, async (req, res) => {
     ok(res, { data: await settingsView(req.db) });
   } catch (err) {
     logger.error("Recording links: load settings", { error: err?.message });
-    serverError(res, "Error loading settings");
+    serverError(res, "Error loading settings", err);
   }
 });
 
@@ -207,7 +207,7 @@ router.put("/settings", verifyToken, verifyAdmin, async (req, res) => {
     ok(res, { data: await settingsView(req.db), message: "Settings saved" });
   } catch (err) {
     logger.error("Recording links: save settings", { error: err?.message });
-    serverError(res, "Error saving settings");
+    serverError(res, "Error saving settings", err);
   }
 });
 
@@ -273,7 +273,7 @@ router.post("/link/:token/unlock", loginLimiter, async (req, res) => {
   } catch (err) {
     if (err.statusCode === 400) return badRequest(res, err.message);
     logger.error("Recording link unlock error:", { error: err?.message });
-    serverError(res);
+    serverError(res, undefined, err);
   }
 });
 
@@ -285,7 +285,7 @@ router.get("/link/:token", async (req, res) => {
     res.json({ success: true, video: await publicView(req, found, accessToken) });
   } catch (err) {
     logger.error("Recording link view error:", { error: err?.message });
-    serverError(res);
+    serverError(res, undefined, err);
   }
 });
 
@@ -306,7 +306,7 @@ async function streamVideo(req, res) {
     sendVideoFile(req, res, localRecordingPath(rec.filename), rec.mimeType || "video/webm");
   } catch (err) {
     logger.error("Recording link stream error:", { error: err?.message });
-    if (!res.headersSent) serverError(res);
+    if (!res.headersSent) serverError(res, undefined, err);
   }
 }
 

@@ -69,7 +69,13 @@ export const conflict    = (res, message)                 => res.status(409).jso
  * @returns {void}
  */
 export const serverError = (res, message = 'Server error', err) => {
-  if (err instanceof Error) Sentry.captureException(err);
   if (res.headersSent) return; // already answered (e.g. by the request timeout)
+  // Bad input caught by a route's own try/catch (toStr/toObjectId/toInt/toArray in
+  // utils/inputSanitizer.js throw { statusCode: 400 }) is the client's mistake, not a 500
+  const status = err?.statusCode;
+  if (Number.isInteger(status) && status >= 400 && status < 500) {
+    return res.status(status).json({ success: false, message: err.message });
+  }
+  if (err instanceof Error) Sentry.captureException(err);
   res.status(500).json({ success: false, message });
 };

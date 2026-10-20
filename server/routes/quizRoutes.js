@@ -174,7 +174,7 @@ router.post("/link/:token/unlock", loginLimiter, async (req, res) => {
   } catch (err) {
     if (err.statusCode === 400) return badRequest(res, err.message);
     logger.error("Quiz link unlock error:", { error: err?.message });
-    serverError(res);
+    serverError(res, undefined, err);
   }
 });
 
@@ -186,7 +186,7 @@ router.get("/link/:token", async (req, res) => {
     res.json({ success: true, quiz: quizLinkView(found.quiz, await findAttempt(req, found.quiz), found.expiresAt, req.center?.centerName) });
   } catch (err) {
     logger.error("Quiz link view error:", { error: err?.message });
-    serverError(res);
+    serverError(res, undefined, err);
   }
 });
 
@@ -206,7 +206,7 @@ router.post("/link/:token/start", async (req, res) => {
     res.json({ success: true, quiz: quizLinkView(quiz, null, found.expiresAt, req.center?.centerName) });
   } catch (err) {
     logger.error("Quiz link start error:", { error: err?.message });
-    serverError(res);
+    serverError(res, undefined, err);
   }
 });
 
@@ -261,7 +261,7 @@ router.post("/link/:token/submit", async (req, res) => {
     res.json({ success: true, quiz: quizLinkView(quiz, attempt, expiresAt, req.center?.centerName) });
   } catch (err) {
     logger.error("Quiz link submit error:", { error: err?.message });
-    serverError(res);
+    serverError(res, undefined, err);
   }
 });
 
@@ -297,7 +297,7 @@ router.post("/:id/share-link", verifyToken, validateObjectId("id"), async (req, 
     res.json({ success: true, quiz: withShareInfo(quiz, req.center) });
   } catch (err) {
     logger.error("Create quiz share link error:", { error: err?.message });
-    serverError(res);
+    serverError(res, undefined, err);
   }
 });
 
@@ -309,7 +309,7 @@ router.delete("/:id/share-link", verifyToken, validateObjectId("id"), async (req
     res.json({ success: true, message: "Link deleted — it no longer works." });
   } catch (err) {
     logger.error("Delete quiz share link error:", { error: err?.message });
-    serverError(res);
+    serverError(res, undefined, err);
   }
 });
 

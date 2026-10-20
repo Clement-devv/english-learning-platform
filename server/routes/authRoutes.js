@@ -7,7 +7,7 @@ import { config, JWT_STANDARD_CLAIMS, JWT_VERIFY_OPTIONS } from "../config/confi
 import { getCenterSecret, getCenter2faPendingSecret } from "../utils/jwtUtils.js";
 import { loginLimiter, passwordResetLimiter, trackFailedLogin, isAccountLocked, clearFailedAttempts } from "../middleware/rateLimiter.js";
 import { validatePasswordStrength } from "../utils/passwordUtils.js";
-import { startSession, verifyDeviceProof, endSession, notifySessionsRevoked, alertNewDevice, endSessionsAfterPasswordChange } from "../utils/sessionManager.js";
+import { startSession, verifyDeviceProof, endSession, notifySessionsRevoked, alertNewDevice, endSessionsAfterPasswordChange, alertPasswordChanged } from "../utils/sessionManager.js";
 import { buildRoleClaims, signAccessToken } from "../utils/sessionClaims.js";
 import { getUserModelForRole, isAccountUsable, normaliseRole } from "../utils/roleModels.js";
 import mongoose from "mongoose";
@@ -384,6 +384,7 @@ router.post("/teacher/change-password", tenantMiddleware, verifyToken, changePas
     const endedSessions = await endSessionsAfterPasswordChange(teacher, req, { keepCurrent: true });
     await teacher.save();
     notifySessionsRevoked(req.app.get("io"), req.center.slug, teacher._id, endedSessions);
+    alertPasswordChanged({ req, user: teacher, role: "teacher" });
 
     res.json({ success: true, message: "Password changed successfully" });
 
@@ -477,6 +478,7 @@ router.post("/teacher/reset-password/:token", tenantMiddleware, passwordResetLim
     const endedSessions = await endSessionsAfterPasswordChange(teacher, req);
     await teacher.save();
     notifySessionsRevoked(req.app.get("io"), req.center.slug, teacher._id, endedSessions);
+    alertPasswordChanged({ req, user: teacher, role: "teacher" });
 
     res.json({ success: true, message: "Password reset successfully. You can now login with your new password." });
 
@@ -568,6 +570,7 @@ router.post("/student/change-password", tenantMiddleware, changePasswordRules, v
     const endedSessions = await endSessionsAfterPasswordChange(student, req, { keepCurrent: true });
     await student.save();
     notifySessionsRevoked(req.app.get("io"), req.center.slug, student._id, endedSessions);
+    alertPasswordChanged({ req, user: student, role: "student" });
 
     res.json({ success: true, message: "Password changed successfully" });
 
@@ -662,6 +665,7 @@ router.post("/student/reset-password/:token", tenantMiddleware, passwordResetLim
     const endedSessions = await endSessionsAfterPasswordChange(student, req);
     await student.save();
     notifySessionsRevoked(req.app.get("io"), req.center.slug, student._id, endedSessions);
+    alertPasswordChanged({ req, user: student, role: "student" });
 
     res.json({ success: true, message: "Password reset successfully. You can now login with your new password." });
 
@@ -766,6 +770,7 @@ router.post("/admin/change-password", tenantMiddleware, changePasswordRules, val
     const endedSessions = await endSessionsAfterPasswordChange(admin, req, { keepCurrent: true });
     await admin.save();
     notifySessionsRevoked(req.app.get("io"), req.center.slug, admin._id, endedSessions);
+    alertPasswordChanged({ req, user: admin, role: "admin" });
 
     res.json({ success: true, message: "Password changed successfully" });
 
@@ -846,6 +851,7 @@ router.post("/admin/reset-password/:token", tenantMiddleware, passwordResetLimit
     const endedSessions = await endSessionsAfterPasswordChange(admin, req);
     await admin.save();
     notifySessionsRevoked(req.app.get("io"), req.center.slug, admin._id, endedSessions);
+    alertPasswordChanged({ req, user: admin, role: "admin" });
 
     res.json({ success: true, message: "Password reset successfully. You can now log in with your new password." });
   } catch (err) {

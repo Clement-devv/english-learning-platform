@@ -312,7 +312,7 @@ export default function SunshineShell() {
   useOnDataChanged(['bookings'], refreshAttention);
   useOnDataChanged(['teachers', 'students'], refreshPeople);
 
-  const handleLogout = () => { authLogout(); navigate('/admin/login', { replace: true }); };
+  const handleLogout = () => { authLogout(); navigate('/admin/login', { replace: true }); };
   const toggleGroup = (group) => {
     setBroadcastTargets(prev => ({
       ...prev,
@@ -367,6 +367,9 @@ export default function SunshineShell() {
     });
     setBroadcastSearch({ teachers: '', students: '', parents: '' });
     setBroadcastResult(null);
+    // Fresh recipient lists every time — the directory may be stale or may have
+    // failed to load earlier, which showed "0 teachers / 0 students" here.
+    refreshPeople();
     try {
       const res = await api.get('/parents');
       setBroadcastParents(res.data.parents || res.data || []);

@@ -1,4 +1,5 @@
 import express          from 'express';
+import { toEmail } from '../utils/inputSanitizer.js';
 import bcrypt           from '../utils/passwordHash.js';
 import jwt              from 'jsonwebtoken';
 import crypto           from 'crypto';
@@ -14,11 +15,12 @@ import { verifyToken, verifyAdmin, isTokenBlacklisted } from '../middleware/auth
 import { loginLimiter, passwordResetLimiter } from '../middleware/rateLimiter.js';
 import { config, JWT_VERIFY_OPTIONS }  from '../config/config.js';
 import { getCenterSecret } from '../utils/jwtUtils.js';
-import { startSession, alertNewDevice, endSessionsAfterPasswordChange, notifySessionsRevoked } from '../utils/sessionManager.js';
+import { startSession, alertNewDevice, endSessionsAfterPasswordChange, alertPasswordChanged, notifySessionsRevoked } from '../utils/sessionManager.js';
 import { signAccessToken } from '../utils/sessionClaims.js';
 import { validatePasswordStrength }     from '../utils/passwordUtils.js';
 import { sendParentInviteEmail }        from '../utils/emailService.js';
 import logger from '../utils/logger.js';
+import { esc } from '../emails/layout.js';
 import { summariesForStudent } from './classSummaryRoutes.js';
 import { badRequest, unauthorized, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
 import { loginRules, forgotPasswordRules, resetPasswordRules, validate } from '../middleware/validate.js';
@@ -179,7 +181,7 @@ router.post('/forgot-password', tenantMiddleware, passwordResetLimiter, forgotPa
         centerName: req.center.centerName,
         to: parent.email,
         subject: `Reset your password — ${req.center.centerName || config.appName}`,
-        html: `<p>Hi ${parent.firstName},</p><p>Click <a href="${resetUrl}">here</a> to reset your password. This link expires in 1 hour.</p><p>If you did not request this, ignore this email.</p>`,
+        html: `<p>Hi ${esc(parent.firstName)},</p><p>Click <a href="${resetUrl}">here</a> to reset your password. This link expires in 1 hour.</p><p>If you did not request this, ignore this email.</p>`,
       });
     } catch (e) { logger.error('Parent forgot-password email failed:', { error: e?.message }); }
 
@@ -222,6 +224,7 @@ router.post('/reset-password/:token', tenantMiddleware, passwordResetLimiter, re
     const endedSessions = await endSessionsAfterPasswordChange(parent, req);
     await parent.save();
     notifySessionsRevoked(req.app.get('io'), req.center.slug, parent._id, endedSessions);
+    alertPasswordChanged({ req, user: parent, role: "parent" });
 
     res.json({ success: true, message: 'Password reset successfully. You can now log in.' });
   } catch (err) {
@@ -370,7 +373,9 @@ router.post('/', tenantMiddleware, verifyToken, verifyAdmin, async (req, res) =>
     }
 
     const Parent = getParent(req.db);
-    const exists = await Parent.findOne({ email: email.trim().toLowerCase() });
+    let cleanEmail;
+    try { cleanEmail = toEmail(email); } catch (e) { return badRequest(res, e.message); }
+    const exists = await Parent.findOne({ email: cleanEmail });
     if (exists) return conflict(res, 'A parent with this email already exists');
 
     const rawToken    = crypto.randomBytes(32).toString('hex');
@@ -436,7 +441,8 @@ router.patch('/:id', tenantMiddleware, verifyToken, verifyAdmin, async (req, res
     if (notes     !== undefined) parent.notes     = notes.trim();
     if (Array.isArray(children)) parent.children  = children;
     if (email !== undefined) {
-      const emailLow = email.trim().toLowerCase();
+      let emailLow;
+      try { emailLow = toEmail(email); } catch (e) { return badRequest(res, e.message); }
       if (emailLow !== parent.email) {
         const clash = await Parent.findOne({ email: emailLow, _id: { $ne: parent._id } });
         if (clash) return conflict(res, 'Email already in use');

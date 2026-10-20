@@ -112,3 +112,17 @@ export function toArray(val, field, { minLen = 1, maxLen } = {}) {
   }
   return val;
 }
+
+/**
+ * One plain email address, lower-cased. Rejects lists ("a@x.com,b@y.com"), spaces and
+ * characters that have no place in an address but would change an email header or the
+ * HTML it is shown in. Throws { statusCode: 400 } like the helpers above.
+ */
+export function toEmail(val, field = "email") {
+  const s = typeof val === "string" ? val.trim().toLowerCase() : "";
+  const control = [...s].some((ch) => ch.charCodeAt(0) < 32 || ch.charCodeAt(0) === 127);
+  if (!s || control || s.length > 254 || !/^[^\s@,;:<>()"'[\]\\]+@[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(s)) {
+    throw Object.assign(new Error(`Please enter a valid ${field === "email" ? "email address" : field}`), { statusCode: 400 });
+  }
+  return s;
+}

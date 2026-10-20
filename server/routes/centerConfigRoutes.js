@@ -63,6 +63,24 @@ router.patch('/branding', tenantMiddleware, verifyToken, verifyAdmin, async (req
   try {
     const { primaryColor, secondaryColor, fontFamily, logo, favicon, borderRadius, shadowStyle, spacing, theme, loginBgOverlay } = req.body;
 
+    // These end up in page styles, image/favicon URLs and every email's header logo —
+    // only well-formed values (anything was stored before)
+    const HEX = /^#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/;
+    const image = (v) => v === null || v === "" || (typeof v === "string" && v.length <= 1000 && (/^\/uploads\/[\w\-./]+$/.test(v) && !v.includes("..") || /^https:\/\/[^\s"'<>]+$/i.test(v)));
+    const bad =
+      (primaryColor !== undefined && !HEX.test(primaryColor)) ? "primaryColor must be a hex colour like #4F46E5"
+      : (secondaryColor !== undefined && !HEX.test(secondaryColor)) ? "secondaryColor must be a hex colour like #E0E7FF"
+      : (fontFamily !== undefined && !/^[A-Za-z0-9 ]{1,40}$/.test(fontFamily)) ? "fontFamily must be a font name"
+      : (logo !== undefined && !image(logo)) ? "logo must be an uploaded image or an https:// link"
+      : (favicon !== undefined && !image(favicon)) ? "favicon must be an uploaded image or an https:// link"
+      : (borderRadius !== undefined && !/^\d{1,2}px$/.test(borderRadius)) ? "borderRadius must look like 8px"
+      : (shadowStyle !== undefined && !["none", "soft", "medium", "strong"].includes(shadowStyle)) ? "Unknown shadowStyle"
+      : (spacing !== undefined && !["compact", "comfortable", "spacious"].includes(spacing)) ? "Unknown spacing"
+      : (theme !== undefined && theme !== null && !/^[a-z0-9-]{1,30}$/.test(theme)) ? "Unknown theme"
+      : (loginBgOverlay !== undefined && !(Number(loginBgOverlay) >= 0 && Number(loginBgOverlay) <= 1)) ? "loginBgOverlay must be between 0 and 1"
+      : null;
+    if (bad) return badRequest(res, bad);
+
     await Center.findByIdAndUpdate(req.center._id, {
       'branding.primaryColor':   primaryColor   !== undefined ? primaryColor   : req.center.branding.primaryColor,
       'branding.secondaryColor': secondaryColor !== undefined ? secondaryColor : req.center.branding.secondaryColor,

@@ -91,7 +91,7 @@ router.get("/", verifyToken, verifyAdminOrSubAdmin("canManageParentChecks"), asy
     });
   } catch (err) {
     logger.error("Parent checks list error:", { error: err?.message });
-    serverError(res);
+    serverError(res, undefined, err);
   }
 });
 
@@ -114,7 +114,7 @@ router.post("/:bookingId/link", verifyToken, verifyAdminOrSubAdmin("canManagePar
     res.json({ success: true, check: withShareInfo(booking, req.center, { expiresAt: expiryFor(req.center) }) });
   } catch (err) {
     logger.error("Parent check link error:", { error: err?.message });
-    serverError(res);
+    serverError(res, undefined, err);
   }
 });
 
@@ -135,7 +135,7 @@ router.post("/:bookingId/email", verifyToken, verifyAdminOrSubAdmin("canManagePa
     res.json({ success: true, message });
   } catch (err) {
     logger.error("Parent check email error:", { error: err?.message });
-    serverError(res, "Error sending the email");
+    serverError(res, "Error sending the email", err);
   }
 });
 
@@ -219,6 +219,31 @@ ${b.parentCheck.comment ? `<p><strong>Parent's note:</strong> ${esc(b.parentChec
     .catch(e => logger.warn("Parent check email failed:", { error: e?.message }));
 }
 
+// Email the class's teacher too — a "No" puts their pay for the class at stake
+// (deducted if the dispute isn't settled by the deadline), and they were never told.
+function notifyTeacher(req, b, kind) {
+  const to = b.teacherId?.email;
+  if (!to) return;
+  const { baseUrl } = getCenterBaseUrl(req.center);
+  const cls = `<ul><li><strong>Student:</strong> ${esc(b.studentId.firstName)} ${esc(b.studentId.lastName)}</li>
+<li><strong>Class:</strong> ${esc(b.classTitle)} — ${esc(new Date(b.scheduledTime).toUTCString())}</li></ul>`;
+  const mail = kind === "withdrawn"
+    ? {
+        subject: `Parent withdrew their report — ${b.studentId.firstName}`,
+        html: `<p>Hi ${esc(b.teacherId.firstName)}, the parent changed their answer to <strong>Yes</strong> — the student did attend:</p>${cls}
+<p>The dispute is cancelled and the class stands. Nothing to do.</p>`,
+      }
+    : {
+        subject: `A parent says ${b.studentId.firstName} missed your class`,
+        html: `<p>Hi ${esc(b.teacherId.firstName)}, a parent answered <strong>No</strong> to the attendance check for this class you confirmed:</p>${cls}
+${b.parentCheck.comment ? `<p><strong>Parent's note:</strong> ${esc(b.parentCheck.comment)}</p>` : ""}
+<p>The school will review it. If it isn't settled by <strong>${esc(b.parentCheck.disputeDeadline.toUTCString())}</strong>, the class is returned to the student and the pay for it is deducted.
+If you have proof the class happened (a recording, chat messages), send it to your school now. See it in <a href="${baseUrl}/teacher/dashboard">Completed classes</a>.</p>`,
+      };
+  sendEmail({ centerName: req.center?.centerName, to, ...mail })
+    .catch(e => logger.warn("Parent check teacher email failed:", { error: e?.message }));
+}
+
 router.post("/link/:token/unlock", loginLimiter, async (req, res) => {
   try {
     const found = await findByLink(req, res);
@@ -236,7 +261,7 @@ router.post("/link/:token/unlock", loginLimiter, async (req, res) => {
   } catch (err) {
     if (err.statusCode === 400) return badRequest(res, err.message);
     logger.error("Parent check unlock error:", { error: err?.message });
-    serverError(res);
+    serverError(res, undefined, err);
   }
 });
 
@@ -247,7 +272,7 @@ router.get("/link/:token", async (req, res) => {
     res.json({ success: true, check: view(found.booking, req.center?.centerName) });
   } catch (err) {
     logger.error("Parent check view error:", { error: err?.message });
-    serverError(res);
+    serverError(res, undefined, err);
   }
 });
 
@@ -311,19 +336,19 @@ router.post("/link/:token/respond", async (req, res) => {
     if (from !== "waiting") update.$push = { "parentCheck.history": { from, to, at: now } };
 
     const updated = await Booking.findOneAndUpdate(guard, update, { new: true })
-      .populate("studentId", "firstName lastName").populate("teacherId", "firstName lastName displayName");
+      .populate("studentId", "firstName lastName").populate("teacherId", "firstName lastName displayName email");
     if (!updated) {
       return res.status(409).json({ success: false, message: "This answer changed in the meantime (the school may have just reviewed it). Please reload the page." });
     }
 
-    if (to === "denied") notifyAdmin(req, updated, "no");
-    else if (from === "denied") notifyAdmin(req, updated, "withdrawn");
+    if (to === "denied") { notifyAdmin(req, updated, "no"); notifyTeacher(req, updated, "no"); }
+    else if (from === "denied") { notifyAdmin(req, updated, "withdrawn"); notifyTeacher(req, updated, "withdrawn"); }
 
     res.json({ success: true, check: view(updated, req.center?.centerName) });
   } catch (err) {
     if (err.statusCode === 400) return badRequest(res, err.message);
     logger.error("Parent check respond error:", { error: err?.message });
-    serverError(res);
+    serverError(res, undefined, err);
   }
 });
 

@@ -1,5 +1,6 @@
 // server/routes/notificationRoutes.js
 import express from "express";
+import { validateObjectId } from "../middleware/validateObjectId.js";
 import { verifyToken, verifyAdmin } from "../middleware/authMiddleware.js";
 import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
 import { notificationSchema } from "../schemas/notificationSchema.js";
@@ -50,7 +51,7 @@ router.patch("/read-all", verifyToken, verifyAdmin, async (req, res) => {
 });
 
 // PATCH /api/notifications/:id/read — mark one as read
-router.patch("/:id/read", verifyToken, verifyAdmin, async (req, res) => {
+router.patch("/:id/read", validateObjectId("id"), verifyToken, verifyAdmin, async (req, res) => {
   try {
     await getNotification(req.db).findByIdAndUpdate(req.params.id, { $set: { read: true } });
     res.json({ success: true });

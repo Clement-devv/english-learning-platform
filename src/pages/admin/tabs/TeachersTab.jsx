@@ -488,10 +488,9 @@ export default function TeachersTab({ onNotify, isDarkMode = false }) {
     const teacher = teachers[index];
     if (!teacher) return;
     try {
-      const newPass = Math.random().toString(36).slice(-8);
-      const res = await api.put(`/teachers/${teacher._id}`, {
-        password: newPass,
-      });
+      // The server makes a strong temporary password and returns it once
+      const res = await api.put(`/teachers/${teacher._id}`, { resetPassword: true });
+      const newPass = res.data.temporaryPassword;
       setTeachers((prev) =>
         prev.map((t, i) =>
           i === index

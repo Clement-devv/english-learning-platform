@@ -5,7 +5,7 @@ import { loginLimiter, passwordResetLimiter } from "../middleware/rateLimiter.js
 import { sendSubAdminWelcomeEmail, sendSubAdminForgotPasswordEmail } from "../utils/emailService.js";
 import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
 import { subAdminSchema }   from "../schemas/subAdminSchema.js";
-import { startSession, alertNewDevice, endSessionsAfterPasswordChange, notifySessionsRevoked } from "../utils/sessionManager.js";
+import { startSession, alertNewDevice, endSessionsAfterPasswordChange, alertPasswordChanged, notifySessionsRevoked } from "../utils/sessionManager.js";
 import { buildRoleClaims, signAccessToken } from "../utils/sessionClaims.js";
 import logger from "../utils/logger.js";
 import { badRequest, unauthorized, forbidden, notFound, serverError } from '../utils/apiResponse.js';
@@ -201,6 +201,7 @@ router.post("/reset-password/:token", passwordResetLimiter, resetPasswordRules, 
     const endedSessions = await endSessionsAfterPasswordChange(subAdmin, req);
     await subAdmin.save();
     notifySessionsRevoked(req.app.get("io"), req.center.slug, subAdmin._id, endedSessions);
+    alertPasswordChanged({ req, user: subAdmin, role: "sub-admin" });
 
     res.json({ success: true, message: "Password reset successfully. You can now log in." });
   } catch (err) {

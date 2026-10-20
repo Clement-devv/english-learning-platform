@@ -1,4 +1,5 @@
 import express        from "express";
+import { validateObjectId } from "../middleware/validateObjectId.js";
 import { verifyToken } from "../middleware/authMiddleware.js";
 import { tenantMiddleware }    from "../middleware/tenantMiddleware.js";
 import { quizTemplateSchema }  from "../schemas/quizTemplateSchema.js";
@@ -66,7 +67,7 @@ router.get("/", verifyToken, async (req, res) => {
 });
 
 // PATCH /api/quiz-templates/:id/use  — increment usage count
-router.patch("/:id/use", verifyToken, async (req, res) => {
+router.patch("/:id/use", validateObjectId("id"), verifyToken, async (req, res) => {
   try {
     if (req.user.role !== "teacher") return forbidden(res, "Teachers only");
     const tmpl = await getQuizTemplate(req.db).findOneAndUpdate(
@@ -82,7 +83,7 @@ router.patch("/:id/use", verifyToken, async (req, res) => {
 });
 
 // DELETE /api/quiz-templates/:id
-router.delete("/:id", verifyToken, async (req, res) => {
+router.delete("/:id", validateObjectId("id"), verifyToken, async (req, res) => {
   try {
     if (req.user.role !== "teacher") return forbidden(res, "Teachers only");
     const tmpl = await getQuizTemplate(req.db).findOne({ _id: req.params.id, teacherId: req.user.id });

@@ -42,6 +42,53 @@
       "port": 4173
     },
     {
+      "name": "sandbox",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "C:/Users/speak/AppData/Local/Temp/claude/C--Users-speak-Pictures-English-learning-platform/606353f2-b8e3-4647-83c6-1a6151f69db1/scratchpad/sandbox.mjs",
+        "C:/Users/speak/Pictures/English learning platform"
+      ],
+      "port": 8025
+    },
+    {
+      "name": "sandbox-api",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--prefix", "server"],
+      "port": 5055,
+      "env": {
+        "PORT": "5055",
+        "NODE_ENV": "development",
+        "MONGO_URI": "mongodb://127.0.0.1:27999/sandbox_master",
+        "MASTER_DB_URI": "mongodb://127.0.0.1:27999/sandbox_master",
+        "DB_BASE_URI": "mongodb://127.0.0.1:27999",
+        "EMAIL_HOST": "127.0.0.1",
+        "EMAIL_PORT": "1025",
+        "EMAIL_USER": "noreply@sandbox.test",
+        "EMAIL_PASSWORD": "sandbox",
+        "RESEND_API_KEY": "",
+        "FRONTEND_URL": "http://localhost:5180",
+        "CORS_ORIGINS": "http://localhost:5180",
+        "SUPER_ADMIN_EMAIL": "owner@sandbox.test",
+        "SENTRY_DSN": "",
+        "SENTRY_ENABLED": "false",
+        "REDIS_URL": ""
+      }
+    },
+    {
+      "name": "sandbox-web",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["vite", "--port", "5180", "--strictPort"],
+      "port": 5180,
+      "env": {
+        "VITE_DEV_SAME_ORIGIN": "false",
+        "VITE_API_URL": "http://localhost:5055",
+        "VITE_API_BASE_URL": "http://localhost:5055/api/v1",
+        "VITE_SOCKET_URL": "http://localhost:5055",
+        "VITE_CENTER_SLUG": "sandbox-academy",
+        "VITE_SENTRY_DSN": ""
+      }
+    },
+    {
       "name": "dev-phone",
       "runtimeExecutable": "npx",
       "runtimeArgs": [

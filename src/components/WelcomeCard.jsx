@@ -16,7 +16,7 @@ import {
   // Sub-admin
   UserCog, BookOpen, MessageCircle,
   // Parent
-  Baby, Clock, MessageSquare,
+  Baby, Clock,
   // Header role icons
   BookMarked, School, Building2, Briefcase, HeartHandshake,
   // UI
@@ -128,9 +128,9 @@ const ROLE_CONTENT = {
         desc: "Check what's scheduled so you can prepare your child.",
       },
       {
-        Icon: MessageSquare, iconColor: '#059669', iconBg: '#d1fae5',
-        title: 'Messages',
-        desc: 'Send messages directly to teachers whenever you need an update.',
+        Icon: BookOpen, iconColor: '#059669', iconBg: '#d1fae5',
+        title: 'Homework & Reports',
+        desc: "See your child's homework, grades and what the teacher wrote after each class.",
       },
     ],
   },

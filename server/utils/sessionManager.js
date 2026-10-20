@@ -205,6 +205,26 @@ export const alertNewDevice = ({ req, user, role, session, isNewDevice }) => {
     .catch(err => logger.warn('New-device email failed:', { error: err?.message }));
 };
 
+/**
+ * Email the user that their password was just changed (fire-and-forget) — after they
+ * change it or reset it themselves. Staff-issued passwords are emailed separately.
+ */
+export const alertPasswordChanged = ({ req, user, role }) => {
+  if (!user?.email) return;
+  import('./emailService.js')
+    .then(({ sendPasswordChangedEmail }) => sendPasswordChangedEmail({
+      email:      user.email,
+      name:       user.firstName || user.name || '',
+      role,
+      center:     req.center,
+      centerName: req.center?.centerName || '',
+      ipAddress:  req.ip,
+      lang:       user.emailLanguage,
+      tz:         user.timezone,
+    }))
+    .catch(err => logger.warn('Password-changed email failed:', { error: err?.message }));
+};
+
 /** Add a JWT to the revocation blacklist (in-memory now, Redis for other instances) */
 export const blacklistJwt = async (jwtToken) => {
   if (!jwtToken) return;

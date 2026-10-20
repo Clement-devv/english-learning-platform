@@ -1,5 +1,9 @@
 // server/routes/teacherRoutes.js
 import express from "express";
+import { toEmail } from "../utils/inputSanitizer.js";
+import { validateObjectId } from "../middleware/validateObjectId.js";
+import { cleanMeetingLink } from "../utils/meetingLinks.js";
+import { generateSecurePassword } from "../utils/passwordUtils.js";
 import bcrypt from "../utils/passwordHash.js";
 import crypto from "crypto";
 import multer from "multer";
@@ -94,7 +98,7 @@ const STAFF_TEACHER_FIELDS = [...PUBLIC_TEACHER_FIELDS, "email", "phone", "lastL
 
 const pick = (obj, keys) => Object.fromEntries(keys.filter(k => obj[k] !== undefined).map(k => [k, obj[k]]));
 
-router.get("/:id", verifyToken, async (req, res) => {
+router.get("/:id", validateObjectId("id"), verifyToken, async (req, res) => {
   try {
     const cacheKey = teacherCacheKey(req.center?.slug, req.params.id);
     const teacher = await cachedQuery(cacheKey, 60, () =>
@@ -145,7 +149,7 @@ const requireOwnerOrAdmin = (req, res, next) => {
 };
 
 // ─── POST upload photo ────────────────────────────────────────────────────────
-router.post("/:id/photo", verifyToken, requireOwnerOrAdmin, (req, res, next) => {
+router.post("/:id/photo", validateObjectId("id"), verifyToken, requireOwnerOrAdmin, (req, res, next) => {
   photoUpload.single("photo")(req, res, (err) => {
     if (err) return res.status(400).json({ message: err.message });
     next();
@@ -192,7 +196,7 @@ router.post("/:id/photo", verifyToken, requireOwnerOrAdmin, (req, res, next) => 
 });
 
 // ─── DELETE photo ─────────────────────────────────────────────────────────────
-router.delete("/:id/photo", verifyToken, requireOwnerOrAdmin, async (req, res) => {
+router.delete("/:id/photo", validateObjectId("id"), verifyToken, requireOwnerOrAdmin, async (req, res) => {
   try {
     const Teacher = getTeacher(req.db);
     const teacher = await Teacher.findById(req.params.id);
@@ -214,7 +218,7 @@ router.delete("/:id/photo", verifyToken, requireOwnerOrAdmin, async (req, res) =
 });
 
 // ─── PATCH schedule-visibility ────────────────────────────────────────────────
-router.patch("/:id/schedule-visibility", verifyToken, requireOwnerOrAdmin, async (req, res) => {
+router.patch("/:id/schedule-visibility", validateObjectId("id"), verifyToken, requireOwnerOrAdmin, async (req, res) => {
   try {
     const { showScheduleToStudents } = req.body;
     if (typeof showScheduleToStudents !== "boolean")
@@ -235,7 +239,7 @@ router.patch("/:id/schedule-visibility", verifyToken, requireOwnerOrAdmin, async
 // Body: { workingHours: [{ day 0-6, start "HH:MM", end "HH:MM" }], timezone }
 // The hours are wall-clock in `timezone`, saved alongside them (workingHoursTz) so a
 // teacher logging in from a device in another timezone doesn't shift their hours.
-router.put("/:id/working-hours", verifyToken, requireOwnerOrAdmin, async (req, res) => {
+router.put("/:id/working-hours", validateObjectId("id"), verifyToken, requireOwnerOrAdmin, async (req, res) => {
   try {
     const { value, error } = normaliseWorkingHours(req.body.workingHours);
     if (error) return badRequest(res, error);
@@ -255,7 +259,7 @@ router.put("/:id/working-hours", verifyToken, requireOwnerOrAdmin, async (req, r
 });
 
 // ─── PATCH timezone ───────────────────────────────────────────────────────────
-router.patch("/:id/timezone", verifyToken, requireOwnerOrAdmin, async (req, res) => {
+router.patch("/:id/timezone", validateObjectId("id"), verifyToken, requireOwnerOrAdmin, async (req, res) => {
   try {
     const { timezone } = req.body;
     if (!timezone || typeof timezone !== "string")
@@ -270,38 +274,38 @@ router.patch("/:id/timezone", verifyToken, requireOwnerOrAdmin, async (req, res)
 });
 
 // ─── PATCH google-meet ────────────────────────────────────────────────────────
-router.patch("/:id/google-meet", verifyToken, requireOwnerOrAdmin, async (req, res) => {
+router.patch("/:id/google-meet", validateObjectId("id"), verifyToken, requireOwnerOrAdmin, async (req, res) => {
   try {
-    const { googleMeetLink } = req.body;
+    const googleMeetLink = cleanMeetingLink("googlemeet", req.body.googleMeetLink ?? "");
     const teacher = await getTeacher(req.db).findByIdAndUpdate(
       req.params.id,
-      { googleMeetLink: googleMeetLink || "" },
+      { googleMeetLink },
       { new: true, select: "firstName lastName googleMeetLink zoomLink" }
     );
     if (!teacher) return notFound(res, "Teacher not found");
     res.json({ message: "Google Meet link updated", googleMeetLink: teacher.googleMeetLink });
   } catch (err) {
-    logger.error("Error updating Google Meet link:", { error: err?.message });
-    serverError(res, "Error updating Google Meet link");
+    if (err.statusCode !== 400) logger.error("Error updating Google Meet link:", { error: err?.message });
+    serverError(res, "Error updating Google Meet link", err);
   }
 });
 
 // ─── PATCH zoom ───────────────────────────────────────────────────────────────
 // Mirror of /google-meet so teachers can update their Zoom link from the same
 // dashboard card.  Validates ownership via requireOwnerOrAdmin.
-router.patch("/:id/zoom", verifyToken, requireOwnerOrAdmin, async (req, res) => {
+router.patch("/:id/zoom", validateObjectId("id"), verifyToken, requireOwnerOrAdmin, async (req, res) => {
   try {
-    const { zoomLink } = req.body;
+    const zoomLink = cleanMeetingLink("zoom", req.body.zoomLink ?? "");
     const teacher = await getTeacher(req.db).findByIdAndUpdate(
       req.params.id,
-      { zoomLink: zoomLink || "" },
+      { zoomLink },
       { new: true, select: "firstName lastName googleMeetLink zoomLink" }
     );
     if (!teacher) return notFound(res, "Teacher not found");
     res.json({ message: "Zoom link updated", zoomLink: teacher.zoomLink });
   } catch (err) {
-    logger.error("Error updating Zoom link:", { error: err?.message });
-    serverError(res, "Error updating Zoom link");
+    if (err.statusCode !== 400) logger.error("Error updating Zoom link:", { error: err?.message });
+    serverError(res, "Error updating Zoom link", err);
   }
 });
 
@@ -322,7 +326,7 @@ router.post("/", verifyToken, verifyAdmin, async (req, res) => {
     const Teacher  = getTeacher(req.db);
     const Student  = getStudent(req.db);
     const SubAdmin = getSubAdmin(req.db);
-    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedEmail = toEmail(email);
 
     const [asTeacher, asStudent, asSubAdmin] = await Promise.all([
       Teacher.findOne({ email: normalizedEmail }).lean(),
@@ -350,7 +354,8 @@ router.post("/", verifyToken, verifyAdmin, async (req, res) => {
       continent, status: "pending", active: false,
       inviteToken, inviteExpires,
       phone: phone || "", country: country || "",
-      timezone: timezone || "", googleMeetLink: googleMeetLink || "",
+      timezone: timezone || "", googleMeetLink: cleanMeetingLink("googlemeet", googleMeetLink ?? ""),
+      zoomLink: cleanMeetingLink("zoom", req.body.zoomLink ?? ""),
       bio: bio || "", yearsOfExperience: yearsOfExperience || 0,
       specializations: specializations || [], certifications: certifications || [],
     });
@@ -365,13 +370,8 @@ router.post("/", verifyToken, verifyAdmin, async (req, res) => {
       logger.error("Failed to send teacher invite email:", { error: e?.message });
     }
 
-    // Fire-and-forget: send admin a record PDF
-    const adminEmail = req.center?.adminEmail;
-    if (adminEmail) {
-      generateTeacherRecordPdf(teacher.toObject(), centerName)
-        .then(pdf => sendNewTeacherRecordEmail(adminEmail, teacher.toObject(), pdf, centerName))
-        .catch(err => logger.error("Admin teacher record email failed:", { error: err?.message }));
-    }
+    // The admin's record PDF goes out once the teacher finishes setup (/setup-account),
+    // same as students — sending it here too gave the admin two identical emails.
 
     const response = teacher.toObject();
     delete response.password;
@@ -453,7 +453,7 @@ router.post("/setup-account", strictLimiter, async (req, res) => {
 });
 
 // ─── POST resend-invite ───────────────────────────────────────────────────────
-router.post("/:id/resend-invite", verifyToken, verifyAdmin, async (req, res) => {
+router.post("/:id/resend-invite", validateObjectId("id"), verifyToken, verifyAdmin, async (req, res) => {
   try {
     const Teacher = getTeacher(req.db);
     const teacher = await Teacher.findById(req.params.id);
@@ -477,7 +477,7 @@ router.post("/:id/resend-invite", verifyToken, verifyAdmin, async (req, res) => 
 
 // ─── PATCH self-update (teacher or admin) ─────────────────────────────────────
 // Only safe fields — firstName/lastName/country/continent are admin-only (PUT below)
-router.patch("/:id/profile", verifyToken, requireOwnerOrAdmin, async (req, res) => {
+router.patch("/:id/profile", validateObjectId("id"), verifyToken, requireOwnerOrAdmin, async (req, res) => {
   try {
     const ALLOWED = ["displayName", "phone", "bio", "timezone", "googleMeetLink", "zoomLink",
                      "yearsOfExperience", "specializations", "certifications",
@@ -486,25 +486,43 @@ router.patch("/:id/profile", verifyToken, requireOwnerOrAdmin, async (req, res) 
     for (const key of ALLOWED) {
       if (req.body[key] !== undefined) updates[key] = req.body[key];
     }
+    if (updates.googleMeetLink !== undefined) updates.googleMeetLink = cleanMeetingLink("googlemeet", updates.googleMeetLink);
+    if (updates.zoomLink !== undefined) updates.zoomLink = cleanMeetingLink("zoom", updates.zoomLink);
     const teacher = await getTeacher(req.db)
       .findByIdAndUpdate(req.params.id, updates, { new: true })
       .select("-password -inviteToken -twoFactorSecret -twoFactorBackupCodes");
     if (!teacher) return notFound(res, "Teacher not found");
     await invalidateCache(teacherCacheKey(req.center?.slug, req.params.id));
     res.json(teacher);
-  } catch {
-    serverError(res, "Error updating profile");
+  } catch (err) {
+    serverError(res, "Error updating profile", err);
   }
 });
 
 // ─── PUT update teacher (admin only) ──────────────────────────────────────────
-router.put("/:id", verifyToken, verifyAdmin, async (req, res) => {
+router.put("/:id", validateObjectId("id"), verifyToken, verifyAdmin, async (req, res) => {
   try {
-    const { continent, password, ...otherUpdates } = req.body;
+    const { continent } = req.body;
     if (continent && !["Africa", "Europe", "Asia", "Americas", "Oceania"].includes(continent))
       return badRequest(res, "Invalid continent");
 
-    let updateData = { ...otherUpdates, continent };
+    // Only the fields the admin's teacher form edits — the whole body used to be written
+    // to the document, so a request could also set earned, sessions, twoFactorSecret…
+    const ADMIN_EDITABLE = ["firstName", "lastName", "email", "phone", "country", "continent", "ratePerClass",
+      "yearsOfExperience", "googleMeetLink", "zoomLink", "timezone", "bio", "displayName",
+      "specializations", "certifications", "active"];
+    const updateData = {};
+    for (const key of ADMIN_EDITABLE) if (req.body[key] !== undefined) updateData[key] = req.body[key];
+    if (updateData.email !== undefined) updateData.email = toEmail(updateData.email);
+    if (updateData.active !== undefined) updateData.active = updateData.active === true;
+    if (updateData.googleMeetLink !== undefined) updateData.googleMeetLink = cleanMeetingLink("googlemeet", updateData.googleMeetLink);
+    if (updateData.zoomLink !== undefined) updateData.zoomLink = cleanMeetingLink("zoom", updateData.zoomLink);
+
+    // { resetPassword: true } → a strong temporary password made here (the browser used
+    // to invent a short Math.random() one); a typed password is still accepted
+    const password = req.body.resetPassword === true ? generateSecurePassword(12)
+      : typeof req.body.password === "string" ? req.body.password.trim() : "";
+    if (password && password.length < 8) return badRequest(res, "Password must be at least 8 characters");
     if (password) {
       updateData.password           = await bcrypt.hash(password, config.bcryptRounds);
       updateData.lastPasswordChange = new Date();
@@ -515,7 +533,7 @@ router.put("/:id", verifyToken, verifyAdmin, async (req, res) => {
 
     const teacher = await getTeacher(req.db)
       .findByIdAndUpdate(req.params.id, updateData, { new: true, runValidators: true })
-      .select("-password -inviteToken -sessions");
+      .select("-password -inviteToken -sessions -twoFactorSecret -twoFactorBackupCodes -knownDevices");
     if (!teacher) return notFound(res, "Teacher not found");
 
     await invalidateCache(teacherCacheKey(req.center?.slug, req.params.id));
@@ -533,7 +551,7 @@ router.put("/:id", verifyToken, verifyAdmin, async (req, res) => {
 });
 
 // ─── DELETE (soft-delete) ─────────────────────────────────────────────────────
-router.delete("/:id", verifyToken, verifyAdmin, strictLimiter, async (req, res) => {
+router.delete("/:id", validateObjectId("id"), verifyToken, verifyAdmin, strictLimiter, async (req, res) => {
   try {
     const Teacher = getTeacher(req.db);
     const teacher = await Teacher.findById(req.params.id);
@@ -559,7 +577,7 @@ router.delete("/:id", verifyToken, verifyAdmin, strictLimiter, async (req, res) 
 });
 
 // ─── POST restore ─────────────────────────────────────────────────────────────
-router.post("/:id/restore", verifyToken, verifyAdmin, async (req, res) => {
+router.post("/:id/restore", validateObjectId("id"), verifyToken, verifyAdmin, async (req, res) => {
   try {
     const Teacher = getTeacher(req.db);
     const teacher = await Teacher.findById(req.params.id);

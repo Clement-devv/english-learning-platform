@@ -101,7 +101,7 @@ router.get("/", verifyToken, subAdminNeeds("canManageGroupClasses"), async (req,
     res.json({ success: true, classes, total, limit, skip });
   } catch (err) {
     logger.error("Error fetching group classes:", { error: err?.message });
-    serverError(res, "Error fetching group classes");
+    serverError(res, "Error fetching group classes", err);
   }
 });
 
@@ -187,7 +187,7 @@ router.post("/", verifyToken, subAdminNeeds("canManageGroupClasses"), staffOrTea
     res.status(201).json({ success: true, message: "Group class created", groupClass });
   } catch (err) {
     logger.error("Error creating group class:", { error: err?.message });
-    serverError(res, "Error creating group class");
+    serverError(res, "Error creating group class", err);
   }
 });
 
@@ -208,7 +208,7 @@ router.get("/students/search", verifyToken, subAdminNeeds("canManageGroupClasses
     res.json({ success: true, students });
   } catch (err) {
     logger.error("Error searching students:", { error: err?.message });
-    serverError(res, "Error searching students");
+    serverError(res, "Error searching students", err);
   }
 });
 
@@ -245,7 +245,7 @@ router.get("/:id/join", verifyToken, subAdminNeeds("canManageGroupClasses"), val
     res.json({ success: true, platform, link });
   } catch (err) {
     logger.error("Group class join error:", { error: err?.message });
-    serverError(res, "Could not open the class");
+    serverError(res, "Could not open the class", err);
   }
 });
 
@@ -271,7 +271,7 @@ router.get("/:id", verifyToken, subAdminNeeds("canManageGroupClasses"), validate
     res.json({ success: true, groupClass: gc });
   } catch (err) {
     logger.error("Error fetching group class:", { error: err?.message });
-    serverError(res, "Error fetching group class");
+    serverError(res, "Error fetching group class", err);
   }
 });
 
@@ -315,7 +315,7 @@ router.patch("/:id", verifyToken, subAdminNeeds("canManageGroupClasses"), staffO
     res.json({ success: true, message: "Group class updated", groupClass: gc });
   } catch (err) {
     logger.error("Error updating group class:", { error: err?.message });
-    serverError(res, "Error updating group class");
+    serverError(res, "Error updating group class", err);
   }
 });
 
@@ -331,7 +331,7 @@ router.delete("/:id", verifyToken, verifyAdmin, validateObjectId("id"), async (r
     res.json({ success: true, message: "Group class deleted" });
   } catch (err) {
     logger.error("Error deleting group class:", { error: err?.message });
-    serverError(res, "Error deleting group class");
+    serverError(res, "Error deleting group class", err);
   }
 });
 
@@ -445,7 +445,7 @@ router.post("/:id/enroll", verifyToken, subAdminNeeds("canManageGroupClasses"), 
     });
   } catch (err) {
     logger.error("Error enrolling student:", { error: err?.message });
-    serverError(res, "Error enrolling student");
+    serverError(res, "Error enrolling student", err);
   }
 });
 
@@ -495,7 +495,7 @@ router.delete("/:id/enroll/:studentId", verifyToken, subAdminNeeds("canManageGro
     });
   } catch (err) {
     logger.error("Error removing enrollment:", { error: err?.message });
-    serverError(res, "Error removing enrollment");
+    serverError(res, "Error removing enrollment", err);
   }
 });
 
@@ -534,7 +534,7 @@ router.patch("/:id/attendance", verifyToken, subAdminNeeds("canManageGroupClasse
     res.json({ success: true, message: "Attendance updated", enrollments: gc.enrollments, feePaid });
   } catch (err) {
     logger.error("Error marking attendance:", { error: err?.message });
-    serverError(res, "Error marking attendance");
+    serverError(res, "Error marking attendance", err);
   }
 });
 
@@ -590,7 +590,7 @@ router.patch("/:id/complete", verifyToken, subAdminNeeds("canManageGroupClasses"
     res.json({ success: true, message: "Group class completed", groupClass: gc, feePaid });
   } catch (err) {
     logger.error("Error completing group class:", { error: err?.message });
-    serverError(res, "Error completing group class");
+    serverError(res, "Error completing group class", err);
   }
 });
 
@@ -642,7 +642,7 @@ router.patch("/:id/cancel", verifyToken, subAdminNeeds("canManageGroupClasses"),
     });
   } catch (err) {
     logger.error("Error cancelling group class:", { error: err?.message });
-    serverError(res, "Error cancelling group class");
+    serverError(res, "Error cancelling group class", err);
   }
 });
 
@@ -663,7 +663,7 @@ router.patch("/:id/start", verifyToken, subAdminNeeds("canManageGroupClasses"), 
     res.json({ success: true, message: "Group class started", groupClass: gc });
   } catch (err) {
     logger.error("Error starting group class:", { error: err?.message });
-    serverError(res, "Error starting group class");
+    serverError(res, "Error starting group class", err);
   }
 });
 
@@ -709,7 +709,7 @@ router.patch("/:id/invite", verifyToken, subAdminNeeds("canManageGroupClasses"),
     res.json({ success: true, invitedStudents: gc.invitedStudents });
   } catch (err) {
     logger.error("Error updating invite list:", { error: err?.message });
-    serverError(res, "Error updating invite list");
+    serverError(res, "Error updating invite list", err);
   }
 });
 

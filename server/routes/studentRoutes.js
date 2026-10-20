@@ -1,5 +1,6 @@
 // server/routes/studentRoutes.js
 import express from "express";
+import { toEmail } from "../utils/inputSanitizer.js";
 import bcrypt  from "../utils/passwordHash.js";
 import mongoose from "mongoose";
 import crypto  from "crypto";
@@ -26,6 +27,7 @@ import { paymentSchema }  from "../schemas/paymentSchema.js";
 import { assignmentSchema } from "../schemas/assignmentSchema.js";
 import { parsePagination, DIRECTORY_MAX } from "../utils/pagination.js";
 import logger from "../utils/logger.js";
+import { emailPaymentReceipt } from "../utils/progressEmails.js";
 import { sharedSnapshot } from "../utils/sharedSnapshot.js";
 import { effectiveStreak } from "../utils/streakService.js";
 import { sendJoinReminder, currentClassFor, ReminderError } from "../utils/joinReminder.js";
@@ -161,7 +163,7 @@ router.post("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
     if (planError) return forbidden(res, planError);
 
     const Student  = getStudent(req.db);
-    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedEmail = toEmail(email);
 
     const emailConflict = await findEmailConflict(req.db, normalizedEmail);
     if (emailConflict) return badRequest(res, emailConflict);
@@ -207,8 +209,8 @@ router.post("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
       student: { ...student.toObject(), password: undefined, inviteToken: undefined },
     });
   } catch (err) {
-    logger.error(err);
-    serverError(res, "Error creating student");
+    if (err.statusCode !== 400) logger.error(err);
+    serverError(res, "Error creating student", err);
   }
 });
 
@@ -401,7 +403,7 @@ router.post("/:id/convert", verifyToken, verifyAdmin, strictLimiter, async (req,
 });
 
 // ─── POST resend invite email ─────────────────────────────────────────────────
-router.post("/:id/resend-invite", verifyToken, verifyAdminOrTeacher, async (req, res) => {
+router.post("/:id/resend-invite", verifyToken, verifyAdminOrTeacher, strictLimiter, async (req, res) => {
   try {
     const Student = getStudent(req.db);
     const student = await Student.findById(req.params.id);
@@ -510,32 +512,6 @@ router.post("/setup-account", strictLimiter, async (req, res) => {
   } catch (err) {
     logger.error(err);
     serverError(res, "Error setting up account");
-  }
-});
-
-// ─── POST resend-invite ───────────────────────────────────────────────────────
-router.post("/:id/resend-invite", verifyToken, verifyAdmin, strictLimiter, async (req, res) => {
-  try {
-    const Student = getStudent(req.db);
-    const student = await Student.findById(req.params.id);
-    if (!student) return notFound(res, "Student not found");
-    if (student.isManaged) return badRequest(res, MANAGED_NO_LOGIN_MSG);
-    if (student.status !== "pending") return badRequest(res, "Student has already set up their account");
-
-    const inviteToken   = crypto.randomBytes(32).toString("hex");
-    const inviteExpires = new Date(Date.now() + 48 * 60 * 60 * 1000);
-    student.inviteToken   = inviteToken;
-    student.inviteExpires = inviteExpires;
-    await student.save();
-
-    const { baseUrl, needsSlug } = getCenterBaseUrl(req.center);
-    const setupUrl = `${baseUrl}/student/setup?token=${inviteToken}${needsSlug ? `&center=${req.center.slug}` : ""}`;
-    await sendStudentInviteEmail(student, setupUrl, req.center?.centerName || "");
-
-    res.json({ message: "Invite resent successfully" });
-  } catch (err) {
-    logger.error(err);
-    serverError(res, "Error resending invite");
   }
 });
 
@@ -713,6 +689,8 @@ router.post("/:id/payment", verifyToken, verifyAdmin, async (req, res) => {
     });
 
     res.json({ message: "Payment recorded", student, payment });
+    // Receipt (not for failed payments)
+    if (status !== "failed") emailPaymentReceipt(req.db, req.center, { studentId: student._id, amount, count: classes, method, pending: !paid });
   } catch (err) {
     logger.error("Payment error:", { error: err?.message });
     serverError(res, "Error recording payment");

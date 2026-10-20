@@ -12,6 +12,7 @@ import { classroomSessionSchema }   from "../schemas/classroomSessionSchema.js";
 import { recordActivity, recordClassCompletion } from "../utils/streakService.js";
 import { chargeClassCredit, adjustTeacherEarnings, toMoney, recordPendingPayment, rollbackPendingPayment } from "../utils/classPayment.js";
 import logger from "../utils/logger.js";
+import { awardMilestonesAndNotify } from "../utils/progressEmails.js";
 
 const __filename   = fileURLToPath(import.meta.url);
 const __dirname    = path.dirname(__filename);
@@ -270,9 +271,13 @@ export async function completeClass(db, bookingId, markedBy = "system", options 
     recordActivity(db, sid).catch((e) => logger.error("[Streak] recordActivity error:", { error: e?.message }));
     recordClassCompletion(db, sid).catch((e) => logger.error("[Streak] recordClassCompletion error:", { error: e?.message }));
 
+    // Milestone certificates (+ their emails) — every completion path comes through here
+    const newCertificates = await awardMilestonesAndNotify(db, studentId);
+
     return {
       success:                 true,
       completed:               true,
+      newCertificates,
       missed:                  false,
       attendance,
       booking:                 await Booking.findById(bookingId).lean(),

@@ -22,6 +22,7 @@ import {
 import { recordActivity } from "../utils/streakService.js";
 import { readPaging, pageMeta, statusCounts, oid, todoFirstIds, inOrder } from "../utils/paging.js";
 import logger from "../utils/logger.js";
+import { emailHomeworkGraded } from "../utils/progressEmails.js";
 import { badRequest, forbidden, notFound, serverError } from '../utils/apiResponse.js';
 import { toStr, toObjectId } from '../utils/inputSanitizer.js';
 import { wrapUpload } from '../middleware/validateObjectId.js';
@@ -214,7 +215,7 @@ router.post("/link/:token/unlock", loginLimiter, async (req, res) => {
   } catch (err) {
     if (err.statusCode === 400) return badRequest(res, err.message);
     logger.error("Homework link unlock error:", { error: err?.message });
-    serverError(res);
+    serverError(res, undefined, err);
   }
 });
 
@@ -226,7 +227,7 @@ router.get("/link/:token", async (req, res) => {
     res.json({ success: true, homework: linkView(found.hw, found.expiresAt, req.center?.centerName) });
   } catch (err) {
     logger.error("Homework link view error:", { error: err?.message });
-    serverError(res);
+    serverError(res, undefined, err);
   }
 });
 
@@ -271,7 +272,7 @@ router.get("/link/:token/file/:type/:fileId", async (req, res) => {
     res.sendFile(filePath);
   } catch (err) {
     logger.error("Homework link file error:", { error: err?.message });
-    serverError(res);
+    serverError(res, undefined, err);
   }
 });
 
@@ -318,7 +319,7 @@ router.post("/link/:token/submit", uploadLimiter, async (req, res, next) => {
     next();
   } catch (err) {
     logger.error("Homework link submit pre-check error:", { error: err?.message });
-    serverError(res);
+    serverError(res, undefined, err);
   }
 }, wrapUpload(uploadLinkSubmission.fields([{ name: "files", maxCount: MAX_FILES }, { name: "audio", maxCount: 1 }])), async (req, res) => {
   try {
@@ -348,7 +349,7 @@ router.post("/link/:token/submit", uploadLimiter, async (req, res, next) => {
     res.json({ success: true, homework: linkView(hw, linkExpiresAt(hw.dueDate, req.center?.timezone), req.center?.centerName) });
   } catch (err) {
     logger.error("Homework link submit error:", { error: err?.message });
-    serverError(res);
+    serverError(res, undefined, err);
   }
 });
 
@@ -383,7 +384,7 @@ router.post("/:id/share-link", verifyToken, validateObjectId("id"), async (req, 
     res.json({ success: true, homework: withShareInfo(hw, req.center) });
   } catch (err) {
     logger.error("Create share link error:", { error: err?.message });
-    serverError(res);
+    serverError(res, undefined, err);
   }
 });
 
@@ -395,7 +396,7 @@ router.delete("/:id/share-link", verifyToken, validateObjectId("id"), async (req
     res.json({ success: true, message: "Link deleted — it no longer works." });
   } catch (err) {
     logger.error("Delete share link error:", { error: err?.message });
-    serverError(res);
+    serverError(res, undefined, err);
   }
 });
 
@@ -592,6 +593,7 @@ router.post("/:id/grade", verifyToken, validateObjectId("id"), async (req, res) 
     await hw.save();
 
     res.json({ success: true, homework: hw });
+    emailHomeworkGraded(req.db, req.center, hw._id); // student / family / parents
   } catch (err) {
     serverError(res, undefined, err);
   }

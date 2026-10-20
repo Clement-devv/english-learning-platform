@@ -1,5 +1,6 @@
 // server/routes/assignmentRoutes.js
 import express from "express";
+import { validateObjectId } from "../middleware/validateObjectId.js";
 import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
 import { verifyToken, verifyAdmin } from "../middleware/authMiddleware.js";
 import { assignmentSchema } from "../schemas/assignmentSchema.js";
@@ -110,7 +111,7 @@ router.post("/", async (req, res) => {
 });
 
 // Delete assignment
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", validateObjectId("id"), async (req, res) => {
   try {
     const Assignment = getAssignment(req.db);
     const assignment = await Assignment.findByIdAndDelete(req.params.id);

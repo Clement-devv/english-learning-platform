@@ -30,6 +30,7 @@ import { LINK_DAYS } from "../utils/parentCheck.js";
 import { sendEmail, getCenterBaseUrl } from "../utils/emailService.js";
 import { toStr } from "../utils/inputSanitizer.js";
 import logger from "../utils/logger.js";
+import { awardMilestonesAndNotify } from "../utils/progressEmails.js";
 
 const PAGE_SIZE = 20;
 import { badRequest, forbidden, notFound, conflict, serverError } from "../utils/apiResponse.js";
@@ -162,7 +163,7 @@ router.post("/", verifyToken, async (req, res) => {
   } catch (err) {
     if (err.statusCode === 400) return badRequest(res, err.message);
     logger.error("Log offline class error:", { error: err?.message });
-    serverError(res);
+    serverError(res, undefined, err);
   }
 });
 
@@ -222,11 +223,26 @@ router.get("/", verifyToken, verifyAdminOrSubAdmin("canViewLoggedClasses"), asyn
     });
   } catch (err) {
     logger.error("Offline classes list error:", { error: err?.message });
-    serverError(res);
+    serverError(res, undefined, err);
   }
 });
 
 // Approving pays the teacher and uses one of the student's classes — a separate sub-admin permission
+// Tell the teacher whether the class they logged was approved (and paid) or not
+function emailTeacherDecision(req, booking, { approved, note }) {
+  getTeacher(req.db).findById(booking.teacherId).select("firstName email").lean().then((t) => {
+    if (!t?.email) return;
+    const { baseUrl } = getCenterBaseUrl(req.center);
+    return sendEmail({
+      centerName: req.center?.centerName, to: t.email,
+      subject: `Logged class ${approved ? "approved" : "not approved"} — ${booking.classTitle}`,
+      html: `<p>Hi ${esc(t.firstName)}, the class you logged on ${esc(new Date(booking.scheduledTime).toUTCString())} (<strong>${esc(booking.classTitle)}</strong>) was <strong>${approved ? "approved — you are paid for it" : "not approved — nothing is paid for it"}</strong>.</p>
+${note ? `<p><strong>School's note:</strong> ${esc(note)}</p>` : ""}
+<p>See it in <a href="${baseUrl}/teacher/dashboard">your dashboard</a>.</p>`,
+    });
+  }).catch((e) => logger.warn("Logged class decision email failed:", { error: e?.message }));
+}
+
 router.post("/:id/approve", verifyToken, verifyAdminOrSubAdmin(["canViewLoggedClasses", "canApproveLoggedClasses"]), validateObjectId("id"), async (req, res) => {
   const Booking = getBooking(req.db);
   let claimed = null;
@@ -270,12 +286,14 @@ router.post("/:id/approve", verifyToken, verifyAdminOrSubAdmin(["canViewLoggedCl
     });
 
     res.json({ success: true, message: `Approved — teacher paid ${earned}`, earned });
+    emailTeacherDecision(req, current, { approved: true, note });
+    awardMilestonesAndNotify(req.db, current.studentId?._id || current.studentId, req.center);
   } catch (err) {
     // Release the claim so it can be retried
     if (claimed) await Booking.updateOne({ _id: claimed._id, "offline.approval.status": "processing" }, { $set: { "offline.approval.status": "pending" } }).catch(() => {});
     if (err.statusCode === 400) return badRequest(res, err.message);
     logger.error("Approve offline class error:", { error: err?.message });
-    serverError(res);
+    serverError(res, undefined, err);
   }
 });
 
@@ -303,10 +321,11 @@ router.post("/:id/reject", verifyToken, verifyAdminOrSubAdmin(["canViewLoggedCla
       } });
     }
     res.json({ success: true, message: "Rejected — nothing was charged or paid" });
+    emailTeacherDecision(req, updated, { approved: false, note: reason });
   } catch (err) {
     if (err.statusCode === 400) return badRequest(res, err.message);
     logger.error("Reject offline class error:", { error: err?.message });
-    serverError(res);
+    serverError(res, undefined, err);
   }
 });
 

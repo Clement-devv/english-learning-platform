@@ -3,7 +3,10 @@
 // Register with: app.use("/api/admin/lessons", adminLessonRoutes)
 
 import express from "express";
+import mongoose from "mongoose";
 import { verifyToken, verifyAdmin } from "../middleware/authMiddleware.js";
+import { esc } from "../emails/layout.js";
+import { isManagedEmail } from "../utils/managedStudent.js";
 import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
 import { sendEmail } from "../utils/emailService.js";
 import { sendLessonMarkedEmails as sendMarked, sendLessonUnmarkedEmails as sendUnmarked } from "../emails/lessonEmails.js";
@@ -14,8 +17,10 @@ import { studentSchema }            from "../schemas/studentSchema.js";
 import { assignmentSchema }         from "../schemas/assignmentSchema.js";
 import { parentSchema }             from "../schemas/parentSchema.js";
 import logger from "../utils/logger.js";
+import { awardMilestonesAndNotify } from "../utils/progressEmails.js";
 import { badRequest, notFound, serverError } from '../utils/apiResponse.js';
 import { reverseCompletedClass } from "../utils/classReversal.js";
+import { reinstateUnmarkedClass } from "../utils/classPayment.js";
 
 const router = express.Router();
 router.use(tenantMiddleware);
@@ -140,6 +145,16 @@ router.post("/mark", verifyToken, verifyAdmin, async (req, res) => {
   }
 
   try {
+    if (!mongoose.isValidObjectId(bookingId)) return badRequest(res, "Invalid bookingId");
+
+    // An admin-un-marked class (completed + adminRejected) can be marked again
+    getBooking(req.db);
+    const reinstated = await reinstateUnmarkedClass(req.db, bookingId, "admin");
+    if (reinstated) {
+      awardMilestonesAndNotify(req.db, reinstated.studentId, req.center);
+      return res.json({ success: true, message: "Lesson marked as completed.", studentClassesRemaining: reinstated.student?.classCredits ?? null, teacherEarnedThisClass: reinstated.earned });
+    }
+
     const result = await completeClass(req.db, bookingId, "admin", { skipAttendanceCheck: true });
 
     if (result.alreadyProcessed) {
@@ -287,6 +302,10 @@ router.post('/broadcast', verifyToken, verifyAdmin, async (req, res) => {
     const db         = req.db;
     const centerName = req.center?.centerName || 'Your School';
     const recipients = [];
+    // "Specific" picks: ignore anything that isn't an id (a bad one made the query throw)
+    for (const group of ['teachers', 'students', 'parents']) {
+      if (Array.isArray(targets[group]?.ids)) targets[group].ids = targets[group].ids.filter((id) => mongoose.isValidObjectId(id));
+    }
 
     if (targets.teachers) {
       const query = targets.teachers.mode === 'specific' && targets.teachers.ids?.length
@@ -304,7 +323,8 @@ router.post('/broadcast', verifyToken, verifyAdmin, async (req, res) => {
         : { active: true };
       const list = await getStudent(db).find(query).select('firstName lastName email').lean();
       for (const s of list) {
-        if (s.email) recipients.push({ email: s.email, name: `${s.firstName || ''} ${s.lastName || ''}`.trim() || 'Student' });
+        // Managed students only have a placeholder login address
+        if (s.email && !isManagedEmail(s.email)) recipients.push({ email: s.email, name: `${s.firstName || ''} ${s.lastName || ''}`.trim() || 'Student' });
       }
     }
 
@@ -323,22 +343,28 @@ router.post('/broadcast', verifyToken, verifyAdmin, async (req, res) => {
 
     let sent = 0, failed = 0;
 
-    await Promise.all(recipients.map(async (r) => {
-      try {
-        await sendEmail({
-          centerName,
-          to:      r.email,
-          subject: subject.trim(),
-          html: `
-            <p>Dear <strong>${r.name}</strong>,</p>
-            <div style="white-space:pre-line">${message.trim()}</div>
-            <br/>
-            <p>— The ${centerName} Team</p>
-          `,
-        });
-        sent++;
-      } catch { failed++; }
-    }));
+    // A few at a time — firing every email at once opens one SMTP connection per
+    // recipient, which providers throttle or reject for a large center.
+    // Text is escaped: it is shown as written, never as HTML.
+    const BATCH = 5;
+    for (let i = 0; i < recipients.length; i += BATCH) {
+      await Promise.all(recipients.slice(i, i + BATCH).map(async (r) => {
+        try {
+          const result = await sendEmail({
+            centerName,
+            to:      r.email,
+            subject: subject.trim(),
+            html: `
+              <p>Dear <strong>${esc(r.name)}</strong>,</p>
+              <div style="white-space:pre-line">${esc(message.trim())}</div>
+              <br/>
+              <p>— The ${esc(centerName)} Team</p>
+            `,
+          });
+          if (result?.success === false) failed++; else sent++;
+        } catch { failed++; }
+      }));
+    }
 
     res.json({ success: true, sent, failed, total: recipients.length });
   } catch (err) {

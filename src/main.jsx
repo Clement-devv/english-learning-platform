@@ -7,6 +7,9 @@ import './i18n/i18n.js';
 import { fetchBranding, applyBranding, setCachedBranding, loadStoredBranding, storeBranding } from './utils/branding.js';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import { installClientErrorReporting } from './utils/reportClientError.js';
+import { installSafeWindowOpen } from './utils/safeWindowOpen.js';
+
+installSafeWindowOpen(); // no javascript:/data: links from the database (utils/safeWindowOpen.js)
 
 // ── Handle impersonation hand-off ────────────────────────────────────────────
 // Super admin "Enter as Admin" opens a new tab with #imp_token=xxx&imp_center=slug.

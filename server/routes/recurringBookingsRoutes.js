@@ -1,5 +1,6 @@
 // server/routes/recurringBookingsRoutes.js
 import express from "express";
+import { validateObjectId } from "../middleware/validateObjectId.js";
 import { verifyToken, verifyAdmin, verifyAdminOrTeacher } from "../middleware/authMiddleware.js";
 import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
 import { sendBookingRequestToTeacher } from "../utils/emailService.js";
@@ -392,7 +393,7 @@ router.get("/", verifyToken, verifyAdminOrTeacher, async (req, res) => {
  * GET /api/recurring-bookings/:id
  * Get specific recurring pattern with all bookings
  */
-router.get("/:id", verifyToken, async (req, res) => {
+router.get("/:id", validateObjectId("id"), verifyToken, async (req, res) => {
   try {
     getTeacher(req.db); getStudent(req.db); getBooking(req.db);
     const pattern = await getRecurringPattern(req.db).findById(req.params.id)
@@ -422,7 +423,7 @@ router.get("/:id", verifyToken, async (req, res) => {
  * PATCH /api/recurring-bookings/:id/cancel
  * Cancel recurring pattern and all future bookings
  */
-router.patch("/:id/cancel", verifyToken, verifyAdminOrTeacher, async (req, res) => {
+router.patch("/:id/cancel", validateObjectId("id"), verifyToken, verifyAdminOrTeacher, async (req, res) => {
   try {
     const { cancelFuture = true, reason } = req.body;
 
@@ -506,7 +507,7 @@ router.patch("/:id/cancel", verifyToken, verifyAdminOrTeacher, async (req, res) 
  * DELETE /api/recurring-bookings/:id
  * Delete recurring pattern and all associated bookings (Admin only)
  */
-router.delete("/:id", verifyToken, verifyAdmin, async (req, res) => {
+router.delete("/:id", validateObjectId("id"), verifyToken, verifyAdmin, async (req, res) => {
   try {
     const pattern = await getRecurringPattern(req.db).findById(req.params.id);
 

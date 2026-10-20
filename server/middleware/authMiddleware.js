@@ -61,15 +61,31 @@ export async function isTokenBlacklisted(token) {
 
 // ─── Impersonation whitelist check ───────────────────────────────────────────
 // Returns true if the token is still whitelisted in Redis (not revoked).
-// Falls back to true when Redis is unavailable — the 10m expiry is the safety net.
+// Without Redis, "End impersonation" records the time on this process
+// (revokeImpersonationLocally) and tokens issued up to then stop working —
+// before, nothing could revoke them and they lasted the full 10 minutes.
+const impersonationRevokedAt = new Map(); // centerId → unix seconds
+
+export function revokeImpersonationLocally(centerId) {
+  impersonationRevokedAt.set(centerId, Math.floor(Date.now() / 1000));
+}
+
+function revokedLocally(authHeader, centerId) {
+  const revokedAt = impersonationRevokedAt.get(centerId);
+  if (!revokedAt) return false;
+  const iat = jwt.decode(authHeader?.split(' ')[1] || '')?.iat;
+  return !iat || iat <= revokedAt;
+}
+
 export async function isImpersonationActive(authHeader, centerId) {
+  if (revokedLocally(authHeader, centerId)) return false;
   if (!redisClient) return true;
   try {
     const sig = authHeader?.split(' ')[1]?.split('.')[2];
     const stored = await redisClient.get(`impers:${centerId}`);
     return stored === sig;
   } catch (_) {
-    return true; // Redis unavailable — rely on short token lifetime
+    return true; // Redis unavailable — local revocation above + the 10m expiry
   }
 }
 

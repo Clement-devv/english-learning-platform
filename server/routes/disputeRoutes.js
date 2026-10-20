@@ -6,10 +6,13 @@ import { bookingSchema }            from "../schemas/bookingSchema.js";
 import { studentSchema }            from "../schemas/studentSchema.js";
 import { teacherSchema }            from "../schemas/teacherSchema.js";
 import logger from "../utils/logger.js";
+import { awardMilestonesAndNotify } from "../utils/progressEmails.js";
 import { badRequest, forbidden, notFound, serverError } from '../utils/apiResponse.js';
 import { reverseCompletedClass } from "../utils/classReversal.js";
 import { recordOutcomeChange } from "../utils/classOutcome.js";
 import { payForCompletedClass } from "../utils/classPayment.js";
+import { sendEmail, getCenterBaseUrl } from "../utils/emailService.js";
+import { esc } from "../emails/layout.js";
 
 const router = express.Router();
 router.use(tenantMiddleware);
@@ -143,7 +146,7 @@ router.patch("/:bookingId/resolve", verifyToken, verifyAdmin, async (req, res) =
       { $set: { disputeStatus: finalStatus } },
       { new: true },
     )
-      .populate("teacherId", "firstName lastName")
+      .populate("teacherId", "firstName lastName email")
       .populate("studentId", "firstName lastName classCredits");
 
     if (!booking) {
@@ -227,6 +230,25 @@ router.patch("/:bookingId/resolve", verifyToken, verifyAdmin, async (req, res) =
     logger.info(`✅ Dispute resolved (${resolution}) for booking ${booking._id}`);
 
     res.json({ success: true, message: msg, booking });
+
+    if (resolution === "approve_teacher") awardMilestonesAndNotify(req.db, booking.studentId?._id || booking.studentId, req.center);
+
+    // Tell the teacher how it ended — their pay for the class depends on it
+    if (booking.teacherId?.email) {
+      const won = resolution === "approve_teacher";
+      const { baseUrl } = getCenterBaseUrl(req.center);
+      sendEmail({
+        centerName: req.center?.centerName,
+        to: booking.teacherId.email,
+        subject: `Dispute ${won ? "resolved in your favour" : "upheld"} — ${booking.classTitle}`,
+        html: `<p>Hi ${esc(booking.teacherId.firstName)}, the school has reviewed the dispute about this class:</p>
+<ul><li><strong>Student:</strong> ${esc(booking.studentId?.firstName)} ${esc(booking.studentId?.lastName)}</li>
+<li><strong>Class:</strong> ${esc(booking.classTitle)} — ${esc(new Date(booking.scheduledTime).toUTCString())}</li></ul>
+<p><strong>Decision:</strong> ${won ? "the class counts — you are paid for it." : "the class does not count — any pay for it has been deducted."}</p>
+${adminNotes ? `<p><strong>School's note:</strong> ${esc(adminNotes)}</p>` : ""}
+<p>See it in <a href="${baseUrl}/teacher/dashboard">Completed classes</a>.</p>`,
+      }).catch((e) => logger.warn("Dispute resolution email failed:", { error: e?.message }));
+    }
   } catch (err) {
     if (claimedId && !moneyMoved) {
       // Nothing was charged or paid yet — reopen so the admin can try again

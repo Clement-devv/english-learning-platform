@@ -4,7 +4,7 @@ import { verifyToken, verifyAdmin } from "../middleware/authMiddleware.js";
 import { subAdminNeeds, isSubAdmin, inScope, scopedStudentIds } from "../middleware/staffAccess.js";
 import {
   sendBookingRequestToTeacher, sendBookingAcceptedToStudent,
-  sendBookingRejectedToStudent, sendBookingCreatedToStudent,
+  sendBookingRejectedToStudent, sendBookingCreatedToStudent, sendClassCancelledEmail,
   sendClassCompletedNotification,
 } from "../utils/emailService.js";
 import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
@@ -12,12 +12,11 @@ import { bookingSchema }            from "../schemas/bookingSchema.js";
 import { teacherSchema }            from "../schemas/teacherSchema.js";
 import { studentSchema }            from "../schemas/studentSchema.js";
 import { teacherAvailabilitySchema } from "../schemas/teacherAvailabilitySchema.js";
-import { freeIntervals, teacherTz, bookingInterval, BUSY_STATUSES } from "../utils/schedule.js";
+import { freeIntervals, teacherTz, bookingInterval, BUSY_STATUSES, findTeacherClash } from "../utils/schedule.js";
 import { notifyAdmins } from "../utils/adminNotify.js";
 import { sendJoinReminder, ReminderError } from "../utils/joinReminder.js";
 import logger from "../utils/logger.js";
 import { badRequest, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
-import { checkAndAwardCertificates } from './certificateRoutes.js';
 import { validateObjectId } from '../middleware/validateObjectId.js';
 import { parsePagination } from '../utils/pagination.js';
 import { toStr, toObjectId } from '../utils/inputSanitizer.js';
@@ -91,6 +90,13 @@ router.post("/", verifyToken, subAdminNeeds("canCreateBookings"), async (req, re
       return forbidden(res, "You are not authorized to create bookings with this role");
     if (!scheduledTime)
       return badRequest(res, "scheduledTime is required");
+    const start = new Date(scheduledTime);
+    const mins  = duration == null || duration === "" ? 60 : Number(duration);
+    if (isNaN(start)) return badRequest(res, "scheduledTime is invalid");
+    if (!Number.isFinite(mins) || mins < 15 || mins > 180) return badRequest(res, "Duration must be 15–180 minutes");
+    // A few minutes' grace for "starting now"; classes that already happened are
+    // recorded through Logged classes, not booked
+    if (start.getTime() < Date.now() - 5 * 60000) return badRequest(res, "Please pick a time in the future");
 
     const [teacher, student] = await Promise.all([
       getTeacher(req.db).findById(teacherId),
@@ -106,10 +112,13 @@ router.post("/", verifyToken, subAdminNeeds("canCreateBookings"), async (req, re
     const initialStatus = createdBy === "admin" ? "pending" : "accepted";
     const Booking = getBooking(req.db);
 
+    const clash = await findTeacherClash(Booking, { teacherId, start, mins, classTitle });
+    if (clash) return conflict(res, `${teacher.firstName} already has a class then ("${clash.classTitle}") — pick another time`);
+
     const booking = await Booking.create({
       teacherId, studentId, classTitle,
-      topic: topic || "", scheduledTime: new Date(scheduledTime),
-      duration: duration || 60, notes: notes || "",
+      topic: topic || "", scheduledTime: start,
+      duration: mins, notes: notes || "",
       status: initialStatus, createdBy,
       isTrial,
       createdByUserId: req.user.id,
@@ -148,7 +157,7 @@ router.post("/", verifyToken, subAdminNeeds("canCreateBookings"), async (req, re
     });
   } catch (err) {
     logger.error("Error creating booking:", { error: err?.message });
-    serverError(res, "Error creating booking");
+    serverError(res, "Error creating booking", err);
   }
 });
 
@@ -179,7 +188,7 @@ router.patch("/:id/student-confirm", verifyToken, validateObjectId("id"), async 
     res.json({ success: true, message: "Thanks for confirming!" });
   } catch (err) {
     logger.error("Student confirm error:", { error: err?.message });
-    serverError(res);
+    serverError(res, undefined, err);
   }
 });
 
@@ -221,7 +230,7 @@ router.patch("/:id/dispute", verifyToken, validateObjectId("id"), async (req, re
   } catch (err) {
     if (err.statusCode === 400) return badRequest(res, err.message);
     logger.error("Student dispute error:", { error: err?.message });
-    serverError(res);
+    serverError(res, undefined, err);
   }
 });
 
@@ -245,6 +254,12 @@ router.patch("/:id/accept", verifyToken, validateObjectId("id"), async (req, res
     // free for the student while the teacher is still paid
     if (!booking.isTrial && (booking.studentId?.classCredits || 0) <= 0)
       return badRequest(res, `${booking.studentId?.firstName || "The student"} has no classes left — they need to buy more before this class can be accepted.`);
+    // Other pending requests compete for the slot; an accepted class owns it
+    const clash = await findTeacherClash(Booking, {
+      teacherId: booking.teacherId._id, start: booking.scheduledTime, mins: booking.duration || 60,
+      statuses: ["accepted", "in-progress", "scheduled"], excludeId: booking._id, classTitle: booking.classTitle,
+    });
+    if (clash) return conflict(res, `This overlaps another class already accepted ("${clash.classTitle}"). Reject one of them, or move this class.`);
 
     const acceptedAt = new Date();
     const claimed = await Booking.updateOne({ _id: booking._id, status: "pending" }, { $set: { status: "accepted", acceptedAt } });
@@ -295,7 +310,7 @@ router.post("/:id/join-reminder", verifyToken, validateObjectId("id"), async (re
   } catch (err) {
     if (err instanceof ReminderError) return res.status(err.status).json({ success: false, message: err.message });
     logger.error("Join reminder error:", { error: err?.message });
-    serverError(res, "Could not send the reminder");
+    serverError(res, "Could not send the reminder", err);
   }
 });
 
@@ -388,10 +403,8 @@ router.patch("/:id/complete", verifyToken, verifyAdmin, validateObjectId("id"), 
     try { await sendClassCompletedNotification(booking.teacherId, booking.studentId, booking, req.center?.centerName || "", req.center); }
     catch (e) { logger.error("Email notification failed:", { error: e?.message }); }
 
-    // Auto-award certificates for milestones reached
-    const newCerts = await checkAndAwardCertificates(
-      req.db, booking.studentId._id, req.center?.slug, req.center?._id
-    );
+    // Milestone certificates were awarded (and emailed) by completeClass
+    const newCerts = result.newCertificates || [];
 
     // Push real-time update + device notification to student
     try {
@@ -427,7 +440,7 @@ router.patch("/:id/complete", verifyToken, verifyAdmin, validateObjectId("id"), 
     });
   } catch (err) {
     logger.error("Error completing booking:", { error: err?.message });
-    serverError(res, "Error completing booking");
+    serverError(res, "Error completing booking", err);
   }
 });
 
@@ -457,7 +470,7 @@ router.get("/", verifyToken, verifyAdmin, async (req, res) => {
     res.json({ success: true, bookings, total, limit, skip, ...(active ? { acceptedTotal } : {}) });
   } catch (err) {
     logger.error("Error fetching bookings:", { error: err?.message });
-    serverError(res, "Error fetching bookings");
+    serverError(res, "Error fetching bookings", err);
   }
 });
 
@@ -498,7 +511,7 @@ router.get("/teacher/:teacherId", verifyToken, async (req, res) => {
     res.json(bookings);
   } catch (err) {
     logger.error("Error fetching teacher bookings:", { error: err?.message });
-    serverError(res, "Error fetching teacher bookings");
+    serverError(res, "Error fetching teacher bookings", err);
   }
 });
 
@@ -564,6 +577,20 @@ router.patch("/:id/cancel", verifyToken, validateObjectId("id"), async (req, res
       .populate("teacherId", "firstName lastName email timezone")
       .populate("studentId", "firstName lastName email isManaged emailLanguage timezone");
     res.json({ success: true, message: "Booking cancelled", booking: populatedBooking });
+
+    // Tell whoever didn't cancel — nobody was told before, so a teacher could wait
+    // for a class the student had cancelled. (Managed students' placeholder
+    // addresses are skipped by sendEmail.)
+    const byRole = role === "teacher" || role === "student" ? role : "admin";
+    const tell = [
+      byRole !== "teacher" && { to: populatedBooking.teacherId, role: "teacher" },
+      byRole !== "student" && { to: populatedBooking.studentId, role: "student" },
+    ].filter((x) => x && x.to?.email);
+    for (const t of tell) {
+      sendClassCancelledEmail({ ...t, byRole, booking: populatedBooking, reason: typeof reason === "string" ? reason.slice(0, 500) : "",
+        centerName: req.center?.centerName || "", center: req.center })
+        .catch((e) => logger.warn("Class cancelled email failed:", { error: e?.message }));
+    }
   } catch (err) {
     logger.error("Error cancelling booking:", { error: err?.message });
     res.status(500).json({ success: false, message: "Error cancelling booking" });
@@ -669,7 +696,7 @@ router.post("/student-request", verifyToken, async (req, res) => {
     });
   } catch (err) {
     logger.error("Error creating student booking request:", { error: err?.message });
-    serverError(res, "Error creating booking request");
+    serverError(res, "Error creating booking request", err);
   }
 });
 

@@ -76,4 +76,14 @@ describe('super-admin sign-in', () => {
 
     expect((await post('/login/verify', { pendingToken: body.pendingToken, code })).status).toBe(401)
   })
+
+  it('an account saved without `active` (scripts/createSuperAdmin.js) can sign in; a deactivated one cannot', async () => {
+    await SuperAdmin.collection.updateOne({ email: EMAIL }, { $unset: { active: 1, loginCode: 1 } })
+    let { body } = await post('/login', { email: EMAIL, password: PASSWORD })
+    expect((await post('/login/verify', { pendingToken: body.pendingToken, code: lastCode() })).status).toBe(200)
+
+    await SuperAdmin.updateOne({ email: EMAIL }, { $set: { active: false } })
+    expect((await post('/login', { email: EMAIL, password: PASSWORD })).status).toBe(401)
+    await SuperAdmin.updateOne({ email: EMAIL }, { $set: { active: true } })
+  })
 })

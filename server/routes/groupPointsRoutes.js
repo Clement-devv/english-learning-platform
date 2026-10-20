@@ -14,6 +14,7 @@ import { addPoints, getGroupPointsLedger } from "../utils/groupPoints.js";
 import { toStr } from "../utils/inputSanitizer.js";
 import { badRequest, forbidden, notFound, serverError } from "../utils/apiResponse.js";
 import logger from "../utils/logger.js";
+import { emailPaymentReceipt } from "../utils/progressEmails.js";
 
 const router = express.Router();
 router.use(tenantMiddleware);
@@ -46,10 +47,11 @@ router.post("/students/:id/sell", verifyToken, verifyAdmin, validateObjectId("id
     });
     if (balance === null) return notFound(res, "Student not found");
     res.json({ success: true, balance, message: `${points} group point${points === 1 ? "" : "s"} added` });
+    if (amountPaid > 0) emailPaymentReceipt(req.db, req.center, { studentId: req.params.id, amount: amountPaid, count: points, kind: "points", method }); // receipt
   } catch (err) {
     if (err.statusCode === 400) return badRequest(res, err.message);
     logger.error("Sell group points error:", { error: err?.message });
-    serverError(res);
+    serverError(res, undefined, err);
   }
 });
 
@@ -62,7 +64,7 @@ router.get("/students/:id", verifyToken, verifyAdminOrSubAdmin("canManageGroupCl
     res.json({ success: true, ...data });
   } catch (err) {
     logger.error("Group points history error:", { error: err?.message });
-    serverError(res);
+    serverError(res, undefined, err);
   }
 });
 
@@ -74,7 +76,7 @@ router.get("/me", verifyToken, async (req, res) => {
     res.json({ success: true, balance: data.balance, history: data.history });
   } catch (err) {
     logger.error("My group points error:", { error: err?.message });
-    serverError(res);
+    serverError(res, undefined, err);
   }
 });
 

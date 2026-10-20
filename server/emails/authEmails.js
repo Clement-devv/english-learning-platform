@@ -354,6 +354,52 @@ export const sendNewDeviceSignInEmail = async ({ email, name, role, center, cent
   });
 };
 
+// ── Password changed (all roles) ────────────────────────────────────────────────
+// Sent after the user changes or resets their own password, so a takeover is noticed.
+const PASSWORD_CHANGED = {
+  en: {
+    subject: (c) => `Your ${c} password was changed`, eyebrow: "Security notice", title: "Your password was changed",
+    intro: (n, c) => `Hi ${n}, the password for your ${c} account was just changed.`,
+    labels: ["When", "IP address"], none: "Not available",
+    ok: "<strong>Was this you?</strong> Then you don't need to do anything. Your other devices have been signed out.",
+    notYou: "<strong>Not you?</strong> Reset your password straight away with “Forgot password” on the sign-in page, and tell your school.",
+    cta: "Go to sign in",
+  },
+  vi: {
+    subject: (c) => `Mật khẩu tài khoản ${c} của em đã được thay đổi`, eyebrow: "Thông báo bảo mật", title: "Mật khẩu của em đã được thay đổi",
+    intro: (n, c) => `Chào ${n}, mật khẩu tài khoản ${c} của em vừa được thay đổi.`,
+    labels: ["Thời gian", "Địa chỉ IP"], none: "Không có",
+    ok: "<strong>Đó là em?</strong> Vậy em không cần làm gì cả. Các thiết bị khác đã được đăng xuất.",
+    notYou: "<strong>Không phải em?</strong> Hãy đặt lại mật khẩu ngay bằng “Quên mật khẩu” ở trang đăng nhập, và báo cho trung tâm.",
+    cta: "Đăng nhập",
+  },
+};
+export const sendPasswordChangedEmail = async ({ email, name, role, center, centerName = "", ipAddress, when = new Date(), lang = "en", tz }) => {
+  const b = brandOf(center, centerName);
+  const l = role === "student" ? langOf({ emailLanguage: lang }) : "en";
+  const s = pick(PASSWORD_CHANGED, l);
+  const ip = ipAddress && ipAddress !== "Unknown" ? ipAddress : s.none;
+  return sendEmail({
+    centerName: b.centerName,
+    to: email,
+    subject: s.subject(b.centerName),
+    html: renderEmail({
+      ...b, lang: l, tone: "amber",
+      preheader: s.title,
+      eyebrow: s.eyebrow, title: s.title,
+      body:
+        p(s.intro(esc(name || ""), esc(b.centerName))) +
+        details([
+          [s.labels[0], `${fmtDate(when, l, tz)} · ${fmtTime(when, l, tz)}${tz ? "" : " UTC"}`],
+          [s.labels[1], esc(ip)],
+        ]) +
+        p(s.ok) +
+        callout(s.notYou, "amber"),
+      cta: { label: s.cta, href: `${b.baseUrl}${LOGIN_PATHS[role] || "/"}`, tone: "amber" },
+    }),
+  });
+};
+
 // ── Analytics PIN (admins, English) ─────────────────────────────────────────────
 /** 6-digit code that must be entered to set, change, reset or remove the PIN */
 export const sendAnalyticsPinCodeEmail = async ({ email, name, code: pin, action, centerName = "", minutes = 15 }) => {

@@ -4,6 +4,7 @@ import Center from '../models/master/Center.js';
 import { centerEmailInUse, isEmailTakenError } from '../utils/centerEmail.js';
 import { config } from '../config/config.js';
 import { sendEmail } from '../utils/emailService.js';
+import { esc } from '../emails/layout.js';
 import { validateCenterRegistration } from '../middleware/validation.js';
 import logger from "../utils/logger.js";
 import { badRequest, conflict, serverError } from '../utils/apiResponse.js';
@@ -64,7 +65,7 @@ router.post('/', validateCenterRegistration, async (req, res) => {
         subject: `Registration received — ${config.appName}`,
         html: `
           <p>Hi,</p>
-          <p>We received your registration request for <strong>${centerName}</strong>.</p>
+          <p>We received your registration request for <strong>${esc(centerName)}</strong>.</p>
           <p>Your application is currently <strong>pending review</strong>. We'll notify you by email once it has been approved.</p>
           <p>— The ${config.appName} Team</p>
         `,
@@ -82,10 +83,10 @@ router.post('/', validateCenterRegistration, async (req, res) => {
           html: `
             <p>A new center has registered and is awaiting approval.</p>
             <ul>
-              <li><strong>Name:</strong> ${centerName}</li>
-              <li><strong>Slug:</strong> ${slug}</li>
-              <li><strong>Admin email:</strong> ${adminEmail}</li>
-              <li><strong>Country:</strong> ${country || 'N/A'}</li>
+              <li><strong>Name:</strong> ${esc(centerName)}</li>
+              <li><strong>Slug:</strong> ${esc(slug)}</li>
+              <li><strong>Admin email:</strong> ${esc(adminEmail)}</li>
+              <li><strong>Country:</strong> ${esc(country || 'N/A')}</li>
             </ul>
             <p>Log in to the super admin dashboard to review this application.</p>
           `,

@@ -25,10 +25,10 @@ import { getDb } from '../config/dbManager.js';
 import redisClient from '../config/redis.js';
 import { config, JWT_STANDARD_CLAIMS, JWT_VERIFY_OPTIONS } from '../config/config.js';
 import { getCenterSecret } from '../utils/jwtUtils.js';
-import { sendEmail, sendCenterDeletionWarningEmail } from '../utils/emailService.js';
+import { sendEmail, sendCenterDeletionWarningEmail, getCenterBaseUrl } from '../utils/emailService.js';
 import { verifyDomainDns } from '../utils/domainVerifier.js';
 import { createSession, pruneSessionsToLimit } from '../utils/sessionManager.js';
-import { addToLocalBlacklist } from '../middleware/authMiddleware.js';
+import { addToLocalBlacklist, revokeImpersonationLocally } from '../middleware/authMiddleware.js';
 import { invalidateCache } from '../utils/cache.js';
 import {
   validateSuperAdminLogin,
@@ -241,9 +241,11 @@ router.post('/login/verify', loginLimiter, async (req, res) => {
       return unauthorized(res, 'Your sign-in expired. Please enter your password again.');
     }
 
-    // Reserve an attempt atomically so parallel guesses can't exceed the limit
+    // Reserve an attempt atomically so parallel guesses can't exceed the limit.
+    // active: $ne false — accounts saved without the field (scripts/createSuperAdmin.js
+    // before it set one) are active by the schema default, same as the password step.
     const withCode = await SuperAdmin.findOneAndUpdate(
-      { _id: pending.id, active: true, 'loginCode.expiresAt': { $gt: new Date() } },
+      { _id: pending.id, active: { $ne: false }, 'loginCode.expiresAt': { $gt: new Date() } },
       { $inc: { 'loginCode.attempts': 1 } },
       { new: true },
     ).select('+loginCode');
@@ -502,8 +504,8 @@ router.patch('/centers/:id/approve', verifySuperAdmin, strictLimiter, validatePa
         to: center.adminEmail,
         subject: `Your ${config.appName} center is approved!`,
         html: `
-          <p>Congratulations! Your center <strong>${center.centerName}</strong> has been approved.</p>
-          <p>You can now log in to your admin dashboard at: <strong>${config.frontendUrl}</strong></p>
+          <p>Congratulations! Your center <strong>${escHtml(center.centerName)}</strong> has been approved.</p>
+          <p>You can now log in to your admin dashboard at: <a href="${getCenterBaseUrl(center).baseUrl}/admin/login">${getCenterBaseUrl(center).baseUrl}/admin/login</a></p>
           <p>Use your registered email address and the password you set during registration.</p>
           <p>— The ${config.appName} Team</p>
         `,
@@ -546,8 +548,8 @@ router.patch('/centers/:id/reject', verifySuperAdmin, strictLimiter, validateCen
         subject: `Update on your ${config.appName} registration`,
         html: `
           <p>Hi,</p>
-          <p>Unfortunately, we were unable to approve the registration for <strong>${center.centerName}</strong>.</p>
-          ${rejectReason ? `<p><strong>Reason:</strong> ${rejectReason}</p>` : ''}
+          <p>Unfortunately, we were unable to approve the registration for <strong>${escHtml(center.centerName)}</strong>.</p>
+          ${rejectReason ? `<p><strong>Reason:</strong> ${escHtml(rejectReason)}</p>` : ''}
           <p>If you believe this is a mistake, please contact us.</p>
           <p>— The ${config.appName} Team</p>
         `,
@@ -732,6 +734,7 @@ router.post('/impersonate/:slug', verifySuperAdmin, loginLimiter, validateSlugPa
 // DELETE /api/super-admin/impersonate/:slug — revoke an active impersonation session early
 router.delete('/impersonate/:slug', verifySuperAdmin, strictLimiter, validateSlugParam, async (req, res) => {
   try {
+    revokeImpersonationLocally(req.params.slug);
     if (redisClient) {
       try {
         await redisClient.del(`impers:${req.params.slug}`);
@@ -1509,7 +1512,7 @@ router.patch('/centers/:id/restore', verifySuperAdmin, strictLimiter, validatePa
         subject: `✅ Your ${config.appName} center has been restored`,
         html: `
           <p>Hi,</p>
-          <p>Great news! Your center <strong>${center.centerName}</strong> has been restored and is now active again.</p>
+          <p>Great news! Your center <strong>${escHtml(center.centerName)}</strong> has been restored and is now active again.</p>
           <p>You can log in to your admin dashboard immediately.</p>
           <p>— The ${config.appName} Team</p>
         `,
@@ -1745,8 +1748,8 @@ router.post('/broadcast', verifySuperAdmin, emailLimiter, validateBroadcast, asy
           to:      center.adminEmail,
           subject: subject.trim(),
           html: `
-            <p>Dear <strong>${center.centerName}</strong> Admin,</p>
-            <div style="white-space:pre-line">${message.trim()}</div>
+            <p>Dear <strong>${escHtml(center.centerName)}</strong> Admin,</p>
+            <div style="white-space:pre-line">${escHtml(message.trim())}</div>
             <br/>
             <p>— The ${config.appName} Team</p>
           `,

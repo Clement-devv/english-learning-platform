@@ -1,5 +1,7 @@
 // server/routes/subAdminRoutes.js
 import express from "express";
+import { toEmail } from "../utils/inputSanitizer.js";
+import { validateObjectId } from "../middleware/validateObjectId.js";
 import crypto from "crypto";
 import { verifyToken, verifyAdmin } from "../middleware/authMiddleware.js";
 import { sendSubAdminInviteEmail, getCenterBaseUrl } from "../utils/emailService.js";
@@ -9,7 +11,7 @@ import { teacherSchema }  from "../schemas/teacherSchema.js";
 import { studentSchema }  from "../schemas/studentSchema.js";
 import logger from "../utils/logger.js";
 import { SUB_ADMIN_PAGE_PERMISSIONS } from "../middleware/staffAccess.js";
-import { badRequest, notFound, conflict } from '../utils/apiResponse.js';
+import { badRequest, notFound, conflict, serverError } from '../utils/apiResponse.js';
 
 const router = express.Router();
 router.use(tenantMiddleware);
@@ -37,17 +39,28 @@ router.get("/", async (req, res) => {
 });
 
 // POST /api/sub-admins/invite — create and invite a new sub-admin
+// Bad values used to reach the schema and come back as a 500
+const REGIONS = ["africa", "asia", "europe", "americas", "oceania"];
+function checkScope(type, region) {
+  if (!["region", "manual"].includes(type)) return "assignmentType must be region or manual";
+  if (type === "region" && !REGIONS.includes(region)) return `Choose a region: ${REGIONS.join(", ")}`;
+  return null;
+}
+
 router.post("/invite", async (req, res) => {
   try {
     const { firstName, lastName, email, assignmentType, region, assignedTeachers, permissions, notes } = req.body;
 
     if (!firstName || !lastName || !email)
       return badRequest(res, "First name, last name and email are required");
+    const type = assignmentType || "manual";
+    const scopeError = checkScope(type, region);
+    if (scopeError) return badRequest(res, scopeError);
 
     const SubAdmin = getSubAdmin(req.db);
     const Teacher  = getTeacher(req.db);
     const Student  = getStudent(req.db);
-    const normalizedEmail = email.toLowerCase().trim();
+    const normalizedEmail = toEmail(email);
 
     const [asSubAdmin, asTeacher, asStudent] = await Promise.all([
       SubAdmin.findOne({ email: normalizedEmail }).lean(),
@@ -64,10 +77,10 @@ router.post("/invite", async (req, res) => {
     const subAdmin = await SubAdmin.create({
       firstName: firstName.trim(),
       lastName:  lastName.trim(),
-      email:     email.toLowerCase().trim(),
-      assignmentType:   assignmentType || "manual",
-      region:           assignmentType === "region" ? region : null,
-      assignedTeachers: assignmentType === "manual" ? (assignedTeachers || []) : [],
+      email:     normalizedEmail,
+      assignmentType:   type,
+      region:           type === "region" ? region : null,
+      assignedTeachers: type === "manual" ? (assignedTeachers || []) : [],
       permissions: {
         canMarkLessons:  permissions?.canMarkLessons  ?? false,
         canViewPayments: permissions?.canViewPayments ?? false,
@@ -96,13 +109,13 @@ router.post("/invite", async (req, res) => {
       },
     });
   } catch (err) {
-    logger.error("Invite sub-admin error:", { error: err?.message });
-    res.status(500).json({ success: false, message: "Failed to send invitation" });
+    if (err.statusCode !== 400) logger.error("Invite sub-admin error:", { error: err?.message });
+    serverError(res, "Failed to send invitation", err);
   }
 });
 
 // POST /api/sub-admins/:id/resend-invite
-router.post("/:id/resend-invite", async (req, res) => {
+router.post("/:id/resend-invite", validateObjectId("id"), async (req, res) => {
   try {
     const SubAdmin = getSubAdmin(req.db);
     const subAdmin = await SubAdmin.findById(req.params.id);
@@ -127,7 +140,7 @@ router.post("/:id/resend-invite", async (req, res) => {
 });
 
 // PUT /api/sub-admins/:id — update sub-admin
-router.put("/:id", async (req, res) => {
+router.put("/:id", validateObjectId("id"), async (req, res) => {
   try {
     const { assignmentType, region, assignedTeachers, permissions, notes, status } = req.body;
 
@@ -135,6 +148,10 @@ router.put("/:id", async (req, res) => {
     const subAdmin = await SubAdmin.findById(req.params.id);
     if (!subAdmin) return notFound(res, "Sub-admin not found");
 
+    if (assignmentType !== undefined || region !== undefined) {
+      const scopeError = checkScope(assignmentType ?? subAdmin.assignmentType, region ?? subAdmin.region);
+      if (scopeError) return badRequest(res, scopeError);
+    }
     if (assignmentType) subAdmin.assignmentType = assignmentType;
     if (region !== undefined) subAdmin.region = region;
     if (assignedTeachers !== undefined) subAdmin.assignedTeachers = assignedTeachers;
@@ -161,7 +178,7 @@ router.put("/:id", async (req, res) => {
 });
 
 // PATCH /api/sub-admins/:id/toggle-status
-router.patch("/:id/toggle-status", async (req, res) => {
+router.patch("/:id/toggle-status", validateObjectId("id"), async (req, res) => {
   try {
     const SubAdmin = getSubAdmin(req.db);
     const subAdmin = await SubAdmin.findById(req.params.id);
@@ -184,7 +201,7 @@ router.patch("/:id/toggle-status", async (req, res) => {
 });
 
 // PATCH /api/sub-admins/:id/assign-teachers
-router.patch("/:id/assign-teachers", async (req, res) => {
+router.patch("/:id/assign-teachers", validateObjectId("id"), async (req, res) => {
   try {
     const { teacherIds } = req.body;
     if (!Array.isArray(teacherIds))
@@ -210,7 +227,7 @@ router.patch("/:id/assign-teachers", async (req, res) => {
 });
 
 // DELETE /api/sub-admins/:id
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", validateObjectId("id"), async (req, res) => {
   try {
     const subAdmin = await getSubAdmin(req.db).findByIdAndDelete(req.params.id);
     if (!subAdmin) return notFound(res, "Sub-admin not found");
