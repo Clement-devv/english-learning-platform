@@ -4,7 +4,8 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install
 COPY . .
-RUN NODE_OPTIONS=--max-old-space-size=1536 npm run build
+ARG NODE_HEAP_MB=3072
+RUN NODE_OPTIONS=--max-old-space-size=${NODE_HEAP_MB} npm run build
 
 # Stage 2 — production server (lean image, no devDeps)
 FROM node:22-alpine
