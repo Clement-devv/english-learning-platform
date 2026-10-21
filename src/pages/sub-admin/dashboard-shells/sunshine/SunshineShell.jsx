@@ -4,6 +4,7 @@
 // permission-gated sidebar nav · sunrise/sunset artwork · Nunito font · dark mode.
 
 import React, { useState, useMemo, useEffect, lazy, Suspense } from 'react';
+import { useTabFromUrl } from "../../../../hooks/useTabFromUrl";
 import {
   TrendingUp, Video, Users, Calendar,
   DollarSign, Film, BarChart2, Star, CheckSquare,
@@ -75,6 +76,7 @@ export default function SunshineShell() {
   const perms      = subAdminInfo?.permissions || {};
 
   const [activeTab, setActiveTab] = useState('overview');
+  useTabFromUrl(setActiveTab, ['overview','teachers','students','classes','live-classes','group-classes','book-class','logged-classes','parent-checks','parent-links','messages','payments','recordings','reports','reviews','class-report']); // ?tab= from notification clicks / links
   const [showDevices, setShowDevices] = useState(false);
 
   // Permissions saved at login go stale when the admin changes them — refresh on open

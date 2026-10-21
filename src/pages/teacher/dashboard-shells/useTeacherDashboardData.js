@@ -3,6 +3,8 @@
 // Mirrors the pattern of useDashboardData.js used by student shells.
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { showLocalNotification } from "../../../utils/localNotify";
+import { useTabFromUrl } from "../../../hooks/useTabFromUrl";
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext.jsx';
 import { io } from 'socket.io-client';
@@ -48,6 +50,7 @@ export function useTeacherDashboardData() {
   // ── Core state ─────────────────────────────────────────────────────────────
   const [teacherInfo,    setTeacherInfo]    = useState(null);
   const [activeTab,      setActiveTab]      = useState('dashboard');
+  useTabFromUrl(setActiveTab, ['dashboard','classes','group-classes','completed-classes','class-summaries','schedule','students','bookings','homework','quiz','vocab','library','messages','payment','recordings','reviews','rating-dashboard','profile']); // ?tab= from notification clicks / links
   const [toast,          setToast]          = useState('');
   const [sidebarOpen,    setSidebarOpen]    = useState(true);
   const [mounted,        setMounted]        = useState(false);
@@ -113,17 +116,13 @@ export function useTeacherDashboardData() {
       if (cancelled) return;
       socket = io(SOCKET_URL, { transports: ['websocket'], auth: { token } });
       socket.on('connect', () => { socket.emit('join-teacher-room'); });
-      socket.on('new-direct-message', ({ senderName, message }) => {
+      socket.on('new-direct-message', ({ dmId, senderName, message }) => {
         setUnreadMessages(prev => prev + 1);
-        if ('Notification' in window && Notification.permission === 'granted') {
-          new Notification(`💬 Message from ${senderName}`, { body: message, icon: '/favicon.ico' });
-        }
+        showLocalNotification(`💬 Message from ${senderName}`, { body: message, tag: `dm-${dmId}`, renotify: true, url: '/teacher/dashboard?tab=messages' });
       });
-      socket.on('new-group-message', ({ senderName }) => {
+      socket.on('new-group-message', ({ chatId, senderName, message }) => {
         setUnreadMessages(prev => prev + 1);
-        if ('Notification' in window && Notification.permission === 'granted') {
-          new Notification(`💬 Group message from ${senderName || 'Someone'}`, { icon: '/favicon.ico' });
-        }
+        showLocalNotification(`💬 Message from ${senderName || 'Someone'}`, { body: message, tag: `chat-${chatId}`, renotify: true, url: '/teacher/dashboard?tab=messages' });
       });
     }, 0);
 
@@ -216,13 +215,7 @@ export function useTeacherDashboardData() {
         setHomeworkToGrade(toGrade);
         setBadgeLoaded((l) => (l.homework ? l : { ...l, homework: true }));
         if (prevHomeworkRef.current !== null && toGrade > prevHomeworkRef.current) {
-          const diff = toGrade - prevHomeworkRef.current;
-          if ('Notification' in window && Notification.permission === 'granted') {
-            new Notification('📬 Homework Submitted!', {
-              body: `${diff} student${diff > 1 ? 's have' : ' has'} submitted homework for you to grade.`,
-              icon: '/favicon.ico',
-            });
-          }
+          // (the pop-up for each submission comes from the server's web push)
         }
         prevHomeworkRef.current = toGrade;
       } catch { /* silent */ }
@@ -237,13 +230,7 @@ export function useTeacherDashboardData() {
         setQuizAttempted(attempted);
         setBadgeLoaded((l) => (l.quiz ? l : { ...l, quiz: true }));
         if (prevQuizRef.current !== null && attempted > prevQuizRef.current) {
-          const diff = attempted - prevQuizRef.current;
-          if ('Notification' in window && Notification.permission === 'granted') {
-            new Notification('📝 Quiz Completed!', {
-              body: `${diff} student${diff > 1 ? 's have' : ' has'} completed a quiz.`,
-              icon: '/favicon.ico',
-            });
-          }
+          // (the pop-up for each finished quiz comes from the server's web push)
         }
         prevQuizRef.current = attempted;
       } catch { /* silent */ }
@@ -292,11 +279,8 @@ export function useTeacherDashboardData() {
         });
         // Notify for each genuinely new booking
         next.forEach(b => {
-          if (!prevIds.has(b.id) && 'Notification' in window && Notification.permission === 'granted') {
-            new Notification('📅 New Booking Request', {
-              body: `${b.name} wants to book "${b.classTitle}"`,
-              icon: '/favicon.ico',
-            });
+          if (!prevIds.has(b.id)) {
+            showLocalNotification('📅 New class request', { body: `${b.name} — "${b.classTitle}"`, tag: `booking-${b.id}`, url: '/teacher/dashboard?tab=bookings' });
           }
         });
         return next;

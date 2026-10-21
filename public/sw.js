@@ -98,6 +98,10 @@ self.addEventListener("fetch", (event) => {
 });
 
 // ── Push Notifications ───────────────────────────────────────────────────────
+// Shown when the app is in a background tab, minimised or closed. When the person is
+// looking at an app tab right now, that page already shows it (toast / badge), so no
+// system pop-up. `tag` (set by the server per event) makes the page's own notification
+// for the same event replace this one instead of doubling it (src/utils/localNotify.js).
 self.addEventListener("push", (event) => {
   let data = {};
   try { data = event.data?.json() ?? {}; } catch (_) {}
@@ -109,25 +113,42 @@ self.addEventListener("push", (event) => {
     badge:   data.badge  ?? "/icons/icon.svg",
     vibrate: [200, 100, 200],
     data:    data.data   ?? {},
+    ...(data.tag ? { tag: data.tag, renotify: !!data.renotify } : {}),
   };
 
-  event.waitUntil(self.registration.showNotification(title, options));
+  event.waitUntil(
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
+      const watching = list.some((c) => c.focused && c.visibilityState === "visible");
+      if (watching) return undefined;
+      return self.registration.showNotification(title, options);
+    })
+  );
 });
 
 // ── Notification Click ───────────────────────────────────────────────────────
+// Opens the page the notification is about. Only links on this site are followed.
+// An app tab that's already open is reused: it's focused and told where to go
+// (src/main.jsx listens for "notification-click"), instead of opening another tab.
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const url = event.notification.data?.url ?? "/";
+  let target = new URL("/", self.location.origin);
+  try {
+    const u = new URL(event.notification.data?.url ?? "/", self.location.origin);
+    if (u.origin === self.location.origin) target = u;
+  } catch (_) { /* keep "/" */ }
+  const url = target.pathname + target.search + target.hash;
+
   event.waitUntil(
     clients
       .matchAll({ type: "window", includeUncontrolled: true })
       .then((list) => {
-        for (const client of list) {
-          if (client.url.includes(url) && "focus" in client) {
-            return client.focus();
-          }
+        const same = list.find((c) => new URL(c.url).pathname === target.pathname) || list[0];
+        if (same && "focus" in same) {
+          same.postMessage({ type: "notification-click", url });
+          return same.focus();
         }
         if (clients.openWindow) return clients.openWindow(url);
+        return undefined;
       })
   );
 });

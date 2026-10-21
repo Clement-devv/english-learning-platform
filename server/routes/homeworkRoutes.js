@@ -22,7 +22,9 @@ import {
 import { recordActivity } from "../utils/streakService.js";
 import { readPaging, pageMeta, statusCounts, oid, todoFirstIds, inOrder } from "../utils/paging.js";
 import logger from "../utils/logger.js";
-import { emailHomeworkGraded } from "../utils/progressEmails.js";
+import { pushTeacher, pushStudent } from "../utils/notifyPush.js";
+import { parseNewDueDate, forgetDueReminder } from "../utils/dueDates.js";
+import { emailHomeworkGraded, emailDueDateChanged } from "../utils/progressEmails.js";
 import { badRequest, forbidden, notFound, serverError } from '../utils/apiResponse.js';
 import { toStr, toObjectId } from '../utils/inputSanitizer.js';
 import { wrapUpload } from '../middleware/validateObjectId.js';
@@ -117,15 +119,50 @@ function sanitiseName(name) {
   return path.basename(name).replace(/[^\w.\-\s]/g, "_").slice(0, 100);
 }
 
-// Validate magic bytes and either upload to S3 or write to local disk.
-async function processUploadedFiles(files, localDir, s3KeyFn, slug) {
-  const attachments = [];
+// PDFs that can run something: JavaScript, launching programs, embedded files, Flash/XFA
+// forms. Homework PDFs (phone scans, worksheets) never need these. Names may be written
+// with #xx escapes (/J#61vaScript), so those are decoded first.
+const PDF_ACTIVE = /\/(JavaScript|JS|Launch|EmbeddedFile|RichMedia|XFA|ImportData|SubmitForm|GoToE)\b/;
+export function pdfHasActiveContent(buffer) {
+  const text = buffer.toString("latin1").replace(/#([0-9a-fA-F]{2})/g, (_, h) => String.fromCharCode(parseInt(h, 16)));
+  return PDF_ACTIVE.test(text);
+}
+
+/** Every file must really be what it claims; a bad one rejects the whole upload (400) */
+function checkFiles(files) {
   for (const file of files) {
     const info = ALLOWED[file.mimetype];
-    if (!checkMagicBytesBuffer(file.buffer, info?.magic)) {
+    const name = sanitiseName(file.originalname);
+    if (!info || !checkMagicBytesBuffer(file.buffer, info.magic)) {
       logger.warn("File rejected — magic bytes mismatch:", { originalName: file.originalname, mimetype: file.mimetype });
-      continue;
+      throw Object.assign(new Error(`"${name}" isn't a real ${info?.ext?.[0]?.slice(1).toUpperCase() || "supported"} file`), { statusCode: 400 });
     }
+    if (file.mimetype === "application/pdf" && pdfHasActiveContent(file.buffer)) {
+      logger.warn("File rejected — PDF with active content:", { originalName: file.originalname });
+      throw Object.assign(new Error(`"${name}" contains scripts or embedded files, which aren't allowed. Please send a plain PDF or a photo.`), { statusCode: 400 });
+    }
+  }
+}
+
+/**
+ * Headers for a stored upload served from our own origin: never sniff the type, and run
+ * anything that isn't a PDF in a sandbox with no scripts — so even a mislabelled file can't
+ * act as a page of this site. (PDFs are left out: the browser's PDF viewer won't render a
+ * sandboxed response; their scripts were already refused at upload — pdfHasActiveContent.)
+ */
+function fileSafetyHeaders(res, mimeType) {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("Cross-Origin-Resource-Policy", "same-origin");
+  if (mimeType !== "application/pdf") {
+    res.setHeader("Content-Security-Policy", "sandbox; default-src 'none'; img-src 'self'; media-src 'self'; style-src 'unsafe-inline'");
+  }
+}
+
+// Validate (all files first — nothing is stored if one is bad), then upload to S3 or local disk.
+async function processUploadedFiles(files, localDir, s3KeyFn, slug) {
+  checkFiles(files);
+  const attachments = [];
+  for (const file of files) {
     const fileId = crypto.randomUUID();
     if (s3Enabled()) {
       await uploadToS3(file.buffer, s3KeyFn(slug, fileId), file.mimetype);
@@ -159,7 +196,7 @@ async function findByLinkToken(req, res) {
   const r = await resolveShareLink(getHomework(req.db), req.params.token, req.center);
   if (r.status === "invalid") { notFound(res, LINK_UNAVAILABLE); return null; }
   if (r.status === "expired") {
-    res.status(410).json({ success: false, expired: true, message: "This homework link has expired — the due date has passed." });
+    res.status(410).json({ success: false, expired: true, endedAt: r.expiresAt, message: "This homework link has expired — the due date has passed." });
     return null;
   }
   return { hw: r.doc, tokenHash: r.tokenHash, expiresAt: r.expiresAt };
@@ -268,7 +305,7 @@ router.get("/link/:token/file/:type/:fileId", async (req, res) => {
     if (!fs.existsSync(filePath)) return notFound(res, "File not found");
     res.setHeader("Content-Type", mimeType);
     res.setHeader("Content-Disposition", `inline; filename="${sanitiseName(name)}"`);
-    res.setHeader("X-Content-Type-Options", "nosniff");
+    fileSafetyHeaders(res, mimeType);
     res.sendFile(filePath);
   } catch (err) {
     logger.error("Homework link file error:", { error: err?.message });
@@ -331,17 +368,29 @@ router.post("/link/:token/submit", uploadLimiter, async (req, res, next) => {
     if (!text && attachments.length === 0 && !audio)
       return badRequest(res, "Please write an answer, record your voice or attach a photo/PDF");
 
-    // Resubmitting (before grading) replaces the previous answer, its files and voice note
-    const oldFiles = hw.submission?.attachments || [];
-    const oldAudio = hw.submission?.audio?.fileId ? [{ fileId: hw.submission.audio.fileId }] : [];
-    hw.submission = { text, attachments, submittedAt: new Date(), via: "link", ...(audio && { audio }) };
+    // Resubmitting (before grading) replaces the previous answer, its files and voice note.
+    // One atomic update: if the teacher graded it while this upload was arriving, the grade
+    // stands (the new files are removed) — and the files replaced are the ones actually
+    // stored, so a parallel resubmission can't leave orphans on disk.
+    const submission = { text, attachments, submittedAt: new Date(), via: "link", ...(audio && { audio }) };
+    const prev = await getHomework(req.db).findOneAndUpdate(
+      { _id: hw._id, status: { $ne: "graded" } },
+      { $set: { submission, status: "submitted" } },
+      { new: false },
+    ).select("submission").lean();
+    if (!prev) {
+      await deleteFiles(attachments, SUB_DIR, subKey, slug);
+      if (audio) await deleteFiles([audio], SUB_AUD_DIR, subAudKey, slug);
+      return badRequest(res, "This homework has just been graded — it can't be changed now.");
+    }
+    await deleteFiles(prev.submission?.attachments || [], SUB_DIR, subKey, slug);
+    if (prev.submission?.audio?.fileId) await deleteFiles([prev.submission.audio], SUB_AUD_DIR, subAudKey, slug);
+    hw.submission = submission;
     hw.status     = "submitted";
-    await hw.save();
-    await deleteFiles(oldFiles, SUB_DIR, subKey, slug);
-    await deleteFiles(oldAudio, SUB_AUD_DIR, subAudKey, slug);
 
     Promise.all([getTeacher(req.db).findById(hw.teacherId._id), getStudent(req.db).findById(hw.studentId._id)])
       .then(([teacherDoc, studentDoc]) => {
+        if (studentDoc) pushTeacher(req.db, hw.teacherId, "📬 Homework submitted", `${studentDoc.firstName} ${studentDoc.lastName || ""}: "${hw.title}"`, { tag: `hw-sub-${hw._id}`, tab: "homework" });
         if (teacherDoc && studentDoc) sendHomeworkSubmitted(teacherDoc, studentDoc, hw, req.center?.centerName || "", req.center)
           .catch(e => logger.warn("sendHomeworkSubmitted failed:", { error: e?.message }));
       }).catch(() => {});
@@ -401,6 +450,32 @@ router.delete("/:id/share-link", verifyToken, validateObjectId("id"), async (req
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// PATCH /api/homework/:id/due-date  { dueDate } — the teacher moves the due date.
+// A managed student's link lives until the end of the due date, so this also reopens
+// an expired link (same address — the family is emailed that it works again).
+// ─────────────────────────────────────────────────────────────────────────────
+router.patch("/:id/due-date", verifyToken, validateObjectId("id"), async (req, res) => {
+  try {
+    const hw = await loadOwnHomework(req, res);
+    if (!hw) return;
+    if (hw.status === "graded") return badRequest(res, "This homework is already graded — its due date can't change.");
+    const tz = req.center?.timezone;
+    const dueDate = parseNewDueDate(req.body?.dueDate, tz);
+    const reopened = !!hw.shareLink?.tokenEnc && Date.now() > linkExpiresAt(hw.dueDate, tz).getTime();
+
+    hw.dueDate = dueDate;
+    await hw.save();
+    await forgetDueReminder(req.db, "homework", hw._id);
+
+    const view = withShareInfo(hw, req.center);
+    res.json({ success: true, homework: view, message: reopened ? "Due date changed — the family's link works again" : "Due date changed" });
+    emailDueDateChanged(req.db, req.center, "homework", view, { reopened });
+  } catch (err) {
+    serverError(res, undefined, err);
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // POST /api/homework
 // ─────────────────────────────────────────────────────────────────────────────
 const uploadAssignment = makeUpload();
@@ -450,8 +525,8 @@ router.post("/", verifyToken, uploadLimiter, wrapUpload(uploadAssignment.array("
         homeworkId: hw._id,
         dueDate,
       });
-      pushToUser(req.db, 'student', studentId, { title: '📚 New Homework!', body: `Your teacher assigned: "${titleClean}"`, icon: '/icons/icon.svg', data: { url: '/student/dashboard?tab=homework' } });
     } catch (_) {}
+    pushToUser(req.db, 'student', studentId, { title: '📚 New Homework!', body: `Your teacher assigned: "${titleClean}"`, icon: '/icons/icon.svg', tag: `hw-${hw._id}`, data: { url: '/student/dashboard?tab=homework' } }); // web push: independent of the socket server
 
     res.status(201).json({ success: true, homework: withShareInfo(hw, req.center) });
   } catch (err) {
@@ -549,9 +624,22 @@ router.post("/:id/submit", verifyToken, uploadLimiter, validateObjectId("id"), w
 
     if (!text && attachments.length === 0) return badRequest(res, "Please provide text or a file");
 
-    hw.submission = { text, attachments, submittedAt: new Date() };
+    // Atomic, same as the link route: a grade given meanwhile stands, and the previous
+    // answer's files are deleted (they used to stay on disk forever)
+    const submission = { text, attachments, submittedAt: new Date() };
+    const prev = await getHomework(req.db).findOneAndUpdate(
+      { _id: hw._id, status: { $ne: "graded" } },
+      { $set: { submission, status: "submitted" } },
+      { new: false },
+    ).select("submission").lean();
+    if (!prev) {
+      await deleteFiles(attachments, SUB_DIR, subKey, req.center.slug);
+      return badRequest(res, "Already graded");
+    }
+    await deleteFiles(prev.submission?.attachments || [], SUB_DIR, subKey, req.center.slug);
+    if (prev.submission?.audio?.fileId) await deleteFiles([prev.submission.audio], SUB_AUD_DIR, subAudKey, req.center.slug);
+    hw.submission = submission;
     hw.status     = "submitted";
-    await hw.save();
 
     let streakResult = null;
     try { streakResult = await recordActivity(req.db, req.user.id); } catch (_) {}
@@ -560,6 +648,7 @@ router.post("/:id/submit", verifyToken, uploadLimiter, validateObjectId("id"), w
       getTeacher(req.db).findById(hw.teacherId),
       getStudent(req.db).findById(req.user.id),
     ]).then(([teacherDoc, studentDoc]) => {
+        if (studentDoc) pushTeacher(req.db, hw.teacherId, "📬 Homework submitted", `${studentDoc.firstName} ${studentDoc.lastName || ""}: "${hw.title}"`, { tag: `hw-sub-${hw._id}`, tab: "homework" });
       if (teacherDoc && studentDoc) sendHomeworkSubmitted(teacherDoc, studentDoc, hw, req.center?.centerName || "", req.center).catch(e => logger.warn("sendHomeworkSubmitted failed:", { error: e?.message }));
     }).catch(e => logger.warn("User lookup for submission email failed:", { error: e?.message }));
 
@@ -594,6 +683,7 @@ router.post("/:id/grade", verifyToken, validateObjectId("id"), async (req, res) 
 
     res.json({ success: true, homework: hw });
     emailHomeworkGraded(req.db, req.center, hw._id); // student / family / parents
+    pushStudent(req.db, hw.studentId, "✅ Homework graded", `"${hw.title}" — ${score}/100`, { tag: `hw-${hw._id}`, tab: "homework" });
   } catch (err) {
     serverError(res, undefined, err);
   }
@@ -784,7 +874,7 @@ router.get("/file/:type/:fileId", verifyToken, async (req, res) => {
 
     res.setHeader("Content-Type", mimeType);
     res.setHeader("Content-Disposition", disposition);
-    res.setHeader("X-Content-Type-Options", "nosniff");
+    fileSafetyHeaders(res, mimeType);
     res.sendFile(filePath);
   } catch (err) {
     serverError(res, undefined, err);

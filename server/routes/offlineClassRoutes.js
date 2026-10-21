@@ -30,6 +30,7 @@ import { LINK_DAYS } from "../utils/parentCheck.js";
 import { sendEmail, getCenterBaseUrl } from "../utils/emailService.js";
 import { toStr } from "../utils/inputSanitizer.js";
 import logger from "../utils/logger.js";
+import { pushTeacher, pushStudent, pushAdmins } from "../utils/notifyPush.js";
 import { awardMilestonesAndNotify } from "../utils/progressEmails.js";
 
 const PAGE_SIZE = 20;
@@ -144,6 +145,10 @@ router.post("/", verifyToken, async (req, res) => {
       });
     }
 
+    pushAdmins(req.db, "🗂️ Class logged — needs approval", `${student.firstName} ${student.lastName || ""} — "${classTitle}"`, { tag: `logged-${booking._id}`, tab: "logged-classes" });
+    // A student with their own login confirms it in their dashboard (managed: the parent check)
+    if (!student.isManaged) pushStudent(req.db, student._id, "📋 Please confirm a class", `Did "${classTitle}" take place?`, { tag: `confirm-${booking._id}` });
+
     const adminEmail = req.center?.adminEmail;
     if (adminEmail) {
       const { baseUrl } = getCenterBaseUrl(req.center);
@@ -155,7 +160,7 @@ router.post("/", verifyToken, async (req, res) => {
 <li><strong>Student:</strong> ${esc(student.firstName)} ${esc(student.lastName)}</li>
 <li><strong>Where / why:</strong> ${esc(platform)} — ${esc(reason)}</li>
 <li><strong>Recording link:</strong> ${recordingUrl ? "added" : "none"}</li></ul>
-<p>Nothing is charged or paid until you approve it in <a href="${baseUrl}/admin/dashboard">Logged classes</a>.</p>`,
+<p>Nothing is charged or paid until you approve it in <a href="${baseUrl}/admin?tab=logged-classes">Logged classes</a>.</p>`,
       }).catch(e => logger.warn("Offline class email failed:", { error: e?.message }));
     }
 
@@ -230,6 +235,7 @@ router.get("/", verifyToken, verifyAdminOrSubAdmin("canViewLoggedClasses"), asyn
 // Approving pays the teacher and uses one of the student's classes — a separate sub-admin permission
 // Tell the teacher whether the class they logged was approved (and paid) or not
 function emailTeacherDecision(req, booking, { approved, note }) {
+  pushTeacher(req.db, booking.teacherId, approved ? "✅ Logged class approved" : "❌ Logged class not approved", `"${booking.classTitle}"${approved ? " — you are paid for it" : ""}`, { tag: `logged-${booking._id}`, tab: "completed-classes" });
   getTeacher(req.db).findById(booking.teacherId).select("firstName email").lean().then((t) => {
     if (!t?.email) return;
     const { baseUrl } = getCenterBaseUrl(req.center);

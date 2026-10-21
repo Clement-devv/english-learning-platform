@@ -11,6 +11,7 @@ import api from "../../api";
 import { HERO, HERO_FONTS, scoreStamp } from "../../components/hero/heroTheme";
 import { StarBuddy, Celebration, PowBurst } from "../../components/hero/HeroScene";
 import { HeroPage, HeroGate, HeroNotice, HeroLoading, useShareLinkSession } from "../../components/hero/HeroLinkKit";
+import { endedText } from "../../components/hero/linkText";
 
 const LETTERS = ["A", "B", "C", "D"];
 const OPTION_COLORS = [HERO.red, HERO.blue, HERO.green, HERO.sunDeep];
@@ -74,7 +75,7 @@ export default function QuizLinkPage() {
       )}
       {s.phase === "expired" && (
         <HeroNotice title="This quiz has ended"
-          text={s.message || "The due date for this quiz has passed. Ask your teacher if you still want to take it."} />
+          text={endedText("quiz", s.endedAt)} />
       )}
       {s.phase === "gate" && (
         <HeroGate unlockPath={`${basePath}/unlock`} subtitle="Your quiz mission is waiting." onUnlocked={s.onUnlocked} onFailure={s.onFailure} />

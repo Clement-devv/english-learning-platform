@@ -6,6 +6,7 @@ import { bookingSchema }            from "../schemas/bookingSchema.js";
 import { studentSchema }            from "../schemas/studentSchema.js";
 import { teacherSchema }            from "../schemas/teacherSchema.js";
 import logger from "../utils/logger.js";
+import { pushTeacher } from "../utils/notifyPush.js";
 import { awardMilestonesAndNotify } from "../utils/progressEmails.js";
 import { badRequest, forbidden, notFound, serverError } from '../utils/apiResponse.js';
 import { reverseCompletedClass } from "../utils/classReversal.js";
@@ -234,6 +235,7 @@ router.patch("/:bookingId/resolve", verifyToken, verifyAdmin, async (req, res) =
     if (resolution === "approve_teacher") awardMilestonesAndNotify(req.db, booking.studentId?._id || booking.studentId, req.center);
 
     // Tell the teacher how it ended — their pay for the class depends on it
+    pushTeacher(req.db, booking.teacherId, resolution === "approve_teacher" ? "✅ Dispute decided for you" : "⚠️ Dispute upheld", `"${booking.classTitle}" — ${resolution === "approve_teacher" ? "the class counts" : "the class does not count"}`, { tag: `dispute-${booking._id}`, tab: "completed-classes" });
     if (booking.teacherId?.email) {
       const won = resolution === "approve_teacher";
       const { baseUrl } = getCenterBaseUrl(req.center);

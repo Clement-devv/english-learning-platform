@@ -115,6 +115,13 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => {});
   });
+  // A notification was clicked while this tab was open (public/sw.js): go to its page
+  // inside the app (React Router follows popstate) — e.g. /teacher/dashboard?tab=messages
+  navigator.serviceWorker.addEventListener('message', (e) => {
+    if (e.data?.type !== 'notification-click' || typeof e.data.url !== 'string' || !e.data.url.startsWith('/')) return;
+    window.history.pushState({}, '', e.data.url);
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  });
 }
 
 const renderApp = () => {

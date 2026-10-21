@@ -10,6 +10,7 @@ import {
 import AudioRecorder from "../../../components/AudioRecorder";
 import ManagedBadge from "../../../components/ManagedBadge";
 import ShareLinkPanel from "../../../components/ShareLinkPanel";
+import DueDateEditor from "../../../components/DueDateEditor";
 import Pagination from "../../../components/Pagination";
 import { downloadGradedHomeworkPdf } from "../../../utils/homeworkPdf";
 
@@ -311,6 +312,18 @@ export default function HomeworkTab({ teacherInfo, students, isDarkMode }) {
     }
   };
 
+  // Move the due date (also reopens an expired parent link — same address)
+  const handleDueDate = async (hwId, dueDate) => {
+    try {
+      const { data } = await api.patch(`/homework/${hwId}/due-date`, { dueDate });
+      replaceHw(data.homework);
+      showToast(data.message || "Due date changed");
+    } catch (err) {
+      showToast(err?.response?.data?.message || "Could not change the due date", "error");
+      throw err;
+    }
+  };
+
   const handleDeleteLink = async (hwId) => {
     try {
       await api.delete(`/homework/${hwId}/share-link`);
@@ -605,6 +618,12 @@ export default function HomeworkTab({ teacherInfo, students, isDarkMode }) {
                 {/* Expanded detail */}
                 {isExpanded && (
                   <div style={{ borderTop: `1px solid ${c.border}`, padding: "16px 18px", display: "flex", flexDirection: "column", gap: 14 }}>
+
+                    {/* Due date — can move until it's graded */}
+                    {hw.status !== "graded" && (
+                      <DueDateEditor dueDate={hw.dueDate} isDarkMode={isDarkMode}
+                        onSave={(d) => handleDueDate(hw._id, d)} />
+                    )}
 
                     {/* Share link — managed students only, until graded */}
                     {student?.isManaged && hw.status !== "graded" && (

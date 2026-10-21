@@ -156,7 +156,7 @@ export async function checkUnlock(Model, doc, studentName, teacherName) {
 /**
  * Find the document behind a link token. `Model` must have studentId/teacherId
  * refs (Student/Teacher models registered on the same connection).
- * Returns { status: "invalid" } | { status: "expired", doc } | { status: "ok", doc, tokenHash, expiresAt }.
+ * Returns { status: "invalid" } | { status: "expired", doc, expiresAt } | { status: "ok", doc, tokenHash, expiresAt }.
  * `graceUntil(doc)` may return a Date that keeps an expired link usable (e.g. a quiz already in progress).
  * `expiresAt(doc)` overrides the default expiry (end of the due date).
  */
@@ -172,7 +172,7 @@ export async function resolveShareLink(Model, token, center, { select = "", grac
   const expiresAt = expiryFor ? expiryFor(doc) : linkExpiresAt(doc.dueDate, center?.timezone);
   const grace = graceUntil?.(doc);
   if (Date.now() > expiresAt.getTime() && !(grace && Date.now() <= grace.getTime())) {
-    return { status: "expired", doc };
+    return { status: "expired", doc, expiresAt };
   }
   return { status: "ok", doc, tokenHash, expiresAt };
 }

@@ -29,6 +29,7 @@ import { parentCheckExpiresAt, disputeDeadlineFrom, DISPUTE_DAYS } from "../util
 import { sendEmail, getCenterBaseUrl } from "../utils/emailService.js";
 import { toStr } from "../utils/inputSanitizer.js";
 import logger from "../utils/logger.js";
+import { pushTeacher, pushAdmins } from "../utils/notifyPush.js";
 import { PARENT_CHECK_BASE, PARENT_CHECK_DISPUTED, PARENT_CHECK_WAITING, PARENT_CHECK_ANSWERED } from "../utils/parentCheckFilters.js";
 import { badRequest, forbidden, notFound, serverError } from "../utils/apiResponse.js";
 import { emailParentCheck } from "../utils/familyLinkEmails.js";
@@ -196,6 +197,8 @@ const esc = (s) => String(s || "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<
 
 // Email the center admin about a parent's answer ("no" = new dispute, "withdrawn" = No changed to Yes)
 function notifyAdmin(req, b, kind) {
+  pushAdmins(req.db, kind === "withdrawn" ? "↩️ Parent withdrew a report" : "⚠️ Parent says a class was missed",
+    `${b.studentId.firstName} ${b.studentId.lastName || ""} — "${b.classTitle}"`, { tag: `dispute-${b._id}`, tab: "disputes" });
   const adminEmail = req.center?.adminEmail;
   if (!adminEmail) return;
   const { baseUrl } = getCenterBaseUrl(req.center);
@@ -213,7 +216,7 @@ function notifyAdmin(req, b, kind) {
         html: `<p>A parent answered <strong>No</strong> to the attendance check for:</p>${who}
 ${b.parentCheck.comment ? `<p><strong>Parent's note:</strong> ${esc(b.parentCheck.comment)}</p>` : ""}
 <p>The teacher had confirmed this student joined. The class is <strong>not</strong> reversed yet — a dispute is open.</p>
-<p><strong>Please review it within ${DISPUTE_DAYS} days</strong> in <a href="${baseUrl}/admin/dashboard">Disputes</a>. If it isn't settled by ${esc(b.parentCheck.disputeDeadline.toUTCString())}, the class is automatically returned to the student and the teacher's pay for it is deducted.</p>`,
+<p><strong>Please review it within ${DISPUTE_DAYS} days</strong> in <a href="${baseUrl}/admin?tab=disputes">Disputes</a>. If it isn't settled by ${esc(b.parentCheck.disputeDeadline.toUTCString())}, the class is automatically returned to the student and the teacher's pay for it is deducted.</p>`,
       };
   sendEmail({ centerName: req.center?.centerName, to: adminEmail, ...mail })
     .catch(e => logger.warn("Parent check email failed:", { error: e?.message }));
@@ -222,6 +225,9 @@ ${b.parentCheck.comment ? `<p><strong>Parent's note:</strong> ${esc(b.parentChec
 // Email the class's teacher too — a "No" puts their pay for the class at stake
 // (deducted if the dispute isn't settled by the deadline), and they were never told.
 function notifyTeacher(req, b, kind) {
+  pushTeacher(req.db, b.teacherId, kind === "withdrawn" ? "↩️ Parent withdrew their report" : "⚠️ A parent says a class was missed",
+    `${b.studentId.firstName} — "${b.classTitle}"${kind === "withdrawn" ? "" : " · your pay for it is on hold until the school decides"}`,
+    { tag: `dispute-${b._id}`, tab: "completed-classes" });
   const to = b.teacherId?.email;
   if (!to) return;
   const { baseUrl } = getCenterBaseUrl(req.center);

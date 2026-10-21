@@ -40,7 +40,8 @@ export const wrapUpload = (uploadMiddleware) => (req, res, next) => {
       const messages = {
         LIMIT_FILE_SIZE:       "File is too large",
         LIMIT_FILE_COUNT:      "Too many files uploaded at once",
-        LIMIT_UNEXPECTED_FILE: `Unexpected field: ${err.field || "unknown"}`,
+        // Multer also uses this when a field gets more files than its maxCount
+        LIMIT_UNEXPECTED_FILE: "Too many files, or a file in the wrong place — please send fewer files",
         LIMIT_PART_COUNT:      "Too many form parts",
         LIMIT_FIELD_VALUE:     "A field value is too large",
       };

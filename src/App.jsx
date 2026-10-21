@@ -158,6 +158,13 @@ function ImpersonationBanner() {
   );
 }
 
+// /admin/dashboard was never a page (the dashboard is /admin), but notifications and
+// emails link there — send them on to /admin, keeping ?tab=…
+function AdminDashboardRedirect() {
+  const { search } = useLocation();
+  return <Navigate to={`/admin${search}`} replace />;
+}
+
 // On center subdomains (school.clemify.com) or custom domains show the center landing page.
 // On clemify.com / localhost (main domain) show the Clemify company home page.
 // Dev override: set VITE_CENTER_SLUG=your-slug in .env.local to preview the landing page at /
@@ -206,6 +213,8 @@ function App() {
             <Route path="/admin/email-change/verify/:token"    element={<EmailChangeVerify />} />
             <Route path="/admin/email-change/cancel/:token"    element={<EmailChangeCancelConfirm />} />
             <Route path="/admin" element={<AuthGuard role="admin"><AdminDashboard /></AuthGuard>} />
+            {/* Old links (emails already sent, notifications) point here — keep their ?tab= */}
+            <Route path="/admin/dashboard" element={<AdminDashboardRedirect />} />
 
             <Route path="/sub-admin/login"                  element={<SubAdminLogin />} />
             <Route path="/sub-admin/forgot-password"        element={<SubAdminForgotPassword />} />

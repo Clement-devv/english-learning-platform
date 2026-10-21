@@ -145,6 +145,7 @@ export function HeroGate({ unlockPath, subtitle, onUnlocked, onFailure, title = 
 export function useShareLinkSession({ basePath, dataKey, storageKey }) {
   const [phase, setPhase]     = useState("loading");
   const [message, setMessage] = useState("");
+  const [endedAt, setEndedAt] = useState(null); // when an expired link stopped working
   const [data, setData]       = useState(null);
   const [access, setAccess]   = useState(null);
 
@@ -155,7 +156,7 @@ export function useShareLinkSession({ basePath, dataKey, storageKey }) {
   const onFailure = (err) => {
     const status = err?.response?.status;
     const msg    = err?.response?.data?.message;
-    if (status === 410) { setPhase("expired"); setMessage(msg); return true; }
+    if (status === 410) { setPhase("expired"); setMessage(msg); setEndedAt(err.response.data?.endedAt || null); return true; }
     if (status === 404) { setPhase("invalid"); setMessage(msg); return true; }
     if (status === 403 && access) { forget(); setAccess(null); setPhase("gate"); return true; }
     return false;
@@ -165,13 +166,26 @@ export function useShareLinkSession({ basePath, dataKey, storageKey }) {
   useEffect(() => {
     let saved = null;
     try { saved = sessionStorage.getItem(storageKey); } catch { /* storage unavailable */ }
-    if (!saved) { setPhase("gate"); return; }
+    if (!saved) {
+      // Ask first, without access: an expired or removed link is said straight away
+      // (410 / 404), instead of after the family has typed both names. 403 = the link
+      // is fine and needs the name check. Nothing about the homework is revealed.
+      api.get(basePath)
+        .catch((err) => {
+          const status = err?.response?.status;
+          if (status === 410) { setPhase("expired"); setMessage(err.response.data?.message); setEndedAt(err.response.data?.endedAt || null); }
+          else if (status === 404) { setPhase("invalid"); setMessage(err.response.data?.message); }
+          else setPhase("gate");
+        })
+        .then((ok) => { if (ok) setPhase("gate"); });
+      return;
+    }
     api.get(basePath, { headers: headers(saved) })
       .then(({ data: res }) => { setAccess(saved); setData(res[dataKey]); setPhase("view"); })
       .catch((err) => {
         forget();
         const status = err?.response?.status;
-        if (status === 410) { setPhase("expired"); setMessage(err.response.data?.message); }
+        if (status === 410) { setPhase("expired"); setMessage(err.response.data?.message); setEndedAt(err.response.data?.endedAt || null); }
         else if (status === 404) { setPhase("invalid"); setMessage(err.response.data?.message); }
         else setPhase("gate");
       });
@@ -185,5 +199,5 @@ export function useShareLinkSession({ basePath, dataKey, storageKey }) {
     setPhase("view");
   };
 
-  return { phase, message, data, setData, headers, onUnlocked, onFailure };
+  return { phase, message, endedAt, data, setData, headers, onUnlocked, onFailure };
 }

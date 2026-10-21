@@ -40,20 +40,23 @@ async function main() {
   const master = mongoose.connection.db;
   const db = mongoose.connection.client.db(SLUG);
 
+  const oldCenter = await master.collection("centers").findOne({ slug: SLUG }, { projection: { _id: 1 } });
+  if (oldCenter) await master.collection("boardmessages").deleteMany({ "target.centerIds": oldCenter._id }); // demo board message
   await master.collection("centers").deleteOne({ slug: SLUG });
   await db.dropDatabase();
   if (process.argv.includes("--drop")) { console.log("🗑  demo center removed"); return; }
 
   const template = await master.collection("centers").findOne({}, { projection: { _id: 0, pendingPasswordHash: 0 } });
+  const centerId = oid();
   await master.collection("centers").insertOne({
     ...(template || {}),
-    _id: oid(),
+    _id: centerId,
     centerName: "Family English Academy",
     slug: SLUG,
     customDomain: null,
     adminEmail: "admin@familyenglish.demo",
     dbName: `db_${SLUG}`,
-    plan: "basic",
+    plan: "enterprise", // managed (no-login) and real (log-in) students side by side
     status: "active",
     phone: "+84 90 123 4567",
     country: "Vietnam",
@@ -157,9 +160,9 @@ async function main() {
         t.lessonsCompleted++; t.earned += t.ratePerClass;
         txs.push({
           _id: oid(), teacherId: t._id, studentId: s._id, bookingId: b._id, amount: t.ratePerClass, type: "class_completion",
-          status: d < -7 ? "paid" : "pending", description: `Class completed: ${topic}`, classTitle: b.classTitle,
+          status: "pending", description: `Class completed: ${topic}`, classTitle: b.classTitle, // salaries are paid through Payroll
           studentName: `${s.firstName} ${s.lastName}`, completedAt: b.completedAt, paymentMethod: "bank_transfer", notes: "",
-          ...(d < -7 ? { paidAt: daysFrom(-7, 10) } : {}), createdAt: b.completedAt, updatedAt: b.completedAt,
+          createdAt: b.completedAt, updatedAt: b.completedAt,
         });
       }
     }
@@ -375,6 +378,17 @@ async function main() {
   } });
   await db.collection("students").bulkWrite(students.filter((s) => s !== mai).map((s, i) => ({ updateOne: { filter: { _id: s._id },
     update: { $set: { currentStreak: [9, 3, 15, 1, 6, 4, 11, 2, 7, 5, 8, 2, 3, 6, 1][i], lastActivityDate: now } } } })));
+  // Three more log-in students, so the admin shows both kinds side by side (Enterprise plan)
+  for (const i of [3, 10, 14]) {
+    const s = students[i];
+    await db.collection("students").updateOne({ _id: s._id }, { $set: {
+      isManaged: false, email: `${s.firstName}.${s.lastName}@familyenglish.demo`.toLowerCase(), password: pw,
+      referralCode: `${s.firstName}${2026 + i}`.toUpperCase(), hasAcceptedTerms: true, termsAcceptedAt: daysFrom(-35),
+      lastLogin: daysFrom(-(i % 3), 18),
+    } });
+  }
+  // Emails in Vietnamese for two families (admin setting: Students → ⋯ → Notifications & reminders)
+  await db.collection("students").updateMany({ _id: { $in: [students[0]._id, students[2]._id] } }, { $set: { emailLanguage: "vi" } });
   const credit = (credits, used, label) => ({ _id: oid(), studentId: mai._id, credits, totalUsed: used,
     log: [{ type: "grant", amount: credits + used, note: `Welcome pack — ${label}`, createdAt: daysFrom(-20) }, { type: "spend", amount: used, note: "Practice", createdAt: daysFrom(-1) }],
     createdAt: daysFrom(-20), updatedAt: now });
@@ -430,6 +444,16 @@ async function main() {
     createdAt: daysFrom(-2), updatedAt: daysFrom(-2),
   });
   await db.collection("students").updateOne({ _id: students[5]._id }, { $set: { notifyEmail: "parent.hoang@familyenglish.demo", joinReminderTeacherAllowed: true } });
+
+  // ── Platform board: an announcement from the platform, shown on this center's dashboards only ──
+  await master.collection("boardmessages").insertOne({
+    kind: "info", layout: "text", title: "New: monthly payroll is here 💰",
+    body: "Set your salary day, take charges, record loans — then pay every teacher in one click.",
+    imageUrl: "", mobileImageUrl: "", ctaLabel: "", ctaUrl: "", durationSec: 8, showOnLogin: true, showOnClick: true,
+    active: true, startsAt: null, endsAt: null,
+    target: { allCenters: false, centerIds: [centerId], roles: ["admin"], allTeachers: true, teacherIds: [], allStudents: true, studentIds: [] },
+    views: 0, clicks: 0, createdBy: "demo-seed", createdAt: now, updatedAt: now,
+  });
 
   console.log(`✅ Demo center "${SLUG}" seeded: ${teachers.length} teachers, ${students.length} students, ${bookings.length} bookings`);
   console.log(JSON.stringify(demoLinks));

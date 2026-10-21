@@ -94,6 +94,46 @@ export const sendCertificateEmail = ({ to, lang, studentName, cert, pdf, href, c
   });
 };
 
+// ── Due date changed (homework / quiz) ───────────────────────────────────────
+const DUE = {
+  en: {
+    subject: (t) => `New due date – ${t}`,
+    eyebrow: "Due date changed",
+    title: { homework: "More time for this homework", quiz: "More time for this quiz" },
+    intro: (n, t, k) => `${t} has changed the due date of ${n}'s ${k === "quiz" ? "quiz" : "homework"}.`,
+    labels: ["Title", "Now due"],
+    reopened: "The link works again until the end of the new due date.",
+    cta: { homework: "Open the homework", quiz: "Open the quiz" },
+  },
+  vi: {
+    subject: (t) => `Hạn nộp mới – ${t}`,
+    eyebrow: "Đã đổi hạn nộp",
+    title: { homework: "Thêm thời gian cho bài tập", quiz: "Thêm thời gian cho bài kiểm tra" },
+    intro: (n, t, k) => `${t} đã đổi hạn nộp ${k === "quiz" ? "bài kiểm tra" : "bài tập"} của ${n}.`,
+    labels: ["Tên bài", "Hạn mới"],
+    reopened: "Đường link hoạt động lại đến hết ngày hạn mới.",
+    cta: { homework: "Mở bài tập", quiz: "Mở bài kiểm tra" },
+  },
+};
+/** `kind`: "homework" | "quiz"; `reopened`: the family's expired link works again */
+export const sendDueDateChangedEmail = ({ to, lang, kind, studentName, teacherName, title, dueDate, reopened, href, center }) => {
+  const b = brandOf(center, center?.centerName), s = pick(DUE, lang);
+  return sendEmail({
+    centerName: b.centerName, to, kind: "Due date changed",
+    subject: s.subject(title),
+    html: renderEmail({
+      ...b, lang, tone: "blue",
+      preheader: `${title} — ${fmtDate(dueDate, lang, "UTC")}`, // due dates are calendar days (stored at 00:00 UTC)
+      eyebrow: s.eyebrow, title: s.title[kind] || s.title.homework,
+      body:
+        p(s.intro(esc(studentName), esc(teacherName), kind)) +
+        details([[s.labels[0], esc(title)], [s.labels[1], fmtDate(dueDate, lang, "UTC")]]) +
+        (reopened ? callout(s.reopened, "blue") : ""),
+      cta: href ? { label: s.cta[kind] || s.cta.homework, href, tone: "blue" } : null,
+    }),
+  });
+};
+
 // ── Payment receipt ──────────────────────────────────────────────────────────
 const RECEIPT = {
   en: {

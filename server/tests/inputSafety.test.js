@@ -21,6 +21,19 @@ describe('toEmail', () => {
   })
 })
 
+describe('homework PDF uploads', async () => {
+  const { pdfHasActiveContent } = await import('../routes/homeworkRoutes.js')
+  const pdf = (body) => Buffer.from(`%PDF-1.4\n1 0 obj << /Type /Catalog ${body} >> endobj\n%%EOF`, 'latin1')
+  it('a plain PDF is fine', () => expect(pdfHasActiveContent(pdf('/Pages 2 0 R'))).toBe(false))
+  it.each([
+    ['JavaScript', '/OpenAction << /S /JavaScript /JS (x) >>'],
+    ['escaped name', '/S /J#61vaScript'],
+    ['launch', '/S /Launch /F (cmd.exe)'],
+    ['embedded file', '/EmbeddedFile'],
+    ['XFA form', '/XFA 5 0 R'],
+  ])('refuses a PDF with %s', (_, body) => expect(pdfHasActiveContent(pdf(body))).toBe(true))
+})
+
 describe('meeting links', () => {
   it('accepts real https Meet / Zoom links', () => {
     expect(isMeetingLink('googlemeet', 'https://meet.google.com/abc-defg-hij')).toBe(true)

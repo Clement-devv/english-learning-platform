@@ -15,6 +15,9 @@ import {
 import { callGemini, extractJSONArray } from "../utils/geminiHelper.js";
 import { recordActivity } from "../utils/streakService.js";
 import logger from "../utils/logger.js";
+import { pushTeacher } from "../utils/notifyPush.js";
+import { emailDueDateChanged } from "../utils/progressEmails.js";
+import { parseNewDueDate, forgetDueReminder } from "../utils/dueDates.js";
 import { badRequest, forbidden, notFound, serverError } from '../utils/apiResponse.js';
 import { validateObjectId } from '../middleware/validateObjectId.js';
 import { toStr, toObjectId, toInt, toArray } from '../utils/inputSanitizer.js';
@@ -106,7 +109,7 @@ async function findQuizByLink(req, res) {
   });
   if (r.status === "invalid") { notFound(res, QUIZ_LINK_UNAVAILABLE); return null; }
   if (r.status === "expired") {
-    res.status(410).json({ success: false, expired: true, message: "This quiz link has expired — the due date has passed." });
+    res.status(410).json({ success: false, expired: true, endedAt: r.expiresAt, message: "This quiz link has expired — the due date has passed." });
     return null;
   }
   return { quiz: r.doc, tokenHash: r.tokenHash, expiresAt: r.expiresAt };
@@ -254,6 +257,7 @@ router.post("/link/:token/submit", async (req, res) => {
 
     Promise.all([getTeacher(req.db).findById(quiz.teacherId._id), getStudent(req.db).findById(quiz.studentId._id)])
       .then(([teacherDoc, studentDoc]) => {
+        if (studentDoc) pushTeacher(req.db, quiz.teacherId, "📝 Quiz completed", `${studentDoc.firstName} ${studentDoc.lastName || ""}: "${quiz.title}" — ${attempt?.percentage ?? 0}%`, { tag: `quiz-done-${quiz._id}`, tab: "quiz" });
         if (teacherDoc && studentDoc) sendQuizCompleted(teacherDoc, studentDoc, quiz, attempt, req.center?.centerName || "", req.center)
           .catch(e => logger.warn("sendQuizCompleted failed:", { error: e?.message }));
       }).catch(() => {});
@@ -279,6 +283,29 @@ async function loadOwnQuiz(req, res) {
   if (quiz.teacherId.toString() !== req.user.id) { forbidden(res, "Access denied"); return null; }
   return quiz;
 }
+
+// PATCH /api/quiz/:id/due-date  { dueDate } — the teacher moves the due date (also reopens
+// an expired family link: it lives until the end of the due date)
+router.patch("/:id/due-date", verifyToken, validateObjectId("id"), async (req, res) => {
+  try {
+    const quiz = await loadOwnQuiz(req, res);
+    if (!quiz) return;
+    if (quiz.status === "attempted") return badRequest(res, "This quiz has already been taken — its due date can't change.");
+    const tz = req.center?.timezone;
+    const dueDate = parseNewDueDate(req.body?.dueDate, tz);
+    const reopened = !!quiz.shareLink?.tokenEnc && Date.now() > linkExpiresAt(quiz.dueDate, tz).getTime();
+
+    quiz.dueDate = dueDate;
+    await quiz.save();
+    await forgetDueReminder(req.db, "quiz", quiz._id);
+
+    const view = withShareInfo(quiz, req.center);
+    res.json({ success: true, quiz: view, message: reopened ? "Due date changed — the family's link works again" : "Due date changed" });
+    emailDueDateChanged(req.db, req.center, "quiz", view, { reopened });
+  } catch (err) {
+    serverError(res, undefined, err);
+  }
+});
 
 router.post("/:id/share-link", verifyToken, validateObjectId("id"), async (req, res) => {
   try {
@@ -376,8 +403,8 @@ router.post("/", verifyToken, async (req, res) => {
         quizId: quiz._id,
         dueDate,
       });
-      pushToUser(req.db, 'student', studentId, { title: '📝 New Quiz!', body: `Your teacher assigned: "${title.slice(0, 60)}"`, icon: '/icons/icon.svg', data: { url: '/student/dashboard?tab=quiz' } });
     } catch (_) {}
+    pushToUser(req.db, 'student', studentId, { title: '📝 New Quiz!', body: `Your teacher assigned: "${title.slice(0, 60)}"`, icon: '/icons/icon.svg', tag: `quiz-${quiz._id}`, data: { url: '/student/dashboard?tab=quiz' } }); // web push: independent of the socket server
 
     res.status(201).json({ success: true, quiz: withShareInfo(quiz, req.center) });
   } catch (err) {
@@ -530,6 +557,7 @@ router.post("/:id/attempt", verifyToken, validateObjectId("id"), async (req, res
       getTeacher(req.db).findById(quiz.teacherId),
       getStudent(req.db).findById(req.user.id),
     ]).then(([teacherDoc, studentDoc]) => {
+        if (studentDoc) pushTeacher(req.db, quiz.teacherId, "📝 Quiz completed", `${studentDoc.firstName} ${studentDoc.lastName || ""}: "${quiz.title}" — ${attempt?.percentage ?? 0}%`, { tag: `quiz-done-${quiz._id}`, tab: "quiz" });
       if (teacherDoc && studentDoc) sendQuizCompleted(teacherDoc, studentDoc, quiz, attempt, req.center?.centerName || "", req.center).catch(e => logger.warn("sendQuizCompleted failed:", { error: e?.message }));
     }).catch(e => logger.warn("User lookup for quiz completion email failed:", { error: e?.message }));
 

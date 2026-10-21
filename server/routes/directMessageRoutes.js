@@ -404,46 +404,59 @@ router.post("/:id/messages", verifyToken, validateObjectId("id"), async (req, re
     try {
       const io = req.app.get('io');
       const slug = req.center?.slug;
-      if (io && slug) {
+      if (slug) { // pop-ups go out even if the socket server is down
+        // Phone / desktop pop-up (signed-in devices that allowed notifications). One tag
+        // per conversation: a newer message replaces the older pop-up and alerts again.
+        const pop = (title, url) => ({
+          title, body: message.trim().slice(0, 100), icon: '/icons/icon.svg',
+          tag: `dm-${dm._id}`, renotify: true, data: { url },
+        });
+        const TEACHER_URL = '/teacher/dashboard?tab=messages', STUDENT_URL = '/student/dashboard?tab=messages';
+        const ADMIN_URL = '/admin?tab=messages', SUB_ADMIN_URL = '/sub-admin/dashboard?tab=messages';
+
         if (role === 'admin') {
           if (dm.type === 'teacher-admin' && dm.teacherId) {
-            io.to(`teacher-room:${slug}:${dm.teacherId}`).emit('new-direct-message', payload);
-            pushToUser(req.db, 'teacher', dm.teacherId, { title: `💬 Message from Admin`, body: message.trim().slice(0, 100), icon: '/icons/icon.svg', data: { url: '/teacher/dashboard?tab=messages' } });
+            io?.to(`teacher-room:${slug}:${dm.teacherId}`).emit('new-direct-message', payload);
+            pushToUser(req.db, 'teacher', dm.teacherId, pop('💬 Message from Admin', TEACHER_URL));
           } else if (dm.type === 'student-admin' && dm.studentId) {
-            io.to(`student-room:${slug}:${dm.studentId}`).emit('new-direct-message', payload);
-            if (dm.subAdminId) io.to(`admin-room:${slug}:${dm.subAdminId}`).emit('new-direct-message', payload);
-            pushToUser(req.db, 'student', dm.studentId, { title: `💬 Message from Admin`, body: message.trim().slice(0, 100), icon: '/icons/icon.svg', data: { url: '/student/dashboard?tab=messages' } });
+            io?.to(`student-room:${slug}:${dm.studentId}`).emit('new-direct-message', payload);
+            if (dm.subAdminId) io?.to(`admin-room:${slug}:${dm.subAdminId}`).emit('new-direct-message', payload);
+            pushToUser(req.db, 'student', dm.studentId, pop('💬 Message from Admin', STUDENT_URL));
           } else if (dm.subAdminId) {
             // sub-admin-admin or sub-admin-teacher (admin sending)
-            io.to(`admin-room:${slug}:${dm.subAdminId}`).emit('new-direct-message', payload);
+            io?.to(`admin-room:${slug}:${dm.subAdminId}`).emit('new-direct-message', payload);
+            pushToUser(req.db, 'sub-admin', dm.subAdminId, pop('💬 Message from Admin', SUB_ADMIN_URL));
           }
         } else if (role === 'teacher' && dm.type === 'sub-admin-teacher') {
           // Teacher → sub-admin
-          if (dm.subAdminId) io.to(`admin-room:${slug}:${dm.subAdminId}`).emit('new-direct-message', payload);
+          if (dm.subAdminId) {
+            io?.to(`admin-room:${slug}:${dm.subAdminId}`).emit('new-direct-message', payload);
+            pushToUser(req.db, 'sub-admin', dm.subAdminId, pop(`💬 Message from ${sender.name}`, SUB_ADMIN_URL));
+          }
         } else if (role === 'sub-admin') {
           if (dm.type === 'sub-admin-teacher' && dm.teacherId) {
             // Sub-admin → teacher
-            io.to(`teacher-room:${slug}:${dm.teacherId}`).emit('new-direct-message', payload);
-            pushToUser(req.db, 'teacher', dm.teacherId, { title: `💬 Message from Sub-Admin`, body: message.trim().slice(0, 100), icon: '/icons/icon.svg', data: { url: '/teacher/dashboard?tab=messages' } });
+            io?.to(`teacher-room:${slug}:${dm.teacherId}`).emit('new-direct-message', payload);
+            pushToUser(req.db, 'teacher', dm.teacherId, pop('💬 Message from Sub-Admin', TEACHER_URL));
           } else if (dm.type === 'student-admin' && dm.studentId) {
             // Sub-admin → student + admin
-            io.to(`student-room:${slug}:${dm.studentId}`).emit('new-direct-message', payload);
-            io.to(adminContentRooms(slug)).emit('new-direct-message', payload);
+            io?.to(`student-room:${slug}:${dm.studentId}`).emit('new-direct-message', payload);
+            io?.to(adminContentRooms(slug)).emit('new-direct-message', payload);
+            pushToUser(req.db, 'student', dm.studentId, pop(`💬 Message from ${sender.name}`, STUDENT_URL));
           } else {
             // sub-admin-admin → admin
-            io.to(adminContentRooms(slug)).emit('new-direct-message', payload);
+            io?.to(adminContentRooms(slug)).emit('new-direct-message', payload);
           }
           // Push admins for sub-admin messages (except sub-admin-teacher which goes to teacher)
-          if (dm.type !== 'sub-admin-teacher') {
-            pushToAllAdmins(req.db, { title: `💬 Message from ${sender.name}`, body: message.trim().slice(0, 100), icon: '/icons/icon.svg', data: { url: '/admin/dashboard?tab=messages' } });
-          }
+          if (dm.type !== 'sub-admin-teacher') pushToAllAdmins(req.db, pop(`💬 Message from ${sender.name}`, ADMIN_URL));
         } else {
           // Student or teacher (non sub-admin-teacher) → admin broadcast
-          io.to(adminContentRooms(slug)).emit('new-direct-message', payload);
+          io?.to(adminContentRooms(slug)).emit('new-direct-message', payload);
           if (role === 'student' && dm.subAdminId) {
-            io.to(`admin-room:${slug}:${dm.subAdminId}`).emit('new-direct-message', payload);
+            io?.to(`admin-room:${slug}:${dm.subAdminId}`).emit('new-direct-message', payload);
+            pushToUser(req.db, 'sub-admin', dm.subAdminId, pop(`💬 Message from ${sender.name}`, SUB_ADMIN_URL));
           }
-          pushToAllAdmins(req.db, { title: `💬 Message from ${sender.name}`, body: message.trim().slice(0, 100), icon: '/icons/icon.svg', data: { url: '/admin/dashboard?tab=messages' } });
+          pushToAllAdmins(req.db, pop(`💬 Message from ${sender.name}`, ADMIN_URL));
         }
       }
     } catch (err) {

@@ -10,6 +10,7 @@ import AudioRecorder from "../../components/AudioRecorder";
 import { HERO, HERO_FONTS } from "../../components/hero/heroTheme";
 import { StarBuddy, Celebration, PowBurst } from "../../components/hero/HeroScene";
 import { HeroPage, HeroGate, HeroNotice, HeroLoading, useShareLinkSession } from "../../components/hero/HeroLinkKit";
+import { endedText } from "../../components/hero/linkText";
 
 // Photos and PDFs only (the server enforces the same list)
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "application/pdf"];
@@ -64,7 +65,7 @@ export default function HomeworkLinkPage() {
       )}
       {s.phase === "expired" && (
         <HeroNotice title="This mission has ended"
-          text={s.message || "The due date for this homework has passed. Ask your teacher if you still want to send it."} />
+          text={endedText("homework", s.endedAt)} />
       )}
       {s.phase === "gate" && (
         <HeroGate unlockPath={`${basePath}/unlock`} subtitle="Your homework mission is waiting." onUnlocked={s.onUnlocked} onFailure={s.onFailure} />

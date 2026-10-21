@@ -225,7 +225,7 @@ router.post("/:chatId/messages", verifyToken, validateObjectId("chatId"), async 
     try {
       const io   = req.app.get('io');
       const slug = req.center?.slug;
-      if (io && slug) {
+      if (slug) { // pop-ups go out even if the socket server is down
         const payload = {
           chatId:     chatId,
           message:    message.trim().slice(0, 120),
@@ -239,7 +239,7 @@ router.post("/:chatId/messages", verifyToken, validateObjectId("chatId"), async 
         if (role !== 'student')                       rooms.push(`student-room:${slug}:${chat.studentId}`);
         // Admins + only the sub-admins whose scope covers this chat's teacher
         if (role !== 'admin' && role !== 'sub-admin') rooms.push(...adminContentRooms(slug, chat.teacherId));
-        io.to(rooms).emit('new-group-message', payload);
+        io?.to(rooms).emit('new-group-message', payload);
 
         // Phone / desktop notification for the teacher and student in this chat
         // (only their signed-in devices that allowed notifications)
@@ -247,6 +247,7 @@ router.post("/:chatId/messages", verifyToken, validateObjectId("chatId"), async 
           title: `💬 ${senderName} · ${chat.chatName || 'Group chat'}`,
           body:  message.trim().slice(0, 100),
           icon:  '/icons/icon.svg',
+          tag:   `chat-${chatId}`, renotify: true, // one pop-up per chat, newest message
           data:  { url },
         });
         if (role !== 'teacher') pushToUser(req.db, 'teacher', chat.teacherId, note('/teacher/dashboard?tab=messages'));

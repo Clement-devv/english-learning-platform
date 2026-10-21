@@ -3,6 +3,8 @@
 // Both SunshineShell and CRMShell (and any future shells) consume this hook.
 
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { showLocalNotification } from "../../../utils/localNotify";
+import { useTabFromUrl } from "../../../hooks/useTabFromUrl";
 import { io } from "socket.io-client";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../../context/AuthContext.jsx";
@@ -128,6 +130,7 @@ export function useDashboardData() {
     typeof Notification !== "undefined" ? Notification.permission : "default"
   );
   const [activeTab,             setActiveTab]             = useState("dashboard");
+  useTabFromUrl(setActiveTab, ['dashboard','homework','quiz','flashcards','pronunciation','conversation','book-class','group-classes','messages','completed-classes','class-reports','schedule','charts','badges','certificates','leaderboard','recordings','reviews','referral']); // ?tab= from notification clicks / links
   const [unreadMessages,        setUnreadMessages]        = useState(0);
   const [homeworkPending,       setHomeworkPending]       = useState(0);
   const prevHomeworkRef = useRef(null);
@@ -257,10 +260,7 @@ export function useDashboardData() {
         setHomeworkPending(pending);
         setBadgeLoaded((l) => (l.homework ? l : { ...l, homework: true }));
         if (prevHomeworkRef.current !== null && pending > prevHomeworkRef.current) {
-          const diff = pending - prevHomeworkRef.current;
-          if ("Notification" in window && Notification.permission === "granted") {
-            new Notification(tr("useDashboardData.notifyNewHomework"), { body: tr("useDashboardData.youHaveNewHomeworkAssignment", { diff, value: diff > 1 ? "s" : "" }), icon: "/favicon.ico" });
-          }
+          // (the pop-up for new homework comes from the live event / web push, per item)
         }
         prevHomeworkRef.current = pending;
       } catch { /* silent */ }
@@ -275,10 +275,7 @@ export function useDashboardData() {
         setQuizPending(pending);
         setBadgeLoaded((l) => (l.quiz ? l : { ...l, quiz: true }));
         if (prevQuizRef.current !== null && pending > prevQuizRef.current) {
-          const diff = pending - prevQuizRef.current;
-          if ("Notification" in window && Notification.permission === "granted") {
-            new Notification(tr("useDashboardData.notifyNewQuiz"), { body: tr("useDashboardData.youHaveNewQuizAssigned", { diff, value: diff > 1 ? "zes" : "" }), icon: "/favicon.ico" });
-          }
+          // (the pop-up for a new quiz comes from the live event / web push, per item)
         }
         prevQuizRef.current = pending;
       } catch { /* silent */ }
@@ -492,31 +489,27 @@ export function useDashboardData() {
       socket = io(SOCKET_URL, { transports: ["websocket"], auth: { token } });
 
       socket.on("connect", () => { socket.emit("join-student-room"); });
-      socket.on("new-direct-message", ({ senderName, message }) => {
+      socket.on("new-direct-message", ({ dmId, senderName, message }) => {
         setUnreadMessages(prev => prev + 1);
-        if ("Notification" in window && Notification.permission === "granted") {
-          new Notification(`💬 Message from ${senderName}`, { body: message, icon: "/favicon.ico" });
-        }
+        showLocalNotification(`💬 Message from ${senderName}`, { body: message, tag: `dm-${dmId}`, renotify: true, url: "/student/dashboard?tab=messages" });
       });
-      socket.on("new-group-message", ({ senderName }) => {
+      socket.on("new-group-message", ({ chatId, senderName, message }) => {
         setUnreadMessages(prev => prev + 1);
-        if ("Notification" in window && Notification.permission === "granted") {
-          new Notification(`💬 Group message from ${senderName || "Someone"}`, { icon: "/favicon.ico" });
-        }
+        showLocalNotification(`💬 Message from ${senderName || "Someone"}`, { body: message, tag: `chat-${chatId}`, renotify: true, url: "/student/dashboard?tab=messages" });
       });
-      socket.on("booking-update", ({ title, message, type }) => {
+      socket.on("booking-update", ({ title, message, type, bookingId }) => {
         showToast(message, type === "rejected" ? "error" : "success");
-        if ("Notification" in window && Notification.permission === "granted") new Notification(title, { body: message, icon: "/favicon.ico" });
+        showLocalNotification(title, { body: message, tag: `booking-${bookingId}`, url: "/student/dashboard" });
         fetchStudentDataRef.current?.({ quiet: true });
       });
-      socket.on("homework-assigned", ({ title, message }) => {
+      socket.on("homework-assigned", ({ title, message, homeworkId }) => {
         showToast(message, "success");
-        if ("Notification" in window && Notification.permission === "granted") new Notification(title, { body: message, icon: "/favicon.ico" });
+        showLocalNotification(title, { body: message, tag: `hw-${homeworkId}`, url: "/student/dashboard?tab=homework" });
         setHomeworkPending(prev => prev + 1);
       });
-      socket.on("quiz-assigned", ({ title, message }) => {
+      socket.on("quiz-assigned", ({ title, message, quizId }) => {
         showToast(message, "success");
-        if ("Notification" in window && Notification.permission === "granted") new Notification(title, { body: message, icon: "/favicon.ico" });
+        showLocalNotification(title, { body: message, tag: `quiz-${quizId}`, url: "/student/dashboard?tab=quiz" });
         setQuizPending(prev => prev + 1);
       });
     }, 0);
@@ -553,10 +546,10 @@ export function useDashboardData() {
           teacherConfirmedAt: b.teacherConfirmedAt, autoConfirmAt: b.autoConfirmAt,
           topic: b.topic || "English Lesson",
         }));
-        if (newConfs.length > prev.length && "Notification" in window && Notification.permission === "granted") {
-          new Notification(tr("useDashboardData.notifyClassConfirmation"), {
+        if (newConfs.length > prev.length) {
+          showLocalNotification(tr("useDashboardData.notifyClassConfirmation"), {
             body: tr("useDashboardData.pleaseConfirmAttendanceFor", { title: newConfs[0]?.title }),
-            icon: "/favicon.ico",
+            tag: `confirm-${newConfs[0]?.id}`, url: "/student/dashboard",
           });
         }
         return newConfs;

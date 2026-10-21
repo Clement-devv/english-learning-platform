@@ -4,6 +4,7 @@
 // Same design language as student/teacher Sunshine shells.
 
 import React, { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react';
+import { useTabFromUrl } from "../../../../hooks/useTabFromUrl";
 import {
   TrendingUp, Video, User, Home, Bell, Users, DollarSign,
   Calendar, BarChart3, AlertTriangle, MessageCircle, Mic,
@@ -203,6 +204,7 @@ export default function SunshineShell() {
   }, []);
 
   const [activeTab,       setActiveTab]       = useState('overview');
+  useTabFromUrl(setActiveTab, ['overview','analytics','teachers','teacher-schedules','students','classes','group-classes','certificates','parents','applications','notifications','assign','bookings','messages','payments','class-pricing','chat-credits','pronunciation-credits','disputes','parent-checks','share-links','library','logged-classes','class-summaries','class-report','recordings','reports','reviews','referrals','sub-admins','branding','domain','cert-template']); // ?tab= from notification clicks / links
   const [teachers,        setTeachers]        = useState([]);
   const [students,        setStudents]        = useState([]);
   const [loading,         setLoading]         = useState(true);

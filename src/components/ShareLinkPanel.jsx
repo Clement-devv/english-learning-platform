@@ -85,7 +85,7 @@ export default function ShareLinkPanel({ item, kind, isDarkMode, onCreate, onDel
           </p>
         </>
       ) : expired ? (
-        <p style={{ margin: 0, fontSize: 12, color: muted }}>The link expired on {fmtDate(item.dueDate)} (due date passed).</p>
+        <p style={{ margin: 0, fontSize: 12, color: muted }}>The link expired on {fmtDate(item.dueDate)} (due date passed). Change the due date above to open it again — same link.</p>
       ) : (
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
           <span style={{ fontSize: 12, color: muted }}>No active link — the old one was deleted.</span>

@@ -13,12 +13,13 @@ import { teacherSchema } from "../schemas/teacherSchema.js";
 import { classPricingSchema } from "../schemas/classPricingSchema.js";
 import { getCenterBaseUrl } from "../emails/core.js";
 import { langOf } from "../emails/i18n.js";
-import { sendHomeworkGradedEmail, sendCertificateEmail, sendPaymentReceiptEmail } from "../emails/progressEmails.js";
+import { sendHomeworkGradedEmail, sendCertificateEmail, sendPaymentReceiptEmail, sendDueDateChangedEmail } from "../emails/progressEmails.js";
 import { loadCenterSettings, prefOn } from "./familyEmailPrefs.js";
 import { getCert, buildCertificatePdf, checkAndAwardCertificates } from "./certificates.js";
 import mongoose from "mongoose";
 import Center from "../models/master/Center.js";
 import logger from "./logger.js";
+import { pushStudent } from "./notifyPush.js";
 
 const getStudent  = (db) => db.models.Student      || db.model("Student",      studentSchema);
 const getParent   = (db) => db.models.Parent       || db.model("Parent",       parentSchema);
@@ -78,7 +79,9 @@ export async function emailCertificate(db, center, certId) {
     const cert = await getCert(db).findById(certId).lean();
     if (!cert) return;
     const { student, list } = await progressRecipients(db, center, cert.studentId);
-    if (!student || !list.length) return;
+    if (!student) return;
+    pushStudent(db, student._id, "🏆 Certificate awarded", cert.title, { tag: `cert-${cert._id}`, tab: "certificates" });
+    if (!list.length) return;
     const fullCenter = center?.slug ? (await Center.findOne({ slug: center.slug }).lean()) || center : center;
     let pdf = null;
     try { pdf = await buildCertificatePdf(cert, student, fullCenter); } catch (e) { logger.warn("Certificate PDF for email failed:", { error: e?.message }); }
@@ -107,6 +110,30 @@ export async function awardMilestonesAndNotify(db, studentId, center) {
   } catch (err) {
     logger.warn("Milestone certificates failed:", { error: err?.message });
     return [];
+  }
+}
+
+/**
+ * After a teacher moves a homework / quiz due date. The family of a managed student gets
+ * their share link (it works again until the new date); others get their dashboard.
+ * `item` needs { title, dueDate, studentId, teacherId, shareToken? }.
+ */
+export async function emailDueDateChanged(db, center, kind, item, { reopened = false } = {}) {
+  try {
+    const [{ student, list }, teacher] = await Promise.all([
+      progressRecipients(db, center, item.studentId?._id || item.studentId, { familyPref: "shareLinkEmails" }),
+      getTeacher(db).findById(item.teacherId?._id || item.teacherId).select("firstName lastName displayName").lean(),
+    ]);
+    if (!student) return;
+    const { baseUrl } = getCenterBaseUrl(center);
+    const familyHref = item.shareToken ? `${baseUrl}/${kind === "quiz" ? "q" : "hw"}/${item.shareToken}` : null;
+    const teacherName = teacher?.displayName?.trim() || fullName(teacher);
+    await each(list, (r) => sendDueDateChangedEmail({
+      ...r, href: r.href || familyHref, kind, studentName: student.firstName, teacherName,
+      title: item.title, dueDate: item.dueDate, reopened: reopened && !r.href, center,
+    }), "Due date changed");
+  } catch (err) {
+    logger.warn("Due date emails failed:", { error: err?.message });
   }
 }
 

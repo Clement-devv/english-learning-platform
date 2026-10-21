@@ -16,6 +16,7 @@ import { freeIntervals, teacherTz, bookingInterval, BUSY_STATUSES, findTeacherCl
 import { notifyAdmins } from "../utils/adminNotify.js";
 import { sendJoinReminder, ReminderError } from "../utils/joinReminder.js";
 import logger from "../utils/logger.js";
+import { pushTeacher, pushStudent } from "../utils/notifyPush.js";
 import { badRequest, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
 import { validateObjectId } from '../middleware/validateObjectId.js';
 import { parsePagination } from '../utils/pagination.js';
@@ -133,6 +134,7 @@ router.post("/", verifyToken, subAdminNeeds("canCreateBookings"), async (req, re
 
     if (createdBy === "admin") {
       sendBookingRequestToTeacher(teacher, student, populatedBooking, req.center?.centerName || "", req.center).catch(e => logger.error("Teacher booking email failed:", { error: e?.message }));
+      pushTeacher(req.db, teacherId, "📅 New class request", `${student.firstName} ${student.lastName || ""} — "${classTitle}"`, { tag: `booking-${booking._id}`, tab: "bookings" });
     }
     sendBookingCreatedToStudent(student, teacher, populatedBooking, req.center?.centerName || "", req.center).catch(e => logger.error("Student booking email failed:", { error: e?.message }));
 
@@ -147,8 +149,8 @@ router.post("/", verifyToken, subAdminNeeds("canCreateBookings"), async (req, re
           bookingId: booking._id,
         });
       }
-      pushToUser(req.db, 'student', student._id, { title: '📅 New Class Scheduled!', body: `"${classTitle}" has been booked for you`, icon: '/icons/icon.svg', data: { url: '/student/dashboard' } });
     } catch (_) {}
+    pushToUser(req.db, 'student', student._id, { title: initialStatus === 'pending' ? '📅 New class requested' : '📅 New class scheduled', body: initialStatus === 'pending' ? `"${classTitle}" — waiting for your teacher to confirm` : `"${classTitle}" has been booked for you`, icon: '/icons/icon.svg', tag: `booking-${booking._id}`, data: { url: '/student/dashboard' } }); // web push: independent of the socket server
 
     res.status(201).json({
       success: true,
@@ -223,7 +225,7 @@ router.patch("/:id/dispute", verifyToken, validateObjectId("id"), async (req, re
 <ul><li><strong>Class:</strong> ${esc(updated.classTitle)} — ${esc(new Date(updated.scheduledTime).toUTCString())}</li>
 <li><strong>Teacher:</strong> ${esc(updated.teacherId.firstName)} ${esc(updated.teacherId.lastName)}</li>
 <li><strong>Reason:</strong> ${esc(reason)}</li></ul>
-<p>Please review it within ${DISPUTE_DAYS} days in <a href="${baseUrl}/admin/dashboard">Disputes</a>, or it will be rejected automatically.</p>`,
+<p>Please review it within ${DISPUTE_DAYS} days in <a href="${baseUrl}/admin?tab=disputes">Disputes</a>, or it will be rejected automatically.</p>`,
       }).catch(e => logger.warn("Student dispute email failed:", { error: e?.message }));
     }
     res.json({ success: true, message: "Dispute sent — your school will review it." });
@@ -289,8 +291,8 @@ router.patch("/:id/accept", verifyToken, validateObjectId("id"), async (req, res
         message: `Your class "${booking.classTitle}" has been confirmed`,
         bookingId: booking._id,
       });
-      pushToUser(req.db, 'student', booking.studentId._id, { title: '✅ Class Confirmed!', body: `"${booking.classTitle}" is confirmed`, icon: '/icons/icon.svg', data: { url: '/student/dashboard' } });
     } catch (_) {}
+    pushToUser(req.db, 'student', booking.studentId._id, { title: '✅ Class Confirmed!', body: `"${booking.classTitle}" is confirmed`, icon: '/icons/icon.svg', tag: `booking-${booking._id}`, data: { url: '/student/dashboard' } }); // web push: independent of the socket server
 
     res.json({ success: true, message: "Booking accepted successfully", booking });
   } catch (err) {
@@ -365,8 +367,8 @@ router.patch("/:id/reject", verifyToken, validateObjectId("id"), async (req, res
         message: `Your booking "${booking.classTitle}" was not accepted`,
         bookingId: booking._id,
       });
-      pushToUser(req.db, 'student', booking.studentId._id, { title: '❌ Booking Declined', body: `"${booking.classTitle}" was not accepted`, icon: '/icons/icon.svg', data: { url: '/student/dashboard' } });
     } catch (_) {}
+    pushToUser(req.db, 'student', booking.studentId._id, { title: '❌ Booking Declined', body: `"${booking.classTitle}" was not accepted`, icon: '/icons/icon.svg', tag: `booking-${booking._id}`, data: { url: '/student/dashboard' } }); // web push: independent of the socket server
 
     res.json({ success: true, message: "Booking rejected", booking });
   } catch (err) {
@@ -415,7 +417,6 @@ router.patch("/:id/complete", verifyToken, verifyAdmin, validateObjectId("id"), 
         message: `Your class "${booking.classTitle}" has been marked as completed`,
         bookingId: booking._id,
       });
-      pushToUser(req.db, 'student', booking.studentId._id, { title: '🎉 Class Completed!', body: `"${booking.classTitle}" is done — great work!`, icon: '/icons/icon.svg', data: { url: '/student/dashboard' } });
       // Notify student of any new certificates
       for (const cert of newCerts) {
         io.to(`student-room:${req.center.slug}:${booking.studentId._id}`).emit('certificate-awarded', {
@@ -426,6 +427,7 @@ router.patch("/:id/complete", verifyToken, verifyAdmin, validateObjectId("id"), 
         });
       }
     } catch (_) {}
+    pushToUser(req.db, 'student', booking.studentId._id, { title: '🎉 Class Completed!', body: `"${booking.classTitle}" is done — great work!`, icon: '/icons/icon.svg', tag: `booking-${booking._id}`, data: { url: '/student/dashboard' } }); // web push: independent of the socket server
 
     const updatedBooking = await Booking.findById(booking._id)
       .populate("teacherId", "firstName lastName earned lessonsCompleted")
@@ -591,6 +593,10 @@ router.patch("/:id/cancel", verifyToken, validateObjectId("id"), async (req, res
         centerName: req.center?.centerName || "", center: req.center })
         .catch((e) => logger.warn("Class cancelled email failed:", { error: e?.message }));
     }
+    const when = new Date(populatedBooking.scheduledTime).toUTCString().slice(0, 22);
+    const tag = `booking-${populatedBooking._id}`;
+    if (byRole !== "teacher") pushTeacher(req.db, populatedBooking.teacherId, "🚫 Class cancelled", `"${populatedBooking.classTitle}" · ${when} UTC`, { tag, tab: "classes" });
+    if (byRole !== "student") pushStudent(req.db, populatedBooking.studentId, "🚫 Class cancelled", `"${populatedBooking.classTitle}" · ${when} UTC`, { tag });
   } catch (err) {
     logger.error("Error cancelling booking:", { error: err?.message });
     res.status(500).json({ success: false, message: "Error cancelling booking" });
@@ -684,6 +690,7 @@ router.post("/student-request", verifyToken, async (req, res) => {
       .populate("teacherId", "firstName lastName email timezone")
       .populate("studentId", "firstName lastName email isManaged emailLanguage timezone");
 
+    pushTeacher(req.db, teacher._id, "📅 New class request", `${student.firstName} ${student.lastName || ""} — "${populated.classTitle}"`, { tag: `booking-${populated._id}`, tab: "bookings" });
     sendBookingRequestToTeacher(teacher, student, populated, req.center?.centerName || "", req.center)
       .catch(e => logger.error("Teacher booking email failed:", { error: e?.message }));
     sendBookingCreatedToStudent(student, teacher, populated, req.center?.centerName || "", req.center)

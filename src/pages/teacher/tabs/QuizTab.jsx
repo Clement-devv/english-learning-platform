@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import ManagedBadge from "../../../components/ManagedBadge";
 import ShareLinkPanel from "../../../components/ShareLinkPanel";
+import DueDateEditor from "../../../components/DueDateEditor";
 import Pagination from "../../../components/Pagination";
 import { downloadQuizResultPdf } from "../../../utils/quizPdf";
 
@@ -562,6 +563,17 @@ export default function QuizTab({ teacherInfo, students, isDarkMode }) {
       showToast("New link created");
     } catch (err) { showToast(err?.response?.data?.message || "Could not create link", "error"); }
   };
+  // Move the due date (also reopens an expired parent link — same address)
+  const handleDueDate = async (id, dueDate) => {
+    try {
+      const { data } = await api.patch(`/quiz/${id}/due-date`, { dueDate });
+      setQuizzes(prev => prev.map(q => (q._id === id ? { ...q, dueDate: data.quiz.dueDate, shareToken: data.quiz.shareToken, shareLink: data.quiz.shareLink } : q)));
+      showToast(data.message || "Due date changed");
+    } catch (err) {
+      showToast(err?.response?.data?.message || "Could not change the due date", "error");
+      throw err;
+    }
+  };
   const handleDeleteLink = async (id) => {
     try {
       await api.delete(`/quiz/${id}/share-link`);
@@ -1021,6 +1033,11 @@ export default function QuizTab({ teacherInfo, students, isDarkMode }) {
 
                 {isExpanded && (
                   <div className="tqz-detail" style={{ borderTop: `1px solid ${c.border}`, padding: "16px 18px", display: "flex", flexDirection: "column", gap: 14 }}>
+                    {/* Due date — can move until the quiz is taken */}
+                    {quiz.status !== "attempted" && (
+                      <DueDateEditor dueDate={quiz.dueDate} isDarkMode={isDarkMode}
+                        onSave={(d) => handleDueDate(quiz._id, d)} />
+                    )}
                     {/* Share link — managed students only, until the quiz is taken */}
                     {student?.isManaged && quiz.status !== "attempted" && (
                       <ShareLinkPanel item={quiz} kind="quiz" isDarkMode={isDarkMode}
