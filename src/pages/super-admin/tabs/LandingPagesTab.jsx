@@ -1,6 +1,6 @@
 // src/pages/super-admin/tabs/LandingPagesTab.jsx
 // Super admin: build & manage the public landing page for each center.
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, createContext, useContext } from 'react';
 import {
   Globe, ChevronDown, ChevronUp, Save, Eye, EyeOff,
   Plus, Trash2, Loader2, Monitor, Smartphone, X, Wand2,
@@ -9,7 +9,7 @@ import ClassicTemplate from '../../landing-page/templates/ClassicTemplate';
 import ModernTemplate  from '../../landing-page/templates/ModernTemplate';
 import MinimalTemplate from '../../landing-page/templates/MinimalTemplate';
 import { ImageField, ListEditor } from './LandingEditorFields';
-import { classicSample, CLASSIC_FEATURE_ICONS } from '../../landing-page/classicContent';
+import { classicSample, classicExampleStrings, CLASSIC_FEATURE_ICONS } from '../../landing-page/classicContent';
 import { GoogleFont }  from '../../landing-page/utils.jsx';
 
 const PREVIEW_TEMPLATES = { classic: ClassicTemplate, modern: ModernTemplate, minimal: MinimalTemplate };
@@ -57,6 +57,28 @@ const SECTION_TABS = [
   ['gallery', 'Gallery'], ['cta', 'Enrol banner'], ['faq', 'FAQ'], ['contact', 'Contact & footer'],
   ['links', 'Links'], ['seo', 'SEO'],
 ];
+// Where each tab's content appears on the Classic website
+const SECTION_WHERE = {
+  design: 'Colours and fonts used across the whole website.',
+  hero: 'The first screen visitors see: the announcement bar at the very top, then the small label, big headline, buttons and the arch-shaped photo. The first three “Why us” items show as cards under it.',
+  stats: 'A row of big numbers under the hero that count up as visitors scroll to them. The 1st number also shows in the hero’s trust line; the 2nd and 3rd sit on the floating cards beside the hero photo.',
+  about: 'Your story: two overlapping photos with a round seal (badge number + text), the title, body text and a checklist.',
+  programs: 'Arch-topped course cards, numbered “No. 01”, “No. 02”… in the order listed here.',
+  features: 'A numbered list (01, 02…) of reasons to choose the school. The first three also appear under the hero.',
+  teachers: 'Teacher cards with photo, name, role and a short bio.',
+  testimonials: 'Reviews. With 3 or more, the first becomes a large quote in your main colour and the rest show as cards. Their photos and stars also appear in the hero’s trust line.',
+  gallery: 'A photo grid — the first photo is shown large.',
+  cta: 'A full-width “Enrolment open” banner with a photo background, near the end of the page.',
+  faq: 'Questions visitors can click to open, next to the section title.',
+  contact: 'Contact details near the bottom of the page, plus the dark footer (logo, footer text, social icons and links).',
+  links: 'The “Login” menu in the header and the social icons in the top bar and footer.',
+  seo: 'Not shown on the page — the browser-tab title and the text Google shows in search results.',
+};
+// Sample section key → the editor tab that edits it
+const SAMPLE_TAB = { topBar: 'hero', footer: 'contact' };
+// Example strings of the open center's sample — fields holding one get an “Example” tag
+const ExampleCtx = createContext(null);
+
 // Sections only the Classic template shows
 const CLASSIC_ONLY = ['stats', 'programs', 'features', 'testimonials', 'gallery', 'cta', 'faq'];
 
@@ -100,6 +122,28 @@ function fillEmpty(target, sample) {
     else if (cur === undefined || cur === null || cur === '' || (typeof v === 'boolean' && cur === false)) out[k] = v;
   }
   return out;
+}
+
+/** A website nobody has written yet (Mongo fills defaults, so check the content). */
+const isBlankSite = (lp) => !lp.hero?.headline && !lp.hero?.subheadline && !lp.about?.body
+  && !lp.teachers?.length && !lp.programs?.items?.length && !lp.features?.items?.length && !lp.stats?.items?.length;
+
+/** The Classic sample over a blank website, using the center's real details where known. */
+function startFromSample(lp, center) {
+  const sample = classicSample(center.centerName);
+  if (center.phone)   sample.contact.phone   = center.phone;
+  if (center.address) sample.contact.address = center.address;
+  return { ...mergeDeep(lp, sample), template: 'classic', published: !!lp.published };
+}
+
+/** Editor tabs that still hold example text or photos. */
+function tabsWithExamples(lp, examples) {
+  const tabs = new Set();
+  const has = (v, set) => Array.isArray(v) ? v.some(x => has(x, set))
+    : v && typeof v === 'object' ? Object.values(v).some(x => has(x, set))
+    : set.has(v);
+  for (const [k, set] of Object.entries(examples)) if (set.size && has(lp[k], set)) tabs.add(SAMPLE_TAB[k] || k);
+  return SECTION_TABS.filter(([k]) => tabs.has(k));
 }
 
 function authHeaders() {
@@ -160,11 +204,15 @@ export default function LandingPagesTab({ centers, darkMode, focusCenterId }) {
       try {
         const r = await fetch(`${API}/super-admin/centers/${cid}/landing-page`, { headers: authHeaders() });
         const d = await r.json();
-        const lp = d.landingPage && Object.keys(d.landingPage).length
+        let lp = d.landingPage && Object.keys(d.landingPage).length
           ? mergeDeep({ ...DEFAULT_LP }, d.landingPage)
           : { ...DEFAULT_LP, design: { ...DEFAULT_LP.design, primaryColor: center.branding?.primaryColor || '#BE185D' } };
+        // A new website opens filled with the Classic example, so every field shows
+        // what goes where — the super admin then swaps in the school's own content.
+        const blank = isBlankSite(lp);
+        if (blank) lp = startFromSample(lp, center);
         setLps(p => ({ ...p, [cid]: lp }));
-        setSection(p => ({ ...p, [cid]: 'design' }));
+        setSection(p => ({ ...p, [cid]: blank ? 'hero' : 'design' }));
       } catch {
         flash(cid, 'Failed to load landing page data', false);
       }
@@ -205,6 +253,8 @@ export default function LandingPagesTab({ centers, darkMode, focusCenterId }) {
     const lp    = lps[cid];
     if (!lp) return;
     const next  = !lp.published;
+    const left  = next ? tabsWithExamples(lp, classicExampleStrings(center.centerName)) : [];
+    if (left.length && !window.confirm(`These tabs still have example content:\n\n${left.map(([, l]) => '• ' + l).join('\n')}\n\nPublish anyway? Visitors will see the example text and photos.`)) return;
     setToggling(p => ({ ...p, [cid]: true }));
     try {
       const r = await fetch(`${API}/super-admin/centers/${cid}/landing-page/publish`, {
@@ -246,6 +296,13 @@ export default function LandingPagesTab({ centers, darkMode, focusCenterId }) {
     flash(cid, 'Sample content added — press Save to keep it');
   };
 
+  const startBlank = (center) => {
+    const cid = center._id;
+    if (!window.confirm('Clear all the example content and start with an empty website?\n\nColours and fonts are kept. Nothing is saved until you press Save.')) return;
+    setLps(p => ({ ...p, [cid]: { ...deepClone(DEFAULT_LP), design: p[cid]?.design || DEFAULT_LP.design, template: p[cid]?.template || 'classic', published: !!p[cid]?.published } }));
+    flash(cid, 'Example content cleared — press Save to keep it');
+  };
+
   const s = styles(isDark, card, bdr, txt, muted, inputBg, inputBdr);
 
   return (
@@ -272,6 +329,9 @@ export default function LandingPagesTab({ centers, darkMode, focusCenterId }) {
         const flash_msg = msg[cid];
         const published = lp?.published || false;
         const sec = section[cid] || 'design';
+        const examples = isOpen && lp ? classicExampleStrings(center.centerName) : null;
+        const exampleTabs = examples ? tabsWithExamples(lp, examples) : [];
+        const exampleSet = examples ? new Set(Object.values(examples).flatMap(x => [...x])) : null;
 
         return (
           <div key={cid} ref={el => { cardRefs.current[cid] = el; }} style={s.centerCard}>
@@ -297,6 +357,7 @@ export default function LandingPagesTab({ centers, darkMode, focusCenterId }) {
 
             {/* Editor body */}
             {isOpen && lp && (
+              <ExampleCtx.Provider value={exampleSet}>
               <div style={{ padding: '20px 24px', borderTop: `1px solid ${bdr}` }}>
 
                 {/* Action bar */}
@@ -317,6 +378,23 @@ export default function LandingPagesTab({ centers, darkMode, focusCenterId }) {
                   </button>
                 </div>
 
+                {exampleTabs.length > 0 && (
+                  <div style={s.exampleBox}>
+                    <strong style={{ color: txt, fontSize: 13.5 }}>This website is filled with example content</strong>
+                    <span style={s.hint}>
+                      It shows where everything goes. Open each tab, replace the text and photos marked <span style={s.exampleTag}>Example</span> with
+                      the school’s own (or delete what you don’t need), press Preview to check, then Save.
+                    </span>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+                      <span style={{ fontSize: 12, color: muted, fontWeight: 600 }}>Still to edit:</span>
+                      {exampleTabs.map(([k, label]) => (
+                        <button key={k} onClick={() => setSection(p => ({ ...p, [cid]: k }))} style={s.exampleChip}>{label}</button>
+                      ))}
+                      <button onClick={() => startBlank(center)} style={{ ...s.exampleChip, marginLeft: 'auto', background: 'transparent', color: muted }}>Start blank instead</button>
+                    </div>
+                  </div>
+                )}
+
                 {/* ── Template picker ── */}
                 <TemplatePicker
                   selected={lp.template || 'classic'}
@@ -327,11 +405,16 @@ export default function LandingPagesTab({ centers, darkMode, focusCenterId }) {
                 {/* Section tabs */}
                 <div style={s.sectionTabs}>
                   {SECTION_TABS.map(([k, label]) => (
-                    <button key={k} onClick={() => setSection(p => ({ ...p, [cid]: k }))} style={{ ...s.sectionTab, ...(sec === k ? s.sectionTabActive : {}) }}>
+                    <button key={k} onClick={() => setSection(p => ({ ...p, [cid]: k }))} style={{ ...s.sectionTab, ...(sec === k ? s.sectionTabActive : {}) }}
+                      title={exampleTabs.some(([t]) => t === k) ? 'Still has example content' : undefined}>
                       {label}
+                      {exampleTabs.some(([t]) => t === k) && <span style={s.exampleDot} aria-label="has example content" />}
                     </button>
                   ))}
                 </div>
+                {SECTION_WHERE[sec] && (
+                  <p style={s.whereNote}><strong style={{ color: txt }}>On the page: </strong>{SECTION_WHERE[sec]}</p>
+                )}
                 {lp.template !== 'classic' && CLASSIC_ONLY.includes(sec) && (
                   <p style={s.note}>This section shows on the <strong>Classic</strong> template. Pick Classic above to use it.</p>
                 )}
@@ -591,6 +674,7 @@ export default function LandingPagesTab({ centers, darkMode, focusCenterId }) {
 
 
               </div>
+              </ExampleCtx.Provider>
             )}
           </div>
         );
@@ -813,10 +897,21 @@ function MinimalThumb({ active }) {
 }
 
 /* ─── Reusable field components ─────────────────────────────────────────── */
+/** Field label, tagged “Example” while the value is still the sample's. */
+function FieldLabel({ label, value, s }) {
+  const examples = useContext(ExampleCtx);
+  return (
+    <label style={s.label}>
+      {label}
+      {examples?.has(value) && <span style={{ ...s.exampleTag, marginLeft: 6 }}>Example</span>}
+    </label>
+  );
+}
+
 function TextField({ label, value, onChange, placeholder = '', s }) {
   return (
     <div style={s.field}>
-      <label style={s.label}>{label}</label>
+      <FieldLabel label={label} value={value} s={s} />
       <input value={value || ''} onChange={e => onChange(e.target.value)} placeholder={placeholder} style={s.input} />
     </div>
   );
@@ -825,7 +920,7 @@ function TextField({ label, value, onChange, placeholder = '', s }) {
 function TextareaField({ label, value, onChange, rows = 4, placeholder = '', s }) {
   return (
     <div style={s.field}>
-      <label style={s.label}>{label}</label>
+      <FieldLabel label={label} value={value} s={s} />
       <textarea value={value || ''} onChange={e => onChange(e.target.value)} rows={rows} placeholder={placeholder} style={{ ...s.input, resize: 'vertical' }} />
     </div>
   );
@@ -883,6 +978,11 @@ function styles(isDark, card, bdr, txt, muted, inputBg, inputBdr) {
     _bdr: inputBdr, _txt: txt, _muted: muted,
     note: { fontSize: 12.5, color: '#f59e0b', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.25)', borderRadius: 9, padding: '8px 12px', margin: '0 0 16px' },
     hint: { fontSize: 12, color: muted, lineHeight: 1.5 },
+    whereNote: { fontSize: 12.5, color: muted, lineHeight: 1.55, margin: '0 0 16px', padding: '8px 12px', borderRadius: 9, background: isDark ? 'rgba(255,255,255,0.03)' : '#f8fafc', border: `1px dashed ${bdr}` },
+    exampleBox: { display: 'flex', flexDirection: 'column', gap: 8, padding: '12px 14px', margin: '0 0 18px', borderRadius: 12, background: isDark ? 'rgba(139,92,246,0.1)' : '#f5f3ff', border: `1px solid ${isDark ? 'rgba(139,92,246,0.3)' : '#ddd6fe'}` },
+    exampleTag: { display: 'inline-block', fontSize: 10, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', padding: '1px 6px', borderRadius: 999, color: isDark ? '#c4b5fd' : '#6d28d9', background: isDark ? 'rgba(139,92,246,0.18)' : '#ede9fe', verticalAlign: 'middle' },
+    exampleChip: { fontSize: 12, fontWeight: 600, padding: '4px 10px', borderRadius: 999, cursor: 'pointer', border: `1px solid ${isDark ? 'rgba(139,92,246,0.35)' : '#ddd6fe'}`, background: isDark ? 'rgba(139,92,246,0.15)' : '#fff', color: isDark ? '#c4b5fd' : '#6d28d9', fontFamily: 'inherit' },
+    exampleDot: { display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: '#8b5cf6', marginLeft: 6, verticalAlign: 'middle' },
     subCard: { display: 'flex', flexDirection: 'column', gap: 12, padding: 14, borderRadius: 12, border: `1px solid ${bdr}`, background: isDark ? 'rgba(255,255,255,0.02)' : '#f8fafc' },
     smallBtn: { display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 11px', borderRadius: 8, border: `1px solid ${inputBdr}`, background: 'transparent', color: txt, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: FONT },
     iconBtn: { display: 'inline-grid', placeItems: 'center', width: 28, height: 26, borderRadius: 7, border: `1px solid ${inputBdr}`, background: 'transparent', color: muted, cursor: 'pointer' },

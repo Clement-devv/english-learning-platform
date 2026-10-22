@@ -104,7 +104,12 @@ export function classicSample(centerName = 'Our school') {
         { q: 'Can I try a lesson before paying?', a: 'Of course — book a free trial lesson and meet your teacher before you decide.' },
       ],
     },
-    contact: { enabled: true, hours: 'Mon–Fri 8:00–20:00 · Sat 9:00–14:00' },
+    contact: { enabled: true, email: 'hello@yourschool.com', phone: '+1 555 0100', address: '12 Example Street, Your City', hours: 'Mon–Fri 8:00–20:00 · Sat 9:00–14:00' },
+    links: { facebook: 'https://facebook.com/yourschool', instagram: 'https://instagram.com/yourschool' },
+    seo: {
+      title: `${centerName} — English lessons for kids, teens & adults`,
+      description: `${centerName}: friendly English classes online and in person. Small groups, qualified teachers and a free placement test.`,
+    },
     footer: { about: `${centerName} offers friendly, high-quality English lessons for children, teens and adults — online and in person.` },
     teachers: [
       { name: 'Grace Mensah', title: 'Head of Studies · CELTA', bio: 'Ten years teaching young learners and exam classes.', photo: photo('1573497019940-1c28c88b4f3e', 600) },
@@ -113,4 +118,24 @@ export function classicSample(centerName = 'Our school') {
       { name: 'Daniel Okafor', title: 'Business English Coach', bio: 'Helps professionals communicate clearly at work.', photo: photo('1519085360753-af0119f7cbe7', 600) },
     ],
   };
+}
+
+/**
+ * Text and photos in the sample that are clearly "example" — long sentences, the
+ * sample photos and the yourschool / Example Street placeholders. Short generic
+ * words ("Learn more", "About us") are left out so they never stay flagged.
+ */
+export const isExampleText = (v) => typeof v === 'string' && (v.length >= 25 || /unsplash\.com|yourschool|example street/i.test(v));
+
+/** Every example string in the sample, grouped by top-level section key. */
+export function classicExampleStrings(centerName) {
+  const bySection = {};
+  // every sample number ("1,200+", "98%") is an example, however short
+  const walk = (v, set, all) => {
+    if (Array.isArray(v)) v.forEach(x => walk(x, set, all));
+    else if (v && typeof v === 'object') Object.values(v).forEach(x => walk(x, set, all));
+    else if (isExampleText(v) || (all && typeof v === 'string' && v)) set.add(v);
+  };
+  for (const [k, v] of Object.entries(classicSample(centerName))) walk(v, (bySection[k] = new Set()), k === 'stats');
+  return bySection;
 }

@@ -1,12 +1,14 @@
 // src/pages/landing-page/CenterLandingPage.jsx
 // Fetches the center's published landing page and routes to the correct template.
-// Redirects to /admin/login if no published page exists for this center.
+// No published page yet → a "coming soon" page with login buttons (ComingSoonPage);
+// center not found → /admin/login.
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PageLoader, GoogleFont } from './utils.jsx';
 import ClassicTemplate from './templates/ClassicTemplate';
 import ModernTemplate  from './templates/ModernTemplate';
 import MinimalTemplate from './templates/MinimalTemplate';
+import ComingSoonPage  from './ComingSoonPage';
 
 const API = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api/v1';
 
@@ -19,6 +21,7 @@ const TEMPLATES = {
 export default function CenterLandingPage() {
   const navigate  = useNavigate();
   const [data,    setData]    = useState(null);
+  const [soon,    setSoon]    = useState(null);  // center info while its website isn't published
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -32,6 +35,7 @@ export default function CenterLandingPage() {
       .then(r => r.json())
       .then(d => {
         if (d.success) setData(d);
+        else if (d.center) setSoon(d.center);
         else navigate('/admin/login', { replace: true });
       })
       .catch(() => navigate('/admin/login', { replace: true }))
@@ -39,6 +43,7 @@ export default function CenterLandingPage() {
   }, [navigate]);
 
   if (loading) return <PageLoader />;
+  if (soon)    return <ComingSoonPage center={soon} />;
   if (!data)   return null;
 
   const { center, landingPage: lp } = data;

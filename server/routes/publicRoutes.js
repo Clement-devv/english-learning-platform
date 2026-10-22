@@ -7,7 +7,7 @@ import { tenantMiddleware } from '../middleware/tenantMiddleware.js';
 import { sendEmail }        from '../emails/core.js';
 import logger from '../utils/logger.js';
 import { contactFormLimiter } from '../middleware/rateLimiter.js';
-import { notFound, serverError } from '../utils/apiResponse.js';
+import { serverError } from '../utils/apiResponse.js';
 import { PUBLIC_LANDING_KEYS } from '../utils/landingPage.js';
 
 const router = express.Router();
@@ -21,7 +21,16 @@ router.get('/landing-page', tenantMiddleware, async (req, res) => {
     const lp = center.landingPage;
 
     if (!lp || !lp.published) {
-      return notFound(res, 'No public landing page for this center');
+      // Name, logo and colour only — the site shows a "coming soon" page with login buttons
+      return res.status(404).json({
+        success: false,
+        message: 'No public landing page for this center',
+        center: {
+          centerName:   center.centerName,
+          logo:         center.branding?.logo || null,
+          primaryColor: center.branding?.primaryColor || null,
+        },
+      });
     }
 
     // Only expose safe public fields — never expose dbName, credits, pendingPasswordHash etc.
