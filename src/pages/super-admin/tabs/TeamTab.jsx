@@ -2,9 +2,13 @@
 // Super admins who run the platform together. Everyone sees and manages the same centers
 // and settings — each person just has their own login, sign-in codes and name in the logs.
 // Invite → they get an email link to set a password. Switch off / remove anyone but yourself.
+// Passwords: change your own here; "Reset password" emails a teammate a link to set a new
+// one. The main super admin (made on the server) resets theirs on the droplet instead:
+//   docker compose exec app node scripts/resetSuperAdminPassword.js <email>
 // Server: server/routes/superAdminTeamRoutes.js
 import { useState, useEffect, useCallback } from 'react';
-import { Users, UserPlus, RefreshCw, Mail, Power, Trash2, ShieldCheck } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Users, UserPlus, RefreshCw, Mail, Power, Trash2, ShieldCheck, KeyRound, Crown } from 'lucide-react';
 import styles from '../SuperAdmin.module.css';
 
 const fmt = (d) => (d ? new Date(d).toLocaleString(undefined, { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—');
@@ -69,6 +73,28 @@ export default function TeamTab({ apiBase, authHeaders }) {
     if (window.confirm(what)) call(`remove-${a.id}`, `/${a.id}`, { method: 'DELETE' });
   };
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
+  const resetPassword = (a) => {
+    if (window.confirm(`Reset the password of ${a.firstName} ${a.lastName}? Their old password stops working and they're signed out everywhere. We'll email them a link (valid 1 hour) to set a new one.`)) {
+      call(`reset-${a.id}`, `/${a.id}/reset-password`, { method: 'POST' });
+    }
+  };
+
+  // Change your own password → every device (this one too) is signed out
+  const navigate = useNavigate();
+  const [pw, setPw] = useState({ current: '', next: '', again: '' });
+  const setP = (k) => (e) => setPw((f) => ({ ...f, [k]: e.target.value }));
+  const changePassword = async (e) => {
+    e.preventDefault();
+    if (pw.next !== pw.again) { flash("The two new passwords don't match", 'err'); return; }
+    const done = await call('password', '/me/password', { method: 'POST', body: JSON.stringify({ currentPassword: pw.current, newPassword: pw.next }) });
+    if (!done) return;
+    setPw({ current: '', next: '', again: '' });
+    setTimeout(() => {
+      localStorage.removeItem('superAdminToken');
+      localStorage.removeItem('superAdminInfo');
+      navigate('/super-admin/login', { replace: true });
+    }, 1500);
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -121,7 +147,13 @@ export default function TeamTab({ apiBase, authHeaders }) {
                     <tr key={a.id} className={styles.tr}>
                       <td className={styles.td}>
                         <strong>{a.firstName} {a.lastName}</strong>{a.isYou && <span style={{ marginLeft: 6, fontSize: 11, opacity: 0.7 }}>(you)</span>}
+                        {a.isMain && (
+                          <span title="Made on the server — resets their password on the droplet" style={{ marginLeft: 6, display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 10, fontWeight: 800, padding: '2px 7px', borderRadius: 999, color: '#d97706', background: 'rgba(245,158,11,0.14)' }}>
+                            <Crown size={10} /> Main
+                          </span>
+                        )}
                         {a.invitedBy && <div style={{ fontSize: 11, opacity: 0.6 }}>invited by {a.invitedBy}</div>}
+                        {a.resetPending && <div style={{ fontSize: 11, color: '#d97706', marginTop: 2 }}>password reset link sent</div>}
                       </td>
                       <td className={styles.td}>{a.email}</td>
                       <td className={styles.td}>
@@ -136,6 +168,11 @@ export default function TeamTab({ apiBase, authHeaders }) {
                             {a.status === 'invited' && (
                               <button style={btn()} disabled={!!busy} onClick={() => call(`resend-${a.id}`, `/${a.id}/resend`, { method: 'POST' })}>
                                 <Mail size={13} /> {busy === `resend-${a.id}` ? 'Sending…' : 'Resend'}
+                              </button>
+                            )}
+                            {a.status !== 'invited' && !a.isMain && (
+                              <button style={btn()} disabled={!!busy} onClick={() => resetPassword(a)}>
+                                <KeyRound size={13} /> {busy === `reset-${a.id}` ? 'Sending…' : 'Reset password'}
                               </button>
                             )}
                             {a.status !== 'invited' && (
@@ -157,6 +194,30 @@ export default function TeamTab({ apiBase, authHeaders }) {
           </div>
         )}
       </div>
+
+      <form onSubmit={changePassword} className={styles.card}>
+        <h2 className={styles.sectionTitle} style={{ marginBottom: 12 }}><KeyRound size={16} color="#d97706" /> Change your password</h2>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 10, alignItems: 'end' }}>
+          <label style={{ fontSize: 12, fontWeight: 700 }}>Current password
+            <input className={styles.input} type="password" autoComplete="current-password" value={pw.current} onChange={setP('current')} required style={{ marginTop: 4 }} />
+          </label>
+          <label style={{ fontSize: 12, fontWeight: 700 }}>New password
+            <input className={styles.input} type="password" autoComplete="new-password" value={pw.next} onChange={setP('next')} minLength={12} required style={{ marginTop: 4 }} />
+          </label>
+          <label style={{ fontSize: 12, fontWeight: 700 }}>New password again
+            <input className={styles.input} type="password" autoComplete="new-password" value={pw.again} onChange={setP('again')} required style={{ marginTop: 4 }} />
+          </label>
+          <button type="submit" disabled={busy === 'password'} style={{ ...btn('primary'), padding: '10px 16px', justifyContent: 'center' }}>
+            <KeyRound size={14} /> {busy === 'password' ? 'Saving…' : 'Change password'}
+          </button>
+        </div>
+        <p style={{ margin: '10px 0 0', fontSize: 12, opacity: 0.65, lineHeight: 1.6 }}>
+          At least 12 characters, with upper- and lower-case letters, a number and a symbol (@ $ ! % * ? &amp;). Every device, this one too, is signed out afterwards.
+          {team.some((a) => a.isYou && a.isMain)
+            ? 'Forgot it? As the main super admin you reset it on the server (scripts/resetSuperAdminPassword.js).'
+            : 'Forgot it? Another super admin can reset it from this page.'}
+        </p>
+      </form>
 
       {notice && (
         <div role="status" style={{ position: 'fixed', top: 20, right: 20, zIndex: 9999, padding: '12px 18px', borderRadius: 12, fontSize: 13, fontWeight: 700, color: '#fff',

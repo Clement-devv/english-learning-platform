@@ -349,7 +349,19 @@ docker compose exec app sh
 
 # Health check
 curl http://localhost:5000/api/health/ready
+
+# Forgot the MAIN super admin password → prints a one-time link (1 hour) to set a new one.
+# Old password stops working and every device is signed out. No email needed.
+docker compose exec app node scripts/resetSuperAdminPassword.js you@example.com
+
+# Same command with no email lists the super admins ("(main)" = made on the server)
+docker compose exec app node scripts/resetSuperAdminPassword.js
 ```
+
+Super admin passwords, in short: everyone can change their own on **Team → Change your
+password**. An invited super admin who forgot theirs is reset by a teammate (**Team → Reset
+password**, emails a 1-hour link). The main super admin can't be reset from Team — only with the
+command above, so a teammate can never take over the owner account.
 
 ---
 

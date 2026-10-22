@@ -48,6 +48,21 @@ const superAdminSchema = new mongoose.Schema({
     select: false,
     default: undefined,
   },
+  // Password reset link (1 hour): sent by another super admin from Team, or printed by
+  // scripts/resetSuperAdminPassword.js on the server. Only the sha256 is stored.
+  passwordReset: {
+    type: {
+      tokenHash: String,
+      expiresAt: Date,
+      sentAt:    Date,
+      by:        String, // who started it: a super admin's email, or "server"
+    },
+    select: false,
+    default: undefined,
+  },
+  // Tokens issued before this are refused (middleware/superAdminMiddleware.js), so a
+  // password change or reset signs the account out everywhere — even from the script.
+  passwordChangedAt: Date,
 }, { timestamps: true });
 
 // Never serialize password hash or session tokens

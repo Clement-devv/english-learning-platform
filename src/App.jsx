@@ -210,6 +210,7 @@ function App() {
             <Route path="/super-admin/dashboard" element={<AuthGuard role="super-admin"><SuperAdminDashboard /></AuthGuard>} />
             {/* Invite link for a new super admin (no login) — server/routes/superAdminTeamRoutes.js */}
             <Route path="/super-admin/accept-invite/:token" element={<SuperAdminAcceptInvite />} />
+            <Route path="/super-admin/reset-password/:token" element={<SuperAdminAcceptInvite mode="reset" />} />
 
             <Route path="/admin/login"                          element={<AdminLogin />} />
             <Route path="/admin/reset-password/:token"         element={<AdminResetPassword />} />

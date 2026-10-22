@@ -1,6 +1,6 @@
 // src/pages/super-admin/AcceptInvitePage.jsx
-// Opened from a super-admin invite email: shows who the invite is for and lets them set
-// their password. Afterwards they sign in at /super-admin/login like everyone else
+// Opened from a super-admin invite email (or, with mode="reset", a password reset link from
+// a teammate / the server script): shows whose account it is and lets them set a password. Afterwards they sign in at /super-admin/login like everyone else
 // (password + emailed code). Server: server/routes/superAdminTeamRoutes.js
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
@@ -17,8 +17,10 @@ const S = {
   error: { marginTop: 12, padding: '10px 12px', borderRadius: 10, background: 'rgba(220,38,38,0.15)', border: '1px solid rgba(220,38,38,0.4)', color: '#fca5a5', fontSize: 13 },
 };
 
-export default function AcceptInvitePage() {
+export default function AcceptInvitePage({ mode = 'invite' }) {
   const { token } = useParams();
+  const reset = mode === 'reset';
+  const url = `${API_BASE}/super-admin/team/${reset ? 'reset' : 'invite'}/${token}`;
   const [invite, setInvite] = useState(null);
   const [state, setState] = useState('loading'); // loading | form | gone | done
   const [message, setMessage] = useState('');
@@ -29,14 +31,14 @@ export default function AcceptInvitePage() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    fetch(`${API_BASE}/super-admin/team/invite/${token}`)
+    fetch(url)
       .then(async (r) => ({ ok: r.ok, body: await r.json().catch(() => ({})) }))
       .then(({ ok, body }) => {
         if (ok) { setInvite(body.data); setState('form'); }
-        else { setMessage(body.message || 'This invite link is not valid.'); setState('gone'); }
+        else { setMessage(body.message || 'This link is not valid.'); setState('gone'); }
       })
       .catch(() => { setMessage("Couldn't reach the server. Please try again."); setState('gone'); });
-  }, [token]);
+  }, [url]);
 
   const submit = async (e) => {
     e.preventDefault();
@@ -44,7 +46,7 @@ export default function AcceptInvitePage() {
     if (password !== confirm) { setError("The two passwords don't match"); return; }
     setBusy(true);
     try {
-      const r = await fetch(`${API_BASE}/super-admin/team/invite/${token}`, {
+      const r = await fetch(url, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password }),
       });
       const body = await r.json().catch(() => ({}));
@@ -60,10 +62,10 @@ export default function AcceptInvitePage() {
       <div style={S.card}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
           <Crown size={22} color="#d97706" />
-          <h1 style={{ margin: 0, fontSize: 20, fontWeight: 800 }}>Super admin invite</h1>
+          <h1 style={{ margin: 0, fontSize: 20, fontWeight: 800 }}>{reset ? 'Set a new password' : 'Super admin invite'}</h1>
         </div>
 
-        {state === 'loading' && <p style={{ opacity: 0.8 }}>Checking your invite…</p>}
+        {state === 'loading' && <p style={{ opacity: 0.8 }}>{reset ? 'Checking your link…' : 'Checking your invite…'}</p>}
 
         {state === 'gone' && (
           <>
@@ -75,11 +77,11 @@ export default function AcceptInvitePage() {
         {state === 'form' && invite && (
           <form onSubmit={submit}>
             <p style={{ margin: '0 0 4px', lineHeight: 1.6, fontSize: 14, opacity: 0.9 }}>
-              Hello <strong>{invite.firstName}</strong>{invite.invitedBy ? <> — {invite.invitedBy} invited you</> : null}.
-              Set a password for <strong>{invite.email}</strong>.
+              Hello <strong>{invite.firstName}</strong>{!reset && invite.invitedBy ? <> — {invite.invitedBy} invited you</> : null}.
+              Set a {reset ? 'new ' : ''}password for <strong>{invite.email}</strong>.
             </p>
             <p style={{ margin: 0, fontSize: 12, opacity: 0.65 }}>
-              At least {invite.minLength} characters, with upper- and lower-case letters and a number.
+              At least {invite.minLength} characters, with upper- and lower-case letters, a number and a symbol (@ $ ! % * ? &amp;).
             </p>
             <label style={S.label} htmlFor="ai-pw">New password</label>
             <div style={{ position: 'relative' }}>
@@ -101,7 +103,7 @@ export default function AcceptInvitePage() {
         {state === 'done' && (
           <>
             <p style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 700, color: '#34d399' }}>
-              <CheckCircle2 size={18} /> Your password is set.
+              <CheckCircle2 size={18} /> Your {reset ? 'new ' : ''}password is set.
             </p>
             <p style={{ lineHeight: 1.6, opacity: 0.9, fontSize: 14 }}>
               Sign in with your email and password. Each time, we'll email you a 6-digit code to finish signing in.

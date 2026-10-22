@@ -27,6 +27,10 @@ export const verifySuperAdmin = async (req, res, next) => {
     if (!superAdmin || !superAdmin.active) {
       return res.status(403).json({ success: false, message: 'Super admin account inactive' });
     }
+    // Signed in before the password was last changed / reset → sign in again
+    if (superAdmin.passwordChangedAt && decoded.iat < Math.floor(superAdmin.passwordChangedAt.getTime() / 1000)) {
+      return res.status(401).json({ success: false, message: 'Your password was changed. Please sign in again.' });
+    }
 
     req.superAdmin = superAdmin;
     req.user = decoded;

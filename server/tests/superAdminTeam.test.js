@@ -104,3 +104,64 @@ describe('super admin team', () => {
     expect(await SuperAdmin.findById(partnerId)).toBeNull()
   })
 })
+
+describe('super admin passwords', () => {
+  let sam
+  // A token from before a password change (iat in whole seconds — make it clearly older)
+  const oldTokenFor = (a) => jwt.sign({ ...JWT_STANDARD_CLAIMS, id: String(a._id), role: 'superadmin', email: a.email, iat: Math.floor(Date.now() / 1000) - 30 }, config.jwtSecret, { expiresIn: '5m' })
+  const resetToken = (mail) => /reset-password\/([A-Za-z0-9_-]{43})/.exec(mail.html)[1]
+
+  beforeAll(async () => {
+    sam = await SuperAdmin.create({ firstName: 'Sam', lastName: 'Second', email: 'sam@partner.test', password: await bcrypt.hash(STRONG, 4), active: true, invitedBy: 'owner@platform.test' })
+  })
+
+  it('a teammate resets an invited admin: old password dead, signed out, link sets a new one', async () => {
+    const samOld = oldTokenFor(sam)
+    const res = await asOwner(request(app).post(`/api/super-admin/team/${sam._id}/reset-password`))
+    expect(res.status).toBe(200)
+    expect(res.body.data.find((a) => a.email === 'sam@partner.test').resetPending).toBe(true)
+    const after = await SuperAdmin.findById(sam._id)
+    expect(await bcrypt.compare(STRONG, after.password)).toBe(false)
+    expect((await request(app).get('/api/super-admin/team').set('Authorization', `Bearer ${samOld}`)).status).toBe(401)
+
+    const token = resetToken(sent.filter((m) => m.to === 'sam@partner.test' && /set a new/.test(m.subject)).at(-1))
+    const info = await request(app).get(`/api/super-admin/team/reset/${token}`)
+    expect(info.body.data).toMatchObject({ email: 'sam@partner.test', minLength: 12 })
+    expect((await request(app).post(`/api/super-admin/team/reset/${token}`).send({ password: 'weak' })).status).toBe(400)
+    expect((await request(app).post(`/api/super-admin/team/reset/${token}`).send({ password: 'Sam@New-Secret42' })).status).toBe(200)
+    expect(await bcrypt.compare('Sam@New-Secret42', (await SuperAdmin.findById(sam._id)).password)).toBe(true)
+    expect((await request(app).post(`/api/super-admin/team/reset/${token}`).send({ password: 'Sam@New-Secret43' })).status).toBe(404) // used
+  })
+
+  it('the main super admin can not be reset from Team', async () => {
+    const res = await request(app).post(`/api/super-admin/team/${owner._id}/reset-password`).set('Authorization', `Bearer ${signFor(sam)}`)
+    expect(res.status).toBe(403)
+    const list = await request(app).get('/api/super-admin/team').set('Authorization', `Bearer ${signFor(sam)}`)
+    expect(list.body.data.find((a) => a.email === 'owner@platform.test').isMain).toBe(true)
+    expect(list.body.data.find((a) => a.email === 'sam@partner.test').isMain).toBe(false)
+  })
+
+  it('changing your own password needs the current one and signs you out', async () => {
+    const samToken = signFor(sam)
+    const samOld = oldTokenFor(sam)
+    const wrong = await request(app).post('/api/super-admin/team/me/password').set('Authorization', `Bearer ${samToken}`).send({ currentPassword: 'nope', newPassword: 'Another@Secret77' })
+    expect(wrong.status).toBe(400)
+    const okRes = await request(app).post('/api/super-admin/team/me/password').set('Authorization', `Bearer ${samToken}`).send({ currentPassword: 'Sam@New-Secret42', newPassword: 'Another@Secret77' })
+    expect(okRes.status).toBe(200)
+    expect(await bcrypt.compare('Another@Secret77', (await SuperAdmin.findById(sam._id)).password)).toBe(true)
+    expect((await request(app).get('/api/super-admin/team').set('Authorization', `Bearer ${samOld}`)).status).toBe(401)
+  })
+
+  it('the server script resets the main super admin with a printed link', async () => {
+    const { execFileSync } = await import('child_process')
+    const path = await import('path')
+    const c = global.__TEST_DB__
+    const out = execFileSync(process.execPath, [path.resolve(__dirname, '../scripts/resetSuperAdminPassword.js'), 'owner@platform.test'], {
+      env: { ...process.env, MONGO_URI: `mongodb://${c.host}:${c.port}/master-team-test`, FRONTEND_URL: 'https://app.example.test' },
+      encoding: 'utf8',
+    })
+    const token = /https:\/\/app\.example\.test\/super-admin\/reset-password\/([A-Za-z0-9_-]{43})/.exec(out)[1]
+    expect((await request(app).post(`/api/super-admin/team/reset/${token}`).send({ password: 'Owner@Fresh-Secret1' })).status).toBe(200)
+    expect(await bcrypt.compare('Owner@Fresh-Secret1', (await SuperAdmin.findById(owner._id)).password)).toBe(true)
+  })
+})
