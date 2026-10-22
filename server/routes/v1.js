@@ -53,6 +53,7 @@ import notificationRoutes        from "./notificationRoutes.js";
 import centerRegistrationRoutes  from "./centerRegistrationRoutes.js";
 import centerConfigRoutes        from "./centerConfigRoutes.js";
 import superAdminRoutes          from "./superAdminRoutes.js";
+import superAdminTeamRoutes      from "./superAdminTeamRoutes.js";
 import classPricingRoutes        from "./classPricingRoutes.js";
 import ringRoutes                from "./ringRoutes.js";
 import groupClassRoutes          from "./groupClassRoutes.js";
@@ -119,6 +120,7 @@ router.use("/notifications",        notificationRoutes);
 router.use("/register-center",      centerRegistrationRoutes);
 router.use("/center",               centerConfigRoutes);
 router.use("/super-admin/monitor",  monitorAdminRoutes); // App Health (super admin)
+router.use("/super-admin/team",     superAdminTeamRoutes); // several super admins, same platform (+ public invite page API)
 router.use("/super-admin/center-invites", centerInviteAdminRoutes); // create center by invite
 router.use("/super-admin/library", libraryAdminRoutes); // library storage, billing, takedowns
 router.use("/super-admin/board",   saBoardRoutes);      // ads / info on the dashboard banner

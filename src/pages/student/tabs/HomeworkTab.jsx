@@ -717,7 +717,7 @@ function InstructionAudioPlayer({ fileId, duration }) {
       const { data } = await api.get(`/homework/file/instruction-audio/${fileId}`, { responseType: "blob" });
       const url = URL.createObjectURL(data);
       setBlobUrl(url);
-      setTimeout(() => { audioRef.current?.play(); setPlaying(true); }, 50);
+      setTimeout(() => { audioRef.current?.play().then(() => setPlaying(true)).catch(() => setPlaying(false)); }, 50); // play() rejects if paused/blocked meanwhile
     } catch { /* silent */ }
     finally { setLoading(false); }
   };
@@ -761,7 +761,7 @@ function StudentAudioPlayer({ fileId, duration }) {
       const { data } = await api.get(`/homework/file/audio-feedback/${fileId}`, { responseType: "blob" });
       const url = URL.createObjectURL(data);
       setBlobUrl(url);
-      setTimeout(() => { audioRef.current?.play(); setPlaying(true); }, 50);
+      setTimeout(() => { audioRef.current?.play().then(() => setPlaying(true)).catch(() => setPlaying(false)); }, 50); // play() rejects if paused/blocked meanwhile
     } catch { /* silent */ }
     finally { setLoading(false); }
   };

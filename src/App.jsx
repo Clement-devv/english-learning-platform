@@ -42,6 +42,7 @@ const EmailChangeCancelConfirm = lazy(() => import("./pages/admin/EmailChangeCan
 
 // Heavy pages — lazy loaded (each becomes its own JS chunk)
 const SuperAdminDashboard = lazy(() => import("./pages/super-admin/SuperAdminDashboard"));
+const SuperAdminAcceptInvite = lazy(() => import("./pages/super-admin/AcceptInvitePage"));
 const AdminDashboard      = lazy(() => import("./pages/admin/AdminDashboard"));
 const SubAdminSetup            = lazy(() => import("./pages/sub-admin/SubAdminSetup"));
 const CenterInvitePage         = lazy(() => import("./pages/center-invite/CenterInvitePage"));
@@ -207,6 +208,8 @@ function App() {
 
             <Route path="/super-admin/login"     element={<SuperAdminLogin />} />
             <Route path="/super-admin/dashboard" element={<AuthGuard role="super-admin"><SuperAdminDashboard /></AuthGuard>} />
+            {/* Invite link for a new super admin (no login) — server/routes/superAdminTeamRoutes.js */}
+            <Route path="/super-admin/accept-invite/:token" element={<SuperAdminAcceptInvite />} />
 
             <Route path="/admin/login"                          element={<AdminLogin />} />
             <Route path="/admin/reset-password/:token"         element={<AdminResetPassword />} />

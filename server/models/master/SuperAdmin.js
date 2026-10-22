@@ -35,6 +35,19 @@ const superAdminSchema = new mongoose.Schema({
     select: false,
     default: undefined,
   },
+  // Team (routes/superAdminTeamRoutes.js): every super admin sees and manages the same
+  // platform — accounts only separate logins, sign-in codes and who-did-what in the logs.
+  // An invited account stays inactive until the invite link is used to set a password.
+  invitedBy: { type: String, default: '' }, // inviter's email
+  invite: {
+    type: {
+      tokenHash: String, // sha256 of the link token — the raw token is only in the email
+      expiresAt: Date,
+      sentAt:    Date,
+    },
+    select: false,
+    default: undefined,
+  },
 }, { timestamps: true });
 
 // Never serialize password hash or session tokens

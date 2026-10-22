@@ -9,7 +9,7 @@ import {
   Globe, RefreshCw, Trash2, Mail, KeyRound, Palette,
   BarChart2, ChevronDown, ChevronUp, ToggleLeft, ToggleRight, Video, Mic, Film,
   AlertTriangle, RotateCcw, Zap, Send, Activity, Users, UserCheck, LogIn, Megaphone, SlidersHorizontal, Award, Sun, Moon, Menu,
-  HeartPulse, HardDrive, LayoutDashboard, Link2, Search,
+  HeartPulse, HardDrive, LayoutDashboard, Link2, Search, UserCog,
 } from 'lucide-react';
 import { THEMES } from '../../data/themes';
 import { LOGIN_THEMES, TEACHER_LOGIN_THEMES, ADMIN_LOGIN_THEMES } from '../../data/loginThemes';
@@ -34,6 +34,7 @@ import CertificateTemplatesTab from './tabs/CertificateTemplatesTab';
 import LandingPagesTab         from './tabs/LandingPagesTab';
 import BoardTab                from './tabs/BoardTab';
 import OverviewTab             from './tabs/OverviewTab';
+import TeamTab                 from './tabs/TeamTab';
 import CommandPalette          from './CommandPalette';
 import './saShell.css';
 import { studentModesLabel }   from '../../utils/planFeatures';
@@ -1115,6 +1116,9 @@ export default function SuperAdminDashboard() {
     { group: 'Archive', items: [
       { key: 'deleted',      label: 'Deleted centers', icon: Trash2,     desc: 'Centers waiting for permanent deletion — restore them before the date' },
     ] },
+    { group: 'Settings', items: [
+      { key: 'team',         label: 'Team',            icon: UserCog,    desc: 'Super admins who run the platform with you — same centers, own logins' },
+    ] },
   ];
   const TABS = NAV.flatMap(g => g.items.map(i => ({ ...i, group: g.group || '' })));
   const current = TABS.find(t => t.key === tab) || TABS[0];
@@ -1274,6 +1278,9 @@ export default function SuperAdminDashboard() {
                 deleted={deleted} loadData={loadData} restoring={restoring}
                 handleRestore={handleRestore} daysRemaining={daysRemaining}
               />
+            )}
+            {tab === 'team' && (
+              <TeamTab apiBase={API_BASE} authHeaders={authHeaders} />
             )}
             {tab === 'certificates' && (
               <CertificateTemplatesTab centers={centers} />

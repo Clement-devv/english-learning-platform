@@ -796,7 +796,7 @@ function AudioFeedbackPlayer({ fileId, duration, type = "audio-feedback", label 
       const { data } = await api.get(`/homework/file/${type}/${fileId}`, { responseType: "blob" });
       const url = URL.createObjectURL(data);
       setBlobUrl(url);
-      setTimeout(() => { audioRef.current?.play(); setPlaying(true); }, 50);
+      setTimeout(() => { audioRef.current?.play().then(() => setPlaying(true)).catch(() => setPlaying(false)); }, 50); // play() rejects if paused/blocked meanwhile
     } catch { /* silent */ }
     finally { setLoading(false); }
   };
