@@ -11,11 +11,11 @@ const ta = (key, opts) => i18n.t(`admin:${key}`, opts);
 
 
 const CURRENCIES = [
+  { code: "VND", symbol: "₫",  get label() { return ta("classPricingTab.currencyName.VND"); }  },
   { code: "USD", symbol: "$",  get label() { return ta("classPricingTab.currencyName.USD"); }        },
   { code: "GBP", symbol: "£",  get label() { return ta("classPricingTab.currencyName.GBP"); }    },
   { code: "EUR", symbol: "€",  get label() { return ta("classPricingTab.currencyName.EUR"); }             },
   { code: "NGN", symbol: "₦",  get label() { return ta("classPricingTab.currencyName.NGN"); }   },
-  { code: "VND", symbol: "₫",  get label() { return ta("classPricingTab.currencyName.VND"); }  },
   { code: "JPY", symbol: "¥",  get label() { return ta("classPricingTab.currencyName.JPY"); }     },
   { code: "KRW", symbol: "₩",  get label() { return ta("classPricingTab.currencyName.KRW"); } },
   { code: "BRL", symbol: "R$", get label() { return ta("classPricingTab.currencyName.BRL"); }   },

@@ -130,7 +130,7 @@ router.put('/settings', async (req, res) => {
     }
     if (b.currency !== undefined) {
       const c = String(b.currency).trim().toUpperCase();
-      if (!/^[A-Z]{3}$/.test(c)) return fail(res, 400, 'Currency must be a 3-letter code like USD or NGN');
+      if (!/^[A-Z]{3}$/.test(c)) return fail(res, 400, 'Currency must be a 3-letter code like VND or USD');
       next.currency = c;
     }
     if (b.copyrightEmail !== undefined) {

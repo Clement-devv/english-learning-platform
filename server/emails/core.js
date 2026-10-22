@@ -53,13 +53,38 @@ const smtpTransporter = !useResend
     })
   : null;
 
+// ── Sender ("From") ───────────────────────────────────────────────────────────
+// Resend (and SMTP servers) want `address` or `Name <address>`. EMAIL_FROM may be set
+// either way ("noreply@x.com" or "Clemify <noreply@x.com>") — take just the address
+// from it, then put the center's name in front. A name containing , ; : " etc. must be
+// quoted, and <, >, quotes and line breaks are removed so a center name can't break it.
+const SENDER_MISSING = "EMAIL_FROM is not set to a valid address (e.g. EMAIL_FROM=noreply@yourdomain.com)";
+export const senderAddress = () => {
+  const raw = String(process.env.EMAIL_FROM || config.emailFrom || config.emailUser || "").trim();
+  const addr = (raw.match(/<([^<>]+)>/)?.[1] ?? raw).trim().replace(/^["']|["']$/g, "");
+  return /^[^\s@<>"]+@[^\s@<>"]+\.[^\s@<>"]+$/.test(addr) ? addr : null;
+};
+export const buildFrom = (name) => {
+  const addr = senderAddress();
+  if (!addr) return null;
+  const display = String(name || config.appName || "").replace(/[\r\n]+/g, " ").replace(/[<>"\\]/g, "").replace(/\s+/g, " ").trim().slice(0, 70);
+  if (!display) return addr;
+  return /[,;:()[\]@.]/.test(display) ? `"${display}" <${addr}>` : `${display} <${addr}>`;
+};
+
 // ── verifyEmailConfig ─────────────────────────────────────────────────────────
 export const verifyEmailConfig = async () => {
   emailHealth.checkedAt = new Date();
   emailHealth.provider = useResend ? "Resend" : "SMTP";
+  if (!senderAddress()) {
+    logger.error(`❌ ${SENDER_MISSING} — current value: "${process.env.EMAIL_FROM || config.emailFrom || ""}"`);
+    emailHealth.configured = false;
+    emailHealth.detail = SENDER_MISSING;
+    return false;
+  }
   if (useResend) {
     emailHealth.configured = true;
-    logger.info(`📧 Email via Resend HTTP API — from: ${config.emailFrom || process.env.EMAIL_FROM}`);
+    logger.info(`📧 Email via Resend HTTP API — from: ${buildFrom(config.appName)}`);
     logger.info("✅ Email service is ready (Resend)");
     return true;
   }
@@ -122,7 +147,8 @@ const deliver = async (mailOptions) => {
   const recipients = (Array.isArray(mailOptions.to) ? mailOptions.to : [mailOptions.to]).filter(r => !isManagedEmail(r));
   if (recipients.length === 0) return { success: true, skipped: true };
   const to = Array.isArray(mailOptions.to) ? recipients : recipients[0];
-  const from = `${centerName || config.appName} <${process.env.EMAIL_FROM || config.emailFrom || config.emailUser}>`;
+  const from = buildFrom(centerName);
+  if (!from) return { success: false, error: SENDER_MISSING };
 
   // Attachments (PDF reports, records…) — previously dropped here, so emails
   // arrived without their PDF. Shape: [{ filename, content: Buffer|string, contentType? }]

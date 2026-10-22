@@ -124,7 +124,7 @@ export default function CenterInvitePage() {
                 <Field label="First name" id="ci-first"><input id="ci-first" required autoFocus autoComplete="given-name" maxLength={60} value={form.firstName} onChange={set('firstName')} style={S.input} /></Field>
                 <Field label="Last name" id="ci-last"><input id="ci-last" required autoComplete="family-name" maxLength={60} value={form.lastName} onChange={set('lastName')} style={S.input} /></Field>
               </div>
-              <Field label="Phone (optional)" id="ci-phone"><input id="ci-phone" type="tel" autoComplete="tel" maxLength={40} placeholder="+234 801 234 5678" value={form.phone} onChange={set('phone')} style={S.input} /></Field>
+              <Field label="Phone (optional)" id="ci-phone"><input id="ci-phone" type="tel" autoComplete="tel" maxLength={40} placeholder="+84 912 345 678" value={form.phone} onChange={set('phone')} style={S.input} /></Field>
             </Section>
 
             <Section icon={MapPin} title="Your center">

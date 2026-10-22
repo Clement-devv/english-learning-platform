@@ -52,6 +52,7 @@ import redisClient from "./config/redis.js";
 import { applyLivePlugins, applyPresencePlugin, setLiveIO } from "./utils/liveUpdates.js";
 import { requestMonitor } from "./middleware/requestMonitor.js";
 import { startMonitorChecks } from "./utils/monitorChecks.js";
+import { centerFromRequest, pwaIcon, manifestIcons, ICON_SIZES } from "./utils/pwaIcons.js";
 
 // "data-changed" pushes — must be attached before any center model is compiled
 applyLivePlugins();
@@ -432,22 +433,32 @@ app.get("/", (req, res) => {
 // Versioned API
 app.use("/api/v1", v1Router);
 
+// Center app icons for install / home screen (utils/pwaIcons.js):
+//   /pwa-icon/192.png, /pwa-icon/512.png, /pwa-icon/512-maskable.png, /pwa-icon/180.png (iPhone)…
+// Made from the center's logo, or its initial on its brand colour. No center → Clemify icon.
+app.get('/pwa-icon/:file', async (req, res) => {
+  const m = /^(\d+)(-maskable)?\.png$/.exec(req.params.file || '');
+  const size = m ? Number(m[1]) : 0;
+  if (!ICON_SIZES.includes(size)) return res.status(404).end();
+  try {
+    const center = await centerFromRequest(req);
+    if (!center) return res.redirect(302, '/icons/icon.svg');
+    const png = await pwaIcon(center, size, !!m[2]);
+    res.setHeader('Content-Type', 'image/png');
+    // ?v= changes with the branding, so a versioned URL can be cached for long
+    res.setHeader('Cache-Control', req.query.v ? 'public, max-age=2592000' : 'public, max-age=3600');
+    return res.send(png);
+  } catch (err) {
+    logger.error('PWA icon error:', { error: err?.message });
+    return res.redirect(302, '/icons/icon.svg');
+  }
+});
+
 // Dynamic PWA manifest — serves center-branded manifest per tenant
 app.get('/manifest.json', async (req, res) => {
   try {
-    const host = (req.headers.host || '').split(':')[0];
-    let center = null;
-
-    // Try custom domain first — domainVerified must be true (mirrors tenantMiddleware)
-    center = await Center.findOne({ customDomain: host, status: 'active', domainVerified: true }).lean();
-
-    // Try subdomain (abc.clemify.com → slug = abc)
-    if (!center) {
-      const parts = host.split('.');
-      if (parts.length >= 3) {
-        center = await Center.findOne({ slug: parts[0], status: 'active' }).lean();
-      }
-    }
+    // Custom domain → subdomain → x-center-slug (dev proxy); mirrors tenantMiddleware
+    const center = await centerFromRequest(req);
 
     // No center resolved — serve the platform default
     if (!center) {
@@ -457,7 +468,10 @@ app.get('/manifest.json', async (req, res) => {
     const b = center.branding || {};
     const name = center.centerName;
     const shortName = name.length > 14 ? name.split(' ')[0] : name;
-    const icon = b.favicon || b.logo || null;
+    // Square PNGs in the exact sizes phones require — a raw logo with sizes "any" was
+    // rejected by Chrome, which then fell back to the Clemify icon
+    const icons = manifestIcons(center);
+    const icon = icons[0].src;
 
     res.setHeader('Content-Type', 'application/manifest+json');
     res.setHeader('Cache-Control', 'public, max-age=3600');
@@ -473,36 +487,28 @@ app.get('/manifest.json', async (req, res) => {
       theme_color: b.primaryColor || '#4F46E5',
       categories: ['education'],
       lang: 'en',
-      icons: icon
-        ? [
-            { src: icon, sizes: 'any', type: 'image/png', purpose: 'any' },
-            { src: icon, sizes: 'any', type: 'image/png', purpose: 'maskable' },
-          ]
-        : [
-            { src: '/icons/icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' },
-            { src: '/icons/icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'maskable' },
-          ],
+      icons,
       shortcuts: [
         {
           name: 'Student Login',
           short_name: 'Student',
           description: 'Sign in as a student',
           url: '/student/login',
-          icons: [{ src: icon || '/icons/icon.svg', sizes: 'any' }],
+          icons: [{ src: icon, sizes: '192x192', type: 'image/png' }],
         },
         {
           name: 'Teacher Login',
           short_name: 'Teacher',
           description: 'Sign in as a teacher',
           url: '/teacher/login',
-          icons: [{ src: icon || '/icons/icon.svg', sizes: 'any' }],
+          icons: [{ src: icon, sizes: '192x192', type: 'image/png' }],
         },
         {
           name: 'Admin Login',
           short_name: 'Admin',
           description: 'Sign in as an admin',
           url: '/admin/login',
-          icons: [{ src: icon || '/icons/icon.svg', sizes: 'any' }],
+          icons: [{ src: icon, sizes: '192x192', type: 'image/png' }],
         },
       ],
     });

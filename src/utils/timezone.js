@@ -7,6 +7,8 @@
  * Ordered by UTC offset then alphabetically within each region.
  */
 export const TIMEZONE_OPTIONS = [
+  // Vietnam first — the centers are in Vietnam (it is listed only here, not again under Asia)
+  { value: "Asia/Ho_Chi_Minh",    label: "Ho Chi Minh City / Hanoi, Vietnam (ICT, UTC+7)" },
   // ── Africa ────────────────────────────────────────────────────────────
   { value: "Africa/Abidjan",      label: "Abidjan, Côte d'Ivoire (GMT, UTC+0)" },
   { value: "Africa/Accra",        label: "Accra, Ghana (GMT, UTC+0)" },
@@ -31,7 +33,6 @@ export const TIMEZONE_OPTIONS = [
   { value: "Asia/Dhaka",          label: "Dhaka, Bangladesh (BST, UTC+6)" },
   { value: "Asia/Rangoon",        label: "Yangon, Myanmar (MMT, UTC+6:30)" },
   { value: "Asia/Bangkok",        label: "Bangkok, Thailand (ICT, UTC+7)" },
-  { value: "Asia/Ho_Chi_Minh",    label: "Ho Chi Minh City / Hanoi, Vietnam (ICT, UTC+7)" },
   { value: "Asia/Jakarta",        label: "Jakarta, Indonesia (WIB, UTC+7)" },
   { value: "Asia/Phnom_Penh",     label: "Phnom Penh, Cambodia (ICT, UTC+7)" },
   { value: "Asia/Kuala_Lumpur",   label: "Kuala Lumpur, Malaysia (MYT, UTC+8)" },

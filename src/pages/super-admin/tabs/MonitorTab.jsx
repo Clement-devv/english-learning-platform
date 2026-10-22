@@ -425,7 +425,7 @@ function AlertSettings({ call, initial, flash }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {toggle(form.whatsappEnabled, set('whatsappEnabled'), <><MessageCircle size={14} /> WhatsApp alerts</>)}
           <input value={form.whatsappPhone} onChange={e => set('whatsappPhone')(e.target.value)} className={styles.input}
-            placeholder="+2348012345678" aria-label="WhatsApp number" disabled={!form.whatsappEnabled} inputMode="tel" />
+            placeholder="+84912345678" aria-label="WhatsApp number" disabled={!form.whatsappEnabled} inputMode="tel" />
           <span style={{ fontSize: 11.5, color: provider ? '#34d399' : '#f59e0b' }}>
             {provider ? `Sending through ${provider}` : 'No WhatsApp provider yet — add Twilio or CallMeBot keys to server/.env (see docs/monitoring.md)'}
           </span>

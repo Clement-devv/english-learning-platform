@@ -48,6 +48,7 @@ import {
   getAllLessons,
 } from "../../../services/studentService";
 import { useTranslation } from "react-i18next";
+import { useCurrencySymbol } from "../../../hooks/useCurrencySymbol";
 
 const PASSWORD_TTL = 15000;
 const ACCOUNT_TYPE_KEY = "admin.students.accountType";
@@ -244,6 +245,7 @@ function SummaryCard({ icon: Icon, label, value, sub, color }) {
 // ── Main component ────────────────────────────────────────────────────────────
 export default function StudentsTab({ onNotify, isDarkMode = false }) {
   const { t: tr } = useTranslation("admin");
+  const currencySym = useCurrencySymbol(); // the center's currency (Class pricing), e.g. ₫
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -491,7 +493,7 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
         ...result.payment,
         studentId: selectedStudent,
         student: stu ? `${stu.firstName} ${stu.lastName}` : "Unknown",
-        amountDisplay: `₦${result.payment?.amount ?? paymentData.amount}`,
+        amountDisplay: `${currencySym}${result.payment?.amount ?? paymentData.amount}`,
       };
       setPaymentHistory((prev) => [...prev, newEntry]);
       setIsManualModalOpen(false);
@@ -514,7 +516,7 @@ export default function StudentsTab({ onNotify, isDarkMode = false }) {
         ...p,
         studentId: p.studentId._id,
         student: `${p.studentId.firstName} ${p.studentId.lastName}`,
-        amountDisplay: `₦${p.amount}`,
+        amountDisplay: `${currencySym}${p.amount}`,
       }))))
       .catch((err) => {
         if (isAnalyticsLocked(err)) {

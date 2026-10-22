@@ -183,16 +183,27 @@ export const applyBranding = (branding, center) => {
     favicon.href = branding.favicon;
   }
 
-  // 9. Apple touch icon — iOS uses this for PWA home screen, ignores the manifest icons
-  const pwaIcon = branding.favicon || branding.logo;
-  if (pwaIcon) {
+  // 9. Apple touch icon — iOS uses this for the home screen and ignores the manifest icons.
+  // The server makes a square 180px PNG from the center's logo (or its initial on the brand
+  // colour) — a raw logo is often not square. ?v= refreshes it when the branding changes.
+  if (center?.centerName) {
     let appleIcon = document.querySelector("link[rel='apple-touch-icon']");
     if (!appleIcon) {
       appleIcon = document.createElement('link');
       appleIcon.rel = 'apple-touch-icon';
       document.head.appendChild(appleIcon);
     }
-    appleIcon.href = pwaIcon;
+    const v = encodeURIComponent([branding.logo, branding.favicon, branding.primaryColor, center.centerName].join('|')).slice(0, 120);
+    appleIcon.href = `/pwa-icon/180.png?v=${v}`;
+
+    // 10. iPhone home-screen name (defaults to "Clemify" in index.html)
+    let appTitle = document.querySelector("meta[name='apple-mobile-web-app-title']");
+    if (!appTitle) {
+      appTitle = document.createElement('meta');
+      appTitle.name = 'apple-mobile-web-app-title';
+      document.head.appendChild(appTitle);
+    }
+    appTitle.content = center.centerName;
   }
 };
 

@@ -28,7 +28,9 @@ function sameOriginApi() {
 const proxyTo = (extra = {}) => ({ target: API_TARGET, changeOrigin: true, headers: { origin: 'http://localhost:5173' }, ...extra })
 
 export default defineConfig(({ mode }) => {
-  const sameOrigin = loadEnv(mode, process.cwd(), 'VITE_').VITE_DEV_SAME_ORIGIN === 'true'
+  const env = loadEnv(mode, process.cwd(), 'VITE_')
+  const sameOrigin = env.VITE_DEV_SAME_ORIGIN === 'true'
+  const devCenterSlug = env.VITE_CENTER_SLUG || ''
   return {
   plugins: [react(), ...(sameOrigin ? [sameOriginApi()] : [])],
 
@@ -82,6 +84,10 @@ export default defineConfig(({ mode }) => {
       '/api': proxyTo(),
       '/uploads': proxyTo(),
       '/socket.io': proxyTo({ ws: true }), // live updates, chat, classroom
+      // Center app icon + install manifest (server/utils/pwaIcons.js). The API finds the
+      // center from the host on a real domain; in dev it's told which one (VITE_CENTER_SLUG).
+      '/pwa-icon': proxyTo({ headers: { origin: 'http://localhost:5173', ...(devCenterSlug ? { 'x-center-slug': devCenterSlug } : {}) } }),
+      '/manifest.json': proxyTo({ headers: { origin: 'http://localhost:5173', ...(devCenterSlug ? { 'x-center-slug': devCenterSlug } : {}) } }),
     }
   },
 

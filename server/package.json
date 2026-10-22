@@ -51,6 +51,7 @@
     "recharts": "^3.3.0",
     "resend": "^4.0.0",
     "sanitize-html": "^2.17.4",
+    "sharp": "^0.34.5",
     "socket.io": "^4.8.1",
     "speakeasy": "^2.0.0",
     "swagger-ui-express": "^5.0.1",

@@ -182,7 +182,7 @@ function SettingsDialog({ settings, call, onClose, onSaved }) {
       <form onSubmit={save} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           <label><Label>Price per extra GB / month</Label><input type="number" min={0} step="0.01" className={styles.input} value={form.pricePerGb} onChange={e => setForm(f => ({ ...f, pricePerGb: e.target.value }))} /></label>
-          <label><Label>Currency</Label><input className={styles.input} maxLength={3} value={form.currency} onChange={e => setForm(f => ({ ...f, currency: e.target.value.toUpperCase() }))} placeholder="USD, NGN, VND…" /></label>
+          <label><Label>Currency</Label><input className={styles.input} maxLength={3} value={form.currency} onChange={e => setForm(f => ({ ...f, currency: e.target.value.toUpperCase() }))} placeholder="VND, USD…" /></label>
         </div>
         <div>
           <Label>Library allowance per plan (MB)</Label>

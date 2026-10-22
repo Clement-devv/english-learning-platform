@@ -14,6 +14,39 @@ import api from "../../api";
  * @param {Function} onCancel - Callback when form is cancelled
  * @param {Object} teacherInfo - Teacher information
  */
+// Maps the form's Tailwind colour classes to the dashboard theme (light + dark).
+const RCF_CSS = `
+.rcf { background: var(--a-surface, #fff) !important; color: var(--a-ink, #1f2937); box-shadow: none !important; }
+.rcf .text-gray-800, .rcf h2, .rcf h3 { color: var(--a-ink, #1f2937) !important; }
+.rcf .text-gray-700 { color: var(--a-ink-2, #374151) !important; }
+.rcf .text-gray-600, .rcf .text-gray-500 { color: var(--a-muted, #6b7280) !important; }
+.rcf .border-gray-300, .rcf .border-gray-200 { border-color: var(--a-line-strong, #d1d5db) !important; }
+.rcf .border-t { border-color: var(--a-line, #e5e7eb) !important; }
+.rcf input, .rcf select, .rcf textarea { background: var(--a-raised, #fff); color: var(--a-ink, #1f2937); font-size: max(16px, 1em); color-scheme: inherit; }
+.rcf input::placeholder, .rcf textarea::placeholder { color: var(--a-muted, #9ca3af); }
+.rcf input:focus, .rcf select:focus, .rcf textarea:focus { outline: none; border-color: var(--a-accent, #2563eb) !important; box-shadow: 0 0 0 3px color-mix(in srgb, var(--a-accent, #2563eb) 18%, transparent); }
+.rcf .text-blue-600 { color: var(--a-accent, #2563eb) !important; }
+.rcf .bg-blue-600 { background: var(--a-accent, #2563eb) !important; color: #fff !important; }
+.rcf .bg-gray-100 { background: var(--a-raised, #f3f4f6) !important; }
+.rcf .hover\\:bg-gray-100:hover, .rcf .hover\\:bg-gray-200:hover, .rcf .hover\\:bg-gray-50:hover { background: var(--a-line, #e5e7eb) !important; }
+.rcf .bg-blue-50 { background: color-mix(in srgb, var(--a-accent, #2563eb) 9%, var(--a-surface, #fff)) !important; }
+.rcf .border-blue-200, .rcf .border-blue-100 { border-color: color-mix(in srgb, var(--a-accent, #2563eb) 28%, transparent) !important; }
+.rcf .text-blue-900 { color: var(--a-ink, #1e3a8a) !important; }
+.rcf .bg-blue-50 .bg-white { background: var(--a-surface, #fff) !important; }
+.rcf .bg-red-50 { background: color-mix(in srgb, #ef4444 10%, var(--a-surface, #fff)) !important; }
+.rcf .border-red-200 { border-color: color-mix(in srgb, #ef4444 35%, transparent) !important; }
+.rcf .text-red-800 { color: #b91c1c !important; }
+.as-root[data-theme="dark"] .rcf .text-red-800, .as-root[data-theme="dark"] .rcf .text-red-600 { color: #fca5a5 !important; }
+@media (max-width: 640px) {
+  .rcf h2 { font-size: 19px !important; }
+  .rcf .space-y-6 > * + * { margin-top: 18px !important; }
+  .rcf .p-3 { padding: 10px 12px !important; }
+  .rcf .justify-end.pt-4 { flex-direction: column-reverse; }
+  .rcf .justify-end.pt-4 > button { width: 100%; justify-content: center; }
+  .rcf .grid-cols-2.md\\:grid-cols-4 { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+}
+`;
+
 export default function RecurringClassForm({ 
   students = [], 
   onSuccess, 
@@ -231,7 +264,10 @@ export default function RecurringClassForm({
   const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
   return (
-    <div className="bg-white rounded-lg shadow-lg p-6">
+    <div className="rcf bg-white rounded-lg shadow-lg p-4 sm:p-6">
+      {/* Theme-aware colours: inside a Sunshine dashboard the --a-* tokens follow light /
+          dark mode; anywhere else the fallbacks keep the original light look. */}
+      <style>{RCF_CSS}</style>
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">

@@ -254,7 +254,7 @@ monitorAdminRoutes.put("/settings", async (req, res) => {
     }
     if (b.whatsappPhone !== undefined) {
       const phone = String(b.whatsappPhone || "").replace(/[\s()-]/g, "");
-      if (phone && !/^\+\d{7,15}$/.test(phone)) return res.status(400).json({ success: false, message: "WhatsApp number must be in international format, e.g. +2348012345678" });
+      if (phone && !/^\+\d{7,15}$/.test(phone)) return res.status(400).json({ success: false, message: "WhatsApp number must be in international format, e.g. +84912345678" });
       set.whatsappPhone = phone;
     }
     await MonitorState.updateOne({ _id: "settings" }, { $set: set }, { upsert: true });

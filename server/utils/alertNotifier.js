@@ -37,7 +37,7 @@ async function alertEmails(settings) {
 
 async function sendWhatsApp(phone, text) {
   const to = String(phone || "").replace(/[^\d+]/g, "");
-  if (!/^\+\d{7,15}$/.test(to)) return "failed: WhatsApp number must be in international format, e.g. +2348012345678";
+  if (!/^\+\d{7,15}$/.test(to)) return "failed: WhatsApp number must be in international format, e.g. +84912345678";
   const provider = whatsappProvider();
   if (!provider) return "off: no WhatsApp provider set in server/.env";
   try {

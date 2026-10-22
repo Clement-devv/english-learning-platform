@@ -1,5 +1,5 @@
 // src/pages/VideoCall.jsx
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, createContext, useContext } from "react";
 import AgoraRTC from "agora-rtc-sdk-ng";
 import VirtualBackgroundExtension from "agora-extension-virtual-background";
 
@@ -9,7 +9,7 @@ import api from "../api";
 import { useRecording }  from "../hooks/useRecording";
 import { useVideoChat }  from "../hooks/useVideoChat";
 import {
-  Mic, MicOff, Video as VideoIcon, VideoOff,
+  Mic, MicOff, Video as VideoIcon, VideoOff, MoreHorizontal,
   PhoneOff, Monitor, MonitorOff, Users, Loader,
   Smile, Layers, Upload, X, MessageSquare, Send, Waves, Circle, Square,
   ChevronUp, Check, LayoutGrid, Maximize2,
@@ -53,7 +53,12 @@ const ACCENT_CLASSES = {
   red:    "bg-red-600    hover:bg-red-500",
 };
 
+// Phones get compact buttons: 44 px (still a comfortable tap target), caption hidden
+// but kept as the accessible name. Provided around the control bar in VideoCall.
+const CtrlCompact = createContext(false);
+
 function CtrlBtn({ children, onClick, label, active, danger, accent, hangup, pulse, disabled, title }) {
+  const compact = useContext(CtrlCompact);
   const base = "flex flex-col items-center gap-1 focus:outline-none group";
   let inner;
 
@@ -71,15 +76,16 @@ function CtrlBtn({ children, onClick, label, active, danger, accent, hangup, pul
       : " bg-white/10 hover:bg-white/20";
   }
 
+  if (compact) inner = inner.replace("w-14 h-12", "w-12 h-11").replace("w-12 h-12", "w-11 h-11");
   if (pulse) inner += " ring-2 ring-red-500 ring-offset-1 ring-offset-transparent";
   if (disabled) inner += " opacity-50 cursor-wait";
 
   return (
-    <button onClick={onClick} disabled={disabled} title={title} className={base}>
+    <button onClick={onClick} disabled={disabled} title={title || label} aria-label={label} className={base}>
       <div className={`flex items-center justify-center transition-all duration-150 ${inner}`}>
         {children}
       </div>
-      <span className="text-[10px] font-medium text-white/50 group-hover:text-white/80 transition-colors leading-none">
+      <span className={compact ? "sr-only" : "text-[10px] font-medium text-white/50 group-hover:text-white/80 transition-colors leading-none"}>
         {label}
       </span>
     </button>
@@ -120,6 +126,7 @@ export default function VideoCall({
   const [selectedMicId,   setSelectedMicId]   = useState(null);
   const [showMicPicker,   setShowMicPicker]   = useState(false);
   const [isMobile,        setIsMobile]        = useState(() => window.innerWidth < 768);
+  const [showMore,        setShowMore]        = useState(false);   // phones: secondary controls live in a pop-up
   const [pendingLeave,    setPendingLeave]    = useState(false); // waiting for recording upload before leaving
 
   useEffect(() => {
@@ -1037,7 +1044,7 @@ export default function VideoCall({
     ));
 
     const chatPanelJSX = showChat && (
-      <div className="chat-panel absolute inset-y-0 right-4 w-80 bg-white rounded-3xl shadow-2xl border-2 border-purple-200 flex flex-col z-40 overflow-hidden">
+      <div className={`chat-panel absolute bg-white shadow-2xl border-2 border-purple-200 flex flex-col z-40 overflow-hidden ${isMobile ? "inset-2 rounded-2xl" : "inset-y-0 right-4 w-80 rounded-3xl"}`}>
         <div className="flex items-center justify-between px-5 py-4 bg-gradient-to-r from-purple-600 to-indigo-600 flex-shrink-0">
           <div className="flex items-center gap-2.5">
             <MessageSquare className="w-5 h-5 text-white" />
@@ -1137,10 +1144,82 @@ export default function VideoCall({
       </>
     );
 
+
+    // Secondary controls — inline on desktop, inside the "More" pop-up on phones.
+    // Screen sharing needs getDisplayMedia, which most phone browsers don't have.
+    const canShareScreen = !!navigator.mediaDevices?.getDisplayMedia;
+    const shareCtl = (
+      <>
+          {/* ── Screen share ── */}
+          {canShareScreen && <CtrlBtn onClick={toggleScreenShare} label={isScreenSharing ? "Stop Share" : "Share"} active={!isScreenSharing} accent={isScreenSharing ? "blue" : null}>
+            {isScreenSharing ? <MonitorOff className="w-5 h-5" /> : <Monitor className="w-5 h-5" />}
+          </CtrlBtn>}
+      </>
+    );
+    const bgCtl = (
+      <>
+          {/* ── Virtual background ── */}
+          {vbCompatible && vbProcessorRef.current && (
+            <div className="relative">
+              {!isMobile && BgPanel}
+              <CtrlBtn onClick={() => { setShowBgPanel(v => !v); setShowEmojiPicker(false); setShowChat(false); setShowMicPicker(false); }}
+                label="Background" active={!showBgPanel && activeBg === "none"} accent={activeBg !== "none" || showBgPanel ? "purple" : null}>
+                <Layers className="w-5 h-5" />
+              </CtrlBtn>
+            </div>
+          )}
+
+      </>
+    );
+    const moreCtl = (
+      <>
+          {/* ── Noise cancellation ── */}
+          {noiseCancelSupported && (
+            <CtrlBtn onClick={toggleNoiseCancel} label={noiseCancel ? "Noise Off" : "Noise On"}
+              active={!noiseCancel} accent={noiseCancel ? "teal" : null}
+              title={noiseCancel ? "Noise cancellation on" : "Noise cancellation off"}>
+              <Waves className="w-5 h-5" />
+            </CtrlBtn>
+          )}
+
+          {/* ── Record (teacher only) ── */}
+          {userRole === "teacher" && (
+            <div className="relative">
+              {isRecording && (
+                <div className="absolute -top-7 left-1/2 -translate-x-1/2 whitespace-nowrap bg-black/80 text-white text-[10px] font-semibold px-2.5 py-1 rounded-full flex items-center gap-1.5 backdrop-blur-sm">
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />{formatRecTime(recSeconds)}
+                </div>
+              )}
+              <CtrlBtn onClick={isRecording ? stopRecording : startRecording} disabled={uploadingRecording}
+                label={uploadingRecording ? "Saving…" : isRecording ? "Stop Rec" : "Record"}
+                active={!isRecording && !uploadingRecording} accent={isRecording ? "red" : null} pulse={isRecording}>
+                {uploadingRecording ? <Loader className="w-5 h-5 animate-spin" /> : isRecording ? <Square className="w-5 h-5 fill-current" /> : <Circle className="w-5 h-5" />}
+              </CtrlBtn>
+            </div>
+          )}
+
+          {/* ── Layout toggle ── */}
+          <CtrlBtn onClick={() => setViewMode(v => v === 'pip' ? 'split' : 'pip')}
+            label={viewMode === 'pip' ? "Split View" : "Focus View"} active>
+            {viewMode === 'pip' ? <LayoutGrid className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
+          </CtrlBtn>
+
+      </>
+    );
+    const secondaryControls = <>{shareCtl}{bgCtl}{moreCtl}</>;
+
     const controlBar = joined && (
-      <div className="flex-shrink-0 px-4 pb-4 pt-2"
-        style={{ background: "linear-gradient(to top, rgba(0,0,0,0.55) 0%, transparent 100%)" }}>
-        <div className="flex items-end justify-center gap-2 relative flex-wrap">
+      <CtrlCompact.Provider value={isMobile}>
+      <div className={isMobile ? "flex-shrink-0 px-2 pt-2" : "flex-shrink-0 px-4 pb-4 pt-2"}
+        style={{ background: "linear-gradient(to top, rgba(0,0,0,0.55) 0%, transparent 100%)", ...(isMobile && { paddingBottom: "max(10px, env(safe-area-inset-bottom, 0px))" }) }}>
+        <div className={`flex items-end justify-center relative ${isMobile ? "gap-1.5 flex-nowrap" : "gap-2 flex-wrap"}`}>
+          {/* phones: the background picker and the recording timer sit above the bar */}
+          {isMobile && showBgPanel && BgPanel}
+          {isMobile && isRecording && (
+            <div className="absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap bg-black/80 text-white text-[11px] font-semibold px-2.5 py-1 rounded-full flex items-center gap-1.5 backdrop-blur-sm z-10">
+              <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />Recording {formatRecTime(recSeconds)}
+            </div>
+          )}
 
           {/* ── Mic + device picker ── */}
           <div className="relative flex flex-col items-center">
@@ -1163,10 +1242,12 @@ export default function VideoCall({
                 }
               </div>
             )}
+            {!isMobile && (
             <button onClick={() => { setShowMicPicker(v => !v); loadMicDevices(); }}
               className="mb-0.5 px-1.5 py-0.5 rounded-md text-white/40 hover:text-white/80 hover:bg-white/10 transition-all" title="Choose microphone">
               <ChevronUp className="w-3 h-3" />
             </button>
+            )}
             <CtrlBtn onClick={localAudioTrack ? toggleMic : retryMic}
               label={!localAudioTrack ? "No Mic" : micOn ? "Mute" : "Unmuted"}
               active={micOn && !!localAudioTrack} danger={!micOn || !localAudioTrack}
@@ -1180,21 +1261,8 @@ export default function VideoCall({
             {camOn ? <VideoIcon className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
           </CtrlBtn>
 
-          {/* ── Screen share ── */}
-          <CtrlBtn onClick={toggleScreenShare} label={isScreenSharing ? "Stop Share" : "Share"} active={!isScreenSharing} accent={isScreenSharing ? "blue" : null}>
-            {isScreenSharing ? <MonitorOff className="w-5 h-5" /> : <Monitor className="w-5 h-5" />}
-          </CtrlBtn>
-
-          {/* ── Virtual background ── */}
-          {vbCompatible && vbProcessorRef.current && (
-            <div className="relative">
-              {BgPanel}
-              <CtrlBtn onClick={() => { setShowBgPanel(v => !v); setShowEmojiPicker(false); setShowChat(false); setShowMicPicker(false); }}
-                label="Background" active={!showBgPanel && activeBg === "none"} accent={activeBg !== "none" || showBgPanel ? "purple" : null}>
-                <Layers className="w-5 h-5" />
-              </CtrlBtn>
-            </div>
-          )}
+          {!isMobile && shareCtl}
+          {!isMobile && bgCtl}
 
           {/* ── Chat ── */}
           <div className="relative">
@@ -1229,36 +1297,31 @@ export default function VideoCall({
             </CtrlBtn>
           </div>
 
-          {/* ── Noise cancellation ── */}
-          {noiseCancelSupported && (
-            <CtrlBtn onClick={toggleNoiseCancel} label={noiseCancel ? "Noise Off" : "Noise On"}
-              active={!noiseCancel} accent={noiseCancel ? "teal" : null}
-              title={noiseCancel ? "Noise cancellation on" : "Noise cancellation off"}>
-              <Waves className="w-5 h-5" />
-            </CtrlBtn>
-          )}
+          {!isMobile && moreCtl}
 
-          {/* ── Record (teacher only) ── */}
-          {userRole === "teacher" && (
+          {/* ── More (phones) ── */}
+          {isMobile && (
             <div className="relative">
-              {isRecording && (
-                <div className="absolute -top-7 left-1/2 -translate-x-1/2 whitespace-nowrap bg-black/80 text-white text-[10px] font-semibold px-2.5 py-1 rounded-full flex items-center gap-1.5 backdrop-blur-sm">
-                  <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />{formatRecTime(recSeconds)}
-                </div>
+              {showMore && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowMore(false)} />
+                  <div className="absolute bottom-full right-0 mb-3 z-50 rounded-2xl border border-white/10 p-3"
+                    style={{ background: "rgba(18,18,22,0.97)", backdropFilter: "blur(20px)", boxShadow: "0 20px 60px rgba(0,0,0,0.6)" }}
+                    onClickCapture={() => setTimeout(() => setShowMore(false), 0)}>
+                    <CtrlCompact.Provider value={false}>
+                      <div className="grid grid-cols-3 gap-x-2 gap-y-3" style={{ width: 228 }}>
+                        {secondaryControls}
+                      </div>
+                    </CtrlCompact.Provider>
+                  </div>
+                </>
               )}
-              <CtrlBtn onClick={isRecording ? stopRecording : startRecording} disabled={uploadingRecording}
-                label={uploadingRecording ? "Saving…" : isRecording ? "Stop Rec" : "Record"}
-                active={!isRecording && !uploadingRecording} accent={isRecording ? "red" : null} pulse={isRecording}>
-                {uploadingRecording ? <Loader className="w-5 h-5 animate-spin" /> : isRecording ? <Square className="w-5 h-5 fill-current" /> : <Circle className="w-5 h-5" />}
+              <CtrlBtn onClick={() => { setShowMore(v => !v); setShowEmojiPicker(false); setShowBgPanel(false); }}
+                label="More" active={!showMore} accent={showMore ? "indigo" : isRecording ? "red" : null}>
+                <MoreHorizontal className="w-5 h-5" />
               </CtrlBtn>
             </div>
           )}
-
-          {/* ── Layout toggle ── */}
-          <CtrlBtn onClick={() => setViewMode(v => v === 'pip' ? 'split' : 'pip')}
-            label={viewMode === 'pip' ? "Split View" : "Focus View"} active>
-            {viewMode === 'pip' ? <LayoutGrid className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
-          </CtrlBtn>
 
           {/* ── Hang up ── */}
           <CtrlBtn onClick={handleHangUp} label={pendingLeave ? "Saving…" : "Leave"} hangup disabled={pendingLeave}>
@@ -1267,6 +1330,7 @@ export default function VideoCall({
 
         </div>
       </div>
+      </CtrlCompact.Provider>
     );
 
     // ── PiP layout (default): remote fills screen, local is bottom-right overlay ──
@@ -1279,7 +1343,7 @@ export default function VideoCall({
 
             {/* Remote video – fills entire area */}
             {joined && remoteUsers.length > 0 ? remoteUsers.map(user => (
-              <div key={user.uid} className="absolute inset-0 flex items-center justify-center p-3 bg-gray-950">
+              <div key={user.uid} className={`absolute inset-0 flex items-center justify-center bg-gray-950 ${isMobile ? "p-1.5" : "p-3"}`}>
                 <div className="relative w-full h-full rounded-2xl overflow-hidden ring-1 ring-white/10 shadow-2xl">
                   <div ref={el => { remoteContainerRef.current[user.uid] = el; }} className="pip-remote w-full h-full" />
                   {!user.videoTrack && (
@@ -1326,8 +1390,8 @@ export default function VideoCall({
 
             {/* Local video – PiP overlay, bottom-right corner */}
             {joined && (
-              <div className="absolute bottom-4 right-4 z-20 rounded-2xl overflow-hidden shadow-2xl ring-2 ring-white/20"
-                style={{ width: isMobile ? '96px' : '176px', height: isMobile ? '72px' : '132px' }}>
+              <div className={`absolute z-20 overflow-hidden shadow-2xl ring-2 ring-white/20 ${isMobile ? "bottom-3 right-3 rounded-xl" : "bottom-4 right-4 rounded-2xl"}`}
+                style={{ width: isMobile ? '84px' : '176px', height: isMobile ? '112px' : '132px' }}>
                 <div ref={localContainer} className="pip-local w-full h-full bg-gray-800" />
                 {camError && (
                   <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900/90 p-2 text-center">

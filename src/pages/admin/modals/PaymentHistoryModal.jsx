@@ -1,8 +1,10 @@
 import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useCurrencySymbol } from "../../../hooks/useCurrencySymbol";
 
 export default function PaymentHistoryModal({ isOpen, onClose, history }) {
   const { t: tr } = useTranslation("admin");
+  const sym = useCurrencySymbol(); // the center's currency (Class pricing), e.g. ₫
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
 
@@ -113,7 +115,7 @@ export default function PaymentHistoryModal({ isOpen, onClose, history }) {
                     </td>
                     <td className="border p-2">{row.student || tr("paymentHistoryModal.unknown")}</td>
                     <td className="border p-2">{row.method}</td>
-                    <td className="border p-2">₦{row.amount}</td>
+                    <td className="border p-2">{sym}{row.amount}</td>
                     <td className="border p-2">{row.classes || "-"}</td>
                     <td className="border p-2">{row.status}</td>
                   </tr>
