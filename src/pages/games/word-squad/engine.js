@@ -23,7 +23,8 @@ export function detectDevice() {
  * @param host     element the canvas goes into
  * @param chapter  0 | 1 | 2
  * @param session  { seed, gates, answer } — from the demo now, the server later
- * @param on       { question(gate|null), lane(i), result(ev), stars(n), end(summary, liveStars), quality(level, fps) }
+ * @param on       { question(gate|null), lane(i), phase(p), result(ev), spell(ev), power(kind, secs),
+ *                   down(reviveQuestion), stars(n), end(summary, liveStars), quality(level, fps) }
  */
 export async function startGame({ host, chapter, session, on = {} }) {
   const device = detectDevice();
@@ -37,7 +38,7 @@ export async function startGame({ host, chapter, session, on = {} }) {
   let drag = null;
   let targetX = null;
   const cssToLogical = () => {
-    const scale = Math.min(host.clientHeight / LOGICAL_H, host.clientWidth / PORTRAIT_W) || 1;
+    const scale = host.clientHeight / LOGICAL_H || 1;
     return 1 / scale;
   };
   const onDown = (e) => {
@@ -63,8 +64,6 @@ export async function startGame({ host, chapter, session, on = {} }) {
   host.addEventListener('pointercancel', onUp);
   window.addEventListener('keydown', keyDown);
   window.addEventListener('keyup', keyUp);
-
-  if (import.meta.env.DEV) window.__wordSquad = { world }; // for poking at the game in dev tools
 
   const ro = new ResizeObserver(() => R.resize());
   ro.observe(host);
@@ -103,6 +102,9 @@ export async function startGame({ host, chapter, session, on = {} }) {
         fx.handle(events, world);
         for (const ev of events) {
           if (ev.type === 'gateResult') on.result?.(ev);
+          if (ev.type === 'down') { keys.left = keys.right = false; drag = null; on.down?.(session.revive); }
+          if (ev.type === 'spellStart' || ev.type === 'letter' || ev.type === 'spellDone') on.spell?.({ ...ev, got: world.spell?.got ?? 0 });
+          if (ev.type === 'pickup' && ev.secs) on.power?.(ev.kind, ev.secs);
           if (ev.type === 'won' || ev.type === 'lost') ended = true;
         }
       }
@@ -147,6 +149,19 @@ export async function startGame({ host, chapter, session, on = {} }) {
   }
   raf = requestAnimationFrame(frame);
 
+  // Dev only: poke at the game from dev tools, and step it frame by frame when the tab is in the background
+  if (import.meta.env.DEV) {
+    window.__wordSquad = {
+      world,
+      renderer: R,
+      advance(seconds) {
+        paused = false; // stepping by hand means "play"
+        for (let i = 0; i < Math.round(seconds * 60); i++) { frame(lastT + 1000 / 60); cancelAnimationFrame(raf); }
+        raf = requestAnimationFrame(frame);
+      },
+    };
+  }
+
   return {
     world,
     setPaused(p) {
@@ -156,6 +171,8 @@ export async function startGame({ host, chapter, session, on = {} }) {
       if (p) suspendAudio(); else resumeAudio();
     },
     get paused() { return paused; },
+    /** Answer of the bonus question after the squad was wiped out */
+    revive(ok) { world.revive(ok); },
     destroy() {
       cancelAnimationFrame(raf);
       ro.disconnect();

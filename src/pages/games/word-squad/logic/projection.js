@@ -1,17 +1,20 @@
 // src/pages/games/word-squad/logic/projection.js
 // Perspective road camera. A point on the ground at (x, rz) — rz is the
-// distance ahead of the squad — maps to a screen point. The squad (rz = 0)
-// stands near the bottom; the horizon is a fixed line across the screen.
+// distance ahead of the squad — maps to a screen point. The camera sits low,
+// just behind the squad ("over the shoulder"), so the road rushes toward you,
+// fills the screen width, and gates and bosses loom up face to face.
 // Logical screen: LOGICAL_H high, width depends on the aspect ratio.
 
 export const LOGICAL_H = 960;
 export const PORTRAIT_W = 540;
 export const MAX_W = 1800;
 
-const HORIZON_Y = 300;
-const CAM_BACK = 2.2;   // camera sits this far behind the squad
-const Y_K = 1040;       // ground drop  (camera height × focal)
-const X_K = 330;        // road spread  (focal)
+const HORIZON_Y = 400;
+export const CAM_BACK = 2.2;   // camera sits this far behind the squad
+const Y_K = 790;               // ground drop (camera height × focal) — low camera, squad near the bottom
+export const X_K = 400;        // road spread (focal) — the road fills a phone screen at the squad
+/** Screen px per world unit across the road, at the squad's depth */
+export const PX_PER_UNIT = X_K / CAM_BACK;
 
 export function logicalWidth(screenW, screenH) {
   const w = Math.round((LOGICAL_H * screenW) / Math.max(1, screenH));

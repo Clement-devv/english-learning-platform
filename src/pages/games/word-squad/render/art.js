@@ -384,6 +384,77 @@ const ITEMS = {
   muzzle: { w: 30, h: 30, draw(ctx) { star(ctx, 15, 15, 14, 5, 6); ctx.fillStyle = 'rgba(255,240,180,1)'; ctx.fill(); ell(ctx, 15, 15, 5, 5); ctx.fillStyle = '#fff'; ctx.fill(); } },
 };
 
+// Road challenges (Batch 1)
+const ROAD_ART = {
+  spinner: {
+    w: 76, h: 76,
+    draw(ctx) {
+      // A candy pinwheel: six rounded petals around a gumdrop middle
+      const cols = ['#ff5d8f', '#ffffff', '#ffd166', '#ffffff', '#4cc9f0', '#ffffff'];
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * Math.PI * 2;
+        ctx.save(); ctx.translate(38, 38); ctx.rotate(a);
+        ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(30, -6, 32, 10); ctx.quadraticCurveTo(18, 14, 0, 0);
+        fillStroke(ctx, cols[i], 2.5);
+        ctx.restore();
+      }
+      ell(ctx, 38, 38, 11, 11); fillStroke(ctx, rad(ctx, 38, 38, 1, 12, [[0, '#fff3b0'], [1, '#ff9f1c']], -3, -3), 3);
+      shine(ctx, 34, 34, 3, 2, 0.9);
+    },
+  },
+  gumBlock: {
+    w: 46, h: 44,
+    draw(ctx) {
+      ctx.beginPath(); ctx.moveTo(4, 40); ctx.quadraticCurveTo(2, 6, 23, 5); ctx.quadraticCurveTo(44, 6, 42, 40); ctx.closePath();
+      fillStroke(ctx, lin(ctx, 0, 5, 0, 40, [[0, '#ffffff'], [1, '#d8d4ec']]), 3);
+      for (const [x, y] of [[14, 20], [28, 14], [32, 28], [18, 32]]) { rr(ctx, x - 3, y - 1.5, 6, 3, 1.5); ctx.fillStyle = 'rgba(42,31,69,0.25)'; ctx.fill(); }
+      shine(ctx, 15, 14, 5, 3, 0.8);
+    },
+  },
+  pickBubble: {
+    w: 60, h: 60,
+    draw(ctx) {
+      ell(ctx, 30, 30, 27, 27);
+      ctx.fillStyle = rad(ctx, 30, 30, 8, 28, [[0, 'rgba(255,255,255,0.15)'], [0.8, 'rgba(200,230,255,0.35)'], [1, 'rgba(255,255,255,0.85)']]);
+      ctx.fill();
+      ctx.lineWidth = 2.5; ctx.strokeStyle = 'rgba(255,255,255,0.95)'; ctx.stroke();
+      shine(ctx, 20, 18, 7, 4, 0.85);
+    },
+  },
+  coin: {
+    w: 36, h: 36,
+    draw(ctx) {
+      ell(ctx, 18, 18, 16, 16); fillStroke(ctx, rad(ctx, 18, 18, 2, 17, [[0, '#fff3b0'], [0.6, '#ffd166'], [1, '#f4a100']], -4, -4), 2.5, '#9a5b00');
+      ell(ctx, 18, 18, 11, 11); ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(154,91,0,0.5)'; ctx.stroke();
+      star(ctx, 18, 18, 7, 3); ctx.fillStyle = '#fff7d6'; ctx.fill();
+    },
+  },
+  iconShield: {
+    w: 44, h: 44,
+    draw(ctx) {
+      ctx.beginPath(); ctx.moveTo(22, 4); ctx.lineTo(38, 10); ctx.quadraticCurveTo(38, 32, 22, 40); ctx.quadraticCurveTo(6, 32, 6, 10); ctx.closePath();
+      fillStroke(ctx, lin(ctx, 6, 4, 38, 40, [[0, '#a5f3fc'], [1, '#0891b2']]), 3);
+      star(ctx, 22, 21, 8, 3.5); ctx.fillStyle = '#ffffff'; ctx.fill();
+    },
+  },
+  iconFrenzy: {
+    w: 44, h: 44,
+    draw(ctx) {
+      ell(ctx, 22, 22, 19, 19); fillStroke(ctx, rad(ctx, 22, 22, 2, 20, [[0, '#ffe8a3'], [1, '#ff7a00']], -5, -5), 2.5);
+      ctx.beginPath(); ctx.moveTo(25, 6); ctx.lineTo(13, 24); ctx.lineTo(21, 24); ctx.lineTo(17, 38); ctx.lineTo(31, 18); ctx.lineTo(23, 18); ctx.closePath();
+      fillStroke(ctx, '#ffffff', 2.5);
+    },
+  },
+  target: {
+    w: 80, h: 80,
+    draw(ctx) {
+      ell(ctx, 40, 40, 38, 38); ctx.fillStyle = rad(ctx, 40, 40, 4, 38, [[0, 'rgba(255,255,180,0.9)'], [0.5, 'rgba(255,210,80,0.45)'], [1, 'rgba(255,200,60,0)']]); ctx.fill();
+      for (const [r, c] of [[26, '#ff4d6d'], [17, '#ffffff'], [9, '#ff4d6d']]) { ell(ctx, 40, 40, r, r); fillStroke(ctx, c, 3); }
+      star(ctx, 40, 40, 6, 2.5); ctx.fillStyle = '#ffffff'; ctx.fill();
+    },
+  },
+};
+
 // Badge icons for gate rewards
 function iconWeapon(weapon) {
   return {
@@ -594,7 +665,7 @@ export const SPECIES_KEYS = ['beetle', 'bee', 'snail', 'spiderbot'];
 
 /** Everything for the main atlas */
 export function mainArt() {
-  const out = { ...ITEMS, ...ICONS };
+  const out = { ...ITEMS, ...ICONS, ...ROAD_ART };
   for (const wp of WEAPON_KEYS) {
     for (let f = 0; f < 4; f++) out[`soldier_${wp}_${f}`] = soldier(wp, f);
     if (wp !== 'blaster') out[`icon_${wp}`] = iconWeapon(wp);

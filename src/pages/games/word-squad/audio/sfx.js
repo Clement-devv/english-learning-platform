@@ -144,6 +144,47 @@ export const sfx = {
     if (!ready('lose')) return;
     [392, 330, 262, 196].forEach((f, i) => tone({ type: 'triangle', from: f, dur: 0.3, vol: 0.18, at: i * 0.22 }));
   },
+  spit() {
+    if (!ready('spit', 90)) return;
+    noise({ dur: 0.18, vol: 0.14, freq: 700, sweepTo: 300, type: 'bandpass', q: 3 });
+    tone({ type: 'sine', from: 320, to: 180, dur: 0.15, vol: 0.08 });
+  },
+  coin() {
+    if (!ready('coin', 40)) return;
+    tone({ type: 'square', from: 988, dur: 0.06, vol: 0.06 });
+    tone({ type: 'square', from: 1319, dur: 0.12, vol: 0.06, at: 0.06 });
+  },
+  bonk() {
+    if (!ready('bonk', 150)) return;
+    tone({ type: 'sine', from: 260, to: 90, dur: 0.22, vol: 0.3 });
+    noise({ dur: 0.12, vol: 0.15, freq: 800 });
+  },
+  whoosh() {
+    if (!ready('whoosh', 120)) return;
+    noise({ dur: 0.35, vol: 0.18, freq: 400, sweepTo: 2400, type: 'bandpass', q: 2 });
+  },
+  windup() {
+    if (!ready('windup', 300)) return;
+    tone({ type: 'sawtooth', from: 120, to: 360, dur: 0.9, vol: 0.07, attack: 0.3 });
+  },
+  shatter() {
+    if (!ready('shatter', 200)) return;
+    noise({ dur: 0.5, vol: 0.35, freq: 3500, type: 'highpass' });
+    [1568, 2093, 2637].forEach((f, i) => tone({ type: 'triangle', from: f, to: f * 0.8, dur: 0.25, vol: 0.08, at: i * 0.04 }));
+  },
+  ping() {
+    if (!ready('ping', 120)) return;
+    tone({ type: 'sine', from: 1760, dur: 0.18, vol: 0.12 });
+  },
+  letter(ok) {
+    if (!ready('letter', 60)) return;
+    if (ok) tone({ type: 'triangle', from: 660, to: 990, dur: 0.15, vol: 0.18 });
+    else tone({ type: 'square', from: 200, to: 150, dur: 0.18, vol: 0.08 });
+  },
+  powerup() {
+    if (!ready('powerup', 200)) return;
+    [523, 784, 1047, 1568].forEach((f, i) => tone({ type: 'sine', from: f, dur: 0.12, vol: 0.14, at: i * 0.05 }));
+  },
   star() {
     if (!ready('star', 45)) return;
     tone({ type: 'sine', from: 1400 + Math.random() * 500, dur: 0.08, vol: 0.08 });

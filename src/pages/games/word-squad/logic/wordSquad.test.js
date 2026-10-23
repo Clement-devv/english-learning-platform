@@ -9,14 +9,17 @@ import { createWorld } from './world.js';
 import { autopilot } from './autopilot.js';
 import { createDemoSession } from '../data/demoSession.js';
 import { DEMO_QUESTIONS } from '../data/demoQuestions.js';
-import { ENEMY_CAP, CHAPTERS, ROAD_HALF, VISIBLE_SOLDIERS, MAX_SQUAD, START_SQUAD } from './config.js';
+import { ENEMY_CAP, CHAPTERS, ROAD_HALF, VISIBLE_SOLDIERS, MAX_SQUAD } from './config.js';
 
+const MID = 8; // squad size in the middle of a chapter
 const flush = async () => { for (let i = 0; i < 5; i++) await Promise.resolve(); };
 
 /** A world with nothing scheduled, for testing one thing at a time. */
 function bareWorld(opts = {}) {
   const w = createWorld({ chapter: 0, seed: 7, gates: [], answer: async () => ({ correct: true }), ...opts });
   w.plan.events.length = 0;
+  w.squad.count = MID;
+  w.stats.answered = 5; // past the protected start
   return w;
 }
 
@@ -113,7 +116,7 @@ describe('world: gates', () => {
     w.step(0.016, { targetX: -1 });
     expect(calls).toEqual([['g1', 'have']]);
     expect(w.stats.right).toBe(1);
-    expect(w.squad.count).toBe(START_SQUAD[0] + 5);
+    expect(w.squad.count).toBe(MID + 5);
     expect(w.events.some((e) => e.type === 'gateResult' && e.correct)).toBe(true);
   });
 
@@ -123,10 +126,10 @@ describe('world: gates', () => {
     for (let i = 0; i < 60; i++) w.step(0.016, { targetX: 1 });
     await flush();
     w.step(0.016, { targetX: 1 });
-    expect(w.squad.count).toBe(START_SQUAD[0] - 2);
-    expect(w.swarmBoost).toBeCloseTo(0.35);
+    expect(w.squad.count).toBe(MID - 2);
+    expect(w.swarmBoost).toBeCloseTo(0.5);
     expect(w.enemies.some((e) => e.kind === 'mini')).toBe(true);
-    expect(w.enemies.filter((e) => e.angry && e.kind === 'bug').length).toBe(6); // 6 + 3 × chapter
+    expect(w.enemies.filter((e) => e.angry && e.kind === 'bug').length).toBe(7); // about one per soldier left (6 × 1.1), at most 12 + 4 × chapter
     expect(w.review).toEqual([{ prompt: 'I ___ a cat.', answer: 'have', chose: 'has' }]);
   });
 
@@ -183,7 +186,7 @@ describe('world: combat', () => {
     w.squad.weapon = 'blaster';
     w.crates.push({ id: 5, x: 0, z: 0.05, hp: 999, maxHp: 999, r: 0.22, drop: { type: 'friends', amount: 3 }, flashT: 0 });
     w.step(0.016);
-    expect(w.squad.count).toBe(START_SQUAD[0] - 2);
+    expect(w.squad.count).toBe(MID - 2);
   });
 
   it('shooting a crate open gives its drop', () => {
@@ -200,7 +203,7 @@ describe('world: whole chapter', () => {
   async function play(chapter, rightRate, seed = 11) {
     const session = createDemoSession(chapter, seed);
     const rng = createRng(seed);
-    const w = createWorld({ chapter, seed, gates: session.gates, answer: session.answer });
+    const w = createWorld({ chapter, seed, gates: session.gates, answer: session.answer, revive: false });
     const picks = new Map();
     const pick = (g) => {
       if (!picks.has(g.id)) {
@@ -233,7 +236,7 @@ describe('world: whole chapter', () => {
     expect(wins.length).toBeGreaterThanOrEqual(2);
     for (const { w, t } of wins) {
       expect(w.stats.bossBeaten).toBe(true);
-      expect(t).toBeGreaterThan(150);
+      expect(t).toBeGreaterThan(120); // right answers speed the squad up
       expect(t).toBeLessThan(360);
     }
   });

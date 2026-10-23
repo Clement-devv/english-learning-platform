@@ -3,17 +3,18 @@
 // perspective road, scenery, the squad, bugs, crates, gates, the boss, bullets
 // and the laser. Effects for world events live in fx.js.
 import { Application, BitmapFont, BitmapText, CanvasSource, Container, Graphics, Sprite, Texture } from 'pixi.js';
-import { project, depthScale, LOGICAL_H, PORTRAIT_W, horizonY } from '../logic/projection.js';
+import { project, depthScale, LOGICAL_H, PORTRAIT_W, horizonY, PX_PER_UNIT, X_K } from '../logic/projection.js';
 import { ROAD_HALF, VIEW_DIST, PARTICLE_CAP, BOSS_HOLD_Z } from '../logic/config.js';
 import { formation, laneIndex } from '../logic/squad.js';
 import { buildAtlases } from './atlas.js';
 import { createParticles } from './particles.js';
 import { createGateView } from './gateView.js';
 import { createBossView } from './bossView.js';
+import { createRoadView } from './roadView.js';
 import { BUG_EYES, CANDY_COLORS } from './art.js';
 
 const FONT = 'Nunito';
-const BUG_SCALE = 1.3;
+const BUG_SCALE = 1.45;
 const MINI_SCALE = 3.0;
 const BOSS_SCALE = 2.6;
 const fade = (rz) => Math.max(0, Math.min(1, (VIEW_DIST + 1.2 - rz) / 2.2));
@@ -166,7 +167,9 @@ export async function createRenderer({ host, device, reducedMotion }) {
   function resize() {
     const cw = Math.max(1, host.clientWidth), ch = Math.max(1, host.clientHeight);
     app.renderer.resize(cw, ch, resolution);
-    const scale = Math.min(ch / LOGICAL_H, cw / PORTRAIT_W);
+    // Fit the height: on a narrow phone the road runs off both edges, so the action
+    // fills the screen (a close, over-the-shoulder view) instead of shrinking
+    const scale = ch / LOGICAL_H;
     W = cw / scale;
     H = ch / scale;
     top = -(H - LOGICAL_H);              // extra height on tall phones goes to the sky
@@ -239,9 +242,11 @@ export async function createRenderer({ host, device, reducedMotion }) {
     (s) => { s.visible = false; world.removeChild(s); bulletPool.push(s); },
   );
   const gates = keyed(
-    (g, weapon) => { const v = createGateView(atlas, g, weapon); world.addChild(v.root); return v; },
+    (g, weapon, total) => { const v = createGateView(atlas, g, weapon, total); world.addChild(v.root); labels.addChild(v.banner); return v; },
     (v) => v.destroy(),
   );
+
+  const roadView = createRoadView({ world, labels, particles, keyed, sprite, shadowOf, releaseShadow, fade, proj: (x, rz) => project(x, rz, W) });
 
   // Squad: a fixed set of soldier sprites
   const soldiers = [];
@@ -275,7 +280,7 @@ export async function createRenderer({ host, device, reducedMotion }) {
   }
   function updateScenery(dist) {
     const reach = dist + VIEW_DIST + 1;
-    const spread = Math.max(2.2, ((W / 2) * 2.4) / 330); // wider screens show more of the sides
+    const spread = Math.max(2.2, ((W / 2) * 2.4) / X_K); // wider screens show more of the sides
     while (nextPropZ < reach) {
       for (const side of [-1, 1]) {
         const n = 1 + Math.floor(rnd() * Math.min(3, spread));
@@ -355,23 +360,27 @@ export async function createRenderer({ host, device, reducedMotion }) {
     g.clear();
     const bossRz = w.boss ? w.boss.z - w.dist : BOSS_HOLD_Z;
     for (const tg of w.telegraphs) {
-      const urgency = 1 - tg.t / tg.dur;
+      const flying = tg.state === 'flying';
+      const urgency = flying ? 1 : 1 - tg.t / tg.dur;
       const pulse = 0.5 + 0.5 * Math.sin(t * (10 + urgency * 26));
-      const alpha = 0.3 + 0.4 * pulse;
+      const alpha = flying ? 0.22 : 0.3 + 0.4 * pulse;
       if (tg.shape === 'lane') {
         const col = tg.harmless ? 0xb388ff : tg.kind === 'goo' ? 0x34d399 : 0xff3b5c;
         quad(g, tg.x0, tg.x1, -0.6, bossRz, col, alpha);
         quad(g, tg.x0, tg.x0 + 0.05, -0.6, bossRz, 0xffffff, 0.5 + 0.5 * pulse);
         quad(g, tg.x1 - 0.05, tg.x1, -0.6, bossRz, 0xffffff, 0.5 + 0.5 * pulse);
+        // the attack itself racing toward the squad: a bright band with a glowing front
+        if (flying && !tg.harmless) { quad(g, tg.x0, tg.x1, tg.prz - 0.9, tg.prz, 0xffffff, 0.5); quad(g, tg.x0, tg.x1, tg.prz - 0.12, tg.prz + 0.08, 0xffd166, 0.95); }
       } else if (tg.shape === 'circle') {
         const q = project(tg.cx, tg.rz, W);
-        const rx = (tg.r * 330 * q.s) / 2.2;
+        const rx = tg.r * PX_PER_UNIT * q.s * (flying ? 0.5 + 0.5 * Math.min(1, tg.ft / tg.flight) : 1);
         g.ellipse(q.x, q.y, rx, rx * 0.38).fill({ color: 0xff3b5c, alpha });
         g.ellipse(q.x, q.y, rx * (1.15 - urgency * 0.15), rx * 0.38 * (1.15 - urgency * 0.15)).stroke({ width: 4, color: 0xffffff, alpha: 0.9 });
       } else if (tg.shape === 'wave') {
         quad(g, -ROAD_HALF, tg.gx0, -0.6, bossRz, 0xff3b5c, alpha);
         quad(g, tg.gx1, ROAD_HALF, -0.6, bossRz, 0xff3b5c, alpha);
         quad(g, tg.gx0, tg.gx1, -0.6, bossRz, 0x22c55e, 0.25 + 0.2 * pulse);
+        if (flying) { quad(g, -ROAD_HALF, tg.gx0, tg.prz - 0.5, tg.prz, 0xffb703, 0.8); quad(g, tg.gx1, ROAD_HALF, tg.prz - 0.5, tg.prz, 0xffb703, 0.8); }
       }
     }
     // Attack sweeps travelling from the boss toward the squad
@@ -419,7 +428,10 @@ export async function createRenderer({ host, device, reducedMotion }) {
       const size = (e.kind === 'mini' ? MINI_SCALE : BUG_SCALE) * q.s;
       const hover = e.species === 'bee' ? (Math.sin(t * 7 + e.phase) * 5 - 12) * q.s : 0;
       v.c.position.set(q.x, q.y + hover);
-      const pop = e.flashT > 0 ? 1.12 : 1;
+      // a shooting bug swells and glows green just before it spits — the warning to dodge
+      const aiming = e.shooter && e.aimX !== null;
+      const pop = (e.flashT > 0 ? 1.12 : 1) * (aiming ? 1.18 + Math.sin(t * 30) * 0.06 : 1);
+      v.body.tint = e.shooter ? (aiming ? 0xd9ff8a : 0xd4f5b0) : 0xffffff;
       v.body.scale.set(size * v.body._inv * pop);
       v.eyes.scale.set(size * v.eyes._inv * pop);
       // eyes follow the squad
@@ -478,10 +490,12 @@ export async function createRenderer({ host, device, reducedMotion }) {
     }
     bullets.sweep();
 
+    roadView.draw(w, t, dt, view);
+
     // gates
     const active = w.activeGate();
     for (const g of w.gates) {
-      const v = gates.get(g.id, g, w.squad.weapon);
+      const v = gates.get(g.id, g, w.squad.weapon, w.plan.gates);
       const rz = g.z - dist;
       const q = project(0, rz, W);
       v.root.position.set(q.x, q.y);
@@ -489,6 +503,15 @@ export async function createRenderer({ host, device, reducedMotion }) {
       v.root.zIndex = Math.round(-rz * 100) - 5;
       v.root.alpha = fade(rz) * (rz < 0 ? Math.max(0, 1 + rz / 1.2) : 1);
       v.update(g, w.squad.weapon, g === active ? laneIndex(sx, g.n) : -1);
+      // The question hangs above its gate; kept big enough to read while the gate is far away
+      v.banner.visible = v.banner.visible && g === active;
+      if (v.banner.visible) {
+        const bs = Math.max(0.62, Math.min(1, q.s * 1.9));
+        const h = v.banner.pivot.y * bs;
+        v.banner.scale.set(bs);
+        v.banner.position.set(q.x, Math.max(top + 70 + h, q.y + v.bannerAnchorY * q.s));
+        v.banner.alpha = Math.min(1, fade(rz) * 1.5);
+      }
     }
     gates.sweep();
 
@@ -505,7 +528,7 @@ export async function createRenderer({ host, device, reducedMotion }) {
       setTex(v.s, `soldier_${weapon}_${frame}`);
       v.s.visible = true;
       v.s.position.set(q.x, q.y + Math.abs(Math.sin(t * 9 + i)) * -2 * q.s);
-      v.s.scale.set(q.s * v.s._inv * 0.95);
+      v.s.scale.set(q.s * v.s._inv * 1.1);
       v.s.zIndex = Math.round(-p.dz * 100) + 3;
       v.s.tint = view.hurtT > 0 ? 0xff9a9a : 0xffffff;
       v.sh.visible = true;
@@ -544,7 +567,7 @@ export async function createRenderer({ host, device, reducedMotion }) {
       bossView.root.position.set(q.x, q.y);
       bossView.root.scale.set(q.s * BOSS_SCALE);
       bossView.root.zIndex = Math.round(-rz * 100);
-      bossView.update(w.boss, t, dt, w.telegraphs[0]?.kind || null);
+      bossView.update(w.boss, t, dt, w.boss.windup?.kind || null);
       bossView.hud.position.set(q.x, q.y + bossView.top * q.s * BOSS_SCALE - 14);
       view.bossScreen = { x: q.x, y: q.y, s: q.s * BOSS_SCALE, top: bossView.top };
     } else if (bossView && (!w.boss || w.boss.state === 'dead')) {
@@ -580,7 +603,7 @@ export async function createRenderer({ host, device, reducedMotion }) {
     },
     render() { app.renderer.render(app.stage); },
     destroy() {
-      bugs.clear(); crates.clear(); bullets.clear(); gates.clear();
+      bugs.clear(); crates.clear(); bullets.clear(); gates.clear(); roadView.destroy();
       bossView?.destroy();
       atlas.destroy();
       for (const n of ['WSNum', 'WSComic', 'WSDark']) { try { BitmapFont.uninstall(n); } catch { /* ignore */ } }

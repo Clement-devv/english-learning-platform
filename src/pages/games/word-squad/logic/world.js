@@ -1,6 +1,6 @@
 // src/pages/games/word-squad/logic/world.js
-// The Word Squad simulation: squad, bugs, bullets, crates, Word Gates and the
-// boss. Plain data in, plain data out — no rendering, no timers, no DOM — so it
+// The Word Squad simulation: squad, bugs, bullets, crates, Word Gates, the
+// road challenges (road.js) and the boss (boss.js). Plain data in, plain data out — no rendering, no timers, no DOM — so it
 // runs the same in tests. The renderer reads the state after each step() and
 // drains world.events for effects and sounds.
 //
@@ -13,12 +13,15 @@
 import {
   SPEED, VIEW_DIST, STEER_SPEED, START_SQUAD, ENEMY_CAP, COMBO_WINDOW, WEAPONS,
   MAX_SHOOTERS, AIM_ASSIST, BASE_POWER, SPECIES, CHAPTER_HP, SWARM_BOOST_PER_WRONG, SWARM_BOOST_MAX, MINI_BOSS, CRATE,
-  BOSS_HOLD_Z, BOSS_RADIUS, TELEGRAPH_S, WRONG_IN_BOSS_HP, ROAD_HALF, MAX_SQUAD,
+  BOSS_RADIUS, ROAD_HALF, MAX_SQUAD, HOMING, TARGET_CONE, PICKUP, REVIVE_SQUAD,
+  SPEED_PER_RIGHT, SPEED_MAX, WRONG_SWARM, SHOOTERS, FIRST_GATE_REWARD, STARTER_SAFE_GATES, BUILD_UP_GATES,
 } from './config.js';
 import { createRng } from './rng.js';
 import { buildChapterPlan, choicesForGate } from './chapters.js';
-import { formation, squadRadius, clampSquadX, laneIndex } from './squad.js';
+import { formation, squadRadius, clampSquadX, laneIndex, dodgeReach } from './squad.js';
 import { applyReward, rollReward, effectiveReward } from './rewards.js';
+import { createRoad } from './road.js';
+import { createBoss } from './boss.js';
 
 const TRICKLE_EVERY = [1.5, 1.25, 1.05];
 const SPECIES_MIX = [
@@ -34,7 +37,7 @@ function compact(list, keep) {
   list.length = j;
 }
 
-export function createWorld({ chapter = 0, seed = 1, gates = [], answer, device = 'desktop' } = {}) {
+export function createWorld({ chapter = 0, seed = 1, gates = [], answer, device = 'desktop', revive = true } = {}) {
   const rng = createRng(seed);
   const plan = buildChapterPlan(chapter);
   const hpScale = CHAPTER_HP[chapter] ?? CHAPTER_HP[CHAPTER_HP.length - 1];
@@ -43,12 +46,16 @@ export function createWorld({ chapter = 0, seed = 1, gates = [], answer, device 
   let planIndex = 0;
 
   const w = {
-    chapter, plan, t: 0, dist: 0, phase: 'run', // run | boss | finish | won | lost
-    squad: { x: 0, targetX: 0, count: START_SQUAD[chapter] ?? START_SQUAD[START_SQUAD.length - 1], weapon: 'blaster' },
+    chapter, plan, t: 0, dist: 0, phase: 'run', // run | boss | finish | down (waiting for the revive question) | won | lost
+    squad: { x: 0, targetX: 0, count: START_SQUAD[chapter] ?? START_SQUAD[START_SQUAD.length - 1], weapon: 'blaster', shieldT: 0, frenzyT: 0 },
     enemies: [], crates: [], bullets: [], gates: [], telegraphs: [],
     beam: null, boss: null, archZ: null,
     queue: [], swarmBoost: 0,
-    stats: { bugsPopped: 0, combo: 0, bestCombo: 0, lastKillT: -9, right: 0, wrong: 0, answered: 0, bossBeaten: false },
+    speedMul: 1,     // grows with every right answer
+    shots: [],       // goo spat by shooting bugs
+    shootersSeen: false,
+    stats: { bugsPopped: 0, combo: 0, bestCombo: 0, lastKillT: -9, right: 0, wrong: 0, answered: 0, bossBeaten: false, coins: 0, spells: 0, bossHits: 0 },
+    reviveUsed: false, revived: null, downFrom: null,
     review: [], results: [],
     events: [],
   };
@@ -57,24 +64,34 @@ export function createWorld({ chapter = 0, seed = 1, gates = [], answer, device 
   let trickleT = 2;
   let beamHitT = 0;
   let pending = [];      // answers that came back, applied on the next step
-  let bossGateAt = null; // time the boss-fight gate appears
-  let sweepT = 0;        // after the boss: pop the leftover bugs one by one
+  let weakHitT = 0;
 
   const emit = (ev) => w.events.push(ev);
+  const newId = () => nextId++;
   const loseSoldiers = (n, cause) => {
-    if (n <= 0 || w.phase === 'won' || w.phase === 'lost') return;
+    if (n <= 0 || w.phase === 'won' || w.phase === 'lost' || w.phase === 'down') return;
+    if (w.squad.shieldT > 0 && cause !== 'wrong') { emit({ type: 'shielded', cause }); return; }
+    // The squad starts as one soldier: until the first gates are passed, a hit can't take the last one
+    if (w.stats.answered <= STARTER_SAFE_GATES) n = Math.min(n, w.squad.count - 1);
+    if (n <= 0) { emit({ type: 'shielded', cause }); return; }
     w.squad.count = Math.max(0, w.squad.count - n);
     emit({ type: 'squadHit', amount: n, cause });
   };
 
   // ── Spawning ───────────────────────────────────────────────────────────────
+  const shooterChance = () => (w.stats.wrong < SHOOTERS.fromWrong ? 0
+    : Math.min(SHOOTERS.maxChance, SHOOTERS.chancePerWrong * (w.stats.wrong - SHOOTERS.fromWrong + 1)));
+  const nextShot = () => SHOOTERS.every[0] + rng.next() * (SHOOTERS.every[1] - SHOOTERS.every[0]);
   function makeBug(species, x, rz, angry = false) {
     const sp = SPECIES[species];
     const hp = sp.hp * hpScale * (angry ? 1.5 : 1);
+    const shooter = rng.chance(shooterChance());
+    if (shooter && !w.shootersSeen) { w.shootersSeen = true; emit({ type: 'shootersArrive' }); }
     return {
-      id: nextId++, kind: 'bug', species, angry, x, z: w.dist + rz,
+      id: nextId++, kind: 'bug', species, angry: angry || shooter, x, z: w.dist + rz,
       hp, maxHp: hp, r: sp.radius, speed: sp.speed * (angry ? 1.2 : 1) * (0.9 + rng.next() * 0.2),
       flashT: 0, phase: rng.next() * 6.28,
+      shooter, fireT: shooter ? 0.7 + rng.next() * 1.1 : 0, aimX: null, // first spit soon after coming in range
     };
   }
   function spawnBug(species, x, rz, angry) {
@@ -107,12 +124,20 @@ export function createWorld({ chapter = 0, seed = 1, gates = [], answer, device 
       w.crates.push({ id: nextId++, x: side * CRATE.laneX, z: w.dist + VIEW_DIST, hp, maxHp: hp, r: CRATE.radius, drop, flashT: 0 });
     }
   }
+  /** Early gates build the squad: friends first, weapons once there is a squad to carry them */
+  function gateReward(index, data, boss) {
+    if (boss) return data.reward || rollReward(rng);
+    if (index === 0) return FIRST_GATE_REWARD;
+    const r = data.reward || rollReward(rng);
+    if (index < BUILD_UP_GATES && r.type === 'weapon') return { type: 'friends', amount: 6 };
+    return r;
+  }
   function spawnGate(index, data, z, boss = false) {
     if (!data) return;
     const n = Math.min(data.choices.length, boss ? 3 : choicesForGate(chapter, index));
     w.gates.push({
       id: nextId++, index, gateId: data.gateId, prompt: data.prompt,
-      choices: data.choices.slice(0, n), n, reward: data.reward || rollReward(rng),
+      choices: data.choices.slice(0, n), n, reward: gateReward(index, data, boss),
       z, state: 'coming', boss, choice: null, correct: null, correctAnswer: null,
     });
   }
@@ -121,17 +146,9 @@ export function createWorld({ chapter = 0, seed = 1, gates = [], answer, device 
     w.enemies.push({
       id: nextId++, kind: 'mini', species: 'spiderbot', angry: true, x: (rng.next() - 0.5) * 1.6,
       z: w.dist + 9, hp, maxHp: hp, r: MINI_BOSS.radius, speed: MINI_BOSS.speed, flashT: 0, phase: 0,
+      shooter: true, fireT: 2, aimX: null,
     });
     emit({ type: 'miniBoss' });
-  }
-  function spawnBoss() {
-    const b = plan.boss;
-    w.boss = {
-      kind: b.kind, name: b.name, hp: b.hp, maxHp: b.hp, x: 0, z: w.dist + VIEW_DIST,
-      state: 'enter', attackT: 2.2, attackIndex: 0, flashT: 0, dyingT: 0,
-    };
-    w.phase = 'boss';
-    emit({ type: 'bossSpawn', kind: b.kind, name: b.name });
   }
 
   function runPlan() {
@@ -140,7 +157,8 @@ export function createWorld({ chapter = 0, seed = 1, gates = [], answer, device 
       if (ev.type === 'gate') spawnGate(ev.gate, gates[ev.gate], ev.z);
       else if (ev.type === 'swarm') spawnSwarm(ev.size * (1 + w.swarmBoost));
       else if (ev.type === 'crates') spawnCrates();
-      else if (ev.type === 'boss') spawnBoss();
+      else if (ev.type === 'boss') boss.spawn();
+      else road.spawn(ev);
     }
   }
 
@@ -160,14 +178,17 @@ export function createWorld({ chapter = 0, seed = 1, gates = [], answer, device 
     emit({ type: 'pop', x: e.x, z: e.z, species: e.species, angry: e.angry, big: e.kind === 'mini' });
     if (s.combo >= 3) emit({ type: 'combo', count: s.combo });
   }
-  function damage(target, amount, kind) {
+  function damage(target, amount, kind, hitX = target.x) {
     if (target.dead || amount <= 0) return;
+    if (target === w.boss) {
+      const { m, weak } = boss.damageMult(hitX);
+      target.hp -= amount * m;
+      target.flashT = 0.06;
+      if (weak && weakHitT <= 0) { weakHitT = 0.15; emit({ type: 'weakHit', x: hitX, z: target.z }); }
+      return; // boss.update() handles a defeat
+    }
     target.hp -= amount;
     target.flashT = 0.06;
-    if (target === w.boss) {
-      if (w.boss.hp <= 0 && w.boss.state === 'fight') defeatBoss();
-      return;
-    }
     if (target.drop !== undefined) { // crate
       if (target.hp <= 0) openCrate(target);
       return;
@@ -187,7 +208,7 @@ export function createWorld({ chapter = 0, seed = 1, gates = [], answer, device 
       if (!e.dead && Math.hypot(e.x - x, e.z - z) < radius + e.r) damage(e, dmg, 'splash');
     }
     for (const c of w.crates) if (!c.dead && Math.hypot(c.x - x, c.z - z) < radius + c.r) damage(c, dmg, 'splash');
-    if (w.boss && w.boss.state === 'fight' && Math.abs(w.boss.x - x) < BOSS_RADIUS + radius && z >= w.boss.z - 0.5) damage(w.boss, dmg, 'splash');
+    if (w.boss && w.boss.state === 'fight' && Math.abs(w.boss.x - x) < BOSS_RADIUS + radius && z >= w.boss.z - 0.5) damage(w.boss, dmg, 'splash', x);
   }
 
   // ── Targets ────────────────────────────────────────────────────────────────
@@ -197,13 +218,13 @@ export function createWorld({ chapter = 0, seed = 1, gates = [], answer, device 
     const sx = w.squad.x;
     for (const e of w.enemies) {
       const rz = e.z - w.dist;
-      if (e.dead || rz < 0.1 || rz > range) continue;
+      if (e.dead || rz < 0.1 || rz > range || Math.abs(e.x - sx) > TARGET_CONE) continue;
       const score = rz + Math.abs(e.x - sx) * 1.5;
       if (score < bestRz) { bestRz = score; best = e; }
     }
     for (const c of w.crates) {
       const rz = c.z - w.dist;
-      if (c.dead || rz < 0.1 || rz > range) continue;
+      if (c.dead || rz < 0.1 || rz > range || Math.abs(c.x - sx) > TARGET_CONE) continue;
       const score = rz + Math.abs(c.x - sx) * 1.5;
       if (score < bestRz) { bestRz = score; best = c; }
     }
@@ -216,7 +237,8 @@ export function createWorld({ chapter = 0, seed = 1, gates = [], answer, device 
     const found = [];
     const consider = (t) => {
       const rz = t.z - w.dist;
-      if (t.dead || rz < 0.1 || rz > range) return;
+      // Only things roughly in front get aimed at — line up with a swarm to shoot it
+      if (t.dead || rz < 0.1 || rz > range || Math.abs(t.x - sx) > TARGET_CONE) return;
       found.push({ t, score: rz + Math.abs(t.x - sx) * 1.5 });
     };
     for (const e of w.enemies) consider(e);
@@ -227,7 +249,7 @@ export function createWorld({ chapter = 0, seed = 1, gates = [], answer, device 
     return list;
   }
   /** Firepower: a small squad still fights like a few extra soldiers, so one mistake isn't the end. */
-  const power = (count) => (count > 0 ? count + BASE_POWER : 0);
+  const power = (count) => (count > 0 ? (count + BASE_POWER) * (w.squad.frenzyT > 0 ? PICKUP.frenzyBoost : 1) : 0);
 
   // ── Shooting ───────────────────────────────────────────────────────────────
   function shoot(dt) {
@@ -250,7 +272,7 @@ export function createWorld({ chapter = 0, seed = 1, gates = [], answer, device 
         const rz = c.z - w.dist;
         if (!c.dead && rz > 0 && rz < wp.range && Math.abs(c.x - w.beam.x) < half + c.r) damage(c, dmg, 'beam');
       }
-      if (w.boss && w.boss.state === 'fight' && Math.abs(w.boss.x - w.beam.x) < BOSS_RADIUS) damage(w.boss, dmg, 'beam');
+      if (w.boss && w.boss.state === 'fight' && Math.abs(w.boss.x - w.beam.x) < BOSS_RADIUS) damage(w.boss, dmg, 'beam', w.beam.x);
       beamHitT -= dt;
       if (beamHitT <= 0 && target) { beamHitT = 0.12; emit({ type: 'hit', x: target.x, z: target.z, beam: true }); }
       return;
@@ -259,7 +281,7 @@ export function createWorld({ chapter = 0, seed = 1, gates = [], answer, device 
     w.beam = null;
     fireT -= dt;
     if (fireT > 0) return;
-    fireT += 1 / wp.rate;
+    fireT += 1 / (wp.rate * (w.squad.frenzyT > 0 ? 1.5 : 1)); // frenzy: faster fire (and more damage via power())
     if (fireT < 0) fireT = 0;
     const spots = formation(Math.min(count, MAX_SHOOTERS));
     const per = (wp.dps * power(count)) / (wp.rate * spots.length * wp.streams);
@@ -309,7 +331,7 @@ export function createWorld({ chapter = 0, seed = 1, gates = [], answer, device 
       if (hit) {
         b.dead = true;
         if (b.splash) explode(b.x, b.z, b.splash, b.dmg);
-        else damage(hit, b.dmg, 'bullet');
+        else damage(hit, b.dmg, 'bullet', b.x);
       }
     }
     compact(w.bullets, (b) => !b.dead);
@@ -324,9 +346,14 @@ export function createWorld({ chapter = 0, seed = 1, gates = [], answer, device 
       e.flashT = Math.max(0, e.flashT - dt);
       e.z -= e.speed * dt;
       const rz = e.z - w.dist;
-      if (rz < 6) {
+      if (rz < 5) {
         const dx = sx - e.x;
-        e.x += Math.sign(dx) * Math.min(Math.abs(dx), (e.kind === 'mini' ? 0.25 : 0.38) * dt);
+        e.x += Math.sign(dx) * Math.min(Math.abs(dx), (e.kind === 'mini' ? 0.22 : HOMING) * dt);
+      }
+      if (e.shooter && rz > SHOOTERS.range[0] && rz < SHOOTERS.range[1]) {
+        e.fireT -= dt;
+        if (e.fireT <= SHOOTERS.aim && e.aimX === null) e.aimX = sx; // swell and take aim (fair warning)
+        if (e.fireT <= 0) spit(e);
       }
       if (rz < 0.22 && rz > -0.4 && Math.abs(e.x - sx) < reach + e.r) {
         e.dead = true;
@@ -343,6 +370,38 @@ export function createWorld({ chapter = 0, seed = 1, gates = [], answer, device 
       w.enemies.push(bug);
     }
   }
+  /** A shooting bug spits a goo ball at where the squad was when it took aim */
+  function spit(e) {
+    const rz = e.z - w.dist;
+    const closing = SHOOTERS.shotSpeed + SPEED * w.speedMul;
+    const tHit = rz / closing;
+    const spread = e.kind === 'mini' ? [-0.45, 0, 0.45] : [0];
+    for (const off of spread) {
+      w.shots.push({ id: nextId++, x: e.x, z: e.z - 0.1, vx: ((e.aimX ?? w.squad.x) + off - e.x) / Math.max(0.4, tHit), big: e.kind === 'mini' });
+    }
+    e.aimX = null;
+    e.fireT = nextShot();
+    emit({ type: 'enemyShot', x: e.x, z: e.z, big: e.kind === 'mini' });
+  }
+  function moveShots(dt) {
+    const sx = w.squad.x;
+    const reach = dodgeReach(w.squad.count) + 0.1;
+    for (const p of w.shots) {
+      p.x += p.vx * dt;
+      p.z -= SHOOTERS.shotSpeed * dt;
+      const rz = p.z - w.dist;
+      if (rz < 0.2 && rz > -0.3 && Math.abs(p.x - sx) < reach) {
+        p.dead = true;
+        emit({ type: 'spitHit', x: p.x, z: p.z });
+        loseSoldiers(SHOOTERS.hitSoldiers, 'spit');
+      } else if (rz < -0.5) {
+        p.dead = true;
+        emit({ type: 'dodge', kind: 'spit' });
+      }
+    }
+    compact(w.shots, (p) => !p.dead);
+  }
+
   function moveCrates(dt) {
     const reach = squadRadius(w.squad.count) * 0.8;
     for (const c of w.crates) {
@@ -401,139 +460,61 @@ export function createWorld({ chapter = 0, seed = 1, gates = [], answer, device 
         const before = w.squad.weapon;
         w.squad = { ...w.squad, ...applyReward(w.squad, g.reward) };
         emit({ type: 'gateResult', gate: g.index, correct: true, reward: effectiveReward(g.reward, before), boss: g.boss });
+        if (w.speedMul < SPEED_MAX) {
+          w.speedMul = Math.min(SPEED_MAX, w.speedMul + SPEED_PER_RIGHT);
+          emit({ type: 'speedUp', speed: w.speedMul });
+        }
+        if (g.boss) boss.gateResult(true);
       } else {
         w.stats.wrong += 1;
         w.review.push({ prompt: g.prompt, answer: r.correctAnswer, chose: r.chose });
         emit({ type: 'gateResult', gate: g.index, correct: false, correctAnswer: r.correctAnswer, boss: g.boss });
         loseSoldiers(2, 'wrong');
-        if (w.boss && w.boss.state !== 'dead') {
-          w.boss.hp = Math.round(w.boss.hp * (1 + WRONG_IN_BOSS_HP));
-          w.boss.maxHp = Math.round(w.boss.maxHp * (1 + WRONG_IN_BOSS_HP));
-          for (let i = 0; i < 10; i++) spawnBug('bee', w.boss.x + (rng.next() - 0.5) * 1.6, w.boss.z - w.dist - 0.3 - rng.next() * 0.6, true);
-          emit({ type: 'bossStronger' });
-        } else {
+        if (!boss.gateResult(false)) {
           w.swarmBoost = Math.min(SWARM_BOOST_MAX, w.swarmBoost + SWARM_BOOST_PER_WRONG);
-          spawnSwarm(6 + 3 * chapter, { angry: true, rz: 10 });
+          const flood = Math.min(WRONG_SWARM.base + WRONG_SWARM.perChapter * chapter, Math.max(WRONG_SWARM.min, w.squad.count * WRONG_SWARM.perSoldier));
+          spawnSwarm(flood, { angry: true, rz: 10 });
           spawnMiniBoss();
         }
       }
     }
   }
 
-  // ── Boss ───────────────────────────────────────────────────────────────────
-  const ATTACKS = { queen: ['summon', 'sting'], bongo: ['drum', 'gumball'], rex: ['goo', 'stomp'] };
+  // ── Road challenges and the boss ────────────────────────────────────────
+  const road = createRoad({ w, rng, emit, newId, loseSoldiers, chapter });
+  const boss = createBoss({
+    w, rng, emit, newId, loseSoldiers, spawnBug, kill, plan, chapter,
+    spawnBossGate: (z) => {
+      const data = gates[plan.gates];
+      if (!data) return false;
+      spawnGate(plan.gates, data, z, true);
+      return true;
+    },
+  });
 
-  function startAttack(b) {
-    const list = ATTACKS[b.kind];
-    const kind = list[b.attackIndex++ % list.length];
-    const sx = w.squad.x;
-    const lane = (width) => ({ x0: Math.max(-ROAD_HALF, sx - width / 2), x1: Math.min(ROAD_HALF, sx + width / 2) });
-    const base = { id: nextId++, kind, t: TELEGRAPH_S, dur: TELEGRAPH_S };
-    if (kind === 'summon') w.telegraphs.push({ ...base, shape: 'lane', x0: b.x - 0.7, x1: b.x + 0.7, harmless: true });
-    else if (kind === 'sting') w.telegraphs.push({ ...base, shape: 'lane', ...lane(0.8) });
-    else if (kind === 'drum') w.telegraphs.push({ ...base, shape: 'lane', ...lane(1.0) });
-    else if (kind === 'goo') w.telegraphs.push({ ...base, shape: 'lane', ...lane(1.3) });
-    else if (kind === 'gumball') {
-      const spots = [sx, sx + (rng.next() < 0.5 ? -0.9 : 0.9), (rng.next() - 0.5) * 2.2];
-      for (const cx of spots) {
-        w.telegraphs.push({ ...base, id: nextId++, shape: 'circle', cx: Math.max(-1.2, Math.min(1.2, cx)), rz: 0.15 + rng.next() * 0.4, r: 0.38 });
-      }
-    } else if (kind === 'stomp') {
-      // A wave across the whole road with one safe gap
-      const gapLane = rng.int(0, 2);
-      const gx0 = -ROAD_HALF + gapLane * (2 * ROAD_HALF / 3);
-      w.telegraphs.push({ ...base, shape: 'wave', gx0, gx1: gx0 + (2 * ROAD_HALF) / 3 });
-    }
-    emit({ type: 'bossTelegraph', kind });
-  }
-  function resolveAttack(tg) {
-    const b = w.boss;
-    const sx = w.squad.x;
-    const reach = squadRadius(w.squad.count) * 0.6;
-    let hit = false;
-    if (tg.shape === 'lane' && !tg.harmless) hit = sx + reach > tg.x0 && sx - reach < tg.x1;
-    else if (tg.shape === 'circle') hit = Math.abs(sx - tg.cx) < tg.r + reach * 0.5 && tg.rz < 0.6;
-    else if (tg.shape === 'wave') hit = !(sx > tg.gx0 + 0.05 && sx < tg.gx1 - 0.05);
-    if (tg.kind === 'summon') {
-      for (let i = 0; i < 8 + chapter * 2; i++) spawnBug('bee', b.x + (rng.next() - 0.5) * 1.4, b.z - w.dist - 0.4 - rng.next() * 0.8, false);
-    }
-    if (tg.kind === 'gumball') {
-      for (let i = 0; i < 3; i++) spawnBug('beetle', tg.cx + (i - 1) * 0.18, tg.rz + 0.9, false);
-    }
-    emit({ type: 'bossAttack', kind: tg.kind, shape: tg.shape, hit, x0: tg.x0, x1: tg.x1, cx: tg.cx, rz: tg.rz, gx0: tg.gx0, gx1: tg.gx1 });
-    if (hit) loseSoldiers(plan.boss.hitSoldiers, 'boss');
-  }
-  function defeatBoss() {
-    const b = w.boss;
-    b.hp = 0;
-    b.state = 'dying';
-    b.dyingT = 1.8;
-    w.telegraphs.length = 0;
-    w.stats.bossBeaten = true;
-    emit({ type: 'bossDefeated', kind: b.kind, x: b.x, z: b.z });
-  }
-  function updateBoss(dt) {
-    const b = w.boss;
-    if (!b) return;
-    b.flashT = Math.max(0, b.flashT - dt);
-    if (b.state === 'enter') {
-      const goal = w.dist + BOSS_HOLD_Z;
-      b.z = Math.max(goal, b.z - 1.3 * dt);
-      if (b.z <= goal + 1e-6) {
-        b.state = 'fight';
-        bossGateAt = w.t + 5;
-        emit({ type: 'bossReady', kind: b.kind });
-      }
-      return;
-    }
-    if (b.state === 'fight') {
-      b.z = w.dist + BOSS_HOLD_Z;
-      b.x = Math.sin(w.t * 0.45) * 0.55;
-      if (bossGateAt !== null && w.t >= bossGateAt) {
-        bossGateAt = null;
-        const data = gates[plan.gates];
-        if (data) spawnGate(plan.gates, data, w.dist + 8.4, true);
-      }
-      b.attackT -= dt;
-      if (b.attackT <= 0) {
-        b.attackT = plan.boss.attackEvery;
-        startAttack(b);
-      }
-      for (const tg of w.telegraphs) {
-        tg.t -= dt;
-        if (tg.t <= 0) { tg.done = true; resolveAttack(tg); }
-      }
-      compact(w.telegraphs, (tg) => !tg.done);
-      return;
-    }
-    if (b.state === 'dying') {
-      b.z = w.dist + BOSS_HOLD_Z;
-      b.dyingT -= dt;
-      sweepT -= dt;
-      if (sweepT <= 0 && w.enemies.length) {
-        sweepT = 0.05;
-        const e = w.enemies[0];
-        if (e) kill(e, { counted: false });
-        compact(w.enemies, (x) => !x.dead);
-      }
-      if (b.dyingT <= 0) {
-        b.state = 'dead';
-        for (const e of w.enemies) kill(e, { counted: false });
-        w.enemies.length = 0;
-        w.queue.length = 0;
-        w.phase = 'finish';
-        w.archZ = w.dist + 5;
-        emit({ type: 'finishArch', z: w.archZ });
-      }
-    }
-  }
+  // ── Revive ─────────────────────────────────────────────────────────────────
+  /** After the bonus question: ok → back in the fight with a few soldiers; otherwise the chapter is lost. */
+  w.revive = (ok) => {
+    if (w.phase !== 'down') return;
+    w.revived = !!ok;
+    if (!ok) { w.phase = 'lost'; emit({ type: 'lost' }); return; }
+    w.phase = w.downFrom || 'run';
+    w.squad.count = REVIVE_SQUAD;
+    w.squad.shieldT = 3;
+    // clear the bugs right in front so the comeback isn't an instant defeat
+    for (const e of w.enemies) if (!e.dead && e.z - w.dist < 4) kill(e, { counted: false });
+    w.telegraphs = [];
+    w.shots.length = 0;
+    emit({ type: 'revived', count: REVIVE_SQUAD });
+  };
 
   // ── Step ───────────────────────────────────────────────────────────────────
   w.step = (dt, input = {}) => {
-    if (w.phase === 'won' || w.phase === 'lost') return;
+    if (w.phase === 'won' || w.phase === 'lost' || w.phase === 'down') return;
     dt = Math.min(dt, 0.05);
+    weakHitT -= dt;
     w.t += dt;
-    w.dist += SPEED * dt;
+    w.dist += SPEED * w.speedMul * dt;
 
     const sq = w.squad;
     if (typeof input.targetX === 'number') sq.targetX = input.targetX;
@@ -544,21 +525,31 @@ export function createWorld({ chapter = 0, seed = 1, gates = [], answer, device 
 
     runPlan();
     trickle(dt);
+    road.update(dt);
     moveEnemies(dt);
+    moveShots(dt);
     moveCrates(dt);
     shoot(dt);
     moveBullets(dt);
     updateGates();
     applyResults();
-    updateBoss(dt);
+    boss.update(dt);
 
     if (w.phase === 'finish' && w.dist >= w.archZ) {
       w.phase = 'won';
       emit({ type: 'won' });
     } else if (sq.count <= 0 && w.phase !== 'won') {
-      w.phase = 'lost';
       w.beam = null;
-      emit({ type: 'lost' });
+      if (revive && !w.reviveUsed) {
+        // One bonus question per chapter can bring the squad back
+        w.reviveUsed = true;
+        w.downFrom = w.phase;
+        w.phase = 'down';
+        emit({ type: 'down' });
+      } else {
+        w.phase = 'lost';
+        emit({ type: 'lost' });
+      }
     }
   };
 
@@ -573,6 +564,11 @@ export function createWorld({ chapter = 0, seed = 1, gates = [], answer, device 
     bestCombo: w.stats.bestCombo,
     squadSize: w.squad.count,
     bossBeaten: w.stats.bossBeaten,
+    bossHits: w.stats.bossHits,
+    topSpeed: Math.round(w.speedMul * 100) / 100,
+    coins: w.stats.coins,
+    spells: w.stats.spells,
+    revived: w.revived,
     review: w.review.slice(),
     results: w.results.slice(),
     won: w.phase === 'won',

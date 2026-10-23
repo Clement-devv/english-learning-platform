@@ -42,6 +42,12 @@ export function createBossView(atlas, kind, name) {
   const v = BUILD[kind](atlas);
   rig.addChild(...v.parts);
   root.addChild(rig);
+  // Word-shield bubble (goes up with the boss gate)
+  const shield = new Graphics();
+  shield.ellipse(0, v.top * 0.5, 230, -v.top * 0.62).fill({ color: 0x7dd3fc, alpha: 0.18 }).stroke({ width: 10, color: 0xe0f7ff, alpha: 0.9 });
+  shield.ellipse(-70, v.top * 0.78, 50, 26).fill({ color: 0xffffff, alpha: 0.35 });
+  shield.visible = false;
+  root.addChild(shield);
 
   // Health bar + big number (not scaled with depth — always readable)
   const hud = new Container();
@@ -61,12 +67,22 @@ export function createBossView(atlas, kind, name) {
     root,
     hud,
     top: v.top,
-    /** t = time, attack = kind of the telegraph in progress (or null) */
+    /** t = time, attack = kind of the attack being wound up (or null) */
     update(boss, t, dt, attack) {
       const breathe = Math.sin(t * 2.2) * 0.02;
-      rig.scale.set(1 + breathe, 1 - breathe);
+      // Wind-up: rear back and swell, trembling; launch: lunge forward
+      const wind = attack ? 1 - Math.max(0, boss.windup?.t ?? 0) : 0;
+      const lunge = boss.lunge || 0;
+      const grow = 1 + wind * 0.08 + lunge * 0.06;
+      rig.scale.set((1 + breathe) * grow, (1 - breathe) * grow);
+      rig.x = attack ? Math.sin(t * 50) * 4 * wind : 0;
+      rig.y = -wind * 22 + lunge * 26;
       const hit = boss.flashT > 0;
-      for (const p of v.parts) p.tint = hit ? 0xffc4c4 : 0xffffff;
+      // Angry phases turn the boss pinker / redder
+      const mood = boss.phase >= 2 ? 0xff9e9e : boss.phase === 1 ? 0xffd2dc : 0xffffff;
+      for (const p of v.parts) p.tint = hit ? 0xffc4c4 : mood;
+      shield.visible = !!boss.shield;
+      if (boss.shield) shield.alpha = 0.75 + Math.sin(t * 6) * 0.2;
 
       if (kind === 'queen') {
         const flap = Math.sin(t * 18) * 0.25;
@@ -84,7 +100,7 @@ export function createBossView(atlas, kind, name) {
         const wave = attack === 'goo' ? 0.5 : 0;
         v.armL.rotation = -0.2 + Math.sin(t * 4) * 0.15 - wave;
         v.armR.rotation = 0.2 - Math.sin(t * 4) * 0.15 + wave;
-        rig.y = attack === 'stomp' ? -Math.abs(Math.sin(t * 9)) * 26 : 0;
+        if (attack === 'stomp') rig.y -= Math.abs(Math.sin(t * 9)) * 26;
       }
 
       if (boss.state === 'dying') {

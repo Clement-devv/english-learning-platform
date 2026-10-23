@@ -4,8 +4,10 @@
 // then only moved, scaled and highlighted.
 import { Container, Graphics, Sprite, Text } from 'pixi.js';
 import { rewardLabel, effectiveReward } from '../logic/rewards.js';
+import { ROAD_HALF } from '../logic/config.js';
+import { PX_PER_UNIT } from '../logic/projection.js';
 
-const ROAD_PX = 450;          // road width in px at scale 1 (2 × ROAD_HALF × X_K / CAM_BACK)
+const ROAD_PX = 2 * ROAD_HALF * PX_PER_UNIT; // road width in px at scale 1
 const PANEL_H = 112;
 const COLORS = [0x4cc9f0, 0xb388ff, 0x06d6a0];
 const FONT = 'Nunito, "Arial Rounded MT Bold", Arial, sans-serif';
@@ -17,7 +19,12 @@ function badgeIcon(reward, weapon) {
   return 'iconFriends';
 }
 
-export function createGateView(atlas, gate, weapon) {
+const esc = (t) => String(t).replace(/[<>]/g, '');
+
+/**
+ * @param total number of regular gates in the chapter (for the "GATE 3/6" label)
+ */
+export function createGateView(atlas, gate, weapon, total) {
   const root = new Container();
   const n = gate.n;
   const pw = ROAD_PX / n;
@@ -84,6 +91,41 @@ export function createGateView(atlas, gate, weapon) {
   }
   setBadge(weapon);
 
+  // The question, floating above the gate (kept readable even far away — the
+  // renderer scales and places it). The word the squad is lined up with fills the blank.
+  const banner = new Container();
+  const card = new Graphics();
+  const head = new Text({ text: gate.boss ? 'BOSS GATE' : `GATE ${gate.index + 1}/${total}`, style: { fontFamily: FONT, fontSize: 20, fontWeight: '900', fill: 0xffffff }, resolution: 2 });
+  head.anchor.set(0.5);
+  const headPill = new Graphics();
+  const sentence = new Text({
+    text: '',
+    style: {
+      fontFamily: FONT, fontSize: 34, fontWeight: '900', fill: 0x2a1f45, align: 'center',
+      wordWrap: true, wordWrapWidth: 470, lineHeight: 42,
+      tagStyles: { w: { fill: 0x7c3aed }, e: { fill: 0xb8b2d6 } },
+    },
+    resolution: 2,
+  });
+  sentence.anchor.set(0.5, 0);
+  banner.addChild(card, sentence, headPill, head);
+  function setSentence(lane) {
+    const word = lane >= 0 ? gate.choices[lane] : null;
+    const [a, b = ''] = String(gate.prompt).split('___');
+    sentence.text = `${esc(a)}${word ? `<w>${esc(word)}</w>` : '<e>_____</e>'}${esc(b)}`;
+    const w = Math.max(240, sentence.width + 44);
+    const h = sentence.height + 34;
+    sentence.y = 18;
+    card.clear();
+    card.roundRect(-w / 2, 0, w, h, 22).fill({ color: 0xffffff, alpha: 0.96 }).stroke({ width: 5, color: 0x2a1f45 });
+    card.moveTo(-14, h).lineTo(0, h + 16).lineTo(14, h).fill(0xffffff); // little pointer down to the gate
+    const hw = head.width + 26;
+    headPill.clear();
+    headPill.roundRect(-hw / 2, -15, hw, 30, 15).fill(gate.boss ? 0xe11d48 : 0x7c3aed).stroke({ width: 3, color: 0x2a1f45 });
+    banner.pivot.set(0, h + 16); // the banner hangs from its pointer
+  }
+  setSentence(-1);
+
   let shownLane = -1;
   let shownResult = null;
 
@@ -95,6 +137,7 @@ export function createGateView(atlas, gate, weapon) {
         if (lane !== shownLane) {
           shownLane = lane;
           panels.forEach((p, i) => { p.glow.visible = i === lane; p.c.scale.set(i === lane ? 1.04 : 1); });
+          setSentence(lane);
         }
       } else if (g.state === 'done' && shownResult === null) {
         shownResult = g.correct;
@@ -113,7 +156,11 @@ export function createGateView(atlas, gate, weapon) {
         });
         badge.visible = false;
       }
+      banner.visible = g.state === 'coming';
     },
-    destroy() { root.destroy({ children: true }); },
+    banner,
+    /** where the banner's pointer should touch: top of the gate, in the gate's own px */
+    bannerAnchorY: -PANEL_H - 100,
+    destroy() { root.destroy({ children: true }); banner.destroy({ children: true }); },
   };
 }

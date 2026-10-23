@@ -46,11 +46,17 @@ export function createDemoSession(chapter, seed = Date.now() % 1e9) {
     }
   }
 
+  // One spare question for the revive ("answer to bring your squad back")
+  const rq = pool[count % pool.length];
+  const revive = { gateId: `demo-${chapter}-revive`, prompt: rq.prompt, choices: shuffle(rng, [rq.answer, ...rq.distractors.slice(0, 2)]) };
+  answers.set(revive.gateId, rq.answer);
+
   const answered = new Set();
   return {
     sessionId: `demo-${seed}`,
     seed,
     gates,
+    revive,
     answer: async (gateId, choice) => {
       if (!answers.has(gateId) || answered.has(gateId)) return { correct: false, correctAnswer: answers.get(gateId) ?? null };
       answered.add(gateId);

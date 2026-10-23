@@ -34,3 +34,6 @@ export function laneIndex(x, n, roadHalf = ROAD_HALF) {
 
 /** Centre x of gate section i of n */
 export const laneCenter = (i, n, roadHalf = ROAD_HALF) => -roadHalf + ((i + 0.5) * 2 * roadHalf) / n;
+
+/** How much of the squad a boss attack has to touch to hit it: around the middle, so even a big squad can dodge. */
+export const dodgeReach = (count) => Math.min(squadRadius(count) * 0.5, 0.25);
