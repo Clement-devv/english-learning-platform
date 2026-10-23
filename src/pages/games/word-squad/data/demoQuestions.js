@@ -1,0 +1,36 @@
+// src/pages/games/word-squad/data/demoQuestions.js
+// Built-in demo set (A1–A2, children around age 10) used until teachers make
+// their own sets in Phase 2. Same shape as a QuestionSet question.
+
+export const DEMO_QUESTIONS = [
+  { type: 'gap', prompt: 'I ___ a student.', answer: 'am', distractors: ['is', 'are'] },
+  { type: 'gap', prompt: 'She ___ two cats.', answer: 'has', distractors: ['have', 'having'] },
+  { type: 'gap', prompt: 'They ___ playing football now.', answer: 'are', distractors: ['is', 'am'] },
+  { type: 'gap', prompt: 'There is an ___ on the table.', answer: 'apple', distractors: ['banana', 'grapes'] },
+  { type: 'gap', prompt: 'My brother ___ to school by bus.', answer: 'goes', distractors: ['go', 'going'] },
+  { type: 'gap', prompt: 'We ___ rice for dinner yesterday.', answer: 'ate', distractors: ['eat', 'eats'] },
+  { type: 'gap', prompt: 'The sun is very ___ today.', answer: 'hot', distractors: ['cold', 'wet'] },
+  { type: 'gap', prompt: 'Can you ___ a bike?', answer: 'ride', distractors: ['rides', 'riding'] },
+  { type: 'gap', prompt: 'A fish lives in the ___.', answer: 'water', distractors: ['tree', 'sky'] },
+  { type: 'gap', prompt: 'I brush my ___ every morning.', answer: 'teeth', distractors: ['shoes', 'books'] },
+  { type: 'gap', prompt: 'He is ___ than his sister.', answer: 'taller', distractors: ['tall', 'tallest'] },
+  { type: 'gap', prompt: 'Look! The baby ___ sleeping.', answer: 'is', distractors: ['are', 'am'] },
+  { type: 'gap', prompt: 'There ___ three books on my desk.', answer: 'are', distractors: ['is', 'be'] },
+  { type: 'gap', prompt: 'We go to the beach ___ summer.', answer: 'in', distractors: ['on', 'at'] },
+  { type: 'gap', prompt: 'My birthday is ___ Monday.', answer: 'on', distractors: ['in', 'at'] },
+  { type: 'gap', prompt: 'Lan ___ her homework last night.', answer: 'did', distractors: ['do', 'does'] },
+  { type: 'gap', prompt: 'An elephant is a very ___ animal.', answer: 'big', distractors: ['small', 'tiny'] },
+  { type: 'gap', prompt: 'Do you ___ milk?', answer: 'like', distractors: ['likes', 'liking'] },
+  { type: 'gap', prompt: 'I wear a coat when it is ___.', answer: 'cold', distractors: ['hot', 'sunny'] },
+  { type: 'gap', prompt: 'The cat is ___ the box.', answer: 'under', distractors: ['eat', 'happy'] },
+  { type: 'gap', prompt: 'Tom and I ___ best friends.', answer: 'are', distractors: ['is', 'am'] },
+  { type: 'gap', prompt: 'She can ___ very well.', answer: 'sing', distractors: ['sings', 'singing'] },
+  { type: 'gap', prompt: 'We use a ___ to cut paper.', answer: 'scissors', distractors: ['spoon', 'pillow'] },
+  { type: 'gap', prompt: 'Minh ___ his grandma last Sunday.', answer: 'visited', distractors: ['visit', 'visits'] },
+  { type: 'gap', prompt: 'This is the ___ day of my life!', answer: 'best', distractors: ['good', 'better'] },
+  { type: 'gap', prompt: 'How ___ apples do you have?', answer: 'many', distractors: ['much', 'any'] },
+  { type: 'gap', prompt: 'A cow gives us ___.', answer: 'milk', distractors: ['eggs', 'wool'] },
+  { type: 'gap', prompt: 'Please ___ the door. It is cold.', answer: 'close', distractors: ['open', 'eat'] },
+  { type: 'gap', prompt: 'I am hungry. I want to ___ something.', answer: 'eat', distractors: ['sleep', 'drink'] },
+  { type: 'gap', prompt: 'The opposite of "fast" is ___.', answer: 'slow', distractors: ['quick', 'loud'] },
+];

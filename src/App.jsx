@@ -68,6 +68,8 @@ const Join                = lazy(() => import("./pages/Join"));
 const ParentDashboard     = lazy(() => import("./pages/parent/ParentDashboard"));
 const CenterLandingPage   = lazy(() => import("./pages/landing-page/CenterLandingPage"));
 const ClemifyHome         = lazy(() => import("./pages/clemify-home/ClemifyHome"));
+// Word Squad game — its own chunk; the PixiJS engine loads only when a chapter starts
+const WordSquadPage       = lazy(() => import("./pages/games/word-squad/WordSquadPage"));
 
 // Full-screen spinner shown while a lazy chunk loads
 function PageLoader() {
@@ -240,6 +242,9 @@ function App() {
             <Route path="/student/reset-password/:token" element={<StudentResetPassword />} />
             <Route path="/student/dashboard"             element={<AuthGuard role="student"><StudentDashboard /></AuthGuard>} />
             <Route path="/student/setup"                 element={<StudentSetup />} />
+            <Route path="/student/games/word-squad"      element={<AuthGuard role="student"><WordSquadPage /></AuthGuard>} />
+            {/* Dev only: play the demo without logging in (stripped from production builds) */}
+            {import.meta.env.DEV && <Route path="/dev/word-squad" element={<WordSquadPage exitTo="/" />} />}
 
             <Route path="/parent/login"              element={<ParentLogin />} />
             <Route path="/parent/forgot-password"    element={<ParentForgotPassword />} />

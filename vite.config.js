@@ -56,7 +56,7 @@ export default defineConfig(({ mode }) => {
       '@tanstack/react-query', 'axios', 'socket.io-client', 'lucide-react',
       'i18next', 'react-i18next', '@sentry/react',
       'framer-motion', 'recharts', 'react-confetti', 'emoji-picker-react',
-      'three', '@react-three/fiber', '@react-three/drei',
+      'three', '@react-three/fiber', '@react-three/drei', 'pixi.js',
       'jspdf', 'jspdf-autotable', 'pdfjs-dist',
       'agora-rtc-sdk-ng', 'agora-extension-virtual-background',
     ],
@@ -125,6 +125,12 @@ export default defineConfig(({ mode }) => {
           }
           if (id.includes('node_modules/three') || id.includes('@react-three')) {
             return 'vendor-three';
+          }
+          // Word Squad game engine — only the lazy game route imports it.
+          // (eventemitter3 is left out: recharts shares it, and putting it here
+          // would make every chart page download the game engine.)
+          if (/[\\/]node_modules[\\/](pixi\.js|@pixi|earcut|parse-svg-path|ismobilejs|tiny-lru|gifuct-js|@xmldom)[\\/]/.test(id)) {
+            return 'vendor-pixi';
           }
           if (id.includes('jspdf') || id.includes('jspdf-autotable')) {
             return 'vendor-jspdf';
