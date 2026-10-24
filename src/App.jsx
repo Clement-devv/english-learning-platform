@@ -244,7 +244,7 @@ function App() {
             <Route path="/student/setup"                 element={<StudentSetup />} />
             <Route path="/student/games/word-squad"      element={<AuthGuard role="student"><WordSquadPage /></AuthGuard>} />
             {/* Dev only: play the demo without logging in (stripped from production builds) */}
-            {import.meta.env.DEV && <Route path="/dev/word-squad" element={<WordSquadPage exitTo="/" />} />}
+            {import.meta.env.DEV && <Route path="/dev/word-squad" element={<WordSquadPage exitTo="/" demo />} />}
 
             <Route path="/parent/login"              element={<ParentLogin />} />
             <Route path="/parent/forgot-password"    element={<ParentForgotPassword />} />

@@ -212,3 +212,9 @@
 /* ── Low camera: the question floats above the gate, so the top strip is only a result toast ── */
 .ws-sr { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .ws-spell { top: max(8px, env(safe-area-inset-top)); }
+
+/* ── Phase 2: assigned games ── */
+.ws-game-head {
+  display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px; padding: 8px 12px; border-radius: 14px;
+  background: #f3e8ff; font-weight: 900; font-size: 14px; text-align: left;
+}

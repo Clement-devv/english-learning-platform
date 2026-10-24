@@ -32,6 +32,8 @@ export const studentSchema = new mongoose.Schema({
   // Group-class points — bought from the admin, spent only on group class seats
   // (separate from classCredits). History: groupPointsLedgerSchema.
   groupPoints:  { type: Number, default: 0, min: 0 },
+  // Reward stars from games (Word Squad). Not money — history: starLedgerSchema.
+  stars:        { type: Number, default: 0, min: 0 },
   lastPaymentDate: Date,
   showTempPassword: { type: Boolean, default: false },
   age: { type: Number },

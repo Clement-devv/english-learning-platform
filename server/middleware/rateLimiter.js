@@ -359,6 +359,25 @@ export const strictLimiter = rateLimit({
 // =========================================
 // 7. FILE UPLOAD LIMITER (Keep your existing)
 // =========================================
+// =========================================
+// GAME LIMITER (Word Squad play API)
+// One short request per Word Gate (~every 10–16 s) plus start/finish: normal
+// play is ~15 requests a chapter, so 120 per 10 minutes per student never gets
+// in the way but stops a script hammering the answer endpoint.
+// =========================================
+export const gameLimiter = rateLimit({
+  ...withStore("game"),
+  windowMs: 10 * 60 * 1000,
+  max: 120,
+  skip: shouldSkip,
+  validate: { keyGeneratorIpFallback: false },
+  keyGenerator: createKeyGenerator(true),
+  handler: (req, res) => {
+    logger.security('RATE_LIMIT_EXCEEDED', { type: 'game', userId: req.user?.id, ip: req.ip, path: req.path });
+    res.status(429).json({ success: false, message: "Slow down a little — please try again in a few minutes." });
+  },
+});
+
 export const uploadLimiter = rateLimit({
   ...withStore("upload"),
   windowMs: 60 * 60 * 1000,
