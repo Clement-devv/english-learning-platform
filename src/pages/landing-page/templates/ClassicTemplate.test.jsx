@@ -28,8 +28,8 @@ describe('ClassicTemplate', () => {
       expect(container.querySelector(`#${id}`), id).toBeNull();
     }
     expect(container.querySelector('footer')).toBeTruthy();
-    // nav only links to sections that exist
-    expect([...container.querySelectorAll('.ct-nav a')].map(a => a.textContent)).toEqual(['Home']);
+    // nav only links to sections that exist (the logo is the link home)
+    expect([...container.querySelectorAll('.ct-nav a')].map(a => a.textContent)).toEqual([]);
   });
 
   it('respects switched-off sections', () => {

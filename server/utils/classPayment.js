@@ -9,6 +9,7 @@
 import { studentSchema } from "../schemas/studentSchema.js";
 import { teacherSchema } from "../schemas/teacherSchema.js";
 import { paymentTransactionSchema } from "../schemas/paymentTransactionSchema.js";
+import { scheduleCreditReminder } from "./creditReminder.js";
 
 const getStudent            = (db) => db.models.Student            || db.model("Student",            studentSchema);
 const getTeacher            = (db) => db.models.Teacher            || db.model("Teacher",            teacherSchema);
@@ -22,7 +23,7 @@ export const toMoney = (n) => Math.round((parseFloat(n) || 0) * 100) / 100;
  * (only if still at 0 — a top-up landing at the same moment wins).
  * Returns { student (after the change, lean; null if not found), charged, deactivated }.
  */
-export async function chargeClassCredit(db, studentId) {
+export async function chargeClassCredit(db, studentId, cls = {}) {
   const Student = getStudent(db);
   const after = await Student.findOneAndUpdate(
     { _id: studentId, classCredits: { $gt: 0 } },
@@ -35,6 +36,8 @@ export async function chargeClassCredit(db, studentId) {
     const off = await Student.updateOne({ _id: studentId, classCredits: { $lte: 0 } }, { $set: { active: false } });
     if (off.modifiedCount) { student.active = false; deactivated = true; }
   }
+  // Tell the family (managed) / the student (when low) how many classes are left
+  if (after) scheduleCreditReminder(db, studentId, after.classCredits || 0, cls);
   return { student, charged: !!after, deactivated };
 }
 
@@ -93,7 +96,7 @@ export async function payForCompletedClass(db, booking, { description }) {
 
   const student = booking.isTrial
     ? await getStudent(db).findById(studentId).lean()
-    : (await chargeClassCredit(db, studentId)).student;
+    : (await chargeClassCredit(db, studentId, { title: booking.classTitle, when: booking.scheduledTime })).student;
 
   let teacher = await getTeacher(db).findById(teacherId).select("ratePerClass firstName lastName").lean();
   let earned = 0;

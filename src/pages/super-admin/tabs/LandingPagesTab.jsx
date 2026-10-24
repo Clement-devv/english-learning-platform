@@ -11,6 +11,7 @@ import MinimalTemplate from '../../landing-page/templates/MinimalTemplate';
 import { ImageField, ListEditor } from './LandingEditorFields';
 import { classicSample, classicExampleStrings, CLASSIC_FEATURE_ICONS } from '../../landing-page/classicContent';
 import { GoogleFont }  from '../../landing-page/utils.jsx';
+import { SITE_LANGUAGES, NO_VIETNAMESE_FONTS } from '../../landing-page/siteText.js';
 
 const PREVIEW_TEMPLATES = { classic: ClassicTemplate, modern: ModernTemplate, minimal: MinimalTemplate };
 
@@ -29,7 +30,7 @@ const TEMPLATE_DEFS = [
   {
     id: 'modern',
     name: 'Modern',
-    desc: 'Split dark/color hero, CTA band, multi-column footer',
+    desc: 'Dark studio look: colour glows, floating header, bento grids, giant footer name',
     thumb: ModernThumb,
   },
   {
@@ -74,12 +75,32 @@ const SECTION_WHERE = {
   links: 'The “Login” menu in the header and the social icons in the top bar and footer.',
   seo: 'Not shown on the page — the browser-tab title and the text Google shows in search results.',
 };
+// …and where it differs on the Modern website
+const SECTION_WHERE_MODERN = {
+  design: 'Modern always has a dark background. Primary and Accent colours make the glows, gradient text and buttons — pick two that look good together on black.',
+  hero: 'The first screen: a slim announcement line, the floating pill header, a centred headline (its longest word in gradient colour), buttons, then the photo in an app-window frame. Program and “Why us” titles scroll past in a ticker under it.',
+  stats: 'Number cards under the hero that count up on scroll. The 1st number also shows in the hero’s trust line; the 2nd and 3rd float on the hero photo.',
+  about: 'A bento grid: main photo, your story, the badge number (with the second photo faded behind it) and the checklist.',
+  programs: 'Cards with a big “01, 02…” on each photo. On phones they become a row visitors swipe sideways.',
+  features: 'Bento tiles — the 1st and 6th are wide with a colour glow.',
+  testimonials: 'Review cards. With 3 or more, the first is a tall card with a glowing gradient border.',
+  gallery: 'A bento photo grid — the first photo is large.',
+  cta: 'A big rounded colour card with a dotted glow and “Enrolment open”; the photo shows faintly behind.',
+  contact: 'Contact cards near the bottom, then the footer with the school’s name written huge across the page.',
+  links: 'The “Log in” menu in the floating header and the social buttons in the contact section and footer.',
+};
+// Default colours each template starts with — switching template swaps them,
+// unless the colours were already changed, so two centers rarely look alike
+const TEMPLATE_COLORS = {
+  classic: { primaryColor: '#BE185D', secondaryColor: '#FCE7F3', accentColor: '#f59e0b' },
+  modern:  { primaryColor: '#7C5CFF', secondaryColor: '#1E1B4B', accentColor: '#2EE6A6' },
+};
 // Sample section key → the editor tab that edits it
 const SAMPLE_TAB = { topBar: 'hero', footer: 'contact' };
 // Example strings of the open center's sample — fields holding one get an “Example” tag
 const ExampleCtx = createContext(null);
 
-// Sections only the Classic template shows
+// Sections the Minimal template doesn't show (Classic and Modern show them all)
 const CLASSIC_ONLY = ['stats', 'programs', 'features', 'testimonials', 'gallery', 'cta', 'faq'];
 
 const DEFAULT_LP = {
@@ -129,11 +150,35 @@ const isBlankSite = (lp) => !lp.hero?.headline && !lp.hero?.subheadline && !lp.a
   && !lp.teachers?.length && !lp.programs?.items?.length && !lp.features?.items?.length && !lp.stats?.items?.length;
 
 /** The Classic sample over a blank website, using the center's real details where known. */
+// New websites start in Vietnamese — most centers' visitors are Vietnamese.
 function startFromSample(lp, center) {
-  const sample = classicSample(center.centerName);
+  const sample = classicSample(center.centerName, 'vi');
   if (center.phone)   sample.contact.phone   = center.phone;
   if (center.address) sample.contact.address = center.address;
-  return { ...mergeDeep(lp, sample), template: 'classic', published: !!lp.published };
+  return { ...mergeDeep(lp, sample), template: 'classic', language: 'vi', published: !!lp.published };
+}
+
+/** Pairs every sample string with the same field in the other language
+ *  (the two samples have the same shape). */
+function sampleTranslations(centerName, from, to) {
+  const map = new Map();
+  const walk = (a, b) => {
+    if (Array.isArray(a)) a.forEach((x, i) => walk(x, b?.[i]));
+    else if (a && typeof a === 'object') Object.keys(a).forEach(k => walk(a[k], b?.[k]));
+    else if (typeof a === 'string' && typeof b === 'string' && a !== b) map.set(a, b);
+  };
+  walk(classicSample(centerName, from), classicSample(centerName, to));
+  return map;
+}
+
+/** Example text still on the website switches language with it; what was typed stays. */
+function translateExamples(lp, centerName, from, to) {
+  const map = sampleTranslations(centerName, from, to);
+  const conv = (v) => Array.isArray(v) ? v.map(conv)
+    : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, conv(x)]))
+    : (typeof v === 'string' && map.has(v) ? map.get(v) : v);
+  const { design, links, ...content } = lp;
+  return { ...conv(content), design, links: conv(links || {}) };
 }
 
 /** Editor tabs that still hold example text or photos. */
@@ -292,15 +337,38 @@ export default function LandingPagesTab({ centers, darkMode, focusCenterId }) {
   const fillSample = (center) => {
     const cid = center._id;
     if (!window.confirm('Fill the empty parts of this website with sample text and photos?\n\nNothing you have already typed will be changed. Replace the sample photos with your own before publishing.')) return;
-    setLps(p => ({ ...p, [cid]: { ...fillEmpty(p[cid] || DEFAULT_LP, classicSample(center.centerName)), template: 'classic' } }));
+    setLps(p => ({ ...p, [cid]: { ...fillEmpty(p[cid] || DEFAULT_LP, classicSample(center.centerName, p[cid]?.language || 'en')), template: p[cid]?.template === 'modern' ? 'modern' : 'classic' } }));
     flash(cid, 'Sample content added — press Save to keep it');
+  };
+
+  // Switching template also swaps the colours if they are still the old template's defaults
+  const changeTemplate = (cid, next) => {
+    setLps(p => {
+      const lp = deepClone(p[cid] || DEFAULT_LP);
+      const from = TEMPLATE_COLORS[lp.template || 'classic'];
+      const to = TEMPLATE_COLORS[next];
+      const untouched = from && Object.entries(from).every(([k, v]) => (lp.design?.[k] || '').toLowerCase() === v.toLowerCase());
+      lp.template = next;
+      if (to && untouched) lp.design = { ...lp.design, ...to };
+      return { ...p, [cid]: lp };
+    });
   };
 
   const startBlank = (center) => {
     const cid = center._id;
     if (!window.confirm('Clear all the example content and start with an empty website?\n\nColours and fonts are kept. Nothing is saved until you press Save.')) return;
-    setLps(p => ({ ...p, [cid]: { ...deepClone(DEFAULT_LP), design: p[cid]?.design || DEFAULT_LP.design, template: p[cid]?.template || 'classic', published: !!p[cid]?.published } }));
+    setLps(p => ({ ...p, [cid]: { ...deepClone(DEFAULT_LP), design: p[cid]?.design || DEFAULT_LP.design, template: p[cid]?.template || 'classic', language: p[cid]?.language, published: !!p[cid]?.published } }));
     flash(cid, 'Example content cleared — press Save to keep it');
+  };
+
+  const changeLanguage = (center, next) => {
+    const cid = center._id;
+    setLps(p => {
+      const lp = p[cid] || DEFAULT_LP;
+      const from = lp.language || 'en';
+      if (from === next) return p;
+      return { ...p, [cid]: { ...translateExamples(lp, center.centerName, from, next), language: next } };
+    });
   };
 
   const s = styles(isDark, card, bdr, txt, muted, inputBg, inputBdr);
@@ -398,7 +466,7 @@ export default function LandingPagesTab({ centers, darkMode, focusCenterId }) {
                 {/* ── Template picker ── */}
                 <TemplatePicker
                   selected={lp.template || 'classic'}
-                  onChange={v => setField(cid, 'template', v)}
+                  onChange={v => changeTemplate(cid, v)}
                   s={s} isDark={isDark} txt={txt} muted={muted} bdr={bdr}
                 />
 
@@ -412,23 +480,31 @@ export default function LandingPagesTab({ centers, darkMode, focusCenterId }) {
                     </button>
                   ))}
                 </div>
-                {SECTION_WHERE[sec] && (
-                  <p style={s.whereNote}><strong style={{ color: txt }}>On the page: </strong>{SECTION_WHERE[sec]}</p>
+                {(lp.template === 'modern' && SECTION_WHERE_MODERN[sec] || SECTION_WHERE[sec]) && (
+                  <p style={s.whereNote}><strong style={{ color: txt }}>On the page: </strong>{lp.template === 'modern' && SECTION_WHERE_MODERN[sec] || SECTION_WHERE[sec]}</p>
                 )}
-                {lp.template !== 'classic' && CLASSIC_ONLY.includes(sec) && (
-                  <p style={s.note}>This section shows on the <strong>Classic</strong> template. Pick Classic above to use it.</p>
+                {lp.template === 'minimal' && CLASSIC_ONLY.includes(sec) && (
+                  <p style={s.note}>This section shows on the <strong>Classic</strong> and <strong>Modern</strong> templates. Pick one of them above to use it.</p>
                 )}
 
                 {/* ── DESIGN ── */}
                 {sec === 'design' && (
                   <div style={s.grid2}>
+                    <div style={{ gridColumn: '1 / -1', ...s.subCard }}>
+                      <SelectField label="Website language" value={lp.language || 'en'} options={SITE_LANGUAGES} onChange={v => changeLanguage(center, v)} s={s} />
+                      <span style={s.hint}>
+                        The website’s own words — menu, “Log in”, section labels, buttons, contact cards — appear in this language.
+                        Text you type in the other tabs shows exactly as typed, so type it in the same language. Example content that
+                        hasn’t been edited yet switches language too.
+                      </span>
+                    </div>
                     <ColorField label="Primary Color" value={lp.design?.primaryColor} onChange={v => setField(cid,'design.primaryColor',v)} s={s} />
                     <ColorField label="Secondary Color" value={lp.design?.secondaryColor} onChange={v => setField(cid,'design.secondaryColor',v)} s={s} />
                     <ColorField label="Accent / CTA Color" value={lp.design?.accentColor} onChange={v => setField(cid,'design.accentColor',v)} s={s} />
                     <ColorField label="Background Color" value={lp.design?.bgColor} onChange={v => setField(cid,'design.bgColor',v)} s={s} />
                     <ColorField label="Text Color" value={lp.design?.textColor} onChange={v => setField(cid,'design.textColor',v)} s={s} />
                     <ColorField label="Muted Text Color" value={lp.design?.mutedColor} onChange={v => setField(cid,'design.mutedColor',v)} s={s} />
-                    <SelectField label="Body Font" value={lp.design?.fontFamily} options={FONT_OPTIONS.map(f => ({ value: f, label: f }))} onChange={v => setField(cid,'design.fontFamily',v)} s={s} />
+                    <SelectField label="Body Font" value={lp.design?.fontFamily} options={FONT_OPTIONS.map(f => ({ value: f, label: NO_VIETNAMESE_FONTS.includes(f) ? `${f} (no Vietnamese accents — Vietnamese sites use Inter)` : f }))} onChange={v => setField(cid,'design.fontFamily',v)} s={s} />
                     <SelectField label="Hero Style" value={lp.design?.heroStyle} options={HERO_STYLES} onChange={v => setField(cid,'design.heroStyle',v)} s={s} />
                     <SelectField label="Nav Style" value={lp.design?.navStyle} options={NAV_STYLES} onChange={v => setField(cid,'design.navStyle',v)} s={s} />
                     {lp.design?.heroStyle === 'image' && lp.template !== 'classic' && (
@@ -455,7 +531,7 @@ export default function LandingPagesTab({ centers, darkMode, focusCenterId }) {
                       <TextField label="Second button text (optional)" value={lp.hero?.secondaryCtaText} onChange={v => setField(cid,'hero.secondaryCtaText',v)} s={s} />
                       <TextField label="Second button link" value={lp.hero?.secondaryCtaUrl} onChange={v => setField(cid,'hero.secondaryCtaUrl',v)} placeholder="#programs" s={s} />
                     </div>
-                    <span style={s.hint}>The first three “Why choose us” items appear as highlight cards at the bottom of the hero.</span>
+                    {lp.template !== 'modern' && <span style={s.hint}>The first three “Why choose us” items appear as highlight cards at the bottom of the hero.</span>}
                   </div>
                 )}
 
@@ -834,29 +910,32 @@ function ClassicThumb({ active }) {
 }
 
 function ModernThumb({ active }) {
-  const c = active ? '#f472b6' : '#94a3b8';
-  const c2 = active ? '#f9a8d4' : '#cbd5e1';
+  const p = active ? '#8b5cf6' : '#64748b';
+  const a = active ? '#2ee6a6' : '#94a3b8';
   return (
     <svg width="100%" viewBox="0 0 140 90" fill="none" xmlns="http://www.w3.org/2000/svg">
-      {/* Nav */}
-      <rect x="0" y="0" width="140" height="10" rx="2" fill={c2} />
-      {/* Split hero — dark left, colored right */}
-      <rect x="0" y="12" width="78" height="36" rx="0" fill="#1e293b" opacity="0.85" />
-      <rect x="78" y="12" width="62" height="36" rx="0" fill={c} opacity="0.75" />
-      {/* Left text lines */}
-      <rect x="6" y="18" width="36" height="4" rx="2" fill="white" opacity="0.5" />
-      <rect x="6" y="25" width="28" height="3" rx="1.5" fill="white" opacity="0.35" />
-      <rect x="6" y="32" width="20" height="5" rx="2.5" fill="#f59e0b" opacity="0.85" />
-      {/* Right floating card */}
-      <rect x="88" y="17" width="40" height="24" rx="4" fill="white" opacity="0.15" />
-      <rect x="93" y="22" width="28" height="3" rx="1.5" fill="white" opacity="0.5" />
-      <rect x="93" y="28" width="22" height="3" rx="1.5" fill="white" opacity="0.35" />
-      {/* About */}
-      <rect x="8" y="52" width="55" height="16" rx="2" fill={c2} opacity="0.4" />
-      <rect x="72" y="52" width="60" height="16" rx="2" fill={c2} opacity="0.3" />
-      {/* CTA band */}
-      <rect x="0" y="72" width="140" height="12" rx="0" fill={c} opacity="0.5" />
-      <rect x="50" y="75" width="40" height="5" rx="2.5" fill="white" opacity="0.6" />
+      <defs>
+        <radialGradient id="mt-g1" cx="0.2" cy="0.1" r="0.6"><stop offset="0" stopColor={p} stopOpacity="0.7" /><stop offset="1" stopColor={p} stopOpacity="0" /></radialGradient>
+        <radialGradient id="mt-g2" cx="0.85" cy="0.2" r="0.5"><stop offset="0" stopColor={a} stopOpacity="0.45" /><stop offset="1" stopColor={a} stopOpacity="0" /></radialGradient>
+      </defs>
+      {/* Midnight page with colour glows */}
+      <rect width="140" height="90" rx="4" fill="#0b0d14" />
+      <rect width="140" height="90" rx="4" fill="url(#mt-g1)" />
+      <rect width="140" height="90" rx="4" fill="url(#mt-g2)" />
+      {/* Floating pill nav */}
+      <rect x="10" y="5" width="120" height="8" rx="4" fill="white" opacity="0.1" />
+      <rect x="112" y="7" width="15" height="4" rx="2" fill={p} />
+      {/* Centered headline + buttons */}
+      <rect x="30" y="19" width="80" height="6" rx="3" fill="white" opacity="0.85" />
+      <rect x="44" y="28" width="52" height="3" rx="1.5" fill="white" opacity="0.35" />
+      <rect x="52" y="35" width="17" height="5" rx="2.5" fill={p} />
+      <rect x="71" y="35" width="17" height="5" rx="2.5" fill="white" opacity="0.15" />
+      {/* App-window photo */}
+      <rect x="20" y="45" width="100" height="22" rx="4" fill="white" opacity="0.08" stroke={a} strokeOpacity="0.5" strokeWidth="0.6" />
+      {/* Bento tiles */}
+      <rect x="10" y="72" width="56" height="14" rx="3" fill={p} opacity="0.35" />
+      <rect x="69" y="72" width="28" height="14" rx="3" fill="white" opacity="0.08" />
+      <rect x="100" y="72" width="30" height="14" rx="3" fill="white" opacity="0.08" />
     </svg>
   );
 }

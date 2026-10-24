@@ -33,6 +33,7 @@ const section = (v, fields = {}) => {
 
 const CLEANERS = {
   template: (v) => (['classic', 'modern', 'minimal'].includes(v) ? v : 'classic'),
+  language: (v) => (['en', 'vi'].includes(v) ? v : 'en'),   // the website's built-in labels
   design: (d = {}) => ({
     primaryColor: str(d.primaryColor, 20), secondaryColor: str(d.secondaryColor, 20), accentColor: str(d.accentColor, 20),
     bgColor: str(d.bgColor, 20), textColor: str(d.textColor, 20), mutedColor: str(d.mutedColor, 20),
@@ -93,6 +94,6 @@ export function cleanLandingPage(input) {
 
 /** The public copy of a center website — every section the templates can show. */
 export const PUBLIC_LANDING_KEYS = [
-  'template', 'design', 'hero', 'about', 'teachers', 'links', 'contact', 'seo',
+  'template', 'language', 'design', 'hero', 'about', 'teachers', 'links', 'contact', 'seo',
   'topBar', 'stats', 'features', 'programs', 'testimonials', 'gallery', 'faq', 'cta', 'footer', 'publishedAt',
 ];

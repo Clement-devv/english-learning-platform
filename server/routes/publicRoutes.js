@@ -21,7 +21,8 @@ router.get('/landing-page', tenantMiddleware, async (req, res) => {
     const lp = center.landingPage;
 
     if (!lp || !lp.published) {
-      // Name, logo and colour only — the site shows a "coming soon" page with login buttons
+      // Name, logo and colour only — the site shows a "coming soon" page with login buttons.
+      // Most centers are Vietnamese, so that page is Vietnamese unless the site says otherwise.
       return res.status(404).json({
         success: false,
         message: 'No public landing page for this center',
@@ -29,6 +30,7 @@ router.get('/landing-page', tenantMiddleware, async (req, res) => {
           centerName:   center.centerName,
           logo:         center.branding?.logo || null,
           primaryColor: center.branding?.primaryColor || null,
+          language:     lp?.language === 'en' ? 'en' : 'vi',
         },
       });
     }
@@ -51,6 +53,7 @@ router.get('/landing-page', tenantMiddleware, async (req, res) => {
       landingPage: {
         ...Object.fromEntries(PUBLIC_LANDING_KEYS.map(k => [k, lp[k]])),
         teachers: lp.teachers || [],
+        language: lp.language === 'vi' ? 'vi' : 'en',
       },
     });
   } catch (err) {

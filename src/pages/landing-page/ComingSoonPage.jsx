@@ -4,6 +4,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { GraduationCap, Users, BookOpen } from 'lucide-react';
+import { siteText } from './siteText.js';
 
 const CSS = `
 .cs { --ink:#1c1917; --ink-2:#57534e; --paper:#fbf7f0; --card:#ffffff; --rule:#e6d9c4;
@@ -42,24 +43,25 @@ const CSS = `
 `;
 
 export default function ComingSoonPage({ center }) {
-  const name = center?.centerName || 'Our school';
+  const T = siteText(center?.language);
+  const name = center?.centerName || T.ourSchool;
   const p = center?.primaryColor || '#BE185D';
   return (
-    <main className="cs" style={{ '--p': p }}>
+    <main className="cs" style={{ '--p': p }} lang={T.lang}>
       <style>{CSS}</style>
       <div className="cs-card">
         <div className="cs-logo">
           {center?.logo ? <img src={center.logo} alt="" /> : name.trim()[0]?.toUpperCase()}
         </div>
-        <span className="cs-eyebrow">Website coming soon</span>
+        <span className="cs-eyebrow">{T.soon}</span>
         <h1>{name}</h1>
-        <p>Our new website is on the way. Students, parents and teachers can sign in below.</p>
+        <p>{T.soonText}</p>
         <div className="cs-btns">
-          <Link className="cs-btn main" to="/student/login"><GraduationCap size={18} /> Student login</Link>
-          <Link className="cs-btn" to="/parent/login"><Users size={18} /> Parent login</Link>
-          <Link className="cs-btn" to="/teacher/login"><BookOpen size={18} /> Teacher login</Link>
+          <Link className="cs-btn main" to="/student/login"><GraduationCap size={18} /> {T.studentLogin}</Link>
+          <Link className="cs-btn" to="/parent/login"><Users size={18} /> {T.parentLogin}</Link>
+          <Link className="cs-btn" to="/teacher/login"><BookOpen size={18} /> {T.teacherLogin}</Link>
         </div>
-        <span className="cs-staff">School staff? <Link to="/admin/login">Admin login</Link></span>
+        <span className="cs-staff">{T.staff} <Link to="/admin/login">{T.adminShort}</Link></span>
       </div>
     </main>
   );

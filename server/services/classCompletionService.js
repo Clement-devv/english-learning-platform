@@ -204,7 +204,7 @@ export async function completeClass(db, bookingId, markedBy = "system", options 
     if (isTrial) {
       student = await Student.findById(studentId).lean();
     } else {
-      const charge = await chargeClassCredit(db, studentId);
+      const charge = await chargeClassCredit(db, studentId, { title: claimedBooking.classTitle, when: claimedBooking.scheduledTime });
       student = charge.student;
       done.charged = charge.charged;
       done.deactivated = charge.deactivated;

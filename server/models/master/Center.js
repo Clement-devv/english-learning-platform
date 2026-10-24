@@ -143,6 +143,9 @@ const centerSchema = new mongoose.Schema({
   landingPage: {
     published:  { type: Boolean, default: false },
     template:   { type: String, default: 'classic' },
+    // 'en' | 'vi' — language of the website's built-in labels. No default: sites saved
+    // before this existed are English; the editor starts new websites in Vietnamese.
+    language:   { type: String },
 
     design: {
       primaryColor:   { type: String, default: '#BE185D' },

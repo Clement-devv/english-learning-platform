@@ -8,25 +8,18 @@
 // phone layout (media queries would only see the browser window).
 import { useEffect, useRef, useState } from 'react';
 import { resolveDesign, adjustHex, sortedTeachers, SOCIAL_ICONS, SOCIAL_LABELS } from '../utils.jsx';
+import { onColor, on, items, CountUp, Icon, useReveal, useScrolledIn, useDocTitle, useDocLang, splitHeadline } from './shared.jsx';
+import { siteText, siteFont, SiteTextCtx, useSiteText } from '../siteText.js';
 
 const SERIF = "'Playfair Display', Georgia, 'Times New Roman', serif";
-
-/** Black or white text, whichever reads better on `hex`. */
-function onColor(hex = '#000000') {
-  const c = hex.replace('#', '').padEnd(6, '0');
-  const [r, g, b] = [0, 2, 4].map(i => parseInt(c.slice(i, i + 2), 16) / 255)
-    .map(v => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.45 ? '#111827' : '#ffffff';
-}
-
-const on = (sec) => !!sec && sec.enabled !== false;
-const items = (sec) => (on(sec) && Array.isArray(sec.items) ? sec.items.filter(Boolean) : []);
 
 export default function ClassicTemplate({ center, lp }) {
   const D = resolveDesign(lp.design);
   const rootRef = useRef(null);
-  useReveal(rootRef);
+  useReveal(rootRef, 'ct');
   useDocTitle(lp.seo?.title || center.centerName);
+  const T = siteText(lp.language);
+  useDocLang(T.lang);
 
   const urls = {
     student: lp.links?.studentLogin || '/student/login',
@@ -45,30 +38,31 @@ export default function ClassicTemplate({ center, lp }) {
   const showContact = !!lp.contact?.enabled;
 
   const nav = [
-    { label: 'Home', href: '#home' },
-    showAbout && { label: 'About', href: '#about' },
-    programs.length > 0 && { label: lp.programs?.navLabel || 'Programs', href: '#programs' },
-    teachers.length > 0 && { label: 'Teachers', href: '#teachers' },
-    testimonials.length > 0 && { label: 'Reviews', href: '#testimonials' },
-    faq.length > 0 && { label: 'FAQ', href: '#faq' },
-    showContact && { label: 'Contact', href: '#contact' },
+    { label: T.home, href: '#home' },
+    showAbout && { label: T.about, href: '#about' },
+    programs.length > 0 && { label: lp.programs?.navLabel || T.programs, href: '#programs' },
+    teachers.length > 0 && { label: T.teachers, href: '#teachers' },
+    testimonials.length > 0 && { label: T.reviews, href: '#testimonials' },
+    faq.length > 0 && { label: T.faq, href: '#faq' },
+    showContact && { label: T.contact, href: '#contact' },
   ].filter(Boolean);
 
   const vars = {
     '--p': D.primary, '--p-dark': adjustHex(D.primary, -45), '--p-deep': `color-mix(in srgb, ${D.primary} 30%, #0b1120)`,
     '--p-on': onColor(D.primary), '--a': D.accent, '--a-on': onColor(D.accent),
-    '--soft': `${D.primary}0d`, '--font': D.font, '--serif': SERIF,
+    '--soft': `${D.primary}0d`, '--font': siteFont(D, T.lang), '--serif': SERIF,
   };
 
   return (
-    <div ref={rootRef} className="ct" style={vars}>
+    <SiteTextCtx.Provider value={T}>
+    <div ref={rootRef} className="ct" style={vars} lang={T.lang}>
       <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800&display=swap" />
       <style>{CSS}</style>
 
       {lp.topBar?.enabled && (lp.topBar.text || lp.contact?.phone || lp.contact?.email) && (
         <TopBar text={lp.topBar.text} contact={lp.contact} links={lp.links} />
       )}
-      <Header center={center} nav={nav} urls={urls} cta={{ text: lp.hero?.ctaText || 'Enroll now', url: lp.hero?.ctaUrl || urls.student }} />
+      <Header center={center} nav={nav} urls={urls} cta={{ text: lp.hero?.ctaText || T.enroll, url: lp.hero?.ctaUrl || urls.student }} />
       <Hero center={center} lp={lp} D={D} highlights={features.slice(0, 3)} stats={stats} testimonials={testimonials} />
       {stats.length > 0 && <Stats stats={stats} />}
       {showAbout && <About about={lp.about} cta={lp.hero} />}
@@ -82,6 +76,7 @@ export default function ClassicTemplate({ center, lp }) {
       {showContact && <Contact contact={lp.contact} links={lp.links} />}
       <Footer center={center} lp={lp} nav={nav} programs={programs} urls={urls} />
     </div>
+    </SiteTextCtx.Provider>
   );
 }
 
@@ -104,6 +99,7 @@ function TopBar({ text, contact, links }) {
 
 /* ── Header ──────────────────────────────────────────────────────────────── */
 function Header({ center, nav, urls, cta }) {
+  const T = useSiteText();
   const [menu, setMenu] = useState(false);
   const [login, setLogin] = useState(false);
   const scrolled = useScrolledIn();
@@ -124,29 +120,30 @@ function Header({ center, nav, urls, cta }) {
           <span className="ct-brand-name">{center.centerName}</span>
         </a>
 
-        <nav className="ct-nav" aria-label="Main">
-          {nav.map(l => <a key={l.href} href={l.href}>{l.label}</a>)}
+        <nav className="ct-nav" aria-label={T.mainNav}>
+          {/* the logo already links home, so the header menu skips Home */}
+          {nav.filter(l => l.href !== '#home').map(l => <a key={l.href} href={l.href}>{l.label}</a>)}
         </nav>
 
         <div className="ct-header-actions">
           <div className="ct-login" onClick={e => e.stopPropagation()}>
             <button type="button" className="ct-btn ct-btn-ghost" onClick={() => setLogin(v => !v)} aria-expanded={login}>
-              Login <Icon name="chevron" size={14} />
+              {T.login} <Icon name="chevron" size={14} />
             </button>
             {login && (
               <div className="ct-login-menu" role="menu">
-                {[['Student', 'Join your classes', urls.student], ['Teacher', 'Manage your lessons', urls.teacher], ['Parent', "Follow your child's progress", urls.parent]].map(([who, hint, href]) => (
-                  <a key={who} href={href} role="menuitem">
-                    <span className="ct-login-ic"><Icon name={who === 'Teacher' ? 'board' : who === 'Parent' ? 'users' : 'cap'} size={16} /></span>
-                    <span><strong>{who} login</strong><small>{hint}</small></span>
+                {[[T.studentLogin, T.hintStudent, urls.student, 'cap'], [T.teacherLogin, T.hintTeacher, urls.teacher, 'board'], [T.parentLogin, T.hintParent, urls.parent, 'users']].map(([who, hint, href, ic]) => (
+                  <a key={href} href={href} role="menuitem">
+                    <span className="ct-login-ic"><Icon name={ic} size={16} /></span>
+                    <span><strong>{who}</strong><small>{hint}</small></span>
                   </a>
                 ))}
-                <a href={urls.admin} className="ct-login-admin" role="menuitem">School admin login</a>
+                <a href={urls.admin} className="ct-login-admin" role="menuitem">{T.adminLogin}</a>
               </div>
             )}
           </div>
           <a href={cta.url} className="ct-btn ct-btn-accent ct-hide-sm">{cta.text}</a>
-          <button type="button" className="ct-burger" aria-label="Menu" aria-expanded={menu} onClick={() => setMenu(v => !v)}>
+          <button type="button" className="ct-burger" aria-label={T.menu} aria-expanded={menu} onClick={() => setMenu(v => !v)}>
             <Icon name={menu ? 'close' : 'menu'} size={22} />
           </button>
         </div>
@@ -156,9 +153,9 @@ function Header({ center, nav, urls, cta }) {
         <div className="ct-mobile-menu">
           {nav.map(l => <a key={l.href} href={l.href} onClick={() => setMenu(false)}>{l.label}</a>)}
           <hr />
-          <a href={urls.student}>Student login</a>
-          <a href={urls.teacher}>Teacher login</a>
-          <a href={urls.parent}>Parent login</a>
+          <a href={urls.student}>{T.studentLogin}</a>
+          <a href={urls.teacher}>{T.teacherLogin}</a>
+          <a href={urls.parent}>{T.parentLogin}</a>
           <a href={cta.url} className="ct-btn ct-btn-accent" style={{ marginTop: 8, justifyContent: 'center' }}>{cta.text}</a>
         </div>
       )}
@@ -169,19 +166,12 @@ function Header({ center, nav, urls, cta }) {
 /* ── Hero ────────────────────────────────────────────────────────────────── */
 // The headline's longest word gets the classic treatment: italic, accent colour and a
 // hand-drawn underline ("Speak English with *confidence* — …").
-function splitHeadline(text) {
-  const words = text.split(' ');
-  let best = -1;
-  words.forEach((w, i) => { const clean = w.replace(/[^\p{L}]/gu, ''); if (clean.length >= 5 && (best < 0 || clean.length > words[best].replace(/[^\p{L}]/gu, '').length)) best = i; });
-  if (best < 0) return [text, '', ''];
-  return [words.slice(0, best).join(' '), words[best], words.slice(best + 1).join(' ')];
-}
-
 function Hero({ center, lp, D, highlights, stats, testimonials }) {
+  const T = useSiteText();
   const h = lp.hero || {};
   const image = h.image || (D.heroStyle === 'image' ? D.heroImage : null) || D.heroImage;
-  const headline = h.headline || `Learn English with confidence at ${center.centerName}`;
-  const sub = h.subheadline || center.description || 'Expert teachers, small classes and a clear path from your first words to fluent conversation.';
+  const headline = h.headline || T.heroHeadline(center.centerName);
+  const sub = h.subheadline || center.description || T.heroSub;
   const [before, word, after] = splitHeadline(headline);
   const trust = stats[0];
   const faces = testimonials.filter(t => t.photo).slice(0, 3);
@@ -201,14 +191,14 @@ function Hero({ center, lp, D, highlights, stats, testimonials }) {
           </h1>
           <p className="ct-rise ct-d2">{sub}</p>
           <div className="ct-hero-ctas ct-rise ct-d3">
-            <a href={h.ctaUrl || '/student/login'} className="ct-btn ct-btn-accent ct-btn-lg">{h.ctaText || 'Enroll now'} <Icon name="arrow" size={16} /></a>
+            <a href={h.ctaUrl || '/student/login'} className="ct-btn ct-btn-accent ct-btn-lg">{h.ctaText || T.enroll} <Icon name="arrow" size={16} /></a>
             {h.secondaryCtaText && <a href={h.secondaryCtaUrl || '#about'} className="ct-btn ct-btn-outline ct-btn-lg">{h.secondaryCtaText}</a>}
           </div>
           {(trust || faces.length > 0) && (
             <div className="ct-hero-trust ct-rise ct-d4">
               {faces.length > 0 && <span className="ct-faces">{faces.map((t, i) => <img key={i} src={t.photo} alt="" />)}</span>}
               <span>
-                {rating && <span className="ct-trust-stars" aria-label={`Rated ${rating.toFixed(1)} out of 5`}>{Array.from({ length: 5 }, (_, s) => <Icon key={s} name="star-fill" size={13} />)} <b>{rating.toFixed(1)}</b></span>}
+                {rating && <span className="ct-trust-stars" aria-label={T.rated(rating.toFixed(1))}>{Array.from({ length: 5 }, (_, s) => <Icon key={s} name="star-fill" size={13} />)} <b>{rating.toFixed(1)}</b></span>}
                 {trust && <small><b>{trust.value}</b> {trust.label.toLowerCase()}</small>}
               </span>
             </div>
@@ -266,6 +256,8 @@ function Stats({ stats }) {
 
 /* ── About ───────────────────────────────────────────────────────────────── */
 function About({ about, cta }) {
+  const T = useSiteText();
+  const badgeLabel = about.badgeLabel || T.yearsExp;
   const points = (about.points || []).filter(Boolean);
   const hasImages = about.image || about.image2;
   return (
@@ -276,11 +268,11 @@ function About({ about, cta }) {
             {about.image && <img className="ct-about-main" src={about.image} alt="" loading="lazy" />}
             {about.image2 && <img className="ct-about-second" src={about.image2} alt="" loading="lazy" />}
             {about.badgeValue && (
-              <div className="ct-about-badge" aria-label={`${about.badgeValue} ${about.badgeLabel || 'Years of experience'}`}>
+              <div className="ct-about-badge" aria-label={`${about.badgeValue} ${badgeLabel}`}>
                 {/* circular seal: label runs round the ring, the number sits in the middle */}
                 <svg className="ct-seal-ring" viewBox="0 0 120 120" aria-hidden>
                   <defs><path id="ct-seal-path" d="M60,60 m-46,0 a46,46 0 1,1 92,0 a46,46 0 1,1 -92,0" /></defs>
-                  <text><textPath href="#ct-seal-path" startOffset="0">{`${(about.badgeLabel || 'Years of experience').toUpperCase()} • ${(about.badgeLabel || 'Years of experience').toUpperCase()} • `}</textPath></text>
+                  <text><textPath href="#ct-seal-path" startOffset="0">{`${badgeLabel.toUpperCase()} • ${badgeLabel.toUpperCase()} • `}</textPath></text>
                 </svg>
                 <strong>{about.badgeValue}</strong>
               </div>
@@ -288,8 +280,8 @@ function About({ about, cta }) {
           </div>
         )}
         <div className="ct-reveal">
-          <Eyebrow>{about.subtitle || 'About us'}</Eyebrow>
-          <h2 className="ct-h2">{about.title || 'A school built around every learner'}</h2>
+          <Eyebrow>{about.subtitle || T.aboutUs}</Eyebrow>
+          <h2 className="ct-h2">{about.title || T.aboutTitle}</h2>
           {about.body && <p className="ct-lead">{about.body}</p>}
           {points.length > 0 && (
             <ul className="ct-checks">
@@ -305,10 +297,11 @@ function About({ about, cta }) {
 
 /* ── Programs ────────────────────────────────────────────────────────────── */
 function Programs({ sec, list }) {
+  const T = useSiteText();
   return (
     <section id="programs" className="ct-section ct-tinted">
       <div className="ct-wrap">
-        <SectionHead eyebrow="Our programs" title={sec.title || 'Courses for every goal'} subtitle={sec.subtitle} />
+        <SectionHead eyebrow={T.ourPrograms} title={sec.title || T.programsTitle} subtitle={sec.subtitle} />
         <div className="ct-grid ct-grid-3">
           {list.map((p, i) => (
             <article key={i} className="ct-card ct-program ct-reveal" style={{ transitionDelay: `${(i % 3) * 80}ms` }}>
@@ -317,7 +310,7 @@ function Programs({ sec, list }) {
                 {p.level && <span className="ct-chip">{p.level}</span>}
               </div>
               <div className="ct-program-body">
-                <span className="ct-program-no">No. {String(i + 1).padStart(2, '0')}</span>
+                <span className="ct-program-no">{T.programNo(String(i + 1).padStart(2, '0'))}</span>
                 <h3>{p.title}</h3>
                 {p.text && <p>{p.text}</p>}
                 {(p.duration || p.price) && (
@@ -326,7 +319,7 @@ function Programs({ sec, list }) {
                     {p.price && <span className="ct-price">{p.price}</span>}
                   </div>
                 )}
-                <a href={p.ctaUrl || '#contact'} className="ct-link">{p.ctaText || 'Learn more'} <Icon name="arrow" size={14} /></a>
+                <a href={p.ctaUrl || '#contact'} className="ct-link">{p.ctaText || T.learnMore} <Icon name="arrow" size={14} /></a>
               </div>
             </article>
           ))}
@@ -338,10 +331,11 @@ function Programs({ sec, list }) {
 
 /* ── Why choose us ───────────────────────────────────────────────────────── */
 function Features({ sec, list }) {
+  const T = useSiteText();
   return (
     <section className="ct-section">
       <div className="ct-wrap">
-        <SectionHead eyebrow="Why choose us" title={sec.title || 'Everything you need to succeed'} subtitle={sec.subtitle} />
+        <SectionHead eyebrow={T.whyUs} title={sec.title || T.featuresTitle} subtitle={sec.subtitle} />
         {/* editorial numbered list — 01, 02, 03 … in large outlined serif numerals */}
         <ol className="ct-features">
           {list.map((f, i) => (
@@ -361,10 +355,11 @@ function Features({ sec, list }) {
 
 /* ── Teachers ────────────────────────────────────────────────────────────── */
 function Teachers({ list }) {
+  const T = useSiteText();
   return (
     <section id="teachers" className="ct-section ct-tinted">
       <div className="ct-wrap">
-        <SectionHead eyebrow="Our teachers" title="Learn from experienced educators" />
+        <SectionHead eyebrow={T.ourTeachers} title={T.teachersTitle} />
         <div className="ct-grid ct-grid-4">
           {list.map((t, i) => (
             <article key={i} className="ct-card ct-teacher ct-reveal" style={{ transitionDelay: `${(i % 4) * 70}ms` }}>
@@ -386,15 +381,16 @@ function Teachers({ list }) {
 
 /* ── Testimonials ────────────────────────────────────────────────────────── */
 function Testimonials({ sec, list }) {
+  const T = useSiteText();
   return (
     <section id="testimonials" className="ct-section">
       <div className="ct-wrap">
-        <SectionHead eyebrow="Testimonials" title={sec.title || 'What our students and parents say'} subtitle={sec.subtitle} />
+        <SectionHead eyebrow={T.testimonials} title={sec.title || T.testimonialsTitle} subtitle={sec.subtitle} />
         <div className={`ct-quotes${list.length >= 3 ? ' has-feature' : ''}`}>
           {list.map((t, i) => (
             <figure key={i} className={`ct-card ct-quote ct-reveal${i === 0 && list.length >= 3 ? ' is-feature' : ''}`} style={{ transitionDelay: `${(i % 3) * 80}ms` }}>
               <span className="ct-quote-mark" aria-hidden>“</span>
-              <div className="ct-stars" aria-label={`${t.rating || 5} out of 5`}>
+              <div className="ct-stars" aria-label={T.outOf5(t.rating || 5)}>
                 {Array.from({ length: 5 }, (_, s) => <Icon key={s} name="star-fill" size={15} className={s < (t.rating || 5) ? '' : 'off'} />)}
               </div>
               <blockquote>{t.quote}</blockquote>
@@ -412,6 +408,7 @@ function Testimonials({ sec, list }) {
 
 /* ── Gallery ─────────────────────────────────────────────────────────────── */
 function Gallery({ sec, list }) {
+  const T = useSiteText();
   const [open, setOpen] = useState(null);
   useEffect(() => {
     if (open === null) return undefined;
@@ -427,10 +424,10 @@ function Gallery({ sec, list }) {
   return (
     <section className="ct-section ct-tinted">
       <div className="ct-wrap">
-        <SectionHead eyebrow="Gallery" title={sec.title || 'Life at our school'} subtitle={sec.subtitle} />
+        <SectionHead eyebrow={T.gallery} title={sec.title || T.galleryTitle} subtitle={sec.subtitle} />
         <div className="ct-gallery">
           {list.map((g, i) => (
-            <button key={i} type="button" className="ct-gallery-item ct-reveal" onClick={() => setOpen(i)} aria-label={g.caption || `Photo ${i + 1}`}>
+            <button key={i} type="button" className="ct-gallery-item ct-reveal" onClick={() => setOpen(i)} aria-label={g.caption || T.photoN(i + 1)}>
               <img src={g.image} alt={g.caption || ''} loading="lazy" />
               {g.caption && <span>{g.caption}</span>}
             </button>
@@ -438,14 +435,14 @@ function Gallery({ sec, list }) {
         </div>
       </div>
       {open !== null && list[open] && (
-        <div className="ct-lightbox" onClick={() => setOpen(null)} role="dialog" aria-label="Photo">
+        <div className="ct-lightbox" onClick={() => setOpen(null)} role="dialog" aria-label={T.photo}>
           <img src={list[open].image} alt={list[open].caption || ''} onClick={e => e.stopPropagation()} />
           {list[open].caption && <p>{list[open].caption}</p>}
-          <button type="button" className="ct-lightbox-close" aria-label="Close" onClick={() => setOpen(null)}><Icon name="close" size={22} /></button>
+          <button type="button" className="ct-lightbox-close" aria-label={T.close} onClick={() => setOpen(null)}><Icon name="close" size={22} /></button>
           {list.length > 1 && (
             <>
-              <button type="button" className="ct-lightbox-nav prev" aria-label="Previous" onClick={e => { e.stopPropagation(); setOpen(i => (i - 1 + list.length) % list.length); }}><Icon name="chevron" size={22} /></button>
-              <button type="button" className="ct-lightbox-nav next" aria-label="Next" onClick={e => { e.stopPropagation(); setOpen(i => (i + 1) % list.length); }}><Icon name="chevron" size={22} /></button>
+              <button type="button" className="ct-lightbox-nav prev" aria-label={T.prev} onClick={e => { e.stopPropagation(); setOpen(i => (i - 1 + list.length) % list.length); }}><Icon name="chevron" size={22} /></button>
+              <button type="button" className="ct-lightbox-nav next" aria-label={T.next} onClick={e => { e.stopPropagation(); setOpen(i => (i + 1) % list.length); }}><Icon name="chevron" size={22} /></button>
             </>
           )}
         </div>
@@ -456,16 +453,17 @@ function Gallery({ sec, list }) {
 
 /* ── Enrolment banner ────────────────────────────────────────────────────── */
 function Banner({ cta, fallbackUrl }) {
+  const T = useSiteText();
   return (
     <section className={`ct-banner${cta.image ? ' has-image' : ''}`} style={cta.image ? { backgroundImage: `url("${encodeURI(cta.image)}")` } : undefined}>
       <div className="ct-banner-shade" aria-hidden />
       <div className="ct-wrap ct-banner-in ct-reveal">
         <div>
-          <span className="ct-banner-eyebrow"><Ornament /> Enrolment open <Ornament /></span>
+          <span className="ct-banner-eyebrow"><Ornament /> {T.enrolOpen} <Ornament /></span>
           <h2>{cta.title}</h2>
           {cta.text && <p>{cta.text}</p>}
         </div>
-        <a href={cta.buttonUrl || fallbackUrl} className="ct-btn ct-btn-accent ct-btn-lg">{cta.buttonText || 'Enroll now'} <Icon name="arrow" size={16} /></a>
+        <a href={cta.buttonUrl || fallbackUrl} className="ct-btn ct-btn-accent ct-btn-lg">{cta.buttonText || T.enroll} <Icon name="arrow" size={16} /></a>
       </div>
     </section>
   );
@@ -473,14 +471,15 @@ function Banner({ cta, fallbackUrl }) {
 
 /* ── FAQ ─────────────────────────────────────────────────────────────────── */
 function Faq({ sec, list, contact }) {
+  const T = useSiteText();
   return (
     <section id="faq" className="ct-section">
       <div className="ct-wrap ct-faq">
         <div className="ct-reveal">
-          <Eyebrow>FAQ</Eyebrow>
-          <h2 className="ct-h2">{sec.title || 'Frequently asked questions'}</h2>
-          <p className="ct-lead">{sec.subtitle || "Can't find your answer? We're happy to help."}</p>
-          {contact?.enabled && <a href="#contact" className="ct-btn ct-btn-primary">Contact us <Icon name="arrow" size={16} /></a>}
+          <Eyebrow>{T.faq}</Eyebrow>
+          <h2 className="ct-h2">{sec.title || T.faqTitle}</h2>
+          <p className="ct-lead">{sec.subtitle || T.faqSub}</p>
+          {contact?.enabled && <a href="#contact" className="ct-btn ct-btn-primary">{T.contactUs} <Icon name="arrow" size={16} /></a>}
         </div>
         <div className="ct-faq-list ct-reveal">
           {list.map((f, i) => (
@@ -497,17 +496,18 @@ function Faq({ sec, list, contact }) {
 
 /* ── Contact ─────────────────────────────────────────────────────────────── */
 function Contact({ contact, links }) {
+  const T = useSiteText();
   const cards = [
-    contact.address && { icon: 'pin', label: 'Visit us', value: contact.address, href: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(contact.address)}`, ext: true, more: 'Open in Google Maps' },
-    contact.phone && { icon: 'phone', label: 'Call us', value: contact.phone, href: `tel:${contact.phone}` },
-    contact.email && { icon: 'mail', label: 'Email us', value: contact.email, href: `mailto:${contact.email}` },
-    contact.hours && { icon: 'clock', label: 'Opening hours', value: contact.hours },
+    contact.address && { icon: 'pin', label: T.visitUs, value: contact.address, href: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(contact.address)}`, ext: true, more: T.openMaps },
+    contact.phone && { icon: 'phone', label: T.callUs, value: contact.phone, href: `tel:${contact.phone}` },
+    contact.email && { icon: 'mail', label: T.emailUs, value: contact.email, href: `mailto:${contact.email}` },
+    contact.hours && { icon: 'clock', label: T.openingHours, value: contact.hours },
   ].filter(Boolean);
   const socials = Object.keys(SOCIAL_ICONS).filter(k => links?.[k]);
   return (
     <section id="contact" className="ct-section ct-tinted">
       <div className="ct-wrap">
-        <SectionHead eyebrow="Contact" title="Get in touch" subtitle="Questions about classes, levels or prices? Reach out — we reply quickly." />
+        <SectionHead eyebrow={T.contact} title={T.contactTitle} subtitle={T.contactSub} />
         <div className="ct-grid ct-grid-4">
           {cards.map((c, i) => {
             const body = (
@@ -535,6 +535,7 @@ function Contact({ contact, links }) {
 
 /* ── Footer ──────────────────────────────────────────────────────────────── */
 function Footer({ center, lp, nav, programs, urls }) {
+  const T = useSiteText();
   const socials = Object.keys(SOCIAL_ICONS).filter(k => lp.links?.[k]);
   const c = lp.contact || {};
   return (
@@ -545,7 +546,7 @@ function Footer({ center, lp, nav, programs, urls }) {
             {center.logo ? <img src={center.logo} alt="" /> : <span className="ct-mark" aria-hidden>{center.centerName.charAt(0).toUpperCase()}</span>}
             <span className="ct-brand-name">{center.centerName}</span>
           </div>
-          <p>{lp.footer?.about || center.description || 'Quality English education for children and adults, online and in class.'}</p>
+          <p>{lp.footer?.about || center.description || T.footerAbout}</p>
           {socials.length > 0 && (
             <div className="ct-footer-socials">
               {socials.map(k => { const S = SOCIAL_ICONS[k]; return <a key={k} href={lp.links[k]} target="_blank" rel="noopener noreferrer" aria-label={SOCIAL_LABELS[k]}><S size={16} /></a>; })}
@@ -553,27 +554,27 @@ function Footer({ center, lp, nav, programs, urls }) {
           )}
         </div>
         <div>
-          <h4>Explore</h4>
+          <h4>{T.explore}</h4>
           {nav.map(l => <a key={l.href} href={l.href}>{l.label}</a>)}
         </div>
         <div>
-          <h4>{programs.length ? 'Programs' : 'Portals'}</h4>
+          <h4>{programs.length ? T.programs : T.portals}</h4>
           {programs.length
             ? programs.slice(0, 6).map((p, i) => <a key={i} href="#programs">{p.title}</a>)
-            : <><a href={urls.student}>Student login</a><a href={urls.teacher}>Teacher login</a><a href={urls.parent}>Parent login</a></>}
+            : <><a href={urls.student}>{T.studentLogin}</a><a href={urls.teacher}>{T.teacherLogin}</a><a href={urls.parent}>{T.parentLogin}</a></>}
         </div>
         <div>
-          <h4>Contact</h4>
+          <h4>{T.contact}</h4>
           {c.address && <span><Icon name="pin" size={14} /> {c.address}</span>}
           {c.phone && <a href={`tel:${c.phone}`}><Icon name="phone" size={14} /> {c.phone}</a>}
           {c.email && <a href={`mailto:${c.email}`}><Icon name="mail" size={14} /> {c.email}</a>}
           {c.hours && <span><Icon name="clock" size={14} /> {c.hours}</span>}
-          {!c.address && !c.phone && !c.email && <a href={urls.student}>Student login</a>}
+          {!c.address && !c.phone && !c.email && <a href={urls.student}>{T.studentLogin}</a>}
         </div>
       </div>
       <div className="ct-wrap ct-footer-bottom">
-        <span>© {new Date().getFullYear()} {center.centerName}. All rights reserved.{center.partnershipText && <em> {center.partnershipText}</em>}</span>
-        <span>Powered by Clemify</span>
+        <span>© {new Date().getFullYear()} {center.centerName}. {T.rights}{center.partnershipText && <em> {center.partnershipText}</em>}</span>
+        <span>{T.poweredBy}</span>
       </div>
     </footer>
   );
@@ -589,41 +590,6 @@ function Ornament() {
   return <svg className="ct-orn" width="8" height="8" viewBox="0 0 8 8" aria-hidden><path d="M4 0 L8 4 L4 8 L0 4 Z" /></svg>;
 }
 
-/** Counts a stat like "1,200+" or "98%" up from 0 once it scrolls into view.
- *  Values without a number ("Online") are shown as they are. Reduced motion: no count. */
-function CountUp({ value }) {
-  const ref = useRef(null);
-  const m = String(value).match(/^(\D*)([\d,.]+)(.*)$/);
-  // Starts on the real value (what search engines, print and no-JS see); the count runs
-  // only once the number is actually on screen.
-  const [shown, setShown] = useState(value);
-  useEffect(() => {
-    const el = ref.current;
-    if (!m || !el) { setShown(value); return undefined; }
-    const target = parseFloat(m[2].replace(/,/g, ''));
-    const decimals = (m[2].split('.')[1] || '').length;
-    const fmt = (n) => `${m[1]}${n.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}${m[3]}`;
-    if (typeof IntersectionObserver === 'undefined' || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) { setShown(value); return undefined; }
-    let raf;
-    const io = new IntersectionObserver(([e]) => {
-      if (!e.isIntersecting) return;
-      io.disconnect();
-      setShown(fmt(0));
-      const start = performance.now(), dur = 1400;
-      const tick = (t) => {
-        const p = Math.min(1, (t - start) / dur);
-        const eased = 1 - Math.pow(1 - p, 3);          // ease-out: fast start, gentle landing
-        setShown(p < 1 ? fmt(target * eased) : value);
-        if (p < 1) raf = requestAnimationFrame(tick);
-      };
-      raf = requestAnimationFrame(tick);
-    }, { threshold: 0.4 });
-    io.observe(el);
-    return () => { io.disconnect(); cancelAnimationFrame(raf); };
-  }, [value]); // eslint-disable-line react-hooks/exhaustive-deps
-  return <span ref={ref} className="ct-count">{shown}</span>;
-}
-
 function SectionHead({ eyebrow, title, subtitle }) {
   return (
     <div className="ct-head ct-reveal">
@@ -632,78 +598,6 @@ function SectionHead({ eyebrow, title, subtitle }) {
       {subtitle && <p className="ct-lead">{subtitle}</p>}
     </div>
   );
-}
-
-const PATHS = {
-  arrow: <><line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" /></>,
-  chevron: <polyline points="6 9 12 15 18 9" />,
-  check: <polyline points="20 6 9 17 4 12" />,
-  menu: <><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" /></>,
-  close: <><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></>,
-  phone: <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z" />,
-  mail: <><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" /><polyline points="22,6 12,13 2,6" /></>,
-  pin: <><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></>,
-  clock: <><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></>,
-  book: <><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /></>,
-  cap: <><path d="M22 10 12 5 2 10l10 5 10-5z" /><path d="M6 12v5c3 2 9 2 12 0v-5" /></>,
-  users: <><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></>,
-  board: <><rect x="2" y="3" width="20" height="14" rx="2" /><path d="M8 21h8M12 17v4" /></>,
-  globe: <><circle cx="12" cy="12" r="10" /><line x1="2" y1="12" x2="22" y2="12" /><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" /></>,
-  award: <><circle cx="12" cy="8" r="7" /><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88" /></>,
-  video: <><polygon points="23 7 16 12 23 17 23 7" /><rect x="1" y="5" width="15" height="14" rx="2" /></>,
-  chat: <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />,
-  star: <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />,
-  target: <><circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="6" /><circle cx="12" cy="12" r="2" /></>,
-  laptop: <><rect x="3" y="4" width="18" height="12" rx="2" /><line x1="2" y1="20" x2="22" y2="20" /></>,
-  heart: <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78z" />,
-  shield: <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />,
-  calendar: <><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></>,
-};
-// Icon names offered in the editor: landing-page/classicContent.js (CLASSIC_FEATURE_ICONS)
-
-function Icon({ name, size = 18, className = '' }) {
-  if (name === 'star-fill') {
-    return <svg className={`ct-ic ${className}`} width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden>{PATHS.star}</svg>;
-  }
-  return (
-    <svg className={`ct-ic ${className}`} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      {PATHS[name] || PATHS.star}
-    </svg>
-  );
-}
-
-/* ── Hooks ───────────────────────────────────────────────────────────────── */
-// Sections fade up as they scroll into view. Without IntersectionObserver
-// (or before it fires) everything stays visible.
-function useReveal(rootRef) {
-  useEffect(() => {
-    const root = rootRef.current;
-    if (!root || typeof IntersectionObserver === 'undefined') return undefined;
-    root.classList.add('ct-anim');
-    const io = new IntersectionObserver((entries) => {
-      entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
-    }, { rootMargin: '0px 0px -8% 0px', threshold: 0.08 });
-    root.querySelectorAll('.ct-reveal').forEach(el => io.observe(el));
-    return () => io.disconnect();
-  });
-}
-
-// Scroll position of the page — or of the editor preview's scroll box
-function useScrolledIn() {
-  const [scrolled, setScrolled] = useState(false);
-  useEffect(() => {
-    const fn = (e) => {
-      const t = e.target === document ? document.scrollingElement : e.target;
-      setScrolled((t?.scrollTop || window.scrollY) > 24);
-    };
-    window.addEventListener('scroll', fn, { passive: true, capture: true });
-    return () => window.removeEventListener('scroll', fn, { capture: true });
-  }, []);
-  return scrolled;
-}
-
-function useDocTitle(title) {
-  useEffect(() => { if (title) document.title = title; }, [title]);
 }
 
 /* ── Styles ──────────────────────────────────────────────────────────────── */
@@ -720,7 +614,7 @@ const CSS = `
 :where(.ct) a { color: inherit; text-decoration: none; }
 .ct img { display: block; max-width: 100%; }
 .ct-wrap { width: 100%; max-width: 1200px; margin: 0 auto; padding: 0 28px; }
-.ct-ic { flex-shrink: 0; }
+.ct .lp-ic { flex-shrink: 0; }
 .ct-orn { fill: var(--a); flex-shrink: 0; }
 .ct-h2 { font-family: var(--serif); font-size: clamp(1.95rem, 4.2cqi, 2.9rem); line-height: 1.12; font-weight: 700; color: var(--ink); margin: 16px 0 16px; letter-spacing: -0.015em; text-wrap: balance; }
 .ct-lead { font-size: 1.06rem; color: var(--ink-2); margin: 0 0 26px; white-space: pre-line; text-wrap: pretty; }
@@ -770,9 +664,11 @@ const CSS = `
 .ct-brand img { height: 46px; width: auto; object-fit: contain; }
 .ct-mark { width: 44px; height: 44px; border-radius: 50% 50% 12px 12px; display: grid; place-items: center; background: var(--p); color: var(--p-on);
   font-family: var(--serif); font-size: 23px; font-weight: 800; flex-shrink: 0; box-shadow: inset 0 0 0 3px var(--paper), 0 0 0 1.5px var(--p); }
-.ct-brand-name { font-family: var(--serif); font-size: 21px; font-weight: 700; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: -.01em; }
+/* long names ("Trung tâm Anh ngữ …") wrap to two lines rather than being cut off */
+.ct-brand-name { font-family: var(--serif); font-size: 21px; font-weight: 700; color: var(--ink); line-height: 1.15; max-width: 250px; letter-spacing: -.01em;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; text-wrap: balance; }
 .ct-nav { display: flex; gap: 2px; margin-left: auto; }
-.ct-nav a { padding: 8px 14px; font-weight: 600; font-size: 14.5px; color: var(--ink-2); position: relative; transition: color .15s ease; }
+.ct-nav a { padding: 8px 14px; white-space: nowrap; font-weight: 600; font-size: 14.5px; color: var(--ink-2); position: relative; transition: color .15s ease; }
 .ct-nav a::after { content: ''; position: absolute; left: 50%; bottom: 2px; width: 5px; height: 5px; background: var(--a); transform: translateX(-50%) rotate(45deg) scale(0); transition: transform .25s var(--ease); }
 .ct-header-actions { display: flex; align-items: center; gap: 10px; }
 .ct-login { position: relative; }
@@ -996,7 +892,7 @@ const CSS = `
 .ct-footer-grid { display: grid; grid-template-columns: 1.6fr 1fr 1fr 1.3fr; gap: 44px; padding-bottom: 56px; }
 .ct-footer h4 { color: #fff; font-family: var(--serif); font-size: 1.18rem; margin: 6px 0 18px; }
 .ct-footer-grid > div > a, .ct-footer-grid > div > span { display: flex; align-items: flex-start; gap: 8px; padding: 5px 0; font-size: 14.5px; color: rgba(255,255,255,.68); transition: color .15s ease; }
-.ct-footer-grid .ct-ic { margin-top: 4px; color: var(--a); }
+.ct-footer-grid .lp-ic { margin-top: 4px; color: var(--a); }
 .ct-brand-footer { margin-bottom: 18px; }
 .ct-brand-footer .ct-brand-name { color: #fff; }
 .ct-brand-footer .ct-mark { box-shadow: inset 0 0 0 3px var(--ink), 0 0 0 1.5px var(--p); }
@@ -1041,6 +937,15 @@ const CSS = `
 }
 
 /* Tablet */
+@container (max-width: 1240px) {
+  .ct-nav a { padding: 8px 10px; font-size: 14px; }
+}
+/* the menu moves into the burger a little early, so long school names never get cut */
+@container (max-width: 1120px) {
+  .ct-nav { display: none; }
+  .ct-burger { display: inline-grid; place-items: center; }
+  .ct-header-actions { margin-left: auto; }
+}
 @container (max-width: 1020px) {
   .ct-nav, .ct-hide-sm { display: none; }
   .ct-burger { display: inline-grid; place-items: center; }
@@ -1055,6 +960,8 @@ const CSS = `
 }
 /* Phone */
 @container (max-width: 760px) {
+  .ct-login { display: none; }   /* phone: the burger menu has all three logins — the name gets the room */
+  .ct-brand-name { max-width: none; }
   .ct-wrap { padding: 0 20px; }
   .ct-section { padding: 72px 0; }
   .ct-section + .ct-section::before, .ct-stats + .ct-section::before { width: calc(100% - 40px); }
