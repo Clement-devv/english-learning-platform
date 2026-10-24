@@ -14,7 +14,7 @@ import {
   SPEED, VIEW_DIST, STEER_SPEED, START_SQUAD, ENEMY_CAP, COMBO_WINDOW, WEAPONS,
   MAX_SHOOTERS, AIM_ASSIST, BASE_POWER, SPECIES, CHAPTER_HP, SWARM_BOOST_PER_WRONG, SWARM_BOOST_MAX, MINI_BOSS, CRATE,
   BOSS_RADIUS, ROAD_HALF, MAX_SQUAD, HOMING, TARGET_CONE, PICKUP, REVIVE_SQUAD,
-  SPEED_PER_RIGHT, SPEED_MAX, WRONG_SWARM, SHOOTERS, FIRST_GATE_REWARD, STARTER_SAFE_GATES, BUILD_UP_GATES,
+  SPEED_PER_RIGHT, SPEED_MAX, WRONG_SWARM, SHOOTERS, FLYERS, FIRST_GATE_REWARD, STARTER_SAFE_GATES, BUILD_UP_GATES,
 } from './config.js';
 import { createRng } from './rng.js';
 import { buildChapterPlan, choicesForGate } from './chapters.js';
@@ -22,6 +22,7 @@ import { formation, squadRadius, clampSquadX, laneIndex, dodgeReach } from './sq
 import { applyReward, rollReward, effectiveReward } from './rewards.js';
 import { createRoad } from './road.js';
 import { createBoss } from './boss.js';
+import { createFlyers } from './flyer.js';
 
 const TRICKLE_EVERY = [1.5, 1.25, 1.05];
 const SPECIES_MIX = [
@@ -54,7 +55,7 @@ export function createWorld({ chapter = 0, seed = 1, gates = [], answer, device 
     speedMul: 1,     // grows with every right answer
     shots: [],       // goo spat by shooting bugs
     shootersSeen: false,
-    stats: { bugsPopped: 0, combo: 0, bestCombo: 0, lastKillT: -9, right: 0, wrong: 0, answered: 0, bossBeaten: false, coins: 0, spells: 0, bossHits: 0 },
+    stats: { bugsPopped: 0, combo: 0, bestCombo: 0, lastKillT: -9, right: 0, wrong: 0, answered: 0, bossBeaten: false, coins: 0, spells: 0, bossHits: 0, flyersBeaten: 0 },
     reviveUsed: false, revived: null, downFrom: null,
     review: [], results: [],
     events: [],
@@ -158,6 +159,7 @@ export function createWorld({ chapter = 0, seed = 1, gates = [], answer, device 
       else if (ev.type === 'swarm') spawnSwarm(ev.size * (1 + w.swarmBoost));
       else if (ev.type === 'crates') spawnCrates();
       else if (ev.type === 'boss') boss.spawn();
+      else if (ev.type === 'flyer') flyers.spawn(ev.level);
       else road.spawn(ev);
     }
   }
@@ -180,6 +182,7 @@ export function createWorld({ chapter = 0, seed = 1, gates = [], answer, device 
   }
   function damage(target, amount, kind, hitX = target.x) {
     if (target.dead || amount <= 0) return;
+    if (target === w.flyer) { flyers.hurt(amount); return; }
     if (target === w.boss) {
       const { m, weak } = boss.damageMult(hitX);
       target.hp -= amount * m;
@@ -209,6 +212,7 @@ export function createWorld({ chapter = 0, seed = 1, gates = [], answer, device 
     }
     for (const c of w.crates) if (!c.dead && Math.hypot(c.x - x, c.z - z) < radius + c.r) damage(c, dmg, 'splash');
     if (w.boss && w.boss.state === 'fight' && Math.abs(w.boss.x - x) < BOSS_RADIUS + radius && z >= w.boss.z - 0.5) damage(w.boss, dmg, 'splash', x);
+    if (flyerOpen() && Math.abs(w.flyer.x - x) < flyerRadius() + radius && z >= w.flyer.z - 0.6) damage(w.flyer, dmg, 'splash', x);
   }
 
   // ── Targets ────────────────────────────────────────────────────────────────
@@ -228,6 +232,7 @@ export function createWorld({ chapter = 0, seed = 1, gates = [], answer, device 
       const score = rz + Math.abs(c.x - sx) * 1.5;
       if (score < bestRz) { bestRz = score; best = c; }
     }
+    if (!best && flyerOpen() && Math.abs(w.flyer.x - sx) < TARGET_CONE + 0.4) best = w.flyer;
     if (!best && w.boss && w.boss.state === 'fight') best = w.boss;
     return best;
   }
@@ -245,9 +250,13 @@ export function createWorld({ chapter = 0, seed = 1, gates = [], answer, device 
     for (const c of w.crates) consider(c);
     found.sort((a, b) => a.score - b.score);
     const list = found.slice(0, k).map((f) => f.t);
+    if (flyerOpen() && Math.abs(w.flyer.x - sx) < TARGET_CONE + 0.4 && list.length < k) list.push(w.flyer);
     if (!list.length && w.boss && w.boss.state === 'fight') list.push(w.boss);
     return list;
   }
+  const flyerOpen = () => !!(w.flyer && w.flyer.state === 'fight');
+  const flyerRadius = () => FLYERS.radius * (w.flyer ? FLYERS[w.flyer.level].scale : 1);
+
   /** Firepower: a small squad still fights like a few extra soldiers, so one mistake isn't the end. */
   const power = (count) => (count > 0 ? (count + BASE_POWER) * (w.squad.frenzyT > 0 ? PICKUP.frenzyBoost : 1) : 0);
 
@@ -273,6 +282,7 @@ export function createWorld({ chapter = 0, seed = 1, gates = [], answer, device 
         if (!c.dead && rz > 0 && rz < wp.range && Math.abs(c.x - w.beam.x) < half + c.r) damage(c, dmg, 'beam');
       }
       if (w.boss && w.boss.state === 'fight' && Math.abs(w.boss.x - w.beam.x) < BOSS_RADIUS) damage(w.boss, dmg, 'beam', w.beam.x);
+      if (flyerOpen() && Math.abs(w.flyer.x - w.beam.x) < flyerRadius() && w.flyer.z - w.dist < wp.range + 0.3) damage(w.flyer, dmg, 'beam', w.beam.x);
       beamHitT -= dt;
       if (beamHitT <= 0 && target) { beamHitT = 0.12; emit({ type: 'hit', x: target.x, z: target.z, beam: true }); }
       return;
@@ -327,6 +337,7 @@ export function createWorld({ chapter = 0, seed = 1, gates = [], answer, device 
           if (!c.dead && Math.abs(c.x - b.x) < c.r + 0.05 && Math.abs(c.z - b.z) < c.r + 0.15) { hit = c; break; }
         }
       }
+      if (!hit && flyerOpen() && Math.abs(w.flyer.x - b.x) < flyerRadius() && b.z >= w.flyer.z - 0.3) hit = w.flyer;
       if (!hit && w.boss && w.boss.state === 'fight' && Math.abs(w.boss.x - b.x) < BOSS_RADIUS && b.z >= w.boss.z - 0.3) hit = w.boss;
       if (hit) {
         b.dead = true;
@@ -480,8 +491,9 @@ export function createWorld({ chapter = 0, seed = 1, gates = [], answer, device 
     }
   }
 
-  // ── Road challenges and the boss ────────────────────────────────────────
+  // ── Road challenges, flying bombers and the boss ─────────────────────────
   const road = createRoad({ w, rng, emit, newId, loseSoldiers, chapter });
+  const flyers = createFlyers({ w, rng, emit, newId, loseSoldiers, spawnBug, chapter });
   const boss = createBoss({
     w, rng, emit, newId, loseSoldiers, spawnBug, kill, plan, chapter,
     spawnBossGate: (z) => {
@@ -505,6 +517,7 @@ export function createWorld({ chapter = 0, seed = 1, gates = [], answer, device 
     for (const e of w.enemies) if (!e.dead && e.z - w.dist < 4) kill(e, { counted: false });
     w.telegraphs = [];
     w.shots.length = 0;
+    w.bombs = [];
     emit({ type: 'revived', count: REVIVE_SQUAD });
   };
 
@@ -526,6 +539,7 @@ export function createWorld({ chapter = 0, seed = 1, gates = [], answer, device 
     runPlan();
     trickle(dt);
     road.update(dt);
+    flyers.update(dt);
     moveEnemies(dt);
     moveShots(dt);
     moveCrates(dt);
@@ -568,6 +582,7 @@ export function createWorld({ chapter = 0, seed = 1, gates = [], answer, device 
     topSpeed: Math.round(w.speedMul * 100) / 100,
     coins: w.stats.coins,
     spells: w.stats.spells,
+    flyersBeaten: w.stats.flyersBeaten,
     revived: w.revived,
     review: w.review.slice(),
     results: w.results.slice(),

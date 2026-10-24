@@ -659,6 +659,69 @@ const REX = {
   },
 };
 
+// ── Flying bombers (original design: a round goggled bug with a bomb hatch) ─
+const BOMBER = {
+  bomberWing: {
+    w: 150, h: 90,
+    draw(ctx) {
+      ell(ctx, 78, 45, 68, 34, -0.25);
+      fillStroke(ctx, lin(ctx, 10, 10, 140, 80, [[0, 'rgba(230,250,255,0.9)'], [1, 'rgba(150,220,255,0.55)']]), 4);
+      ctx.beginPath(); ctx.moveTo(140, 60); ctx.quadraticCurveTo(80, 40, 30, 30); ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(42,31,69,0.35)'; ctx.stroke();
+    },
+  },
+  bomberBody: {
+    w: 220, h: 200,
+    draw(ctx) {
+      // striped round body
+      ell(ctx, 110, 112, 88, 76);
+      ctx.save(); ctx.clip();
+      ctx.fillStyle = rad(ctx, 110, 112, 8, 92, [[0, '#a7f3d0'], [1, '#14b8a6']], -24, -24); ctx.fillRect(10, 30, 200, 170);
+      ctx.fillStyle = 'rgba(255,209,102,0.95)';
+      for (const y of [92, 132]) ctx.fillRect(10, y, 200, 18);
+      ctx.restore();
+      ell(ctx, 110, 112, 88, 76); ctx.lineWidth = 6; ctx.strokeStyle = INK; ctx.stroke();
+      // bomb hatch underneath
+      rr(ctx, 80, 172, 60, 20, 10); fillStroke(ctx, '#475569', 4);
+      // goggles
+      rr(ctx, 46, 54, 128, 24, 12); fillStroke(ctx, '#334155', 4);
+      for (const s of [-1, 1]) {
+        ell(ctx, 110 + s * 30, 70, 25, 25); fillStroke(ctx, rad(ctx, 110 + s * 30, 70, 2, 26, [[0, '#e0f2fe'], [1, '#7dd3fc']], -6, -6), 5);
+        ell(ctx, 110 + s * 28, 74, 9, 11); ctx.fillStyle = INK; ctx.fill();
+        ell(ctx, 110 + s * 24, 68, 4, 4); ctx.fillStyle = '#fff'; ctx.fill();
+      }
+      // grin
+      ctx.beginPath(); ctx.moveTo(86, 108); ctx.quadraticCurveTo(110, 126, 134, 108); ctx.lineWidth = 5; ctx.strokeStyle = INK; ctx.lineCap = 'round'; ctx.stroke();
+      // antennae
+      for (const s of [-1, 1]) {
+        ctx.beginPath(); ctx.moveTo(110 + s * 20, 40); ctx.quadraticCurveTo(110 + s * 34, 8, 110 + s * 52, 12); ctx.lineWidth = 5; ctx.strokeStyle = INK; ctx.stroke();
+        ell(ctx, 110 + s * 52, 12, 9, 9); fillStroke(ctx, '#ff5d8f', 4);
+      }
+      shine(ctx, 70, 92, 16, 8, 0.45);
+      rim(ctx, 110, 112, 80, 70, -2.8, -1.8, 5, 0.55);
+    },
+  },
+  bomberHelmet: {
+    w: 170, h: 70,
+    draw(ctx) {
+      // the big one wears a spiky candy helmet
+      ctx.beginPath(); ctx.moveTo(10, 66); ctx.quadraticCurveTo(85, -10, 160, 66); ctx.closePath();
+      fillStroke(ctx, lin(ctx, 0, 0, 0, 66, [[0, '#fecaca'], [1, '#e11d48']]), 5);
+      for (const x of [40, 85, 130]) { star(ctx, x, x === 85 ? 18 : 32, 12, 5); fillStroke(ctx, '#ffd166', 3); }
+    },
+  },
+  bomb: {
+    w: 50, h: 56,
+    draw(ctx) {
+      ell(ctx, 25, 32, 21, 21); fillStroke(ctx, rad(ctx, 25, 32, 2, 22, [[0, '#fbcfe8'], [1, '#db2777']], -7, -7), 3.5);
+      for (const [x, y, c] of [[17, 36, '#ffffff'], [31, 26, '#ffd166'], [30, 40, '#4cc9f0']]) { ell(ctx, x, y, 3, 3); ctx.fillStyle = c; ctx.fill(); }
+      rr(ctx, 19, 7, 12, 8, 3); fillStroke(ctx, '#475569', 2.5);
+      ctx.beginPath(); ctx.moveTo(25, 7); ctx.quadraticCurveTo(30, 0, 36, 3); ctx.lineWidth = 3; ctx.strokeStyle = '#a16207'; ctx.stroke();
+      star(ctx, 38, 3, 5, 2, 6); ctx.fillStyle = '#ffd166'; ctx.fill();
+      shine(ctx, 18, 24, 5, 3, 0.8);
+    },
+  },
+};
+
 // ── Catalogue ────────────────────────────────────────────────────────────────
 export const WEAPON_KEYS = Object.keys(SUITS);
 export const SPECIES_KEYS = ['beetle', 'bee', 'snail', 'spiderbot'];
@@ -681,5 +744,5 @@ export function mainArt() {
 }
 /** Bosses + arch (big pieces) go in their own atlas */
 export function bigArt() {
-  return { ...ARCH, ...QUEEN, ...BONGO, ...REX };
+  return { ...ARCH, ...QUEEN, ...BONGO, ...REX, ...BOMBER };
 }

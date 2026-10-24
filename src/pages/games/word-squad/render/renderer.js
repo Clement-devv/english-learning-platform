@@ -11,6 +11,7 @@ import { createParticles } from './particles.js';
 import { createGateView } from './gateView.js';
 import { createBossView } from './bossView.js';
 import { createRoadView } from './roadView.js';
+import { createFlyerView } from './flyerView.js';
 import { BUG_EYES, CANDY_COLORS } from './art.js';
 
 const FONT = 'Nunito';
@@ -246,6 +247,7 @@ export async function createRenderer({ host, device, reducedMotion }) {
     (v) => v.destroy(),
   );
 
+  const flyerView = createFlyerView({ atlas, world, labels, ground: shadows, proj: (x, rz) => project(x, rz, W), sprite, shadowOf, releaseShadow });
   const roadView = createRoadView({ world, labels, particles, keyed, sprite, shadowOf, releaseShadow, fade, proj: (x, rz) => project(x, rz, W) });
 
   // Squad: a fixed set of soldier sprites
@@ -491,6 +493,8 @@ export async function createRenderer({ host, device, reducedMotion }) {
     bullets.sweep();
 
     roadView.draw(w, t, dt, view);
+    flyerView.draw(w, t);
+    view.flyerScreen = flyerView.screen();
 
     // gates
     const active = w.activeGate();
@@ -603,7 +607,7 @@ export async function createRenderer({ host, device, reducedMotion }) {
     },
     render() { app.renderer.render(app.stage); },
     destroy() {
-      bugs.clear(); crates.clear(); bullets.clear(); gates.clear(); roadView.destroy();
+      bugs.clear(); crates.clear(); bullets.clear(); gates.clear(); roadView.destroy(); flyerView.destroy();
       bossView?.destroy();
       atlas.destroy();
       for (const n of ['WSNum', 'WSComic', 'WSDark']) { try { BitmapFont.uninstall(n); } catch { /* ignore */ } }

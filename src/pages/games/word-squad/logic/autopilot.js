@@ -22,6 +22,7 @@ export function autopilot(world, pickChoice, { dodge = true } = {}) {
   else if (nextLetter) x = laneCenter(nextLetter.lane, 3);
   else if (g) x = laneCenter(Math.max(0, pickChoice(g)), g.n);
   else if (w.boss?.weak) x = w.boss.weak.x;
+  else if (w.flyer && w.flyer.state === 'fight') x = w.flyer.x; // get under the bomber to shoot it
   else {
     // Line up with the bugs that are closest — the squad only shoots what is in front
     let sum = 0, wsum = 0;
@@ -54,6 +55,8 @@ export function autopilot(world, pickChoice, { dodge = true } = {}) {
       danger.push([ox - o.r - pad, ox + o.r + pad]);
     }
   }
+  // Bombs: their landing spots glow on the road
+  for (const b of w.bombs || []) danger.push([b.x - b.r - bossPad, b.x + b.r + bossPad]);
   // Goo spat by shooting bugs: where will it cross our row?
   for (const p of w.shots || []) {
     const rz = p.z - w.dist;

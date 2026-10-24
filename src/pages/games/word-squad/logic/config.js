@@ -110,3 +110,16 @@ export const SHOOTERS = {
   range: [1.6, 9],       // only bugs this far ahead shoot (beyond the squad's reach, so they get a shot off)
   hitSoldiers: 1,
 };
+
+// ── Flying bomber bosses (twice per chapter, before the chapter boss) ───────
+// A flying bug hovers ahead and drops candy bombs: each bomb's landing spot
+// glows on the road while it falls, so the squad can step aside.
+export const FLYERS = {
+  mini: { name: 'Buzz Bomber', hp: 650, hitSoldiers: 1, bombEvery: 2.0, bombs: 1, helpers: 0, reward: { type: 'friends', amount: 6 }, coins: 4, scale: 1 },
+  big:  { name: 'Mega Buzz Bomber', hp: 1400, hitSoldiers: 2, bombEvery: 2.4, bombs: 3, helpers: 6, reward: { type: 'double' }, coins: 8, scale: 1.45 },
+  holdZ: 4.3,          // hovers this far ahead (inside every weapon's reach)
+  radius: 0.65,        // how wide it is for bullets
+  bombFall: 1.1,       // seconds a bomb is in the air
+  bombRadius: 0.36,
+  leaveAfter: 32,      // seconds before an undefeated bomber flies away
+};

@@ -38,14 +38,20 @@ export function buildChapterPlan(chapter) {
   // Between gates: something to do every few seconds — a coin trail, obstacles,
   // a word to spell, a power-up orb. Spelling goes in the 2nd and 2nd-to-last gaps.
   const spellGaps = [1, G - 2];
+  // Two flying bombers before the chapter boss: a mini one about a third in, a big one about two thirds in
+  const miniGap = Math.max(2, Math.floor(G / 3));
+  const bigGap = Math.max(miniGap + 2, Math.floor((2 * G) / 3));
+  events.push({ type: 'flyer', level: 'mini', at: gateZ(miniGap) + gap * 0.2 });
+  events.push({ type: 'flyer', level: 'big', at: gateZ(bigGap) + gap * 0.2 });
+  const busy = (i) => i === miniGap || i === bigGap; // lighter road while a bomber is overhead
   const at = (z) => Math.max(0, z - VIEW_DIST);
   events.push({ type: 'pickups', z: 2, at: 0 }); // a friend bubble right away, so the lone soldier has company
   for (let i = 0; i < G - 1; i++) {
     const g0 = gateZ(i);
     events.push({ type: 'pickups', z: g0 + gap * 0.18, at: at(g0 + gap * 0.18) });
-    events.push({ type: 'obstacles', pattern: i % 2 ? 'wall' : 'spinners', z: g0 + gap * 0.34, at: at(g0 + gap * 0.34) });
+    if (!busy(i)) events.push({ type: 'obstacles', pattern: i % 2 ? 'wall' : 'spinners', z: g0 + gap * 0.34, at: at(g0 + gap * 0.34) });
     if (spellGaps.includes(i)) events.push({ type: 'spell', z: g0 + gap * 0.56, at: at(g0 + gap * 0.56) });
-    else events.push({ type: 'obstacles', pattern: i % 2 ? 'spinners' : 'wall', z: g0 + gap * 0.66, at: at(g0 + gap * 0.66) });
+    else if (!busy(i)) events.push({ type: 'obstacles', pattern: i % 2 ? 'spinners' : 'wall', z: g0 + gap * 0.66, at: at(g0 + gap * 0.66) });
     if (i % 3 === 1 || i === G - 2) events.push({ type: 'powerup', z: g0 + gap * 0.88, at: at(g0 + gap * 0.88) });
   }
 

@@ -42,7 +42,7 @@ export function createFx(R, { reducedMotion, onStars }) {
   let starPop = 0;
   let comboT = 0;
   let bannerT = 0;
-  const starTarget = () => ({ x: R.W - 96, y: R.top + 205 }); // below the question strip, even when it wraps
+  const starTarget = () => ({ x: 44, y: R.top + 120 }); // top-left, clear of boss names and the question
   function layoutHud() {
     const t = starTarget();
     starIcon.position.set(t.x, t.y);
@@ -51,8 +51,8 @@ export function createFx(R, { reducedMotion, onStars }) {
     coinIcon.position.set(t.x, t.y + 46);
     coinIcon.scale.set(coinArt.inv * 1.1 * (1 + coinPop * 0.4));
     coinText.position.set(t.x + 26, t.y + 48);
-    comboText.anchor.set(0, 0.5);
-    comboText.position.set(24, R.top + 205);
+    comboText.anchor.set(1, 0.5);
+    comboText.position.set(R.W - 20, R.top + 130);
     banner.position.set(R.W / 2, R.top + 300);
   }
   function addStars(n) {
@@ -266,7 +266,7 @@ export function createFx(R, { reducedMotion, onStars }) {
         case 'shieldDown': sfx.shatter(); break;
         case 'bossEnrage': showBanner(e.phase >= 2 ? 'BOSS IS FURIOUS!' : 'BOSS IS ANGRY!', 1.6, 0xff8fab); sfx.roar(); kick(10); break;
         case 'bump': { const p = at(e.x, e.z, w, 30); say('BONK!', p.x, p.y - 30, { size: 0.9, color: 0xffb3c6, life: 0.7 }); sfx.bonk(); break; }
-        case 'dodge': if (['drum', 'goo', 'sting', 'stomp', 'gumball', 'spit'].includes(e.kind) && Math.random() < (e.kind === 'spit' ? 0.4 : 1)) { const p = squadPos(w); say('DODGED!', p.x, p.y - 20, { size: 0.8, color: 0x9be7ff, life: 0.7 }); } break;
+        case 'dodge': if (['drum', 'goo', 'sting', 'stomp', 'gumball', 'spit', 'bomb'].includes(e.kind) && Math.random() < (e.kind === 'spit' ? 0.4 : 1)) { const p = squadPos(w); say('DODGED!', p.x, p.y - 20, { size: 0.8, color: 0x9be7ff, life: 0.7 }); } break;
         case 'coin': { const p = at(e.x, e.z, w, 40); const t = starTarget(); P.emit('coin', p.x, p.y, { life: 0.55, scale: p.s, scaleTo: 0.8, alpha: 1, alphaTo: 1, target: { x: t.x, y: t.y + 46, onArrive: () => { coins += 1; coinText.text = String(coins); coinPop = 1; } } }); sfx.coin(); break; }
         case 'pickup': {
           const p = at(e.x, e.z, w, 40);
@@ -285,6 +285,28 @@ export function createFx(R, { reducedMotion, onStars }) {
           else showBanner('ALMOST! NEXT TIME', 1.2, 0xffffff);
           break;
         case 'down': sfx.lose(); break;
+        case 'flyerSpawn': showBanner(e.level === 'big' ? 'BIG BOSS: MEGA BUZZ BOMBER!' : 'MINI BOSS: BUZZ BOMBER!', 2.2, e.level === 'big' ? 0xff8fab : 0xbef264); sfx.roar(); kick(6); break;
+        case 'bombDrop': sfx.whistle(); break;
+        case 'bombLand': {
+          const q = R.proj(e.x, e.z - w.dist);
+          blast(q.x, q.y - 10 * q.s, Math.max(0.6, q.s) * (e.big ? 1.2 : 1));
+          burst(q.x, q.y - 20 * q.s, Math.max(0.7, q.s), { n: 14, colors: [0xff4fa3, 0xffd166, 0x4cc9f0, 0xffffff] });
+          sfx.boom(e.big); kick(e.hit ? 12 : 5);
+          break;
+        }
+        case 'flyerHelpers': showBanner('HELPER BUGS!', 1.2, 0xbef264); break;
+        case 'flyerEscape': showBanner('IT FLEW AWAY!', 1.4, 0xffffff); break;
+        case 'flyerDefeated': {
+          const b = view.flyerScreen || { x: R.W / 2, y: 400, s: 1 };
+          for (let i = 0; i < 4; i++) after(i * 0.18, () => { blast(b.x + rnd(-60, 60) * b.s, b.y + rnd(-50, 50) * b.s, Math.max(0.7, b.s), true); sfx.boom(true); });
+          say(`${rewardLabel(e.reward, null).toUpperCase()}!`, b.x, b.y - 60, { size: 1.1, life: 1.4, rise: 90 });
+          showBanner(e.level === 'big' ? 'BIG BOSS DOWN!' : 'MINI BOSS DOWN!', 1.8, 0xffd166);
+          starShower(b.x, b.y, 10, 0);
+          if (!reducedMotion) zoom = 0.06;
+          kick(14);
+          try { navigator.vibrate?.(60); } catch { /* not supported */ }
+          break;
+        }
         case 'speedUp': { const p = squadPos(w); say('FASTER!', p.x, p.y - 60, { size: 0.9, color: 0x9be7ff, life: 0.9, rise: 80 }); sfx.whoosh(); break; }
         case 'shootersArrive': showBanner('BUGS ARE SHOOTING! DODGE!', 2, 0xbef264); sfx.roar(); kick(8); break;
         case 'enemyShot': { const p = at(e.x, e.z, w, 40); P.emit('glow', p.x, p.y, { scale: 0.5 * p.s, scaleTo: 1.4 * p.s, life: 0.2, tint: 0xbef264, blend: 'add' }); sfx.spit(); break; }

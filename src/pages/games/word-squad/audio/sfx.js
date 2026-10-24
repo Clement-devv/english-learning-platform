@@ -144,6 +144,10 @@ export const sfx = {
     if (!ready('lose')) return;
     [392, 330, 262, 196].forEach((f, i) => tone({ type: 'triangle', from: f, dur: 0.3, vol: 0.18, at: i * 0.22 }));
   },
+  whistle() {
+    if (!ready('whistle', 300)) return;
+    tone({ type: 'sine', from: 1600, to: 500, dur: 0.9, vol: 0.06 });
+  },
   spit() {
     if (!ready('spit', 90)) return;
     noise({ dur: 0.18, vol: 0.14, freq: 700, sweepTo: 300, type: 'bandpass', q: 3 });
