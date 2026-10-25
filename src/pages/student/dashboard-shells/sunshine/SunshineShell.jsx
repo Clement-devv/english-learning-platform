@@ -19,6 +19,7 @@ import {
   Moon, Sun, Shield, KeyRound, PhoneMissed, X, Radio, Target,
   LayoutGrid,
 } from "lucide-react";
+import { Gamepad2 } from "lucide-react";
 import { useTranslation }        from "react-i18next";
 import { useBranding }           from "../../../../context/BrandingContext";
 import { getDashboardThemeById } from "../../../../data/dashboardThemes";
@@ -36,7 +37,7 @@ import StreakWidget        from "../../components/StreakWidget";
 import { useDashboardData, BADGE_DEFINITIONS } from "../useDashboardData";
 import DashboardAlertsBar from "../../../../components/DashboardAlertsBar";
 // Tabs load on demand (see src/pages/student/tabs/lazyTabs.js)
-import { ChangePassword, StudentCompletedTab, StudentScheduleTab, StudentHomeworkTab, StudentQuizTab, PronunciationTab, ConversationTab, FlashcardsTab, RecordingsTab, ReviewsTab, ReferralTab, LeaderboardTab, MessagesTab, Classroom } from "../../tabs/lazyTabs";
+import { ChangePassword, StudentCompletedTab, StudentScheduleTab, StudentHomeworkTab, StudentQuizTab, PronunciationTab, ConversationTab, FlashcardsTab, RecordingsTab, ReviewsTab, ReferralTab, LeaderboardTab, WordSquadTab, MessagesTab, Classroom } from "../../tabs/lazyTabs";
 import { dateLocale } from "../../../../i18n/dateLocale.js";
 import { adminAccent, adminOnAccent } from "../../../../utils/adminAccent";
 import { DoodleBackdrop, DoodleSunset, DoodleBannerArt } from "../../../../components/dashboard/DoodleArt";
@@ -81,6 +82,7 @@ const NAV_GROUPS = [
       { key: "badges",       icon: "🏅", labelKey: "nav.badges",       lucide: Award      },
       { key: "certificates", icon: "🎓", labelKey: "nav.certificates", lucide: Award      },
       { key: "leaderboard",  icon: "🏆", labelKey: "nav.leaderboard",  lucide: Award      },
+      { key: "games",        icon: "🎮", labelKey: "nav.wordSquad",    lucide: Gamepad2   },
     ],
   },
   {
@@ -850,6 +852,7 @@ export default function SunshineShell() {
           {d.activeTab === "recordings"  && <RecordingsTab  isDarkMode={d.isDarkMode} />}
           {d.activeTab === "reviews"     && <ReviewsTab     isDarkMode={d.isDarkMode} />}
           {d.activeTab === "referral"    && <ReferralTab    isDarkMode={d.isDarkMode} />}
+          {d.activeTab === "games" && <WordSquadTab isDarkMode={d.isDarkMode} />}
           {d.activeTab === "leaderboard" && (
             <div style={{ background: col.card, border: `1px solid ${col.border}`, borderRadius: "24px", padding: "24px" }}>
               <LeaderboardTab isDarkMode={d.isDarkMode} />

@@ -18,6 +18,7 @@ const PaymentTab          = lazyTab(() => import('../tabs/PaymentTab'));
 const HomeworkTab         = lazyTab(() => import('../tabs/HomeworkTab'));
 const QuizTab             = lazyTab(() => import('../tabs/QuizTab'));
 const VocabTab            = lazyTab(() => import('../tabs/VocabTab'));
+const WordSquadTab        = lazyTab(() => import('../tabs/WordSquadTab'));
 const RecordingsTab       = lazyTab(() => import('../tabs/RecordingsTab'));
 const ReviewsTab          = lazyTab(() => import('../tabs/ReviewsTab'));
 const RatingDashboardTab  = lazyTab(() => import('../tabs/RatingDashboardTab'));
@@ -185,6 +186,15 @@ export default function TeacherTabContent({ d, wrapStyle = {}, msgStyle = {}, ms
     return (
       <div style={wrapStyle}>
         <VocabTab teacherInfo={d.teacherInfo} students={d.students} isDarkMode={isDarkMode} />
+      </div>
+    );
+  }
+
+  // ── WORD SQUAD (game question sets) ───────────────────────────────────────
+  if (activeTab === 'games') {
+    return (
+      <div style={wrapStyle}>
+        <WordSquadTab isDarkMode={isDarkMode} />
       </div>
     );
   }

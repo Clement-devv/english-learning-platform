@@ -16,6 +16,7 @@ export const RecordingsTab       = lazyTab(() => import('./RecordingsTab'));
 export const ReviewsTab          = lazyTab(() => import('./ReviewsTab'));
 export const ReferralTab         = lazyTab(() => import('./ReferralTab'));
 export const LeaderboardTab      = lazyTab(() => import('./LeaderboardTab'));
+export const WordSquadTab        = lazyTab(() => import('./WordSquadTab'));
 export const BookingCalendarTab  = lazyTab(() => import('./BookingCalendarTab'));
 export const ClassReportsTab     = lazyTab(() => import('./ClassReportsTab'));
 export const ChangePassword      = lazyTab(() => import('../../../components/student/auth/ChangePassword'));
@@ -25,7 +26,7 @@ export const ChangePassword      = lazyTab(() => import('../../../components/stu
 preloadWhenIdle([
   StudentScheduleTab, StudentHomeworkTab, StudentQuizTab, StudentCompletedTab,
   PronunciationTab, ConversationTab, FlashcardsTab, RecordingsTab,
-  ReviewsTab, ReferralTab, LeaderboardTab, BookingCalendarTab, ClassReportsTab,
+  ReviewsTab, ReferralTab, LeaderboardTab, BookingCalendarTab, ClassReportsTab, WordSquadTab,
 ]);
 
 // Not tabs, but only needed once the student opens Messages / joins a class.

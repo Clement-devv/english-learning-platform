@@ -8,9 +8,10 @@
 //   POST /word-squad/sessions               { assignmentId, chapter } → gates without answers
 //   POST /word-squad/sessions/:id/answer    { gateId, choice } → { correct, correctAnswer }
 //   POST /word-squad/sessions/:id/finish    { won, bugsPopped, … } → stars, rating, review
+// Teachers and admins manage question sets and assignments further down.
 import express from "express";
 import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
-import { verifyToken, verifyStudent } from "../middleware/authMiddleware.js";
+import { verifyToken, verifyStudent, verifyAdminOrTeacher } from "../middleware/authMiddleware.js";
 import { gameLimiter } from "../middleware/rateLimiter.js";
 import { validateObjectId } from "../middleware/validateObjectId.js";
 import { questionSetSchema } from "../schemas/questionSetSchema.js";
@@ -20,10 +21,12 @@ import { gameProgressSchema } from "../schemas/gameProgressSchema.js";
 import { starLedgerSchema } from "../schemas/starLedgerSchema.js";
 import { groupClassSchema } from "../schemas/groupClassSchema.js";
 import { studentSchema } from "../schemas/studentSchema.js";
+import { assignmentSchema } from "../schemas/assignmentSchema.js";
 import {
   CHAPTER_GATES, CHAPTER_COUNT, MIN_ANSWER_GAP_MS, SESSION_TTL_MS,
   choicesForGate, createRng, shuffle, rollReward, computeStars, chapterRating,
 } from "../utils/wordSquadRules.js";
+import { LIMITS, LEVELS, normalizeQuestion, questionErrors, publishErrors } from "../utils/questionRules.js";
 import { recordActivity } from "../utils/streakService.js";
 import { ok, created, badRequest, forbidden, notFound, conflict, serverError } from "../utils/apiResponse.js";
 import { toObjectId, toInt, toStr } from "../utils/inputSanitizer.js";
@@ -301,6 +304,242 @@ router.post("/word-squad/sessions/:id/finish", validateObjectId("id"), ...studen
   } catch (err) {
     return fail(res, err, "finish");
   }
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Teachers and admins: question sets and assignments
+//   GET/POST       /sets                 list (teacher: own, admin: all) / create a draft
+//   GET/PUT/DELETE /sets/:id             one set with answers / save / delete
+//   POST           /sets/:id/publish     checks it, then students can be given it
+//   POST           /sets/:id/unpublish   back to draft
+//   POST           /sets/:id/duplicate   a draft copy
+//   GET            /targets              group classes and students this person may assign to
+//   GET/POST       /assignments          list / give a published set to classes or students
+//   PATCH          /assignments/:id      stop / restart, due date, plays per day
+// ═════════════════════════════════════════════════════════════════════════════
+const staff = [verifyToken, verifyAdminOrTeacher];
+const who = (req) => (req.admin ? { role: "admin", id: req.admin._id || null } : { role: "teacher", id: req.teacher._id });
+const isAdmin = (req) => !!req.admin;
+/** Teachers only see and change their own sets and assignments; admins see the whole center */
+const mine = (req) => (isAdmin(req) ? {} : { "createdBy.id": req.teacher._id });
+
+const getTeacherAssignment = (db) => db.models.Assignment || db.model("Assignment", assignmentSchema);
+
+function setSummary(s, assignmentsBySet) {
+  return {
+    id: s._id, title: s.title, level: s.level, status: s.status, source: s.source,
+    questionCount: (s.questions || []).length, updatedAt: s.updatedAt, createdBy: s.createdBy,
+    activeAssignments: assignmentsBySet.get(String(s._id)) || 0,
+  };
+}
+/** Clean questions from the editor; 400 with per-question messages if any is wrong */
+function readQuestions(raw) {
+  const list = Array.isArray(raw) ? raw.slice(0, LIMITS.maxQuestions + 1) : [];
+  if (list.length > LIMITS.maxQuestions) throw Object.assign(new Error(`At most ${LIMITS.maxQuestions} questions in a set`), { statusCode: 400 });
+  const questions = list.map(normalizeQuestion);
+  const problems = questions.map((q, i) => ({ index: i, errors: questionErrors(q) })).filter((p) => p.errors.length);
+  return { questions, problems };
+}
+
+router.get("/sets", ...staff, async (req, res) => {
+  try {
+    const filter = { ...mine(req) };
+    if (["draft", "published"].includes(req.query.status)) filter.status = req.query.status;
+    const sets = await getSet(req.db).find(filter).sort({ updatedAt: -1 }).limit(200).lean();
+    const counts = await getAssignment(req.db).aggregate([
+      { $match: { setId: { $in: sets.map((s) => s._id) }, active: true } },
+      { $group: { _id: "$setId", n: { $sum: 1 } } },
+    ]);
+    const bySet = new Map(counts.map((c) => [String(c._id), c.n]));
+    return ok(res, { data: sets.map((s) => setSummary(s, bySet)) });
+  } catch (err) { return fail(res, err, "list sets"); }
+});
+
+router.post("/sets", ...staff, async (req, res) => {
+  try {
+    const title = toStr(req.body?.title, "title", { maxLen: 120, required: true });
+    const level = LEVELS.includes(req.body?.level) ? req.body.level : "A1";
+    const { questions, problems } = readQuestions(req.body?.questions);
+    if (problems.length) return res.status(400).json({ success: false, message: "Some questions need fixing", problems });
+    const set = await getSet(req.db).create({ title, level, questions, createdBy: who(req), status: "draft" });
+    return created(res, { data: set });
+  } catch (err) { return fail(res, err, "create set"); }
+});
+
+async function ownSet(req) {
+  return getSet(req.db).findOne({ _id: req.params.id, ...mine(req) });
+}
+
+router.get("/sets/:id", validateObjectId("id"), ...staff, async (req, res) => {
+  try {
+    const set = await getSet(req.db).findOne({ _id: req.params.id, ...mine(req) }).lean();
+    if (!set) return notFound(res, "Question set not found");
+    return ok(res, { data: set });
+  } catch (err) { return fail(res, err, "get set"); }
+});
+
+router.put("/sets/:id", validateObjectId("id"), ...staff, async (req, res) => {
+  try {
+    const set = await ownSet(req);
+    if (!set) return notFound(res, "Question set not found");
+    if (req.body?.title !== undefined) set.title = toStr(req.body.title, "title", { maxLen: 120, required: true });
+    if (LEVELS.includes(req.body?.level)) set.level = req.body.level;
+    if (req.body?.questions !== undefined) {
+      const { questions, problems } = readQuestions(req.body.questions);
+      if (problems.length) return res.status(400).json({ success: false, message: "Some questions need fixing", problems });
+      set.questions = questions;
+    }
+    // A published set must stay playable
+    if (set.status === "published") {
+      const errs = publishErrors(set);
+      if (errs.length) return res.status(400).json({ success: false, message: errs[0], errors: errs });
+    }
+    await set.save();
+    return ok(res, { data: set, message: "Saved" });
+  } catch (err) { return fail(res, err, "save set"); }
+});
+
+router.post("/sets/:id/publish", validateObjectId("id"), ...staff, async (req, res) => {
+  try {
+    const set = await ownSet(req);
+    if (!set) return notFound(res, "Question set not found");
+    const errs = publishErrors(set);
+    if (errs.length) return res.status(400).json({ success: false, message: errs[0], errors: errs });
+    set.status = "published";
+    await set.save();
+    return ok(res, { data: set, message: "Published — you can give it to your students now" });
+  } catch (err) { return fail(res, err, "publish set"); }
+});
+
+router.post("/sets/:id/unpublish", validateObjectId("id"), ...staff, async (req, res) => {
+  try {
+    const set = await ownSet(req);
+    if (!set) return notFound(res, "Question set not found");
+    set.status = "draft";
+    await set.save();
+    return ok(res, { data: set, message: "Back to draft — students can't play it until you publish it again" });
+  } catch (err) { return fail(res, err, "unpublish set"); }
+});
+
+router.post("/sets/:id/duplicate", validateObjectId("id"), ...staff, async (req, res) => {
+  try {
+    const set = await getSet(req.db).findOne({ _id: req.params.id, ...mine(req) }).lean();
+    if (!set) return notFound(res, "Question set not found");
+    const copy = await getSet(req.db).create({
+      title: `${set.title} (copy)`.slice(0, 120), level: set.level, status: "draft", createdBy: who(req),
+      questions: set.questions.map(({ _id, ...q }) => q),
+    });
+    return created(res, { data: copy });
+  } catch (err) { return fail(res, err, "duplicate set"); }
+});
+
+router.delete("/sets/:id", validateObjectId("id"), ...staff, async (req, res) => {
+  try {
+    const set = await ownSet(req);
+    if (!set) return notFound(res, "Question set not found");
+    const inUse = await getAssignment(req.db).countDocuments({ setId: set._id, active: true });
+    if (inUse) return conflict(res, "Students are playing this set — stop its assignments first");
+    await set.deleteOne();
+    return ok(res, { message: "Deleted" });
+  } catch (err) { return fail(res, err, "delete set"); }
+});
+
+/** Group classes and students this person may give a game to */
+async function targetsFor(req) {
+  const recent = new Date(Date.now() - 60 * 86400000);
+  const gcFilter = { status: { $nin: ["cancelled", "missed"] }, scheduledTime: { $gte: recent } };
+  let studentIds = null;
+  if (!isAdmin(req)) {
+    gcFilter.teacherId = req.teacher._id;
+    studentIds = await getTeacherAssignment(req.db).distinct("studentId", { teacherId: req.teacher._id });
+  }
+  const groupClasses = await getGroupClass(req.db).find(gcFilter).sort({ scheduledTime: -1 }).limit(100).select("title scheduledTime enrollments.studentId").lean();
+  const sFilter = { active: true, ...(studentIds ? { _id: { $in: studentIds } } : {}) };
+  const students = await getStudent(req.db).find(sFilter).sort({ firstName: 1 }).limit(500).select("firstName lastName").lean();
+  return { groupClasses, students };
+}
+
+router.get("/targets", ...staff, async (req, res) => {
+  try {
+    const { groupClasses, students } = await targetsFor(req);
+    return ok(res, {
+      data: {
+        groupClasses: groupClasses.map((g) => ({ id: g._id, title: g.title, scheduledTime: g.scheduledTime, students: (g.enrollments || []).length })),
+        students: students.map((s) => ({ id: s._id, name: `${s.firstName} ${s.lastName || ""}`.trim() })),
+      },
+    });
+  } catch (err) { return fail(res, err, "targets"); }
+});
+
+router.get("/assignments", ...staff, async (req, res) => {
+  try {
+    const list = await getAssignment(req.db).find(mine(req)).sort({ createdAt: -1 }).limit(200).lean();
+    const sets = await getSet(req.db).find({ _id: { $in: list.map((a) => a.setId) } }).select("title status").lean();
+    const setById = new Map(sets.map((s) => [String(s._id), s]));
+    const players = await getProgress(req.db).aggregate([
+      { $match: { assignmentId: { $in: list.map((a) => a._id) } } },
+      { $group: { _id: "$assignmentId", n: { $sum: 1 } } },
+    ]);
+    const playersBy = new Map(players.map((p) => [String(p._id), p.n]));
+    return ok(res, {
+      data: list.map((a) => ({
+        id: a._id, setId: a.setId, setTitle: setById.get(String(a.setId))?.title || "(deleted set)",
+        setStatus: setById.get(String(a.setId))?.status || "deleted",
+        groupClasses: a.groupClassIds.length, students: a.studentIds.length, chapters: a.chapters,
+        startsAt: a.startsAt, dueAt: a.dueAt, maxPlaysPerDay: a.maxPlaysPerDay, active: a.active,
+        players: playersBy.get(String(a._id)) || 0, createdAt: a.createdAt,
+      })),
+    });
+  } catch (err) { return fail(res, err, "list assignments"); }
+});
+
+router.post("/assignments", ...staff, async (req, res) => {
+  try {
+    const b = req.body || {};
+    const setId = toObjectId(b.setId, "setId");
+    const set = await getSet(req.db).findOne({ _id: setId, ...mine(req) }).lean();
+    if (!set) return notFound(res, "Question set not found");
+    if (set.status !== "published") return badRequest(res, "Publish the set before giving it to students");
+
+    // Only group classes and students within this person's reach
+    const { groupClasses, students } = await targetsFor(req);
+    const okGc = new Set(groupClasses.map((g) => String(g._id)));
+    const okSt = new Set(students.map((s) => String(s._id)));
+    const groupClassIds = [...new Set((Array.isArray(b.groupClassIds) ? b.groupClassIds : []).map(String))];
+    const studentIds = [...new Set((Array.isArray(b.studentIds) ? b.studentIds : []).map(String))];
+    if (!groupClassIds.length && !studentIds.length) return badRequest(res, "Choose at least one group class or student");
+    if (groupClassIds.some((id) => !okGc.has(id)) || studentIds.some((id) => !okSt.has(id))) {
+      return forbidden(res, "You can only give games to your own group classes and students");
+    }
+    const startsAt = b.startsAt ? new Date(b.startsAt) : new Date();
+    const dueAt = b.dueAt ? new Date(b.dueAt) : null;
+    if (Number.isNaN(startsAt.getTime()) || (dueAt && Number.isNaN(dueAt.getTime()))) return badRequest(res, "Invalid date");
+    if (dueAt && dueAt <= startsAt) return badRequest(res, "The due date must be after the start");
+
+    const assignment = await getAssignment(req.db).create({
+      setId, groupClassIds, studentIds, createdBy: who(req), startsAt, dueAt,
+      chapters: toInt(b.chapters, "chapters", { min: 1, max: CHAPTER_COUNT, default: CHAPTER_COUNT }),
+      maxPlaysPerDay: toInt(b.maxPlaysPerDay, "maxPlaysPerDay", { min: 1, max: 20, default: 3 }),
+    });
+    return created(res, { data: assignment, message: "Given to your students" });
+  } catch (err) { return fail(res, err, "assign"); }
+});
+
+router.patch("/assignments/:id", validateObjectId("id"), ...staff, async (req, res) => {
+  try {
+    const a = await getAssignment(req.db).findOne({ _id: req.params.id, ...mine(req) });
+    if (!a) return notFound(res, "Assignment not found");
+    const b = req.body || {};
+    if (typeof b.active === "boolean") a.active = b.active;
+    if (b.dueAt !== undefined) {
+      const dueAt = b.dueAt ? new Date(b.dueAt) : null;
+      if (dueAt && Number.isNaN(dueAt.getTime())) return badRequest(res, "Invalid date");
+      a.dueAt = dueAt;
+    }
+    if (b.maxPlaysPerDay !== undefined) a.maxPlaysPerDay = toInt(b.maxPlaysPerDay, "maxPlaysPerDay", { min: 1, max: 20 });
+    await a.save();
+    return ok(res, { data: a, message: "Saved" });
+  } catch (err) { return fail(res, err, "update assignment"); }
 });
 
 export default router;

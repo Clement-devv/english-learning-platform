@@ -205,7 +205,9 @@
     "pageTitlesRecordings": "Bản ghi",
     "pageTitlesReviews": "Đánh giá",
     "pageTitlesInviteFriends": "Mời bạn bè",
-    "pageTitlesLeaderboard": "Bảng xếp hạng"
+    "pageTitlesLeaderboard": "Bảng xếp hạng",
+    "subTabsWordSquad": "Word Squad",
+    "pageTitlesWordSquad": "Word Squad"
   },
   "brutalistShell": {
     "achievementRegistry": "[ SỔ THÀNH TÍCH ]",
@@ -449,7 +451,9 @@
     "subTabsBadges": "Huy hiệu",
     "subTabsRecordings": "Bản ghi",
     "subTabsReviews": "Đánh giá",
-    "subTabsInvite": "Mời bạn"
+    "subTabsInvite": "Mời bạn",
+    "navGroupsWordSquad": "Word Squad",
+    "pageTitlesWordSquad": "Word Squad"
   },
   "pendingConfirmationBanners": {
     "attendanceConfirmationNeeded": "Cần xác nhận tham gia",
@@ -584,7 +588,9 @@
     "pageTitleRecordings": "Bản ghi",
     "pageTitleReviews": "Đánh giá",
     "pageTitleInviteFriends": "Mời bạn bè",
-    "pageTitleLeaderboard": "Bảng xếp hạng"
+    "pageTitleLeaderboard": "Bảng xếp hạng",
+    "subTabsWordSquad": "Word Squad",
+    "pageTitleWordSquad": "Word Squad"
   },
   "sunshineShell": {
     "all": "🏅 Tất cả",

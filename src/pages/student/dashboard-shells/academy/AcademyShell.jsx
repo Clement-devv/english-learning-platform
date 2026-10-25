@@ -28,7 +28,7 @@ import UpcomingClasses from "../../components/UpcomingClasses";
 import ProgressCard from "../../components/ProgressCard";
 import DashboardAlertsBar from "../../../../components/DashboardAlertsBar";
 // Tabs load on demand (see src/pages/student/tabs/lazyTabs.js)
-import { LeaderboardTab, ChangePassword, StudentCompletedTab, BookingCalendarTab, ClassReportsTab, StudentScheduleTab, StudentHomeworkTab, StudentQuizTab, PronunciationTab, ConversationTab, FlashcardsTab, RecordingsTab, ReviewsTab, ReferralTab, MessagesTab, Classroom } from "../../tabs/lazyTabs";
+import { LeaderboardTab, WordSquadTab, ChangePassword, StudentCompletedTab, BookingCalendarTab, ClassReportsTab, StudentScheduleTab, StudentHomeworkTab, StudentQuizTab, PronunciationTab, ConversationTab, FlashcardsTab, RecordingsTab, ReviewsTab, ReferralTab, MessagesTab, Classroom } from "../../tabs/lazyTabs";
 import { useTranslation } from "react-i18next";
 import i18n from "../../../../i18n/i18n.js";
 
@@ -80,7 +80,7 @@ const NAV = [
   { id:"messages",  Icon:MessageSquare,  get label() { return ta("academyShell.navMessages"); },   tabs:["messages"]                         },
   { id:"classes",   Icon:CalendarDays,   get label() { return ta("academyShell.navClasses"); },    tabs:["completed-classes","schedule","book-class","class-reports"]     },
   { id:"progress",  Icon:BarChart2,      get label() { return ta("academyShell.navProgress"); },   tabs:["charts","badges"]                  },
-  { id:"more",      Icon:MoreHorizontal, get label() { return ta("academyShell.navMore"); },       tabs:["recordings","reviews","referral","leaderboard"]  },
+  { id:"more",      Icon:MoreHorizontal, get label() { return ta("academyShell.navMore"); },       tabs:["games","recordings","reviews","referral","leaderboard"]  },
 ];
 
 const SUB_TABS = {
@@ -88,7 +88,7 @@ const SUB_TABS = {
   practice: [{ key:"pronunciation",get label() { return ta("academyShell.subTabsSpeak"); } }, { key:"conversation",get label() { return ta("academyShell.subTabsAiChat"); } }],
   classes:  [{ key:"completed-classes",get label() { return ta("academyShell.subTabsCompleted"); } }, { key:"schedule",get label() { return ta("academyShell.subTabsSchedule"); } }, { key:"book-class",get label() { return ta("academyShell.subTabsBookAClass"); } }, { key:"class-reports",get label() { return ta("academyShell.subTabsReports"); } }],
   progress: [{ key:"charts",get label() { return ta("academyShell.subTabsCharts"); } }, { key:"badges",get label() { return ta("academyShell.subTabsBadges"); } }],
-  more:     [{ key:"recordings",get label() { return ta("academyShell.subTabsRecordings"); } }, { key:"reviews",get label() { return ta("academyShell.subTabsReviews"); } }, { key:"referral",get label() { return ta("academyShell.subTabsInvite"); } }, { key:"leaderboard",get label() { return ta("academyShell.subTabsLeaderboard"); } }],
+  more:     [{ key:"games",get label() { return ta("academyShell.subTabsWordSquad"); } }, { key:"recordings",get label() { return ta("academyShell.subTabsRecordings"); } }, { key:"reviews",get label() { return ta("academyShell.subTabsReviews"); } }, { key:"referral",get label() { return ta("academyShell.subTabsInvite"); } }, { key:"leaderboard",get label() { return ta("academyShell.subTabsLeaderboard"); } }],
 };
 
 // ── Page titles ────────────────────────────────────────────────────────────────
@@ -108,6 +108,7 @@ const PAGE_TITLES = {
   get reviews() { return ta("academyShell.pageTitlesReviews"); },
   get referral() { return ta("academyShell.pageTitlesInviteFriends"); },
   get leaderboard() { return ta("academyShell.pageTitlesLeaderboard"); },
+  get games() { return ta("academyShell.pageTitlesWordSquad"); },
 };
 
 // ── Grade colour helpers ───────────────────────────────────────────────────────
@@ -821,6 +822,7 @@ export default function AcademyShell() {
           {/* ═══ REFERRAL ═══ */}
           {d.activeTab === "referral" && <ReferralTab isDarkMode={d.isDarkMode} />}
           {d.activeTab === "leaderboard" && <LeaderboardTab isDarkMode={d.isDarkMode} />}
+          {d.activeTab === "games" && <WordSquadTab isDarkMode={d.isDarkMode} />}
         </main>
       </div>
 

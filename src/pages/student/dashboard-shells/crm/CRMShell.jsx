@@ -9,7 +9,7 @@ import {
   Bell, LogOut, Settings, Star, ChevronRight, Shield, KeyRound,
   Sun, Moon, Gift, Video, Brain, Flame, CheckSquare, Clock,
 } from "lucide-react";
-import { Award } from "lucide-react";
+import { Award, Gamepad2 } from "lucide-react";
 import LanguageSwitcher from "../../../../components/LanguageSwitcher";
 import {
   PieChart, Pie, Cell,
@@ -27,7 +27,7 @@ import { useDashboardData, BADGE_DEFINITIONS } from "../useDashboardData";
 import { useRing }                              from "../../../../context/RingContext";
 import DashboardAlertsBar from "../../../../components/DashboardAlertsBar";
 // Tabs load on demand (see src/pages/student/tabs/lazyTabs.js)
-import { LeaderboardTab, StudentCompletedTab, StudentScheduleTab, BookingCalendarTab, ClassReportsTab, StudentHomeworkTab, StudentQuizTab, PronunciationTab, ConversationTab, FlashcardsTab, RecordingsTab, ReviewsTab, ReferralTab, ChangePassword, MessagesTab, Classroom } from "../../tabs/lazyTabs";
+import { LeaderboardTab, WordSquadTab, StudentCompletedTab, StudentScheduleTab, BookingCalendarTab, ClassReportsTab, StudentHomeworkTab, StudentQuizTab, PronunciationTab, ConversationTab, FlashcardsTab, RecordingsTab, ReviewsTab, ReferralTab, ChangePassword, MessagesTab, Classroom } from "../../tabs/lazyTabs";
 import { useTranslation } from "react-i18next";
 import i18n from "../../../../i18n/i18n.js";
 
@@ -124,6 +124,7 @@ const NAV_GROUPS = [
       { key:"reviews",    Icon:Star,          get label() { return ta("cRMShell.navGroupsReviews"); }    },
       { key:"referral",   Icon:Gift,          get label() { return ta("cRMShell.navGroupsInvite"); }     },
       { key:"leaderboard", Icon:Award,        get label() { return ta("cRMShell.navGroupsLeaderboard"); } },
+      { key:"games",       Icon:Gamepad2,     get label() { return ta("cRMShell.navGroupsWordSquad"); } },
     ],
   },
 ];
@@ -133,7 +134,7 @@ const PAGE_TITLES = {
   get flashcards() { return ta("cRMShell.pageTitlesFlashcards"); }, get pronunciation() { return ta("cRMShell.pageTitlesSpeaking"); }, get conversation() { return ta("cRMShell.pageTitlesAiChat"); },
   get messages() { return ta("cRMShell.pageTitlesMessages"); }, get "completed-classes"() { return ta("cRMShell.pageTitlesCompletedClasses"); }, get "class-reports"() { return ta("cRMShell.pageTitlesClassReports"); },
   get schedule() { return ta("cRMShell.pageTitlesSchedule"); }, get charts() { return ta("cRMShell.pageTitlesProgress"); }, get badges() { return ta("cRMShell.pageTitlesBadges"); },
-  get recordings() { return ta("cRMShell.pageTitlesRecordings"); }, get reviews() { return ta("cRMShell.pageTitlesReviews"); }, get referral() { return ta("cRMShell.pageTitlesInviteFriends"); }, get leaderboard() { return ta("cRMShell.pageTitlesLeaderboard"); },
+  get recordings() { return ta("cRMShell.pageTitlesRecordings"); }, get reviews() { return ta("cRMShell.pageTitlesReviews"); }, get referral() { return ta("cRMShell.pageTitlesInviteFriends"); }, get leaderboard() { return ta("cRMShell.pageTitlesLeaderboard"); }, get games() { return ta("cRMShell.pageTitlesWordSquad"); },
 };
 
 // ── Floating island SVG card ───────────────────────────────────────────────────
@@ -661,6 +662,7 @@ export default function CRMShell() {
           {d.activeTab==="reviews"           && <ReviewsTab isDarkMode={d.isDarkMode}/>}
           {d.activeTab==="referral"          && <ReferralTab isDarkMode={d.isDarkMode}/>}
           {d.activeTab==="leaderboard"       && <LeaderboardTab isDarkMode={d.isDarkMode}/>}
+          {d.activeTab==="games"             && <WordSquadTab isDarkMode={d.isDarkMode}/>}
           {d.activeTab==="badges"            && <BadgesTab badges={d.badges} progress={d.progress} completedClasses={d.completedClasses} shareAchievement={d.shareAchievement} P={P}/>}
 
           {/* ═══ CHARTS ═══ */}

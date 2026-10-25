@@ -205,7 +205,9 @@
     "goodMorning": "Good morning, {{name}}! 👋",
     "goodAfternoon": "Good afternoon, {{name}}! 👋",
     "goodEvening": "Good evening, {{name}}! 👋",
-    "there": "there"
+    "there": "there",
+    "subTabsWordSquad": "Word Squad",
+    "pageTitlesWordSquad": "Word Squad"
   },
   "brutalistShell": {
     "achievementRegistry": "[ ACHIEVEMENT REGISTRY ]",
@@ -449,7 +451,9 @@
     "subTabsBadges": "Badges",
     "subTabsRecordings": "Recordings",
     "subTabsReviews": "Reviews",
-    "subTabsInvite": "Invite"
+    "subTabsInvite": "Invite",
+    "navGroupsWordSquad": "Word Squad",
+    "pageTitlesWordSquad": "Word Squad"
   },
   "pendingConfirmationBanners": {
     "attendanceConfirmationNeeded": "Attendance confirmation needed",
@@ -584,7 +588,9 @@
     "pageTitleRecordings": "Recordings",
     "pageTitleReviews": "Reviews",
     "pageTitleInviteFriends": "Invite Friends",
-    "pageTitleLeaderboard": "Leaderboard"
+    "pageTitleLeaderboard": "Leaderboard",
+    "subTabsWordSquad": "Word Squad",
+    "pageTitleWordSquad": "Word Squad"
   },
   "sunshineShell": {
     "all": "🏅 All",

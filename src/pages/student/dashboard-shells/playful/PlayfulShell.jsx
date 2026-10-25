@@ -27,7 +27,7 @@ import UpcomingClasses     from "../../components/UpcomingClasses";
 import ProgressCard        from "../../components/ProgressCard";
 import DashboardAlertsBar from "../../../../components/DashboardAlertsBar";
 // Tabs load on demand (see src/pages/student/tabs/lazyTabs.js)
-import { LeaderboardTab, ChangePassword, StudentCompletedTab, BookingCalendarTab, ClassReportsTab, StudentScheduleTab, StudentHomeworkTab, StudentQuizTab, PronunciationTab, ConversationTab, FlashcardsTab, RecordingsTab, ReviewsTab, ReferralTab, MessagesTab, Classroom } from "../../tabs/lazyTabs";
+import { LeaderboardTab, WordSquadTab, ChangePassword, StudentCompletedTab, BookingCalendarTab, ClassReportsTab, StudentScheduleTab, StudentHomeworkTab, StudentQuizTab, PronunciationTab, ConversationTab, FlashcardsTab, RecordingsTab, ReviewsTab, ReferralTab, MessagesTab, Classroom } from "../../tabs/lazyTabs";
 import { useTranslation } from "react-i18next";
 import i18n from "../../../../i18n/i18n.js";
 
@@ -79,7 +79,7 @@ const NAV = [
   { id:"messages",  Icon:MessageSquare,  get label() { return ta("playfulShell.navMessages"); }, tabs:["messages"],                        dot:"#4ADE80" },
   { id:"classes",   Icon:CalendarDays,   get label() { return ta("playfulShell.navClasses"); },  tabs:["completed-classes","schedule","book-class","class-reports"],    dot:"#06B6D4" },
   { id:"progress",  Icon:BarChart2,      get label() { return ta("playfulShell.navProgress"); }, tabs:["charts","badges"],                 dot:"#FF8E53" },
-  { id:"more",      Icon:MoreHorizontal, get label() { return ta("playfulShell.navMore"); },     tabs:["recordings","reviews","referral","leaderboard"], dot:"#818CF8" },
+  { id:"more",      Icon:MoreHorizontal, get label() { return ta("playfulShell.navMore"); },     tabs:["games","recordings","reviews","referral","leaderboard"], dot:"#818CF8" },
 ];
 
 const SUB_TABS = {
@@ -87,7 +87,7 @@ const SUB_TABS = {
   practice: [{ key:"pronunciation",get label() { return ta("playfulShell.subTabsSpeak"); } }, { key:"conversation",get label() { return ta("playfulShell.subTabsAiChat"); } }],
   classes:  [{ key:"completed-classes",get label() { return ta("playfulShell.subTabsCompleted"); } }, { key:"schedule",get label() { return ta("playfulShell.subTabsSchedule"); } }, { key:"book-class",get label() { return ta("playfulShell.subTabsBookAClass"); } }, { key:"class-reports",get label() { return ta("playfulShell.subTabsReports"); } }],
   progress: [{ key:"charts",get label() { return ta("playfulShell.subTabsCharts"); } }, { key:"badges",get label() { return ta("playfulShell.subTabsBadges"); } }],
-  more:     [{ key:"recordings",get label() { return ta("playfulShell.subTabsRecordings"); } }, { key:"reviews",get label() { return ta("playfulShell.subTabsReviews"); } }, { key:"referral",get label() { return ta("playfulShell.subTabsInvite"); } }, { key:"leaderboard",get label() { return ta("playfulShell.subTabsLeaderboard"); } }],
+  more:     [{ key:"games",get label() { return ta("playfulShell.subTabsWordSquad"); } }, { key:"recordings",get label() { return ta("playfulShell.subTabsRecordings"); } }, { key:"reviews",get label() { return ta("playfulShell.subTabsReviews"); } }, { key:"referral",get label() { return ta("playfulShell.subTabsInvite"); } }, { key:"leaderboard",get label() { return ta("playfulShell.subTabsLeaderboard"); } }],
 };
 
 // ── Lesson category tiles ──────────────────────────────────────────────────────
@@ -107,7 +107,7 @@ const PAGE_TITLE = {
   get pronunciation() { return ta("playfulShell.pageTitleSpeaking"); },get conversation() { return ta("playfulShell.pageTitleAiChat"); },get messages() { return ta("playfulShell.pageTitleMessages"); },
   get "completed-classes"() { return ta("playfulShell.pageTitleCompletedClasses"); },get schedule() { return ta("playfulShell.pageTitleSchedule"); },
   get charts() { return ta("playfulShell.pageTitleProgress"); },get badges() { return ta("playfulShell.pageTitleBadges"); },get recordings() { return ta("playfulShell.pageTitleRecordings"); },
-  get reviews() { return ta("playfulShell.pageTitleReviews"); },get referral() { return ta("playfulShell.pageTitleInviteFriends"); },get leaderboard() { return ta("playfulShell.pageTitleLeaderboard"); },
+  get reviews() { return ta("playfulShell.pageTitleReviews"); },get referral() { return ta("playfulShell.pageTitleInviteFriends"); },get leaderboard() { return ta("playfulShell.pageTitleLeaderboard"); },get games() { return ta("playfulShell.pageTitleWordSquad"); },
 };
 
 // ── Badges panel ───────────────────────────────────────────────────────────────
@@ -654,6 +654,7 @@ export default function PlayfulShell() {
           {/* ════ REFERRAL ════ */}
           {d.activeTab==="referral"&&<ReferralTab isDarkMode={d.isDarkMode}/>}
           {d.activeTab==="leaderboard"&&<LeaderboardTab isDarkMode={d.isDarkMode}/>}
+          {d.activeTab==="games"&&<WordSquadTab isDarkMode={d.isDarkMode}/>}
         </main>
       </div>
 
@@ -759,7 +760,7 @@ export default function PlayfulShell() {
               {NAV.filter(n => !['dashboard','messages','classes'].includes(n.id)).flatMap(n => n.tabs).map(tab => {
                 const navItem = NAV.find(n => n.tabs.includes(tab));
                 const isActive = d.activeTab === tab;
-                const label = {homework:'Homework',quiz:'Quizzes',flashcards:'Flashcards',pronunciation:'Speaking',conversation:'AI Chat','completed-classes':'Completed',charts:'Charts',badges:'Badges',recordings:'Recordings',reviews:'Reviews',referral:'Invite',leaderboard:'Leaderboard'}[tab] || tab;
+                const label = {homework:'Homework',quiz:'Quizzes',flashcards:'Flashcards',pronunciation:'Speaking',conversation:'AI Chat','completed-classes':'Completed',charts:'Charts',badges:'Badges',recordings:'Recordings',reviews:'Reviews',referral:'Invite',leaderboard:'Leaderboard',games:'Word Squad'}[tab] || tab;
                 if (!navItem) return null;
                 const Icon = navItem.Icon;
                 return (
