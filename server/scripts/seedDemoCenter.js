@@ -11,6 +11,7 @@ import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import dotenv from "dotenv";
+import { EXAMPLE_SET_TITLE, EXAMPLE_QUESTIONS } from "../utils/exampleQuestions.js";
 dotenv.config();
 
 const SLUG = "family-english";
@@ -366,6 +367,21 @@ async function main() {
     externalUrl: "https://drive.google.com/file/d/demo-class-recording/view", note: "Class recording", duration: 45 * 60 - i * 120,
     visibleToStudent: false, createdAt: b.completedAt, updatedAt: b.completedAt,
   })));
+
+  // ── Word Squad: Sarah's example set, given to her students (and Mai) ─────
+  const wsSetId = oid();
+  await db.collection("questionsets").insertOne({
+    _id: wsSetId, title: EXAMPLE_SET_TITLE, level: "A1", status: "published", source: "manual", sourceFiles: [],
+    createdBy: { role: "teacher", id: teachers[0]._id },
+    questions: EXAMPLE_QUESTIONS.map((q) => ({ _id: oid(), explanation: "", tags: [], ...q })),
+    createdAt: daysFrom(-4), updatedAt: daysFrom(-4),
+  });
+  await db.collection("gameassignments").insertOne({
+    _id: oid(), setId: wsSetId, gameType: "word-squad", groupClassIds: [],
+    studentIds: [...new Set([...sarahKids, students[5]].map((s) => s._id))], chapters: 3,
+    startsAt: daysFrom(-3), dueAt: daysFrom(7), maxPlaysPerDay: 3, createdBy: { role: "teacher", id: teachers[0]._id }, active: true,
+    createdAt: daysFrom(-3), updatedAt: daysFrom(-3),
+  });
 
   // ── One real (log-in) student for the student guide: Mai Hoang ───────────
   // Plans gate only *creating* real students, so this works on the Basic demo.

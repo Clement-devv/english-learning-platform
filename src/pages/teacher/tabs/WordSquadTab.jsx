@@ -4,10 +4,11 @@
 // appears above a gate in the game, publish, and give a set to group classes or
 // students. The question checks are the server's own (server/utils/questionRules.js).
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ArrowDown, ArrowUp, Copy, Play, Plus, Sparkles, Trash2, Upload } from 'lucide-react';
+import { ArrowDown, ArrowUp, BookOpen, Copy, Download, Play, Plus, Sparkles, Trash2, Upload } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../../api';
 import { questionErrors, publishErrors, parseQuestionsCsv, LEVELS, LIMITS } from '../../../../server/utils/questionRules.js';
+import { EXAMPLE_SET_TITLE, EXAMPLE_QUESTIONS, exampleCsv } from '../../../../server/utils/exampleQuestions.js';
 import WordSquadAi from './WordSquadAi.jsx';
 import './wordSquadTeacher.css';
 
@@ -16,6 +17,13 @@ const blankQuestion = () => ({ type: 'gap', prompt: '', answer: '', distractors:
 const toForm = (q) => ({ ...q, distractors: [...(q.distractors || []), '', '', ''].slice(0, 3) });
 const fromForm = (q) => ({ type: q.type || 'gap', prompt: q.prompt, answer: q.answer, distractors: q.distractors.filter((d) => d.trim()) });
 const msg = (err, fallback) => err?.response?.data?.message || fallback;
+
+function downloadExampleCsv() {
+  const url = URL.createObjectURL(new Blob([exampleCsv()], { type: 'text/csv' }));
+  const a = Object.assign(document.createElement('a'), { href: url, download: 'word-squad-example.csv' });
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
 
 function Preview({ q, index }) {
   const [a, b = ''] = String(q?.prompt || 'Write a sentence with ___ in it.').split(/_{3,}/);
@@ -139,6 +147,7 @@ function Editor({ initialId, onDone, onTestPlay, flash }) {
               <Upload size={14} /> Import CSV
               <input type="file" accept=".csv,text/csv,.txt" hidden onChange={(e) => { onCsv(e.target.files?.[0]); e.target.value = ''; }} />
             </label>
+            <button type="button" className="wst-btn wst-btn--sm" title="A CSV with the 20 example questions, to see the format" onClick={downloadExampleCsv}><Download size={14} /> CSV example</button>
             <button type="button" className="wst-btn wst-btn--sm" onClick={add}><Plus size={14} /> Add question</button>
           </div>
           {csvReport && (
@@ -310,6 +319,14 @@ export default function WordSquadTab({ isDarkMode }) {
     if (!window.confirm(`Delete “${s.title}”? This can't be undone.`)) return;
     try { await api.delete(`${BASE}/sets/${s.id}`); flash('Deleted'); load(); } catch (err) { flash(msg(err, 'Could not delete'), true); }
   };
+  // A copy of the 20-question example, so a teacher sees what a good set looks like
+  const addExample = async () => {
+    try {
+      const { data } = await api.post(`${BASE}/sets`, { title: EXAMPLE_SET_TITLE, level: 'A1', questions: EXAMPLE_QUESTIONS });
+      flash('Example set added — look through it, test play it, change anything');
+      setView({ name: 'edit', id: data.data._id });
+    } catch (err) { flash(msg(err, 'Could not add the example'), true); }
+  };
   const toggleAssignment = async (a) => {
     try { await api.patch(`${BASE}/assignments/${a.id}`, { active: !a.active }); load(); } catch (err) { flash(msg(err, 'Could not change it'), true); }
   };
@@ -329,12 +346,16 @@ export default function WordSquadTab({ isDarkMode }) {
               <p className="wst-muted" style={{ margin: '4px 0 0' }}>Make question sets from your lessons and give them to your students to play.</p>
             </div>
             <span className="wst-spacer" />
+            <button type="button" className="wst-btn" title="Add a ready-made set of 20 questions to see how it works" onClick={addExample}><BookOpen size={14} /> Example set</button>
             <button type="button" className="wst-btn" onClick={() => setView({ name: 'ai' })}><Sparkles size={14} /> Make questions with AI</button>
             <button type="button" className="wst-btn wst-btn--primary" onClick={() => setView({ name: 'edit' })}><Plus size={14} /> New question set</button>
           </div>
 
           {sets === null ? <p className="wst-muted">Loading…</p> : sets.length === 0 ? (
-            <div className="wst-card"><p style={{ margin: 0 }}>No question sets yet. Write your own with <b>New question set</b> (or import a CSV), or let the AI make some from your book pages with <b>Make questions with AI</b>.</p></div>
+            <div className="wst-card wst-row">
+              <p style={{ margin: 0, flex: '1 1 320px' }}>No question sets yet. New to Word Squad? Add the <b>example set</b> — 20 ready questions you can look through, test play and give to students. Or write your own with <b>New question set</b> (or import a CSV), or let the AI make some from your book pages.</p>
+              <button type="button" className="wst-btn wst-btn--primary" onClick={addExample}><BookOpen size={14} /> Add example set (20 questions)</button>
+            </div>
           ) : (
             <div className="wst-grid">
               {sets.map((s) => (
