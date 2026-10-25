@@ -30,6 +30,7 @@ import PeopleTab   from './tabs/PeopleTab';
 import ClassesTab  from './tabs/ClassesTab';
 import DeletedTab  from './tabs/DeletedTab';
 import CreditsTab             from './tabs/CreditsTab';
+import AiCreditsCard          from './tabs/AiCreditsCard';
 import CertificateTemplatesTab from './tabs/CertificateTemplatesTab';
 import LandingPagesTab         from './tabs/LandingPagesTab';
 import BoardTab                from './tabs/BoardTab';
@@ -1107,7 +1108,7 @@ export default function SuperAdminDashboard() {
       { key: 'usage',        label: 'Video minutes',   icon: BarChart2,  desc: 'Agora video minutes by center and month' },
     ] },
     { group: 'Billing', items: [
-      { key: 'credits',      label: 'AI credits',      icon: Zap,        desc: 'Chat and pronunciation credits for each center' },
+      { key: 'credits',      label: 'AI credits',      icon: Zap,        desc: 'Chat, pronunciation and teacher AI credits for each center' },
       { key: 'library',      label: 'Library storage', icon: HardDrive,  desc: 'Teaching-library storage, limits and billing' },
     ] },
     { group: 'Content', items: [
@@ -1300,6 +1301,7 @@ export default function SuperAdminDashboard() {
                 setPronAllocModal={setPronAllocModal} setPronAllocAmount={setPronAllocAmount} setPronAllocNote={setPronAllocNote} setPronAllocMsg={setPronAllocMsg}
               />
             )}
+            {tab === 'credits' && <AiCreditsCard apiBase={API_BASE} authHeaders={authHeaders} />}
             {tab === 'people' && (
               <PeopleTab
                 centers={centers} peopleCenter={peopleCenter} setPeopleCenter={setPeopleCenter}

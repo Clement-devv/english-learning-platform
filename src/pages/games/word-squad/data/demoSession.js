@@ -17,10 +17,13 @@ function shuffle(rng, list) {
   return a;
 }
 
-export function createDemoSession(chapter, seed = Date.now() % 1e9) {
+/**
+ * @param questions  defaults to the built-in demo set; a teacher's test play passes their own set
+ */
+export function createDemoSession(chapter, seed = Date.now() % 1e9, questions = DEMO_QUESTIONS) {
   const rng = createRng(seed ^ 0x5eed);
   const count = (CHAPTERS[chapter]?.gates ?? 8) + 1; // + the gate during the boss fight
-  const pool = shuffle(rng, DEMO_QUESTIONS);
+  const pool = shuffle(rng, questions.filter((q) => q.prompt && q.answer && (q.distractors || []).some(Boolean)));
   const answers = new Map();
 
   const gates = [];
@@ -31,7 +34,7 @@ export function createDemoSession(chapter, seed = Date.now() % 1e9) {
     gates.push({
       gateId,
       prompt: q.prompt,
-      choices: shuffle(rng, [q.answer, ...q.distractors.slice(0, 2)]),
+      choices: shuffle(rng, [q.answer, ...q.distractors.filter((x) => x && x !== q.answer).slice(0, 2)]),
       reward: rollReward(rng),
     });
   }
@@ -48,7 +51,7 @@ export function createDemoSession(chapter, seed = Date.now() % 1e9) {
 
   // One spare question for the revive ("answer to bring your squad back")
   const rq = pool[count % pool.length];
-  const revive = { gateId: `demo-${chapter}-revive`, prompt: rq.prompt, choices: shuffle(rng, [rq.answer, ...rq.distractors.slice(0, 2)]) };
+  const revive = { gateId: `demo-${chapter}-revive`, prompt: rq.prompt, choices: shuffle(rng, [rq.answer, ...rq.distractors.filter((x) => x && x !== rq.answer).slice(0, 2)]) };
   answers.set(revive.gateId, rq.answer);
 
   const answered = new Set();

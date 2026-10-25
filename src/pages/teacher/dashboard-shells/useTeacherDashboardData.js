@@ -50,7 +50,7 @@ export function useTeacherDashboardData() {
   // ── Core state ─────────────────────────────────────────────────────────────
   const [teacherInfo,    setTeacherInfo]    = useState(null);
   const [activeTab,      setActiveTab]      = useState('dashboard');
-  useTabFromUrl(setActiveTab, ['dashboard','classes','group-classes','completed-classes','class-summaries','schedule','students','bookings','homework','quiz','vocab','library','messages','payment','recordings','reviews','rating-dashboard','profile']); // ?tab= from notification clicks / links
+  useTabFromUrl(setActiveTab, ['dashboard','classes','group-classes','completed-classes','class-summaries','schedule','students','bookings','homework','quiz','vocab','games','library','messages','payment','recordings','reviews','rating-dashboard','profile']); // ?tab= from notification clicks / links
   const [toast,          setToast]          = useState('');
   const [sidebarOpen,    setSidebarOpen]    = useState(true);
   const [mounted,        setMounted]        = useState(false);

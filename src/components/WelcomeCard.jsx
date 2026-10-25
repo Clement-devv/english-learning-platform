@@ -168,7 +168,8 @@ export default function WelcomeCard() {
     setVisible(false);
   };
 
-  if (!visible) return null;
+  // only on the dashboard itself — not over a page opened from it (e.g. a game)
+  if (!visible || !DASHBOARD_ROUTES.includes(location.pathname)) return null;
 
   const content      = ROLE_CONTENT[role];
   const { HeaderIcon } = content;

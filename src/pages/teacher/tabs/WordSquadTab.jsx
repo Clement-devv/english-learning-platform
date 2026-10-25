@@ -4,9 +4,11 @@
 // appears above a gate in the game, publish, and give a set to group classes or
 // students. The question checks are the server's own (server/utils/questionRules.js).
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ArrowDown, ArrowUp, Copy, Plus, Trash2, Upload } from 'lucide-react';
+import { ArrowDown, ArrowUp, Copy, Play, Plus, Sparkles, Trash2, Upload } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import api from '../../../api';
 import { questionErrors, publishErrors, parseQuestionsCsv, LEVELS, LIMITS } from '../../../../server/utils/questionRules.js';
+import WordSquadAi from './WordSquadAi.jsx';
 import './wordSquadTeacher.css';
 
 const BASE = '/games';
@@ -31,7 +33,7 @@ function Preview({ q, index }) {
   );
 }
 
-function Editor({ initialId, onDone, flash }) {
+function Editor({ initialId, onDone, onTestPlay, flash }) {
   const [title, setTitle] = useState('');
   const [level, setLevel] = useState('A1');
   const [status, setStatus] = useState('draft');
@@ -90,6 +92,7 @@ function Editor({ initialId, onDone, flash }) {
         flash('Published — you can give it to your students now');
         onDone();
       } else flash('Saved');
+      return saved._id;
     } catch (err) {
       const problems = err?.response?.data?.problems;
       if (problems) {
@@ -99,7 +102,10 @@ function Editor({ initialId, onDone, flash }) {
       }
       flash(msg(err, 'Could not save'), true);
     } finally { setBusy(false); }
+    return null;
   };
+  // Save first, so the test plays what is on screen
+  const testPlay = async () => { const saved = await save(false); if (saved) onTestPlay(saved); };
 
   const unpublish = async () => {
     try { await api.post(`${BASE}/sets/${id}/unpublish`); setStatus('draft'); flash('Back to draft'); }
@@ -179,6 +185,7 @@ function Editor({ initialId, onDone, flash }) {
             {status !== 'published'
               ? <button type="button" className="wst-btn wst-btn--primary" disabled={busy || readyErrors.length > 0} onClick={() => save(true)}>Publish</button>
               : <button type="button" className="wst-btn" disabled={busy} onClick={unpublish}>Back to draft</button>}
+            <button type="button" className="wst-btn" disabled={busy || !title.trim() || !filled.length} onClick={testPlay}><Play size={14} /> Save &amp; test play</button>
           </div>
         </div>
       </div>
@@ -282,6 +289,8 @@ export default function WordSquadTab({ isDarkMode }) {
   const [sets, setSets] = useState(null);
   const [assignments, setAssignments] = useState([]);
   const [toast, setToast] = useState(null);
+  const navigate = useNavigate();
+  const testPlay = useCallback((id) => navigate(`/teacher/games/word-squad/test/${id}`), [navigate]);
 
   const flash = useCallback((text, bad = false) => {
     setToast({ text, bad });
@@ -309,7 +318,8 @@ export default function WordSquadTab({ isDarkMode }) {
   return (
     <div className={`wst${isDarkMode ? ' wst--dark' : ''}`}>
       {toast && <div className={`wst-toast${toast.bad ? ' wst-toast--bad' : ''}`} role="status">{toast.text}</div>}
-      {view.name === 'edit' && <Editor initialId={view.id} onDone={back} flash={flash} />}
+      {view.name === 'edit' && <Editor key={view.id || 'new'} initialId={view.id} onDone={back} onTestPlay={testPlay} flash={flash} />}
+      {view.name === 'ai' && <WordSquadAi onBack={back} onOpenDraft={(id) => setView({ name: 'edit', id })} onTestPlay={testPlay} flash={flash} />}
       {view.name === 'assign' && <AssignForm set={view.set} onDone={back} flash={flash} />}
       {view.name === 'list' && (
         <>
@@ -319,11 +329,12 @@ export default function WordSquadTab({ isDarkMode }) {
               <p className="wst-muted" style={{ margin: '4px 0 0' }}>Make question sets from your lessons and give them to your students to play.</p>
             </div>
             <span className="wst-spacer" />
+            <button type="button" className="wst-btn" onClick={() => setView({ name: 'ai' })}><Sparkles size={14} /> Make questions with AI</button>
             <button type="button" className="wst-btn wst-btn--primary" onClick={() => setView({ name: 'edit' })}><Plus size={14} /> New question set</button>
           </div>
 
           {sets === null ? <p className="wst-muted">Loading…</p> : sets.length === 0 ? (
-            <div className="wst-card"><p style={{ margin: 0 }}>No question sets yet. Start one with <b>New question set</b> — or import a CSV.</p></div>
+            <div className="wst-card"><p style={{ margin: 0 }}>No question sets yet. Write your own with <b>New question set</b> (or import a CSV), or let the AI make some from your book pages with <b>Make questions with AI</b>.</p></div>
           ) : (
             <div className="wst-grid">
               {sets.map((s) => (
@@ -337,6 +348,7 @@ export default function WordSquadTab({ isDarkMode }) {
                   <div className="wst-row">
                     <button type="button" className="wst-btn wst-btn--sm" onClick={() => setView({ name: 'edit', id: s.id })}>Edit</button>
                     <button type="button" className="wst-btn wst-btn--sm wst-btn--primary" disabled={s.status !== 'published'} title={s.status !== 'published' ? 'Publish the set first' : ''} onClick={() => setView({ name: 'assign', set: s })}>Give to students</button>
+                    <button type="button" className="wst-btn wst-btn--sm" disabled={!s.questionCount} title="Play it yourself first — no stars" onClick={() => testPlay(s.id)}><Play size={14} /> Test</button>
                     <button type="button" className="wst-btn wst-btn--sm" aria-label="Copy" onClick={() => duplicate(s)}><Copy size={14} /></button>
                     <button type="button" className="wst-btn wst-btn--sm wst-btn--danger" aria-label="Delete" onClick={() => remove(s)}><Trash2 size={14} /></button>
                   </div>

@@ -1930,6 +1930,57 @@ router.post('/pronunciation-credits/:centerId', verifySuperAdmin, async (req, re
   }
 });
 
+// ── GET /api/super-admin/ai-credits  — teacher AI tool budgets (Word Squad questions) ──
+router.get('/ai-credits', verifySuperAdmin, async (req, res) => {
+  try {
+    const centers = await Center.find({ status: 'active' }).select('centerName slug adminEmail plan aiCredits').lean();
+    const data = centers.map(c => ({
+      _id: c._id, centerName: c.centerName, slug: c.slug, adminEmail: c.adminEmail, plan: c.plan,
+      balance: c.aiCredits?.balance ?? 0,
+      totalAllocated: c.aiCredits?.totalAllocated ?? 0,
+      used: (c.aiCredits?.totalAllocated ?? 0) - (c.aiCredits?.balance ?? 0),
+      log: (c.aiCredits?.log || []).slice(-10).reverse(),
+    }));
+    const totals = {
+      totalBalance: data.reduce((n, c) => n + c.balance, 0),
+      totalAllocated: data.reduce((n, c) => n + c.totalAllocated, 0),
+      totalUsed: data.reduce((n, c) => n + c.used, 0),
+    };
+    res.json({ success: true, centers: data, totals });
+  } catch (err) {
+    logger.error('AI credits list error:', { error: err?.message });
+    serverError(res);
+  }
+});
+
+// ── POST /api/super-admin/ai-credits/:centerId  — allocate ────────────────────
+router.post('/ai-credits/:centerId', verifySuperAdmin, strictLimiter, validateParamMongoId('centerId'), async (req, res) => {
+  try {
+    const { amount, note } = req.body;
+    if (!amount || typeof amount !== 'number' || !Number.isInteger(amount) || amount < 1 || amount > 100000) {
+      return badRequest(res, 'amount must be a whole number between 1 and 100,000');
+    }
+    const center = await Center.findById(req.params.centerId);
+    if (!center || center.status !== 'active') return notFound(res, 'Center not found or inactive');
+    const logEntry = { amount, note: String(note || 'Allocated by super admin').slice(0, 200), by: req.user?.username || 'superadmin', createdAt: new Date() };
+    const updated = await Center.findByIdAndUpdate(center._id, {
+      $inc: { 'aiCredits.balance': amount, 'aiCredits.totalAllocated': amount },
+      $push: { 'aiCredits.log': { $each: [logEntry], $slice: -50 } },
+    }, { new: true }).select('aiCredits centerName').lean();
+    await writeAuditLog({
+      action: 'AI_CREDITS_ALLOCATED', superAdmin: req.superAdmin,
+      targetId: center._id.toString(), targetName: center.centerName, details: { amount, note }, ip: req.ip,
+    });
+    res.json({
+      success: true, message: `${amount} AI credits allocated to ${center.centerName}`,
+      balance: updated.aiCredits.balance, totalAllocated: updated.aiCredits.totalAllocated,
+    });
+  } catch (err) {
+    logger.error('Allocate AI credits error:', { error: err?.message });
+    serverError(res);
+  }
+});
+
 // GET /api/super-admin/centers/:id/people — active teachers + students for one center
 router.get('/centers/:id/people', verifySuperAdmin, validateParamMongoId('id'), async (req, res) => {
   try {

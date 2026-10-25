@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { createDemoSession } from './data/demoSession.js';
 import { listAssignments, createServerSession, apiMessage } from './data/serverSession.js';
+import api from '../../../api';
 import { computeStars } from './logic/stars.js';
 import { chapterRating } from './logic/rating.js';
 import { rewardLabel } from './logic/rewards.js';
@@ -120,14 +121,17 @@ const ratingsObj = (arr) => Object.fromEntries((arr || []).map((n, i) => [i, n])
  *              Otherwise the student plays their assigned games and the server checks
  *              every answer and pays the stars.
  */
-export default function WordSquadPage({ exitTo = '/student/dashboard', demo = false }) {
+export default function WordSquadPage({ exitTo = '/student/dashboard', demo = false, testSetId = null }) {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const [games, setGames] = useState(null);        // the student's assigned games (server mode)
   const [assignment, setAssignment] = useState(null);
   const [practice, setPractice] = useState(false); // play the demo questions without stars
   const [totalStars, setTotalStars] = useState(0);
-  const offline = demo || practice;
+  // A teacher trying their own set: their questions, all chapters, no stars, nothing saved
+  const [testSet, setTestSet] = useState(null);
+  const testing = !!testSetId;
+  const offline = demo || practice || testing;
   const hostRef = useRef(null);
   const gameRef = useRef(null);
   const flashTimer = useRef(null);
@@ -177,7 +181,20 @@ export default function WordSquadPage({ exitTo = '/student/dashboard', demo = fa
       setError(apiMessage(err, 'Could not load your games. Check your connection and try again.'));
     }
   }, [params, pick]);
-  useEffect(() => { if (!demo) loadGames(); }, [demo, loadGames]);
+  useEffect(() => { if (!demo && !testing) loadGames(); }, [demo, testing, loadGames]);
+  useEffect(() => {
+    if (!testSetId) return;
+    api.get(`/games/sets/${testSetId}`)
+      .then(({ data }) => {
+        if (!data.data.questions.some((q) => q.prompt && q.answer && q.distractors?.some(Boolean))) {
+          setError('This set has no finished questions yet — add a sentence, the right word and a wrong word.');
+          return;
+        }
+        setTestSet(data.data);
+        setUnlocked(2);
+      })
+      .catch((err) => setError(apiMessage(err, 'Could not open this question set.')));
+  }, [testSetId]);
 
   const stopGame = useCallback(() => {
     clearTimeout(flashTimer.current);
@@ -213,7 +230,7 @@ export default function WordSquadPage({ exitTo = '/student/dashboard', demo = fa
       const { startGame } = await import('./engine.js');
       let session;
       try {
-        session = offline ? createDemoSession(ch) : await createServerSession(assignment.id, ch);
+        session = offline ? createDemoSession(ch, undefined, testing && testSet ? testSet.questions : undefined) : await createServerSession(assignment.id, ch);
       } catch (err) {
         setError(apiMessage(err, 'Could not start the game. Check your connection and try again.'));
         setScreen('menu');
@@ -270,7 +287,7 @@ export default function WordSquadPage({ exitTo = '/student/dashboard', demo = fa
             const stars = computeStars(s);
             const rating = chapterRating(s);
             setSummary({ ...s, stars, rating });
-            if (practice) { setScreen('ended'); return; } // practice: no progress kept
+            if (practice || testing) { setScreen('ended'); return; } // practice / test play: no progress kept
             setRatings((r) => {
               if ((r[ch] || 0) >= rating.count) return r;
               const next = { ...r, [ch]: rating.count };
@@ -289,7 +306,7 @@ export default function WordSquadPage({ exitTo = '/student/dashboard', demo = fa
       setError('The game could not start on this device. Please try again or use another browser.');
       setScreen('menu');
     }
-  }, [stopGame, offline, assignment, practice]);
+  }, [stopGame, offline, assignment, practice, testing, testSet]);
 
   const answerRevive = async (choice) => {
     const session = sessionRef.current;
@@ -316,7 +333,7 @@ export default function WordSquadPage({ exitTo = '/student/dashboard', demo = fa
 
   const total = CHAPTERS[chapter]?.gates ?? 0;
   const lastChapter = assignment && !practice ? assignment.chapters - 1 : 2;
-  const backToList = !demo && (practice || (assignment && games?.length > 1));
+  const backToList = !demo && !testing && (practice || (assignment && games?.length > 1));
 
   return (
     <div className="ws-root">
@@ -359,8 +376,9 @@ export default function WordSquadPage({ exitTo = '/student/dashboard', demo = fa
               <span className="ws-title-word">WORD</span><span className="ws-title-word ws-title-word--b">SQUAD</span>
             </div>
             <p className="ws-lead">Steer your squad through the <b>right word</b>. Right words give weapons and friends. Wrong words bring more bugs!</p>
-            {!demo && games === null && <p className="ws-lead">Loading your games…</p>}
-            {!demo && games && !assignment && !practice && (
+            {testing && <div className="ws-game-head"><span>Test play: {testSet ? testSet.title : 'loading…'}</span><span>Your questions · no stars</span></div>}
+            {!demo && !testing && games === null && <p className="ws-lead">Loading your games…</p>}
+            {!demo && !testing && games && !assignment && !practice && (
               <div className="ws-chapters">
                 {games.length === 0 && <p className="ws-lead">No Word Squad games from your teacher yet.</p>}
                 {games.map((g) => (
@@ -376,9 +394,9 @@ export default function WordSquadPage({ exitTo = '/student/dashboard', demo = fa
                 <button type="button" className="ws-btn ws-btn--ghost" onClick={() => { setPractice(true); setUnlocked(2); setRatings({}); }}>Practice with sample words (no stars)</button>
               </div>
             )}
-            {(demo || assignment || practice) && (
+            {(demo || assignment || practice || (testing && testSet)) && (
             <>
-            {!demo && (
+            {!demo && !testing && (
               <div className="ws-game-head">
                 <span>{practice ? 'Practice — sample words, no stars' : assignment.title}</span>
                 {!practice && <span>⭐ {totalStars} · star plays today {Math.min(assignment.playsToday, assignment.maxPlaysPerDay)}/{assignment.maxPlaysPerDay}</span>}

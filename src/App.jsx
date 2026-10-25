@@ -2,7 +2,7 @@ import React, { useState, useEffect, lazy, Suspense } from "react";
 import { BrandingProvider } from './context/BrandingContext.jsx';
 import { AuthProvider }     from './context/AuthContext.jsx';
 import {
-  BrowserRouter as Router, Routes, Route, Navigate, useLocation,
+  BrowserRouter as Router, Routes, Route, Navigate, useLocation, useParams,
 } from "react-router-dom";
 
 // Auth guard — single component for all roles
@@ -70,6 +70,11 @@ const CenterLandingPage   = lazy(() => import("./pages/landing-page/CenterLandin
 const ClemifyHome         = lazy(() => import("./pages/clemify-home/ClemifyHome"));
 // Word Squad game — its own chunk; the PixiJS engine loads only when a chapter starts
 const WordSquadPage       = lazy(() => import("./pages/games/word-squad/WordSquadPage"));
+// A teacher plays their own set before giving it out (no stars, nothing saved)
+function WordSquadTestPlay() {
+  const { setId } = useParams();
+  return <WordSquadPage exitTo="/teacher/dashboard?tab=games" testSetId={setId} />;
+}
 
 // Full-screen spinner shown while a lazy chunk loads
 function PageLoader() {
@@ -243,6 +248,7 @@ function App() {
             <Route path="/student/dashboard"             element={<AuthGuard role="student"><StudentDashboard /></AuthGuard>} />
             <Route path="/student/setup"                 element={<StudentSetup />} />
             <Route path="/student/games/word-squad"      element={<AuthGuard role="student"><WordSquadPage /></AuthGuard>} />
+            <Route path="/teacher/games/word-squad/test/:setId" element={<AuthGuard role="teacher"><WordSquadTestPlay /></AuthGuard>} />
             {/* Dev only: play the demo without logging in (stripped from production builds) */}
             {import.meta.env.DEV && <Route path="/dev/word-squad" element={<WordSquadPage exitTo="/" demo />} />}
 

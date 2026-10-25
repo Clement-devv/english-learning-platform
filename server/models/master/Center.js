@@ -260,6 +260,20 @@ const centerSchema = new mongoose.Schema({
     }],
   },
 
+  // ── AI Credit Budget for teacher tools (Word Squad questions from book pages) ──
+  // Allocated by the super admin; each AI job is charged by what it actually used
+  // (utils/aiCredits.js). Separate from the students' chat credits.
+  aiCredits: {
+    balance:        { type: Number, default: 0, min: 0 },
+    totalAllocated: { type: Number, default: 0 },
+    log: [{
+      amount:    Number,
+      note:      String,
+      by:        String,
+      createdAt: { type: Date, default: Date.now },
+    }],
+  },
+
   // ── Pronunciation Credit Budget (allocated by super admin) ───────────────
   pronunciationCredits: {
     balance:        { type: Number, default: 0, min: 0 },

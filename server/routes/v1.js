@@ -42,6 +42,7 @@ import pronunciationRoutes       from "./pronunciationRoutes.js";
 import quizRoutes                from "./quizRoutes.js";
 import quizTemplateRoutes        from "./quizTemplateRoutes.js";
 import gameRoutes                from "./gameRoutes.js";
+import gameAiRoutes              from "./gameAiRoutes.js";
 import grammarRoutes             from "./grammarRoutes.js";
 import chatRoutes                from "./chatRoutes.js";
 import vocabRoutes               from "./vocabRoutes.js";
@@ -108,6 +109,7 @@ router.use("/homework",             homeworkRoutes);
 router.use("/pronunciation",        pronunciationRoutes);
 router.use("/quiz",                 quizRoutes);
 router.use("/quiz-templates",       quizTemplateRoutes);
+router.use("/games/ai",             gameAiRoutes);       // Word Squad: questions from book pages (before /games)
 router.use("/games",                gameRoutes);         // Word Squad play API
 router.use("/grammar",              grammarRoutes);
 router.use("/chat",                 chatRoutes);

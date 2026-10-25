@@ -47,6 +47,21 @@ export async function getPresignedUrl(key, expiresIn = 3600, response = {}) {
   return getSignedUrl(s3, cmd, { expiresIn });
 }
 
+// Presigned PUT so the browser uploads straight to S3 (the file never passes
+// through Express). The key stays private.
+export async function getPresignedPutUrl(key, contentType, expiresIn = 600) {
+  if (!s3) return null;
+  const cmd = new PutObjectCommand({ Bucket: BUCKET, Key: key, ContentType: contentType });
+  return getSignedUrl(s3, cmd, { expiresIn });
+}
+
+// Read a (small) private object into memory — e.g. pages to send to the AI.
+export async function getObjectBuffer(key) {
+  if (!s3) throw new Error("S3 not configured");
+  const out = await s3.send(new GetObjectCommand({ Bucket: BUCKET, Key: key }));
+  return Buffer.from(await out.Body.transformToByteArray());
+}
+
 // Extract the S3 key from a stored URL or key string.
 // Stored public URLs look like: https://bucket.s3.region.amazonaws.com/key
 // Stored keys look like: centers/slug/...

@@ -19,6 +19,7 @@ import { startParentCheckScheduler } from "./parentCheck.js";
 import { startRecordingLinkScheduler } from "./recordingLinks.js";
 import { startSummaryEmailScheduler } from "./classSummaryEmails.js";
 import { startFamilyLinkScheduler } from "./familyLinkEmails.js";
+import { startQuestionJobScheduler } from "./questionJobs.js";
 import { backfillTeacherCodes } from "./teacherCode.js";
 import logger from "./logger.js";
 
@@ -46,6 +47,7 @@ export async function startCenterJobs(center) {
       ...startSummaryEmailScheduler(db, center),  // email teachers' class summaries to families
       ...startFamilyLinkScheduler(db, center),    // email parent attendance checks to families
       ...startDailyClassReportScheduler(db, center),
+      ...startQuestionJobScheduler(db, center),   // Word Squad: AI questions from book pages + 30-day page cleanup
     ];
     running.set(slug, { timers });
     // Give teachers created before ID numbers existed a TCH-xxxxx code (once; no-op after)

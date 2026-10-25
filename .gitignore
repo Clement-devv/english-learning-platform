@@ -21,6 +21,7 @@ build/
 server/uploads/content/
 server/uploads/recordings/
 server/uploads/homework/
+server/uploads/question-sources/
 # Keep branding and teacher photos tracked (small, intentional assets)
 
 # Markdown docs
