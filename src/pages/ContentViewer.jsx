@@ -1,4 +1,7 @@
 // src/pages/ContentViewer.jsx
+// Content tab: the teacher's PDF, page, zoom and pen marks, mirrored to the student.
+// Live updates go over the socket; the DB (content-state) is the fallback the
+// student polls and what the teacher comes back to after switching tabs.
 import { useState, useRef, useEffect, useCallback } from "react";
 import * as pdfjsLib from "pdfjs-dist";
 import pdfWorkerSrc from "pdfjs-dist/build/pdf.worker.min.mjs?url";
@@ -14,6 +17,57 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerSrc;
 
 const COLORS = ["#e74c3c", "#3498db", "#2ecc71", "#f39c12", "#9b59b6", "#1abc9c", "#e67e22", "#000000"];
 
+// In production the socket server is on the same origin (it used to fall back
+// to localhost:5000, so without VITE_SOCKET_URL nothing synced live).
+const SERVER_URL = import.meta.env.VITE_SOCKET_URL || "";
+
+const getSocketToken = () =>
+  sessionStorage.getItem("teacherToken") ||
+  sessionStorage.getItem("studentToken") ||
+  sessionStorage.getItem("adminToken") ||
+  localStorage.getItem("teacherToken") ||
+  localStorage.getItem("studentToken") ||
+  localStorage.getItem("adminToken");
+
+// Pen widths are relative to an 800-px-wide page, so marks keep their size on
+// the page at any zoom and on any screen.
+const PAGE_UNITS = 800;
+// Pen moves are batched — one socket message per pointermove went past the
+// server's 60 events/second limit, which disconnects the teacher.
+const SEND_EVERY_MS = 40;
+const MAX_BATCH = 400; // numbers per batch — matches the server's limit
+// After a live socket update, ignore the (slower) DB poll for a moment so it
+// can't flip the student back to the previous page or remove a fresh stroke.
+const LIVE_GRACE_MS = 3000;
+
+const round4 = (n) => Math.round(n * 1e4) / 1e4;
+const newStrokeId = () =>
+  globalThis.crypto?.randomUUID?.() || `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+
+/** Saved/received stroke list for one page, or [] if it isn't one. */
+function parseStrokes(json) {
+  try {
+    const list = JSON.parse(json);
+    return Array.isArray(list) ? list.filter((s) => Array.isArray(s?.points)) : [];
+  } catch { return []; }
+}
+
+// Draw points [from…] of a stroke, joined to the point before `from` (if any).
+function drawStrokePart(ctx, canvas, stroke, from = 0) {
+  const pts = stroke.points;
+  if (!pts?.length) return;
+  const w = canvas.width;
+  const h = canvas.height;
+  const start = Math.max(0, from - 1);
+  applyStrokeStyle(ctx, stroke.tool, stroke.color, w / PAGE_UNITS);
+  ctx.beginPath();
+  ctx.moveTo(pts[start].x * w, pts[start].y * h);
+  if (pts.length - start === 1) ctx.lineTo(pts[start].x * w, pts[start].y * h); // a tap is a dot
+  for (let i = start + 1; i < pts.length; i++) ctx.lineTo(pts[i].x * w, pts[i].y * h);
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+  ctx.globalCompositeOperation = "source-over";
+}
 
 export default function ContentViewer({ bookingId, userRole, channelName }) {
   const isTeacher = userRole === "teacher";
@@ -32,35 +86,34 @@ export default function ContentViewer({ bookingId, userRole, channelName }) {
   // ── Drawing state (teacher only) ───────────────────────────────────────────
   const [tool,         setTool]        = useState("pointer");
   const [color,        setColor]       = useState("#e74c3c");
-  const [isDrawing,    setIsDrawing]   = useState(false);
   const [pageInput,    setPageInput]   = useState("");   // controlled value while editing
   const [editingPage,  setEditingPage] = useState(false);
 
   // ── Refs ───────────────────────────────────────────────────────────────────
   const pdfCanvasRef        = useRef(null);
   const annotationCanvasRef = useRef(null);
-  const lastPosRef          = useRef(null);
   const renderTaskRef       = useRef(null);
-  const annotationsRef      = useRef({}); // { pageNum: ImageData }
+  const renderSeq           = useRef(0);      // only the latest render may touch the canvas
   const fileInputRef        = useRef(null);
   const currentPageRef      = useRef(1);
   const socketRef           = useRef(null);
-  const isDrawingRef        = useRef(false);
   const toolRef             = useRef("pointer");
   const colorRef            = useRef("#e74c3c");
   const pdfDocRef           = useRef(null);   // mirrors pdfDoc state for socket callbacks
   const pendingPageRef      = useRef(null);   // page received before PDF was loaded
   const loadPdfRef          = useRef(null);   // stable ref to latest loadPdf callback
-  const renderPageRef       = useRef(null);   // imperative render fn — called directly by socket (like canvas drawing events)
   const scaleRef            = useRef(1.3);    // mirrors scale state for socket callbacks
   const annotationSaveTimer = useRef(null);   // debounce timer for saving annotation to DB
-  const lastAnnotationTs    = useRef(0);      // student: timestamp of last applied annotation
-  const strokesRef          = useRef({});     // teacher: per-page stroke paths { [pageNum]: [{tool,color,points}] }
-  const currentStrokeRef    = useRef(null);   // teacher: stroke currently being drawn
+  const strokesRef          = useRef({});     // { [page]: [{ id, tool, color, points: [{x, y}] }] } — both sides
+  const currentStrokeRef    = useRef(null);   // teacher: stroke being drawn
+  const pendingPts          = useRef([]);     // teacher: its points not sent yet
+  const sendTimer           = useRef(null);
+  const liveAt              = useRef(0);      // student: last live socket update (page/zoom/pen)
+  const appliedTs           = useRef({});     // student: { [page]: ts of the DB marks drawn }
+  const pendingSave         = useRef(null);   // teacher: page/zoom save not sent yet
 
   // Keep refs in sync with state
   useEffect(() => { currentPageRef.current = currentPage; }, [currentPage]);
-  useEffect(() => { isDrawingRef.current = isDrawing; }, [isDrawing]);
   useEffect(() => { toolRef.current = tool; }, [tool]);
   useEffect(() => { colorRef.current = color; }, [color]);
   useEffect(() => { pdfDocRef.current = pdfDoc; }, [pdfDoc]);
@@ -70,130 +123,110 @@ export default function ContentViewer({ bookingId, userRole, channelName }) {
   useEffect(() => { hasPdfRef.current  = hasPdf;   }, [hasPdf]);
   useEffect(() => { loadingRef.current = loading;  }, [loading]);
 
+  // Free the PDF (pdf.js keeps it in its worker) when it's replaced or we unmount
+  useEffect(() => () => { pdfDoc?.destroy?.(); }, [pdfDoc]);
+
+  // ── Pen marks: always drawn from the stroke list ───────────────────────────
+  // (They used to be saved as pixels, which came back misplaced after a zoom.)
+
+
+  const redrawMarks = useCallback((page = currentPageRef.current) => {
+    if (page !== currentPageRef.current) return;
+    const canvas = annotationCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    for (const s of strokesRef.current[page] || []) drawStrokePart(ctx, canvas, s);
+  }, []);
+
   // ── Socket.IO connection ───────────────────────────────────────────────────
   useEffect(() => {
     if (!channelName) return;
 
-    const userId   = localStorage.getItem("userId") || "unknown";
-    const userName = localStorage.getItem("name")   || "User";
-    const token    =
-      sessionStorage.getItem("teacherToken") || sessionStorage.getItem("studentToken") ||
-      localStorage.getItem("teacherToken")   || localStorage.getItem("studentToken");
-
-    const socket = io(import.meta.env.VITE_SOCKET_URL || "http://localhost:5000", {
-      auth:       { token },
+    const userName = localStorage.getItem("name") || "User";
+    const socket = io(SERVER_URL, {
+      auth:       { token: getSocketToken() },
       transports: ["websocket"],
     });
     socketRef.current = socket;
 
-    socket.emit("join-whiteboard", { channelName, userId, userName, userRole });
+    // (Re)join on every connect — after a network blip the room is gone
+    socket.on("connect", () => socket.emit("join-whiteboard", { channelName, userName }));
 
     if (isTeacher) {
       // When a student joins mid-session, push the current page and zoom so
       // they land on the same view as the teacher immediately.
       socket.on("user-joined", () => {
-        if (pdfDocRef.current && socketRef.current && channelName) {
-          socketRef.current.emit("pdf-page-sync", {
-            channelName,
-            page: currentPageRef.current,
-          });
-          socketRef.current.emit("pdf-zoom-sync", {
-            channelName,
-            scale: scaleRef.current,
-          });
+        if (pdfDocRef.current) {
+          socket.emit("pdf-page-sync", { channelName, page: currentPageRef.current });
+          socket.emit("pdf-zoom-sync", { channelName, scale: scaleRef.current });
         }
       });
     }
 
     // ── Student: receive teacher's annotations ─────────────────────────────
     if (!isTeacher) {
-      socket.on("pdf-stroke-start", ({ x, y, strokeTool, strokeColor, page }) => {
-        if (page !== currentPageRef.current) return;
+      const findStroke = (page, id) => (strokesRef.current[page] || []).find((s) => s.id === id);
+
+      socket.on("pdf-stroke-start", ({ page, id, x, y, strokeTool, strokeColor }) => {
+        liveAt.current = Date.now();
+        const stroke = { id, tool: strokeTool, color: strokeColor, points: [{ x, y }] };
+        (strokesRef.current[page] ||= []).push(stroke);
         const canvas = annotationCanvasRef.current;
-        if (!canvas) return;
-        const ctx = canvas.getContext("2d");
-        applyStrokeStyle(ctx, strokeTool, strokeColor);
-        ctx.beginPath();
-        ctx.moveTo(x * canvas.width, y * canvas.height);
+        if (canvas && page === currentPageRef.current) drawStrokePart(canvas.getContext("2d"), canvas, stroke);
       });
 
-      socket.on("pdf-stroke-move", ({ x, y, page }) => {
-        if (page !== currentPageRef.current) return;
+      socket.on("pdf-stroke-move", ({ page, id, pts }) => {
+        liveAt.current = Date.now();
+        const stroke = findStroke(page, id);
+        if (!stroke || !Array.isArray(pts)) return;
+        const from = stroke.points.length;
+        for (let i = 0; i + 1 < pts.length; i += 2) stroke.points.push({ x: pts[i], y: pts[i + 1] });
         const canvas = annotationCanvasRef.current;
-        if (!canvas) return;
-        const ctx = canvas.getContext("2d");
-        ctx.lineTo(x * canvas.width, y * canvas.height);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.moveTo(x * canvas.width, y * canvas.height);
+        if (canvas && page === currentPageRef.current) drawStrokePart(canvas.getContext("2d"), canvas, stroke, from);
       });
 
+      // finished stroke — redraw the page so marker overlaps look like the teacher's
       socket.on("pdf-stroke-end", ({ page }) => {
-        if (page !== currentPageRef.current) return;
-        const canvas = annotationCanvasRef.current;
-        if (!canvas) return;
-        const ctx = canvas.getContext("2d");
-        ctx.globalAlpha = 1;
-        ctx.globalCompositeOperation = "source-over";
-        annotationsRef.current[page] = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        // Suppress DB-poll annotation re-apply for 3 s — we just got live socket data,
-        // no need for the poll to clear + redraw the same strokes and cause a flicker.
-        lastAnnotationTs.current = Date.now() + 3000;
+        liveAt.current = Date.now();
+        redrawMarks(page);
       });
 
       socket.on("pdf-page-sync", ({ page }) => {
+        liveAt.current = Date.now();
         // Store so loadPdf can apply the right page if PDF isn't loaded yet.
         pendingPageRef.current = page;
-
-        // Save annotations for the page we're leaving (only if canvas ready).
-        const annCanvas = annotationCanvasRef.current;
-        if (annCanvas && pdfDocRef.current) {
-          const ctx = annCanvas.getContext("2d");
-          annotationsRef.current[currentPageRef.current] = ctx.getImageData(
-            0, 0, annCanvas.width, annCanvas.height
-          );
-        }
-
-        // Update the ref immediately so annotation events use the new page.
         currentPageRef.current = page;
-        // Update state for the page-counter UI.
-        setCurrentPage(page);
-
-        // ── Direct render (same pattern as drawing events) ──────────────────
-        // Don't wait for React to re-render + run the useEffect chain.
-        // Call the render function directly, exactly like canvas drawing events
-        // call ctx.lineTo() directly from the socket handler.
-        renderPageRef.current?.(page);
+        setCurrentPage(page); // the render effect draws it
       });
 
       socket.on("pdf-clear-sync", ({ page }) => {
-        if (page !== currentPageRef.current) return;
-        const canvas = annotationCanvasRef.current;
-        if (!canvas) return;
-        const ctx = canvas.getContext("2d");
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        annotationsRef.current[page] = null;
+        liveAt.current = Date.now();
+        strokesRef.current[page] = [];
+        redrawMarks(page);
       });
 
       // Teacher uploaded a new PDF — reload it on the student side
       socket.on("pdf-uploaded", () => {
         pendingPageRef.current = null; // new PDF always starts at page 1
+        liveAt.current = Date.now();
         setScale(1.3);
-        loadPdfRef.current?.();
+        loadPdfRef.current?.({ fresh: true });
       });
 
       // Teacher changed zoom — follow immediately
       socket.on("pdf-zoom-sync", ({ scale: newScale }) => {
+        liveAt.current = Date.now();
         setScale(newScale);
       });
     }
 
     return () => {
-      socket.emit("leave-whiteboard", { channelName, userId });
+      socket.emit("leave-whiteboard", { channelName });
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [channelName, isTeacher, userRole]);  
+  }, [channelName, isTeacher, redrawMarks]);
 
   // ── Check for existing PDF on mount ───────────────────────────────────────
   useEffect(() => {
@@ -206,25 +239,38 @@ export default function ContentViewer({ bookingId, userRole, channelName }) {
       .catch(() => setLoading(false));
   }, [bookingId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const loadPdf = useCallback(async () => {
+  // fresh: a newly uploaded PDF — start at page 1 with no marks. Otherwise the
+  // teacher picks up their saved page, zoom and marks (the tab unmounts on
+  // every tab switch in the Zoom / Google Meet classrooms).
+  const loadPdf = useCallback(async ({ fresh = false } = {}) => {
     try {
       setLoading(true);
       setUploadError(null);
-      const { data: arrayBuffer } = await api.get(
-        `/content/file/${bookingId}`,
-        { responseType: "arraybuffer" }
-      );
+      const [{ data: arrayBuffer }, saved] = await Promise.all([
+        api.get(`/content/file/${bookingId}`, { responseType: "arraybuffer" }),
+        isTeacher && !fresh
+          ? api.get(`/classroom/session/${bookingId}/content-state`, { params: { all: 1 } }).then((r) => r.data).catch(() => null)
+          : null,
+      ]);
       const doc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+
+      const strokes = {};
+      for (const [page, ann] of Object.entries(saved?.contentAnnotations || {})) {
+        if (ann?.data) strokes[page] = parseStrokes(ann.data);
+      }
       // If a page sync arrived before the PDF finished loading, jump to that
       // page immediately instead of always resetting to 1.
-      const startPage = pendingPageRef.current ?? 1;
+      const wanted = fresh ? 1 : pendingPageRef.current ?? saved?.contentPage ?? 1;
+      const startPage = Math.min(Math.max(1, wanted), doc.numPages);
       pendingPageRef.current = null;
+      strokesRef.current = strokes;
+      appliedTs.current = {};
+      currentPageRef.current = startPage;
+      if (saved?.contentScale) setScale(saved.contentScale);
       setPdfDoc(doc);
       setNumPages(doc.numPages);
       setCurrentPage(startPage);
       setHasPdf(true);
-      annotationsRef.current = {};
-      strokesRef.current = {};
     } catch (err) {
       console.error("PDF load error:", err);
       setUploadError(
@@ -235,7 +281,7 @@ export default function ContentViewer({ bookingId, userRole, channelName }) {
     } finally {
       setLoading(false);
     }
-  }, [bookingId]);
+  }, [bookingId, isTeacher]);
 
   // Keep loadPdfRef pointing at the latest callback so socket listeners
   // (which capture a stale closure) can call it without re-subscribing.
@@ -244,19 +290,19 @@ export default function ContentViewer({ bookingId, userRole, channelName }) {
   // ── Render PDF page ────────────────────────────────────────────────────────
   useEffect(() => {
     if (!pdfDoc || !pdfCanvasRef.current) return;
+    const seq = ++renderSeq.current;
 
-    // Build a render function that closes over the latest pdfDoc and scale.
-    // We store it in renderPageRef so the student's socket handler can call
-    // it directly — the same way drawing events call canvas methods directly —
-    // without going through the React state → useEffect chain.
-    const doRender = async (pageNum) => {
+    (async () => {
+      // One render at a time: two overlapping renders into one canvas made
+      // pdf.js fail and could leave a blank or mixed page.
       if (renderTaskRef.current) {
         renderTaskRef.current.cancel();
         renderTaskRef.current = null;
       }
       setRendering(true);
       try {
-        const page = await pdfDoc.getPage(pageNum);
+        const page = await pdfDoc.getPage(currentPage);
+        if (seq !== renderSeq.current) return;
 
         const dpr      = window.devicePixelRatio || 1;
         const viewport = page.getViewport({ scale: scale * dpr });
@@ -275,6 +321,7 @@ export default function ContentViewer({ bookingId, userRole, channelName }) {
           annCanvas.style.width  = `${viewport.width  / dpr}px`;
           annCanvas.style.height = `${viewport.height / dpr}px`;
         }
+        redrawMarks(currentPage);
 
         const ctx = pdfCanvas.getContext("2d", { alpha: false });
         ctx.fillStyle = "#ffffff";
@@ -283,36 +330,21 @@ export default function ContentViewer({ bookingId, userRole, channelName }) {
         const task = page.render({ canvasContext: ctx, viewport });
         renderTaskRef.current = task;
         await task.promise;
-
-        if (annCanvas && annotationsRef.current[pageNum]) {
-          const annCtx = annCanvas.getContext("2d");
-          annCtx.putImageData(annotationsRef.current[pageNum], 0, 0);
-        }
       } catch (err) {
         if (err?.name !== "RenderingCancelledException") console.error("Render error:", err);
       } finally {
-        setRendering(false);
+        if (seq === renderSeq.current) {
+          renderTaskRef.current = null;
+          setRendering(false);
+        }
       }
-    };
-
-    // Expose to socket handlers before rendering
-    renderPageRef.current = doRender;
-    doRender(currentPage);
-  }, [pdfDoc, currentPage, scale]);
-
-  // ── Save annotations before page change ───────────────────────────────────
-  const saveAnnotations = useCallback(() => {
-    const annCanvas = annotationCanvasRef.current;
-    if (!annCanvas) return;
-    const ctx = annCanvas.getContext("2d");
-    annotationsRef.current[currentPage] = ctx.getImageData(0, 0, annCanvas.width, annCanvas.height);
-  }, [currentPage]);
+    })();
+  }, [pdfDoc, currentPage, scale, redrawMarks]);
 
   const goToPage = useCallback((n) => {
-    saveAnnotations();
     const newPage = Math.max(1, Math.min(n, numPages));
     setCurrentPage(newPage);
-  }, [saveAnnotations, numPages]);
+  }, [numPages]);
 
   // ── Teacher: broadcast current page whenever it changes ───────────────────
   useEffect(() => {
@@ -331,101 +363,71 @@ export default function ContentViewer({ bookingId, userRole, channelName }) {
   const contentSaveTimerRef = useRef(null);
   useEffect(() => {
     if (!isTeacher || !hasPdf || !bookingId) return;
-    clearTimeout(contentSaveTimerRef.current);
-    contentSaveTimerRef.current = setTimeout(() => {
+    const save = () => {
+      pendingSave.current = null;
       api.patch(`/classroom/session/${bookingId}/content-state`, { page: currentPage, scale })
         .catch(() => {}); // silent — polling is best-effort
-    }, 600);
+    };
+    pendingSave.current = save;
+    clearTimeout(contentSaveTimerRef.current);
+    contentSaveTimerRef.current = setTimeout(save, 600);
     return () => clearTimeout(contentSaveTimerRef.current);
   }, [currentPage, scale, isTeacher, hasPdf, bookingId]);
+
+  // Leaving the tab within 600 ms of a page change must still save it
+  useEffect(() => () => { pendingSave.current?.(); }, []);
 
   // ── Student: poll content-state every 1.5 s — mirrors page, zoom, annotations ──
   useEffect(() => {
     if (isTeacher || !bookingId) return;
     let timer;
-
-    const applyAnnotation = (ann) => {
-      if (!ann || ann.ts <= lastAnnotationTs.current) return;
-      if (ann.page !== currentPageRef.current) return;
-      lastAnnotationTs.current = ann.ts;
-
-      const canvas = annotationCanvasRef.current;
-      if (!canvas) return;
-      const ctx = canvas.getContext("2d");
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      if (!ann.data || ann.data === "[]") {
-        // Cleared state — update cache and return
-        annotationsRef.current[ann.page] = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        return;
-      }
-
-      // Parse stroke-path JSON and re-draw each stroke
-      try {
-        const strokes = JSON.parse(ann.data);
-        for (const stroke of strokes) {
-          if (!stroke.points || stroke.points.length < 1) continue;
-          applyStrokeStyle(ctx, stroke.tool, stroke.color);
-          ctx.beginPath();
-          ctx.moveTo(stroke.points[0].x * canvas.width, stroke.points[0].y * canvas.height);
-          for (let i = 1; i < stroke.points.length; i++) {
-            ctx.lineTo(stroke.points[i].x * canvas.width, stroke.points[i].y * canvas.height);
-            ctx.stroke();
-            ctx.beginPath();
-            ctx.moveTo(stroke.points[i].x * canvas.width, stroke.points[i].y * canvas.height);
-          }
-        }
-        ctx.globalAlpha = 1;
-        ctx.globalCompositeOperation = "source-over";
-        // Cache for page re-renders
-        annotationsRef.current[ann.page] = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      } catch (_) {}
-    };
+    let stopped = false;
 
     const poll = async () => {
       try {
         // No PDF loaded yet — check if teacher uploaded one (polling fallback for socket miss)
         if (!hasPdfRef.current) {
           if (!loadingRef.current) {
-            const { data: info } = await api.get(`/content/info/${bookingId}`).catch(() => ({ hasPdf: false }));
-            if (info.hasPdf) loadPdfRef.current?.();
+            const info = await api.get(`/content/info/${bookingId}`).then((r) => r.data).catch(() => null);
+            if (info?.hasPdf) loadPdfRef.current?.();
           }
-          timer = setTimeout(poll, 2000);
           return;
         }
 
-        const { data } = await api.get(`/classroom/session/${bookingId}/content-state`);
+        const page = currentPageRef.current;
+        const { data } = await api.get(`/classroom/session/${bookingId}/content-state`, { params: { page } });
+        if (stopped) return;
+        // A live update just came in — the DB may not have caught up yet
+        if (Date.now() - liveAt.current < LIVE_GRACE_MS) return;
 
         // ── Page sync ───────────────────────────────────────────────────────
         const pg = data?.contentPage;
         if (pg && pg !== currentPageRef.current) {
-          const annCanvas = annotationCanvasRef.current;
-          if (annCanvas) {
-            const ctx = annCanvas.getContext("2d");
-            annotationsRef.current[currentPageRef.current] = ctx.getImageData(0, 0, annCanvas.width, annCanvas.height);
-          }
           currentPageRef.current = pg;
-          setCurrentPage(pg);
-          renderPageRef.current?.(pg);
-          lastAnnotationTs.current = 0; // reset so annotation for new page is applied
+          setCurrentPage(pg); // the next poll fetches that page's marks
+          return;
         }
 
         // ── Scale sync ──────────────────────────────────────────────────────
         const sc = data?.contentScale;
-        if (sc && Math.abs(sc - scaleRef.current) > 0.01) {
-          setScale(sc);
+        if (sc && Math.abs(sc - scaleRef.current) > 0.01) setScale(sc);
+
+        // ── Annotation sync — redraw when the saved marks changed ───────────
+        const ann = data?.contentAnnotation;
+        if (ann && ann.page === currentPageRef.current && ann.ts !== appliedTs.current[ann.page]) {
+          appliedTs.current[ann.page] = ann.ts;
+          strokesRef.current[ann.page] = parseStrokes(ann.data);
+          redrawMarks(ann.page);
         }
-
-        // ── Annotation sync ─────────────────────────────────────────────────
-        applyAnnotation(data?.contentAnnotation);
-
-      } catch (_) {}
-      timer = setTimeout(poll, 1500);
+      } catch { /* best-effort — try again next tick */ }
+      finally {
+        if (!stopped) timer = setTimeout(poll, hasPdfRef.current ? 1500 : 2000);
+      }
     };
 
     timer = setTimeout(poll, 1500);
-    return () => clearTimeout(timer);
-  }, [isTeacher, bookingId]);  
+    return () => { stopped = true; clearTimeout(timer); };
+  }, [isTeacher, bookingId, redrawMarks]);
 
   // ── Upload handler ─────────────────────────────────────────────────────────
   const handleFileSelect = async (e) => {
@@ -441,7 +443,8 @@ export default function ContentViewer({ bookingId, userRole, channelName }) {
       const form = new FormData();
       form.append("pdf", file);
       await api.post(`/content/upload?bookingId=${bookingId}`, form);
-      await loadPdf();
+      setScale(1.3);
+      await loadPdf({ fresh: true });
       // Notify students that a new PDF is available so they load it too
       if (socketRef.current && channelName) {
         socketRef.current.emit("pdf-uploaded", { channelName });
@@ -455,156 +458,103 @@ export default function ContentViewer({ bookingId, userRole, channelName }) {
     }
   };
 
-  // ── Drawing helpers ────────────────────────────────────────────────────────
-  const getPos = (e, canvas) => {
-    const rect   = canvas.getBoundingClientRect();
-    const scaleX = canvas.width  / rect.width;
-    const scaleY = canvas.height / rect.height;
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+  // ── Drawing (teacher) ──────────────────────────────────────────────────────
+  const getNormPos = (e, canvas) => {
+    const rect = canvas.getBoundingClientRect();
+    const clamp = (n) => Math.min(1, Math.max(0, n));
     return {
-      x: (clientX - rect.left) * scaleX,
-      y: (clientY - rect.top)  * scaleY,
+      x: round4(clamp((e.clientX - rect.left) / rect.width)),
+      y: round4(clamp((e.clientY - rect.top)  / rect.height)),
     };
   };
 
-  // Normalized position (0–1) for socket emission
-  const getNormPos = (pos, canvas) => ({
-    x: pos.x / canvas.width,
-    y: pos.y / canvas.height,
-  });
+  const saveMarks = useCallback((page) => {
+    clearTimeout(annotationSaveTimer.current);
+    annotationSaveTimer.current = setTimeout(() => {
+      const list = (strokesRef.current[page] || []).map(({ tool: t, color: c, points }) => ({ tool: t, color: c, points }));
+      api.patch(`/classroom/session/${bookingId}/content-state`, {
+        annotation:     JSON.stringify(list),
+        annotationPage: page,
+      }).catch(() => {});
+    }, 300);
+  }, [bookingId]);
+
+  const flushPts = useCallback(() => {
+    clearTimeout(sendTimer.current);
+    sendTimer.current = null;
+    const stroke = currentStrokeRef.current;
+    if (!stroke || pendingPts.current.length === 0) return;
+    socketRef.current?.emit("pdf-stroke-move", { channelName, page: stroke.page, id: stroke.id, pts: pendingPts.current });
+    pendingPts.current = [];
+  }, [channelName]);
 
   const startDraw = useCallback((e) => {
     if (!isTeacher || toolRef.current === "pointer") return;
+    if (e.button !== 0 || currentStrokeRef.current) return; // left button / one finger only
     e.preventDefault();
     const canvas = annotationCanvasRef.current;
     if (!canvas) return;
-    const pos  = getPos(e, canvas);
-    const ctx  = canvas.getContext("2d");
-    const norm = getNormPos(pos, canvas);
+    e.currentTarget.setPointerCapture?.(e.pointerId); // keep the stroke if the pointer leaves the page
+    const norm = getNormPos(e, canvas);
+    const page = currentPageRef.current;
+    const stroke = { id: newStrokeId(), page, tool: toolRef.current, color: colorRef.current, points: [norm] };
+    currentStrokeRef.current = stroke;
+    pendingPts.current = [];
+    (strokesRef.current[page] ||= []).push(stroke);
+    drawStrokePart(canvas.getContext("2d"), canvas, stroke);
 
-    applyStrokeStyle(ctx, toolRef.current, colorRef.current);
-    ctx.beginPath();
-    ctx.moveTo(pos.x, pos.y);
-    lastPosRef.current = pos;
-
-    // Begin recording this stroke's path for DB sync
-    currentStrokeRef.current = {
-      tool:   toolRef.current,
-      color:  colorRef.current,
-      points: [norm],
-    };
-
-    setIsDrawing(true);
-
-    // Emit to students
-    if (socketRef.current && channelName) {
-      socketRef.current.emit("pdf-stroke-start", {
-        channelName,
-        page: currentPageRef.current,
-        x: norm.x,
-        y: norm.y,
-        strokeTool:  toolRef.current,
-        strokeColor: colorRef.current,
-      });
-    }
+    socketRef.current?.emit("pdf-stroke-start", {
+      channelName, page, id: stroke.id,
+      x: norm.x, y: norm.y,
+      strokeTool: stroke.tool, strokeColor: stroke.color,
+    });
   }, [isTeacher, channelName]);
 
   const draw = useCallback((e) => {
-    if (!isTeacher || !isDrawingRef.current || toolRef.current === "pointer") return;
+    const stroke = currentStrokeRef.current;
+    if (!stroke) return;
     e.preventDefault();
     const canvas = annotationCanvasRef.current;
     if (!canvas) return;
-    const ctx  = canvas.getContext("2d");
-    const pos  = getPos(e, canvas);
-    const norm = getNormPos(pos, canvas);
+    const norm = getNormPos(e, canvas);
+    const from = stroke.points.length;
+    stroke.points.push(norm);
+    if (stroke.page === currentPageRef.current) drawStrokePart(canvas.getContext("2d"), canvas, stroke, from);
 
-    ctx.lineTo(pos.x, pos.y);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(pos.x, pos.y);
-    lastPosRef.current = pos;
-
-    // Accumulate points for DB sync
-    if (currentStrokeRef.current) {
-      currentStrokeRef.current.points.push(norm);
-    }
-
-    // Emit to students
-    if (socketRef.current && channelName) {
-      socketRef.current.emit("pdf-stroke-move", {
-        channelName,
-        page: currentPageRef.current,
-        x: norm.x,
-        y: norm.y,
-      });
-    }
-  }, [isTeacher, channelName]);
+    pendingPts.current.push(norm.x, norm.y);
+    if (pendingPts.current.length >= MAX_BATCH) flushPts();
+    else if (!sendTimer.current) sendTimer.current = setTimeout(flushPts, SEND_EVERY_MS);
+  }, [flushPts]);
 
   const stopDraw = useCallback(() => {
-    if (!isTeacher || !isDrawingRef.current) return;
-    const canvas = annotationCanvasRef.current;
-    const page   = currentPageRef.current;
+    const stroke = currentStrokeRef.current;
+    if (!stroke) return;
+    flushPts();
+    currentStrokeRef.current = null;
+    redrawMarks(stroke.page);
+    saveMarks(stroke.page);
+    socketRef.current?.emit("pdf-stroke-end", { channelName, page: stroke.page, id: stroke.id });
+  }, [channelName, flushPts, redrawMarks, saveMarks]);
 
-    if (canvas) {
-      const ctx = canvas.getContext("2d");
-      ctx.globalAlpha = 1;
-      ctx.globalCompositeOperation = "source-over";
-      // Save canvas state locally for page-switch restoration
-      annotationsRef.current[page] = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  // Switching page mid-stroke ends the stroke on the page it started on
+  useEffect(() => { stopDraw(); }, [currentPage]); // eslint-disable-line react-hooks/exhaustive-deps
 
-      // Append completed stroke to per-page stroke list and persist as JSON
-      if (currentStrokeRef.current && currentStrokeRef.current.points.length > 0) {
-        if (!strokesRef.current[page]) strokesRef.current[page] = [];
-        strokesRef.current[page].push(currentStrokeRef.current);
-        currentStrokeRef.current = null;
-
-        const strokeJson = JSON.stringify(strokesRef.current[page]);
-        clearTimeout(annotationSaveTimer.current);
-        annotationSaveTimer.current = setTimeout(() => {
-          api.patch(`/classroom/session/${bookingId}/content-state`, {
-            annotation:     strokeJson,
-            annotationPage: page,
-          }).catch(() => {});
-        }, 300);
-      }
-    }
-
-    setIsDrawing(false);
-    lastPosRef.current = null;
-
-    // Emit to students via socket (best-effort — polling is the reliable path)
-    if (socketRef.current && channelName) {
-      socketRef.current.emit("pdf-stroke-end", {
-        channelName,
-        page,
-      });
-    }
-  }, [isTeacher, channelName, bookingId]);
+  useEffect(() => () => { clearTimeout(sendTimer.current); }, []);
 
   const clearAnnotations = () => {
-    const canvas = annotationCanvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    annotationsRef.current[currentPage] = null;
-
-    if (isTeacher) {
-      strokesRef.current[currentPage] = [];
-
-      // Persist cleared state to DB
-      if (bookingId) {
-        api.patch(`/classroom/session/${bookingId}/content-state`, {
-          annotation:     "[]",
-          annotationPage: currentPage,
-        }).catch(() => {});
-      }
-
-      // Also emit via socket (best-effort)
-      if (socketRef.current && channelName) {
-        socketRef.current.emit("pdf-clear-sync", { channelName, page: currentPage });
-      }
+    if (!isTeacher) return;
+    const page = currentPageRef.current;
+    strokesRef.current[page] = [];
+    redrawMarks(page);
+    clearTimeout(annotationSaveTimer.current);
+    // Persist cleared state to DB
+    if (bookingId) {
+      api.patch(`/classroom/session/${bookingId}/content-state`, {
+        annotation:     "[]",
+        annotationPage: page,
+      }).catch(() => {});
     }
+    socketRef.current?.emit("pdf-clear-sync", { channelName, page });
   };
 
   // ── Cursor ─────────────────────────────────────────────────────────────────
@@ -612,8 +562,6 @@ export default function ContentViewer({ bookingId, userRole, channelName }) {
     : tool === "eraser"  ? "cell"
     : tool === "pointer" ? "default"
     : "crosshair";
-
-  // ── Helper: apply stroke style to context ──────────────────────────────────
 
   // ── Loading / empty states ─────────────────────────────────────────────────
   if (loading) {
@@ -832,13 +780,11 @@ export default function ContentViewer({ bookingId, userRole, channelName }) {
                 touchAction: (!isTeacher || tool === "pointer") ? "auto" : "none",
                 pointerEvents: isTeacher ? "auto" : "none",
               }}
-              onMouseDown={isTeacher ? startDraw : undefined}
-              onMouseMove={isTeacher ? draw    : undefined}
-              onMouseUp={isTeacher   ? stopDraw : undefined}
-              onMouseLeave={isTeacher ? stopDraw : undefined}
-              onTouchStart={isTeacher ? startDraw : undefined}
-              onTouchMove={isTeacher  ? draw    : undefined}
-              onTouchEnd={isTeacher   ? stopDraw : undefined}
+              onPointerDown={isTeacher ? startDraw : undefined}
+              onPointerMove={isTeacher ? draw      : undefined}
+              onPointerUp={isTeacher   ? stopDraw  : undefined}
+              onPointerCancel={isTeacher ? stopDraw : undefined}
+              onLostPointerCapture={isTeacher ? stopDraw : undefined}
             />
           </div>
         </div>
@@ -848,23 +794,24 @@ export default function ContentViewer({ bookingId, userRole, channelName }) {
 }
 
 // ── Shared helper: configure canvas context for a given tool ──────────────────
-function applyStrokeStyle(ctx, strokeTool, strokeColor) {
+// k scales the widths to the page size (see PAGE_UNITS).
+function applyStrokeStyle(ctx, strokeTool, strokeColor, k = 1) {
   ctx.lineCap  = "round";
   ctx.lineJoin = "round";
   if (strokeTool === "eraser") {
     ctx.globalCompositeOperation = "destination-out";
-    ctx.lineWidth = 28;
+    ctx.lineWidth = 28 * k;
     ctx.globalAlpha = 1;
   } else if (strokeTool === "marker") {
     ctx.globalCompositeOperation = "source-over";
     ctx.strokeStyle = strokeColor;
-    ctx.lineWidth   = 18;
+    ctx.lineWidth   = 18 * k;
     ctx.globalAlpha = 0.35;
   } else {
     // pen
     ctx.globalCompositeOperation = "source-over";
     ctx.strokeStyle = strokeColor;
-    ctx.lineWidth   = 2.5;
+    ctx.lineWidth   = 2.5 * k;
     ctx.globalAlpha = 1;
   }
 }

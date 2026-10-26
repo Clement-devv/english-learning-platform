@@ -1,5 +1,7 @@
 // src/pages/WhiteboardTab.jsx
-// Real-time collaborative whiteboard with socket sync, undo, lock/unlock
+// Real-time collaborative whiteboard with socket sync, undo, lock/unlock.
+// The board is a list of strokes kept by the server (socketServer.js "drawing"):
+// undo removes only your own stroke, and every screen redraws the same picture.
 import { useEffect, useRef, useCallback, useState } from "react";
 import { io } from "socket.io-client";
 import {
@@ -16,50 +18,73 @@ const getSocketToken = () =>
   localStorage.getItem("teacherToken") ||
   localStorage.getItem("studentToken") ||
   localStorage.getItem("adminToken");
-const MAX_UNDO = 20;
+
+// Everyone gets the same board shape (letterboxed to fit), so a drawing never
+// looks stretched on a screen of a different shape.
+const BOARD_RATIO = 16 / 9;
+// Brush sizes are in "board pixels" of a 1000-wide board, so a line is as thick
+// relative to the board on a phone as on a big monitor.
+const BOARD_UNITS = 1000;
+// Moves are sent in batches — one message per pointermove went past the
+// server's 60 events/second limit on fast screens and pens, which disconnects.
+const SEND_EVERY_MS = 40;
+const MAX_BATCH = 400; // numbers per batch — matches the server's WB_MAX_BATCH
 
 // ── helpers ─────────────────────────────────────────────────────────────────
 
 function getPos(e, canvas) {
   const rect = canvas.getBoundingClientRect();
-  const src = e.touches ? e.touches[0] : e;
+  const clamp = (n) => Math.min(1, Math.max(0, n));
   return {
-    x: (src.clientX - rect.left) / rect.width,
-    y: (src.clientY - rect.top)  / rect.height,
+    x: clamp((e.clientX - rect.left) / rect.width),
+    y: clamp((e.clientY - rect.top)  / rect.height),
   };
 }
 
-function applyStroke(ctx, tool, color, size) {
-  ctx.globalCompositeOperation = tool === "eraser" ? "destination-out" : "source-over";
-  ctx.strokeStyle = tool === "marker" ? color + "88" : color;
-  ctx.lineWidth   = tool === "marker" ? size * 3 : tool === "eraser" ? size * 5 : size;
+const newStrokeId = () =>
+  globalThis.crypto?.randomUUID?.() || `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+
+function applyStroke(ctx, canvas, tool, color, size) {
+  const k = canvas.width / BOARD_UNITS;
+  ctx.globalCompositeOperation = "source-over";
+  ctx.strokeStyle = tool === "eraser" ? "#ffffff" : tool === "marker" ? color + "88" : color;
+  ctx.lineWidth   = (tool === "marker" ? size * 3 : tool === "eraser" ? size * 5 : size) * k;
   ctx.lineCap     = "round";
   ctx.lineJoin    = "round";
 }
 
-function drawOnCanvas(ctx, canvas, data) {
+// Draw points pts[from…] of a stroke, joined to the point before `from` (if any).
+// pts is a flat [x, y, x, y, …] list of 0–1 board fractions.
+function drawStroke(ctx, canvas, stroke, from = 0) {
+  const { pts } = stroke;
   const w = canvas.width;
   const h = canvas.height;
-  applyStroke(ctx, data.tool, data.color, data.size);
-  if (data.type === "start") {
-    ctx.beginPath();
-    ctx.moveTo(data.x * w, data.y * h);
-  } else if (data.type === "move") {
-    ctx.lineTo(data.x * w, data.y * h);
-    ctx.stroke();
-  }
+  const start = Math.max(0, from - 2);
+  if (pts.length < 2) return;
+  applyStroke(ctx, canvas, stroke.tool, stroke.color, stroke.size);
+  ctx.beginPath();
+  ctx.moveTo(pts[start] * w, pts[start + 1] * h);
+  if (pts.length - start === 2) ctx.lineTo(pts[start] * w, pts[start + 1] * h); // a tap is a dot
+  for (let i = start + 2; i < pts.length; i += 2) ctx.lineTo(pts[i] * w, pts[i + 1] * h);
+  ctx.stroke();
 }
 
 // ── component ────────────────────────────────────────────────────────────────
 
-export default function WhiteboardTab({ userRole, channelName, userId, userName }) {
+export default function WhiteboardTab({ userRole, channelName, userName }) {
   const isTeacher = userRole === "teacher";
 
+  const boxRef     = useRef(null);
   const canvasRef  = useRef(null);
   const socketRef  = useRef(null);
-  const drawing    = useRef(false);
-  const undoStack  = useRef([]);
   const ctxRef     = useRef(null);
+  const strokes    = useRef(new Map()); // id → { id, by, tool, color, size, pts } in drawing order
+  const meRef      = useRef(null);      // my user id, from the server — marks my strokes
+  const myActions  = useRef([]);        // what undo walks back: { id } of my strokes, or { clear: true }
+  const current    = useRef(null);      // the stroke I'm drawing right now
+  const pending    = useRef([]);        // its points not sent yet
+  const sendTimer  = useRef(null);
+  const toastTimer = useRef(null);
 
   const [tool,        setTool]        = useState("pen");
   const [color,       setColor]       = useState("#1e1e1e");
@@ -80,93 +105,80 @@ export default function WhiteboardTab({ userRole, channelName, userId, userName 
 
   const showToast = useCallback((msg, type = "info") => {
     setToast({ msg, type });
-    setTimeout(() => setToast(null), 2500);
+    clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), 2500);
   }, []);
+  useEffect(() => () => { clearTimeout(toastTimer.current); clearTimeout(sendTimer.current); }, []);
 
-  // ── canvas init + resize ──────────────────────────────────────────────────
+  // ── drawing the board ─────────────────────────────────────────────────────
 
-  const initCanvas = useCallback(() => {
+  const redraw = useCallback(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    ctxRef.current = ctx;
-
-    const resize = () => {
-      const snapshot = canvas.toDataURL();
-      canvas.width  = canvas.offsetWidth;
-      canvas.height = canvas.offsetHeight;
-
-      // restore white bg
-      ctx.fillStyle = "#ffffff";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      // restore drawing
-      const img = new Image();
-      img.onload = () => ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      img.src = snapshot;
-    };
-
-    canvas.width  = canvas.offsetWidth;
-    canvas.height = canvas.offsetHeight;
+    const ctx    = ctxRef.current;
+    if (!canvas || !ctx) return;
+    ctx.globalCompositeOperation = "source-over";
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    const ro = new ResizeObserver(resize);
-    ro.observe(canvas);
-    return () => ro.disconnect();
+    for (const s of strokes.current.values()) drawStroke(ctx, canvas, s);
   }, []);
+
+  // ── canvas fit + resize ───────────────────────────────────────────────────
+  // The canvas is the largest 16:9 box that fits; resizing just redraws the
+  // strokes, so nothing gets blurrier.
 
   useEffect(() => {
-    const cleanup = initCanvas();
-    return cleanup;
-  }, [initCanvas]);
-
-  // ── push undo snapshot ────────────────────────────────────────────────────
-
-  const pushUndo = useCallback(() => {
+    const box    = boxRef.current;
     const canvas = canvasRef.current;
-    if (!canvas) return;
-    undoStack.current.push(canvas.toDataURL());
-    if (undoStack.current.length > MAX_UNDO) undoStack.current.shift();
-  }, []);
+    if (!box || !canvas) return;
+    ctxRef.current = canvas.getContext("2d");
 
-  // ── undo ─────────────────────────────────────────────────────────────────
+    const fit = () => {
+      const W = box.clientWidth;
+      const H = box.clientHeight;
+      if (!W || !H) return; // hidden — keep the drawing
+      const w = Math.min(W, H * BOARD_RATIO);
+      const h = w / BOARD_RATIO;
+      const dpr = window.devicePixelRatio || 1; // sharp lines on high-DPI screens
+      canvas.style.width  = `${w}px`;
+      canvas.style.height = `${h}px`;
+      canvas.width  = Math.round(w * dpr);
+      canvas.height = Math.round(h * dpr);
+      redraw();
+    };
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(box);
+    return () => ro.disconnect();
+  }, [redraw]);
+
+  // ── undo (only my own strokes) ────────────────────────────────────────────
 
   const undo = useCallback(() => {
     if (!isTeacher && lockedRef.current) return;
-    if (undoStack.current.length === 0) return;
-    const snapshot = undoStack.current.pop();
-    const canvas = canvasRef.current;
-    const ctx    = ctxRef.current;
-    if (!canvas || !ctx) return;
-    const img = new Image();
-    img.onload = () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = "#ffffff";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-    };
-    img.src = snapshot;
-    // sync undo to others
-    if (socketRef.current) {
-      socketRef.current.emit("wb-sync", { channelName, snapshot });
+    if (current.current) return; // not mid-stroke
+    while (myActions.current.length) {
+      const action = myActions.current.pop();
+      if (action.clear) {
+        socketRef.current?.emit("wb-undo-clear", { channelName }); // server sends the board back
+        return;
+      }
+      if (strokes.current.delete(action.id)) {
+        redraw();
+        socketRef.current?.emit("wb-undo", { channelName, id: action.id });
+        return;
+      }
+      // that stroke was already cleared away — try the one before
     }
-  }, [isTeacher, channelName]);
+  }, [isTeacher, channelName, redraw]);
 
   // ── clear canvas ─────────────────────────────────────────────────────────
 
-  const clearCanvas = useCallback((emit = true) => {
-    const canvas = canvasRef.current;
-    const ctx    = ctxRef.current;
-    if (!canvas || !ctx) return;
-    pushUndo();
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    if (emit && socketRef.current) {
-      socketRef.current.emit("clear-canvas", { channelName });
-    }
-  }, [channelName, pushUndo]);
+  const clearCanvas = useCallback(() => {
+    strokes.current.clear();
+    myActions.current.push({ clear: true });
+    redraw();
+    socketRef.current?.emit("clear-canvas", { channelName });
+  }, [channelName, redraw]);
 
   // ── socket setup ──────────────────────────────────────────────────────────
 
@@ -192,128 +204,148 @@ export default function WhiteboardTab({ userRole, channelName, userId, userName 
     socket.on("lock-status", (isLocked) => {
       setLocked(isLocked);
       lockedRef.current = isLocked;
+      // a student mid-stroke stops when the teacher locks (the server drops the rest anyway)
+      if (isLocked && !isTeacher) current.current = null;
     });
 
     socket.on("drawing-blocked", () =>
       showToast("Whiteboard is locked by teacher", "warn")
     );
 
-    // remote draw events
+    socket.on("wb-full", () =>
+      showToast("The board is full — clear it to keep drawing", "warn")
+    );
+
+    // the whole board — on (re)join, and after a clear is undone
+    socket.on("wb-strokes", ({ strokes: list, you } = {}) => {
+      if (!Array.isArray(list)) return;
+      if (you != null) meRef.current = String(you);
+      strokes.current = new Map(list.map((s) => [s.id, s]));
+      // after a remount my undo history is gone — rebuild it from my strokes
+      myActions.current = list.filter((s) => s.by === meRef.current).map((s) => ({ id: s.id }));
+      current.current = null;
+      redraw();
+    });
+
+    // remote strokes — each has its own id, so two people drawing never mix
     socket.on("drawing", (data) => {
       const canvas = canvasRef.current;
       const ctx    = ctxRef.current;
-      if (!canvas || !ctx) return;
-      drawOnCanvas(ctx, canvas, data);
+      if (!canvas || !ctx || !data || !Array.isArray(data.pts)) return;
+      if (data.type === "start") {
+        const stroke = { id: data.id, by: data.by, tool: data.tool, color: data.color, size: data.size, pts: [...data.pts] };
+        strokes.current.set(stroke.id, stroke);
+        drawStroke(ctx, canvas, stroke);
+      } else if (data.type === "move") {
+        const stroke = strokes.current.get(data.id);
+        if (!stroke) return;
+        const from = stroke.pts.length;
+        stroke.pts.push(...data.pts);
+        drawStroke(ctx, canvas, stroke, from);
+      }
+    });
+
+    socket.on("wb-undo", ({ id } = {}) => {
+      if (strokes.current.delete(id)) redraw();
     });
 
     socket.on("clear-canvas", () => {
-      // remote clear — don't emit back
-      const canvas = canvasRef.current;
-      const ctx    = ctxRef.current;
-      if (!canvas || !ctx) return;
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = "#ffffff";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      // remote clear — don't emit back (and end my stroke: the server dropped it too)
+      strokes.current.clear();
+      current.current = null;
+      redraw();
     });
-
-    // wb-sync: restore a snapshot pushed by another user (undo)
-    socket.on("wb-sync", ({ snapshot }) => {
-      const canvas = canvasRef.current;
-      const ctx    = ctxRef.current;
-      if (!canvas || !ctx) return;
-      const img = new Image();
-      img.onload = () => {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = "#ffffff";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      };
-      img.src = snapshot;
-    });
-
-    // When a new user joins, teacher pushes current canvas state
-    if (isTeacher) {
-      socket.on("user-joined", () => {
-        const canvas = canvasRef.current;
-        if (!canvas) return;
-        const snapshot = canvas.toDataURL();
-        socket.emit("wb-sync", { channelName, snapshot });
-      });
-    }
 
     return () => {
-      socket.emit("leave-whiteboard", { channelName, userId: userId || "wb-user" });
+      socket.emit("leave-whiteboard", { channelName });
       socket.disconnect();
     };
-  }, [channelName, userId, userName, userRole, isTeacher, showToast]);
+  }, [channelName, userName, isTeacher, showToast, redraw]);
 
   // ── pointer events ────────────────────────────────────────────────────────
 
   const canDraw = () => isTeacher || !lockedRef.current;
+
+  const flush = useCallback(() => {
+    clearTimeout(sendTimer.current);
+    sendTimer.current = null;
+    const stroke = current.current;
+    if (!stroke || pending.current.length === 0) return;
+    socketRef.current?.emit("drawing", { channelName, type: "move", id: stroke.id, pts: pending.current });
+    pending.current = [];
+  }, [channelName]);
 
   const onPointerDown = useCallback((e) => {
     if (!canDraw()) {
       showToast("Whiteboard is locked", "warn");
       return;
     }
+    if (e.button !== 0 || current.current) return; // left button / one finger only
     e.preventDefault();
-    pushUndo();
-    drawing.current = true;
+    e.currentTarget.setPointerCapture?.(e.pointerId); // keep the stroke if the pointer leaves the canvas
     const canvas = canvasRef.current;
     const ctx    = ctxRef.current;
     const pos    = getPos(e, canvas);
-    applyStroke(ctx, toolRef.current, colorRef.current, sizeRef.current);
-    ctx.beginPath();
-    ctx.moveTo(pos.x * canvas.width, pos.y * canvas.height);
+    const stroke = {
+      id: newStrokeId(), by: meRef.current,
+      tool: toolRef.current, color: colorRef.current, size: sizeRef.current,
+      pts: [pos.x, pos.y],
+    };
+    current.current = stroke;
+    pending.current = [];
+    strokes.current.set(stroke.id, stroke);
+    myActions.current.push({ id: stroke.id });
+    drawStroke(ctx, canvas, stroke);
 
     socketRef.current?.emit("drawing", {
       channelName,
       type: "start",
+      id: stroke.id,
       x: pos.x, y: pos.y,
-      tool: toolRef.current,
-      color: colorRef.current,
-      size: sizeRef.current,
+      tool: stroke.tool,
+      color: stroke.color,
+      size: stroke.size,
     });
-  }, [channelName, pushUndo, showToast]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [channelName, showToast]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const onPointerMove = useCallback((e) => {
-    if (!drawing.current) return;
+    const stroke = current.current;
+    if (!stroke) return;
     e.preventDefault();
     const canvas = canvasRef.current;
-    const ctx    = ctxRef.current;
     const pos    = getPos(e, canvas);
-    ctx.lineTo(pos.x * canvas.width, pos.y * canvas.height);
-    ctx.stroke();
+    const from   = stroke.pts.length;
+    stroke.pts.push(pos.x, pos.y);
+    drawStroke(ctxRef.current, canvas, stroke, from);
 
-    socketRef.current?.emit("drawing", {
-      channelName,
-      type: "move",
-      x: pos.x, y: pos.y,
-      tool: toolRef.current,
-      color: colorRef.current,
-      size: sizeRef.current,
-    });
-  }, [channelName]);
+    pending.current.push(pos.x, pos.y);
+    if (pending.current.length >= MAX_BATCH) flush();
+    else if (!sendTimer.current) sendTimer.current = setTimeout(flush, SEND_EVERY_MS);
+  }, [flush]);
 
   const onPointerUp = useCallback(() => {
-    drawing.current = false;
-  }, []);
+    if (!current.current) return;
+    flush();
+    current.current = null;
+  }, [flush]);
 
   // ── keyboard shortcuts ────────────────────────────────────────────────────
 
   useEffect(() => {
     const onKey = (e) => {
-      const tag = document.activeElement?.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      const el = document.activeElement;
+      if (["INPUT", "TEXTAREA", "SELECT"].includes(el?.tagName) || el?.isContentEditable) return;
 
-      if (e.ctrlKey && e.key === "z") { e.preventDefault(); undo(); return; }
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z") { e.preventDefault(); undo(); return; }
+      // leave browser shortcuts alone (Ctrl+L used to lock the board, Ctrl+P switched tool)
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
 
       switch (e.key.toLowerCase()) {
         case "p": setTool("pen");    break;
         case "m": setTool("marker"); break;
         case "e": setTool("eraser"); break;
+        // Delete only — Backspace is pressed by habit and wiped everyone's board
         case "delete":
-        case "backspace":
           if (isTeacher) clearCanvas(); break;
         case "l":
           if (isTeacher) toggleLock(); break;
@@ -345,7 +377,7 @@ export default function WhiteboardTab({ userRole, channelName, userId, userName 
   // ── render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="h-full flex flex-col bg-white select-none">
+    <div className="relative h-full flex flex-col bg-white select-none">
 
       {/* ── toolbar ── */}
       <div className="flex flex-wrap items-center gap-2 px-3 py-2 bg-gray-50 border-b border-gray-200 flex-shrink-0">
@@ -442,28 +474,27 @@ export default function WhiteboardTab({ userRole, channelName, userId, userName 
           title={connected ? "Connected" : "Disconnected"} />
       </div>
 
-      {/* ── lock badge (student view) ── */}
-      {!isTeacher && locked && (
-        <div className="flex items-center gap-2 px-4 py-2 bg-amber-50 border-b border-amber-200 text-amber-700 text-sm">
-          <Lock className="w-4 h-4 flex-shrink-0" />
-          Whiteboard is locked — you can view but not draw
-        </div>
-      )}
-
       {/* ── canvas ── */}
-      <div className="flex-1 relative overflow-hidden">
+      <div ref={boxRef} className="flex-1 min-h-0 relative overflow-hidden flex items-center justify-center bg-gray-100">
         <canvas
           ref={canvasRef}
-          className="absolute inset-0 w-full h-full"
-          style={{ cursor: tool === "eraser" ? "cell" : "crosshair" }}
-          onMouseDown={onPointerDown}
-          onMouseMove={onPointerMove}
-          onMouseUp={onPointerUp}
-          onMouseLeave={onPointerUp}
-          onTouchStart={onPointerDown}
-          onTouchMove={onPointerMove}
-          onTouchEnd={onPointerUp}
+          className="block bg-white shadow-sm"
+          // touch-action: none stops the page scrolling/zooming while drawing on a phone or tablet
+          style={{ cursor: tool === "eraser" ? "cell" : "crosshair", touchAction: "none" }}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerCancel={onPointerUp}
+          onLostPointerCapture={onPointerUp}
         />
+
+        {/* ── lock badge (student view) — overlaid so toggling it doesn't resize (and blur) the canvas ── */}
+        {!isTeacher && locked && (
+          <div className="absolute top-0 inset-x-0 flex items-center gap-2 px-4 py-2 bg-amber-50/95 border-b border-amber-200 text-amber-700 text-sm pointer-events-none">
+            <Lock className="w-4 h-4 flex-shrink-0" />
+            Whiteboard is locked — you can view but not draw
+          </div>
+        )}
       </div>
 
       {/* ── toast ── */}

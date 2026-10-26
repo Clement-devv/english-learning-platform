@@ -28,10 +28,15 @@ export const classroomSessionSchema = new mongoose.Schema({
   }],
   contentPage:     { type: Number, default: 1   }, // current PDF page teacher is viewing
   contentScale:    { type: Number, default: 1.3 }, // current PDF zoom level
-  contentAnnotation: {                             // latest annotation canvas for current page
-    page: { type: Number },
-    data: { type: String }, // base64 PNG data URL
-    ts:   { type: Number }, // Date.now() — student compares to skip unchanged frames
+  // Teacher's pen marks on the PDF, one entry per page ("3" → that page's strokes).
+  // Kept for every page so going back to a page (or rejoining) still shows them.
+  contentAnnotations: {
+    type: Map,
+    of: new mongoose.Schema({
+      data: { type: String }, // JSON array of strokes [{ tool, color, points: [{x, y}] }], points 0–1
+      ts:   { type: Number }, // Date.now() at save — the student redraws when it changes
+    }, { _id: false }),
+    default: undefined,
   },
   extendedTime:    { type: Number, default: 0 }, // total extra seconds added via time extensions
   timeExtensions:  [{

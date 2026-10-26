@@ -1,5 +1,6 @@
 // server/routes/contentRoutes.js
 import express from "express";
+import mongoose from "mongoose";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -7,6 +8,7 @@ import { fileURLToPath } from "url";
 import { verifyToken, verifyAdminOrTeacher } from "../middleware/authMiddleware.js";
 import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
 import { canAccessClass } from "../utils/classAccess.js";
+import { classroomSessionSchema } from "../schemas/classroomSessionSchema.js";
 import logger from "../utils/logger.js";
 import { badRequest, forbidden, notFound } from '../utils/apiResponse.js';
 import { s3Enabled, uploadToS3, deleteFromS3, getPresignedUrl, s3ObjectExists } from "../utils/s3.js";
@@ -51,6 +53,16 @@ router.post("/upload", tenantMiddleware, verifyToken, verifyAdminOrTeacher, uplo
       // Fallback: write to local disk
       const filePath = path.join(UPLOAD_DIR, `${bookingId}.pdf`);
       fs.writeFileSync(filePath, req.file.buffer);
+    }
+
+    // A new PDF starts at page 1 with no pen marks — the old PDF's marks would
+    // otherwise show up on the new pages
+    if (mongoose.isValidObjectId(bookingId)) {
+      const ClassroomSession = req.db.models.ClassroomSession || req.db.model("ClassroomSession", classroomSessionSchema);
+      await ClassroomSession.updateOne(
+        { bookingId },
+        { $set: { contentPage: 1, contentScale: 1.3 }, $unset: { contentAnnotations: 1 } }
+      ).catch(err => logger.warn("Content state reset failed:", { error: err?.message }));
     }
 
     res.json({ success: true, message: "PDF uploaded successfully", bookingId, size: req.file.size });

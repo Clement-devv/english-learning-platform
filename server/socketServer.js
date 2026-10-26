@@ -79,8 +79,24 @@ async function getTargetInfo(centerId, targetUserId, targetRole) {
 const ROLE_LABEL = { admin: 'Admin', 'sub-admin': 'Sub-admin', teacher: 'Teacher', student: 'Student', parent: 'Parent' };
 // Roles that can be rung (ring contacts are teachers, students and admins — see routes/ringRoutes.js)
 const RING_TARGET_ROLES = new Set(['student', 'teacher', 'admin', 'sub-admin']);
-// Whiteboard snapshot kept per room for (re)joiners — a data:image URL, bounded
-const MAX_CANVAS_SNAPSHOT = 3 * 1024 * 1024;
+// Whiteboard strokes kept per room for (re)joiners. Points are 0–1 fractions of
+// the board, so every screen draws the same picture at its own size.
+const WB_MAX_POINTS = 100_000;  // per board (~1.6 MB) — then "board full, clear it"
+const WB_MAX_BATCH = 400;       // numbers (x, y pairs) in one "move" message
+const WB_TOOLS = new Set(['pen', 'marker', 'eraser']);
+const WB_COLOR = /^#[0-9a-f]{6}$/i;
+const WB_STROKE_ID = /^[\w-]{1,40}$/;
+// Content tab (PDF) pen — same id/colour/point rules as the whiteboard
+const PDF_TOOLS = new Set(['pen', 'marker', 'eraser']);
+const isPdfPage  = (n) => Number.isInteger(n) && n >= 1 && n <= 10_000;
+const isPdfScale = (n) => typeof n === 'number' && n >= 0.5 && n <= 3;
+
+/** Flat [x, y, x, y, …] list clamped to the board and rounded, or null if it isn't one. */
+function wbCoords(arr) {
+  if (!Array.isArray(arr) || arr.length === 0 || arr.length % 2 || arr.length > WB_MAX_BATCH) return null;
+  if (!arr.every(Number.isFinite)) return null;
+  return arr.map(n => Math.round(Math.min(1, Math.max(0, n)) * 1e4) / 1e4);
+}
 
 /** The caller's real name from the DB — the client-sent name can't be trusted (anyone could ring as "Admin"). */
 async function getCallerName(socket) {
@@ -221,6 +237,27 @@ export async function initializeSocket(httpServer) {
 
   // Store active whiteboard sessions keyed by tenant-scoped room name.
   const whiteboardSessions = new Map();
+  // An empty board is kept a while before it's dropped — the classroom unmounts
+  // the board on every tab switch, so "everyone went to the Video tab" must not
+  // wipe the drawing (or reset the lock).
+  const WB_IDLE_TTL = 30 * 60 * 1000;
+
+  // users: socket id → user id. Keyed by socket, not user, so one user's second
+  // tab/device leaving doesn't end the session under the one still drawing.
+  const wbUserCount = (session) => new Set(session.users.values()).size;
+
+  const leaveWbSession = (socket, room) => {
+    const session = whiteboardSessions.get(room);
+    if (!session || !session.users.delete(socket.id)) return null;
+    if (session.users.size === 0) {
+      clearTimeout(session.idleTimer);
+      session.idleTimer = setTimeout(() => {
+        if (whiteboardSessions.get(room) === session && session.users.size === 0) whiteboardSessions.delete(room);
+      }, WB_IDLE_TTL);
+      session.idleTimer.unref?.();
+    }
+    return session;
+  };
 
   // Track in-flight rings: ringId → { callerId, callerRoom, targetUserId, targetRoom, timeout }
   const activeRings = new Map();
@@ -266,43 +303,41 @@ export async function initializeSocket(httpServer) {
         const room = tenantRoom(socket, channelName);
         socket.join(room);
         socket.userName = userName;
+        // Switching to another class's board leaves the previous one
+        if (socket.roomName && socket.roomName !== room) {
+          socket.leave(socket.roomName);
+          leaveWbSession(socket, socket.roomName);
+        }
         socket.channelName = channelName; // original name kept for client-facing log messages
         socket.roomName = room;        // scoped name used for all room operations
 
         if (!whiteboardSessions.has(room)) {
           whiteboardSessions.set(room, {
-            users: new Set(),
+            users: new Map(),
+            idleTimer: null,
             locked: true,
-            pdfData: null,
-            pdfVisibleToStudents: false,
             currentPage: 1,
             currentScale: 1.3,
-            canvasSnapshot: null,
+            // The board is a list of strokes (id → stroke, in drawing order), so
+            // undo can remove one person's stroke without touching anyone else's
+            strokes: new Map(),
+            pointCount: 0,
+            lastClear: null, // { strokes, pointCount, by } — lets the clearer undo a clear
           });
         }
 
         const session = whiteboardSessions.get(room);
-        session.users.add(socket.userId);
+        clearTimeout(session.idleTimer);
+        session.idleTimer = null;
+        session.users.set(socket.id, socket.userId);
 
-        const userCount = session.users.size;
+        const userCount = wbUserCount(session);
 
         logger.info(`✅ ${userName} (${socket.userRole}) joined whiteboard: ${channelName} (${userCount} users)`);
 
         // Send current states to new joiner
         socket.emit('lock-status', session.locked);
-        socket.emit('pdf-visibility-changed', session.pdfVisibleToStudents);
-
-        // Send current PDF if exists (whiteboard share-pdf flow)
-        if (session.pdfData) {
-          socket.emit('pdf-shared', {
-            ...session.pdfData,
-            visibleToStudents: session.pdfVisibleToStudents
-          });
-        }
-
         // Always send current page/zoom to new joiner so they mirror the teacher.
-        // ContentViewer loads the PDF via REST API (not share-pdf), so pdfData may
-        // be null even though the teacher has already navigated to a specific page.
         if (session.currentPage > 1) {
           socket.emit('pdf-page-sync', { page: session.currentPage });
         }
@@ -310,10 +345,9 @@ export async function initializeSocket(httpServer) {
           socket.emit('pdf-zoom-sync', { scale: session.currentScale });
         }
 
-        // Restore canvas drawing for rejoining users (tab-switch recovery)
-        if (session.canvasSnapshot) {
-          socket.emit('canvas-state', { dataUrl: session.canvasSnapshot });
-        }
+        // The board as it is now (tab-switch recovery + late joiners). `you` tells
+        // the client which strokes are its own, for undo.
+        socket.emit('wb-strokes', { strokes: [...session.strokes.values()], you: String(socket.userId) });
 
         io.to(room).emit('user-count', userCount);
         socket.to(room).emit('user-joined', {
@@ -327,7 +361,9 @@ export async function initializeSocket(httpServer) {
       }
     });
 
-    // Handle drawing events
+    // Handle drawing events. A stroke is one "start" then batched "move"s:
+    //   { type: 'start', id, tool, color, size, x, y }   { type: 'move', id, pts: [x, y, x, y, …] }
+    // The server keeps every stroke, so it's the one copy of the board.
     onChannel('drawing', (data) => {
       try {
         const room = tenantRoom(socket, data.channelName);
@@ -339,26 +375,65 @@ export async function initializeSocket(httpServer) {
           return;
         }
 
-        socket.to(room).emit('drawing', data);
+        const by = String(socket.userId);
+        if (data.type === 'start') {
+          const pts = wbCoords([data.x, data.y]);
+          if (!WB_STROKE_ID.test(data.id ?? '') || session.strokes.has(data.id) || !pts) return;
+          if (!WB_TOOLS.has(data.tool) || !WB_COLOR.test(data.color ?? '')) return;
+          const size = Number(data.size);
+          if (!Number.isInteger(size) || size < 1 || size > 24) return;
+          if (session.pointCount + 1 > WB_MAX_POINTS) return socket.emit('wb-full');
+
+          const stroke = { id: data.id, by, tool: data.tool, color: data.color, size, pts };
+          session.strokes.set(stroke.id, stroke);
+          session.pointCount += 1;
+          socket.to(room).emit('drawing', { type: 'start', ...stroke });
+        } else if (data.type === 'move') {
+          const stroke = session.strokes.get(data.id);
+          const pts = wbCoords(data.pts);
+          if (!stroke || stroke.by !== by || !pts?.length) return;
+          if (session.pointCount + pts.length / 2 > WB_MAX_POINTS) return socket.emit('wb-full');
+
+          stroke.pts.push(...pts);
+          session.pointCount += pts.length / 2;
+          socket.to(room).emit('drawing', { type: 'move', id: stroke.id, pts });
+        }
       } catch (err) {
         logger.error('drawing error:', { error: err?.message });
       }
     });
 
-    // Persist canvas snapshot so rejoining users (tab-switch) see current drawing
-    onChannel('save-canvas-state', ({ channelName, dataUrl }) => {
+    // Undo removes one of the sender's own strokes — never someone else's
+    onChannel('wb-undo', ({ channelName, id }) => {
       try {
         const room = tenantRoom(socket, channelName);
         const session = whiteboardSessions.get(room);
         if (!session) return;
-        // Same rule as drawing: a student can't change the board while it's locked
-        // (the snapshot is what everyone who (re)joins sees)
         if (socket.userRole === 'student' && session.locked) return;
-        if (typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image/') || dataUrl.length > MAX_CANVAS_SNAPSHOT) return;
-        session.canvasSnapshot = dataUrl;
-      } catch (err) {
-        logger.error('save-canvas-state error:', { error: err?.message });
-      }
+        const stroke = session.strokes.get(id);
+        if (!stroke || stroke.by !== String(socket.userId)) return;
+
+        session.strokes.delete(id);
+        session.pointCount -= stroke.pts.length / 2;
+        socket.to(room).emit('wb-undo', { id });
+      } catch (err) { logger.error('wb-undo error:', { error: err?.message }); }
+    });
+
+    // Undo of a clear — only by whoever cleared, and only the latest clear.
+    // Strokes drawn since the clear stay on top.
+    onChannel('wb-undo-clear', ({ channelName }) => {
+      try {
+        const room = tenantRoom(socket, channelName);
+        const session = whiteboardSessions.get(room);
+        if (!session?.lastClear || session.lastClear.by !== String(socket.userId)) return;
+        if (socket.userRole === 'student' && session.locked) return;
+
+        const { strokes, pointCount } = session.lastClear;
+        session.strokes = new Map([...strokes, ...session.strokes]);
+        session.pointCount += pointCount;
+        session.lastClear = null;
+        io.to(room).emit('wb-strokes', { strokes: [...session.strokes.values()] });
+      } catch (err) { logger.error('wb-undo-clear error:', { error: err?.message }); }
     });
 
     // Handle canvas clear
@@ -373,8 +448,10 @@ export async function initializeSocket(httpServer) {
           return;
         }
 
-        session.canvasSnapshot = null;
-        socket.to(room).emit('clear-canvas', data);
+        session.lastClear = { strokes: session.strokes, pointCount: session.pointCount, by: String(socket.userId) };
+        session.strokes = new Map();
+        session.pointCount = 0;
+        socket.to(room).emit('clear-canvas', { channelName: data.channelName });
       } catch (err) {
         logger.error('clear-canvas error:', { error: err?.message });
       }
@@ -400,94 +477,17 @@ export async function initializeSocket(httpServer) {
       }
     });
 
-    // Handle PDF sharing (teacher only)
-    onChannel('share-pdf', ({ channelName, pdfData, fileName, sharedBy, visibleToStudents }) => {
-      try {
-        if (socket.userRole !== 'teacher') {
-          socket.emit('error', { message: 'Only teachers can share PDFs' });
-          return;
-        }
-
-        const room = tenantRoom(socket, channelName);
-        const session = whiteboardSessions.get(room);
-        if (session) {
-          session.pdfData = { pdfData, fileName, sharedBy };
-          session.pdfVisibleToStudents = visibleToStudents || false;
-
-          io.to(room).emit('pdf-shared', {
-            pdfData,
-            fileName,
-            sharedBy,
-            visibleToStudents: session.pdfVisibleToStudents
-          });
-
-          logger.info(`📄 PDF "${fileName}" shared in ${channelName} by ${sharedBy} (Students: ${visibleToStudents ? 'CAN see' : 'CANNOT see'})`);
-        }
-      } catch (err) {
-        logger.error('share-pdf error:', { error: err?.message });
-      }
-    });
-
-    // Handle PDF visibility toggle (teacher only)
-    onChannel('toggle-pdf-visibility', ({ channelName, visible }) => {
-      try {
-        if (socket.userRole !== 'teacher') {
-          socket.emit('error', { message: 'Only teachers can control PDF visibility' });
-          return;
-        }
-
-        const room = tenantRoom(socket, channelName);
-        const session = whiteboardSessions.get(room);
-        if (session) {
-          session.pdfVisibleToStudents = visible;
-          io.to(room).emit('pdf-visibility-changed', visible);
-          logger.info(`👁️ PDF visibility in ${channelName}: Students ${visible ? 'CAN see' : 'CANNOT see'} (changed by ${socket.userName})`);
-        }
-      } catch (err) {
-        logger.error('toggle-pdf-visibility error:', { error: err?.message });
-      }
-    });
-
-    // Handle PDF removal (teacher only)
-    onChannel('remove-pdf', ({ channelName }) => {
-      try {
-        if (socket.userRole !== 'teacher') {
-          socket.emit('error', { message: 'Only teachers can remove PDFs' });
-          return;
-        }
-
-        const room = tenantRoom(socket, channelName);
-        const session = whiteboardSessions.get(room);
-        if (session) {
-          session.pdfData = null;
-          session.pdfVisibleToStudents = false;
-          io.to(room).emit('pdf-removed');
-          logger.info(`📄 PDF removed from ${channelName} by ${socket.userName}`);
-        }
-      } catch (err) {
-        logger.error('remove-pdf error:', { error: err?.message });
-      }
-    });
-
     // Leave whiteboard room
     socket.on('leave-whiteboard', ({ channelName }) => {
       try {
         const room = tenantRoom(socket, channelName);
         socket.leave(room);
+        if (socket.roomName === room) socket.roomName = null;
 
-        if (whiteboardSessions.has(room)) {
-          const session = whiteboardSessions.get(room);
-          session.users.delete(socket.userId);
-
-          const userCount = session.users.size;
-
-          if (userCount === 0) {
-            whiteboardSessions.delete(room);
-            logger.info(`🗑️ Whiteboard session ${channelName} deleted (no users)`);
-          } else {
-            io.to(room).emit('user-count', userCount);
-          }
-
+        const session = leaveWbSession(socket, room);
+        if (session) {
+          const userCount = wbUserCount(session);
+          if (userCount > 0) io.to(room).emit('user-count', userCount);
           logger.info(`👋 User ${socket.userId} left whiteboard: ${channelName} (${userCount} users remaining)`);
         }
       } catch (err) {
@@ -680,59 +680,58 @@ export async function initializeSocket(httpServer) {
 
     // ── PDF content sync (teacher → student) ────────────────────────────────
 
-    onChannel('pdf-stroke-start', (data) => {
-      try { socket.to(tenantRoom(socket, data.channelName)).emit('pdf-stroke-start', data); }
-      catch (err) { logger.error('pdf-stroke-start error:', { error: err?.message }); }
-    });
-
-    onChannel('pdf-stroke-move', (data) => {
-      try { socket.to(tenantRoom(socket, data.channelName)).emit('pdf-stroke-move', data); }
-      catch (err) { logger.error('pdf-stroke-move error:', { error: err?.message }); }
-    });
-
-    onChannel('pdf-stroke-end', (data) => {
-      try { socket.to(tenantRoom(socket, data.channelName)).emit('pdf-stroke-end', data); }
-      catch (err) { logger.error('pdf-stroke-end error:', { error: err?.message }); }
-    });
-
-    onChannel('pdf-page-sync', (data) => {
+    // Only the class teacher drives the content tab (page, zoom, PDF, pen) —
+    // these used to be relayed from anyone in the class.
+    const onTeacherContent = (event, handler) => onChannel(event, (data) => {
+      if (socket.userRole !== 'teacher') return;
       try {
         const room = tenantRoom(socket, data.channelName);
-        const session = whiteboardSessions.get(room);
-        if (session) session.currentPage = data.page;
-        socket.to(room).emit('pdf-page-sync', data);
-      } catch (err) { logger.error('pdf-page-sync error:', { error: err?.message }); }
+        handler(data, room, whiteboardSessions.get(room));
+      } catch (err) { logger.error(`${event} error:`, { error: err?.message }); }
     });
 
-    onChannel('pdf-zoom-sync', (data) => {
-      try {
-        const room = tenantRoom(socket, data.channelName);
-        const session = whiteboardSessions.get(room);
-        if (session) session.currentScale = data.scale;
-        socket.to(room).emit('pdf-zoom-sync', data);
-      } catch (err) { logger.error('pdf-zoom-sync error:', { error: err?.message }); }
+    onTeacherContent('pdf-stroke-start', (data, room) => {
+      const pts = wbCoords([data.x, data.y]);
+      if (!isPdfPage(data.page) || !WB_STROKE_ID.test(data.id ?? '') || !pts) return;
+      if (!PDF_TOOLS.has(data.strokeTool) || !WB_COLOR.test(data.strokeColor ?? '')) return;
+      socket.to(room).emit('pdf-stroke-start', {
+        page: data.page, id: data.id, x: pts[0], y: pts[1], strokeTool: data.strokeTool, strokeColor: data.strokeColor,
+      });
     });
 
-    onChannel('pdf-uploaded', (data) => {
-      try {
-        const room = tenantRoom(socket, data.channelName);
-        const session = whiteboardSessions.get(room);
-        if (session) { session.currentPage = 1; session.currentScale = 1.3; }
-        socket.to(room).emit('pdf-uploaded', data);
-        // Auto-blink the content tab for students when teacher uploads a PDF
-        socket.to(`classroom-${room}`).emit('classroom-tab-notify', { tab: 'content' });
-      } catch (err) { logger.error('pdf-uploaded error:', { error: err?.message }); }
+    onTeacherContent('pdf-stroke-move', (data, room) => {
+      const pts = wbCoords(data.pts);
+      if (!isPdfPage(data.page) || !WB_STROKE_ID.test(data.id ?? '') || !pts) return;
+      socket.to(room).emit('pdf-stroke-move', { page: data.page, id: data.id, pts });
     });
 
-    onChannel('pdf-clear-sync', (data) => {
-      try { socket.to(tenantRoom(socket, data.channelName)).emit('pdf-clear-sync', data); }
-      catch (err) { logger.error('pdf-clear-sync error:', { error: err?.message }); }
+    onTeacherContent('pdf-stroke-end', (data, room) => {
+      if (!isPdfPage(data.page) || !WB_STROKE_ID.test(data.id ?? '')) return;
+      socket.to(room).emit('pdf-stroke-end', { page: data.page, id: data.id });
     });
 
-    // Whiteboard canvas state sync (used for undo + join catch-up)
-    onChannel('wb-sync', (data) => {
-      try { socket.to(tenantRoom(socket, data.channelName)).emit('wb-sync', data); }
-      catch (err) { logger.error('wb-sync error:', { error: err?.message }); }
+    onTeacherContent('pdf-page-sync', (data, room, session) => {
+      if (!isPdfPage(data.page)) return;
+      if (session) session.currentPage = data.page;
+      socket.to(room).emit('pdf-page-sync', { page: data.page });
+    });
+
+    onTeacherContent('pdf-zoom-sync', (data, room, session) => {
+      if (!isPdfScale(data.scale)) return;
+      if (session) session.currentScale = data.scale;
+      socket.to(room).emit('pdf-zoom-sync', { scale: data.scale });
+    });
+
+    onTeacherContent('pdf-uploaded', (_data, room, session) => {
+      if (session) { session.currentPage = 1; session.currentScale = 1.3; }
+      socket.to(room).emit('pdf-uploaded', {});
+      // Auto-blink the content tab for students when teacher uploads a PDF
+      socket.to(`classroom-${room}`).emit('classroom-tab-notify', { tab: 'content' });
+    });
+
+    onTeacherContent('pdf-clear-sync', (data, room) => {
+      if (!isPdfPage(data.page)) return;
+      socket.to(room).emit('pdf-clear-sync', { page: data.page });
     });
 
     // ── Classroom tab sync ────────────────────────────────────────────────────
@@ -898,23 +897,16 @@ export async function initializeSocket(httpServer) {
       try {
         logger.debug('🔌 Socket disconnected:', socket.id);
 
-        if (socket.roomName && socket.userId) {
-          if (whiteboardSessions.has(socket.roomName)) {
-            const session = whiteboardSessions.get(socket.roomName);
-            session.users.delete(socket.userId);
-
-            const userCount = session.users.size;
-
-            if (userCount === 0) {
-              whiteboardSessions.delete(socket.roomName);
-            } else {
-              io.to(socket.roomName).emit('user-count', userCount);
-              io.to(socket.roomName).emit('user-left', {
-                userId: socket.userId,
-                userName: socket.userName,
-                userCount
-              });
-            }
+        if (socket.roomName) {
+          const session = leaveWbSession(socket, socket.roomName);
+          const userCount = session ? wbUserCount(session) : 0;
+          if (userCount > 0) {
+            io.to(socket.roomName).emit('user-count', userCount);
+            io.to(socket.roomName).emit('user-left', {
+              userId: socket.userId,
+              userName: socket.userName,
+              userCount
+            });
           }
         }
 

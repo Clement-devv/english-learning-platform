@@ -96,8 +96,8 @@ describe('class rooms', () => {
     student.emit('join-whiteboard', { channelName: `class-${booking._id}`, userName: 's' })
     await wait()
     const got = nextEvent(student, 'drawing')
-    teacher.emit('drawing', { channelName: `class-${booking._id}`, x: 2 })
-    expect(await got).toMatchObject({ x: 2 })
+    teacher.emit('drawing', { channelName: `class-${booking._id}`, type: 'start', id: 'r1', x: 0.5, y: 0.5, tool: 'pen', color: '#1e1e1e', size: 3 })
+    expect(await got).toMatchObject({ id: 'r1', pts: [0.5, 0.5] })
   })
 
   it('an outsider cannot emit into a class room without joining it', async () => {

@@ -432,48 +432,72 @@ router.patch("/session/:bookingId/video-provider", verifyToken, async (req, res)
   }
 });
 
+// The content tab's page, zoom and pen marks. Page/zoom are what the student
+// mirrors; pen marks are kept per page (see contentAnnotations in the schema).
+const isContentPage  = (n) => Number.isInteger(n) && n >= 1 && n <= 10_000;
+const isContentScale = (n) => typeof n === "number" && n >= 0.5 && n <= 3;
+const MAX_ANNOTATION = 300_000; // characters of stroke JSON per page
+
 // PATCH /api/classroom/session/:bookingId/content-state  (teacher only)
 router.patch("/session/:bookingId/content-state", verifyToken, async (req, res) => {
   try {
     if (!(await authorizeClass(req, res, req.params.bookingId, { teacherOnly: true }))) return;
     const { page, scale, annotation, annotationPage } = req.body;
-    const update = {};
-    if (page  != null) update.contentPage  = page;
-    if (scale != null) update.contentScale = scale;
-    if (annotation != null && annotationPage != null) {
-      update.contentAnnotation = { page: annotationPage, data: annotation, ts: Date.now() };
+    const $set = {};
+    if (page != null) {
+      if (!isContentPage(page)) return badRequest(res, "Invalid page");
+      $set.contentPage = page;
     }
-    if (!Object.keys(update).length) return badRequest(res, "page, scale or annotation required");
+    if (scale != null) {
+      if (!isContentScale(scale)) return badRequest(res, "Invalid scale");
+      $set.contentScale = scale;
+    }
+    if (annotation != null) {
+      if (!isContentPage(annotationPage)) return badRequest(res, "Invalid annotationPage");
+      if (typeof annotation !== "string" || annotation.length > MAX_ANNOTATION || !annotation.startsWith("["))
+        return badRequest(res, "Invalid annotation");
+      // A cleared page keeps an empty entry (with a new ts) so students clear it too
+      $set[`contentAnnotations.${annotationPage}`] = { data: annotation, ts: Date.now() };
+    }
+    if (!Object.keys($set).length) return badRequest(res, "page, scale or annotation required");
 
     const session = await getClassroomSession(req.db).findOneAndUpdate(
       { bookingId: req.params.bookingId },
-      { $set: update },
-      { new: true }
-    );
+      { $set },
+      { new: true, projection: "contentPage contentScale" }
+    ).lean();
     if (!session) return notFound(res, "Session not found");
-    res.json({
-      contentPage:       session.contentPage,
-      contentScale:      session.contentScale,
-      contentAnnotation: session.contentAnnotation,
-    });
+    res.json({ contentPage: session.contentPage, contentScale: session.contentScale });
   } catch (err) {
     serverError(res, "Error updating content state", err);
   }
 });
 
-// GET /api/classroom/session/:bookingId/content-state  (student polls this)
+// GET /api/classroom/session/:bookingId/content-state[?page=N]
+// The student polls this; the teacher reads it once to come back to where they were.
+// `contentAnnotation` is the pen marks of page N (default: the teacher's page).
+// `?all=1` (teacher) returns every page's marks so nothing is lost on a tab switch.
 router.get("/session/:bookingId/content-state", verifyToken, async (req, res) => {
   try {
-    if (!(await authorizeClass(req, res, req.params.bookingId))) return;
+    const access = await authorizeClass(req, res, req.params.bookingId);
+    if (!access) return;
     const session = await getClassroomSession(req.db)
       .findOne({ bookingId: req.params.bookingId })
-      .select("contentPage contentScale contentAnnotation");
+      .select("contentPage contentScale contentAnnotations")
+      .lean();
     if (!session) return notFound(res, "Session not found");
-    res.json({
-      contentPage:       session.contentPage  ?? 1,
+
+    const contentPage = session.contentPage ?? 1;
+    const asked = Number(req.query.page);
+    const page = isContentPage(asked) ? asked : contentPage;
+    const ann = session.contentAnnotations?.[String(page)];
+    const body = {
+      contentPage,
       contentScale:      session.contentScale ?? 1.3,
-      contentAnnotation: session.contentAnnotation ?? null,
-    });
+      contentAnnotation: ann ? { page, data: ann.data, ts: ann.ts } : null,
+    };
+    if (req.query.all === "1" && access.role === "teacher") body.contentAnnotations = session.contentAnnotations || {};
+    res.json(body);
   } catch (err) {
     serverError(res, "Error fetching content state", err);
   }
