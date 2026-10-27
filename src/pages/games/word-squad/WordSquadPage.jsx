@@ -126,12 +126,11 @@ export default function WordSquadPage({ exitTo = '/student/dashboard', demo = fa
   const [params] = useSearchParams();
   const [games, setGames] = useState(null);        // the student's assigned games (server mode)
   const [assignment, setAssignment] = useState(null);
-  const [practice, setPractice] = useState(false); // play the demo questions without stars
   const [totalStars, setTotalStars] = useState(0);
   // A teacher trying their own set: their questions, all chapters, no stars, nothing saved
   const [testSet, setTestSet] = useState(null);
   const testing = !!testSetId;
-  const offline = demo || practice || testing;
+  const offline = demo || testing;
   const hostRef = useRef(null);
   const gameRef = useRef(null);
   const flashTimer = useRef(null);
@@ -162,7 +161,6 @@ export default function WordSquadPage({ exitTo = '/student/dashboard', demo = fa
   // The student's assigned games (and where they got to), from the server
   const pick = useCallback((a) => {
     setAssignment(a);
-    setPractice(false);
     if (a) {
       setUnlocked(Math.min(a.progress.unlocked, a.chapters - 1));
       setRatings(ratingsObj(a.progress.ratings));
@@ -287,7 +285,7 @@ export default function WordSquadPage({ exitTo = '/student/dashboard', demo = fa
             const stars = computeStars(s);
             const rating = chapterRating(s);
             setSummary({ ...s, stars, rating });
-            if (practice || testing) { setScreen('ended'); return; } // practice / test play: no progress kept
+            if (testing) { setScreen('ended'); return; } // test play: no progress kept
             setRatings((r) => {
               if ((r[ch] || 0) >= rating.count) return r;
               const next = { ...r, [ch]: rating.count };
@@ -306,7 +304,7 @@ export default function WordSquadPage({ exitTo = '/student/dashboard', demo = fa
       setError('The game could not start on this device. Please try again or use another browser.');
       setScreen('menu');
     }
-  }, [stopGame, offline, assignment, practice, testing, testSet]);
+  }, [stopGame, offline, assignment, testing, testSet]);
 
   const answerRevive = async (choice) => {
     const session = sessionRef.current;
@@ -332,8 +330,8 @@ export default function WordSquadPage({ exitTo = '/student/dashboard', demo = fa
   const exit = () => { stopGame(); navigate(exitTo); };
 
   const total = CHAPTERS[chapter]?.gates ?? 0;
-  const lastChapter = assignment && !practice ? assignment.chapters - 1 : 2;
-  const backToList = !demo && !testing && (practice || (assignment && games?.length > 1));
+  const lastChapter = assignment ? assignment.chapters - 1 : 2;
+  const backToList = !demo && !testing && assignment && games?.length > 1;
 
   return (
     <div className="ws-root">
@@ -378,9 +376,9 @@ export default function WordSquadPage({ exitTo = '/student/dashboard', demo = fa
             <p className="ws-lead">Steer your squad through the <b>right word</b>. Right words give weapons and friends. Wrong words bring more bugs!</p>
             {testing && <div className="ws-game-head"><span>Test play: {testSet ? testSet.title : 'loading…'}</span><span>Your questions · no stars</span></div>}
             {!demo && !testing && games === null && <p className="ws-lead">Loading your games…</p>}
-            {!demo && !testing && games && !assignment && !practice && (
+            {!demo && !testing && games && !assignment && (
               <div className="ws-chapters">
-                {games.length === 0 && <p className="ws-lead">No Word Squad games from your teacher yet.</p>}
+                {games.length === 0 && <p className="ws-lead">🔒 Word Squad isn't open for you yet. When your teacher gives you a game, you can play it here.</p>}
                 {games.map((g) => (
                   <button key={g.id} type="button" className="ws-chapter" style={{ '--c': '#7c3aed' }} onClick={() => pick(g)}>
                     <span className="ws-chapter-emoji" aria-hidden="true">📘</span>
@@ -391,19 +389,18 @@ export default function WordSquadPage({ exitTo = '/student/dashboard', demo = fa
                     </span>
                   </button>
                 ))}
-                <button type="button" className="ws-btn ws-btn--ghost" onClick={() => { setPractice(true); setUnlocked(2); setRatings({}); }}>Practice with sample words (no stars)</button>
               </div>
             )}
-            {(demo || assignment || practice || (testing && testSet)) && (
+            {(demo || assignment || (testing && testSet)) && (
             <>
             {!demo && !testing && (
               <div className="ws-game-head">
-                <span>{practice ? 'Practice — sample words, no stars' : assignment.title}</span>
-                {!practice && <span>⭐ {totalStars} · star plays today {Math.min(assignment.playsToday, assignment.maxPlaysPerDay)}/{assignment.maxPlaysPerDay}</span>}
+                <span>{assignment.title}</span>
+                <span>⭐ {totalStars} · star plays today {Math.min(assignment.playsToday, assignment.maxPlaysPerDay)}/{assignment.maxPlaysPerDay}</span>
               </div>
             )}
             <div className="ws-chapters">
-              {CHAPTER_INFO.slice(0, assignment && !practice ? assignment.chapters : 3).map((c, i) => {
+              {CHAPTER_INFO.slice(0, assignment ? assignment.chapters : 3).map((c, i) => {
                 const locked = i > unlocked;
                 return (
                   <button key={c.title} type="button" className="ws-chapter" style={{ '--c': c.color }} disabled={locked} onClick={() => start(i)}>
@@ -426,7 +423,7 @@ export default function WordSquadPage({ exitTo = '/student/dashboard', demo = fa
             {error && <p className="ws-error" role="alert">{error}</p>}
             <div className="ws-menu-row">
               {backToList
-                ? <button type="button" className="ws-btn ws-btn--ghost" onClick={() => { setAssignment(null); setPractice(false); }}>← My games</button>
+                ? <button type="button" className="ws-btn ws-btn--ghost" onClick={() => setAssignment(null)}>← My games</button>
                 : <button type="button" className="ws-btn ws-btn--ghost" onClick={exit}>← Back</button>}
               <button type="button" className="ws-btn ws-btn--ghost" onClick={toggleMute}>{muted ? '🔇 Sound off' : '🔊 Sound on'}</button>
             </div>

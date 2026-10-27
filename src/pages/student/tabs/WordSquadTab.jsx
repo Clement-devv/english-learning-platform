@@ -23,7 +23,7 @@ export default function WordSquadTab({ isDarkMode }) {
     muted: isDarkMode ? 'var(--as-muted, #8b91b8)' : 'var(--as-ink-2, #6b7280)',
   };
   const card = { background: c.card, border: `1px solid ${c.line}`, borderRadius: 18, padding: 18 };
-  const play = (id) => navigate(`/student/games/word-squad${id ? `?assignment=${id}` : ''}`);
+  const play = (id) => navigate(`/student/games/word-squad?assignment=${id}`);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14, color: c.ink, maxWidth: 820 }}>
@@ -43,10 +43,7 @@ export default function WordSquadTab({ isDarkMode }) {
       {!data && !error && <div style={{ ...card, color: c.muted }}>Loading your games…</div>}
       {data && data.assignments.length === 0 && (
         <div style={card}>
-          <p style={{ margin: '0 0 10px', fontWeight: 700 }}>No games from your teacher yet.</p>
-          <button type="button" onClick={() => play(null)} style={{ font: 'inherit', fontWeight: 800, padding: '10px 16px', borderRadius: 12, border: `1px solid ${c.line}`, background: c.card, color: c.ink, cursor: 'pointer' }}>
-            Practice with sample words
-          </button>
+          <p style={{ margin: 0, fontWeight: 700 }}>🔒 Word Squad isn't open for you yet. When your teacher gives you a game, it will be here.</p>
         </div>
       )}
       {data?.assignments.map((a) => (

@@ -16,6 +16,7 @@ import { useLiveRefresh, refreshStale } from "../../../hooks/useLiveData";
 import { useTabSeen } from "../../../hooks/useTabSeen";
 import { useTranslation } from "react-i18next";
 import i18n from "../../../i18n/i18n.js";
+import { listAssignments } from "../../games/word-squad/data/serverSession.js";
 
 // For text in file-level lists: read when rendered, so it follows the chosen language
 const ta = (key, opts) => i18n.t(`student:${key}`, opts);
@@ -118,6 +119,8 @@ export function useDashboardData() {
   const [showSettingsModal,     setShowSettingsModal]     = useState(false);
   const [toast,                 setToast]                 = useState(null);
   const [loading,               setLoading]               = useState(true);
+  // Word Squad shows only once a teacher has given this student a game
+  const [hasGames,              setHasGames]              = useState(false);
   const [showCelebration,       setShowCelebration]       = useState(false);
   const [celebrationMessage,    setCelebrationMessage]    = useState("");
   const [celebrationEmoji,      setCelebrationEmoji]      = useState("");
@@ -130,7 +133,7 @@ export function useDashboardData() {
     typeof Notification !== "undefined" ? Notification.permission : "default"
   );
   const [activeTab,             setActiveTab]             = useState("dashboard");
-  useTabFromUrl(setActiveTab, ['dashboard','homework','quiz','flashcards','pronunciation','conversation','book-class','group-classes','messages','completed-classes','class-reports','schedule','charts','badges','certificates','leaderboard','recordings','reviews','referral']); // ?tab= from notification clicks / links
+  useTabFromUrl(setActiveTab, ['dashboard','homework','quiz','flashcards','pronunciation','conversation','book-class','group-classes','messages','completed-classes','class-reports','schedule','charts','badges','certificates','leaderboard','recordings','reviews','referral','games']); // ?tab= from notification clicks / links
   const [unreadMessages,        setUnreadMessages]        = useState(0);
   const [homeworkPending,       setHomeworkPending]       = useState(0);
   const prevHomeworkRef = useRef(null);
@@ -757,9 +760,16 @@ export function useDashboardData() {
     showToast(tr("useDashboardData.notificationsDisabled"));
   };
 
+  useEffect(() => {
+    if (!student?.id) return;
+    listAssignments().then((d) => setHasGames(d.assignments.length > 0)).catch(() => setHasGames(false));
+  }, [student?.id]);
+  const showTab = useCallback((key) => key !== "games" || hasGames, [hasGames]);
+
   // ── Return everything shells need ──────────────────────────────────────────
   return {
     student, activeTab, setActiveTab,
+    hasGames, showTab,
     unreadMessages, setUnreadMessages,
     loading, isDarkMode, setIsDarkMode,
     toast, showToast,

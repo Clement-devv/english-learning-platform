@@ -79,7 +79,7 @@ const NAV = [
   { id:"messages",  Icon:MessageSquare,  get label() { return ta("playfulShell.navMessages"); }, tabs:["messages"],                        dot:"#4ADE80" },
   { id:"classes",   Icon:CalendarDays,   get label() { return ta("playfulShell.navClasses"); },  tabs:["completed-classes","schedule","book-class","class-reports"],    dot:"#06B6D4" },
   { id:"progress",  Icon:BarChart2,      get label() { return ta("playfulShell.navProgress"); }, tabs:["charts","badges"],                 dot:"#FF8E53" },
-  { id:"more",      Icon:MoreHorizontal, get label() { return ta("playfulShell.navMore"); },     tabs:["games","recordings","reviews","referral","leaderboard"], dot:"#818CF8" },
+  { id:"more",      Icon:MoreHorizontal, get label() { return ta("playfulShell.navMore"); },     tabs:["recordings","reviews","referral","leaderboard","games"], dot:"#818CF8" },
 ];
 
 const SUB_TABS = {
@@ -87,7 +87,7 @@ const SUB_TABS = {
   practice: [{ key:"pronunciation",get label() { return ta("playfulShell.subTabsSpeak"); } }, { key:"conversation",get label() { return ta("playfulShell.subTabsAiChat"); } }],
   classes:  [{ key:"completed-classes",get label() { return ta("playfulShell.subTabsCompleted"); } }, { key:"schedule",get label() { return ta("playfulShell.subTabsSchedule"); } }, { key:"book-class",get label() { return ta("playfulShell.subTabsBookAClass"); } }, { key:"class-reports",get label() { return ta("playfulShell.subTabsReports"); } }],
   progress: [{ key:"charts",get label() { return ta("playfulShell.subTabsCharts"); } }, { key:"badges",get label() { return ta("playfulShell.subTabsBadges"); } }],
-  more:     [{ key:"games",get label() { return ta("playfulShell.subTabsWordSquad"); } }, { key:"recordings",get label() { return ta("playfulShell.subTabsRecordings"); } }, { key:"reviews",get label() { return ta("playfulShell.subTabsReviews"); } }, { key:"referral",get label() { return ta("playfulShell.subTabsInvite"); } }, { key:"leaderboard",get label() { return ta("playfulShell.subTabsLeaderboard"); } }],
+  more:     [{ key:"recordings",get label() { return ta("playfulShell.subTabsRecordings"); } }, { key:"reviews",get label() { return ta("playfulShell.subTabsReviews"); } }, { key:"referral",get label() { return ta("playfulShell.subTabsInvite"); } }, { key:"leaderboard",get label() { return ta("playfulShell.subTabsLeaderboard"); } }, { key:"games",get label() { return ta("playfulShell.subTabsWordSquad"); } }],
 };
 
 // ── Lesson category tiles ──────────────────────────────────────────────────────
@@ -193,7 +193,7 @@ export default function PlayfulShell() {
   }, []);
 
   const activeSection = NAV.find(n => n.tabs.includes(d.activeTab))?.id || "dashboard";
-  const subTabs = SUB_TABS[activeSection] || [];
+  const subTabs = (SUB_TABS[activeSection] || []).filter(st => d.showTab(st.key));
 
   // Classroom overlay
   if (d.isClassroomOpen && d.activeClass) {
@@ -757,7 +757,7 @@ export default function PlayfulShell() {
           <div style={{ position:'absolute', bottom:0, left:0, right:0, background:P.white, borderRadius:'20px 20px 0 0', padding:'12px 16px 44px', maxHeight:'78vh', overflowY:'auto' }} onClick={e => e.stopPropagation()}>
             <div style={{ width:36, height:4, background:P.border, borderRadius:999, margin:'0 auto 16px' }} />
             <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
-              {NAV.filter(n => !['dashboard','messages','classes'].includes(n.id)).flatMap(n => n.tabs).map(tab => {
+              {NAV.filter(n => !['dashboard','messages','classes'].includes(n.id)).flatMap(n => n.tabs).filter(tab => d.showTab(tab)).map(tab => {
                 const navItem = NAV.find(n => n.tabs.includes(tab));
                 const isActive = d.activeTab === tab;
                 const label = {homework:'Homework',quiz:'Quizzes',flashcards:'Flashcards',pronunciation:'Speaking',conversation:'AI Chat','completed-classes':'Completed',charts:'Charts',badges:'Badges',recordings:'Recordings',reviews:'Reviews',referral:'Invite',leaderboard:'Leaderboard',games:'Word Squad'}[tab] || tab;

@@ -413,7 +413,7 @@ export default function CRMShell() {
                   {group.label}
                 </div>
               )}
-              {group.items.map(({ key, Icon, label }) => {
+              {group.items.filter(item => d.showTab(item.key)).map(({ key, Icon, label }) => {
                 const isActive = d.activeTab === key;
                 // New since the tab was last opened (useDashboardData → tabBadge)
                 const badge = ["homework","quiz","badges"].includes(key) ? d.tabBadge?.(key) : null;
@@ -812,7 +812,7 @@ export default function CRMShell() {
             <div style={{ width:36, height:4, background:P.border, borderRadius:999, margin:'0 auto 16px' }} />
             <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
               {NAV_GROUPS.flatMap(g => g.items)
-                .filter(item => !['dashboard','homework','messages','schedule'].includes(item.key))
+                .filter(item => !['dashboard','homework','messages','schedule'].includes(item.key) && d.showTab(item.key))
                 .map(item => {
                   const isActive = d.activeTab === item.key;
                   return (

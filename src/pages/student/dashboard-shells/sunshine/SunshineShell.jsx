@@ -430,7 +430,7 @@ export default function SunshineShell() {
                   {t(group.labelKey)}
                 </div>
               )}
-              {group.items.map(item => {
+              {group.items.filter(item => d.showTab(item.key)).map(item => {
                 const isActive = d.activeTab === item.key;
                 // New since the tab was last opened (useDashboardData → tabBadge)
                 const badge = ["homework", "quiz", "badges"].includes(item.key) ? d.tabBadge?.(item.key)
@@ -957,7 +957,7 @@ export default function SunshineShell() {
             </div>
 
             {NAV_GROUPS.map((group, gi) => {
-              const items = group.items.filter(item => !['dashboard', 'homework', 'messages', 'schedule'].includes(item.key));
+              const items = group.items.filter(item => !['dashboard', 'homework', 'messages', 'schedule'].includes(item.key) && d.showTab(item.key));
               if (!items.length) return null;
               return (
                 <section key={gi} aria-label={group.labelKey ? t(group.labelKey) : undefined}>
