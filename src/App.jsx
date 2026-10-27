@@ -70,6 +70,7 @@ const CenterLandingPage   = lazy(() => import("./pages/landing-page/CenterLandin
 const ClemifyHome         = lazy(() => import("./pages/clemify-home/ClemifyHome"));
 // Word Squad game — its own chunk; the PixiJS engine loads only when a chapter starts
 const WordSquadPage       = lazy(() => import("./pages/games/word-squad/WordSquadPage"));
+const GameLinkPage        = lazy(() => import("./pages/games/word-squad/GameLinkPage"));
 // A teacher plays their own set before giving it out (no stars, nothing saved)
 function WordSquadTestPlay() {
   const { setId } = useParams();
@@ -262,6 +263,7 @@ function App() {
             {/* Public homework share link (managed students — no login) */}
             <Route path="/hw/:token" element={<HomeworkLinkPage />} />
             <Route path="/q/:token" element={<QuizLinkPage />} />
+            <Route path="/g/:token" element={<GameLinkPage />} />
             <Route path="/ac/:token" element={<AttendanceCheckPage />} />
             {/* Class video for a managed student's family (no login) */}
             <Route path="/rv/:token" element={<RecordingLinkPage />} />

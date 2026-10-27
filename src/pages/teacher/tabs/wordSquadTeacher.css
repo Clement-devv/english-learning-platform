@@ -99,3 +99,9 @@
 .wst-file-exp { white-space: nowrap; }
 .wst-job { display: flex; flex-direction: column; gap: 2px; padding: 8px 0; border-bottom: 1px solid var(--wst-line); }
 .wst-job:last-child { border-bottom: 0; }
+
+/* Game links panel */
+.wst-links { display: flex; flex-direction: column; gap: 14px; }
+.wst-link { display: flex; flex-direction: column; gap: 6px; }
+.wst-link-url { flex: 1 1 260px; min-width: 0; font-size: 13px; }
+.wst-link-name { flex: 0 0 150px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

@@ -4,7 +4,7 @@
 // appears above a gate in the game, publish, and give a set to group classes or
 // students. The question checks are the server's own (server/utils/questionRules.js).
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ArrowDown, ArrowUp, BookOpen, Copy, Download, Play, Plus, Sparkles, Trash2, Upload } from 'lucide-react';
+import { ArrowDown, ArrowUp, BookOpen, Copy, Download, Link2, Play, Plus, Sparkles, Trash2, Upload } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../../api';
 import { questionErrors, publishErrors, parseQuestionsCsv, LEVELS, LIMITS } from '../../../../server/utils/questionRules.js';
@@ -293,11 +293,83 @@ function AssignForm({ set, onDone, flash }) {
   );
 }
 
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); return true; } catch { return false; }
+}
+
+/** Links to send for one game: one address for students who log in, and a
+ *  personal link (with a name check) for each no-login student. */
+function GameLinks({ assignment, onClose, flash }) {
+  const [managed, setManaged] = useState(null);
+  const loginUrl = `${window.location.origin}/student/games/word-squad?assignment=${assignment.id}`;
+  const linkUrl = (token) => `${window.location.origin}/g/${token}`;
+
+  useEffect(() => {
+    api.post(`${BASE}/assignments/${assignment.id}/links`)
+      .then(({ data }) => setManaged(data.data))
+      .catch((err) => { setManaged([]); flash(msg(err, 'Could not make the links'), true); });
+  }, [assignment.id, flash]);
+
+  const copy = async (text, what) => {
+    const done = await copyText(text);
+    flash(done ? `${what} copied — paste it in your message to students` : 'Could not copy — select the link and copy it', !done);
+  };
+  const withLinks = (managed || []).filter((m) => m.token);
+
+  return (
+    <div className="wst-card wst-links">
+      <div className="wst-row">
+        <h3 style={{ margin: 0 }}>Links for “{assignment.setTitle}”</h3>
+        <span className="wst-spacer" />
+        <button type="button" className="wst-btn wst-btn--sm" onClick={onClose}>Close</button>
+      </div>
+      {!assignment.active && <p className="wst-muted" style={{ margin: 0 }}>This game is stopped — the links work again when you restart it.</p>}
+
+      <div className="wst-link">
+        <b>Students who log in</b>
+        <span className="wst-muted">One link for everyone in this game. They log in (if they aren't already) and the game opens. Others can't play it.</span>
+        <div className="wst-row">
+          <input className="wst-input wst-link-url" readOnly value={loginUrl} onFocus={(e) => e.target.select()} aria-label="Game link for students who log in" />
+          <button type="button" className="wst-btn wst-btn--sm wst-btn--primary" onClick={() => copy(loginUrl, 'Link')}><Copy size={14} /> Copy</button>
+        </div>
+      </div>
+
+      <div className="wst-link">
+        <b>Students without a login</b>
+        <span className="wst-muted">Each one has a personal link. To open it they type their name and your name.</span>
+        {managed === null ? <span className="wst-muted">Making links…</span> : managed.length === 0 ? (
+          <span className="wst-muted">No students without a login in this game.</span>
+        ) : (
+          <>
+            {managed.map((m) => (
+              <div key={m.studentId} className="wst-row">
+                <span className="wst-link-name">{m.name}</span>
+                {m.token ? (
+                  <>
+                    <input className="wst-input wst-link-url" readOnly value={linkUrl(m.token)} onFocus={(e) => e.target.select()} aria-label={`Game link for ${m.name}`} />
+                    <button type="button" className="wst-btn wst-btn--sm" onClick={() => copy(linkUrl(m.token), `${m.name}'s link`)}><Copy size={14} /> Copy</button>
+                  </>
+                ) : <span className="wst-muted">No teacher linked to this student yet, so no link.</span>}
+              </div>
+            ))}
+            {withLinks.length > 1 && (
+              <div className="wst-row">
+                <button type="button" className="wst-btn wst-btn--sm" onClick={() => copy(withLinks.map((m) => `${m.name}: ${linkUrl(m.token)}`).join('\n'), 'All links')}><Copy size={14} /> Copy all, one per line</button>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function WordSquadTab({ isDarkMode }) {
   const [view, setView] = useState({ name: 'list' });
   const [sets, setSets] = useState(null);
   const [assignments, setAssignments] = useState([]);
   const [toast, setToast] = useState(null);
+  const [linksFor, setLinksFor] = useState(null);
   const navigate = useNavigate();
   const testPlay = useCallback((id) => navigate(`/teacher/games/word-squad/test/${id}`), [navigate]);
 
@@ -390,13 +462,19 @@ export default function WordSquadTab({ isDarkMode }) {
                       <td>{[a.groupClasses && `${a.groupClasses} class${a.groupClasses > 1 ? 'es' : ''}`, a.students && `${a.students} student${a.students > 1 ? 's' : ''}`].filter(Boolean).join(' + ')}</td>
                       <td>{a.dueAt ? new Date(a.dueAt).toLocaleDateString() : '—'}</td>
                       <td>{a.players}</td>
-                      <td><button type="button" className="wst-btn wst-btn--sm" onClick={() => toggleAssignment(a)}>{a.active ? 'Stop' : 'Restart'}</button></td>
+                      <td>
+                        <div className="wst-row" style={{ flexWrap: 'nowrap' }}>
+                          <button type="button" className="wst-btn wst-btn--sm" onClick={() => setLinksFor(a)}><Link2 size={14} /> Links</button>
+                          <button type="button" className="wst-btn wst-btn--sm" onClick={() => toggleAssignment(a)}>{a.active ? 'Stop' : 'Restart'}</button>
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             )}
           </div>
+          {linksFor && <GameLinks key={linksFor.id} assignment={linksFor} onClose={() => setLinksFor(null)} flash={flash} />}
         </>
       )}
     </div>

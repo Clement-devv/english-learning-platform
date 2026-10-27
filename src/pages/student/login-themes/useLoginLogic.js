@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext.jsx';
 import api from '../../../api';
 import { useTranslation } from "react-i18next";
+import { takeStudentReturn } from '../../../utils/studentReturn.js';
 
 const DASHBOARD = '/student/dashboard';
 
@@ -23,15 +24,16 @@ export function useLoginLogic() {
 
   /** Shared: finish login or gate on T&C */
   const _completeLogin = (userInfo, authToken, sessionToken) => {
+    const next = takeStudentReturn() || DASHBOARD; // back to the game link they opened
     if (!userInfo.hasAcceptedTerms) {
-      requireTerms('student', userInfo, authToken, sessionToken, DASHBOARD);
+      requireTerms('student', userInfo, authToken, sessionToken, next);
       return;
     }
     sessionStorage.setItem('studentToken',        authToken);
     sessionStorage.setItem('studentSessionToken', sessionToken);
     sessionStorage.setItem('studentInfo',         JSON.stringify(userInfo));
     login('student', userInfo, authToken);
-    navigate(DASHBOARD);
+    navigate(next);
   };
 
   const handleInitialLogin = async (e) => {

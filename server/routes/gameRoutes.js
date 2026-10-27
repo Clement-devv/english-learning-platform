@@ -8,11 +8,13 @@
 //   POST /word-squad/sessions               { assignmentId, chapter } → gates without answers
 //   POST /word-squad/sessions/:id/answer    { gateId, choice } → { correct, correctAnswer }
 //   POST /word-squad/sessions/:id/finish    { won, bugsPopped, … } → stars, rating, review
+// Managed students (no login) play the same four routes under /link/:token/…,
+// after a name check — see "Play by link" below.
 // Teachers and admins manage question sets and assignments further down.
 import express from "express";
 import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
 import { verifyToken, verifyStudent, verifyAdminOrTeacher } from "../middleware/authMiddleware.js";
-import { gameLimiter } from "../middleware/rateLimiter.js";
+import { gameLimiter, loginLimiter } from "../middleware/rateLimiter.js";
 import { validateObjectId } from "../middleware/validateObjectId.js";
 import { questionSetSchema } from "../schemas/questionSetSchema.js";
 import { gameAssignmentSchema } from "../schemas/gameAssignmentSchema.js";
@@ -22,6 +24,12 @@ import { starLedgerSchema } from "../schemas/starLedgerSchema.js";
 import { groupClassSchema } from "../schemas/groupClassSchema.js";
 import { studentSchema } from "../schemas/studentSchema.js";
 import { assignmentSchema } from "../schemas/assignmentSchema.js";
+import { gameLinkSchema } from "../schemas/gameLinkSchema.js";
+import { teacherSchema } from "../schemas/teacherSchema.js";
+import {
+  ACCESS_HEADER, issueShareLink, resolveShareLink, checkUnlock, signLinkAccess, verifyLinkAccess,
+} from "../utils/shareLink.js";
+import { decrypt } from "../utils/fieldEncryption.js";
 import {
   CHAPTER_GATES, CHAPTER_COUNT, MIN_ANSWER_GAP_MS, SESSION_TTL_MS,
   choicesForGate, createRng, shuffle, rollReward, computeStars, chapterRating,
@@ -42,6 +50,8 @@ const getProgress   = (db) => db.models.GameProgress   || db.model("GameProgress
 const getLedger     = (db) => db.models.StarLedger     || db.model("StarLedger", starLedgerSchema);
 const getGroupClass = (db) => db.models.GroupClass     || db.model("GroupClass", groupClassSchema);
 const getStudent    = (db) => db.models.Student        || db.model("Student", studentSchema);
+const getGameLink   = (db) => db.models.GameLink       || db.model("GameLink", gameLinkSchema);
+const getTeacher    = (db) => db.models.Teacher        || db.model("Teacher", teacherSchema);
 
 const student = [verifyToken, verifyStudent, gameLimiter];
 const REVIVE_ID = "revive";
@@ -55,9 +65,10 @@ const fail = (res, err, what) => {
 
 const startOfToday = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; };
 
-/** Assignments this student may play right now: given to them, or to a group class they're in. */
-async function playableFilter(db, studentId) {
-  const groupIds = await getGroupClass(db).distinct("_id", { "enrollments.studentId": studentId });
+/** Assignments this student may play right now: given to them, or to a group class they're in.
+ *  Through a game link, only that link's assignment. */
+async function playableFilter(req, studentId) {
+  const groupIds = await getGroupClass(req.db).distinct("_id", { "enrollments.studentId": studentId });
   const now = new Date();
   return {
     active: true,
@@ -65,6 +76,7 @@ async function playableFilter(db, studentId) {
     $and: [
       { $or: [{ dueAt: null }, { dueAt: { $gt: now } }] },
       { $or: [{ studentIds: studentId }, { groupClassIds: { $in: groupIds } }] },
+      ...(req.gameLink ? [{ _id: req.gameLink.assignmentId }] : []),
     ],
   };
 }
@@ -76,10 +88,10 @@ function gateChoices(rng, q, n) {
 }
 
 // ── The student's games ─────────────────────────────────────────────────────
-router.get("/word-squad/assignments", ...student, async (req, res) => {
+async function listGames(req, res) {
   try {
     const sid = req.student._id;
-    const list = await getAssignment(req.db).find(await playableFilter(req.db, sid)).sort({ createdAt: -1 }).limit(50).lean();
+    const list = await getAssignment(req.db).find(await playableFilter(req, sid)).sort({ createdAt: -1 }).limit(50).lean();
     const sets = await getSet(req.db).find({ _id: { $in: list.map((a) => a.setId) }, status: "published" }).select("title level").lean();
     const setById = new Map(sets.map((s) => [String(s._id), s]));
     const progress = await getProgress(req.db).find({ studentId: sid, assignmentId: { $in: list.map((a) => a._id) } }).lean();
@@ -108,16 +120,16 @@ router.get("/word-squad/assignments", ...student, async (req, res) => {
   } catch (err) {
     return fail(res, err, "assignments");
   }
-});
+}
 
 // ── Start a chapter ─────────────────────────────────────────────────────────
-router.post("/word-squad/sessions", ...student, async (req, res) => {
+async function startChapter(req, res) {
   try {
     const sid = req.student._id;
     const assignmentId = toObjectId(req.body?.assignmentId, "assignmentId");
     const chapter = toInt(req.body?.chapter, "chapter", { min: 0, max: CHAPTER_COUNT - 1, default: 0 });
 
-    const assignment = await getAssignment(req.db).findOne({ _id: assignmentId, ...(await playableFilter(req.db, sid)) }).lean();
+    const assignment = await getAssignment(req.db).findOne({ _id: assignmentId, ...(await playableFilter(req, sid)) }).lean();
     if (!assignment) return notFound(res, "This game isn't assigned to you (or it has ended)");
     const set = await getSet(req.db).findOne({ _id: assignment.setId, status: "published" }).lean();
     const questions = (set?.questions || []).filter((q) => q.prompt && q.answer && (q.distractors || []).some((d) => d && d !== q.answer));
@@ -162,7 +174,7 @@ router.post("/word-squad/sessions", ...student, async (req, res) => {
   } catch (err) {
     return fail(res, err, "start");
   }
-});
+}
 
 /** The student's own active session, with its answers loaded */
 async function loadSession(req) {
@@ -171,7 +183,7 @@ async function loadSession(req) {
 }
 
 // ── Answer a gate ───────────────────────────────────────────────────────────
-router.post("/word-squad/sessions/:id/answer", validateObjectId("id"), ...student, async (req, res) => {
+async function answerGate(req, res) {
   try {
     const gateId = toStr(req.body?.gateId, "gateId", { maxLen: 20, required: true });
     const choice = toStr(req.body?.choice, "choice", { maxLen: 40, required: true });
@@ -219,10 +231,10 @@ router.post("/word-squad/sessions/:id/answer", validateObjectId("id"), ...studen
   } catch (err) {
     return fail(res, err, "answer");
   }
-});
+}
 
 // ── Finish a chapter ────────────────────────────────────────────────────────
-router.post("/word-squad/sessions/:id/finish", validateObjectId("id"), ...student, async (req, res) => {
+async function finishChapter(req, res) {
   try {
     const b = req.body || {};
     const num = (v, max) => Math.max(0, Math.min(max, Math.floor(Number(v) || 0)));
@@ -304,7 +316,79 @@ router.post("/word-squad/sessions/:id/finish", validateObjectId("id"), ...studen
   } catch (err) {
     return fail(res, err, "finish");
   }
+}
+
+router.get("/word-squad/assignments", ...student, listGames);
+router.post("/word-squad/sessions", ...student, startChapter);
+router.post("/word-squad/sessions/:id/answer", validateObjectId("id"), ...student, answerGate);
+router.post("/word-squad/sessions/:id/finish", validateObjectId("id"), ...student, finishChapter);
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Play by link — managed students (no login), /api/v1/games/link/:token/…
+//   POST /link/:token/unlock     { studentName, teacherName } → access token
+//   GET  /link/:token            (X-Share-Access) who the link is for
+//   …/word-squad/*               the four play routes above, for this one game
+// The token in the URL is the key and the name check gives a short-lived access
+// token (utils/shareLink.js). The link ends with its game (stopped or past due),
+// or when the student leaves the class. Never 401 (the app would go to a login).
+// ═════════════════════════════════════════════════════════════════════════════
+const LINK_UNAVAILABLE = "This game link doesn't work. Please ask your teacher for a new link.";
+const LINK_KIND = "game";
+const linkExpiry = () => new Date(Date.now() + 365 * 24 * 60 * 60 * 1000); // ends with the game, not a date
+
+async function findGameLink(req, res) {
+  getStudent(req.db); getTeacher(req.db); // register models for populate
+  const r = await resolveShareLink(getGameLink(req.db), req.params.token, req.center, { expiresAt: linkExpiry });
+  if (r.status !== "ok") { notFound(res, LINK_UNAVAILABLE); return null; }
+  const a = await getAssignment(req.db).findOne({ _id: r.doc.assignmentId, ...(await playableFilter(req, r.doc.studentId._id)) }).select("dueAt").lean();
+  if (!a) {
+    const ended = await getAssignment(req.db).findById(r.doc.assignmentId).select("dueAt").lean();
+    res.status(410).json({ success: false, expired: true, endedAt: ended?.dueAt || null, message: "This game has ended. Ask your teacher if you want to play again." });
+    return null;
+  }
+  return r;
+}
+
+const linkView = (link) => ({
+  studentName: link.studentId.firstName,
+  teacherName: link.teacherId.displayName?.trim() || link.teacherId.firstName,
 });
+
+/** Lets the play routes run as the link's student, for the link's game only */
+async function linkPlayer(req, res, next) {
+  try {
+    const r = await findGameLink(req, res);
+    if (!r) return;
+    if (!verifyLinkAccess(req.center.slug, LINK_KIND, req.get(ACCESS_HEADER), r.doc._id, r.tokenHash)) {
+      return forbidden(res, "Please tell us your name to open this game.");
+    }
+    const st = await getStudent(req.db).findById(r.doc.studentId._id).select("firstName stars").lean();
+    if (!st) return notFound(res, LINK_UNAVAILABLE);
+    req.student = st;
+    req.gameLink = { assignmentId: r.doc.assignmentId, view: linkView(r.doc) };
+    req.user = { id: `link-${st._id}`, centerId: req.center.slug }; // rate limit per student, not per school Wi-Fi
+    return next();
+  } catch (err) { return fail(res, err, "game link"); }
+}
+
+router.post("/link/:token/unlock", loginLimiter, async (req, res) => {
+  try {
+    const r = await findGameLink(req, res);
+    if (!r) return;
+    const check = await checkUnlock(getGameLink(req.db), r.doc,
+      toStr(req.body?.studentName, "studentName", { maxLen: 100 }),
+      toStr(req.body?.teacherName, "teacherName", { maxLen: 100 }));
+    if (!check.ok) return res.status(check.status).json({ success: false, message: check.message });
+    return res.json({ success: true, accessToken: signLinkAccess(req.center.slug, LINK_KIND, r.doc._id, r.tokenHash, r.expiresAt), game: linkView(r.doc) });
+  } catch (err) { return fail(res, err, "game link unlock"); }
+});
+
+const link = [linkPlayer, gameLimiter];
+router.get("/link/:token", ...link, (req, res) => res.json({ success: true, game: req.gameLink.view }));
+router.get("/link/:token/word-squad/assignments", ...link, listGames);
+router.post("/link/:token/word-squad/sessions", ...link, startChapter);
+router.post("/link/:token/word-squad/sessions/:id/answer", validateObjectId("id"), ...link, answerGate);
+router.post("/link/:token/word-squad/sessions/:id/finish", validateObjectId("id"), ...link, finishChapter);
 
 // ═════════════════════════════════════════════════════════════════════════════
 // Teachers and admins: question sets and assignments
@@ -316,6 +400,7 @@ router.post("/word-squad/sessions/:id/finish", validateObjectId("id"), ...studen
 //   GET            /targets              group classes and students this person may assign to
 //   GET/POST       /assignments          list / give a published set to classes or students
 //   PATCH          /assignments/:id      stop / restart, due date, plays per day
+//   POST           /assignments/:id/links  personal play links for its managed students
 // ═════════════════════════════════════════════════════════════════════════════
 const staff = [verifyToken, verifyAdminOrTeacher];
 const who = (req) => (req.admin ? { role: "admin", id: req.admin._id || null } : { role: "teacher", id: req.teacher._id });
@@ -540,6 +625,49 @@ router.patch("/assignments/:id", validateObjectId("id"), ...staff, async (req, r
     await a.save();
     return ok(res, { data: a, message: "Saved" });
   } catch (err) { return fail(res, err, "update assignment"); }
+});
+
+// POST /assignments/:id/links — personal play links for the game's managed
+// (no-login) students: makes the missing ones, returns them all. Students who
+// log in use the game's own address instead (the teacher's screen builds it).
+router.post("/assignments/:id/links", validateObjectId("id"), ...staff, async (req, res) => {
+  try {
+    const a = await getAssignment(req.db).findOne({ _id: req.params.id, ...mine(req) }).lean();
+    if (!a) return notFound(res, "Assignment not found");
+    const classes = await getGroupClass(req.db).find({ _id: { $in: a.groupClassIds } }).select("enrollments.studentId").lean();
+    const ids = [...a.studentIds, ...classes.flatMap((g) => (g.enrollments || []).map((e) => e.studentId))];
+    const managed = await getStudent(req.db).find({ _id: { $in: ids }, isManaged: true }).sort({ firstName: 1 }).limit(500).select("firstName lastName").lean();
+
+    // The teacher whose name the student confirms: whoever gave the game, or
+    // (for an admin's game) the student's own teacher
+    const teacherFor = new Map();
+    if (a.createdBy?.role === "teacher") managed.forEach((s) => teacherFor.set(String(s._id), a.createdBy.id));
+    else {
+      const pairs = await getTeacherAssignment(req.db).find({ studentId: { $in: managed.map((s) => s._id) } }).sort({ createdAt: 1 }).select("studentId teacherId").lean();
+      pairs.forEach((p) => { if (!teacherFor.has(String(p.studentId))) teacherFor.set(String(p.studentId), p.teacherId); });
+    }
+
+    const L = getGameLink(req.db);
+    const existing = await L.find({ assignmentId: a._id, studentId: { $in: managed.map((s) => s._id) } }).select("studentId +shareLink.tokenEnc").lean();
+    const tokenFor = new Map();
+    existing.forEach((l) => { try { tokenFor.set(String(l.studentId), decrypt(l.shareLink.tokenEnc)); } catch { /* replaced below */ } });
+    for (const s of managed) {
+      const teacherId = teacherFor.get(String(s._id));
+      if (tokenFor.has(String(s._id)) || !teacherId) continue;
+      const doc = new L({ assignmentId: a._id, studentId: s._id, teacherId });
+      const token = issueShareLink(doc);
+      await L.updateOne({ assignmentId: a._id, studentId: s._id }, { $set: { teacherId, shareLink: doc.shareLink } }, { upsert: true });
+      tokenFor.set(String(s._id), token);
+    }
+
+    return ok(res, {
+      data: managed.map((s) => ({
+        studentId: s._id,
+        name: `${s.firstName} ${s.lastName || ""}`.trim(),
+        token: tokenFor.get(String(s._id)) || null, // null: no teacher to check the name against
+      })),
+    });
+  } catch (err) { return fail(res, err, "game links"); }
 });
 
 export default router;

@@ -121,7 +121,8 @@ const ratingsObj = (arr) => Object.fromEntries((arr || []).map((n, i) => [i, n])
  *              Otherwise the student plays their assigned games and the server checks
  *              every answer and pays the stars.
  */
-export default function WordSquadPage({ exitTo = '/student/dashboard', demo = false, testSetId = null }) {
+// `link`: a managed student playing from a game link (GameLinkPage) — no Back button then
+export default function WordSquadPage({ exitTo = '/student/dashboard', demo = false, testSetId = null, link = null }) {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const [games, setGames] = useState(null);        // the student's assigned games (server mode)
@@ -168,7 +169,7 @@ export default function WordSquadPage({ exitTo = '/student/dashboard', demo = fa
   }, []);
   const loadGames = useCallback(async (keepId) => {
     try {
-      const d = await listAssignments();
+      const d = await listAssignments(link);
       setGames(d.assignments);
       setTotalStars(d.stars);
       const want = keepId || params.get('assignment');
@@ -178,7 +179,7 @@ export default function WordSquadPage({ exitTo = '/student/dashboard', demo = fa
       setGames([]);
       setError(apiMessage(err, 'Could not load your games. Check your connection and try again.'));
     }
-  }, [params, pick]);
+  }, [params, pick, link]);
   useEffect(() => { if (!demo && !testing) loadGames(); }, [demo, testing, loadGames]);
   useEffect(() => {
     if (!testSetId) return;
@@ -228,7 +229,7 @@ export default function WordSquadPage({ exitTo = '/student/dashboard', demo = fa
       const { startGame } = await import('./engine.js');
       let session;
       try {
-        session = offline ? createDemoSession(ch, undefined, testing && testSet ? testSet.questions : undefined) : await createServerSession(assignment.id, ch);
+        session = offline ? createDemoSession(ch, undefined, testing && testSet ? testSet.questions : undefined) : await createServerSession(assignment.id, ch, link);
       } catch (err) {
         setError(apiMessage(err, 'Could not start the game. Check your connection and try again.'));
         setScreen('menu');
@@ -304,7 +305,7 @@ export default function WordSquadPage({ exitTo = '/student/dashboard', demo = fa
       setError('The game could not start on this device. Please try again or use another browser.');
       setScreen('menu');
     }
-  }, [stopGame, offline, assignment, testing, testSet]);
+  }, [stopGame, offline, assignment, testing, testSet, link]);
 
   const answerRevive = async (choice) => {
     const session = sessionRef.current;
@@ -424,7 +425,7 @@ export default function WordSquadPage({ exitTo = '/student/dashboard', demo = fa
             <div className="ws-menu-row">
               {backToList
                 ? <button type="button" className="ws-btn ws-btn--ghost" onClick={() => setAssignment(null)}>← My games</button>
-                : <button type="button" className="ws-btn ws-btn--ghost" onClick={exit}>← Back</button>}
+                : !link && <button type="button" className="ws-btn ws-btn--ghost" onClick={exit}>← Back</button>}
               <button type="button" className="ws-btn ws-btn--ghost" onClick={toggleMute}>{muted ? '🔇 Sound off' : '🔊 Sound on'}</button>
             </div>
           </div>

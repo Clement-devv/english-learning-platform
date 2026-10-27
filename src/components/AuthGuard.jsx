@@ -10,10 +10,11 @@
 //   <AuthGuard role="classroom"> <Classroom />         </AuthGuard>
 
 import { useEffect, useRef, useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import api, { refreshToken } from '../api';
 import { ROLE_CONFIG, readStorage, clearAuth } from '../utils/authStorage.js';
 import { decodeJwtPayload } from '../utils/jwt.js';
+import { saveStudentReturn } from '../utils/studentReturn.js';
 
 // Classroom accepts any of these roles
 const CLASSROOM_ROLES = ['teacher', 'student', 'sub-admin'];
@@ -42,6 +43,7 @@ async function clientSideValidOrRenewed(token) {
 export default function AuthGuard({ role, children }) {
   const [status, setStatus] = useState('loading'); // 'loading' | 'ok' | 'denied'
   const loginPathRef         = useRef('/');
+  const location             = useLocation();
 
   useEffect(() => {
     let cancelled = false;
@@ -132,6 +134,9 @@ export default function AuthGuard({ role, children }) {
     );
   }
 
-  if (status === 'denied') return <Navigate to={loginPathRef.current} replace />;
+  if (status === 'denied') {
+    if (role === 'student') saveStudentReturn(location.pathname + location.search); // e.g. a game link
+    return <Navigate to={loginPathRef.current} replace />;
+  }
   return children;
 }
