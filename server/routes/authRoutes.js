@@ -116,8 +116,6 @@ const createLoginHandler = ({
       return res.status(401).json({ message: invalidCredMsg });
     }
 
-    await clearFailedAttempts(identifier, centerSlug);
-
     if (user.twoFactorEnabled) {
       if (!twoFactorToken && !backupCode) {
         // Sign a short-lived token so the role is server-determined, not client-supplied.
@@ -150,9 +148,12 @@ const createLoginHandler = ({
       }
 
       if (!isValid) {
+        await trackFailedLogin(identifier, centerSlug);
         return unauthorized(res, "Invalid 2FA code or backup code");
       }
     }
+
+    await clearFailedAttempts(identifier, centerSlug);
 
     const extra = buildJwtExtra ? buildJwtExtra(user) : {};
     const { token, session, isNewDevice } = startSession(req, user, (sid) =>

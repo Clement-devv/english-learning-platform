@@ -204,7 +204,7 @@ export async function completeClass(db, bookingId, markedBy = "system", options 
     if (isTrial) {
       student = await Student.findById(studentId).lean();
     } else {
-      const charge = await chargeClassCredit(db, studentId, { title: claimedBooking.classTitle, when: claimedBooking.scheduledTime });
+      const charge = await chargeClassCredit(db, studentId, { title: claimedBooking.classTitle, when: claimedBooking.scheduledTime, standalonePay: claimedBooking.standalonePay });
       student = charge.student;
       done.charged = charge.charged;
       done.deactivated = charge.deactivated;
@@ -215,14 +215,14 @@ export async function completeClass(db, bookingId, markedBy = "system", options 
     teacher = await Teacher.findById(teacherId).select("firstName lastName ratePerClass earned lessonsCompleted").lean();
     if (!teacher) throw new Error(`Teacher ${teacherId} not found`);
     if (!isTrial) {
-      ratePerClass = toMoney(teacher.ratePerClass);
+      ratePerClass = claimedBooking.standalonePay?.currency ? 0 : toMoney(teacher.ratePerClass);
       teacher = await adjustTeacherEarnings(db, teacherId, ratePerClass, 1);
       done.paid = ratePerClass;
       done.lessonAdded = true;
     }
 
     // Write 3: Pending PaymentTransaction (skipped for trial lessons)
-    if (!isTrial) {
+    if (!isTrial && !claimedBooking.standalonePay?.currency) {
       await recordPendingPayment(db, claimedBooking._id, {
         teacherId, studentId, amount: ratePerClass,
         classTitle:  claimedBooking.classTitle,

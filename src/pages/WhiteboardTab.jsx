@@ -4,6 +4,7 @@
 // undo removes only your own stroke, and every screen redraws the same picture.
 import { useEffect, useRef, useCallback, useState } from "react";
 import { io } from "socket.io-client";
+import { socketAuth } from '../utils/socketAuth';
 import {
   Pencil, Highlighter, Eraser, Trash2, Undo2, Lock, Unlock,
 } from "lucide-react";
@@ -186,7 +187,7 @@ export default function WhiteboardTab({ userRole, channelName, userName }) {
     if (!channelName) return;
     const socket = io(SERVER_URL, {
       transports: ["websocket"],
-      auth: { token: getSocketToken() },
+      auth: socketAuth(getSocketToken),
     });
     socketRef.current = socket;
 

@@ -1,6 +1,7 @@
 // @ts-check
 // middleware/authMiddleware.js
 import jwt from "jsonwebtoken";
+import { createHash } from "node:crypto";
 import { JWT_VERIFY_OPTIONS } from "../config/config.js";
 import { getCenterSecret } from "../utils/jwtUtils.js";
 import { adminSchema }    from "../schemas/adminSchema.js";
@@ -14,6 +15,15 @@ import redisClient from "../config/redis.js";
 // Checked on every request so logout works even when Redis is down.
 // Entries self-expire; the interval below clears them to prevent unbounded growth.
 const localBlacklist = new Map();
+
+// A signature identifies one JWT; sid identifies every renewal of one device
+// session. Revoke both so a previously issued JWT cannot survive remote logout.
+export function sessionBlacklistKey(payload) {
+  if (!payload?.sid || !payload?.id || !payload?.role) return null;
+  return `session:${createHash('sha256').update(JSON.stringify([
+    payload.centerId || 'platform', payload.role, String(payload.id), String(payload.sid),
+  ])).digest('hex')}`;
+}
 
 setInterval(() => {
   const now = Math.floor(Date.now() / 1000);
@@ -29,6 +39,8 @@ export function addToLocalBlacklist(token) {
     const exp = payload?.exp ?? Math.floor(Date.now() / 1000) + 900;
     if (exp > Math.floor(Date.now() / 1000)) {
       localBlacklist.set(sig, exp);
+      const sessionKey = sessionBlacklistKey(payload);
+      if (sessionKey) localBlacklist.set(sessionKey, exp);
     }
   } catch (_) {}
 }
@@ -48,10 +60,14 @@ export async function isTokenBlacklisted(token) {
   if (!sig) return false;
   const localExp = localBlacklist.get(sig);
   if (localExp && Math.floor(Date.now() / 1000) < localExp) return true;
+  const sessionKey = sessionBlacklistKey(jwt.decode(token));
+  const sessionExp = sessionKey && localBlacklist.get(sessionKey);
+  if (sessionExp && Math.floor(Date.now() / 1000) < sessionExp) return true;
   if (redisClient) {
     try {
       const revoked = await redisClient.get(`bl:${sig}`);
       if (revoked) return true;
+      if (sessionKey && await redisClient.get(`bl:${sessionKey}`)) return true;
     } catch (_) {
       // Redis unavailable — fall back to in-memory result above.
     }
@@ -111,24 +127,12 @@ export const verifyToken = async (req, res, next) => {
 
     const decoded = jwt.verify(token, getCenterSecret(req.center.slug), JWT_VERIFY_OPTIONS);
 
-    // Check in-memory blacklist first — catches revoked tokens even during Redis outages.
-    const sig = token.split('.')[2];
-    const localExp = localBlacklist.get(sig);
-    if (localExp && Math.floor(Date.now() / 1000) < localExp) {
-      return res.status(401).json({ success: false, message: "Session has been revoked. Please log in again." });
+    if (decoded.teacherInspection && (!req.teacherWorkspace || !['GET', 'HEAD', 'OPTIONS'].includes(req.method))) {
+      return res.status(403).json({ success: false, message: 'This Super Admin viewing session is read-only.' });
     }
 
-    // Check Redis for cross-instance revocation (tokens revoked on other server instances).
-    if (redisClient) {
-      try {
-        const revoked = await redisClient.get(`bl:${sig}`);
-        if (revoked) {
-          return res.status(401).json({ success: false, message: "Session has been revoked. Please log in again." });
-        }
-      } catch (_) {
-        // Redis unavailable — in-memory blacklist above already covers recently-revoked tokens.
-        // Tokens revoked on other instances during this outage won't be caught until Redis recovers.
-      }
+    if (await isTokenBlacklisted(token)) {
+      return res.status(401).json({ success: false, code: "SESSION_REVOKED", message: "Session has been revoked. Please log in again." });
     }
 
     // Revoked super-admin impersonation — enforced here too, not only in verifyAdmin,

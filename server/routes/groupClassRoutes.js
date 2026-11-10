@@ -15,6 +15,8 @@ import { subAdminNeeds, isSubAdmin, inScope, scopeFilter, scopedStudentIds } fro
 import { classPricingSchema } from "../schemas/classPricingSchema.js";
 import { usesPoints, spendPoints, refundEnrollment, payGroupClassFee } from "../utils/groupPoints.js";
 
+import { completeStandaloneLesson } from '../services/standaloneLessonService.js';
+
 const router = express.Router();
 router.use(tenantMiddleware);
 
@@ -550,6 +552,11 @@ router.patch("/:id/complete", verifyToken, subAdminNeeds("canManageGroupClasses"
     if (!["open", "full", "in-progress"].includes(gc.status))
       return badRequest(res, `Cannot complete a class with status: ${gc.status}`);
 
+    if (req.teacherWorkspace) {
+      const completed = await completeStandaloneLesson(req.db, gc, userId, req.body.attendance);
+      return res.json({ success: true, message: "Group class completed", groupClass: completed, feePaid: 0 });
+    }
+
     // Apply final attendance from body if provided
     if (Array.isArray(req.body.attendance)) {
       const valid = new Set(["attended", "absent", "pending"]);
@@ -590,6 +597,7 @@ router.patch("/:id/complete", verifyToken, subAdminNeeds("canManageGroupClasses"
     res.json({ success: true, message: "Group class completed", groupClass: gc, feePaid });
   } catch (err) {
     logger.error("Error completing group class:", { error: err?.message });
+    if (err.statusCode === 400) return badRequest(res, err.message);
     serverError(res, "Error completing group class", err);
   }
 });

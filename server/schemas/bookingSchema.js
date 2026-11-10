@@ -3,6 +3,11 @@ import { shareLinkSchemaDef } from '../utils/shareLink.js';
 
 export const bookingSchema = new mongoose.Schema({
   teacherId:          { type: mongoose.Schema.Types.ObjectId, ref: 'Teacher', required: true },
+  managedCenterId: { type: mongoose.Schema.Types.ObjectId, index: true },
+  standalonePay: {
+    currency: String, basis: String, rateMinor: Number, amountMinor: Number,
+    credits: Boolean,
+  },
   studentId:          { type: mongoose.Schema.Types.ObjectId, ref: 'Student', required: true },
   classTitle:         { type: String, required: true },
   topic:              { type: String, default: '' },
@@ -20,6 +25,8 @@ export const bookingSchema = new mongoose.Schema({
   rejectionReason:    { type: String, default: '' },
   markedBy:           { type: String, enum: ['admin', 'classroom', 'system', 'teacher'], default: null },
   missedReason:       { type: String, default: '' },
+  parentAbsenceReason: { type: String, maxlength: 500, default: '' },
+  parentAbsenceAt: Date,
   // Who confirmed the student was present: 'student' (joined the app classroom) or
   // 'teacher' (managed student — teacher tapped "Student joined"). Shown to admins.
   attendanceConfirmedBy: { type: String, enum: ['student', 'teacher', null], default: null },

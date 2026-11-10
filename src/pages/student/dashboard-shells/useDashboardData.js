@@ -6,6 +6,7 @@ import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { showLocalNotification } from "../../../utils/localNotify";
 import { useTabFromUrl } from "../../../hooks/useTabFromUrl";
 import { io } from "socket.io-client";
+import { socketAuth } from '../../../utils/socketAuth';
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../../context/AuthContext.jsx";
 import api from "../../../api";
@@ -489,7 +490,7 @@ export function useDashboardData() {
     const tid = setTimeout(() => {
       if (cancelled) return;
 
-      socket = io(SOCKET_URL, { transports: ["websocket"], auth: { token } });
+      socket = io(SOCKET_URL, { transports: ["websocket"], auth: socketAuth(() => sessionStorage.getItem('studentToken')) });
 
       socket.on("connect", () => { socket.emit("join-student-room"); });
       socket.on("new-direct-message", ({ dmId, senderName, message }) => {

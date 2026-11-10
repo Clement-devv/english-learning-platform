@@ -10,11 +10,12 @@ import { useState, useEffect, useCallback } from "react";
 import { X, Link2, Copy, Mail, Power, CheckCircle2, MailX } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import api from "../../api";
+import { teacherModeLink } from '../../utils/teacherMode';
 import { dateLocale } from "../../i18n/dateLocale.js";
 
 const fmtDay = (d) => new Date(d).toLocaleDateString(dateLocale("en-GB"), { day: "numeric", month: "short", year: "numeric" });
 const fmtWhen = (d) => new Date(d).toLocaleString(dateLocale("en-GB"), { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
-const parentLinkUrl = (token) => `${window.location.origin}/rv/${token}`;
+const parentLinkUrl = (token) => teacherModeLink(`/rv/${token}`);
 
 /**
  * @param cls    { bookingId } or { groupClassId }

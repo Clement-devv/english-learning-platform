@@ -5,6 +5,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import AgoraRTC from "agora-rtc-sdk-ng";
 AgoraRTC.setLogLevel(import.meta.env.DEV ? 0 : 3);
 import { io } from "socket.io-client";
+import { socketAuth } from '../../utils/socketAuth';
 import api from "../../api";
 import { getStoredToken, getStoredUser, detectActiveRole } from "../../utils/authStorage";
 import { decodeJwtPayload } from "../../utils/jwt";
@@ -310,7 +311,7 @@ export default function GroupAgoraClassroom({ classData, userRole, onLeave }) {
         // Students only watch and listen — their microphone is asked for when the teacher lets them speak
 
         // ── Socket ──
-        const sock = io(API_URL, { auth: { token: getStoredToken(sessionRole) }, transports: ["websocket"] });
+        const sock = io(API_URL, { auth: socketAuth(() => getStoredToken(sessionRole)), transports: ["websocket"] });
         socketRef.current = sock;
 
         sock.on("connect", () => {

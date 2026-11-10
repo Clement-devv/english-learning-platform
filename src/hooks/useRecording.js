@@ -91,7 +91,11 @@ export function useRecording(bookingId, { captureThisTab = false } = {}) {
     const partStarted = Date.now();
     const chunks      = [];
 
-    const recorder = new MediaRecorder(stream, { mimeType: mimeTypeRef.current });
+    const recorder = new MediaRecorder(stream, {
+      mimeType: mimeTypeRef.current,
+      videoBitsPerSecond: 1_500_000,
+      audioBitsPerSecond: 128_000,
+    });
     session.nextPart += 1;
     recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
     recorder.onstop = () => handlePartStop(chunks, {

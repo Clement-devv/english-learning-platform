@@ -1,6 +1,6 @@
 // Installed-app icons: each center gets square PNGs in the sizes phones require, made
 // from its logo (or its initial on its brand colour) — never the Clemify icon.
-import { vi, describe, it, expect, afterAll } from 'vitest'
+import { vi, describe, it, expect, afterAll, afterEach } from 'vitest'
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
@@ -12,6 +12,7 @@ const { pwaIcon, manifestIcons, iconVersion } = await import('../utils/pwaIcons.
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const LOGO = path.join(__dirname, '../uploads/branding', `test-logo-${Date.now()}.png`)
 afterAll(() => { try { fs.unlinkSync(LOGO) } catch { /* gone */ } })
+afterEach(() => vi.unstubAllGlobals())
 
 const meta = (buf) => sharp(buf).metadata()
 const pixel = async (buf, x, y) => {
@@ -21,6 +22,13 @@ const pixel = async (buf, x, y) => {
 }
 
 describe('pwa icons', () => {
+  it.each(['https://127.0.0.1/private', 'https://169.254.169.254/latest/meta-data', 'https://external.example/logo.png'])('does not fetch arbitrary remote logo %s', async (logo) => {
+    const fetch = vi.fn(() => { throw new Error('must not fetch') })
+    vi.stubGlobal('fetch', fetch)
+    const icon = await pwaIcon({ slug: `remote-${logo}`, centerName: 'A', branding: { logo } }, 192)
+    expect((await meta(icon)).format).toBe('png')
+    expect(fetch).not.toHaveBeenCalled()
+  })
   it('makes a square PNG of the exact size from a wide logo, without cropping it', async () => {
     // A wide red logo (300x100)
     fs.mkdirSync(path.dirname(LOGO), { recursive: true })

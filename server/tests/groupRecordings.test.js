@@ -35,7 +35,9 @@ const as = (token) => ({
   post:  (u, b = {}) => request(app).post(u).set('Authorization', `Bearer ${token}`).send(b),
   patch: (u, b = {}) => request(app).patch(u).set('Authorization', `Bearer ${token}`).send(b),
   upload: (fields) => {
-    let r = request(app).post('/recordings/upload').set('Authorization', `Bearer ${token}`)
+    let r = request(app).post('/recordings/upload')
+      .query(fields.groupClassId ? { groupClassId: String(fields.groupClassId) } : { bookingId: String(fields.bookingId) })
+      .set('Authorization', `Bearer ${token}`)
       .attach('recording', Buffer.from('fake webm bytes'), { filename: 'part.webm', contentType: 'video/webm' })
     for (const [k, v] of Object.entries(fields)) r = r.field(k, String(v))
     return r
@@ -69,6 +71,12 @@ afterAll(async () => {
 })
 
 describe('group class recordings', () => {
+  it('rejects unauthorized uploads before creating a file', async () => {
+    const before = fs.readdirSync(RECORDINGS_DIR).sort()
+    expect((await studentApi.upload({ groupClassId: gc._id })).status).toBe(403)
+    expect((await otherTeacherApi.upload({ groupClassId: gc._id })).status).toBe(403)
+    expect(fs.readdirSync(RECORDINGS_DIR).sort()).toEqual(before)
+  })
   it('only the class\'s teacher can upload a part', async () => {
     expect((await otherTeacherApi.upload({ groupClassId: gc._id, duration: 30, sessionId: 'session-group-1', partNumber: 1 })).status).toBe(403)
     expect((await studentApi.upload({ groupClassId: gc._id, duration: 30 })).status).toBe(403)

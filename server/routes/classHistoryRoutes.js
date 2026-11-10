@@ -85,6 +85,7 @@ router.get("/teacher/:teacherId/history", verifyToken, async (req, res) => {
     const now = Date.now();
     const match = {
       teacherId: oid(teacherId),
+      ...(req.teacherWorkspace && req.query.managedCenterId ? { managedCenterId: oid(req.query.managedCenterId) } : {}),
       $or: [
         { status: { $in: ["completed", "missed"] } },
         // Started over an hour ago but never marked complete — still shown, as before
@@ -104,7 +105,7 @@ router.get("/teacher/:teacherId/history", verifyToken, async (req, res) => {
       ] } } } } },
       { $sort: { _id: 1 } },
       { $group: {
-        _id: { t: "$scheduledTime", title: "$classTitle", kind: "$status" },
+        _id: { t: "$scheduledTime", title: "$classTitle", kind: "$status", center: "$managedCenterId" },
         id:                  { $first: "$_id" },
         topic:               { $first: "$topic" },
         duration:            { $first: "$duration" },
@@ -127,11 +128,11 @@ router.get("/teacher/:teacherId/history", verifyToken, async (req, res) => {
         officiallyCompleted: { $eq: ["$_id.kind", "completed"] },
         parentDispute: { $arrayElemAt: [{ $filter: { input: "$disputes", cond: { $ne: ["$$this", null] } } }, 0] },
       } },
-      { $addFields: { notCompleted: { $or: ["$isMissed", "$adminRejected"] } } },
+      { $addFields: { notCompleted: { $or: [{ $not: ["$officiallyCompleted"] }, "$adminRejected"] } } },
       ...(rx ? [{ $match: { $or: [{ title: rx }, { topic: rx }, { students: rx }] } }] : []),
       // Finished group classes: completed → Completed tab, missed → Not completed
       { $unionWith: { coll: getGroupClass(req.db).collection.name, pipeline: [
-        { $match: { teacherId: oid(teacherId), status: { $in: ["completed", "missed"] }, ...(range ? { scheduledTime: range } : {}) } },
+        { $match: { teacherId: oid(teacherId), ...(req.teacherWorkspace && req.query.managedCenterId ? { managedCenterId: oid(req.query.managedCenterId) } : {}), status: { $in: ["completed", "missed"] }, ...(range ? { scheduledTime: range } : {}) } },
         { $lookup: { from: getStudent(req.db).collection.name, localField: "enrollments.studentId", foreignField: "_id", as: "st",
                      pipeline: [{ $project: { firstName: 1, lastName: 1 } }] } },
         { $project: {

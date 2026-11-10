@@ -37,7 +37,14 @@ function s3Key(slug, bookingId) {
 }
 
 // ── POST /api/content/upload — teachers and admins only ─────────────────────
-router.post("/upload", tenantMiddleware, verifyToken, verifyAdminOrTeacher, upload.single("pdf"), async (req, res) => {
+router.post("/upload", tenantMiddleware, verifyToken, verifyAdminOrTeacher, async (req, res, next) => {
+  try {
+    const bookingId = req.query.bookingId;
+    if (typeof bookingId !== 'string' || !mongoose.isValidObjectId(bookingId)) return badRequest(res, 'bookingId required in upload URL');
+    if (!(await canAccessClass(req, 'class', bookingId))) return forbidden(res, 'You are not part of this class');
+    next();
+  } catch (err) { next(err); }
+}, upload.single("pdf"), async (req, res) => {
   try {
     if (!req.file) return badRequest(res, "No file uploaded");
 

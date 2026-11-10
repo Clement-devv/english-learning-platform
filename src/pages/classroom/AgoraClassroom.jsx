@@ -1,3 +1,5 @@
+import { teacherModeKey } from '../../utils/teacherMode';
+import StandaloneClassOutcome from '../teacher-mode/StandaloneClassOutcome';
 // AgoraClassroom.jsx
 // Full Agora video classroom — attendance, timer, and VideoCall SDK.
 //
@@ -10,6 +12,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { io } from "socket.io-client";
+import { socketAuth } from '../../utils/socketAuth';
 import VideoCall from "../VideoCall";
 import ContentViewer from "../ContentViewer";
 import WhiteboardTab from "../WhiteboardTab";
@@ -97,7 +100,7 @@ export default function AgoraClassroom({ classData, userRole, onLeave, googleMee
 
     const sock = io(import.meta.env.VITE_SOCKET_URL || "", {
       transports: ["websocket"],
-      auth: { token },
+      auth: socketAuth(() => sessionStorage.getItem(`${userRole}Token`) || token),
     });
     classroomSockRef.current = sock;
 
@@ -318,7 +321,7 @@ export default function AgoraClassroom({ classData, userRole, onLeave, googleMee
                 )}
               </div>
               <p className={`text-xs mb-4 ${dm ? "text-gray-500" : "text-gray-400"}`}>No class was deducted and no earnings were added.</p>
-              {!disputeSubmitted ? (
+              {teacherModeKey() ? <StandaloneClassOutcome bookingId={bookingId} /> : !disputeSubmitted ? (
                 !disputeOpen ? (
                   <button onClick={() => setDisputeOpen(true)}
                     className="w-full px-6 py-3 mb-3 bg-amber-500 hover:bg-amber-600 text-white rounded-full font-bold transition-all">

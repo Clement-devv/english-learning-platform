@@ -13,6 +13,8 @@ import { fileURLToPath } from "url";
 import sharp from "sharp";
 import Center from "../models/master/Center.js";
 import logger from "./logger.js";
+import { s3Enabled, s3PublicUrl, getObjectBuffer } from './s3.js';
+import { readLimited } from './readLimited.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const UPLOADS_DIR = path.join(__dirname, "../uploads");
@@ -48,18 +50,24 @@ const brandColor = (center) => {
 };
 
 /** The logo / favicon bytes: an uploaded file (/uploads/branding/…) or an https link (e.g. S3). */
-async function loadSource(src) {
+async function loadSource(src, slug) {
   if (!src || typeof src !== "string") return null;
-  if (src.startsWith("/uploads/")) {
+  if (src.startsWith("/uploads/branding/")) {
     const file = path.resolve(UPLOADS_DIR, "." + src.slice("/uploads".length));
     if (!file.startsWith(UPLOADS_DIR + path.sep) || !fs.existsSync(file)) return null;
-    return fs.promises.readFile(file);
+    return readLimited(fs.createReadStream(file), MAX_SOURCE_BYTES);
   }
   if (/^https:\/\//i.test(src)) {
-    const res = await fetch(src, { signal: AbortSignal.timeout(6000) });
-    if (!res.ok) return null;
-    const buf = Buffer.from(await res.arrayBuffer());
-    return buf.length <= MAX_SOURCE_BYTES ? buf : null;
+    // Never fetch tenant-selected URLs from the server. External logos still
+    // display in the browser; installed icons use the initial unless uploaded.
+    // Owned S3 objects are read through the SDK, not via redirects/DNS from a URL.
+    if (!s3Enabled()) return null;
+    const url = new URL(src);
+    const owned = new URL(s3PublicUrl(''));
+    if (url.origin !== owned.origin || url.username || url.password || url.search) return null;
+    const key = decodeURIComponent(url.pathname.slice(1));
+    if (!key.startsWith(`centers/${slug}/branding/`) || key.includes('..')) return null;
+    return getObjectBuffer(key, MAX_SOURCE_BYTES);
   }
   return null;
 }
@@ -67,7 +75,10 @@ async function loadSource(src) {
 /** Logo fitted (never cropped) and centred on a white square; maskable keeps a wider safe margin. */
 async function fromLogo(buf, size, maskable) {
   const inner = Math.round(size * (maskable ? 0.62 : 0.84));
-  const logo = await sharp(buf, { density: 300 })
+  const image = sharp(buf, { limitInputPixels: 16_000_000 });
+  const metadata = await image.metadata();
+  if (!['jpeg', 'png', 'webp', 'gif'].includes(metadata.format)) throw new Error('Unsupported icon image');
+  const logo = await image
     .resize(inner, inner, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } })
     .png().toBuffer();
   return sharp({ create: { width: size, height: size, channels: 4, background: "#ffffff" } })
@@ -99,7 +110,7 @@ export async function pwaIcon(center, size, maskable = false) {
   let png = null;
   for (const src of sources.filter(Boolean)) {
     try {
-      const buf = await loadSource(src);
+      const buf = await loadSource(src, center.slug);
       if (buf) { png = await fromLogo(buf, size, maskable); break; }
     } catch (err) {
       logger.warn("[pwaIcons] could not use branding image", { center: center.slug, error: err?.message });

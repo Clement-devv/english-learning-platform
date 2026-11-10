@@ -1,3 +1,4 @@
+import { studioText } from '../../../teacher-mode/studioLanguage';
 // src/pages/teacher/components/classes/ClassModal.jsx
 import { useState } from 'react';
 import { X, Users, Calendar, Clock, BookOpen, Plus } from 'lucide-react';
@@ -18,12 +19,13 @@ const DEFAULT_THEME = {
   softTextDark:   'var(--as-accent-line, #a5b4fc)',
 };
 
-export default function ClassModal({ isOpen, onClose, onSave, students, isDarkMode, theme = DEFAULT_THEME }) {
+export default function ClassModal({ isOpen, onClose, onSave, students, isDarkMode, theme = DEFAULT_THEME, awaitSave = false, saveError = '', studio = false }) {
   const [title,            setTitle]            = useState('');
   const [topic,            setTopic]            = useState('');
   const [time,             setTime]             = useState('');
   const [duration,         setDuration]         = useState('60');
   const [selectedStudents, setSelectedStudents] = useState([]);
+  const [savingClass, setSavingClass] = useState(false);
 
   if (!isOpen) return null;
 
@@ -67,17 +69,23 @@ export default function ClassModal({ isOpen, onClose, onSave, students, isDarkMo
     });
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!title || !topic || !time || selectedStudents.length === 0) {
-      alert('Please fill in all fields and select at least one student');
+      alert(studioText('Please fill in all fields and select at least one student'));
       return;
     }
-    onSave({
+    if (savingClass) return;
+    if (awaitSave) setSavingClass(true);
+    const saving = onSave({
       id: Date.now(), title, topic, time,
       duration: parseInt(duration, 10),
       students: selectedStudents,
       status: 'scheduled',
     });
+    if (awaitSave) {
+      try { if (await saving === false) return; }
+      finally { setSavingClass(false); }
+    }
     setTitle(''); setTopic(''); setTime(''); setDuration('60'); setSelectedStudents([]);
     onClose();
   };
@@ -92,7 +100,7 @@ export default function ClassModal({ isOpen, onClose, onSave, students, isDarkMo
         <div style={{ background: T.accentGradient, padding: '22px 24px', borderRadius: '24px 24px 0 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <Plus size={22} color="#fff"/>
-            <h2 style={{ margin: 0, fontSize: 20, fontWeight: 900, color: '#fff' }}>Create New Class</h2>
+            <h2 style={{ margin: 0, fontSize: 20, fontWeight: 900, color: '#fff' }}>{studioText("Create New Class")}</h2>
           </div>
           <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: 10, padding: 8, cursor: 'pointer', display: 'flex', color: '#fff' }}>
             <X size={18}/>
@@ -121,23 +129,24 @@ export default function ClassModal({ isOpen, onClose, onSave, students, isDarkMo
             <div>
               <label style={lbl}><Calendar size={13} color="var(--as-accent-ink, #8b5cf6)"/> Date & Time *</label>
               <input type="datetime-local" value={time} onChange={e => setTime(e.target.value)} style={inp}/>
+              {studio && <small style={{ color: col.muted }}>Time on this device: {Intl.DateTimeFormat().resolvedOptions().timeZone}. Parents see the same moment in their own device’s time zone.</small>}
             </div>
             <div>
               <label style={lbl}><Clock size={13} color="var(--as-accent-ink, #f97316)"/> Duration *</label>
               <select value={duration} onChange={e => setDuration(e.target.value)}
                 style={{ ...inp, cursor: 'pointer', appearance: 'auto' }}>
-                <option value="30">30 minutes</option>
-                <option value="45">45 minutes</option>
-                <option value="60">60 minutes</option>
-                <option value="90">90 minutes</option>
-                <option value="120">120 minutes</option>
+                <option value="30">{studioText("30 minutes")}</option>
+                <option value="45">{studioText("45 minutes")}</option>
+                <option value="60">{studioText("60 minutes")}</option>
+                <option value="90">{studioText("90 minutes")}</option>
+                <option value="120">{studioText("120 minutes")}</option>
               </select>
             </div>
           </div>
 
           {/* Students */}
           <div>
-            <label style={lbl}><Users size={13} color={T.accent}/> Select Students * ({selectedStudents.length} selected)</label>
+            <label style={lbl}><Users size={13} color={T.accent}/> {studioText("Select Students *")} ({selectedStudents.length} {studioText("selected")})</label>
             {students && students.length > 0 ? (
               <div style={{ border: `1.5px solid ${col.border}`, borderRadius: 14, padding: 10, maxHeight: 220, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {students.map(student => {
@@ -188,13 +197,14 @@ export default function ClassModal({ isOpen, onClose, onSave, students, isDarkMo
           </div>
         </div>
 
+        {saveError && <p role="alert" style={{ color: '#b42318', padding: '0 24px' }}>{saveError}</p>}
         {/* Footer */}
         <div style={{ padding: '16px 24px', borderTop: `1.5px solid ${col.border}`, background: col.header, borderRadius: '0 0 24px 24px', display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
           <button onClick={onClose}
             style={{ background: 'none', border: `1.5px solid ${col.border}`, borderRadius: 12, padding: '10px 20px', fontSize: 13, fontWeight: 700, color: col.body, cursor: 'pointer', fontFamily: F }}>
             Cancel
           </button>
-          <button onClick={handleSubmit}
+          <button onClick={handleSubmit} disabled={savingClass}
             style={{ background: T.accentGradient, border: 'none', borderRadius: 12, padding: '10px 20px', fontSize: 13, fontWeight: 800, color: '#fff', cursor: 'pointer', fontFamily: F, display: 'flex', alignItems: 'center', gap: 6 }}>
             <Plus size={15}/> Create Class
           </button>

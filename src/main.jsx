@@ -22,6 +22,18 @@ const _impToken  = _imp.get('imp_token');
 const _impCenter = _imp.get('imp_center');
 const _impName   = _imp.get('imp_name');
 const _impExp    = _imp.get('imp_exp');
+const _teacherViewToken = _imp.get('teacher_view_token');
+const _teacherViewInfo = _imp.get('teacher_view_info');
+if (_teacherViewToken && _teacherViewInfo) {
+  try {
+    const info = JSON.parse(_teacherViewInfo);
+    sessionStorage.removeItem('teacherSessionToken');
+    sessionStorage.removeItem('teacherModeCenter');
+    sessionStorage.setItem('teacherToken', _teacherViewToken);
+    sessionStorage.setItem('teacherInfo', JSON.stringify({ ...info, inspection: true }));
+    window.history.replaceState({}, '', '/teacher-mode/dashboard');
+  } catch { window.history.replaceState({}, '', '/teacher-mode/login'); }
+}
 if (_impToken && _impCenter) {
   sessionStorage.setItem('adminToken', _impToken);
   sessionStorage.setItem('adminInfo', JSON.stringify({
@@ -38,8 +50,8 @@ if (_impToken && _impCenter) {
 
 // Blank out credentials if a URL carrying one is ever captured (errors,
 // navigation breadcrumbs, request spans).
-const SECRET_PARAM_RE = /([?&#](?:imp_token|token|sessionToken|access_token|resetToken)=)[^&#\s]*/gi;
-const scrubUrl = (u) => (typeof u === 'string' ? u.replace(SECRET_PARAM_RE, '$1[redacted]') : u);
+const SECRET_PARAM_RE = /([?&#](?:imp_token|teacher_view_token|teacher_view_info|token|sessionToken|access_token|resetToken)=)[^&#\s]*/gi;
+const scrubUrl = (u) => (typeof u === 'string' ? u.replace(SECRET_PARAM_RE, '$1[redacted]').replace(/(\/(?:teacher-mode\/(?:family|setup|reset)|hw|q|g|rv|ac)\/)[A-Za-z0-9_-]{20,}/gi, '$1[redacted]') : u);
 
 // App Health: tell the platform owner when a page crashes (utils/reportClientError.js)
 installClientErrorReporting();

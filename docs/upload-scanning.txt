@@ -1,0 +1,60 @@
+Shared homework upload protection
+=================================
+
+Scope: new files and voice answers submitted through /homework/link/:token/submit,
+including homework reached from standalone family pages and existing center links.
+Parent sign-in and sharing steps are unchanged. Text-only submissions still work
+when the scanner is unavailable. This is not a scanner for every application
+upload endpoint, nor a retrospective scan of existing stored files.
+
+All submitted buffers are sent to private ClamAV over its INSTREAM protocol after
+link authorization and size-limited multipart parsing, before any file persistence.
+Only an explicit clean verdict permits storage. Malware/heuristic detections return
+422. Unavailable, timed out, invalid or incomplete scanner responses return 503.
+The existing type/signature/PDF active-content checks remain in effect.
+Encrypted content and content exceeding ClamAV inspection limits are rejected by
+the configured heuristic alerts. Scans have a 15-second deadline and a four-scan
+per-process concurrency cap. No file contents are sent to a public scanning service.
+
+Docker deployment
+-----------------
+The existing compose file now includes clamav/clamav:1.4, a persistent signature
+volume, and the private ClamAV configuration. Its TCP port is NOT published to the
+host. The official image runs FreshClam to update signatures. Allow approximately
+4 GiB additional RAM for the scanner; signature initialization can take several
+minutes. Check host capacity before deployment.
+
+Start the scanner first:
+  docker compose up -d clamav
+  docker compose logs --tail=80 clamav
+
+After deploying/rebuilding the application, verify the REAL engine:
+  docker compose exec app node scripts/checkUploadScanner.js
+
+Require the PASS result before considering scanning operational. This streams
+clean bytes and the harmless standard EICAR test pattern; neither is stored.
+Also submit a normal photo/PDF/voice answer through a test homework link. Stop the
+scanner temporarily in a staging environment and verify file uploads return a
+retry error, then restart it. Monitor scanner health and signature-update logs.
+There is deliberately no fail-open switch: deploying the application without a
+reachable scanner will block new shared homework files (text submissions work).
+
+Non-Docker/PM2: run a private clamd service with equivalent settings and provide
+CLAMAV_HOST and CLAMAV_PORT to every application worker. Defaults are localhost
+and 3310. Never expose unauthenticated clamd to the public internet.
+
+Local verification
+------------------
+  node --test server/tests/uploadScan.node.mjs
+  docker compose config --quiet
+
+Seven local tests pass using a synthetic TCP daemon. Docker Compose configuration
+validation passes. A real ClamAV/EICAR run has NOT been performed on this machine:
+Docker Desktop's Linux engine was not running. No deployment was performed.
+
+Antivirus reduces known-malware risk; it does not guarantee every accepted file
+is harmless or replace viewer updates and the existing upload restrictions.
+
+References:
+https://docs.clamav.net/manual/Usage/ClamdProtocol.html
+https://docs.clamav.net/manual/Installing/Docker.html

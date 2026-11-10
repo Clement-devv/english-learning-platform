@@ -123,6 +123,10 @@ const LANGUAGES = [
 ];
 
 // ── Component ─────────────────────────────────────────────────────────────────
+export function AccountTerms() {
+  return <div>{T.en.clauses.map(c => <section key={c.heading}><h3>{c.heading}</h3><p>{c.body}</p></section>)}</div>;
+}
+
 export default function TermsModal() {
   const { pendingTerms, resolveTerms, logout } = useAuth();
   const { center } = useBranding();

@@ -13,6 +13,7 @@
 // Several bookings at the same time with the same title are one group class:
 // they share one summary. Parent access: routes/parentRoutes.js (/me/child/:id/class-summaries).
 import express from "express";
+import { teacherModeModels } from "../schemas/teacherModeSchemas.js";
 import mongoose from "mongoose";
 import { verifyToken, verifyAdmin } from "../middleware/authMiddleware.js";
 import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
@@ -47,7 +48,7 @@ router.get("/teacher", verifyToken, async (req, res) => {
     const view = ["missing", "written", "all"].includes(req.query.view) ? req.query.view : "missing";
     if (req.query.source === "group") return listGroupClasses(req, res, view);
     const Booking = getBooking(req.db);
-    const base = { teacherId: oid(req.user.id), ...DONE };
+    const base = { teacherId: oid(req.user.id), ...DONE, ...(req.teacherWorkspace && req.query.managedCenterId ? { managedCenterId: oid(req.query.managedCenterId) } : {}) };
 
     const term = typeof req.query.q === "string" ? req.query.q.trim().slice(0, 60) : "";
     let search = [];
@@ -64,7 +65,7 @@ router.get("/teacher", verifyToken, async (req, res) => {
       ...search,
       { $sort: { _id: 1 } },
       { $group: {
-        _id: { t: "$scheduledTime", title: "$classTitle" },
+        _id: { t: "$scheduledTime", title: "$classTitle", center: "$managedCenterId" },
         id: { $first: "$_id" }, topic: { $first: "$topic" }, duration: { $first: "$duration" },
         studentIds: { $push: "$studentId" },
         summary: { $max: "$classSummary.text" }, summaryAt: { $max: "$classSummary.updatedAt" },
@@ -112,7 +113,7 @@ router.get("/teacher", verifyToken, async (req, res) => {
 async function listGroupClasses(req, res, view) {
   const GroupClass = getGroupClass(req.db);
   getStudent(req.db);
-  const base = { teacherId: oid(req.user.id), status: "completed" };
+  const base = { teacherId: oid(req.user.id), status: "completed", ...(req.teacherWorkspace && req.query.managedCenterId ? { managedCenterId: oid(req.query.managedCenterId) } : {}) };
   const term = typeof req.query.q === "string" ? req.query.q.trim().slice(0, 60) : "";
   if (term) base.title = new RegExp(escapeRx(term), "i");
   const missing = { $or: [{ "classSummary.text": { $exists: false } }, { "classSummary.text": "" }, { "classSummary.text": null }] };
@@ -274,6 +275,7 @@ router.put("/group/:groupClassId", verifyToken, async (req, res) => {
     await GroupClass.findOneAndUpdate({ _id: g._id }, text
       ? { $set: { classSummary: { text, updatedAt: new Date(), by: oid(req.user.id) } } }
       : { $unset: { classSummary: 1 } });
+    if (req.teacherWorkspace) await teacherModeModels(req.db).TeacherWork.updateMany({ bookingId: g._id }, { $set: { summary: text } });
     res.json({ success: true, summary: text, message: text ? "Summary saved" : "Summary removed" });
   } catch (err) {
     logger.error("Save group class summary error:", { error: err?.message });
@@ -291,17 +293,21 @@ router.put("/:bookingId", verifyToken, async (req, res) => {
     if (text.length > SUMMARY_MAX) return badRequest(res, `Please keep the summary under ${SUMMARY_MAX} characters`);
 
     const Booking = getBooking(req.db);
-    const b = await Booking.findById(req.params.bookingId).select("teacherId scheduledTime classTitle status adminRejected").lean();
+    const b = await Booking.findById(req.params.bookingId).select("teacherId scheduledTime classTitle status adminRejected managedCenterId").lean();
     if (!b) return notFound(res, "Class not found");
     if (String(b.teacherId) !== String(req.user.id)) return forbidden(res, "This is not your class");
     if (b.status !== "completed" || b.adminRejected) return badRequest(res, "Summaries can only be written for completed classes");
 
     // The whole group class (same teacher, time and title) gets the same summary
-    const group = { teacherId: b.teacherId, scheduledTime: b.scheduledTime, classTitle: b.classTitle, ...DONE };
+    const group = { teacherId: b.teacherId, scheduledTime: b.scheduledTime, classTitle: b.classTitle, ...DONE, ...(req.teacherWorkspace ? { managedCenterId: b.managedCenterId } : {}) };
     const update = text
       ? { $set: { classSummary: { text, updatedAt: new Date(), by: oid(req.user.id) } } }
       : { $unset: { classSummary: 1 } };
     const r = await Booking.updateMany(group, update);
+    if (req.teacherWorkspace) {
+      const ids = await Booking.distinct("_id", group);
+      await teacherModeModels(req.db).TeacherWork.updateMany({ bookingId: { $in: ids } }, { $set: { summary: text } });
+    }
     res.json({ success: true, updated: r.modifiedCount, summary: text, message: text ? "Summary saved" : "Summary removed" });
   } catch (err) {
     logger.error("Save class summary error:", { error: err?.message });

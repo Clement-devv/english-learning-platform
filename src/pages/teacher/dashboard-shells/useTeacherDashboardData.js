@@ -8,6 +8,7 @@ import { useTabFromUrl } from "../../../hooks/useTabFromUrl";
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext.jsx';
 import { io } from 'socket.io-client';
+import { socketAuth } from '../../../utils/socketAuth';
 import api from '../../../api';
 import { useDarkMode } from '../../../hooks/useDarkMode';
 import { getUserTimezone } from '../../../utils/timezone';
@@ -114,7 +115,7 @@ export function useTeacherDashboardData() {
 
     const tid = setTimeout(() => {
       if (cancelled) return;
-      socket = io(SOCKET_URL, { transports: ['websocket'], auth: { token } });
+      socket = io(SOCKET_URL, { transports: ['websocket'], auth: socketAuth(() => sessionStorage.getItem('teacherToken')) });
       socket.on('connect', () => { socket.emit('join-teacher-room'); });
       socket.on('new-direct-message', ({ dmId, senderName, message }) => {
         setUnreadMessages(prev => prev + 1);

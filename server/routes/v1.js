@@ -71,8 +71,11 @@ import { centerInviteAdminRoutes, centerInviteRoutes } from "./centerInviteRoute
 import libraryRoutes from "./libraryRoutes.js";
 import libraryAdminRoutes from "./libraryAdminRoutes.js";
 import { saBoardRoutes, centerBoardRoutes } from "./boardRoutes.js";
+import teacherModeRoutes from './teacherModeRoutes.js';
 
 const router = Router();
+router.use('/teacher-mode', teacherModeRoutes);
+// Standalone workspaces have their own verified context; no center-admin APIs.
 
 router.use("/teachers",             teacherRoutes);
 router.use("/students",             studentRoutes);

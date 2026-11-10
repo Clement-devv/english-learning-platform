@@ -14,7 +14,7 @@ import { teacherSchema } from "../schemas/teacherSchema.js";
 import { decrypt } from "./fieldEncryption.js";
 import { linkExpiresAt } from "./shareLink.js";
 import { parentCheckExpiresAt, LINK_DAYS } from "./parentCheck.js";
-import { getCenterBaseUrl } from "../emails/core.js";
+import { centerPublicLink } from "../emails/core.js";
 import { sendParentCheckLinkEmail, sendShareLinkEmail } from "../emails/familyLinkEmails.js";
 import { loadCenterSettings, prefOn } from "./familyEmailPrefs.js";
 import { trackJob } from "./monitor.js";
@@ -67,7 +67,7 @@ export async function emailParentCheck(db, center, bookingId, { force = false } 
     const teacher = await getTeacher(db).findById(b.teacherId).select("firstName lastName displayName").lean();
     await sendParentCheckLinkEmail({
       student: fam.student, to: fam.to, cls: { title: b.classTitle, scheduledTime: b.scheduledTime },
-      teacherName: teacherShown(teacher), url: `${getCenterBaseUrl(center).baseUrl}/ac/${token}`, expiresAt,
+      teacherName: teacherShown(teacher), url: centerPublicLink(center, `/ac/${token}`), expiresAt,
       center, centerName: center?.centerName,
     });
     return "sent";
@@ -132,7 +132,7 @@ export async function emailShareLink(db, center, kind, id, { force = false } = {
     const teacher = await getTeacher(db).findById(doc.teacherId).select("firstName lastName displayName").lean();
     await sendShareLinkEmail({
       kind, student: fam.student, to: fam.to, title: doc.title, dueDate: doc.dueDate,
-      teacherName: teacherShown(teacher), url: `${getCenterBaseUrl(center).baseUrl}/${path}/${token}`,
+      teacherName: teacherShown(teacher), url: centerPublicLink(center, `/${path}/${token}`),
       center, centerName: center?.centerName,
     });
     return "sent";

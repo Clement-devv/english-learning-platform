@@ -62,7 +62,10 @@ export function UploadQueueProvider({ children }) {
     }
 
     try {
+      const classQuery = String(bookingId).startsWith('group:')
+        ? { groupClassId: String(bookingId).slice(6) } : { bookingId };
       await api.post('/recordings/upload', form, {
+        params: classQuery,
         timeout: 0, // disable axios timeout — large files need as long as they need
         onUploadProgress: (e) => {
           if (!e.total) return;

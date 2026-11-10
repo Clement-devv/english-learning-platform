@@ -16,6 +16,15 @@ import MissedCallAlert    from "./components/ring/MissedCallAlert";
 import MessageAlert       from "./components/chat/MessageAlert";
 import SignedOutNotice          from "./components/SignedOutNotice";
 import { UploadQueueProvider }  from "./context/UploadQueueContext";
+import { teacherModeKey } from './utils/teacherMode';
+const TeacherModeLogin = lazy(() => import('./pages/teacher-mode/TeacherModeLogin'));
+const TeacherModeDashboard = lazy(() => import('./pages/teacher-mode/TeacherModeDashboard'));
+const TeacherFamilyPage = lazy(() => import('./pages/teacher-mode/TeacherFamilyPage'));
+function TeacherEntry() {
+  const h = window.location.hostname;
+  const main = ['clemify.com', 'www.clemify.com'].includes(h) || (['localhost', '127.0.0.1'].includes(h) && !import.meta.env.VITE_CENTER_SLUG);
+  return main ? <TeacherModeLogin /> : <TeacherLogin />;
+}
 
 // Prompts/popups that aren't needed for the first paint — they load right after
 // the page shows (own <Suspense> below), keeping them out of the main bundle.
@@ -237,10 +246,16 @@ function App() {
 
             <Route path="/classroom" element={<AuthGuard role="classroom"><Classroom /></AuthGuard>} />
 
-            <Route path="/teacher/login"                 element={<TeacherLogin />} />
+            <Route path="/teacher-mode/login" element={<TeacherModeLogin />} />
+            <Route path="/teacher-mode/setup/:token" element={<TeacherModeLogin mode="setup" />} />
+            <Route path="/teacher-mode/forgot-password" element={<TeacherModeLogin mode="forgot" />} />
+            <Route path="/teacher-mode/reset/:token" element={<TeacherModeLogin mode="reset" />} />
+            <Route path="/teacher-mode/dashboard" element={<AuthGuard role="teacher"><TeacherModeDashboard /></AuthGuard>} />
+            <Route path="/teacher-mode/family/:token" element={<TeacherFamilyPage />} />
+            <Route path="/teacher/login"                 element={<TeacherEntry />} />
             <Route path="/teacher/forgot-password"       element={<ForgotPassword />} />
             <Route path="/teacher/reset-password/:token" element={<ResetPassword />} />
-            <Route path="/teacher/dashboard"             element={<AuthGuard role="teacher"><TeacherDashboard /></AuthGuard>} />
+            <Route path="/teacher/dashboard"             element={<AuthGuard role="teacher">{teacherModeKey() ? <TeacherModeDashboard /> : <TeacherDashboard />}</AuthGuard>} />
             <Route path="/teacher/setup"                 element={<TeacherSetup />} />
 
             <Route path="/student/login"                 element={<StudentLogin />} />

@@ -24,7 +24,7 @@ let mongod
 let centerConn
 
 beforeAll(async () => {
-  mongod = await MongoMemoryServer.create()
+  mongod = await MongoMemoryServer.create({ instance: { launchTimeout: 60000 } })
   centerConn = await mongoose.createConnection(mongod.getUri()).asPromise()
 
   // Expose to test files via global so the tenantMiddleware mock can inject it
@@ -70,6 +70,6 @@ beforeAll(async () => {
 })
 
 afterAll(async () => {
-  await centerConn.close()
-  await mongod.stop()
+  await centerConn?.close()
+  await mongod?.stop()
 })

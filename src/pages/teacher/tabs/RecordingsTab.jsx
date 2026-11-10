@@ -15,7 +15,7 @@ import Pagination from "../../../components/Pagination";
 import { visibleEmail } from "../../../utils/managedStudent.js";
 
 
-export default function RecordingsTab({ isDarkMode }) {
+export default function RecordingsTab({ isDarkMode, studio = false }) {
   const [recordings,      setRecordings]      = useState([]);
   const [loading,         setLoading]         = useState(true);
   const [playing,         setPlaying]         = useState(null); // { key, index } — session key + part index
@@ -61,6 +61,7 @@ export default function RecordingsTab({ isDarkMode }) {
 
   const linkModalEl = linkModal && (
     <ExternalRecordingModal
+      studio={studio}
       isDarkMode={isDarkMode}
       studentId={linkModal.studentId || null}
       editing={linkModal.editing || null}
@@ -513,7 +514,7 @@ export default function RecordingsTab({ isDarkMode }) {
     <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "12px", flexWrap: "wrap" }}>
         <div>
-          <h2 style={{ margin: "0 0 4px", fontSize: "22px", fontWeight: 900, color: col.text }}>🎬 Class Recordings</h2>
+          <h2 style={{ margin: "0 0 4px", fontSize: "22px", fontWeight: 900, color: col.text }}>{studio ? "Class recordings" : "🎬 Class Recordings"}</h2>
           <p style={{ margin: 0, fontSize: "13px", color: col.muted }}>
             {loading
               ? "Loading…"
@@ -540,7 +541,7 @@ export default function RecordingsTab({ isDarkMode }) {
 
       {!loading && students.length === 0 && (
         <div style={{ background: col.card, border: `2px dashed ${col.border}`, borderRadius: "18px", padding: "48px 24px", textAlign: "center" }}>
-          <div style={{ fontSize: "56px", marginBottom: "14px" }}>🎬</div>
+          <div style={{ fontSize: "56px", marginBottom: "14px" }}>{studio ? <Video size={35} strokeWidth={1.3} style={{ margin: "auto", color: col.accent }} /> : "🎬"}</div>
           <p style={{ margin: 0, fontSize: "16px", fontWeight: 800, color: col.text }}>No recordings yet</p>
           <p style={{ margin: "6px 0 0", fontSize: "13px", color: col.muted }}>
             Use the record button (⚪) in the video call controls to record a class.

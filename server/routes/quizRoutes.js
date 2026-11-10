@@ -423,10 +423,10 @@ router.get("/my", verifyToken, async (req, res) => {
     // ?status=assigned|attempted  ?page  ?limit — counts always included (badges poll with ?limit=1)
     const Quiz = getQuiz(req.db);
     const status = QUIZ_STATUSES.includes(req.query.status) ? req.query.status : null;
-    const counts = await statusCounts(Quiz, { teacherId: oid(req.user.id) }, QUIZ_STATUSES);
+    const counts = await statusCounts(Quiz, { teacherId: oid(req.user.id), ...req.modeStudentFilter }, QUIZ_STATUSES);
     const { page: want, limit } = readPaging(req.query);
     const pagination = pageMeta(want, limit, status ? counts[status] : counts.all);
-    const quizzes = await Quiz.find({ teacherId: req.user.id, ...(status ? { status } : {}) })
+    const quizzes = await Quiz.find({ teacherId: req.user.id, ...req.modeStudentFilter, ...(status ? { status } : {}) })
       .select("+shareLink.tokenEnc")
       .populate("studentId", "firstName lastName email isManaged emailLanguage timezone")
       .sort({ createdAt: -1, _id: -1 })

@@ -527,6 +527,10 @@ app.get(["/hw/:token", "/q/:token", "/ac/:token"], linkPreviewHandler(frontendPa
 // that doesn't match falls through to the SPA fallback below.
 // The /assets mount at the top of this file is a fast-path for JS/CSS chunks;
 // this catch-all handles everything else from Vite's public/ directory.
+app.use('/teacher-mode/family', (_req, res, next) => {
+  res.set({ 'Cache-Control': 'private, no-store', 'X-Robots-Tag': 'noindex, nofollow', 'Referrer-Policy': 'no-referrer' });
+  next();
+});
 app.use(express.static(frontendPath));
 
 // Unknown API paths get a JSON 404 — not the SPA page with a 200 (which hid typos

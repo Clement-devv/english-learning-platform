@@ -5,6 +5,8 @@ const enrollmentSchema = new mongoose.Schema({
   studentId:     { type: mongoose.Schema.Types.ObjectId, ref: 'Student', required: true },
   enrolledAt:    { type: Date, default: () => new Date() },
   attendance:    { type: String, enum: ['pending', 'attended', 'absent'], default: 'pending' },
+  absenceReason: { type: String, maxlength: 500, default: '' },
+  absenceReportedAt: Date,
   creditCharged: { type: Number, default: 0 }, // older "credits" classes
   pointsCharged: { type: Number, default: 0 }, // "points" classes
   joinedAt:      Date, // first time this student opened the class (GET /:id/join) — the auto-close uses it
@@ -12,6 +14,8 @@ const enrollmentSchema = new mongoose.Schema({
 
 export const groupClassSchema = new mongoose.Schema({
   teacherId:     { type: mongoose.Schema.Types.ObjectId, ref: 'Teacher', required: true },
+  managedCenterId: { type: mongoose.Schema.Types.ObjectId, index: true },
+  standalonePay: { currency: String, basis: String, rateMinor: Number, amountMinor: Number, credits: Boolean },
   title:         { type: String, required: true, maxlength: 200 },
   description:   { type: String, default: '', maxlength: 2000 },
   level:         { type: String, enum: ['A1','A2','B1','B2','C1','C2','Mixed'], default: 'Mixed' },

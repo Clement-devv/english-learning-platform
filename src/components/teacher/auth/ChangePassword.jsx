@@ -22,8 +22,8 @@ export default function ChangePassword({ onClose, onSuccess }) {
       return;
     }
 
-    if (newPassword.length < 6) {
-      setError('New password must be at least 6 characters long');
+    if (newPassword.length < 8) {
+      setError('New password must be at least 8 characters long');
       return;
     }
 
@@ -137,7 +137,7 @@ export default function ChangePassword({ onClose, onSuccess }) {
               </button>
             </div>
             <p className="text-xs text-gray-500 mt-1">
-              Must be at least 6 characters long
+              At least 8 characters, with upper/lowercase letters, a number and a symbol.
             </p>
           </div>
 

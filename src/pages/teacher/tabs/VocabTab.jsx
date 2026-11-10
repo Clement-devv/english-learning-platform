@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { Plus, Trash2, Users, BookOpen, ChevronDown, ChevronUp, X, Check } from "lucide-react";
 import api from "../../../api";
 
-export default function VocabTab({ students, isDarkMode }) {
+export default function VocabTab({ students, isDarkMode, studio = false }) {
   const [lists,       setLists]       = useState([]);
   const [loading,     setLoading]     = useState(true);
   const [view,        setView]        = useState("lists"); // "lists" | "create" | "assign"
@@ -96,7 +96,7 @@ export default function VocabTab({ students, isDarkMode }) {
 
   // ── Render: Create ─────────────────────────────────────────────────────────
   if (view === "create") return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "16px", maxWidth: "700px" }}>
+    <div className="tvb tvb-editor" style={{ display: "flex", flexDirection: "column", gap: "16px", maxWidth: "700px" }}>
       <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
         <button onClick={() => setView("lists")} style={{ background: "none", border: "none", color: col.muted, cursor: "pointer", fontSize: "14px" }}>← Back</button>
         <h2 style={{ margin: 0, fontSize: "20px", fontWeight: 800, color: col.text }}>New Word List</h2>
@@ -180,7 +180,7 @@ export default function VocabTab({ students, isDarkMode }) {
     <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div>
-          <h2 style={{ margin: 0, fontSize: "22px", fontWeight: 900, color: col.text }}>📖 Vocabulary Lists</h2>
+          <h2 style={{ margin: 0, fontSize: "22px", fontWeight: 900, color: col.text }}>{studio ? "Your word lists" : "📖 Vocabulary Lists"}</h2>
           <p style={{ margin: "4px 0 0", fontSize: "13px", color: col.muted }}>{lists.length} list{lists.length !== 1 ? "s" : ""} created</p>
         </div>
         <button onClick={() => setView("create")} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "10px 18px", borderRadius: "12px", background: "linear-gradient(135deg,var(--as-accent, #6366f1),var(--as-accent, #8b5cf6))", color: "#fff", border: "none", cursor: "pointer", fontSize: "14px", fontWeight: 800 }}>

@@ -18,8 +18,8 @@ import { verifyToken, verifyAdminOrTeacher } from "../middleware/authMiddleware.
 import { validateObjectId } from "../middleware/validateObjectId.js";
 import { questionSourceSchema, SOURCE_TTL_DAYS } from "../schemas/questionSourceSchema.js";
 import { questionJobSchema } from "../schemas/questionJobSchema.js";
-import { getPresignedPutUrl, s3ObjectExists } from "../utils/s3.js";
-import { sourceKey, storageKind, saveLocal, localExists, removeSourceFile } from "../utils/questionSources.js";
+import { getPresignedPutUrl, getObjectMetadata, sealS3Upload, deleteFromS3 } from "../utils/s3.js";
+import { sourceKey, storageKind, saveLocal, localExists, removeSourceFile, sourceByteLimit } from "../utils/questionSources.js";
 import { getAiBalance, estimateCredits } from "../utils/aiCredits.js";
 import { LEVELS } from "../utils/questionRules.js";
 import { ok, created, badRequest, forbidden, notFound, conflict, serverError } from "../utils/apiResponse.js";
@@ -80,7 +80,7 @@ router.post("/uploads", ...staff, async (req, res) => {
       } else if (IMAGE_TYPES.includes(f.mime)) {
         if (f.size > UPLOAD_LIMITS.imageBytes) return badRequest(res, "Each photo must be under 1.5 MB");
       } else return badRequest(res, "Only PDF files and photos (JPG, PNG, WebP) can be uploaded");
-      if (f.size < 1) return badRequest(res, "That file is empty");
+      if (!Number.isSafeInteger(f.size) || f.size < 1) return badRequest(res, "Invalid file size");
     }
     const stored = await getSource(req.db).countDocuments({ ...mine(req), expiresAt: { $gt: new Date() } });
     if (stored + clean.length > UPLOAD_LIMITS.stored) return conflict(res, `You can keep ${UPLOAD_LIMITS.stored} uploaded pages at a time — delete some first`);
@@ -100,7 +100,7 @@ router.post("/uploads", ...staff, async (req, res) => {
         mime: f.mime,
         // S3: PUT straight to S3 with this Content-Type. Local: PUT to our own endpoint (with the login).
         upload: kind === "s3"
-          ? { url: await getPresignedPutUrl(src.key, f.mime), local: false }
+          ? { url: await getPresignedPutUrl(src.key, f.mime, 600, f.size), local: false }
           : { url: `/games/ai/uploads/${src._id}/file`, local: true },
       });
     }
@@ -118,7 +118,7 @@ router.put("/uploads/:id/file", validateObjectId("id"), ...staff,
       if (src.storage !== "local") return badRequest(res, "Upload this file to S3");
       const buf = Buffer.isBuffer(req.body) ? req.body : null;
       if (!buf?.length) return badRequest(res, "No file received");
-      if (buf.length > src.size + 1024) return badRequest(res, "The file is bigger than announced");
+      if (buf.length > Math.min(src.size, sourceByteLimit(src.mime))) return badRequest(res, "The file is bigger than announced");
       await saveLocal(src.key, buf);
       src.status = "ready";
       await src.save();
@@ -130,8 +130,31 @@ router.post("/uploads/:id/done", validateObjectId("id"), ...staff, async (req, r
   try {
     const src = await getSource(req.db).findOne({ _id: req.params.id, ...mine(req) });
     if (!src) return notFound(res, "Upload not found");
-    const there = src.storage === "s3" ? await s3ObjectExists(src.key) : await localExists(src.key);
-    if (!there) return badRequest(res, "The upload didn't finish — try again");
+    if (src.status === 'ready') return ok(res, { data: publicSource(src) });
+    if (src.storage === 's3') {
+      let metadata;
+      try { metadata = await getObjectMetadata(src.key); }
+      catch { return badRequest(res, "The upload didn't finish — try again"); }
+      if (!metadata.ETag || !Number.isSafeInteger(metadata.ContentLength) || metadata.ContentLength < 1 ||
+          metadata.ContentLength > Math.min(src.size, sourceByteLimit(src.mime)) ||
+          metadata.ContentType !== src.mime) {
+        await deleteFromS3(src.key);
+        return badRequest(res, 'The uploaded file type or size does not match');
+      }
+      const stagedKey = src.key;
+      const sealedKey = await sealS3Upload(stagedKey, metadata);
+      const ready = await getSource(req.db).findOneAndUpdate(
+        { _id: src._id, status: 'pending', key: stagedKey },
+        { $set: { key: sealedKey, size: metadata.ContentLength, status: 'ready' } }, { new: true },
+      );
+      if (!ready) {
+        await deleteFromS3(sealedKey);
+        return conflict(res, 'The upload was already finalized or deleted');
+      }
+      await deleteFromS3(stagedKey);
+      return ok(res, { data: publicSource(ready) });
+    }
+    if (!(await localExists(src.key))) return badRequest(res, "The upload didn't finish — try again");
     src.status = "ready";
     await src.save();
     return ok(res, { data: publicSource(src) });
@@ -170,6 +193,8 @@ router.post("/jobs", ...staff, async (req, res) => {
 
     const sources = await getSource(req.db).find({ _id: { $in: ids }, ...mine(req), status: "ready", expiresAt: { $gt: new Date() } }).lean();
     if (sources.length !== ids.length) return forbidden(res, "Some of those pages aren't yours or were deleted");
+    if (sources.reduce((total, source) => total + source.size, 0) > 30 * 1024 * 1024)
+      return badRequest(res, 'Use at most 30 MB of pages per AI job');
 
     // 5 AI jobs per teacher per hour
     const lastHour = await getJob(req.db).countDocuments({ "createdBy.id": who(req).id, createdAt: { $gt: new Date(Date.now() - 3600000) } });

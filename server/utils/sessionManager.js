@@ -4,7 +4,7 @@ import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import mongoose from "mongoose";
 import { SESSION_LIMIT, SESSION_EXPIRY_DAYS } from "../config/constants.js";
-import { addToLocalBlacklist } from "../middleware/authMiddleware.js";
+import { addToLocalBlacklist, sessionBlacklistKey } from "../middleware/authMiddleware.js";
 import redisClient from "../config/redis.js";
 import logger from "./logger.js";
 
@@ -233,7 +233,10 @@ export const blacklistJwt = async (jwtToken) => {
   try {
     const decoded = jwt.decode(jwtToken);
     const ttl = decoded?.exp ? decoded.exp - Math.floor(Date.now() / 1000) : 900;
-    if (ttl > 0) await redisClient.setex(`bl:${jwtToken.split('.')[2]}`, ttl, '1');
+    if (ttl > 0) {
+      const keys = [jwtToken.split('.')[2], sessionBlacklistKey(decoded)].filter(Boolean);
+      await Promise.all(keys.map(key => redisClient.setex(`bl:${key}`, ttl, '1')));
+    }
   } catch (err) {
     logger.warn('blacklistJwt redis error:', { error: err?.message });
   }

@@ -5,6 +5,7 @@ import Center from '../models/master/Center.js';
 import { getDb } from '../config/dbManager.js';
 import logger from "../utils/logger.js";
 import { cachedQuery } from '../utils/cache.js';
+import { publicTeacherWorkspace } from '../utils/teacherWorkspace.js';
 
 // Cache TTL for resolved center documents.
 // Short enough that status/branding changes propagate quickly;
@@ -23,6 +24,7 @@ const TENANT_TTL = 60; // seconds
  */
 export const tenantMiddleware = async (req, res, next) => {
   try {
+    if (req.teacherWorkspace || await publicTeacherWorkspace(req)) return next();
     // Strip port so "myschool.com:5000" and "myschool.com" resolve the same key.
     const host = (req.headers.host || '').split(':')[0];
 

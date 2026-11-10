@@ -11,6 +11,8 @@ import { getDb } from "../config/dbManager.js";
 import { canAccessClass, parseChannel } from "./classAccess.js";
 import { groupChatSchema } from "../schemas/groupChatSchema.js";
 import { directMessageSchema } from "../schemas/directMessageSchema.js";
+import { getUserModelForRole, isAccountUsable } from './roleModels.js';
+import { buildRoleClaims } from './sessionClaims.js';
 
 const getGroupChat     = (db) => db.models.GroupChat     || db.model("GroupChat",     groupChatSchema);
 const getDirectMessage = (db) => db.models.DirectMessage || db.model("DirectMessage", directMessageSchema);
@@ -72,3 +74,27 @@ export const joinedChannel = async (socket, channelName) =>
   !!(await socket.accessCache?.get(`ch:${channelName}`));
 export const joinedChat = async (socket, chatId) =>
   !!(await socket.accessCache?.get(`chat:${chatId}`));
+
+// Recheck passive listeners too. A disconnect also revokes broadcast-room
+// subscriptions that were derived from a sub-admin's previous teacher scope.
+export async function refreshSocketAccess(socket) {
+  const db = await getDb(socket.centerId);
+  if (!socket.isImpersonation) {
+    const Model = getUserModelForRole(db, socket.authUser.role);
+    if (!Model) return false;
+    const user = await Model.findById(socket.authUser.id)
+      .select('active status assignedTeachers assignmentType region permissions').lean();
+    if (!isAccountUsable(socket.authUser.role, user)) return false;
+    if (socket.authUser.role === 'sub-admin') {
+      const claims = await buildRoleClaims('sub-admin', user, db);
+      if (JSON.stringify([...claims.teacherScope].sort()) !== JSON.stringify([...socket.authUser.teacherScope].sort())) return false;
+    }
+  }
+  for (const [key, grant] of socket.accessCache || []) {
+    if (!(await grant)) continue;
+    const allowed = key.startsWith('ch:')
+      ? await canAccessChannel(socket, key.slice(3)) : await canAccessChat(socket, key.slice(5));
+    if (!allowed) return false;
+  }
+  return true;
+}

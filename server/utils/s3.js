@@ -1,6 +1,8 @@
 // server/utils/s3.js — shared S3 client and helpers
-import { S3Client, PutObjectCommand, DeleteObjectCommand, HeadObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, DeleteObjectCommand, HeadObjectCommand, GetObjectCommand, CopyObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { randomUUID } from 'node:crypto';
+import { readLimited } from './readLimited.js';
 
 const BUCKET = process.env.S3_BUCKET;
 const REGION = process.env.AWS_REGION || "ap-southeast-1";
@@ -39,6 +41,24 @@ export async function s3ObjectExists(key) {
   }
 }
 
+export async function getObjectMetadata(key) {
+  if (!s3) throw new Error('S3 not configured');
+  return s3.send(new HeadObjectCommand({ Bucket: BUCKET, Key: key }));
+}
+
+// Copy a validated upload to a key that was never exposed in a signed PUT.
+// The ETag condition prevents replacing the staging bytes between HEAD and COPY.
+export async function sealS3Upload(key, metadata) {
+  if (!s3) throw new Error('S3 not configured');
+  const sealed = `${key}.ready-${randomUUID()}`;
+  await s3.send(new CopyObjectCommand({
+    Bucket: BUCKET, Key: sealed,
+    CopySource: `${BUCKET}/${key.split('/').map(encodeURIComponent).join('/')}`,
+    CopySourceIfMatch: metadata.ETag,
+  }));
+  return sealed;
+}
+
 // Generate a presigned GET URL valid for `expiresIn` seconds (default 1 hour).
 // `response` can set ResponseContentDisposition / ResponseContentType (e.g. download file name).
 export async function getPresignedUrl(key, expiresIn = 3600, response = {}) {
@@ -49,17 +69,23 @@ export async function getPresignedUrl(key, expiresIn = 3600, response = {}) {
 
 // Presigned PUT so the browser uploads straight to S3 (the file never passes
 // through Express). The key stays private.
-export async function getPresignedPutUrl(key, contentType, expiresIn = 600) {
+export async function getPresignedPutUrl(key, contentType, expiresIn = 600, size) {
   if (!s3) return null;
-  const cmd = new PutObjectCommand({ Bucket: BUCKET, Key: key, ContentType: contentType });
-  return getSignedUrl(s3, cmd, { expiresIn });
+  const cmd = new PutObjectCommand({ Bucket: BUCKET, Key: key, ContentType: contentType,
+    ...(size === undefined ? {} : { ContentLength: size }),
+  });
+  return getSignedUrl(s3, cmd, { expiresIn, signableHeaders: new Set(['content-length', 'content-type']) });
 }
 
 // Read a (small) private object into memory — e.g. pages to send to the AI.
-export async function getObjectBuffer(key) {
+export async function getObjectBuffer(key, maxBytes = 15 * 1024 * 1024) {
   if (!s3) throw new Error("S3 not configured");
   const out = await s3.send(new GetObjectCommand({ Bucket: BUCKET, Key: key }));
-  return Buffer.from(await out.Body.transformToByteArray());
+  if (out.ContentLength > maxBytes) {
+    out.Body.destroy?.();
+    throw new Error('File exceeds the allowed size');
+  }
+  return readLimited(out.Body, maxBytes);
 }
 
 // Extract the S3 key from a stored URL or key string.

@@ -16,7 +16,7 @@ import { pushToUser } from './utils/webPushService.js';
 import { isTokenBlacklisted, isImpersonationActive } from './middleware/authMiddleware.js';
 import redisClient from './config/redis.js';
 import {
-  verifyChannel, verifyChat, joinedChannel, joinedChat,
+  verifyChannel, verifyChat, joinedChannel, joinedChat, refreshSocketAccess,
   adminOnlyRoom, subAdminTeacherRoom,
 } from './utils/socketAccess.js';
 
@@ -210,6 +210,7 @@ export async function initializeSocket(httpServer) {
       const unverified = jwt.decode(token);
       if (!unverified?.centerId) return next(new Error('Invalid token'));
       const decoded = jwt.verify(token, getCenterSecret(unverified.centerId), JWT_VERIFY_OPTIONS);
+      if (decoded.teacherInspection) return next(new Error('Viewing sessions cannot join live classrooms'));
       // A revoked super-admin impersonation can't open live connections either
       if (decoded.isImpersonation && !(await isImpersonationActive(`Bearer ${token}`, decoded.centerId))) {
         return next(new Error('Session revoked'));
@@ -217,6 +218,9 @@ export async function initializeSocket(httpServer) {
       socket.userId = decoded.id;
       socket.userRole = decoded.role;     // role from JWT — not trusted from client
       socket.centerId = decoded.centerId; // center slug the token was issued for
+      socket.authToken = token;
+      socket.tokenExpiresAt = decoded.exp ? decoded.exp * 1000 : Date.now() + 15 * 60_000;
+      socket.isImpersonation = !!decoded.isImpersonation;
       // Verified identity for room-membership checks (utils/socketAccess.js)
       socket.authUser = {
         id: String(decoded.id), role: decoded.role,
@@ -268,11 +272,33 @@ export async function initializeSocket(httpServer) {
 
     // Throttle all incoming events — disconnect sockets that flood the server.
     // Keyed by userId so multi-tab users share one counter across all workers.
-    socket.onAny(async () => {
+    // Closing the transport lets clients reconnect through an auth callback
+    // which reads/renews the token, rather than keeping a JWT alive indefinitely.
+    const expiryTimer = setTimeout(() => socket.conn.close(), Math.max(1, Math.min(2_147_483_647, socket.tokenExpiresAt - Date.now())));
+    expiryTimer.unref?.();
+    let checkingAccess = false;
+    const accessTimer = setInterval(async () => {
+      if (checkingAccess || !socket.connected) return;
+      checkingAccess = true;
+      try {
+        if (await isTokenBlacklisted(socket.authToken) ||
+            (socket.isImpersonation && !(await isImpersonationActive(`Bearer ${socket.authToken}`, socket.centerId))) ||
+            !(await refreshSocketAccess(socket))) socket.disconnect(true);
+      } catch { socket.disconnect(true); }
+      finally { checkingAccess = false; }
+    }, 30_000);
+    accessTimer.unref?.();
+
+    // Packet middleware gates dispatch; an async onAny listener cannot stop
+    // handlers from running while its Redis rate check is still pending.
+    socket.use(async (_packet, next) => {
+      if (Date.now() >= socket.tokenExpiresAt) { socket.conn.close(); return; }
       if (!await checkSocketRate(socket)) {
         logger.warn(`⚠️  Socket rate limit exceeded: ${socket.id} (${socket.centerId}) — disconnecting`);
         socket.disconnect(true);
+        return;
       }
+      next();
     });
 
     // ── Room guards ───────────────────────────────────────────────────────────
@@ -893,6 +919,8 @@ export async function initializeSocket(httpServer) {
 
     // Handle disconnect — clean up whiteboard session and reaction rooms
     socket.on('disconnect', () => {
+      clearTimeout(expiryTimer);
+      clearInterval(accessTimer);
       _memCounts.delete(socket.id); // rate-limit counter would otherwise outlive the socket
       try {
         logger.debug('🔌 Socket disconnected:', socket.id);

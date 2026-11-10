@@ -59,7 +59,7 @@ function Chip({ label, color = "brand" }) {
   );
 }
 
-export default function ProfileTab({ teacherInfo, isDarkMode, onUpdate }) {
+export default function ProfileTab({ teacherInfo, isDarkMode, onUpdate, studio = false }) {
   const sym = useCurrencySymbol();
   const rate = `${sym}${Number(teacherInfo.ratePerClass ?? 0).toLocaleString("en-US")}`;
   const c = {
@@ -72,6 +72,8 @@ export default function ProfileTab({ teacherInfo, isDarkMode, onUpdate }) {
     inputBorder: isDarkMode ? "#2d3347" : "var(--as-line, #e2e8f0)",
     lockBg:      isDarkMode ? "#1a1f2e" : "var(--as-raised, #f1f5f9)",
   };
+
+  if (studio) Object.assign(c, { bg: 'var(--tm-bg)', card: 'var(--tm-card)', border: 'var(--tm-line)', heading: 'var(--tm-ink)', muted: 'var(--tm-muted)', input: 'var(--tm-field)', inputBorder: 'var(--tm-line)', lockBg: 'var(--tm-soft)' });
 
   const [editing, setEditing] = useState(false);
   const [saving,  setSaving]  = useState(false);
@@ -92,14 +94,14 @@ export default function ProfileTab({ teacherInfo, isDarkMode, onUpdate }) {
 
   // Fetch reviews once teacherInfo is available
   useEffect(() => {
-    if (!teacherInfo?._id && !teacherInfo?.id) return;
+    if (studio || (!teacherInfo?._id && !teacherInfo?.id)) return;
     const tid = teacherInfo._id || teacherInfo.id;
     setReviewsLoading(true);
     api.get(`/reviews/teacher/${tid}`, { params: { page: 1, limit: 5 } })
       .then((res) => { setReviews(res.data.reviews || []); setReviewStats(res.data.stats || null); })
       .catch(() => {})
       .finally(() => setReviewsLoading(false));
-  }, [teacherInfo?._id, teacherInfo?.id]);
+  }, [teacherInfo?._id, teacherInfo?.id, studio]);
 
   useEffect(() => {
     if (teacherInfo) {
@@ -343,7 +345,7 @@ export default function ProfileTab({ teacherInfo, isDarkMode, onUpdate }) {
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
             {teacherInfo.continent && <Chip label={teacherInfo.continent} color="light" />}
             {teacherInfo.timezone && <Chip label={teacherInfo.timezone} color="light" />}
-            {typeof teacherInfo.ratePerClass === "number" && (
+            {!studio && typeof teacherInfo.ratePerClass === "number" && (
               <Chip label={`${rate}/class`} color="light" />
             )}
           </div>
@@ -387,7 +389,7 @@ export default function ProfileTab({ teacherInfo, isDarkMode, onUpdate }) {
             ].map(({ label, value }) => (
               <div key={label}>
                 <label style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11.5, fontWeight: 600, color: c.muted, marginBottom: 5, textTransform: "uppercase", letterSpacing: "0.07em" }}>
-                  <Lock size={11} /> {label} <span style={{ fontWeight: 400, textTransform: "none", letterSpacing: 0 }}>(admin only)</span>
+                  <Lock size={11} /> {label} <span style={{ fontWeight: 400, textTransform: "none", letterSpacing: 0 }}>{studio ? "(invitation details)" : "(admin only)"}</span>
                 </label>
                 <input value={value || ""} disabled style={lockedStyle} />
               </div>
@@ -416,9 +418,9 @@ export default function ProfileTab({ teacherInfo, isDarkMode, onUpdate }) {
             </div>
             <div>
               <label style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11.5, fontWeight: 600, color: c.muted, marginBottom: 5, textTransform: "uppercase", letterSpacing: "0.07em" }}>
-                <Lock size={11} /> Rate per Class <span style={{ fontWeight: 400, textTransform: "none", letterSpacing: 0 }}>(admin only)</span>
+                <Lock size={11} /> {studio ? "Your rates" : "Rate per Class"} <span style={{ fontWeight: 400, textTransform: "none", letterSpacing: 0 }}>{studio ? "(per managed center)" : "(admin only)"}</span>
               </label>
-              <input value={rate} disabled style={lockedStyle} />
+              <input value={studio ? "Set your rates in My centers" : rate} disabled style={lockedStyle} />
             </div>
             <div>
               <label style={{ display: "block", fontSize: 11.5, fontWeight: 600, color: c.muted, marginBottom: 5, textTransform: "uppercase", letterSpacing: "0.07em" }}>Timezone</label>
@@ -443,7 +445,7 @@ export default function ProfileTab({ teacherInfo, isDarkMode, onUpdate }) {
           </div>
         ) : (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(200px, 100%), 1fr))", gap: 18 }}>
-            <InfoRow label="Rate per Class"      value={rate} c={c} />
+            <InfoRow label={studio ? "Earnings rates" : "Rate per Class"} value={studio ? "Managed separately in My centers" : rate} c={c} />
             <InfoRow label="Years of Experience" value={teacherInfo.yearsOfExperience ? `${teacherInfo.yearsOfExperience} yrs` : null} c={c} />
             <InfoRow label="Timezone"
               value={TIMEZONE_OPTIONS.find(t => t.value === teacherInfo.timezone)?.label || teacherInfo.timezone}
@@ -530,15 +532,15 @@ export default function ProfileTab({ teacherInfo, isDarkMode, onUpdate }) {
         <Section icon={Award} title="Account Info" c={c}>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(180px, 100%), 1fr))", gap: 18 }}>
             <InfoRow label="Status"             value={teacherInfo.status}    c={c} />
-            <InfoRow label="Lessons Completed"  value={teacherInfo.lessonsCompleted?.toString()} c={c} />
-            <InfoRow label="Unpaid Balance"      value={teacherInfo.earned != null ? `${sym}${Number(teacherInfo.earned).toLocaleString("en-US")}` : null} c={c} />
+            {!studio && <InfoRow label="Lessons Completed" value={teacherInfo.lessonsCompleted?.toString()} c={c} />}
+            {studio ? <InfoRow label="Account type" value="Independent teacher" c={c} /> : <InfoRow label="Unpaid Balance" value={teacherInfo.earned != null ? `${sym}${Number(teacherInfo.earned).toLocaleString("en-US")}` : null} c={c} />}
             <InfoRow label="Last Login"         value={teacherInfo.lastLogin ? new Date(teacherInfo.lastLogin).toLocaleDateString() : null} c={c} />
           </div>
         </Section>
       )}
 
       {/* ── My Reviews ── */}
-      {!editing && (
+      {!editing && !studio && (
         <Section icon={Star} title="My Reviews" c={c}>
           {reviewsLoading ? (
             <div style={{ display: "flex", alignItems: "center", gap: 8, color: c.muted, fontSize: 13 }}>

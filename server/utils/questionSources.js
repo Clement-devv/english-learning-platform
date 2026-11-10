@@ -8,6 +8,9 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { s3Enabled, deleteFromS3, getObjectBuffer } from "./s3.js";
 import logger from "./logger.js";
+import { readLimited } from './readLimited.js';
+
+export const sourceByteLimit = (mime) => mime === 'application/pdf' ? 15 * 1024 * 1024 : 1.5 * 1024 * 1024;
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const LOCAL_DIR = path.join(__dirname, "..", "uploads", "question-sources");
@@ -21,7 +24,7 @@ export function sourceKey(slug, id, mime) {
 export const storageKind = () => (s3Enabled() ? "s3" : "local");
 const localPath = (key) => {
   const full = path.join(LOCAL_DIR, key);
-  if (!full.startsWith(LOCAL_DIR)) throw new Error("Bad key"); // never leave the folder
+  if (!full.startsWith(LOCAL_DIR + path.sep)) throw new Error("Bad key"); // never leave the folder
   return full;
 };
 
@@ -32,8 +35,16 @@ export async function saveLocal(key, buffer) {
 }
 
 export async function readSource(src) {
-  if (src.storage === "s3") return getObjectBuffer(src.key);
-  return fs.promises.readFile(localPath(src.key));
+  const limit = Math.min(src.size, sourceByteLimit(src.mime));
+  if (!Number.isSafeInteger(limit) || limit < 1) throw new Error('Invalid source size');
+  const buffer = src.storage === "s3" ? await getObjectBuffer(src.key, limit)
+    : await readLimited(fs.createReadStream(localPath(src.key)), limit);
+  const matches = src.mime === 'application/pdf' ? buffer.subarray(0, 5).toString() === '%PDF-'
+    : src.mime === 'image/jpeg' ? buffer.subarray(0, 3).equals(Buffer.from([0xff, 0xd8, 0xff]))
+    : src.mime === 'image/png' ? buffer.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))
+    : src.mime === 'image/webp' && buffer.subarray(0, 4).toString() === 'RIFF' && buffer.subarray(8, 12).toString() === 'WEBP';
+  if (!matches) throw new Error('File content does not match its type');
+  return buffer;
 }
 
 export async function localExists(key) {

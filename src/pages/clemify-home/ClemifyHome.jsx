@@ -501,6 +501,7 @@ export default function ClemifyHome() {
             <li><a href="#how-it-works">How It Works</a></li>
             <li><a href="#about">About</a></li>
             <li><a href="#contact">Contact</a></li>
+            <li><a href="/teacher-mode/login">Teacher Mode</a></li>
           </ul>
           <a href="#contact" className="ch-nav-cta">Get Started</a>
         </div>

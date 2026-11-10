@@ -1,5 +1,6 @@
 import express        from "express";
 import multer         from "multer";
+import { scanSharedSubmission } from '../utils/uploadScan.js';
 import path           from "path";
 import fs             from "fs";
 import crypto         from "crypto";
@@ -358,7 +359,7 @@ router.post("/link/:token/submit", uploadLimiter, async (req, res, next) => {
     logger.error("Homework link submit pre-check error:", { error: err?.message });
     serverError(res, undefined, err);
   }
-}, wrapUpload(uploadLinkSubmission.fields([{ name: "files", maxCount: MAX_FILES }, { name: "audio", maxCount: 1 }])), async (req, res) => {
+}, wrapUpload(uploadLinkSubmission.fields([{ name: "files", maxCount: MAX_FILES }, { name: "audio", maxCount: 1 }])), scanSharedSubmission(), async (req, res) => {
   try {
     const hw   = req.linkHw;
     const slug = req.center.slug;
@@ -546,10 +547,10 @@ router.get("/my", verifyToken, async (req, res) => {
     if (req.user.role !== "teacher") return forbidden(res, "Teachers only");
     const Homework = getHomework(req.db);
     const status = HW_STATUSES.includes(req.query.status) ? req.query.status : null;
-    const counts = await statusCounts(Homework, { teacherId: oid(req.user.id) }, HW_STATUSES);
+    const counts = await statusCounts(Homework, { teacherId: oid(req.user.id), ...req.modeStudentFilter }, HW_STATUSES);
     const { page: want, limit } = readPaging(req.query);
     const pagination = pageMeta(want, limit, status ? counts[status] : counts.all);
-    const list = await Homework.find({ teacherId: req.user.id, ...(status ? { status } : {}) })
+    const list = await Homework.find({ teacherId: req.user.id, ...req.modeStudentFilter, ...(status ? { status } : {}) })
       .select("+shareLink.tokenEnc")
       .populate("studentId", "firstName lastName email isManaged emailLanguage timezone")
       .sort({ createdAt: -1, _id: -1 })

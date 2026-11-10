@@ -14,7 +14,7 @@ const fmtClass = (c) => {
   return `${c.classTitle} — ${date} · ${time}${who ? ` (${who})` : ""}`;
 };
 
-export default function ExternalRecordingModal({ isDarkMode, studentId = null, editing = null, onClose, onSaved }) {
+export default function ExternalRecordingModal({ isDarkMode, studentId = null, editing = null, onClose, onSaved, studio = false }) {
   const isEdit = !!editing;
   const [classes,  setClasses]  = useState([]);
   const [loading,  setLoading]  = useState(!isEdit);
@@ -34,6 +34,8 @@ export default function ExternalRecordingModal({ isDarkMode, studentId = null, e
     input:  isDarkMode ? "#1e2235" : "#f3f4f6",
     accent: "#6366f1",
   };
+
+  if (studio) Object.assign(col, { card: 'var(--tm-card)', border: 'var(--tm-line)', text: 'var(--tm-ink)', muted: 'var(--tm-muted)', input: 'var(--tm-field)', accent: 'var(--as-accent)' });
 
   useEffect(() => {
     if (isEdit) return;
@@ -98,7 +100,7 @@ export default function ExternalRecordingModal({ isDarkMode, studentId = null, e
         style={{ background: col.card, borderRadius: "18px", width: "100%", maxWidth: "520px", maxHeight: "90vh", overflowY: "auto", padding: "22px", boxShadow: "0 20px 60px rgba(0,0,0,0.25)", display: "flex", flexDirection: "column", gap: "16px" }}>
 
         <div style={{ display: "flex", alignItems: "flex-start", gap: "12px" }}>
-          <div style={{ width: "40px", height: "40px", borderRadius: "12px", background: "rgba(99,102,241,0.12)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          <div style={{ width: "40px", height: "40px", borderRadius: "12px", background: studio ? "var(--tm-soft)" : "rgba(99,102,241,0.12)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
             <Link2 size={20} color={col.accent} />
           </div>
           <div style={{ flex: 1 }}>
@@ -106,7 +108,7 @@ export default function ExternalRecordingModal({ isDarkMode, studentId = null, e
               {isEdit ? "Edit recording link" : "Add a recording link"}
             </h3>
             <p style={{ margin: "3px 0 0", fontSize: "12.5px", color: col.muted, lineHeight: 1.5 }}>
-              Recorded the class in Zoom or Google Meet instead of here? Paste the link so your school can see it.
+              {studio ? "Keep a Zoom or Google Meet recording with this lesson, ready to share with the family." : "Recorded the class in Zoom or Google Meet instead of here? Paste the link so your school can see it."}
             </p>
           </div>
           <button type="button" onClick={onClose} aria-label="Close" style={{ background: "none", border: "none", color: col.muted, cursor: "pointer", padding: "4px" }}>
@@ -154,7 +156,7 @@ export default function ExternalRecordingModal({ isDarkMode, studentId = null, e
             placeholder="https://zoom.us/rec/share/…  or  https://drive.google.com/…" style={field} required />
           <p style={{ margin: "6px 0 0", fontSize: "11.5px", color: col.muted, lineHeight: 1.5 }}>
             <strong>Zoom:</strong> Recordings → Share → Copy link. <strong>Google Meet:</strong> the recording is in your Google Drive → Share → Copy link.
-            Make sure the link can be opened by your school admin.
+            {studio ? "Make sure the link can be opened by the family before you share it." : "Make sure the link can be opened by your school admin."}
           </p>
         </div>
 
@@ -183,7 +185,7 @@ export default function ExternalRecordingModal({ isDarkMode, studentId = null, e
             Cancel
           </button>
           <button type="submit" disabled={saving || (!isEdit && (loading || classes.length === 0))}
-            style={{ padding: "10px 18px", borderRadius: "10px", border: "none", background: "linear-gradient(135deg,#6366f1,#8b5cf6)", color: "#fff", cursor: "pointer", fontSize: "13px", fontWeight: 800, fontFamily: "inherit", display: "flex", alignItems: "center", gap: "6px", opacity: saving ? 0.7 : 1 }}>
+            style={{ padding: "10px 18px", borderRadius: "10px", border: "none", background: studio ? "var(--as-accent)" : "linear-gradient(135deg,#6366f1,#8b5cf6)", color: "#fff", cursor: "pointer", fontSize: "13px", fontWeight: 800, fontFamily: "inherit", display: "flex", alignItems: "center", gap: "6px", opacity: saving ? 0.7 : 1 }}>
             {saving ? <><Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> Saving…</> : isEdit ? "Save changes" : "Save link"}
           </button>
         </div>

@@ -540,6 +540,7 @@ async function targetsFor(req) {
   }
   const groupClasses = await getGroupClass(req.db).find(gcFilter).sort({ scheduledTime: -1 }).limit(100).select("title scheduledTime enrollments.studentId").lean();
   const sFilter = { active: true, ...(studentIds ? { _id: { $in: studentIds } } : {}) };
+  if (req.modeStudentIds) sFilter._id = { $in: req.modeStudentIds };
   const students = await getStudent(req.db).find(sFilter).sort({ firstName: 1 }).limit(500).select("firstName lastName").lean();
   return { groupClasses, students };
 }

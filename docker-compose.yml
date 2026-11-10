@@ -17,6 +17,8 @@ services:
       PORT: "5000"
       TRUST_PROXY: "true"
       REDIS_URL: "redis://redis:6379"
+      CLAMAV_HOST: "clamav"
+      CLAMAV_PORT: "3310"
     volumes:
       - /opt/elp/server/uploads:/app/server/uploads
       - /opt/elp/server/logs:/app/server/logs
@@ -49,6 +51,18 @@ services:
       timeout: 5s
       retries: 5
 
+  # Private scanner: no host port and no access to the application's files.
+  # FreshClam in the official image keeps signatures updated.
+  clamav:
+    image: clamav/clamav:1.4
+    restart: unless-stopped
+    mem_limit: 4g
+    volumes:
+      - clamav_data:/var/lib/clamav
+      - ./server/config/clamd.conf:/etc/clamav/clamd.conf:ro
+    networks:
+      - elp-network
+
   caddy:
     image: caddy:2-alpine
     container_name: elp-caddy
@@ -67,6 +81,8 @@ services:
       - app
 
 volumes:
+  clamav_data:
+    driver: local
   redis_data:
     driver: local
   caddy_data:

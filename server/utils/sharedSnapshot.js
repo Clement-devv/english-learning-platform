@@ -49,7 +49,9 @@ export function sharedSnapshot(name, variant) {
     try {
       const v = variant ? await variant(req) : "";
       const q = Object.keys(req.query).sort().map(k => `${k}=${req.query[k]}`).join("&");
-      key = `${slug}|${name}|${v}|${q}`;
+      // Cached responses must never cross role boundaries. Handlers can return
+      // private admin fields even when teachers may access the same endpoint.
+      key = JSON.stringify([slug, name, req.user?.role || "anonymous", v, q]);
     } catch { return next(); }
 
     const hit = store.get(key);

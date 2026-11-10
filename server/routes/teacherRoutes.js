@@ -33,6 +33,7 @@ import { badRequest, forbidden, notFound, serverError } from '../utils/apiRespon
 import { cachedQuery, invalidateCache } from '../utils/cache.js';
 import { normaliseWorkingHours, isValidTz } from "../utils/schedule.js";
 import { s3Enabled, uploadToS3, deleteFromS3, s3PublicUrl, isLegacyPath, keyFromValue } from "../utils/s3.js";
+import { endSessionsAfterPasswordChange, notifySessionsRevoked } from "../utils/sessionManager.js";
 
 const teacherCacheKey = (slug, id) => `teacher:${slug}:${id}`;
 
@@ -531,16 +532,20 @@ router.put("/:id", validateObjectId("id"), verifyToken, verifyAdmin, async (req,
       updateData.active = true;
     }
 
-    const teacher = await getTeacher(req.db)
-      .findByIdAndUpdate(req.params.id, updateData, { new: true, runValidators: true })
-      .select("-password -inviteToken -sessions -twoFactorSecret -twoFactorBackupCodes -knownDevices");
+    const teacher = await getTeacher(req.db).findById(req.params.id);
     if (!teacher) return notFound(res, "Teacher not found");
+    teacher.set(updateData);
+    const ended = password || updateData.active === false
+      ? await endSessionsAfterPasswordChange(teacher, req) : [];
+    await teacher.save();
+    await notifySessionsRevoked(req.app.get("io"), req.center.slug, teacher._id, ended);
 
     await invalidateCache(teacherCacheKey(req.center?.slug, req.params.id));
     if (password) {
       try { await sendPasswordResetEmail(teacher.email, `${teacher.firstName} ${teacher.lastName}`, password, "teacher", req.center?.centerName || "", req.center); }
       catch (e) { logger.error("Password reset email failed:", { error: e?.message }); }
-      const resp = teacher.toObject();
+      // Use the schema's secret-stripping JSON transform, including sessions.
+      const resp = teacher.toJSON();
       resp.temporaryPassword = password;
       return res.json(resp);
     }

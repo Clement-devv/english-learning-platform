@@ -4,6 +4,7 @@ import { body } from 'express-validator';
 import { validate } from '../middleware/validation.js';
 import { verifyToken } from '../middleware/authMiddleware.js';
 import { tenantMiddleware } from '../middleware/tenantMiddleware.js';
+import { strictLimiter } from '../middleware/rateLimiter.js';
 import {
   generateTwoFactorSecret,
   verifyTwoFactorToken,
@@ -35,7 +36,7 @@ const getUserModel = (role, db) => {
 // SETUP 2FA (Step 1: Generate QR Code)
 // ============================================
 
-router.post('/setup', verifyToken, async (req, res) => {
+router.post('/setup', verifyToken, strictLimiter, async (req, res) => {
   try {
     const { role, id, email } = req.user;
     const UserModel = getUserModel(role, req.db);
@@ -96,6 +97,7 @@ router.post('/setup', verifyToken, async (req, res) => {
 
 router.post('/verify', [
   verifyToken,
+  strictLimiter,
   body('token')
     .isLength({ min: 6, max: 6 })
     .withMessage('Token must be 6 digits')
@@ -157,6 +159,7 @@ router.post('/verify', [
 
 router.post('/disable', [
   verifyToken,
+  strictLimiter,
   body('password')
     .notEmpty()
     .withMessage('Password is required to disable 2FA'),
@@ -247,6 +250,7 @@ router.get('/status', verifyToken, async (req, res) => {
 
 router.post('/regenerate-backup-codes', [
   verifyToken,
+  strictLimiter,
   body('password')
     .notEmpty()
     .withMessage('Password is required'),

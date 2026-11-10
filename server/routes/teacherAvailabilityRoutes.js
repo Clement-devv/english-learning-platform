@@ -12,6 +12,7 @@ import mongoose from "mongoose";
 import { verifyToken } from "../middleware/authMiddleware.js";
 import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
 import { teacherAvailabilitySchema } from "../schemas/teacherAvailabilitySchema.js";
+import { groupClassSchema } from "../schemas/groupClassSchema.js";
 import { bookingSchema }             from "../schemas/bookingSchema.js";
 import { teacherSchema }             from "../schemas/teacherSchema.js";
 import { studentSchema }             from "../schemas/studentSchema.js";
@@ -136,6 +137,12 @@ router.get("/:teacherId/calendar", verifyToken, async (req, res) => {
         scheduledTime: { $gte: new Date(from - 4 * 3600000), $lt: to },
       }).populate("studentId", "firstName lastName isManaged").lean(),
     ]);
+
+    if (req.teacherWorkspace) {
+      const Group = req.db.models.GroupClass || req.db.model('GroupClass', groupClassSchema);
+      const groups = await Group.find({ teacherId, status: { $in: full ? ['open', 'full', 'in-progress', 'completed'] : ['open', 'full', 'in-progress'] }, scheduledTime: { $gte: new Date(from - 4 * 3600000), $lt: to } }).lean();
+      bookings.push(...groups.map(g => ({ ...g, classTitle: g.title, studentId: { firstName: 'Group', lastName: g.enrollments.length + ' students', isManaged: true } })));
+    }
 
     const tz = teacherTz(teacher, blocks);
     const hasHours = (teacher.workingHours || []).length > 0;

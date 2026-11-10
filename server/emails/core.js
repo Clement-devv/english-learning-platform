@@ -16,6 +16,7 @@ export const emailHealth = { configured: null, provider: null, detail: "", check
  * - Neither               → FRONTEND_URL (last resort)
  */
 export const getCenterBaseUrl = (center) => {
+  if (center?.kind === 'teacher-workspace') return { baseUrl: config.frontendUrl, needsSlug: false };
   if (center?.customDomain && center?.domainVerified) {
     return { baseUrl: `https://${center.customDomain}`, needsSlug: false };
   }
@@ -32,6 +33,8 @@ export const getCenterBaseUrl = (center) => {
 };
 
 // ── Transport selection ───────────────────────────────────────────────────────
+export const centerPublicLink = (center, pathname) => `${getCenterBaseUrl(center).baseUrl}${pathname}${center?.kind === 'teacher-workspace' ? `?workspace=${encodeURIComponent(center.slug)}` : ''}`;
+
 // Use Resend HTTP API (port 443) when RESEND_API_KEY is set — works on VPS
 // providers that block all outbound SMTP ports.
 // Falls back to nodemailer for local development.

@@ -23,7 +23,7 @@ import { studentSchema } from "../schemas/studentSchema.js";
 import { teacherSchema } from "../schemas/teacherSchema.js";
 import { issueShareLink } from "./shareLink.js";
 import { decrypt } from "./fieldEncryption.js";
-import { getCenterBaseUrl } from "../emails/core.js";
+import { centerPublicLink } from "../emails/core.js";
 import { sendRecordingLinkEmail } from "../emails/recordingEmails.js";
 import { trackJob } from "./monitor.js";
 import { loadCenterSettings, prefOnFilter } from "./familyEmailPrefs.js";
@@ -104,7 +104,7 @@ export async function linkExpiry(db, link) {
   return null;
 }
 
-export const linkUrl = (center, token) => `${getCenterBaseUrl(center).baseUrl}/rv/${token}`;
+export const linkUrl = (center, token) => centerPublicLink(center, `/rv/${token}`);
 
 const useS3 = () => !!process.env.S3_BUCKET;
 

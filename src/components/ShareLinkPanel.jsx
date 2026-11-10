@@ -3,6 +3,7 @@
 // copy, share (WhatsApp / Facebook / Zalo via the phone's share sheet), delete,
 // and create a new link. Server side: server/utils/shareLink.js.
 import { useState } from "react";
+import { teacherModeLink } from '../utils/teacherMode';
 import { Link2, Copy, Share2, Trash2 } from "lucide-react";
 
 // Center brand colour (set by utils/branding.js)
@@ -23,7 +24,7 @@ const KINDS = {
 export default function ShareLinkPanel({ item, kind, isDarkMode, onCreate, onDelete, notify }) {
   const [busy, setBusy] = useState(false);
   const k = KINDS[kind];
-  const url = item.shareToken ? `${window.location.origin}/${k.path}/${item.shareToken}` : null;
+  const url = item.shareToken ? teacherModeLink(`/${k.path}/${item.shareToken}`) : null;
   const expiresAt = item.shareLink?.expiresAt;
   // Server's exact expiry when a link exists; otherwise approximate end of due day (server re-checks)
   const expired = (expiresAt ? new Date(expiresAt).getTime() : new Date(item.dueDate).getTime() + 24 * 3600 * 1000) < Date.now();

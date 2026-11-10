@@ -25,6 +25,10 @@ export const toMoney = (n) => Math.round((parseFloat(n) || 0) * 100) / 100;
  */
 export async function chargeClassCredit(db, studentId, cls = {}) {
   const Student = getStudent(db);
+  if (cls.standalonePay?.currency) {
+    const managed = await Student.findById(studentId).lean();
+    if (managed?.standaloneManaged && cls.standalonePay.credits === false) return { student: managed, charged: false, deactivated: false };
+  }
   const after = await Student.findOneAndUpdate(
     { _id: studentId, classCredits: { $gt: 0 } },
     { $inc: { classCredits: -1 } },
@@ -96,11 +100,11 @@ export async function payForCompletedClass(db, booking, { description }) {
 
   const student = booking.isTrial
     ? await getStudent(db).findById(studentId).lean()
-    : (await chargeClassCredit(db, studentId, { title: booking.classTitle, when: booking.scheduledTime })).student;
+    : (await chargeClassCredit(db, studentId, { title: booking.classTitle, when: booking.scheduledTime, standalonePay: booking.standalonePay })).student;
 
   let teacher = await getTeacher(db).findById(teacherId).select("ratePerClass firstName lastName").lean();
   let earned = 0;
-  if (teacher && !booking.isTrial) {
+  if (teacher && !booking.isTrial && !booking.standalonePay?.currency) {
     earned = toMoney(teacher.ratePerClass);
     teacher = await adjustTeacherEarnings(db, teacherId, earned, 1);
 
@@ -111,6 +115,7 @@ export async function payForCompletedClass(db, booking, { description }) {
       description,
     });
   }
+  if (booking.standalonePay?.currency) await getTeacher(db).updateOne({ _id: teacherId }, { $inc: { lessonsCompleted: 1 } });
   return { student, teacher, earned };
 }
 

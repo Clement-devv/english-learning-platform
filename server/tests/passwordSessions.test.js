@@ -24,6 +24,7 @@ vi.mock('../utils/emailService.js', async (orig) => {
 
 const { default: authRouter }    = await import('../routes/authRoutes.js')
 const { default: studentRouter } = await import('../routes/studentRoutes.js')
+const { default: teacherRouter } = await import('../routes/teacherRoutes.js')
 const { JWT_STANDARD_CLAIMS } = await import('../config/config.js')
 const { getCenterSecret }     = await import('../utils/jwtUtils.js')
 const { isTokenBlacklisted }  = await import('../middleware/authMiddleware.js')
@@ -32,6 +33,7 @@ const app = express()
 app.use(express.json())
 app.use('/api/auth', authRouter)
 app.use('/api/students', studentRouter)
+app.use('/api/teachers', teacherRouter)
 
 const PASSWORD = 'Old@Pass1234'
 const sign = (role, id, sid) => jwt.sign(
@@ -61,6 +63,39 @@ beforeAll(() => {
 })
 
 describe('password change ends other sessions', () => {
+  it('staff resetting a teacher password ends all devices and prevents renewal', async () => {
+    const { doc, phone } = await withTwoDevices(Teacher, 'teacher', { email: 'admin-reset-teacher@test.com', continent: 'Africa' })
+    const admin = await Admin.findOne({})
+    const res = await request(app).put(`/api/teachers/${doc._id}`)
+      .set('Authorization', `Bearer ${sign('admin', admin._id, new mongoose.Types.ObjectId())}`)
+      .send({ resetPassword: true })
+    expect(res.status).toBe(200)
+    expect(res.body.temporaryPassword).toBeTruthy()
+    for (const key of ['password', 'sessions', 'inviteToken']) expect(res.body).not.toHaveProperty(key)
+    const after = await Teacher.findById(doc._id)
+    expect(after.sessions.every(s => !s.isActive)).toBe(true)
+    const refresh = await request(app).post('/api/auth/refresh')
+      .send({ sessionToken: phone.token, expiredToken: phone.jwtToken })
+    expect(refresh.status).toBe(401)
+  })
+
+  it('revoking a renewed session rejects every earlier JWT from that device', async () => {
+    const { endSession } = await import('../utils/sessionManager.js')
+    const { verifyToken } = await import('../middleware/authMiddleware.js')
+    const sid = new mongoose.Types.ObjectId()
+    const userId = new mongoose.Types.ObjectId()
+    const older = sign('teacher', userId, sid)
+    const newer = jwt.sign({ ...JWT_STANDARD_CLAIMS, id: String(userId), role: 'teacher', centerId: 'testcenter', sid: String(sid), nonce: 'newer' }, getCenterSecret('testcenter'), { expiresIn: '15m' })
+    await endSession({ jwtToken: newer, isActive: true }, 'remote')
+    expect(await isTokenBlacklisted(older)).toBe(true)
+    let passed = false
+    const res = { status(code) { this.code = code; return this }, json(body) { this.body = body; return this } }
+    await verifyToken({ center: { slug: 'testcenter' }, headers: { authorization: `Bearer ${older}` } }, res, () => { passed = true })
+    expect(passed).toBe(false)
+    expect(res.code).toBe(401)
+    expect(res.body.code).toBe('SESSION_REVOKED')
+    expect(await isTokenBlacklisted(sign('teacher', userId, new mongoose.Types.ObjectId()))).toBe(false)
+  })
   it('student change-password keeps this device, signs out the other and revokes its token', async () => {
     const { doc, phone, laptop } = await withTwoDevices(Student, 'student', { email: 'pw-student@test.com' })
 

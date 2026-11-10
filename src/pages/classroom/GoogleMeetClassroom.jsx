@@ -1,3 +1,5 @@
+import { teacherModeKey } from '../../utils/teacherMode';
+import StandaloneClassOutcome from '../teacher-mode/StandaloneClassOutcome';
 // GoogleMeetClassroom.jsx
 // Full Google Meet classroom — attendance, timer, and external-tab monitor.
 //
@@ -171,7 +173,7 @@ export default function GoogleMeetClassroom({ classData, userRole, onLeave, goog
                 )}
               </div>
               <p className="text-xs text-gray-400 mb-4">No class was deducted and no earnings were added.</p>
-              {!disputeSubmitted ? (
+              {teacherModeKey() ? <StandaloneClassOutcome bookingId={bookingId} /> : !disputeSubmitted ? (
                 !disputeOpen ? (
                   <button onClick={() => setDisputeOpen(true)}
                     className="w-full px-6 py-3 mb-3 bg-amber-500 hover:bg-amber-600 text-white rounded-full font-bold transition-all">

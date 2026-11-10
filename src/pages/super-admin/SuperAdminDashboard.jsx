@@ -9,7 +9,7 @@ import {
   Globe, RefreshCw, Trash2, Mail, KeyRound, Palette,
   BarChart2, ChevronDown, ChevronUp, ToggleLeft, ToggleRight, Video, Mic, Film,
   AlertTriangle, RotateCcw, Zap, Send, Activity, Users, UserCheck, LogIn, Megaphone, SlidersHorizontal, Award, Sun, Moon, Menu,
-  HeartPulse, HardDrive, LayoutDashboard, Link2, Search, UserCog,
+  HeartPulse, HardDrive, LayoutDashboard, Link2, Search, UserCog, GraduationCap,
 } from 'lucide-react';
 import { THEMES } from '../../data/themes';
 import { LOGIN_THEMES, TEACHER_LOGIN_THEMES, ADMIN_LOGIN_THEMES } from '../../data/loginThemes';
@@ -36,6 +36,8 @@ import LandingPagesTab         from './tabs/LandingPagesTab';
 import BoardTab                from './tabs/BoardTab';
 import OverviewTab             from './tabs/OverviewTab';
 import TeamTab                 from './tabs/TeamTab';
+import StandaloneTeachersTab from './tabs/StandaloneTeachersTab';
+import StandaloneEarningsTab from './tabs/StandaloneEarningsTab';
 import CommandPalette          from './CommandPalette';
 import './saShell.css';
 import { studentModesLabel }   from '../../utils/planFeatures';
@@ -1108,6 +1110,7 @@ export default function SuperAdminDashboard() {
       { key: 'usage',        label: 'Video minutes',   icon: BarChart2,  desc: 'Agora video minutes by center and month' },
     ] },
     { group: 'Billing', items: [
+      { key: 'standalone-earnings', label: 'Teacher earnings', icon: BarChart2, desc: 'Standalone teacher earnings and charges by managed center' },
       { key: 'credits',      label: 'AI credits',      icon: Zap,        desc: 'Chat, pronunciation and teacher AI credits for each center' },
       { key: 'library',      label: 'Library storage', icon: HardDrive,  desc: 'Teaching-library storage, limits and billing' },
     ] },
@@ -1119,6 +1122,7 @@ export default function SuperAdminDashboard() {
     ] },
     { group: 'Settings', items: [
       { key: 'team',         label: 'Team',            icon: UserCog,    desc: 'Super admins who run the platform with you — same centers, own logins' },
+      { key: 'standalone-teachers', label: 'Standalone teachers', icon: GraduationCap, desc: 'Invite teachers, manage access and talk privately' },
     ] },
   ];
   const TABS = NAV.flatMap(g => g.items.map(i => ({ ...i, group: g.group || '' })));
@@ -1280,6 +1284,8 @@ export default function SuperAdminDashboard() {
                 handleRestore={handleRestore} daysRemaining={daysRemaining}
               />
             )}
+            {tab === 'standalone-teachers' && <StandaloneTeachersTab apiBase={API_BASE} authHeaders={authHeaders} />}
+            {tab === 'standalone-earnings' && <StandaloneEarningsTab apiBase={API_BASE} authHeaders={authHeaders} />}
             {tab === 'team' && (
               <TeamTab apiBase={API_BASE} authHeaders={authHeaders} />
             )}

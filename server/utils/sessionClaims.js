@@ -46,6 +46,7 @@ export function signAccessToken({ role, user, centerSlug, sid, extra = {} }) {
       role:     normaliseRole(role),
       centerId: centerSlug,
       sid,
+      ...(user.accountType === 'standalone' ? { realm: 'teacher-mode' } : {}),
       ...extra,
     },
     getCenterSecret(centerSlug),

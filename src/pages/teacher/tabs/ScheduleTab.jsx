@@ -46,7 +46,7 @@ function summarise(hours) {
   return parts.join(" · ");
 }
 
-export default function ScheduleTab({ teacherInfo, isDarkMode, students = [] }) {
+export default function ScheduleTab({ teacherInfo, isDarkMode, students = [], studio = false }) {
   const c = pal(isDarkMode);
   const myTz = viewerTz();
   const teacherId = teacherInfo?._id || teacherInfo?.id;
@@ -176,12 +176,12 @@ export default function ScheduleTab({ teacherInfo, isDarkMode, students = [] }) 
   };
 
   // ── Calendar data ─────────────────────────────────────────────────────────
-  const items = useMemo(() => (cal.blocks || []).map(b => ({
+  const items = useMemo(() => (cal.blocks || []).filter(b => !studio || !['booked', 'pending', 'done'].includes(b.kind)).map(b => ({
     ...b,
     title: b.kind === "off" ? (b.note || "Time off") : b.kind === "reserved" ? `Reserved · ${b.studentName}` : b.title,
     sub: ["booked", "pending", "done"].includes(b.kind) ? b.studentName : b.kind === "reserved" ? b.note : "",
     onClick: () => setDetail(b),
-  })), [cal.blocks]);
+  })), [cal.blocks, studio]);
 
   const freeMins = (cal.free || []).reduce((s, f) => s + (new Date(f.end) - new Date(f.start)) / 60000, 0);
   const stat = (k) => (cal.blocks || []).filter(b => b.kind === k).length;
@@ -243,7 +243,7 @@ export default function ScheduleTab({ teacherInfo, isDarkMode, students = [] }) 
           <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
             <div>
               <div style={{ fontSize: 15, fontWeight: 800, color: c.heading }}>When do you teach each week?</div>
-              <div style={{ fontSize: 12.5, color: c.text }}>Students see these hours as free time (minus classes and time off), shown in their own timezone.</div>
+              <div style={{ fontSize: 12.5, color: c.text }}>{studio ? 'Free time accounts for booked classes and time off. Your classes are shown in Schedule.' : 'Students see these hours as free time (minus classes and time off), shown in their own timezone.'}</div>
             </div>
             <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, color: c.text }}>
               Hours are in
@@ -302,15 +302,14 @@ export default function ScheduleTab({ teacherInfo, isDarkMode, students = [] }) 
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {[
             ["Free this week", cal.hasHours ? `${Math.round(freeMins / 60 * 10) / 10}h` : "—", "#059669"],
-            ["Booked", stat("booked"), BRAND],
-            ["Pending", stat("pending"), "#d97706"],
+            ...(!studio ? [["Booked", stat("booked"), BRAND], ["Pending", stat("pending"), "#d97706"]] : []),
           ].map(([l, v, col]) => (
             <span key={l} style={{ padding: "6px 12px", borderRadius: 10, border: `1px solid ${c.border}`, background: c.card, fontSize: 12.5, color: c.text }}>
               <strong style={{ color: col, fontSize: 14 }}>{v}</strong> {l}
             </span>
           ))}
         </div>
-        <Legend kinds={["free", "booked", "pending", "off", "reserved"]} isDarkMode={isDarkMode} />
+        <Legend kinds={studio ? ["free", "off", "reserved"] : ["free", "booked", "pending", "off", "reserved"]} isDarkMode={isDarkMode} />
       </div>
 
       <WeekCalendar

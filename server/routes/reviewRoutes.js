@@ -7,6 +7,8 @@ import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
 import { reviewSchema }  from "../schemas/reviewSchema.js";
 import { bookingSchema } from "../schemas/bookingSchema.js";
 import { teacherSchema } from "../schemas/teacherSchema.js";
+import { groupClassSchema } from "../schemas/groupClassSchema.js";
+import { standaloneGroupReviewSchema } from "../schemas/standaloneGroupReviewSchema.js";
 import logger from "../utils/logger.js";
 import { badRequest, forbidden, notFound, conflict, serverError } from '../utils/apiResponse.js';
 
@@ -16,6 +18,8 @@ router.use(tenantMiddleware);
 const getReview  = (db) => db.models.Review  || db.model("Review",  reviewSchema);
 const getBooking = (db) => db.models.Booking || db.model("Booking", bookingSchema);
 const getTeacher = (db) => db.models.Teacher || db.model("Teacher", teacherSchema);
+const getGroupReview = (db) => db.models.StandaloneGroupReview || db.model("StandaloneGroupReview", standaloneGroupReviewSchema);
+const getGroupClass = (db) => db.models.GroupClass || db.model("GroupClass", groupClassSchema);
 
 // ── POST /api/reviews  —  student submits a review ───────────────────────────
 router.post("/", verifyToken, verifyStudent, async (req, res) => {
@@ -81,10 +85,16 @@ router.get("/my-trends", verifyToken, async (req, res) => {
     const teacherId = req.user.id;
 
     const reviews = await getReview(req.db)
-      .find({ teacherId, flagged: false })
+      .find({ teacherId, flagged: false, ...(req.modeStudentIds ? { studentId: { $in: req.modeStudentIds } } : {}) })
       .sort({ createdAt: -1 })
       .populate("bookingId", "classTitle scheduledTime")
       .populate("studentId", "firstName");
+    if (req.teacherWorkspace) {
+      getGroupClass(req.db);
+      const groups = await getGroupReview(req.db).find({ teacherId, flagged: false, ...(req.modeStudentIds ? { studentId: { $in: req.modeStudentIds } } : {}) }).sort({ createdAt: -1 }).populate('studentId', 'firstName').populate('groupClassId', 'title scheduledTime').lean();
+      reviews.push(...groups.map(r => ({ ...r, bookingId: r.groupClassId ? { classTitle: r.groupClassId.title, scheduledTime: r.groupClassId.scheduledTime } : null })));
+      reviews.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    }
 
     // ISO week helper
     function isoWeekKey(date) {
@@ -163,13 +173,14 @@ router.get("/teacher/:teacherId", verifyToken, async (req, res) => {
 
     if (!mongoose.isValidObjectId(req.params.teacherId)) return badRequest(res, "Invalid teacher");
     const Review = getReview(req.db);
-    const base = { teacherId: new mongoose.Types.ObjectId(String(req.params.teacherId)), flagged: false };
+    const base = { teacherId: new mongoose.Types.ObjectId(String(req.params.teacherId)), flagged: false, ...(req.modeStudentIds ? { studentId: { $in: req.modeStudentIds } } : {}) };
 
     // Stats always cover ALL of the teacher's (unflagged) reviews
     const distRows = await Review.aggregate([{ $match: base }, { $group: { _id: "$rating", n: { $sum: 1 } } }]);
+    if (req.teacherWorkspace) distRows.push(...await getGroupReview(req.db).aggregate([{ $match: base }, { $group: { _id: '$rating', n: { $sum: 1 } } }]));
     const dist = [0, 0, 0, 0, 0];
     let total = 0, sum = 0;
-    distRows.forEach(r => { if (r._id >= 1 && r._id <= 5) { dist[r._id - 1] = r.n; total += r.n; sum += r._id * r.n; } });
+    distRows.forEach(r => { if (r._id >= 1 && r._id <= 5) { dist[r._id - 1] += r.n; total += r.n; sum += r._id * r.n; } });
     const avgRating = total ? Math.round((sum / total) * 10) / 10 : null;
 
     // ?rating=1..5 filter, ?page=&limit= one page (no ?page → newest 500, as before but bounded)
@@ -184,12 +195,19 @@ router.get("/teacher/:teacherId", verifyToken, async (req, res) => {
 
     const reviews = await Review.find(filter)
       .sort({ createdAt: -1, _id: -1 })
-      .skip((page - 1) * limit)
-      .limit(limit)
+      .skip(req.teacherWorkspace ? 0 : (page - 1) * limit)
+      .limit(req.teacherWorkspace ? page * limit : limit)
       .populate("studentId", "firstName lastName")
-      .populate("bookingId", "classTitle scheduledTime");
+      .populate("bookingId", "classTitle scheduledTime").lean();
 
-    res.json({ reviews, stats: { total, avgRating, dist }, pagination: { page, limit, total: matching, totalPages } });
+    if (req.teacherWorkspace) {
+      getGroupClass(req.db);
+      const groups = await getGroupReview(req.db).find(filter).sort({ createdAt: -1, _id: -1 }).limit(page * limit).populate('studentId', 'firstName lastName').populate('groupClassId', 'title scheduledTime').lean();
+      reviews.push(...groups.map(r => ({ ...r, bookingId: r.groupClassId ? { classTitle: r.groupClassId.title, scheduledTime: r.groupClassId.scheduledTime } : null })));
+      reviews.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt) || String(b._id).localeCompare(String(a._id)));
+    }
+
+    res.json({ reviews: req.teacherWorkspace ? reviews.slice((page - 1) * limit, page * limit) : reviews, stats: { total, avgRating, dist }, pagination: { page, limit, total: matching, totalPages } });
   } catch (err) {
     serverError(res, undefined, err);
   }

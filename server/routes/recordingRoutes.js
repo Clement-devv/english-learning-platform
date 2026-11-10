@@ -5,7 +5,7 @@ import multer     from "multer";
 import path       from "path";
 import fs         from "fs";
 import { fileURLToPath } from "url";
-import { verifyToken } from "../middleware/authMiddleware.js";
+import { verifyToken, verifyTeacher } from "../middleware/authMiddleware.js";
 import { tenantMiddleware } from "../middleware/tenantMiddleware.js";
 import { recordingSchema }  from "../schemas/recordingSchema.js";
 import { bookingSchema }    from "../schemas/bookingSchema.js";
@@ -77,7 +77,8 @@ if (!useS3) {
 
 const upload = multer({
   storage,
-  limits: { fileSize: 2 * 1024 * 1024 * 1024 },
+  // Current clients record eight-minute parts, rather than multi-GB classes.
+  limits: { fileSize: 256 * 1024 * 1024, files: 1, fields: 10, fieldSize: 4096, parts: 11 },
   fileFilter: (_req, file, cb) => {
     const baseType = file.mimetype.split(";")[0].trim();
     logger.info(`Recording fileFilter: originalname="${file.originalname}" mimetype="${file.mimetype}" baseType="${baseType}"`);
@@ -169,6 +170,7 @@ router.get("/classes-for-link", verifyToken, async (req, res) => {
     const until = new Date(Date.now() + 24 * 60 * 60 * 1000); // allow today's upcoming class
     const classes = await getBooking(req.db).find({
       teacherId,
+      ...(req.teacherWorkspace && req.query.managedCenterId ? { managedCenterId: req.query.managedCenterId } : {}),
       scheduledTime: { $gte: since, $lte: until },
       status: { $nin: ["rejected", "cancelled"] },
     })
@@ -262,7 +264,22 @@ router.patch("/:id/external", verifyToken, async (req, res) => {
 // Accepts a whole recording or one part of a split recording
 // (sessionId + partNumber + startOffset). Re-uploading a part that is already
 // saved returns the existing record, so client retries are safe.
-router.post("/upload", verifyToken, wrapUpload(upload.single("recording")), async (req, res) => {
+// Class identity must be available before multipart storage starts. Never trust
+// a later multipart field to authorize an upload that has already consumed disk/S3.
+async function authorizeRecordingUpload(req, res, next) {
+  try {
+    const { bookingId, groupClassId } = req.query;
+    if (!!bookingId === !!groupClassId) return badRequest(res, 'Specify one bookingId or groupClassId in the upload URL');
+    const id = groupClassId || bookingId;
+    if (typeof id !== 'string' || !mongoose.isValidObjectId(id)) return badRequest(res, 'Invalid class ID');
+    const Model = groupClassId ? getGroupClassModel(req.db) : getBooking(req.db);
+    if (!(await Model.exists({ _id: id, teacherId: req.user.id }))) return forbidden(res, 'You can only upload recordings for your own classes');
+    req.recordingClass = groupClassId ? { groupClassId: id } : { bookingId: id };
+    next();
+  } catch (err) { next(err); }
+}
+
+router.post("/upload", verifyToken, verifyTeacher, authorizeRecordingUpload, wrapUpload(upload.single("recording")), async (req, res) => {
   let rec = null; // once a record exists, its file must never be discarded
   try {
     const { role, id: teacherId } = req.user;
@@ -270,8 +287,8 @@ router.post("/upload", verifyToken, wrapUpload(upload.single("recording")), asyn
     if (!req.file)          return badRequest(res, "No file uploaded");
 
     const { duration, title } = req.body;
-    const groupClassId = req.body.groupClassId || null;
-    const bookingId = groupClassId ? null : req.body.bookingId;
+    const groupClassId = req.recordingClass.groupClassId || null;
+    const bookingId = req.recordingClass.bookingId || null;
     if (!bookingId && !groupClassId) { await discardUploadedFile(req.file); return badRequest(res, "bookingId is required"); }
     // Group class recording: only that class's own teacher
     if (groupClassId && (!mongoose.isValidObjectId(groupClassId) ||
@@ -370,7 +387,7 @@ const myGroupClassIds = (db, studentId) => getGroupClassModel(db).distinct("_id"
 /** Who can see what: teacher → own, student → own + shared, admin → all (or ?teacherId). */
 async function scopeFor(req) {
   const { role, id } = req.user;
-  if (role === "teacher") return { teacherId: oid(id) };
+  if (role === "teacher") return { teacherId: oid(id), ...req.modeStudentFilter };
   // Students: their own one-to-one recordings + recordings of group classes they're in, once shared
   if (role === "student") return { visibleToStudent: true, $or: [{ studentId: oid(id) }, { groupClassId: { $in: await myGroupClassIds(req.db, id) } }] };
   if (role === "admin") {

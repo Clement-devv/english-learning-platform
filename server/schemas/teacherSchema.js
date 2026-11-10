@@ -8,6 +8,7 @@ export const teacherSchema = new mongoose.Schema({
   firstName: String,
   lastName: String,
   email: { type: String, unique: true, required: true },
+  accountType: { type: String, enum: ['center', 'standalone'], default: 'center' },
   ratePerClass: Number,
   password: String,
   continent: {

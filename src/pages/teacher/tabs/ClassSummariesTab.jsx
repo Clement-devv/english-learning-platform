@@ -27,7 +27,7 @@ const PROMPTS = [
   "Next class we will: ",
 ];
 
-export default function ClassSummariesTab({ isDarkMode }) {
+export default function ClassSummariesTab({ isDarkMode, studio = false }) {
   const [view, setView]       = useState("missing");
   const [source, setSource]   = useState("single"); // "single" (1-to-1 bookings) | "group" (group classes)
   const [q, setQ]             = useState("");
@@ -71,7 +71,7 @@ export default function ClassSummariesTab({ isDarkMode }) {
     setSaving(true);
     try {
       await api.put(editing.group ? `/class-summaries/group/${editing.id}` : `/class-summaries/${editing.id}`, { text: value });
-      notify(value.trim() ? "Summary saved — the student, parent and admin can see it" : "Summary removed");
+      notify(value.trim() ? (studio ? "Summary saved. Published lesson updates also show this summary to families." : "Summary saved — the student, parent and admin can see it") : "Summary removed");
       setEditing(null);
       quietRef.current = true;
       load();

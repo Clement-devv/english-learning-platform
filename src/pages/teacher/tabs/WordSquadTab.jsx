@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ArrowDown, ArrowUp, BookOpen, Copy, Download, Link2, Play, Plus, Sparkles, Trash2, Upload } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../../api';
+import { teacherModeLink } from '../../../utils/teacherMode';
 import { questionErrors, publishErrors, parseQuestionsCsv, LEVELS, LIMITS } from '../../../../server/utils/questionRules.js';
 import { EXAMPLE_SET_TITLE, EXAMPLE_QUESTIONS, exampleCsv } from '../../../../server/utils/exampleQuestions.js';
 import WordSquadAi from './WordSquadAi.jsx';
@@ -23,6 +24,71 @@ function downloadExampleCsv() {
   const a = Object.assign(document.createElement('a'), { href: url, download: 'word-squad-example.csv' });
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+// The pattern to follow, shown above the questions: one filled-in question,
+// the rules the checks use, and the same thing as CSV rows
+const GUIDE_EXAMPLE = { prompt: 'My sister ___ long hair.', answer: 'has', distractors: ['have', 'is', 'having'] };
+const GUIDE_CSV = [
+  'type,prompt,answer,distractor1,distractor2,distractor3',
+  'gap,My sister ___ long hair.,has,have,is,having',
+  'gap,School starts ___ seven thirty.,at,in,on',
+  'gap,How ___ pens do you have?,many,much',
+  'gap,"Yes, I ___ a dog.",have,has,having',
+].join('\n');
+const GUIDE_KEY = 'wsGuideClosed';
+
+function QuestionGuide({ flash }) {
+  const [open, setOpen] = useState(() => { try { return localStorage.getItem(GUIDE_KEY) !== '1'; } catch { return true; } });
+  const toggle = (e) => {
+    const now = e.currentTarget.open;
+    setOpen(now);
+    try { localStorage.setItem(GUIDE_KEY, now ? '0' : '1'); } catch { /* storage unavailable */ }
+  };
+  const copyCsv = async () => {
+    try { await navigator.clipboard.writeText(GUIDE_CSV + '\n'); flash('Example rows copied — paste them into a spreadsheet or a .csv file'); }
+    catch { flash('Could not copy — select the rows and copy them', true); }
+  };
+  return (
+    <details className="wst-card wst-guide" open={open} onToggle={toggle}>
+      <summary><BookOpen size={15} /> How to write a question — follow this example</summary>
+
+      <div className="wst-guide-example" aria-label="Example question">
+        <span className="wst-q-no">#1</span>
+        <div className="wst-q-fields">
+          <div className="wst-guide-cell wst-q-prompt"><span className="wst-label">Sentence</span>My sister <b className="wst-guide-blank">___</b> long hair.</div>
+          <div className="wst-guide-cell wst-guide-cell--ok"><span className="wst-label">Right word</span>{GUIDE_EXAMPLE.answer}</div>
+          {GUIDE_EXAMPLE.distractors.map((d, i) => (
+            <div key={d} className="wst-guide-cell"><span className="wst-label">Wrong word {i + 1}{i ? ' (optional)' : ''}</span>{d}</div>
+          ))}
+        </div>
+      </div>
+
+      <div className="wst-guide-rules">
+        <ul>
+          <li>✅ <b>One blank</b> in the sentence, typed as <b>3 underscores</b>: <code>___</code></li>
+          <li>✅ The <b>right word</b> fills the blank</li>
+          <li>✅ <b>1 to 3 wrong words</b>, all different, and not the right word</li>
+          <li>✅ At least <b>8 questions</b> to publish</li>
+        </ul>
+        <ul>
+          <li>❌ <code>__</code> (only 2), <code>...</code>, <code>( )</code> or two blanks</li>
+          <li>❌ The right word again in the wrong words</li>
+          <li>❌ Sentences over 120 letters, words over 24</li>
+        </ul>
+      </div>
+
+      <div>
+        <div className="wst-row">
+          <b>Importing a CSV?</b> <span className="wst-muted">Same pattern, one question per row. Put a sentence that has a comma in "double quotes".</span>
+          <span className="wst-spacer" />
+          <button type="button" className="wst-btn wst-btn--sm" onClick={copyCsv}><Copy size={14} /> Copy rows</button>
+        </div>
+        <pre className="wst-guide-csv">{GUIDE_CSV}</pre>
+        <span className="wst-muted">In Excel: one column each (A–F), then <b>Save As → CSV UTF-8</b>. In Google Sheets: <b>File → Download → .csv</b>.</span>
+      </div>
+    </details>
+  );
 }
 
 function Preview({ q, index }) {
@@ -128,7 +194,7 @@ function Editor({ initialId, onDone, onTestPlay, flash }) {
         <span className={`wst-badge ${status === 'published' ? 'wst-badge--pub' : 'wst-badge--draft'}`}>{status}</span>
       </div>
       <div className="wst-layout">
-        <div className="wst-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 12 }}>
+        <div className="wst-row" style={{ flexDirection: 'column', flexWrap: 'nowrap', alignItems: 'stretch', gap: 12 }}>
           <div className="wst-card wst-row">
             <label className="wst-field"><span className="wst-label">Title</span>
               <input className="wst-input" value={title} maxLength={120} placeholder="e.g. Unit 3 — Food" onChange={(e) => setTitle(e.target.value)} />
@@ -156,7 +222,7 @@ function Editor({ initialId, onDone, onTestPlay, flash }) {
               {csvReport.errors.length > 0 && <> Skipped {csvReport.errors.length}: {csvReport.errors.slice(0, 3).map((e) => `line ${e.line} (${e.message})`).join('; ')}{csvReport.errors.length > 3 ? '…' : ''}</>}
             </div>
           )}
-          <p className="wst-muted" style={{ margin: 0 }}>Write a sentence with one blank (___), the right word, and 1–3 wrong words. CSV columns: type, prompt, answer, distractor1, distractor2, distractor3.</p>
+          <QuestionGuide flash={flash} />
 
           {questions.map((q, i) => {
             const errs = serverProblems[i] || rowErrors[i];
@@ -238,7 +304,7 @@ function AssignForm({ set, onDone, flash }) {
       </div>
       {!targets ? <p className="wst-muted">Loading your classes…</p> : (
         <div className="wst-layout">
-          <div className="wst-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 12 }}>
+          <div className="wst-row" style={{ flexDirection: 'column', flexWrap: 'nowrap', alignItems: 'stretch', gap: 12 }}>
             <div className="wst-card">
               <h3 style={{ marginBottom: 8 }}>Group classes</h3>
               {targets.groupClasses.length === 0 ? <p className="wst-muted">No recent group classes.</p> : (
@@ -302,7 +368,7 @@ async function copyText(text) {
 function GameLinks({ assignment, onClose, flash }) {
   const [managed, setManaged] = useState(null);
   const loginUrl = `${window.location.origin}/student/games/word-squad?assignment=${assignment.id}`;
-  const linkUrl = (token) => `${window.location.origin}/g/${token}`;
+  const linkUrl = (token) => teacherModeLink(`/g/${token}`);
 
   useEffect(() => {
     api.post(`${BASE}/assignments/${assignment.id}/links`)

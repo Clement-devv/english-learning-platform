@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { io } from "socket.io-client";
+import { socketAuth } from '../utils/socketAuth';
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || "";
 
@@ -41,7 +42,7 @@ export function useVideoChat(channelName, userName) {
   useEffect(() => {
     const sock = io(SOCKET_URL, {
       transports: ["websocket"],
-      auth: { token: getSocketToken() },
+      auth: socketAuth(getSocketToken),
     });
     socketRef.current = sock;
 

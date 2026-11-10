@@ -217,8 +217,8 @@ export function RingProvider({ children }) {
 
     log("[RingContext] Starting socket for role:", role);
 
-    // The server checks the JWT only during the handshake, so a connected
-    // socket never needs a new token. `auth` is a function so that every
+    // The server closes the transport when its JWT expires. `auth` is a
+    // function so that every
     // (re)connect attempt reads the freshest token — refreshing first if it
     // is about to expire — instead of replaying the one from page load.
     const sock = io(SOCKET_URL, {
@@ -406,8 +406,7 @@ export function RingProvider({ children }) {
       setTypingEvent(prev => (prev?.chatId === chatId ? null : prev));
     });
 
-    // No periodic forced reconnect: the token is only checked at handshake,
-    // and reconnects fetch a fresh one through the auth function above.
+    // Reconnects after token expiry fetch a fresh one through the auth callback.
 
     // Connect on the next tick. React StrictMode (dev) mounts, unmounts and
     // re-mounts every effect; connecting immediately made the first socket get

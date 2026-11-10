@@ -13,6 +13,7 @@ import { badRequest, forbidden, notFound, serverError } from '../utils/apiRespon
 import { outcomeChangePush } from "../utils/classOutcome.js";
 import { payForCompletedClass } from "../utils/classPayment.js";
 import { completeClass } from "../services/classCompletionService.js";
+import { completeStandaloneLesson } from "../services/standaloneLessonService.js";
 
 const router = express.Router();
 router.use(tenantMiddleware);
@@ -313,6 +314,13 @@ router.post("/auto-complete", verifyToken, async (req, res) => {
 
     // Case 1: CLASS COMPLETED
     if (bothJoined && meetsRequirement) {
+      if (req.teacherWorkspace) {
+        await completeStandaloneLesson(req.db, booking, req.user.id);
+        if (session) await getClassroomSession(req.db).updateOne({ _id: session._id }, { $set: { bothActiveTime, status: "completed", classEndedAt: new Date() } });
+        const student = await getStudent(req.db).findById(booking.studentId).select("classCredits").lean();
+        return res.json({ completed: true, missed: false, message: "Class completed successfully!", teacherJoined: true, studentJoined: true,
+          teacherEarned: null, studentClassesRemaining: student?.classCredits ?? 0, bothActiveTime, requiredTime });
+      }
       // Claim the booking atomically — two simultaneous calls (teacher + student,
       // or a retry) must not both pay. Only the request that flips the status pays.
       const claimed = await getBooking(req.db).findOneAndUpdate(
@@ -330,7 +338,7 @@ router.post("/auto-complete", verifyToken, async (req, res) => {
           message: done ? "Class already completed" : "This class was already settled" });
       }
 
-      if (isManaged) {
+      if (isManaged && !req.teacherWorkspace) {
         // Only the teacher saw the student — ready a link so the admin can ask the parent
         issueShareLink(claimed);
         claimed.parentCheck = { status: "waiting" };
@@ -392,6 +400,7 @@ router.post("/auto-complete", verifyToken, async (req, res) => {
     });
   } catch (err) {
     logger.error("Auto-complete error:", { error: err?.message });
+    if (err.statusCode === 400) return badRequest(res, err.message);
     serverError(res, "Error completing class");
   }
 });

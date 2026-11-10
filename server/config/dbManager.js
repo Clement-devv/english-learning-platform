@@ -25,7 +25,10 @@ export const getDb = (centerSlug) => {
   if (connections[centerSlug]) return connections[centerSlug];
   const base = (process.env.DB_BASE_URI || '').replace(/\/+$/, '');
   const uri = `${base}/${encodeURIComponent(centerSlug)}`;
-  const conn = mongoose.createConnection(uri, mongooseOptions);
+  const conn = mongoose.createConnection(uri, {
+    ...mongooseOptions,
+    ...(centerSlug.startsWith('tw-') ? { minPoolSize: 0, maxPoolSize: 5, maxIdleTimeMS: 60_000 } : {}),
+  });
   const pending = conn.asPromise()
     .then(() => {
       logger.info(`✅ DB connected: db_${centerSlug}`);

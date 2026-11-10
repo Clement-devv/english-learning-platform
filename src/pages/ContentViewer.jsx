@@ -6,6 +6,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import * as pdfjsLib from "pdfjs-dist";
 import pdfWorkerSrc from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import io from "socket.io-client";
+import { socketAuth } from '../utils/socketAuth';
 import api from "../api";
 import {
   ChevronLeft, ChevronRight, ZoomIn, ZoomOut,
@@ -145,7 +146,7 @@ export default function ContentViewer({ bookingId, userRole, channelName }) {
 
     const userName = localStorage.getItem("name") || "User";
     const socket = io(SERVER_URL, {
-      auth:       { token: getSocketToken() },
+      auth:       socketAuth(getSocketToken),
       transports: ["websocket"],
     });
     socketRef.current = socket;

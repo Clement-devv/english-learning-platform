@@ -1,0 +1,6 @@
+import { useState } from 'react';
+export default function TeacherCreditForm({ items, call, refresh }) {
+  const [id, setId] = useState(''), [amount, setAmount] = useState(10), [message, setMessage] = useState(''), [busy, setBusy] = useState(false);
+  const style = { background: 'var(--sa-panel)', color: 'var(--sa-text)', border: '1px solid var(--sa-line)', padding: 10, borderRadius: 9, margin: 8 };
+  return <form onSubmit={async e => { e.preventDefault(); setBusy(true); try { await call(`/workspaces/${id}/ai-credits`, 'POST', { amount: Number(amount) }); setMessage('AI credits allocated.'); await refresh(); } catch (error) { setMessage(error.message); } finally { setBusy(false); } }}><h3>Allocate AI credits</h3><label>Teacher<select required style={style} value={id} onChange={e => setId(e.target.value)}><option value="">Choose a standalone teacher</option>{items.filter(w => w.status === 'active').map(w => <option key={w._id} value={w._id}>{w.name} · {w.aiCredits?.balance || 0} credits</option>)}</select></label><label>Credits<input required style={style} type="number" min="1" max="1000000" value={amount} onChange={e => setAmount(e.target.value)} /></label><button style={style} disabled={busy}>Allocate credits</button>{message && <p role="status">{message}</p>}</form>;
+}

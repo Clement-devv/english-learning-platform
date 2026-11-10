@@ -66,7 +66,16 @@ async function runJob(db, center, job, { ai } = {}) {
   if (!sources.length || sources.length !== job.sourceIds.length) return fail("Some pages were deleted before the questions were made. Upload them again.");
   let files;
   try {
-    files = await Promise.all(sources.map(async (s) => ({ mime: s.mime, buffer: await readSource(s) })));
+    files = [];
+    let totalBytes = 0;
+    for (const source of sources) {
+      // Bound the whole job too: ten individually valid PDFs must not cause
+      // ten concurrent large downloads followed by another base64 allocation.
+      if (totalBytes + source.size > 30 * 1024 * 1024) throw new Error('Too many source bytes');
+      const buffer = await readSource(source);
+      totalBytes += buffer.length;
+      files.push({ mime: source.mime, buffer });
+    }
   } catch {
     return fail("Could not read the uploaded pages. Upload them again.");
   }

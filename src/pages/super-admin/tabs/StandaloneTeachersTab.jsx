@@ -1,0 +1,47 @@
+import { useEffect, useState, useCallback } from 'react';
+import { ArrowUpRight, BookOpen, CircleDollarSign, Eye, Mail, MessageSquare, Plus, Search, ShieldCheck, Users, X } from 'lucide-react';
+import TeacherCreditForm from './TeacherCreditForm';
+import StandaloneTeacherActivity from './StandaloneTeacherActivity';
+import StandaloneTeacherCharges from './StandaloneTeacherCharges';
+import './standaloneTeachers.css';
+
+export default function StandaloneTeachersTab({ apiBase, authHeaders }) {
+  const [items, setItems] = useState([]), [name, setName] = useState(''), [email, setEmail] = useState(''), [error, setError] = useState(''), [notice, setNotice] = useState(''), [busy, setBusy] = useState(false), [loading, setLoading] = useState(true);
+  const [selected, setSelected] = useState(null), [messages, setMessages] = useState([]), [message, setMessage] = useState('');
+  const [activity, setActivity] = useState(null), [chargeTeacher, setChargeTeacher] = useState(null), [inviteOpen, setInviteOpen] = useState(false), [search, setSearch] = useState(''), [status, setStatus] = useState('all');
+  const token = authHeaders.Authorization;
+  const call = useCallback(async (url, method = 'GET', body) => {
+    const r = await fetch(`${apiBase}/teacher-mode/admin${url}`, { method, headers: { Authorization: token, 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) });
+    const data = await r.json(); if (!r.ok) throw new Error(data.message || 'The request could not be completed.'); return data.data;
+  }, [apiBase, token]);
+  const refresh = useCallback(async () => { try { setItems(await call('/workspaces')); setError(''); } catch (e) { setError(e.message); } finally { setLoading(false); } }, [call]);
+  useEffect(() => { refresh(); }, [refresh]);
+  const run = async (fn, success) => { setBusy(true); setError(''); setNotice(''); try { await fn(); await refresh(); if (success) setNotice(success); } catch (e) { setError(e.message); } finally { setBusy(false); } };
+  const panel = { background: 'var(--sa-panel)', color: 'var(--sa-text)', border: '1px solid var(--sa-line)', borderRadius: 16, padding: 22, marginBottom: 20 };
+  const field = { background: 'var(--sa-panel)', color: 'var(--sa-text)', border: '1px solid var(--sa-line)', padding: 10, borderRadius: 8, width: '100%' };
+  const button = { padding: '9px 14px', borderRadius: 8, border: '1px solid var(--sa-line)', color: 'var(--sa-text)', background: 'var(--sa-panel)', cursor: 'pointer' };
+  const view = async w => {
+    const tab = window.open('about:blank', '_blank');
+    if (!tab) { setError('Allow pop-ups to open the teacher workspace.'); return; }
+    try {
+      const data = await call(`/workspaces/${w._id}/view`, 'POST');
+      const fragment = new URLSearchParams({ teacher_view_token: data.token, teacher_view_info: JSON.stringify(data.teacher) });
+      tab.location.replace(`${window.location.origin}/teacher-mode/dashboard#${fragment}`);
+    } catch (e) { tab.close(); setError(e.message); }
+  };
+  const openPanel = (type, w) => { setActivity(type === 'activity' ? w : null); setChargeTeacher(type === 'charges' ? w : null); setSelected(null); };
+  const filtered = items.filter(w => (status === 'all' || w.status === status) && `${w.name} ${w.email}`.toLowerCase().includes(search.toLowerCase().trim()));
+  const counts = { active: items.filter(w => w.status === 'active').length, invited: items.filter(w => w.status === 'invited').length, suspended: items.filter(w => w.status === 'suspended').length };
+  return <div className="sa-standalone">
+    <header className="sa-st-hero"><div><span className="sa-st-eyebrow">TEACHER MODE · PLATFORM MANAGEMENT</span><h2>Independent teachers</h2><p>Manage invitations, teacher workspaces and salary charges in one place.</p></div><button className="sa-st-primary" onClick={() => setInviteOpen(v => !v)}>{inviteOpen ? <X size={16} /> : <Plus size={16} />}{inviteOpen ? 'Close invitation' : 'Invite a teacher'}</button></header>
+    <div className="sa-st-metrics"><div><span><Users size={16} /> Total teachers</span><strong>{items.length}</strong><small>Independent workspaces</small></div><div><span><ShieldCheck size={16} /> Active</span><strong>{counts.active}</strong><small>Teachers with access</small></div><div><span><Mail size={16} /> Invited</span><strong>{counts.invited}</strong><small>Awaiting setup</small></div><div><span><BookOpen size={16} /> Suspended</span><strong>{counts.suspended}</strong><small>Access paused</small></div></div>
+    {error && <p className="sa-st-alert" role="alert">{error}</p>}{notice && <p className="sa-st-notice" role="status">{notice}</p>}
+    {inviteOpen && <form className="sa-st-invite" onSubmit={e => { e.preventDefault(); run(async () => { await call('/workspaces', 'POST', { name, email }); setName(''); setEmail(''); setInviteOpen(false); }, 'Invitation sent.'); }}><div><h3>Invite a teacher</h3><p>They will receive a private account setup link by email.</p></div><label>Teacher name<input required maxLength={120} value={name} onChange={e => setName(e.target.value)} placeholder="Full name" /></label><label>Email address<input type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="teacher@example.com" /></label><button className="sa-st-primary" disabled={busy}>Send invitation <ArrowUpRight size={15} /></button></form>}
+    <section className="sa-st-directory"><div className="sa-st-directory-head"><div><span className="sa-st-eyebrow">YOUR DIRECTORY</span><h3>Teacher workspaces <span>{filtered.length}</span></h3><p>Choose a teacher to view activity or manage their settings.</p></div><div className="sa-st-filters"><label className="sa-st-search"><Search size={16} /><span className="sa-st-sr">Search teachers</span><input placeholder="Search teachers" value={search} onChange={e => setSearch(e.target.value)} /></label><label><span className="sa-st-sr">Filter by status</span><select value={status} onChange={e => setStatus(e.target.value)}><option value="all">All statuses</option><option value="active">Active</option><option value="invited">Invited</option><option value="suspended">Suspended</option></select></label></div></div>
+      {loading ? <p role="status" className="sa-st-empty">Loading teachers…</p> : !filtered.length ? <p className="sa-st-empty">{items.length ? 'No teachers match these filters.' : 'No standalone teachers yet. Send an invitation to get started.'}</p> : <div className="sa-st-list">{filtered.map(w => <article className="sa-st-row" key={w._id}><div className="sa-st-person"><span className="sa-st-avatar">{w.name?.trim().charAt(0).toUpperCase() || 'T'}</span><div><h4>{w.name}</h4><p>{w.email}</p></div></div><span className={`sa-st-status sa-st-status-${w.status}`}>{w.status}</span><div className="sa-st-actions">{!w.ownerId ? <><button disabled={busy} onClick={() => run(() => call(`/workspaces/${w._id}/resend`, 'POST', {}), 'Invitation sent.')}>Resend invite</button>{w.status === 'invited' && <button disabled={busy} onClick={() => run(() => call(`/workspaces/${w._id}/revoke-invite`, 'POST', {}), 'Invitation cancelled.')}>Cancel invite</button>}</> : <><button disabled={busy || w.status !== 'active'} onClick={() => view(w)}><Eye size={14} /> View workspace</button><button onClick={() => openPanel('activity', w)}><BookOpen size={14} /> Activity</button><button onClick={() => openPanel('charges', w)}><CircleDollarSign size={14} /> Charges</button><button onClick={() => run(async () => { const rows = await call(`/workspaces/${w._id}/messages`); setActivity(null); setChargeTeacher(null); setSelected(w); setMessages(rows); })}><MessageSquare size={14} /> Messages</button><button disabled={busy} onClick={() => run(() => call(`/workspaces/${w._id}`, 'PATCH', { status: w.status === 'active' ? 'suspended' : 'active' }), w.status === 'active' ? 'Teacher access suspended.' : 'Teacher access reactivated.')}>{w.status === 'active' ? 'Suspend' : 'Reactivate'}</button></>}</div></article>)}</div>}</section>
+    {chargeTeacher && <StandaloneTeacherCharges key={chargeTeacher._id} teacher={chargeTeacher} call={call} onClose={() => setChargeTeacher(null)} panel={panel} field={field} button={button} />}
+    {activity && <StandaloneTeacherActivity key={activity._id} teacher={activity} call={call} onClose={() => setActivity(null)} panel={panel} button={button} />}
+    {selected && <section style={panel}><div className="sa-st-panel-head"><div><span className="sa-st-eyebrow">PRIVATE CONVERSATION</span><h3>Messages with {selected.name}</h3></div><button style={button} onClick={() => setSelected(null)}>Close</button></div><div className="sa-st-messages">{messages.length ? messages.slice().reverse().map(m => <div className="sa-st-message" key={m._id}><small>{m.sender === 'teacher' ? selected.name : 'Super Admin'} · {new Date(m.createdAt).toLocaleString()}</small><p>{m.text}</p></div>) : <p>No messages yet.</p>}</div><form onSubmit={e => { e.preventDefault(); run(async () => { await call(`/workspaces/${selected._id}/messages`, 'POST', { text: message }); setMessage(''); setMessages(await call(`/workspaces/${selected._id}/messages`)); }); }}><label>Your message<textarea style={field} required maxLength={3000} value={message} onChange={e => setMessage(e.target.value)} /></label><button disabled={busy} style={button}>Send message</button></form></section>}
+    <details className="sa-st-credits"><summary>Manage AI credits</summary><TeacherCreditForm items={items} call={call} refresh={refresh} /></details>
+  </div>;
+}

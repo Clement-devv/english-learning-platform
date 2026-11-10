@@ -1,4 +1,5 @@
 import axios from "axios";
+import { teacherModeKey } from './utils/teacherMode';
 import { decodeJwtPayload } from "./utils/jwt";
 import { getCachedCenter } from "./utils/branding";
 import { getAnalyticsUnlock, needsAnalyticsUnlock, ANALYTICS_UNLOCK_HEADER } from "./utils/analyticsPin";
@@ -38,6 +39,11 @@ const SESSIONS = [
 
 // Detect which role is currently logged in and return all relevant keys.
 function getActiveSession() {
+  if (teacherModeKey()) {
+    const teacher = { ...SESSIONS.find(s => s.role === 'teacher'), loginPath: '/teacher-mode/login' };
+    try { if (JSON.parse(sessionStorage.getItem('teacherInfo') || '{}').inspection) return { ...teacher, sessionKey: null }; } catch { /* use the normal session */ }
+    return teacher;
+  }
   return SESSIONS.find(s => sessionStorage.getItem(s.infoKey) && getToken(s.tokenKey))
       || SESSIONS.find(s => getToken(s.tokenKey)) // fallback: whichever token exists
       || null;
@@ -68,6 +74,14 @@ function resolveCenterSlug() {
 // reactive-only approach produced.
 api.interceptors.request.use(
   async (config) => {
+    const publicWorkspace = new URLSearchParams(window.location.search).get('workspace');
+    if (publicWorkspace && /^tw-[a-f\d]{24}$/.test(publicWorkspace)) {
+      config.params = { ...config.params, workspace: publicWorkspace };
+    } else if (teacherModeKey()) {
+      config.baseURL = `${BASE_URL}/teacher-mode/app`;
+      const managedCenterId = sessionStorage.getItem('teacherModeCenter');
+      if (managedCenterId) config.params = { ...config.params, managedCenterId };
+    }
     if (!config.headers.Authorization) {
       const session = getActiveSession();
       if (session) {
@@ -170,7 +184,7 @@ async function attemptRefresh(session) {
 
   try {
     const response = await axios.post(
-      `${BASE_URL}/auth/refresh`,
+      `${BASE_URL}${teacherModeKey() ? '/teacher-mode/app' : ''}/auth/refresh`,
       { sessionToken, expiredToken, deviceProof },
       { headers }
     );

@@ -44,11 +44,12 @@ export default function ReviewsTab({ teacherInfo, isDarkMode }) {
   const muted = isDarkMode ? "var(--as-muted, #94a3b8)" : "var(--as-ink-2, #64748b)";
 
   async function load(quiet = false) {
-    if (!teacherInfo?._id) return;
+    const teacherId = teacherInfo?._id || teacherInfo?.id;
+    if (!teacherId) return;
     if (!quiet) setLoading(true);
     try {
       // One page; the star filter is applied on the server, stats cover everything
-      const res = await api.get(`/reviews/teacher/${teacherInfo._id}`, { params: { page, limit: 10, rating: filter || undefined } });
+      const res = await api.get(`/reviews/teacher/${teacherId}`, { params: { page, limit: 10, rating: filter || undefined } });
       setData(res.data);
       if (res.data.pagination && res.data.pagination.page !== page) setPage(res.data.pagination.page);
     } catch (e) {
@@ -58,7 +59,7 @@ export default function ReviewsTab({ teacherInfo, isDarkMode }) {
     }
   }
 
-  useEffect(() => { load(); }, [teacherInfo?._id, page, filter]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); }, [teacherInfo?._id, teacherInfo?.id, page, filter]); // eslint-disable-line react-hooks/exhaustive-deps
   useOnDataChanged(["reviews"], () => load(true)); // live: a student leaves a review
   useEffect(() => { setPage(1); }, [filter]);
 
