@@ -4,16 +4,20 @@
 import { VISIBLE_SOLDIERS, FORMATION_STEP, ROAD_HALF } from './config.js';
 
 const GOLDEN = 2.39996323;
+const formations = new Map();
 
 export function formation(count) {
   const n = Math.max(0, Math.min(VISIBLE_SOLDIERS, count));
+  if (formations.has(n)) return formations.get(n);
   const out = [];
   for (let i = 0; i < n; i++) {
     const r = FORMATION_STEP * Math.sqrt(i + 0.5);
     const a = i * GOLDEN;
-    out.push({ dx: r * Math.cos(a), dz: r * Math.sin(a) * 0.55 });
+    out.push(Object.freeze({ dx: r * Math.cos(a), dz: r * Math.sin(a) * 0.55 }));
   }
-  return out;
+  const result = Object.freeze(out);
+  formations.set(n, result);
+  return result;
 }
 
 /** Half-width of the squad on the road */

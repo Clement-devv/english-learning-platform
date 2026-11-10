@@ -134,6 +134,8 @@ export default function WordSquadPage({ exitTo = '/student/dashboard', demo = fa
   const offline = demo || testing;
   const hostRef = useRef(null);
   const gameRef = useRef(null);
+  const runId = useRef(0);
+  const runTimers = useRef(new Set());
   const flashTimer = useRef(null);
   const [screen, setScreen] = useState('menu'); // menu | loading | playing | ended
   const [chapter, setChapter] = useState(0);
@@ -196,6 +198,9 @@ export default function WordSquadPage({ exitTo = '/student/dashboard', demo = fa
   }, [testSetId]);
 
   const stopGame = useCallback(() => {
+    runId.current++;
+    for (const timer of runTimers.current) clearTimeout(timer);
+    runTimers.current.clear();
     clearTimeout(flashTimer.current);
     clearTimeout(spellTimer.current);
     gameRef.current?.destroy();
@@ -214,6 +219,8 @@ export default function WordSquadPage({ exitTo = '/student/dashboard', demo = fa
 
   const start = useCallback(async (ch) => {
     stopGame();
+    const id = runId.current;
+    const current = () => runId.current === id;
     unlockAudio();
     setChapter(ch);
     setScreen('loading');
@@ -227,17 +234,21 @@ export default function WordSquadPage({ exitTo = '/student/dashboard', demo = fa
     setError('');
     try {
       const { startGame } = await import('./engine.js');
+      if (!current()) return;
       let session;
       try {
         session = offline ? createDemoSession(ch, undefined, testing && testSet ? testSet.questions : undefined) : await createServerSession(assignment.id, ch, link);
       } catch (err) {
+        if (!current()) return;
         setError(apiMessage(err, 'Could not start the game. Check your connection and try again.'));
         setScreen('menu');
         return;
       }
+      if (!current()) return;
       sessionRef.current = session;
       // wait a frame so the host has its size
       await new Promise((r) => requestAnimationFrame(r));
+      if (!current() || !hostRef.current) return;
       const game = await startGame({
         host: hostRef.current,
         chapter: ch,
@@ -256,7 +267,11 @@ export default function WordSquadPage({ exitTo = '/student/dashboard', demo = fa
           },
           power: (kind, secs) => {
             setPowers((p) => ({ ...p, [kind]: Date.now() + secs * 1000 }));
-            setTimeout(() => setPowers((p) => { const n = { ...p }; if (n[kind] <= Date.now() + 50) delete n[kind]; return n; }), secs * 1000);
+            const timer = setTimeout(() => {
+              runTimers.current.delete(timer);
+              if (current()) setPowers((p) => { const n = { ...p }; if (n[kind] <= Date.now() + 50) delete n[kind]; return n; });
+            }, secs * 1000);
+            runTimers.current.add(timer);
           },
           down: (q) => setRevive({ q, picked: null, result: null }),
           result: (ev) => {
@@ -272,12 +287,14 @@ export default function WordSquadPage({ exitTo = '/student/dashboard', demo = fa
               // The server checked every answer: its right/total, stars and rating are the real ones
               try {
                 const d = await session.finish(s);
+                if (!current()) return;
                 setSummary({ ...s, right: d.right, total: d.total, review: d.review, stars: d.stars, rating: d.rating, countsForStars: d.countsForStars, totalStars: d.totalStars });
                 setTotalStars(d.totalStars);
                 setUnlocked(d.progress.unlocked);
                 setRatings(ratingsObj(d.progress.ratings));
                 setGames((list) => list && list.map((a) => (a.id === assignment.id ? { ...a, progress: { ...a.progress, ...d.progress }, playsToday: a.playsToday + (d.countsForStars ? 1 : 0) } : a)));
               } catch (err) {
+                if (!current()) return;
                 setSummary({ ...s, stars: { base: 0, bonus: 0, boss: 0, total: 0 }, rating: chapterRating(s), saveError: apiMessage(err, 'Your stars could not be saved. Check your connection.') });
               }
               setScreen('ended');
@@ -298,9 +315,11 @@ export default function WordSquadPage({ exitTo = '/student/dashboard', demo = fa
           },
         },
       });
+      if (!current()) { game.destroy(); return; }
       gameRef.current = game;
       setScreen('playing');
     } catch (err) {
+      if (!current()) return;
       console.error('Word Squad failed to start', err);
       setError('The game could not start on this device. Please try again or use another browser.');
       setScreen('menu');
@@ -308,16 +327,21 @@ export default function WordSquadPage({ exitTo = '/student/dashboard', demo = fa
   }, [stopGame, offline, assignment, testing, testSet, link]);
 
   const answerRevive = async (choice) => {
+    const id = runId.current;
     const session = sessionRef.current;
     if (!revive || revive.picked || !session) return;
     setRevive((r) => ({ ...r, picked: choice }));
     let result;
     try { result = await session.answer(revive.q.gateId, choice); } catch { result = { correct: false, correctAnswer: null }; }
+    if (id !== runId.current) return;
     setRevive((r) => r && { ...r, result });
-    setTimeout(() => {
+    const timer = setTimeout(() => {
+      runTimers.current.delete(timer);
+      if (id !== runId.current) return;
       setRevive(null);
       gameRef.current?.revive(!!result?.correct);
     }, result?.correct ? 1100 : 1900);
+    runTimers.current.add(timer);
   };
 
   const togglePause = () => {

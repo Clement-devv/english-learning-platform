@@ -4,7 +4,7 @@
 // to the React page for the question strip and the end screen.
 // Loaded with import() so PixiJS stays out of the main bundle.
 import { createWorld } from './logic/world.js';
-import { screenDxToWorld, LOGICAL_H, PORTRAIT_W } from './logic/projection.js';
+import { screenDxToWorld, LOGICAL_H } from './logic/projection.js';
 import { laneIndex } from './logic/squad.js';
 import { rewardLabel } from './logic/rewards.js';
 import { createRenderer } from './render/renderer.js';
@@ -42,6 +42,7 @@ export async function startGame({ host, chapter, session, on = {} }) {
     return 1 / scale;
   };
   const onDown = (e) => {
+    if (paused || destroyed || finished) return;
     unlockAudio();
     drag = { id: e.pointerId, x: e.clientX, from: world.squad.targetX };
     host.setPointerCapture?.(e.pointerId);
@@ -52,6 +53,7 @@ export async function startGame({ host, chapter, session, on = {} }) {
   };
   const onUp = (e) => { if (drag && e.pointerId === drag.id) drag = null; };
   const onKey = (down) => (e) => {
+    if (paused || destroyed || finished || e.target?.closest?.('input, textarea, select, [contenteditable="true"]')) return;
     const k = e.key.toLowerCase();
     if (k === 'arrowleft' || k === 'a') { keys.left = down; targetX = null; e.preventDefault(); }
     if (k === 'arrowright' || k === 'd') { keys.right = down; targetX = null; e.preventDefault(); }
@@ -71,6 +73,7 @@ export async function startGame({ host, chapter, session, on = {} }) {
   // ── Loop ───────────────────────────────────────────────────────────────────
   let paused = false;
   let ended = false;
+  let destroyed = false, finished = false, endDelay = null;
   let raf = 0;
   let lastT = performance.now();
   let acc = 0;
@@ -84,10 +87,10 @@ export async function startGame({ host, chapter, session, on = {} }) {
   let fpsFrames = 0, fpsTime = 0, warm = 2.5;
 
   function frame(now) {
+    if (destroyed || paused || finished) return;
     raf = requestAnimationFrame(frame);
     const real = Math.min(0.1, (now - lastT) / 1000);
     lastT = now;
-    if (paused) return;
 
     const scale = fx.timeScale(real);
     acc += real * scale;
@@ -143,8 +146,16 @@ export async function startGame({ host, chapter, session, on = {} }) {
 
     if (ended) {
       ended = false;
-      // let the victory / defeat effects play for a moment before the end screen
-      setTimeout(() => on.end?.(world.summary(), fx.stars), world.phase === 'won' ? 1600 : 1200);
+      // Count active time only; pausing or quitting must not deliver a stale result.
+      endDelay = world.phase === 'won' ? 1.6 : 1.2;
+    } else if (endDelay !== null) {
+      endDelay -= real;
+      if (endDelay <= 0) {
+        finished = true;
+        cancelAnimationFrame(raf);
+        suspendAudio();
+        on.end?.(world.summary(), fx.stars);
+      }
     }
   }
   raf = requestAnimationFrame(frame);
@@ -165,15 +176,22 @@ export async function startGame({ host, chapter, session, on = {} }) {
   return {
     world,
     setPaused(p) {
-      if (paused === p) return;
+      if (destroyed || finished || paused === p) return;
       paused = p;
       lastT = performance.now();
-      if (p) suspendAudio(); else resumeAudio();
+      acc = 0;
+      keys.left = keys.right = false;
+      drag = null; targetX = null;
+      world.squad.targetX = world.squad.x;
+      if (p) { cancelAnimationFrame(raf); suspendAudio(); }
+      else { resumeAudio(); raf = requestAnimationFrame(frame); }
     },
     get paused() { return paused; },
     /** Answer of the bonus question after the squad was wiped out */
     revive(ok) { world.revive(ok); },
     destroy() {
+      if (destroyed) return;
+      destroyed = true;
       cancelAnimationFrame(raf);
       ro.disconnect();
       host.removeEventListener('pointerdown', onDown);
@@ -184,6 +202,7 @@ export async function startGame({ host, chapter, session, on = {} }) {
       window.removeEventListener('keyup', keyUp);
       fx.destroy();
       R.destroy();
+      if (import.meta.env.DEV && window.__wordSquad?.world === world) delete window.__wordSquad;
     },
   };
 }
