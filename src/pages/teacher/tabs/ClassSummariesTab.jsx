@@ -1,3 +1,4 @@
+import SummaryPreview from '../../teacher-mode/SummaryPreview';
 // src/pages/teacher/tabs/ClassSummariesTab.jsx
 // After each completed class the teacher writes a short summary of what happened.
 // Students see it in "Class reports", parents in their portal, and admins can
@@ -195,9 +196,7 @@ export default function ClassSummariesTab({ isDarkMode, studio = false }) {
                 </div>
               </div>
               {cls.summary && (
-                <p style={{ margin: "10px 0 0", padding: "10px 12px", borderRadius: 10, background: c.soft, color: c.body, fontSize: 13.5, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>
-                  {cls.summary}
-                </p>
+                <div style={{ margin: "10px 0 0", padding: "10px 12px", borderRadius: 10, background: c.soft, color: c.body, fontSize: 13.5, lineHeight: 1.6 }}><SummaryPreview text={cls.summary} /></div>
               )}
             </div>
           ))}

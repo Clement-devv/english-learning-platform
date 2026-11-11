@@ -55,6 +55,35 @@ beforeAll(async () => { teacher = await invite('solo1@test.com'); other = await 
 afterAll(async () => { for (const db of Object.values(global.__TEST_DB__?.relatedDbs || {})) await db.dropDatabase() })
 
 describe('Teacher Mode boundaries and invitations', () => {
+  it('separates both class outcomes by center for individual and group lessons', async () => {
+    const teacherId = jwt.decode(teacher.token).id;
+    const db = global.__TEST_DB__.useDb(jwt.decode(teacher.token).centerId, { useCache: true });
+    const a = (await call(teacher, 'post', '/managed-centers').send({ name: 'History A', currency: 'USD', payBasis: 'class', rateMinor: 1000 })).body.data;
+    const b = (await call(teacher, 'post', '/managed-centers').send({ name: 'History B', currency: 'USD', payBasis: 'hour', rateMinor: 3000 })).body.data;
+    for (const c of [a,b]) for (const status of ['completed','missed']) {
+      const base = { teacherId: new mongoose.Types.ObjectId(teacherId), managedCenterId: new mongoose.Types.ObjectId(c._id), scheduledTime: new Date('2026-01-05T10:00:00Z'), duration: 45, status };
+      await db.collection('bookings').insertOne({ ...base, classTitle: 'Center history isolation' });
+      await db.collection('groupclasses').insertOne({ ...base, title: 'Center history isolation group', enrollments: [] });
+    }
+    for (const c of [a,b]) for (const view of ['completed','not_completed']) {
+      const r = await call(teacher, 'get', `/bookings/teacher/${teacherId}/history`).query({ managedCenterId: c._id, view, q: 'Center history isolation' });
+      expect(r.status).toBe(200);
+      expect(r.body.classes).toHaveLength(2);
+      expect(r.body.classes.every(row => row.managedCenterId === c._id)).toBe(true);
+      expect(r.body.classes.every(row => row.officiallyCompleted === (view === 'completed'))).toBe(true);
+    }
+  })
+  it('protects date-filtered statements and returns a downloadable PDF', async () => {
+    expect((await request(app).get(root + '/app/earnings/statement').query({ from: '2026-01-01', to: '2026-01-31' })).status).toBe(401)
+    expect((await call(teacher, 'get', '/earnings/statement').query({ from: '2026-02-30', to: '2026-03-01' })).status).toBe(400)
+    const response = await call(teacher, 'get', '/earnings/statement').query({ from: '2026-01-01', to: '2026-01-31' })
+    expect(response.status).toBe(200)
+    expect(response.body.data.entries).toEqual([])
+    const pdf = await call(teacher, 'get', '/earnings/statement.pdf').query({ from: '2026-01-01', to: '2026-01-31' })
+    expect(pdf.status).toBe(200)
+    expect(pdf.headers['content-type']).toContain('application/pdf')
+    expect(pdf.headers['cache-control']).toBe('private, no-store')
+  })
   it('requires Super Admin to invite and consumes invitations once', async () => {
     expect((await request(app).post(root + '/admin/workspaces').send({ name: 'X', email: 'x@test.com' })).status).toBe(403)
     expect((await request(app).post(`${root}/setup/${teacher.invite}`).send({ password: 'Teacher@99999', acceptTerms: true })).status).toBe(400)
@@ -141,6 +170,7 @@ describe('private parent learning pages', () => {
     const db = global.__TEST_DB__.useDb(jwt.decode(teacher.token).centerId, { useCache: true })
     const Work = db.models.TeacherWork
     const created = await Work.create(['Older', 'Newer', 'Hidden'].map((title, i) => ({ centerId: center._id, studentId: student, bookingId: new mongoose.Types.ObjectId(), title, published: i !== 2 })))
+    await db.collection('bookings').insertMany(created.map(w => ({ _id: w.bookingId, studentId: new mongoose.Types.ObjectId(student), teacherId: new mongoose.Types.ObjectId(jwt.decode(teacher.token).id), status: 'completed', classTitle: w.title, scheduledTime: new Date(), duration: 30 })))
     const first = await request(app).get(`${familyUrl}/work?page=1`).set('x-share-access', access)
     const next = await request(app).get(`${familyUrl}/work?page=2`).set('x-share-access', access)
     expect(first.status).toBe(200); expect(first.body.data.items).toHaveLength(2); expect(first.body.data.hasMore).toBe(true)
@@ -207,9 +237,9 @@ describe('private parent learning pages', () => {
     const saved = await Link.create(link)
     await db.models.Booking.updateOne({ _id: classId }, { $set: { status: 'missed' } })
     const schedule = await request(app).get(`${familyUrl}/schedule`).set('x-share-access', access)
-    expect(schedule.body.data.classes.find(c => c.id === classId)).toMatchObject({ status: 'missed', hasReview: true, hasRecordings: true })
+    expect(schedule.body.data.classes.find(c => c.id === classId)).toMatchObject({ status: 'missed', hasReview: false, hasRecordings: true })
     const materials = await request(app).get(`${familyUrl}/schedule/${classId}/materials?group=false`).set('x-share-access', access)
-    expect(materials.body.data.review).toContain('greetings')
+    expect(materials.body.data.review).toBe('')
     expect(materials.body.data.recordings[0].url).toContain('/rv/')
     await Link.updateOne({ _id: saved._id }, { $set: { enabled: false } })
     expect((await request(app).get(`${familyUrl}/schedule/${classId}/materials?group=false`).set('x-share-access', access)).body.data.recordings).toHaveLength(0)
@@ -444,7 +474,7 @@ describe('private parent learning pages', () => {
     expect((await call(teacher, 'get', '/bookings/teacher/' + teacherId + '/history?managedCenterId=' + secondCenter._id)).body.classes.some(c => c.id === id)).toBe(false)
     expect((await call(teacher, 'put', '/class-summaries/' + id).send({ text: 'Reading with confidence.' })).status).toBe(200)
     const work = (await call(teacher, 'get', '/work')).body.data.find(c => c._id === id)
-    expect(work.update).toMatchObject({ summary: 'Reading with confidence.', published: false })
+    expect(work.update).toMatchObject({ summary: 'Reading with confidence.', published: true })
     expect((await call(teacher, 'get', '/class-summaries/teacher?view=written')).body.classes.some(c => c.id === id)).toBe(true)
     expect((await call(teacher, 'get', '/class-summaries/teacher?view=written&managedCenterId=' + secondCenter._id)).body.classes.some(c => c.id === id)).toBe(false)
     const w = (await admin('get', '/admin/workspaces')).body.data.find(w => w.email === 'solo1@test.com')

@@ -255,6 +255,9 @@
 }
 .tm-auth-form input:not([type="checkbox"]) { background: #ffffffa8; border-color: #ffffffd9; box-shadow: inset 0 1px 3px #66776020, 0 1px 0 #fff8; }
 .tm-auth-form input:focus-visible { outline: 2px solid #526a4d; outline-offset: 2px; }
+.tm-auth-form .tm-password-field { position: relative; margin-bottom: 12px; }
+.tm-auth-form .tm-password-field input { width: 100%; padding-right: 52px; margin-bottom: 0; }
+.tm-auth-form .tm-password-field button { position: absolute; right: 3px; top: 50%; transform: translateY(-50%); display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 0; background: transparent; color: #526a4d; box-shadow: none; }
 @media (prefers-reduced-transparency: reduce) { .tm-auth-form { background: #f8f9f1; backdrop-filter: none; -webkit-backdrop-filter: none; } }
 
 /* Liquid-glass surfaces throughout the teacher studio dashboard. */

@@ -275,7 +275,7 @@ router.put("/group/:groupClassId", verifyToken, async (req, res) => {
     await GroupClass.findOneAndUpdate({ _id: g._id }, text
       ? { $set: { classSummary: { text, updatedAt: new Date(), by: oid(req.user.id) } } }
       : { $unset: { classSummary: 1 } });
-    if (req.teacherWorkspace) await teacherModeModels(req.db).TeacherWork.updateMany({ bookingId: g._id }, { $set: { summary: text } });
+    if (req.teacherWorkspace) await teacherModeModels(req.db).TeacherWork.updateMany({ bookingId: g._id }, { $set: { summary: text, published: !!text } });
     res.json({ success: true, summary: text, message: text ? "Summary saved" : "Summary removed" });
   } catch (err) {
     logger.error("Save group class summary error:", { error: err?.message });
@@ -306,7 +306,7 @@ router.put("/:bookingId", verifyToken, async (req, res) => {
     const r = await Booking.updateMany(group, update);
     if (req.teacherWorkspace) {
       const ids = await Booking.distinct("_id", group);
-      await teacherModeModels(req.db).TeacherWork.updateMany({ bookingId: { $in: ids } }, { $set: { summary: text } });
+      await teacherModeModels(req.db).TeacherWork.updateMany({ bookingId: { $in: ids } }, { $set: { summary: text, published: !!text } });
     }
     res.json({ success: true, updated: r.modifiedCount, summary: text, message: text ? "Summary saved" : "Summary removed" });
   } catch (err) {

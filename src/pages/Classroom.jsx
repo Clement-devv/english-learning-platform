@@ -1,3 +1,4 @@
+import { classroomDashboardPath } from '../utils/teacherMode';
 // Classroom.jsx — Platform selector / router
 //
 // Responsibilities:
@@ -201,7 +202,7 @@ export default function Classroom({ classData, userRole: propUserRole, onLeave, 
           <h2 className="text-2xl font-bold text-red-500 mb-2">Cannot Load Classroom</h2>
           <p className={`mb-6 ${dm ? "text-gray-300" : "text-gray-600"}`}>No booking ID found. Please join from your dashboard.</p>
           <button
-            onClick={() => navigate(userRole === "teacher" ? "/teacher/dashboard" : "/student/dashboard")}
+            onClick={() => navigate(classroomDashboardPath(userRole))}
             className="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-full font-bold transition-all"
           >
             Go Back
@@ -441,7 +442,7 @@ export default function Classroom({ classData, userRole: propUserRole, onLeave, 
           <p className={`text-center text-xs mt-6 ${dm ? "text-gray-500" : "text-gray-400"}`}>
             Google Meet and Zoom use your personal subscriptions. Agora is built into the platform.{" "}
             <button
-              onClick={() => navigate("/teacher/dashboard", { state: { activeTab: "profile" } })}
+              onClick={() => navigate(classroomDashboardPath("teacher"), { state: { activeTab: "profile" } })}
               className={`underline underline-offset-2 transition-colors ${dm ? "text-gray-400 hover:text-gray-200" : "text-gray-500 hover:text-gray-700"}`}
             >
               Manage links in Profile

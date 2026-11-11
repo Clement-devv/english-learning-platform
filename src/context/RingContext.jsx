@@ -6,6 +6,7 @@ import { createContext, useContext, useEffect, useRef, useState, useCallback } f
 import { io } from "socket.io-client";
 import { useAuth } from "./AuthContext.jsx";
 import { detectActiveRole, getStoredToken } from "../utils/authStorage.js";
+import { decodeJwtPayload } from "../utils/jwt";
 import api, { refreshToken, tokenExpiresSoon } from "../api.js";
 import { getRingtoneById, DEFAULT_RINGTONE_ID, CUSTOM_RINGTONE_ID, makeCustomRingtone } from "../components/ring/ringtones.js";
 import { loadCustomTone, warmCustomTone } from "../components/ring/ringStorage.js";
@@ -33,8 +34,10 @@ const toMs = (d) => (d ? new Date(d).getTime() || 0 : 0);
 const CENTER_ROLES = new Set(["admin", "sub-admin", "teacher", "student", "parent"]);
 
 /** The signed-in center role (auth state first, storage as the HMR/first-paint fallback). */
-function ringRole(authRole) {
+function ringRole(authRole, authToken) {
   const role = authRole || detectActiveRole();
+  // Standalone teachers use workspace conversations, not center ring/chat APIs.
+  if (role === 'teacher' && decodeJwtPayload(getStoredToken(role) || authToken)?.realm === 'teacher-mode') return null;
   return CENTER_ROLES.has(role) ? role : null;
 }
 
@@ -96,7 +99,7 @@ export function RingProvider({ children }) {
   // the next login starts from a clean slate so the fresh /ring/missed-calls
   // fetch is what populates the dashboard banner.
   useEffect(() => {
-    if (authRole && authToken) return; // still signed in — nothing to reset
+    if (ringRole(authRole, authToken) && authToken) return;
     ringtoneRef.current?.stop();
     ringtoneRef.current = null;
     setIncoming(null);
@@ -136,7 +139,7 @@ export function RingProvider({ children }) {
   // survives logout, refresh, and cross-device sessions. Only calls newer than
   // this person's server-side "calls seen" marker count as new.
   useEffect(() => {
-    const role  = ringRole(authRole);
+    const role  = ringRole(authRole, authToken);
     const token = getSocketToken(role) || (role ? authToken : null);
     if (!token || !role) return; // not authenticated yet
 
@@ -165,7 +168,7 @@ export function RingProvider({ children }) {
   // whose last-message timestamp is newer than the person's "messages seen"
   // marker. Called once on login and then again on every new-message event.
   const refreshUnreadMessages = useCallback(async () => {
-    const role = ringRole(authRole);
+    const role = ringRole(authRole, authToken);
     if (!role) return;
     const unreadKey = role === "sub-admin" ? "subAdmin" : role;
     await loadSeen();
@@ -195,11 +198,11 @@ export function RingProvider({ children }) {
       // A dismissal may have happened while this request was in flight
       setUnreadMessageCount(seenRef.current.messages > lastSeen ? 0 : total);
     } catch { /* fail silently — banner just stays at 0 */ }
-  }, [authRole, loadSeen]);
+  }, [authRole, authToken, loadSeen]);
 
   // Initial fetch + refetch on auth change
   useEffect(() => {
-    const role  = ringRole(authRole);
+    const role  = ringRole(authRole, authToken);
     const token = getSocketToken(role) || (role ? authToken : null);
     if (!token || !role) return;
     refreshUnreadMessages();
@@ -207,7 +210,7 @@ export function RingProvider({ children }) {
 
   useEffect(() => {
     // Prefer sessionStorage token — it may be fresher than authToken after a silent refresh
-    const role  = ringRole(authRole);
+    const role  = ringRole(authRole, authToken);
     const token = getSocketToken(role) || (role ? authToken : null);
 
     if (!token || !role) {
@@ -467,6 +470,7 @@ export function RingProvider({ children }) {
   const missedCallsRef = useRef(missedCalls);
   useEffect(() => { missedCallsRef.current = missedCalls; }, [missedCalls]);
   const clearMissedCalls    = useCallback(() => {
+    if (!ringRole(authRole, authToken)) return;
     // Locally: hide everything we have now, even if this clock is behind the server's
     const newest = Math.max(0, ...missedCallsRef.current.map(c => c.at || 0));
     seenRef.current = { ...seenRef.current, calls: Math.max(seenRef.current.calls, Date.now(), newest), loaded: true };
@@ -477,7 +481,7 @@ export function RingProvider({ children }) {
         if (at) seenRef.current = { ...seenRef.current, calls: Math.max(at, newest) };
       })
       .catch(() => {});
-  }, []);
+  }, [authRole, authToken]);
   const missedCallCount     = missedCalls.length;
   // Dismiss the unread-messages dashboard banner.  The actual per-chat unread
   // counts on the server are NOT touched (those reset when the user opens an
@@ -486,6 +490,7 @@ export function RingProvider({ children }) {
   // Called often while the Messages tab is open, so the save is debounced.
   const seenPostTimerRef = useRef(null);
   const markMessagesSeen    = useCallback(() => {
+    if (!ringRole(authRole, authToken)) return;
     seenRef.current = {
       ...seenRef.current,
       messages: Math.max(seenRef.current.messages, Date.now(), latestMsgTsRef.current),
@@ -502,7 +507,8 @@ export function RingProvider({ children }) {
         })
         .catch(() => {});
     }, 1500);
-  }, []);
+  }, [authRole, authToken]);
+  useEffect(() => () => clearTimeout(seenPostTimerRef.current), [authRole, authToken]);
   const consumeLastChatEvent = useCallback(() => setLastChatEvent(null), []);
 
   // ── Chat room + typing helpers ────────────────────────────────────────────

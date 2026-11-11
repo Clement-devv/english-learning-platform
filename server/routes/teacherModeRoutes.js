@@ -60,7 +60,9 @@ import classHistoryRoutes from './classHistoryRoutes.js';
 import reviewRoutes from './reviewRoutes.js';
 import { reviewSchema } from '../schemas/reviewSchema.js';
 import { standaloneGroupReviewSchema } from '../schemas/standaloneGroupReviewSchema.js';
-import { completeStandaloneLesson } from '../services/standaloneLessonService.js';
+import { completeStandaloneLesson, uncompleteStandaloneLesson, sweepUnattendedStandaloneLessons } from '../services/standaloneLessonService.js';
+import { buildStandaloneStatement, monthlyCharges } from '../services/standaloneStatement.js';
+import { renderStandaloneStatementPdf } from '../utils/standaloneStatementPdf.js';
 import twoFactorRoutes from './twoFactorRoutes.js';
 import pushRoutes from './pushRoutes.js';
 import agoraUsageRoutes from './agoraUsageRoutes.js';
@@ -356,7 +358,7 @@ publicFamily.get('/schedule', handle(async (req, res) => {
     model(req.db, 'StandaloneGroupReview', standaloneGroupReviewSchema).find({ studentId, teacherId: req.teacherWorkspace.ownerId, groupClassId: { $in: ids } }).select('groupClassId rating comment').lean(),
   ]);
   const activeLinks = (await Promise.all(sharedLinks.map(async link => { const expiry = await recordingLinkExpiry(req.db, link); return expiry && expiry > new Date() ? link : null; }))).filter(Boolean);
-  result(res, { classes: pageClasses.map(c => { const ownReview = (c.group ? groupReviews : singleReviews).find(r => String(c.group ? r.groupClassId : r.bookingId) === String(c.id)); return { ...c, hasReview: updates.some(w => String(w.bookingId) === String(c.id) && !!w.summary), hasRecordings: [...recordings, ...activeLinks].some(r => String(r.bookingId || r.groupClassId) === String(c.id)), parentReview: ownReview ? { rating: ownReview.rating, comment: ownReview.comment } : null }; }), page, totalPages: Math.max(1, Math.ceil((a + b) / limit)) });
+  result(res, { classes: pageClasses.map(c => { const ownReview = (c.group ? groupReviews : singleReviews).find(r => String(c.group ? r.groupClassId : r.bookingId) === String(c.id)); return { ...c, hasReview: c.status === 'completed' && updates.some(w => String(w.bookingId) === String(c.id) && !!w.summary), hasRecordings: [...recordings, ...activeLinks].some(r => String(r.bookingId || r.groupClassId) === String(c.id)), parentReview: ownReview ? { rating: ownReview.rating, comment: ownReview.comment } : null }; }), page, totalPages: Math.max(1, Math.ceil((a + b) / limit)) });
 }));
 publicFamily.post('/schedule/:id/review', strictLimiter, handle(async (req, res) => {
   if (!oid(req.params.id) || typeof req.body.group !== 'boolean' || !Number.isInteger(req.body.rating) || req.body.rating < 1 || req.body.rating > 5) throw fail('Choose a rating from 1 to 5.');
@@ -390,7 +392,7 @@ publicFamily.get('/schedule/:id/materials', handle(async (req, res) => {
       try { files.push({ id: sharedLink._id, title: 'Shared class recording', source: 'external', url: `${front()}/rv/${decrypt(sharedLink.shareLink.tokenEnc)}?workspace=${encodeURIComponent(req.teacherWorkspace.key)}`, local: false }); } catch { /* An unreadable token is not shareable. */ }
     }
   }
-  result(res, { review: update?.summary || '', recordings: files });
+  result(res, { review: lesson.status === 'completed' && !lesson.adminRejected ? update?.summary || '' : '', recordings: files });
 }));
 publicFamily.get('/schedule/:id/join', handle(async (req, res) => {
   if (!oid(req.params.id) || !['true', 'false'].includes(req.query.group)) throw fail('Invalid lesson.');
@@ -439,7 +441,7 @@ publicFamily.get('/', handle(async (req, res) => {
   const classFilter = { _id: { $in: work.map(w => w.bookingId) } };
   const bookings = [...await Booking(req).find(classFilter).select('scheduledTime duration status').lean(), ...(await Group(req).find(classFilter).select('scheduledTime duration status').lean()).map(g => ({ ...g, isGroupClass: true }))];
   const reviews = await model(db, 'Review', reviewSchema).find({ studentId }).select('bookingId rating comment').lean();
-  const publicWork = work.map(w => ({ ...w, class: bookings.find(b => String(b._id) === String(w.bookingId)), review: reviews.find(r => String(r.bookingId) === String(w.bookingId)) }));
+  const publicWork = work.map(w => ({ ...w, class: bookings.find(b => String(b._id) === String(w.bookingId)), review: reviews.find(r => String(r.bookingId) === String(w.bookingId)) })).filter(w => w.class?.status === 'completed');
   const activities = [];
   for (const [name, schema, kind] of [['Homework', homeworkSchema, 'hw'], ['Quiz', quizSchema, 'q']]) {
     const docs = await model(db, name, schema).find({ studentId, teacherId: req.teacherWorkspace.ownerId, 'shareLink.tokenEnc': { $exists: true, $ne: null } }).select('+shareLink.tokenEnc title dueDate status grade.score grade.feedback grade.gradedAt submission.submittedAt').sort({ createdAt: -1, _id: -1 }).limit(100).lean();
@@ -467,12 +469,17 @@ publicFamily.get('/', handle(async (req, res) => {
 publicFamily.get('/work', handle(async (req, res) => {
   const page = Math.max(1, Math.min(parseInt(req.query.page, 10) || 1, 100000));
   const limit = 2, studentId = req.familyGrant.studentId;
-  const work = await teacherModeModels(req.db).TeacherWork.find({ studentId, published: true }).sort({ createdAt: -1, _id: -1 }).skip((page - 1) * limit).limit(limit + 1).lean();
+  const work = await teacherModeModels(req.db).TeacherWork.aggregate([
+    { $match: { studentId, published: true } },
+    { $lookup: { from: Booking(req).collection.name, localField: 'bookingId', foreignField: '_id', as: 'book', pipeline: [{ $match: { status: 'completed', studentId } }, { $project: { scheduledTime: 1, duration: 1, status: 1 } }] } },
+    { $lookup: { from: Group(req).collection.name, localField: 'bookingId', foreignField: '_id', as: 'group', pipeline: [{ $match: { status: 'completed', 'enrollments.studentId': studentId } }, { $project: { scheduledTime: 1, duration: 1, status: 1, isGroupClass: { $literal: true } } }] } },
+    { $set: { class: { $ifNull: [{ $arrayElemAt: ['$book', 0] }, { $arrayElemAt: ['$group', 0] }] } } },
+    { $match: { 'class.status': 'completed' } },
+    { $sort: { createdAt: -1, _id: -1 } }, { $skip: (page - 1) * limit }, { $limit: limit + 1 }, { $project: { book: 0, group: 0 } },
+  ]);
   const hasMore = work.length > limit;
   const items = work.slice(0, limit);
-  const classFilter = { _id: { $in: items.map(w => w.bookingId) } };
-  const bookings = [...await Booking(req).find(classFilter).select('scheduledTime duration status').lean(), ...(await Group(req).find(classFilter).select('scheduledTime duration status').lean()).map(g => ({ ...g, isGroupClass: true }))];
-  result(res, { items: items.map(w => ({ ...w, class: bookings.find(b => String(b._id) === String(w.bookingId)) })), page, hasMore });
+  result(res, { items, page, hasMore });
 }));
 publicFamily.post('/messages', handle(async (req, res) => result(res, await teacherModeModels(req.db).TeacherConversation.create({ studentId: req.familyGrant.studentId, sender: 'family', text: text(req.body.text, 3000) }))));
 publicFamily.post('/work/:id/review', strictLimiter, handle(async (req, res) => {
@@ -601,6 +608,7 @@ app.post('/managed-students/:id/email-link', strictLimiter, handle(async (req, r
 }));
 
 app.get('/work', handle(async (req, res) => {
+  if (!req.user.teacherInspection) await sweepUnattendedStandaloneLessons(req.db);
   const filter = req.query.centerId ? { managedCenterId: (await getCenter(req, req.query.centerId, false))._id } : {};
   const books = [...await list(Booking(req).find(filter).populate('studentId', 'firstName lastName')), ...await list(Group(req).find(filter).populate('enrollments.studentId', 'firstName lastName'))];
   const updates = await list(teacherModeModels(req.db).TeacherWork.find());
@@ -645,6 +653,9 @@ app.patch('/work/:id', handle(async (req, res) => {
   if (!oid(req.params.id)) throw fail('Invalid class.');
   const b = await Booking(req).findOne({ _id: req.params.id, teacherId: req.user.id, managedCenterId: { $exists: true } }) || await Group(req).findOne({ _id: req.params.id, teacherId: req.user.id, managedCenterId: { $exists: true } });
   if (!b) throw fail('Class not found.');
+  if (req.body.action === 'unmark') {
+    return result(res, await uncompleteStandaloneLesson(req.db, b, req.user.id, req.body.reason ? text(req.body.reason, 500) : undefined));
+  }
   if (req.body.action !== undefined) {
     if (!['cancel', 'missed', 'edit'].includes(req.body.action)) throw fail('Invalid lesson action.');
     if (!['accepted', 'open', 'full', 'missed'].includes(b.status)) throw fail('Finish the active lesson before changing it.');
@@ -667,11 +678,12 @@ app.patch('/work/:id', handle(async (req, res) => {
     return result(res, { saved: true });
   }
   const update = {};
+  if ((req.body.summary !== undefined || req.body.published === true) && b.status !== 'completed' && req.body.complete !== true) throw fail('Summaries can only be written for completed classes.');
   if (req.body.summary !== undefined) update.summary = req.body.summary === '' ? '' : text(req.body.summary, 3000);
   if (req.body.published !== undefined) update.published = req.body.published === true;
+  if (req.body.complete === true) await completeStandaloneLesson(req.db, b, req.user.id, req.body.attendance);
   await teacherModeModels(req.db).TeacherWork.updateMany({ bookingId: b._id }, { $set: update });
   const work = await teacherModeModels(req.db).TeacherWork.findOne({ bookingId: b._id });
-  if (req.body.complete === true) await completeStandaloneLesson(req.db, b, req.user.id, req.body.attendance);
   if (req.body.summary !== undefined && (b.status === 'completed' || req.body.complete === true)) {
     const Class = b.enrollments ? Group(req) : Booking(req);
     await Class.updateOne({ _id: b._id }, { $set: { classSummary: { text: update.summary, updatedAt: new Date(), by: req.user.id } } });
@@ -705,10 +717,8 @@ async function standaloneEarnings(req) {
       const months = [...new Set(matching.map(r => r._id.month).filter(Boolean))];
       const charges = months.flatMap(month => {
         const gross = matching.filter(r => r._id.month === month).reduce((n, r) => n + (r.earned || 0), 0);
-        const [year, mon] = month.split('-').map(Number), end = new Date(Date.UTC(year, mon, 1));
-        const version = versions.filter(v => v.effectiveAt < end).at(-1);
         const taught = matching.some(r => r._id.month === month && r.lessons > 0);
-        return taught ? (version?.rules || []).filter(r => (!r.centerIds?.length || r.centerIds.some(id => String(id) === String(c._id))) && (r.kind === 'percent' || r.currency === currency)).map(r => ({ month, name: r.name, kind: r.kind, value: r.value, amountMinor: r.kind === 'fixed' ? r.value : Math.round(gross * r.value / 10000) })) : [];
+        return taught ? monthlyCharges(versions, c._id, currency, month, gross) : [];
       });
       const chargesTotal = charges.reduce((n, r) => n + r.amountMinor, 0);
       const periodRows = [...bookingDays, ...groupDays].filter(r => String(r._id.center) === String(c._id) && r._id.currency === currency && new Date(`${r._id.day}T00:00:00Z`) >= period.start && new Date(`${r._id.day}T00:00:00Z`) < period.end);
@@ -717,6 +727,15 @@ async function standaloneEarnings(req) {
   });
 }
 app.get('/earnings', handle(async (req, res) => result(res, await standaloneEarnings(req))));
+app.get(['/earnings/statement', '/earnings/statement.pdf'], handle(async (req, res) => {
+  const teacher = await req.db.models.Teacher.findById(req.user.id).select('firstName lastName timezone').lean();
+  const report = await buildStandaloneStatement(req.db, { teacherId: req.user.id, teacherName: [teacher.firstName, teacher.lastName].filter(Boolean).join(' '), timezone: teacher.timezone || req.teacherWorkspace.timezone, from: req.query.from, to: req.query.to, centerId: req.query.centerId });
+  res.set('Cache-Control', 'private, no-store');
+  if (!req.path.endsWith('.pdf')) return result(res, report);
+  const pdf = await renderStandaloneStatementPdf(report);
+  res.set({ 'Content-Type': 'application/pdf', 'Content-Disposition': `attachment; filename="clemify-earnings-${report.from}-${report.to}.pdf"` });
+  res.send(pdf);
+}));
 app.get('/earnings/history', handle(async (req, res) => {
   const c = await getCenter(req, req.query.centerId, false);
   const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1), limit = 20;

@@ -1,4 +1,4 @@
-import { render } from "@testing-library/react";
+import { render, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const auth = { role: null, token: null };
@@ -37,6 +37,27 @@ describe("RingProvider", () => {
     render(<RingProvider><div /></RingProvider>);
     const urls = get.mock.calls.map(([u]) => u);
     expect(urls).toEqual(expect.arrayContaining(["/ring/alerts-seen", "/ring/missed-calls"]));
+    expect(io).toHaveBeenCalled();
+  });
+
+  it.each([true, false])("skips standalone ring/chat with stored token: %s", async (stored) => {
+    const token = `header.${btoa(JSON.stringify({ realm: 'teacher-mode', centerId: 'tw-demo' }))}.signature`;
+    auth.role = 'teacher'; auth.token = token;
+    if (stored) sessionStorage.setItem('teacherToken', token);
+    render(<RingProvider><div /></RingProvider>);
+    await Promise.resolve();
+    expect(get).not.toHaveBeenCalled();
+    expect(io).not.toHaveBeenCalled();
+  });
+
+  it("keeps center teacher ring and chat active", async () => {
+    const token = `header.${btoa(JSON.stringify({ role: 'teacher', centerId: 'academy' }))}.signature`;
+    auth.role = 'teacher'; auth.token = token;
+    sessionStorage.setItem('teacherToken', token);
+    render(<RingProvider><div /></RingProvider>);
+    await waitFor(() => expect(get.mock.calls.map(([url]) => url)).toEqual(expect.arrayContaining([
+      '/ring/alerts-seen', '/ring/missed-calls', '/group-chats', '/direct-messages',
+    ])));
     expect(io).toHaveBeenCalled();
   });
 });

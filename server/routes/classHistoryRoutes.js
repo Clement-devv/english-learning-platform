@@ -89,7 +89,7 @@ router.get("/teacher/:teacherId/history", verifyToken, async (req, res) => {
       $or: [
         { status: { $in: ["completed", "missed"] } },
         // Started over an hour ago but never marked complete — still shown, as before
-        { status: "accepted", scheduledTime: { $lt: new Date(now - HOUR) } },
+        req.teacherWorkspace ? { status: "accepted", $expr: { $lte: [{ $add: ["$scheduledTime", { $multiply: [{ $ifNull: ["$duration", 60] }, 60000] }] }, new Date(now)] } } : { status: "accepted", scheduledTime: { $lt: new Date(now - HOUR) } },
       ],
       // ANDed with the $or above, so it limits both branches
       ...(range ? { scheduledTime: range } : {}),
@@ -123,6 +123,7 @@ router.get("/teacher/:teacherId/history", verifyToken, async (req, res) => {
       } },
       { $addFields: {
         scheduledTime: "$_id.t",
+        managedCenterId: "$_id.center",
         title:         "$_id.title",
         isMissed:      { $eq: ["$_id.kind", "missed"] },
         officiallyCompleted: { $eq: ["$_id.kind", "completed"] },
@@ -132,18 +133,18 @@ router.get("/teacher/:teacherId/history", verifyToken, async (req, res) => {
       ...(rx ? [{ $match: { $or: [{ title: rx }, { topic: rx }, { students: rx }] } }] : []),
       // Finished group classes: completed → Completed tab, missed → Not completed
       { $unionWith: { coll: getGroupClass(req.db).collection.name, pipeline: [
-        { $match: { teacherId: oid(teacherId), ...(req.teacherWorkspace && req.query.managedCenterId ? { managedCenterId: oid(req.query.managedCenterId) } : {}), status: { $in: ["completed", "missed"] }, ...(range ? { scheduledTime: range } : {}) } },
+        { $match: { teacherId: oid(teacherId), ...(req.teacherWorkspace && req.query.managedCenterId ? { managedCenterId: oid(req.query.managedCenterId) } : {}), ...(req.teacherWorkspace ? { $or: [{status: {$in: ["completed", "missed"]}}, {status: {$in: ["open", "full"]}, $expr: {$lte: [{$add: ["$scheduledTime", {$multiply: [{$ifNull: ["$duration",60]},60000]}]},new Date(now)]}}] } : {status: {$in:["completed", "missed"]}}), ...(range ? { scheduledTime: range } : {}) } },
         { $lookup: { from: getStudent(req.db).collection.name, localField: "enrollments.studentId", foreignField: "_id", as: "st",
                      pipeline: [{ $project: { firstName: 1, lastName: 1 } }] } },
         { $project: {
-          _id: 0, id: "$_id", scheduledTime: 1, title: 1, duration: 1, missedReason: 1, platform: 1,
+          _id: 0, id: "$_id", scheduledTime: 1, title: 1, duration: 1, missedReason: 1, platform: 1, managedCenterId: 1,
           topic: { $ifNull: ["$description", ""] },
           students: { $map: { input: "$st", as: "x", in: { $trim: { input: { $concat: [{ $ifNull: ["$$x.firstName", ""] }, " ", { $ifNull: ["$$x.lastName", ""] }] } } } } },
           attended: { $size: { $filter: { input: { $ifNull: ["$enrollments", []] }, cond: { $eq: ["$$this.attendance", "attended"] } } } },
           isGroupClass: { $literal: true },
           isMissed: { $eq: ["$status", "missed"] },
           officiallyCompleted: { $eq: ["$status", "completed"] },
-          notCompleted: { $eq: ["$status", "missed"] },
+          notCompleted: { $ne: ["$status", "completed"] },
         } },
         ...(rx ? [{ $match: { $or: [{ title: rx }, { topic: rx }, { students: rx }] } }] : []),
       ] } },

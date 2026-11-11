@@ -44,6 +44,8 @@ import v1Router from "./routes/v1.js";
 import Center from "./models/master/Center.js";
 import { getDb, closeConnection, closeAllConnections } from "./config/dbManager.js";
 import { startCenterJobSync, stopCenterJobs, stopAllCenterJobs, runningCenterJobs } from "./utils/centerJobs.js";
+import { startStandaloneDailyReports, stopStandaloneDailyReports } from './utils/standaloneDailyReports.js';
+import { startStandaloneLessonScheduler, stopStandaloneLessonScheduler } from './utils/standaloneLessonScheduler.js';
 import { errorHandler, notFoundHandler, registerProcessHandlers } from "./middleware/errorHandler.js";
 import healthRoutes from "./routes/healthRoutes.js";
 import { sweepExpiredSessionsFromDb } from "./utils/sessionManager.js";
@@ -324,6 +326,8 @@ mongoose
         // theirs without a restart, and suspended / deleted ones are stopped. A center
         // whose DB can't be reached is retried and never blocks the others.
         await startCenterJobSync();
+        startStandaloneDailyReports();
+        startStandaloneLessonScheduler();
         logger.info(`🏢 Background jobs running for ${runningCenterJobs().length} active center(s)`);
 
         // App Health checks + alerts to the super admin (email / WhatsApp)
@@ -606,6 +610,8 @@ const shutdown = async (signal) => {
 
     // 3. Stop per-center background jobs, then close all per-center DB connections
     stopAllCenterJobs();
+    stopStandaloneDailyReports();
+    stopStandaloneLessonScheduler();
     await closeAllConnections();
     logger.info("Per-center DB connections closed");
 

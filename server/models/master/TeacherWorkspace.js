@@ -10,6 +10,7 @@ const schema = new mongoose.Schema({
   inviteHash: { type: String, select: false }, inviteExpires: Date,
   resetHash: { type: String, select: false }, resetExpires: Date,
   timezone: { type: String, default: 'UTC' },
+  dailyReportLastDate: String,
   scheduleLock: String, scheduleLockUntil: Date,
   resourceBytes: { type: Number, default: 0 },
   aiCredits: { balance: { type: Number, default: 0 }, log: [{ amount: Number, note: String, by: String, createdAt: Date }] },

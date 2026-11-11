@@ -1,4 +1,4 @@
-import { teacherModeKey } from '../../utils/teacherMode';
+import { teacherModeKey, classroomDashboardPath } from '../../utils/teacherMode';
 import StandaloneClassOutcome from '../teacher-mode/StandaloneClassOutcome';
 // GoogleMeetClassroom.jsx
 // Full Google Meet classroom — attendance, timer, and external-tab monitor.
@@ -131,7 +131,7 @@ export default function GoogleMeetClassroom({ classData, userRole, onLeave, goog
               <button
                 onClick={() => {
                   if (onLeave) onLeave();
-                  else navigate(userRole === "teacher" ? "/teacher/dashboard" : "/student/dashboard",
+                  else navigate(classroomDashboardPath(userRole),
                     { state: { classCompleted: true, activeTab: "payment" } });
                 }}
                 className="w-full px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full font-bold transition-all"
@@ -225,7 +225,7 @@ export default function GoogleMeetClassroom({ classData, userRole, onLeave, goog
               )}
               <button onClick={() => {
                 if (onLeave) onLeave();
-                else navigate(userRole === "teacher" ? "/teacher/dashboard" : "/student/dashboard",
+                else navigate(classroomDashboardPath(userRole),
                   { state: { classMissed: true } });
               }} className="w-full px-6 py-3 bg-gray-700 hover:bg-gray-800 text-white rounded-full font-bold transition-all">
                 Back to Dashboard

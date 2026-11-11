@@ -6,6 +6,9 @@ export const teacherModeKey = () => {
     return p?.realm === 'teacher-mode' ? p.centerId : null;
   } catch { return null; }
 };
+export const classroomDashboardPath = role => role === 'teacher'
+  ? (teacherModeKey() ? '/teacher-mode/dashboard' : '/teacher/dashboard')
+  : '/student/dashboard';
 export const teacherModeLink = (path) => {
   const key = teacherModeKey();
   return `${window.location.origin}${path}${key ? `${path.includes('?') ? '&' : '?'}workspace=${encodeURIComponent(key)}` : ''}`;

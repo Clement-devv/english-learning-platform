@@ -1,4 +1,4 @@
-import { teacherModeKey } from '../../utils/teacherMode';
+import { teacherModeKey, classroomDashboardPath } from '../../utils/teacherMode';
 import StandaloneClassOutcome from '../teacher-mode/StandaloneClassOutcome';
 // ZoomClassroom.jsx
 // Full Zoom classroom — attendance, timer, and external-tab monitor.
@@ -135,7 +135,7 @@ export default function ZoomClassroom({ classData, userRole, onLeave, zoomLink, 
               <button
                 onClick={() => {
                   if (onLeave) onLeave();
-                  else navigate(userRole === "teacher" ? "/teacher/dashboard" : "/student/dashboard",
+                  else navigate(classroomDashboardPath(userRole),
                     { state: { classCompleted: true, activeTab: "payment" } });
                 }}
                 className="w-full px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-full font-bold transition-all"
@@ -229,7 +229,7 @@ export default function ZoomClassroom({ classData, userRole, onLeave, zoomLink, 
               )}
               <button onClick={() => {
                 if (onLeave) onLeave();
-                else navigate(userRole === "teacher" ? "/teacher/dashboard" : "/student/dashboard",
+                else navigate(classroomDashboardPath(userRole),
                   { state: { classMissed: true } });
               }} className="w-full px-6 py-3 bg-gray-700 hover:bg-gray-800 text-white rounded-full font-bold transition-all">
                 Back to Dashboard

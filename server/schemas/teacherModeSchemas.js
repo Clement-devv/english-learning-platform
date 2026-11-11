@@ -13,6 +13,7 @@ export const managedCenterSchema = new mongoose.Schema({
   rateMinor: { type: Number, default: 0, min: 0 },
   prepaid: { type: Boolean, default: false },
   archived: { type: Boolean, default: false },
+  dailyReportLastDate: String,
   meetingUrl: { type: String, default: '', maxlength: 1000 },
 }, { timestamps: true });
 export const teacherWorkSchema = new mongoose.Schema({

@@ -1,4 +1,4 @@
-import { teacherModeKey } from '../../utils/teacherMode';
+import { teacherModeKey, classroomDashboardPath } from '../../utils/teacherMode';
 import StandaloneClassOutcome from '../teacher-mode/StandaloneClassOutcome';
 // AgoraClassroom.jsx
 // Full Agora video classroom — attendance, timer, and VideoCall SDK.
@@ -191,7 +191,7 @@ export default function AgoraClassroom({ classData, userRole, onLeave, googleMee
       minimizedAt: Date.now(),
     }));
     minimizeSession();
-    navigate(userRole === "teacher" ? "/teacher/dashboard" : "/student/dashboard");
+    navigate(classroomDashboardPath(userRole));
   };
 
   // Clear saved classroom state when properly ending (not minimizing)
@@ -279,7 +279,7 @@ export default function AgoraClassroom({ classData, userRole, onLeave, googleMee
                 onClick={() => {
                   clearClassroomState();
                   if (onLeave) onLeave();
-                  else navigate(userRole === "teacher" ? "/teacher/dashboard" : "/student/dashboard",
+                  else navigate(classroomDashboardPath(userRole),
                     { state: { classCompleted: true, activeTab: "payment" } });
                 }}
                 className="w-full px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full font-bold transition-all"
@@ -374,7 +374,7 @@ export default function AgoraClassroom({ classData, userRole, onLeave, googleMee
               <button onClick={() => {
                 clearClassroomState();
                 if (onLeave) onLeave();
-                else navigate(userRole === "teacher" ? "/teacher/dashboard" : "/student/dashboard",
+                else navigate(classroomDashboardPath(userRole),
                   { state: { classMissed: true, activeTab: userRole === "teacher" ? "completed-classes" : "dashboard" } });
               }} className="w-full px-6 py-3 bg-gray-700 hover:bg-gray-800 text-white rounded-full font-bold transition-all">
                 Back to Dashboard
@@ -695,7 +695,7 @@ export default function AgoraClassroom({ classData, userRole, onLeave, googleMee
             key={`video-${bookingId}`}
             channelName={channelName}
             userName={userName}
-            onLeave={() => navigate(userRole === "teacher" ? "/teacher/dashboard" : "/student/dashboard")}
+            onLeave={() => navigate(classroomDashboardPath(userRole))}
             onUserJoined={handleUserJoined}
             onUserLeft={handleUserLeft}
             mode={activeTab === "video" ? "video" : activeTab === "content" ? "sidebar" : "video"}

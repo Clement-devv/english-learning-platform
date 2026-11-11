@@ -1,0 +1,30 @@
+import { render,screen,fireEvent,waitFor,act } from '@testing-library/react';
+import { it,expect,vi } from 'vitest';
+import TeacherEarningsStatement from './TeacherEarningsStatement';
+import api from '../../api';
+vi.mock('../../api',()=>({default:{get:vi.fn()}}));
+it('requests the selected dates and center and shows server-calculated salary totals',async()=>{
+  api.get.mockResolvedValue({data:{data:{from:'2026-11-01',to:'2026-11-10',timezone:'Asia/Ho_Chi_Minh',entries:[],totals:[{currency:'USD',gross:50000,charges:5000,net:45000,received:10000,outstanding:35000}]}}});
+  render(<TeacherEarningsStatement centerId="center-1"/>);
+  fireEvent.change(screen.getByLabelText('From'),{target:{value:'2026-11-01'}});
+  fireEvent.change(screen.getByLabelText('To'),{target:{value:'2026-11-10'}});
+  fireEvent.click(screen.getByRole('button',{name:'View statement'}));
+  await waitFor(()=>expect(api.get).toHaveBeenCalledWith('/earnings/statement',{params:{from:'2026-11-01',to:'2026-11-10',centerId:'center-1'}}));
+  expect(await screen.findByText(/Final salary:/)).toHaveTextContent('450');
+  expect(screen.getByText(/Asia\/Ho_Chi_Minh/)).toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText('From'),{target:{value:'2026-11-02'}});
+  expect(screen.queryByText(/Final salary:/)).not.toBeInTheDocument();
+});
+it('keeps dates across center changes and ignores the previous center response',async()=>{
+  let resolve;
+  api.get.mockImplementationOnce(()=>new Promise(r=>{resolve=r;}));
+  const {rerender}=render(<TeacherEarningsStatement centerId="a"/>);
+  fireEvent.change(screen.getByLabelText('From'),{target:{value:'2026-09-01'}});
+  fireEvent.change(screen.getByLabelText('To'),{target:{value:'2026-09-30'}});
+  fireEvent.click(screen.getByRole('button',{name:'View statement'}));
+  rerender(<TeacherEarningsStatement centerId="b"/>);
+  expect(screen.getByLabelText('From')).toHaveValue('2026-09-01');
+  expect(screen.getByLabelText('To')).toHaveValue('2026-09-30');
+  await act(async()=>resolve({data:{data:{from:'2026-09-01',to:'2026-09-30',timezone:'UTC',entries:[],totals:[{centerId:'a',centerName:'Wrong center',currency:'USD',gross:500,charges:0,net:500,received:0,outstanding:500}]}}}));
+  expect(screen.queryByText(/Wrong center/)).not.toBeInTheDocument();
+});
