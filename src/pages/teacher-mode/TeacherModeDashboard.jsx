@@ -1,7 +1,7 @@
 import StudioLanguageSwitch from './StudioLanguageSwitch';
 import { useStudioLanguage } from './useStudioLanguage';
 import { studioText } from './studioLanguage';
-import { useState, useEffect, useLayoutEffect, useCallback, lazy, Suspense } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect, useCallback, lazy, Suspense } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { BookOpen, Building2, Users, CalendarDays, Link2, Wallet, MessageCircle, LogOut, SunMoon, ArrowUpRight, GraduationCap, Video, Gamepad2, ListChecks, ShieldCheck } from 'lucide-react';
 import api from '../../api';
@@ -67,16 +67,53 @@ export default function TeacherModeDashboard() {
   const filteredStudents = students.filter(s => !centerId || String(s.managedCenterId) === centerId);
   const filteredWork = work.filter(w => !centerId || String(w.managedCenterId) === centerId);
   const current = centers.find(c => c._id === centerId);
-  const refresh = useCallback(async () => {
+  const activeRefresh = useRef(null);
+  const retryAfter = useRef(0);
+  const failures = useRef(0);
+  const failedPaths = useRef([]);
+  const [refreshError, setRefreshError] = useState('');
+  const refresh = useCallback(async (options = {}) => {
     if (!teacherModeKey()) { navigate('/teacher-mode/login', { replace: true }); return; }
-    try {
-      const responses = await Promise.all(['/managed-centers', '/managed-students', '/work', '/earnings', '/messages'].map(p => api.get(p)));
-      const values = responses.map(r => r.data.data);
-      setCenters(values[0]); setStudents(values[1]); setWork(values[2]); setEarnings(values[3]); setMessages(values[4]); setError('');
-    } catch (e) { setError(e.response?.data?.message || 'Unable to load your workspace. Please retry.'); }
-    finally { setLoading(false); }
+    if (options?.background && activeRefresh.current) return;
+    activeRefresh.current?.abort();
+    const controller = new AbortController();
+    activeRefresh.current = controller;
+    const sections = [
+      ['/managed-centers', 'centers', setCenters], ['/managed-students', 'students', setStudents],
+      ['/work', 'classes', setWork], ['/earnings', 'earnings', setEarnings], ['/messages', 'messages', setMessages],
+    ].filter(([path]) => !options?.failedOnly || failedPaths.current.includes(path));
+    const results = await Promise.allSettled(sections.map(async ([path, , update]) => {
+      const response = await api.get(path, { signal: controller.signal });
+      if (!controller.signal.aborted) update(response.data.data);
+    }));
+    if (controller.signal.aborted) return;
+    activeRefresh.current = null;
+    const failed = sections.filter((_, index) => results[index].status === 'rejected');
+    failedPaths.current = failed.map(([path]) => path);
+    setRefreshError(failed.length ? `Could not update ${failed.map(([, label]) => label).join(', ')}.` : '');
+    failures.current = failed.length ? Math.min(4, failures.current + 1) : 0;
+    retryAfter.current = Date.now() + Math.min(300000, 30000 * 2 ** failures.current);
+    setLoading(false);
   }, [navigate]);
-  useEffect(() => { refresh(); const interval = setInterval(refresh, 30000); return () => clearInterval(interval); }, [refresh]);
+  useEffect(() => {
+    const check = (resume = false) => {
+      if (!document.hidden && navigator.onLine !== false && (resume || Date.now() >= retryAfter.current)) {
+        void refresh({ background: true });
+      }
+    };
+    const resume = () => check(true);
+    check(true);
+    const timer = setInterval(() => check(), 30000);
+    document.addEventListener('visibilitychange', resume);
+    window.addEventListener('online', resume);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', resume);
+      window.removeEventListener('online', resume);
+      activeRefresh.current?.abort();
+      activeRefresh.current = null;
+    };
+  }, [refresh]);
   useLayoutEffect(() => {
     if (teacherModeKey()) sessionStorage.setItem('teacherModeCenter', centerId);
     setRecipient('');
@@ -99,7 +136,7 @@ export default function TeacherModeDashboard() {
     {teacherInfo.inspection && <div role="status" style={{ position: 'fixed', zIndex: 9999, top: 0, left: '50%', transform: 'translateX(-50%)', padding: '10px 18px', borderRadius: '0 0 12px 12px', background: '#283d32', color: '#fff', boxShadow: '0 4px 16px #0003' }}>Super Admin view · Read-only · Session expires in 10 minutes <button type="button" style={{ marginLeft: 12, color: '#fff', background: 'transparent', border: '1px solid #ffffff99', borderRadius: 6, padding: '4px 9px' }} onClick={() => { sessionStorage.removeItem('teacherToken'); sessionStorage.removeItem('teacherInfo'); window.close(); }}>Exit view</button></div>}
     <a className="tm-skip-link" href="#teacher-workspace-content">Skip to workspace</a>
     <aside className="tm-sidebar">
-      <a className="tm-brand" href="/teacher-mode/dashboard"><span className="tm-brand-symbol" aria-hidden="true">c.</span><span className="tm-brand-name">clemify<span>THE TEACHER STUDIO</span></span></a>
+      <a className="tm-brand" href="/teacher-mode/dashboard"><span className="tm-brand-symbol" aria-hidden="true">E.</span><span className="tm-brand-name">E.G.O<span>THE TEACHER STUDIO</span></span></a>
       <div className="tm-studio-badge"><span className="tm-status-dot" />{studioText("Independent workspace")}</div>
       <nav aria-label="Teacher workspace">{tabs.map(([id, label, Icon]) => <div className="tm-nav-item" key={id}>{['overview', 'homework', 'parents'].includes(id) && <span className="tm-nav-label">{id === 'overview' ? 'YOUR WORKSPACE' : id === 'homework' ? 'TEACHING TOOLS' : 'CONNECTIONS & BUSINESS'}</span>}<button className={tab === id ? 'active' : ''} aria-current={tab === id ? 'page' : undefined} onClick={() => switchTab(id)}><Icon size={17} strokeWidth={1.6} /><span>{studioText(label)}</span>{id === 'parents' && unreadParents > 0 && <span className="tm-unread-count">{unreadParents}</span>}</button></div>)}</nav>
       <div className="tm-sidebar-bottom"><div className="tm-sidebar-note"><span className="tm-eyebrow">A WINDOW INTO LEARNING</span><p>Great teaching.<br />Worth sharing.</p><button onClick={() => switchTab('parent-links')}>{studioText("Create a parent link")}<ArrowUpRight size={14} /></button></div>
@@ -108,7 +145,7 @@ export default function TeacherModeDashboard() {
     </aside>
     <section className="tm-main" id="teacher-workspace-content" tabIndex={-1}>
       <header className="tm-header"><div><span className="tm-eyebrow">YOUR SPACE TO MAKE A DIFFERENCE</span><h1>{tab === 'overview' ? studioText('The teacher studio') : studioText(tabs.find(t => t[0] === tab)?.[1])}</h1></div><div className="tm-header-controls"><span className="tm-header-date">{new Intl.DateTimeFormat(undefined, { weekday: 'short', month: 'short', day: 'numeric' }).format(new Date())}</span>{!['students', 'parent-links'].includes(tab) && <label><span>{studioText("Workspace view")}</span><select value={centerId} onChange={e => setCenterId(e.target.value)}><option value="">{studioText("All centers")}</option>{centers.map(c => <option key={c._id} value={c._id}>{c.name}{c.archived ? ' · archived' : ''}</option>)}</select></label>}</div></header>
-      {error && <div role="alert" className="tm-notice tm-error">{error}<button onClick={refresh}>Retry</button></div>}{notice && <p role="status" className="tm-notice">{notice}</p>}{loading ? <div className="tm-card" role="status">Loading your workspace…</div> : <>
+      {error && <div role="alert" className="tm-notice tm-error">{error}</div>}{refreshError && <div role="alert" className="tm-notice tm-error">{refreshError} <button onClick={() => refresh({ failedOnly: true })}>Retry</button></div>}{notice && <p role="status" className="tm-notice">{notice}</p>}{loading ? <div className="tm-card" role="status">Loading your workspace…</div> : <>
       {tab === 'overview' && <TeacherWorkspaceOverview teacher={teacherInfo} centers={centers} students={filteredStudents} work={filteredWork} messages={messages.filter(m => !centerId || filteredStudents.some(s => s._id === m.studentId))} onNavigate={switchTab} />}
       {tab === 'centers' && <CentersSection centers={centers} students={students} busy={busy} run={run} onViewStudents={id => switchTab('students', { centerId: id })} />}
       {tab === 'students' && <StudentsSection centers={centers} students={students} busy={busy} run={run} refresh={refresh} centerFilter={studentCenterFilter} onCenterFilter={setStudentCenterFilter} />}

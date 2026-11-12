@@ -2,6 +2,8 @@
 // Draws the world from logic/world.js with PixiJS: sky and city parallax, the
 // perspective road, scenery, the squad, bugs, crates, gates, the boss, bullets
 // and the laser. Effects for world events live in fx.js.
+// Use prewritten shader sync routines under the site script policy.
+import 'pixi.js/unsafe-eval';
 import { Application, BitmapFont, BitmapText, CanvasSource, Container, Graphics, Sprite, Texture } from 'pixi.js';
 import { project, depthScale, LOGICAL_H, PORTRAIT_W, horizonY, PX_PER_UNIT, X_K } from '../logic/projection.js';
 import { ROAD_HALF, VIEW_DIST, PARTICLE_CAP, BOSS_HOLD_Z } from '../logic/config.js';

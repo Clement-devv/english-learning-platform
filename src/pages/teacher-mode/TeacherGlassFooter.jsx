@@ -20,11 +20,11 @@ export default function TeacherGlassFooter({ onNavigate, dark, onToggleDark, com
   };
   return <footer className={`tm-glass-footer${compact ? ' tm-glass-footer--compact' : ''}`} onPointerEnter={enter} onPointerMove={move} onPointerLeave={() => setLit(false)}>
     <div className="tm-footer-sculpture" aria-hidden="true" />
-    <div className="tm-footer-top"><div className="tm-footer-intro"><span className="tm-eyebrow">MADE FOR YOUR WAY OF TEACHING</span><h2>A little more clarity.<br /><em>A lot more connection.</em></h2><button className="tm-text-button" onClick={() => onNavigate('messages')}>Talk to Clemify<ArrowUpRight size={15} /></button></div>
+    <div className="tm-footer-top"><div className="tm-footer-intro"><span className="tm-eyebrow">MADE FOR YOUR WAY OF TEACHING</span><h2>A little more clarity.<br /><em>A lot more connection.</em></h2><button className="tm-text-button" onClick={() => onNavigate('messages')}>Talk to E.G.O<ArrowUpRight size={15} /></button></div>
       <nav aria-label="Workspace shortcuts"><div><span>YOUR STUDIO</span><button onClick={() => onNavigate('centers')}>My centers</button><button onClick={() => onNavigate('students')}>Students</button><button onClick={() => onNavigate('parent-links')}>Parent links</button><button onClick={() => onNavigate('schedule')}>Schedule</button></div><div><span>YOUR CRAFT</span><button onClick={() => onNavigate('recordings')}>Recordings</button><button onClick={() => onNavigate('homework')}>Homework</button><button onClick={() => onNavigate('resources')}>Teaching library</button></div></nav>
     </div>
     <div className="tm-footer-meta"><span>© {new Date().getFullYear()} Clemify <span className="tm-footer-dot">·</span> Your independent teaching space.</span><button className="tm-appearance" onClick={onToggleDark} aria-label={dark ? 'Switch to light appearance' : 'Switch to dark appearance'}>{dark ? <Moon size={13} /> : <Sun size={13} />}{dark ? 'Evening' : 'Daylight'}<span className="tm-toggle-track" aria-hidden="true"><span /></span></button></div>
-    <div className="tm-footer-wordmark" aria-hidden="true">Clemify<span>®</span></div>
+    <div className="tm-footer-wordmark" aria-hidden="true">E.G.O<span>®</span></div>
     {!compact && !reduced && <Motion.div className="tm-liquid-lens" aria-hidden="true" style={{ transform, opacity: lit ? 1 : 0 }} />}
   </footer>;
 }
