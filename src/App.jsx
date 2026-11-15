@@ -35,12 +35,12 @@ const TermsModal               = lazy(() => import("./components/TermsModal"));
 const WelcomeCard              = lazy(() => import("./components/WelcomeCard"));
 const RecordingUploadBanner    = lazy(() => import("./components/RecordingUploadBanner"));
 
-// Role login pages — tiny wrappers (their themes are lazy), keep static
-import AdminLogin          from "./pages/admin/AdminLogin";
-import ParentLogin         from "./pages/parent/ParentLogin";
-import SubAdminLogin       from "./pages/sub-admin/SubAdminLogin";
-import TeacherLogin        from "./pages/teacher/TeacherLogin";
-import StudentLogin        from "./pages/student/StudentLogin";
+// Load each role login only when its route opens.
+const AdminLogin = lazy(() => import("./pages/admin/AdminLogin"));
+const ParentLogin = lazy(() => import("./pages/parent/ParentLogin"));
+const SubAdminLogin = lazy(() => import("./pages/sub-admin/SubAdminLogin"));
+const TeacherLogin = lazy(() => import("./pages/teacher/TeacherLogin"));
+const StudentLogin = lazy(() => import("./pages/student/StudentLogin"));
 
 // Rarely visited pages — lazy, so ordinary visitors never download them
 const SuperAdminLogin          = lazy(() => import("./pages/super-admin/SuperAdminLogin"));

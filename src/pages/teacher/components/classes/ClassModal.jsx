@@ -1,3 +1,6 @@
+import './studioClassModal.css';
+import { currencyFactor, studioMoney } from '../../../teacher-mode/studioFormatting';
+import ClassRecurrence, { useClassRecurrence } from '../../../teacher-mode/ClassRecurrence';
 import { studioText } from '../../../teacher-mode/studioLanguage';
 // src/pages/teacher/components/classes/ClassModal.jsx
 import { useState } from 'react';
@@ -19,7 +22,7 @@ const DEFAULT_THEME = {
   softTextDark:   'var(--as-accent-line, #a5b4fc)',
 };
 
-export default function ClassModal({ isOpen, onClose, onSave, students, isDarkMode, theme = DEFAULT_THEME, awaitSave = false, saveError = '', studio = false }) {
+export default function ClassModal({ isOpen, onClose, onSave, students, isDarkMode, theme = DEFAULT_THEME, awaitSave = false, saveError = '', studio = false, center }) {
   const [title,            setTitle]            = useState('');
   const [topic,            setTopic]            = useState('');
   const [time,             setTime]             = useState('');
@@ -27,6 +30,8 @@ export default function ClassModal({ isOpen, onClose, onSave, students, isDarkMo
   const [selectedStudents, setSelectedStudents] = useState([]);
   const [savingClass, setSavingClass] = useState(false);
 
+  const [customAmount, setCustomAmount] = useState(null);
+  const recurrence = useClassRecurrence();
   if (!isOpen) return null;
 
   // Merge passed theme over defaults so callers can override only what they need.
@@ -75,9 +80,22 @@ export default function ClassModal({ isOpen, onClose, onSave, students, isDarkMo
       return;
     }
     if (savingClass) return;
+    let classAmountMinor;
+    if (studio && center && customAmount !== null) {
+      const factor = currencyFactor(center.currency);
+      const decimals = Math.log10(factor);
+      const validPrecision = /^\d+(\.\d+)?$/.test(customAmount) && (customAmount.split(".")[1]?.length || 0) <= decimals;
+      classAmountMinor = Math.round(Number(customAmount) * factor);
+      if (!validPrecision || !Number.isSafeInteger(classAmountMinor) || classAmountMinor > 1000000000) {
+        alert('Enter a valid class payout in ' + center.currency + '.');
+        return;
+      }
+    }
+    let scheduledDates;
+    if (studio) { try { scheduledDates = recurrence.dates(time); } catch (e) { alert(e.message); return; } }
     if (awaitSave) setSavingClass(true);
     const saving = onSave({
-      id: Date.now(), title, topic, time,
+      id: Date.now(), title, topic, time, ...(studio ? { scheduledDates, classAmountMinor } : {}),
       duration: parseInt(duration, 10),
       students: selectedStudents,
       status: 'scheduled',
@@ -86,6 +104,7 @@ export default function ClassModal({ isOpen, onClose, onSave, students, isDarkMo
       try { if (await saving === false) return; }
       finally { setSavingClass(false); }
     }
+    recurrence.setWeekly(false);
     setTitle(''); setTopic(''); setTime(''); setDuration('60'); setSelectedStudents([]);
     onClose();
   };
@@ -93,8 +112,8 @@ export default function ClassModal({ isOpen, onClose, onSave, students, isDarkMo
   return (
     <div style={{ position: 'fixed', inset: 0, background: col.overlay, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: 16, fontFamily: F }}
       onClick={onClose}>
-      <div onClick={e => e.stopPropagation()}
-        style={{ background: col.card, border: `1.5px solid ${col.border}`, borderRadius: 24, width: '100%', maxWidth: 600, maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 24px 64px rgba(0,0,0,0.25)' }}>
+      <div className={studio ? "studio-class-dialog" : undefined} role="dialog" aria-modal="true" aria-label="Create class" onClick={e => e.stopPropagation()}
+        style={{ background: col.card, border: `1.5px solid ${col.border}`, borderRadius: 24, width: '100%', maxWidth: studio ? 740 : 600, maxHeight: '90vh', overflowY: studio ? 'hidden' : 'auto', boxShadow: '0 24px 64px rgba(0,0,0,0.25)' }}>
 
         {/* Header */}
         <div style={{ background: T.accentGradient, padding: '22px 24px', borderRadius: '24px 24px 0 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -102,14 +121,15 @@ export default function ClassModal({ isOpen, onClose, onSave, students, isDarkMo
             <Plus size={22} color="#fff"/>
             <h2 style={{ margin: 0, fontSize: 20, fontWeight: 900, color: '#fff' }}>{studioText("Create New Class")}</h2>
           </div>
-          <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: 10, padding: 8, cursor: 'pointer', display: 'flex', color: '#fff' }}>
+          <button aria-label="Close create class" onClick={onClose} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: 10, padding: 8, cursor: 'pointer', display: 'flex', color: '#fff' }}>
             <X size={18}/>
           </button>
         </div>
 
         {/* Body */}
-        <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: 18 }}>
+        <div className={studio ? 'studio-class-body' : undefined} style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: 18 }}>
 
+          <div className={studio ? "studio-class-fields" : undefined} style={studio ? undefined : { display: "contents" }}>
           {/* Title */}
           <div>
             <label style={lbl}><BookOpen size={13} color={T.accent}/> Class Title *</label>
@@ -124,12 +144,15 @@ export default function ClassModal({ isOpen, onClose, onSave, students, isDarkMo
               placeholder="e.g., Past Perfect Tense & Conditionals" style={inp}/>
           </div>
 
+
+          </div>
+          <div className={studio ? "studio-class-schedule" : undefined} style={studio ? undefined : { display: "contents" }}>
           {/* Date & Time + Duration */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+          <div className={studio ? 'studio-class-fields' : undefined} style={studio ? undefined : { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
             <div>
               <label style={lbl}><Calendar size={13} color="var(--as-accent-ink, #8b5cf6)"/> Date & Time *</label>
               <input type="datetime-local" value={time} onChange={e => setTime(e.target.value)} style={inp}/>
-              {studio && <small style={{ color: col.muted }}>Time on this device: {Intl.DateTimeFormat().resolvedOptions().timeZone}. Parents see the same moment in their own device’s time zone.</small>}
+              {studio && <small style={{ color: col.muted }}>Time zone: {Intl.DateTimeFormat().resolvedOptions().timeZone}</small>}
             </div>
             <div>
               <label style={lbl}><Clock size={13} color="var(--as-accent-ink, #f97316)"/> Duration *</label>
@@ -144,6 +167,18 @@ export default function ClassModal({ isOpen, onClose, onSave, students, isDarkMo
             </div>
           </div>
 
+          {studio && center && <div className="studio-class-payout">
+            <strong>Teacher payout per class</strong>
+            {customAmount === null ? <div>
+              <span>{studioMoney(Math.round(center.rateMinor * (center.payBasis === 'hour' ? Number(duration) / 60 : 1)), center.currency)} · Center default</span>{' '}
+              <button type="button" onClick={() => setCustomAmount('')}>Set class amount</button>
+            </div> : <div>
+              <label>Class amount ({center.currency})<input type="number" min="0" step={1 / currencyFactor(center.currency)} value={customAmount} onChange={e => setCustomAmount(e.target.value)} style={inp} /></label>
+              <button type="button" onClick={() => setCustomAmount(null)}>Use center default</button>
+            </div>}
+          </div>}
+          {studio && <ClassRecurrence recurrence={recurrence} start={time} />}
+          </div>
           {/* Students */}
           <div>
             <label style={lbl}><Users size={13} color={T.accent}/> {studioText("Select Students *")} ({selectedStudents.length} {studioText("selected")})</label>
@@ -158,13 +193,13 @@ export default function ClassModal({ isOpen, onClose, onSave, students, isDarkMo
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: col.heading, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                           {student.name}
-                          {student.isManaged && <ManagedBadge isDarkMode={isDarkMode} />}
+                          {!studio && student.isManaged && <ManagedBadge isDarkMode={isDarkMode} />}
                         </p>
-                        <p style={{ margin: 0, fontSize: 11, color: col.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {!studio && <p style={{ margin: 0, fontSize: 11, color: col.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {student.isManaged ? 'No login · you confirm attendance in the classroom' : student.email}
-                        </p>
+                        </p>}
                       </div>
-                      {isSelected && (
+                      {!studio && isSelected && (
                         <span style={{ fontSize: 11, fontWeight: 800, color: col.accent, background: col.accentBg, borderRadius: 999, padding: '2px 8px' }}>Selected</span>
                       )}
                     </label>
@@ -180,7 +215,7 @@ export default function ClassModal({ isOpen, onClose, onSave, students, isDarkMo
           </div>
 
           {/* Managed students: how attendance works */}
-          {selectedStudents.some(s => s.isManaged) && (
+          {!studio && selectedStudents.some(s => s.isManaged) && (
             <div style={{ background: isDarkMode ? 'rgba(245,158,11,0.12)' : '#fffbeb', border: `1.5px solid ${isDarkMode ? 'rgba(245,158,11,0.35)' : '#fde68a'}`, borderRadius: 12, padding: '12px 14px' }}>
               <p style={{ margin: 0, fontSize: 12, color: isDarkMode ? '#fcd34d' : '#92400e', fontWeight: 600, lineHeight: 1.5 }}>
                 <strong>Managed student:</strong> they don't use the app, so in the classroom press
@@ -190,11 +225,11 @@ export default function ClassModal({ isOpen, onClose, onSave, students, isDarkMo
           )}
 
           {/* Tip */}
-          <div style={{ background: col.accentBg, border: `1.5px solid ${isDarkMode ? T.softBorderDark : T.softBorder}`, borderRadius: 12, padding: '12px 14px' }}>
+          {!studio && <div style={{ background: col.accentBg, border: `1.5px solid ${isDarkMode ? T.softBorderDark : T.softBorder}`, borderRadius: 12, padding: '12px 14px' }}>
             <p style={{ margin: 0, fontSize: 12, color: isDarkMode ? T.softTextDark : T.softText, fontWeight: 600 }}>
               <strong>Tip:</strong> You can select multiple students for a group class. All selected students will be scheduled for the same class time.
             </p>
-          </div>
+          </div>}
         </div>
 
         {saveError && <p role="alert" style={{ color: '#b42318', padding: '0 24px' }}>{saveError}</p>}

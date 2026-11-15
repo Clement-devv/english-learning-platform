@@ -601,7 +601,7 @@ describe('private parent learning pages', () => {
     expect(usd.chargesTotal).toBe(sums.reduce((n, t) => n + t.chargesTotal, 0))
   })
   it('tracks a non-prepaid student balance once per attended completion and shows it to their family', async () => {
-    const c = (await call(teacher, 'post', '/managed-centers').send({ name: 'Counted classes', currency: 'USD', rateMinor: 500, payBasis: 'class', prepaid: false })).body.data
+    const c = (await call(teacher, 'post', '/managed-centers').send({ name: 'Counted classes', notificationEmail: 'office@example.test', currency: 'USD', rateMinor: 500, payBasis: 'class', prepaid: false })).body.data
     const created = await call(teacher, 'post', '/managed-students').send({ centerId: c._id, name: 'Balance pupil', classCount: 4 })
     expect(created.status).toBe(200)
     const pupil = created.body.data.id, family = root + '/family/' + created.body.data.parentLink.split('/').at(-1)
@@ -611,12 +611,14 @@ describe('private parent learning pages', () => {
     expect((await call(teacher, 'patch', `/work/${lesson.body.data._id}`).send({ complete: true })).status).toBe(200)
     expect((await call(teacher, 'patch', `/work/${lesson.body.data._id}`).send({ complete: true })).status).toBe(200)
     const page = await request(app).get(family).set('x-share-access', token)
-    expect(page.body.data.student.classesRemaining).toBe(3)
+    expect(page.body.data.student).toMatchObject({ classesRemaining: 3, classesUsed: 1 })
+    expect(page.body.data.manualCompletions).toMatchObject([{ classTitle: 'Counted lesson', completedAt: expect.any(String), scheduledTime: expect.any(String) }])
     expect((await call(teacher, 'patch', `/managed-students/${pupil}`).send({ classCount: 8 })).status).toBe(200)
     expect((await request(app).get(family).set('x-share-access', token)).body.data.student.classesRemaining).toBe(8)
     const otherPupil = (await call(teacher, 'post', '/managed-students').send({ centerId: c._id, name: 'Group balance', classCount: 3 })).body.data.id
     const group = await call(teacher, 'post', '/work').send({ centerId: c._id, studentIds: [pupil, otherPupil], group: true, title: 'Counted group', duration: 30, scheduledTime: new Date(Date.now() + 101 * 86400000).toISOString() })
     expect((await request(app).post(`${family}/schedule/${group.body.data._id}/absence`).set('x-share-access', token).send({ group: true })).status).toBe(200)
+    expect(sent.at(-1)).toMatchObject({ to: ['solo1@test.com', 'office@example.test'], centerName: c.name, subject: 'Student absence notification', text: expect.stringContaining('Counted group') })
     expect((await call(teacher, 'patch', `/work/${group.body.data._id}`).send({ complete: true })).status).toBe(200)
     const pupils = (await call(teacher, 'get', `/managed-students?centerId=${c._id}`)).body.data
     expect(pupils.find(s => s._id === pupil).classCredits).toBe(8)
@@ -739,3 +741,21 @@ describe('private parent learning pages', () => {
 
 
 
+
+it('reserves a whole series against paid credits', async () => {
+  const c = (await call(teacher, 'post', '/managed-centers').send({ name: 'Series', currency: 'USD', rateMinor: 500, payBasis: 'class' })).body.data
+  const pupil = (await call(teacher, 'post', '/managed-students').send({ centerId: c._id, name: 'Series pupil', classCount: 0 })).body.data
+  const dates = [300, 307, 314].map(days => new Date(Date.now() + days * 86400000).toISOString())
+  const book = scheduledDates => call(teacher, 'post', '/work').send({ centerId: c._id, studentId: pupil.id, title: 'Weekly lesson', classAmountMinor: 750, duration: 30, scheduledDates })
+  expect((await book([dates[0]])).status).toBe(400)
+  await call(teacher, 'patch', '/managed-students/' + pupil.id).send({ classCount: 2 })
+  expect((await book(dates)).status).toBe(400)
+  const series = await book(dates.slice(0, 2))
+  expect(series.status).toBe(200)
+  expect((await book([dates[2]])).status).toBe(400)
+  expect((await call(teacher, 'patch', '/work/' + series.body.data._id).send({ complete: true })).status).toBe(200)
+  const students = await call(teacher, 'get', '/managed-students?centerId=' + c._id)
+  expect(students.body.data[0]).toMatchObject({ classesUsed: 1, classCredits: 1 })
+  const history = await call(teacher, 'get', '/earnings/history?centerId=' + c._id)
+  expect(history.body.data.entries[0]).toMatchObject({ amountMinor: 750, basis: 'class' })
+})

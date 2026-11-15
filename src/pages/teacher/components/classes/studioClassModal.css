@@ -1,0 +1,12 @@
+.studio-class-dialog { display: flex; flex-direction: column; max-height: min(90vh, 90dvh); }
+.studio-class-body { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.studio-class-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.studio-class-schedule { display: grid; gap: 14px; padding-block: 18px; border-block: 1px solid var(--tm-line, #ccc); }
+.studio-class-payout { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px 16px; }
+.studio-class-payout > div { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.studio-class-dialog input[type="checkbox"] { width: 16px; height: 16px; flex: none; }
+.studio-class-dialog input, .studio-class-dialog select { min-width: 0; }
+@media (max-width: 600px) {
+  .studio-class-fields { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .studio-class-dialog .studio-class-body { padding: 16px !important; }
+}

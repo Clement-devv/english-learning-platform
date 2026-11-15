@@ -8,9 +8,9 @@ import api from '../../api';
 import { useAuth } from '../../context/AuthContext';
 import { teacherModeKey, studioClassroomState } from '../../utils/teacherMode';
 import './teacherMode.css';
-import TeacherResources from './TeacherResources';
-import TeacherCalendar from './TeacherCalendar';
-import TeacherClassHistory from './TeacherClassHistory';
+const TeacherResources = lazy(() => import('./TeacherResources'));
+const TeacherCalendar = lazy(() => import('./TeacherCalendar'));
+const TeacherClassHistory = lazy(() => import('./TeacherClassHistory'));
 import { joinGroupClass } from '../../components/groupClass/joinGroupClass';
 const Reviews = lazy(() => import('../teacher/tabs/ReviewsTab'));
 const Ratings = lazy(() => import('../teacher/tabs/RatingDashboardTab'));
@@ -19,9 +19,12 @@ const Schedule = lazy(() => import('../teacher/tabs/ScheduleTab'));
 const ClassSummaries = lazy(() => import('../teacher/tabs/ClassSummariesTab'));
 import TeacherWorkspaceOverview from './TeacherWorkspaceOverview';
 import TeacherGlassFooter from './TeacherGlassFooter';
-import { LessonsSection, EarningsSection, ConversationsSection } from './StudioManagementTabs';
-import { CentersSection, StudentsSection } from './StudioDirectoryTabs';
-import TeacherParentLinks from './TeacherParentLinks';
+const LessonsSection = lazy(() => import('./StudioManagementTabs').then(module => ({ default: module.LessonsSection })));
+const EarningsSection = lazy(() => import('./StudioManagementTabs').then(module => ({ default: module.EarningsSection })));
+const ConversationsSection = lazy(() => import('./StudioManagementTabs').then(module => ({ default: module.ConversationsSection })));
+const CentersSection = lazy(() => import('./StudioDirectoryTabs').then(module => ({ default: module.CentersSection })));
+const StudentsSection = lazy(() => import('./StudioDirectoryTabs').then(module => ({ default: module.StudentsSection })));
+const TeacherParentLinks = lazy(() => import('./TeacherParentLinks'));
 import './teacherStudioDirectories.css';
 import { StudioIntro } from './StudioUI';
 import './teacherStudioSections.css';
@@ -43,13 +46,13 @@ const toolCopy = {
 };
 const tabs = [
   ['overview', 'Overview', BookOpen], ['classes', 'Classes & updates', CalendarDays], ['centers', 'My centers', Building2],
-  ['students', 'Students', Users], ['parent-links', 'Parent links', Link2],
+  ['students', 'Students', Users], ['completed-classes', 'Completed classes', ShieldCheck],
+  ['class-summaries', 'Class summaries', BookOpen], ['recordings', 'Recordings', Video], ['parent-links', 'Parent links', Link2],
   ['schedule', 'Schedule', CalendarDays], ['availability', 'Working hours & time off', CalendarDays],
   ['student-progress', 'Student progress', GraduationCap], ['reviews', 'Reviews', MessageCircle], ['ratings', 'Rating dashboard', ListChecks],
-  ['completed-classes', 'Completed classes', ShieldCheck], ['class-summaries', 'Class summaries', BookOpen],
   ['homework', 'Homework', GraduationCap], ['quizzes', 'Quizzes', ListChecks],
   ['games', 'Games', Gamepad2], ['vocab', 'Vocabulary', BookOpen],
-  ['recordings', 'Recordings', Video], ['resources', 'Teaching library', BookOpen],
+  ['resources', 'Teaching library', BookOpen],
   ['parents', 'Parent responses', Link2], ['earnings', 'Earnings', Wallet],
   ['messages', 'Clemify messages', MessageCircle], ['profile', 'Profile & security', Users],
 ];
@@ -66,12 +69,17 @@ export default function TeacherModeDashboard() {
   const [studentCenterFilter, setStudentCenterFilter] = useState('');
   const filteredStudents = students.filter(s => !centerId || String(s.managedCenterId) === centerId);
   const filteredWork = work.filter(w => !centerId || String(w.managedCenterId) === centerId);
+  const pendingMaterials = {
+    'class-summaries': filteredWork.filter(w => w.needsSummary).length,
+    recordings: filteredWork.filter(w => w.needsRecording).length,
+  };
   const current = centers.find(c => c._id === centerId);
   const activeRefresh = useRef(null);
   const retryAfter = useRef(0);
   const failures = useRef(0);
   const failedPaths = useRef([]);
   const [refreshError, setRefreshError] = useState('');
+  const needsEarnings = tab === 'earnings';
   const refresh = useCallback(async (options = {}) => {
     if (!teacherModeKey()) { navigate('/teacher-mode/login', { replace: true }); return; }
     if (options?.background && activeRefresh.current) return;
@@ -81,7 +89,7 @@ export default function TeacherModeDashboard() {
     const sections = [
       ['/managed-centers', 'centers', setCenters], ['/managed-students', 'students', setStudents],
       ['/work', 'classes', setWork], ['/earnings', 'earnings', setEarnings], ['/messages', 'messages', setMessages],
-    ].filter(([path]) => !options?.failedOnly || failedPaths.current.includes(path));
+    ].filter(([path]) => (path !== '/earnings' || needsEarnings) && (!options?.failedOnly || failedPaths.current.includes(path)));
     const results = await Promise.allSettled(sections.map(async ([path, , update]) => {
       const response = await api.get(path, { signal: controller.signal });
       if (!controller.signal.aborted) update(response.data.data);
@@ -94,7 +102,7 @@ export default function TeacherModeDashboard() {
     failures.current = failed.length ? Math.min(4, failures.current + 1) : 0;
     retryAfter.current = Date.now() + Math.min(300000, 30000 * 2 ** failures.current);
     setLoading(false);
-  }, [navigate]);
+  }, [navigate, needsEarnings, centerId]);
   useEffect(() => {
     const check = (resume = false) => {
       if (!document.hidden && navigator.onLine !== false && (resume || Date.now() >= retryAfter.current)) {
@@ -138,20 +146,20 @@ export default function TeacherModeDashboard() {
     <aside className="tm-sidebar">
       <a className="tm-brand" href="/teacher-mode/dashboard"><span className="tm-brand-symbol" aria-hidden="true">E.</span><span className="tm-brand-name">E.G.O<span>THE TEACHER STUDIO</span></span></a>
       <div className="tm-studio-badge"><span className="tm-status-dot" />{studioText("Independent workspace")}</div>
-      <nav aria-label="Teacher workspace">{tabs.map(([id, label, Icon]) => <div className="tm-nav-item" key={id}>{['overview', 'homework', 'parents'].includes(id) && <span className="tm-nav-label">{id === 'overview' ? 'YOUR WORKSPACE' : id === 'homework' ? 'TEACHING TOOLS' : 'CONNECTIONS & BUSINESS'}</span>}<button className={tab === id ? 'active' : ''} aria-current={tab === id ? 'page' : undefined} onClick={() => switchTab(id)}><Icon size={17} strokeWidth={1.6} /><span>{studioText(label)}</span>{id === 'parents' && unreadParents > 0 && <span className="tm-unread-count">{unreadParents}</span>}</button></div>)}</nav>
+      <nav aria-label="Teacher workspace">{tabs.map(([id, label, Icon]) => <div className="tm-nav-item" key={id}>{['overview', 'homework', 'parents'].includes(id) && <span className="tm-nav-label">{id === 'overview' ? 'YOUR WORKSPACE' : id === 'homework' ? 'TEACHING TOOLS' : 'CONNECTIONS & BUSINESS'}</span>}<button className={tab === id ? 'active' : ''} aria-current={tab === id ? 'page' : undefined} onClick={() => switchTab(id)}><Icon size={17} strokeWidth={1.6} /><span>{studioText(label)}</span>{pendingMaterials[id] > 0 && <span className="tm-material-reminder" aria-label={pendingMaterials[id] + ' classes to share with families'}>{pendingMaterials[id]}</span>}{id === 'parents' && unreadParents > 0 && <span className="tm-unread-count">{unreadParents}</span>}</button></div>)}</nav>
       <div className="tm-sidebar-bottom"><div className="tm-sidebar-note"><span className="tm-eyebrow">A WINDOW INTO LEARNING</span><p>Great teaching.<br />Worth sharing.</p><button onClick={() => switchTab('parent-links')}>{studioText("Create a parent link")}<ArrowUpRight size={14} /></button></div>
       <div className="tm-sidebar-controls"><StudioLanguageSwitch /><button onClick={toggleDark} aria-label={dark ? 'Switch to light appearance' : 'Switch to dark appearance'}><SunMoon size={16} />{studioText(dark ? 'Evening' : 'Daylight')}</button><button aria-label="Sign out" onClick={() => { auth.logout(); sessionStorage.removeItem('teacherModeCenter'); navigate('/teacher-mode/login'); }}><LogOut size={16} />{studioText("Sign out")}</button></div>
       <button className="tm-account" onClick={() => switchTab('profile')}><span className="tm-avatar">{teacherInfo.firstName?.slice(0, 1) || 'T'}</span><span><strong>{[teacherInfo.firstName, teacherInfo.lastName].filter(Boolean).join(' ') || 'My account'}</strong><small>Independent teacher</small></span><ArrowUpRight size={15} /></button></div>
     </aside>
     <section className="tm-main" id="teacher-workspace-content" tabIndex={-1}>
       <header className="tm-header"><div><span className="tm-eyebrow">YOUR SPACE TO MAKE A DIFFERENCE</span><h1>{tab === 'overview' ? studioText('The teacher studio') : studioText(tabs.find(t => t[0] === tab)?.[1])}</h1></div><div className="tm-header-controls"><span className="tm-header-date">{new Intl.DateTimeFormat(undefined, { weekday: 'short', month: 'short', day: 'numeric' }).format(new Date())}</span>{!['students', 'parent-links'].includes(tab) && <label><span>{studioText("Workspace view")}</span><select value={centerId} onChange={e => setCenterId(e.target.value)}><option value="">{studioText("All centers")}</option>{centers.map(c => <option key={c._id} value={c._id}>{c.name}{c.archived ? ' · archived' : ''}</option>)}</select></label>}</div></header>
-      {error && <div role="alert" className="tm-notice tm-error">{error}</div>}{refreshError && <div role="alert" className="tm-notice tm-error">{refreshError} <button onClick={() => refresh({ failedOnly: true })}>Retry</button></div>}{notice && <p role="status" className="tm-notice">{notice}</p>}{loading ? <div className="tm-card" role="status">Loading your workspace…</div> : <>
+      {error && <div role="alert" className="tm-notice tm-error">{error}</div>}{refreshError && <div role="alert" className="tm-notice tm-error">{refreshError} <button onClick={() => refresh({ failedOnly: true })}>Retry</button></div>}{notice && <p role="status" className="tm-notice">{notice}</p>}{loading ? <div className="tm-card" role="status">Loading your workspace…</div> : <Suspense fallback={<div className="tm-card" role="status">Loading tab…</div>}>
       {tab === 'overview' && <TeacherWorkspaceOverview teacher={teacherInfo} centers={centers} students={filteredStudents} work={filteredWork} messages={messages.filter(m => !centerId || filteredStudents.some(s => s._id === m.studentId))} onNavigate={switchTab} />}
       {tab === 'centers' && <CentersSection centers={centers} students={students} busy={busy} run={run} onViewStudents={id => switchTab('students', { centerId: id })} />}
       {tab === 'students' && <StudentsSection centers={centers} students={students} busy={busy} run={run} refresh={refresh} centerFilter={studentCenterFilter} onCenterFilter={setStudentCenterFilter} />}
       {tab === 'parent-links' && <TeacherParentLinks centers={centers} students={students} busy={busy} run={run} copy={copy} onOpenTool={(kind, id) => { setCenterId(String(id)); switchTab({ homework: 'homework', quiz: 'quizzes', game: 'games', recording: 'recordings' }[kind]); }} />}
       {tab === 'classes' && <LessonsSection key={centerId} centerId={centerId} center={current} centers={centers} students={filteredStudents} work={filteredWork} busy={busy} run={run} refresh={refresh} onNavigate={switchTab} onCenterChange={setCenterId} isDarkMode={dark} onJoin={b => b.isGroupClass ? joinGroupClass(b, { before: () => b.status === 'in-progress' ? Promise.resolve() : api.patch(`/group-classes/${b._id}/start`), onAgora: c => navigate('/classroom', { state: studioClassroomState(c, teacherInfo) }), onError: setError }).then(refresh) : navigate('/classroom', { state: studioClassroomState(b, teacherInfo) })} />}
-      {['reviews', 'ratings', 'student-progress'].includes(tab) && <Suspense fallback={<p role="status">Loading teaching tools…</p>}><div className="tm-tool">{tab === 'reviews' ? <Reviews key={centerId} {...props} /> : tab === 'ratings' ? <Ratings key={centerId} isDarkMode={dark} /> : <StudentProgress isDarkMode={dark} students={filteredStudents.map(s => ({ ...s, id: s._id, name: [s.firstName, s.lastName].filter(Boolean).join(' '), progress: s.classCredits, assignedDate: s.createdAt }))} />}</div></Suspense>}
+      {['reviews', 'ratings', 'student-progress'].includes(tab) && <Suspense fallback={<p role="status">Loading teaching tools…</p>}><div className="tm-tool">{tab === 'reviews' ? <Reviews key={centerId} {...props} /> : tab === 'ratings' ? <Ratings key={centerId} isDarkMode={dark} /> : <StudentProgress isDarkMode={dark} students={filteredStudents.map(s => ({ ...s, id: s._id, name: [s.firstName, s.lastName].filter(Boolean).join(' '), paidProgress: (s.classesUsed || 0) + "/" + ((s.classesUsed || 0) + (s.classCredits || 0)), progress: s.classCredits, assignedDate: s.createdAt }))} />}</div></Suspense>}
       {tab === 'completed-classes' && <TeacherClassHistory refreshKey={work} onChanged={refresh} teacherInfo={teacherInfo} centerId={centerId} centers={centers} onCenterChange={setCenterId} onNavigate={switchTab} />}
       {['class-summaries', 'availability'].includes(tab) && <Suspense fallback={<p role="status">Loading teaching tools…</p>}><div className="tm-tool">{tab === 'class-summaries' ? <ClassSummaries key={centerId} studio isDarkMode={dark} /> : <Schedule teacherInfo={teacherInfo} isDarkMode={dark} students={filteredStudents} studio />}</div></Suspense>}
       {tab === 'schedule' && <TeacherCalendar work={filteredWork} centers={centers} onLesson={() => switchTab('classes')} />}
@@ -160,5 +168,5 @@ export default function TeacherModeDashboard() {
       {['homework', 'quizzes', 'games', 'recordings', 'vocab'].includes(tab) && <><StudioIntro eyebrow={toolCopy[tab][0]} title={toolCopy[tab][1]}>{toolCopy[tab][2]}</StudioIntro><div className={`tm-tool tm-tool-${tab}`}><Suspense fallback={<div className="tm-card" role="status">Loading teaching tools…</div>}>{tab === 'homework' && <Homework key={centerId} {...props} />}{tab === 'quizzes' && <Quiz key={centerId} {...props} />}{tab === 'games' && <Games key={centerId} isDarkMode={dark} />}{tab === 'recordings' && <Recordings key={centerId} isDarkMode={dark} studio />}{tab === 'vocab' && <Vocab key={centerId} {...props} />}</Suspense></div></>}
       {tab === 'earnings' && <EarningsSection earnings={earnings} onCenterChange={setCenterId} centerId={centerId} center={current} busy={busy} run={run} onNavigate={switchTab} />}
       {['parents', 'messages'].includes(tab) && <ConversationsSection key={tab} platform={tab === 'messages'} students={filteredStudents} messages={messages.filter(m => !m.studentId || filteredStudents.some(s => s._id === m.studentId))} recipient={recipient} setRecipient={setRecipient} busy={busy} run={run} />}
-      </>}<TeacherGlassFooter compact={tab !== 'overview'} onNavigate={switchTab} dark={dark} onToggleDark={toggleDark} /></section></main>;
+      </Suspense>}<TeacherGlassFooter compact={tab !== 'overview'} onNavigate={switchTab} dark={dark} onToggleDark={toggleDark} /></section></main>;
 }

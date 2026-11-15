@@ -125,7 +125,7 @@ describe('parent learning page', () => {
     fireEvent.change(screen.getByLabelText('Student’s name'), { target: { value: 'Linh' } });
     fireEvent.click(screen.getByRole('button', { name: 'Open learning page' }));
     expect(await screen.findByText('Read page 4 together')).toBeInTheDocument();
-    expect(screen.getByText('Classes low · please contact your teacher')).toBeInTheDocument();
+    expect(screen.getByText('Classes low. Please contact the admin.')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Reading practice/ })).toHaveAttribute('href', '/hw/opaque?workspace=tw-synthetic');
     fireEvent.change(screen.getByLabelText('Your message'), { target: { value: 'Thank you for the update.' } });
     fireEvent.click(screen.getByRole('button', { name: 'Send to teacher' }));

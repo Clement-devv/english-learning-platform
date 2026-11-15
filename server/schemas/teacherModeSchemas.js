@@ -6,6 +6,7 @@ export const teacherChargeVersionSchema = new mongoose.Schema({
   rules: [{ name: { type: String, required: true, maxlength: 60 }, kind: { type: String, enum: ['percent', 'fixed'], required: true }, value: { type: Number, min: 0, required: true }, currency: { type: String, default: '' }, centerIds: { type: [O], default: [] } }],
 }, { timestamps: true });
 export const managedCenterSchema = new mongoose.Schema({
+  notificationEmail: { type: String, default: "", trim: true, lowercase: true, maxlength: 254 },
   name: { type: String, required: true, maxlength: 120 },
   currency: { type: String, default: 'USD', match: /^[A-Z]{3}$/ },
   payBasis: { type: String, enum: ['class', 'hour'], default: 'class' },
@@ -14,6 +15,8 @@ export const managedCenterSchema = new mongoose.Schema({
   prepaid: { type: Boolean, default: false },
   archived: { type: Boolean, default: false },
   dailyReportLastDate: String,
+  weeklyReportStart: Date,
+  weeklyReportLastDate: String,
   meetingUrl: { type: String, default: '', maxlength: 1000 },
 }, { timestamps: true });
 export const teacherWorkSchema = new mongoose.Schema({

@@ -98,6 +98,10 @@ export async function getOrCreateLink(db, cls, studentId) {
 /** When the class's videos are deleted (= when the link stops working), or null if there is nothing to watch. */
 export async function linkExpiry(db, link) {
   const recs = await getRecording(db).find(classFilter(link)).select("source autoDeleteAt").lean();
+  return expiryFromRecordings(recs, link);
+}
+
+export function expiryFromRecordings(recs, link) {
   const app = recs.filter((r) => r.source !== "external" && r.autoDeleteAt);
   if (app.length) return new Date(Math.max(...app.map((r) => new Date(r.autoDeleteAt).getTime())));
   if (recs.length) return new Date(new Date(link.createdAt || Date.now()).getTime() + 30 * DAY); // saved Zoom / Meet links only

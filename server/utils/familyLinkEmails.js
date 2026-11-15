@@ -6,6 +6,7 @@
 // Automatic sends follow the switches in utils/familyEmailPrefs.js (parentCheckEmails,
 // shareLinkEmails). The "Email to family" buttons send now, regardless of the switches.
 // Each record remembers when it was emailed (and whether by hand) so it goes out once.
+import { teacherModeModels } from "../schemas/teacherModeSchemas.js";
 import { bookingSchema } from "../schemas/bookingSchema.js";
 import { homeworkSchema } from "../schemas/homeworkSchema.js";
 import { quizSchema } from "../schemas/quizSchema.js";
@@ -33,11 +34,14 @@ const tokenOf = (doc) => { try { return doc?.shareLink?.tokenEnc ? decrypt(doc.s
 /** The managed student's family address, if this kind of email may go to them. { student, to } | reason string */
 async function familyOf(db, studentId, kind, force) {
   const student = await getStudent(db).findById(studentId)
-    .select(`+notifyEmail firstName isManaged emailLanguage timezone ${kind}`).lean();
+    .select(`+notifyEmail firstName isManaged standaloneManaged managedCenterId emailLanguage timezone ${kind}`).lean();
   const to = student?.isManaged ? (student.notifyEmail || "").trim() : "";
   if (!to) return "no-email";
   if (!force && !prefOn(student, await loadCenterSettings(db), kind)) return "off";
-  return { student, to };
+  const managed = student.standaloneManaged && student.managedCenterId
+    ? await teacherModeModels(db).ManagedCenter.findById(student.managedCenterId).select('name').lean()
+    : null;
+  return { student, to, centerName: managed?.name };
 }
 
 // ── Parent attendance check ──────────────────────────────────────────────────
@@ -68,7 +72,7 @@ export async function emailParentCheck(db, center, bookingId, { force = false } 
     await sendParentCheckLinkEmail({
       student: fam.student, to: fam.to, cls: { title: b.classTitle, scheduledTime: b.scheduledTime },
       teacherName: teacherShown(teacher), url: centerPublicLink(center, `/ac/${token}`), expiresAt,
-      center, centerName: center?.centerName,
+      center, centerName: fam.centerName || center?.centerName,
     });
     return "sent";
   } catch (err) {
@@ -133,7 +137,7 @@ export async function emailShareLink(db, center, kind, id, { force = false } = {
     await sendShareLinkEmail({
       kind, student: fam.student, to: fam.to, title: doc.title, dueDate: doc.dueDate,
       teacherName: teacherShown(teacher), url: centerPublicLink(center, `/${path}/${token}`),
-      center, centerName: center?.centerName,
+      center, centerName: fam.centerName || center?.centerName,
     });
     return "sent";
   } catch (err) {

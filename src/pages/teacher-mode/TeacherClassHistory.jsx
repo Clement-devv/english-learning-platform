@@ -1,3 +1,4 @@
+import { useClassConfirmation } from './ClassConfirmation';
 import { studioText } from './studioLanguage';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import api from '../../api';
@@ -13,6 +14,7 @@ export default function TeacherClassHistory({
   refreshKey,
   onChanged,
 }) {
+  const { ask, dialog } = useClassConfirmation();
   const [view, setView] = useState('completed'),
     [q, setQ] = useState(''),
     [page, setPage] = useState(1);
@@ -110,9 +112,9 @@ export default function TeacherClassHistory({
   const changeOutcome = async (lesson, completed) => {
     let reason;
     if (completed) {
-      reason = window.prompt('Why are you unmarking this class? Its earnings and recorded credit deductions will be reversed, and its summary removed.');
+      reason = await ask({ title: 'Unmark class as taught?', message: lesson.title + ' · Its earnings and recorded credit deductions will be reversed, and its summary removed.', reason: true, action: 'Unmark as taught' });
       if (reason === null) return;
-    } else if (!window.confirm('Mark this class as taught? Its booked earnings and attendance credits will be applied.')) return;
+    } else if (!(await ask({ title: 'Mark class as taught?', message: lesson.title + ' · Its booked earnings and attendance credits will be applied.', action: 'Mark as taught' }))) return;
     setSaving(true); setError('');
     try { await api.patch(`/work/${lesson.id}`, completed ? { action: 'unmark', reason } : { complete: true }); await onChanged?.(); await load(); }
     catch (e) { setError(e.response?.data?.message || 'Could not update this class.'); }
@@ -123,6 +125,7 @@ export default function TeacherClassHistory({
   }, [view, q, from, to, centerId]);
   return (
     <>
+      {dialog}
       <StudioIntro eyebrow="YOUR TEACHING RECORD" title="Every lesson, accounted for.">
         Review completed and missed classes. You decide when a lesson is taught and when its summary
         is shared with families.

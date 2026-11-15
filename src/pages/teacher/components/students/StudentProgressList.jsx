@@ -26,7 +26,7 @@ function StudentDetailModal({ student, isDarkMode, onClose }) {
   const modalBg   = dm ? "bg-gray-800"   : "bg-white";
   const text      = dm ? "text-gray-100" : "text-gray-900";
   const subText   = dm ? "text-gray-400" : "text-gray-500";
-  const divider   = dm ? "divide-gray-700" : "divide-gray-100";
+  const divider   = dm ? "divide-gray-700" : "divide-gray-100";
   const dob     = formatDob(student.dateOfBirth);
   const age     = calcAge(student.dateOfBirth) ?? student.age;
   const initials = student.name
@@ -36,7 +36,7 @@ function StudentDetailModal({ student, isDarkMode, onClose }) {
   const rows = [
     { icon: Award,    label: "Rank / Level",       value: student.rank || "—" },
     { icon: Calendar, label: "Date of Birth",       value: dob ? `${dob}${age ? ` (age ${age})` : ""}` : age ? `Age ${age}` : "—" },
-    { icon: BookOpen, label: "Classes remaining",   value: student.progress ?? 0 },
+    { icon: BookOpen, label: student.paidProgress ? "Paid classes used" : "Classes remaining", value: student.paidProgress ?? student.progress ?? 0 },
     { icon: TrendingUp, label: "Status",            value: student.active ? "Active" : "Inactive",
       badge: student.active
         ? dm ? "bg-emerald-900 text-emerald-300" : "bg-emerald-100 text-emerald-700"
@@ -239,7 +239,7 @@ export default function StudentProgressList({ students, isDarkMode }) {
                   </div>
                   <div className="flex items-center gap-1.5">
                     <TrendingUp className="w-3.5 h-3.5 flex-shrink-0" />
-                    <span>{student.progress ?? 0} classes remaining</span>
+                    <span>{student.paidProgress ? student.paidProgress + " paid classes used" : (student.progress ?? 0) + " classes remaining"}</span>
                   </div>
                 </div>
 
@@ -306,7 +306,7 @@ export default function StudentProgressList({ students, isDarkMode }) {
       {/* Detail modal */}
       {selected && (
         <StudentDetailModal
-          student={selected}
+          student={students.find(s => s.id === selected.id) || selected}
           isDarkMode={isDarkMode}
           onClose={() => setSelected(null)}
         />

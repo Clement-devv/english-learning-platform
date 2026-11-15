@@ -9,7 +9,7 @@ import {
   buildStandaloneStatement,
 } from '../services/standaloneStatement.js';
 import { renderStandaloneStatementPdf, statementMoney } from '../utils/standaloneStatementPdf.js';
-import { dueReportDate, deliverStandaloneDailyReport } from '../utils/standaloneDailyReports.js';
+import { dueReportDate, deliverStandaloneDailyReport, deliverWeeklyStudentCounts } from '../utils/standaloneDailyReports.js';
 vi.mock('../emails/core.js', () => ({
   sendEmail: vi.fn(() => {
     throw new Error('Real mail disabled in tests');
@@ -241,7 +241,7 @@ describe('standalone statements', () => {
       .mockResolvedValueOnce({ success: false, error: 'Offline' })
       .mockResolvedValue({ success: true });
     const now = new Date('2026-11-10T17:01:00Z');
-    const reportCenter = { _id: center, name: 'Test center' };
+    const reportCenter = { _id: center, name: 'Test center', notificationEmail: 'center@example.test' };
     await expect(
       deliverStandaloneDailyReport(db, workspace, teacher, reportCenter, now, send)
     ).rejects.toThrow('Offline');
@@ -252,7 +252,11 @@ describe('standalone statements', () => {
       await deliverStandaloneDailyReport(db, workspace, teacher, reportCenter, now, send)
     ).toBe('2026-11-10');
     expect(send).toHaveBeenCalledTimes(2);
-    expect(send.mock.calls[1][0].to).toBe('teacher@example.test');
+
+    const html = send.mock.calls[1][0].html;
+    for (const value of ['data-em-layout', 'Test center', 'Completed (2)', 'Not completed (1)', 'Speaking practice', 'No one joined.']) {
+      expect(html).toContain(value);
+    }
     expect(send.mock.calls[1][0].attachments).toBeUndefined();
     expect(send.mock.calls[1][0].text).toContain('Not completed: 1');
     expect(send.mock.calls[1][0].text).toContain('Speaking practice | Individual | 45 min | No one joined.');
@@ -266,6 +270,10 @@ describe('standalone statements', () => {
       '2026-11-10'
     );
     expect(send).toHaveBeenCalledTimes(3);
+    expect(send.mock.calls[1][0].to).toEqual([teacher.email, reportCenter.notificationEmail]);
+    expect(send.mock.calls[2][0].to).toBe(teacher.email);
+    expect(send.mock.calls[1][0].centerName).toBe('Test center');
+    expect(send.mock.calls[2][0].centerName).toBe('Second center');
     expect(send.mock.calls[1][0].subject).toContain('Test center');
     expect(send.mock.calls[1][0].text).toContain('Completed classes: 2');
     expect(send.mock.calls[2][0].subject).toContain('Second center');
@@ -276,4 +284,29 @@ describe('standalone statements', () => {
     );
     expect(send).toHaveBeenCalledTimes(3);
   });
+});
+
+it('sends paid class progress to the center at the end of the calendar week, once per week', async () => {
+  const db = global.__TEST_DB__.useDb('weekly-progress', { useCache: true });
+  const id = () => new mongoose.Types.ObjectId();
+  const center = { _id: id(), name: 'E.G.O', notificationEmail: 'office@example.test', weeklyReportStart: new Date('2026-11-08T09:00:00Z') };
+  const teacher = { _id: id(), firstName: 'Amara', timezone: 'Asia/Ho_Chi_Minh' };
+  const student = id();
+  await db.collection('students').insertMany([
+    { _id: student, managedCenterId: center._id, standaloneManaged: true, firstName: 'Linh', classCredits: 5 },
+    { managedCenterId: id(), standaloneManaged: true, firstName: 'Other center', classCredits: 4 },
+  ]);
+  await db.collection('bookings').insertMany(Array.from({length:5}, () => ({ status: 'completed', standaloneCompletion: { chargedStudentIds: [student] } })));
+  const send = vi.fn().mockResolvedValue({ success: true });
+  const report = date => deliverWeeklyStudentCounts(db, {}, teacher, center, new Date(date), send);
+  await report('2026-11-08T16:59:59Z');
+  expect(send).not.toHaveBeenCalled();
+  await report('2026-11-08T17:00:00Z');
+  await report('2026-11-08T17:01:00Z');
+  expect(send).toHaveBeenCalledTimes(1);
+  expect(send.mock.calls[0][0]).toMatchObject({ to: center.notificationEmail, text: expect.stringContaining('Linh: 5/10') });
+  expect(send.mock.calls[0][0].text).not.toContain('Other center');
+  await db.collection('students').updateOne({ _id: student }, { $inc: { classCredits: 5 } });
+  await report('2026-11-15T17:00:00Z');
+  expect(send.mock.calls[1][0].text).toContain('Linh: 5/15');
 });

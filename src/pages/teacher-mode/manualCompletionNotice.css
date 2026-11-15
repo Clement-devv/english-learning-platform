@@ -1,0 +1,9 @@
+.tm-manual-notice { box-sizing: border-box; max-width: 100%; min-width: 0; overflow-wrap: anywhere; border: 1px solid #bc4853; border-radius: 12px; background: #8b1823; color: white; overflow: hidden; padding: .65rem 1rem; font-weight: 600; }
+.tm-notice-track { display: flex; gap: 3rem; width: max-content; padding-inline-start: 100%; animation: tm-notice-scroll linear infinite; }
+.tm-notice-track span { white-space: nowrap; }
+.tm-manual-notice:hover .tm-notice-track, .tm-manual-notice:focus .tm-notice-track { animation-play-state: paused; }
+@keyframes tm-notice-scroll { to { transform: translateX(-100%); } }
+@media (prefers-reduced-motion: reduce) {
+  .tm-notice-track { display: grid; gap: .5rem; width: auto; padding: 0; animation: none; }
+  .tm-notice-track span { white-space: normal; }
+}

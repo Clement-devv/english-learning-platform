@@ -10,7 +10,7 @@ const invalid = message => Object.assign(new Error(message), { statusCode: 400 }
 
 // Every standalone completion entry point uses the same atomic claim. A retry
 // cannot charge twice, and the booked rate/credit policy survives later edits.
-export async function completeStandaloneLesson(db, lesson, teacherId, attendance) {
+export async function completeStandaloneLesson(db, lesson, teacherId, attendance, manual = false) {
   if (String(lesson.teacherId?._id || lesson.teacherId) !== String(teacherId) || !lesson.standalonePay?.currency)
     throw invalid('This is not your standalone lesson.');
   const group = !!lesson.enrollments;
@@ -42,29 +42,50 @@ export async function completeStandaloneLesson(db, lesson, teacherId, attendance
   }
   await model(db, 'Teacher', teacherSchema).updateOne({ _id: teacherId }, { $inc: { lessonsCompleted: 1 } });
   if (!group) await model(db, 'ClassroomSession', classroomSessionSchema).updateOne({ bookingId: lesson._id }, { $set: { status: 'completed', classEndedAt: now } });
-  await Class.updateOne({ _id: lesson._id, 'standaloneCompletion.state': 'applying' }, { $set: { standaloneCompletion: { state: 'applied', chargedStudentIds: charged } } });
+  await Class.updateOne({ _id: lesson._id, 'standaloneCompletion.state': 'applying' }, { $set: { standaloneCompletion: { state: 'applied', manual, chargedStudentIds: charged } } });
   return claimed;
 }
 
-export async function uncompleteStandaloneLesson(db, lesson, teacherId, reason) {
+// Identify the most recent local payday, clamping the 29th–31st in short months.
+function payPeriodStart(instant, timezone, payday) {
+  const parts = new Intl.DateTimeFormat('en', { timeZone: timezone, year: 'numeric', month: 'numeric', day: 'numeric' }).formatToParts(instant);
+  const { year, month, day } = Object.fromEntries(parts.map(p => [p.type, Number(p.value)]));
+  const boundary = monthIndex => Date.UTC(year, monthIndex, Math.min(payday, new Date(Date.UTC(year, monthIndex + 1, 0)).getUTCDate()));
+  const current = boundary(month - 1);
+  return Date.UTC(year, month - 1, day) >= current ? current : boundary(month - 2);
+}
+
+export async function uncompleteStandaloneLesson(db, lesson, teacherId, reason, workspaceTimezone = 'UTC', now = new Date()) {
   if (String(lesson.teacherId?._id || lesson.teacherId) !== String(teacherId) || !lesson.standalonePay?.currency) throw invalid('This is not your standalone lesson.');
   if (lesson.status === 'missed') return lesson;
   if (lesson.status !== 'completed') throw invalid('Only a completed class can be unmarked.');
-  if (!lesson.standaloneCompletion?.state) throw invalid('This older class has no credit deduction audit. Its credits must be reviewed before completion can be reversed.');
-  if (lesson.standaloneCompletion.state !== 'applied') throw invalid('This class is still being updated. Please retry.');
+  const state = lesson.standaloneCompletion?.state;
+  if (!state) {
+    const [center, teacher] = await Promise.all([
+      teacherModeModels(db).ManagedCenter.findById(lesson.managedCenterId).select('salaryDay').lean(),
+      model(db, 'Teacher', teacherSchema).findById(teacherId).select('timezone').lean(),
+    ]);
+    if (!center) throw invalid('The center for this class could not be found.');
+    const zone = teacher?.timezone || workspaceTimezone || 'UTC';
+    const payday = center.salaryDay || 31;
+    const earnedAt = lesson.completedAt || lesson.scheduledTime;
+    if (!earnedAt || earnedAt > now || payPeriodStart(earnedAt, zone, payday) !== payPeriodStart(now, zone, payday)) {
+      throw invalid('This older class falls outside the current pay period for its center.');
+    }
+  } else if (state !== 'applied') throw invalid('This class is still being updated. Please retry.');
   const group = !!lesson.enrollments, Class = model(db, group ? 'GroupClass' : 'Booking', group ? groupClassSchema : bookingSchema);
-  const claim = await Class.findOneAndUpdate({ _id: lesson._id, teacherId, status: 'completed', 'standaloneCompletion.state': 'applied' }, { $set: { 'standaloneCompletion.state': 'reversing' } }, { new: true });
+  const claim = await Class.findOneAndUpdate({ _id: lesson._id, teacherId, status: 'completed', 'standaloneCompletion.state': state || null }, { $set: { 'standaloneCompletion.state': 'reversing' } }, { new: true });
   if (!claim) throw invalid('This class is being updated. Please retry.');
   const Student = model(db, 'Student', studentSchema), refunded = [];
   try {
-    for (const id of claim.standaloneCompletion.chargedStudentIds) {
+    for (const id of claim.standaloneCompletion.chargedStudentIds || []) {
       const r = await Student.updateOne({ _id: id }, { $inc: { classCredits: 1 } });
       if (!r.matchedCount) throw invalid('A charged student could not be found. Please review this class.');
       refunded.push(id);
     }
   } catch (error) {
     for (const id of refunded) await Student.updateOne({ _id: id }, { $inc: { classCredits: -1 } });
-    await Class.updateOne({ _id: lesson._id, 'standaloneCompletion.state': 'reversing' }, { $set: { 'standaloneCompletion.state': 'applied' } });
+    await Class.updateOne({ _id: lesson._id, 'standaloneCompletion.state': 'reversing' }, state ? { $set: { 'standaloneCompletion.state': state } } : { $unset: { 'standaloneCompletion.state': '' } });
     throw error;
   }
   await teacherModeModels(db).TeacherWork.updateMany({ bookingId: lesson._id }, { $set: { published: false, summary: '', attended: 'unanswered', parentComment: '' } });

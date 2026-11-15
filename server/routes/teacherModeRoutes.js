@@ -1,3 +1,5 @@
+import { usedClassCounts } from '../utils/standaloneClassCounts.js';
+import { standaloneMailRecipients } from '../utils/standaloneMailRecipients.js';
 import express from 'express';
 import mongoose from 'mongoose';
 import crypto from 'node:crypto';
@@ -20,7 +22,7 @@ import { quizSchema } from '../schemas/quizSchema.js';
 import { quizAttemptSchema } from '../schemas/quizAttemptSchema.js';
 import { recordingSchema } from '../schemas/recordingSchema.js';
 import { recordingLinkSchema } from '../schemas/recordingLinkSchema.js';
-import { linkExpiry as recordingLinkExpiry } from '../utils/recordingLinks.js';
+import { expiryFromRecordings, linkExpiry as recordingLinkExpiry } from '../utils/recordingLinks.js';
 import { groupClassSchema } from '../schemas/groupClassSchema.js';
 import { classroomSessionSchema } from '../schemas/classroomSessionSchema.js';
 import { gameLinkSchema } from '../schemas/gameLinkSchema.js';
@@ -109,8 +111,8 @@ const getCenter = async (req, id, active = true) => {
   if (!c) throw fail('Managed center not found.');
   return c;
 };
-const sendLink = async (to, subject, description, url) => {
-  const sent = await sendEmail({ to, subject, html: `<p>${esc(description)}</p><p><a href="${esc(url)}">${esc(subject)}</a></p><p>If you did not expect this email, ignore it.</p>` });
+const sendLink = async (to, subject, description, url, centerName) => {
+  const sent = await sendEmail({ to, subject, centerName, html: `<p>${esc(description)}</p><p><a href="${esc(url)}">${esc(subject)}</a></p><p>If you did not expect this email, ignore it.</p>` });
   if (sent?.success === false) throw Object.assign(new Error('Email could not be sent. Please retry.'), { statusCode: 502 });
 };
 
@@ -429,7 +431,20 @@ publicFamily.post('/schedule/:id/absence', strictLimiter, handle(async (req, res
   const message = `${name} will be absent from ${title} on ${new Date(lesson.scheduledTime).toISOString()}.${reason ? ` Reason: ${reason}` : ''}${req.body.group ? ' The group class remains scheduled.' : ' The class was cancelled.'}`;
   await teacherModeModels(req.db).TeacherConversation.create({ studentId, sender: 'family', text: message });
   let emailSent = false;
-  try { const sent = await sendEmail({ to: req.teacherWorkspace.email, subject: 'Student absence notification', html: `<p>${esc(message)}</p>` }); emailSent = sent?.success === true && !sent.skipped; } catch { /* The in-app notice remains available. */ }
+  const logContext = { workspace: String(req.teacherWorkspace._id), lesson: String(lesson._id) };
+  try {
+    const center = await teacherModeModels(req.db).ManagedCenter.findById(lesson.managedCenterId).select('name notificationEmail').lean()
+      .catch(error => { logger.warn('Absence email center lookup failed', { ...logContext, error: error.message }); return null; });
+    const sent = await sendEmail({
+      kind: 'Student absence notification', to: standaloneMailRecipients(req.teacherWorkspace.email, center?.notificationEmail), centerName: center?.name,
+      subject: 'Student absence notification', text: message, html: `<p>${esc(message)}</p>`,
+    });
+    emailSent = sent?.success === true && !sent.skipped;
+    if (emailSent) logger.info('Absence email accepted', { ...logContext, messageId: sent.messageId });
+    else logger.warn('Absence email not sent', { ...logContext, reason: sent?.skipped ? 'Skipped recipient' : sent?.error });
+  } catch (error) {
+    logger.warn('Absence email failed after absence was saved', { ...logContext, error: error.message });
+  }
   result(res, { reported: true, emailSent });
 }));
 publicFamily.get('/', handle(async (req, res) => {
@@ -464,7 +479,14 @@ publicFamily.get('/', handle(async (req, res) => {
   }
   const owner = await model(db, 'Teacher', teacherSchema).findById(req.teacherWorkspace.ownerId).select('firstName lastName displayName').lean();
   const teacherName = owner?.displayName || `${owner?.firstName || ''} ${owner?.lastName || ''}`.trim() || req.teacherWorkspace.name;
-  result(res, { student: { firstName: s.firstName, lastName: s.lastName, managedCenterId: s.managedCenterId, classesRemaining: s.standaloneClassTracking || s.prepaidCredits ? Math.max(0, s.classCredits || 0) : null }, center: c?.name, teacher: teacherName, work: publicWork, activities, messages: await list(M.TeacherConversation.find({ studentId })) });
+  const manualFilter = { teacherId: req.teacherWorkspace.ownerId, status: 'completed', completedAt: { $gt: new Date(Date.now() - 48 * 60 * 60 * 1000) }, 'standaloneCompletion.manual': true, adminRejected: { $ne: true } };
+  const recent = await Promise.all([
+    Booking(req).find({ ...manualFilter, studentId }).select('classTitle scheduledTime completedAt').sort({ completedAt: -1 }).lean(),
+    Group(req).find({ ...manualFilter, 'enrollments.studentId': studentId }).select('title scheduledTime completedAt').sort({ completedAt: -1 }).lean(),
+  ]);
+  const manualCompletions = recent.flat().sort((a, b) => b.completedAt - a.completedAt);
+  const used = await usedClassCounts(req.db, [studentId]);
+  result(res, { manualCompletions, student: { classesUsed: used.get(String(studentId)) || 0, firstName: s.firstName, lastName: s.lastName, managedCenterId: s.managedCenterId, classesRemaining: s.standaloneClassTracking || s.prepaidCredits ? Math.max(0, s.classCredits || 0) : null }, center: c?.name, teacher: teacherName, work: publicWork, activities, messages: await list(M.TeacherConversation.find({ studentId })) });
 }));
 publicFamily.get('/work', handle(async (req, res) => {
   const page = Math.max(1, Math.min(parseInt(req.query.page, 10) || 1, 100000));
@@ -552,6 +574,8 @@ const centerFields = (body, current = {}) => {
   if (salaryDay > 31) throw fail('Salary day must be between 1 and 31.');
   const c = { name: text(body.name), currency: text(body.currency || 'USD', 3).toUpperCase(), payBasis: body.payBasis, rateMinor: integer(body.rateMinor), prepaid: body.prepaid === true, meetingUrl: safeUrl(body.meetingUrl), salaryDay };
   if (!['USD', 'EUR', 'GBP', 'VND', 'JPY', 'CAD', 'AUD', 'PHP'].includes(c.currency) || !['class', 'hour'].includes(c.payBasis)) throw fail('Invalid currency or pay basis.');
+  c.notificationEmail = body.notificationEmail === undefined ? current.notificationEmail || '' : body.notificationEmail === '' ? '' : email(body.notificationEmail);
+  if (c.notificationEmail && c.notificationEmail !== current.notificationEmail) c.weeklyReportStart = new Date();
   return c;
 };
 app.post('/managed-centers', handle(async (req, res) => result(res, await teacherModeModels(req.db).ManagedCenter.create(centerFields(req.body)))));
@@ -566,7 +590,8 @@ app.get('/managed-students', handle(async (req, res) => {
   if (req.query.centerId) filter.managedCenterId = (await getCenter(req, req.query.centerId, false))._id;
   const students = await Student(req).find(filter).select('firstName lastName managedCenterId classCredits standaloneClassTracking prepaidCredits active +notifyEmail').sort({ createdAt: -1, _id: -1 }).limit(1000).lean();
   const grants = await TeacherFamilyGrant.find({ workspaceId: req.teacherWorkspace._id, enabled: true, expiresAt: { $gt: new Date() } }).select('+tokenEnc').lean();
-  result(res, students.map(s => ({ ...s, parentLink: grants.find(g => String(g.studentId) === String(s._id))?.tokenEnc ? `${front()}/teacher-mode/family/${decrypt(grants.find(g => String(g.studentId) === String(s._id)).tokenEnc)}` : null })));
+  const used = await usedClassCounts(req.db, students.map(s => s._id));
+  result(res, students.map(s => ({ ...s, classesUsed: used.get(String(s._id)) || 0, parentLink: grants.find(g => String(g.studentId) === String(s._id))?.tokenEnc ? `${front()}/teacher-mode/family/${decrypt(grants.find(g => String(g.studentId) === String(s._id)).tokenEnc)}` : null })));
 }));
 app.post('/managed-students', handle(async (req, res) => {
   if (await Student(req).countDocuments() >= 1000) throw fail('This workspace has reached its 1,000 student allowance.');
@@ -587,7 +612,7 @@ app.patch('/managed-students/:id', handle(async (req, res) => {
   if (req.body.notifyEmail !== undefined) s.notifyEmail = req.body.notifyEmail ? email(req.body.notifyEmail) : '';
   if (req.body.active !== undefined) s.active = req.body.active === true;
   if (req.body.classCount !== undefined) { s.classCredits = integer(req.body.classCount); s.standaloneClassTracking = true; }
-  if (req.body.addCredits !== undefined) { s.classCredits += integer(req.body.addCredits, 1); s.active = true; }
+  if (req.body.addCredits !== undefined) { s.$inc('classCredits', integer(req.body.addCredits, 1)); s.standaloneClassTracking = true; s.active = true; }
   await s.save(); result(res, { saved: true });
 }));
 app.post('/managed-students/:id/parent-link', handle(async (req, res) => {
@@ -603,7 +628,8 @@ app.post('/managed-students/:id/email-link', strictLimiter, handle(async (req, r
   const s = await Student(req).findById(req.params.id).select('+notifyEmail');
   const g = await TeacherFamilyGrant.findOne({ workspaceId: req.teacherWorkspace._id, studentId: req.params.id, enabled: true, expiresAt: { $gt: new Date() } }).select('+tokenEnc');
   if (!s?.notifyEmail || !g) throw fail('Add a family email and create a parent link first.');
-  await sendLink(s.notifyEmail, 'Your child’s learning updates', `${req.teacherWorkspace.name} has shared a private learning page for ${s.firstName}. Confirm your child's name to open it.`, `${front()}/teacher-mode/family/${decrypt(g.tokenEnc)}`);
+  const center = await teacherModeModels(req.db).ManagedCenter.findById(s.managedCenterId).select('name').lean();
+  await sendLink(s.notifyEmail, 'Your child’s learning updates', `${center?.name || req.teacherWorkspace.name} has shared a private learning page for ${s.firstName}. Confirm your child's name to open it.`, `${front()}/teacher-mode/family/${decrypt(g.tokenEnc)}`, center?.name);
   result(res, { sent: true });
 }));
 
@@ -611,8 +637,44 @@ app.get('/work', handle(async (req, res) => {
   if (!req.user.teacherInspection) await sweepUnattendedStandaloneLessons(req.db);
   const filter = req.query.centerId ? { managedCenterId: (await getCenter(req, req.query.centerId, false))._id } : {};
   const books = [...await list(Booking(req).find(filter).populate('studentId', 'firstName lastName')), ...await list(Group(req).find(filter).populate('enrollments.studentId', 'firstName lastName'))];
-  const updates = await list(teacherModeModels(req.db).TeacherWork.find());
-  result(res, books.map(b => ({ ...b, ...(b.enrollments ? { isGroupClass: true, classTitle: b.title, studentId: { firstName: `${b.enrollments.length} students` } } : {}), update: updates.find(u => String(u.bookingId) === String(b._id)) })).sort((a, b) => +new Date(b.scheduledTime) - +new Date(a.scheduledTime)));
+  const ids = books.map(b => b._id);
+  const completedIds = books.filter(b => b.status === 'completed' && !b.adminRejected).map(b => b._id);
+  const updates = await teacherModeModels(req.db).TeacherWork.find({ bookingId: { $in: ids } }).lean();
+  const byLesson = new Map();
+  for (const update of updates) {
+    const key = String(update.bookingId);
+    if (!byLesson.has(key)) byLesson.set(key, []);
+    byLesson.get(key).push(update);
+  }
+  const scope = { teacherId: req.user.id, $or: [{ bookingId: { $in: completedIds } }, { groupClassId: { $in: completedIds } }] };
+  const now = new Date();
+  const [files, links] = completedIds.length ? await Promise.all([
+    model(req.db, 'Recording', recordingSchema).find(scope).select('bookingId groupClassId visibleToStudent autoDeleteAt source').lean(),
+    model(req.db, 'RecordingLink', recordingLinkSchema).find({ ...scope, enabled: true, purgeAt: { $gt: now }, 'shareLink.tokenEnc': { $exists: true, $ne: null } })
+      .select('bookingId groupClassId studentId createdAt').lean(),
+  ]) : [[], []];
+  const filesByLesson = new Map(), visible = new Set(), linkedFamilies = new Map();
+  for (const file of files) {
+    const key = String(file.bookingId || file.groupClassId);
+    if (!filesByLesson.has(key)) filesByLesson.set(key, []);
+    filesByLesson.get(key).push(file);
+    if (file.visibleToStudent && (!file.autoDeleteAt || file.autoDeleteAt > now)) visible.add(key);
+  }
+  for (const link of links) {
+    const key = String(link.bookingId || link.groupClassId);
+    if (!(expiryFromRecordings(filesByLesson.get(key) || [], link) > now)) continue;
+    if (!linkedFamilies.has(key)) linkedFamilies.set(key, new Set());
+    linkedFamilies.get(key).add(String(link.studentId));
+  }
+  function hasFamilyRecording(lesson) {
+    const key = String(lesson._id);
+    if (visible.has(key)) return true;
+    const students = lesson.enrollments ? lesson.enrollments.map(e => e.studentId) : [lesson.studentId];
+    return students.length > 0 && students.every(s => linkedFamilies.get(key)?.has(String(s?._id || s)));
+  }
+  result(res, books.map(b => ({ ...b, ...(b.enrollments ? { isGroupClass: true, classTitle: b.title, studentId: { firstName: `${b.enrollments.length} students` } } : {}), update: byLesson.get(String(b._id))?.[0],
+    needsSummary: b.status === 'completed' && !b.adminRejected && !(byLesson.get(String(b._id))?.length && byLesson.get(String(b._id)).every(u => u.published && u.summary?.trim())),
+    needsRecording: b.status === 'completed' && !b.adminRejected && !hasFamilyRecording(b) })).sort((a, b) => +new Date(b.scheduledTime) - +new Date(a.scheduledTime)));
 }));
 // Serialize scheduling within this workspace, including requests from other API
 // workers. Every class creation below holds this short-lived master-DB lease.
@@ -628,33 +690,76 @@ app.post('/work', handle(async (req, res) => {
   const c = await getCenter(req, req.body.centerId);
   const ids = req.body.group === true ? [...new Set(req.body.studentIds || [])] : [req.body.studentId];
   if (!ids.length || ids.length > 20 || ids.some(id => !oid(id)) || (req.body.group === true && ids.length < 2)) throw fail('Choose valid students (2–20 for a group).');
+  const rawDates = req.body.scheduledDates ?? [req.body.scheduledTime];
+  const duration = integer(req.body.duration, 15);
+  if (!Array.isArray(rawDates) || !rawDates.length || rawDates.length > 6 || duration > 180) throw fail('Choose 1 to 6 valid class dates and a valid duration.');
+  const dates = rawDates.map(value => new Date(value));
+  if (dates.some((date, i) => typeof rawDates[i] !== 'string' || !Number.isFinite(+date) || (i && date - dates[i - 1] < duration * 60000))) throw fail('Class dates must be in order and cannot overlap.');
+  if (dates.length > 1) {
+    let clock;
+    try {
+      clock = new Intl.DateTimeFormat('en-GB', { timeZone: req.body.recurrenceTimezone || 'UTC',
+        year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+    } catch { throw fail('Choose a valid time zone for weekly classes.'); }
+    // Compare calendar weeks in local time so daylight-saving changes preserve the class hour.
+    const localMinute = date => {
+      const parts = Object.fromEntries(clock.formatToParts(date).map(p => [p.type, p.value]));
+      return Date.UTC(parts.year, Number(parts.month) - 1, parts.day, parts.hour, parts.minute);
+    };
+    const first = localMinute(dates[0]);
+    if (dates.some((date, index) => localMinute(date) !== first + index * 7 * 86400000)) {
+      throw fail('Weekly classes must use the same weekday and local time each week.');
+    }
+  }
   const pupils = await Student(req).find({ _id: { $in: ids }, managedCenterId: c._id, active: true });
   if (pupils.length !== ids.length) throw fail('Choose active students from this center.');
   const s = pupils[0];
-  const date = new Date(req.body.scheduledTime), duration = integer(req.body.duration, 15);
-  if (isNaN(date) || duration > 180) throw fail('Choose a valid class date and duration.');
-  const end = new Date(+date + duration * 60000);
-  const clashFilter = { teacherId: req.user.id, status: { $in: ['accepted', 'pending', 'open', 'full', 'in-progress'] }, scheduledTime: { $lt: end, $gt: new Date(+date - 300 * 60000) } };
-  const clashes = [...await Booking(req).find(clashFilter).select('scheduledTime duration').lean(), ...await Group(req).find(clashFilter).select('scheduledTime duration').lean()];
-  if (clashes.some(b => +new Date(b.scheduledTime) + b.duration * 60000 > +date)) throw fail('This overlaps another class, possibly at a different center.');
-  const amountMinor = Math.round(c.rateMinor * (c.payBasis === 'hour' ? duration / 60 : 1));
-  if (req.body.group === true) {
-    let platform = 'agora';
-    if (c.meetingUrl) { const host = new URL(c.meetingUrl).hostname; if (host === 'meet.google.com') platform = 'googlemeet'; else if (/(^|\.)zoom\.(us|com)$/i.test(host)) platform = 'zoom'; }
-    const group = await Group(req).create({ teacherId: req.user.id, managedCenterId: c._id, title: text(req.body.title, 200), description: req.body.topic ? text(req.body.topic, 2000) : '', scheduledTime: date, duration, status: 'open', platform, meetingLink: platform === 'agora' ? '' : c.meetingUrl, enrollmentMode: 'invite-only', maxSeats: ids.length, paymentType: 'credits', enrollments: ids.map(studentId => ({ studentId, creditCharged: 0, pointsCharged: 0 })), standalonePay: { currency: c.currency, basis: c.payBasis, rateMinor: c.rateMinor, amountMinor, credits: c.prepaid } });
-    await teacherModeModels(req.db).TeacherWork.insertMany(ids.map(studentId => ({ centerId: c._id, studentId, bookingId: group._id, title: group.title })));
-    return result(res, group);
+  const active = { teacherId: req.user.id, status: { $in: ['accepted', 'pending', 'open', 'full', 'in-progress'] } };
+  const reservations = { ...active, managedCenterId: c._id, $or: [
+    { status: 'in-progress' },
+    { $expr: { $gt: [{ $add: ['$scheduledTime', { $multiply: ['$duration', 60000] }] }, new Date()] } }
+  ] };
+  const singles = await Booking(req).find({ ...reservations, studentId: { $in: ids } }).select('studentId').lean();
+  const groups = await Group(req).find({ ...reservations, 'enrollments.studentId': { $in: ids } }).select('enrollments.studentId enrollments.attendance').lean();
+  const reserved = new Map();
+  const reserve = id => reserved.set(String(id), (reserved.get(String(id)) || 0) + 1);
+  singles.forEach(row => reserve(row.studentId));
+  groups.forEach(row => row.enrollments.filter(e => e.attendance !== 'absent').forEach(e => reserve(e.studentId)));
+  for (const pupil of pupils) {
+    const available = Math.max(0, pupil.classCredits - (reserved.get(String(pupil._id)) || 0));
+    if (available < dates.length) throw fail(pupil.firstName + ' has ' + available + ' paid classes available to book. Update the balance or choose fewer classes.');
   }
-  const b = await Booking(req).create({ teacherId: req.user.id, studentId: s._id, managedCenterId: c._id, classTitle: text(req.body.title, 200), topic: req.body.topic ? text(req.body.topic, 200) : '', scheduledTime: date, duration, status: 'accepted', createdBy: 'teacher', standalonePay: { currency: c.currency, basis: c.payBasis, rateMinor: c.rateMinor, amountMinor, credits: c.prepaid } });
-  await teacherModeModels(req.db).TeacherWork.create({ centerId: c._id, studentId: s._id, bookingId: b._id, title: b.classTitle });
-  result(res, b);
+  const range = { ...active, scheduledTime: { $gt: new Date(+dates[0] - 300 * 60000), $lt: new Date(+dates.at(-1) + duration * 60000) } };
+  const clashes = [...await Booking(req).find(range).select('scheduledTime duration').lean(), ...await Group(req).find(range).select('scheduledTime duration').lean()];
+  if (dates.some(date => clashes.some(b => +b.scheduledTime < +date + duration * 60000 && +b.scheduledTime + b.duration * 60000 > +date))) throw fail('A selected date overlaps another class.');
+  const custom = req.body.classAmountMinor !== undefined;
+  const basis = custom ? 'class' : c.payBasis;
+  const rateMinor = custom ? integer(req.body.classAmountMinor) : c.rateMinor;
+  const amountMinor = Math.round(rateMinor * (basis === 'hour' ? duration / 60 : 1));
+  const standalonePay = { currency: c.currency, basis, rateMinor, amountMinor, credits: true };
+  const isGroup = req.body.group === true;
+  const Class = isGroup ? Group(req) : Booking(req);
+  const Work = teacherModeModels(req.db).TeacherWork;
+  let platform = 'agora';
+  if (c.meetingUrl) { const host = new URL(c.meetingUrl).hostname; if (host === 'meet.google.com') platform = 'googlemeet'; else if (/(^|\.)zoom\.(us|com)$/i.test(host)) platform = 'zoom'; }
+  const lessons = dates.map(date => ({ _id: new mongoose.Types.ObjectId(), ...(isGroup ? { teacherId: req.user.id, managedCenterId: c._id, title: text(req.body.title, 200), description: req.body.topic ? text(req.body.topic, 2000) : '', scheduledTime: date, duration, status: 'open', platform, meetingLink: platform === 'agora' ? '' : c.meetingUrl, enrollmentMode: 'invite-only', maxSeats: ids.length, paymentType: 'credits', enrollments: ids.map(studentId => ({ studentId, creditCharged: 0, pointsCharged: 0 })), standalonePay } : { teacherId: req.user.id, studentId: s._id, managedCenterId: c._id, classTitle: text(req.body.title, 200), topic: req.body.topic ? text(req.body.topic, 200) : '', scheduledTime: date, duration, status: 'accepted', createdBy: 'teacher', standalonePay }) }));
+  const bookingIds = lessons.map(l => l._id);
+  try {
+    const saved = await Class.insertMany(lessons);
+    await Work.insertMany(lessons.flatMap(l => ids.map(studentId => ({ centerId: c._id, studentId, bookingId: l._id, title: l.title || l.classTitle }))));
+    result(res, saved[0]);
+  } catch (error) {
+    await Work.deleteMany({ bookingId: { $in: bookingIds } });
+    await Class.deleteMany({ _id: { $in: bookingIds } });
+    throw error;
+  }
 }));
 app.patch('/work/:id', handle(async (req, res) => {
   if (!oid(req.params.id)) throw fail('Invalid class.');
   const b = await Booking(req).findOne({ _id: req.params.id, teacherId: req.user.id, managedCenterId: { $exists: true } }) || await Group(req).findOne({ _id: req.params.id, teacherId: req.user.id, managedCenterId: { $exists: true } });
   if (!b) throw fail('Class not found.');
   if (req.body.action === 'unmark') {
-    return result(res, await uncompleteStandaloneLesson(req.db, b, req.user.id, req.body.reason ? text(req.body.reason, 500) : undefined));
+    return result(res, await uncompleteStandaloneLesson(req.db, b, req.user.id, req.body.reason ? text(req.body.reason, 500) : undefined, req.teacherWorkspace.timezone));
   }
   if (req.body.action !== undefined) {
     if (!['cancel', 'missed', 'edit'].includes(req.body.action)) throw fail('Invalid lesson action.');
@@ -681,7 +786,7 @@ app.patch('/work/:id', handle(async (req, res) => {
   if ((req.body.summary !== undefined || req.body.published === true) && b.status !== 'completed' && req.body.complete !== true) throw fail('Summaries can only be written for completed classes.');
   if (req.body.summary !== undefined) update.summary = req.body.summary === '' ? '' : text(req.body.summary, 3000);
   if (req.body.published !== undefined) update.published = req.body.published === true;
-  if (req.body.complete === true) await completeStandaloneLesson(req.db, b, req.user.id, req.body.attendance);
+  if (req.body.complete === true) await completeStandaloneLesson(req.db, b, req.user.id, req.body.attendance, true);
   await teacherModeModels(req.db).TeacherWork.updateMany({ bookingId: b._id }, { $set: update });
   const work = await teacherModeModels(req.db).TeacherWork.findOne({ bookingId: b._id });
   if (req.body.summary !== undefined && (b.status === 'completed' || req.body.complete === true)) {
@@ -800,6 +905,9 @@ app.use('/games/ai', (req, res, next) => {
   }
   next();
 });
+// Standalone enrollment happens when the teacher books the group against each student's balance.
+app.post(['/group-classes', '/group-classes/:id/enroll'], (_req, res) =>
+  res.status(400).json({ success: false, message: 'Book group lessons from Classes and updates.' }));
 for (const [prefix, child] of Object.entries({ auth: authRoutes, homework: homeworkRoutes, quiz: quizRoutes, games: gameRoutes, 'games/ai': gameAiRoutes, vocab: vocabRoutes, recordings: recordingRoutes, 'recording-links': recordingLinkRoutes, classroom: classroomRoutes, content: contentRoutes, agora: agoraRoutes, 'teacher-assignments': teacherAssignmentRoutes, teachers: teacherRoutes, 'teacher-availability': teacherAvailabilityRoutes, 'class-summaries': classSummaryRoutes, 'group-classes': groupClassRoutes })) app.use(`/${prefix}`, child);
 router.use('/app', teacherWorkspaceAuth, app);
 router.use((error, _req, res, _next) => {

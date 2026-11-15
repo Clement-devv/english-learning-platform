@@ -41,3 +41,25 @@ it.each([false,true])('reverses only recorded credits once and supports marking 
   await completeStandaloneLesson(db,lesson,teacherId,group?[{studentId,status:'attended'},{studentId:absentId,status:'absent'}]:undefined);
   expect((await db.collection('students').findOne({_id:studentId})).classCredits).toBe(2);
 });
+
+it('reverses legacy earnings once within the center pay period without inventing a student refund', async () => {
+  const db = global.__TEST_DB__.useDb('legacy-pay-window', { useCache: true });
+  const Booking = model(db, 'Booking', bookingSchema);
+  const teacherId = oid(), studentId = oid(), managedCenterId = oid();
+  await db.collection('managedcenters').insertOne({ _id: managedCenterId, salaryDay: 15 });
+  await db.collection('students').insertOne({ _id: studentId, classCredits: 8 });
+  const now = new Date('2026-12-14T16:59:00Z');
+  const base = { teacherId, studentId, managedCenterId, classTitle: 'Legacy class', duration: 45, status: 'completed', standalonePay: { currency: 'VND', amountMinor: 60000 } };
+  const create = date => Booking.create({ ...base, completedAt: date, scheduledTime: date });
+  const reverse = (lesson, at = now) => uncompleteStandaloneLesson(db, lesson, teacherId, undefined, 'Asia/Ho_Chi_Minh', at);
+  const before = await create(new Date('2026-11-14T16:59:59Z'));
+  await expect(reverse(before)).rejects.toThrow('outside the current pay period');
+  const inside = await create(new Date('2026-11-14T17:00:00Z'));
+  await expect(reverse(inside, new Date('2026-12-14T17:00:00Z'))).rejects.toThrow('outside the current pay period');
+  const reversed = await reverse(inside);
+  await reverse(reversed);
+  expect(reversed.status).toBe('missed');
+  const earnings = await Booking.aggregate([{ $match: { teacherId, status: 'completed' } }, { $group: { _id: null, total: { $sum: '$standalonePay.amountMinor' } } }]);
+  expect(earnings[0].total).toBe(60000);
+  expect((await db.collection('students').findOne({ _id: studentId })).classCredits).toBe(8);
+});

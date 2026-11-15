@@ -15,7 +15,7 @@ const enrollmentSchema = new mongoose.Schema({
 export const groupClassSchema = new mongoose.Schema({
   teacherId:     { type: mongoose.Schema.Types.ObjectId, ref: 'Teacher', required: true },
   managedCenterId: { type: mongoose.Schema.Types.ObjectId, index: true },
-  standaloneCompletion: { state: String, chargedStudentIds: [mongoose.Schema.Types.ObjectId] },
+  standaloneCompletion: { manual: Boolean, state: String, chargedStudentIds: [mongoose.Schema.Types.ObjectId] },
   standalonePay: { currency: String, basis: String, rateMinor: Number, amountMinor: Number, credits: Boolean },
   title:         { type: String, required: true, maxlength: 200 },
   description:   { type: String, default: '', maxlength: 2000 },

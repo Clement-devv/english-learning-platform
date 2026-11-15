@@ -7,7 +7,7 @@ import StudentClassBalance from './StudentClassBalance';
 import { currencyFactor, studioMoney } from './studioFormatting';
 import { CenterHint, PanelHeading, StudioEmpty, StudioIntro, StudioSearch } from './StudioUI';
 
-const blankCenter = { name: '', currency: 'USD', payBasis: 'class', salaryDay: 31, rate: '', prepaid: false, meetingUrl: '' };
+const blankCenter = { name: '', notificationEmail: '', currency: 'USD', payBasis: 'class', salaryDay: 31, rate: '', prepaid: false, meetingUrl: '' };
 
 export function ManagedStudentForm({ centers, centerId = '', fixedCenter = false, busy, run, onDone }) {
   const [selected, setSelected] = useState(centerId), [form, setForm] = useState({ name: '', notifyEmail: '', classCount: '' });
@@ -21,7 +21,7 @@ export function ManagedStudentForm({ centers, centerId = '', fixedCenter = false
     {fixedCenter ? <CenterHint center={center} /> : <label>Student’s managed center<select required value={selected} onChange={e => setSelected(e.target.value)}><option value="">{studioText("Choose a center")}</option>{centers.filter(c => !c.archived).map(c => <option key={c._id} value={c._id}>{c.name}</option>)}</select></label>}
     <label>{studioText("Student name")}<input required placeholder="Student’s first and last name" maxLength={120} value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} /></label>
     <label>{studioText("Parent email (optional)")}<input type="email" placeholder="family@example.com" value={form.notifyEmail} onChange={e => setForm({ ...form, notifyEmail: e.target.value })} /></label>
-    <label>{studioText("Number of classes (optional)")}<input type="number" min="0" step="1" max="1000000000" value={form.classCount} onChange={e => setForm({ ...form, classCount: e.target.value })} /><small>Leave blank if you don’t want to track a balance yet.</small></label>
+    <label>{studioText("Number of classes (optional)")}<input type="number" min="0" step="1" max="1000000000" value={form.classCount} onChange={e => setForm({ ...form, classCount: e.target.value })} /><small>Add paid classes here or update the balance before booking.</small></label>
     <div className="tm-form-footer"><button className="tm-primary" disabled={busy || !center || center.archived}>{busy ? 'Adding…' : 'Add student'}<Plus size={14} /></button>{onDone && <button type="button" onClick={onDone}>{studioText("Cancel")}</button>}</div>
     <p className="tm-form-note"><ShieldCheck size={13} />The student belongs to this center and does not need a login.</p>
   </form>;
@@ -33,7 +33,7 @@ function CenterRecord({ center: c, students, index, centers, busy, run, onEdit, 
   return <article className={`tm-card tm-center-record ${c.archived ? 'is-archived' : ''}`}>
     <div className="tm-row"><span className={`tm-center-monogram tone-${index % 3}`}><Building2 size={23} strokeWidth={1.3} /></span><span className={`tm-status-label ${c.archived ? '' : 'is-active'}`}><span />{c.archived ? 'Archived' : 'Active center'}</span></div>
     <h3>{c.name}</h3><div className="tm-center-rate"><strong>{studioMoney(c.rateMinor, c.currency)}</strong><span> / {c.payBasis === 'hour' ? 'hour' : 'class'}</span></div>
-    <div className="tm-center-facts"><span><Users size={14} />{roster.length} {roster.length === 1 ? 'student' : 'students'}</span><span><Wallet size={14} />{c.prepaid ? 'Prepaid credits' : 'No credits required'}</span><span><CalendarDays size={14} />Salary day {c.salaryDay || 31}</span></div>
+    <div className="tm-center-facts"><span><Users size={14} />{roster.length} {roster.length === 1 ? 'student' : 'students'}</span><span><Wallet size={14} />Paid classes required</span><span><CalendarDays size={14} />Salary day {c.salaryDay || 31}</span></div>
     <section className="tm-center-roster" aria-label={`Students at ${c.name}`}><div className="tm-row"><span className="tm-eyebrow">STUDENTS IN THIS CENTER</span>{roster.length > 0 && <button className="tm-text-button" onClick={() => onViewStudents(c._id)}>View all<ArrowUpRight size={12} /></button>}</div>{roster.length ? <div className="tm-roster-chips">{roster.slice(0, 6).map(s => <span key={s._id}>{s.firstName}{!s.active && <small> · archived</small>}</span>)}{roster.length > 6 && <span>+{roster.length - 6} more</span>}</div> : <p>No students yet. Create the first student below.</p>}</section>
     {!c.archived && <button className="tm-center-create-student" aria-label={`${creating ? 'Close student form for' : 'Create student in'} ${c.name}`} aria-expanded={creating} onClick={() => setCreating(!creating)}><Plus size={15} />{creating ? 'Close student form' : 'Create student'}</button>}
     {creating && !c.archived && <ManagedStudentForm centers={centers} centerId={c._id} fixedCenter busy={busy} run={run} onDone={() => setCreating(false)} />}
@@ -49,12 +49,12 @@ export function CentersSection({ centers, students, busy, run, onViewStudents })
     <div className={`tm-center-page-layout ${editing ? 'with-editor' : ''}`}>
       {editing && <form id="studio-center-editor" className="tm-card tm-editor-panel" onSubmit={e => { e.preventDefault(); run(async () => { const payload = { ...form, rateMinor: Math.round(Number(form.rate) * currencyFactor(form.currency)) }; await (form._id ? api.put(`/managed-centers/${form._id}`, payload) : api.post('/managed-centers', payload)); setForm(blankCenter); setEditing(false); }); }}>
         <PanelHeading icon={form._id ? Pencil : Plus} eyebrow="CENTER DETAILS" title={form._id ? 'Edit managed center' : 'Add a managed center'} />
+        <label>Center email (optional)<input type="email" maxLength={254} value={form.notificationEmail || ''} onChange={e => setForm({ ...form, notificationEmail: e.target.value })} /><small>Receives this teacher’s daily report for this center and family absence notifications.</small></label>
         <label>Center or client name<input required placeholder="e.g. Sunrise English" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} /></label>
         <div className="tm-field-pair"><label>{studioText("Currency")}<select value={form.currency} onChange={e => setForm({ ...form, currency: e.target.value })}>{['USD', 'EUR', 'GBP', 'VND', 'JPY', 'CAD', 'AUD', 'PHP'].map(c => <option key={c}>{c}</option>)}</select></label><label>{studioText("Your rate")}<input required type="number" min="0" step="any" value={form.rate} onChange={e => setForm({ ...form, rate: e.target.value })} /></label></div>
         <label>{studioText("Pay basis")}<select value={form.payBasis} onChange={e => setForm({ ...form, payBasis: e.target.value })}><option value="class">{studioText("Per class")}</option><option value="hour">{studioText("Per hour")}</option></select></label>
         <label>{studioText("Salary payment day")}<select value={form.salaryDay || 31} onChange={e => setForm({ ...form, salaryDay: Number(e.target.value) })}>{Array.from({ length: 31 }, (_, i) => i + 1).map(day => <option key={day} value={day}>{day === 31 ? "31st (or last day of shorter months)" : `Day ${day}`}</option>)}</select><small>Pay periods run from the day after the previous payment date through this day. Days 29–31 use the last day in shorter months.</small></label>
         <label>Meeting link (optional)<input type="url" value={form.meetingUrl} onChange={e => setForm({ ...form, meetingUrl: e.target.value })} placeholder="https://meet.google.com/…" /></label>
-        <label className="tm-policy-check"><input type="checkbox" checked={form.prepaid} onChange={e => setForm({ ...form, prepaid: e.target.checked })} /><span>Require student class credits<small>Off by default. Turn on for a prepaid center.</small></span></label>
         <div className="tm-form-footer"><button className="tm-primary" disabled={busy}>{busy ? 'Saving…' : 'Save center'}<ArrowUpRight size={15} /></button><button type="button" onClick={() => setEditing(false)}>{studioText("Cancel")}</button></div>
       </form>}
       <section className="tm-records-panel"><div className="tm-list-toolbar"><h3>Your centers <span>{centers.length}</span></h3><StudioSearch value={search} onChange={setSearch} label="Search centers" placeholder="Find a center…" /></div>
