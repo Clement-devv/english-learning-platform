@@ -1,3 +1,7 @@
+import { sendEmail } from '../emails/core.js';
+import { renderEmail, details, esc } from '../emails/layout.js';
+import { safeTimeZone } from '../utils/dailyClassReport.js';
+import logger from '../utils/logger.js';
 import { bookingSchema } from '../schemas/bookingSchema.js';
 import { groupClassSchema } from '../schemas/groupClassSchema.js';
 import { studentSchema } from '../schemas/studentSchema.js';
@@ -43,7 +47,39 @@ export async function completeStandaloneLesson(db, lesson, teacherId, attendance
   await model(db, 'Teacher', teacherSchema).updateOne({ _id: teacherId }, { $inc: { lessonsCompleted: 1 } });
   if (!group) await model(db, 'ClassroomSession', classroomSessionSchema).updateOne({ bookingId: lesson._id }, { $set: { status: 'completed', classEndedAt: now } });
   await Class.updateOne({ _id: lesson._id, 'standaloneCompletion.state': 'applying' }, { $set: { standaloneCompletion: { state: 'applied', manual, chargedStudentIds: charged } } });
+  if (manual) {
+    try {
+      await emailManualCompletion(db, claimed, teacherId);
+    } catch (error) {
+      logger.warn('Manual completion email failed', { lesson: String(claimed._id), error: error.message });
+    }
+  }
   return claimed;
+}
+
+async function emailManualCompletion(db, lesson, teacherId) {
+  const center = await teacherModeModels(db).ManagedCenter.findById(lesson.managedCenterId).select('name notificationEmail').lean();
+  if (!center?.notificationEmail) return;
+  const teacher = await db.models.Teacher.findById(teacherId).select('firstName lastName timezone').lean();
+  const ids = lesson.enrollments ? lesson.enrollments.map(e => e.studentId) : [lesson.studentId];
+  const students = await db.models.Student.find({ _id: { $in: ids }, managedCenterId: center._id }).select('firstName lastName').lean();
+  const fullName = person => [person?.firstName, person?.lastName].filter(Boolean).join(' ');
+  const zone = safeTimeZone(teacher?.timezone || 'UTC');
+  const clock = new Intl.DateTimeFormat('en-GB', { timeZone: zone, dateStyle: 'medium', timeStyle: 'short' });
+  const title = lesson.classTitle || lesson.title || 'Class';
+  const rows = [
+    ['Class', title], ['Teacher', fullName(teacher) || 'Teacher'],
+    ['Students', students.map(fullName).join(', ') || 'Name unavailable'],
+    ['Scheduled', clock.format(lesson.scheduledTime)], ['Marked taught', clock.format(lesson.completedAt)], ['Time zone', zone],
+  ];
+  const subject = 'Class manually marked as taught';
+  const sent = await sendEmail({
+    to: center.notificationEmail, centerName: center.name, subject,
+    text: [subject, ...rows.map(([label, value]) => label + ': ' + value)].join('\n'),
+    html: renderEmail({ centerName: center.name, title: subject, preheader: fullName(teacher) + ' marked ' + title + ' as taught.',
+      body: details(rows.map(([label, value]) => [label, esc(value)])) }),
+  });
+  if (!sent?.success || sent.skipped) throw new Error(sent?.error || 'Email was not sent');
 }
 
 // Identify the most recent local payday, clamping the 29th–31st in short months.

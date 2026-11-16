@@ -150,7 +150,7 @@ describe('private parent learning pages', () => {
     expect(r.status).toBe(200)
     familyUrl = root + '/family/' + r.body.data.url.split('/').at(-1)
     expect((await request(app).get(familyUrl)).status).toBe(403)
-    expect((await request(app).get(familyUrl + '/preview')).body.data).toEqual({ studentName: 'Linh' })
+    expect((await request(app).get(familyUrl + '/preview')).body.data).toEqual({ studentName: 'Linh', center: 'Sunrise' })
     const unlock = await request(app).post(familyUrl + '/unlock').send({})
     expect(unlock.status).toBe(200); access = unlock.body.data.access
     const view = await request(app).get(familyUrl).set('x-share-access', access)
@@ -610,6 +610,10 @@ describe('private parent learning pages', () => {
     const lesson = await call(teacher, 'post', '/work').send({ centerId: c._id, studentId: pupil, title: 'Counted lesson', duration: 30, scheduledTime: new Date(Date.now() + 100 * 86400000).toISOString() })
     expect((await call(teacher, 'patch', `/work/${lesson.body.data._id}`).send({ complete: true })).status).toBe(200)
     expect((await call(teacher, 'patch', `/work/${lesson.body.data._id}`).send({ complete: true })).status).toBe(200)
+    const notices = sent.filter(mail => mail.subject === 'Class manually marked as taught' && mail.to === 'office@example.test');
+    expect(notices).toHaveLength(1)
+    expect(notices[0].text).toContain('Class: Counted lesson')
+    expect(notices[0].html).toContain('Balance pupil')
     const page = await request(app).get(family).set('x-share-access', token)
     expect(page.body.data.student).toMatchObject({ classesRemaining: 3, classesUsed: 1 })
     expect(page.body.data.manualCompletions).toMatchObject([{ classTitle: 'Counted lesson', completedAt: expect.any(String), scheduledTime: expect.any(String) }])
@@ -620,6 +624,7 @@ describe('private parent learning pages', () => {
     expect((await request(app).post(`${family}/schedule/${group.body.data._id}/absence`).set('x-share-access', token).send({ group: true })).status).toBe(200)
     expect(sent.at(-1)).toMatchObject({ to: ['solo1@test.com', 'office@example.test'], centerName: c.name, subject: 'Student absence notification', text: expect.stringContaining('Counted group') })
     expect((await call(teacher, 'patch', `/work/${group.body.data._id}`).send({ complete: true })).status).toBe(200)
+    expect(sent.at(-1)).toMatchObject({ to: 'office@example.test', subject: 'Class manually marked as taught', text: expect.stringContaining('Counted group') })
     const pupils = (await call(teacher, 'get', `/managed-students?centerId=${c._id}`)).body.data
     expect(pupils.find(s => s._id === pupil).classCredits).toBe(8)
     expect(pupils.find(s => s._id === otherPupil).classCredits).toBe(2)

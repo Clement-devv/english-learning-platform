@@ -22,3 +22,17 @@ it('keeps the video closed until the parent chooses to watch', () => {
   fireEvent.click(screen.getByRole('button', { name: 'Close recording' }));
   expect(container.querySelector('video')).toBeNull();
 });
+it('seeks across the full class and tracks playback within the selected part', () => {
+  const recordings = [1, 2].map(id => ({ id, sessionId: 'class', partNumber: id, local: true, duration: 60 }));
+  const { container } = render(<FamilyVideoPlayer recordings={recordings} base="/family" access="token" />);
+  const slider = screen.getByRole('slider');
+  expect(slider.max).toBe('120');
+  fireEvent.change(slider, { target: { value: '75' } });
+  const video = container.querySelector('video');
+  expect(video.src).toContain('/recordings/2');
+  fireEvent.loadedMetadata(video);
+  expect(video.currentTime).toBe(15);
+  video.currentTime = 20;
+  fireEvent.timeUpdate(video);
+  expect(slider.value).toBe('80');
+});

@@ -331,9 +331,10 @@ const familyAccess = async (req, res, next) => {
   } catch { res.status(403).json({ success: false, message: 'Please open the learning page again.' }); }
 };
 publicFamily.get('/preview', handle(async (req, res) => {
-  const student = await Student(req).findById(req.familyGrant.studentId).select('firstName lastName').lean();
+  const student = await Student(req).findById(req.familyGrant.studentId).select('firstName lastName managedCenterId').lean();
   if (!student) throw fail('Student not found.');
-  result(res, { studentName: [student.firstName, student.lastName].filter(Boolean).join(' ') });
+  const center = await teacherModeModels(req.db).ManagedCenter.findById(student.managedCenterId).select('name').lean();
+  result(res, { center: center?.name, studentName: [student.firstName, student.lastName].filter(Boolean).join(' ') });
 }));
 publicFamily.post('/unlock', loginLimiter, handle(async (req, res) => {
   const s = await Student(req).findById(req.familyGrant.studentId).select('firstName lastName');
